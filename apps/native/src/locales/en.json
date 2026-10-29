@@ -964,5 +964,18 @@
   "tripPlanner.searchUnavailable": "Search isn't available right now. You can still add places you saved.",
   "tripPlanner.noSavesLeft": "Every place you saved here is already on this trip.",
   "tripPlanner.addFailed": "Couldn't add that place. Try again.",
-  "tripPlanner.onTrip": "On this trip"
+  "tripPlanner.onTrip": "On this trip",
+  "placeCorrection.title": "Edit places",
+  "placeCorrection.hint": "Correct a match or add a missed place. Existing trips stay unchanged.",
+  "placeCorrection.replace": "Replace place",
+  "placeCorrection.remove": "Remove",
+  "placeCorrection.city": "City",
+  "placeCorrection.search": "Search places",
+  "placeCorrection.save": "Save places",
+  "placeCorrection.retry": "Reopen this save to load the latest places, then try again.",
+  "placeCorrection.wait": "Wait for this save to finish processing.",
+  "tripShare.title": "Share trip",
+  "tripShare.hint": "Anyone with the link can view your days, dates and stops, including later edits. Your accommodation and source saves stay private.",
+  "tripShare.stop": "Stop sharing",
+  "tripShare.stopHint": "This link will stop working for everyone who has it."
 }

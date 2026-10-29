@@ -964,5 +964,18 @@
   "tripPlanner.searchUnavailable": "Die Suche ist gerade nicht verfügbar. Gespeicherte Orte kannst du trotzdem hinzufügen.",
   "tripPlanner.noSavesLeft": "Alle Orte, die du hier gespeichert hast, sind schon auf dieser Reise.",
   "tripPlanner.addFailed": "Der Ort konnte nicht hinzugefügt werden. Versuch es noch einmal.",
-  "tripPlanner.onTrip": "Auf dieser Reise"
+  "tripPlanner.onTrip": "Auf dieser Reise",
+  "placeCorrection.title": "Orte bearbeiten",
+  "placeCorrection.hint": "Korrigiere einen Treffer oder ergänze einen fehlenden Ort. Bestehende Reisen bleiben unverändert.",
+  "placeCorrection.replace": "Ort ersetzen",
+  "placeCorrection.remove": "Entfernen",
+  "placeCorrection.city": "Stadt",
+  "placeCorrection.search": "Orte suchen",
+  "placeCorrection.save": "Orte speichern",
+  "placeCorrection.retry": "Öffne diesen Eintrag erneut, um die aktuellen Orte zu laden, und versuche es noch einmal.",
+  "placeCorrection.wait": "Warte, bis dieser Eintrag verarbeitet wurde.",
+  "tripShare.title": "Reise teilen",
+  "tripShare.hint": "Alle mit dem Link können deine Tage, Daten und Stopps sehen, auch spätere Änderungen. Unterkunft und gespeicherte Quellen bleiben privat.",
+  "tripShare.stop": "Teilen beenden",
+  "tripShare.stopHint": "Dieser Link funktioniert dann für niemanden mehr."
 }

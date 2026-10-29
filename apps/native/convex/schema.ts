@@ -108,6 +108,7 @@ export default defineSchema({
     latitude: v.optional(v.number()),
     longitude: v.optional(v.number()),
     placePins: v.optional(placePinsValidator),
+    placesEdited: v.optional(v.boolean()),
     isSticker: v.optional(v.boolean()),
     tags: v.array(v.string()),
     content: v.optional(v.string()),
@@ -356,6 +357,7 @@ export default defineSchema({
 
   tripPlans: defineTable({
     userId: v.string(),
+    shareToken: v.optional(v.string()),
     name: v.optional(v.string()),
     city: v.string(),
     startDate: v.optional(v.string()),
@@ -365,7 +367,9 @@ export default defineSchema({
     stay: v.optional(tripStayValidator),
     stopCount: v.number(),
     savedCount: v.number(),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    .index("by_share_token", ["shareToken"]),
 
   tripStops: defineTable({
     tripId: v.id("tripPlans"),

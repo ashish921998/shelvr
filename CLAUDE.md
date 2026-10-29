@@ -336,6 +336,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   the save's tags; "date night" always comes from the tags.
 - **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark. Planning
   and trip swaps check these records inside Shelvr; they are not sent to an AI provider.
+- **`placeCorrections.ts`**, **`placeCorrectionSearch.ts`**: owner-only place editing and Apple Maps lookup. `items.placesEdited` preserves the chosen places across extraction retries and pin refreshes. Corrections update city grouping and search; existing trip stops remain unchanged.
+- **`tripShares.ts`**: revocable view-only trip links. `tripPlans.shareToken` is indexed by token; `/trip/shares/` returns days, dates and stop names/coordinates only while the owner and trip exist. The web page is `/t/[token]`; stays, source saves and account details are private.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
   link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and
   `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the
@@ -521,6 +523,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   `src/lib/trip-edit.ts`) lays stops out in fixed-height rows: hold one to drag it within a
   day or onto another, minus sends it to Unplanned, plus puts an unplanned one on a day, the
   name is editable, and an Undo bar takes back the last move or remove
+- `edit-save-places` edits the places on a ready save, with remove/replace/add and explicit Save.
 - `add-trip-stop` is Add a place, a modal with `tripId` and `day` params: Apple Maps search
   near the trip plus the city's saved places not on it yet
   The old `trip/[id]` screen is gone and its links open Home; `trips.ts` and `tripData.ts`

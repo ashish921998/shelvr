@@ -988,5 +988,18 @@
   "tripPlanner.searchUnavailable": "La búsqueda no está disponible ahora. Aún puedes añadir sitios que guardaste.",
   "tripPlanner.noSavesLeft": "Todos los sitios que guardaste aquí ya están en este viaje.",
   "tripPlanner.addFailed": "No se ha podido añadir el sitio. Inténtalo de nuevo.",
-  "tripPlanner.onTrip": "En este viaje"
+  "tripPlanner.onTrip": "En este viaje",
+  "placeCorrection.title": "Editar lugares",
+  "placeCorrection.hint": "Corrige una coincidencia o añade un lugar que falta. Los viajes existentes no cambian.",
+  "placeCorrection.replace": "Reemplazar lugar",
+  "placeCorrection.remove": "Eliminar",
+  "placeCorrection.city": "Ciudad",
+  "placeCorrection.search": "Buscar lugares",
+  "placeCorrection.save": "Guardar lugares",
+  "placeCorrection.retry": "Vuelve a abrir este guardado para cargar los lugares actuales e inténtalo de nuevo.",
+  "placeCorrection.wait": "Espera a que termine de procesarse este guardado.",
+  "tripShare.title": "Compartir viaje",
+  "tripShare.hint": "Cualquiera con el enlace puede ver tus días, fechas y paradas, incluidos cambios posteriores. Tu alojamiento y fuentes guardadas siguen siendo privados.",
+  "tripShare.stop": "Dejar de compartir",
+  "tripShare.stopHint": "Este enlace dejará de funcionar para todos."
 }

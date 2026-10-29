@@ -487,6 +487,25 @@ http.route({
 });
 
 http.route({
+  pathPrefix: "/trip/shares/",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const token = new URL(req.url).pathname.split("/").pop() ?? "";
+    const trip = await ctx.runQuery(internal.tripShares.getPublicTrip, {
+      token,
+    });
+    return new Response(JSON.stringify(trip ?? { message: "Not found." }), {
+      status: trip ? 200 : 404,
+      headers: {
+        "content-type": "application/json",
+        "cache-control": "no-store",
+        "x-robots-tag": "noindex, nofollow",
+      },
+    });
+  }),
+});
+
+http.route({
   pathPrefix: "/plan/shares/",
   method: "GET",
   handler: httpAction(async (ctx, req) => {

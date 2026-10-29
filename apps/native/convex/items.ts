@@ -223,8 +223,10 @@ function stripEmbedding(
   | "places"
   | "placesHeard"
   | "placeLocations"
+  | "placesEdited"
 > {
   const {
+    placesEdited: _placesEdited,
     places: _places,
     placesHeard: _placesHeard,
     placeLocations: _placeLocations,
@@ -2232,6 +2234,7 @@ export const pinListPlaces = internalMutation({
     if (
       item === null ||
       !ownsRun(item, args.runId) ||
+      item.placesEdited ||
       (await liveOwner(ctx, item.userId)) === null ||
       !(await aiAllowed(ctx, item.userId))
     ) {

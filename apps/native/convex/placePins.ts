@@ -143,7 +143,8 @@ export const toLocate = internalQuery({
   ),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
-    if (item === null || item.status !== "ready") return null;
+    if (item === null || item.placesEdited || item.status !== "ready")
+      return null;
     if (!(await aiAllowed(ctx, item.userId))) return null;
     const pinned = new Set(
       (item.placePins ?? []).map((p) =>
@@ -201,7 +202,12 @@ export const storePins = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
-    if (item === null || !(await aiAllowed(ctx, item.userId))) return null;
+    if (
+      item === null ||
+      item.placesEdited ||
+      !(await aiAllowed(ctx, item.userId))
+    )
+      return null;
     const wanted = await wantedPlaces(ctx, item);
     const next = new Map<string, Pin>();
     for (const pin of [...(item.placePins ?? []), ...args.found]) {

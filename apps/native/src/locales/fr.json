@@ -988,5 +988,18 @@
   "tripPlanner.searchUnavailable": "La recherche n'est pas disponible pour le moment. Vous pouvez toujours ajouter des lieux enregistrés.",
   "tripPlanner.noSavesLeft": "Tous les lieux enregistrés ici sont déjà dans ce voyage.",
   "tripPlanner.addFailed": "Impossible d'ajouter ce lieu. Réessayez.",
-  "tripPlanner.onTrip": "Dans ce voyage"
+  "tripPlanner.onTrip": "Dans ce voyage",
+  "placeCorrection.title": "Modifier les lieux",
+  "placeCorrection.hint": "Corrigez un résultat ou ajoutez un lieu manquant. Les voyages existants restent inchangés.",
+  "placeCorrection.replace": "Remplacer le lieu",
+  "placeCorrection.remove": "Supprimer",
+  "placeCorrection.city": "Ville",
+  "placeCorrection.search": "Rechercher des lieux",
+  "placeCorrection.save": "Enregistrer les lieux",
+  "placeCorrection.retry": "Rouvrez cet élément pour charger les lieux actuels, puis réessayez.",
+  "placeCorrection.wait": "Attendez la fin du traitement de cet élément.",
+  "tripShare.title": "Partager le voyage",
+  "tripShare.hint": "Toute personne ayant le lien peut voir vos jours, dates et étapes, y compris les modifications ultérieures. Votre hébergement et vos sources restent privés.",
+  "tripShare.stop": "Arrêter le partage",
+  "tripShare.stopHint": "Ce lien ne fonctionnera plus pour personne."
 }

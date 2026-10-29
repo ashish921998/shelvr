@@ -158,6 +158,10 @@ export default function AppLayout() {
             }}
           />
           <Stack.Screen
+            name="edit-save-places"
+            options={{ headerShown: true, headerTransparent: false }}
+          />
+          <Stack.Screen
             name="add-trip-stop"
             options={{
               presentation: "modal",

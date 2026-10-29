@@ -894,6 +894,19 @@ export type MessageParams = {
   "tripPlanner.noSavesLeft": undefined;
   "tripPlanner.addFailed": undefined;
   "tripPlanner.onTrip": undefined;
+  "placeCorrection.title": undefined;
+  "placeCorrection.hint": undefined;
+  "placeCorrection.replace": undefined;
+  "placeCorrection.remove": undefined;
+  "placeCorrection.city": undefined;
+  "placeCorrection.search": undefined;
+  "placeCorrection.save": undefined;
+  "placeCorrection.retry": undefined;
+  "placeCorrection.wait": undefined;
+  "tripShare.title": undefined;
+  "tripShare.hint": undefined;
+  "tripShare.stop": undefined;
+  "tripShare.stopHint": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

@@ -940,5 +940,18 @@
   "tripPlanner.searchUnavailable": "現在検索を利用できません。保存した場所は追加できます。",
   "tripPlanner.noSavesLeft": "ここで保存した場所はすべてこの旅行に入っています。",
   "tripPlanner.addFailed": "場所を追加できませんでした。もう一度お試しください。",
-  "tripPlanner.onTrip": "この旅行に追加済み"
+  "tripPlanner.onTrip": "この旅行に追加済み",
+  "placeCorrection.title": "場所を編集",
+  "placeCorrection.hint": "誤った場所を修正したり、見つからなかった場所を追加できます。既存の旅行は変更されません。",
+  "placeCorrection.replace": "場所を変更",
+  "placeCorrection.remove": "削除",
+  "placeCorrection.city": "都市",
+  "placeCorrection.search": "場所を検索",
+  "placeCorrection.save": "場所を保存",
+  "placeCorrection.retry": "この保存を開き直して最新の場所を読み込み、もう一度お試しください。",
+  "placeCorrection.wait": "この保存の処理が完了するまでお待ちください。",
+  "tripShare.title": "旅行を共有",
+  "tripShare.hint": "リンクを持つ人は、日程、日付、立ち寄り先と今後の変更を閲覧できます。宿泊先と保存元は公開されません。",
+  "tripShare.stop": "共有を停止",
+  "tripShare.stopHint": "このリンクは誰も開けなくなります。"
 }
