@@ -27,6 +27,7 @@ const CATEGORY_EMOJI: Record<string, string> = {
   Aquarium: "🐠",
   Planetarium: "🔭",
   Spa: "💆",
+  FitnessCenter: "🏋️",
   AmusementPark: "🎢",
   Bowling: "🎳",
   GoKart: "🏎️",
