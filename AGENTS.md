@@ -96,6 +96,14 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Running on a simulator:** `docs/architecture/local-qa.md` covers worktree
   setup, the dev client link, sign-in, fixtures, and forcing onboarding or the
   paywall.
+  For local development and agent testing, use the `E2E_DEVICE` in the
+  gitignored `tools/e2e/.env.local` when present, including when passing
+  `--device` to an Expo build. Final QA uses its `E2E_QA_DEVICE` explicitly;
+  keep that simulator stock and never apply SimSlim to it. An explicit user
+  device request takes precedence. If the configured development device is
+  missing, report it rather than falling back to the final-QA device.
+  New worktrees copy that local file from the main checkout before choosing
+  a development device.
 - **Proving a change on the simulator:** `.agents/skills/verify-shelvr`
   drives the `tools/e2e` suite and maps the core features it covers to their tests.
 - **Proving account deletion:** `.agents/skills/account-deletion` runs

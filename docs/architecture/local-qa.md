@@ -7,6 +7,34 @@ machine stay out of this file.
 Each "seen" date is when the behaviour was last observed. Re-check an old one
 before relying on it.
 
+## Local simulator defaults
+
+Machine-specific device choices live in the gitignored
+`tools/e2e/.env.local`:
+
+```dotenv
+E2E_DEVICE=<development-simulator-udid>
+E2E_QA_DEVICE=<stock-final-qa-simulator-udid>
+```
+
+The E2E config loads this file outside CI, preserving an explicit
+`E2E_DEVICE` environment override. Agents use the development device for
+routine development, builds and testing; pass its id explicitly with
+`expo run:ios --device <udid>`. For final QA, pass the stock device explicitly:
+`E2E_DEVICE=<E2E_QA_DEVICE value> pnpm exec e2e run ...` from `tools/e2e`.
+The runner does not automatically expand `E2E_QA_DEVICE` or change a device's
+service profile.
+
+Keep the QA device stock. Use SimSlim only on the separate development device,
+with its local `.argent/simslim-development.json` profile. Verify that profile
+before relying on its slim state, and reapply it after recreating the device.
+Do not run a global `simslim watch`, which could also slim the QA simulator.
+When no local file exists, device selection follows the runner's normal
+behavior. A configured device that is missing must be resolved explicitly;
+do not substitute the final-QA device. A new worktree needs its own copy of
+`tools/e2e/.env.local`; use the main checkout's local profile path for any
+SimSlim verification from that worktree.
+
 ## A worktree needs three things
 
 1. **Dependencies.** `pnpm install --frozen-lockfile --prefer-offline` from the
