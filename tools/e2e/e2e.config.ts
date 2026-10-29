@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-
 import { google } from "@ai-sdk/google";
 import { mobile } from "@e2e-dev/mobile";
 import { mobileTools } from "@e2e-dev/mobile/tools";
@@ -12,11 +10,6 @@ import {
   METRO_URL,
 } from "./tests/launch.ts";
 import { SHEET_TRANSITION_MS } from "./tests/seeded-home.ts";
-
-const localEnvironment = new URL(".env.local", import.meta.url);
-if (!process.env.CI && existsSync(localEnvironment)) {
-  process.loadEnvFile(localEnvironment);
-}
 
 const ios = mobile({
   platform: "ios",

@@ -17,8 +17,11 @@ E2E_DEVICE=<development-simulator-udid>
 E2E_QA_DEVICE=<stock-final-qa-simulator-udid>
 ```
 
-The E2E config loads this file outside CI, preserving an explicit
-`E2E_DEVICE` environment override. Agents use the development device for
+The shared E2E launch module loads this file before capturing settings for
+the runner or workers. It follows the runner's CI semantics: unset, empty,
+`0` and `false` mean local mode (ignoring case and surrounding whitespace).
+Explicit environment values win, including `E2E_DEVICE` and
+`E2E_METRO_PORT`. Agents use the development device for
 routine development, builds and testing; pass its id explicitly with
 `expo run:ios --device <udid>`. For final QA, pass the stock device explicitly:
 `E2E_DEVICE=<E2E_QA_DEVICE value> pnpm exec e2e run ...` from `tools/e2e`.
