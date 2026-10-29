@@ -1,9 +1,9 @@
 {
   "production": {
     "ios": {
-      "buildId": "local build, EAS submission 0d6363aa-c1a9-400e-8223-003f4444eba4",
+      "buildId": "local build, EAS submission 31d80af3-6676-4fb9-be7e-5a21366f5b20",
       "fingerprint": "f4b125860b02e07913ec6b1b9d8200fe1912c5c3",
-      "release": "1.0.12 (50), App Store, released 2026-10-27"
+      "release": "1.0.13 (51), App Store, released YYYY-MM-DD"
     },
     "android": {
       "buildId": "local build, EAS submission cc49558e-83ab-4a34-8afd-d21a670bf19b",
