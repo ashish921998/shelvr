@@ -88,6 +88,58 @@ async function setup(
 }
 
 describe("placePins", () => {
+  it("looks up the source's branch while keeping its display name and public contract", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup(["Carette"], { read: ["Carette"] });
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        cities: ["Paris"],
+        placeLocations: [{ name: "Carette", location: "Place du Trocadéro" }],
+      }),
+    );
+    const queries: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
+        const q = url.searchParams.get("q") ?? "";
+        queries.push(q);
+        const trocadero = q.includes("Trocadéro");
+        return Response.json({
+          results: [
+            {
+              name: "Carette",
+              id: trocadero ? "trocadero" : "vosges",
+              coordinate: {
+                latitude: 48.862,
+                longitude: trocadero ? 2.287 : 2.365,
+              },
+            },
+          ],
+        });
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(queries).toEqual(["Carette, Place du Trocadéro, Paris"]);
+    expect(await pins()).toEqual([
+      {
+        name: "Carette",
+        city: "Paris",
+        lat: 48.862,
+        lng: 2.287,
+        appleId: "trocadero",
+      },
+    ]);
+    const item = await t.run((ctx) => ctx.db.get(itemId));
+    if (!item) throw new Error("Missing test save");
+    const client = t.withIdentity({ subject: item.userId });
+    expect(
+      await client.query(api.items.getItem, { id: itemId }),
+    ).not.toHaveProperty("placeLocations");
+  });
+
   it("repairs suffixed places and pins without a new lookup, including legacy Maps intents", async () => {
     const { t, itemId, pins } = await setup(["Guest House, Austin"], {
       read: ["Guest House, Austin", "Guest House", "Eberly, Austin"],

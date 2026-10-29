@@ -18,6 +18,8 @@ import {
   MAX_ITEM_PLACES,
   normalizePlaceName,
   normalizePlaces,
+  normalizePlaceLocations,
+  placeLocationsValidator,
   placePinsValidator,
   withoutCitySuffix,
 } from "./model/itemFields";
@@ -133,6 +135,7 @@ export const toLocate = internalQuery({
     v.null(),
     v.object({
       names: v.array(v.string()),
+      locations: placeLocationsValidator,
       city: v.optional(v.string()),
       singleCity: v.boolean(),
       centre: v.union(v.null(), v.object({ lat: v.number(), lng: v.number() })),
@@ -159,6 +162,11 @@ export const toLocate = internalQuery({
     const pins = nearEachOther(item.placePins ?? [], city);
     return {
       names,
+      locations: normalizePlaceLocations(
+        item.placeLocations,
+        names,
+        item.cities,
+      ),
       city,
       singleCity,
       centre: singleCity ? lookupCentre(pins) : null,
@@ -243,6 +251,7 @@ async function lookUp(
   city: string | undefined,
   centre: LatLng | null,
   singleCity: boolean,
+  locations: { name: string; location: string }[],
 ): Promise<Pin[]> {
   const config = appleMapsConfig(env);
   if (config === null) {
@@ -254,13 +263,16 @@ async function lookUp(
     logEvent("warn", "place_pins_token_failed", {});
     return [];
   }
+  const queries = new Map(
+    locations.map(({ name, location }) => [name, `${name}, ${location}`]),
+  );
   const looked = await Promise.all(
     names.map(async (name) => ({
       name,
       at: await appleMapsLookup(
         token,
         "search",
-        lookupQuery(name, city),
+        lookupQuery(queries.get(name) ?? name, city),
         centre ?? undefined,
         undefined,
         true,
@@ -279,7 +291,7 @@ async function lookUp(
         place.at = await appleMapsLookup(
           token,
           "search",
-          lookupQuery(place.name, city),
+          lookupQuery(queries.get(place.name) ?? place.name, city),
           anchor,
           undefined,
           true,
@@ -312,7 +324,13 @@ export const locateItem = internalAction({
     const found =
       todo.names.length === 0
         ? []
-        : await lookUp(todo.names, todo.city, todo.centre, todo.singleCity);
+        : await lookUp(
+            todo.names,
+            todo.city,
+            todo.centre,
+            todo.singleCity,
+            todo.locations,
+          );
     await ctx.runMutation(internal.placePins.storePins, {
       itemId: args.itemId,
       found,

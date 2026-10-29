@@ -35,6 +35,31 @@ export const placePinsValidator = v.array(
   }),
 );
 
+export const placeLocationsValidator = v.array(
+  v.object({ name: v.string(), location: v.string() }),
+);
+
+/** Branch clues stay separate from names, and only belong to places in this save. */
+export function normalizePlaceLocations(
+  raw: Infer<typeof placeLocationsValidator> | undefined,
+  places: readonly string[] | undefined,
+  cities: readonly string[] = [],
+): Infer<typeof placeLocationsValidator> {
+  const names = new Map(
+    normalizePlaces(places, cities).map((name) => [name.toLowerCase(), name]),
+  );
+  const locations = new Map<string, { name: string; location: string }>();
+  for (const entry of raw ?? []) {
+    const key = normalizePlaceName(entry.name, cities).toLowerCase();
+    const name = names.get(key);
+    const location = entry.location.replace(/\s+/g, " ").trim();
+    if (name && location && location.length <= 120 && !locations.has(key)) {
+      locations.set(key, { name, location });
+    }
+  }
+  return [...locations.values()];
+}
+
 export const postMediaValidator = v.object({
   kind: v.union(v.literal("photo"), v.literal("video"), v.literal("gif")),
   imageUrl: v.string(),

@@ -77,6 +77,46 @@ describe("a run without the model", () => {
   });
 });
 
+it("replaces only pins whose branch clue changed and retains them without AI permission", () => {
+  const oldPins = [
+    { name: "Carette, Paris", lat: 48.855, lng: 2.365 },
+    { name: "Louvre", lat: 48.86, lng: 2.337 },
+  ];
+  const item = savedItem({
+    places: ["Carette", "Louvre"],
+    cities: ["Paris"],
+    placePins: oldPins,
+  });
+  const run = {
+    reading: {},
+    classification: {
+      description: "Paris cafes",
+      tags: [],
+      cities: ["Paris"],
+      places: ["Carette", "Louvre"],
+      placeLocations: [
+        { name: "Carette, Paris", location: "Place du Trocadéro" },
+      ],
+    },
+  };
+  const patch = completionPatch(item, run, true);
+  expect(patch.placeLocations).toEqual([
+    { name: "Carette", location: "Place du Trocadéro" },
+  ]);
+  expect(patch.placePins).toEqual([oldPins[1]]);
+  expect(completionPatch(item, run, false)).not.toHaveProperty("placePins");
+  expect(completionPatch(item, run, false)).not.toHaveProperty(
+    "placeLocations",
+  );
+  expect(
+    completionPatch(
+      { ...item, placeLocations: patch.placeLocations },
+      run,
+      true,
+    ),
+  ).not.toHaveProperty("placePins");
+});
+
 it("stores single-city classification places without city suffixes", () => {
   const patch = completionPatch(
     savedItem(),

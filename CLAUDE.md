@@ -379,6 +379,11 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   city page's map pins. `locateItem` looks up in Apple Maps the places read off the save
   (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),
   and `storePins` writes at most 30, dropping any place no longer named.
+  `items.placeLocations` keeps explicitly stated branch/address clues separately from display
+  names. Caption and speech extraction preserve these clues for Apple lookup. A reread that
+  learns a different clue clears only that place's old pin so the scheduled lookup replaces it;
+  existing saves without clues keep their old behavior until reread. This optional field stays
+  declared through rollback and is stripped from public item responses.
   Each pin also keeps Apple's place id (`appleId`) and point-of-interest `category` when the
   search result carried them; the Map tab's filters read the category.
   Every pin on a single-city save keeps its source city, including suburbs. For multi-city saves,

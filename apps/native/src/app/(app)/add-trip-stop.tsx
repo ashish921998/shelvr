@@ -248,6 +248,7 @@ export default function AddTripStopScreen() {
           </ThemedText>
           <ScrollView
             horizontal
+            keyboardShouldPersistTaps="handled"
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.chips}
           >

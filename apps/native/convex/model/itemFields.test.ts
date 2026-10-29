@@ -4,7 +4,45 @@ import {
   MAX_ITEM_PLACES,
   normalizeCities,
   normalizePlaces,
+  normalizePlaceLocations,
 } from "./itemFields";
+
+describe("normalizePlaceLocations", () => {
+  it("keeps only bounded clues for named places, matching normalized names", () => {
+    expect(
+      normalizePlaceLocations(
+        [
+          { name: " carette, Paris ", location: " Place  du Trocadéro " },
+          { name: "Carette", location: "Place des Vosges" },
+          { name: "Invented", location: "Somewhere" },
+          { name: "Louvre", location: " " },
+          { name: "Cafe", location: "x".repeat(121) },
+        ],
+        ["Carette", "Louvre", "Cafe"],
+        ["Paris"],
+      ),
+    ).toEqual([{ name: "Carette", location: "Place du Trocadéro" }]);
+    expect(normalizePlaceLocations(undefined, ["Carette"])).toEqual([]);
+    expect(
+      normalizePlaceLocations(
+        [{ name: "Carette", location: "Paris" }],
+        undefined,
+      ),
+    ).toEqual([]);
+  });
+  it("keeps multi-city branch clues attached to their qualified names", () => {
+    expect(
+      normalizePlaceLocations(
+        [
+          { name: "Cafe, Paris", location: "Rue Royale" },
+          { name: "Cafe, Lyon", location: "Rue Victor Hugo" },
+        ],
+        ["Cafe, Paris", "Cafe, Lyon"],
+        ["Paris", "Lyon"],
+      ),
+    ).toHaveLength(2);
+  });
+});
 
 describe("normalizeCities", () => {
   it("trims, single-spaces and drops trailing punctuation", () => {
