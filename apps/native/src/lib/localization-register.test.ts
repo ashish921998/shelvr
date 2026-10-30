@@ -6,7 +6,7 @@ import fr from "@/locales/fr.json";
 const tuPronoun =
   /(?<!\p{L})(?:tu|ton|ta|tes|toi|te)(?!\p{L})|(?<!\p{L})t[’']/iu;
 const tuImperative =
-  /(?:^|[.!?…]\s+|\bpuis\s+|,\s+)(?:trouve|choisis|tire|touche|glisse|balaie|retourne|partage|découvre|essaie|fais|enregistres?|réessaie|vérifie|surprends|prépare|ajoute|ouvre|appuie|regarde|garde|reviens|va|viens|planifie|prévois|réponds|autorise|active|lis|commence|continue|passe|reprends|demande|envoie)(?!\p{L})/iu;
+  /(?:^|[.!?…]\s+|\bpuis\s+|,\s+|\bet\s+)(?:trouve|choisis|tire|touche|glisse|balaie|retourne|partage|découvre|essaie|fais|enregistres?|réessaie|vérifie|surprends|prépare|ajoute|ouvre|appuie|regarde|garde|reviens|va|viens|planifie|prévois|réponds|autorise|active|lis|commence|continue|passe|reprends|demande|envoie)(?!\p{L})/iu;
 
 type Catalog = Record<string, string | Record<string, string>>;
 
@@ -63,6 +63,7 @@ describe("catalog register", () => {
     expect(french.breaks("Trouve où manger la prochaine fois.")).toBe(true);
     expect(french.breaks("Vérifie ta connexion et réessaie.")).toBe(true);
     expect(french.breaks("Enregistre un café, puis réessaie.")).toBe(true);
+    expect(french.breaks("Vérifiez votre connexion et réessaie.")).toBe(true);
     expect(french.breaks("Vérifiez votre connexion et réessayez.")).toBe(false);
     expect(french.breaks("Cuisine et recettes")).toBe(false);
     expect(german.breaks("Deine Saves werden gelesen")).toBe(true);

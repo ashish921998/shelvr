@@ -10,7 +10,7 @@
     "verify:agent-docs": "node tools/verify-agent-docs.mjs",
     "verify:fingerprint": "node tools/verify-native-fingerprint.mjs",
     "verify:convex-api": "node tools/verify-convex-api.mjs",
-    "verify:comments": "node tools/verify-comments.mjs origin/main",
+    "verify:comments": "node tools/verify-comments.mjs",
     "verify:ota": "node tools/verify-ota-compatibility.mjs",
     "test:tools": "node --test tools/*.test.mjs",
     "test": "pnpm --filter native-app test && pnpm --filter web-app test",
