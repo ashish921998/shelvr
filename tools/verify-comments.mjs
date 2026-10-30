@@ -39,14 +39,21 @@ export function comments(path, source) {
       found.set(pos, source.slice(pos, end));
     }
   };
+  const jsxText = [];
   const visit = (node) => {
-    if (node.kind === ts.SyntaxKind.JsxText) return;
+    if (node.kind === ts.SyntaxKind.JsxText) {
+      jsxText.push(node);
+      return;
+    }
     add(ts.getLeadingCommentRanges(source, node.pos));
     add(ts.getTrailingCommentRanges(source, node.end));
     for (const child of node.getChildren(file)) visit(child);
   };
   visit(file);
+  const isJsxText = (pos) =>
+    jsxText.some((node) => pos >= node.pos && pos < node.end);
   return [...found.entries()]
+    .filter(([pos]) => !isJsxText(pos))
     .sort(([a], [b]) => a - b)
     .map(([pos, text]) => ({
       line: file.getLineAndCharacterOfPosition(pos).line + 1,

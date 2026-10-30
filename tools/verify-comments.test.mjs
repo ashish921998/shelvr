@@ -25,6 +25,20 @@ export const C = () => <div>{/* jsx */}https://example.com // text</div>;
   ]);
 });
 
+test("reads JSX text as text when it starts like a comment", () => {
+  const source = `export const A = () => <div>/* literal */</div>;
+export const B = () => <a href="x">// see docs</a>;
+export const C = (p) => <div>{p.x}// after expr</div>;
+export const D = () => <div>/* one */ /* two */</div>;
+export const E = () => <div>{/* real */}/* literal */</div>;
+`;
+  assert.deepEqual(texts("a.tsx", source), ["/* real */"]);
+  assert.deepEqual(
+    addedComments("a.tsx", "", "const C = () => <div>/* text */</div>;\n"),
+    [],
+  );
+});
+
 test("ignores pragmas and comment-like strings", () => {
   const source = `// @vitest-environment edge-runtime
 // eslint-disable-next-line no-console
