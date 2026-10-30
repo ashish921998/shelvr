@@ -193,18 +193,46 @@ function keepAppleId(stored: Pin | undefined, found: Pin): Pin {
   };
 }
 
+/** Each place's branch clue, keyed like the pins; a place without one is absent. */
+function cluesByPlace(
+  locations: { name: string; location: string }[],
+  cities: string[] | undefined,
+): Map<string, string> {
+  return new Map(
+    locations.map(({ name, location }) => [
+      placeKey(normalizePlaceName(name, cities)),
+      location,
+    ]),
+  );
+}
+
 export const storePins = internalMutation({
   args: {
     itemId: v.id("items"),
     found: placePinsValidator,
+    /** The branch clues the lookup searched with. */
+    searched: v.optional(placeLocationsValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     if (item === null || !(await aiAllowed(ctx, item.userId))) return null;
     const wanted = await wantedPlaces(ctx, item);
+    // A reread that changed a place's branch while this lookup ran scheduled its own lookup; this pin is the old branch.
+    const now = cluesByPlace(item.placeLocations ?? [], item.cities);
+    const then =
+      args.searched === undefined
+        ? undefined
+        : cluesByPlace(args.searched, item.cities);
+    const found =
+      then === undefined
+        ? args.found
+        : args.found.filter((pin) => {
+            const key = placeKey(normalizePlaceName(pin.name, item.cities));
+            return now.get(key) === then.get(key);
+          });
     const next = new Map<string, Pin>();
-    for (const pin of [...(item.placePins ?? []), ...args.found]) {
+    for (const pin of [...(item.placePins ?? []), ...found]) {
       const key = placeKey(normalizePlaceName(pin.name, item.cities));
       if (wanted.has(key))
         next.set(
@@ -334,6 +362,7 @@ export const locateItem = internalAction({
     await ctx.runMutation(internal.placePins.storePins, {
       itemId: args.itemId,
       found,
+      searched: todo.locations,
     });
     return null;
   },

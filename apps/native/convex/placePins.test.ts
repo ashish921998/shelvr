@@ -140,6 +140,78 @@ describe("placePins", () => {
     ).not.toHaveProperty("placeLocations");
   });
 
+  it.each([
+    ["after", true],
+    ["before", false],
+  ])(
+    "drops a pin an older lookup found once a reread names another branch (new lookup lands %s it)",
+    async (_order, newFirst) => {
+      vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+      vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+      vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: string) => {
+          const url = new URL(input);
+          if (url.pathname === "/v1/token")
+            return Response.json({
+              accessToken: "maps",
+              expiresInSeconds: 1800,
+            });
+          const trocadero = (url.searchParams.get("q") ?? "").includes(
+            "Trocadéro",
+          );
+          return Response.json({
+            results: [
+              {
+                name: "Carette",
+                id: trocadero ? "trocadero" : "vosges",
+                coordinate: {
+                  latitude: 48.862,
+                  longitude: trocadero ? 2.287 : 2.365,
+                },
+              },
+            ],
+          });
+        }),
+      );
+      const { t, itemId, pins } = await setup([], { read: ["Carette"] });
+      await t.run((ctx) => ctx.db.patch(itemId, { cities: ["Paris"] }));
+      const old = await t.query(internal.placePins.toLocate, { itemId });
+      if (old === null) throw new Error("Expected a lookup");
+      expect(old.locations).toEqual([]);
+      await t.run((ctx) => ctx.db.patch(itemId, { status: "processing" }));
+      expect(
+        await t.mutation(internal.items.finalizeItem, {
+          itemId,
+          reading: {},
+          classification: {
+            title: "Lisbon eats",
+            description: "",
+            tags: [],
+            cities: ["Paris"],
+            places: ["Carette"],
+            placeLocations: [
+              { name: "Carette", location: "Place du Trocadéro" },
+            ],
+          },
+        }),
+      ).toBe("applied");
+      const oldStores = () =>
+        t.mutation(internal.placePins.storePins, {
+          itemId,
+          found: [
+            { name: "Carette", lat: 48.862, lng: 2.365, appleId: "vosges" },
+          ],
+          searched: old.locations,
+        });
+      if (!newFirst) await oldStores();
+      await t.action(internal.placePins.locateItem, { itemId });
+      if (newFirst) await oldStores();
+      expect((await pins())?.map((pin) => pin.appleId)).toEqual(["trocadero"]);
+    },
+  );
+
   it("repairs suffixed places and pins without a new lookup, including legacy Maps intents", async () => {
     const { t, itemId, pins } = await setup(["Guest House, Austin"], {
       read: ["Guest House, Austin", "Guest House", "Eberly, Austin"],

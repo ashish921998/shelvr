@@ -382,6 +382,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `items.placeLocations` keeps explicitly stated branch/address clues separately from display
   names. Caption and speech extraction preserve these clues for Apple lookup. A reread that
   learns a different clue clears only that place's old pin so the scheduled lookup replaces it;
+  a lookup that lands after such a reread drops its pin, since it searched with the old clue;
   existing saves without clues keep their old behavior until reread. This optional field stays
   declared through rollback and is stripped from public item responses.
   Each pin also keeps Apple's place id (`appleId`) and point-of-interest `category` when the
