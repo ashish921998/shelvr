@@ -51,11 +51,15 @@ const re = /\\/\\//;
 test("counts a comment that only mentions a pragma", () => {
   const source = `// explain eslint-disable behaviour
 /* see c8 ignore docs */
+/**
+ * explain @ts-expect-error
+ */
 export {};
 `;
   assert.deepEqual(texts("a.ts", source), [
     "// explain eslint-disable behaviour",
     "/* see c8 ignore docs */",
+    "/**\n * explain @ts-expect-error\n */",
   ]);
 });
 
@@ -64,6 +68,12 @@ test("ignores a pragma in every comment form", () => {
 /** @vitest-environment edge-runtime */
 /* eslint-disable no-console */
 //@ts-expect-error reason
+/// @ts-expect-error reason
+/**
+ * @ts-expect-error reason */
+/*
+ * @vitest-environment jsdom
+ */
 const a = /* @__PURE__ */ f();
 const b = /*#__PURE__*/ f();
 export const C = () => <div>{/* eslint-disable-next-line x */}</div>;

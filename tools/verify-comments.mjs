@@ -13,7 +13,7 @@ const SOURCE = /^(apps|tools)\/.*\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/;
 const SKIPPED =
   /\/(_generated|node_modules)\/|\/locales\/(catalogs|message-types)\.ts$/;
 const PRAGMA =
-  /^(?:\/\/\/\s*<reference|(?:\/\/|\/\*+)\s*(?:eslint-(?:disable|enable)|@ts-(?:expect-error|ignore|nocheck)|@vitest-environment|prettier-ignore|[#@]__PURE__|istanbul ignore|c8 ignore))/;
+  /^(?:\/\/\/\s*<reference|(?:\/\/+|\/\*+(?:\s*\*)?)\s*(?:eslint-(?:disable|enable)|@ts-(?:expect-error|ignore|nocheck)|@vitest-environment|prettier-ignore|[#@]__PURE__|istanbul ignore|c8 ignore))/;
 
 export function isChecked(path) {
   return SOURCE.test(path) && !SKIPPED.test(path);
