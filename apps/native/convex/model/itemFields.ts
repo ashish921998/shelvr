@@ -1,5 +1,7 @@
 import { type Infer, v } from "convex/values";
 
+import { placeKey } from "./plan";
+
 export const INTENT_KINDS = [
   "open_url",
   "copy",
@@ -45,12 +47,15 @@ export function normalizePlaceLocations(
   places: readonly string[] | undefined,
   cities: readonly string[] = [],
 ): Infer<typeof placeLocationsValidator> {
-  const names = new Map(
-    normalizePlaces(places, cities).map((name) => [name.toLowerCase(), name]),
-  );
+  // The key pins use, so a respelled place has one clue. The first spelling and clue win: callers list the newest first.
+  const names = new Map<string, string>();
+  for (const name of normalizePlaces(places, cities)) {
+    const key = placeKey(name);
+    if (key !== "" && !names.has(key)) names.set(key, name);
+  }
   const locations = new Map<string, { name: string; location: string }>();
   for (const entry of raw ?? []) {
-    const key = normalizePlaceName(entry.name, cities).toLowerCase();
+    const key = placeKey(normalizePlaceName(entry.name, cities));
     const name = names.get(key);
     const location = entry.location.replace(/\s+/g, " ").trim();
     if (name && location && location.length <= 120 && !locations.has(key)) {

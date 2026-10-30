@@ -212,6 +212,58 @@ describe("placePins", () => {
     },
   );
 
+  it("pins the new branch when a reread respells the place and changes its branch", async () => {
+    vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+    vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+    vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
+        const neuve = (url.searchParams.get("q") ?? "").includes("Rue Neuve");
+        return Response.json({
+          results: [
+            {
+              name: "Cafe Joe",
+              id: neuve ? "neuve" : "vieille",
+              coordinate: { latitude: 48.86, longitude: neuve ? 2.29 : 2.36 },
+            },
+          ],
+        });
+      }),
+    );
+    const { t, itemId, pins } = await setup([], { read: ["Cafe Joe"] });
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        status: "processing",
+        cities: ["Paris"],
+        placeLocations: [{ name: "Cafe Joe", location: "Rue Vieille" }],
+        placePins: [{ name: "Cafe Joe", lat: 48.86, lng: 2.36, city: "Paris" }],
+      }),
+    );
+    // A reread's speech step lists the new spelling and clue, then what the save already had.
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      reading: {},
+      classification: {
+        title: "Lisbon eats",
+        description: "",
+        tags: [],
+        cities: ["Paris"],
+        places: ["Café Joe", "Cafe Joe"],
+        placeLocations: [
+          { name: "Café Joe", location: "Rue Neuve" },
+          { name: "Cafe Joe", location: "Rue Vieille" },
+        ],
+      },
+    });
+    expect(await pins()).toEqual([]);
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect((await pins())?.map((pin) => pin.appleId)).toEqual(["neuve"]);
+  });
+
   it("repairs suffixed places and pins without a new lookup, including legacy Maps intents", async () => {
     const { t, itemId, pins } = await setup(["Guest House, Austin"], {
       read: ["Guest House, Austin", "Guest House", "Eberly, Austin"],
