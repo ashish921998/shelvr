@@ -55,7 +55,7 @@ export default async function PlanVotePage({ params }: PageProps) {
               {planTitle(share)}
             </h1>
             <p className="mt-1 mb-5 text-[15px] text-muted">
-              Tap ✓ on the ones you&apos;d go to.
+              Flip through and tap ✓ on the ones you&apos;d go to.
             </p>
             <PlanVote
               token={token}

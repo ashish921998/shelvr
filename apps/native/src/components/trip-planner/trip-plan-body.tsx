@@ -22,7 +22,7 @@ import {
   tripDayLabel,
   tripLengthLine,
   tripStopsLine,
-  tripTitle,
+  tripName,
 } from "@/lib/trip-planner";
 import type { TripPlanDetail, TripPlanStop } from "@convex/model/tripPlan";
 import * as Haptics from "expo-haptics";
@@ -256,7 +256,7 @@ export function TripPlanBody({ trip }: { trip: TripPlanDetail }) {
       >
         <View style={styles.heading}>
           <ThemedText variant="largeTitle" accessibilityRole="header">
-            {tripTitle(trip.city)}
+            {tripName(trip)}
           </ThemedText>
           <ThemedText variant="subhead" style={styles.muted}>
             {tripLengthLine(trip)}

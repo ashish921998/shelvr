@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import { UnplacedSaves } from "@/components/home/home-places";
@@ -41,40 +41,27 @@ vi.mock("react-native", () => ({
 }));
 
 describe("unplaced save states", () => {
-  it("shows finding places until processing finishes, then shows no place found only without a city", () => {
+  it("shows finding places while a save reads, and nothing once it finishes", () => {
     const { rerender } = render(
       <UnplacedSaves
         saves={[{ _id: "new", status: "processing", title: "New reel" }]}
       />,
     );
     expect(screen.getAllByText("Finding places…")).toHaveLength(1);
-    expect(screen.queryByText("No place found")).toBeNull();
+    expect(
+      screen.getByRole("button", { name: "New reel, Finding places…" }),
+    ).toBeTruthy();
 
     rerender(
       <UnplacedSaves
         saves={[{ _id: "new", status: "ready", title: "New reel", cities: [] }]}
       />,
     );
-    expect(screen.getByText("No place found")).toBeTruthy();
     expect(screen.queryByText("Finding places…")).toBeNull();
-
-    rerender(
-      <UnplacedSaves
-        saves={[
-          {
-            _id: "new",
-            status: "ready",
-            title: "New reel",
-            cities: ["New York"],
-          },
-        ]}
-      />,
-    );
     expect(screen.queryByText("New reel")).toBeNull();
-    expect(screen.queryByText("No place found")).toBeNull();
   });
 
-  it("keeps processing, failed and completed saves under their own headings", () => {
+  it("leaves failed and placeless saves off Home's list", () => {
     render(
       <UnplacedSaves
         saves={[
@@ -84,42 +71,28 @@ describe("unplaced save states", () => {
         ]}
       />,
     );
-    const emptySection = screen.getByText("No place found").parentElement!;
-    expect(within(emptySection).getByText("Empty reel")).toBeTruthy();
-    expect(within(emptySection).queryByText("Pending reel")).toBeNull();
-    expect(within(emptySection).queryByText("Failed reel")).toBeNull();
-    expect(screen.getAllByText("Finding places…")).toHaveLength(1);
-    expect(screen.getAllByText("Couldn't read these saves")).toHaveLength(1);
-    expect(
-      screen.getByRole("button", { name: "Pending reel, Finding places…" }),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole("button", {
-        name: "Failed reel, Couldn't read these saves",
-      }),
-    ).toBeTruthy();
+    expect(screen.getByText("Pending reel")).toBeTruthy();
+    expect(screen.queryByText("Failed reel")).toBeNull();
+    expect(screen.queryByText("Empty reel")).toBeNull();
   });
 
-  it("distinguishes equal save titles by their status when navigating buttons", () => {
+  it("names an untitled save that is still reading by its site, not its URL", () => {
     render(
       <UnplacedSaves
         saves={[
-          { _id: "pending", status: "processing", title: "Same reel" },
-          { _id: "failed", status: "failed", title: "Same reel" },
+          {
+            _id: "new",
+            status: "processing",
+            url: "https://www.timeout.com/lisbon/restaurants",
+          },
         ]}
       />,
     );
-    expect(
-      screen.getByRole("button", { name: "Same reel, Finding places…" }),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole("button", {
-        name: "Same reel, Couldn't read these saves",
-      }),
-    ).toBeTruthy();
+    expect(screen.getByText("timeout.com")).toBeTruthy();
+    expect(screen.queryByText(/https:/)).toBeNull();
   });
 
-  it("expands processing saves without labeling them as missing places", () => {
+  it("expands processing saves", () => {
     render(
       <UnplacedSaves
         saves={Array.from({ length: 6 }, (_, index) => ({
@@ -132,6 +105,5 @@ describe("unplaced save states", () => {
     expect(screen.queryByText("Pending 5")).toBeNull();
     fireEvent.click(screen.getByText("+ 1 more"));
     expect(screen.getByText("Pending 5")).toBeTruthy();
-    expect(screen.queryByText("No place found")).toBeNull();
   });
 });

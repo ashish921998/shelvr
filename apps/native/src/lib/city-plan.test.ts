@@ -5,14 +5,11 @@ import { useCityPlan } from "./city-plan";
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
-  ensureCitySpace: vi.fn(),
   guard: vi.fn(),
   capture: vi.fn(),
   captureError: vi.fn(),
   focus: undefined as (() => void) | undefined,
 }));
-vi.mock("convex/react", () => ({ useMutation: () => mocks.ensureCitySpace }));
-vi.mock("@convex/_generated/api", () => ({ api: { spaces: {} } }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mocks.capture, captureError: mocks.captureError },
 }));
@@ -60,8 +57,7 @@ it("opens the trip form again once the city page is back in focus", async () => 
   expect(mocks.push).toHaveBeenCalledTimes(2);
 });
 
-it("opens one date plan for a double tap on Plan a date", async () => {
-  mocks.ensureCitySpace.mockResolvedValue("space1");
+it("opens one date planner for a double tap on Plan a date", async () => {
   const { result } = renderHook(() => useCityPlan("Lisbon"));
   await act(async () => {
     await Promise.all([
@@ -69,10 +65,10 @@ it("opens one date plan for a double tap on Plan a date", async () => {
       result.current.start("date"),
     ]);
   });
-  expect(mocks.ensureCitySpace).toHaveBeenCalledTimes(1);
+  expect(mocks.push).toHaveBeenCalledTimes(1);
   expect(mocks.push).toHaveBeenCalledWith({
-    pathname: "/plan/[id]",
-    params: { id: "space1", city: "Lisbon" },
+    pathname: "/date-plan",
+    params: { city: "Lisbon" },
   });
   expect(result.current.busy).toBeNull();
 });

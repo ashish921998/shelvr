@@ -163,6 +163,11 @@ export function tripTitle(city: string): string {
   return t("tripPlanner.tripTitle", { city });
 }
 
+/** The name the person gave the trip, else "<city> trip". */
+export function tripName(trip: { name?: string; city: string }): string {
+  return trip.name?.trim() || tripTitle(trip.city);
+}
+
 function shortDate(date: Date): string {
   return date.toLocaleDateString(formattingLocale(), {
     month: "short",
@@ -254,6 +259,8 @@ export function stopBadge(source: TripPlanStop["source"]): TextMessageKey {
       return "tripPlanner.badgeYours";
     case "suggested":
       return "tripPlanner.badgeSuggested";
+    case "added":
+      return "tripPlanner.badgeAdded";
   }
 }
 
@@ -312,7 +319,7 @@ export function stopAction(
   return { kind: "maps", url: placeMapsUrl(stop) };
 }
 
-function placeMapsUrl(
+export function placeMapsUrl(
   stop: Pick<TripPlanStop, "name" | "lat" | "lng">,
 ): string {
   const at = `${stop.lat},${stop.lng}`;

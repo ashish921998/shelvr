@@ -38,13 +38,18 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `paywall-telemetry.ts` and `revenuecat-*.ts`.
   The server side is `convex/subscriptions.ts`.
 - **Home:** `src/lib/home-feed.tsx` (`HomeFeedProvider`, `useHomeFeed`); the
-  cities list and processing, failed-read and "No place found" sections are in `src/components/home`
-  (`home-places.tsx`). The city page is `src/app/(app)/city/[name].tsx`, with its
+  cities list and processing section are in `src/components/home`
+  (`home-places.tsx`); failed and placeless saves are in `review-saves.tsx` and
+  `unplaced-toast.tsx`. The city page is `src/app/(app)/city/[name].tsx`, with its
   map in `src/components/city` and Plan a date / Plan a trip in `src/lib/city-plan.ts`.
+  Plan a date is the `src/app/(app)/date-plan.tsx` route, with its screens in
+  `src/components/date-plan`, state in `src/lib/date-plan.ts` and backend in
+  `convex/datePlans.ts` (rules in `convex/model/dateRank.ts`).
   Retired routes redirect to Home through `src/lib/home-href.ts`.
 - **Map tab:** route `src/app/(app)/(tabs)/(map)/index.tsx`, map, search and filter chips in
   `src/components/map`, filter rules in `src/lib/map-filters.ts` and
-  `convex/model/placeKinds.ts`, data from `convex/mapPlaces.ts`.
+  `convex/model/placeKinds.ts`, each pin's emoji in `src/lib/map-pin-emoji.ts`, data from
+  `convex/mapPlaces.ts`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;

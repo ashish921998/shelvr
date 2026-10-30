@@ -1,3 +1,4 @@
+import { UnplacedToast } from "@/components/home/unplaced-toast";
 import { AppIntentsBridge } from "@/lib/app-intents";
 import { releaseSheetLink } from "@/lib/deferred-sheet-link";
 import { useForgetExitOffer } from "@/lib/forget-exit-offer";
@@ -111,6 +112,10 @@ export default function AppLayout() {
             name="trip-plan/[id]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
+          <Stack.Screen
+            name="date-plan"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
         </Stack.Protected>
         {/* Native sheets and modals present above the loading cover, so they wait for the plan. */}
         <Stack.Protected
@@ -147,6 +152,17 @@ export default function AppLayout() {
           />
           <Stack.Screen
             name="new-trip"
+            options={{
+              presentation: "modal",
+              headerShown: true,
+              headerTransparent: false,
+              headerShadowVisible: false,
+              headerStyle: { backgroundColor: theme.colors.background },
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
+          />
+          <Stack.Screen
+            name="add-trip-stop"
             options={{
               presentation: "modal",
               headerShown: true,
@@ -201,6 +217,7 @@ export default function AppLayout() {
         />
       </Stack>
       {onboarded && planUnknown ? <PlanLoadingCover /> : null}
+      {onboarded && !gated ? <UnplacedToast /> : null}
     </HomeFeedProvider>
   );
 }

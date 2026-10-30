@@ -10,7 +10,7 @@ test("saves a link and shows it on Home", async ({ agent, screen }) => {
   await screen.getByRole("button", "Save").tap();
 
   await agent.waitFor(
-    "Home lists exactly one save about sourdough under No place found",
+    "Home says a save has no place, with a Review link under the cities",
     { timeout: 120_000, vision: "only" },
   );
 });

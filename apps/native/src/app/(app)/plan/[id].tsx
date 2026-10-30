@@ -159,6 +159,7 @@ function AskButton({ busy, onPress }: { busy: boolean; onPress: () => void }) {
       style={({ pressed }) => [
         styles.action,
         styles.actionOpen,
+        styles.askAction,
         busy && styles.actionBusy,
         pressed && styles.pressed,
       ]}
@@ -569,6 +570,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     borderColor: "transparent",
   },
   actionSlot: { flex: 1 },
+  // flex: 1 gives a zero basis in the column slot, which clips a wrapped label.
+  askAction: { flex: 0, flexGrow: 1 },
   pick: { minHeight: theme.control.minHeight },
   actionFilled: {
     backgroundColor: theme.colors.primary,

@@ -1,6 +1,11 @@
 import { CityCover } from "@/components/city/city-cover";
 import { useEntitlement, usePaywallGuard } from "@/lib/entitlement";
-import { type City, unplacedSaves, visibleCities } from "@/lib/home-places";
+import {
+  type City,
+  saveSource,
+  unplacedSaves,
+  visibleCities,
+} from "@/lib/home-places";
 import { t, useAppLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
@@ -66,6 +71,7 @@ type UnplacedSave = {
   cities?: string[];
   title?: string;
   url?: string;
+  siteName?: string;
 };
 
 function UnplacedSection({
@@ -87,7 +93,7 @@ function UnplacedSection({
         <Pressable
           key={save._id}
           accessibilityRole="button"
-          accessibilityLabel={`${save.title ?? save.url ?? ""}, ${title}`}
+          accessibilityLabel={`${save.title ?? saveSource(save)}, ${title}`}
           onPress={() =>
             router.push({
               pathname: "/item/[id]",
@@ -100,11 +106,8 @@ function UnplacedSection({
           ]}
         >
           <Text style={styles.unplacedTitle} numberOfLines={1}>
-            {save.title ?? save.url ?? ""}
+            {save.title ?? saveSource(save)}
           </Text>
-          {save.status === "ready" ? (
-            <Text style={styles.muted}>{t("homePlaces.noPlaceNone")}</Text>
-          ) : null}
         </Pressable>
       ))}
       {hidden > 0 ? (
@@ -122,25 +125,16 @@ function UnplacedSection({
   );
 }
 
-/** Keep pending and failed reads separate from completed saves without a city. */
+/** Saves still being read. Failed and placeless saves wait behind one line (`ReviewSaves`). */
 export function UnplacedSaves({ saves }: { saves: UnplacedSave[] }) {
   useAppLocale();
-  const all = unplacedSaves(saves);
   return (
-    <>
-      <UnplacedSection
-        saves={all.filter((save) => save.status === "processing")}
-        title={t("homePlaces.noPlaceReading")}
-      />
-      <UnplacedSection
-        saves={all.filter((save) => save.status === "failed")}
-        title={t("homePlaces.noPlaceFailed")}
-      />
-      <UnplacedSection
-        saves={all.filter((save) => save.status === "ready")}
-        title={t("homePlaces.noPlaceTitle")}
-      />
-    </>
+    <UnplacedSection
+      saves={unplacedSaves(saves).filter(
+        (save) => save.status === "processing",
+      )}
+      title={t("homePlaces.noPlaceReading")}
+    />
   );
 }
 

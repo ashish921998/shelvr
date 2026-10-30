@@ -71,6 +71,9 @@ vi.mock("@/lib/i18n", () => ({
 vi.mock("@/lib/home-feed", () => ({
   HomeFeedProvider: vi.fn(({ children }: { children: ReactNode }) => children),
 }));
+vi.mock("@/components/home/unplaced-toast", () => ({
+  UnplacedToast: vi.fn(() => null),
+}));
 vi.mock("@/components/plan-loading-cover", () => ({
   PlanLoadingCover: vi.fn(() => <div>plan-loading-cover</div>),
 }));

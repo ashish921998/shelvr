@@ -15,6 +15,8 @@ const mapPlaceValidator = v.object({
   lng: v.number(),
   city: v.optional(v.string()),
   appleId: v.optional(v.string()),
+  /** Apple's point-of-interest category, which picks the pin's icon. */
+  category: v.optional(v.string()),
   /** Ids from `PLACE_KINDS`; a client skips an id it has no label for. */
   kinds: v.array(v.string()),
 });
@@ -26,6 +28,7 @@ type MapPlace = {
   lng: number;
   city?: string;
   appleId?: string;
+  category?: string;
   kinds: string[];
 };
 
@@ -44,12 +47,16 @@ export const listMapPlaces = authedQuery({
           lng: pin.lng,
           ...(pin.city ? { city: pin.city } : {}),
           ...(pin.appleId ? { appleId: pin.appleId } : {}),
+          ...(pin.category ? { category: pin.category } : {}),
           kinds: placeKinds(pin.category, item.tags),
         });
     // One venue across saves, by the city page's identity rules: it keeps the newest save and every
-    // kind any of its saves gave it.
+    // kind any of its saves gave it, and the first category any of them found.
     return uniquePlacePins(pins, (kept, repeat) => ({
       ...kept,
+      ...(kept.category || !repeat.category
+        ? {}
+        : { category: repeat.category }),
       kinds: PLACE_KINDS.filter(
         (kind) => kept.kinds.includes(kind) || repeat.kinds.includes(kind),
       ),
