@@ -48,6 +48,29 @@ const re = /\\/\\//;
   assert.deepEqual(texts("a.ts", source), []);
 });
 
+test("counts a comment that only mentions a pragma", () => {
+  const source = `// explain eslint-disable behaviour
+/* see c8 ignore docs */
+export {};
+`;
+  assert.deepEqual(texts("a.ts", source), [
+    "// explain eslint-disable behaviour",
+    "/* see c8 ignore docs */",
+  ]);
+});
+
+test("ignores a pragma in every comment form", () => {
+  const source = `/// <reference types="node" />
+/** @vitest-environment edge-runtime */
+/* eslint-disable no-console */
+//@ts-expect-error reason
+const a = /* @__PURE__ */ f();
+const b = /*#__PURE__*/ f();
+export const C = () => <div>{/* eslint-disable-next-line x */}</div>;
+`;
+  assert.deepEqual(texts("a.tsx", source), []);
+});
+
 test("fails a file only when its comment count goes up", () => {
   const base = "// one\n// two\nexport {};\n";
   assert.deepEqual(addedComments("a.ts", base, "// shorter\nexport {};\n"), []);
