@@ -54,10 +54,8 @@ vi.mock("@/components/city/city-map", () => ({
 vi.mock("@/components/onboarding/sample-trip-map", () => ({
   PinBadge: vi.fn(({ number }: { number: number }) => <span>{number}</span>),
 }));
-vi.mock("@/components/ui/screen-loader", () => ({
-  ScreenLoader: vi.fn(({ label }: { label: string }) => (
-    <div aria-label={label} role="progressbar" />
-  )),
+vi.mock("@/components/ui/stitch-mark", () => ({
+  StitchMark: vi.fn(() => null),
 }));
 vi.mock("@/components/ui/button", () => ({ Button: vi.fn(fakes.pressable) }));
 vi.mock("@/lib/motion", () => ({ springIn: () => undefined }));
@@ -72,6 +70,7 @@ vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => new Proxy({}, { get: () => ({}) }) },
   useUnistyles: () => ({
     rt: { screen: { height: 800 }, insets: { top: 0, bottom: 0 } },
+    theme: { gap: (n: number) => n * 8 },
   }),
 }));
 vi.mock("react-native", () => ({
@@ -98,7 +97,7 @@ afterEach(() => {
 it("finds the spots while the save is read", () => {
   mocks.save = { _id: "item-1", status: "processing" };
   render(<SpotsScreen />);
-  expect(screen.getByLabelText("spots.finding")).toBeTruthy();
+  expect(screen.getByText("spots.finding")).toBeTruthy();
   expect(mocks.replace).not.toHaveBeenCalled();
 });
 

@@ -1,7 +1,7 @@
 import { CityMap } from "@/components/city/city-map";
 import { PinBadge } from "@/components/onboarding/sample-trip-map";
 import { Button } from "@/components/ui/button";
-import { ScreenLoader } from "@/components/ui/screen-loader";
+import { StitchMark } from "@/components/ui/stitch-mark";
 import { analytics } from "@/lib/analytics";
 import { cityPins, type CityPin } from "@/lib/city-pins";
 import { t, useAppLocale } from "@/lib/i18n";
@@ -18,7 +18,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-const MAP_SHARE = 0.55;
+const MAP_SHARE = 0.45;
 const TICK_MS = 500;
 
 /** The reveal for one save, re-read every half second so the waits can run out. */
@@ -73,7 +73,16 @@ export default function SpotsScreen() {
   }, [reveal, waitedMs, router]);
 
   if (reveal.kind !== "spots") {
-    return <ScreenLoader label={t("spots.finding")} />;
+    return (
+      <View
+        style={styles.finding}
+        accessibilityRole="progressbar"
+        accessibilityLabel={t("spots.finding")}
+      >
+        <StitchMark />
+        <Text style={styles.findingText}>{t("spots.finding")}</Text>
+      </View>
+    );
   }
   return <Spots itemId={id ?? ""} city={reveal.city} found={reveal.pins} />;
 }
@@ -88,7 +97,7 @@ function Spots({
   found: Extract<Reveal, { kind: "spots" }>["pins"];
 }) {
   const router = useRouter();
-  const { rt } = useUnistyles();
+  const { rt, theme } = useUnistyles();
   const reduced = useReducedMotion();
   // Fixed once shown, so a late Apple lookup does not reshuffle the drop.
   const [pins] = useState<CityPin[]>(() =>
@@ -101,17 +110,17 @@ function Spots({
     router.replace({ pathname: "/city/[name]", params: { name: city } });
   };
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { paddingTop: rt.insets.top }]}>
       <View style={[styles.map, { height: mapHeight }]}>
         <CityMap
           pins={pins}
           selected={null}
           height={mapHeight}
-          coveredBottom={0}
+          coveredBottom={theme.gap(5)}
           onSelect={() => undefined}
           visible={dropped}
         />
-        <View style={[styles.added, { top: rt.insets.top + 12 }]}>
+        <View style={styles.added}>
           <Text style={styles.addedText}>{t("spots.addedTo", { city })}</Text>
         </View>
       </View>
@@ -120,11 +129,7 @@ function Spots({
         <Text style={styles.title} accessibilityRole="header">
           {t("spots.count", { count: pins.length })}
         </Text>
-        <ScrollView
-          style={styles.rows}
-          showsVerticalScrollIndicator={false}
-          accessibilityLiveRegion="polite"
-        >
+        <ScrollView style={styles.rows} accessibilityLiveRegion="polite">
           {pins.map((pin, index) => (
             <SpotRow
               key={`${pin.name}:${index < dropped ? "shown" : "waiting"}`}
@@ -188,8 +193,20 @@ const styles = StyleSheet.create((theme) => ({
   map: {
     overflow: "hidden",
   },
+  finding: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.gap(2),
+    backgroundColor: theme.colors.background,
+  },
+  findingText: {
+    ...theme.type.headline,
+    color: theme.colors.muted,
+  },
   added: {
     position: "absolute",
+    top: theme.gap(1.5),
     left: theme.gap(3),
     paddingVertical: theme.gap(0.75),
     paddingHorizontal: theme.gap(1.5),

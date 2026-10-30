@@ -296,14 +296,17 @@ function complete(
   return { state: { ...state, completing: sid }, effects };
 }
 
-/** One saved link opens the screen that drops its spots on the map; anything else goes Home. */
+/**
+ * A share of links opens the screen that drops the first saved one's spots on the map (Safari's
+ * page Share sends the page twice); a photo, or nothing saved, goes Home.
+ */
 function afterSave(session: ShareSession): ShareEffect {
-  const [only] = session.entries;
-  return session.entries.length === 1 &&
-    only.kind === "link" &&
-    only.status === "saved" &&
-    only.itemId !== undefined
-    ? { type: "revealSpots", itemId: only.itemId }
+  const first = session.entries.find(
+    (e) => e.status === "saved" && e.itemId !== undefined,
+  );
+  return first?.itemId !== undefined &&
+    session.entries.every((e) => e.kind === "link")
+    ? { type: "revealSpots", itemId: first.itemId }
     : { type: "navigateHome" };
 }
 

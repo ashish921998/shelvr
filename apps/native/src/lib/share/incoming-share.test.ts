@@ -165,7 +165,7 @@ describe("incoming share owner", () => {
     expect(state.phase.kind).toBe("complete");
   });
 
-  it("opens the spots reveal after one saved link, and Home after more", () => {
+  it("opens the spots reveal for the first saved link, and Home for a photo", () => {
     const finish = (saved: ShareSession) => {
       const { effects } = run(
         [
@@ -191,7 +191,14 @@ describe("incoming share owner", () => {
       { ...two.entries[0], itemId: "item-1" },
       { ...two.entries[0], index: 1, itemId: "item-2" },
     ];
-    expect(finish(two)).toEqual({ type: "navigateHome" });
+    expect(finish(two)).toEqual({ type: "revealSpots", itemId: "item-1" });
+
+    const mixed = session("s4", "saved");
+    mixed.entries = [
+      { ...mixed.entries[0], itemId: "item-1" },
+      { ...mixed.entries[0], index: 1, kind: "image", itemId: "item-2" },
+    ];
+    expect(finish(mixed)).toEqual({ type: "navigateHome" });
 
     const image = session("s3", "saved");
     image.entries[0] = { ...image.entries[0], kind: "image", itemId: "i" };

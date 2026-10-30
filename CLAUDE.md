@@ -478,7 +478,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
   `profile`, `settings`, `item/[id]`, `city/[name]`, `spots/[id]`, `plan/[id]`,
   `new-trip`, `trip-plan/[id]`
-- `spots/[id]` is the moment after sharing one link: "Finding the spots…" while the save is
+- `spots/[id]` is the moment after sharing links: "Finding the spots…" while the first saved one is
   read and pinned, then its pins drop onto the city most of them share, with Open <city> and
   Done (`src/lib/spots-reveal.ts` holds the waits). A failed save, one with no place, or a wait
   past 25 s goes Home, as every other share does. Creator videos film this moment
