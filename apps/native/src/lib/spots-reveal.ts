@@ -84,7 +84,8 @@ export function revealFor(
       }
     }
   }
-  return waitedMs >= REVEAL_MAX_WAIT_MS
+  // A ready save is bounded by the pin grace above, so a late one still gets its full grace.
+  return waitedMs >= REVEAL_MAX_WAIT_MS && save?.status !== "ready"
     ? { kind: "none", reason: "timeout" }
     : { kind: "finding" };
 }

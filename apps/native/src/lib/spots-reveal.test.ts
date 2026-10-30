@@ -138,4 +138,15 @@ describe("revealFor", () => {
       reason: "timeout",
     });
   });
+
+  it("gives a save that turns ready late its full pin grace", () => {
+    const late = save({ status: "ready", cities: ["Austin"] });
+    expect(revealFor(late, REVEAL_MAX_WAIT_MS + 1_000, 5_000)).toEqual({
+      kind: "finding",
+    });
+    expect(revealFor(late, REVEAL_MAX_WAIT_MS + 6_000, 10_000)).toEqual({
+      kind: "none",
+      reason: "no_place",
+    });
+  });
 });
