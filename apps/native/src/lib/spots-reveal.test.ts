@@ -43,7 +43,7 @@ describe("revealFor", () => {
     expect(reveal).toEqual({
       kind: "spots",
       city: "Austin",
-      pins: [pin("Odd Duck", "Austin"), pin("Uchi", "austin"), pin("Loro")],
+      pins: [pin("Odd Duck", "Austin"), pin("Uchi", "austin")],
     });
   });
 
@@ -65,6 +65,15 @@ describe("revealFor", () => {
       city: "Austin",
       pins: [pin("Craft Omakase", "Austin")],
     });
+  });
+
+  it("keeps unlabelled pins out of a multi-city save, as the city page does", () => {
+    const multi = save({
+      status: "processing",
+      cities: ["Austin", "Dallas"],
+      placePins: [pin("Loro"), pin("Uchi")],
+    });
+    expect(revealFor(multi, 7_000, 0)).toEqual({ kind: "finding" });
   });
 
   it("names the save's own city when its pins carry none", () => {

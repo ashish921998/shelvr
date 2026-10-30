@@ -64,8 +64,12 @@ export function revealFor(
     const city = pins.length > 0 ? revealCity(save, pins) : null;
     if (city !== null) {
       const key = cityKey(city);
-      const here = pins.filter((pin) => !pin.city || cityKey(pin.city) === key);
-      return { kind: "spots", city, pins: here.length > 0 ? here : pins };
+      // Like the city page: a pin with no city belongs only to a single-city save.
+      const single = (save.cities ?? []).length <= 1;
+      const here = pins.filter((pin) =>
+        pin.city ? cityKey(pin.city) === key : single,
+      );
+      if (here.length > 0) return { kind: "spots", city, pins: here };
     }
     if (save.status === "ready") {
       if ((save.cities ?? []).length === 0) {

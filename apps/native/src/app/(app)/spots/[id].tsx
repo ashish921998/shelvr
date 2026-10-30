@@ -3,7 +3,7 @@ import { PinBadge } from "@/components/onboarding/sample-trip-map";
 import { Button } from "@/components/ui/button";
 import { StitchMark } from "@/components/ui/stitch-mark";
 import { analytics } from "@/lib/analytics";
-import { cityPins, type CityPin } from "@/lib/city-pins";
+import { cityPinId, cityPins, type CityPin } from "@/lib/city-pins";
 import { t, useAppLocale } from "@/lib/i18n";
 import { springIn } from "@/lib/motion";
 import { type Reveal, revealFor } from "@/lib/spots-reveal";
@@ -132,7 +132,7 @@ function Spots({
         <ScrollView style={styles.rows} accessibilityLiveRegion="polite">
           {pins.map((pin, index) => (
             <SpotRow
-              key={`${pin.name}:${index < dropped ? "shown" : "waiting"}`}
+              key={`${cityPinId(pin)}:${index < dropped ? "shown" : "waiting"}`}
               pin={pin}
               shown={index < dropped}
               reduced={reduced}
