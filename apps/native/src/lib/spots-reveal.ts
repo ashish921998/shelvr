@@ -58,10 +58,14 @@ export function revealFor(
       return { kind: "none", reason: "failed" };
     }
     // A bare street address is usually a named spot's own address, pinned on top of it.
-    const all = save.placePins ?? [];
-    const named = all.filter((pin) => !isStreetAddress(pin.name));
-    const pins = named.length > 0 ? named : all;
-    const city = pins.length > 0 ? revealCity(save, pins) : null;
+    const pins = (save.placePins ?? []).filter(
+      (pin) => !isStreetAddress(pin.name),
+    );
+    // A list save is pinned before it settles, so wait for ready: more pins, or a failure, may follow.
+    const city =
+      save.status === "ready" && pins.length > 0
+        ? revealCity(save, pins)
+        : null;
     if (city !== null) {
       const key = cityKey(city);
       // Like the city page: a pin with no city belongs only to a single-city save.

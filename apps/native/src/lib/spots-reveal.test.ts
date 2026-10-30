@@ -69,11 +69,31 @@ describe("revealFor", () => {
 
   it("keeps unlabelled pins out of a multi-city save, as the city page does", () => {
     const multi = save({
-      status: "processing",
       cities: ["Austin", "Dallas"],
+      status: "ready",
       placePins: [pin("Loro"), pin("Uchi")],
     });
-    expect(revealFor(multi, 7_000, 0)).toEqual({ kind: "finding" });
+    expect(revealFor(multi, 7_000, 1_000)).toEqual({ kind: "finding" });
+  });
+
+  it("waits for a pinned list save to settle before dropping its spots", () => {
+    const pinned = save({
+      cities: ["Austin"],
+      placePins: [pin("Uchi", "Austin")],
+    });
+    expect(revealFor(pinned, 3_000, 0)).toEqual({ kind: "finding" });
+  });
+
+  it("never shows a save whose only pins are street addresses", () => {
+    const addresses = save({
+      status: "ready",
+      cities: ["Austin"],
+      placePins: [pin("3108 Windsor Road, Austin, TX 78703", "Austin")],
+    });
+    expect(revealFor(addresses, 20_000, REVEAL_PIN_GRACE_MS)).toEqual({
+      kind: "none",
+      reason: "no_place",
+    });
   });
 
   it("names the save's own city when its pins carry none", () => {
