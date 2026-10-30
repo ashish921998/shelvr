@@ -306,7 +306,7 @@ export function splitSavedPlace(value: string): { name: string; area: string } {
   return { name: name.trim(), area: area.join(",").trim() };
 }
 
-function isStreetAddress(name: string): boolean {
+export function isStreetAddress(name: string): boolean {
   const words = wordsOf(name);
   if (
     ["burger", "burgers", "cafe", "bar", "restaurant", "bakery"].includes(

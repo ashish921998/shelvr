@@ -1,3 +1,4 @@
+import { isStreetAddress } from "@convex/model/plan";
 import { cityKey } from "@convex/model/trip";
 
 /** How long the reveal waits for a save to be read and pinned before it gives up and goes Home. */
@@ -56,7 +57,10 @@ export function revealFor(
     if (save.status === "failed" || save.status === "unavailable") {
       return { kind: "none", reason: "failed" };
     }
-    const pins = save.placePins ?? [];
+    // A bare street address is usually a named spot's own address, pinned on top of it.
+    const all = save.placePins ?? [];
+    const named = all.filter((pin) => !isStreetAddress(pin.name));
+    const pins = named.length > 0 ? named : all;
     const city = pins.length > 0 ? revealCity(save, pins) : null;
     if (city !== null) {
       const key = cityKey(city);

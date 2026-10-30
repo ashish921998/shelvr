@@ -47,6 +47,26 @@ describe("revealFor", () => {
     });
   });
 
+  it("leaves out bare street addresses pinned on top of named spots", () => {
+    const reveal = revealFor(
+      save({
+        status: "ready",
+        cities: ["Austin"],
+        placePins: [
+          pin("Craft Omakase", "Austin"),
+          pin("4400 N Lamar Blvd Suite 102, Austin, TX 78756", "Austin"),
+        ],
+      }),
+      7_000,
+      0,
+    );
+    expect(reveal).toEqual({
+      kind: "spots",
+      city: "Austin",
+      pins: [pin("Craft Omakase", "Austin")],
+    });
+  });
+
   it("names the save's own city when its pins carry none", () => {
     const reveal = revealFor(
       save({
