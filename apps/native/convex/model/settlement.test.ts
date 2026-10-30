@@ -117,6 +117,29 @@ it("replaces only pins whose branch clue changed and retains them without AI per
   ).not.toHaveProperty("placePins");
 });
 
+it("clears a pin whose name differs from the clue only by accents or punctuation", () => {
+  const item = savedItem({
+    places: ["Cafe Joe's"],
+    cities: ["Paris"],
+    placePins: [{ name: "Cafe Joe's", lat: 48.855, lng: 2.365 }],
+  });
+  const patch = completionPatch(
+    item,
+    {
+      reading: {},
+      classification: {
+        description: "Paris cafes",
+        tags: [],
+        cities: ["Paris"],
+        places: ["Café Joe’s"],
+        placeLocations: [{ name: "Café Joe’s", location: "Rue Oberkampf" }],
+      },
+    },
+    true,
+  );
+  expect(patch.placePins).toEqual([]);
+});
+
 it("stores single-city classification places without city suffixes", () => {
   const patch = completionPatch(
     savedItem(),

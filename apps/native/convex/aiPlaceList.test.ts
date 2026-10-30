@@ -80,6 +80,11 @@ function model(cityCall: () => Promise<unknown>) {
             ],
             cities: ["Tokyo"],
             places: ["Marcy Land"],
+            // A list line carries each place's address, so the model reads branch clues off it.
+            placeLocations: [
+              { name: "Marcy Land", location: "Minato City, Tokyo" },
+              { name: "Savoy Azabujuban", location: "Azabujuban, Tokyo" },
+            ],
           },
         },
   );

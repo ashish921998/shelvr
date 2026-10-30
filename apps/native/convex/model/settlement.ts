@@ -18,6 +18,7 @@ import {
   recipeValidator,
   type Recipe,
 } from "./itemFields";
+import { placeKey } from "./plan";
 import { buildSearchText } from "./searchText";
 
 const readingValidator = v.object({
@@ -228,18 +229,23 @@ export function completionPatch(
 /** A newly learned branch must replace its old pin on the next lookup. */
 function locationPatch(item: Doc<"items">, words: Words): ItemPatch {
   if (words.placeLocations === undefined) return {};
+  // The same key toLocate and storePins use, so accents or punctuation cannot hide a pin.
+  const key = (name: string) =>
+    placeKey(normalizePlaceName(name, words.cities));
   const changed = new Set(
     words.placeLocations
       .filter(
         (hint) =>
           !item.placeLocations?.some(
-            (old) => old.name === hint.name && old.location === hint.location,
+            (old) =>
+              key(old.name) === key(hint.name) &&
+              old.location === hint.location,
           ),
       )
-      .map((hint) => hint.name.toLowerCase()),
+      .map((hint) => key(hint.name)),
   );
   const changedPin = (pin: NonNullable<Doc<"items">["placePins"]>[number]) =>
-    changed.has(normalizePlaceName(pin.name, words.cities).toLowerCase());
+    changed.has(key(pin.name));
   return {
     placeLocations: words.placeLocations,
     ...(item.placePins?.some(changedPin)

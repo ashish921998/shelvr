@@ -584,6 +584,8 @@ async function analyzeLinkItem(
       intents: intentsForPart(result.intents, part),
       places: part.places,
       cities: part.cities,
+      // The list's own points pin its places; an address clue would clear them for an Apple lookup.
+      placeLocations: [],
       ...(parts.length > 1 ? { title: part.title } : {}),
     },
     page: { ...page, content: part.content },
