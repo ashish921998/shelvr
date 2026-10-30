@@ -165,6 +165,39 @@ describe("incoming share owner", () => {
     expect(state.phase.kind).toBe("complete");
   });
 
+  it("opens the spots reveal after one saved link, and Home after more", () => {
+    const finish = (saved: ShareSession) => {
+      const { effects } = run(
+        [
+          { type: "reconciled", result: { kind: "new", session: saved } },
+          { type: "saveSettled", session: saved },
+          {
+            type: "nativeClearSettled",
+            ok: true,
+            for: { kind: "complete", session: saved },
+          },
+        ],
+        ctx(),
+        initialIncomingShare(false),
+      );
+      return effects[2].at(-1);
+    };
+    const one = session("s1", "saved");
+    one.entries[0].itemId = "item-1";
+    expect(finish(one)).toEqual({ type: "revealSpots", itemId: "item-1" });
+
+    const two = session("s2", "saved");
+    two.entries = [
+      { ...two.entries[0], itemId: "item-1" },
+      { ...two.entries[0], index: 1, itemId: "item-2" },
+    ];
+    expect(finish(two)).toEqual({ type: "navigateHome" });
+
+    const image = session("s3", "saved");
+    image.entries[0] = { ...image.entries[0], kind: "image", itemId: "i" };
+    expect(finish(image)).toEqual({ type: "navigateHome" });
+  });
+
   it("never tombstones on iOS", () => {
     const { effects } = run(
       [

@@ -899,5 +899,12 @@
   "tripPlanner.revealTitle": "Planning your %{city} trip",
   "tripPlanner.revealRead": "Reading your saves…",
   "tripPlanner.revealFind": "Finding places nearby…",
-  "tripPlanner.revealBuild": "Building your days…"
+  "tripPlanner.revealBuild": "Building your days…",
+  "spots.finding": "Finding the spots…",
+  "spots.addedTo": "Added to %{city}",
+  "spots.count": {
+    "one": "%{formattedCount} spot from this save",
+    "other": "%{formattedCount} spots from this save"
+  },
+  "spots.openCity": "Open %{city}"
 }

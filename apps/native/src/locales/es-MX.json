@@ -922,5 +922,13 @@
   "tripPlanner.revealTitle": "Planeando tu viaje a %{city}",
   "tripPlanner.revealRead": "Leyendo lo que guardaste…",
   "tripPlanner.revealFind": "Buscando lugares cercanos…",
-  "tripPlanner.revealBuild": "Armando tus días…"
+  "tripPlanner.revealBuild": "Armando tus días…",
+  "spots.finding": "Buscando los lugares…",
+  "spots.addedTo": "Agregado a %{city}",
+  "spots.count": {
+    "one": "%{formattedCount} lugar de este guardado",
+    "many": "%{formattedCount} lugares de este guardado",
+    "other": "%{formattedCount} lugares de este guardado"
+  },
+  "spots.openCity": "Abrir %{city}"
 }

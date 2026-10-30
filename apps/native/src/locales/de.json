@@ -899,5 +899,12 @@
   "tripPlanner.revealTitle": "Deine Reise nach %{city} wird geplant",
   "tripPlanner.revealRead": "Deine Saves werden gelesen …",
   "tripPlanner.revealFind": "Orte in der Nähe werden gesucht …",
-  "tripPlanner.revealBuild": "Deine Tage werden zusammengestellt …"
+  "tripPlanner.revealBuild": "Deine Tage werden zusammengestellt …",
+  "spots.finding": "Orte werden gesucht…",
+  "spots.addedTo": "Zu %{city} hinzugefügt",
+  "spots.count": {
+    "one": "%{formattedCount} Ort aus diesem Inhalt",
+    "other": "%{formattedCount} Orte aus diesem Inhalt"
+  },
+  "spots.openCity": "%{city} öffnen"
 }

@@ -922,5 +922,13 @@
   "tripPlanner.revealTitle": "Préparation de votre voyage à %{city}",
   "tripPlanner.revealRead": "Lecture de vos enregistrements…",
   "tripPlanner.revealFind": "Recherche de lieux à proximité…",
-  "tripPlanner.revealBuild": "Organisation de vos journées…"
+  "tripPlanner.revealBuild": "Organisation de vos journées…",
+  "spots.finding": "Recherche des adresses…",
+  "spots.addedTo": "Ajouté à %{city}",
+  "spots.count": {
+    "one": "%{formattedCount} adresse de cet enregistrement",
+    "many": "%{formattedCount} adresses de cet enregistrement",
+    "other": "%{formattedCount} adresses de cet enregistrement"
+  },
+  "spots.openCity": "Ouvrir %{city}"
 }

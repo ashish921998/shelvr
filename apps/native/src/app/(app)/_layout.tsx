@@ -104,6 +104,10 @@ export default function AppLayout() {
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
           <Stack.Screen
+            name="spots/[id]"
+            options={{ headerShown: false, gestureEnabled: false }}
+          />
+          <Stack.Screen
             name="trip-plan/[id]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />

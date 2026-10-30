@@ -832,6 +832,10 @@ export type MessageParams = {
   "tripPlanner.revealRead": undefined;
   "tripPlanner.revealFind": undefined;
   "tripPlanner.revealBuild": undefined;
+  "spots.finding": undefined;
+  "spots.addedTo": { city: string };
+  "spots.count": { count: number };
+  "spots.openCity": { city: string };
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

@@ -79,7 +79,8 @@ export type ShareEffect =
   | { type: "capture"; event: "share_ghost_skipped" }
   | { type: "sharedContentSaved"; itemCount: number }
   | { type: "openPaywall" }
-  | { type: "navigateHome" };
+  | { type: "navigateHome" }
+  | { type: "revealSpots"; itemId: string };
 
 type Step = { state: IncomingShareState; effects: ShareEffect[] };
 
@@ -295,6 +296,17 @@ function complete(
   return { state: { ...state, completing: sid }, effects };
 }
 
+/** One saved link opens the screen that drops its spots on the map; anything else goes Home. */
+function afterSave(session: ShareSession): ShareEffect {
+  const [only] = session.entries;
+  return session.entries.length === 1 &&
+    only.kind === "link" &&
+    only.status === "saved" &&
+    only.itemId !== undefined
+    ? { type: "revealSpots", itemId: only.itemId }
+    : { type: "navigateHome" };
+}
+
 function abandon(state: IncomingShareState, ctx: ShareContext): Step {
   return {
     state: { ...state, recordId: null },
@@ -355,7 +367,7 @@ function clearSettled(
       itemCount: session.entries.length,
     });
   }
-  effects.push({ type: "navigateHome" });
+  effects.push(afterSave(session));
   return {
     state: {
       ...state,

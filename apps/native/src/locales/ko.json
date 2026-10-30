@@ -876,5 +876,11 @@
   "tripPlanner.revealTitle": "%{city} 여행을 계획하는 중",
   "tripPlanner.revealRead": "저장한 항목을 읽는 중…",
   "tripPlanner.revealFind": "근처 장소를 찾는 중…",
-  "tripPlanner.revealBuild": "하루하루 일정을 짜는 중…"
+  "tripPlanner.revealBuild": "하루하루 일정을 짜는 중…",
+  "spots.finding": "장소를 찾는 중…",
+  "spots.addedTo": "%{city}에 추가됨",
+  "spots.count": {
+    "other": "이 저장에서 장소 %{formattedCount}곳"
+  },
+  "spots.openCity": "%{city} 열기"
 }

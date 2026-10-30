@@ -876,5 +876,11 @@
   "tripPlanner.revealTitle": "%{city}旅行を計画しています",
   "tripPlanner.revealRead": "保存したものを読んでいます…",
   "tripPlanner.revealFind": "近くの場所を探しています…",
-  "tripPlanner.revealBuild": "日ごとの予定を組んでいます…"
+  "tripPlanner.revealBuild": "日ごとの予定を組んでいます…",
+  "spots.finding": "スポットを探しています…",
+  "spots.addedTo": "%{city}に追加しました",
+  "spots.count": {
+    "other": "この保存から%{formattedCount}件のスポット"
+  },
+  "spots.openCity": "%{city}を開く"
 }
