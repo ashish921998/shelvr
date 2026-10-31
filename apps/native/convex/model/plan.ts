@@ -42,6 +42,15 @@ export type RawPlanPlace = {
   why: string;
 };
 
+export function shuffled<T>(items: readonly T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 export function clip(text: string, max: number): string {
   const trimmed = text.replace(/\s+/g, " ").trim();
   return trimmed.length <= max ? trimmed : `${trimmed.slice(0, max - 1)}…`;
@@ -468,10 +477,8 @@ export function suggestSavedPlaces(
   const candidates = sanitizePicks(raw, sources, new Set(), raw.length).map(
     ({ place }) => place,
   );
-  const places = uniqueUnvisitedPlaces(candidates, sources, been);
-  for (let i = places.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [places[i], places[j]] = [places[j], places[i]];
-  }
-  return places.slice(0, limit);
+  return shuffled(uniqueUnvisitedPlaces(candidates, sources, been)).slice(
+    0,
+    limit,
+  );
 }

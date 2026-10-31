@@ -123,7 +123,6 @@ import type * as placeVisits from "../placeVisits.js";
 import type * as planShares from "../planShares.js";
 import type * as plans from "../plans.js";
 import type * as reelPlaces from "../reelPlaces.js";
-import type * as sharedListSearch from "../sharedListSearch.js";
 import type * as sharedLists from "../sharedLists.js";
 import type * as spaces from "../spaces.js";
 import type * as subscriptions from "../subscriptions.js";
@@ -256,7 +255,6 @@ declare const fullApi: ApiFromModules<{
   planShares: typeof planShares;
   plans: typeof plans;
   reelPlaces: typeof reelPlaces;
-  sharedListSearch: typeof sharedListSearch;
   sharedLists: typeof sharedLists;
   spaces: typeof spaces;
   subscriptions: typeof subscriptions;

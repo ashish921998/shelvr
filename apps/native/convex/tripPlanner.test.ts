@@ -304,6 +304,7 @@ describe("claimTripPlanInternal", () => {
       been: ["Elsewhere"],
       aiAllowed: true,
     });
+    if (claim.from !== "saves") throw new Error("expected a saves claim");
     expect(claim.startDate).toBeUndefined();
     expect(claim.sources).toHaveLength(3);
     expect(claim.pins.map((pin) => pin.appleId).sort()).toEqual([
@@ -923,6 +924,7 @@ describe("a personal trip", () => {
       const listId = await ctx.db.insert("sharedLists", {
         ownerId: userId,
         name: "Ours",
+        cities: ["Lisbon"],
         inviteToken: "t",
         placeCount: 1,
         createdAt: 1,

@@ -448,6 +448,7 @@ describe("a personal date plan", () => {
       const listId = await ctx.db.insert("sharedLists", {
         ownerId: userId,
         name: "Ours",
+        cities: ["Lisbon"],
         inviteToken: "t",
         placeCount: 1,
         createdAt: 1,

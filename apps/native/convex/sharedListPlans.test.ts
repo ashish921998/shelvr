@@ -8,7 +8,12 @@ import type { DatePlanResult } from "./model/datePlan";
 import { joiner, listWithOwner, near } from "./sharedLists.test.helpers";
 import { setTestConsent, signedInUser, type TestBackend } from "./test.setup";
 
-const RED_FROG = { name: "Red Frog", ...near(4), category: "Nightlife" };
+const RED_FROG = {
+  name: "Red Frog",
+  ...near(4),
+  category: "Nightlife",
+  city: "Lisbon",
+};
 
 async function testKey(): Promise<string> {
   const pair = await crypto.subtle.generateKey(

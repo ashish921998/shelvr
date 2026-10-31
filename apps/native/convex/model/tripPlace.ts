@@ -1,5 +1,6 @@
+import type { Doc } from "../_generated/dataModel";
 import { MAX_AREA_CHARS, MAX_PLACE_NAME_CHARS } from "./plan";
-import type { TripPlace } from "./tripPlan";
+import type { TripPlace, TripPlanSummary } from "./tripPlan";
 
 export const MAX_APPLE_ID_CHARS = 100;
 export const MAX_CATEGORY_CHARS = 60;
@@ -45,5 +46,19 @@ export function tidyPlace(place: TripPlace): TidyPlace {
     ...(appleId !== undefined ? { appleId } : {}),
     ...(category !== undefined ? { category } : {}),
     ...(area !== undefined ? { area } : {}),
+  };
+}
+
+export function tripSummary(plan: Doc<"tripPlans">): TripPlanSummary {
+  return {
+    _id: plan._id,
+    ...(plan.name !== undefined ? { name: plan.name } : {}),
+    city: plan.city,
+    ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
+    dayCount: plan.dayCount,
+    stopCount: plan.stopCount,
+    savedCount: plan.savedCount,
+    interests: plan.interests,
+    createdAt: plan._creationTime,
   };
 }

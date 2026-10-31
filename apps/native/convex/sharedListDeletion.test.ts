@@ -61,7 +61,7 @@ describe("deleting an account with shared lists", () => {
     const bo = await joiner(base, token);
     await bo.t.mutation(api.sharedLists.addSharedListPlace, {
       listId,
-      place: { name: "Ramiro", lat: 38.73, lng: -9.139 },
+      place: { name: "Ramiro", lat: 38.73, lng: -9.139, city: "Lisbon" },
     });
     await bo.t.mutation(api.users.deleteCurrentUserAccount, {});
     await owner.t.mutation(api.users.deleteCurrentUserAccount, {});
@@ -82,7 +82,7 @@ describe("deleting an account with shared lists", () => {
     const bo = await joiner(base, token);
     await bo.t.mutation(api.sharedLists.addSharedListPlace, {
       listId,
-      place: { name: "Ramiro", lat: 38.73, lng: -9.139 },
+      place: { name: "Ramiro", lat: 38.73, lng: -9.139, city: "Lisbon" },
     });
     const before = await remains(base, listId);
     await bo.t.mutation(api.users.deleteCurrentUserAccount, {});
@@ -133,6 +133,7 @@ describe("deleting an account with shared lists", () => {
           name: `Spot ${n}`,
           lat: 38.7 + n * 0.0001,
           lng: -9.14,
+          city: "Lisbon",
           addedAt: n,
         });
       }
@@ -159,6 +160,7 @@ describe("deleting an account with shared lists", () => {
         const id = await ctx.db.insert("sharedLists", {
           ownerId: owner.userId,
           name: `List ${n}`,
+          cities: ["Lisbon"],
           inviteToken: `token-${n}`,
           placeCount: 0,
           createdAt: n,

@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { MAX_LIST_PLACES } from "./model/sharedLists";
+import { MAX_CITY_CHARS } from "./model/trip";
 import {
   joiner,
   listWithOwner,
@@ -128,6 +129,23 @@ describe("addSavePlaces", () => {
     ).rejects.toThrow(/List not found/);
   });
 
+  it("skips a pin with no city of its own on a save that names several", async () => {
+    const { base, owner, listId } = await listWithOwner();
+    const itemId = await seedSave(base, owner.userId, {
+      cities: ["Porto", "Lisbon"],
+      pins: [
+        { name: "Somewhere", ...near(12) },
+        { name: "Ramiro", ...near(10), city: "Lisbon" },
+      ],
+    });
+    expect(
+      await owner.t.mutation(api.sharedLists.addSavePlaces, { listId, itemId }),
+    ).toBe(1);
+    const names = (await placeRows(base, listId)).map((row) => row.name);
+    expect(names).toContain("Ramiro");
+    expect(names).not.toContain("Somewhere");
+  });
+
   it("removeSavePlaces takes back only the rows the caller added from that save", async () => {
     const { base, owner, itemId, token, listId } = await listWithOwner();
     const bo = await joiner(base, token, { pro: true });
@@ -192,28 +210,55 @@ describe("addSharedListPlace", () => {
     expect(row).not.toHaveProperty("itemId");
   });
 
+  it("needs a city and caps its length, for a free member too", async () => {
+    const { base, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    await expect(
+      bo.t.mutation(api.sharedLists.addSharedListPlace, {
+        listId,
+        place: { name: "Nowhere", ...near(30), city: "   " },
+      }),
+    ).rejects.toThrow(/City required/);
+    const id = await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: { name: "Longtown", ...near(31), city: "x".repeat(500) },
+    });
+    const row = await base.run((ctx) => ctx.db.get(id));
+    expect(row?.city).toBe("x".repeat(MAX_CITY_CHARS));
+  });
+
   it("refuses a bad point, a full list, and a stranger", async () => {
     const { base, owner, listId } = await listWithOwner();
     await expect(
       owner.t.mutation(api.sharedLists.addSharedListPlace, {
         listId,
-        place: { name: "Nowhere", lat: 91, lng: 0 },
+        place: { name: "Nowhere", lat: 91, lng: 0, city: "Lisbon" },
       }),
     ).rejects.toThrow(/Place required/);
-    await base.run((ctx) =>
-      ctx.db.patch(listId, { placeCount: MAX_LIST_PLACES }),
-    );
+    await base.run(async (ctx) => {
+      for (let n = 2; n < MAX_LIST_PLACES; n++) {
+        await ctx.db.insert("sharedListPlaces", {
+          listId,
+          addedBy: owner.userId,
+          name: `Spot ${n}`,
+          lat: 38 + n * 0.01,
+          lng: -9,
+          city: "Lisbon",
+          addedAt: n,
+        });
+      }
+    });
     await expect(
       owner.t.mutation(api.sharedLists.addSharedListPlace, {
         listId,
-        place: { name: "One more", ...near(50) },
+        place: { name: "One more", ...near(50), city: "Lisbon" },
       }),
     ).rejects.toThrow(/full/);
     const stranger = await signedInUser(base, { pro: false });
     await expect(
       stranger.t.mutation(api.sharedLists.addSharedListPlace, {
         listId,
-        place: { name: "Mine", ...near(60) },
+        place: { name: "Mine", ...near(60), city: "Lisbon" },
       }),
     ).rejects.toThrow(/List not found/);
   });
@@ -264,7 +309,7 @@ describe("a place on the list", () => {
     later();
     await owner.t.mutation(api.sharedLists.addSharedListPlace, {
       listId,
-      place: { name: "Ramiro", ...near(10) },
+      place: { name: "Ramiro", ...near(10), city: "Lisbon" },
     });
     const after = await bo.t.query(api.sharedLists.listSharedLists, {});
     expect(after[0]?.newCount).toBe(1);
@@ -326,7 +371,7 @@ describe("searchListPlaces", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { base, token, listId } = await listWithOwner();
     const bo = await joiner(base, token);
-    const result = await bo.t.action(api.sharedListSearch.searchListPlaces, {
+    const result = await bo.t.action(api.tripPlanner.searchListPlaces, {
       listId,
       query: "  ramen ",
     });
@@ -342,14 +387,14 @@ describe("searchListPlaces", () => {
   it("answers nothing for a short query and refuses a stranger", async () => {
     const { base, owner, listId } = await listWithOwner();
     expect(
-      await owner.t.action(api.sharedListSearch.searchListPlaces, {
+      await owner.t.action(api.tripPlanner.searchListPlaces, {
         listId,
         query: "r",
       }),
     ).toEqual({ available: true, places: [] });
     const stranger = await signedInUser(base, { pro: true });
     await expect(
-      stranger.t.action(api.sharedListSearch.searchListPlaces, {
+      stranger.t.action(api.tripPlanner.searchListPlaces, {
         listId,
         query: "ramen",
       }),
@@ -367,7 +412,7 @@ describe("searchListPlaces", () => {
       if (sub) await ctx.db.delete(sub._id);
     });
     await expect(
-      bo.t.action(api.sharedListSearch.searchListPlaces, {
+      bo.t.action(api.tripPlanner.searchListPlaces, {
         listId,
         query: "ramen",
       }),
@@ -381,7 +426,7 @@ describe("searchListPlaces", () => {
     const { base, owner, token, listId } = await listWithOwner();
     const bo = await joiner(base, token);
     await base.run((ctx) => setTestConsent(ctx, owner.userId, "declined"));
-    const result = await bo.t.action(api.sharedListSearch.searchListPlaces, {
+    const result = await bo.t.action(api.tripPlanner.searchListPlaces, {
       listId,
       query: "ramen",
     });

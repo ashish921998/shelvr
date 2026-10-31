@@ -569,8 +569,8 @@ describe("place removals", () => {
     const date = await t.mutation(internal.datePlanData.claimDatePlanInternal, {
       city: "Lisbon",
     });
-    expect(trip.pins).toEqual([]);
-    expect(date.pins).toEqual([]);
+    expect(trip).toMatchObject({ from: "saves", pins: [] });
+    expect(date).toMatchObject({ from: "saves", pins: [] });
     const found = {
       name: "Tigre",
       area: "Alfama",
