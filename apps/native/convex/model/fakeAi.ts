@@ -51,7 +51,8 @@ function isLoopback(url: string | undefined): boolean {
   }
 }
 
-const ANALYSIS_KEYS = "cities,description,intents,places,spaceNames,tags,title";
+const ANALYSIS_KEYS =
+  "cities,description,intents,placeLocations,places,spaceNames,tags,title";
 const NOTE_TASK = "Analyze this saved note";
 const NOTE_MARKER = "\n\nNote:\n";
 const LINK_TASK = "Analyze this saved web page";
