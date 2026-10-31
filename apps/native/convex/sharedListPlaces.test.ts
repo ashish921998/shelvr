@@ -44,6 +44,25 @@ afterEach(() => {
 });
 
 describe("addSavePlaces", () => {
+  it("adds only the named place when given one", async () => {
+    const { base, owner, listId } = await listWithOwner();
+    const itemId = await seedSave(base, owner.userId, {
+      pins: [
+        { name: "Cervejaria Ramiro", ...near(10) },
+        { name: "Taberna da Rua", ...near(14) },
+      ],
+    });
+    const added = await owner.t.mutation(api.sharedLists.addSavePlaces, {
+      listId,
+      itemId,
+      name: "Taberna da Rua",
+    });
+    expect(added).toBe(1);
+    const names = (await placeRows(base, listId)).map((row) => row.name);
+    expect(names).toContain("Taberna da Rua");
+    expect(names).not.toContain("Cervejaria Ramiro");
+  });
+
   it("leaves out a place the person removed from the save", async () => {
     const { base, owner, listId } = await listWithOwner();
     const itemId = await seedSave(base, owner.userId, {
