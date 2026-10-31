@@ -50,7 +50,7 @@ import {
 } from "./model/sharedLists";
 import { sameTripPlace } from "./model/placeIdentity";
 import { saveError } from "./model/saveErrors";
-import { cityKey, MAX_CITY_CHARS, middleOf } from "./model/trip";
+import { cityKey, MAX_CITY_CHARS } from "./model/trip";
 import { tidyText, tripSummary } from "./model/tripPlace";
 import {
   hasProEntitlement,
@@ -269,29 +269,31 @@ export const getSharedList = authedQuery({
           joinedAt: member.joinedAt,
         };
       }),
-      places: places.map((place) => {
-        const addedByName = names.get(place.addedBy);
-        const own = place.addedBy === userId;
-        return {
-          _id: place._id,
-          name: place.name,
-          lat: place.lat,
-          lng: place.lng,
-          city: place.city,
-          ...(place.appleId !== undefined ? { appleId: place.appleId } : {}),
-          ...(place.category !== undefined ? { category: place.category } : {}),
-          ...(own && place.itemId !== undefined
-            ? { itemId: place.itemId }
-            : {}),
-          addedByYou: own,
-          ...(addedByName !== undefined ? { addedByName } : {}),
-          addedAt: place.addedAt,
-          isNew: isNewPlace(place, membership),
-          ...(place.visitedAt !== undefined
-            ? { visitedAt: place.visitedAt }
-            : {}),
-        };
-      }),
+      places: await Promise.all(
+        places.map(async (place) => {
+          const addedByName = names.get(place.addedBy);
+          const itemId = await ownSaveId(ctx, place, userId);
+          return {
+            _id: place._id,
+            name: place.name,
+            lat: place.lat,
+            lng: place.lng,
+            city: place.city,
+            ...(place.appleId !== undefined ? { appleId: place.appleId } : {}),
+            ...(place.category !== undefined
+              ? { category: place.category }
+              : {}),
+            ...(itemId !== undefined ? { itemId } : {}),
+            addedByYou: place.addedBy === userId,
+            ...(addedByName !== undefined ? { addedByName } : {}),
+            addedAt: place.addedAt,
+            isNew: isNewPlace(place, membership),
+            ...(place.visitedAt !== undefined
+              ? { visitedAt: place.visitedAt }
+              : {}),
+          };
+        }),
+      ),
       trips: trips.map(tripSummary),
     };
   },
@@ -404,8 +406,7 @@ export const removeSharedListMember = authedMutation({
     if (list.ownerId !== userId) throw new Error("Only the owner can remove");
     if (args.memberId === userId) throw new Error("Leave the list instead");
     const membership = await memberOf(ctx, list._id, args.memberId);
-    if (membership === null) return null;
-    await ctx.db.delete(membership._id);
+    if (membership !== null) await ctx.db.delete(membership._id);
     await ctx.db.patch(list._id, { inviteToken: inviteToken() });
     return null;
   },
@@ -602,19 +603,22 @@ export async function claimListPlan(
   listId: Id<"sharedLists">,
   userId: Id<"users">,
   city: string,
-  bucket: "makePlan" | "createTripPlan",
+  options: { bucket: "makePlan" | "createTripPlan"; needsPlaces: boolean },
 ): Promise<ListPlanClaim> {
   const list = await requireCoveredList(ctx, listId, userId);
-  await rateLimiter.limit(ctx, bucket, { key: userId, throws: true });
   const wanted = cityKey(city);
-  const been = await recentVisits(ctx, userId);
-  const skipped = new Set(been.map(placeKey));
-  const rows = (await listPlaces(ctx, list._id)).filter(
-    (row) =>
-      row.visitedAt === undefined &&
-      cityKey(row.city) === wanted &&
-      !skipped.has(placeKey(row.name)),
+  const inCity = (await listPlaces(ctx, list._id)).filter(
+    (row) => cityKey(row.city) === wanted,
   );
+  const visited = await recentVisits(ctx, userId);
+  const skipped = new Set(visited.map(placeKey));
+  const rows = inCity.filter(
+    (row) => row.visitedAt === undefined && !skipped.has(placeKey(row.name)),
+  );
+  if (options.needsPlaces && rows.length === 0) {
+    throw new Error("No places in this city");
+  }
+  await rateLimiter.limit(ctx, options.bucket, { key: userId, throws: true });
   const places: ListPlanClaim["places"] = [];
   for (const row of rows) {
     const itemId = await ownSaveId(ctx, row, userId);
@@ -631,32 +635,35 @@ export async function claimListPlan(
   }
   return {
     places,
-    been,
+    been: [
+      ...new Set([
+        ...visited,
+        ...inCity
+          .filter((row) => row.visitedAt !== undefined)
+          .map((row) => row.name),
+      ]),
+    ],
     removed: await userRemovals(ctx, userId),
     aiAllowed: await listAiAllowed(ctx, userId, rows),
   };
 }
 
 export const claimListSearchInternal = internalMutation({
-  args: { listId: v.id("sharedLists") },
+  args: { listId: v.id("sharedLists"), city: v.string() },
   returns: v.object({
-    city: v.optional(v.string()),
-    centre: v.union(v.null(), v.object({ lat: v.number(), lng: v.number() })),
+    city: v.string(),
+    centre: v.null(),
     aiAllowed: v.boolean(),
   }),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    const list = await requireCoveredList(ctx, args.listId, userId);
+    await requireCoveredList(ctx, args.listId, userId);
+    const city = tidyText(args.city, MAX_CITY_CHARS);
+    if (city === undefined) throw new Error("City required");
     await rateLimiter.limit(ctx, "sharedListSearch", {
       key: userId,
       throws: true,
     });
-    const places = await listPlaces(ctx, list._id);
-    const city = listCities(list, places)[0];
-    return {
-      ...(city !== undefined ? { city } : {}),
-      centre: middleOf(places),
-      aiAllowed: await listAiAllowed(ctx, userId, places),
-    };
+    return { city, centre: null, aiAllowed: await aiAllowed(ctx, userId) };
   },
 });

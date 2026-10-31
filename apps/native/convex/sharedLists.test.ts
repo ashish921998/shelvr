@@ -317,7 +317,46 @@ describe("leaveSharedList", () => {
   });
 });
 
+describe("getSharedList's save links", () => {
+  it("drops the link once the save behind a place is gone", async () => {
+    const { base, owner, itemId, listId } = await listWithOwner();
+    const before = await owner.t.query(api.sharedLists.getSharedList, {
+      listId,
+    });
+    expect(before?.places.map((place) => place.itemId)).toEqual([
+      itemId,
+      itemId,
+    ]);
+    await base.run((ctx) => ctx.db.delete(itemId));
+    const after = await owner.t.query(api.sharedLists.getSharedList, {
+      listId,
+    });
+    expect(after?.places).toHaveLength(2);
+    expect(after?.places.map((place) => place.itemId)).toEqual([
+      undefined,
+      undefined,
+    ]);
+  });
+});
+
 describe("removeSharedListMember", () => {
+  it("rotates the link even when the person has already left", async () => {
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    await bo.t.mutation(api.sharedLists.leaveSharedList, { listId });
+    await expect(
+      owner.t.mutation(api.sharedLists.removeSharedListMember, {
+        listId,
+        memberId: bo.userId,
+      }),
+    ).resolves.toBeNull();
+    const after = await base.run((ctx) => ctx.db.get(listId));
+    expect(after?.inviteToken).not.toBe(token);
+    expect(
+      await bo.t.mutation(api.sharedLists.joinSharedList, { token }),
+    ).toBeNull();
+  });
+
   it("is for the owner, drops the member and rotates the invite link", async () => {
     const { base, owner, token, listId } = await listWithOwner();
     const bo = await joiner(base, token);

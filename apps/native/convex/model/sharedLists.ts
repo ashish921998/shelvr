@@ -2,6 +2,7 @@ import { type Infer, v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { liveOwner } from "./auth";
+import { namesOneVenue } from "./dateRank";
 import { removalValidator } from "./placeRemovals";
 import {
   cityKey,
@@ -134,7 +135,7 @@ export function foundPlace(input: TripPlace & { city: string }): NewListPlace {
 
 export function savePlaces(item: Doc<"items">, city?: string): NewListPlace[] {
   const only = item.cities?.length === 1 ? item.cities[0] : undefined;
-  const tags = item.tags.slice(0, TAGS_PER_PLACE);
+  const tags = namesOneVenue(item) ? item.tags.slice(0, TAGS_PER_PLACE) : [];
   const pins = (
     city ? pinsForCity(item, city) : (item.placePins ?? [])
   ).flatMap((pin) => {

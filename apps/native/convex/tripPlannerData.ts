@@ -166,13 +166,10 @@ export const claimTripPlanInternal = internalMutation({
       ...(stay !== undefined ? { stay } : {}),
     };
     if (args.listId !== undefined) {
-      const claim = await claimListPlan(
-        ctx,
-        args.listId,
-        userId,
-        city,
-        "createTripPlan",
-      );
+      const claim = await claimListPlan(ctx, args.listId, userId, city, {
+        bucket: "createTripPlan",
+        needsPlaces: true,
+      });
       return {
         from: "list" as const,
         ...asked,
@@ -706,7 +703,10 @@ export const claimTripSearchInternal = internalMutation({
     const planned = stops.filter((stop) => stop.day !== UNPLANNED_DAY);
     return {
       city: plan.city,
-      centre: middleOf(planned.length > 0 ? planned : stops),
+      centre:
+        plan.listId !== undefined
+          ? null
+          : middleOf(planned.length > 0 ? planned : stops),
       aiAllowed: await aiAllowed(ctx, userId),
     };
   },

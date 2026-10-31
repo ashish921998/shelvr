@@ -409,7 +409,7 @@ const MAX_SEARCH_RESULTS = 15;
 const SEARCH_RADIUS_KM = SUGGEST_RADIUS_KM * 2;
 
 type SearchClaim = {
-  city?: string;
+  city: string;
   centre: LatLng | null;
   aiAllowed: boolean;
 };
@@ -429,10 +429,7 @@ async function placeSearch(
   const maps = claim.aiAllowed ? await openMaps(appleLang(locale)) : null;
   if (maps === null) return { available: false, places: [] };
   const centre =
-    claim.centre ??
-    (claim.city === undefined
-      ? null
-      : await appleMapsLookup(maps.token, "geocode", claim.city));
+    claim.centre ?? (await appleMapsLookup(maps.token, "geocode", claim.city));
   if (centre === null) {
     logEvent("info", "trip_search_no_centre", {});
     return { available: true, places: [] };
@@ -470,6 +467,7 @@ export const searchTripPlaces = action({
 export const searchListPlaces = action({
   args: {
     listId: v.id("sharedLists"),
+    city: v.string(),
     query: v.string(),
     locale: v.optional(v.string()),
   },
@@ -478,6 +476,7 @@ export const searchListPlaces = action({
     await placeSearch(args.query, args.locale, () =>
       ctx.runMutation(internal.sharedLists.claimListSearchInternal, {
         listId: args.listId,
+        city: args.city,
       }),
     ),
 });
