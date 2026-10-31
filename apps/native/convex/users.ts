@@ -20,6 +20,7 @@ import {
 import { takeWithinBytes } from "./model/readBudget";
 import { logEvent } from "./model/log";
 import { deletePlanSharesForUser } from "./planShares";
+import { deleteSharedListsBatch } from "./sharedLists";
 
 /** Null when unauthenticated or the account is being deleted. */
 export const getCurrentUser = query({
@@ -345,14 +346,15 @@ async function deleteCaptureTokensBatch(
 
 async function deleteSharingAndPlansBatch(
   ctx: MutationCtx,
-  userId: string,
+  userId: Id<"users">,
 ): Promise<boolean> {
   return (
     (await deleteShareLinksBatch(ctx, userId)) &&
     (await deletePlaceVisitsBatch(ctx, userId)) &&
     (await deleteTripsBatch(ctx, userId)) &&
     (await deleteTripPlansBatch(ctx, userId)) &&
-    (await deletePlanSharesForUser(ctx, userId))
+    (await deletePlanSharesForUser(ctx, userId)) &&
+    (await deleteSharedListsBatch(ctx, userId))
   );
 }
 

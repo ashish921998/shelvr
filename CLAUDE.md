@@ -95,6 +95,15 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `tripStops`: one stop of a `tripPlans` trip, on day 1..dayCount or day 0 (unplanned),
     from a save (`itemId`), an Apple Maps suggestion or a place found with Add a place, carrying its own name, pin, Apple id
     and category. Deleting the save keeps the stop; a trip read opens only live saves
+  - `sharedLists`: one list of places two people keep together: its owner (`ownerId`, a
+    users id), name, the random `inviteToken` behind its join link, and a `placeCount`
+  - `sharedListMembers`: one row per person on a `sharedLists` list, the owner included,
+    with `joinedAt` and the `seenAt` that decides which places are new to them. At most
+    8 members a list and 20 lists a person
+  - `sharedListPlaces`: one copied place on a `sharedLists` list, modelled on `tripStops`:
+    its own name, pin, city, Apple id, category and tags, who added it (`addedBy`), the
+    save it came from (`itemId`, returned only to that person) and `visitedAt`. No save
+    title or text is copied, and a row outlives the save. At most 200 a list
   - `shareLinks`: one random public token per shared item, the capability behind the
     branded preview page (`createShareLink`, `getSharePreview`, `/share/links/`)
   - `weeklyDigests`: the persisted weekly shelf and its delivery state
@@ -341,6 +350,17 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the
   web page at `apps/web/src/app/p`. Links and votes go with their space or account, and a
   daily cron deletes them a week after they close.
+- **`sharedLists.ts`**: shared lists, the places two people keep together. No client calls
+  it yet. `createSharedList` (Pro) copies the caller's pins for the named cities into
+  `sharedListPlaces`; `listSharedLists` and `getSharedList` read a member's lists (members'
+  first names, new-place counts, the caller's own trips from the list). `invitePreview`
+  answers a signed-out caller from the token alone (`PUBLIC_ON_PURPOSE`), `joinSharedList`
+  needs no Pro and is idempotent, `leaveSharedList` and the owner-only
+  `removeSharedListMember` (which rotates the token) run `departMember` from
+  `model/sharedLists.ts`: the oldest live member inherits an owner's list, and the last
+  member's leaving deletes it. Coverage (`listCovered`) is "the live owner has Pro or the
+  caller has Pro"; reading, joining, leaving and marking places need no Pro. Rules and
+  caps live in `model/sharedLists.ts`; place tidying shared with trips in `model/tripPlace.ts`.
 - **`trips.ts`** (`"use node"` action), **`tripData.ts`**: "Plan my trip". `makeTrip` reads
   the chosen city's ready saves (or the most common city in a space), shuffles stored
   unvisited place names, resolves missing pins with Apple Maps (`model/appleMaps.ts`),

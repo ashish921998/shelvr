@@ -10,7 +10,6 @@ import { aiAllowed } from "./aiConsent";
 import { readyCitySaves } from "./items";
 import { authedMutation, authedQuery, requireUserId } from "./model/auth";
 import {
-  MAX_AREA_CHARS,
   MAX_PLACE_NAME_CHARS,
   MAX_PLAN_ITEMS,
   placeKey,
@@ -26,6 +25,7 @@ import {
   tidyCity,
   tripPaceValidator,
 } from "./model/trip";
+import { tidyPlace, tidyText } from "./model/tripPlace";
 import {
   MAX_TRIP_NAME_CHARS,
   tripInterestValidator,
@@ -40,6 +40,7 @@ import {
   type TripInterest,
   type TripPlace,
   type TripPlanStop,
+  type TripPlanSummary,
   type TripSavePlace,
 } from "./model/tripPlan";
 import { requireProEntitlement } from "./subscriptions";
@@ -257,22 +258,23 @@ export const listTripPlans = authedQuery({
       .withIndex("by_user", (q) => q.eq("userId", ctx.userId))
       .order("desc")
       .paginate({ ...opts, numItems: Math.min(opts.numItems, LIST_PAGE_MAX) });
-    return {
-      ...result,
-      page: result.page.map((plan) => ({
-        _id: plan._id,
-        ...(plan.name !== undefined ? { name: plan.name } : {}),
-        city: plan.city,
-        ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
-        dayCount: plan.dayCount,
-        stopCount: plan.stopCount,
-        savedCount: plan.savedCount,
-        interests: plan.interests,
-        createdAt: plan._creationTime,
-      })),
-    };
+    return { ...result, page: result.page.map(tripSummary) };
   },
 });
+
+export function tripSummary(plan: Doc<"tripPlans">): TripPlanSummary {
+  return {
+    _id: plan._id,
+    ...(plan.name !== undefined ? { name: plan.name } : {}),
+    city: plan.city,
+    ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
+    dayCount: plan.dayCount,
+    stopCount: plan.stopCount,
+    savedCount: plan.savedCount,
+    interests: plan.interests,
+    createdAt: plan._creationTime,
+  };
+}
 
 async function ownedPlan(
   ctx: QueryCtx,
@@ -387,8 +389,6 @@ export const deleteTripPlan = authedMutation({
   },
 });
 
-const MAX_APPLE_ID_CHARS = 100;
-const MAX_CATEGORY_CHARS = 60;
 /** Saved places Add a place offers; a city's saves rarely name more. */
 const MAX_SAVE_PLACES = 100;
 
@@ -519,42 +519,13 @@ export const removeTripStop = authedMutation({
   },
 });
 
-function tidyText(text: string | undefined, max: number): string | undefined {
-  const tidy = text?.replace(/\s+/g, " ").trim().slice(0, max);
-  return tidy ? tidy : undefined;
-}
-
-function validPoint(lat: number, lng: number): boolean {
-  return (
-    Number.isFinite(lat) &&
-    Number.isFinite(lng) &&
-    Math.abs(lat) <= 90 &&
-    Math.abs(lng) <= 180
-  );
-}
-
 type NewStop = Omit<
   Doc<"tripStops">,
   "_id" | "_creationTime" | "tripId" | "userId" | "day" | "order"
 >;
 
 function addedStop(place: TripPlace): NewStop {
-  const name = tidyText(place.name, MAX_PLACE_NAME_CHARS);
-  if (name === undefined || !validPoint(place.lat, place.lng)) {
-    throw new Error("Place required");
-  }
-  const appleId = tidyText(place.appleId, MAX_APPLE_ID_CHARS);
-  const category = tidyText(place.category, MAX_CATEGORY_CHARS);
-  const area = tidyText(place.area, MAX_AREA_CHARS);
-  return {
-    source: "added",
-    name,
-    lat: place.lat,
-    lng: place.lng,
-    ...(appleId !== undefined ? { appleId } : {}),
-    ...(category !== undefined ? { category } : {}),
-    ...(area !== undefined ? { area } : {}),
-  };
+  return { source: "added", ...tidyPlace(place) };
 }
 
 async function savedStop(

@@ -14,6 +14,8 @@ export const PUBLIC_ON_PURPOSE: Readonly<Record<string, string>> = {
     "Convex Auth's own query answers false to a signed-out caller, which is how the client learns it is signed out.",
   "devFixtures:canResetCurrentUser":
     "Answers false, not an error, to a signed-out caller or a non-development account, so the dev-only reset button can hide.",
+  "sharedLists:invitePreview":
+    "The join screen opens from an invite link before sign-in, so it answers a signed-out caller; the random token is the capability, and a list whose owner is gone or deleting answers null.",
   "users:deleteCurrentUserAccount":
     "Resumes the cleanup for an account already marked deleting, which requireUserId would refuse.",
   "users:getCurrentUser":
