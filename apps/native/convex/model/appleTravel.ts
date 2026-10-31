@@ -7,6 +7,7 @@ import type { TravelEstimate, TravelMode, TravelStop } from "./tripTravel";
 
 const API = "https://maps-api.apple.com/v1";
 const MAX_REPLY_BYTES = 32_768;
+const SAME_POINT_TOLERANCE_DEGREES = 0.00001;
 
 async function appleJson(url: string, authorization: string): Promise<unknown> {
   const response = await safeFetch(url, {
@@ -33,7 +34,7 @@ export async function travelAccessToken(
       `${API}/token`,
       headers.get("Authorization") ?? "",
     );
-    return Response.json(json);
+    return json === null ? Response.error() : Response.json(json);
   });
 }
 
@@ -69,8 +70,10 @@ export async function appleTravelEstimate(
   const eta = body.data.etas.find(
     (item) =>
       item.transportType.toLowerCase() === transport.toLowerCase() &&
-      Math.abs(item.destination.latitude - to.lat) < 0.00001 &&
-      Math.abs(item.destination.longitude - to.lng) < 0.00001,
+      Math.abs(item.destination.latitude - to.lat) <
+        SAME_POINT_TOLERANCE_DEGREES &&
+      Math.abs(item.destination.longitude - to.lng) <
+        SAME_POINT_TOLERANCE_DEGREES,
   );
   return eta
     ? { seconds: eta.expectedTravelTimeSeconds, meters: eta.distanceMeters }

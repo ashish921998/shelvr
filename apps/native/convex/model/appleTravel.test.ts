@@ -9,8 +9,9 @@ vi.mock("./appleMaps", () => ({
     const response = await fetcher("https://maps-api.apple.com/v1/token", {
       headers: { Authorization: "Bearer signed-test-token" },
     });
+    if (!response.ok) return null;
     const body = await response.json();
-    return body?.accessToken ?? null;
+    return body.accessToken;
   },
 }));
 const from = { _id: "from" as Id<"tripStops">, lat: 38.7, lng: -9.1 };
@@ -52,6 +53,21 @@ describe("Apple travel times", () => {
         headers: { Authorization: "Bearer signed-test-token" },
       }),
     );
+  });
+
+  it("gets no token when Apple refuses the exchange", async () => {
+    vi.mocked(safeFetch).mockResolvedValue({
+      ok: false,
+      code: "http_error",
+      status: 401,
+    });
+    expect(
+      await travelAccessToken({
+        privateKey: "key",
+        keyId: "id",
+        teamId: "team",
+      }),
+    ).toBeNull();
   });
   it("returns real walking time and road distance for the requested destination", async () => {
     vi.mocked(safeFetch).mockResolvedValue(reply({ etas: [eta] }));

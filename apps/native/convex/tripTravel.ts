@@ -13,6 +13,8 @@ import {
 } from "./model/tripTravel";
 import { logEvent } from "./model/log";
 
+const ESTIMATES_AT_ONCE_PER_DAY = 4;
+
 export const estimateDay = action({
   args: {
     tripId: v.id("tripPlans"),
@@ -34,17 +36,22 @@ export const estimateDay = action({
     if (!stops || !config) return null;
     const token = await travelAccessToken(config);
     if (!token) return null;
+    const adjacentStops = stops
+      .slice(1)
+      .map((to, index) => ({ from: stops[index], to }));
     const legs = [];
-    // Bound concurrent requests even when a user moves many stops onto one day.
-    for (let start = 1; start < stops.length; start += 4) {
+    for (
+      let start = 0;
+      start < adjacentStops.length;
+      start += ESTIMATES_AT_ONCE_PER_DAY
+    ) {
       const batch = await Promise.all(
-        stops.slice(start, start + 4).map(async (to, index) => {
-          const from = stops[start + index - 1];
-          return {
+        adjacentStops
+          .slice(start, start + ESTIMATES_AT_ONCE_PER_DAY)
+          .map(async ({ from, to }) => ({
             key: travelLegKey(from, to),
             estimate: await appleTravelEstimate(token, from, to, args.mode),
-          };
-        }),
+          })),
       );
       legs.push(...batch);
     }
