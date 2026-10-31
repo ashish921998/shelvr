@@ -36,8 +36,8 @@ export async function loadListInvite(
   }
 }
 
-export function inviteHeading(invite: ListInvite | undefined): string {
-  return `${invite?.inviterName || "Someone"} wants to save places with you`;
+export function inviteHeading(invite: ListInvite): string {
+  return `${invite.inviterName || "Someone"} wants to save places with you`;
 }
 
 export function inviteSummary(invite: ListInvite): string {

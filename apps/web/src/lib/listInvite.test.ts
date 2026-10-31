@@ -62,9 +62,6 @@ describe("invite copy", () => {
     expect(inviteHeading({ ...invite, inviterName: undefined })).toBe(
       "Someone wants to save places with you",
     );
-    expect(inviteHeading(undefined)).toBe(
-      "Someone wants to save places with you",
-    );
   });
 
   it("summarises the count and cities", () => {

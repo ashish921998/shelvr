@@ -12,7 +12,7 @@ export async function generateMetadata({
 }: PageProps): Promise<Metadata> {
   const { token } = await params;
   const { invite } = await loadListInvite(token);
-  const title = inviteHeading(invite);
+  const title = invite ? inviteHeading(invite) : "A Shelvr invite";
   const description = invite
     ? `Join ${invite.name} on Shelvr. Free to join. You don’t need Pro.`
     : "A shared list of places, made with Shelvr.";
