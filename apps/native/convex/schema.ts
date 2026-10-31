@@ -89,6 +89,15 @@ export default defineSchema({
     ["eventId"],
   ),
 
+  placeRemovals: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    city: v.string(),
+    lat: v.number(),
+    lng: v.number(),
+    appleId: v.optional(v.string()),
+  }).index("by_user", ["userId"]),
+
   items: defineTable({
     userId: v.string(),
     fixtureKey: v.optional(v.string()),

@@ -751,6 +751,8 @@
   },
   "cityMap.placesList": "Lista de lugares",
   "cityMap.placeDetails": "Detalles de %{name}",
+  "cityMap.removePlace": "Eliminar %{name}",
+  "cityMap.removedPlace": "Se eliminó %{name}",
   "opener.tagline": "Guarda los sitios. Nosotros planeamos la cita o el viaje.",
   "onboardingQ.skip": "Omitir",
   "onboardingQ.savedTitle": "¿Cuántos lugares has guardado?",
