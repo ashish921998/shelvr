@@ -17,7 +17,7 @@ import {
   withLinkedRecipe,
   type PageData,
 } from "./pageReadCore";
-import { fetchTikTokOEmbed } from "./readers/tiktok";
+import { fetchTikTok } from "./readers/tiktok";
 import { fetchYouTube } from "./readers/youtube";
 import { fetchXPost } from "./readers/x";
 import { fetchInstagram } from "./readers/instagram";
@@ -119,11 +119,12 @@ async function asInstagramCaption(read: Promise<PageData>): Promise<PageData> {
 type ReadOptions = {
   /** Skip the linked-recipe fetches a caption may trigger, for callers that only want the caption. */
   captionOnly?: boolean;
+  claimPaidRead?: () => Promise<boolean>;
 };
 
 const SOURCE_READERS = {
-  tiktok: async (url, { captionOnly }) => {
-    const page = await asCaption(fetchTikTokOEmbed(url));
+  tiktok: async (url, { captionOnly, claimPaidRead }) => {
+    const page = await asCaption(fetchTikTok(url, claimPaidRead));
     return captionOnly ? page : withLinkedRecipe(page);
   },
   x: async (url) => withLinkedRecipe(await asCaption(fetchXPost(url))),

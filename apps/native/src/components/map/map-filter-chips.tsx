@@ -1,4 +1,5 @@
 import type { PlaceKind } from "@convex/model/placeKinds";
+import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
 import type { TextMessageKey } from "@/locales/message-types";
 import { Pressable, ScrollView, Text, View } from "react-native";
@@ -54,6 +55,10 @@ export function MapFilterChips({
   selected: PlaceKind | null;
   onSelect: (kind: PlaceKind | null) => void;
 }) {
+  const choose = (kind: PlaceKind | null) => {
+    if (kind !== selected) void haptics.selection();
+    onSelect(kind);
+  };
   return (
     <ScrollView
       horizontal
@@ -64,14 +69,14 @@ export function MapFilterChips({
       <Chip
         label={t("map.filterAll")}
         selected={selected === null}
-        onPress={() => onSelect(null)}
+        onPress={() => choose(null)}
       />
       {kinds.map((kind) => (
         <Chip
           key={kind}
           label={t(KIND_LABELS[kind])}
           selected={selected === kind}
-          onPress={() => onSelect(selected === kind ? null : kind)}
+          onPress={() => choose(selected === kind ? null : kind)}
         />
       ))}
     </ScrollView>
