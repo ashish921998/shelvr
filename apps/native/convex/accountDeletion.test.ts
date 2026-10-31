@@ -771,6 +771,64 @@ const RECIPES: Record<string, Recipe> = {
       );
     },
   },
+  "notifications.ts#prepareTripEve": {
+    fence:
+      "liveOwner at the top of the handler, so a draining account gets no trip push",
+    table: "tripEveReminders",
+    padding: 3 * DELETE_BATCH + 1,
+    fillers: {},
+    env: { SAVE_REMINDERS_ENABLED: "true" },
+    seed: async (backend, userId, now) => {
+      await backend.run(async (ctx) => {
+        await ctx.db.insert("notificationPreferences", {
+          userId,
+          weeklyShelfEnabled: false,
+          nextDigestAt: now + 7 * DAY_MS,
+          timezone: "UTC",
+          updatedAt: now,
+        });
+        await ctx.db.insert("notificationDevices", {
+          userId,
+          token: `ExponentPushToken[${userId}]`,
+          platform: "ios",
+          enabled: true,
+          lastSeenAt: now,
+        });
+      });
+    },
+    call: async (backend, userId, now) => {
+      const startDate = new Date(now + 2 * DAY_MS).toISOString().slice(0, 10);
+      const eveDay = new Date(now + DAY_MS).toISOString().slice(0, 10);
+      const eveAt = Date.parse(`${eveDay}T18:00:00Z`);
+      const tripId = await backend.run(async (ctx) => {
+        const id = await ctx.db.insert("tripPlans", {
+          userId,
+          city: "Lisbon",
+          startDate,
+          dayCount: 1,
+          pace: "balanced",
+          interests: [],
+          stopCount: 1,
+          savedCount: 1,
+        });
+        await ctx.db.insert("tripStops", {
+          tripId: id,
+          userId,
+          day: 1,
+          order: 0,
+          source: "save",
+          name: "Place",
+          lat: 38.7,
+          lng: -9.1,
+        });
+        return id;
+      });
+      return backend.mutation(internal.notifications.prepareTripEve, {
+        tripId,
+        now: eveAt,
+      });
+    },
+  },
   "planShares.ts#recordPlanVote": {
     fence:
       "liveShare calls liveOwner, so a vote on a draining owner's link is refused",

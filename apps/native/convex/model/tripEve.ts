@@ -4,8 +4,10 @@ import { localHourOnDayAt } from "./notificationSchedule";
 import { MAX_LATE_MS } from "./saveReminders";
 
 export const TRIP_EVE_HOUR = 18;
+export const TRIP_EVE_MAX_AGE_MS = 3 * 60 * 60 * 1000;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+const MIN_LEAD_MS = 6 * 60 * 60 * 1000;
 const MAX_TRIP_STOPS = 300;
 
 type DatedTrip = Pick<Doc<"tripPlans">, "startDate" | "_creationTime">;
@@ -25,7 +27,9 @@ export function tripEveDue(
   if (trip.startDate === undefined) return false;
   const eveAt = tripEveAt(trip.startDate, timezone);
   return (
-    eveAt <= now && now < eveAt + MAX_LATE_MS && trip._creationTime < eveAt
+    eveAt <= now &&
+    now < eveAt + MAX_LATE_MS &&
+    trip._creationTime < eveAt - MIN_LEAD_MS
   );
 }
 
@@ -37,7 +41,7 @@ export function nextTripEveAt(
   const upcoming = trips.flatMap((trip) => {
     if (trip.startDate === undefined) return [];
     const eveAt = tripEveAt(trip.startDate, timezone);
-    return trip._creationTime < eveAt && now < eveAt + MAX_LATE_MS
+    return trip._creationTime < eveAt - MIN_LEAD_MS && now < eveAt + MAX_LATE_MS
       ? [eveAt]
       : [];
   });

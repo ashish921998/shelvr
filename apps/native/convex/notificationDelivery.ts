@@ -26,7 +26,7 @@ import {
   saveRemindersLive,
   type ReminderKind,
 } from "./model/saveReminders";
-import { tripSavedStopCount } from "./model/tripEve";
+import { TRIP_EVE_MAX_AGE_MS, tripSavedStopCount } from "./model/tripEve";
 import { visibleSave } from "./model/placeRemovals";
 import { visitedPlaceKeys } from "./model/placeVisits";
 
@@ -757,7 +757,7 @@ export const claimTripEve = internalMutation({
       paused ||
       disabled ||
       attempts >= MAX_ATTEMPTS ||
-      now - reminder.createdAt >= REMINDER_MAX_AGE_MS
+      now - reminder.createdAt >= TRIP_EVE_MAX_AGE_MS
     ) {
       await fail(
         paused
@@ -816,7 +816,7 @@ export const finishTripEve = internalMutation({
       args.recipients,
       args.attempt,
       now - reminder.createdAt,
-      REMINDER_MAX_AGE_MS,
+      TRIP_EVE_MAX_AGE_MS,
       now,
     );
     const sentAt = firstSendAt(reminder.deliverySentAt, args.recipients, now);

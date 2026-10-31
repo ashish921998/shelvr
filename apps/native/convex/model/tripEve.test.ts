@@ -34,7 +34,7 @@ describe("tripEveAt", () => {
 
 describe("tripEveDue", () => {
   const eve = at("2026-09-25T12:30:00Z");
-  const trip = { startDate: "2026-09-26", _creationTime: eve - 3 * HOUR };
+  const trip = { startDate: "2026-09-26", _creationTime: eve - 7 * HOUR };
 
   it("opens at 18:00 local and closes two hours later", () => {
     expect(tripEveDue(trip, "Asia/Kolkata", eve - 1)).toBe(false);
@@ -43,9 +43,16 @@ describe("tripEveDue", () => {
     expect(tripEveDue(trip, "Asia/Kolkata", eve + 2 * HOUR)).toBe(false);
   });
 
-  it("skips a trip made after its eve, or without a date", () => {
+  it("skips a trip made after its eve, shortly before it, or without a date", () => {
     expect(
       tripEveDue({ ...trip, _creationTime: eve }, "Asia/Kolkata", eve),
+    ).toBe(false);
+    expect(
+      tripEveDue(
+        { ...trip, _creationTime: eve - 5 * HOUR },
+        "Asia/Kolkata",
+        eve,
+      ),
     ).toBe(false);
     expect(
       tripEveDue({ ...trip, startDate: undefined }, "Asia/Kolkata", eve),

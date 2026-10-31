@@ -35,6 +35,7 @@ import {
   HOUR_SAMPLE_WINDOW_MS,
   IGNORED_STREAK,
   MAX_LATE_MS,
+  MIN_GAP_MS,
   WEEK_MS,
   WEEKLY_LIMIT,
   openedTooRecently,
@@ -824,6 +825,7 @@ export const prepareDueTripEves = internalMutation({
       .withIndex("by_start_date", (q) =>
         q.gte("startDate", from).lte("startDate", to),
       )
+      .order("desc")
       .paginate({
         cursor: args.cursor ?? null,
         numItems: DUE_TRIP_EVE_BATCH_SIZE,
@@ -844,6 +846,29 @@ export const prepareDueTripEves = internalMutation({
     return null;
   },
 });
+
+async function pushedRecently(
+  ctx: QueryCtx,
+  userId: string,
+  now: number,
+): Promise<boolean> {
+  const [eves, reminders] = await Promise.all([
+    ctx.db
+      .query("tripEveReminders")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(2),
+    ctx.db
+      .query("saveReminders")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(2),
+  ]);
+  return [...eves, ...reminders].some(
+    (row) =>
+      row.deliveryStatus !== "failed" && now - row.createdAt < MIN_GAP_MS,
+  );
+}
 
 export const prepareTripEve = internalMutation({
   args: { tripId: v.id("tripPlans"), now: v.number() },
@@ -876,6 +901,7 @@ export const prepareTripEve = internalMutation({
       .first();
     if (earlier !== null || (await tripSavedStopCount(ctx, tripId)) < 1)
       return null;
+    if (await pushedRecently(ctx, trip.userId, now)) return null;
     const reminderId = await ctx.db.insert("tripEveReminders", {
       userId: trip.userId,
       tripId,

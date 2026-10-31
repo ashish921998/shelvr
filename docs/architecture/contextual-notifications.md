@@ -89,15 +89,20 @@ and recover machine as save reminders. The rules are pure functions in
 
 - **When.** 18:00 in the owner's registered timezone on the day before
   `startDate` (`tripEveAt`). A row is made only inside the two hours after
-  that, and only for a trip created before the eve, so a trip planned that
-  evening is not announced to the person who just made it.
+  that, and only for a trip created at least six hours before the eve, so a
+  trip planned that afternoon is not announced to the person who just made it.
+  A row expires three hours after it is made, so a retry can never say
+  "tomorrow" on the day itself.
 - **What.** The count is the stops on a planned day (1 or later) that came from
   a save or a shared list, recounted at send time. Suggested and added stops
   do not count. A trip with none, or one deleted after the row was made,
   closes as `no_items` with no push.
 - **Who.** Save reminders on, the server switch on, a live owner, an enabled
   device and a preferences row. The ignored-streak, weekly and gap limits do
-  not apply, because the person set this date.
+  not apply, because the person set this date. Each person gets one in any 20
+  hours, whichever kind came first: someone who planned a city twice, or two
+  cities for one day, hears about the newest with saved stops, and a save
+  reminder sent earlier that day takes its place.
 - **Budget.** A trip push counts as a send, so a save reminder waits 20 hours
   after it. A save reminder also makes room for one: it is held when a trip
   eve is due within the next 20 hours (`reminderBlocked`), looking at the

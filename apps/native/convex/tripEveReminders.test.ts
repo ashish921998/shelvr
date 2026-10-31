@@ -34,6 +34,7 @@ async function setup({
   locale = "en",
   withPreferences = true,
   article = false,
+  newerTrip = false,
 }: {
   device?: boolean;
   preferences?: Partial<Doc<"notificationPreferences">>;
@@ -43,6 +44,7 @@ async function setup({
   locale?: string;
   withPreferences?: boolean;
   article?: boolean;
+  newerTrip?: boolean;
 } = {}) {
   const t = newConvexTest();
   vi.setSystemTime(EVE - 10 * DAY);
@@ -84,6 +86,31 @@ async function setup({
       });
     return id;
   });
+  const newerTripId = !newerTrip
+    ? undefined
+    : await t.run(async (ctx) => {
+        const id = await ctx.db.insert("tripPlans", {
+          userId,
+          city: "Porto",
+          startDate: START,
+          dayCount: 2,
+          pace: "balanced",
+          interests: [],
+          stopCount: 1,
+          savedCount: 1,
+        });
+        await ctx.db.insert("tripStops", {
+          tripId: id,
+          userId,
+          day: 1,
+          order: 0,
+          source: "save",
+          name: "Place",
+          lat: 38.7,
+          lng: -9.1,
+        });
+        return id;
+      });
   vi.setSystemTime(EVE);
   await t.run(async (ctx) => {
     if (withPreferences)
@@ -113,7 +140,7 @@ async function setup({
     t
       .run((ctx) => ctx.db.system.query("_scheduled_functions").collect())
       .then((all) => all.filter((job) => pattern.test(job.name)));
-  return { t, user, userId, tripId, prepare, rows, jobs };
+  return { t, user, userId, tripId, newerTripId, prepare, rows, jobs };
 }
 
 describe("choosing the trip eve push", () => {
@@ -139,6 +166,7 @@ describe("choosing the trip eve push", () => {
   it.each([
     ["more than two hours late", { late: true }],
     ["a trip made after its eve", { createdAt: EVE + 1 }],
+    ["a trip made that afternoon", { createdAt: EVE - 5 * HOUR }],
     ["an undated trip", { startDate: null }],
     ["no saved stops", { stops: [] }],
     [
@@ -176,6 +204,70 @@ describe("choosing the trip eve push", () => {
 
   it("counts a list stop as a saved place", async () => {
     const { prepare, rows } = await setup({ stops: [["list", 2]] });
+    await prepare();
+    expect(await rows()).toHaveLength(1);
+  });
+
+  it("sends one push when two trips start the same day, for the newest", async () => {
+    const {
+      t,
+      tripId,
+      newerTripId: newer,
+      prepare,
+      rows,
+    } = await setup({ newerTrip: true });
+    await t.mutation(internal.notifications.prepareDueTripEves, { now: EVE });
+    const order = (
+      await t.run((ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      )
+    )
+      .filter((job) => job.name.includes("prepareTripEve"))
+      .map((job) => (job.args[0] as { tripId: Id<"tripPlans"> }).tripId);
+    expect(order).toEqual([newer, tripId]);
+    await t.mutation(internal.notifications.prepareTripEve, {
+      tripId: newer!,
+      now: EVE,
+    });
+    await prepare();
+    expect(await rows()).toMatchObject([{ tripId: newer }]);
+  });
+
+  it("does not stack on a save reminder sent earlier that day", async () => {
+    const { t, userId, prepare, rows } = await setup({ article: true });
+    await t.run(async (ctx) => {
+      const item = await ctx.db.query("items").first();
+      await ctx.db.insert("saveReminders", {
+        userId,
+        itemId: item!._id,
+        kind: "read",
+        createdAt: EVE - HOUR,
+        deliveryStatus: "complete",
+      });
+    });
+    await prepare();
+    expect(await rows()).toEqual([]);
+  });
+
+  it("is not held by a save reminder that failed, or one from the day before", async () => {
+    const { t, userId, prepare, rows } = await setup({ article: true });
+    await t.run(async (ctx) => {
+      const item = await ctx.db.query("items").first();
+      await ctx.db.insert("saveReminders", {
+        userId,
+        itemId: item!._id,
+        kind: "read",
+        createdAt: EVE - HOUR,
+        deliveryStatus: "failed",
+      });
+      await ctx.db.insert("saveReminders", {
+        userId,
+        itemId: item!._id,
+        kind: "read",
+        createdAt: EVE - 21 * HOUR,
+        deliveryStatus: "complete",
+      });
+    });
     await prepare();
     expect(await rows()).toHaveLength(1);
   });
@@ -370,6 +462,18 @@ describe("delivering the trip eve push", () => {
       deliveryStatus: "failed",
       deliveryError: "notifications_disabled",
     });
+  });
+
+  it("gives up before the evening is over, so tomorrow never arrives on the day", async () => {
+    const { t, reminder, rows } = await queued();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    vi.setSystemTime(reminder.createdAt + 3 * HOUR);
+    await send(t, reminder._id);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await rows()).toMatchObject([
+      { deliveryStatus: "failed", deliveryError: "expired" },
+    ]);
   });
 
   it("is picked up again by recovery when a send never finished", async () => {
