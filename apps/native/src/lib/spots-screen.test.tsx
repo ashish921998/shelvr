@@ -187,3 +187,31 @@ it("goes Home when the revealed save is deleted from its detail screen", () => {
   expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
   expect(mocks.capture).toHaveBeenCalledTimes(1);
 });
+
+it("adds spots the save gains after the reveal", () => {
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [{ name: "Uchi", lat: 30.26, lng: -97.75, city: "Austin" }],
+  };
+  const { rerender } = render(<SpotsScreen />);
+  expect(screen.queryByText("Odd Duck")).toBeNull();
+  mocks.save = {
+    ...mocks.save,
+    placePins: [
+      { name: "Uchi", lat: 30.26, lng: -97.75, city: "Austin" },
+      {
+        name: "Odd Duck",
+        lat: 30.25,
+        lng: -97.76,
+        city: "Austin",
+        category: "Restaurant",
+      },
+    ],
+  };
+  rerender(<SpotsScreen />);
+  expect(screen.getByText("Odd Duck")).toBeTruthy();
+  expect(screen.getByText("label Restaurant")).toBeTruthy();
+  expect(mocks.capture).toHaveBeenCalledTimes(1);
+});

@@ -110,9 +110,7 @@ function Spots({
   const router = useRouter();
   const { rt, theme } = useUnistyles();
   const reduced = useReducedMotion();
-  const [pins] = useState<CityPin[]>(() =>
-    cityPins([{ _id: save._id, placePins: found }]),
-  );
+  const pins = cityPins([{ _id: save._id, placePins: found }]);
   const dropped = useDroppedPins(pins.length);
   useLandingHaptics(dropped, pins.length);
   const mapHeight = rt.screen.height * MAP_SHARE;
