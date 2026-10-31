@@ -1,4 +1,5 @@
 import { CityMap } from "@/components/city/city-map";
+import { SaveRow } from "@/components/city/save-row";
 import { PinBadge } from "@/components/onboarding/sample-trip-map";
 import { Button } from "@/components/ui/button";
 import { StitchMark } from "@/components/ui/stitch-mark";
@@ -6,12 +7,15 @@ import { analytics } from "@/lib/analytics";
 import { cityPinId, cityPins, type CityPin } from "@/lib/city-pins";
 import { t, useAppLocale } from "@/lib/i18n";
 import { springIn } from "@/lib/motion";
+import { placeCategoryLabel } from "@/lib/place-category";
 import { type Reveal, revealFor } from "@/lib/spots-reveal";
 import { useDroppedPins } from "@/lib/use-dropped-pins";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import type { FunctionReturnType } from "convex/server";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
+import * as Haptics from "expo-haptics";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
@@ -22,7 +26,13 @@ const MAP_SHARE = 0.45;
 const TICK_MS = 500;
 
 /** The reveal for one save, re-read every half second so the waits can run out. */
-function useReveal(id: string): { reveal: Reveal; waitedMs: number } {
+type Save = NonNullable<FunctionReturnType<typeof api.items.getItem>>;
+
+function useReveal(id: string): {
+  reveal: Reveal;
+  save: Save | null | undefined;
+  waitedMs: number;
+} {
   const item = useQuery(
     convexQuery(api.items.getItem, { id: id as Id<"items"> }),
   );
@@ -44,7 +54,7 @@ function useReveal(id: string): { reveal: Reveal; waitedMs: number } {
     const timer = setInterval(() => setNow(Date.now()), TICK_MS);
     return () => clearInterval(timer);
   }, [settled]);
-  return { reveal, waitedMs };
+  return { reveal, save, waitedMs };
 }
 
 /** After one shared link: its spots drop onto the city they belong to, or the share ends on Home as before. */
@@ -52,7 +62,7 @@ export default function SpotsScreen() {
   useAppLocale();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { reveal, waitedMs } = useReveal(id ?? "");
+  const { reveal, save, waitedMs } = useReveal(id ?? "");
 
   const reported = useRef(false);
   useEffect(() => {
@@ -72,7 +82,7 @@ export default function SpotsScreen() {
     }
   }, [reveal, waitedMs, router]);
 
-  if (reveal.kind !== "spots") {
+  if (reveal.kind !== "spots" || !save) {
     return (
       <View
         style={styles.finding}
@@ -84,15 +94,15 @@ export default function SpotsScreen() {
       </View>
     );
   }
-  return <Spots itemId={id ?? ""} city={reveal.city} found={reveal.pins} />;
+  return <Spots save={save} city={reveal.city} found={reveal.pins} />;
 }
 
 function Spots({
-  itemId,
+  save,
   city,
   found,
 }: {
-  itemId: string;
+  save: Save;
   city: string;
   found: Extract<Reveal, { kind: "spots" }>["pins"];
 }) {
@@ -101,9 +111,10 @@ function Spots({
   const reduced = useReducedMotion();
   // Fixed once shown, so a late Apple lookup does not reshuffle the drop.
   const [pins] = useState<CityPin[]>(() =>
-    cityPins([{ _id: itemId, placePins: found }]),
+    cityPins([{ _id: save._id, placePins: found }]),
   );
   const dropped = useDroppedPins(pins.length);
+  useLandingHaptics(dropped, pins.length);
   const mapHeight = rt.screen.height * MAP_SHARE;
   const openCity = () => {
     analytics.capture("share_spots_city_opened", { pin_count: pins.length });
@@ -129,6 +140,7 @@ function Spots({
         <Text style={styles.title} accessibilityRole="header">
           {t("spots.count", { count: pins.length })}
         </Text>
+        <SaveRow item={save} />
         <ScrollView style={styles.rows} accessibilityLiveRegion="polite">
           {pins.map((pin, index) => (
             <SpotRow
@@ -154,6 +166,16 @@ function Spots({
   );
 }
 
+/** A light tap as each pin lands and a success when the last one does: the moment people film. */
+function useLandingHaptics(dropped: number, total: number) {
+  useEffect(() => {
+    if (process.env.EXPO_OS !== "ios" || dropped === 0) return;
+    void (dropped >= total
+      ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
+  }, [dropped, total]);
+}
+
 /** Every row takes its room from the start, so the sheet's size stays put while the pins drop. */
 function SpotRow({
   pin,
@@ -164,10 +186,14 @@ function SpotRow({
   shown: boolean;
   reduced: boolean;
 }) {
+  const category = placeCategoryLabel(pin.category);
   const row = (
     <>
       <PinBadge number={pin.number} day={0} />
-      <Text style={styles.spotName}>{pin.name}</Text>
+      <View style={styles.spotText}>
+        <Text style={styles.spotName}>{pin.name}</Text>
+        {category ? <Text style={styles.category}>{category}</Text> : null}
+      </View>
     </>
   );
   return shown ? (
@@ -256,10 +282,17 @@ const styles = StyleSheet.create((theme) => ({
   waiting: {
     opacity: 0,
   },
+  spotText: {
+    flex: 1,
+    gap: theme.gap(0.25),
+  },
   spotName: {
     ...theme.type.headline,
-    flex: 1,
     color: theme.colors.foreground,
+  },
+  category: {
+    ...theme.type.footnote,
+    color: theme.colors.muted,
   },
   actions: {
     marginTop: "auto",

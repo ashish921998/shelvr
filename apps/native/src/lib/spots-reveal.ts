@@ -12,6 +12,7 @@ type RevealPin = {
   lng: number;
   city?: string;
   appleId?: string;
+  category?: string;
 };
 
 export type RevealSave = {
