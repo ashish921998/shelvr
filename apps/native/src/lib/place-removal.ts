@@ -1,4 +1,5 @@
 import { analytics } from "@/lib/analytics";
+import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -53,12 +54,14 @@ export function usePlaceRemoval() {
           lng: pin.lng,
           ...(pin.appleId ? { appleId: pin.appleId } : {}),
         });
+        void haptics.success();
         setPending((entries) => [...entries, { removalId, name: pin.name }]);
       }),
     restore: () =>
       run(async () => {
         if (!undo) return;
         await restore({ removalId: undo.removalId });
+        void haptics.success();
         setPending((entries) =>
           entries.filter((entry) => entry.removalId !== undo.removalId),
         );

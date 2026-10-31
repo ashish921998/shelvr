@@ -21,7 +21,7 @@ export function useFixSave() {
     try {
       const scheduled = await reprocess({ id: save._id });
       if (scheduled) {
-        void haptics.success();
+        void haptics.impact();
       } else {
         Alert.alert(t("item.stillWorking"), t("item.retryLater"));
       }

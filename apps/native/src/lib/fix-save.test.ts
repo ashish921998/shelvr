@@ -4,6 +4,7 @@ import { useFixSave } from "./fix-save";
 const mock = vi.hoisted(() => ({
   reprocess: vi.fn(),
   deleteItem: vi.fn(),
+  impact: vi.fn(),
   success: vi.fn(),
   alert: vi.fn(),
 }));
@@ -23,7 +24,9 @@ vi.mock("@/lib/confirm-item-delete", () => ({
 vi.mock("@/lib/entitlement", () => ({
   usePaywallGuard: () => ({ guard: vi.fn(async () => true) }),
 }));
-vi.mock("@/lib/haptics", () => ({ haptics: { success: mock.success } }));
+vi.mock("@/lib/haptics", () => ({
+  haptics: { impact: mock.impact, success: mock.success },
+}));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
 
 const save = { _id: "item1", type: "link" } as Parameters<
@@ -32,10 +35,11 @@ const save = { _id: "item1", type: "link" } as Parameters<
 
 beforeEach(() => vi.clearAllMocks());
 
-it("confirms a retry only once the server scheduled it", async () => {
+it("marks a scheduled retry as started, not finished, since the read can still fail", async () => {
   mock.reprocess.mockResolvedValueOnce(true);
   await useFixSave().retry(save);
-  expect(mock.success).toHaveBeenCalledOnce();
+  expect(mock.impact).toHaveBeenCalledOnce();
+  expect(mock.success).not.toHaveBeenCalled();
   expect(mock.alert).not.toHaveBeenCalled();
 });
 
@@ -44,7 +48,7 @@ it("stays quiet and explains when a retry is not scheduled or fails", async () =
   await useFixSave().retry(save);
   mock.reprocess.mockRejectedValueOnce(new Error("offline"));
   await useFixSave().retry(save);
-  expect(mock.success).not.toHaveBeenCalled();
+  expect(mock.impact).not.toHaveBeenCalled();
   expect(mock.alert).toHaveBeenCalledTimes(2);
 });
 

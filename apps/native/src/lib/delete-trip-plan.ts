@@ -1,4 +1,5 @@
 import { analytics } from "@/lib/analytics";
+import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -14,6 +15,7 @@ export function useDeleteTripPlan() {
       const remove = async () => {
         try {
           await deleteTripPlan({ tripId });
+          void haptics.success();
           analytics.capture("trip_plan_deleted", {});
           onDeleted?.();
         } catch (error) {
