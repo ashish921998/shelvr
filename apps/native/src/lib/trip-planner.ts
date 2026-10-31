@@ -258,6 +258,7 @@ export function stopBadge(
 ): TextMessageKey {
   switch (stop.source) {
     case "save":
+    case "list":
       return "tripPlanner.badgeYours";
     case "list":
       return stop.itemId === undefined
