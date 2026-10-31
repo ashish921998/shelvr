@@ -146,8 +146,8 @@ export default function AddListPlaceScreen() {
   const city = params.city ?? detail.data?.cities[0] ?? "";
   const searchAction = useAction(api.tripPlanner.searchListPlaces);
   const run = useCallback(
-    (text: string) => searchAction({ listId, city, query: text, locale }),
-    [searchAction, listId, city, locale],
+    (text: string) => searchAction({ listId, query: text, locale }),
+    [searchAction, listId, locale],
   );
   const search = usePlaceSearch(
     run,
