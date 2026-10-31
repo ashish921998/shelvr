@@ -131,4 +131,31 @@ describe("trip sharing", () => {
       await base.query(internal.tripShares.getPublicTrip, { token }),
     ).toBeNull();
   });
+  it("takes a link down while its owner has no Pro, since they cannot reach Stop sharing", async () => {
+    const { base, t, userId, tripId } = await setup();
+    const token = await t.mutation(api.tripShares.createShare, { tripId });
+    const subscription = await base.run(async (ctx) => {
+      const row = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .unique();
+      if (!row) throw new Error("Missing subscription");
+      await ctx.db.delete(row._id);
+      return row;
+    });
+    expect(
+      await base.query(internal.tripShares.getPublicTrip, { token }),
+    ).toBeNull();
+    const restored = {
+      userId: subscription.userId,
+      status: subscription.status,
+      productId: subscription.productId,
+      expiresAt: subscription.expiresAt,
+      updatedAt: subscription.updatedAt,
+    };
+    await base.run((ctx) => ctx.db.insert("subscriptions", restored));
+    expect(
+      await base.query(internal.tripShares.getPublicTrip, { token }),
+    ).not.toBeNull();
+  });
 });

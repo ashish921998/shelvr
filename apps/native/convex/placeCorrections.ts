@@ -1,9 +1,14 @@
 import { v, type Infer } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 import { internalMutation } from "./_generated/server";
 import { authedMutation, authedQuery, requireUserId } from "./model/auth";
 import { aiAllowed } from "./aiConsent";
-import { MAX_ITEM_PLACES, normalizeCities } from "./model/itemFields";
+import {
+  MAX_ITEM_PLACES,
+  normalizeCities,
+  normalizePlaceLocations,
+} from "./model/itemFields";
 import { buildSearchText } from "./model/searchText";
 import { requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
@@ -124,6 +129,7 @@ export const savePlaces = authedMutation({
       ),
     );
     const places = [...new Set(chosen.map((place) => place.name))];
+    const unpinned = chosen.filter((place) => place.lat === undefined);
     const placePins = chosen.flatMap((place) =>
       place.lat !== undefined && place.lng !== undefined
         ? [{ ...place, lat: place.lat, lng: place.lng }]
@@ -134,13 +140,21 @@ export const savePlaces = authedMutation({
       places,
       placePins,
       placesEdited: true,
-      placeLocations: [],
+      placeLocations: normalizePlaceLocations(
+        item.placeLocations,
+        unpinned.map(({ name }) => name),
+        cities,
+      ),
       intents: item.intents?.filter((intent) => intent.kind !== "open_maps"),
     };
     await ctx.db.patch(item._id, {
       ...patch,
       searchText: buildSearchText({ ...item, ...patch }),
     });
+    if (unpinned.length > 0)
+      await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
+        itemId: item._id,
+      });
     return null;
   },
 });

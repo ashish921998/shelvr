@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { internalQuery } from "./_generated/server";
 import { authedMutation, authedQuery, liveOwner } from "./model/auth";
-import { requireProEntitlement } from "./subscriptions";
+import { hasProEntitlementAt, requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
 
 const sharedStop = v.object({
@@ -70,7 +70,10 @@ export const getPublicTrip = internalQuery({
       .query("tripPlans")
       .withIndex("by_share_token", (q) => q.eq("shareToken", token))
       .unique();
-    if (!trip || !(await liveOwner(ctx, trip.userId))) return null;
+    if (!trip) return null;
+    const owner = await liveOwner(ctx, trip.userId);
+    if (!owner || !(await hasProEntitlementAt(ctx, owner._id, Date.now())))
+      return null;
     const stops = await ctx.db
       .query("tripStops")
       .withIndex("by_trip_and_day", (q) => q.eq("tripId", trip._id))
