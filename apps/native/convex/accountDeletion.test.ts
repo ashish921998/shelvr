@@ -52,6 +52,13 @@ const ONE_ROW_PER_ACCOUNT = new Set([
   "cancelSurveys",
 ]);
 
+const FEW_ROWS_PER_ACCOUNT: Record<string, string> = {
+  sharedLists:
+    "A person is on at most MAX_LISTS_PER_USER lists and owns only lists they have a member row on, so the drain reaches each through its member row and never sees a batch. sharedListDeletion.test.ts drains a person at the cap",
+  sharedListMembers:
+    "At most MAX_LISTS_PER_USER rows a person, and the drain handles one a pass because one row can delete a whole list. sharedListDeletion.test.ts drains a person at the cap",
+};
+
 type Validator = {
   kind: string;
   isOptional: "required" | "optional";
@@ -115,7 +122,10 @@ function classifyTables() {
 const { owned: OWNED, children: CHILDREN, unowned: UNOWNED } = classifyTables();
 const ACCOUNT_TABLES = [...OWNED, ...CHILDREN];
 const MULTI_ROW_TABLES = OWNED.filter(
-  (table) => !(table in RETAINED_ROWS) && !ONE_ROW_PER_ACCOUNT.has(table),
+  (table) =>
+    !(table in RETAINED_ROWS) &&
+    !ONE_ROW_PER_ACCOUNT.has(table) &&
+    !(table in FEW_ROWS_PER_ACCOUNT),
 );
 
 type RunCtx = Parameters<Parameters<TestBackend["run"]>[0]>[0];
