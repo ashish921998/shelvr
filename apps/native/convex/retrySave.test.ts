@@ -28,6 +28,7 @@ const GOOD_SAVE = {
   siteName: "Example",
   author: "Sam",
   heroImageUrl: "https://www.example.com/hero.jpg",
+  aspectRatio: 0.75,
   recipe: { name: "Salsa", ingredients: ["tomato"], steps: ["Blend."] },
   cities: ["Austin"],
   places: ["Luna Tacos"],
@@ -264,6 +265,7 @@ it("keeps the recipe and hero when Retry reads a body without them", async () =>
   expect(item?.content).toContain("breakfast tacos");
   expect(item?.recipe).toEqual(GOOD_SAVE.recipe);
   expect(item?.heroImageUrl).toBe(GOOD_SAVE.heroImageUrl);
+  expect(item?.aspectRatio).toBe(GOOD_SAVE.aspectRatio);
 });
 
 it("takes the new reading when Retry reads the page", async () => {
