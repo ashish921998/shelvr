@@ -46,6 +46,12 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: DAY,
     capacity: 10,
   },
+  tikTokCaption: {
+    kind: "token bucket",
+    rate: 50,
+    period: DAY,
+    capacity: 25,
+  },
   videoTranscriptGlobal: {
     kind: "token bucket",
     rate: 2000,
@@ -80,6 +86,12 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     rate: 60,
     period: MINUTE,
     capacity: 30,
+  },
+  reelPlacesCaption: {
+    kind: "token bucket",
+    rate: 200,
+    period: DAY,
+    capacity: 50,
   },
   oracleGlobal: {
     kind: "token bucket",

@@ -852,6 +852,114 @@ describe("readPage for Instagram posts", () => {
   });
 });
 
+describe("readPage for a TikTok whose oEmbed has no caption", () => {
+  const url = "https://www.tiktok.com/@dens/video/7621235470587989270";
+  const endpoint = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
+  const caption = "3 days in Mexico City\n\nLunch at Contramar";
+  const tregPost = {
+    success: true,
+    aweme_detail: {
+      desc: caption,
+      aweme_id: "7621235470587989270",
+      author: { unique_id: "dens", nickname: "Den" },
+      video: {
+        width: 576,
+        height: 1024,
+        cover: { url_list: ["https://p16.tiktokcdn-us.com/cover.jpeg"] },
+      },
+    },
+  };
+  const fetchMock = vi.fn();
+  const answer = (body: unknown, status = 200) =>
+    fetchMock.mockImplementation(
+      async () => new Response(JSON.stringify(body), { status }),
+    );
+
+  beforeEach(() => {
+    vi.stubEnv("TREG_API_KEY", "unit-test-only");
+    vi.stubEnv("VIDEO_TRANSCRIPTS_ENABLED", "true");
+    fetchMock.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
+    serve({ [endpoint]: json(endpoint, { type: "video", version: "1.0" }) });
+  });
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("reads the whole post from Treg once the caller allows the paid read", async () => {
+    answer(tregPost);
+    const read = await readPage(url, {
+      claimPaidRead: () => Promise.resolve(true),
+    });
+
+    expect(read.status === "ok" && read.page).toMatchObject({
+      title: "3 days in Mexico City",
+      content: caption,
+      caption: true,
+      author: "@dens",
+      siteName: "TikTok",
+      postUrl: url,
+      heroImageUrl: "https://p16.tiktokcdn-us.com/cover.jpeg",
+      heroAspectRatio: 576 / 1024,
+    });
+    expect(linkEnrichment(read.status === "ok" ? read : undefined)).toBe(
+      undefined,
+    );
+    const called = new URL(String(fetchMock.mock.calls[0][0]));
+    expect(called.pathname).toBe("/call/scrapecreators.tiktok.video.detail");
+    expect(called.searchParams.get("url")).toBe(url);
+  });
+
+  it("stays free for a caller that allows no paid read", async () => {
+    const read = await readPage(url);
+
+    expect(read.status === "ok" && read.page.incomplete).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("stays free once the claim is refused", async () => {
+    const read = await readPage(url, {
+      claimPaidRead: () => Promise.resolve(false),
+    });
+
+    expect(read.status === "ok" && read.page.incomplete).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("spends no claim while the switch is off", async () => {
+    vi.stubEnv("VIDEO_TRANSCRIPTS_ENABLED", "false");
+    const claimPaidRead = vi.fn(() => Promise.resolve(true));
+    const read = await readPage(url, { claimPaidRead });
+
+    expect(read.status === "ok" && read.page.incomplete).toBe(true);
+    expect(claimPaidRead).not.toHaveBeenCalled();
+  });
+
+  it("spends no claim when oEmbed has the caption", async () => {
+    serve({ [endpoint]: json(endpoint, { title: caption }) });
+    const claimPaidRead = vi.fn(() => Promise.resolve(true));
+    const read = await readPage(url, { claimPaidRead });
+
+    expect(read.status === "ok" && read.page.content).toBe(caption);
+    expect(claimPaidRead).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["Treg fails", { error: "down" }, 500],
+    ["the post is missing", { success: false, error: "not_found" }, 200],
+    ["the reply has another shape", { aweme_detail: { desc: 7 } }, 200],
+  ])("keeps the save retryable when %s", async (_case, body, status) => {
+    answer(body, status);
+    const read = await readPage(url, {
+      claimPaidRead: () => Promise.resolve(true),
+    });
+
+    expect(read.status === "ok" && read.page).toMatchObject({
+      incomplete: true,
+      siteName: "TikTok",
+    });
+  });
+});
+
 describe("readPage for TikTok videos", () => {
   it("keeps an empty oEmbed response retryable", async () => {
     const url = "https://www.tiktok.com/@cook/video/7350000000000000000";

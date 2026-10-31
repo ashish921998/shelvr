@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { internal } from "./_generated/api";
 import { WAITLIST_CLIENT_IP_HEADER, WAITLIST_SECRET_HEADER } from "./http";
+import { rateLimiter } from "./model/rateLimiter";
 import { newConvexTest } from "./test.setup";
 
 const SECRET = "reel-places-test-secret";
@@ -122,7 +123,50 @@ describe("reelPlaces.find", () => {
     generateObject.mockResolvedValue({ object: { places: [] } });
     const t = newConvexTest();
     await t.action(internal.reelPlaces.find, { url: REEL });
-    expect(pageRead).toHaveBeenCalledWith(REEL, { captionOnly: true });
+    expect(pageRead).toHaveBeenCalledWith(
+      REEL,
+      expect.objectContaining({ captionOnly: true }),
+    );
+  });
+
+  describe("a paid caption read", () => {
+    function claimOnRead() {
+      const claims: boolean[] = [];
+      pageRead.mockImplementation(
+        async (
+          _url: string,
+          options: { claimPaidRead: () => Promise<boolean> },
+        ) => {
+          claims.push(await options.claimPaidRead());
+          return ok("Time Out Market");
+        },
+      );
+      generateObject.mockResolvedValue({ object: { places: [] } });
+      return claims;
+    }
+
+    it("leaves the budget for paying users' transcripts untouched", async () => {
+      const claims = claimOnRead();
+      const t = newConvexTest();
+      await t.action(internal.reelPlaces.find, { url: REEL });
+
+      expect(claims).toEqual([true]);
+      const transcripts = await t.run((ctx) =>
+        rateLimiter.limit(ctx, "videoTranscriptGlobal", { count: 200 }),
+      );
+      expect(transcripts.ok).toBe(true);
+    });
+
+    it("is refused once the finder's own budget is empty", async () => {
+      const claims = claimOnRead();
+      const t = newConvexTest();
+      await t.run((ctx) =>
+        rateLimiter.limit(ctx, "reelPlacesCaption", { count: 50 }),
+      );
+      await t.action(internal.reelPlaces.find, { url: REEL });
+
+      expect(claims).toEqual([false]);
+    });
   });
 
   it("lists the places the caption names and no invented ones", async () => {
