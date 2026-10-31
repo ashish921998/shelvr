@@ -150,6 +150,7 @@ export async function beenPlaces(
 export function toPlanSource(item: Doc<"items">, city?: string): PlanSource {
   return {
     itemId: item._id,
+    savedAt: item._creationTime,
     title: item.title,
     description: item.description,
     content:

@@ -10,6 +10,7 @@ export const MAX_PLACE_NAME_CHARS = MAX_NAME_CHARS;
 
 export const planSourceValidator = v.object({
   itemId: v.id("items"),
+  savedAt: v.number(),
   title: v.optional(v.string()),
   description: v.optional(v.string()),
   content: v.optional(v.string()),

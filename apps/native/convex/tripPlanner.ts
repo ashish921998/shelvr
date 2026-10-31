@@ -13,7 +13,7 @@ import {
   type ApplePoi,
 } from "./model/appleMaps";
 import { logEvent } from "./model/log";
-import { isRemovedSuggestion } from "./model/placeRemovals";
+import { isRemovedSuggestion, removalsSince } from "./model/placeRemovals";
 import {
   placeKey,
   splitSavedPlace,
@@ -187,7 +187,10 @@ async function savedStops(
       const at = found[i];
       if (
         at &&
-        !isRemovedSuggestion(claim.removed, { name: place.name, ...at })
+        !isRemovedSuggestion(
+          removalsSince(claim.removed, sources.get(place.itemId)!.savedAt),
+          { name: place.name, ...at },
+        )
       )
         stops.push(saveStop(place, at, why(place)));
     });

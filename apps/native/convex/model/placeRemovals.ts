@@ -56,13 +56,18 @@ export function isRemovedSuggestion(
   return removals.some((row) => removedPin(row, pin));
 }
 
+export function removalsSince(
+  removals: readonly Removal[],
+  savedAt: number,
+): Removal[] {
+  return removals.filter((row) => savedAt <= row._creationTime);
+}
+
 export function visibleItemPlaces(
   item: Doc<"items">,
   removals: readonly Removal[],
 ): Doc<"items"> {
-  const applicable = removals.filter(
-    (row) => item._creationTime <= row._creationTime,
-  );
+  const applicable = removalsSince(removals, item._creationTime);
   if (!applicable.length) return item;
   const cities = item.cities ?? [];
   const hidden = (item.placePins ?? []).filter((pin) =>
