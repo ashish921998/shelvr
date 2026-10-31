@@ -4,12 +4,12 @@ import { describe, expect, it } from "vitest";
 
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { LIST_DRAIN_BATCH } from "./model/sharedLists";
+import { LIST_DRAIN_BATCH, MAX_LISTS_PER_USER } from "./model/sharedLists";
 import { joiner, listWithOwner, seedSave } from "./sharedLists.test.helpers";
 import { seedNotes, signedInUser, type TestBackend } from "./test.setup";
 import { DELETE_BATCH } from "./users";
 
-const MAX_PASSES = 20;
+const MAX_PASSES = 30;
 
 async function drain(base: TestBackend, userId: Id<"users">): Promise<void> {
   for (let pass = 0; pass < MAX_PASSES; pass++) {
@@ -61,7 +61,7 @@ describe("deleting an account with shared lists", () => {
     const bo = await joiner(base, token);
     await bo.t.mutation(api.sharedLists.addSharedListPlace, {
       listId,
-      place: { name: "Ramiro", lat: 38.73, lng: -9.139 },
+      place: { name: "Ramiro", lat: 38.73, lng: -9.139, city: "Lisbon" },
     });
     await bo.t.mutation(api.users.deleteCurrentUserAccount, {});
     await owner.t.mutation(api.users.deleteCurrentUserAccount, {});
@@ -82,7 +82,7 @@ describe("deleting an account with shared lists", () => {
     const bo = await joiner(base, token);
     await bo.t.mutation(api.sharedLists.addSharedListPlace, {
       listId,
-      place: { name: "Ramiro", lat: 38.73, lng: -9.139 },
+      place: { name: "Ramiro", lat: 38.73, lng: -9.139, city: "Lisbon" },
     });
     const before = await remains(base, listId);
     await bo.t.mutation(api.users.deleteCurrentUserAccount, {});
@@ -122,7 +122,7 @@ describe("deleting an account with shared lists", () => {
     ).toBe(listId);
   });
 
-  it("drains a list with more places than one batch over several passes", async () => {
+  it("deletes a list with more places than one batch in the pass that reaches it", async () => {
     const { base, owner, token, listId } = await listWithOwner();
     const bo = await joiner(base, token);
     await base.run(async (ctx) => {
@@ -133,6 +133,7 @@ describe("deleting an account with shared lists", () => {
           name: `Spot ${n}`,
           lat: 38.7 + n * 0.0001,
           lng: -9.14,
+          city: "Lisbon",
           addedAt: n,
         });
       }
@@ -143,11 +144,60 @@ describe("deleting an account with shared lists", () => {
       LIST_DRAIN_BATCH + 52,
     );
     await owner.t.mutation(api.users.deleteCurrentUserAccount, {});
-    const midway = await remains(base, listId);
-    expect(midway.list).not.toBeNull();
-    expect(midway.places).toHaveLength(50);
-    expect(midway.members).toHaveLength(1);
     await drain(base, owner.userId);
+    expect(await remains(base, listId)).toEqual({
+      list: null,
+      places: [],
+      members: [],
+    });
+  });
+
+  it("drains a person who is on as many lists as the cap allows", async () => {
+    const { base, owner, listId, token } = await listWithOwner();
+    const bo = await joiner(base, token);
+    await base.run(async (ctx) => {
+      for (let n = 1; n < MAX_LISTS_PER_USER; n++) {
+        const id = await ctx.db.insert("sharedLists", {
+          ownerId: owner.userId,
+          name: `List ${n}`,
+          cities: ["Lisbon"],
+          inviteToken: `token-${n}`,
+          placeCount: 0,
+          createdAt: n,
+        });
+        await ctx.db.insert("sharedListMembers", {
+          listId: id,
+          userId: owner.userId,
+          joinedAt: n,
+          seenAt: n,
+        });
+      }
+    });
+    await owner.t.mutation(api.users.deleteCurrentUserAccount, {});
+    await drain(base, owner.userId);
+    expect((await remains(base, listId)).list?.ownerId).toBe(bo.userId);
+    expect(
+      (await base.run((ctx) => ctx.db.query("sharedLists").collect())).map(
+        (list) => list._id,
+      ),
+    ).toEqual([listId]);
+  });
+
+  it("clears a membership whose list is already gone", async () => {
+    const { base, owner, listId } = await listWithOwner();
+    await base.run((ctx) => ctx.db.delete(listId));
+    await owner.t.mutation(api.users.deleteCurrentUserAccount, {});
+    await drain(base, owner.userId);
+    expect(
+      await base.run((ctx) => ctx.db.query("sharedListMembers").collect()),
+    ).toEqual([]);
+  });
+
+  it("deletes the list when a member leaves and only a deleting owner remains", async () => {
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    await base.run((ctx) => ctx.db.patch(owner.userId, { deleting: true }));
+    await bo.t.mutation(api.sharedLists.leaveSharedList, { listId });
     expect(await remains(base, listId)).toEqual({
       list: null,
       places: [],

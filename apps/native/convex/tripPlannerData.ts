@@ -21,7 +21,8 @@ import {
   planSourceValidator,
 } from "./model/plan";
 import { sameTripPlace } from "./model/placeIdentity";
-import { listPlanPlaceValidator } from "./model/sharedLists";
+import { recentVisits } from "./model/placeVisits";
+import { listPlanClaimValidator } from "./model/sharedLists";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   MAX_CITY_CHARS,
@@ -32,7 +33,7 @@ import {
   tidyCity,
   tripPaceValidator,
 } from "./model/trip";
-import { tidyPlace, tidyText } from "./model/tripPlace";
+import { tidyPlace, tidyText, tripSummary } from "./model/tripPlace";
 import {
   MAX_TRIP_NAME_CHARS,
   tripInterestValidator,
@@ -46,16 +47,10 @@ import {
   UNPLANNED_DAY,
   type TripInterest,
   type TripPlace,
-  tripSummary,
   type TripPlanStop,
   type TripSavePlace,
 } from "./model/tripPlan";
-import {
-  listAiAllowed,
-  listPlanPlaces,
-  requireCoveredList,
-  requirePlanAccess,
-} from "./sharedLists";
+import { claimListPlan, requirePlanAccess } from "./sharedLists";
 import { requireProEntitlement } from "./subscriptions";
 import { beenPlaces, toPlanSource } from "./tripData";
 
@@ -64,8 +59,6 @@ const MAX_STAY_CHARS = 120;
 const MAX_TRIP_STOPS = 150;
 /** The most trips one page of My trips reads, whatever the client asks for. */
 const LIST_PAGE_MAX = 50;
-/** Recent "We went" marks a suggestion is checked against, beyond the saves' own places. */
-const RECENT_VISITS = 200;
 const TAGS_PER_SAVE = 8;
 
 function tripDays(days: number): number {
@@ -111,18 +104,6 @@ const saveTasteValidator = v.object({
   categories: v.array(v.string()),
 });
 
-export async function recentVisits(
-  ctx: QueryCtx,
-  userId: string,
-): Promise<string[]> {
-  const visits = await ctx.db
-    .query("placeVisits")
-    .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
-    .order("desc")
-    .take(RECENT_VISITS);
-  return visits.map((visit) => visit.name);
-}
-
 function tasteOf(item: Doc<"items">, city: string) {
   return {
     tags: item.tags.slice(0, TAGS_PER_SAVE),
@@ -136,6 +117,15 @@ function tasteOf(item: Doc<"items">, city: string) {
   };
 }
 
+const plannedTripFields = {
+  city: v.string(),
+  days: v.number(),
+  interests: v.array(tripInterestValidator),
+  startDate: v.optional(v.string()),
+  stay: v.optional(v.string()),
+  tastes: v.array(saveTasteValidator),
+};
+
 /** Checks the caller may plan, spends one plan from the rate limit, and reads what the plan is made from. */
 export const claimTripPlanInternal = internalMutation({
   args: {
@@ -146,23 +136,24 @@ export const claimTripPlanInternal = internalMutation({
     stay: v.optional(v.string()),
     listId: v.optional(v.id("sharedLists")),
   },
-  returns: v.object({
-    city: v.string(),
-    days: v.number(),
-    interests: v.array(tripInterestValidator),
-    startDate: v.optional(v.string()),
-    stay: v.optional(v.string()),
-    sources: v.array(planSourceValidator),
-    been: v.array(v.string()),
-    removed: v.array(removalValidator),
-    pins: v.array(savedPinValidator),
-    tastes: v.array(saveTasteValidator),
-    places: v.array(listPlanPlaceValidator),
-    aiAllowed: v.boolean(),
-  }),
+  returns: v.union(
+    v.object({
+      from: v.literal("saves"),
+      ...plannedTripFields,
+      sources: v.array(planSourceValidator),
+      been: v.array(v.string()),
+      removed: v.array(removalValidator),
+      pins: v.array(savedPinValidator),
+      aiAllowed: v.boolean(),
+    }),
+    v.object({
+      from: v.literal("list"),
+      ...plannedTripFields,
+      ...listPlanClaimValidator.fields,
+    }),
+  ),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    if (args.listId === undefined) await requireProEntitlement(ctx, userId);
     const city = tidyCity(args.city).slice(0, MAX_CITY_CHARS);
     if (city === "") throw new Error("City required");
     const startDate = tidyStartDate(args.startDate);
@@ -175,29 +166,23 @@ export const claimTripPlanInternal = internalMutation({
       ...(stay !== undefined ? { stay } : {}),
     };
     if (args.listId !== undefined) {
-      const list = await requireCoveredList(ctx, args.listId, userId);
-      await rateLimiter.limit(ctx, "createTripPlan", {
-        key: userId,
-        throws: true,
+      const claim = await claimListPlan(ctx, args.listId, userId, city, {
+        bucket: "createTripPlan",
+        needsPlaces: true,
       });
-      const { rows, places } = await listPlanPlaces(ctx, list, userId, city);
-      const allowed = await listAiAllowed(ctx, userId, rows);
       return {
+        from: "list" as const,
         ...asked,
-        sources: [],
-        been: await recentVisits(ctx, userId),
-        removed: await userRemovals(ctx, userId),
-        pins: [],
-        tastes: allowed
-          ? places.map((place) => ({
+        ...claim,
+        tastes: claim.aiAllowed
+          ? claim.places.map((place) => ({
               tags: place.tags,
               categories: place.category !== undefined ? [place.category] : [],
             }))
           : [],
-        places,
-        aiAllowed: allowed,
       };
     }
+    await requireProEntitlement(ctx, userId);
     await rateLimiter.limit(ctx, "createTripPlan", {
       key: userId,
       throws: true,
@@ -213,6 +198,7 @@ export const claimTripPlanInternal = internalMutation({
     const sources = saves.map((item) => toPlanSource(item, city));
     const allowed = await aiAllowed(ctx, userId);
     return {
+      from: "saves" as const,
       ...asked,
       sources,
       removed,
@@ -234,7 +220,6 @@ export const claimTripPlanInternal = internalMutation({
       ),
       // Tags come from the model's reading of a save, so they reach Apple only while AI is allowed.
       tastes: allowed ? saves.map((item) => tasteOf(item, city)) : [],
-      places: [],
       aiAllowed: allowed,
     };
   },
@@ -242,6 +227,14 @@ export const claimTripPlanInternal = internalMutation({
 
 const { _id: _stopId, ...stopFields } = tripPlanStopValidator.fields;
 const stopInputValidator = v.object(stopFields);
+
+function savedStops(
+  plan: { listId?: Id<"sharedLists"> },
+  planned: { source: string }[],
+): number {
+  if (plan.listId !== undefined) return 0;
+  return planned.filter((stop) => stop.source === "save").length;
+}
 type StopInput = Omit<TripPlanStop, "_id">;
 
 /** Stores a new trip (older trips stay) with its stops; day 0 holds the unplanned ones. */
@@ -283,7 +276,7 @@ export const saveTripPlanInternal = internalMutation({
       ...trip,
       userId,
       stopCount: planned.length,
-      savedCount: planned.filter((stop) => stop.source === "save").length,
+      savedCount: savedStops(trip, planned),
     });
     for (const { day, stops } of placed) {
       for (const [order, stop] of stops.entries()) {
@@ -508,7 +501,7 @@ async function recount(ctx: MutationCtx, plan: Doc<"tripPlans">) {
   );
   await ctx.db.patch(plan._id, {
     stopCount: planned.length,
-    savedCount: planned.filter((stop) => stop.source === "save").length,
+    savedCount: savedStops(plan, planned),
   });
 }
 
@@ -718,7 +711,10 @@ export const claimTripSearchInternal = internalMutation({
     const planned = stops.filter((stop) => stop.day !== UNPLANNED_DAY);
     return {
       city: plan.city,
-      centre: middleOf(planned.length > 0 ? planned : stops),
+      centre:
+        plan.listId !== undefined
+          ? null
+          : middleOf(planned.length > 0 ? planned : stops),
       aiAllowed: await aiAllowed(ctx, userId),
     };
   },

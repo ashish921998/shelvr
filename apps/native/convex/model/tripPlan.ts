@@ -1,5 +1,4 @@
 import { type Infer, v } from "convex/values";
-import type { Doc } from "../_generated/dataModel";
 import { tripPaceValidator, tripSlotValidator } from "./trip";
 
 // The app imports this module, so it holds validators and plain data only.
@@ -71,20 +70,6 @@ export const tripPlanSummaryValidator = v.object({
   createdAt: v.number(),
 });
 export type TripPlanSummary = Infer<typeof tripPlanSummaryValidator>;
-
-export function tripSummary(plan: Doc<"tripPlans">): TripPlanSummary {
-  return {
-    _id: plan._id,
-    ...(plan.name !== undefined ? { name: plan.name } : {}),
-    city: plan.city,
-    ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
-    dayCount: plan.dayCount,
-    stopCount: plan.stopCount,
-    savedCount: plan.savedCount,
-    interests: plan.interests,
-    createdAt: plan._creationTime,
-  };
-}
 
 export const tripPlanDetailValidator = v.object({
   _id: v.id("tripPlans"),

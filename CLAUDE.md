@@ -99,12 +99,14 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
     from a save (`itemId`), an Apple Maps suggestion or a place found with Add a place, carrying its own name, pin, Apple id
     and category. Deleting the save keeps the stop; a trip read opens only live saves
   - `sharedLists`: one list of places two people keep together: its owner (`ownerId`, a
-    users id), name, the random `inviteToken` behind its join link, and a `placeCount`
+    users id), name, the `cities` chosen at creation, the random `inviteToken` behind its
+    join link, and a `placeCount`
   - `sharedListMembers`: one row per person on a `sharedLists` list, the owner included,
     with `joinedAt` and the `seenAt` that decides which places are new to them. At most
     8 members a list and 20 lists a person
   - `sharedListPlaces`: one copied place on a `sharedLists` list, modelled on `tripStops`:
-    its own name, pin, city, Apple id, category and tags, who added it (`addedBy`), the
+    its own name, pin, required city, Apple id, category and tags (copied only when the
+    save names one place), who added it (`addedBy`), the
     save it came from (`itemId`, returned only to that person) and `visitedAt`. No save
     title or text is copied, and a row outlives the save. At most 200 a list
   - `shareLinks`: one random public token per shared item, the capability behind the
@@ -343,10 +345,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   stop on the phone.
   With an optional `listId`, `makeDatePlan` and `createTripPlan` plan from a shared list
   instead of the caller's saves: the claim checks membership and coverage (the live owner's
-  Pro or the caller's), reads the list's unvisited places for the city (rows with no city
-  count too), and sets a stop's `itemId` only when the caller owns that save. AI permission
-  for a list run is the caller's plus every contributor's, former members included, so one
-  decline means no Apple call for that run. Without `listId` nothing changes for old callers.
+  Pro or the caller's), reads the list's unvisited places for the city, and sets a stop's `itemId` only when the
+  caller owns that save. The names of the city's visited rows join `been`, so Apple can't
+  suggest one back. A trip for a city with no unvisited list places is refused before the
+  rate limit or any Apple call. AI permission for a list plan is the caller's plus every
+  contributor's, former members included, so one decline means no Apple call for that run.
+  Without `listId` nothing changes for old callers.
 - **`mapPlaces.ts`**: `listMapPlaces`, every mapped place across the caller's ready saves
   (newest first, one entry per spot) for the Map tab, each with Apple's category (which picks
   the pin's icon) and its filter kinds from
@@ -369,14 +373,15 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   web page at `apps/web/src/app/p`. Links and votes go with their space or account, and a
   daily cron deletes them a week after they close.
 - **`sharedLists.ts`**: shared lists, the places two people keep together. No client calls
-  it yet. `createSharedList` (Pro) copies the caller's pins for the named cities into
-  `sharedListPlaces`; `listSharedLists` and `getSharedList` read a member's lists (members'
-  first names, new-place counts, the caller's own trips from the list). `invitePreview`
+  it yet. `createSharedList` (Pro) needs at least one city, keeps them on the list and
+  copies the caller's pins for them into `sharedListPlaces`; `listSharedLists` and `getSharedList` read a member's lists (members'
+  first names, new-place counts, the caller's own trips from the list). A list's cities, there
+  and in the invite preview, are the chosen ones first, then any others its places carry. `invitePreview`
   answers a signed-out caller from the token alone (`PUBLIC_ON_PURPOSE`), `joinSharedList`
   needs no Pro and is idempotent, `leaveSharedList` and the owner-only
-  `removeSharedListMember` (which rotates the token) run `departMember` from
-  `model/sharedLists.ts`: the oldest live member inherits an owner's list, and the last
-  member's leaving deletes it. Coverage (`listCovered`) is "the live owner has Pro or the
+  `removeSharedListMember` (which always rotates the token, even if that person already left) run `departMember` from
+  `model/sharedLists.ts` in one transaction: the oldest live member inherits an owner's list,
+  and the last member's leaving deletes it. Account deletion runs it one membership a pass. Coverage (`listCovered`) is "the live owner has Pro or the
   caller has Pro"; reading, joining, leaving and marking places need no Pro. Rules and
   caps live in `model/sharedLists.ts`; place tidying shared with trips in `model/tripPlace.ts`.
   The public `GET /list/invites/<token>` HTTP route (`getPublicInvite`, the same answer as
@@ -386,11 +391,6 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   city or all), `addSharedListPlace` stores an Apple search result, `removeSavePlaces` and
   `removeSharedListPlace` take them off, `setSharedListPlaceVisited` marks "We went" and
   `markSharedListSeen` resets what counts as new. Every add dedupes with `sameTripPlace`.
-- **`sharedListSearch.ts`** (`"use node"` action): `searchListPlaces`, Add a place's Apple
-  search near a shared list, through `claimListSearchInternal` in `sharedLists.ts` (member,
-  covered, its own `sharedListSearch` rate bucket). The search body is `searchPlacesNear`
-  in `tripPlanner.ts`, shared with `searchTripPlaces`. AI permission for a list run is
-  every contributor's and the caller's; one decline means no Apple call.
 - **`trips.ts`** (`"use node"` action), **`tripData.ts`**: "Plan my trip". `makeTrip` reads
   the chosen city's ready saves (or the most common city in a space), shuffles stored
   unvisited place names, resolves missing pins with Apple Maps (`model/appleMaps.ts`),
@@ -428,6 +428,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   the app's Undo sends back to `moveTripStop`. Stop ids survive every edit; only `deleteTripPlan` deletes
   stops. `tripPlanner.ts` `searchTripPlaces` (`tripPlaceSearch` rate limit) is Add a
   place's Apple search near the trip, refused like `createTripPlan` when AI is declined.
+  `searchListPlaces` (`sharedListSearch` rate limit, through `claimListSearchInternal`) is
+  the same search for a shared list. It and `searchTripPlaces` on a trip made from a list
+  send Apple only the city name, never a point from someone's places, and need only the
+  caller's own AI permission.
 - **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names, which the
   city page's map pins. `locateItem` looks up in Apple Maps the places read off the save
   (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),

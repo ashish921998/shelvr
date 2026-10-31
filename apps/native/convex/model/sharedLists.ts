@@ -2,16 +2,23 @@ import { type Infer, v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { liveOwner } from "./auth";
-import { sameTripPlace, type TripPlaceRef } from "./placeIdentity";
-import { countCities, pinsForCity, uniquePlacePins } from "./trip";
-import { tidyPlace } from "./tripPlace";
+import { namesOneVenue } from "./dateRank";
+import { removalValidator } from "./placeRemovals";
+import {
+  cityKey,
+  countCities,
+  MAX_CITY_CHARS,
+  pinsForCity,
+  uniquePlacePins,
+} from "./trip";
+import { tidyPlace, tidyText } from "./tripPlace";
 import {
   tripPlaceValidator,
   tripPlanSummaryValidator,
   type TripPlace,
 } from "./tripPlan";
 
-export const MAX_LIST_NAME_CHARS = 60;
+const MAX_LIST_NAME_CHARS = 60;
 export const MAX_LIST_CITIES = 5;
 export const MAX_LIST_PLACES = 200;
 export const MAX_LIST_MEMBERS = 8;
@@ -35,7 +42,7 @@ export const sharedListPlaceValidator = v.object({
   name: v.string(),
   lat: v.number(),
   lng: v.number(),
-  city: v.optional(v.string()),
+  city: v.string(),
   appleId: v.optional(v.string()),
   category: v.optional(v.string()),
   itemId: v.optional(v.id("items")),
@@ -80,11 +87,10 @@ export const invitePreviewValidator = v.object({
 
 export const sharedPlaceInputValidator = v.object({
   ...tripPlaceValidator.fields,
-  city: v.optional(v.string()),
+  city: v.string(),
 });
 
-export const listPlanPlaceValidator = v.object({
-  key: v.string(),
+const listPlanPlaceValidator = v.object({
   itemId: v.optional(v.id("items")),
   name: v.string(),
   lat: v.number(),
@@ -94,7 +100,14 @@ export const listPlanPlaceValidator = v.object({
   tags: v.array(v.string()),
   addedAt: v.number(),
 });
-export type ListPlanPlace = Infer<typeof listPlanPlaceValidator>;
+
+export const listPlanClaimValidator = v.object({
+  places: v.array(listPlanPlaceValidator),
+  been: v.array(v.string()),
+  removed: v.array(removalValidator),
+  aiAllowed: v.boolean(),
+});
+export type ListPlanClaim = Infer<typeof listPlanClaimValidator>;
 
 export type NewListPlace = Omit<
   Doc<"sharedListPlaces">,
@@ -108,56 +121,37 @@ export function inviteToken(): string {
 }
 
 export function tidyListName(name: string): string {
-  const tidy = name.replace(/\s+/g, " ").trim().slice(0, MAX_LIST_NAME_CHARS);
-  if (tidy === "") throw new Error("Name required");
+  const tidy = tidyText(name, MAX_LIST_NAME_CHARS);
+  if (tidy === undefined) throw new Error("Name required");
   return tidy;
 }
 
-export function placeRef(
-  place: Pick<Doc<"sharedListPlaces">, "name" | "lat" | "lng"> & {
-    appleId?: string;
-    itemId?: Id<"items">;
-  },
-): TripPlaceRef {
-  return {
-    name: place.name,
-    lat: place.lat,
-    lng: place.lng,
-    ...(place.appleId !== undefined ? { appleId: place.appleId } : {}),
-    ...(place.itemId !== undefined ? { itemId: place.itemId } : {}),
-  };
-}
-
-export function sameListPlace(
-  a: Parameters<typeof placeRef>[0],
-  b: Parameters<typeof placeRef>[0],
-): boolean {
-  return sameTripPlace(placeRef(a), placeRef(b));
-}
-
-export function foundPlace(input: TripPlace & { city?: string }): NewListPlace {
+export function foundPlace(input: TripPlace & { city: string }): NewListPlace {
   const { area: _area, ...place } = tidyPlace(input);
-  const city = input.city?.replace(/\s+/g, " ").trim();
-  return { ...place, ...(city ? { city } : {}) };
+  const city = tidyText(input.city, MAX_CITY_CHARS);
+  if (city === undefined) throw new Error("City required");
+  return { ...place, city };
 }
 
 export function savePlaces(item: Doc<"items">, city?: string): NewListPlace[] {
-  const pins = city ? pinsForCity(item, city) : (item.placePins ?? []);
   const only = item.cities?.length === 1 ? item.cities[0] : undefined;
-  const tags = item.tags.slice(0, TAGS_PER_PLACE);
-  return uniquePlacePins(pins).map((pin) => {
-    const pinCity = pin.city ?? city ?? only;
-    return {
-      itemId: item._id,
-      name: pin.name,
-      lat: pin.lat,
-      lng: pin.lng,
-      ...(pinCity !== undefined ? { city: pinCity } : {}),
-      ...(pin.appleId !== undefined ? { appleId: pin.appleId } : {}),
-      ...(pin.category !== undefined ? { category: pin.category } : {}),
-      ...(tags.length > 0 ? { tags } : {}),
-    };
+  const tags = namesOneVenue(item) ? item.tags.slice(0, TAGS_PER_PLACE) : [];
+  const pins = (
+    city ? pinsForCity(item, city) : (item.placePins ?? [])
+  ).flatMap((pin) => {
+    const pinCity = pin.city || city || only;
+    return pinCity ? [{ ...pin, city: pinCity }] : [];
   });
+  return uniquePlacePins(pins).map((pin) => ({
+    itemId: item._id,
+    name: pin.name,
+    lat: pin.lat,
+    lng: pin.lng,
+    city: pin.city,
+    ...(pin.appleId !== undefined ? { appleId: pin.appleId } : {}),
+    ...(pin.category !== undefined ? { category: pin.category } : {}),
+    ...(tags.length > 0 ? { tags } : {}),
+  }));
 }
 
 export function isNewPlace(
@@ -167,10 +161,20 @@ export function isNewPlace(
   return place.addedAt > member.seenAt && place.addedBy !== member.userId;
 }
 
-export function listCities(places: { city?: string }[]): string[] {
-  return countCities(
-    places.map((place) => ({ cities: place.city ? [place.city] : [] })),
-  ).map(({ city }) => city);
+export function uniqueCities(cities: string[]): string[] {
+  const byKey = new Map<string, string>();
+  for (const city of cities) {
+    if (!byKey.has(cityKey(city))) byKey.set(cityKey(city), city);
+  }
+  return [...byKey.values()];
+}
+
+export function listCities(
+  list: Doc<"sharedLists">,
+  places: { city: string }[],
+): string[] {
+  const carried = countCities(places.map(({ city }) => ({ cities: [city] })));
+  return uniqueCities([...list.cities, ...carried.map(({ city }) => city)]);
 }
 
 export function previewNames(places: { name: string }[]): string[] {
@@ -180,12 +184,11 @@ export function previewNames(places: { name: string }[]): string[] {
 export async function listMembers(
   ctx: QueryCtx,
   listId: Id<"sharedLists">,
-  limit = MEMBER_SCAN,
 ): Promise<Doc<"sharedListMembers">[]> {
   const rows = await ctx.db
     .query("sharedListMembers")
     .withIndex("by_list_and_user", (q) => q.eq("listId", listId))
-    .take(limit);
+    .take(MEMBER_SCAN);
   return rows.sort((a, b) => a.joinedAt - b.joinedAt);
 }
 
@@ -247,63 +250,30 @@ async function pickSuccessor(
   return null;
 }
 
-async function drainListChildren(
-  ctx: MutationCtx,
-  listId: Id<"sharedLists">,
-  departing: Id<"users">,
-  batch: number,
-): Promise<boolean> {
-  const places = await ctx.db
-    .query("sharedListPlaces")
-    .withIndex("by_list_and_added", (q) => q.eq("listId", listId))
-    .take(batch);
-  for (const place of places) {
-    await ctx.db.delete(place._id);
-  }
-  if (places.length === batch) return false;
-  const members = await ctx.db
-    .query("sharedListMembers")
-    .withIndex("by_list_and_user", (q) => q.eq("listId", listId))
-    .take(batch);
-  let anchored = false;
-  for (const member of members) {
-    if (member.userId === departing && !anchored) {
-      anchored = true;
-      continue;
-    }
-    await ctx.db.delete(member._id);
-  }
-  return members.length !== batch;
-}
-
 export async function departMember(
   ctx: MutationCtx,
   list: Doc<"sharedLists">,
   userId: Id<"users">,
-  batch = LIST_DRAIN_BATCH,
-): Promise<boolean> {
-  if (list.ownerId === userId) {
-    const others = (await listMembers(ctx, list._id, batch)).filter(
-      (member) => member.userId !== userId,
-    );
-    const successor = await pickSuccessor(ctx, others);
-    if (successor !== null) {
-      await ctx.db.patch(list._id, { ownerId: successor.userId });
-    } else {
-      if (!(await drainListChildren(ctx, list._id, userId, batch))) {
-        return false;
-      }
-      await ctx.db.delete(list._id);
+): Promise<void> {
+  const members = await listMembers(ctx, list._id);
+  const successor = await pickSuccessor(
+    ctx,
+    members.filter((member) => member.userId !== userId),
+  );
+  if (successor === null) {
+    for (const place of await listPlaces(ctx, list._id)) {
+      await ctx.db.delete(place._id);
     }
+    for (const member of members) {
+      await ctx.db.delete(member._id);
+    }
+    await ctx.db.delete(list._id);
+    return;
   }
-  const own = await ctx.db
-    .query("sharedListMembers")
-    .withIndex("by_list_and_user", (q) =>
-      q.eq("listId", list._id).eq("userId", userId),
-    )
-    .take(batch);
-  for (const row of own) {
-    await ctx.db.delete(row._id);
+  if (list.ownerId === userId) {
+    await ctx.db.patch(list._id, { ownerId: successor.userId });
   }
-  return true;
+  for (const member of members) {
+    if (member.userId === userId) await ctx.db.delete(member._id);
+  }
 }

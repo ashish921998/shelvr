@@ -402,6 +402,7 @@ export default defineSchema({
   sharedLists: defineTable({
     ownerId: v.id("users"),
     name: v.string(),
+    cities: v.array(v.string()),
     inviteToken: v.string(),
     placeCount: v.number(),
     createdAt: v.number(),
@@ -425,7 +426,7 @@ export default defineSchema({
     name: v.string(),
     lat: v.number(),
     lng: v.number(),
-    city: v.optional(v.string()),
+    city: v.string(),
     appleId: v.optional(v.string()),
     category: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),

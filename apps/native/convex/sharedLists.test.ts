@@ -2,8 +2,8 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
 
-import { api } from "./_generated/api";
-import { MAX_LIST_MEMBERS } from "./model/sharedLists";
+import { api, internal } from "./_generated/api";
+import { MAX_LIST_CITIES, MAX_LIST_MEMBERS } from "./model/sharedLists";
 import {
   joiner,
   LISBON,
@@ -55,6 +55,38 @@ describe("createSharedList", () => {
     expect(list?.trips).toEqual([]);
   });
 
+  it("does not count a list trip's stops as the planner's saves", async () => {
+    const { owner, itemId, listId } = await listWithOwner();
+    const tripId = await owner.t.mutation(
+      internal.tripPlannerData.saveTripPlanInternal,
+      {
+        city: "Lisbon",
+        dayCount: 1,
+        pace: "easy",
+        interests: [],
+        listId,
+        days: [
+          [
+            {
+              source: "save",
+              itemId,
+              name: "Ramen Shop",
+              lat: 38.71,
+              lng: -9.14,
+            },
+          ],
+        ],
+        unplanned: [],
+      },
+    );
+    const { page } = await owner.t.query(api.tripPlannerData.listTripPlans, {
+      paginationOpts: { numItems: 5, cursor: null },
+    });
+    expect(page).toEqual([
+      expect.objectContaining({ _id: tripId, stopCount: 1, savedCount: 0 }),
+    ]);
+  });
+
   it("leaves out pins of other cities and never copies a save's title", async () => {
     const base = newConvexTest();
     const owner = await signedInUser(base, { pro: true });
@@ -78,6 +110,76 @@ describe("createSharedList", () => {
     );
     expect(rows.map((row) => row.name)).toEqual(["Brasileira"]);
     expect(JSON.stringify(rows)).not.toContain("Porto secrets");
+  });
+});
+
+describe("a list's cities", () => {
+  async function emptyList(cities: string[]) {
+    const base = newConvexTest();
+    const owner = await signedInUser(base, { pro: true });
+    const listId = await owner.t.mutation(api.sharedLists.createSharedList, {
+      name: "Ours",
+      cities,
+    });
+    const token = await base.run(
+      async (ctx) => (await ctx.db.get(listId))?.inviteToken ?? "",
+    );
+    return { base, owner, listId, token };
+  }
+
+  it("refuses a list when no city survives tidying", async () => {
+    const base = newConvexTest();
+    const owner = await signedInUser(base, { pro: true });
+    for (const cities of [[], ["   "]]) {
+      await expect(
+        owner.t.mutation(api.sharedLists.createSharedList, {
+          name: "Ours",
+          cities,
+        }),
+      ).rejects.toThrow(/City required/);
+    }
+  });
+
+  it("keeps the tidied choice, one per city and capped, on a list with no places", async () => {
+    const { base, owner, listId, token } = await emptyList([
+      "  Lisbon ",
+      "LISBON",
+      "Porto",
+      "Faro",
+      "Braga",
+      "Sintra",
+      "Evora",
+    ]);
+    const chosen = ["Lisbon", "Porto", "Faro", "Braga", "Sintra"];
+    expect(MAX_LIST_CITIES).toBe(chosen.length);
+    expect((await base.run((ctx) => ctx.db.get(listId)))?.cities).toEqual(
+      chosen,
+    );
+    const list = await owner.t.query(api.sharedLists.getSharedList, { listId });
+    expect(list?.placeCount).toBe(0);
+    expect(list?.cities).toEqual(chosen);
+    expect(
+      (await base.query(api.sharedLists.invitePreview, { token }))?.cities,
+    ).toEqual(chosen);
+  });
+
+  it("names the chosen cities first, then others its places carry, once each", async () => {
+    const { base, owner, listId, token } = await emptyList(["Lisbon"]);
+    for (const [name, lat, city] of [
+      ["Forum", 37.01, "Faro"],
+      ["Marina", 37.02, "Faro"],
+      ["Rossio", 38.71, "LISBON"],
+    ] as const) {
+      await owner.t.mutation(api.sharedLists.addSharedListPlace, {
+        listId,
+        place: { name, lat, lng: -8, city },
+      });
+    }
+    const list = await owner.t.query(api.sharedLists.getSharedList, { listId });
+    expect(list?.cities).toEqual(["Lisbon", "Faro"]);
+    expect(
+      (await base.query(api.sharedLists.invitePreview, { token }))?.cities,
+    ).toEqual(["Lisbon", "Faro"]);
   });
 });
 
@@ -247,7 +349,46 @@ describe("leaveSharedList", () => {
   });
 });
 
+describe("getSharedList's save links", () => {
+  it("drops the link once the save behind a place is gone", async () => {
+    const { base, owner, itemId, listId } = await listWithOwner();
+    const before = await owner.t.query(api.sharedLists.getSharedList, {
+      listId,
+    });
+    expect(before?.places.map((place) => place.itemId)).toEqual([
+      itemId,
+      itemId,
+    ]);
+    await base.run((ctx) => ctx.db.delete(itemId));
+    const after = await owner.t.query(api.sharedLists.getSharedList, {
+      listId,
+    });
+    expect(after?.places).toHaveLength(2);
+    expect(after?.places.map((place) => place.itemId)).toEqual([
+      undefined,
+      undefined,
+    ]);
+  });
+});
+
 describe("removeSharedListMember", () => {
+  it("rotates the link even when the person has already left", async () => {
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    await bo.t.mutation(api.sharedLists.leaveSharedList, { listId });
+    await expect(
+      owner.t.mutation(api.sharedLists.removeSharedListMember, {
+        listId,
+        memberId: bo.userId,
+      }),
+    ).resolves.toBeNull();
+    const after = await base.run((ctx) => ctx.db.get(listId));
+    expect(after?.inviteToken).not.toBe(token);
+    expect(
+      await bo.t.mutation(api.sharedLists.joinSharedList, { token }),
+    ).toBeNull();
+  });
+
   it("is for the owner, drops the member and rotates the invite link", async () => {
     const { base, owner, token, listId } = await listWithOwner();
     const bo = await joiner(base, token);

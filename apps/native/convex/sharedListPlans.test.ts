@@ -5,10 +5,22 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { DatePlanResult } from "./model/datePlan";
-import { joiner, listWithOwner, near } from "./sharedLists.test.helpers";
+import {
+  joiner,
+  listWithOwner,
+  near,
+  seedSave,
+} from "./sharedLists.test.helpers";
 import { setTestConsent, signedInUser, type TestBackend } from "./test.setup";
 
-const RED_FROG = { name: "Red Frog", ...near(4), category: "Nightlife" };
+const TRIP_BUCKET_CAPACITY = 5;
+
+const RED_FROG = {
+  name: "Red Frog",
+  ...near(4),
+  category: "Nightlife",
+  city: "Lisbon",
+};
 
 async function testKey(): Promise<string> {
   const pair = await crypto.subtle.generateKey(
@@ -155,6 +167,226 @@ describe("makeDatePlan from a shared list", () => {
         listId,
       }),
     ).rejects.toThrow(/List not found/);
+  });
+});
+
+function appleOffering(names: string[]) {
+  return vi.fn(async (input: string) => {
+    const url = new URL(input);
+    if (url.pathname === "/v1/token") {
+      return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
+    }
+    const category = url.searchParams
+      .get("includePoiCategories")
+      ?.split(",")[0];
+    return Response.json({
+      results: names.map((name, i) => ({
+        name,
+        id: `A-${i}`,
+        poiCategory: category,
+        structuredAddress: { locality: "Lisbon" },
+        coordinate: {
+          latitude: near(3 + i * 0.1).lat,
+          longitude: near(0).lng,
+        },
+      })),
+    });
+  });
+}
+
+describe("a save's tags on a shared list", () => {
+  it("speak for a place only when the save names that one place", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const { base, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const guide = await seedSave(base, bo.userId, {
+      pins: [
+        { name: "Bookshop Bertrand", ...near(5) },
+        { name: "Tile Museum", ...near(6) },
+      ],
+      tags: ["coffee"],
+    });
+    const solo = await seedSave(base, bo.userId, {
+      pins: [{ name: "Solo Roasters", ...near(7) }],
+      tags: ["coffee"],
+    });
+    for (const itemId of [guide, solo]) {
+      await bo.t.mutation(api.sharedLists.addSavePlaces, { listId, itemId });
+    }
+    await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: { name: "Jardim", ...near(8), category: "Park", city: "Lisbon" },
+    });
+    const result = await bo.t.action(api.datePlans.makeDatePlan, {
+      city: "Lisbon",
+      kind: "lowkey",
+      listId,
+    });
+    expect(stopNames(result)).toEqual(
+      expect.arrayContaining(["Solo Roasters", "Jardim"]),
+    );
+    expect(stopNames(result)).not.toContain("Bookshop Bertrand");
+    expect(stopNames(result)).not.toContain("Tile Museum");
+  });
+});
+
+describe("a place the list marked visited", () => {
+  it("is not suggested back on a date", async () => {
+    await stubMaps();
+    vi.stubGlobal("fetch", appleOffering(["Red Frog", "Blue Frog"]));
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const frog = await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: RED_FROG,
+    });
+    await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: frog,
+      visited: true,
+    });
+    const result = await owner.t.action(api.datePlans.makeDatePlan, {
+      city: "Lisbon",
+      kind: "classic",
+      listId,
+    });
+    expect(stopNames(result)).toContain("Blue Frog");
+    expect(stopNames(result)).not.toContain("Red Frog");
+  });
+
+  it("is not suggested back on a trip", async () => {
+    await stubMaps();
+    vi.stubGlobal("fetch", appleOffering(["Red Frog", "Blue Frog"]));
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const frog = await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: RED_FROG,
+    });
+    await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: frog,
+      visited: true,
+    });
+    const { tripId } = await owner.t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 2,
+      pace: "easy",
+      interests: ["food"],
+      listId,
+    });
+    const trip = await owner.t.query(api.tripPlannerData.getTripPlan, {
+      tripId: tripId!,
+    });
+    const names = [
+      ...(trip?.days.flat() ?? []),
+      ...(trip?.unplanned ?? []),
+    ].map((stop) => stop.name);
+    expect(names).toContain("Blue Frog");
+    expect(names).not.toContain("Red Frog");
+  });
+
+  it("still leaves another branch of that name on the plan", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const frog = await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: RED_FROG,
+    });
+    await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: { ...RED_FROG, ...near(40) },
+    });
+    await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: frog,
+      visited: true,
+    });
+    const { saves } = await owner.t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 1,
+      pace: "easy",
+      interests: [],
+      listId,
+    });
+    expect(saves).toBe(3);
+  });
+});
+
+describe("planning one city of a list with two", () => {
+  it("uses only that city's places", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: { ...RED_FROG, name: "Porto Frog", city: "Porto" },
+    });
+    await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: RED_FROG,
+    });
+    const result = await owner.t.action(api.datePlans.makeDatePlan, {
+      city: "lisbon",
+      kind: "classic",
+      listId,
+    });
+    expect(stopNames(result)).toContain("Red Frog");
+    expect(stopNames(result)).not.toContain("Porto Frog");
+  });
+});
+
+describe("planning a city the list does not hold", () => {
+  it("gives a date plan no Apple call and no stops", async () => {
+    const fetchMock = await stubMaps();
+    const { owner, listId } = await listWithOwner();
+    const result = await owner.t.action(api.datePlans.makeDatePlan, {
+      city: "Porto",
+      kind: "classic",
+      listId,
+    });
+    expect(result).toMatchObject({ status: "no_anchor", stops: [] });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses a trip before the rate limit or any Apple call", async () => {
+    const fetchMock = await stubMaps();
+    const { base, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const trip = (city: string) =>
+      bo.t.action(api.tripPlanner.createTripPlan, {
+        city,
+        days: 1,
+        pace: "easy",
+        interests: ["food"],
+        listId,
+      });
+    for (let n = 0; n < TRIP_BUCKET_CAPACITY + 1; n++) {
+      await expect(trip("Porto")).rejects.toThrow(/No places in this city/);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect((await trip("Lisbon")).tripId).not.toBeNull();
+  });
+
+  it("refuses a trip when every place in the city has been visited", async () => {
+    const fetchMock = await stubMaps();
+    const { base, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const list = await bo.t.query(api.sharedLists.getSharedList, { listId });
+    for (const place of list?.places ?? []) {
+      await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+        placeId: place._id,
+        visited: true,
+      });
+    }
+    await expect(
+      bo.t.action(api.tripPlanner.createTripPlan, {
+        city: "Lisbon",
+        days: 1,
+        pace: "easy",
+        interests: ["food"],
+        listId,
+      }),
+    ).rejects.toThrow(/No places in this city/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
