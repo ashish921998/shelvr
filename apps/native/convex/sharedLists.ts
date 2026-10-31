@@ -55,8 +55,6 @@ import {
 } from "./subscriptions";
 import { tripSummary } from "./model/tripPlan";
 
-const LEAVE_ROUNDS = 4;
-
 async function memberList(
   ctx: QueryCtx,
   listId: Id<"sharedLists">,
@@ -357,10 +355,7 @@ export const leaveSharedList = authedMutation({
     const { userId } = ctx;
     const found = await memberList(ctx, args.listId, userId);
     if (found === null) return null;
-    for (let round = 0; round < LEAVE_ROUNDS; round++) {
-      const list = await ctx.db.get(found.list._id);
-      if (list === null || (await departMember(ctx, list, userId))) break;
-    }
+    await departMember(ctx, found.list, userId);
     return null;
   },
 });
@@ -390,25 +385,13 @@ export async function deleteSharedListsBatch(
   const memberships = await ctx.db
     .query("sharedListMembers")
     .withIndex("by_user", (q) => q.eq("userId", userId))
-    .take(LIST_DRAIN_BATCH);
-  for (const row of memberships) {
-    if ((await ctx.db.get(row._id)) === null) continue;
-    const list = await ctx.db.get(row.listId);
-    if (list === null) {
-      await ctx.db.delete(row._id);
-      continue;
-    }
-    if (!(await departMember(ctx, list, userId))) return false;
-  }
-  if (memberships.length === LIST_DRAIN_BATCH) return false;
-  const owned = await ctx.db
-    .query("sharedLists")
-    .withIndex("by_owner", (q) => q.eq("ownerId", userId))
-    .take(LIST_DRAIN_BATCH);
-  for (const list of owned) {
-    if (!(await departMember(ctx, list, userId))) return false;
-  }
-  return owned.length !== LIST_DRAIN_BATCH;
+    .take(2);
+  const [membership] = memberships;
+  if (membership === undefined) return true;
+  const list = await ctx.db.get(membership.listId);
+  if (list === null) await ctx.db.delete(membership._id);
+  else await departMember(ctx, list, userId);
+  return memberships.length === 1;
 }
 
 export const removeSharedListMember = authedMutation({
