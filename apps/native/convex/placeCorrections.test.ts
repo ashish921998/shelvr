@@ -240,6 +240,58 @@ describe("place corrections", () => {
     expect(item?.cities).toEqual(["Lisbon"]);
     expect(item?.placesEdited).toBeUndefined();
   });
+  it("leaves a removed place out of the editor and shows it again when the owner adds it back", async () => {
+    const { t, itemId } = await setup();
+    await t.mutation(api.placeRemovals.removePlace, {
+      itemId,
+      name: original.name,
+      lat: original.lat,
+      lng: original.lng,
+    });
+    const removed = await t.query(api.placeCorrections.getPlaces, { itemId });
+    expect(removed?.places).toEqual([]);
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: removed?.version ?? "",
+      places: [original],
+    });
+    const map = await t.query(api.mapPlaces.listMapPlaces, {});
+    expect(map.map((place) => place.name)).toEqual([original.name]);
+  });
+  it("keeps a removal that applies only to older saves when a newer save keeps the place", async () => {
+    const { base, t, userId, itemId } = await setup();
+    await t.mutation(api.placeRemovals.removePlace, {
+      itemId,
+      name: original.name,
+      lat: original.lat,
+      lng: original.lng,
+    });
+    const newer = await base.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Newer save",
+        tags: [],
+        cities: ["Lisbon"],
+        places: [original.name, "Cafe"],
+        placePins: [original],
+        searchText: "old branch cafe lisbon",
+      }),
+    );
+    const data = await t.query(api.placeCorrections.getPlaces, {
+      itemId: newer,
+    });
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId: newer,
+      version: data?.version ?? "",
+      places: [original],
+    });
+    const rows = await base.run((ctx) =>
+      ctx.db.query("placeRemovals").collect(),
+    );
+    expect(rows).toHaveLength(1);
+  });
   it("requires ownership and Pro for changes and search", async () => {
     const { base, t, itemId, data } = await setup(false);
     const other = await signedInUser(base, { pro: true });

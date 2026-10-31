@@ -345,7 +345,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   automatic suggestions use the projection; source saves, existing trips and deliberate manual
   additions remain. A save made after the removal shows the place again. Keep the
   `placeRemovals` table on rollback once rows exist.
-- **`placeCorrections.ts`**, **`placeCorrectionSearch.ts`**: owner-only place editing and Apple Maps lookup. `items.placesEdited` preserves the chosen places across extraction retries and pin refreshes. A kept place with no pin still gets one from a lookup, which never changes a pin already on the save. Corrections update city grouping and search; existing trip stops remain unchanged.
+- **`placeCorrections.ts`**, **`placeCorrectionSearch.ts`**: owner-only place editing and Apple Maps lookup. `items.placesEdited` preserves the chosen places across extraction retries and pin refreshes. A kept place with no pin still gets one from a lookup, which never changes a pin already on the save. Corrections update city grouping and search; existing trip stops remain unchanged. The editor leaves out removed places (`placeRemovals.ts`), and adding one back clears its removal.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
   link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and
   `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the

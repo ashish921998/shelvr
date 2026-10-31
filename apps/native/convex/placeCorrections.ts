@@ -9,6 +9,11 @@ import {
   normalizeCities,
   normalizePlaceLocations,
 } from "./model/itemFields";
+import {
+  isRemovedSuggestion,
+  removalsSince,
+  visibleSave,
+} from "./model/placeRemovals";
 import { buildSearchText } from "./model/searchText";
 import { requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
@@ -56,7 +61,7 @@ export const getPlaces = authedQuery({
   handler: async (ctx, { itemId }) => {
     const item = await ctx.db.get(itemId);
     if (!item || item.userId !== ctx.userId) return null;
-    const places = currentPlaces(item);
+    const places = currentPlaces(await visibleSave(ctx, item));
     return {
       places,
       version: JSON.stringify(places),
@@ -113,16 +118,18 @@ export const savePlaces = authedMutation({
     const item = await ctx.db.get(args.itemId);
     if (!item || item.userId !== ctx.userId) throw new Error("Save not found");
     await requireProEntitlement(ctx, ctx.userId);
-    if (
-      item.status !== "ready" ||
-      JSON.stringify(currentPlaces(item)) !== args.version
-    )
+    const removals = await ctx.db
+      .query("placeRemovals")
+      .withIndex("by_user", (q) => q.eq("userId", ctx.userId))
+      .collect();
+    const current = currentPlaces(await visibleSave(ctx, item, removals));
+    if (item.status !== "ready" || JSON.stringify(current) !== args.version)
       throw new Error("Places changed; reopen this save");
     if (args.places.length > MAX_ITEM_PLACES)
       throw new Error("Too many places");
     await rateLimiter.limit(ctx, "tripEdit", { key: ctx.userId, throws: true });
     const chosen = args.places.map(cleanPlace);
-    if (samePlaces(chosen, currentPlaces(item))) return null;
+    if (samePlaces(chosen, current)) return null;
     const cities = normalizeCities(
       chosen.flatMap((place) =>
         place.city ? [place.city] : (item.cities ?? []),
@@ -151,6 +158,9 @@ export const savePlaces = authedMutation({
       ...patch,
       searchText: buildSearchText({ ...item, ...patch }),
     });
+    for (const removal of removalsSince(removals, item._creationTime))
+      if (placePins.some((pin) => isRemovedSuggestion([removal], pin)))
+        await ctx.db.delete(removal._id);
     if (unpinned.length > 0)
       await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
         itemId: item._id,
