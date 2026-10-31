@@ -85,6 +85,25 @@ export function visibleItemPlaces(
       (!label.area || !own.area || label.area === own.area)
     );
   };
+  const labels = [
+    ...(item.places ?? []),
+    ...(item.intents ?? [])
+      .filter((intent) => intent.kind === "open_maps")
+      .map((intent) => intent.value),
+  ].map((value) => parseLabel(value, cities));
+  const hidesLabel = (
+    label: Label,
+    pin: Placed & { city?: string },
+  ): boolean => {
+    if (!namesPin(label, pin)) return false;
+    if (!label.area || parseLabel(pin.name, [...cities, pin.city ?? ""]).area)
+      return true;
+    const branches = labels.filter(
+      (other) =>
+        other.key === label.key && other.area && namesCity(other, pin.city),
+    );
+    return new Set(branches.map((other) => other.area)).size === 1;
+  };
   const namesRemoval = (label: Label, row: Removal): boolean =>
     venueKey(row.name) === label.key &&
     cities.some((city) => placeKey(city) === placeKey(row.city)) &&
@@ -93,7 +112,7 @@ export function visibleItemPlaces(
   const keep = (value: string): boolean => {
     const label = parseLabel(value, cities);
     if (placePins?.some((pin) => namesPin(label, pin))) return true;
-    if (hidden.some((pin) => namesPin(label, pin))) return false;
+    if (hidden.some((pin) => hidesLabel(label, pin))) return false;
     return !applicable.some((row) => namesRemoval(label, row));
   };
   return {

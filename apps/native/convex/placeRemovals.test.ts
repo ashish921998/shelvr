@@ -714,6 +714,98 @@ describe("place removals", () => {
     expect(keep({ ...found, appleId: "b" })).toBe(true);
   });
 
+  it("keeps both branches when a removed pin does not say which one it was", async () => {
+    const { t, itemId, pin, map, source } = await setup();
+    const bare = { ...pin, name: "Tigre" };
+    const places = ["Tigre, Alfama", "Tigre, Baixa"];
+    await t.run((ctx) => ctx.db.patch(itemId, { placePins: [bare], places }));
+    await t.mutation(api.placeRemovals.removePlace, {
+      itemId,
+      name: bare.name,
+      lat: bare.lat,
+      lng: bare.lng,
+      appleId: bare.appleId,
+    });
+    expect(await map()).toEqual([]);
+    expect((await source()).places).toEqual(places);
+  });
+
+  it("counts a Maps intent's branch when a removed pin does not say which one it was", async () => {
+    const { t, itemId, pin, source } = await setup();
+    const bare = { ...pin, name: "Tigre" };
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        placePins: [bare],
+        places: ["Tigre, Alfama"],
+        intents: [{ kind: "open_maps", label: "Tigre", value: "Tigre, Baixa" }],
+      }),
+    );
+    await t.mutation(api.placeRemovals.removePlace, {
+      itemId,
+      name: bare.name,
+      lat: bare.lat,
+      lng: bare.lng,
+      appleId: bare.appleId,
+    });
+    expect((await source()).places).toEqual(["Tigre, Baixa", "Tigre, Alfama"]);
+  });
+
+  it("still drops a bare pin's one branch when the save's other label is another venue", async () => {
+    const { t, itemId, pin, source } = await setup();
+    const bare = { ...pin, name: "Tigre" };
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        placePins: [bare],
+        places: ["Tigre, Alfama", "Prado, Chiado"],
+      }),
+    );
+    await t.mutation(api.placeRemovals.removePlace, {
+      itemId,
+      name: bare.name,
+      lat: bare.lat,
+      lng: bare.lng,
+      appleId: bare.appleId,
+    });
+    expect((await source()).places).toEqual(["Prado, Chiado"]);
+  });
+
+  it("drops only the named branch when the removal came from another save's bare copy", async () => {
+    const { t, itemId, pin, insert, source } = await setup();
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, { places: ["Tigre, Alfama", "Tigre, Baixa"] }),
+    );
+    const bare = { ...pin, name: "Tigre" };
+    const other = await insert("ready", [bare], [bare.name]);
+    await t.mutation(api.placeRemovals.removePlace, {
+      itemId: other,
+      name: bare.name,
+      lat: bare.lat,
+      lng: bare.lng,
+      appleId: bare.appleId,
+    });
+    expect((await source()).places).toEqual(["Tigre, Baixa"]);
+  });
+
+  it("still drops a bare pin's one branch when a branch elsewhere is in another city", async () => {
+    const { t, itemId, pin, source } = await setup();
+    const bare = { ...pin, name: "Tigre" };
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        cities: ["Lisbon", "Porto"],
+        placePins: [bare],
+        places: ["Tigre, Alfama, Lisbon", "Tigre, Ribeira, Porto"],
+      }),
+    );
+    await t.mutation(api.placeRemovals.removePlace, {
+      itemId,
+      name: bare.name,
+      lat: bare.lat,
+      lng: bare.lng,
+      appleId: bare.appleId,
+    });
+    expect((await source()).places).toEqual(["Tigre, Ribeira, Porto"]);
+  });
+
   it("drops every label of a removed pin, even one the pin does not spell out", async () => {
     const { t, itemId, pin, map, source } = await setup();
     const bare = { ...pin, name: "Tigre" };
