@@ -184,6 +184,28 @@ it("keeps a good save and its Retry when the page answers with an empty shell", 
   expect(generateObject).not.toHaveBeenCalled();
 });
 
+it("still reaches the speech read for a caption-less video with no places", async () => {
+  servesTikTokWithoutCaption();
+
+  await retried(TIKTOK, {
+    title: "A TikTok",
+    description: "A TikTok video by cook.",
+  });
+
+  expect(generateObject).toHaveBeenCalled();
+});
+
+it("takes a first image from a read with nothing else", async () => {
+  servesPage(
+    `<html><head><meta property="og:image" content="https://www.example.com/new.jpg"></head><body></body></html>`,
+  );
+
+  const item = await retried(PAGE, { description: GOOD_SAVE.description });
+
+  expect(generateObject).toHaveBeenCalled();
+  expect(item?.heroImageUrl).toBe("https://www.example.com/new.jpg");
+});
+
 it("still asks the model when a save has nothing to lose", async () => {
   servesTikTokWithoutCaption();
 
