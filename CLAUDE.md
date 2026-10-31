@@ -361,6 +361,15 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   member's leaving deletes it. Coverage (`listCovered`) is "the live owner has Pro or the
   caller has Pro"; reading, joining, leaving and marking places need no Pro. Rules and
   caps live in `model/sharedLists.ts`; place tidying shared with trips in `model/tripPlace.ts`.
+  Any member adds places: `addSavePlaces` copies a save's pins (the caller's own save, one
+  city or all), `addSharedListPlace` stores an Apple search result, `removeSavePlaces` and
+  `removeSharedListPlace` take them off, `setSharedListPlaceVisited` marks "We went" and
+  `markSharedListSeen` resets what counts as new. Every add dedupes with `sameTripPlace`.
+- **`sharedListSearch.ts`** (`"use node"` action): `searchListPlaces`, Add a place's Apple
+  search near a shared list, through `claimListSearchInternal` in `sharedLists.ts` (member,
+  covered, its own `sharedListSearch` rate bucket). The search body is `searchPlacesNear`
+  in `tripPlanner.ts`, shared with `searchTripPlaces`. AI permission for a list run is
+  every contributor's and the caller's; one decline means no Apple call.
 - **`trips.ts`** (`"use node"` action), **`tripData.ts`**: "Plan my trip". `makeTrip` reads
   the chosen city's ready saves (or the most common city in a space), shuffles stored
   unvisited place names, resolves missing pins with Apple Maps (`model/appleMaps.ts`),

@@ -1,16 +1,24 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import {
+  internalMutation,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
+import { aiAllowed } from "./aiConsent";
 import { readyCitySaves } from "./items";
 import {
   authedMutation,
   authedQuery,
   liveOwner,
+  requireUserId,
   senderFirstName,
 } from "./model/auth";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   departMember,
+  foundPlace,
   inviteToken,
   invitePreviewValidator,
   isNewPlace,
@@ -31,11 +39,14 @@ import {
   savePlaces,
   sharedListDetailValidator,
   sharedListSummaryValidator,
+  sharedPlaceInputValidator,
   tidyListName,
   type NewListPlace,
 } from "./model/sharedLists";
-import { tidyCity } from "./model/trip";
+import { saveError } from "./model/saveErrors";
+import { middleOf, tidyCity } from "./model/trip";
 import {
+  hasProEntitlement,
   hasProEntitlementStatus,
   requireProEntitlement,
 } from "./subscriptions";
@@ -399,5 +410,188 @@ export const removeSharedListMember = authedMutation({
     await ctx.db.delete(membership._id);
     await ctx.db.patch(list._id, { inviteToken: inviteToken() });
     return null;
+  },
+});
+
+async function requireEditableList(
+  ctx: MutationCtx,
+  listId: Id<"sharedLists">,
+  userId: Id<"users">,
+): Promise<Doc<"sharedLists">> {
+  const { list } = await requireMember(ctx, listId, userId);
+  await rateLimiter.limit(ctx, "sharedListEdit", { key: userId, throws: true });
+  return list;
+}
+
+async function memberPlace(
+  ctx: MutationCtx,
+  placeId: Id<"sharedListPlaces">,
+  userId: Id<"users">,
+): Promise<{ list: Doc<"sharedLists">; place: Doc<"sharedListPlaces"> }> {
+  const place = await ctx.db.get(placeId);
+  if (place === null) throw new Error("Place not found");
+  const list = await requireEditableList(ctx, place.listId, userId);
+  return { list, place };
+}
+
+async function removePlaces(
+  ctx: MutationCtx,
+  list: Doc<"sharedLists">,
+  places: Doc<"sharedListPlaces">[],
+): Promise<number> {
+  for (const place of places) {
+    await ctx.db.delete(place._id);
+  }
+  if (places.length > 0) {
+    await ctx.db.patch(list._id, {
+      placeCount: Math.max(0, list.placeCount - places.length),
+    });
+  }
+  return places.length;
+}
+
+export const addSavePlaces = authedMutation({
+  args: {
+    listId: v.id("sharedLists"),
+    itemId: v.id("items"),
+    city: v.optional(v.string()),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const { userId } = ctx;
+    const list = await requireEditableList(ctx, args.listId, userId);
+    const item = await ctx.db.get(args.itemId);
+    if (item === null || item.userId !== userId || item.status !== "ready") {
+      throw new Error("Save not found");
+    }
+    const city =
+      args.city === undefined
+        ? undefined
+        : tidyCity(args.city).slice(0, MAX_CITY_CHARS) || undefined;
+    return await insertListPlaces(
+      ctx,
+      list,
+      userId,
+      savePlaces(item, city),
+      Date.now(),
+    );
+  },
+});
+
+export const removeSavePlaces = authedMutation({
+  args: { listId: v.id("sharedLists"), itemId: v.id("items") },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const { userId } = ctx;
+    const list = await requireEditableList(ctx, args.listId, userId);
+    const own = (await listPlaces(ctx, list._id)).filter(
+      (place) => place.addedBy === userId && place.itemId === args.itemId,
+    );
+    return await removePlaces(ctx, list, own);
+  },
+});
+
+export const addSharedListPlace = authedMutation({
+  args: { listId: v.id("sharedLists"), place: sharedPlaceInputValidator },
+  returns: v.id("sharedListPlaces"),
+  handler: async (ctx, args) => {
+    const { userId } = ctx;
+    const list = await requireEditableList(ctx, args.listId, userId);
+    const next = foundPlace(args.place);
+    const existing = (await listPlaces(ctx, list._id)).find((row) =>
+      sameListPlace(row, next),
+    );
+    if (existing !== undefined) return existing._id;
+    if (list.placeCount >= MAX_LIST_PLACES) throw new Error("List is full");
+    const placeId = await ctx.db.insert("sharedListPlaces", {
+      ...next,
+      listId: list._id,
+      addedBy: userId,
+      addedAt: Date.now(),
+    });
+    await ctx.db.patch(list._id, { placeCount: list.placeCount + 1 });
+    return placeId;
+  },
+});
+
+export const removeSharedListPlace = authedMutation({
+  args: { placeId: v.id("sharedListPlaces") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { list, place } = await memberPlace(ctx, args.placeId, ctx.userId);
+    await removePlaces(ctx, list, [place]);
+    return null;
+  },
+});
+
+export const setSharedListPlaceVisited = authedMutation({
+  args: { placeId: v.id("sharedListPlaces"), visited: v.boolean() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { place } = await memberPlace(ctx, args.placeId, ctx.userId);
+    await ctx.db.patch(place._id, {
+      visitedAt: args.visited ? Date.now() : undefined,
+    });
+    return null;
+  },
+});
+
+export const markSharedListSeen = authedMutation({
+  args: { listId: v.id("sharedLists") },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const found = await memberList(ctx, args.listId, ctx.userId);
+    if (found !== null) {
+      await ctx.db.patch(found.membership._id, { seenAt: Date.now() });
+    }
+    return null;
+  },
+});
+
+export async function listAiAllowed(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  places: { addedBy: Id<"users"> }[],
+): Promise<boolean> {
+  for (const id of new Set([userId, ...places.map((p) => p.addedBy)])) {
+    if (!(await aiAllowed(ctx, id))) return false;
+  }
+  return true;
+}
+
+export async function requireCoveredList(
+  ctx: MutationCtx,
+  listId: Id<"sharedLists">,
+  userId: Id<"users">,
+): Promise<Doc<"sharedLists">> {
+  const { list } = await requireMember(ctx, listId, userId);
+  const covered = await listCovered(ctx, list, userId, (id) =>
+    hasProEntitlement(ctx, id),
+  );
+  if (!covered) throw saveError("pro_required");
+  return list;
+}
+
+export const claimListSearchInternal = internalMutation({
+  args: { listId: v.id("sharedLists") },
+  returns: v.object({
+    city: v.optional(v.string()),
+    centre: v.union(v.null(), v.object({ lat: v.number(), lng: v.number() })),
+    aiAllowed: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const list = await requireCoveredList(ctx, args.listId, userId);
+    await rateLimiter.limit(ctx, "sharedListSearch", {
+      key: userId,
+      throws: true,
+    });
+    const places = await listPlaces(ctx, list._id);
+    const city = listCities(places)[0];
+    return {
+      ...(city !== undefined ? { city } : {}),
+      centre: middleOf(places),
+      aiAllowed: await listAiAllowed(ctx, userId, places),
+    };
   },
 });

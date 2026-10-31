@@ -367,6 +367,54 @@ const MAX_SEARCH_RESULTS = 15;
 /** Add a place looks a little wider than suggestions do: a day trip out of town is fine. */
 const SEARCH_RADIUS_KM = SUGGEST_RADIUS_KM * 2;
 
+export type SearchClaim = {
+  city?: string;
+  centre: LatLng | null;
+  aiAllowed: boolean;
+};
+
+export type SearchResult = { available: boolean; places: TripPlace[] };
+
+export function tidyQuery(query: string): string {
+  return query.replace(/\s+/g, " ").trim().slice(0, MAX_SEARCH_CHARS);
+}
+
+export function shortQuery(query: string): boolean {
+  return query.length < MIN_SEARCH_CHARS;
+}
+
+export async function searchPlacesNear(
+  claim: SearchClaim,
+  query: string,
+  locale: string | undefined,
+): Promise<SearchResult> {
+  // The trip's centre comes from the saves' pins, so a declined account sends Apple nothing,
+  // as createTripPlan does.
+  const maps = claim.aiAllowed ? await openMaps(appleLang(locale)) : null;
+  if (maps === null) return { available: false, places: [] };
+  const centre =
+    claim.centre ??
+    (claim.city === undefined
+      ? null
+      : await appleMapsLookup(maps.token, "geocode", claim.city));
+  if (centre === null) {
+    logEvent("info", "trip_search_no_centre", {});
+    return { available: true, places: [] };
+  }
+  const found = await appleMapsSearchPlaces(maps.token, query, {
+    near: centre,
+    ...(maps.lang !== undefined ? { lang: maps.lang } : {}),
+  });
+  const places = found
+    .filter((place) => distanceKm(place, centre) <= SEARCH_RADIUS_KM)
+    .slice(0, MAX_SEARCH_RESULTS);
+  logEvent("info", "trip_search_done", {
+    found: found.length,
+    kept: places.length,
+  });
+  return { available: true, places };
+}
+
 /** Add a place: an Apple Maps search for what the person typed, near the trip. */
 export const searchTripPlaces = action({
   args: {
@@ -375,43 +423,13 @@ export const searchTripPlaces = action({
     locale: v.optional(v.string()),
   },
   returns: searchTripPlacesResultValidator,
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{ available: boolean; places: TripPlace[] }> => {
-    const query = args.query
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, MAX_SEARCH_CHARS);
-    if (query.length < MIN_SEARCH_CHARS) return { available: true, places: [] };
+  handler: async (ctx, args): Promise<SearchResult> => {
+    const query = tidyQuery(args.query);
+    if (shortQuery(query)) return { available: true, places: [] };
     const claim = await ctx.runMutation(
       internal.tripPlannerData.claimTripSearchInternal,
       { tripId: args.tripId },
     );
-    // The trip's centre comes from the saves' pins, so a declined account sends Apple nothing,
-    // as createTripPlan does.
-    const maps = claim.aiAllowed
-      ? await openMaps(appleLang(args.locale))
-      : null;
-    if (maps === null) return { available: false, places: [] };
-    const centre =
-      claim.centre ??
-      (await appleMapsLookup(maps.token, "geocode", claim.city));
-    if (centre === null) {
-      logEvent("info", "trip_search_no_centre", {});
-      return { available: true, places: [] };
-    }
-    const found = await appleMapsSearchPlaces(maps.token, query, {
-      near: centre,
-      ...(maps.lang !== undefined ? { lang: maps.lang } : {}),
-    });
-    const places = found
-      .filter((place) => distanceKm(place, centre) <= SEARCH_RADIUS_KM)
-      .slice(0, MAX_SEARCH_RESULTS);
-    logEvent("info", "trip_search_done", {
-      found: found.length,
-      kept: places.length,
-    });
-    return { available: true, places };
+    return await searchPlacesNear(claim, query, args.locale);
   },
 });
