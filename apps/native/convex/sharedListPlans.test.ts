@@ -1,0 +1,259 @@
+// @vitest-environment edge-runtime
+/// <reference types="vite/client" />
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { api } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
+import type { DatePlanResult } from "./model/datePlan";
+import { joiner, listWithOwner } from "./sharedLists.test";
+import { setTestConsent, signedInUser, type TestBackend } from "./test.setup";
+
+const LISBON = { lat: 38.7223, lng: -9.1393 };
+const near = (steps: number) => ({
+  lat: LISBON.lat + steps * 0.001,
+  lng: LISBON.lng,
+});
+const RED_FROG = { name: "Red Frog", ...near(4), category: "Nightlife" };
+
+async function testKey(): Promise<string> {
+  const pair = await crypto.subtle.generateKey(
+    { name: "ECDSA", namedCurve: "P-256" },
+    true,
+    ["sign", "verify"],
+  );
+  const der = new Uint8Array(
+    await crypto.subtle.exportKey("pkcs8", pair.privateKey),
+  );
+  return btoa(String.fromCharCode(...der));
+}
+
+async function stubMaps() {
+  vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+  vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+  vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+  const fetchMock = vi.fn(async (input: string) => {
+    const url = new URL(input);
+    if (url.pathname === "/v1/token") {
+      return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
+    }
+    return Response.json({ results: [] });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function stopNames(result: DatePlanResult): string[] {
+  return result.stops.map((stop) => stop.name);
+}
+
+async function lapse(base: TestBackend, userId: Id<"users">) {
+  await base.run(async (ctx) => {
+    const sub = await ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .unique();
+    if (sub) await ctx.db.delete(sub._id);
+  });
+}
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+});
+
+describe("makeDatePlan from a shared list", () => {
+  it("plans a free member's evening from the list's places, naming no save of someone else", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: RED_FROG,
+    });
+    const result = await bo.t.action(api.datePlans.makeDatePlan, {
+      city: "Lisbon",
+      kind: "classic",
+      listId,
+    });
+    expect(result.status).toBe("ready");
+    expect(stopNames(result)).toEqual(
+      expect.arrayContaining(["Time Out Market", "Red Frog"]),
+    );
+    expect(result.stops.every((stop) => stop.source === "save")).toBe(true);
+    expect(result.stops.every((stop) => stop.itemId === undefined)).toBe(true);
+    const owners = await owner.t.action(api.datePlans.makeDatePlan, {
+      city: "Lisbon",
+      kind: "classic",
+      listId,
+    });
+    expect(
+      owners.stops.find((stop) => stop.name === "Time Out Market")?.itemId,
+    ).toBeDefined();
+    expect(
+      owners.stops.find((stop) => stop.name === "Red Frog")?.itemId,
+    ).toBeUndefined();
+  });
+
+  it("leaves out places the list marked visited", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const frog = await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: RED_FROG,
+    });
+    await owner.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: frog,
+      visited: true,
+    });
+    const result = await bo.t.action(api.datePlans.makeDatePlan, {
+      city: "Lisbon",
+      kind: "classic",
+      listId,
+    });
+    expect(stopNames(result)).not.toContain("Red Frog");
+  });
+
+  it("makes no Apple call when a former member who added a place had declined AI", async () => {
+    const fetchMock = await stubMaps();
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    await base.run((ctx) => setTestConsent(ctx, bo.userId, "declined"));
+    await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: RED_FROG,
+    });
+    await bo.t.mutation(api.sharedLists.leaveSharedList, { listId });
+    const result = await owner.t.action(api.datePlans.makeDatePlan, {
+      city: "Lisbon",
+      kind: "classic",
+      listId,
+    });
+    expect(result.status).toBe("ready");
+    expect(stopNames(result)).toContain("Red Frog");
+    expect(fetchMock).not.toHaveBeenCalled();
+    await base.run((ctx) => setTestConsent(ctx, bo.userId, "granted"));
+    await owner.t.action(api.datePlans.makeDatePlan, {
+      city: "Lisbon",
+      kind: "classic",
+      listId,
+    });
+    expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it("refuses a free member once the owner lapsed, and anyone not on the list", async () => {
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    await lapse(base, owner.userId);
+    await expect(
+      bo.t.action(api.datePlans.makeDatePlan, {
+        city: "Lisbon",
+        kind: "classic",
+        listId,
+      }),
+    ).rejects.toMatchObject({ data: { code: "pro_required" } });
+    const stranger = await signedInUser(base, { pro: true });
+    await expect(
+      stranger.t.action(api.datePlans.makeDatePlan, {
+        city: "Lisbon",
+        kind: "classic",
+        listId,
+      }),
+    ).rejects.toThrow(/List not found/);
+  });
+});
+
+describe("createTripPlan from a shared list", () => {
+  it("plans a free member's trip from the list and remembers the list on it", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const result = await bo.t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 1,
+      pace: "easy",
+      interests: ["food"],
+      listId,
+    });
+    expect(result).toMatchObject({ saves: 2, suggested: 0 });
+    const trip = await bo.t.query(api.tripPlannerData.getTripPlan, {
+      tripId: result.tripId!,
+    });
+    expect(trip?.listId).toBe(listId);
+    const stops = [...(trip?.days.flat() ?? []), ...(trip?.unplanned ?? [])];
+    expect(stops.map((stop) => stop.name).sort()).toEqual([
+      "Manteigaria",
+      "Time Out Market",
+    ]);
+    expect(stops.every((stop) => stop.itemId === undefined)).toBe(true);
+    const list = await bo.t.query(api.sharedLists.getSharedList, { listId });
+    expect(list?.trips.map((plan) => plan._id)).toEqual([result.tripId]);
+    expect(
+      await owner.t.query(api.tripPlannerData.getTripPlan, {
+        tripId: result.tripId!,
+      }),
+    ).toBeNull();
+  });
+
+  it("is refused for a free member once the owner lapsed", async () => {
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    await lapse(base, owner.userId);
+    await expect(
+      bo.t.action(api.tripPlanner.createTripPlan, {
+        city: "Lisbon",
+        days: 1,
+        pace: "easy",
+        interests: [],
+        listId,
+      }),
+    ).rejects.toMatchObject({ data: { code: "pro_required" } });
+  });
+});
+
+describe("editing a trip without Pro", () => {
+  it("is refused on a personal trip and allowed on a covered list trip", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const personal = await base.run((ctx) =>
+      ctx.db.insert("tripPlans", {
+        userId: bo.userId,
+        city: "Lisbon",
+        dayCount: 1,
+        pace: "easy",
+        interests: [],
+        stopCount: 0,
+        savedCount: 0,
+      }),
+    );
+    await expect(
+      bo.t.mutation(api.tripPlannerData.renameTripPlan, {
+        tripId: personal,
+        name: "Mine",
+      }),
+    ).rejects.toMatchObject({ data: { code: "pro_required" } });
+    const { tripId } = await bo.t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 1,
+      pace: "easy",
+      interests: [],
+      listId,
+    });
+    await bo.t.mutation(api.tripPlannerData.renameTripPlan, {
+      tripId: tripId!,
+      name: "Our weekend",
+    });
+    expect(
+      (await bo.t.query(api.tripPlannerData.getTripPlan, { tripId: tripId! }))
+        ?.name,
+    ).toBe("Our weekend");
+    await lapse(base, owner.userId);
+    await expect(
+      bo.t.mutation(api.tripPlannerData.renameTripPlan, {
+        tripId: tripId!,
+        name: "Still ours",
+      }),
+    ).rejects.toMatchObject({ data: { code: "pro_required" } });
+  });
+});

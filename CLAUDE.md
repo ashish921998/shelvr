@@ -91,7 +91,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `trips`: one day-by-day trip per travel space ("Plan my trip"), every stop one of the
     user's saves; a new trip replaces the old one. Old builds only; new trips are `tripPlans`
   - `tripPlans`: one planned trip ("Plan a trip" v2) for a city: days, pace, interests,
-    optional start date and stay, plus stop and saved counts. Every new plan is a new row
+    optional start date and stay, plus stop and saved counts. Every new plan is a new row.
+    Optional `listId` says the trip was planned from a shared list (provenance, one-way
+    door, stays `v.optional`); the trip itself stays personal to the person who made it
   - `tripStops`: one stop of a `tripPlans` trip, on day 1..dayCount or day 0 (unplanned),
     from a save (`itemId`), an Apple Maps suggestion or a place found with Add a place, carrying its own name, pin, Apple id
     and category. Deleting the save keeps the stop; a trip read opens only live saves
@@ -338,6 +340,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   for the missing stop near up to three saved ones (one search each, 10 s deadline, none when
   AI is declined or the Maps key is unset). Nothing is stored; the app shows the best evening and changes a
   stop on the phone.
+  With an optional `listId`, `makeDatePlan` and `createTripPlan` plan from a shared list
+  instead of the caller's saves: the claim checks membership and coverage (the live owner's
+  Pro or the caller's), reads the list's unvisited places for the city (rows with no city
+  count too), and sets a stop's `itemId` only when the caller owns that save. AI permission
+  for a list run is the caller's plus every contributor's, former members included, so one
+  decline means no Apple call for that run. Without `listId` nothing changes for old callers.
 - **`mapPlaces.ts`**: `listMapPlaces`, every mapped place across the caller's ready saves
   (newest first, one entry per spot) for the Map tab, each with Apple's category (which picks
   the pin's icon) and its filter kinds from
@@ -396,6 +404,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   Without the Maps key it plans from saves only. `tripPlannerData.ts` serves
   `listTripPlans`, `getTripPlan` and `deleteTripPlan`, plus `claimTripPlanInternal` and
   `saveTripPlanInternal`. `trips.ts` and `tripData.ts` stay for installed builds.
+  `getTripPlan` returns the trip's `listId` when it has one. Editing a list trip and
+  searching near it (`requirePlanAccess` in `sharedLists.ts`) need the list's coverage while
+  the caller is still a member; otherwise, as for a personal trip, the caller's own Pro.
   Editing (Pro, `tripEdit` rate limit) is single-row writes in `tripPlannerData.ts`:
   `moveTripStop` (a day and position, day 0 is Unplanned), `removeTripStop` (to the top of
   Unplanned, never a delete), `addTripStop` (a search result as an

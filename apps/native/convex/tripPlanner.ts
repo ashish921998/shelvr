@@ -133,6 +133,20 @@ function saveStop(
   };
 }
 
+function listStops(claim: Claim, been: ReadonlySet<string>): PlannedStop[] {
+  const stops: PlannedStop[] = claim.places
+    .filter((place) => !been.has(placeKey(place.name)))
+    .map(({ key: _key, addedAt: _addedAt, tags: _tags, ...place }) => ({
+      source: "save",
+      ...place,
+    }));
+  for (let i = stops.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [stops[i], stops[j]] = [stops[j], stops[i]];
+  }
+  return stops;
+}
+
 /** The city's unvisited saved places with a pin: stored pins first, then a few looked up near the city. */
 async function savedStops(
   claim: Claim,
@@ -152,7 +166,7 @@ async function savedStops(
     claim.sources.map((source) => [source.itemId, source]),
   );
   const why = (place: PlanPlace) => saveWhy(place, sources.get(place.itemId));
-  const stops: PlannedStop[] = [];
+  const stops: PlannedStop[] = listStops(claim, been).slice(0, cap);
   const unpinned: PlanPlace[] = [];
   places.forEach((place, i) => {
     const pin = pinned[i];
@@ -286,6 +300,7 @@ export const createTripPlan = action({
     interests: v.array(tripInterestValidator),
     stay: v.optional(v.string()),
     locale: v.optional(v.string()),
+    listId: v.optional(v.id("sharedLists")),
   },
   returns: createTripPlanResultValidator,
   // Annotated: inferring through `internal` is circular for an action.
@@ -305,6 +320,7 @@ export const createTripPlan = action({
         interests: args.interests,
         ...(args.startDate !== undefined ? { startDate: args.startDate } : {}),
         ...(args.stay !== undefined ? { stay: args.stay } : {}),
+        ...(args.listId !== undefined ? { listId: args.listId } : {}),
       },
     );
     // No interests means no suggestions: the trip is planned from the saves alone.
@@ -341,6 +357,7 @@ export const createTripPlan = action({
       internal.tripPlannerData.saveTripPlanInternal,
       {
         city: claim.city,
+        ...(args.listId !== undefined ? { listId: args.listId } : {}),
         dayCount: claim.days,
         pace: args.pace,
         interests,

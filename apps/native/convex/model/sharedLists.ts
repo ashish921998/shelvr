@@ -1,4 +1,4 @@
-import { v } from "convex/values";
+import { type Infer, v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { liveOwner } from "./auth";
@@ -94,6 +94,7 @@ export const listPlanPlaceValidator = v.object({
   tags: v.array(v.string()),
   addedAt: v.number(),
 });
+export type ListPlanPlace = Infer<typeof listPlanPlaceValidator>;
 
 export type NewListPlace = Omit<
   Doc<"sharedListPlaces">,

@@ -127,7 +127,7 @@ export function dateSlotOf(
 
 /** A saved place with a pin, and what the save it came from says about it. */
 export type DateCandidate = {
-  itemId: Id<"items">;
+  itemId?: Id<"items">;
   name: string;
   area?: string;
   why?: string;

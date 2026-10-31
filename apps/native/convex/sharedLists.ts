@@ -41,16 +41,17 @@ import {
   sharedListSummaryValidator,
   sharedPlaceInputValidator,
   tidyListName,
+  type ListPlanPlace,
   type NewListPlace,
 } from "./model/sharedLists";
 import { saveError } from "./model/saveErrors";
-import { middleOf, tidyCity } from "./model/trip";
+import { cityKey, MAX_CITY_CHARS, middleOf, tidyCity } from "./model/trip";
 import {
   hasProEntitlement,
   hasProEntitlementStatus,
   requireProEntitlement,
 } from "./subscriptions";
-import { MAX_CITY_CHARS, tripSummary } from "./tripPlannerData";
+import { tripSummary } from "./model/tripPlan";
 
 const LEAVE_ROUNDS = 4;
 
@@ -570,6 +571,68 @@ export async function requireCoveredList(
   );
   if (!covered) throw saveError("pro_required");
   return list;
+}
+
+export async function requirePlanAccess(
+  ctx: MutationCtx,
+  plan: Doc<"tripPlans">,
+  userId: Id<"users">,
+): Promise<void> {
+  if (
+    plan.listId !== undefined &&
+    (await coveredListMember(ctx, plan.listId, userId)) !== null
+  ) {
+    return;
+  }
+  await requireProEntitlement(ctx, userId);
+}
+
+export async function listPlanPlaces(
+  ctx: QueryCtx,
+  list: Doc<"sharedLists">,
+  userId: Id<"users">,
+  city: string,
+): Promise<{ rows: Doc<"sharedListPlaces">[]; places: ListPlanPlace[] }> {
+  const wanted = cityKey(city);
+  const rows = (await listPlaces(ctx, list._id)).filter(
+    (row) =>
+      row.visitedAt === undefined &&
+      (row.city === undefined || cityKey(row.city) === wanted),
+  );
+  const places: ListPlanPlace[] = [];
+  for (const row of rows) {
+    const item =
+      row.addedBy === userId && row.itemId !== undefined
+        ? await ctx.db.get(row.itemId)
+        : null;
+    const itemId =
+      item !== null && item.userId === userId ? item._id : undefined;
+    places.push({
+      key: row._id,
+      ...(itemId !== undefined ? { itemId } : {}),
+      name: row.name,
+      lat: row.lat,
+      lng: row.lng,
+      ...(row.appleId !== undefined ? { appleId: row.appleId } : {}),
+      ...(row.category !== undefined ? { category: row.category } : {}),
+      tags: row.tags ?? [],
+      addedAt: row.addedAt,
+    });
+  }
+  return { rows, places };
+}
+
+export async function coveredListMember(
+  ctx: MutationCtx,
+  listId: Id<"sharedLists">,
+  userId: Id<"users">,
+): Promise<Doc<"sharedLists"> | null> {
+  const found = await memberList(ctx, listId, userId);
+  if (found === null) return null;
+  const covered = await listCovered(ctx, found.list, userId, (id) =>
+    hasProEntitlement(ctx, id),
+  );
+  return covered ? found.list : null;
 }
 
 export const claimListSearchInternal = internalMutation({

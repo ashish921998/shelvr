@@ -4,6 +4,7 @@ import { internalMutation } from "./_generated/server";
 import { aiAllowed } from "./aiConsent";
 import { readyCitySaves } from "./items";
 import { requireUserId } from "./model/auth";
+import { listPlanPlaceValidator } from "./model/sharedLists";
 import {
   MAX_PLAN_ITEMS,
   placeKey,
@@ -12,14 +13,15 @@ import {
 } from "./model/plan";
 import { sameVenue } from "./model/datePlan";
 import { rateLimiter } from "./model/rateLimiter";
-import { pinsForCity, tidyCity } from "./model/trip";
+import { MAX_CITY_CHARS, pinsForCity, tidyCity } from "./model/trip";
+import {
+  listAiAllowed,
+  listPlanPlaces,
+  requireCoveredList,
+} from "./sharedLists";
 import { requireProEntitlement } from "./subscriptions";
 import { beenPlaces, toPlanSource } from "./tripData";
-import {
-  MAX_CITY_CHARS,
-  recentVisits,
-  savedPinValidator,
-} from "./tripPlannerData";
+import { recentVisits, savedPinValidator } from "./tripPlannerData";
 
 const TAGS_PER_SAVE = 8;
 
@@ -61,7 +63,7 @@ function namesOneVenue(item: Doc<"items">): boolean {
  * looked up, and reads the city's ready saves with their pins, tags and age.
  */
 export const claimDatePlanInternal = internalMutation({
-  args: { city: v.string() },
+  args: { city: v.string(), listId: v.optional(v.id("sharedLists")) },
   returns: v.object({
     city: v.string(),
     sources: v.array(planSourceValidator),
@@ -75,13 +77,28 @@ export const claimDatePlanInternal = internalMutation({
         savedAt: v.number(),
       }),
     ),
+    places: v.array(listPlanPlaceValidator),
     aiAllowed: v.boolean(),
   }),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    await requireProEntitlement(ctx, userId);
+    if (args.listId === undefined) await requireProEntitlement(ctx, userId);
     const city = tidyCity(args.city).slice(0, MAX_CITY_CHARS);
     if (city === "") throw new Error("City required");
+    if (args.listId !== undefined) {
+      const list = await requireCoveredList(ctx, args.listId, userId);
+      await rateLimiter.limit(ctx, "makePlan", { key: userId, throws: true });
+      const { rows, places } = await listPlanPlaces(ctx, list, userId, city);
+      return {
+        city,
+        sources: [],
+        been: await recentVisits(ctx, userId),
+        pins: [],
+        saves: [],
+        places,
+        aiAllowed: await listAiAllowed(ctx, userId, rows),
+      };
+    }
     await rateLimiter.limit(ctx, "makePlan", { key: userId, throws: true });
     const items = await readyCitySaves(ctx, userId, city, MAX_PLAN_ITEMS);
     const sources = items.map((item) => toPlanSource(item, undefined, city));
@@ -110,6 +127,7 @@ export const claimDatePlanInternal = internalMutation({
         ownTags: namesOneVenue(item),
         savedAt: item._creationTime,
       })),
+      places: [],
       aiAllowed: await aiAllowed(ctx, userId),
     };
   },

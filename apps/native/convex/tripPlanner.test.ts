@@ -838,3 +838,49 @@ describe("trip ownership", () => {
     expect(trip!.days[0][0].itemId).toBeUndefined();
   });
 });
+
+describe("a personal trip", () => {
+  it("ignores the caller's shared lists when no list is named", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const { base, t, userId } = await setup();
+    await base.run(async (ctx) => {
+      const listId = await ctx.db.insert("sharedLists", {
+        ownerId: userId,
+        name: "Ours",
+        inviteToken: "t",
+        placeCount: 1,
+        createdAt: 1,
+      });
+      await ctx.db.insert("sharedListMembers", {
+        listId,
+        userId,
+        joinedAt: 1,
+        seenAt: 1,
+      });
+      await ctx.db.insert("sharedListPlaces", {
+        listId,
+        addedBy: userId,
+        name: "List Only Spot",
+        lat: 38.715,
+        lng: -9.14,
+        city: "Lisbon",
+        addedAt: 1,
+      });
+    });
+    const result = await t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 1,
+      pace: "easy",
+      interests: [],
+    });
+    const trip = await t.query(api.tripPlannerData.getTripPlan, {
+      tripId: result.tripId!,
+    });
+    const names = [
+      ...(trip?.days.flat() ?? []),
+      ...(trip?.unplanned ?? []),
+    ].map((stop) => stop.name);
+    expect(names).not.toContain("List Only Spot");
+    expect(trip?.listId).toBeUndefined();
+  });
+});

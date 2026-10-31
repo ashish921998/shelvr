@@ -16,8 +16,10 @@ import {
   planSourceValidator,
 } from "./model/plan";
 import { sameTripPlace } from "./model/placeIdentity";
+import { listPlanPlaceValidator } from "./model/sharedLists";
 import { rateLimiter } from "./model/rateLimiter";
 import {
+  MAX_CITY_CHARS,
   MAX_TRIP_DAYS,
   middleOf,
   MIN_TRIP_DAYS,
@@ -39,14 +41,19 @@ import {
   UNPLANNED_DAY,
   type TripInterest,
   type TripPlace,
+  tripSummary,
   type TripPlanStop,
-  type TripPlanSummary,
   type TripSavePlace,
 } from "./model/tripPlan";
+import {
+  listAiAllowed,
+  listPlanPlaces,
+  requireCoveredList,
+  requirePlanAccess,
+} from "./sharedLists";
 import { requireProEntitlement } from "./subscriptions";
 import { beenPlaces, toPlanSource } from "./tripData";
 
-export const MAX_CITY_CHARS = 80;
 const MAX_STAY_CHARS = 120;
 /** Days of a packed 15-day trip, plus room for unplanned extras. */
 const MAX_TRIP_STOPS = 150;
@@ -132,6 +139,7 @@ export const claimTripPlanInternal = internalMutation({
     interests: v.array(tripInterestValidator),
     startDate: v.optional(v.string()),
     stay: v.optional(v.string()),
+    listId: v.optional(v.id("sharedLists")),
   },
   returns: v.object({
     city: v.string(),
@@ -143,13 +151,46 @@ export const claimTripPlanInternal = internalMutation({
     been: v.array(v.string()),
     pins: v.array(savedPinValidator),
     tastes: v.array(saveTasteValidator),
+    places: v.array(listPlanPlaceValidator),
     aiAllowed: v.boolean(),
   }),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    await requireProEntitlement(ctx, userId);
+    if (args.listId === undefined) await requireProEntitlement(ctx, userId);
     const city = tidyCity(args.city).slice(0, MAX_CITY_CHARS);
     if (city === "") throw new Error("City required");
+    const startDate = tidyStartDate(args.startDate);
+    const stay = tidyStay(args.stay);
+    const asked = {
+      city,
+      days: tripDays(args.days),
+      interests: tripInterests(args.interests),
+      ...(startDate !== undefined ? { startDate } : {}),
+      ...(stay !== undefined ? { stay } : {}),
+    };
+    if (args.listId !== undefined) {
+      const list = await requireCoveredList(ctx, args.listId, userId);
+      await rateLimiter.limit(ctx, "createTripPlan", {
+        key: userId,
+        throws: true,
+      });
+      const { rows, places } = await listPlanPlaces(ctx, list, userId, city);
+      const allowed = await listAiAllowed(ctx, userId, rows);
+      return {
+        ...asked,
+        sources: [],
+        been: await recentVisits(ctx, userId),
+        pins: [],
+        tastes: allowed
+          ? places.map((place) => ({
+              tags: place.tags,
+              categories: place.category !== undefined ? [place.category] : [],
+            }))
+          : [],
+        places,
+        aiAllowed: allowed,
+      };
+    }
     await rateLimiter.limit(ctx, "createTripPlan", {
       key: userId,
       throws: true,
@@ -157,14 +198,8 @@ export const claimTripPlanInternal = internalMutation({
     const saves = await readyCitySaves(ctx, userId, city, MAX_PLAN_ITEMS);
     const sources = saves.map((item) => toPlanSource(item, undefined, city));
     const allowed = await aiAllowed(ctx, userId);
-    const startDate = tidyStartDate(args.startDate);
-    const stay = tidyStay(args.stay);
     return {
-      city,
-      days: tripDays(args.days),
-      interests: tripInterests(args.interests),
-      ...(startDate !== undefined ? { startDate } : {}),
-      ...(stay !== undefined ? { stay } : {}),
+      ...asked,
       sources,
       been: [
         ...new Set([
@@ -184,6 +219,7 @@ export const claimTripPlanInternal = internalMutation({
       ),
       // Tags come from the model's reading of a save, so they reach Apple only while AI is allowed.
       tastes: allowed ? saves.map((item) => tasteOf(item, city)) : [],
+      places: [],
       aiAllowed: allowed,
     };
   },
@@ -197,6 +233,7 @@ type StopInput = Omit<TripPlanStop, "_id">;
 export const saveTripPlanInternal = internalMutation({
   args: {
     city: v.string(),
+    listId: v.optional(v.id("sharedLists")),
     dayCount: v.number(),
     pace: tripPaceValidator,
     interests: v.array(tripInterestValidator),
@@ -261,20 +298,6 @@ export const listTripPlans = authedQuery({
     return { ...result, page: result.page.map(tripSummary) };
   },
 });
-
-export function tripSummary(plan: Doc<"tripPlans">): TripPlanSummary {
-  return {
-    _id: plan._id,
-    ...(plan.name !== undefined ? { name: plan.name } : {}),
-    city: plan.city,
-    ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
-    dayCount: plan.dayCount,
-    stopCount: plan.stopCount,
-    savedCount: plan.savedCount,
-    interests: plan.interests,
-    createdAt: plan._creationTime,
-  };
-}
 
 async function ownedPlan(
   ctx: QueryCtx,
@@ -360,6 +383,7 @@ export const getTripPlan = authedQuery({
     }
     return {
       _id: plan._id,
+      ...(plan.listId !== undefined ? { listId: plan.listId } : {}),
       ...(plan.name !== undefined ? { name: plan.name } : {}),
       city: plan.city,
       ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
@@ -398,9 +422,9 @@ async function editablePlan(
   tripId: Id<"tripPlans">,
   userId: Id<"users">,
 ): Promise<Doc<"tripPlans">> {
-  await requireProEntitlement(ctx, userId);
   const plan = await ownedPlan(ctx, tripId, userId);
   if (plan === null) throw new Error("Trip not found");
+  await requirePlanAccess(ctx, plan, userId);
   await rateLimiter.limit(ctx, "tripEdit", { key: userId, throws: true });
   return plan;
 }
@@ -668,9 +692,9 @@ export const claimTripSearchInternal = internalMutation({
   }),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    await requireProEntitlement(ctx, userId);
     const plan = await ownedPlan(ctx, args.tripId, userId);
     if (plan === null) throw new Error("Trip not found");
+    await requirePlanAccess(ctx, plan, userId);
     await rateLimiter.limit(ctx, "tripPlaceSearch", {
       key: userId,
       throws: true,

@@ -182,21 +182,36 @@ async function suggestStops(
   return { stops, searches: targets.length };
 }
 
+function listCandidates(claim: Claim): DateCandidate[] {
+  const been = new Set(claim.been.map(placeKey));
+  return claim.places
+    .filter((place) => !been.has(placeKey(place.name)))
+    .map(({ key: _key, addedAt, ...place }) => ({
+      ...place,
+      ownTags: true,
+      savedAt: addedAt,
+    }));
+}
+
 export const makeDatePlan = action({
   args: {
     city: v.string(),
     kind: dateAskValidator,
     locale: v.optional(v.string()),
+    listId: v.optional(v.id("sharedLists")),
   },
   returns: datePlanResultValidator,
   // Annotated: inferring through `internal` is circular for an action.
   handler: async (ctx, args): Promise<DatePlanResult> => {
     const claim: Claim = await ctx.runMutation(
       internal.datePlanData.claimDatePlanInternal,
-      { city: args.city },
+      {
+        city: args.city,
+        ...(args.listId !== undefined ? { listId: args.listId } : {}),
+      },
     );
     const now = Date.now();
-    const candidates = savedCandidates(claim);
+    const candidates = [...savedCandidates(claim), ...listCandidates(claim)];
     const { kind, scored } = chooseKind(args.kind, candidates, now);
     const fields = {
       kind,
