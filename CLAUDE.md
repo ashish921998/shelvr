@@ -513,7 +513,8 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   `src/lib/home-href.ts` and `src/app/+native-intent.ts`
 - `city/[name]` is the city page: a map and numbered rows for distinct places from the
   city's saves, plus a row for every other save a removal has not emptied, with Plan a date
-  and Plan a trip. A selected place row shows an info button that opens Apple's place card
+  and Plan a trip. Removing the last place keeps the map and says "No places left" until the
+  person goes back. A selected place row shows an info button that opens Apple's place card
   (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`); tapping the row opens the save
 - Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
   `profile`, `settings`, `item/[id]`, `city/[name]`, `spots/[id]`, `plan/[id]`, `date-plan`,
