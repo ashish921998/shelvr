@@ -1,6 +1,5 @@
 import { userRemovals, removalValidator } from "./model/placeRemovals";
 import { v } from "convex/values";
-import type { Doc } from "./_generated/dataModel";
 import { internalMutation } from "./_generated/server";
 import { aiAllowed } from "./aiConsent";
 import { readyCitySaves } from "./items";
