@@ -12,6 +12,7 @@ import { AppsSheet } from "./share-sheets";
 import { AhaShareStep } from "./aha-share";
 import { AhaReel } from "./aha-reel";
 import { ahaSample } from "@/lib/aha-sample";
+import { haptics } from "@/lib/haptics";
 
 type Children = { children?: ReactNode };
 
@@ -111,6 +112,20 @@ it.each(["date", "trip", "weekend"] as const)(
     );
   },
 );
+
+it("gives the Shelvr pick the medium impact, the only one in the practice share", () => {
+  const impact = vi.spyOn(haptics, "impact");
+  render(
+    <AhaShareStep sample={ahaSample("trip", "lisbon")} onShared={vi.fn()} />,
+  );
+  for (const label of ["common.share", "aha.sheetShareTo", "aha.sheetMore"]) {
+    fireEvent.click(screen.getByRole("button", { name: label }));
+  }
+  expect(impact).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Shelvr" }));
+  expect(impact.mock.calls).toEqual([["medium"]]);
+  impact.mockRestore();
+});
 
 it("reaches the map callback after only Share, Share to…, More and Shelvr", () => {
   vi.useFakeTimers();

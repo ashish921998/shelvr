@@ -23,6 +23,14 @@ describe("haptics", () => {
     expect(Haptics.performAndroidHapticsAsync).not.toHaveBeenCalled();
   });
 
+  it("plays a medium impact on iOS when asked for one", async () => {
+    vi.stubEnv("EXPO_OS", "ios");
+    await haptics.impact("medium");
+    expect(Haptics.impactAsync).toHaveBeenCalledWith(
+      Haptics.ImpactFeedbackStyle.Medium,
+    );
+  });
+
   it("uses the Android haptic engine for equivalent feedback", async () => {
     vi.stubEnv("EXPO_OS", "android");
     await haptics.selection();

@@ -2,7 +2,10 @@ import * as Haptics from "expo-haptics";
 
 type Feedback = "selection" | "impact" | "success";
 
-async function playOptionalFeedback(kind: Feedback): Promise<void> {
+async function playOptionalFeedback(
+  kind: Feedback,
+  impactStyle = Haptics.ImpactFeedbackStyle.Light,
+): Promise<void> {
   if (process.env.EXPO_OS === "web") return;
   try {
     if (process.env.EXPO_OS === "android") {
@@ -15,7 +18,7 @@ async function playOptionalFeedback(kind: Feedback): Promise<void> {
     } else if (kind === "selection") {
       await Haptics.selectionAsync();
     } else if (kind === "impact") {
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await Haptics.impactAsync(impactStyle);
     } else {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
@@ -26,6 +29,12 @@ async function playOptionalFeedback(kind: Feedback): Promise<void> {
 
 export const haptics = {
   selection: () => playOptionalFeedback("selection"),
-  impact: () => playOptionalFeedback("impact"),
+  impact: (strength: "light" | "medium" = "light") =>
+    playOptionalFeedback(
+      "impact",
+      strength === "medium"
+        ? Haptics.ImpactFeedbackStyle.Medium
+        : Haptics.ImpactFeedbackStyle.Light,
+    ),
   success: () => playOptionalFeedback("success"),
 };

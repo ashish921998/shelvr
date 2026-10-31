@@ -37,7 +37,7 @@ export function AhaShareStep({
     setStage(next);
   };
   const pick = () => {
-    void haptics.impact();
+    void haptics.impact("medium");
     setStage("reading");
   };
 

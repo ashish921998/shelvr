@@ -150,6 +150,20 @@ fade instead of sliding, zoom transitions are suppressed, and the text morph fal
 shapes correctly and per-glyph Skia cannot). Pure opacity changes may opt
 into `ReduceMotion.Never` to keep state changes legible.
 
+## Haptics
+
+Every haptic goes through `haptics` in `src/lib/haptics.ts`, and ESLint rejects
+a direct `expo-haptics` import. Onboarding is the reference for the feel.
+
+- `selection`: picking an option, or a drag crossing into a new slot.
+- `impact()`: a light press that starts something, such as picking up a stop.
+- `impact("medium")`: one deliberate moment on a screen, such as choosing
+  Shelvr in the practice share.
+- `success`: something finished. Fire it after the server confirms, not on press.
+
+Stay quiet on taps that only open a page, on scrolling and panning, and on a
+failed action.
+
 ## Primitives
 
 `Button` is the capsule action for a screen's main step.
