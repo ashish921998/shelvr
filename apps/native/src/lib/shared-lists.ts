@@ -81,8 +81,11 @@ export function defaultListCity(cities: string[]): string | null {
   return cities[0] ?? null;
 }
 
-export function inCity(place: { city: string }, city: string | null): boolean {
-  return city === null || cityKey(place.city) === cityKey(city);
+export function inCity(place: { city?: string }, city: string | null): boolean {
+  return (
+    city === null ||
+    (place.city !== undefined && cityKey(place.city) === cityKey(city))
+  );
 }
 
 export function listRows(

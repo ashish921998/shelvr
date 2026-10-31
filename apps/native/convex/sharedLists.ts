@@ -454,6 +454,7 @@ export const addSavePlaces = authedMutation({
     listId: v.id("sharedLists"),
     itemId: v.id("items"),
     city: v.optional(v.string()),
+    name: v.optional(v.string()),
   },
   returns: v.number(),
   handler: async (ctx, args) => {
@@ -468,7 +469,9 @@ export const addSavePlaces = authedMutation({
       ctx,
       list._id,
       userId,
-      savePlaces(await visibleSave(ctx, item), city),
+      savePlaces(await visibleSave(ctx, item), city).filter(
+        (place) => args.name === undefined || place.name === args.name,
+      ),
       Date.now(),
     );
     return inserted.length;
