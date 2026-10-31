@@ -1,5 +1,5 @@
 import {
-  suggestionRemovals,
+  userRemovals,
   removalValidator,
   visibleSave,
 } from "./model/placeRemovals";
@@ -159,8 +159,15 @@ export const claimTripPlanInternal = internalMutation({
       key: userId,
       throws: true,
     });
-    const saves = await readyCitySaves(ctx, userId, city, MAX_PLAN_ITEMS);
-    const sources = saves.map((item) => toPlanSource(item, undefined, city));
+    const removed = await userRemovals(ctx, userId);
+    const saves = await readyCitySaves(
+      ctx,
+      userId,
+      city,
+      MAX_PLAN_ITEMS,
+      removed,
+    );
+    const sources = saves.map((item) => toPlanSource(item, city));
     const allowed = await aiAllowed(ctx, userId);
     const startDate = tidyStartDate(args.startDate);
     const stay = tidyStay(args.stay);
@@ -171,7 +178,7 @@ export const claimTripPlanInternal = internalMutation({
       ...(startDate !== undefined ? { startDate } : {}),
       ...(stay !== undefined ? { stay } : {}),
       sources,
-      removed: await suggestionRemovals(ctx, userId, city),
+      removed,
       been: [
         ...new Set([
           ...(await beenPlaces(ctx, userId, sources)),

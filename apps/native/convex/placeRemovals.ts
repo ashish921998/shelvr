@@ -1,12 +1,7 @@
 import { v } from "convex/values";
 import { authedMutation } from "./model/auth";
 import { cityKey } from "./model/trip";
-import {
-  removalArea,
-  removalKey,
-  sameMapPin,
-  visibleSave,
-} from "./model/placeRemovals";
+import { removalArea, visibleSave } from "./model/placeRemovals";
 import { rateLimiter } from "./model/rateLimiter";
 import { requireProEntitlement } from "./subscriptions";
 
@@ -24,7 +19,13 @@ export const removePlace = authedMutation({
     if (!item || item.userId !== ctx.userId) throw new Error("Item not found");
     await requireProEntitlement(ctx, ctx.userId);
     const projected = await visibleSave(ctx, item);
-    const selected = projected.placePins?.find((pin) => sameMapPin(pin, args));
+    const selected = projected.placePins?.find(
+      (pin) =>
+        pin.name === args.name &&
+        pin.lat === args.lat &&
+        pin.lng === args.lng &&
+        (!pin.appleId || !args.appleId || pin.appleId === args.appleId),
+    );
     if (!selected) throw new Error("Place not found");
     const city =
       selected.city ?? (item.cities?.length === 1 ? item.cities[0] : undefined);
@@ -33,11 +34,10 @@ export const removePlace = authedMutation({
       key: ctx.userId,
       throws: true,
     });
-    const removalId = await ctx.db.insert("placeRemovals", {
+    return await ctx.db.insert("placeRemovals", {
       userId: ctx.userId,
-      key: removalKey(selected.name),
       name: selected.name,
-      area: removalArea(item, selected, city),
+      area: removalArea(item, selected.name, city),
       city: cityKey(city),
       lat: selected.lat,
       lng: selected.lng,
@@ -46,11 +46,7 @@ export const removePlace = authedMutation({
         : selected.appleId
           ? { appleId: selected.appleId }
           : {}),
-      removedAt: Date.now(),
     });
-    const row = await ctx.db.get(removalId);
-    if (row) await ctx.db.patch(removalId, { removedAt: row._creationTime });
-    return removalId;
   },
 });
 

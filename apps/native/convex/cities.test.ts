@@ -233,7 +233,7 @@ describe("listCities", () => {
       const source = await base.run(async (ctx) => {
         const item = await ctx.db.get(id);
         if (!item) throw new Error("Missing fixture");
-        return toPlanSource(await visibleSave(ctx, item), undefined, city);
+        return toPlanSource(await visibleSave(ctx, item), city);
       });
       expect(source.pins).toEqual([
         { name: pin.name, lat: pin.lat, lng: pin.lng },

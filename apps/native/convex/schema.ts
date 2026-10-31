@@ -90,17 +90,13 @@ export default defineSchema({
 
   placeRemovals: defineTable({
     userId: v.string(),
-    key: v.string(),
-    city: v.string(),
     name: v.string(),
+    city: v.string(),
     area: v.string(),
     lat: v.number(),
     lng: v.number(),
     appleId: v.optional(v.string()),
-    removedAt: v.number(),
-  })
-    .index("by_userId_and_key", ["userId", "key"])
-    .index("by_userId_and_city", ["userId", "city"]),
+  }).index("by_userId", ["userId"]),
 
   items: defineTable({
     userId: v.string(),

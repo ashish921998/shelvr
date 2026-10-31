@@ -71,5 +71,5 @@ const styles = StyleSheet.create((theme, rt) => ({
     justifyContent: "center",
   },
   action: { color: theme.colors.primary },
-  pressed: { opacity: 0.6 },
+  pressed: { opacity: theme.opacity.pressed },
 }));
