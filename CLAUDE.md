@@ -343,7 +343,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   (`uniquePlacePins`): one Apple id, or one name a few doors apart unless Apple ids differ.
   A label without a pin matches by name and city. City, Map, search, planning and
   automatic suggestions use the projection; source saves, existing trips and deliberate manual
-  additions remain. A save made after the removal shows the place again. Keep the
+  additions remain. A save a removal leaves with no place in a city leaves that city's reads
+  (`visibleCitySave`), so its row, and a city with nothing else, go away; it stays open by id
+  and in search. A save made after the removal shows the place again. Keep the
   `placeRemovals` table on rollback once rows exist.
 - **`placeCorrections.ts`**, **`placeCorrectionSearch.ts`**: owner-only place editing and Apple Maps lookup. `items.placesEdited` preserves the chosen places across extraction retries and pin refreshes. A kept place with no pin still gets one from a lookup, which never changes a pin already on the save. Corrections update city grouping and search; existing trip stops remain unchanged. The editor leaves out removed places (`placeRemovals.ts`), and adding one back clears its removal.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
@@ -510,7 +512,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   shortcuts to removed screens (spaces, search, digest, camera, the old trip) open Home, through
   `src/lib/home-href.ts` and `src/app/+native-intent.ts`
 - `city/[name]` is the city page: a map and numbered rows for distinct places from the
-  city's saves, plus a row for every save not represented by a place row, with Plan a date
+  city's saves, plus a row for every other save a removal has not emptied, with Plan a date
   and Plan a trip. A selected place row shows an info button that opens Apple's place card
   (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`); tapping the row opens the save
 - Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
