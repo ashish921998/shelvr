@@ -203,7 +203,7 @@ describe("placePins", () => {
           found: [
             { name: "Carette", lat: 48.862, lng: 2.365, appleId: "vosges" },
           ],
-          searched: old.locations,
+          cluesSearched: old.locations,
         });
       if (!newFirst) await oldStores();
       await t.action(internal.placePins.locateItem, { itemId });
@@ -243,7 +243,6 @@ describe("placePins", () => {
         placePins: [{ name: "Cafe Joe", lat: 48.86, lng: 2.36, city: "Paris" }],
       }),
     );
-    // A reread's speech step lists the new spelling and clue, then what the save already had.
     await t.mutation(internal.items.finalizeItem, {
       itemId,
       reading: {},

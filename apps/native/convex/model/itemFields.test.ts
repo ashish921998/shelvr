@@ -45,7 +45,7 @@ describe("normalizePlaceLocations", () => {
       { name: "Cafe, Lyon", location: "Rue Victor Hugo" },
     ]);
   });
-  it("keeps one clue for a respelled place, the newest spelling and clue first", () => {
+  it("keeps the first clue listed for a respelled place, with its spelling", () => {
     expect(
       normalizePlaceLocations(
         [
