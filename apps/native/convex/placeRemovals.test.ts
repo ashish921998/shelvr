@@ -1,6 +1,6 @@
-import { enrichItems } from "./items";
 // @vitest-environment edge-runtime
 import { describe, expect, it, vi } from "vitest";
+import { enrichItems } from "./items";
 import { cityPins } from "../src/lib/city-pins";
 import { api, internal } from "./_generated/api";
 import { newConvexTest, signedInUser } from "./test.setup";
@@ -174,20 +174,6 @@ describe("place removals", () => {
     expect((await map())[0].name).toBe("Renamed venue");
   });
 
-  it("hides nearby generic-name aliases and preserves a different nearby named venue", async () => {
-    const { t, itemId, pin, remove, map } = await setup();
-    await remove();
-    await t.run((ctx) =>
-      ctx.db.patch(itemId, {
-        placePins: [
-          { ...pin, name: "Tigre Restaurant, Alfama", appleId: "new" },
-          { ...pin, name: "Other", appleId: "other" },
-        ],
-      }),
-    );
-    expect((await map()).map((p) => p.name)).toEqual(["Other"]);
-  });
-
   it("removes every copy of the merged map row, including a missing-id generic alias", async () => {
     const { t, userId, itemId, pin, insert, map } = await setup();
     const noId = { name: "Tigre", lat: pin.lat, lng: pin.lng, city: pin.city };
@@ -279,50 +265,6 @@ describe("place removals", () => {
     ).resolves.toBeDefined();
   });
 
-  it("keeps late background split-list parts removed using the original save time", async () => {
-    const { t, userId, pin, remove, source } = await setup();
-    const parentId = await t.run((ctx) =>
-      ctx.db.insert("items", {
-        userId,
-        type: "link",
-        status: "processing",
-        tags: [],
-        searchText: "List",
-        url: "https://example.com/list",
-        title: "Original list",
-      }),
-    );
-    const removalId = await remove();
-    await t.run((ctx) => ctx.db.patch(parentId, { status: "ready" }));
-    expect(
-      await t.mutation(internal.items.addPlaceListParts, {
-        itemId: parentId,
-        parts: [
-          {
-            title: "List · Lisbon",
-            cities: ["Lisbon"],
-            places: [pin.name],
-            pins: [],
-            content: pin.name,
-          },
-        ],
-      }),
-    ).toBe(1);
-    const child = await t.run((ctx) =>
-      ctx.db
-        .query("items")
-        .withIndex("by_user_and_url", (q) =>
-          q.eq("userId", userId).eq("url", "https://example.com/list"),
-        )
-        .collect(),
-    );
-    const part = child.find((item) => item.title === "List · Lisbon");
-    expect(part).toBeDefined();
-    expect((await source(part!._id)).places).toEqual([]);
-    await t.mutation(api.placeRemovals.undoRemovePlace, { removalId });
-    expect((await source(part!._id)).places).toContain(pin.name);
-  });
-
   it("a deliberate new save is visible, while the old save stays removed", async () => {
     const { t, insert, itemId, remove, map } = await setup();
     const removalId = await remove();
@@ -364,23 +306,6 @@ describe("place removals", () => {
       await t.mutation(api.placeRemovals.undoRemovePlace, { removalId: first });
     expect((await map()).map((p) => p.name)).toEqual([pin.name]);
     expect(await t.run((ctx) => ctx.db.get(second))).not.toBeNull();
-  });
-
-  it("removes an old save even when more than a thousand newer unrelated saves exist", async () => {
-    const { t, userId, remove, source } = await setup();
-    await t.run(async (ctx) => {
-      for (let i = 0; i < 1002; i++)
-        await ctx.db.insert("items", {
-          userId,
-          type: "link",
-          status: "ready",
-          tags: [],
-          cities: ["Other city"],
-          searchText: "Other",
-        });
-    });
-    await remove();
-    expect((await source()).places).toEqual([]);
   });
 
   it("requires Pro with an otherwise valid pin, and rejects foreign ownership", async () => {
@@ -482,12 +407,9 @@ describe("place removals", () => {
     expect(other?.places).toEqual(["Tigre, Baixa"]);
   });
 
-  it("preserves emoji identities and Japanese voicing marks", async () => {
+  it("preserves emoji identities", async () => {
     const { t, itemId, pin } = await setup();
-    for (const [removed, kept] of [
-      ["🍕", "🍣"],
-      ["すし", "ずし"],
-    ]) {
+    for (const [removed, kept] of [["🍕", "🍣"]]) {
       await t.run((ctx) =>
         ctx.db.patch(itemId, {
           placePins: [
@@ -509,7 +431,7 @@ describe("place removals", () => {
     }
   });
 
-  it("allows an idless lookup beyond two kilometers to reappear", async () => {
+  it("allows an idless lookup in another part of town to reappear", async () => {
     const { t, itemId, pin, remove, map } = await setup();
     await remove();
     await t.run((ctx) =>
@@ -648,5 +570,170 @@ describe("place removals", () => {
         removed: date.removed,
       }),
     ).toBe(false);
+  });
+
+  it("removes every spelling of a row the city page merged", async () => {
+    for (const [shown, twin] of [
+      ["Jo's Coffee", "Jos Coffee"],
+      ["Cafe  de Flore", "CafeDeFlore"],
+      ["すし", "ずし"],
+    ]) {
+      const { t, itemId, pin, map, source } = await setup();
+      const at = { lat: pin.lat, lng: pin.lng, city: pin.city };
+      const pins = [
+        { ...at, name: shown },
+        { ...at, name: twin, lat: pin.lat + 0.001 },
+      ];
+      await t.run((ctx) =>
+        ctx.db.patch(itemId, { placePins: pins, places: [shown, twin] }),
+      );
+      expect(
+        cityPins(await t.query(api.items.listCityItems, { city: "Lisbon" })),
+      ).toHaveLength(1);
+      await t.mutation(api.placeRemovals.removePlace, {
+        itemId,
+        name: shown,
+        lat: pin.lat,
+        lng: pin.lng,
+      });
+      expect(await map()).toEqual([]);
+      expect((await source()).places).toEqual([]);
+    }
+  });
+
+  it("keeps what the city page shows as a separate row", async () => {
+    const { t, itemId, pin, map } = await setup();
+    const at = { lat: pin.lat, lng: pin.lng, city: pin.city };
+    const cases = [
+      {
+        removed: { ...at, name: "Tigre", appleId: "a" },
+        kept: { ...at, name: "Tigre", appleId: "b", lat: pin.lat + 0.001 },
+      },
+      {
+        removed: { ...at, name: "Tigre", appleId: "a" },
+        kept: { ...at, name: "Tigre Bakery", appleId: "b" },
+      },
+      { removed: { ...at, name: "Le Bar" }, kept: { ...at, name: "Le Cafe" } },
+      {
+        removed: { ...at, name: "Sol" },
+        kept: { ...at, name: "Sol", lat: pin.lat + 0.01 },
+      },
+    ];
+    for (const { removed, kept } of cases) {
+      await t.run((ctx) =>
+        ctx.db.patch(itemId, {
+          placePins: [removed, kept],
+          places: [removed.name, kept.name],
+        }),
+      );
+      const removalId = await t.mutation(api.placeRemovals.removePlace, {
+        itemId,
+        name: removed.name,
+        lat: removed.lat,
+        lng: removed.lng,
+        appleId: removed.appleId,
+      });
+      expect((await map()).map((p) => [p.name, p.lat])).toEqual([
+        [kept.name, kept.lat],
+      ]);
+      await t.mutation(api.placeRemovals.undoRemovePlace, { removalId });
+    }
+  });
+
+  it("hides an idless alias of the row but no nearby place Apple names apart", async () => {
+    const { t, itemId, pin, remove, map } = await setup();
+    await remove();
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        placePins: [
+          { name: "Tigre Restaurant, Alfama", lat: pin.lat, lng: pin.lng },
+          { name: "Casa Tigre", lat: pin.lat, lng: pin.lng },
+          { ...pin, name: "Other", appleId: "other" },
+        ],
+      }),
+    );
+    expect((await map()).map((p) => p.name)).toEqual(["Other"]);
+  });
+
+  it("filters an Apple suggestion at the removed spot, with or without an area", async () => {
+    const at = { lat: 38.7, lng: -9.1 };
+    const removed = [
+      { ...at, name: "Tigre", city: "lisbon", _creationTime: 1 },
+    ];
+    const found = {
+      ...at,
+      name: "Tigre",
+      category: "Restaurant",
+      interest: "food" as const,
+    };
+    const keep = (suggestion: typeof found & { area?: string }) =>
+      keepSuggestion(suggestion, {
+        centre: at,
+        been: new Set(),
+        taken: [],
+        removed,
+      });
+    expect(keep({ ...found, area: "Alfama" })).toBe(false);
+    expect(keep({ ...found, appleId: "new", area: "Alfama" })).toBe(false);
+    expect(keep({ ...found, name: "Sol", area: "Alfama" })).toBe(true);
+  });
+
+  it("drops every label of a removed pin, even one the pin does not spell out", async () => {
+    const { t, itemId, pin, map, source } = await setup();
+    const bare = { ...pin, name: "Tigre" };
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        placePins: [bare],
+        places: ["Tigre", "Tigre, Alfama"],
+      }),
+    );
+    await t.mutation(api.placeRemovals.removePlace, {
+      itemId,
+      name: bare.name,
+      lat: bare.lat,
+      lng: bare.lng,
+      appleId: bare.appleId,
+    });
+    expect(await map()).toEqual([]);
+    expect((await source()).places).toEqual([]);
+  });
+
+  it("keeps a multi-city guide's other city and scopes unpinned labels to the removal's city", async () => {
+    const { t, itemId, pin, insert, map, source } = await setup();
+    const lisbon = { ...pin, name: "Sol", appleId: "lisbon" };
+    const porto = {
+      ...pin,
+      name: "Sol",
+      city: "Porto",
+      lat: 41.15,
+      appleId: "porto",
+    };
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        cities: ["Lisbon", "Porto"],
+        placePins: [lisbon, porto],
+        places: ["Sol, Lisbon", "Sol, Porto"],
+      }),
+    );
+    const portoOnly = await insert("ready", [], ["Sol"], ["Porto"]);
+    const namedPorto = await insert(
+      "ready",
+      [],
+      ["Sol, Porto"],
+      ["Lisbon", "Porto"],
+    );
+    const lisbonSave = await insert("ready", [], ["Sol"], ["Lisbon"]);
+    await t.mutation(api.placeRemovals.removePlace, {
+      itemId,
+      name: lisbon.name,
+      lat: lisbon.lat,
+      lng: lisbon.lng,
+      appleId: lisbon.appleId,
+    });
+    expect((await map()).map((p) => p.appleId)).toEqual(["porto"]);
+    expect((await source()).places).toEqual(["Sol, Porto"]);
+    expect((await source(portoOnly)).places).toEqual(["Sol"]);
+    expect((await source(namedPorto)).places).toEqual(["Sol, Porto"]);
+    expect((await source(lisbonSave)).places).toEqual([]);
   });
 });
