@@ -192,20 +192,44 @@ it("still asks the model when a save has nothing to lose", async () => {
   expect(item?.title).toBe("Guessed from the URL");
 });
 
-it("takes a real title and keeps the rest when Retry finds no body", async () => {
+function servesCard() {
   servesPage(
     `<html><head><title>Fresh tacos</title><meta name="description" content="A taco guide."><meta property="og:image" content="https://www.example.com/new.jpg"></head><body></body></html>`,
   );
-  modelNames("Fresh tacos");
+}
+
+it("leaves a save with a body alone when Retry finds only a title and image", async () => {
+  servesCard();
 
   const item = await retried();
+
+  expect(generateObject).not.toHaveBeenCalled();
+  expect(item).toMatchObject({
+    ...GOOD_SAVE,
+    status: "ready",
+    enrichment: "partial",
+  });
+});
+
+it("takes a real title and keeps the places when a save has no body", async () => {
+  servesCard();
+  modelNames("Fresh tacos");
+  const thin = {
+    title: "best-tacos",
+    places: GOOD_SAVE.places,
+    cities: GOOD_SAVE.cities,
+    author: GOOD_SAVE.author,
+  };
+
+  const item = await retried(PAGE, thin);
 
   expect(generateObject).toHaveBeenCalled();
   expect(item).toMatchObject({
     title: "Fresh tacos",
-    content: GOOD_SAVE.content,
-    recipe: GOOD_SAVE.recipe,
+    places: GOOD_SAVE.places,
+    cities: GOOD_SAVE.cities,
     author: GOOD_SAVE.author,
+    heroImageUrl: "https://www.example.com/new.jpg",
     status: "ready",
     enrichment: "partial",
   });
