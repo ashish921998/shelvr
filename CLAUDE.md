@@ -82,6 +82,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `notificationPreferences`: weekly shelf opt-in, save reminder opt-out, timezone, and the
     next digest and reminder instants
   - `itemReads`: per-user read state, kept out of the item row
+  - `placeRemovals`: user-owned venue removal decisions, indexed by user; the account deletion drain removes them in batches through `deletePlaceRemovalsBatch`
   - `placeVisits`: places the user marked "We went" on a plan, one row per place name, so
     later plans rank them last
   - `planShares`: a plan's shortlist snapshot behind a random public vote link (one week),
@@ -351,8 +352,17 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   the pin's icon) and its filter kinds from
   `model/placeKinds.ts`: Apple's point-of-interest category when the pin has one, otherwise
   the save's tags; "date night" always comes from the tags.
-- **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark. Planning
-  and trip swaps check these records inside Shelvr; they are not sent to an AI provider.
+- **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark.
+  Planning reads these records inside Shelvr; they are not sent to an AI provider.
+- **`placeRemovals.ts`**: `removePlace` stores an owned venue decision; `undoRemovePlace`
+  deletes that decision idempotently. `model/placeRemovals.ts` projects a user's decisions over
+  raw saves and membership intents on read. A pin matches by the city page's row identity
+  (`uniquePlacePins`): one Apple id, or one name a few doors apart unless Apple ids differ.
+  A label without a pin matches by name and city. City, Map, search, planning and
+  automatic suggestions use the projection; source saves, existing trips and deliberate manual
+  additions remain. A save made after the removal shows the place again. Keep the
+  `placeRemovals` table on rollback once rows exist.
+- **`placeCorrections.ts`**, **`placeCorrectionSearch.ts`**: owner-only place editing and Apple Maps lookup. `items.placesEdited` preserves the chosen places across extraction retries and pin refreshes. A kept place with no pin still gets one from a lookup, which never changes a pin already on the save. Corrections update city grouping and search; existing trip stops remain unchanged. The editor leaves out removed places (`placeRemovals.ts`), and adding one back clears its removal.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
   link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and
   `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the
@@ -569,6 +579,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   `src/lib/trip-edit.ts`) lays stops out in fixed-height rows: hold one to drag it within a
   day or onto another, minus sends it to Unplanned, plus puts an unplanned one on a day, the
   name is editable, and an Undo bar takes back the last move or remove
+- `edit-save-places` edits the places on a ready save, with remove/replace/add and explicit Save.
 - `add-trip-stop` is Add a place, a modal with `tripId` and `day` params: Apple Maps search
   near the trip plus the city's saved places not on it yet
   The old `trip/[id]` screen is gone and its links open Home; `trips.ts` and `tripData.ts`

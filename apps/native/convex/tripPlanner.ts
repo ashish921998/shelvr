@@ -13,6 +13,7 @@ import {
   type ApplePoi,
 } from "./model/appleMaps";
 import { logEvent } from "./model/log";
+import { isRemovedSuggestion, removalsSince } from "./model/placeRemovals";
 import {
   placeKey,
   splitSavedPlace,
@@ -198,7 +199,14 @@ async function savedStops(
     );
     asked.forEach((place, i) => {
       const at = found[i];
-      if (at) stops.push(saveStop(place, at, why(place)));
+      if (
+        at &&
+        !isRemovedSuggestion(
+          removalsSince(claim.removed, sources.get(place.itemId)!.savedAt),
+          { name: place.name, ...at },
+        )
+      )
+        stops.push(saveStop(place, at, why(place)));
     });
   }
   return { stops: mergeSavedNamesakes(uniquePlacePins(stops)), centre };
@@ -257,7 +265,14 @@ async function suggestStops(
       for (const found of replies[i]) {
         seen.push(found);
         const suggestion = { ...found, interest: search.interest };
-        if (!keepSuggestion(suggestion, { centre, been, taken: kept }))
+        if (
+          !keepSuggestion(suggestion, {
+            centre,
+            been,
+            taken: kept,
+            removed: claim.removed,
+          })
+        )
           continue;
         lists.get(search.interest)?.push(suggestion);
         kept.push(suggestion);

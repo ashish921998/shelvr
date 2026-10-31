@@ -729,6 +729,8 @@
   },
   "cityMap.placesList": "Places list",
   "cityMap.placeDetails": "Place details for %{name}",
+  "cityMap.removePlace": "Remove %{name}",
+  "cityMap.removedPlace": "Removed %{name}",
   "opener.tagline": "Save the spots. We'll plan the date or the trip.",
   "onboardingQ.skip": "Skip",
   "onboardingQ.savedTitle": "How many places have you saved?",
@@ -1005,5 +1007,14 @@
   "placeCategory.rockClimbing": "Climbing",
   "placeCategory.skating": "Skating",
   "placeCategory.store": "Shop",
-  "placeCategory.hotel": "Hotel"
+  "placeCategory.hotel": "Hotel",
+  "placeCorrection.title": "Edit places",
+  "placeCorrection.hint": "Correct a match or add a missed place. Existing trips stay unchanged.",
+  "placeCorrection.replace": "Replace place",
+  "placeCorrection.remove": "Remove",
+  "placeCorrection.city": "City",
+  "placeCorrection.search": "Search places",
+  "placeCorrection.save": "Save places",
+  "placeCorrection.retry": "Reopen this save to load the latest places, then try again.",
+  "placeCorrection.wait": "Wait for this save to finish processing."
 }

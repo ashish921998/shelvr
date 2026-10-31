@@ -26,7 +26,7 @@ import {
   type DateStop,
   swapStop,
 } from "@convex/model/datePlan";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useRef } from "react";
 import { Linking, Pressable, ScrollView, Share, View } from "react-native";
@@ -69,7 +69,7 @@ function useInfoOpener() {
             );
         }
       };
-      if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
+      void haptics.selection();
       const action = infoAction(stop, canOpenPlaceCard(stop.appleId));
       analytics.capture("date_plan_stop_opened", {
         source: stop.source,
@@ -104,7 +104,7 @@ export function DateEvening({
   const change = (slot: DateSlot) =>
     swapStop(result.stops, evening, slot) !== null
       ? () => {
-          if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
+          void haptics.selection();
           onSwap(slot);
         }
       : undefined;

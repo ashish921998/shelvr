@@ -16,6 +16,20 @@ for (const ext of [".jpg", ".jpeg", ".png"]) {
 
 process.env.EXPO_PUBLIC_CONVEX_URL ??= "https://test.convex.cloud";
 
+vi.mock("expo-haptics", () => ({
+  selectionAsync: vi.fn(async () => {}),
+  impactAsync: vi.fn(async () => {}),
+  notificationAsync: vi.fn(async () => {}),
+  performAndroidHapticsAsync: vi.fn(async () => {}),
+  ImpactFeedbackStyle: { Light: "light", Medium: "medium" },
+  NotificationFeedbackType: { Success: "success" },
+  AndroidHaptics: {
+    Segment_Tick: "segment-tick",
+    Drag_Start: "drag-start",
+    Confirm: "confirm",
+  },
+}));
+
 vi.mock("expo-localization", () => ({
   getLocales: () => [
     { languageTag: "en-US", languageCode: "en", textDirection: "ltr" },

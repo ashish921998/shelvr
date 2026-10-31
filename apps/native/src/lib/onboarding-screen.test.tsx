@@ -180,10 +180,6 @@ vi.mock("@/components/onboarding/commitment", () => ({
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: false }),
 }));
-vi.mock("expo-haptics", () => ({
-  notificationAsync: vi.fn(),
-  NotificationFeedbackType: { Success: "success" },
-}));
 vi.mock("expo-sharing", () => ({ getSharedPayloads: () => [] }));
 vi.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),

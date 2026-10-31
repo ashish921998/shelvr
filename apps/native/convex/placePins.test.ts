@@ -88,6 +88,25 @@ async function setup(
 }
 
 describe("placePins", () => {
+  it("finds a kept place on an edited save by its branch and leaves the owner's pin alone", async () => {
+    const { queries } = await withMaps();
+    const { t, itemId, pins } = await setup([], { read: ["Chosen", "Bakery"] });
+    const chosen = { name: "Chosen", city: "Lisbon", lat: 7, lng: 8 };
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        placesEdited: true,
+        placePins: [chosen],
+        placeLocations: [{ name: "Bakery", location: "Bairro Alto" }],
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId, refresh: true });
+    expect(queries()).toEqual(["Bakery, Bairro Alto, Lisbon"]);
+    const q = "Bakery, Bairro Alto, Lisbon".length;
+    expect(await pins()).toEqual([
+      chosen,
+      { name: "Bakery", city: "Lisbon", lat: q, lng: -q },
+    ]);
+  });
   it("looks up the source's branch while keeping its display name and public contract", async () => {
     await withMaps();
     const { t, itemId, pins } = await setup(["Carette"], { read: ["Carette"] });

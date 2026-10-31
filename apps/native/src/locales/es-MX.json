@@ -751,6 +751,8 @@
   },
   "cityMap.placesList": "Lista de lugares",
   "cityMap.placeDetails": "Detalles de %{name}",
+  "cityMap.removePlace": "Eliminar %{name}",
+  "cityMap.removedPlace": "Se eliminó %{name}",
   "opener.tagline": "Guarda los lugares. Nosotros planeamos la cita o el viaje.",
   "onboardingQ.skip": "Omitir",
   "onboardingQ.savedTitle": "¿Cuántos lugares has guardado?",
@@ -1030,5 +1032,14 @@
   "placeCategory.rockClimbing": "Escalada",
   "placeCategory.skating": "Patinaje",
   "placeCategory.store": "Tienda",
-  "placeCategory.hotel": "Hotel"
+  "placeCategory.hotel": "Hotel",
+  "placeCorrection.title": "Editar lugares",
+  "placeCorrection.hint": "Corrige una coincidencia o añade un lugar que falta. Los viajes existentes no cambian.",
+  "placeCorrection.replace": "Reemplazar lugar",
+  "placeCorrection.remove": "Eliminar",
+  "placeCorrection.city": "Ciudad",
+  "placeCorrection.search": "Buscar lugares",
+  "placeCorrection.save": "Guardar lugares",
+  "placeCorrection.retry": "Vuelve a abrir este guardado para cargar los lugares actuales e inténtalo de nuevo.",
+  "placeCorrection.wait": "Espera a que termine de procesarse este guardado."
 }

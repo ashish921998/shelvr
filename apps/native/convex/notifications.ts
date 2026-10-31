@@ -6,7 +6,7 @@ import { ConvexError, v } from "convex/values";
 import { internalMutation, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { enrichItem, enrichedItemValidator } from "./items";
+import { enrichItems, enrichedItemValidator } from "./items";
 import { tripStopItemIds } from "./tripData";
 import { liveOwner, authedMutation, authedQuery } from "./model/auth";
 import {
@@ -370,7 +370,7 @@ export const getDigest = authedQuery({
       createdAt: digest.createdAt,
       openedAt: digest.openedAt,
       itemCount: items.length,
-      items: await Promise.all(items.map((item) => enrichItem(ctx, item))),
+      items: await enrichItems(ctx, items),
     };
   },
 });

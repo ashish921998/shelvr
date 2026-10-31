@@ -10,7 +10,7 @@ import {
 } from "./plan";
 
 function source(fields: Partial<PlanSource>): PlanSource {
-  return { itemId: "item1" as Id<"items">, places: [], ...fields };
+  return { itemId: "item1" as Id<"items">, savedAt: 0, places: [], ...fields };
 }
 
 describe("isGrounded", () => {

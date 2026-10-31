@@ -7,7 +7,7 @@ const mock = vi.hoisted(() => ({
   openLink: vi.fn(async () => {}),
   openURL: vi.fn(async () => true),
   setStringAsync: vi.fn(async () => true),
-  notificationAsync: vi.fn(async () => {}),
+  success: vi.fn(async () => {}),
   createEventInCalendarAsync: vi.fn(async () => ({ action: "saved" })),
 }));
 
@@ -21,10 +21,7 @@ vi.mock("react-native", () => ({
 vi.mock("@/lib/open-link", () => ({ openLink: mock.openLink }));
 vi.mock("expo-linking", () => ({ openURL: mock.openURL }));
 vi.mock("expo-clipboard", () => ({ setStringAsync: mock.setStringAsync }));
-vi.mock("expo-haptics", () => ({
-  notificationAsync: mock.notificationAsync,
-  NotificationFeedbackType: { Success: "success" },
-}));
+vi.mock("@/lib/haptics", () => ({ haptics: { success: mock.success } }));
 vi.mock("expo-calendar/legacy", () => ({
   createEventInCalendarAsync: mock.createEventInCalendarAsync,
 }));
@@ -43,7 +40,7 @@ describe("runIntent", () => {
   it("copies the value and confirms with a success haptic", async () => {
     await runIntent("copy", "WELCOME10");
     expect(mock.setStringAsync).toHaveBeenCalledWith("WELCOME10");
-    expect(mock.notificationAsync).toHaveBeenCalledWith("success");
+    expect(mock.success).toHaveBeenCalledOnce();
   });
 
   it("searches the web for the encoded value", async () => {

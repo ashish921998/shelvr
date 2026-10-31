@@ -664,6 +664,8 @@ export type MessageParams = {
   "cityMap.placesFromSaves": { count: number };
   "cityMap.placesList": undefined;
   "cityMap.placeDetails": { name: string };
+  "cityMap.removePlace": { name: string };
+  "cityMap.removedPlace": { name: string };
   "opener.tagline": undefined;
   "onboardingQ.skip": undefined;
   "onboardingQ.savedTitle": undefined;
@@ -932,6 +934,15 @@ export type MessageParams = {
   "placeCategory.skating": undefined;
   "placeCategory.store": undefined;
   "placeCategory.hotel": undefined;
+  "placeCorrection.title": undefined;
+  "placeCorrection.hint": undefined;
+  "placeCorrection.replace": undefined;
+  "placeCorrection.remove": undefined;
+  "placeCorrection.city": undefined;
+  "placeCorrection.search": undefined;
+  "placeCorrection.save": undefined;
+  "placeCorrection.retry": undefined;
+  "placeCorrection.wait": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

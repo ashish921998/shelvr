@@ -707,6 +707,8 @@
   },
   "cityMap.placesList": "장소 목록",
   "cityMap.placeDetails": "%{name} 장소 정보",
+  "cityMap.removePlace": "%{name} 삭제",
+  "cityMap.removedPlace": "%{name} 삭제됨",
   "opener.tagline": "장소를 저장하세요. 데이트도 여행도 계획은 저희가 할게요.",
   "onboardingQ.skip": "건너뛰기",
   "onboardingQ.savedTitle": "장소를 얼마나 저장했나요?",
@@ -980,5 +982,14 @@
   "placeCategory.rockClimbing": "클라이밍",
   "placeCategory.skating": "스케이트",
   "placeCategory.store": "상점",
-  "placeCategory.hotel": "호텔"
+  "placeCategory.hotel": "호텔",
+  "placeCorrection.title": "장소 수정",
+  "placeCorrection.hint": "잘못된 장소를 수정하거나 누락된 장소를 추가하세요. 기존 여행은 변경되지 않습니다.",
+  "placeCorrection.replace": "장소 바꾸기",
+  "placeCorrection.remove": "삭제",
+  "placeCorrection.city": "도시",
+  "placeCorrection.search": "장소 검색",
+  "placeCorrection.save": "장소 저장",
+  "placeCorrection.retry": "이 저장 항목을 다시 열어 최신 장소를 불러온 후 다시 시도하세요.",
+  "placeCorrection.wait": "이 저장 항목의 처리가 완료될 때까지 기다려 주세요."
 }

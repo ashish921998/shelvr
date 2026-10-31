@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { emptyMessage, useDatePlan } from "@/lib/date-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { tidyCity } from "@convex/model/trip";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import { ScrollView, View } from "react-native";
@@ -21,8 +21,8 @@ export default function DatePlanScreen() {
 
   const ready = state.status === "ready";
   useEffect(() => {
-    if (ready && process.env.EXPO_OS === "ios") {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (ready) {
+      void haptics.success();
     }
   }, [ready]);
 
