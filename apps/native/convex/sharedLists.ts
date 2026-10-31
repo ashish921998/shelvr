@@ -16,7 +16,9 @@ import {
   requireUserId,
   senderFirstName,
 } from "./model/auth";
-import { visibleSave } from "./model/placeRemovals";
+import { recentVisits } from "./model/placeVisits";
+import { userRemovals, visibleSave } from "./model/placeRemovals";
+import { placeKey } from "./model/plan";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   departMember,
@@ -42,7 +44,7 @@ import {
   sharedListSummaryValidator,
   sharedPlaceInputValidator,
   tidyListName,
-  type ListPlanPlace,
+  type ListPlanClaim,
   type NewListPlace,
 } from "./model/sharedLists";
 import { sameTripPlace } from "./model/placeIdentity";
@@ -541,7 +543,7 @@ export const markSharedListSeen = authedMutation({
   },
 });
 
-export async function listAiAllowed(
+async function listAiAllowed(
   ctx: QueryCtx,
   userId: Id<"users">,
   places: { addedBy: Id<"users"> }[],
@@ -562,7 +564,7 @@ async function coveredNow(
   );
 }
 
-export async function requireCoveredList(
+async function requireCoveredList(
   ctx: MutationCtx,
   listId: Id<"sharedLists">,
   userId: Id<"users">,
@@ -584,28 +586,38 @@ export async function requirePlanAccess(
   await requireProEntitlement(ctx, userId);
 }
 
-export async function listPlanPlaces(
+async function ownSaveId(
   ctx: QueryCtx,
-  list: Doc<"sharedLists">,
+  place: Doc<"sharedListPlaces">,
+  userId: Id<"users">,
+): Promise<Id<"items"> | undefined> {
+  if (place.addedBy !== userId || place.itemId === undefined) return undefined;
+  const item = await ctx.db.get(place.itemId);
+  return item !== null && item.userId === userId ? item._id : undefined;
+}
+
+export async function claimListPlan(
+  ctx: MutationCtx,
+  listId: Id<"sharedLists">,
   userId: Id<"users">,
   city: string,
-): Promise<{ rows: Doc<"sharedListPlaces">[]; places: ListPlanPlace[] }> {
+  bucket: "makePlan" | "createTripPlan",
+): Promise<ListPlanClaim> {
+  const list = await requireCoveredList(ctx, listId, userId);
+  await rateLimiter.limit(ctx, bucket, { key: userId, throws: true });
   const wanted = cityKey(city);
+  const been = await recentVisits(ctx, userId);
+  const skipped = new Set(been.map(placeKey));
   const rows = (await listPlaces(ctx, list._id)).filter(
     (row) =>
       row.visitedAt === undefined &&
-      (row.city === undefined || cityKey(row.city) === wanted),
+      (row.city === undefined || cityKey(row.city) === wanted) &&
+      !skipped.has(placeKey(row.name)),
   );
-  const places: ListPlanPlace[] = [];
+  const places: ListPlanClaim["places"] = [];
   for (const row of rows) {
-    const item =
-      row.addedBy === userId && row.itemId !== undefined
-        ? await ctx.db.get(row.itemId)
-        : null;
-    const itemId =
-      item !== null && item.userId === userId ? item._id : undefined;
+    const itemId = await ownSaveId(ctx, row, userId);
     places.push({
-      key: row._id,
       ...(itemId !== undefined ? { itemId } : {}),
       name: row.name,
       lat: row.lat,
@@ -616,7 +628,12 @@ export async function listPlanPlaces(
       addedAt: row.addedAt,
     });
   }
-  return { rows, places };
+  return {
+    places,
+    been,
+    removed: await userRemovals(ctx, userId),
+    aiAllowed: await listAiAllowed(ctx, userId, rows),
+  };
 }
 
 export const claimListSearchInternal = internalMutation({

@@ -5,7 +5,8 @@ import { internalMutation } from "./_generated/server";
 import { aiAllowed } from "./aiConsent";
 import { readyCitySaves } from "./items";
 import { requireUserId } from "./model/auth";
-import { listPlanPlaceValidator } from "./model/sharedLists";
+import { recentVisits } from "./model/placeVisits";
+import { listPlanClaimValidator } from "./model/sharedLists";
 import {
   MAX_PLAN_ITEMS,
   placeKey,
@@ -15,14 +16,10 @@ import {
 import { sameVenue } from "./model/datePlan";
 import { rateLimiter } from "./model/rateLimiter";
 import { MAX_CITY_CHARS, pinsForCity, tidyCity } from "./model/trip";
-import {
-  listAiAllowed,
-  listPlanPlaces,
-  requireCoveredList,
-} from "./sharedLists";
+import { claimListPlan } from "./sharedLists";
 import { requireProEntitlement } from "./subscriptions";
 import { beenPlaces, toPlanSource } from "./tripData";
-import { recentVisits, savedPinValidator } from "./tripPlannerData";
+import { savedPinValidator } from "./tripPlannerData";
 
 const TAGS_PER_SAVE = 8;
 
@@ -65,43 +62,42 @@ function namesOneVenue(item: Doc<"items">): boolean {
  */
 export const claimDatePlanInternal = internalMutation({
   args: { city: v.string(), listId: v.optional(v.id("sharedLists")) },
-  returns: v.object({
-    city: v.string(),
-    sources: v.array(planSourceValidator),
-    been: v.array(v.string()),
-    removed: v.array(removalValidator),
-    pins: v.array(savedPinValidator),
-    saves: v.array(
-      v.object({
-        itemId: v.id("items"),
-        tags: v.array(v.string()),
-        ownTags: v.boolean(),
-        savedAt: v.number(),
-      }),
-    ),
-    places: v.array(listPlanPlaceValidator),
-    aiAllowed: v.boolean(),
-  }),
+  returns: v.union(
+    v.object({
+      from: v.literal("saves"),
+      city: v.string(),
+      sources: v.array(planSourceValidator),
+      been: v.array(v.string()),
+      removed: v.array(removalValidator),
+      pins: v.array(savedPinValidator),
+      saves: v.array(
+        v.object({
+          itemId: v.id("items"),
+          tags: v.array(v.string()),
+          ownTags: v.boolean(),
+          savedAt: v.number(),
+        }),
+      ),
+      aiAllowed: v.boolean(),
+    }),
+    v.object({
+      from: v.literal("list"),
+      city: v.string(),
+      ...listPlanClaimValidator.fields,
+    }),
+  ),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    if (args.listId === undefined) await requireProEntitlement(ctx, userId);
     const city = tidyCity(args.city).slice(0, MAX_CITY_CHARS);
     if (city === "") throw new Error("City required");
     if (args.listId !== undefined) {
-      const list = await requireCoveredList(ctx, args.listId, userId);
-      await rateLimiter.limit(ctx, "makePlan", { key: userId, throws: true });
-      const { rows, places } = await listPlanPlaces(ctx, list, userId, city);
       return {
+        from: "list" as const,
         city,
-        sources: [],
-        removed: await userRemovals(ctx, userId),
-        been: await recentVisits(ctx, userId),
-        pins: [],
-        saves: [],
-        places,
-        aiAllowed: await listAiAllowed(ctx, userId, rows),
+        ...(await claimListPlan(ctx, args.listId, userId, city, "makePlan")),
       };
     }
+    await requireProEntitlement(ctx, userId);
     await rateLimiter.limit(ctx, "makePlan", { key: userId, throws: true });
     const removed = await userRemovals(ctx, userId);
     const items = await readyCitySaves(
@@ -113,6 +109,7 @@ export const claimDatePlanInternal = internalMutation({
     );
     const sources = items.map((item) => toPlanSource(item, city));
     return {
+      from: "saves" as const,
       city,
       sources,
       removed,
@@ -138,7 +135,6 @@ export const claimDatePlanInternal = internalMutation({
         ownTags: namesOneVenue(item),
         savedAt: item._creationTime,
       })),
-      places: [],
       aiAllowed: await aiAllowed(ctx, userId),
     };
   },

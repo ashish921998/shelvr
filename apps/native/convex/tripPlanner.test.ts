@@ -304,6 +304,7 @@ describe("claimTripPlanInternal", () => {
       been: ["Elsewhere"],
       aiAllowed: true,
     });
+    if (claim.from !== "saves") throw new Error("expected a saves claim");
     expect(claim.startDate).toBeUndefined();
     expect(claim.sources).toHaveLength(3);
     expect(claim.pins.map((pin) => pin.appleId).sort()).toEqual([

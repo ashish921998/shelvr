@@ -21,7 +21,8 @@ import {
   planSourceValidator,
 } from "./model/plan";
 import { sameTripPlace } from "./model/placeIdentity";
-import { listPlanPlaceValidator } from "./model/sharedLists";
+import { recentVisits } from "./model/placeVisits";
+import { listPlanClaimValidator } from "./model/sharedLists";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   MAX_CITY_CHARS,
@@ -49,12 +50,7 @@ import {
   type TripPlanStop,
   type TripSavePlace,
 } from "./model/tripPlan";
-import {
-  listAiAllowed,
-  listPlanPlaces,
-  requireCoveredList,
-  requirePlanAccess,
-} from "./sharedLists";
+import { claimListPlan, requirePlanAccess } from "./sharedLists";
 import { requireProEntitlement } from "./subscriptions";
 import { beenPlaces, toPlanSource } from "./tripData";
 
@@ -63,8 +59,6 @@ const MAX_STAY_CHARS = 120;
 const MAX_TRIP_STOPS = 150;
 /** The most trips one page of My trips reads, whatever the client asks for. */
 const LIST_PAGE_MAX = 50;
-/** Recent "We went" marks a suggestion is checked against, beyond the saves' own places. */
-const RECENT_VISITS = 200;
 const TAGS_PER_SAVE = 8;
 
 function tripDays(days: number): number {
@@ -110,18 +104,6 @@ const saveTasteValidator = v.object({
   categories: v.array(v.string()),
 });
 
-export async function recentVisits(
-  ctx: QueryCtx,
-  userId: string,
-): Promise<string[]> {
-  const visits = await ctx.db
-    .query("placeVisits")
-    .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
-    .order("desc")
-    .take(RECENT_VISITS);
-  return visits.map((visit) => visit.name);
-}
-
 function tasteOf(item: Doc<"items">, city: string) {
   return {
     tags: item.tags.slice(0, TAGS_PER_SAVE),
@@ -135,6 +117,15 @@ function tasteOf(item: Doc<"items">, city: string) {
   };
 }
 
+const plannedTripFields = {
+  city: v.string(),
+  days: v.number(),
+  interests: v.array(tripInterestValidator),
+  startDate: v.optional(v.string()),
+  stay: v.optional(v.string()),
+  tastes: v.array(saveTasteValidator),
+};
+
 /** Checks the caller may plan, spends one plan from the rate limit, and reads what the plan is made from. */
 export const claimTripPlanInternal = internalMutation({
   args: {
@@ -145,23 +136,24 @@ export const claimTripPlanInternal = internalMutation({
     stay: v.optional(v.string()),
     listId: v.optional(v.id("sharedLists")),
   },
-  returns: v.object({
-    city: v.string(),
-    days: v.number(),
-    interests: v.array(tripInterestValidator),
-    startDate: v.optional(v.string()),
-    stay: v.optional(v.string()),
-    sources: v.array(planSourceValidator),
-    been: v.array(v.string()),
-    removed: v.array(removalValidator),
-    pins: v.array(savedPinValidator),
-    tastes: v.array(saveTasteValidator),
-    places: v.array(listPlanPlaceValidator),
-    aiAllowed: v.boolean(),
-  }),
+  returns: v.union(
+    v.object({
+      from: v.literal("saves"),
+      ...plannedTripFields,
+      sources: v.array(planSourceValidator),
+      been: v.array(v.string()),
+      removed: v.array(removalValidator),
+      pins: v.array(savedPinValidator),
+      aiAllowed: v.boolean(),
+    }),
+    v.object({
+      from: v.literal("list"),
+      ...plannedTripFields,
+      ...listPlanClaimValidator.fields,
+    }),
+  ),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    if (args.listId === undefined) await requireProEntitlement(ctx, userId);
     const city = tidyCity(args.city).slice(0, MAX_CITY_CHARS);
     if (city === "") throw new Error("City required");
     const startDate = tidyStartDate(args.startDate);
@@ -174,29 +166,26 @@ export const claimTripPlanInternal = internalMutation({
       ...(stay !== undefined ? { stay } : {}),
     };
     if (args.listId !== undefined) {
-      const list = await requireCoveredList(ctx, args.listId, userId);
-      await rateLimiter.limit(ctx, "createTripPlan", {
-        key: userId,
-        throws: true,
-      });
-      const { rows, places } = await listPlanPlaces(ctx, list, userId, city);
-      const allowed = await listAiAllowed(ctx, userId, rows);
+      const claim = await claimListPlan(
+        ctx,
+        args.listId,
+        userId,
+        city,
+        "createTripPlan",
+      );
       return {
+        from: "list" as const,
         ...asked,
-        sources: [],
-        been: await recentVisits(ctx, userId),
-        removed: await userRemovals(ctx, userId),
-        pins: [],
-        tastes: allowed
-          ? places.map((place) => ({
+        ...claim,
+        tastes: claim.aiAllowed
+          ? claim.places.map((place) => ({
               tags: place.tags,
               categories: place.category !== undefined ? [place.category] : [],
             }))
           : [],
-        places,
-        aiAllowed: allowed,
       };
     }
+    await requireProEntitlement(ctx, userId);
     await rateLimiter.limit(ctx, "createTripPlan", {
       key: userId,
       throws: true,
@@ -212,6 +201,7 @@ export const claimTripPlanInternal = internalMutation({
     const sources = saves.map((item) => toPlanSource(item, city));
     const allowed = await aiAllowed(ctx, userId);
     return {
+      from: "saves" as const,
       ...asked,
       sources,
       removed,
@@ -233,7 +223,6 @@ export const claimTripPlanInternal = internalMutation({
       ),
       // Tags come from the model's reading of a save, so they reach Apple only while AI is allowed.
       tastes: allowed ? saves.map((item) => tasteOf(item, city)) : [],
-      places: [],
       aiAllowed: allowed,
     };
   },

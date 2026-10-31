@@ -2,6 +2,7 @@ import { type Infer, v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { liveOwner } from "./auth";
+import { removalValidator } from "./placeRemovals";
 import {
   countCities,
   MAX_CITY_CHARS,
@@ -87,8 +88,7 @@ export const sharedPlaceInputValidator = v.object({
   city: v.optional(v.string()),
 });
 
-export const listPlanPlaceValidator = v.object({
-  key: v.string(),
+const listPlanPlaceValidator = v.object({
   itemId: v.optional(v.id("items")),
   name: v.string(),
   lat: v.number(),
@@ -98,7 +98,14 @@ export const listPlanPlaceValidator = v.object({
   tags: v.array(v.string()),
   addedAt: v.number(),
 });
-export type ListPlanPlace = Infer<typeof listPlanPlaceValidator>;
+
+export const listPlanClaimValidator = v.object({
+  places: v.array(listPlanPlaceValidator),
+  been: v.array(v.string()),
+  removed: v.array(removalValidator),
+  aiAllowed: v.boolean(),
+});
+export type ListPlanClaim = Infer<typeof listPlanClaimValidator>;
 
 export type NewListPlace = Omit<
   Doc<"sharedListPlaces">,

@@ -42,9 +42,11 @@ const SUGGESTIONS_PER_ANCHOR = 3;
 type Claim = FunctionReturnType<
   typeof internal.datePlanData.claimDatePlanInternal
 >;
+type SavesClaim = Extract<Claim, { from: "saves" }>;
+type ListClaim = Extract<Claim, { from: "list" }>;
 
 /** The city's unvisited saved places that already have a pin; a date never looks one up. */
-function savedCandidates(claim: Claim): DateCandidate[] {
+function savedCandidates(claim: SavesClaim): DateCandidate[] {
   const been = new Set(claim.been.map(placeKey));
   const places = suggestSavedPlaces(
     claim.sources,
@@ -191,15 +193,12 @@ async function suggestStops(
   return { stops, searches: targets.length };
 }
 
-function listCandidates(claim: Claim): DateCandidate[] {
-  const been = new Set(claim.been.map(placeKey));
-  return claim.places
-    .filter((place) => !been.has(placeKey(place.name)))
-    .map(({ key: _key, addedAt, ...place }) => ({
-      ...place,
-      ownTags: true,
-      savedAt: addedAt,
-    }));
+function listCandidates(claim: ListClaim): DateCandidate[] {
+  return claim.places.map(({ addedAt, ...place }) => ({
+    ...place,
+    ownTags: true,
+    savedAt: addedAt,
+  }));
 }
 
 export const makeDatePlan = action({
@@ -220,7 +219,8 @@ export const makeDatePlan = action({
       },
     );
     const now = Date.now();
-    const candidates = [...savedCandidates(claim), ...listCandidates(claim)];
+    const candidates =
+      claim.from === "list" ? listCandidates(claim) : savedCandidates(claim);
     const { kind, scored } = chooseKind(args.kind, candidates, now);
     const fields = {
       kind,
