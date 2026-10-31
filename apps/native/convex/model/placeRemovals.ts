@@ -1,9 +1,9 @@
 import { v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
-import { nameWithin, type Placed } from "./placeIdentity";
+import type { Placed } from "./placeIdentity";
 import { placeKey, splitSavedPlace } from "./plan";
-import { distanceKm, SAME_PLACE_KM } from "./trip";
+import { distanceKm, otherVenue, SAME_PLACE_KM } from "./trip";
 
 export type Removal = Omit<Doc<"placeRemovals">, "_id" | "userId">;
 export const removalValidator = v.object({
@@ -14,9 +14,6 @@ export const removalValidator = v.object({
   appleId: v.optional(v.string()),
   _creationTime: v.number(),
 });
-// Closer than this under one name, a second Apple id is the venue's id changing, not a second branch.
-const REISSUED_ID_KM = 0.05;
-
 function venueKey(label: string): string {
   const { name } = splitSavedPlace(label);
   return placeKey(name) || name;
@@ -24,16 +21,10 @@ function venueKey(label: string): string {
 
 function removedPin(removal: Removal, pin: Placed): boolean {
   if (pin.appleId && pin.appleId === removal.appleId) return true;
-  const km = distanceKm(pin, removal);
-  const sameName = venueKey(pin.name) === venueKey(removal.name);
-  if (pin.appleId && removal.appleId) return sameName && km <= REISSUED_ID_KM;
+  if (otherVenue(pin, removal)) return false;
   return (
-    km <= SAME_PLACE_KM &&
-    (sameName ||
-      nameWithin(
-        splitSavedPlace(pin.name).name,
-        splitSavedPlace(removal.name).name,
-      ))
+    distanceKm(pin, removal) <= SAME_PLACE_KM &&
+    placeKey(pin.name) === placeKey(removal.name)
   );
 }
 

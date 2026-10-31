@@ -59,7 +59,10 @@ export function uniquePlacePins<
 }
 
 /** Apple tells two nearby branches of one name apart; trust it over distance. */
-function otherVenue(a: { appleId?: string }, b: { appleId?: string }): boolean {
+export function otherVenue(
+  a: { appleId?: string },
+  b: { appleId?: string },
+): boolean {
   return (
     a.appleId !== undefined &&
     b.appleId !== undefined &&

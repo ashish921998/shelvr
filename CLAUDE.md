@@ -339,9 +339,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   Planning reads these records inside Shelvr; they are not sent to an AI provider.
 - **`placeRemovals.ts`**: `removePlace` stores an owned venue decision; `undoRemovePlace`
   deletes that decision idempotently. `model/placeRemovals.ts` projects a user's decisions over
-  raw saves and membership intents on read. A pin matches by the city page's row identity: one
-  Apple id, or one name a few doors apart; a second Apple id counts only within 50 m under the
-  same name. A label without a pin matches by name and city. City, Map, search, planning and
+  raw saves and membership intents on read. A pin matches by the city page's row identity
+  (`uniquePlacePins`): one Apple id, or one name a few doors apart unless Apple ids differ.
+  A label without a pin matches by name and city. City, Map, search, planning and
   automatic suggestions use the projection; source saves, existing trips and deliberate manual
   additions remain. A save made after the removal shows the place again. Keep the
   `placeRemovals` table on rollback once rows exist.

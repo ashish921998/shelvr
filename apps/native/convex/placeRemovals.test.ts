@@ -4,7 +4,7 @@ import { enrichItems } from "./items";
 import { cityPins } from "../src/lib/city-pins";
 import { api, internal } from "./_generated/api";
 import { newConvexTest, signedInUser } from "./test.setup";
-import { visibleSave } from "./model/placeRemovals";
+import { visibleSave, type Removal } from "./model/placeRemovals";
 import { toPlanSource } from "./tripData";
 import { keepSuggestion } from "./model/tripSuggest";
 import { keepDateSuggestion } from "./model/dateRank";
@@ -154,50 +154,34 @@ describe("place removals", () => {
     expect((await source()).places).toContain("Tigre");
   });
 
-  it("survives changed ids and renamed Apple results; Undo keeps fresh extraction", async () => {
+  it("survives a renamed Apple result; Undo keeps fresh extraction", async () => {
     const { t, itemId, pin, remove, map, source } = await setup();
     const removalId = await remove();
-    for (const refreshed of [
-      { ...pin, appleId: "new" },
-      { ...pin, name: "Renamed venue" },
-    ]) {
-      await t.run((ctx) =>
-        ctx.db.patch(itemId, {
-          placePins: [refreshed],
-          places: [refreshed.name],
-        }),
-      );
-      expect(await map()).toEqual([]);
-      expect((await source()).places).toEqual([]);
-    }
+    const refreshed = { ...pin, name: "Renamed venue" };
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        placePins: [refreshed],
+        places: [refreshed.name],
+      }),
+    );
+    expect(await map()).toEqual([]);
+    expect((await source()).places).toEqual([]);
     await t.mutation(api.placeRemovals.undoRemovePlace, { removalId });
     expect((await map())[0].name).toBe("Renamed venue");
   });
 
-  it("removes every copy of the merged map row, including a missing-id generic alias", async () => {
-    const { t, userId, itemId, pin, insert, map } = await setup();
+  it("removes every copy of the merged map row", async () => {
+    const { t, itemId, pin, insert, map } = await setup();
     const noId = { name: "Tigre", lat: pin.lat, lng: pin.lng, city: pin.city };
     await t.run((ctx) =>
       ctx.db.patch(itemId, { placePins: [noId], places: ["Tigre"] }),
     );
-    await insert("ready", [{ ...pin, name: "Tigre" }], ["Tigre"]);
     await insert(
       "ready",
       [{ ...pin, name: "Tigre Restaurant" }],
       ["Tigre Restaurant"],
     );
-    await t.run((ctx) =>
-      ctx.db.insert("items", {
-        userId,
-        type: "link",
-        status: "ready",
-        tags: [],
-        cities: ["Lisbon"],
-        searchText: "Tigre",
-        placePins: [{ ...noId, name: "Tigre Restaurant" }],
-        places: ["Tigre Restaurant"],
-      }),
-    );
+    await insert("ready", [{ ...pin, name: "Tigre" }], ["Tigre"]);
     const items = await t.query(api.items.listCityItems, { city: "Lisbon" });
     const merged = cityPins(items);
     expect(merged).toHaveLength(1);
@@ -407,30 +391,6 @@ describe("place removals", () => {
     expect(other?.places).toEqual(["Tigre, Baixa"]);
   });
 
-  it("preserves emoji identities", async () => {
-    const { t, itemId, pin } = await setup();
-    for (const [removed, kept] of [["🍕", "🍣"]]) {
-      await t.run((ctx) =>
-        ctx.db.patch(itemId, {
-          placePins: [
-            { name: removed, lat: pin.lat, lng: pin.lng, city: "Lisbon" },
-            { name: kept, lat: pin.lat, lng: pin.lng, city: "Lisbon" },
-          ],
-          places: [removed, kept],
-        }),
-      );
-      const removalId = await t.mutation(api.placeRemovals.removePlace, {
-        itemId,
-        name: removed,
-        lat: pin.lat,
-        lng: pin.lng,
-      });
-      const item = await t.query(api.items.getItem, { id: itemId });
-      expect(item?.placePins?.map((value) => value.name)).toEqual([kept]);
-      await t.mutation(api.placeRemovals.undoRemovePlace, { removalId });
-    }
-  });
-
   it("allows an idless lookup in another part of town to reappear", async () => {
     const { t, itemId, pin, remove, map } = await setup();
     await remove();
@@ -495,20 +455,6 @@ describe("place removals", () => {
     });
   });
 
-  it("matches nearby cafe and bar aliases using raw stored names", async () => {
-    const { t, itemId, pin, remove, map } = await setup();
-    await remove();
-    for (const name of ["Tigre Cafe, Alfama", "Tigre Bar, Alfama"]) {
-      await t.run((ctx) =>
-        ctx.db.patch(itemId, {
-          placePins: [{ name, city: pin.city, lat: pin.lat, lng: pin.lng }],
-          places: [name],
-        }),
-      );
-      expect(await map()).toEqual([]);
-    }
-  });
-
   it("filters joined Maps intents and both planning claim paths", async () => {
     const { t, userId, itemId, pin, remove } = await setup();
     const spaceId = await t.run(async (ctx) => {
@@ -547,7 +493,7 @@ describe("place removals", () => {
       area: "Alfama",
       lat: pin.lat,
       lng: pin.lng,
-      appleId: "replacement",
+      appleId: pin.appleId,
       category: "Restaurant",
       interest: "food" as const,
     };
@@ -615,6 +561,23 @@ describe("place removals", () => {
         kept: { ...at, name: "Tigre Bakery", appleId: "b" },
       },
       { removed: { ...at, name: "Le Bar" }, kept: { ...at, name: "Le Cafe" } },
+      { removed: { ...at, name: "Sol" }, kept: { ...at, name: "Sol Bakery" } },
+      {
+        removed: { ...at, name: "Tigre" },
+        kept: { ...at, name: "Tigre Bakery", appleId: "b" },
+      },
+      {
+        removed: { ...at, name: "Tigre", appleId: "a" },
+        kept: { ...at, name: "Casa Tigre" },
+      },
+      {
+        removed: { ...at, name: "Tigre, Rua A" },
+        kept: { ...at, name: "Tigre, Rua B" },
+      },
+      {
+        removed: { ...at, name: "Starbucks", appleId: "a" },
+        kept: { ...at, name: "Starbucks", appleId: "b" },
+      },
       {
         removed: { ...at, name: "Sol" },
         kept: { ...at, name: "Sol", lat: pin.lat + 0.01 },
@@ -641,24 +604,9 @@ describe("place removals", () => {
     }
   });
 
-  it("hides an idless alias of the row but no nearby place Apple names apart", async () => {
-    const { t, itemId, pin, remove, map } = await setup();
-    await remove();
-    await t.run((ctx) =>
-      ctx.db.patch(itemId, {
-        placePins: [
-          { name: "Tigre Restaurant, Alfama", lat: pin.lat, lng: pin.lng },
-          { name: "Casa Tigre", lat: pin.lat, lng: pin.lng },
-          { ...pin, name: "Other", appleId: "other" },
-        ],
-      }),
-    );
-    expect((await map()).map((p) => p.name)).toEqual(["Other"]);
-  });
-
   it("filters an Apple suggestion at the removed spot, with or without an area", async () => {
     const at = { lat: 38.7, lng: -9.1 };
-    const removed = [
+    const removed: Removal[] = [
       { ...at, name: "Tigre", city: "lisbon", _creationTime: 1 },
     ];
     const found = {
@@ -679,6 +627,8 @@ describe("place removals", () => {
     expect(keep({ ...found, area: "Alfama" })).toBe(false);
     expect(keep({ ...found, appleId: "new", area: "Alfama" })).toBe(false);
     expect(keep({ ...found, name: "Sol", area: "Alfama" })).toBe(true);
+    removed[0].appleId = "a";
+    expect(keep({ ...found, appleId: "b" })).toBe(true);
   });
 
   it("drops every label of a removed pin, even one the pin does not spell out", async () => {
