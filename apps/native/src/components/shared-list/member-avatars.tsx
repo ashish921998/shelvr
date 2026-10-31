@@ -1,3 +1,4 @@
+import { AppSymbolIcon } from "@/components/symbol";
 import { Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -40,9 +41,17 @@ export function MemberAvatars({
               },
             ]}
           >
-            <Text style={[styles.letter, { color: fill.text }]}>
-              {(member.firstName ?? "").slice(0, 1).toLocaleUpperCase()}
-            </Text>
+            {member.firstName ? (
+              <Text style={[styles.letter, { color: fill.text }]}>
+                {member.firstName.slice(0, 1).toLocaleUpperCase()}
+              </Text>
+            ) : (
+              <AppSymbolIcon
+                name="person.fill"
+                size={size * 0.5}
+                tintColor={fill.text}
+              />
+            )}
           </View>
         );
       })}

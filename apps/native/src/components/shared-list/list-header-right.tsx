@@ -1,3 +1,4 @@
+import { hasLiquidGlass } from "@/components/glass";
 import { MemberAvatars } from "@/components/shared-list/member-avatars";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ActionMenu } from "@/components/ui/action-menu";
@@ -86,29 +87,33 @@ export function ListHeaderRight({ detail }: { detail: SharedListDetail }) {
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
-  right: { flexDirection: "row", alignItems: "center", gap: theme.gap(0.5) },
-  invite: {
-    height: 40,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(0.75),
-    paddingLeft: theme.gap(0.75),
-    paddingRight: theme.gap(1.5),
-    borderRadius: 20,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  menu: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 20,
-    backgroundColor: theme.colors.surface,
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  pressed: { opacity: theme.opacity.pressed },
-}));
+const styles = StyleSheet.create((theme) => {
+  const chrome = hasLiquidGlass
+    ? {}
+    : {
+        borderRadius: 20,
+        backgroundColor: theme.colors.surface,
+        borderWidth: 1,
+        borderColor: theme.colors.border,
+      };
+  return {
+    right: { flexDirection: "row", alignItems: "center", gap: theme.gap(0.5) },
+    invite: {
+      height: 40,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: theme.gap(0.75),
+      paddingLeft: theme.gap(0.75),
+      paddingRight: theme.gap(1.5),
+      ...chrome,
+    },
+    menu: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+      ...chrome,
+    },
+    pressed: { opacity: theme.opacity.pressed },
+  };
+});

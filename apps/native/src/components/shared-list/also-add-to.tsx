@@ -35,9 +35,13 @@ export function AlsoAddTo({
         const status = state[list._id] ?? "off";
         const on = status === "on" || status === "removing";
         const busy = status === "adding" || status === "removing";
-        const line = on
-          ? t("sharedLists.willSee", { name: partnerName(list.members), count })
-          : withLine(list.members);
+        const line =
+          on && list.members.length > 1
+            ? t("sharedLists.willSee", {
+                name: partnerName(list.members),
+                count,
+              })
+            : withLine(list.members);
         return (
           <Pressable
             key={list._id}

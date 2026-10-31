@@ -108,24 +108,33 @@ export function dateShareText(
   ].join("\n");
 }
 
-export function emptyMessage(result: DatePlanResult): {
+export function emptyMessage(
+  result: DatePlanResult,
+  onList: boolean,
+): {
   title: string;
   message: string;
 } {
+  const { city } = result;
   if (result.status === "no_pair") {
     return {
       title: t("datePlan.noPairTitle"),
-      message: t("datePlan.noPairBody", { city: result.city }),
+      message: onList
+        ? t("sharedLists.noPairBody", { city })
+        : t("datePlan.noPairBody", { city }),
     };
   }
+  const classic = result.kind === "classic";
+  const anchorKey = onList
+    ? classic
+      ? "sharedLists.noAnchorClassic"
+      : "sharedLists.noAnchorLowkey"
+    : classic
+      ? "datePlan.noAnchorClassic"
+      : "datePlan.noAnchorLowkey";
   return {
     title: t("datePlan.noAnchorTitle"),
-    message: t(
-      result.kind === "classic"
-        ? "datePlan.noAnchorClassic"
-        : "datePlan.noAnchorLowkey",
-      { city: result.city },
-    ),
+    message: t(anchorKey, { city }),
   };
 }
 

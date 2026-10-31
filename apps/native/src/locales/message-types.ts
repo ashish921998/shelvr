@@ -944,6 +944,10 @@ export type MessageParams = {
   "placeCorrection.retry": undefined;
   "placeCorrection.wait": undefined;
   "sharedLists.title": undefined;
+  "sharedLists.dateSurpriseHint": undefined;
+  "sharedLists.noAnchorClassic": { city: string };
+  "sharedLists.noAnchorLowkey": { city: string };
+  "sharedLists.noPairBody": { city: string };
   "sharedLists.hint": undefined;
   "sharedLists.start": undefined;
   "sharedLists.with": { names: string };

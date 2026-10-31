@@ -1,4 +1,5 @@
 import { SignInView } from "@/components/sign-in-view";
+import { AppSymbolIcon } from "@/components/symbol";
 import { Button } from "@/components/ui/button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ThemedText } from "@/components/ui/themed-text";
@@ -13,10 +14,11 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 export default function ListInviteScreen() {
   useAppLocale();
+  const { theme } = useUnistyles();
   const router = useRouter();
   const { token: raw } = useLocalSearchParams<{ token: string }>();
   const token = raw ?? "";
@@ -55,9 +57,17 @@ export default function ListInviteScreen() {
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.avatar}>
-          <ThemedText variant="headline" style={styles.avatarText}>
-            {(inviterName ?? "").slice(0, 1).toLocaleUpperCase()}
-          </ThemedText>
+          {inviterName ? (
+            <ThemedText variant="headline" style={styles.avatarText}>
+              {inviterName.slice(0, 1).toLocaleUpperCase()}
+            </ThemedText>
+          ) : (
+            <AppSymbolIcon
+              name="person.fill"
+              size={26}
+              tintColor={theme.colors.surface}
+            />
+          )}
         </View>
         <ThemedText variant="largeTitle">
           {inviterName === undefined

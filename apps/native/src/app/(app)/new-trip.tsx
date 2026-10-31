@@ -132,11 +132,15 @@ export default function NewTripScreen() {
         contentContainerStyle={styles.content}
       >
         <FormSection title={t("tripPlanner.whereTo")}>
-          <CityPicker
-            cities={choices}
-            value={form.city}
-            onChange={(city) => update({ city })}
-          />
+          {listId === undefined ? (
+            <CityPicker
+              cities={choices}
+              value={form.city}
+              onChange={(city) => update({ city })}
+            />
+          ) : (
+            <ThemedText variant="body">{form.city}</ThemedText>
+          )}
         </FormSection>
 
         <FormSection title={t("trip.howManyDays")}>

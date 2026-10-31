@@ -70,7 +70,10 @@ export default function DatePlanScreen() {
         </>
       );
     case "empty": {
-      const { title, message } = emptyMessage(state.result);
+      const { title, message } = emptyMessage(
+        state.result,
+        listId !== undefined,
+      );
       return (
         <View style={styles.screen}>
           {backTitle}
@@ -92,6 +95,7 @@ export default function DatePlanScreen() {
           >
             <DateKindPicker
               city={city}
+              onList={listId !== undefined}
               problem={
                 state.problem === "rate_limited"
                   ? t("datePlan.rateLimited")

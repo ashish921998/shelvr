@@ -7,6 +7,7 @@ import { ListFooter } from "@/components/shared-list/list-footer";
 import { ListHeaderRight } from "@/components/shared-list/list-header-right";
 import { Chip } from "@/components/trip-planner/chip";
 import { Button } from "@/components/ui/button";
+import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
@@ -33,6 +34,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
+import { useNavigationState } from "expo-router/react-navigation";
 import {
   Stack,
   useFocusEffect,
@@ -40,7 +42,14 @@ import {
   useRouter,
 } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, FlatList, Linking, ScrollView, View } from "react-native";
+import {
+  Alert,
+  FlatList,
+  Linking,
+  Platform,
+  ScrollView,
+  View,
+} from "react-native";
 import Animated, { useSharedValue } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -124,8 +133,39 @@ export default function SharedListScreen() {
     convexQuery(api.sharedLists.getSharedList, { listId }),
   );
   const focused = useSeenOnLeave(listId, detail.data != null);
+  const { theme } = useUnistyles();
+  const stranded = useNavigationState((state) => state.index === 0);
+  const goHome = () => backOrHome(router);
   const backTitle = (
-    <Stack.Screen options={{ headerBackTitle: t("common.back") }} />
+    <>
+      <Stack.Screen
+        options={{
+          headerBackTitle: t("common.back"),
+          ...(stranded && Platform.OS !== "ios"
+            ? {
+                headerLeft: () => (
+                  <HeaderIconButton
+                    icon="chevron.left"
+                    label={t("common.back")}
+                    onPress={goHome}
+                  />
+                ),
+              }
+            : {}),
+        }}
+      />
+      {stranded && Platform.OS === "ios" ? (
+        <Stack.Toolbar placement="left">
+          <Stack.Toolbar.Button
+            icon="chevron.left"
+            tintColor={theme.colors.foreground}
+            onPress={goHome}
+          >
+            {t("common.back")}
+          </Stack.Toolbar.Button>
+        </Stack.Toolbar>
+      ) : null}
+    </>
   );
   if (detail.isError) {
     return (
@@ -401,7 +441,7 @@ function SharedList({
           />
         )}
       />
-      {city !== null ? (
+      {city !== null && hasMap ? (
         <View
           style={styles.plans}
           onLayout={(event) => setPlansHeight(event.nativeEvent.layout.height)}
