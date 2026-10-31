@@ -665,7 +665,7 @@ needed at runtime by the features that use them:
   (`model/videoTranscript.ts`, about $0.002
   each, rate limited per user and globally). The same pair pays for a TikTok's caption when
   oEmbed returns none (`model/readers/tiktok.ts`, about $0.002 each, its own per-user limit,
-  the shared global one). Both are fetched only while the switch is `"true"` and the key is
+  the shared global one; the web reel finder has its own budget). Both are fetched only while the switch is `"true"` and the key is
   set; set the switch to anything else to stop them with no deploy
 - `RESEND_API_KEY`: Resend key for the waitlist contact projection. Without it, rows stay
   `unconfigured` and no attempt is spent

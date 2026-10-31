@@ -770,11 +770,14 @@ async function fromSpeech(
   aiAllowed: boolean,
 ): Promise<Spoken> {
   const spoken = await readSpeech(ctx, item, read, result, aiAllowed);
-  if (!item.places?.length) {
-    return spoken;
-  }
   const named = spoken.cities ?? result.cities;
-  const cities = normalizeCities(named).length > 0 ? named : item.cities;
+  const cities =
+    normalizeCities(named).length === 0 && item.cities?.length
+      ? item.cities
+      : named;
+  if (!item.places?.length) {
+    return { ...spoken, cities };
+  }
   return {
     ...spoken,
     cities,

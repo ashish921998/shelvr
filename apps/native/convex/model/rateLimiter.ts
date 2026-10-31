@@ -87,6 +87,12 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: MINUTE,
     capacity: 30,
   },
+  reelPlacesCaption: {
+    kind: "token bucket",
+    rate: 200,
+    period: DAY,
+    capacity: 50,
+  },
   oracleGlobal: {
     kind: "token bucket",
     rate: 120,

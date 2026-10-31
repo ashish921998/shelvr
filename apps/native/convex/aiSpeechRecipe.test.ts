@@ -515,6 +515,35 @@ describe("processItem places from a video's speech", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("keeps the city of a save with no places when a rerun names none", async () => {
+    const t = newConvexTest();
+    placesModel([], { caption: [], cities: ["Lisbon"], placesVideo: false });
+    const first = await process(t);
+    expect(first?.cities).toEqual(["Lisbon"]);
+    expect(first?.places ?? []).toEqual([]);
+
+    placesModel([], { caption: [], placesVideo: false });
+    await t.run((ctx) =>
+      ctx.db.patch(first!._id, {
+        status: "processing",
+        processingRunId: "run-2",
+      }),
+    );
+    await t.action(internal.ai.processItem, {
+      itemId: first!._id,
+      runId: "run-2",
+    });
+
+    const item = await t.run((ctx) => ctx.db.get(first!._id));
+    expect(item?.cities).toEqual(["Lisbon"]);
+  });
+
+  it("stores an empty city list on a first run that names none", async () => {
+    placesModel([], { caption: [], placesVideo: false });
+
+    expect((await process(newConvexTest()))?.cities).toEqual([]);
+  });
+
   describe("on a rerun of a save whose speech was read", () => {
     async function rerun(
       prepare: () => void,

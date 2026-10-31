@@ -41,7 +41,7 @@ export const find = internalAction({
       readPage(url, {
         captionOnly: true,
         claimPaidRead: async () =>
-          (await rateLimiter.limit(ctx, "videoTranscriptGlobal")).ok,
+          (await rateLimiter.limit(ctx, "reelPlacesCaption")).ok,
       }),
       new Promise<undefined>((resolve) => {
         budget = setTimeout(resolve, PAGE_READ_BUDGET_MS, undefined);
