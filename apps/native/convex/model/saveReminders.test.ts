@@ -77,6 +77,7 @@ describe("asking about a saved place", () => {
     for (const label of [
       "12, rue de la Paix, Paris",
       "123, rue de Rivoli, Paris",
+      "12 bis, rue de la Paix",
       "Restaurant",
       "the bar",
     ])

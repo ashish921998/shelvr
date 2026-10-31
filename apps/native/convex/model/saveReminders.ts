@@ -76,6 +76,7 @@ export function placeToVisit(
     if (
       !isGenericPlaceName(name) &&
       !isStreetAddress(name) &&
+      !isStreetAddress(label) &&
       !visited.has(placeKey(name)) &&
       !visited.has(placeKey(label))
     )
@@ -108,7 +109,6 @@ export function reminderCandidates(
   previousKind: ReminderKind | undefined,
   tripStops: ReadonlySet<string>,
   visited: ReadonlySet<string> = new Set(),
-  recentlyAsked: ReadonlySet<string> = new Set(),
 ): ReminderCandidate[] {
   const byKind: Record<ReminderKind, ReminderCandidate[]> = {
     visit: [],
@@ -119,11 +119,7 @@ export function reminderCandidates(
     const age = now - item._creationTime;
     const place = placeToVisit(item, visited);
     if (place !== undefined) {
-      if (
-        age >= VISIT_MIN_AGE_MS &&
-        !tripStops.has(item._id) &&
-        !recentlyAsked.has(placeKey(place))
-      )
+      if (age >= VISIT_MIN_AGE_MS && !tripStops.has(item._id))
         byKind.visit.push({ item, kind: "visit", subject: place });
       continue;
     }

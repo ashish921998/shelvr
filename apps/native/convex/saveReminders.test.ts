@@ -331,9 +331,41 @@ describe("choosing a save reminder", () => {
     expect(await reminders()).toHaveLength(2);
   });
 
+  it("remembers a place past the recent reminders", async () => {
+    const { t, userId, prepare, reminders, ids } = await setup({
+      saves: [[5, { ...reel, places: ["As Bifanas do Afonso"] }]],
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("saveReminders", {
+        userId,
+        itemId: await ctx.db.insert("items", {
+          userId,
+          status: "ready",
+          type: "link",
+          tags: [],
+          searchText: "",
+        }),
+        kind: "visit",
+        placeKey: placeKey("As Bifanas do Afonso"),
+        createdAt: NOW - 30 * DAY,
+        deliveryStatus: "complete",
+      });
+      for (let day = 0; day < 13; day++)
+        await ctx.db.insert("saveReminders", {
+          userId,
+          itemId: ids[0],
+          kind: "read",
+          createdAt: NOW - (29 - day) * DAY,
+          deliveryStatus: "failed",
+        });
+    });
+    await prepare();
+    expect(await reminders()).toHaveLength(14);
+  });
+
   it("does not ask about a place again from another save, until months later", async () => {
     const afonso = "As Bifanas do Afonso";
-    const { prepare, due, reminders, ids } = await setup({
+    const { t, prepare, due, reminders, ids } = await setup({
       saves: [
         [4, { ...reel, title: "Again", places: [afonso, "Zé dos Cornos"] }],
         [5, { ...reel, places: [afonso] }],
@@ -351,6 +383,9 @@ describe("choosing a save reminder", () => {
       ids[0],
       ids[2],
     ]);
+    await t.run((ctx) => ctx.db.delete(ids[0]));
+    await pass(NOW + 3 * DAY);
+    expect(await reminders()).toHaveLength(2);
     await pass(NOW + 100 * DAY);
     expect(await reminders()).toHaveLength(3);
     expect((await reminders())[2].itemId).toBe(ids[1]);
