@@ -58,6 +58,15 @@ function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
+function inboxKey(email: string): string {
+  const [local = "", domain = ""] = email.split("@");
+  const base = local.split("+")[0] ?? local;
+  const isGmail = domain === "gmail.com" || domain === "googlemail.com";
+  return isGmail
+    ? `${base.replaceAll(".", "")}@gmail.com`
+    : `${base}@${domain}`;
+}
+
 function isValidEmail(email: string): boolean {
   return emailPattern.test(email) && email.length <= 254;
 }
@@ -96,7 +105,7 @@ export const upsertSignup = internalMutation({
       throws: true,
     });
     await rateLimiter.limit(ctx, "waitlistJoin", {
-      key: args.email,
+      key: inboxKey(args.email),
       throws: true,
     });
 

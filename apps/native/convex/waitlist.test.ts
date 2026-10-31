@@ -323,6 +323,26 @@ describe("POST /waitlist/join", () => {
     }
   });
 
+  it("counts every alias of one inbox against the same limit", async () => {
+    const t = setup();
+    const aliases = [
+      "victim@gmail.com",
+      "victim+1@gmail.com",
+      "v.ictim@gmail.com",
+      "victim+2@googlemail.com",
+    ];
+    const statuses: number[] = [];
+    for (const [index, email] of aliases.entries()) {
+      const response = await join(
+        t,
+        { email, source: "hero" },
+        { ip: `203.0.113.${index + 1}` },
+      );
+      statuses.push(response.status);
+    }
+    expect(statuses).toEqual([200, 200, 429, 429]);
+  });
+
   it("rate-limits one client IP that rotates email addresses", async () => {
     const t = setup();
     const ip = "203.0.113.7";
