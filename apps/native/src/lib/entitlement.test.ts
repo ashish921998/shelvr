@@ -30,6 +30,7 @@ const mock = vi.hoisted(() => ({
   logOut: vi.fn(async () => {}),
   isAnonymous: vi.fn(async () => true),
   syncPurchasesForResult: vi.fn(async () => ({})),
+  restorePurchases: vi.fn(),
   syncPurchase: vi.fn(async () => true),
   appStateListeners: [] as ((state: string) => void)[],
 }));
@@ -64,6 +65,7 @@ seedRequire("react-native-purchases", {
     logOut: mock.logOut,
     isAnonymous: mock.isAnonymous,
     syncPurchasesForResult: mock.syncPurchasesForResult,
+    restorePurchases: mock.restorePurchases,
     overridePreferredLocale: async () => {},
     getOfferings: mock.getOfferings,
     checkTrialOrIntroductoryPriceEligibility: mock.checkEligibility,
@@ -623,6 +625,50 @@ describe("paywall activation funnel", () => {
         delay_ms: expect.any(Number),
       }),
     );
+  });
+});
+
+describe("a purchase made while signed in", () => {
+  it("reads it into the account without waiting for the webhook", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywallIfNeeded.mockResolvedValue("PURCHASED");
+
+    await openPaywall(router, "plan_gate");
+
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
+  });
+
+  it("reads a restore into the account", async () => {
+    const { restorePurchases } = await loadReady();
+    mock.restorePurchases.mockResolvedValue({
+      entitlements: { active: { Pro: {} } },
+    });
+
+    await expect(restorePurchases()).resolves.toBe("restored");
+
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
+  });
+
+  it("reads again when the first read finds nothing yet", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywallIfNeeded.mockResolvedValue("PURCHASED");
+    mock.syncPurchase.mockResolvedValueOnce(false);
+
+    await openPaywall(router, "plan_gate");
+
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledTimes(2), {
+      timeout: 4000,
+    });
+  });
+
+  it("does not read when the paywall closes without a purchase", async () => {
+    const { openPaywall } = await loadReady();
+    mock.presentPaywallIfNeeded.mockResolvedValue("CANCELLED");
+
+    await openPaywall(router, "plan_gate");
+    await act(() => new Promise<void>((r) => setTimeout(r, 0)));
+
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
   });
 });
 
