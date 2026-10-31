@@ -117,6 +117,7 @@ export default defineSchema({
     latitude: v.optional(v.number()),
     longitude: v.optional(v.number()),
     placePins: v.optional(placePinsValidator),
+    placesEdited: v.optional(v.boolean()),
     isSticker: v.optional(v.boolean()),
     tags: v.array(v.string()),
     content: v.optional(v.string()),

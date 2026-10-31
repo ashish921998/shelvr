@@ -56,10 +56,10 @@ export function isRemovedSuggestion(
   return removals.some((row) => removedPin(row, pin));
 }
 
-export function removalsSince(
-  removals: readonly Removal[],
+export function removalsSince<Row extends Removal>(
+  removals: readonly Row[],
   savedAt: number,
-): Removal[] {
+): Row[] {
   return removals.filter((row) => savedAt <= row._creationTime);
 }
 

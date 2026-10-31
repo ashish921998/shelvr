@@ -345,6 +345,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   automatic suggestions use the projection; source saves, existing trips and deliberate manual
   additions remain. A save made after the removal shows the place again. Keep the
   `placeRemovals` table on rollback once rows exist.
+- **`placeCorrections.ts`**, **`placeCorrectionSearch.ts`**: owner-only place editing and Apple Maps lookup. `items.placesEdited` preserves the chosen places across extraction retries and pin refreshes. A kept place with no pin still gets one from a lookup, which never changes a pin already on the save. Corrections update city grouping and search; existing trip stops remain unchanged. The editor leaves out removed places (`placeRemovals.ts`), and adding one back clears its removal.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
   link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and
   `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the
@@ -535,6 +536,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   `src/lib/trip-edit.ts`) lays stops out in fixed-height rows: hold one to drag it within a
   day or onto another, minus sends it to Unplanned, plus puts an unplanned one on a day, the
   name is editable, and an Undo bar takes back the last move or remove
+- `edit-save-places` edits the places on a ready save, with remove/replace/add and explicit Save.
 - `add-trip-stop` is Add a place, a modal with `tripId` and `day` params: Apple Maps search
   near the trip plus the city's saved places not on it yet
   The old `trip/[id]` screen is gone and its links open Home; `trips.ts` and `tripData.ts`

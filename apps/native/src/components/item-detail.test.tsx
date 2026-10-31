@@ -48,9 +48,14 @@ vi.mock("expo-image", () => ({
   Image: vi.fn(() => <img data-testid="hero" alt="" />),
 }));
 vi.mock("expo-router", () => ({
-  Link: {
-    AppleZoomTarget: vi.fn(({ children }: { children: ReactNode }) => children),
-  },
+  Link: Object.assign(
+    vi.fn(({ children }: { children: ReactNode }) => children),
+    {
+      AppleZoomTarget: vi.fn(
+        ({ children }: { children: ReactNode }) => children,
+      ),
+    },
+  ),
 }));
 vi.mock("@convex/_generated/api", () => ({
   api: {
@@ -306,4 +311,24 @@ it("shows a note's own text, read-only", () => {
     note: "Lamp, shelves, linen.",
   } as DetailItem);
   expect(screen.getByText("Lamp, shelves, linen.")).toBeTruthy();
+});
+
+it("offers place correction on a ready save", () => {
+  render(
+    <ItemDetail
+      item={product}
+      isZoomTarget={false}
+      pageHeight={844}
+      reserveFooter={false}
+    />,
+  );
+  expect(
+    screen.getByRole("button", { name: "placeCorrection.title" }),
+  ).toBeTruthy();
+  expect(Link).toHaveBeenCalledWith(
+    expect.objectContaining({
+      href: { pathname: "/edit-save-places", params: { itemId: "item-1" } },
+    }),
+    undefined,
+  );
 });

@@ -934,6 +934,15 @@ export type MessageParams = {
   "placeCategory.skating": undefined;
   "placeCategory.store": undefined;
   "placeCategory.hotel": undefined;
+  "placeCorrection.title": undefined;
+  "placeCorrection.hint": undefined;
+  "placeCorrection.replace": undefined;
+  "placeCorrection.remove": undefined;
+  "placeCorrection.city": undefined;
+  "placeCorrection.search": undefined;
+  "placeCorrection.save": undefined;
+  "placeCorrection.retry": undefined;
+  "placeCorrection.wait": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

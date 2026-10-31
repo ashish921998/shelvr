@@ -439,6 +439,7 @@ function ItemPageBody({
           </Text>
         ) : null}
         <SaveStatusNotice item={detail} />
+        <EditPlacesLink item={item} />
       </View>
     );
   }
@@ -446,6 +447,7 @@ function ItemPageBody({
   return (
     <View style={[styles.body, hasHero ? { paddingTop: theme.gap(5) } : null]}>
       <SaveStatusNotice item={item} centered />
+      <EditPlacesLink item={item} />
 
       {item.url && plainLink(item, social) ? (
         <View style={styles.siteActions}>
@@ -508,10 +510,25 @@ function ItemPageBody({
   );
 }
 
+function EditPlacesLink({ item }: { item: DetailItem }) {
+  if (item.status !== "ready") return null;
+  return (
+    <Link
+      href={{ pathname: "/edit-save-places", params: { itemId: item._id } }}
+      asChild
+    >
+      <Pressable accessibilityRole="button" style={{ paddingVertical: 12 }}>
+        <Text style={styles.description}>{t("placeCorrection.title")}</Text>
+      </Pressable>
+    </Link>
+  );
+}
+
 function ItemSheetBody({ item, detail, paragraphs, social }: DetailBodyProps) {
   useAppLocale();
   return (
     <View style={styles.body}>
+      <EditPlacesLink item={item} />
       {social && item.url ? <MoreMedia item={item} site={social.site} /> : null}
 
       {item.description ? (

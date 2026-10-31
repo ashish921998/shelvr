@@ -113,6 +113,8 @@ import type * as notifications from "../notifications.js";
 import type * as oracle from "../oracle.js";
 import type * as oracleLimits from "../oracleLimits.js";
 import type * as paymentTelemetry from "../paymentTelemetry.js";
+import type * as placeCorrectionSearch from "../placeCorrectionSearch.js";
+import type * as placeCorrections from "../placeCorrections.js";
 import type * as placePins from "../placePins.js";
 import type * as placeRemovals from "../placeRemovals.js";
 import type * as placeVisits from "../placeVisits.js";
@@ -240,6 +242,8 @@ declare const fullApi: ApiFromModules<{
   oracle: typeof oracle;
   oracleLimits: typeof oracleLimits;
   paymentTelemetry: typeof paymentTelemetry;
+  placeCorrectionSearch: typeof placeCorrectionSearch;
+  placeCorrections: typeof placeCorrections;
   placePins: typeof placePins;
   placeRemovals: typeof placeRemovals;
   placeVisits: typeof placeVisits;
