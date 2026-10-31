@@ -72,6 +72,8 @@ test("keeps both consecutive removals recoverable with queued Undo", async ({
   const other = screen.getByRole("button", "Houndstooth Coffee");
   await coffee.tap();
   await screen.getByRole("button", "Remove Jo's Coffee").tap();
+  await expect(coffee).toBeHidden();
+  await expect(other).toBeVisible();
   await other.tap();
   await screen.getByRole("button", "Remove Houndstooth Coffee").tap();
   await expect(coffee).toBeHidden();
