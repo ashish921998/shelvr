@@ -4,6 +4,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { liveOwner } from "./auth";
 import { namesOneVenue } from "./dateRank";
 import { removalValidator } from "./placeRemovals";
+import { MAX_LIST_NAME_CHARS } from "./sharedListLimits";
 import {
   cityKey,
   countCities,
@@ -18,8 +19,6 @@ import {
   type TripPlace,
 } from "./tripPlan";
 
-const MAX_LIST_NAME_CHARS = 60;
-export const MAX_LIST_CITIES = 5;
 export const MAX_LIST_PLACES = 200;
 export const MAX_LIST_MEMBERS = 8;
 export const MAX_LISTS_PER_USER = 20;

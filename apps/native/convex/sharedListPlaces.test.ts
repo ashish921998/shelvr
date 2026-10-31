@@ -217,6 +217,24 @@ describe("addSavePlaces", () => {
 });
 
 describe("addSharedListPlace", () => {
+  it("is refused once neither the owner nor the caller has Pro", async () => {
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    await base.run(async (ctx) => {
+      const sub = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", owner.userId))
+        .unique();
+      if (sub) await ctx.db.delete(sub._id);
+    });
+    await expect(
+      bo.t.mutation(api.sharedLists.addSharedListPlace, {
+        listId,
+        place: { name: "Ramen House", lat: 38.7, lng: -9.1, city: "Lisbon" },
+      }),
+    ).rejects.toThrow(/Pro required/);
+  });
+
   it("stores a tidied search result once, for any member", async () => {
     const { base, token, listId } = await listWithOwner();
     const bo = await joiner(base, token);
@@ -457,10 +475,10 @@ describe("searchListPlaces", () => {
     vi.stubGlobal("fetch", fetchMock);
     const base = newConvexTest();
     const owner = await signedInUser(base, { pro: true });
-    const listId = await owner.t.mutation(api.sharedLists.createSharedList, {
-      name: "Ours",
-      cities: ["Lisbon"],
-    });
+    const { listId } = await owner.t.mutation(
+      api.sharedLists.createSharedList,
+      { name: "Ours", cities: ["Lisbon"] },
+    );
     const result = await owner.t.action(api.tripPlanner.searchListPlaces, {
       listId,
       city: "Lisbon",
@@ -519,6 +537,17 @@ describe("searchListPlaces", () => {
         query: "ramen",
       }),
     ).rejects.toThrow(/City required/);
+  });
+
+  it("only searches the list's own cities", async () => {
+    const { owner, listId } = await listWithOwner();
+    await expect(
+      owner.t.action(api.tripPlanner.searchListPlaces, {
+        listId,
+        city: "Tokyo",
+        query: "ramen",
+      }),
+    ).rejects.toThrow(/City not on this list/);
   });
 
   it("is refused once neither the owner nor the caller has Pro", async () => {

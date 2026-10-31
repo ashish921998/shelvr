@@ -86,7 +86,7 @@ describe("makeDatePlan from a shared list", () => {
     expect(stopNames(result)).toEqual(
       expect.arrayContaining(["Time Out Market", "Red Frog"]),
     );
-    expect(result.stops.every((stop) => stop.source === "save")).toBe(true);
+    expect(result.stops.every((stop) => stop.source === "list")).toBe(true);
     expect(result.stops.every((stop) => stop.itemId === undefined)).toBe(true);
     const owners = await owner.t.action(api.datePlans.makeDatePlan, {
       city: "Lisbon",

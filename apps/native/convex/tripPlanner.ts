@@ -377,6 +377,12 @@ export const createTripPlan = action({
       days: claim.days,
       pace: args.pace,
     });
+    const stored = (stops: PlannedStop[]): PlannedStop[] =>
+      claim.from === "list"
+        ? stops.map((stop) =>
+            stop.source === "save" ? { ...stop, source: "list" } : stop,
+          )
+        : stops;
     const tripId: Id<"tripPlans"> = await ctx.runMutation(
       internal.tripPlannerData.saveTripPlanInternal,
       {
@@ -389,8 +395,8 @@ export const createTripPlan = action({
           ? { startDate: claim.startDate }
           : {}),
         ...(stay !== undefined ? { stay } : {}),
-        days: layout.days,
-        unplanned: layout.unplanned,
+        days: layout.days.map(stored),
+        unplanned: stored(layout.unplanned),
       },
     );
     logEvent("info", "trip_plan_created", fields);

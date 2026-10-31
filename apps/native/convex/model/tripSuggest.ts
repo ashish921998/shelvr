@@ -437,7 +437,7 @@ export function balanceSuggestions(
 }
 
 export type PlannedStop = LatLng & {
-  source: "save" | "suggested";
+  source: "save" | "suggested" | "list";
   itemId?: Id<"items">;
   name: string;
   area?: string;

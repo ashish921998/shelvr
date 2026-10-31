@@ -228,11 +228,7 @@ export const claimTripPlanInternal = internalMutation({
 const { _id: _stopId, ...stopFields } = tripPlanStopValidator.fields;
 const stopInputValidator = v.object(stopFields);
 
-function savedStops(
-  plan: { listId?: Id<"sharedLists"> },
-  planned: { source: string }[],
-): number {
-  if (plan.listId !== undefined) return 0;
+function savedStops(planned: { source: string }[]): number {
   return planned.filter((stop) => stop.source === "save").length;
 }
 type StopInput = Omit<TripPlanStop, "_id">;
@@ -276,7 +272,7 @@ export const saveTripPlanInternal = internalMutation({
       ...trip,
       userId,
       stopCount: planned.length,
-      savedCount: savedStops(trip, planned),
+      savedCount: savedStops(planned),
     });
     for (const { day, stops } of placed) {
       for (const [order, stop] of stops.entries()) {
@@ -501,7 +497,7 @@ async function recount(ctx: MutationCtx, plan: Doc<"tripPlans">) {
   );
   await ctx.db.patch(plan._id, {
     stopCount: planned.length,
-    savedCount: savedStops(plan, planned),
+    savedCount: savedStops(planned),
   });
 }
 

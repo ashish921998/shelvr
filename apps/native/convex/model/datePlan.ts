@@ -32,7 +32,7 @@ export const MAX_WALK_KM = 1.5;
 
 export const dateStopValidator = v.object({
   slot: dateSlotValidator,
-  source: v.union(v.literal("save"), v.literal("suggested")),
+  source: v.union(v.literal("save"), v.literal("suggested"), v.literal("list")),
   itemId: v.optional(v.id("items")),
   name: v.string(),
   area: v.optional(v.string()),
@@ -85,7 +85,7 @@ export function sameVenue(
 export function pairs(a: DateStop, b: DateStop): boolean {
   return (
     a.slot !== b.slot &&
-    (a.source === "save" || b.source === "save") &&
+    (a.source !== "suggested" || b.source !== "suggested") &&
     distanceKm(a, b) <= MAX_WALK_KM &&
     !sameVenue(a, b)
   );
