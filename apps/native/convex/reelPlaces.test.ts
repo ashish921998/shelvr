@@ -122,7 +122,27 @@ describe("reelPlaces.find", () => {
     generateObject.mockResolvedValue({ object: { places: [] } });
     const t = newConvexTest();
     await t.action(internal.reelPlaces.find, { url: REEL });
-    expect(pageRead).toHaveBeenCalledWith(REEL, { captionOnly: true });
+    expect(pageRead).toHaveBeenCalledWith(
+      REEL,
+      expect.objectContaining({ captionOnly: true }),
+    );
+  });
+
+  it("lets the read pay for a caption from the shared budget", async () => {
+    let claimed: boolean | undefined;
+    pageRead.mockImplementation(
+      async (
+        _url: string,
+        options: { claimPaidRead: () => Promise<boolean> },
+      ) => {
+        claimed = await options.claimPaidRead();
+        return ok("Time Out Market");
+      },
+    );
+    generateObject.mockResolvedValue({ object: { places: [] } });
+    const t = newConvexTest();
+    await t.action(internal.reelPlaces.find, { url: REEL });
+    expect(claimed).toBe(true);
   });
 
   it("lists the places the caption names and no invented ones", async () => {

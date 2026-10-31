@@ -2,7 +2,11 @@
 /// <reference types="vite/client" />
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { internal } from "@convex/_generated/api";
-import { newConvexTest, insertConsentingUser } from "./test.setup";
+import {
+  newConvexTest,
+  insertConsentingUser,
+  setTestConsent,
+} from "./test.setup";
 
 const safeFetch = vi.hoisted(() => vi.fn());
 const generateObject = vi.hoisted(() => vi.fn());
@@ -65,11 +69,12 @@ function model(cookingVideo: boolean, spoken: typeof SPOKEN | null = SPOKEN) {
 }
 
 function transcript(text: string) {
-  fetchMock.mockResolvedValue(
-    new Response(JSON.stringify({ success: true, transcript: text }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    }),
+  fetchMock.mockImplementation(
+    async () =>
+      new Response(JSON.stringify({ success: true, transcript: text }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
   );
 }
 
@@ -379,6 +384,70 @@ describe("processItem places from a video's speech", () => {
       placesHeard: true,
     });
   });
+  describe("when oEmbed gives a TikTok no caption", () => {
+    const LISBON = "5 restaurants in Lisbon: Antiga, Santelmo";
+
+    function serveEmptyOEmbed() {
+      safeFetch.mockResolvedValue({
+        ok: true,
+        finalUrl: TIKTOK,
+        status: 200,
+        contentType: "application/json",
+        bytes: new TextEncoder().encode("{}"),
+      });
+    }
+
+    function serveTregPost() {
+      fetchMock.mockImplementation(
+        async () =>
+          new Response(
+            JSON.stringify({ success: true, aweme_detail: { desc: LISBON } }),
+            { status: 200 },
+          ),
+      );
+    }
+
+    function classifyPrompt(): string | undefined {
+      return (
+        generateObject.mock.calls[0]?.[0] as { prompt?: string } | undefined
+      )?.prompt;
+    }
+
+    it("classifies the caption Treg reads", async () => {
+      serveEmptyOEmbed();
+      serveTregPost();
+      placesModel([], {
+        caption: ["Antiga", "Santelmo"],
+        cities: ["Lisbon"],
+        placesVideo: false,
+      });
+      const item = await process(newConvexTest());
+
+      expect(classifyPrompt()).toContain(LISBON);
+      expect(item).toMatchObject({
+        status: "ready",
+        places: ["Antiga", "Santelmo"],
+        cities: ["Lisbon"],
+      });
+      expect(item?.enrichment).toBeUndefined();
+    });
+
+    it("sends nothing to Treg for an account that declined AI", async () => {
+      serveEmptyOEmbed();
+      serveTregPost();
+      placesModel([], { placesVideo: false });
+      const t = newConvexTest();
+      const itemId = await tiktok(t);
+      await t.run(async (ctx) => {
+        const item = await ctx.db.get(itemId);
+        await setTestConsent(ctx, item!.userId, "declined");
+      });
+      await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+  });
+
   it("adds the places a travel video says out loud to the caption's", async () => {
     placesModel(["Santelmo", "antiga", "Intenso"], { caption: ["Antiga"] });
     transcript("First up, Antiga. Next up is Santelmo. Then we have Intenso.");
@@ -447,9 +516,15 @@ describe("processItem places from a video's speech", () => {
   });
 
   describe("on a rerun of a save whose speech was read", () => {
-    async function rerun(prepare: () => void) {
+    async function rerun(
+      prepare: () => void,
+      firstRun: Parameters<typeof placesModel>[1] = {},
+    ) {
       const t = newConvexTest();
-      placesModel(["Santelmo", "Intenso"], { caption: ["Antiga"] });
+      placesModel(["Santelmo", "Intenso"], {
+        caption: ["Antiga"],
+        ...firstRun,
+      });
       transcript("Antiga, then Santelmo, then Intenso.");
       const first = await process(t);
       expect(first?.places).toEqual(["Antiga", "Santelmo", "Intenso"]);
@@ -487,6 +562,23 @@ describe("processItem places from a video's speech", () => {
       });
 
       expect(item?.places).toEqual(["Antiga", "Santelmo", "Intenso"]);
+    });
+
+    it("keeps the city it heard when this run names none", async () => {
+      const item = await rerun(() => placesModel([], { caption: [] }), {
+        spokenCities: ["Lisbon"],
+      });
+
+      expect(item?.cities).toEqual(["Lisbon"]);
+    });
+
+    it("takes the city this run names over the stored one", async () => {
+      const item = await rerun(
+        () => placesModel([], { caption: ["Antiga"], cities: ["Porto"] }),
+        { spokenCities: ["Lisbon"] },
+      );
+
+      expect(item?.cities).toEqual(["Porto"]);
     });
 
     it("reads the speech again when the first read failed", async () => {

@@ -534,7 +534,13 @@ async function analyzeLinkItem(
   if (!item.url) {
     throw new Error("Link item has no url");
   }
-  const read = fixtureRead(item.url) ?? (await readPage(item.url));
+  const read =
+    fixtureRead(item.url) ??
+    (await readPage(item.url, {
+      claimPaidRead: async () =>
+        (await stillAllowed(ctx, aiAllowed, item)) &&
+        (await claimVideoRead(ctx, "tikTokCaption", item.userId)),
+    }));
   if (read.status === "gone") {
     logEvent("error", "process_item_gone", {
       item_id: args.itemId,
@@ -712,13 +718,12 @@ function speechWants(
   };
 }
 
-async function claimTranscript(
+async function claimVideoRead(
   ctx: ActionCtx,
+  limit: "videoTranscript" | "tikTokCaption",
   userId: Doc<"items">["userId"],
 ): Promise<boolean> {
-  const perUser = await rateLimiter.limit(ctx, "videoTranscript", {
-    key: userId,
-  });
+  const perUser = await rateLimiter.limit(ctx, limit, { key: userId });
   return (
     perUser.ok && (await rateLimiter.limit(ctx, "videoTranscriptGlobal")).ok
   );
@@ -768,8 +773,11 @@ async function fromSpeech(
   if (!item.places?.length) {
     return spoken;
   }
+  const named = spoken.cities ?? result.cities;
+  const cities = normalizeCities(named).length > 0 ? named : item.cities;
   return {
     ...spoken,
+    cities,
     places: normalizePlaces([
       ...(spoken.places ?? result.places ?? []),
       ...item.places,
@@ -781,7 +789,7 @@ async function fromSpeech(
         ...(item.placeLocations ?? []),
       ],
       [...(spoken.places ?? result.places ?? []), ...item.places],
-      result.cities,
+      cities,
     ),
   };
 }
@@ -857,7 +865,7 @@ async function readTranscript(
   if (!(await stillAllowed(ctx, aiAllowed, item))) {
     return undefined;
   }
-  if (!(await claimTranscript(ctx, item.userId))) {
+  if (!(await claimVideoRead(ctx, "videoTranscript", item.userId))) {
     video.log("rate_limited");
     return undefined;
   }
