@@ -1032,5 +1032,14 @@
   "placeCategory.rockClimbing": "Escalada",
   "placeCategory.skating": "Patinação",
   "placeCategory.store": "Loja",
-  "placeCategory.hotel": "Hotel"
+  "placeCategory.hotel": "Hotel",
+  "placeCorrection.title": "Editar lugares",
+  "placeCorrection.hint": "Corrija um resultado ou adicione um lugar que falta. As viagens existentes não mudam.",
+  "placeCorrection.replace": "Substituir lugar",
+  "placeCorrection.remove": "Remover",
+  "placeCorrection.city": "Cidade",
+  "placeCorrection.search": "Buscar lugares",
+  "placeCorrection.save": "Salvar lugares",
+  "placeCorrection.retry": "Reabra este item para carregar os lugares atuais e tente novamente.",
+  "placeCorrection.wait": "Aguarde o processamento deste item terminar."
 }

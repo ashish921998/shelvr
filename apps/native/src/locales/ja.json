@@ -982,5 +982,14 @@
   "placeCategory.rockClimbing": "クライミング",
   "placeCategory.skating": "スケート",
   "placeCategory.store": "ショップ",
-  "placeCategory.hotel": "ホテル"
+  "placeCategory.hotel": "ホテル",
+  "placeCorrection.title": "場所を編集",
+  "placeCorrection.hint": "誤った場所を修正したり、見つからなかった場所を追加できます。既存の旅行は変更されません。",
+  "placeCorrection.replace": "場所を変更",
+  "placeCorrection.remove": "削除",
+  "placeCorrection.city": "都市",
+  "placeCorrection.search": "場所を検索",
+  "placeCorrection.save": "場所を保存",
+  "placeCorrection.retry": "この保存を開き直して最新の場所を読み込み、もう一度お試しください。",
+  "placeCorrection.wait": "この保存の処理が完了するまでお待ちください。"
 }

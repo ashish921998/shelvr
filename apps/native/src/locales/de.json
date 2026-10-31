@@ -1007,5 +1007,14 @@
   "placeCategory.rockClimbing": "Klettern",
   "placeCategory.skating": "Eislaufen",
   "placeCategory.store": "Geschäft",
-  "placeCategory.hotel": "Hotel"
+  "placeCategory.hotel": "Hotel",
+  "placeCorrection.title": "Orte bearbeiten",
+  "placeCorrection.hint": "Korrigiere einen Treffer oder ergänze einen fehlenden Ort. Bestehende Reisen bleiben unverändert.",
+  "placeCorrection.replace": "Ort ersetzen",
+  "placeCorrection.remove": "Entfernen",
+  "placeCorrection.city": "Stadt",
+  "placeCorrection.search": "Orte suchen",
+  "placeCorrection.save": "Orte speichern",
+  "placeCorrection.retry": "Öffne diesen Eintrag erneut, um die aktuellen Orte zu laden, und versuche es noch einmal.",
+  "placeCorrection.wait": "Warte, bis dieser Eintrag verarbeitet wurde."
 }

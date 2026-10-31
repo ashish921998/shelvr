@@ -184,6 +184,14 @@ export function completionPatch(
 ): ItemPatch {
   const { reading } = run;
   const words = settledWords(item, run, aiAllowed);
+  if (item.placesEdited) {
+    words.cities = item.cities ?? [];
+    words.places = item.places ?? [];
+    words.placeLocations = item.placeLocations;
+    words.intents = words.intents?.filter(
+      (intent) => intent.kind !== "open_maps",
+    );
+  }
   const title = settledTitle(item, run.keepTitle, words);
   return {
     title,
@@ -229,7 +237,7 @@ function replaceCluesAndDropTheirPins(
   item: Doc<"items">,
   words: Words,
 ): ItemPatch {
-  if (words.placeLocations === undefined) return {};
+  if (item.placesEdited || words.placeLocations === undefined) return {};
   const cities = words.cities ?? item.cities;
   const key = (name: string) => savedPlaceKey(name, cities);
   const changed = new Set(
