@@ -73,7 +73,6 @@ export function useInviteJoinCoordinator() {
     });
     if (step.kind !== "join") return;
     inFlight.current = step.token;
-    clearPending();
     join({ token: step.token })
       .then((listId) => {
         const outcome = inviteJoinOutcome(
@@ -88,6 +87,7 @@ export function useInviteJoinCoordinator() {
         clearPendingInvite();
         if (outcome.completeOnboarding) {
           holdIncomingShare();
+          clearPending();
           completeOnboarding();
         }
         router.replace(outcome.href as never);

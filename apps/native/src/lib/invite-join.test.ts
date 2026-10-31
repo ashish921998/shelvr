@@ -1,19 +1,97 @@
-import { describe, expect, it, vi } from "vitest";
+// @vitest-environment jsdom
+import { act, renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
-import { inviteJoinOutcome, inviteJoinStep } from "./invite-join";
+import {
+  inviteJoinOutcome,
+  inviteJoinStep,
+  useInviteJoinCoordinator,
+} from "./invite-join";
 
-vi.mock("@/lib/analytics", () => ({ analytics: {} }));
+const mocks = vi.hoisted(() => ({
+  onboarded: true,
+  join: vi.fn(),
+  alert: vi.fn(),
+  capture: vi.fn(),
+  captureError: vi.fn(),
+  completeOnboarding: vi.fn(),
+  holdIncomingShare: vi.fn(),
+  clearPending: vi.fn(),
+  clearPendingInvite: vi.fn(),
+  router: { replace: vi.fn() },
+}));
+
+vi.mock("@/lib/analytics", () => ({
+  analytics: { capture: mocks.capture, captureError: mocks.captureError },
+}));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
-vi.mock("react-native", () => ({ Alert: {} }));
-vi.mock("@/lib/onboarding", () => ({ useOnboarding: () => ({}) }));
-vi.mock("@/lib/onboarding-exit", () => ({ holdIncomingShare: () => {} }));
-vi.mock("@/lib/pending-onboarding", () => ({ clearPending: () => {} }));
-vi.mock("@/lib/pending-invite", () => ({}));
-vi.mock("@convex/_generated/api", () => ({ api: { sharedLists: {} } }));
-vi.mock("convex/react", () => ({}));
-vi.mock("expo-router", () => ({}));
+vi.mock("react-native", () => ({ Alert: { alert: mocks.alert } }));
+vi.mock("@/lib/onboarding", () => ({
+  useOnboarding: () => ({
+    onboarded: mocks.onboarded,
+    completeOnboarding: mocks.completeOnboarding,
+  }),
+}));
+vi.mock("@/lib/onboarding-exit", () => ({
+  holdIncomingShare: mocks.holdIncomingShare,
+}));
+vi.mock("@/lib/pending-onboarding", () => ({
+  clearPending: mocks.clearPending,
+}));
+vi.mock("@/lib/pending-invite", () => ({
+  clearPendingInvite: mocks.clearPendingInvite,
+  getPendingInvite: () => "abc",
+  subscribePendingInvite: () => () => {},
+}));
+vi.mock("@convex/_generated/api", () => ({
+  api: { sharedLists: { joinSharedList: "joinSharedList" } },
+}));
+vi.mock("convex/react", () => ({
+  useConvexAuth: () => ({ isLoading: false, isAuthenticated: true }),
+  useMutation: () => mocks.join,
+}));
+vi.mock("expo-router", () => ({ useRouter: () => mocks.router }));
 
 const settled = { isLoading: false, isAuthenticated: true, inFlight: null };
+
+describe("useInviteJoinCoordinator", () => {
+  async function joinWith(onboarded: boolean, listId: string | null | Error) {
+    mocks.onboarded = onboarded;
+    if (listId instanceof Error) mocks.join.mockRejectedValue(listId);
+    else mocks.join.mockResolvedValue(listId);
+    renderHook(() => useInviteJoinCoordinator());
+    await act(async () => {});
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("keeps a queued reel when an onboarded person joins from the paywall", async () => {
+    await joinWith(true, "list1");
+    expect(mocks.clearPending).not.toHaveBeenCalled();
+    expect(mocks.router.replace).toHaveBeenCalledWith("/shared-list/list1");
+  });
+
+  it("keeps onboarding's answers when the invite is dead", async () => {
+    await joinWith(false, null);
+    expect(mocks.clearPending).not.toHaveBeenCalled();
+    expect(mocks.completeOnboarding).not.toHaveBeenCalled();
+  });
+
+  it("keeps onboarding's answers when the join fails", async () => {
+    await joinWith(false, new Error("list full"));
+    expect(mocks.clearPending).not.toHaveBeenCalled();
+    expect(mocks.alert).toHaveBeenCalledWith("sharedLists.joinFailed");
+  });
+
+  it("drops onboarding's queue before finishing onboarding for a person who joined", async () => {
+    await joinWith(false, "list1");
+    const [cleared] = mocks.clearPending.mock.invocationCallOrder;
+    const [completed] = mocks.completeOnboarding.mock.invocationCallOrder;
+    expect(cleared).toBeLessThan(completed!);
+  });
+});
 
 describe("inviteJoinStep", () => {
   it("waits with no token", () => {
