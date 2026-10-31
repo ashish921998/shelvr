@@ -21,7 +21,7 @@ async function setup(pro = true) {
   };
   const insert = (
     status: "ready" | "processing" = "ready",
-    pins = [pin],
+    pins: Omit<typeof pin, "appleId">[] = [pin],
     places = [pin.name],
     cities = ["Lisbon"],
   ) =>
@@ -128,6 +128,25 @@ describe("place removals", () => {
     expect(await other.t.query(api.mapPlaces.listMapPlaces, {})).toHaveLength(
       1,
     );
+  });
+
+  it("removes a merged row whose newest copy borrowed its Apple id", async () => {
+    const { t, pin, insert, map } = await setup();
+    const { appleId: _appleId, ...noId } = pin;
+    const newest = await insert("ready", [noId]);
+    const [selected] = cityPins(
+      await t.query(api.items.listCityItems, { city: "Lisbon" }),
+    );
+    expect(selected.itemId).toBe(newest);
+    expect(selected.appleId).toBe(pin.appleId);
+    await t.mutation(api.placeRemovals.removePlace, {
+      itemId: newest,
+      name: selected.name,
+      lat: selected.lat,
+      lng: selected.lng,
+      appleId: selected.appleId,
+    });
+    expect(await map()).toEqual([]);
   });
 
   it("keeps an unpinned other neighborhood while filtering the removed one", async () => {
