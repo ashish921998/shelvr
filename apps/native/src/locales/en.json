@@ -1016,5 +1016,15 @@
   "placeCorrection.search": "Search places",
   "placeCorrection.save": "Save places",
   "placeCorrection.retry": "Reopen this save to load the latest places, then try again.",
-  "placeCorrection.wait": "Wait for this save to finish processing."
+  "placeCorrection.wait": "Wait for this save to finish processing.",
+  "tripTravel.walking": "Walking",
+  "tripTravel.driving": "Driving",
+  "tripTravel.hint": "Apple Maps estimates for now. Tap a time for directions.",
+  "tripTravel.minutes": "~%{count} min",
+  "tripTravel.loading": "Checking travel time…",
+  "tripTravel.unavailable": "Time unavailable · Directions",
+  "tripTravel.directions": "Directions",
+  "tripTravel.leg": "%{mode}: %{from} to %{to}. %{summary}. Directions.",
+  "tripTravel.kilometers": "%{distance} km",
+  "tripTravel.meters": "%{distance} m"
 }

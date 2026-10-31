@@ -943,6 +943,16 @@ export type MessageParams = {
   "placeCorrection.save": undefined;
   "placeCorrection.retry": undefined;
   "placeCorrection.wait": undefined;
+  "tripTravel.walking": undefined;
+  "tripTravel.driving": undefined;
+  "tripTravel.hint": undefined;
+  "tripTravel.minutes": { count: number };
+  "tripTravel.loading": undefined;
+  "tripTravel.unavailable": undefined;
+  "tripTravel.directions": undefined;
+  "tripTravel.leg": { mode: string; from: string; to: string; summary: string };
+  "tripTravel.kilometers": { distance: string };
+  "tripTravel.meters": { distance: string };
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

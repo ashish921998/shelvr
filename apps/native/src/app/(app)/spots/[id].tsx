@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { StitchMark } from "@/components/ui/stitch-mark";
 import { analytics } from "@/lib/analytics";
 import { cityPinId, cityPins, type CityPin } from "@/lib/city-pins";
+import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { springIn } from "@/lib/motion";
 import { placeCategoryLabel } from "@/lib/place-category";
@@ -15,7 +16,6 @@ import type { Id } from "@convex/_generated/dataModel";
 import type { FunctionReturnType } from "convex/server";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import * as Haptics from "expo-haptics";
 import { useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
@@ -169,9 +169,7 @@ function Spots({
 function useLandingHaptics(dropped: number, total: number) {
   useEffect(() => {
     if (process.env.EXPO_OS !== "ios" || dropped === 0) return;
-    void (dropped >= total
-      ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-      : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
+    void (dropped >= total ? haptics.success() : haptics.impact());
   }, [dropped, total]);
 }
 

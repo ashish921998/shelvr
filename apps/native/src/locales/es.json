@@ -1041,5 +1041,15 @@
   "placeCorrection.search": "Buscar lugares",
   "placeCorrection.save": "Guardar lugares",
   "placeCorrection.retry": "Vuelve a abrir este guardado para cargar los lugares actuales e inténtalo de nuevo.",
-  "placeCorrection.wait": "Espera a que termine de procesarse este guardado."
+  "placeCorrection.wait": "Espera a que termine de procesarse este guardado.",
+  "tripTravel.walking": "A pie",
+  "tripTravel.driving": "En coche",
+  "tripTravel.hint": "Estimaciones actuales de Apple Maps. Toca un tiempo para ver la ruta.",
+  "tripTravel.minutes": "~%{count} min",
+  "tripTravel.loading": "Calculando el tiempo…",
+  "tripTravel.unavailable": "Tiempo no disponible · Ruta",
+  "tripTravel.directions": "Cómo llegar",
+  "tripTravel.leg": "%{mode}: de %{from} a %{to}. %{summary}. Cómo llegar.",
+  "tripTravel.kilometers": "%{distance} km",
+  "tripTravel.meters": "%{distance} m"
 }
