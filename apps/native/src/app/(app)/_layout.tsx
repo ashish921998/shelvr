@@ -19,6 +19,8 @@ import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
 import { useTrialReminder } from "@/lib/trial-reminder";
 import { useWelcomeSaveTracker } from "@/lib/welcome-save";
 import { RecentSavesWidgetSync } from "@/lib/widget-sync";
+import { listRouteAllowed } from "@/lib/list-gate";
+import { useSharedLists } from "@/lib/shared-lists";
 import { useConvexAuth } from "convex/react";
 import { Redirect, Stack, useRouter } from "expo-router";
 import { useReducedMotion } from "react-native-reanimated";
@@ -46,6 +48,9 @@ export default function AppLayout() {
     !entitlement.loading &&
     !entitlement.entitled &&
     !awaitingPurchase;
+
+  const lists = useSharedLists(isAuthenticated && onboarded);
+  const listRoutes = listRouteAllowed({ onboarded, gated, lists: lists.data });
 
   const planLoading = entitlement.loading;
   const entitled = entitlement.entitled;
@@ -108,6 +113,11 @@ export default function AppLayout() {
             name="spots/[id]"
             options={{ headerShown: false, gestureEnabled: false }}
           />
+        </Stack.Protected>
+        <Stack.Protected
+          guard={listRoutes}
+          redirectTo={onboarded ? "/plan-gate" : "/onboarding"}
+        >
           <Stack.Screen
             name="trip-plan/[id]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
@@ -115,6 +125,32 @@ export default function AppLayout() {
           <Stack.Screen
             name="date-plan"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
+          <Stack.Screen
+            name="shared-list/[id]"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
+          <Stack.Screen
+            name="new-trip"
+            options={{
+              presentation: "modal",
+              headerShown: true,
+              headerTransparent: false,
+              headerShadowVisible: false,
+              headerStyle: { backgroundColor: theme.colors.background },
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
+          />
+          <Stack.Screen
+            name="add-list-place"
+            options={{
+              presentation: "modal",
+              headerShown: true,
+              headerTransparent: false,
+              headerShadowVisible: false,
+              headerStyle: { backgroundColor: theme.colors.background },
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
           />
         </Stack.Protected>
         {/* Native sheets and modals present above the loading cover, so they wait for the plan. */}
@@ -151,7 +187,7 @@ export default function AppLayout() {
             }
           />
           <Stack.Screen
-            name="new-trip"
+            name="new-shared-list"
             options={{
               presentation: "modal",
               headerShown: true,

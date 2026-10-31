@@ -556,7 +556,22 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   city's saves, plus a row for every save not represented by a place row, with Plan a date
   and Plan a trip. A selected place row shows an info button that opens Apple's place card
   (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`); tapping the row opens the save
-- Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
+- Shared lists: Home shows a "Shared lists" section above "Your cities" (one card per list from
+  `listSharedLists`, or a quiet "Start a shared list" row when the person has none).
+  `shared-list/[id]` is a list: the same map-and-sheet shape as the city page, "New from <name>"
+  first, a row menu for We went and Remove from list, city chips when the list spans cities,
+  Plan a date and Plan a trip passing `listId`, Invite (the system share sheet with
+  `/l/<token>` on the web origin), the person's trips from the list, and for the owner the
+  member list. `new-shared-list` is the Invite form (Pro only): a name, a city or more,
+  Send invite. `add-list-place` is the list's Add a place (`searchListPlaces` near the chosen
+  city, plus the caller's saved places there). `spots/[id]` offers "Also add to" per list, off
+  by default. The root route `list-invite/[token]` (outside `(app)` and `(auth)`) is the Join
+  screen from `invitePreview`; Join stores the token in `src/lib/pending-invite.ts` and
+  `useInviteJoinCoordinator` (mounted at the root layout) finishes the join once signed in,
+  completing onboarding if needed. Gating: `src/lib/list-gate.ts`; a free member reaches
+  `shared-list/[id]`, `add-list-place`, `date-plan`, `new-trip` and `trip-plan/[id]` only
+  through a list, and a personal plan still redirects to `plan-gate`
+- Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`, `new-shared-list`, `add-list-place`,
   `profile`, `settings`, `item/[id]`, `city/[name]`, `spots/[id]`, `plan/[id]`, `date-plan`,
   `new-trip`, `trip-plan/[id]`, `add-trip-stop`
 - `date-plan` is Plan a date, pushed from the city page with a `city` param: "What kind of
@@ -585,7 +600,9 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   The old `trip/[id]` screen is gone and its links open Home; `trips.ts` and `tripData.ts`
   stay for installed builds
 - `plan-gate` is the hard paywall: a signed-in account past onboarding without an active
-  entitlement sees it instead of every other route except `profile`, `settings` and `paywall`
+  entitlement sees it instead of every other route except `profile`, `settings`, `paywall`
+  and, for a member of a shared list, that list and plans started from it; it shows the
+  person's lists above See plans
 - `(auth)` holds a single `sign-in` route
 - Scheme: `shelvr`. Bundle id: `app.shelvr.save` in production. `app.config.js` appends `.dev`
   or `.preview` for the other `APP_VARIANT` build profiles, so a dev install never collides
