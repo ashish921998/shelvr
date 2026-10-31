@@ -309,6 +309,70 @@ describe("place removals", () => {
     ).toEqual([]);
   });
 
+  it("refuses a pin the save does not have", async () => {
+    const { t, itemId, pin } = await setup();
+    const { name, lat, lng, appleId } = pin;
+    for (const wrong of [
+      { name: "Sol" },
+      { lat: lat + 1 },
+      { lng: lng + 1 },
+      { appleId: "another" },
+    ]) {
+      await expect(
+        t.mutation(api.placeRemovals.removePlace, {
+          itemId,
+          name,
+          lat,
+          lng,
+          appleId,
+          ...wrong,
+        }),
+      ).rejects.toThrow("Place not found");
+    }
+    expect(
+      await t.run((ctx) => ctx.db.query("placeRemovals").collect()),
+    ).toEqual([]);
+  });
+
+  it("stops removing at the rate limit and stores nothing past it", async () => {
+    const { t, itemId, pin } = await setup();
+    const pins = Array.from({ length: 21 }, (_, i) => ({
+      ...pin,
+      name: `Tigre ${i}`,
+      appleId: `tigre-${i}`,
+      lat: pin.lat + i,
+    }));
+    await t.run((ctx) => ctx.db.patch(itemId, { placePins: pins }));
+    const removeAt = (i: number) =>
+      t.mutation(api.placeRemovals.removePlace, {
+        itemId,
+        name: pins[i].name,
+        lat: pins[i].lat,
+        lng: pins[i].lng,
+      });
+    for (let i = 0; i < 20; i++) await removeAt(i);
+    await expect(removeAt(20)).rejects.toThrow(/RateLimited/);
+    expect(
+      await t.run((ctx) => ctx.db.query("placeRemovals").collect()),
+    ).toHaveLength(20);
+  });
+
+  it("hides a removed place in search, keeps the save findable, and Undo restores it", async () => {
+    const { t, itemId, pin, remove } = await setup();
+    const places = [pin.name, "Sol, Baixa"];
+    await t.run((ctx) => ctx.db.patch(itemId, { places }));
+    const search = async () =>
+      (await t.query(api.items.searchItems, { query: "Tigre" }))[0];
+    expect((await search())?.places).toEqual(places);
+    const removalId = await remove();
+    const found = await search();
+    expect(found?._id).toBe(itemId);
+    expect(found?.places).toEqual(["Sol, Baixa"]);
+    expect(found?.placePins).toEqual([]);
+    await t.mutation(api.placeRemovals.undoRemovePlace, { removalId });
+    expect((await search())?.places).toEqual(places);
+  });
+
   it("matches an Apple venue across city labels in Map, city pages and date plans", async () => {
     const { t, pin, insert, remove, map } = await setup();
     await insert(
