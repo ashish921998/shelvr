@@ -193,17 +193,19 @@ export function completionPatch(
     );
   }
   const title = settledTitle(item, run.keepTitle, words);
+  const earlier = item.enrichment === "partial" ? item : undefined;
+  const content = reading.content || earlier?.content;
   return {
     title,
     description: words.description,
     tags: words.tags,
-    content: reading.content,
-    recipe: words.recipe,
-    siteName: reading.siteName,
-    author: reading.author,
-    heroImageUrl: reading.heroImageUrl,
-    media: reading.media,
-    articleMedia: reading.articleMedia,
+    content,
+    recipe: words.recipe ?? earlier?.recipe,
+    siteName: reading.siteName ?? earlier?.siteName,
+    author: reading.author ?? earlier?.author,
+    heroImageUrl: reading.heroImageUrl ?? earlier?.heroImageUrl,
+    media: reading.media ?? earlier?.media,
+    articleMedia: reading.articleMedia ?? earlier?.articleMedia,
     ...(reading.storageId !== undefined
       ? { storageId: reading.storageId }
       : {}),
@@ -216,7 +218,10 @@ export function completionPatch(
       ? { placesHeard: words.placesHeard }
       : {}),
     status: "ready",
-    enrichment: reading.enrichment,
+    enrichment:
+      earlier && !reading.content && reading.enrichment === "no_article"
+        ? "partial"
+        : reading.enrichment,
     failureReason: undefined,
     searchText: buildSearchText({
       title,
@@ -227,7 +232,7 @@ export function completionPatch(
       tags: words.tags,
       siteName: reading.siteName,
       note: item.note,
-      content: reading.content,
+      content,
     }),
     ...embeddingPatch(item, run, aiAllowed),
   };

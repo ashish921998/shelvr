@@ -526,9 +526,13 @@ function linkAnalysisPrompt(
 function retryReadNothingNew(item: Doc<"items">, read: LinkRead): boolean {
   if (item.enrichment !== "partial") return false;
   if (read.status === "unreadable") return true;
-  const { content, recipe, placeList } = read.page;
-  if (content || recipe || placeList) return false;
-  return Boolean(item.content || item.recipe || item.places?.length);
+  const { content, recipe, placeList, description, title, heroImageUrl } =
+    read.page;
+  if (content || recipe || placeList || description) return false;
+  if (title && heroImageUrl) return false;
+  return Boolean(
+    item.content || item.recipe || item.description || item.places?.length,
+  );
 }
 
 async function analyzeLinkItem(
