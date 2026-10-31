@@ -247,6 +247,20 @@ describe("plan tiles", () => {
 });
 
 describe("city cards", () => {
+  it("names a city's status for screen readers, including no place yet", () => {
+    mocks.cities = [
+      { city: "Lisbon", count: 2, placeCount: 3, cover: null },
+      { city: "Tokyo", count: 3, placeCount: 0, cover: null },
+    ];
+    render(<HomePlaces />);
+    expect(
+      screen.getByRole("button", { name: "Lisbon, 3 places" }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: "Tokyo, 3 saves, no place yet" }),
+    ).toBeTruthy();
+  });
+
   it("shows the share tip only for a single city", () => {
     mocks.cities = [{ city: "Lisbon", count: 1, placeCount: 1, cover: null }];
     const { unmount } = render(<HomePlaces />);
