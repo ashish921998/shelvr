@@ -408,9 +408,9 @@ describe("place removals", () => {
     );
     await remove();
     expect(await map()).toEqual([]);
-    expect(
-      (await t.query(api.items.listCityItems, { city: "Lisboa" }))[0].placePins,
-    ).toEqual([]);
+    expect(await t.query(api.items.listCityItems, { city: "Lisboa" })).toEqual(
+      [],
+    );
     expect(
       (
         await t.mutation(internal.datePlanData.claimDatePlanInternal, {
@@ -864,5 +864,152 @@ describe("place removals", () => {
     expect((await source(portoOnly)).places).toEqual(["Sol"]);
     expect((await source(namedPorto)).places).toEqual(["Sol, Porto"]);
     expect((await source(lisbonSave)).places).toEqual([]);
+  });
+
+  describe("a save a removal leaves with no place in a city", () => {
+    const cityNames = async (t: Awaited<ReturnType<typeof setup>>["t"]) =>
+      (await t.query(api.items.listCities, {})).map(({ city }) => city);
+    const rowTitles = async (
+      t: Awaited<ReturnType<typeof setup>>["t"],
+      city: string,
+    ) =>
+      (await t.query(api.items.listCityItems, { city })).map(
+        ({ title }) => title,
+      );
+
+    it("leaves the city and Home but stays open by id and search, until Undo", async () => {
+      const { t, itemId, pin } = await setup();
+      await t.run((ctx) => ctx.db.patch(itemId, { title: "Tigre is great" }));
+      expect(await cityNames(t)).toEqual(["Lisbon"]);
+      const removalId = await t.mutation(api.placeRemovals.removePlace, {
+        itemId,
+        name: pin.name,
+        lat: pin.lat,
+        lng: pin.lng,
+        appleId: pin.appleId,
+      });
+      expect(await rowTitles(t, "Lisbon")).toEqual([]);
+      expect(await cityNames(t)).toEqual([]);
+      const open = await t.query(api.items.getItem, { id: itemId });
+      expect(open?.title).toBe("Tigre is great");
+      expect(open?.cities).toEqual(["Lisbon"]);
+      expect(
+        (await t.query(api.items.searchItems, { query: "Tigre" })).map(
+          ({ _id }) => _id,
+        ),
+      ).toEqual([itemId]);
+
+      await t.mutation(api.placeRemovals.undoRemovePlace, { removalId });
+      expect(await rowTitles(t, "Lisbon")).toEqual(["Tigre is great"]);
+      expect(await cityNames(t)).toEqual(["Lisbon"]);
+    });
+
+    it("stays while it still names another place, pinned or not", async () => {
+      const { t, itemId, pin, remove } = await setup();
+      await t.run((ctx) =>
+        ctx.db.patch(itemId, {
+          title: "Two spots",
+          places: [pin.name, "Prado"],
+        }),
+      );
+      await remove();
+      expect(await rowTitles(t, "Lisbon")).toEqual(["Two spots"]);
+    });
+
+    it("keeps a save that never named a place", async () => {
+      const { t, insert, remove } = await setup();
+      const plain = await insert("ready", [], []);
+      await t.run((ctx) => ctx.db.patch(plain, { title: "Just a link" }));
+      await remove();
+      expect(await rowTitles(t, "Lisbon")).toEqual(["Just a link"]);
+    });
+
+    it("leaves when a pin was all that named the place", async () => {
+      const { t, itemId, remove } = await setup();
+      await t.run((ctx) =>
+        ctx.db.patch(itemId, { title: "Pin only", places: [], intents: [] }),
+      );
+      await remove();
+      expect(await rowTitles(t, "Lisbon")).toEqual([]);
+    });
+
+    it("leaves only the city it emptied on a multi-city save", async () => {
+      const { t, itemId, pin, remove } = await setup();
+      await t.run((ctx) =>
+        ctx.db.patch(itemId, {
+          title: "Portugal",
+          cities: ["Lisbon", "Porto"],
+          places: ["Tigre, Alfama, Lisbon", "Sol, Porto"],
+          placePins: [
+            pin,
+            { name: "Sol", city: "Porto", lat: 41.1, lng: -8.6 },
+          ],
+        }),
+      );
+      await remove();
+      expect(await rowTitles(t, "Lisbon")).toEqual([]);
+      expect(await rowTitles(t, "Porto")).toEqual(["Portugal"]);
+      expect(await cityNames(t)).toEqual(["Porto"]);
+    });
+
+    it("leaves a city when a place with no city in its name is pinned elsewhere", async () => {
+      const { t, itemId, pin, remove } = await setup();
+      await t.run((ctx) =>
+        ctx.db.patch(itemId, {
+          title: "Portugal",
+          cities: ["Lisbon", "Porto"],
+          places: [pin.name, "Sol"],
+          placePins: [
+            pin,
+            { name: "Sol", city: "Porto", lat: 41.1, lng: -8.6 },
+          ],
+        }),
+      );
+      await remove();
+      expect(await rowTitles(t, "Lisbon")).toEqual([]);
+      expect(await rowTitles(t, "Porto")).toEqual(["Portugal"]);
+      expect(await cityNames(t)).toEqual(["Porto"]);
+    });
+
+    it("stays for a place with no city in its name and no pin yet", async () => {
+      const { t, itemId, pin, remove } = await setup();
+      await t.run((ctx) =>
+        ctx.db.patch(itemId, {
+          title: "Portugal",
+          cities: ["Lisbon", "Porto"],
+          places: [pin.name, "Sol", "Prado"],
+          placePins: [
+            pin,
+            { name: "Sol", city: "Porto", lat: 41.1, lng: -8.6 },
+          ],
+        }),
+      );
+      await remove();
+      expect(await rowTitles(t, "Lisbon")).toEqual(["Portugal"]);
+    });
+
+    it("does not hand a pin with no city to the city that is left", async () => {
+      const { t, itemId, pin, remove } = await setup();
+      await t.run((ctx) =>
+        ctx.db.patch(itemId, {
+          title: "Portugal",
+          cities: ["Lisbon", "Porto"],
+          places: ["Tigre, Alfama, Lisbon", "Sol, Porto"],
+          placePins: [pin, { name: "Belem", lat: 38.69, lng: -9.2 }],
+        }),
+      );
+      await remove();
+      const porto = await t.query(api.items.listCityItems, { city: "Porto" });
+      expect(porto.flatMap((save) => save.placePins ?? [])).toEqual([]);
+      expect(await rowTitles(t, "Lisbon")).toEqual(["Portugal"]);
+    });
+
+    it("comes back in a new save of the same place", async () => {
+      const { t, insert, remove } = await setup();
+      await remove();
+      const fresh = await insert();
+      await t.run((ctx) => ctx.db.patch(fresh, { title: "Again" }));
+      expect(await rowTitles(t, "Lisbon")).toEqual(["Again"]);
+    });
   });
 });

@@ -1,5 +1,6 @@
 import {
   visibleSave,
+  visibleCitySave,
   visibleItemPlaces,
   userRemovals,
   type Removal,
@@ -322,7 +323,7 @@ export async function readySavesNewestFirst(
 ): Promise<Doc<"items">[]> {
   const decisions = removals ?? (await userRemovals(ctx, userId));
   return (await rawReadySavesNewestFirst(ctx, userId)).map((item) =>
-    visibleItemPlaces(item, decisions),
+    visibleCitySave(item, decisions),
   );
 }
 
