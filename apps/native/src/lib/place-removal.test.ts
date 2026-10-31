@@ -9,7 +9,9 @@ const mocks = vi.hoisted(() => ({
   restore: vi.fn(),
   alert: vi.fn(),
   error: vi.fn(),
+  success: vi.fn(),
 }));
+vi.mock("@/lib/haptics", () => ({ haptics: { success: mocks.success } }));
 vi.mock("@convex/_generated/api", () => ({
   api: { placeRemovals: { removePlace: "remove", undoRemovePlace: "restore" } },
 }));
@@ -51,6 +53,20 @@ it("offers Undo after the server removes the venue, then restores that operation
     removalId: "removal1",
   });
   expect(result.current.undo).toBeNull();
+});
+
+it("confirms a removal and its Undo only once the server has applied them", async () => {
+  const { result } = renderHook(usePlaceRemoval);
+  mocks.remove.mockRejectedValueOnce(new Error("offline"));
+  await act(() => result.current.remove(ITEM, PIN));
+  expect(mocks.success).not.toHaveBeenCalled();
+  await act(() => result.current.remove(ITEM, PIN));
+  expect(mocks.success).toHaveBeenCalledOnce();
+  mocks.restore.mockRejectedValueOnce(new Error("offline"));
+  await act(() => result.current.restore());
+  expect(mocks.success).toHaveBeenCalledOnce();
+  await act(() => result.current.restore());
+  expect(mocks.success).toHaveBeenCalledTimes(2);
 });
 
 it("expires Undo after six seconds without making another write", async () => {

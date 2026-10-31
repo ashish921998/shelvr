@@ -6,6 +6,7 @@ import { Alert } from "react-native";
 import { analytics, type AnalyticsItem } from "@/lib/analytics";
 import { confirmItemDelete } from "@/lib/confirm-item-delete";
 import { usePaywallGuard } from "@/lib/entitlement";
+import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
 
 type FixableSave = AnalyticsItem & { _id: Id<"items"> };
@@ -19,7 +20,9 @@ export function useFixSave() {
   const retry = async (save: FixableSave): Promise<void> => {
     try {
       const scheduled = await reprocess({ id: save._id });
-      if (!scheduled) {
+      if (scheduled) {
+        void haptics.impact();
+      } else {
         Alert.alert(t("item.stillWorking"), t("item.retryLater"));
       }
     } catch (error) {
@@ -34,6 +37,7 @@ export function useFixSave() {
     confirmItemDelete(async () => {
       try {
         await deleteItem({ id: save._id });
+        void haptics.success();
         analytics.itemDeleted(save, "feed");
         onDeleted?.();
       } catch {

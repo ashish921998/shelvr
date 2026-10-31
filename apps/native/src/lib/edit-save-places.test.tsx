@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   search: vi.fn(),
   back: vi.fn(),
   alert: vi.fn(),
+  success: vi.fn(),
   data: {
     places: [{ name: "Old branch", city: "Lisbon", lat: 38.7, lng: -9.1 }],
     version: "original",
@@ -20,6 +21,7 @@ vi.mock("@/lib/i18n", () => ({
   useAppLocale: () => "en",
 }));
 vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
+vi.mock("@/lib/haptics", () => ({ haptics: { success: mocks.success } }));
 vi.mock("@/lib/screen-dismiss", () => ({ backOrHome: () => mocks.back() }));
 vi.mock("expo-router", () => ({
   Stack: { Screen: vi.fn(() => null) },
@@ -156,10 +158,17 @@ it("replaces a branch with the chosen search result, without storing its display
     }),
   );
 });
+it("confirms a correction once the server has saved it", async () => {
+  render(<EditSavePlacesScreen />);
+  fireEvent.click(screen.getByText("placeCorrection.save"));
+  await waitFor(() => expect(mocks.back).toHaveBeenCalled());
+  expect(mocks.success).toHaveBeenCalledOnce();
+});
 it("keeps the editor open when saving fails", async () => {
   mocks.save.mockRejectedValue(new Error("stale"));
   render(<EditSavePlacesScreen />);
   fireEvent.click(screen.getByText("placeCorrection.save"));
   await waitFor(() => expect(mocks.alert).toHaveBeenCalled());
   expect(mocks.back).not.toHaveBeenCalled();
+  expect(mocks.success).not.toHaveBeenCalled();
 });
