@@ -16,6 +16,7 @@ import { logEvent } from "./model/log";
 import { isRemovedSuggestion, removalsSince } from "./model/placeRemovals";
 import {
   placeKey,
+  shuffled,
   splitSavedPlace,
   suggestSavedPlaces,
   type PlanPlace,
@@ -65,7 +66,9 @@ const EXTRA_SUGGESTIONS = 5;
 type Claim = FunctionReturnType<
   typeof internal.tripPlannerData.claimTripPlanInternal
 >;
-type SavedPin = Claim["pins"][number];
+type SavesClaim = Extract<Claim, { from: "saves" }>;
+type ListClaim = Extract<Claim, { from: "list" }>;
+type SavedPin = SavesClaim["pins"][number];
 
 type Maps = { token: string; left: number; lang?: string };
 
@@ -134,9 +137,28 @@ function saveStop(
   };
 }
 
+function listStops(claim: ListClaim): {
+  stops: PlannedStop[];
+  centre: LatLng | null;
+} {
+  const stops = mergeSavedNamesakes(
+    uniquePlacePins(
+      shuffled(claim.places)
+        .slice(0, tripPlaceCap(claim.days))
+        .map(
+          ({ addedAt: _addedAt, tags: _tags, ...place }): PlannedStop => ({
+            source: "save",
+            ...place,
+          }),
+        ),
+    ),
+  );
+  return { stops, centre: middleOf(stops) };
+}
+
 /** The city's unvisited saved places with a pin: stored pins first, then a few looked up near the city. */
 async function savedStops(
-  claim: Claim,
+  claim: SavesClaim,
   maps: Maps | null,
 ): Promise<{ stops: PlannedStop[]; centre: LatLng | null }> {
   const been = new Set(claim.been.map(placeKey));
@@ -301,6 +323,7 @@ export const createTripPlan = action({
     interests: v.array(tripInterestValidator),
     stay: v.optional(v.string()),
     locale: v.optional(v.string()),
+    listId: v.optional(v.id("sharedLists")),
   },
   returns: createTripPlanResultValidator,
   // Annotated: inferring through `internal` is circular for an action.
@@ -320,6 +343,7 @@ export const createTripPlan = action({
         interests: args.interests,
         ...(args.startDate !== undefined ? { startDate: args.startDate } : {}),
         ...(args.stay !== undefined ? { stay: args.stay } : {}),
+        ...(args.listId !== undefined ? { listId: args.listId } : {}),
       },
     );
     // No interests means no suggestions: the trip is planned from the saves alone.
@@ -329,7 +353,8 @@ export const createTripPlan = action({
     const maps = claim.aiAllowed
       ? await openMaps(appleLang(args.locale))
       : null;
-    const { stops: saves, centre } = await savedStops(claim, maps);
+    const { stops: saves, centre } =
+      claim.from === "list" ? listStops(claim) : await savedStops(claim, maps);
     const stay = await locateStay(claim, maps, centre);
     const wanted = suggestionRoom(args.pace, claim.days, saves.length);
     const suggested =
@@ -352,10 +377,17 @@ export const createTripPlan = action({
       days: claim.days,
       pace: args.pace,
     });
+    const stored = (stops: PlannedStop[]): PlannedStop[] =>
+      claim.from === "list"
+        ? stops.map((stop) =>
+            stop.source === "save" ? { ...stop, source: "list" } : stop,
+          )
+        : stops;
     const tripId: Id<"tripPlans"> = await ctx.runMutation(
       internal.tripPlannerData.saveTripPlanInternal,
       {
         city: claim.city,
+        ...(args.listId !== undefined ? { listId: args.listId } : {}),
         dayCount: claim.days,
         pace: args.pace,
         interests,
@@ -363,8 +395,8 @@ export const createTripPlan = action({
           ? { startDate: claim.startDate }
           : {}),
         ...(stay !== undefined ? { stay } : {}),
-        days: layout.days,
-        unplanned: layout.unplanned,
+        days: layout.days.map(stored),
+        unplanned: stored(layout.unplanned),
       },
     );
     logEvent("info", "trip_plan_created", fields);
@@ -382,6 +414,46 @@ const MAX_SEARCH_RESULTS = 15;
 /** Add a place looks a little wider than suggestions do: a day trip out of town is fine. */
 const SEARCH_RADIUS_KM = SUGGEST_RADIUS_KM * 2;
 
+type SearchClaim = {
+  city: string;
+  centre: LatLng | null;
+  aiAllowed: boolean;
+};
+
+type SearchResult = { available: boolean; places: TripPlace[] };
+
+async function placeSearch(
+  typed: string,
+  locale: string | undefined,
+  claimSearch: () => Promise<SearchClaim>,
+): Promise<SearchResult> {
+  const query = typed.replace(/\s+/g, " ").trim().slice(0, MAX_SEARCH_CHARS);
+  if (query.length < MIN_SEARCH_CHARS) return { available: true, places: [] };
+  const claim = await claimSearch();
+  // The trip's centre comes from the saves' pins, so a declined account sends Apple nothing,
+  // as createTripPlan does.
+  const maps = claim.aiAllowed ? await openMaps(appleLang(locale)) : null;
+  if (maps === null) return { available: false, places: [] };
+  const centre =
+    claim.centre ?? (await appleMapsLookup(maps.token, "geocode", claim.city));
+  if (centre === null) {
+    logEvent("info", "trip_search_no_centre", {});
+    return { available: true, places: [] };
+  }
+  const found = await appleMapsSearchPlaces(maps.token, query, {
+    near: centre,
+    ...(maps.lang !== undefined ? { lang: maps.lang } : {}),
+  });
+  const places = found
+    .filter((place) => distanceKm(place, centre) <= SEARCH_RADIUS_KM)
+    .slice(0, MAX_SEARCH_RESULTS);
+  logEvent("info", "trip_search_done", {
+    found: found.length,
+    kept: places.length,
+  });
+  return { available: true, places };
+}
+
 /** Add a place: an Apple Maps search for what the person typed, near the trip. */
 export const searchTripPlaces = action({
   args: {
@@ -390,43 +462,27 @@ export const searchTripPlaces = action({
     locale: v.optional(v.string()),
   },
   returns: searchTripPlacesResultValidator,
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{ available: boolean; places: TripPlace[] }> => {
-    const query = args.query
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, MAX_SEARCH_CHARS);
-    if (query.length < MIN_SEARCH_CHARS) return { available: true, places: [] };
-    const claim = await ctx.runMutation(
-      internal.tripPlannerData.claimTripSearchInternal,
-      { tripId: args.tripId },
-    );
-    // The trip's centre comes from the saves' pins, so a declined account sends Apple nothing,
-    // as createTripPlan does.
-    const maps = claim.aiAllowed
-      ? await openMaps(appleLang(args.locale))
-      : null;
-    if (maps === null) return { available: false, places: [] };
-    const centre =
-      claim.centre ??
-      (await appleMapsLookup(maps.token, "geocode", claim.city));
-    if (centre === null) {
-      logEvent("info", "trip_search_no_centre", {});
-      return { available: true, places: [] };
-    }
-    const found = await appleMapsSearchPlaces(maps.token, query, {
-      near: centre,
-      ...(maps.lang !== undefined ? { lang: maps.lang } : {}),
-    });
-    const places = found
-      .filter((place) => distanceKm(place, centre) <= SEARCH_RADIUS_KM)
-      .slice(0, MAX_SEARCH_RESULTS);
-    logEvent("info", "trip_search_done", {
-      found: found.length,
-      kept: places.length,
-    });
-    return { available: true, places };
+  handler: async (ctx, args): Promise<SearchResult> =>
+    await placeSearch(args.query, args.locale, () =>
+      ctx.runMutation(internal.tripPlannerData.claimTripSearchInternal, {
+        tripId: args.tripId,
+      }),
+    ),
+});
+
+export const searchListPlaces = action({
+  args: {
+    listId: v.id("sharedLists"),
+    city: v.string(),
+    query: v.string(),
+    locale: v.optional(v.string()),
   },
+  returns: searchTripPlacesResultValidator,
+  handler: async (ctx, args): Promise<SearchResult> =>
+    await placeSearch(args.query, args.locale, () =>
+      ctx.runMutation(internal.sharedLists.claimListSearchInternal, {
+        listId: args.listId,
+        city: args.city,
+      }),
+    ),
 });

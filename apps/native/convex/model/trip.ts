@@ -100,6 +100,8 @@ export function tripPlaceCap(days: number): number {
   return STOPS_PER_DAY.packed * Math.max(days, 5);
 }
 
+export const MAX_CITY_CHARS = 80;
+
 export function tidyCity(city: string): string {
   return city.replace(/\s+/g, " ").trim();
 }

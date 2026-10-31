@@ -225,7 +225,7 @@ export type AnalyticsEventProperties = {
   trip_plan_failed: { reason: "rate_limited" | "pro_required" | "error" };
   trip_plan_opened: { days: number; stops: number; saved: number };
   trip_plan_stop_opened: {
-    source: "save" | "suggested" | "added";
+    source: "save" | "suggested" | "added" | "list";
     action: "save" | "card" | "maps";
   };
   trip_plan_deleted: Record<string, never>;
@@ -240,14 +240,14 @@ export type AnalyticsEventProperties = {
   date_plan_failed: { reason: "rate_limited" | "pro_required" | "error" };
   date_plan_swapped: { slot: "first" | "second"; swapped: boolean };
   date_plan_stop_opened: {
-    source: "save" | "suggested";
+    source: "save" | "suggested" | "list";
     action: "save" | "card" | "maps";
   };
   date_plan_go: Record<string, never>;
   date_plan_sent: { shared: boolean };
   trip_plan_edit_started: { stops: number };
   trip_plan_stop_moved: { across_days: boolean; method: "drag" | "menu" };
-  trip_plan_stop_removed: { source: "save" | "suggested" | "added" };
+  trip_plan_stop_removed: { source: "save" | "suggested" | "added" | "list" };
   trip_plan_stop_added: { from: "search" | "save"; unplanned: boolean };
   trip_plan_edit_undone: { action: "move" | "remove" };
   trip_plan_place_searched: { results: number; available: boolean };

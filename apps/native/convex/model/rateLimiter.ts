@@ -40,6 +40,25 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: HOUR,
     capacity: 30,
   },
+  sharedListCreate: {
+    kind: "token bucket",
+    rate: 10,
+    period: HOUR,
+    capacity: 5,
+  },
+  sharedListJoin: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
+  sharedListEdit: {
+    kind: "token bucket",
+    rate: 600,
+    period: HOUR,
+    capacity: 120,
+  },
+  sharedListSearch: {
+    kind: "token bucket",
+    rate: 120,
+    period: HOUR,
+    capacity: 30,
+  },
   videoTranscript: {
     kind: "token bucket",
     rate: 20,

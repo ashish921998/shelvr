@@ -256,6 +256,7 @@ export function tripDayLabel(
 export function stopBadge(source: TripPlanStop["source"]): TextMessageKey {
   switch (source) {
     case "save":
+    case "list":
       return "tripPlanner.badgeYours";
     case "suggested":
       return "tripPlanner.badgeSuggested";
@@ -304,13 +305,10 @@ export type StopAction =
   | { kind: "maps"; url: string };
 
 export function stopAction(
-  stop: Pick<
-    TripPlanStop,
-    "source" | "itemId" | "appleId" | "name" | "lat" | "lng"
-  >,
+  stop: Pick<TripPlanStop, "itemId" | "appleId" | "name" | "lat" | "lng">,
   cardAvailable: boolean,
 ): StopAction {
-  if (stop.source === "save" && stop.itemId !== undefined) {
+  if (stop.itemId !== undefined) {
     return { kind: "save", itemId: stop.itemId };
   }
   if (stop.appleId !== undefined && cardAvailable) {
