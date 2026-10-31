@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import SpotsScreen from "@/app/(app)/spots/[id]";
 
@@ -23,6 +29,7 @@ const mocks = vi.hoisted(() => ({
   replace: vi.fn(),
   dismissTo: vi.fn(),
   push: vi.fn(),
+  focused: true,
   save: undefined as Save | null | undefined,
   impact: vi.fn(),
   success: vi.fn(),
@@ -47,6 +54,7 @@ vi.mock("expo-router", () => ({
     push: mocks.push,
   }),
   useLocalSearchParams: () => ({ id: "item-1" }),
+  useIsFocused: () => mocks.focused,
 }));
 const fakes = vi.hoisted(() => ({
   passThrough: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -118,6 +126,7 @@ beforeEach(() => {
   mocks.replace.mockReset();
   mocks.dismissTo.mockReset();
   mocks.push.mockReset();
+  mocks.focused = true;
   mocks.save = undefined;
   mocks.impact.mockReset();
   mocks.success.mockReset();
@@ -199,6 +208,49 @@ it("goes Home when the revealed save is deleted from its detail screen", () => {
   rerender(<SpotsScreen />);
   expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
   expect(mocks.capture).toHaveBeenCalledTimes(1);
+});
+
+it("stays put under the detail screen while a retry runs, then goes Home on return", () => {
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [{ name: "Uchi", lat: 30.26, lng: -97.75, city: "Austin" }],
+  };
+  const { rerender } = render(<SpotsScreen />);
+  mocks.focused = false;
+  mocks.save = { ...mocks.save, status: "processing" };
+  rerender(<SpotsScreen />);
+  act(() => {
+    vi.advanceTimersByTime(26_000);
+  });
+  expect(mocks.replace).not.toHaveBeenCalled();
+  mocks.focused = true;
+  rerender(<SpotsScreen />);
+  expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
+});
+
+it("shows the spots again when a retry finished before the return", () => {
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [{ name: "Uchi", lat: 30.26, lng: -97.75, city: "Austin" }],
+  };
+  const { rerender } = render(<SpotsScreen />);
+  const ready = mocks.save;
+  mocks.focused = false;
+  mocks.save = { ...ready, status: "processing" };
+  rerender(<SpotsScreen />);
+  act(() => {
+    vi.advanceTimersByTime(26_000);
+  });
+  mocks.save = ready;
+  rerender(<SpotsScreen />);
+  mocks.focused = true;
+  rerender(<SpotsScreen />);
+  expect(screen.getByText("Uchi")).toBeTruthy();
+  expect(mocks.replace).not.toHaveBeenCalled();
 });
 
 it("adds spots the save gains after the reveal", () => {
