@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
 
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { MAX_LIST_CITIES, MAX_LIST_MEMBERS } from "./model/sharedLists";
 import {
   joiner,
@@ -53,6 +53,38 @@ describe("createSharedList", () => {
       ]),
     );
     expect(list?.trips).toEqual([]);
+  });
+
+  it("does not count a list trip's stops as the planner's saves", async () => {
+    const { owner, itemId, listId } = await listWithOwner();
+    const tripId = await owner.t.mutation(
+      internal.tripPlannerData.saveTripPlanInternal,
+      {
+        city: "Lisbon",
+        dayCount: 1,
+        pace: "easy",
+        interests: [],
+        listId,
+        days: [
+          [
+            {
+              source: "save",
+              itemId,
+              name: "Ramen Shop",
+              lat: 38.71,
+              lng: -9.14,
+            },
+          ],
+        ],
+        unplanned: [],
+      },
+    );
+    const { page } = await owner.t.query(api.tripPlannerData.listTripPlans, {
+      paginationOpts: { numItems: 5, cursor: null },
+    });
+    expect(page).toEqual([
+      expect.objectContaining({ _id: tripId, stopCount: 1, savedCount: 0 }),
+    ]);
   });
 
   it("leaves out pins of other cities and never copies a save's title", async () => {
