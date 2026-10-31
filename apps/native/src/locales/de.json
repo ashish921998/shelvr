@@ -733,6 +733,8 @@
   "cityMap.placeDetails": "Ortsdetails zu %{name}",
   "cityMap.removePlace": "„%{name}“ entfernen",
   "cityMap.removedPlace": "„%{name}“ entfernt",
+  "cityMap.noPlacesLeft": "Keine Orte mehr",
+  "cityMap.noPlacesLeftBody": "Speichere einen weiteren Ort in %{city}, um ihn hier zu sehen.",
   "opener.tagline": "Speichere die Orte. Wir planen das Date oder die Reise.",
   "onboardingQ.skip": "Überspringen",
   "onboardingQ.savedTitle": "Wie viele Orte hast du gespeichert?",

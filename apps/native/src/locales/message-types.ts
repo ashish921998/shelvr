@@ -668,6 +668,8 @@ export type MessageParams = {
   "cityMap.placeDetails": { name: string };
   "cityMap.removePlace": { name: string };
   "cityMap.removedPlace": { name: string };
+  "cityMap.noPlacesLeft": undefined;
+  "cityMap.noPlacesLeftBody": { city: string };
   "opener.tagline": undefined;
   "onboardingQ.skip": undefined;
   "onboardingQ.savedTitle": undefined;

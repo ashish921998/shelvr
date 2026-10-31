@@ -733,6 +733,8 @@
   "cityMap.placeDetails": "Place details for %{name}",
   "cityMap.removePlace": "Remove %{name}",
   "cityMap.removedPlace": "Removed %{name}",
+  "cityMap.noPlacesLeft": "No places left",
+  "cityMap.noPlacesLeftBody": "Save another place in %{city} to see it here.",
   "opener.tagline": "Save the spots. We'll plan the date or the trip.",
   "onboardingQ.skip": "Skip",
   "onboardingQ.savedTitle": "How many places have you saved?",

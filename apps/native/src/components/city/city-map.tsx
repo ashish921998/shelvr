@@ -89,7 +89,7 @@ export function CityMap({
 
   // A recomputed camera with the same values is not a move.
   const [steady, setSteady] = useState(camera);
-  if (!sameCamera(steady, camera)) setSteady(camera);
+  if (camera && !sameCamera(steady, camera)) setSteady(camera);
   // expo-maps applies every cameraPosition prop change without animation, so the prop holds only the first camera.
   const [firstCamera, setFirstCamera] = useState(steady);
   if (firstCamera === undefined && steady !== undefined) setFirstCamera(steady);

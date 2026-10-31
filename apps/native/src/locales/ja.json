@@ -711,6 +711,8 @@
   "cityMap.placeDetails": "%{name}の詳細",
   "cityMap.removePlace": "%{name}を削除",
   "cityMap.removedPlace": "%{name}を削除しました",
+  "cityMap.noPlacesLeft": "場所がなくなりました",
+  "cityMap.noPlacesLeftBody": "%{city}の別の場所を保存すると、ここに表示されます。",
   "opener.tagline": "スポットを保存しよう。デートも旅行もプランはおまかせ。",
   "onboardingQ.skip": "スキップ",
   "onboardingQ.savedTitle": "いくつの場所を保存しましたか？",
