@@ -210,7 +210,7 @@ describe("the web invite route", () => {
 });
 
 describe("joinSharedList", () => {
-  it("lets a free person in, once, and shows them the owner's places as new", async () => {
+  it("lets a free person in, once, and treats what is already there as seen", async () => {
     const { base, token, listId } = await listWithOwner();
     const bo = await joiner(base, token);
     expect(bo.joined).toBe(listId);
@@ -235,7 +235,7 @@ describe("joinSharedList", () => {
     expect(
       list?.places.every(
         (place) =>
-          place.isNew &&
+          !place.isNew &&
           !place.addedByYou &&
           place.itemId === undefined &&
           place.addedByName === "Ana",
@@ -243,7 +243,7 @@ describe("joinSharedList", () => {
     ).toBe(true);
     const lists = await bo.t.query(api.sharedLists.listSharedLists, {});
     expect(lists).toEqual([
-      expect.objectContaining({ _id: listId, newCount: 2, isOwner: false }),
+      expect.objectContaining({ _id: listId, newCount: 0, isOwner: false }),
     ]);
   });
 

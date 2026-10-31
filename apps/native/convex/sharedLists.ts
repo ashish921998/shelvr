@@ -8,7 +8,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { aiAllowed } from "./aiConsent";
-import { readyCitySaves } from "./items";
+import { readySavesNewestFirst } from "./items";
 import {
   authedMutation,
   authedQuery,
@@ -166,9 +166,13 @@ export const createSharedList = authedMutation({
     const list = await ctx.db.get(listId);
     if (list === null) throw new Error("List not found");
     const places: NewListPlace[] = [];
+    const saves = await readySavesNewestFirst(ctx, userId);
     for (const city of cities) {
-      for (const item of await readyCitySaves(ctx, userId, city)) {
-        places.push(...savePlaces(item, city));
+      const wanted = cityKey(city);
+      for (const item of saves) {
+        if ((item.cities ?? []).some((c) => cityKey(c) === wanted)) {
+          places.push(...savePlaces(item, city));
+        }
       }
     }
     await insertListPlaces(ctx, list, userId, places, now);
@@ -334,11 +338,12 @@ export const joinSharedList = authedMutation({
     }
     const members = await listMembers(ctx, list._id);
     if (members.length >= MAX_LIST_MEMBERS) throw new Error("List is full");
+    const now = Date.now();
     await ctx.db.insert("sharedListMembers", {
       listId: list._id,
       userId,
-      joinedAt: Date.now(),
-      seenAt: 0,
+      joinedAt: now,
+      seenAt: now,
     });
     return list._id;
   },
