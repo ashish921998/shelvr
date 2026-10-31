@@ -528,11 +528,10 @@ function retryReadNothingNew(item: Doc<"items">, read: LinkRead): boolean {
   if (read.status === "unreadable") return true;
   const { content, recipe, placeList, description, title, heroImageUrl } =
     read.page;
-  if (content || recipe || placeList || description) return false;
-  if (title && heroImageUrl) return false;
-  return Boolean(
-    item.content || item.recipe || item.description || item.places?.length,
-  );
+  if (content || recipe || placeList) return false;
+  if (item.content || item.recipe) return true;
+  if (description || (title && heroImageUrl)) return false;
+  return Boolean(item.description || item.places?.length);
 }
 
 async function analyzeLinkItem(

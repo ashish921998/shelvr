@@ -201,15 +201,17 @@ export function completionPatch(
     tags: words.tags,
     content,
     recipe: words.recipe ?? earlier?.recipe,
-    siteName: reading.siteName ?? earlier?.siteName,
+    siteName: reading.siteName,
     author: reading.author ?? earlier?.author,
     heroImageUrl: reading.heroImageUrl ?? earlier?.heroImageUrl,
     media: reading.media ?? earlier?.media,
-    articleMedia: reading.articleMedia ?? earlier?.articleMedia,
+    articleMedia: reading.articleMedia,
     ...(reading.storageId !== undefined
       ? { storageId: reading.storageId }
       : {}),
-    aspectRatio: reading.aspectRatio,
+    aspectRatio:
+      reading.aspectRatio ??
+      (reading.heroImageUrl ? undefined : earlier?.aspectRatio),
     intents: words.intents,
     ...(words.cities !== undefined ? { cities: words.cities } : {}),
     ...(words.places !== undefined ? { places: words.places } : {}),
