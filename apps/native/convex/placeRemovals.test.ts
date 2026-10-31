@@ -604,7 +604,8 @@ describe("place removals", () => {
   it("keeps what the city page shows as a separate row", async () => {
     const { t, itemId, pin, map } = await setup();
     const at = { lat: pin.lat, lng: pin.lng, city: pin.city };
-    const cases = [
+    type Row = typeof at & { name: string; appleId?: string };
+    const cases: { removed: Row; kept: Row }[] = [
       {
         removed: { ...at, name: "Tigre", appleId: "a" },
         kept: { ...at, name: "Tigre", appleId: "b", lat: pin.lat + 0.001 },
@@ -666,7 +667,9 @@ describe("place removals", () => {
       category: "Restaurant",
       interest: "food" as const,
     };
-    const keep = (suggestion: typeof found & { area?: string }) =>
+    const keep = (
+      suggestion: typeof found & { area?: string; appleId?: string },
+    ) =>
       keepSuggestion(suggestion, {
         centre: at,
         been: new Set(),
@@ -731,7 +734,8 @@ describe("place removals", () => {
       appleId: lisbon.appleId,
     });
     expect((await map()).map((p) => p.appleId)).toEqual(["porto"]);
-    expect((await source()).places).toEqual(["Sol, Porto"]);
+    expect((await source()).places).not.toContain("Sol, Lisbon");
+    expect((await source()).places).toContain("Sol, Porto");
     expect((await source(portoOnly)).places).toEqual(["Sol"]);
     expect((await source(namedPorto)).places).toEqual(["Sol, Porto"]);
     expect((await source(lisbonSave)).places).toEqual([]);

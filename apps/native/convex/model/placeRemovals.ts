@@ -1,108 +1,66 @@
 import { v } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
-import { splitSavedPlace } from "./plan";
+import { nameWithin, type Placed } from "./placeIdentity";
+import { placeKey, splitSavedPlace } from "./plan";
 import { distanceKm, SAME_PLACE_KM } from "./trip";
 
 export type Removal = Omit<Doc<"placeRemovals">, "_id" | "userId">;
 export const removalValidator = v.object({
   name: v.string(),
   city: v.string(),
-  area: v.string(),
   lat: v.number(),
   lng: v.number(),
   appleId: v.optional(v.string()),
   _creationTime: v.number(),
 });
-const MAX_UNIDENTIFIED_DISTANCE_KM = 2;
+// Closer than this under one name, a second Apple id is the venue's id changing, not a second branch.
+const REISSUED_ID_KM = 0.05;
 
-function normalized(value: string): string {
-  return (
-    value
-      .normalize("NFKC")
-      .normalize("NFD")
-      .replace(/(\p{Script=Latin})\p{M}+/gu, "$1")
-      .normalize("NFC")
-      .toLowerCase()
-      .match(/[\p{L}\p{N}\p{So}\p{M}]+/gu)
-      ?.join(" ") ?? ""
-  );
+function venueKey(label: string): string {
+  const { name } = splitSavedPlace(label);
+  return placeKey(name) || name;
 }
 
-function venueName(value: string): string {
-  return normalized(splitSavedPlace(value).name).replace(
-    /\s+(restaurant|restaurante|cafe|bar)$/u,
-    "",
-  );
-}
-
-function areaOf(name: string, cities: readonly string[]): string {
-  const cityNames = new Set(cities.map(normalized));
-  return splitSavedPlace(name)
-    .area.split(",")
-    .map(normalized)
-    .filter((part) => part !== "" && !cityNames.has(part))
-    .join(",");
-}
-
-export function removalArea(
-  item: Doc<"items">,
-  name: string,
-  city: string,
-): string {
-  const direct = areaOf(name, [city]);
-  if (direct) return direct;
-  const areas = new Set(
-    (item.places ?? [])
-      .filter((value) => venueName(value) === venueName(name))
-      .map((value) => areaOf(value, [city]))
-      .filter(Boolean),
-  );
-  return areas.size === 1 ? [...areas][0] : "";
-}
-
-function sameLabel(
-  a: string,
-  aArea: string,
-  b: string,
-  bArea: string,
-): boolean {
-  const key = venueName(a);
-  return key !== "" && key === venueName(b) && (!bArea || aArea === bArea);
-}
-
-function removedPin(
-  removal: Removal,
-  pin: {
-    name: string;
-    area?: string;
-    city?: string;
-    lat: number;
-    lng: number;
-    appleId?: string;
-  },
-): boolean {
+function removedPin(removal: Removal, pin: Placed): boolean {
   if (pin.appleId && pin.appleId === removal.appleId) return true;
-  const area = areaOf(pin.area ? `${pin.name}, ${pin.area}` : pin.name, [
-    pin.city ?? removal.city,
-  ]);
-  if (!sameLabel(removal.name, removal.area, pin.name, area)) return false;
-  const limit =
-    pin.appleId && removal.appleId
-      ? SAME_PLACE_KM
-      : MAX_UNIDENTIFIED_DISTANCE_KM;
-  return distanceKm(pin, removal) <= limit;
+  const km = distanceKm(pin, removal);
+  const sameName = venueKey(pin.name) === venueKey(removal.name);
+  if (pin.appleId && removal.appleId) return sameName && km <= REISSUED_ID_KM;
+  return (
+    km <= SAME_PLACE_KM &&
+    (sameName ||
+      nameWithin(
+        splitSavedPlace(pin.name).name,
+        splitSavedPlace(removal.name).name,
+      ))
+  );
+}
+
+type Label = { key: string; cities: string[]; area: string };
+
+function parseLabel(value: string, cities: readonly string[]): Label {
+  const known = new Set(cities.map(placeKey));
+  const parts = splitSavedPlace(value)
+    .area.split(",")
+    .map(placeKey)
+    .filter(Boolean);
+  return {
+    key: venueKey(value),
+    cities: parts.filter((part) => known.has(part)),
+    area: parts.filter((part) => !known.has(part)).join(","),
+  };
+}
+
+function namesCity(label: Label, city: string | undefined): boolean {
+  return (
+    !city || label.cities.length === 0 || label.cities.includes(placeKey(city))
+  );
 }
 
 export function isRemovedSuggestion(
   removals: readonly Removal[],
-  pin: {
-    name: string;
-    area?: string;
-    lat: number;
-    lng: number;
-    appleId?: string;
-  },
+  pin: Placed,
 ): boolean {
   return removals.some((row) => removedPin(row, pin));
 }
@@ -112,33 +70,35 @@ export function visibleItemPlaces(
   removals: readonly Removal[],
 ): Doc<"items"> {
   const applicable = removals.filter(
-    (row) => (item.sourceSavedAt ?? item._creationTime) <= row._creationTime,
+    (row) => item._creationTime <= row._creationTime,
   );
   if (!applicable.length) return item;
+  const cities = item.cities ?? [];
   const hidden = (item.placePins ?? []).filter((pin) =>
     applicable.some((row) => removedPin(row, pin)),
   );
   const placePins = item.placePins?.filter((pin) => !hidden.includes(pin));
-  const keep = (name: string) => {
-    const area = areaOf(name, item.cities ?? []);
-    const matches = (pin: { name: string; city?: string }) =>
-      sameLabel(
-        pin.name,
-        areaOf(pin.name, [pin.city ?? "", ...(item.cities ?? [])]),
-        name,
-        area,
-      );
-    if (hidden.some(matches) && !(placePins ?? []).some(matches)) return false;
-    return !applicable.some((row) => {
-      if (
-        !(item.cities ?? []).some(
-          (city) => normalized(city) === normalized(row.city),
-        )
-      )
-        return false;
-      if (!sameLabel(row.name, row.area, name, area)) return false;
-      return !(placePins ?? []).some(matches);
-    });
+  const namesPin = (
+    label: Label,
+    pin: { name: string; city?: string },
+  ): boolean => {
+    const own = parseLabel(pin.name, [...cities, pin.city ?? ""]);
+    return (
+      own.key === label.key &&
+      namesCity(label, pin.city) &&
+      (!label.area || !own.area || label.area === own.area)
+    );
+  };
+  const namesRemoval = (label: Label, row: Removal): boolean =>
+    venueKey(row.name) === label.key &&
+    cities.some((city) => placeKey(city) === placeKey(row.city)) &&
+    namesCity(label, row.city) &&
+    (!label.area || label.area === parseLabel(row.name, [row.city]).area);
+  const keep = (value: string): boolean => {
+    const label = parseLabel(value, cities);
+    if (placePins?.some((pin) => namesPin(label, pin))) return true;
+    if (hidden.some((pin) => namesPin(label, pin))) return false;
+    return !applicable.some((row) => namesRemoval(label, row));
   };
   return {
     ...item,
@@ -157,7 +117,7 @@ export async function userRemovals(
   return (
     await ctx.db
       .query("placeRemovals")
-      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect()
   ).map(({ _id: _id, userId: _userId, ...row }) => row);
 }

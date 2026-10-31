@@ -123,7 +123,7 @@ async function seedFixtures(
         .take(2),
       ctx.db
         .query("placeRemovals")
-        .withIndex("by_userId", (q) => q.eq("userId", userId))
+        .withIndex("by_user", (q) => q.eq("userId", userId))
         .take(RESET_LIMIT + 1),
     ]);
 

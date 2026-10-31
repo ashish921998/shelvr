@@ -93,11 +93,10 @@ export default defineSchema({
     userId: v.string(),
     name: v.string(),
     city: v.string(),
-    area: v.string(),
     lat: v.number(),
     lng: v.number(),
     appleId: v.optional(v.string()),
-  }).index("by_userId", ["userId"]),
+  }).index("by_user", ["userId"]),
 
   items: defineTable({
     userId: v.string(),
@@ -115,7 +114,6 @@ export default defineSchema({
     storageId: v.optional(v.id("_storage")),
     aspectRatio: v.optional(v.number()),
     capturedAt: v.optional(v.number()),
-    sourceSavedAt: v.optional(v.number()),
     latitude: v.optional(v.number()),
     longitude: v.optional(v.number()),
     placePins: v.optional(placePinsValidator),

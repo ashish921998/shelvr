@@ -377,7 +377,7 @@ async function deletePlaceRemovalsBatch(
 ): Promise<boolean> {
   const rows = await ctx.db
     .query("placeRemovals")
-    .withIndex("by_userId", (q) => q.eq("userId", userId))
+    .withIndex("by_user", (q) => q.eq("userId", userId))
     .take(DELETE_BATCH);
   for (const row of rows) await ctx.db.delete(row._id);
   return rows.length !== DELETE_BATCH;

@@ -1,7 +1,7 @@
 import { v } from "convex/values";
 import { authedMutation } from "./model/auth";
 import { cityKey } from "./model/trip";
-import { removalArea, visibleSave } from "./model/placeRemovals";
+import { visibleSave } from "./model/placeRemovals";
 import { rateLimiter } from "./model/rateLimiter";
 import { requireProEntitlement } from "./subscriptions";
 
@@ -37,7 +37,6 @@ export const removePlace = authedMutation({
     return await ctx.db.insert("placeRemovals", {
       userId: ctx.userId,
       name: selected.name,
-      area: removalArea(item, selected.name, city),
       city: cityKey(city),
       lat: selected.lat,
       lng: selected.lng,

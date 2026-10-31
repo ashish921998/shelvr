@@ -338,13 +338,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark.
   Planning reads these records inside Shelvr; they are not sent to an AI provider.
 - **`placeRemovals.ts`**: `removePlace` stores an owned venue decision; `undoRemovePlace`
-  deletes that decision idempotently. `model/placeRemovals.ts` loads the user's decisions
-  once per batch read and projects them over raw saves and membership intents together.
-  Apple identifiers match across city labels. Name fallbacks preserve neighborhoods and
-  Unicode identities, with a two-kilometer limit for unidentified pins. City, Map, search,
-  planning and automatic suggestions use the projection; source saves, existing trips and
-  deliberate manual additions remain. Background list parts inherit `items.sourceSavedAt`
-  so late processing retains the original save time. Keep that optional field and the
+  deletes that decision idempotently. `model/placeRemovals.ts` projects a user's decisions over
+  raw saves and membership intents on read. A pin matches by the city page's row identity: one
+  Apple id, or one name a few doors apart; a second Apple id counts only within 50 m under the
+  same name. A label without a pin matches by name and city. City, Map, search, planning and
+  automatic suggestions use the projection; source saves, existing trips and deliberate manual
+  additions remain. A save made after the removal shows the place again. Keep the
   `placeRemovals` table on rollback once rows exist.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
   link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and

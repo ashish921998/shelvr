@@ -2334,7 +2334,6 @@ export const addPlaceListParts = internalMutation({
       const placePins = withListPins([], part.pins, cities);
       const partId = await ctx.db.insert("items", {
         userId: item.userId,
-        sourceSavedAt: item.sourceSavedAt ?? item._creationTime,
         type: "link",
         status: "ready",
         url,
