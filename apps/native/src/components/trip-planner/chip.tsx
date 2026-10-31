@@ -1,5 +1,5 @@
 import { ThemedText } from "@/components/ui/themed-text";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -38,7 +38,8 @@ export function Chip({
       accessibilityState={{ checked: selected }}
       hitSlop={4}
       onPress={() => {
-        if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
+        if (pick === "radio" && selected) return;
+        void haptics.selection();
         onPress();
       }}
       style={({ pressed }) => [

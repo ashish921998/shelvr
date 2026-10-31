@@ -1,4 +1,5 @@
 import { shareBatchAllowed } from "@/lib/share/storage";
+import { haptics } from "@/lib/haptics";
 import { t, useAppLocale, localizeError } from "@/lib/i18n";
 import { recordShareSaved } from "@/lib/first-share";
 import {
@@ -446,6 +447,7 @@ function runEffect(
       analytics.capture(effect.event);
       return;
     case "sharedContentSaved":
+      void haptics.success();
       analytics.capture("shared_content_saved", {
         item_count: effect.itemCount,
       });

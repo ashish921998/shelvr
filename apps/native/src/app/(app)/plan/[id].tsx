@@ -24,7 +24,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { Image } from "expo-image";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, type ReactNode } from "react";
@@ -43,11 +43,10 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 const tick = () => haptic("tick");
 
 function haptic(kind: "tick" | "done") {
-  if (process.env.EXPO_OS !== "ios") return;
   if (kind === "tick") {
-    void Haptics.selectionAsync();
+    void haptics.selection();
   } else {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void haptics.success();
   }
 }
 

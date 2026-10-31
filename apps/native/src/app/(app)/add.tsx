@@ -11,7 +11,7 @@ import { saveErrorCode, saveFailureStage } from "@convex/model/saveErrors";
 import { api } from "@convex/_generated/api";
 import { useMutation } from "convex/react";
 import * as Crypto from "expo-crypto";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { Stack, useRouter } from "expo-router";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -123,9 +123,7 @@ function AddContent({ close }: { close: () => void }) {
         saveSource: "manual_link",
       });
       analytics.capture("article_saved");
-      if (process.env.EXPO_OS === "ios") {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
+      void haptics.success();
       dismiss();
     } catch (error) {
       analytics.capture("save_failed", {
