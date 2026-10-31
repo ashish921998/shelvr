@@ -94,7 +94,10 @@ export const claimDatePlanInternal = internalMutation({
       return {
         from: "list" as const,
         city,
-        ...(await claimListPlan(ctx, args.listId, userId, city, "makePlan")),
+        ...(await claimListPlan(ctx, args.listId, userId, city, {
+          bucket: "makePlan",
+          needsPlaces: false,
+        })),
       };
     }
     await requireProEntitlement(ctx, userId);

@@ -602,10 +602,9 @@ export async function claimListPlan(
   listId: Id<"sharedLists">,
   userId: Id<"users">,
   city: string,
-  bucket: "makePlan" | "createTripPlan",
+  options: { bucket: "makePlan" | "createTripPlan"; needsPlaces: boolean },
 ): Promise<ListPlanClaim> {
   const list = await requireCoveredList(ctx, listId, userId);
-  await rateLimiter.limit(ctx, bucket, { key: userId, throws: true });
   const wanted = cityKey(city);
   const been = await recentVisits(ctx, userId);
   const skipped = new Set(been.map(placeKey));
@@ -615,6 +614,10 @@ export async function claimListPlan(
       cityKey(row.city) === wanted &&
       !skipped.has(placeKey(row.name)),
   );
+  if (options.needsPlaces && rows.length === 0) {
+    throw new Error("No places in this city");
+  }
+  await rateLimiter.limit(ctx, options.bucket, { key: userId, throws: true });
   const places: ListPlanClaim["places"] = [];
   for (const row of rows) {
     const itemId = await ownSaveId(ctx, row, userId);

@@ -8,6 +8,8 @@ import type { DatePlanResult } from "./model/datePlan";
 import { joiner, listWithOwner, near } from "./sharedLists.test.helpers";
 import { setTestConsent, signedInUser, type TestBackend } from "./test.setup";
 
+const TRIP_BUCKET_CAPACITY = 5;
+
 const RED_FROG = {
   name: "Red Frog",
   ...near(4),
@@ -160,6 +162,62 @@ describe("makeDatePlan from a shared list", () => {
         listId,
       }),
     ).rejects.toThrow(/List not found/);
+  });
+});
+
+describe("planning a city the list does not hold", () => {
+  it("gives a date plan no Apple call and no stops", async () => {
+    const fetchMock = await stubMaps();
+    const { owner, listId } = await listWithOwner();
+    const result = await owner.t.action(api.datePlans.makeDatePlan, {
+      city: "Porto",
+      kind: "classic",
+      listId,
+    });
+    expect(result).toMatchObject({ status: "no_anchor", stops: [] });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("refuses a trip before the rate limit or any Apple call", async () => {
+    const fetchMock = await stubMaps();
+    const { base, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const trip = (city: string) =>
+      bo.t.action(api.tripPlanner.createTripPlan, {
+        city,
+        days: 1,
+        pace: "easy",
+        interests: ["food"],
+        listId,
+      });
+    for (let n = 0; n < TRIP_BUCKET_CAPACITY + 1; n++) {
+      await expect(trip("Porto")).rejects.toThrow(/No places in this city/);
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect((await trip("Lisbon")).tripId).not.toBeNull();
+  });
+
+  it("refuses a trip when every place in the city has been visited", async () => {
+    const fetchMock = await stubMaps();
+    const { base, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const list = await bo.t.query(api.sharedLists.getSharedList, { listId });
+    for (const place of list?.places ?? []) {
+      await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+        placeId: place._id,
+        visited: true,
+      });
+    }
+    await expect(
+      bo.t.action(api.tripPlanner.createTripPlan, {
+        city: "Lisbon",
+        days: 1,
+        pace: "easy",
+        interests: ["food"],
+        listId,
+      }),
+    ).rejects.toThrow(/No places in this city/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 
