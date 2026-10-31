@@ -311,6 +311,29 @@ describe("a place the list marked visited", () => {
   });
 });
 
+describe("planning one city of a list with two", () => {
+  it("uses only that city's places", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: { ...RED_FROG, name: "Porto Frog", city: "Porto" },
+    });
+    await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: RED_FROG,
+    });
+    const result = await owner.t.action(api.datePlans.makeDatePlan, {
+      city: "lisbon",
+      kind: "classic",
+      listId,
+    });
+    expect(stopNames(result)).toContain("Red Frog");
+    expect(stopNames(result)).not.toContain("Porto Frog");
+  });
+});
+
 describe("planning a city the list does not hold", () => {
   it("gives a date plan no Apple call and no stops", async () => {
     const fetchMock = await stubMaps();
