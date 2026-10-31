@@ -269,29 +269,31 @@ export const getSharedList = authedQuery({
           joinedAt: member.joinedAt,
         };
       }),
-      places: places.map((place) => {
-        const addedByName = names.get(place.addedBy);
-        const own = place.addedBy === userId;
-        return {
-          _id: place._id,
-          name: place.name,
-          lat: place.lat,
-          lng: place.lng,
-          city: place.city,
-          ...(place.appleId !== undefined ? { appleId: place.appleId } : {}),
-          ...(place.category !== undefined ? { category: place.category } : {}),
-          ...(own && place.itemId !== undefined
-            ? { itemId: place.itemId }
-            : {}),
-          addedByYou: own,
-          ...(addedByName !== undefined ? { addedByName } : {}),
-          addedAt: place.addedAt,
-          isNew: isNewPlace(place, membership),
-          ...(place.visitedAt !== undefined
-            ? { visitedAt: place.visitedAt }
-            : {}),
-        };
-      }),
+      places: await Promise.all(
+        places.map(async (place) => {
+          const addedByName = names.get(place.addedBy);
+          const itemId = await ownSaveId(ctx, place, userId);
+          return {
+            _id: place._id,
+            name: place.name,
+            lat: place.lat,
+            lng: place.lng,
+            city: place.city,
+            ...(place.appleId !== undefined ? { appleId: place.appleId } : {}),
+            ...(place.category !== undefined
+              ? { category: place.category }
+              : {}),
+            ...(itemId !== undefined ? { itemId } : {}),
+            addedByYou: place.addedBy === userId,
+            ...(addedByName !== undefined ? { addedByName } : {}),
+            addedAt: place.addedAt,
+            isNew: isNewPlace(place, membership),
+            ...(place.visitedAt !== undefined
+              ? { visitedAt: place.visitedAt }
+              : {}),
+          };
+        }),
+      ),
       trips: trips.map(tripSummary),
     };
   },
@@ -404,8 +406,7 @@ export const removeSharedListMember = authedMutation({
     if (list.ownerId !== userId) throw new Error("Only the owner can remove");
     if (args.memberId === userId) throw new Error("Leave the list instead");
     const membership = await memberOf(ctx, list._id, args.memberId);
-    if (membership === null) return null;
-    await ctx.db.delete(membership._id);
+    if (membership !== null) await ctx.db.delete(membership._id);
     await ctx.db.patch(list._id, { inviteToken: inviteToken() });
     return null;
   },
