@@ -3,7 +3,7 @@ import type { Doc } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import type { Placed } from "./placeIdentity";
 import { placeKey, splitSavedPlace } from "./plan";
-import { distanceKm, otherVenue, SAME_PLACE_KM } from "./trip";
+import { distanceKm, otherVenue, pinsForCity, SAME_PLACE_KM } from "./trip";
 
 export type Removal = Omit<Doc<"placeRemovals">, "_id" | "userId">;
 export const removalValidator = v.object({
@@ -63,6 +63,28 @@ export function removalsSince<Row extends Removal>(
   return removals.filter((row) => savedAt <= row._creationTime);
 }
 
+function placeLabels(item: Doc<"items">): Label[] {
+  return [
+    ...(item.places ?? []),
+    ...(item.intents ?? [])
+      .filter((intent) => intent.kind === "open_maps")
+      .map((intent) => intent.value),
+  ].map((value) => parseLabel(value, item.cities ?? []));
+}
+
+function namesPlaceIn(item: Doc<"items">, city: string): boolean {
+  return (
+    pinsForCity(item, city).length > 0 ||
+    item.placePins?.some((pin) => !pin.city) ||
+    placeLabels(item).some(
+      (label) =>
+        namesCity(label, city) &&
+        (label.cities.length > 0 ||
+          !item.placePins?.some((pin) => venueKey(pin.name) === label.key)),
+    )
+  );
+}
+
 export function visibleItemPlaces(
   item: Doc<"items">,
   removals: readonly Removal[],
@@ -85,12 +107,7 @@ export function visibleItemPlaces(
       (!label.area || !own.area || label.area === own.area)
     );
   };
-  const labels = [
-    ...(item.places ?? []),
-    ...(item.intents ?? [])
-      .filter((intent) => intent.kind === "open_maps")
-      .map((intent) => intent.value),
-  ].map((value) => parseLabel(value, cities));
+  const labels = placeLabels(item);
   const hidesLabel = (
     label: Label,
     pin: Placed & { city?: string },
@@ -123,6 +140,21 @@ export function visibleItemPlaces(
       (intent) => intent.kind !== "open_maps" || keep(intent.value),
     ),
   };
+}
+
+export function visibleCitySave(
+  item: Doc<"items">,
+  removals: readonly Removal[],
+): Doc<"items"> {
+  const visible = visibleItemPlaces(item, removals);
+  return visible === item
+    ? item
+    : {
+        ...visible,
+        cities: item.cities?.filter(
+          (city) => !namesPlaceIn(item, city) || namesPlaceIn(visible, city),
+        ),
+      };
 }
 
 export async function userRemovals(
