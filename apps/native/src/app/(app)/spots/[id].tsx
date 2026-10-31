@@ -75,9 +75,13 @@ export default function SpotsScreen() {
         reason: reveal.reason,
         waited_ms: waitedMs,
       });
-      router.replace("/(app)/(tabs)/(home)");
     }
-  }, [reveal, waitedMs, router]);
+  }, [reveal, waitedMs]);
+
+  const gone = reveal.kind === "none";
+  useEffect(() => {
+    if (gone) router.replace("/(app)/(tabs)/(home)");
+  }, [gone, router]);
 
   if (reveal.kind !== "spots" || !save) {
     return (

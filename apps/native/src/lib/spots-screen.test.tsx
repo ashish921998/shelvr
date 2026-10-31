@@ -21,7 +21,7 @@ type Save = {
 const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   replace: vi.fn(),
-  save: undefined as Save | undefined,
+  save: undefined as Save | null | undefined,
   impact: vi.fn(),
   success: vi.fn(),
 }));
@@ -171,4 +171,19 @@ it("goes Home, as before, when the save has no place", () => {
     reason: "no_place",
     waited_ms: 0,
   });
+});
+
+it("goes Home when the revealed save is deleted from its detail screen", () => {
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [{ name: "Uchi", lat: 30.26, lng: -97.75, city: "Austin" }],
+  };
+  const { rerender } = render(<SpotsScreen />);
+  expect(mocks.replace).not.toHaveBeenCalled();
+  mocks.save = null;
+  rerender(<SpotsScreen />);
+  expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
+  expect(mocks.capture).toHaveBeenCalledTimes(1);
 });
