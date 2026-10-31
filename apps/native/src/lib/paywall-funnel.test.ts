@@ -279,6 +279,34 @@ describe("paywall offering reads", () => {
     });
   });
 
+  it("shows a placement its own offering once RevenueCat has it", async () => {
+    const winback = { identifier: "winback", availablePackages: [] };
+    const intro = { identifier: "intro", availablePackages: [] };
+    const funnel = await load({
+      getOfferings: async () => ({
+        ...offering(trial("DAY", 7), null),
+        all: { winback, intro },
+      }),
+    });
+    await expect(funnel.readPaywallOffering("winback")).resolves.toEqual({
+      offering: winback,
+    });
+    await expect(funnel.readPaywallOffering("intro")).resolves.toEqual({
+      offering: intro,
+    });
+  });
+
+  it("falls back to the default offering when a placement has none yet", async () => {
+    const current = offering(trial("DAY", 7), null);
+    const funnel = await load({ getOfferings: async () => current });
+    for (const placement of ["winback", "intro", "home_card"]) {
+      await expect(funnel.readPaywallOffering(placement)).resolves.toEqual({
+        offering: current.current,
+        trial: { unit: "DAY", count: 7 },
+      });
+    }
+  });
+
   it("shows the no-trial offering to someone who used their trial", async () => {
     const funnel = await load({
       getOfferings: async () => withNoTrial(offering(trial("DAY", 7), null)),

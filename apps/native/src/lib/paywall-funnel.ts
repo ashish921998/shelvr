@@ -146,7 +146,13 @@ export async function readPaywallContext(): Promise<PaywallContext> {
 
 export const NO_TRIAL_OFFERING_ID = "weekly_annual_draft";
 
-export async function readPaywallOffering(): Promise<{
+/** Placements with an offering of their own: `winback` carries the promo offers, `intro` the paid intro products. */
+const PLACEMENT_OFFERING_IDS: Record<string, string> = {
+  winback: "winback",
+  intro: "intro",
+};
+
+export async function readPaywallOffering(placement?: string): Promise<{
   offering?: import("react-native-purchases").PurchasesOffering;
   trial?: TrialPeriod;
   eligibility?: TrialEligibility;
@@ -158,6 +164,12 @@ export async function readPaywallOffering(): Promise<{
     rc.getOfferings(),
     PAYWALL_CONTEXT_TIMEOUT_MS,
   );
+  const placed =
+    placement === undefined
+      ? undefined
+      : offerings.all[PLACEMENT_OFFERING_IDS[placement] ?? ""];
+  // Until RevenueCat has the placement's offering, the default paywall shows.
+  if (placed) return { offering: placed };
   const current = offerings.current;
   if (!current) return {};
   const products = current.availablePackages.map((pkg) => pkg.product);

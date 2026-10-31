@@ -114,6 +114,13 @@
   "planGate.title": "Pick a plan to open Shelvr",
   "planGate.body": "Your saves stay right where you left them.",
   "planGate.seePlans": "See plans",
+  "planGate.winbackTitle": "Your cities are still here",
+  "planGate.winbackBody": {
+    "one": "Your %{formattedCount} saved place is right where you left it. Come back to plan your next date or trip.",
+    "other": "Your %{formattedCount} saved places are right where you left them. Come back to plan your next date or trip."
+  },
+  "planGate.winbackBodyEmpty": "Everything you saved is right where you left it. Come back to plan your next date or trip.",
+  "planGate.winbackCta": "See my comeback offer",
   "paywall.trialOffer": "Start for %{zero}, then %{price}/year.",
   "paywallGoal.travelHeadline": "Plan %{city} from your saves.",
   "paywallGoal.travelHeadlineNoCity": "Plan your next trip from your saves.",

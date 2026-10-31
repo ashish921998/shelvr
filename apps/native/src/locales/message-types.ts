@@ -112,6 +112,10 @@ export type MessageParams = {
   "planGate.title": undefined;
   "planGate.body": undefined;
   "planGate.seePlans": undefined;
+  "planGate.winbackTitle": undefined;
+  "planGate.winbackBody": { count: number };
+  "planGate.winbackBodyEmpty": undefined;
+  "planGate.winbackCta": undefined;
   "paywall.trialOffer": { zero: string; price: string };
   "paywallGoal.travelHeadline": { city: string };
   "paywallGoal.travelHeadlineNoCity": undefined;

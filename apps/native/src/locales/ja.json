@@ -113,6 +113,12 @@
   "planGate.title": "Shelvrを開くにはプランを選んでください",
   "planGate.body": "保存したものはそのまま残っています。",
   "planGate.seePlans": "プランを見る",
+  "planGate.winbackTitle": "あなたの街はそのまま残っています",
+  "planGate.winbackBody": {
+    "other": "保存した%{formattedCount}か所の場所は、そのまま残っています。戻って、次のデートや旅行を計画しましょう。"
+  },
+  "planGate.winbackBodyEmpty": "保存したものはすべてそのまま残っています。戻って、次のデートや旅行を計画しましょう。",
+  "planGate.winbackCta": "おかえりなさい特典を見る",
   "paywall.trialOffer": "%{zero}で始めて、その後は%{price}/年。",
   "paywallGoal.travelHeadline": "保存した場所で%{city}の旅を計画。",
   "paywallGoal.travelHeadlineNoCity": "保存した場所で次の旅を計画。",
