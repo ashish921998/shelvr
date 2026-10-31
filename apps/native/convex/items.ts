@@ -56,6 +56,7 @@ import {
   MAX_NOTE_TEXT_CHARS,
   normalizeCities,
   normalizePlaces,
+  placeLocationsValidator,
   placePinsValidator,
   postMediaValidator,
   PROCESSING_STALE_MS,
@@ -227,12 +228,12 @@ function stripEmbedding(
   | "productsSearchStartedAt"
   | "places"
   | "placesHeard"
-  | "sourceSavedAt"
+  | "placeLocations"
 > {
   const {
     places: _places,
     placesHeard: _placesHeard,
-    sourceSavedAt: _sourceSavedAt,
+    placeLocations: _placeLocations,
     embedding: _embedding,
     embeddingVersion: _version,
     embeddingAttempts: _attempts,
@@ -2099,17 +2100,19 @@ export const getItemInternal = internalQuery({
       ...itemFields,
       places: v.optional(v.array(v.string())),
       placesHeard: v.optional(v.boolean()),
+      placeLocations: v.optional(placeLocationsValidator),
     }),
     v.null(),
   ),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     if (item === null) return null;
-    const { places, placesHeard } = item;
+    const { places, placesHeard, placeLocations } = item;
     return {
       ...stripEmbedding(item),
       ...(places ? { places } : {}),
       ...(placesHeard !== undefined ? { placesHeard } : {}),
+      ...(placeLocations !== undefined ? { placeLocations } : {}),
     };
   },
 });

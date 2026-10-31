@@ -77,6 +77,69 @@ describe("a run without the model", () => {
   });
 });
 
+it("replaces only pins whose branch clue changed and retains them without AI permission", () => {
+  const oldPins = [
+    { name: "Carette, Paris", lat: 48.855, lng: 2.365 },
+    { name: "Louvre", lat: 48.86, lng: 2.337 },
+  ];
+  const item = savedItem({
+    places: ["Carette", "Louvre"],
+    cities: ["Paris"],
+    placePins: oldPins,
+  });
+  const run = {
+    reading: {},
+    classification: {
+      description: "Paris cafes",
+      tags: [],
+      cities: ["Paris"],
+      places: ["Carette", "Louvre"],
+      placeLocations: [
+        { name: "Carette, Paris", location: "Place du Trocadéro" },
+      ],
+    },
+  };
+  const patch = completionPatch(item, run, true);
+  expect(patch.placeLocations).toEqual([
+    { name: "Carette", location: "Place du Trocadéro" },
+  ]);
+  expect(patch.placePins).toEqual([oldPins[1]]);
+  expect(completionPatch(item, run, false)).not.toHaveProperty("placePins");
+  expect(completionPatch(item, run, false)).not.toHaveProperty(
+    "placeLocations",
+  );
+  expect(
+    completionPatch(
+      { ...item, placeLocations: patch.placeLocations },
+      run,
+      true,
+    ),
+  ).not.toHaveProperty("placePins");
+});
+
+it("clears a pin whose name differs from the clue only by accents or punctuation", () => {
+  const item = savedItem({
+    places: ["Cafe Joe's"],
+    cities: ["Paris"],
+    placePins: [{ name: "Cafe Joe's", lat: 48.855, lng: 2.365 }],
+  });
+  const patch = completionPatch(
+    item,
+    {
+      reading: {},
+      classification: {
+        description: "Paris cafes",
+        tags: [],
+        cities: ["Paris"],
+        places: ["Café Joe’s"],
+        placeLocations: [{ name: "Café Joe’s", location: "Rue Oberkampf" }],
+      },
+    },
+    true,
+  );
+  expect(patch.placePins).toEqual([]);
+});
+
 it("stores single-city classification places without city suffixes", () => {
   const patch = completionPatch(
     savedItem(),

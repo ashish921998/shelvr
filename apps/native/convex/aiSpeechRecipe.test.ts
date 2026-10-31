@@ -283,12 +283,20 @@ function placesModel(
     spokenCities?: string[];
     placesVideo?: boolean;
     cookingVideo?: boolean;
+    captionLocations?: { name: string; location: string }[];
+    spokenLocations?: { name: string; location: string }[];
   } = {},
 ) {
   generateObject.mockImplementation(async (call: { prompt?: string }) => {
     if (call.prompt?.startsWith("This is a short video saved")) {
       if (spoken instanceof Error) throw spoken;
-      return { object: { places: spoken, cities: video.spokenCities ?? [] } };
+      return {
+        object: {
+          places: spoken,
+          cities: video.spokenCities ?? [],
+          placeLocations: video.spokenLocations,
+        },
+      };
     }
     if (call.prompt?.startsWith("This is a short cooking video")) {
       return { object: { recipe: SPOKEN } };
@@ -303,6 +311,7 @@ function placesModel(
         recipe: null,
         cities: video.cities ?? [],
         places: video.caption ?? [],
+        placeLocations: video.captionLocations,
         cookingVideo: video.cookingVideo ?? false,
         placesVideo: video.placesVideo ?? true,
       },
@@ -320,6 +329,39 @@ function speechPlacesPrompt(): string | undefined {
 }
 
 describe("processItem places from a video's speech", () => {
+  it("retains caption and spoken branch clues through settlement and reruns", async () => {
+    placesModel(["Carette", "Cafe"], {
+      caption: ["Carette"],
+      cities: ["Paris"],
+      captionLocations: [{ name: "Carette", location: "Place du Trocadéro" }],
+      spokenLocations: [{ name: "Cafe", location: "Rue Royale" }],
+    });
+    transcript("Carette at Place du Trocadéro, and Cafe on Rue Royale.");
+    const t = newConvexTest();
+    const item = await process(t);
+    expect(item?.placeLocations).toEqual([
+      { name: "Carette", location: "Place du Trocadéro" },
+      { name: "Cafe", location: "Rue Royale" },
+    ]);
+    if (!item) throw new Error("Missing test save");
+    expect(
+      await t.query(internal.items.getItemInternal, { itemId: item._id }),
+    ).toHaveProperty("placeLocations", item.placeLocations);
+    placesModel([], { caption: ["Carette"], cities: ["Paris"] });
+    await t.run((ctx) =>
+      ctx.db.patch(item._id, {
+        status: "processing",
+        processingRunId: "run-2",
+      }),
+    );
+    await t.action(internal.ai.processItem, {
+      itemId: item._id,
+      runId: "run-2",
+    });
+    expect(
+      (await t.run((ctx) => ctx.db.get(item._id)))?.placeLocations,
+    ).toEqual(item.placeLocations);
+  });
   it("tries speech when TikTok has no caption to classify", async () => {
     safeFetch.mockResolvedValue({
       ok: true,
