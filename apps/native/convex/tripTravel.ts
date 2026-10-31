@@ -32,10 +32,17 @@ export const estimateDay = action({
       day: args.day,
       layout: args.layout,
     });
+    if (!stops) return null;
     const config = appleMapsConfig(env);
-    if (!stops || !config) return null;
+    if (!config) {
+      logEvent("warn", "trip_travel_config_missing", { mode: args.mode });
+      return null;
+    }
     const token = await travelAccessToken(config);
-    if (!token) return null;
+    if (!token) {
+      logEvent("warn", "trip_travel_token_failed", { mode: args.mode });
+      return null;
+    }
     const adjacentStops = stops
       .slice(1)
       .map((to, index) => ({ from: stops[index], to }));

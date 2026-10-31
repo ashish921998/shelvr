@@ -91,6 +91,55 @@ it("leaves a missing route null without losing the other estimates", async () =>
   expect(legs?.[0].estimate).toBeNull();
   expect(legs?.[1].estimate?.seconds).toBe(120);
 });
+it("warns once with the mode when the Maps key is missing", async () => {
+  const { t, tripId, stops } = await setup();
+  vi.stubEnv("APPLE_MAPS_KEY_ID", "");
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  const legs = await t.action(api.tripTravel.estimateDay, {
+    tripId,
+    day: 1,
+    mode: "walking",
+    layout: travelLayout(stops),
+  });
+  expect(legs).toBeNull();
+  expect(warn).toHaveBeenCalledOnce();
+  expect(JSON.parse(warn.mock.calls[0][0] as string)).toMatchObject({
+    event: "trip_travel_config_missing",
+    mode: "walking",
+  });
+  expect(travelAccessToken).not.toHaveBeenCalled();
+});
+it("warns once with the mode when Apple refuses the token", async () => {
+  const { t, tripId, stops } = await setup();
+  vi.mocked(travelAccessToken).mockResolvedValue(null);
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  const legs = await t.action(api.tripTravel.estimateDay, {
+    tripId,
+    day: 1,
+    mode: "driving",
+    layout: travelLayout(stops),
+  });
+  expect(legs).toBeNull();
+  expect(warn).toHaveBeenCalledOnce();
+  expect(JSON.parse(warn.mock.calls[0][0] as string)).toMatchObject({
+    event: "trip_travel_token_failed",
+    mode: "driving",
+  });
+  expect(appleTravelEstimate).not.toHaveBeenCalled();
+});
+it("stays quiet when the trip has nothing to estimate", async () => {
+  const { base, t, userId, tripId, stops } = await setup();
+  await base.run((ctx) => setTestConsent(ctx, userId, "declined"));
+  vi.stubEnv("APPLE_MAPS_KEY_ID", "");
+  const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  await t.action(api.tripTravel.estimateDay, {
+    tripId,
+    day: 1,
+    mode: "walking",
+    layout: travelLayout(stops),
+  });
+  expect(warn).not.toHaveBeenCalled();
+});
 it("sends nothing to Apple for stale layouts or opted-out users", async () => {
   const { base, t, userId, tripId, stops } = await setup();
   await expect(
