@@ -1,5 +1,6 @@
 import { CityMap } from "@/components/city/city-map";
 import { SaveRow } from "@/components/city/save-row";
+import { AlsoAddTo } from "@/components/shared-list/also-add-to";
 import { PinBadge } from "@/components/onboarding/sample-trip-map";
 import { Button } from "@/components/ui/button";
 import { StitchMark } from "@/components/ui/stitch-mark";
@@ -150,6 +151,7 @@ function Spots({
               reduced={reduced}
             />
           ))}
+          <AlsoAddTo itemId={save._id} city={city} count={pins.length} />
         </ScrollView>
         <View style={[styles.actions, { paddingBottom: rt.insets.bottom }]}>
           <Button title={t("spots.openCity", { city })} onPress={openCity} />

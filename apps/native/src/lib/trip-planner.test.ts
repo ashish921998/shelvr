@@ -202,8 +202,20 @@ describe("trip lines", () => {
 
 describe("stops", () => {
   it("badges saves and suggestions", () => {
-    expect(stopBadge("save")).toBe("tripPlanner.badgeYours");
-    expect(stopBadge("suggested")).toBe("tripPlanner.badgeSuggested");
+    expect(stopBadge({ source: "save" })).toBe("tripPlanner.badgeYours");
+    expect(stopBadge({ source: "suggested" })).toBe(
+      "tripPlanner.badgeSuggested",
+    );
+  });
+
+  it("calls a list stop with no save of yours 'On your list', never 'Yours'", () => {
+    expect(stopBadge({ source: "list" })).toBe("tripPlanner.badgeOnList");
+    expect(stopBadge({ source: "list", itemId: "i" as Id<"items"> })).toBe(
+      "tripPlanner.badgeYours",
+    );
+    expect(stopBadge({ source: "suggested" })).toBe(
+      "tripPlanner.badgeSuggested",
+    );
   });
 
   it("reads a stop row with its number and the line under it, as it shows", () => {

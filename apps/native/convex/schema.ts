@@ -366,6 +366,7 @@ export default defineSchema({
 
   tripPlans: defineTable({
     userId: v.string(),
+    listId: v.optional(v.id("sharedLists")),
     name: v.optional(v.string()),
     city: v.string(),
     startDate: v.optional(v.string()),
@@ -375,7 +376,9 @@ export default defineSchema({
     stay: v.optional(tripStayValidator),
     stopCount: v.number(),
     savedCount: v.number(),
-  }).index("by_user", ["userId"]),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_and_list", ["userId", "listId"]),
 
   tripStops: defineTable({
     tripId: v.id("tripPlans"),
@@ -395,6 +398,43 @@ export default defineSchema({
   })
     .index("by_trip_and_day", ["tripId", "day", "order"])
     .index("by_user", ["userId"]),
+
+  sharedLists: defineTable({
+    ownerId: v.id("users"),
+    name: v.string(),
+    cities: v.array(v.string()),
+    inviteToken: v.string(),
+    placeCount: v.number(),
+    createdAt: v.number(),
+  })
+    .index("by_owner", ["ownerId"])
+    .index("by_invite_token", ["inviteToken"]),
+
+  sharedListMembers: defineTable({
+    listId: v.id("sharedLists"),
+    userId: v.id("users"),
+    joinedAt: v.number(),
+    seenAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_list_and_user", ["listId", "userId"]),
+
+  sharedListPlaces: defineTable({
+    listId: v.id("sharedLists"),
+    addedBy: v.id("users"),
+    itemId: v.optional(v.id("items")),
+    name: v.string(),
+    lat: v.number(),
+    lng: v.number(),
+    city: v.string(),
+    appleId: v.optional(v.string()),
+    category: v.optional(v.string()),
+    tags: v.optional(v.array(v.string())),
+    addedAt: v.number(),
+    visitedAt: v.optional(v.number()),
+  })
+    .index("by_list_and_added", ["listId", "addedAt"])
+    .index("by_added_by", ["addedBy"]),
 
   captureTokens: defineTable({
     userId: v.id("users"),

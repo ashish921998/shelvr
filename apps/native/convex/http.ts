@@ -500,6 +500,19 @@ http.route({
 });
 
 http.route({
+  pathPrefix: "/list/invites/",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const token = new URL(req.url).pathname.split("/").pop() ?? "";
+    const invite = await ctx.runQuery(internal.sharedLists.getPublicInvite, {
+      token,
+    });
+    if (!invite) return json({ message: "Not found." }, 404);
+    return json(invite, 200);
+  }),
+});
+
+http.route({
   path: "/plan/votes",
   method: "POST",
   handler: httpAction(async (ctx, req) => {

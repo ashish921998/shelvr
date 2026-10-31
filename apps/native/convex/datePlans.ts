@@ -42,9 +42,11 @@ const SUGGESTIONS_PER_ANCHOR = 3;
 type Claim = FunctionReturnType<
   typeof internal.datePlanData.claimDatePlanInternal
 >;
+type SavesClaim = Extract<Claim, { from: "saves" }>;
+type ListClaim = Extract<Claim, { from: "list" }>;
 
 /** The city's unvisited saved places that already have a pin; a date never looks one up. */
-function savedCandidates(claim: Claim): DateCandidate[] {
+function savedCandidates(claim: SavesClaim): DateCandidate[] {
   const been = new Set(claim.been.map(placeKey));
   const places = suggestSavedPlaces(
     claim.sources,
@@ -191,21 +193,34 @@ async function suggestStops(
   return { stops, searches: targets.length };
 }
 
+function listCandidates(claim: ListClaim): DateCandidate[] {
+  return claim.places.map(({ addedAt, ...place }) => ({
+    ...place,
+    ownTags: true,
+    savedAt: addedAt,
+  }));
+}
+
 export const makeDatePlan = action({
   args: {
     city: v.string(),
     kind: dateAskValidator,
     locale: v.optional(v.string()),
+    listId: v.optional(v.id("sharedLists")),
   },
   returns: datePlanResultValidator,
   // Annotated: inferring through `internal` is circular for an action.
   handler: async (ctx, args): Promise<DatePlanResult> => {
     const claim: Claim = await ctx.runMutation(
       internal.datePlanData.claimDatePlanInternal,
-      { city: args.city },
+      {
+        city: args.city,
+        ...(args.listId !== undefined ? { listId: args.listId } : {}),
+      },
     );
     const now = Date.now();
-    const candidates = savedCandidates(claim);
+    const candidates =
+      claim.from === "list" ? listCandidates(claim) : savedCandidates(claim);
     const { kind, scored } = chooseKind(args.kind, candidates, now);
     const fields = {
       kind,
@@ -265,6 +280,17 @@ export const makeDatePlan = action({
       suggested,
       searches,
     });
-    return { status, city: claim.city, kind, ...plan };
+    return {
+      status,
+      city: claim.city,
+      kind,
+      evenings: plan.evenings,
+      stops:
+        claim.from === "list"
+          ? plan.stops.map((stop) =>
+              stop.source === "save" ? { ...stop, source: "list" } : stop,
+            )
+          : plan.stops,
+    };
   },
 });

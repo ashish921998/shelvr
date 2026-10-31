@@ -1,3 +1,4 @@
+import { webUrl } from "@/lib/web-url";
 import { t } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import { api } from "@convex/_generated/api";
@@ -313,9 +314,7 @@ export function spinSteps(
 }
 
 export function planVoteUrl(token: string): string {
-  const origin =
-    process.env.EXPO_PUBLIC_WEB_URL || "https://shelvr-web.vercel.app";
-  return new URL(`/p/${encodeURIComponent(token)}`, origin).href;
+  return webUrl(`/p/${encodeURIComponent(token)}`);
 }
 
 export function usePlanAsk(
