@@ -167,7 +167,7 @@ type RowProps = {
   stop: TripPlanStop;
   day: number;
   top: number;
-  trip: Pick<TripPlanDetail, "dayCount" | "startDate" | "listId">;
+  trip: Pick<TripPlanDetail, "dayCount" | "startDate">;
   /** How many stops the row's day holds, so Move down knows the last one. */
   dayLength: number;
   index: number;
@@ -217,9 +217,7 @@ function StopEditRow(props: RowProps) {
   );
   const actions = useRowActions(props);
   const unplanned = day === UNPLANNED_DAY;
-  const subtitle = [t(stopBadge(stop, trip.listId !== undefined)), stop.area]
-    .filter(Boolean)
-    .join(" · ");
+  const subtitle = [t(stopBadge(stop)), stop.area].filter(Boolean).join(" · ");
   return (
     <GestureDetector gesture={pan}>
       <Animated.View

@@ -7,7 +7,7 @@ import { emptyMessage, useDatePlan } from "@/lib/date-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { tidyCity } from "@convex/model/trip";
 import { haptics } from "@/lib/haptics";
-import { useEntitlement } from "@/lib/entitlement";
+import { usePlanGate } from "@/lib/plan-gate";
 import { personalPlanAllowed } from "@/lib/list-gate";
 import type { Id } from "@convex/_generated/dataModel";
 import { Redirect, Stack, useLocalSearchParams } from "expo-router";
@@ -23,7 +23,7 @@ export default function DatePlanScreen() {
     listId?: string;
   }>();
   const city = tidyCity(cityParam ?? "");
-  const entitlement = useEntitlement();
+  const { gated } = usePlanGate();
   const { state, plan, swap, restart } = useDatePlan(
     city,
     locale,
@@ -42,7 +42,6 @@ export default function DatePlanScreen() {
     <Stack.Screen options={{ headerBackTitle: t("common.back") }} />
   );
 
-  const gated = !entitlement.loading && !entitlement.entitled;
   if (!personalPlanAllowed(gated, listId))
     return <Redirect href="/plan-gate" />;
 
@@ -65,7 +64,6 @@ export default function DatePlanScreen() {
             evening={state.evening}
             onSwap={swap}
             onRestart={restart}
-            onList={listId !== undefined}
           />
         </>
       );

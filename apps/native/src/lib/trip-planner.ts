@@ -255,11 +255,12 @@ export function tripDayLabel(
 
 export function stopBadge(
   stop: Pick<TripPlanStop, "source" | "itemId">,
-  onList = false,
 ): TextMessageKey {
   switch (stop.source) {
     case "save":
-      return onList && stop.itemId === undefined
+      return "tripPlanner.badgeYours";
+    case "list":
+      return stop.itemId === undefined
         ? "tripPlanner.badgeOnList"
         : "tripPlanner.badgeYours";
     case "suggested":
@@ -287,18 +288,14 @@ export function stopWhyLine(
  */
 export function stopRowLabel(
   stop: Pick<TripPlanStop, "name" | "source" | "itemId" | "area" | "why">,
-  {
-    number,
-    fromSave,
-    onList = false,
-  }: { number?: number; fromSave: boolean; onList?: boolean },
+  { number, fromSave }: { number?: number; fromSave: boolean },
 ): string {
   return [
     number === undefined
       ? null
       : t("tripPlanner.stopNumber", { number: String(number) }),
     stop.name,
-    t(stopBadge(stop, onList)),
+    t(stopBadge(stop)),
     stop.area,
     stopWhyLine(stop, fromSave),
   ]
@@ -313,13 +310,10 @@ export type StopAction =
   | { kind: "maps"; url: string };
 
 export function stopAction(
-  stop: Pick<
-    TripPlanStop,
-    "source" | "itemId" | "appleId" | "name" | "lat" | "lng"
-  >,
+  stop: Pick<TripPlanStop, "itemId" | "appleId" | "name" | "lat" | "lng">,
   cardAvailable: boolean,
 ): StopAction {
-  if (stop.source === "save" && stop.itemId !== undefined) {
+  if (stop.itemId !== undefined) {
     return { kind: "save", itemId: stop.itemId };
   }
   if (stop.appleId !== undefined && cardAvailable) {

@@ -68,12 +68,9 @@ export async function listWithOwner(options: { pro?: boolean } = {}) {
       },
     ],
   });
-  const listId = await owner.t.mutation(api.sharedLists.createSharedList, {
-    name: "  Lisbon  weekend ",
-    cities: ["Lisbon"],
-  });
-  const token = await base.run(
-    async (ctx) => (await ctx.db.get(listId))?.inviteToken ?? "",
+  const { listId, inviteToken: token } = await owner.t.mutation(
+    api.sharedLists.createSharedList,
+    { name: "  Lisbon  weekend ", cities: ["Lisbon"] },
   );
   return { base, owner, itemId, listId, token };
 }

@@ -1,11 +1,11 @@
 import { analytics } from "@/lib/analytics";
+import { t } from "@/lib/i18n";
 import { useOnboarding } from "@/lib/onboarding";
 import { holdIncomingShare } from "@/lib/onboarding-exit";
 import { clearPending } from "@/lib/pending-onboarding";
 import {
   clearPendingInvite,
   getPendingInvite,
-  getPendingInviteRevision,
   subscribePendingInvite,
 } from "@/lib/pending-invite";
 import { api } from "@convex/_generated/api";
@@ -13,6 +13,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useConvexAuth, useMutation } from "convex/react";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useSyncExternalStore } from "react";
+import { Alert } from "react-native";
 
 type InviteJoinInput = {
   isLoading: boolean;
@@ -31,7 +32,6 @@ export function inviteJoinStep(input: InviteJoinInput): InviteJoinStep {
 }
 
 type InviteJoinOutcome = {
-  clearToken: boolean;
   completeOnboarding: boolean;
   href: string;
 };
@@ -41,8 +41,7 @@ export function inviteJoinOutcome(
   onboarded: boolean,
 ): InviteJoinOutcome {
   return {
-    clearToken: true,
-    completeOnboarding: !onboarded,
+    completeOnboarding: listId !== null && !onboarded,
     href:
       listId === null
         ? `/list-invite/${encodeURIComponent(token)}`
@@ -54,12 +53,11 @@ export function useInviteJoinCoordinator() {
   const { isLoading, isAuthenticated } = useConvexAuth();
   const { onboarded, completeOnboarding } = useOnboarding();
   const join = useMutation(api.sharedLists.joinSharedList);
-  const revision = useSyncExternalStore(
+  const token = useSyncExternalStore(
     subscribePendingInvite,
-    getPendingInviteRevision,
-    getPendingInviteRevision,
+    getPendingInvite,
+    getPendingInvite,
   );
-  const token = getPendingInvite();
   const inFlight = useRef<string | null>(null);
   const onboardedRef = useRef(onboarded);
   useEffect(() => {
@@ -85,9 +83,9 @@ export function useInviteJoinCoordinator() {
         );
         analytics.capture("shared_list_joined", {
           joined: listId !== null,
-          onboarded_before: !outcome.completeOnboarding,
+          onboarded_before: onboardedRef.current,
         });
-        if (outcome.clearToken) clearPendingInvite();
+        clearPendingInvite();
         if (outcome.completeOnboarding) {
           holdIncomingShare();
           completeOnboarding();
@@ -96,17 +94,11 @@ export function useInviteJoinCoordinator() {
       })
       .catch((error: unknown) => {
         analytics.captureError("shared_list_join_failed", error);
+        clearPendingInvite();
+        Alert.alert(t("sharedLists.joinFailed"));
       })
       .finally(() => {
         inFlight.current = null;
       });
-  }, [
-    isLoading,
-    isAuthenticated,
-    token,
-    revision,
-    join,
-    completeOnboarding,
-    router,
-  ]);
+  }, [isLoading, isAuthenticated, token, join, completeOnboarding, router]);
 }

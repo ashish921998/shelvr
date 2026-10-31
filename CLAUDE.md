@@ -372,8 +372,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the
   web page at `apps/web/src/app/p`. Links and votes go with their space or account, and a
   daily cron deletes them a week after they close.
-- **`sharedLists.ts`**: shared lists, the places two people keep together. No client calls
-  it yet. `createSharedList` (Pro) needs at least one city, keeps them on the list and
+- **`sharedLists.ts`**: shared lists, the places two people keep together.
+  `createSharedList` (Pro) needs at least one city, keeps them on the list and
   copies the caller's pins for them into `sharedListPlaces`; `listSharedLists` and `getSharedList` read a member's lists (members'
   first names, new-place counts, the caller's own trips from the list). A list's cities, there
   and in the invite preview, are the chosen ones first, then any others its places carry. `invitePreview`

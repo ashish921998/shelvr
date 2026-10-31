@@ -27,7 +27,7 @@ import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { haptics } from "@/lib/haptics";
-import { useEntitlement } from "@/lib/entitlement";
+import { usePlanGate } from "@/lib/plan-gate";
 import { personalPlanAllowed } from "@/lib/list-gate";
 import type { Id } from "@convex/_generated/dataModel";
 import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
@@ -44,8 +44,7 @@ export default function NewTripScreen() {
     listId?: string;
   }>();
   const [form, setForm] = useState<TripForm>(() => initialTripForm(cityParam));
-  const entitlement = useEntitlement();
-  const gated = !entitlement.loading && !entitlement.entitled;
+  const { gated } = usePlanGate();
   const cities = useQuery(
     convexQuery(api.items.listCities, gated ? "skip" : {}),
   );

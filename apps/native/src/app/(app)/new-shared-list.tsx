@@ -12,10 +12,14 @@ import { backOrHome } from "@/lib/screen-dismiss";
 import { shareInvite } from "@/lib/shared-lists";
 import type { TextMessageKey } from "@/locales/message-types";
 import { api } from "@convex/_generated/api";
+import {
+  MAX_LIST_CITIES,
+  MAX_LIST_NAME_CHARS,
+} from "@convex/model/sharedListLimits";
 import { MAX_CITY_CHARS } from "@convex/model/trip";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useConvex, useMutation } from "convex/react";
+import { useMutation } from "convex/react";
 import { Stack, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
@@ -27,9 +31,6 @@ import {
   View,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-
-const MAX_LIST_CITIES = 5;
-const MAX_LIST_NAME_CHARS = 60;
 
 const NAME_SUGGESTIONS: TextMessageKey[] = [
   "sharedLists.suggestDate",
@@ -85,7 +86,6 @@ export default function NewSharedListScreen() {
   const router = useRouter();
   const { theme } = useUnistyles();
   const cities = useQuery(convexQuery(api.items.listCities, {}));
-  const convex = useConvex();
   const create = useMutation(api.sharedLists.createSharedList);
   const { guard, loading } = usePaywallGuard("shared_list");
   const [name, setName] = useState("");
@@ -120,13 +120,13 @@ export default function NewSharedListScreen() {
     setBusy(true);
     try {
       if (!(await guard())) return;
-      const listId = await create({ name: name.trim(), cities: picked });
+      const { listId, inviteToken } = await create({
+        name: name.trim(),
+        cities: picked,
+      });
       analytics.capture("shared_list_created", { cities: picked.length });
       void haptics.success();
-      const made = await convex.query(api.sharedLists.getSharedList, {
-        listId,
-      });
-      if (made !== null) await shareInvite(made.inviteToken, "new");
+      await shareInvite(inviteToken, "new");
       router.replace({ pathname: "/shared-list/[id]", params: { id: listId } });
     } catch (error) {
       analytics.captureError("shared_list_create_failed", error);

@@ -13,7 +13,6 @@ type Props = {
   fromSave?: boolean;
   /** Its day's colour for the number badge, matching the day's pins and route on the map. */
   dayColor?: { color: string; on: string };
-  onList?: boolean;
   onPress: () => void;
 };
 
@@ -22,10 +21,9 @@ export function TripStopRow({
   number,
   fromSave,
   dayColor,
-  onList = false,
   onPress,
 }: Props) {
-  const badgeKey = stopBadge(stop, onList);
+  const badgeKey = stopBadge(stop);
   const badge = t(badgeKey);
   const yours = badgeKey === "tripPlanner.badgeYours";
   const why = stopWhyLine(stop, fromSave === true);
@@ -35,7 +33,6 @@ export function TripStopRow({
       accessibilityLabel={stopRowLabel(stop, {
         number,
         fromSave: fromSave === true,
-        onList,
       })}
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}

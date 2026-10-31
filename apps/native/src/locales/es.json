@@ -1099,6 +1099,7 @@
   "sharedLists.inviteHint": "Cualquiera con el enlace puede unirse. Puedes quitar a alguien más tarde.",
   "sharedLists.sendInvite": "Enviar invitación",
   "sharedLists.createFailed": "No se pudo crear la lista. Inténtalo de nuevo.",
+  "sharedLists.joinFailed": "No pudiste unirte a esta lista. Puede que esté llena. Inténtalo de nuevo o pide un enlace nuevo.",
   "sharedLists.onList": "En la lista",
   "sharedLists.notCoveredTitle": "Buscar requiere Pro",
   "sharedLists.notCoveredBody": "Buscar en Apple Maps requiere Pro en tu cuenta o en la de quien creó la lista.",

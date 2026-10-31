@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
+import { cityPinId } from "@/lib/city-pins";
+import { stopAction } from "@/lib/trip-planner";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   inviteUrl,
-  listPlaceAction,
   listRows,
+  listSectionRows,
   nextAlsoAddState,
   type SharedListPlace,
   useAlsoAddTo,
@@ -73,30 +75,31 @@ function place(over: Partial<SharedListPlace> = {}): SharedListPlace {
   };
 }
 
-describe("listPlaceAction", () => {
+describe("stopAction on a list place", () => {
   it("opens the save only when the row has your save", () => {
-    expect(
-      listPlaceAction(place({ itemId: ITEM, appleId: "a" }), true),
-    ).toEqual({ kind: "save", itemId: ITEM });
+    expect(stopAction(place({ itemId: ITEM, appleId: "a" }), true)).toEqual({
+      kind: "save",
+      itemId: ITEM,
+    });
   });
 
   it("opens Apple's place card for a partner's place with an Apple id", () => {
-    expect(listPlaceAction(place({ appleId: "a" }), true)).toEqual({
+    expect(stopAction(place({ appleId: "a" }), true)).toEqual({
       kind: "card",
       appleId: "a",
     });
   });
 
   it("falls back to Maps by coordinates, never a dead save page", () => {
-    const action = listPlaceAction(place({ appleId: "a" }), false);
+    const action = stopAction(place({ appleId: "a" }), false);
     expect(action.kind).toBe("maps");
-    expect(listPlaceAction(place(), true).kind).toBe("maps");
+    expect(stopAction(place(), true).kind).toBe("maps");
   });
 });
 
 describe("listRows", () => {
   it("puts new places first and numbers rows and pins together", () => {
-    const { fresh, rest } = listRows(
+    const rows = listRows(
       [
         place({ name: "Old" }),
         place({ name: "New", isNew: true }),
@@ -104,18 +107,42 @@ describe("listRows", () => {
       ],
       "Lisbon",
     );
-    expect(fresh.map((row) => row.pin.number)).toEqual([1]);
-    expect(rest.map((row) => [row.place.name, row.pin.number])).toEqual([
+    expect(rows.map((row) => [row.place.name, row.pin.number])).toEqual([
+      ["New", 1],
       ["Old", 2],
     ]);
   });
+});
 
-  it("shows every city with no chip picked", () => {
-    const { rest } = listRows(
-      [place({ name: "A" }), place({ name: "B", city: "Porto" })],
-      null,
+describe("listSectionRows", () => {
+  it("gives a place row its pin's id, so map and list select each other", () => {
+    const rows = listRows(
+      [place({ name: "Old" }), place({ name: "New", isNew: true })],
+      "Lisbon",
     );
-    expect(rest).toHaveLength(2);
+    const places = listSectionRows(rows, "Maya").filter(
+      (row) => row.kind === "place",
+    );
+    expect(places.map((row) => row.id)).toEqual(
+      rows.map((row) => cityPinId(row.pin)),
+    );
+  });
+
+  it("heads the sections only when something is new", () => {
+    const old = listRows([place({ name: "Old" })], "Lisbon");
+    expect(listSectionRows(old, "Maya").map((row) => row.kind)).toEqual([
+      "place",
+    ]);
+    const both = listRows(
+      [place({ name: "Old" }), place({ name: "New", isNew: true })],
+      "Lisbon",
+    );
+    expect(listSectionRows(both, "Maya").map((row) => row.kind)).toEqual([
+      "heading",
+      "place",
+      "heading",
+      "place",
+    ]);
   });
 });
 

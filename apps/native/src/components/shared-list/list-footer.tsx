@@ -44,7 +44,7 @@ export function ListFooter({
   city,
 }: {
   detail: SharedListDetail;
-  city: string | null;
+  city: string;
 }) {
   const router = useRouter();
   const { theme } = useUnistyles();
@@ -57,7 +57,7 @@ export function ListFooter({
         onPress={() =>
           router.push({
             pathname: "/add-list-place",
-            params: { listId: detail._id, ...(city !== null ? { city } : {}) },
+            params: { listId: detail._id, city },
           })
         }
         style={({ pressed }) => [styles.add, pressed && styles.pressed]}

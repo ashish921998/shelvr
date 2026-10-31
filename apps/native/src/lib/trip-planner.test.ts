@@ -209,11 +209,11 @@ describe("stops", () => {
   });
 
   it("calls a list stop with no save of yours 'On your list', never 'Yours'", () => {
-    expect(stopBadge({ source: "save" }, true)).toBe("tripPlanner.badgeOnList");
-    expect(
-      stopBadge({ source: "save", itemId: "i" as Id<"items"> }, true),
-    ).toBe("tripPlanner.badgeYours");
-    expect(stopBadge({ source: "suggested" }, true)).toBe(
+    expect(stopBadge({ source: "list" })).toBe("tripPlanner.badgeOnList");
+    expect(stopBadge({ source: "list", itemId: "i" as Id<"items"> })).toBe(
+      "tripPlanner.badgeYours",
+    );
+    expect(stopBadge({ source: "suggested" })).toBe(
       "tripPlanner.badgeSuggested",
     );
   });

@@ -1,9 +1,9 @@
 import { analytics } from "@/lib/analytics";
-import type { CityPin } from "@/lib/city-pins";
+import { type CityPin, cityPinId } from "@/lib/city-pins";
 import type { CityPlanKind } from "@/lib/city-plan";
 import { t } from "@/lib/i18n";
 import { shareUrl } from "@/lib/share-link";
-import { type StopAction, stopAction } from "@/lib/trip-planner";
+import { webUrl } from "@/lib/web-url";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { cityKey } from "@convex/model/trip";
@@ -36,9 +36,7 @@ export function useSharedLists(enabled = true) {
 }
 
 export function inviteUrl(token: string): string {
-  const origin =
-    process.env.EXPO_PUBLIC_WEB_URL || "https://shelvr-web.vercel.app";
-  return new URL(`/l/${encodeURIComponent(token)}`, origin).href;
+  return webUrl(`/l/${encodeURIComponent(token)}`);
 }
 
 export async function shareInvite(
@@ -77,27 +75,17 @@ export function partnerName(members: NamedMember[]): string {
 
 export type ListRow = { place: SharedListPlace; pin: CityPin };
 
-export function defaultListCity(cities: string[]): string | null {
-  return cities[0] ?? null;
+export function inCity(place: { city?: string }, city: string): boolean {
+  return place.city !== undefined && cityKey(place.city) === cityKey(city);
 }
 
-export function inCity(place: { city?: string }, city: string | null): boolean {
-  return (
-    city === null ||
-    (place.city !== undefined && cityKey(place.city) === cityKey(city))
-  );
-}
-
-export function listRows(
-  places: SharedListPlace[],
-  city: string | null,
-): { fresh: ListRow[]; rest: ListRow[] } {
+export function listRows(places: SharedListPlace[], city: string): ListRow[] {
   const shown = places.filter((place) => inCity(place, city));
   const ordered = [
     ...shown.filter((place) => place.isNew),
     ...shown.filter((place) => !place.isNew),
   ];
-  const rows = ordered.map((place, index) => ({
+  return ordered.map((place, index) => ({
     place,
     pin: {
       itemId: place._id,
@@ -109,17 +97,44 @@ export function listRows(
       number: index + 1,
     },
   }));
-  return {
-    fresh: rows.filter((row) => row.place.isNew),
-    rest: rows.filter((row) => !row.place.isNew),
-  };
 }
 
-export function listPlaceAction(
-  place: Pick<SharedListPlace, "itemId" | "appleId" | "name" | "lat" | "lng">,
-  cardAvailable: boolean,
-): StopAction {
-  return stopAction({ source: "save", ...place }, cardAvailable);
+export type ListSectionRow =
+  | { kind: "heading"; id: string; label: string; fresh: boolean }
+  | { kind: "place"; id: string; row: ListRow };
+
+export function listSectionRows(
+  rows: ListRow[],
+  partner: string,
+): ListSectionRow[] {
+  const place = (row: ListRow): ListSectionRow => ({
+    kind: "place",
+    id: cityPinId(row.pin),
+    row,
+  });
+  const fresh = rows.filter((row) => row.place.isNew);
+  const rest = rows.filter((row) => !row.place.isNew);
+  if (fresh.length === 0) return rest.map(place);
+  return [
+    {
+      kind: "heading",
+      id: "fresh",
+      label: t("sharedLists.newFrom", { name: partner }),
+      fresh: true,
+    },
+    ...fresh.map(place),
+    ...(rest.length > 0
+      ? [
+          {
+            kind: "heading" as const,
+            id: "rest",
+            label: t("sharedLists.everythingElse"),
+            fresh: false,
+          },
+        ]
+      : []),
+    ...rest.map(place),
+  ];
 }
 
 export function savedByLine(place: SharedListPlace): string {
@@ -182,11 +197,10 @@ export function useAlsoAddTo(itemId: Id<"items">, city: string) {
   return { state, toggle };
 }
 
-export function useListPlan(listId: Id<"sharedLists">, city: string | null) {
+export function useListPlan(listId: Id<"sharedLists">, city: string) {
   const router = useRouter();
   return useCallback(
     (kind: CityPlanKind) => {
-      if (city === null) return;
       analytics.capture("city_plan_started", { kind });
       router.push({
         pathname: kind === "date" ? "/date-plan" : "/new-trip",

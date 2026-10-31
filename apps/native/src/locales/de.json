@@ -1072,6 +1072,7 @@
   "sharedLists.inviteHint": "Jeder mit dem Link kann beitreten. Du kannst Personen später entfernen.",
   "sharedLists.sendInvite": "Einladung senden",
   "sharedLists.createFailed": "Die Liste konnte nicht gestartet werden. Versuch es noch einmal.",
+  "sharedLists.joinFailed": "Du konntest dieser Liste nicht beitreten. Vielleicht ist sie voll. Versuch es noch einmal oder bitte um einen neuen Link.",
   "sharedLists.onList": "Auf der Liste",
   "sharedLists.notCoveredTitle": "Die Suche braucht Pro",
   "sharedLists.notCoveredBody": "Die Suche in Apple Maps braucht Pro auf deinem Konto oder dem der Listenbesitzerin oder des Listenbesitzers.",

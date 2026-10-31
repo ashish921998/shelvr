@@ -47,7 +47,6 @@ export function DateStopCard({
   onColor,
   onOpen,
   onSwap,
-  onList,
 }: {
   stop: DateStop;
   number: number;
@@ -59,9 +58,8 @@ export function DateStopCard({
   onOpen: () => void;
   /** Absent when nothing nearby fits, so the card offers no change it cannot make. */
   onSwap?: () => void;
-  onList?: boolean;
 }) {
-  const badge = stopBadge(stop, onList === true);
+  const badge = stopBadge(stop);
   const yours = badge === "tripPlanner.badgeYours";
   return (
     <View style={styles.card}>

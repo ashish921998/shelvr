@@ -19,11 +19,12 @@ import {
 import { sheetSnaps } from "@/lib/city-sheet";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
+import { stopAction } from "@/lib/trip-planner";
 import {
-  defaultListCity,
   type ListRow,
-  listPlaceAction,
+  type ListSectionRow,
   listRows,
+  listSectionRows,
   partnerName,
   type SharedListDetail,
   useListPlan,
@@ -54,40 +55,6 @@ import Animated, { useSharedValue } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const MAP_SHARE = 0.4;
-
-type Row =
-  | { kind: "heading"; id: string; label: string; fresh: boolean }
-  | { kind: "place"; id: string; row: ListRow };
-
-function sectionRows(
-  fresh: ListRow[],
-  rest: ListRow[],
-  partner: string,
-): Row[] {
-  if (fresh.length === 0) {
-    return rest.map((row) => ({ kind: "place", id: row.pin.itemId, row }));
-  }
-  return [
-    {
-      kind: "heading",
-      id: "fresh",
-      label: t("sharedLists.newFrom", { name: partner }),
-      fresh: true,
-    },
-    ...fresh.map((row): Row => ({ kind: "place", id: row.pin.itemId, row })),
-    ...(rest.length > 0
-      ? [
-          {
-            kind: "heading" as const,
-            id: "rest",
-            label: t("sharedLists.everythingElse"),
-            fresh: false,
-          },
-        ]
-      : []),
-    ...rest.map((row): Row => ({ kind: "place", id: row.pin.itemId, row })),
-  ];
-}
 
 function useSeenOnLeave(listId: Id<"sharedLists">, loaded: boolean) {
   const markSeen = useMutation(api.sharedLists.markSharedListSeen);
@@ -222,28 +189,23 @@ function SharedList({
   const { theme, rt } = useUnistyles();
   const [picked, setPicked] = useState<string | null>(null);
   const city =
-    detail.cities.length > 1
-      ? (picked ?? defaultListCity(detail.cities))
-      : defaultListCity(detail.cities);
+    picked !== null && detail.cities.includes(picked)
+      ? picked
+      : (detail.cities[0] ?? "");
   const partner = partnerName(detail.members);
-  const { fresh, rest } = useMemo(
+  const places = useMemo(
     () => listRows(detail.places, city),
     [detail.places, city],
   );
   const rows = useMemo(
-    () => sectionRows(fresh, rest, partner),
-    [fresh, rest, partner],
+    () => listSectionRows(places, partner),
+    [places, partner],
   );
-  const pins = useMemo(
-    () => [...fresh, ...rest].map((row) => row.pin),
-    [fresh, rest],
-  );
-  const canTrip = [...fresh, ...rest].some(
-    (row) => row.place.visitedAt === undefined,
-  );
+  const pins = useMemo(() => places.map((row) => row.pin), [places]);
+  const canTrip = places.some((row) => row.place.visitedAt === undefined);
   const edits = usePlaceEdits();
   const plan = useListPlan(detail._id, city);
-  const list = useRef<FlatList<Row>>(null);
+  const list = useRef<FlatList<ListSectionRow>>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const { height: screenHeight } = rt.screen;
   const [headerHeight, setHeaderHeight] = useState<number | null>(null);
@@ -294,10 +256,7 @@ function SharedList({
   };
   const open = (row: ListRow) => {
     if (!focused.current) return;
-    const action = listPlaceAction(
-      row.place,
-      canOpenPlaceCard(row.place.appleId),
-    );
+    const action = stopAction(row.place, canOpenPlaceCard(row.place.appleId));
     analytics.capture("shared_list_place_opened", { action: action.kind });
     switch (action.kind) {
       case "save":
@@ -306,7 +265,7 @@ function SharedList({
       case "card":
         void openPlaceDetails(action.appleId, () => {
           if (!focused.current) return;
-          const fallback = listPlaceAction(row.place, false);
+          const fallback = stopAction(row.place, false);
           if (fallback.kind === "maps") {
             Linking.openURL(fallback.url).catch((error: unknown) =>
               analytics.captureError("shared_list_maps_failed", error),
@@ -441,7 +400,7 @@ function SharedList({
           />
         )}
       />
-      {city !== null && hasMap ? (
+      {hasMap ? (
         <View
           style={styles.plans}
           onLayout={(event) => setPlansHeight(event.nativeEvent.layout.height)}

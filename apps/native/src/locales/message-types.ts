@@ -992,6 +992,7 @@ export type MessageParams = {
   "sharedLists.inviteHint": undefined;
   "sharedLists.sendInvite": undefined;
   "sharedLists.createFailed": undefined;
+  "sharedLists.joinFailed": undefined;
   "sharedLists.onList": undefined;
   "sharedLists.notCoveredTitle": undefined;
   "sharedLists.notCoveredBody": undefined;

@@ -1045,6 +1045,7 @@
   "sharedLists.inviteHint": "リンクを持つ人は誰でも参加できます。あとで削除できます。",
   "sharedLists.sendInvite": "招待を送る",
   "sharedLists.createFailed": "リストを作成できませんでした。もう一度お試しください。",
+  "sharedLists.joinFailed": "このリストに参加できませんでした。満員の可能性があります。もう一度試すか、新しいリンクを依頼してください。",
   "sharedLists.onList": "リストにあり",
   "sharedLists.notCoveredTitle": "検索にはProが必要です",
   "sharedLists.notCoveredBody": "Apple マップの検索には、あなたかリストの作成者のProが必要です。",

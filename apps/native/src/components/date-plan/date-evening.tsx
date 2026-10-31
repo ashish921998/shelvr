@@ -86,13 +86,11 @@ export function DateEvening({
   result,
   evening,
   onSwap,
-  onList,
   onRestart,
 }: {
   result: DatePlanResult;
   evening: Evening;
   onSwap: (slot: DateSlot) => void;
-  onList?: boolean;
   onRestart: () => void;
 }) {
   const { rt, theme } = useUnistyles();
@@ -170,7 +168,6 @@ export function DateEvening({
         </View>
 
         <DateStopCard
-          onList={onList}
           stop={first}
           number={1}
           slot={slotLabel(result.kind, "first")}
@@ -188,7 +185,6 @@ export function DateEvening({
           </ThemedText>
         </View>
         <DateStopCard
-          onList={onList}
           stop={second}
           number={2}
           slot={slotLabel(result.kind, "second")}

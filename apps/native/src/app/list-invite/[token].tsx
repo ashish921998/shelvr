@@ -5,7 +5,7 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
-import { setPendingInvite } from "@/lib/pending-invite";
+import { clearPendingInvite, setPendingInvite } from "@/lib/pending-invite";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -28,6 +28,7 @@ export default function ListInviteScreen() {
   );
   const [signingIn, setSigningIn] = useState(false);
   const leave = () => {
+    clearPendingInvite();
     if (router.canGoBack()) router.back();
     else router.replace("/(app)/(tabs)/(home)");
   };
@@ -40,7 +41,14 @@ export default function ListInviteScreen() {
   };
 
   if (signingIn && !isAuthenticated) {
-    return <SignInView onBack={() => setSigningIn(false)} />;
+    return (
+      <SignInView
+        onBack={() => {
+          clearPendingInvite();
+          setSigningIn(false);
+        }}
+      />
+    );
   }
   if (preview.data === undefined || isLoading) {
     return preview.isError ? (

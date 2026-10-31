@@ -169,10 +169,9 @@ export function TripPlanBody({ trip }: { trip: TripPlanDetail }) {
   const hasMap = hasMapPoints(trip);
   const mapHeight = rt.screen.height * MAP_SHARE;
   const stopCount = trip.days.reduce((sum, day) => sum + day.length, 0);
-  const savedCount =
-    trip.listId !== undefined
-      ? 0
-      : trip.days.flat().filter((stop) => stop.source === "save").length;
+  const savedCount = trip.days
+    .flat()
+    .filter((stop) => stop.source === "save").length;
   const fromSave = useMemo(
     () => sharedSaveStops([...trip.days.flat(), ...trip.unplanned]),
     [trip.days, trip.unplanned],
@@ -303,7 +302,6 @@ export function TripPlanBody({ trip }: { trip: TripPlanDetail }) {
                     on: theme.colors.onTripDay,
                   }}
                   fromSave={fromSave.has(stop._id)}
-                  onList={trip.listId !== undefined}
                   onPress={() => {
                     // The map follows the list: coming back, it shows the day this stop is on.
                     pick(index);
@@ -330,7 +328,6 @@ export function TripPlanBody({ trip }: { trip: TripPlanDetail }) {
                 key={stop._id}
                 stop={stop}
                 fromSave={fromSave.has(stop._id)}
-                onList={trip.listId !== undefined}
                 onPress={() => openStop(stop)}
               />
             ))}

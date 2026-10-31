@@ -21,7 +21,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useEntitlement } from "@/lib/entitlement";
+import { usePlanGate } from "@/lib/plan-gate";
 import { personalPlanAllowed } from "@/lib/list-gate";
 import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -138,8 +138,7 @@ export default function TripPlanScreen() {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState<string | null>(null);
   const rename = useRenameTrip(tripId, trip.data?.name);
-  const entitlement = useEntitlement();
-  const gated = !entitlement.loading && !entitlement.entitled;
+  const { gated } = usePlanGate();
 
   const data = trip.data;
   const opened = useRef(false);

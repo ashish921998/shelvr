@@ -280,6 +280,17 @@ export const makeDatePlan = action({
       suggested,
       searches,
     });
-    return { status, city: claim.city, kind, ...plan };
+    return {
+      status,
+      city: claim.city,
+      kind,
+      evenings: plan.evenings,
+      stops:
+        claim.from === "list"
+          ? plan.stops.map((stop) =>
+              stop.source === "save" ? { ...stop, source: "list" } : stop,
+            )
+          : plan.stops,
+    };
   },
 });

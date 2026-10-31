@@ -3,6 +3,8 @@ import type { Id } from "@convex/_generated/dataModel";
 import { inviteJoinOutcome, inviteJoinStep } from "./invite-join";
 
 vi.mock("@/lib/analytics", () => ({ analytics: {} }));
+vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
+vi.mock("react-native", () => ({ Alert: {} }));
 vi.mock("@/lib/onboarding", () => ({ useOnboarding: () => ({}) }));
 vi.mock("@/lib/onboarding-exit", () => ({ holdIncomingShare: () => {} }));
 vi.mock("@/lib/pending-onboarding", () => ({ clearPending: () => {} }));
@@ -51,7 +53,6 @@ describe("inviteJoinOutcome", () => {
 
   it("opens the list and spends the token", () => {
     expect(inviteJoinOutcome(listId, "abc", true)).toEqual({
-      clearToken: true,
       completeOnboarding: false,
       href: "/shared-list/list1",
     });
@@ -65,9 +66,14 @@ describe("inviteJoinOutcome", () => {
 
   it("shows the dead state for an invite that no longer works", () => {
     expect(inviteJoinOutcome(null, "a b", true)).toEqual({
-      clearToken: true,
       completeOnboarding: false,
       href: "/list-invite/a%20b",
     });
+  });
+
+  it("leaves onboarding open when the invite died before the join", () => {
+    expect(inviteJoinOutcome(null, "abc", false).completeOnboarding).toBe(
+      false,
+    );
   });
 });

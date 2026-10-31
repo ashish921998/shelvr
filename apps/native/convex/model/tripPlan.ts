@@ -20,13 +20,14 @@ export const tripInterestValidator = v.union(firstInterest, ...otherInterests);
 export type TripInterest = Infer<typeof tripInterestValidator>;
 
 /**
- * Where a stop came from: one of the person's saves, an Apple Maps suggestion, or a place the
- * person found with Add a place.
+ * Where a stop came from: one of the person's saves, an Apple Maps suggestion, a place the
+ * person found with Add a place, or the shared list the trip was planned from.
  */
 export const tripStopSourceValidator = v.union(
   v.literal("save"),
   v.literal("suggested"),
   v.literal("added"),
+  v.literal("list"),
 );
 export type TripStopSource = Infer<typeof tripStopSourceValidator>;
 

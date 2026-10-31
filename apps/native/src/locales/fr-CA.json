@@ -1099,6 +1099,7 @@
   "sharedLists.inviteHint": "Toute personne avec le lien peut rejoindre la liste. Vous pourrez la retirer plus tard.",
   "sharedLists.sendInvite": "Envoyer l’invitation",
   "sharedLists.createFailed": "Impossible de créer la liste. Réessayez.",
+  "sharedLists.joinFailed": "Impossible de rejoindre cette liste. Elle est peut-être pleine. Réessayez ou demandez un nouveau lien.",
   "sharedLists.onList": "Sur la liste",
   "sharedLists.notCoveredTitle": "La recherche demande Pro",
   "sharedLists.notCoveredBody": "La recherche dans Apple Plans demande Pro sur votre compte ou sur celui de la personne qui a créé la liste.",
