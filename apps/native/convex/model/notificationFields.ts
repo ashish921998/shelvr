@@ -1,6 +1,7 @@
 import { v, type Infer } from "convex/values";
 import translations from "./notificationTranslations.json";
 import { pluralRules } from "./localization";
+import type { ReminderKind } from "./saveReminders";
 
 const fields = {
   token: v.string(),
@@ -81,7 +82,7 @@ const catalogs: Record<
     namedSingle: string;
     namedShelf: Record<string, string>;
     namedShelfSingle: string;
-    reminder: Record<"read" | "cook", { title: string; body: string }>;
+    reminder: Record<ReminderKind, { title: string; body: string }>;
   }
 > = translations;
 
@@ -134,7 +135,7 @@ export function digestCopy(
 
 export function reminderCopy(
   locale: string | undefined,
-  kind: "read" | "cook",
+  kind: ReminderKind,
   subject: string,
 ) {
   const title = truncateTitle(subject) ?? subject;

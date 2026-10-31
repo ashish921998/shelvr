@@ -482,7 +482,8 @@ export default defineSchema({
   saveReminders: defineTable({
     userId: v.string(),
     itemId: v.id("items"),
-    kind: v.union(v.literal("read"), v.literal("cook")),
+    kind: v.union(v.literal("read"), v.literal("cook"), v.literal("visit")),
+    placeKey: v.optional(v.string()),
     createdAt: v.number(),
     deliveredAt: v.optional(v.number()),
     deliveryStatus: v.union(
@@ -498,6 +499,7 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_and_item", ["userId", "itemId"])
+    .index("by_user_and_place_key", ["userId", "placeKey"])
     .index("by_delivery_status_and_attempt", [
       "deliveryStatus",
       "deliveryNextAttemptAt",

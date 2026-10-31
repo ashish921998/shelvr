@@ -138,6 +138,10 @@ const notificationCopy = Object.fromEntries(
           title: messages["reminder.cookTitle"],
           body: messages["reminder.cookBody"],
         },
+        visit: {
+          title: messages["reminder.visitTitle"],
+          body: messages["reminder.visitBody"],
+        },
       },
     },
   ]),

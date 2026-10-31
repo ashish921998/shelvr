@@ -316,6 +316,14 @@ export function splitSavedPlace(value: string): { name: string; area: string } {
   return { name: name.trim(), area: area.join(",").trim() };
 }
 
+export function isGenericPlaceName(name: string): boolean {
+  const words = wordsOf(name);
+  return (
+    words.every((word) => /^\d+$/.test(word)) ||
+    words.every((word) => GENERIC_WORDS.has(word))
+  );
+}
+
 export function isStreetAddress(name: string): boolean {
   const words = wordsOf(name);
   if (

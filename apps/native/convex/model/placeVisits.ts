@@ -17,6 +17,17 @@ export async function findVisit(
     .unique();
 }
 
+export async function visitedPlaceKeys(
+  ctx: QueryCtx,
+  userId: string,
+): Promise<Set<string>> {
+  const visits = await ctx.db
+    .query("placeVisits")
+    .withIndex("by_user_and_key", (q) => q.eq("userId", userId))
+    .collect();
+  return new Set(visits.map((visit) => visit.key));
+}
+
 export async function recentVisits(
   ctx: QueryCtx,
   userId: string,

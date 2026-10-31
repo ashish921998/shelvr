@@ -275,6 +275,7 @@ export async function deleteTripsForSpace(
 
 // ponytail: the newest 10 trips, up to 105 day stops and one membership read each; older trips' stops stay on the shelf.
 const TRIP_STOP_SCAN = 10;
+const PLANNED_STOP_SCAN = 300;
 
 /** Saves the trip page shows on a day of one of the user's trips. A place that didn't fit (`wishlist`) is not planned. */
 export async function tripStopItemIds(
@@ -291,7 +292,16 @@ export async function tripStopItemIds(
       day.stops.map((stop) => ({ itemId: stop.itemId, spaceId: trip.spaceId })),
     ),
   );
-  const planned = new Set<string>();
+  const plannedStops = await ctx.db
+    .query("tripStops")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .order("desc")
+    .take(PLANNED_STOP_SCAN);
+  const planned = new Set<string>(
+    plannedStops.flatMap((stop) =>
+      stop.day > 0 && stop.itemId !== undefined ? [stop.itemId] : [],
+    ),
+  );
   for (const { itemId, spaceId } of stops) {
     if (planned.has(itemId)) continue;
     const membership = await getMembership(ctx, itemId, spaceId);

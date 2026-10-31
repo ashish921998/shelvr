@@ -43,7 +43,11 @@ import {
   remindersOn,
   reminderCandidates,
   saveRemindersLive,
+  VISIT_REPEAT_AFTER_MS,
 } from "./model/saveReminders";
+import { placeKey } from "./model/plan";
+import { visibleItemPlaces, userRemovals } from "./model/placeRemovals";
+import { visitedPlaceKeys } from "./model/placeVisits";
 
 const digestResponseValidator = v.object({
   _id: v.id("weeklyDigests"),
@@ -707,12 +711,14 @@ export const prepareSaveReminder = internalMutation({
       : undefined;
     if (reminderBlocked(now, sentAt, streak, shelf) !== undefined) return null;
 
-    const checks = { read: 0, cook: 0 };
+    const checks = { read: 0, cook: 0, visit: 0 };
+    const removals = await userRemovals(ctx, userId);
     for (const candidate of reminderCandidates(
-      items,
+      items.map((item) => visibleItemPlaces(item, removals)),
       now,
       reminders[0]?.kind,
       await tripStopItemIds(ctx, userId),
+      await visitedPlaceKeys(ctx, userId),
     )) {
       if (checks[candidate.kind]++ >= REMINDER_CHECKS_PER_KIND) continue;
       const earlier = await ctx.db
@@ -733,11 +739,31 @@ export const prepareSaveReminder = internalMutation({
         )
         .unique();
       if (openedTooRecently(candidate.kind, read?.lastOpenedAt, now)) continue;
+      const asked =
+        candidate.kind === "visit" ? placeKey(candidate.subject) : undefined;
+      if (asked !== undefined) {
+        const samePlace = await ctx.db
+          .query("saveReminders")
+          .withIndex("by_user_and_place_key", (q) =>
+            q.eq("userId", userId).eq("placeKey", asked),
+          )
+          .order("desc")
+          .take(MAX_FAILED_REMINDERS + 1);
+        if (
+          samePlace.some(
+            (reminder) =>
+              reminder.deliveryStatus !== "failed" &&
+              now - reminder.createdAt < VISIT_REPEAT_AFTER_MS,
+          )
+        )
+          continue;
+      }
 
       const reminderId = await ctx.db.insert("saveReminders", {
         userId,
         itemId: candidate.item._id,
         kind: candidate.kind,
+        ...(asked !== undefined ? { placeKey: asked } : {}),
         createdAt: now,
         deliveryStatus: "pending",
         deliveryNextAttemptAt: now,
