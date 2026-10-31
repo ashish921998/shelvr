@@ -115,6 +115,14 @@
   "planGate.title": "Choisissez une formule pour ouvrir Shelvr",
   "planGate.body": "Vos contenus enregistrés restent là où vous les avez laissés.",
   "planGate.seePlans": "Voir les formules",
+  "planGate.winbackTitle": "Vos villes sont toujours là",
+  "planGate.winbackBody": {
+    "one": "Votre %{formattedCount} lieu enregistré est là où vous l’avez laissé. Revenez pour planifier votre prochain rendez-vous ou voyage.",
+    "many": "Vos %{formattedCount} lieux enregistrés sont là où vous les avez laissés. Revenez pour planifier votre prochain rendez-vous ou voyage.",
+    "other": "Vos %{formattedCount} lieux enregistrés sont là où vous les avez laissés. Revenez pour planifier votre prochain rendez-vous ou voyage."
+  },
+  "planGate.winbackBodyEmpty": "Tout ce que vous avez enregistré est là où vous l’avez laissé. Revenez pour planifier votre prochain rendez-vous ou voyage.",
+  "planGate.winbackCta": "Voir mon offre de retour",
   "paywall.trialOffer": "Commencez pour %{zero}, puis %{price}/an.",
   "paywallGoal.travelHeadline": "Préparez %{city} avec vos lieux enregistrés.",
   "paywallGoal.travelHeadlineNoCity": "Préparez votre prochain voyage avec vos lieux enregistrés.",

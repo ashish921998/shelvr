@@ -114,6 +114,13 @@
   "planGate.title": "Wähle einen Plan, um Shelvr zu öffnen",
   "planGate.body": "Deine gespeicherten Inhalte bleiben genau da, wo du sie gelassen hast.",
   "planGate.seePlans": "Pläne ansehen",
+  "planGate.winbackTitle": "Deine Städte sind noch da",
+  "planGate.winbackBody": {
+    "one": "Dein %{formattedCount} gespeicherter Ort ist genau da, wo du ihn gelassen hast. Komm zurück und plane dein nächstes Date oder deine nächste Reise.",
+    "other": "Deine %{formattedCount} gespeicherten Orte sind genau da, wo du sie gelassen hast. Komm zurück und plane dein nächstes Date oder deine nächste Reise."
+  },
+  "planGate.winbackBodyEmpty": "Alles, was du gespeichert hast, ist genau da, wo du es gelassen hast. Komm zurück und plane dein nächstes Date oder deine nächste Reise.",
+  "planGate.winbackCta": "Mein Comeback-Angebot ansehen",
   "paywall.trialOffer": "Starte für %{zero}, danach %{price}/Jahr.",
   "paywallGoal.travelHeadline": "Plane %{city} mit deinen gespeicherten Orten.",
   "paywallGoal.travelHeadlineNoCity": "Plane deine nächste Reise mit deinen gespeicherten Orten.",
