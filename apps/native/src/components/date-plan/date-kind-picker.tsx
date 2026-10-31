@@ -14,14 +14,19 @@ const ICONS: Record<DateOption["ask"], AppSymbolName> = {
 
 function OptionRow({
   option,
+  onList,
   onPress,
 }: {
   option: DateOption;
+  onList: boolean;
   onPress: () => void;
 }) {
   const { theme } = useUnistyles();
   const label = t(option.label);
-  const hint = t(option.hint);
+  const hint =
+    onList && option.ask === "surprise"
+      ? t("sharedLists.dateSurpriseHint")
+      : t(option.hint);
   return (
     <Pressable
       accessibilityRole="button"
@@ -57,10 +62,12 @@ function OptionRow({
 /** "What kind of date?": the kinds the planner makes. */
 export function DateKindPicker({
   city,
+  onList,
   problem,
   onPick,
 }: {
   city: string;
+  onList: boolean;
   problem: string | null;
   onPick: (ask: DateOption["ask"]) => void;
 }) {
@@ -88,6 +95,7 @@ export function DateKindPicker({
           <OptionRow
             key={option.ask}
             option={option}
+            onList={onList}
             onPress={() => onPick(option.ask)}
           />
         ))}

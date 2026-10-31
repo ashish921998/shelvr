@@ -217,9 +217,7 @@ function StopEditRow(props: RowProps) {
   );
   const actions = useRowActions(props);
   const unplanned = day === UNPLANNED_DAY;
-  const subtitle = [t(stopBadge(stop.source)), stop.area]
-    .filter(Boolean)
-    .join(" · ");
+  const subtitle = [t(stopBadge(stop)), stop.area].filter(Boolean).join(" · ");
   return (
     <GestureDetector gesture={pan}>
       <Animated.View

@@ -69,6 +69,9 @@ const fakes = vi.hoisted(() => ({
   }) => <button onClick={onPress}>{title ?? children}</button>,
 }));
 
+vi.mock("@/components/shared-list/also-add-to", () => ({
+  AlsoAddTo: vi.fn(() => null),
+}));
 vi.mock("@/components/city/city-map", () => ({
   CityMap: vi.fn(({ visible }: { visible: number }) => (
     <div data-testid="map">{`visible ${visible}`}</div>

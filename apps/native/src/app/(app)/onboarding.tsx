@@ -33,7 +33,7 @@ import {
   setOnboardingProgress,
   setPendingSpaces,
 } from "@/lib/pending-onboarding";
-import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
+import { holdIncomingShare } from "@/lib/onboarding-exit";
 import { SignInView } from "@/components/sign-in-view";
 import { AhaShareStep } from "@/components/onboarding/aha-share";
 import { AhaSpotsStep } from "@/components/onboarding/aha-spots";
@@ -50,7 +50,6 @@ import {
 import { AppSymbolIcon } from "@/components/symbol";
 import { useConvexAuth } from "convex/react";
 import { haptics } from "@/lib/haptics";
-import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
@@ -64,14 +63,6 @@ const SKIPPABLE: ReadonlySet<OnboardingStep> = new Set([
   "planner",
   "city",
 ]);
-
-function holdIncomingShare() {
-  try {
-    if (getSharedPayloads().length > 0) markPendingShareOnDevice();
-  } catch (err) {
-    analytics.captureError("onboarding_hold_share_failed", err);
-  }
-}
 
 function useStepAnalytics(step: OnboardingStep) {
   const tracked = useRef(new Set<OnboardingStep>());

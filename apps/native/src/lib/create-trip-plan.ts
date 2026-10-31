@@ -22,7 +22,11 @@ type CreateTripState =
   | { status: "ready"; city: string; tripId: Id<"tripPlans"> };
 
 /** Plans a trip from the form: checks it, gates it on Pro, runs the planner and keeps where that got to. */
-export function useCreateTripPlan(locale: string, cities: CityChoice[]) {
+export function useCreateTripPlan(
+  locale: string,
+  cities: CityChoice[],
+  listId?: Id<"sharedLists">,
+) {
   const router = useRouter();
   const create = useAction(api.tripPlanner.createTripPlan);
   const { guard, loading } = usePaywallGuard(PLACEMENT);
@@ -46,7 +50,8 @@ export function useCreateTripPlan(locale: string, cities: CityChoice[]) {
         setState({ status: "idle", problem: { kind: parsed.problem } });
         return;
       }
-      if (!(await guard()) || !alive.current) return;
+      if (listId === undefined && !(await guard())) return;
+      if (!alive.current) return;
       const { args } = parsed;
       const shared = { days: args.days, pace: args.pace };
       analytics.capture("trip_plan_started", {
@@ -58,7 +63,10 @@ export function useCreateTripPlan(locale: string, cities: CityChoice[]) {
       });
       setState({ status: "planning", city: args.city });
       try {
-        const result = await create(args);
+        const result = await create({
+          ...args,
+          ...(listId !== undefined ? { listId } : {}),
+        });
         analytics.capture("trip_plan_made", {
           ...shared,
           saves: result.saves,
@@ -86,7 +94,7 @@ export function useCreateTripPlan(locale: string, cities: CityChoice[]) {
         setState({ status: "idle", problem: { kind: reason } });
       }
     },
-    [locale, guard, cities, create, router],
+    [locale, guard, cities, create, router, listId],
   );
 
   const submit = useCallback(
