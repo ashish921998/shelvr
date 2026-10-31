@@ -47,6 +47,25 @@ function servesPage(body: string) {
   });
 }
 
+function servesArticle() {
+  const article = "Luna Tacos serves the best breakfast tacos. ".repeat(40);
+  servesPage(
+    `<html><head><title>Fresh</title></head><body><article><p>${article}</p></article></body></html>`,
+  );
+}
+
+function servesTikTokWithoutCaption() {
+  safeFetch.mockResolvedValue({
+    ok: true,
+    finalUrl: TIKTOK,
+    status: 200,
+    contentType: "application/json",
+    bytes: new TextEncoder().encode(
+      JSON.stringify({ author_unique_id: "cook" }),
+    ),
+  });
+}
+
 function modelNames(title: string) {
   generateObject.mockResolvedValue({
     object: {
@@ -62,7 +81,10 @@ function modelNames(title: string) {
   });
 }
 
-async function retried(url = PAGE) {
+async function retried(
+  url = PAGE,
+  save: Partial<typeof GOOD_SAVE> = GOOD_SAVE,
+) {
   const { t, userId } = await signedInUser(newConvexTest(), { pro: true });
   const itemId: Id<"items"> = await t.run((ctx) =>
     ctx.db.insert("items", {
@@ -72,7 +94,8 @@ async function retried(url = PAGE) {
       status: "ready",
       enrichment: "partial",
       searchText: "best tacos",
-      ...GOOD_SAVE,
+      tags: [],
+      ...save,
     }),
   );
   expect(await t.mutation(api.items.reprocessItem, { id: itemId })).toBe(true);
@@ -119,7 +142,7 @@ it("keeps a good save on Home and offers Retry again when the page is gone", asy
 });
 
 it("keeps a good save when the model fails on Retry", async () => {
-  servesPage("<html><head><title>Tacos</title></head><body></body></html>");
+  servesArticle();
   generateObject.mockRejectedValue(new Error("model down"));
 
   const item = await retried();
@@ -131,18 +154,26 @@ it("keeps a good save when the model fails on Retry", async () => {
   });
 });
 
-it("keeps the caption when a Retry reads a post that has none", async () => {
-  safeFetch.mockResolvedValue({
-    ok: true,
-    finalUrl: TIKTOK,
-    status: 200,
-    contentType: "application/json",
-    bytes: new TextEncoder().encode(
-      JSON.stringify({ author_unique_id: "cook" }),
-    ),
-  });
+it("keeps a caption-less save when a Retry finds no caption either", async () => {
+  servesTikTokWithoutCaption();
+  const { content: _content, ...noCaption } = GOOD_SAVE;
 
-  const item = await retried(TIKTOK);
+  const item = await retried(TIKTOK, noCaption);
+
+  expect(item).toMatchObject({
+    ...noCaption,
+    status: "ready",
+    enrichment: "partial",
+  });
+  expect(generateObject).not.toHaveBeenCalled();
+});
+
+it("keeps a good save and its Retry when the page answers with an empty shell", async () => {
+  servesPage(
+    "<html><head><title>Just a moment</title></head><body></body></html>",
+  );
+
+  const item = await retried();
 
   expect(item).toMatchObject({
     ...GOOD_SAVE,
@@ -152,11 +183,17 @@ it("keeps the caption when a Retry reads a post that has none", async () => {
   expect(generateObject).not.toHaveBeenCalled();
 });
 
+it("still asks the model when a save has nothing to lose", async () => {
+  servesTikTokWithoutCaption();
+
+  const item = await retried(TIKTOK, { title: "A TikTok" });
+
+  expect(generateObject).toHaveBeenCalled();
+  expect(item?.title).toBe("Guessed from the URL");
+});
+
 it("takes the new reading when Retry reads the page", async () => {
-  const article = "Luna Tacos serves the best breakfast tacos. ".repeat(40);
-  servesPage(
-    `<html><head><title>Fresh</title></head><body><article><p>${article}</p></article></body></html>`,
-  );
+  servesArticle();
   modelNames("Fresh tacos guide");
 
   const item = await retried();
