@@ -18,6 +18,7 @@ export const READ_MAX_AGE_MS = 90 * DAY_MS;
 export const COOK_MIN_AGE_MS = 3 * DAY_MS;
 const COOK_RECENTLY_OPENED_MS = 7 * DAY_MS;
 export const VISIT_MIN_AGE_MS = 3 * DAY_MS;
+export const VISIT_REPEAT_AFTER_MS = 90 * DAY_MS;
 
 export const MIN_GAP_MS = 20 * HOUR_MS;
 export const WEEKLY_LIMIT = 4;
@@ -83,13 +84,6 @@ export function placeToVisit(
   return undefined;
 }
 
-export function savedPlaceKeys(item: Doc<"items">): string[] {
-  return (item.places ?? []).flatMap((label) => [
-    placeKey(label),
-    placeKey(splitSavedPlace(label).name),
-  ]);
-}
-
 export function reminderSubject(
   item: Doc<"items">,
   kind: Exclude<ReminderKind, "visit">,
@@ -114,6 +108,7 @@ export function reminderCandidates(
   previousKind: ReminderKind | undefined,
   tripStops: ReadonlySet<string>,
   visited: ReadonlySet<string> = new Set(),
+  recentlyAsked: ReadonlySet<string> = new Set(),
 ): ReminderCandidate[] {
   const byKind: Record<ReminderKind, ReminderCandidate[]> = {
     visit: [],
@@ -124,7 +119,11 @@ export function reminderCandidates(
     const age = now - item._creationTime;
     const place = placeToVisit(item, visited);
     if (place !== undefined) {
-      if (age >= VISIT_MIN_AGE_MS && !tripStops.has(item._id))
+      if (
+        age >= VISIT_MIN_AGE_MS &&
+        !tripStops.has(item._id) &&
+        !recentlyAsked.has(placeKey(place))
+      )
         byKind.visit.push({ item, kind: "visit", subject: place });
       continue;
     }

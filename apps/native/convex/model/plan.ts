@@ -317,8 +317,10 @@ export function splitSavedPlace(value: string): { name: string; area: string } {
 }
 
 export function isGenericPlaceName(name: string): boolean {
-  return !wordsOf(name).some(
-    (word) => !GENERIC_WORDS.has(word) && distinctive(word),
+  const words = wordsOf(name);
+  return (
+    words.every((word) => /^\d+$/.test(word)) ||
+    words.every((word) => GENERIC_WORDS.has(word))
   );
 }
 

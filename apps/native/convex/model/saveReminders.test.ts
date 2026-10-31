@@ -74,10 +74,20 @@ describe("asking about a saved place", () => {
   });
 
   it("never asks about a label that names no venue", () => {
-    for (const label of ["12, rue de la Paix, Paris", "Restaurant", "the bar"])
+    for (const label of [
+      "12, rue de la Paix, Paris",
+      "123, rue de Rivoli, Paris",
+      "Restaurant",
+      "the bar",
+    ])
       expect(
         placeToVisit(spot({ places: [label] }), new Set()),
       ).toBeUndefined();
+  });
+
+  it("asks about a short venue name", () => {
+    for (const name of ["XO", "Ko", "Bar 44", "Room 39", "鮨", "Nobu"])
+      expect(placeToVisit(spot({ places: [name] }), new Set())).toBe(name);
   });
 
   it("has nothing to ask once every place is visited, or none is named", () => {

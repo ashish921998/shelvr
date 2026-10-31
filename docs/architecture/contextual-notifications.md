@@ -42,7 +42,9 @@ functions in `convex/model/saveReminders.ts`, with tests next to them.
 
 - **Which save.** A place is the first of a save's `places` the user has not
   marked "We went" (`placeVisits`), unless the save is a recipe; a place on a
-  stored trip is left to the trip. An article is a link with a readable body
+  day of a planned or stored trip is left to the trip. A save whose place was
+  asked about from another save in the past 90 days waits, and a label that is
+  only a number or a generic word ("Restaurant") is never named. An article is a link with a readable body
   and no social `media`. A recipe is a save with a `recipe`. Anything else
   never gets a reminder, because a vague "remember this?" is the notification people
   turn off. The notification names a recipe by `recipe.name` (the dish), and

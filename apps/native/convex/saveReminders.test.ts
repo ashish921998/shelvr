@@ -331,21 +331,29 @@ describe("choosing a save reminder", () => {
     expect(await reminders()).toHaveLength(2);
   });
 
-  it("does not ask about a place it just asked about from another save", async () => {
-    const { prepare, due, reminders } = await setup({
+  it("does not ask about a place again from another save, until months later", async () => {
+    const afonso = "As Bifanas do Afonso";
+    const { prepare, due, reminders, ids } = await setup({
       saves: [
-        [
-          4,
-          { ...reel, title: "Lisbon again", places: ["As Bifanas do Afonso"] },
-        ],
-        [5, { ...reel, places: ["As Bifanas do Afonso"] }],
+        [4, { ...reel, title: "Again", places: [afonso, "Zé dos Cornos"] }],
+        [5, { ...reel, places: [afonso] }],
+        [6, { ...reel, title: "Other", places: ["Castelo de São Jorge"] }],
       ],
     });
-    await prepare();
-    expect(await reminders()).toHaveLength(1);
-    await due(NOW + DAY);
-    await prepare(NOW + DAY);
-    expect(await reminders()).toHaveLength(1);
+    const pass = async (at: number) => {
+      await due(at);
+      await prepare(at);
+    };
+    await pass(NOW);
+    await pass(NOW + DAY);
+    await pass(NOW + 2 * DAY);
+    expect((await reminders()).map((row) => row.itemId)).toEqual([
+      ids[0],
+      ids[2],
+    ]);
+    await pass(NOW + 100 * DAY);
+    expect(await reminders()).toHaveLength(3);
+    expect((await reminders())[2].itemId).toBe(ids[1]);
   });
 
   it("leaves a place to the planned trip it is a stop of", async () => {
