@@ -1,6 +1,11 @@
 import { CityCover } from "@/components/city/city-cover";
 import { useEntitlement, usePaywallGuard } from "@/lib/entitlement";
-import { type City, unplacedSaves, visibleCities } from "@/lib/home-places";
+import {
+  type City,
+  saveSource,
+  unplacedSaves,
+  visibleCities,
+} from "@/lib/home-places";
 import { t, useAppLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
@@ -66,30 +71,29 @@ type UnplacedSave = {
   cities?: string[];
   title?: string;
   url?: string;
+  siteName?: string;
 };
 
-function unplacedLabel(save: UnplacedSave): string {
-  if (save.status === "processing") return t("homePlaces.noPlaceReading");
-  if (save.status === "failed") return t("homePlaces.noPlaceFailed");
-  return t("homePlaces.noPlaceNone");
-}
-
-/** Saves no city card shows, so nothing shared disappears; each opens its save to retry or delete. */
-export function UnplacedSaves({ saves }: { saves: UnplacedSave[] }) {
-  useAppLocale();
+function UnplacedSection({
+  saves,
+  title,
+}: {
+  saves: UnplacedSave[];
+  title: string;
+}) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
-  const all = unplacedSaves(saves);
-  const unplaced = expanded ? all : all.slice(0, MAX_UNPLACED_ROWS);
-  const hidden = all.length - unplaced.length;
-  if (all.length === 0) return null;
+  const unplaced = expanded ? saves : saves.slice(0, MAX_UNPLACED_ROWS);
+  const hidden = saves.length - unplaced.length;
+  if (saves.length === 0) return null;
   return (
     <View style={styles.unplaced}>
-      <Text style={styles.sectionLabel}>{t("homePlaces.noPlaceTitle")}</Text>
+      <Text style={styles.sectionLabel}>{title}</Text>
       {unplaced.map((save) => (
         <Pressable
           key={save._id}
           accessibilityRole="button"
+          accessibilityLabel={`${save.title ?? saveSource(save)}, ${title}`}
           onPress={() =>
             router.push({
               pathname: "/item/[id]",
@@ -102,9 +106,8 @@ export function UnplacedSaves({ saves }: { saves: UnplacedSave[] }) {
           ]}
         >
           <Text style={styles.unplacedTitle} numberOfLines={1}>
-            {save.title ?? save.url ?? ""}
+            {save.title ?? saveSource(save)}
           </Text>
-          <Text style={styles.muted}>{unplacedLabel(save)}</Text>
         </Pressable>
       ))}
       {hidden > 0 ? (
@@ -119,6 +122,19 @@ export function UnplacedSaves({ saves }: { saves: UnplacedSave[] }) {
         </Pressable>
       ) : null}
     </View>
+  );
+}
+
+/** Saves still being read. Failed and placeless saves wait behind one line (`ReviewSaves`). */
+export function UnplacedSaves({ saves }: { saves: UnplacedSave[] }) {
+  useAppLocale();
+  return (
+    <UnplacedSection
+      saves={unplacedSaves(saves).filter(
+        (save) => save.status === "processing",
+      )}
+      title={t("homePlaces.noPlaceReading")}
+    />
   );
 }
 

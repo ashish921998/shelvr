@@ -81,9 +81,6 @@ vi.mock("expo-router", () => ({
     getState: () => ({ routes: [{ name: mocks.stackRoot }] }),
   }),
 }));
-vi.mock("@/components/ai-consent", () => ({
-  AiConsentSetting: vi.fn(() => null),
-}));
 vi.mock("@/components/legal-consent", () => ({
   LegalConsentPreference: vi.fn(() => null),
 }));

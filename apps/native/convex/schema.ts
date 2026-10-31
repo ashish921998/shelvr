@@ -8,10 +8,10 @@ import {
   failureReasonValidator,
   intentValidator,
   placePinsValidator,
+  placeLocationsValidator,
   postMediaValidator,
   recipeValidator,
 } from "./model/itemFields";
-import { EMBEDDING_DIMENSIONS } from "./model/embedding";
 import {
   cancelSurveyOutcomeValidator,
   cancelSurveyReasonValidator,
@@ -24,8 +24,14 @@ import {
 import {
   tripDayValidator,
   tripPaceValidator,
+  tripSlotValidator,
   tripStopValidator,
 } from "./model/trip";
+import {
+  tripInterestValidator,
+  tripStayValidator,
+  tripStopSourceValidator,
+} from "./model/tripPlan";
 
 export default defineSchema({
   ...authTables,
@@ -83,6 +89,15 @@ export default defineSchema({
     ["eventId"],
   ),
 
+  placeRemovals: defineTable({
+    userId: v.string(),
+    name: v.string(),
+    city: v.string(),
+    lat: v.number(),
+    lng: v.number(),
+    appleId: v.optional(v.string()),
+  }).index("by_user", ["userId"]),
+
   items: defineTable({
     userId: v.string(),
     fixtureKey: v.optional(v.string()),
@@ -102,6 +117,7 @@ export default defineSchema({
     latitude: v.optional(v.number()),
     longitude: v.optional(v.number()),
     placePins: v.optional(placePinsValidator),
+    placesEdited: v.optional(v.boolean()),
     isSticker: v.optional(v.boolean()),
     tags: v.array(v.string()),
     content: v.optional(v.string()),
@@ -115,6 +131,7 @@ export default defineSchema({
     intents: v.optional(v.array(intentValidator)),
     cities: v.optional(v.array(v.string())),
     places: v.optional(v.array(v.string())),
+    placeLocations: v.optional(placeLocationsValidator),
     /** True once a run has read the video's speech for places; a rerun then reads it no more. */
     placesHeard: v.optional(v.boolean()),
     products: v.optional(
@@ -142,6 +159,8 @@ export default defineSchema({
     processingRunId: v.optional(v.string()),
     processingStartedAt: v.optional(v.number()),
     searchText: v.string(),
+    // Retired: nothing reads it, and `items:clearEmbeddings` removes it. Stays declared
+    // until no row carries it (one-way door).
     embedding: v.optional(v.array(v.float64())),
     embeddingVersion: v.optional(v.number()),
     embeddingAttempts: v.optional(v.number()),
@@ -158,11 +177,6 @@ export default defineSchema({
     .index("by_status_and_embeddingVersion", ["status", "embeddingVersion"])
     .searchIndex("search_text", {
       searchField: "searchText",
-      filterFields: ["userId"],
-    })
-    .vectorIndex("by_embedding", {
-      vectorField: "embedding",
-      dimensions: EMBEDDING_DIMENSIONS,
       filterFields: ["userId"],
     }),
 
@@ -349,6 +363,38 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_space", ["spaceId"]),
+
+  tripPlans: defineTable({
+    userId: v.string(),
+    name: v.optional(v.string()),
+    city: v.string(),
+    startDate: v.optional(v.string()),
+    dayCount: v.number(),
+    pace: tripPaceValidator,
+    interests: v.array(tripInterestValidator),
+    stay: v.optional(tripStayValidator),
+    stopCount: v.number(),
+    savedCount: v.number(),
+  }).index("by_user", ["userId"]),
+
+  tripStops: defineTable({
+    tripId: v.id("tripPlans"),
+    userId: v.string(),
+    day: v.number(),
+    order: v.number(),
+    source: tripStopSourceValidator,
+    itemId: v.optional(v.id("items")),
+    name: v.string(),
+    area: v.optional(v.string()),
+    lat: v.number(),
+    lng: v.number(),
+    appleId: v.optional(v.string()),
+    category: v.optional(v.string()),
+    why: v.optional(v.string()),
+    slot: v.optional(tripSlotValidator),
+  })
+    .index("by_trip_and_day", ["tripId", "day", "order"])
+    .index("by_user", ["userId"]),
 
   captureTokens: defineTable({
     userId: v.id("users"),

@@ -67,17 +67,27 @@ const placeSchema = z.object({
       thoroughfare: z.string().optional(),
     })
     .optional(),
+  id: z.string().min(1).optional(),
+  poiCategory: z.string().min(1).optional(),
   coordinate: z.object({
     latitude: z.number().min(-90).max(90),
     longitude: z.number().min(-180).max(180),
   }),
 });
 
+/** Apple's `poiCategory` (Restaurant, Cafe, Bakery...) rides along when the result is a point of interest. */
+type FoundPlace = LatLng & {
+  city?: string;
+  appleId?: string;
+  category?: string;
+};
+
 export function firstPlace(
   body: unknown,
   near?: LatLng,
   skipCityOnly = false,
-): LatLng | null {
+  includeCity = false,
+): FoundPlace | null {
   const reply = replySchema.safeParse(body);
   if (!reply.success) return null;
   for (const result of reply.data.results) {
@@ -94,10 +104,29 @@ export function firstPlace(
       const { latitude, longitude } = place.data.coordinate;
       const point = { lat: latitude, lng: longitude };
       if (near && keepNearby([point], near)[0] === null) continue;
-      return point;
+      return {
+        ...point,
+        ...(includeCity && address?.locality?.trim()
+          ? { city: address.locality.trim() }
+          : {}),
+        ...(place.data.id ? { appleId: place.data.id } : {}),
+        ...(place.data.poiCategory ? { category: place.data.poiCategory } : {}),
+      };
     }
   }
   return null;
+}
+
+function appleGet(
+  accessToken: string,
+  path: "search" | "geocode",
+  params: URLSearchParams,
+  fetchImpl: typeof fetch,
+): Promise<Response> {
+  return fetchImpl(`${API}/${path}?${params.toString()}`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+  });
 }
 
 export async function appleMapsLookup(
@@ -106,7 +135,8 @@ export async function appleMapsLookup(
   query: string,
   near?: LatLng,
   fetchImpl: typeof fetch = fetch,
-): Promise<LatLng | null> {
+  includeCity = false,
+): Promise<FoundPlace | null> {
   const params = new URLSearchParams({ q: query.slice(0, 200) });
   if (near !== undefined) {
     params.set("searchLocation", `${near.lat},${near.lng}`);
@@ -116,20 +146,93 @@ export async function appleMapsLookup(
     // retry as a point of interest instead of pretending that centre is the place.
     for (const filter of kind === "search" ? ["Poi,Address", "Poi"] : [""]) {
       if (filter) params.set("resultTypeFilter", filter);
-      const response = await fetchImpl(`${API}/${kind}?${params.toString()}`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-        signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
-      });
+      const response = await appleGet(accessToken, kind, params, fetchImpl);
       if (!response.ok) return null;
       const found = firstPlace(
         await response.json().catch(() => null),
         near,
         kind === "search",
+        includeCity,
       );
       if (found) return found;
     }
     return null;
   } catch {
     return null;
+  }
+}
+
+const poiSchema = placeSchema.extend({
+  name: z.string().trim().min(1),
+  structuredAddress: z
+    .object({
+      locality: z.string().optional(),
+      subLocality: z.string().optional(),
+      dependentLocalities: z.array(z.string()).optional(),
+    })
+    .optional(),
+});
+
+const MAX_POI_NAME_CHARS = 80;
+const MAX_POI_AREA_CHARS = 60;
+/** Apple answers at most about ten results a search; more than this is not trusted. */
+const MAX_POI_RESULTS = 15;
+
+export type ApplePoi = LatLng & {
+  name: string;
+  appleId?: string;
+  category?: string;
+  /** The neighbourhood, else the town, from Apple's structured address. */
+  area?: string;
+};
+
+/** Every usable point of interest in an Apple `/v1/search` reply, in Apple's order. */
+export function placesOf(body: unknown): ApplePoi[] {
+  const reply = replySchema.safeParse(body);
+  if (!reply.success) return [];
+  const places: ApplePoi[] = [];
+  for (const result of reply.data.results.slice(0, MAX_POI_RESULTS)) {
+    const place = poiSchema.safeParse(result);
+    if (!place.success) continue;
+    const { name, structuredAddress: address, id, poiCategory } = place.data;
+    const area = (
+      address?.subLocality ??
+      address?.dependentLocalities?.[0] ??
+      address?.locality
+    )?.trim();
+    places.push({
+      name: name.slice(0, MAX_POI_NAME_CHARS),
+      lat: place.data.coordinate.latitude,
+      lng: place.data.coordinate.longitude,
+      ...(id ? { appleId: id } : {}),
+      ...(poiCategory ? { category: poiCategory } : {}),
+      ...(area ? { area: area.slice(0, MAX_POI_AREA_CHARS) } : {}),
+    });
+  }
+  return places;
+}
+
+/** Points of interest of `categories` for `query` around `near`; empty on any failure. */
+export async function appleMapsSearchPlaces(
+  accessToken: string,
+  query: string,
+  options: { near: LatLng; categories?: readonly string[]; lang?: string },
+  fetchImpl: typeof fetch = fetch,
+): Promise<ApplePoi[]> {
+  const params = new URLSearchParams({
+    q: query.slice(0, 200),
+    searchLocation: `${options.near.lat},${options.near.lng}`,
+    resultTypeFilter: "Poi",
+  });
+  if (options.categories !== undefined && options.categories.length > 0) {
+    params.set("includePoiCategories", options.categories.join(","));
+  }
+  if (options.lang !== undefined) params.set("lang", options.lang);
+  try {
+    const response = await appleGet(accessToken, "search", params, fetchImpl);
+    if (!response.ok) return [];
+    return placesOf(await response.json().catch(() => null));
+  } catch {
+    return [];
   }
 }

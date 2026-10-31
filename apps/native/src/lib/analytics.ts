@@ -8,6 +8,7 @@ import type { SaveSource } from "@convex/model/saveSource";
 import type { SaveFailureStage } from "@convex/model/saveErrors";
 import type { Goal, Planner, SavedCount } from "@/lib/onboarding-goals";
 import type { SampleCityId } from "@/lib/sample-cities";
+import type { PlanKind } from "@/lib/sample-plans";
 import Constants from "expo-constants";
 
 export type AnalyticsItem = {
@@ -80,6 +81,12 @@ export type AnalyticsEventProperties = {
     duration_ms: number;
   };
   onboarding_opener_page_viewed: { page_index: number };
+  onboarding_commitment: {
+    action: "confirmed" | "skipped";
+    plan_kind: PlanKind;
+    sample_city: SampleCityId;
+    flow_version: number;
+  };
   onboarding_notifications: { action: "allow" | "skip"; granted: boolean };
   auth_started: {
     provider: string;
@@ -177,7 +184,7 @@ export type AnalyticsEventProperties = {
   space_deleted: Record<string, never>;
   space_suggestions_accepted: { suggestion_count: number };
   plan_made: { considered: number; place_count: number };
-  plan_failed: { reason: "ai_consent" | "error" };
+  plan_failed: { reason: "error" };
   plan_picked: { place_count: number };
   plan_place_opened: { rank: number };
   plan_place_visited: { visited: boolean };
@@ -190,12 +197,61 @@ export type AnalyticsEventProperties = {
     pace: "easy" | "balanced" | "packed";
     made: boolean;
   };
-  trip_failed: { reason: "ai_consent" | "error" };
+  trip_failed: { reason: "error" };
   city_opened: { count: number };
+  map_opened: { count: number; located: boolean };
+  map_filter_selected: { kind: string };
+  map_place_opened: { card: boolean };
+  map_search_result_opened: Record<string, never>;
   city_plan_started: { kind: "date" | "trip" };
   trip_stop_opened: { day: number; stop: number };
   trip_directions_opened: { located: boolean };
   trip_stop_swapped: { day: number };
+  trip_plan_started: {
+    days: number;
+    pace: "easy" | "balanced" | "packed";
+    interest_count: number;
+    dated: boolean;
+    has_stay: boolean;
+    saved_city: boolean;
+  };
+  trip_plan_made: {
+    days: number;
+    pace: "easy" | "balanced" | "packed";
+    saves: number;
+    suggested: number;
+    made: boolean;
+  };
+  trip_plan_failed: { reason: "rate_limited" | "pro_required" | "error" };
+  trip_plan_opened: { days: number; stops: number; saved: number };
+  trip_plan_stop_opened: {
+    source: "save" | "suggested" | "added";
+    action: "save" | "card" | "maps";
+  };
+  trip_plan_deleted: Record<string, never>;
+  date_plan_started: { kind: "classic" | "lowkey" | "surprise" };
+  date_plan_made: {
+    kind: "classic" | "lowkey";
+    asked: "classic" | "lowkey" | "surprise";
+    status: "ready" | "no_anchor" | "no_pair";
+    evenings: number;
+    suggested: number;
+  };
+  date_plan_failed: { reason: "rate_limited" | "pro_required" | "error" };
+  date_plan_swapped: { slot: "first" | "second"; swapped: boolean };
+  date_plan_stop_opened: {
+    source: "save" | "suggested";
+    action: "save" | "card" | "maps";
+  };
+  date_plan_go: Record<string, never>;
+  date_plan_sent: { shared: boolean };
+  trip_plan_edit_started: { stops: number };
+  trip_plan_stop_moved: { across_days: boolean; method: "drag" | "menu" };
+  trip_plan_stop_removed: { source: "save" | "suggested" | "added" };
+  trip_plan_stop_added: { from: "search" | "save"; unplanned: boolean };
+  trip_plan_edit_undone: { action: "move" | "remove" };
+  trip_plan_place_searched: { results: number; available: boolean };
+  trip_plan_renamed: { cleared: boolean };
   onboarding_completed: {
     save_pileup: string[];
     interests: string[];
@@ -229,6 +285,12 @@ export type AnalyticsEventProperties = {
       | "sheet_failed";
   };
   shared_content_saved: { item_count: number };
+  share_spots_revealed: { pin_count: number; waited_ms: number };
+  share_spots_skipped: {
+    reason: "missing" | "failed" | "no_place" | "timeout";
+    waited_ms: number;
+  };
+  share_spots_city_opened: { pin_count: number };
   // Android replays a share on task restore; counts the replays the share screen skipped.
   share_ghost_skipped: Record<string, never>;
   save_recall_shown: { match_count: number };
@@ -258,11 +320,6 @@ export type AnalyticsEventProperties = {
   notification_opened: { notification_kind: string; notification_id: string };
   notification_disabled: {
     notification_kind: "weekly_shelf" | "save_reminders";
-  };
-  ai_consent_shown: Record<string, never>;
-  ai_consent_answered: {
-    granted: boolean;
-    surface: "card" | "settings";
   };
   cancel_survey_shown: Record<string, never>;
   cancel_survey_dismissed: Record<string, never>;

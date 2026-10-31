@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => ({
     </button>
   ),
   share: vi.fn((_props: { sample: Sample }) => null),
+  commitment: vi.fn(),
   progress: {
     spaces: [] as string[],
     step: 0,
@@ -170,12 +171,14 @@ vi.mock("@/components/onboarding/aha-spots", () => ({
     button("aha:spots", onContinue),
   ),
 }));
+vi.mock("@/components/onboarding/commitment", () => ({
+  CommitmentStep: vi.fn((props: { sample: Sample; onContinue: () => void }) => {
+    mocks.commitment(props);
+    return button("commitment:continue", props.onContinue);
+  }),
+}));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: false }),
-}));
-vi.mock("expo-haptics", () => ({
-  notificationAsync: vi.fn(),
-  NotificationFeedbackType: { Success: "success" },
 }));
 vi.mock("expo-sharing", () => ({ getSharedPayloads: () => [] }));
 vi.mock("react-native-safe-area-context", () => ({
@@ -238,7 +241,7 @@ it("walks the questions into a sample for the goal that leads, and keeps every a
   });
   expect(mocks.share.mock.lastCall?.[0].sample).toMatchObject({
     kind: "trip",
-    city: "lisbon",
+    city: "austin",
   });
 });
 
@@ -271,11 +274,31 @@ it("moves one step on a double tap", () => {
   expect(screen.getByRole("button", { name: "aha:spots" })).toBeTruthy();
 });
 
-it("opens the paywall from the sample spots", async () => {
+it("reuses the sample for the commitment after the spots, before opening the paywall", async () => {
+  mocks.progress = {
+    ...mocks.progress,
+    goals: ["travel"],
+    travelCity: "lisbon",
+  };
   startAt("ahaSpots");
   render(<OnboardingScreen />);
   await act(async () => tap("aha:spots"));
+  expect(mocks.ask).not.toHaveBeenCalled();
+  expect(mocks.commitment.mock.lastCall?.[0].sample).toMatchObject({
+    kind: "trip",
+    city: "austin",
+  });
+  expect(saved()?.step).toBe(ONBOARDING_STEPS.indexOf("commitment"));
+  await act(async () => tap("commitment:continue"));
   expect(mocks.ask).toHaveBeenCalledTimes(1);
+});
+
+it("returns from commitment to the same spots without opening the paywall", () => {
+  startAt("commitment");
+  render(<OnboardingScreen />);
+  tap("common.back");
+  expect(screen.getByRole("button", { name: "aha:spots" })).toBeTruthy();
+  expect(mocks.ask).not.toHaveBeenCalled();
 });
 
 it("hands the goals' spaces to the replay and reports the answers when onboarding ends", () => {
@@ -290,7 +313,9 @@ it("hands the goals' spaces to the replay and reports the answers when onboardin
   render(<OnboardingScreen />);
   act(() => mocks.paywall.onPro());
   expect(mocks.setPendingSpaces).toHaveBeenCalledWith(["Date nights"]);
-  expect(mocks.queueDemoUrl).not.toHaveBeenCalled();
+  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
+    ahaReelUrl(ahaReel("date", "austin")!),
+  );
   expect(mocks.completeOnboarding).toHaveBeenCalled();
   expect(mocks.capture).toHaveBeenCalledWith(
     "onboarding_completed",
@@ -315,5 +340,22 @@ it("queues the real reel it played as the first save when onboarding ends", () =
   act(() => mocks.paywall.onPro());
   expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
     ahaReelUrl(ahaReel("date", "austin")!),
+  );
+});
+
+it("queues the default reel before leaving onboarding when the city question was skipped", () => {
+  mocks.progress = {
+    ...mocks.progress,
+    step: ONBOARDING_STEPS.indexOf("commitment"),
+    goals: ["travel"],
+    travelCity: null,
+  };
+  render(<OnboardingScreen />);
+  act(() => mocks.paywall.onPro());
+  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
+    ahaReelUrl(ahaReel("trip", "austin")!),
+  );
+  expect(mocks.queueDemoUrl.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.completeOnboarding.mock.invocationCallOrder[0],
   );
 });

@@ -1,10 +1,11 @@
+import { AppSymbolIcon } from "@/components/symbol";
 import { saveSource } from "@/lib/city-pins";
 import { t } from "@/lib/i18n";
 import type { Id } from "@convex/_generated/dataModel";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type SaveRowItem = {
   _id: Id<"items">;
@@ -18,72 +19,130 @@ type SaveRowItem = {
 
 type Props = {
   item: SaveRowItem;
-  /** The number on this save's map pin; a save with no located place has none. */
+  placeName?: string;
+  /** The matching map number when this row represents a located place. */
   number?: number;
   selected?: boolean;
-  /** A place the user marked "We went": the badge fades like its pin. */
   /** Replaces opening the save, so the city page can select its pin first. */
   onPress?: () => void;
+  /** Opens Apple's place card; its button shows while the row is selected. */
+  onPlaceDetails?: () => void;
+  onRemove?: () => void;
+  removing?: boolean;
 };
 
-export function SaveRow({ item, number, selected, onPress }: Props) {
+export function SaveRow({
+  item,
+  placeName,
+  number,
+  selected,
+  onPress,
+  onPlaceDetails,
+  onRemove,
+  removing,
+}: Props) {
   const router = useRouter();
+  const { theme } = useUnistyles();
   const image = item.imageUrl ?? item.heroImageUrl;
-  const source = saveSource(item);
-  const title = item.title ?? t("homePlaces.untitled");
+  const source = placeName
+    ? (item.title ?? saveSource(item))
+    : saveSource(item);
+  const title = placeName ?? item.title ?? t("homePlaces.untitled");
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={title}
-      accessibilityState={{ selected: selected === true }}
-      onPress={
-        onPress ??
-        (() =>
-          router.push({ pathname: "/item/[id]", params: { id: item._id } }))
-      }
-      style={({ pressed }) => [
-        styles.row,
-        selected && styles.selected,
-        pressed && styles.pressed,
-      ]}
-    >
-      {number !== undefined ? (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{number}</Text>
-        </View>
-      ) : null}
-      {image ? (
-        <Image
-          source={{ uri: image }}
-          style={styles.thumb}
-          contentFit="cover"
-        />
-      ) : (
-        <View style={styles.thumb} />
-      )}
-      <View style={styles.text}>
-        <Text style={styles.title} numberOfLines={2}>
-          {title}
-        </Text>
-        {source ? (
-          <Text style={styles.source} numberOfLines={1}>
-            {source}
-          </Text>
+    <View style={[styles.row, selected && styles.selected]}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={title}
+        accessibilityState={{ selected: selected === true }}
+        onPress={
+          onPress ??
+          (() =>
+            router.push({ pathname: "/item/[id]", params: { id: item._id } }))
+        }
+        style={({ pressed }) => [styles.body, pressed && styles.pressed]}
+      >
+        {number !== undefined ? (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{number}</Text>
+          </View>
         ) : null}
-      </View>
-    </Pressable>
+        {!placeName ? (
+          image ? (
+            <Image
+              source={{ uri: image }}
+              style={styles.thumb}
+              contentFit="cover"
+            />
+          ) : (
+            <View style={styles.thumb} />
+          )
+        ) : null}
+        <View style={styles.text}>
+          <Text style={styles.title} numberOfLines={2}>
+            {title}
+          </Text>
+          {source ? (
+            <Text style={styles.source} numberOfLines={1}>
+              {source}
+            </Text>
+          ) : null}
+        </View>
+      </Pressable>
+      {selected && onRemove ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("cityMap.removePlace", { name: title })}
+          disabled={removing}
+          onPress={onRemove}
+          style={styles.details}
+        >
+          <AppSymbolIcon
+            name="minus"
+            size={22}
+            tintColor={theme.colors.foreground}
+          />
+        </Pressable>
+      ) : null}
+      {selected && onPlaceDetails ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("cityMap.placeDetails", { name: title })}
+          onPress={onPlaceDetails}
+          style={({ pressed }) => [styles.details, pressed && styles.pressed]}
+        >
+          <AppSymbolIcon
+            name="info.circle"
+            size={22}
+            tintColor={theme.colors.foreground}
+          />
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
   row: {
+    minHeight: theme.control.minHeight,
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: -theme.gap(0.75),
+    borderRadius: theme.radius.lg,
+    borderCurve: "continuous",
+  },
+  body: {
+    flex: 1,
+    alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(1.5),
     padding: theme.gap(0.75),
-    marginHorizontal: -theme.gap(0.75),
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
+  },
+  details: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
   selected: { backgroundColor: theme.colors.primarySoft },
   pressed: { opacity: theme.opacity.pressed },

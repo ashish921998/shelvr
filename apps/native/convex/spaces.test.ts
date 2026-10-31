@@ -1092,3 +1092,68 @@ describe("steering spend controls", () => {
     ).toHaveLength(10);
   });
 });
+
+describe("getSpaceCards", () => {
+  it("returns saved members as card rows, without suggestions or heavy fields", async () => {
+    const { t, userId } = await entitledUser();
+    const ids = await t.run(async (ctx) => {
+      const spaceId = await ctx.db.insert("spaces", {
+        userId,
+        name: "Austin",
+      });
+      const saved = await ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Tacos",
+        url: "https://example.com/tacos",
+        content: "A long article body. ".repeat(500),
+        recipe: { ingredients: ["tortilla"], steps: ["fold"] },
+        tags: [],
+        searchText: "Tacos",
+      });
+      const suggested = await ctx.db.insert("items", {
+        userId,
+        type: "note",
+        status: "ready",
+        title: "Brisket",
+        tags: [],
+        searchText: "Brisket",
+      });
+      await ctx.db.insert("spaceItems", {
+        itemId: saved,
+        spaceId,
+        userId,
+        status: "saved",
+      });
+      await ctx.db.insert("spaceItems", {
+        itemId: suggested,
+        spaceId,
+        userId,
+        status: "suggested",
+      });
+      return { spaceId, saved };
+    });
+
+    const space = await t.query(api.spaces.getSpaceCards, { id: ids.spaceId });
+    expect(space?.name).toBe("Austin");
+    expect(space?.items.map((item) => item._id)).toEqual([ids.saved]);
+    const [card] = space?.items ?? [];
+    expect(card).toMatchObject({ title: "Tacos", hasRecipe: true });
+    expect(card).not.toHaveProperty("content");
+    expect(card).not.toHaveProperty("recipe");
+    expect(card).not.toHaveProperty("userId");
+  });
+
+  it("returns null for another account's space", async () => {
+    const backend = newConvexTest();
+    const owner = await signedInUser(backend, { pro: true });
+    const other = await signedInUser(backend, { pro: true });
+    const spaceId = await backend.run(async (ctx) =>
+      ctx.db.insert("spaces", { userId: owner.userId, name: "Austin" }),
+    );
+    expect(
+      await other.t.query(api.spaces.getSpaceCards, { id: spaceId }),
+    ).toBeNull();
+  });
+});

@@ -5,7 +5,6 @@ import { Coach } from "@/components/onboarding/share-sheets";
 import { AppSymbolIcon } from "@/components/symbol";
 import type { AhaSample } from "@/lib/aha-sample";
 import { t } from "@/lib/i18n";
-import { SAMPLE_CITIES } from "@/lib/sample-cities";
 import { Image } from "expo-image";
 import { useState } from "react";
 import { Text, View } from "react-native";
@@ -29,16 +28,8 @@ export function AhaReel({
   dimmed?: boolean;
 }) {
   const [playing, setPlaying] = useState(false);
-  const reel = sample.source === "reel";
-  const caption = reel
-    ? null
-    : t(sample.caption, { city: t(SAMPLE_CITIES[sample.city].name) });
   // A creator is named only over their own video, never over the city photo it falls back to.
-  const credit = !reel
-    ? t("aha.shelvrExample")
-    : playing
-      ? sample.creator
-      : null;
+  const credit = playing ? sample.creator : null;
   return (
     <View style={styles.reel}>
       {/* The picture is one image to VoiceOver, apart from the Share button, which stays reachable. */}
@@ -47,11 +38,9 @@ export function AhaReel({
         accessible
         accessibilityRole="image"
         accessibilityLabel={
-          !reel
-            ? `${credit}: ${caption}`
-            : credit === null
-              ? t("aha.sampleBadge")
-              : t("aha.reelBy", { handle: credit })
+          credit === null
+            ? t("aha.sampleBadge")
+            : t("aha.reelBy", { handle: credit })
         }
       >
         <Image
@@ -59,9 +48,7 @@ export function AhaReel({
           contentFit="cover"
           style={StyleSheet.absoluteFill}
         />
-        {sample.source === "reel" ? (
-          <ReelVideo reelCode={sample.videoCode} onPlaying={setPlaying} />
-        ) : null}
+        <ReelVideo reelCode={sample.videoCode} onPlaying={setPlaying} />
         <View style={styles.scrim} />
       </View>
       {dimmed ? <View style={styles.dim} /> : null}
@@ -108,11 +95,6 @@ export function AhaReel({
         accessibilityElementsHidden
       >
         {credit === null ? null : <Text style={styles.handle}>{credit}</Text>}
-        {caption === null ? null : (
-          <Text style={styles.caption} numberOfLines={3}>
-            {caption}
-          </Text>
-        )}
       </View>
     </View>
   );
@@ -196,11 +178,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   handle: {
     ...theme.type.subheadStrong,
-    color: "#FFFFFF",
-  },
-  caption: {
-    ...theme.type.footnote,
-    lineHeight: 19,
     color: "#FFFFFF",
   },
 }));

@@ -17,10 +17,10 @@ which runs between its two mutations.
 
 ## Properties
 
-| Invariant           | Plain meaning                                               |
-| ------------------- | ----------------------------------------------------------- |
-| `ItemBlobExists`    | A saved photo's `storageId` always names a blob that exists |
-| `NoSharedBlob`      | Two saves never share a blob, so deleting one can't blank the other |
+| Invariant           | Plain meaning                                                                                                                              |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ItemBlobExists`    | A saved photo's `storageId` always names a blob that exists                                                                                |
+| `NoSharedBlob`      | Two saves never share a blob, so deleting one can't blank the other                                                                        |
 | `PendingBlobExists` | A pending import never holds a deleted blob. If it did, `finalizeImageImport` would throw "Storage object not found" until the 24h cleanup |
 
 ## Run it
@@ -42,20 +42,20 @@ Last confirmed to describe the code at **68b06180**. Move this commit forward on
 after you have checked that every action below still matches its function at the new
 commit.
 
-| Model action   | Code                                                                 |
-| -------------- | -------------------------------------------------------------------- |
-| `Begin`        | `beginImageImportForUser`, `apps/native/convex/items.ts`             |
-| `Claim`        | `claimImageUpload`, `items.ts`                                       |
+| Model action   | Code                                                                      |
+| -------------- | ------------------------------------------------------------------------- |
+| `Begin`        | `beginImageImportForUser`, `apps/native/convex/items.ts`                  |
+| `Claim`        | `claimImageUpload`, `items.ts`                                            |
 | `Store`        | `ctx.storage.store` in `receiveImageUpload`, `apps/native/convex/http.ts` |
-| `Finish`       | `finishImageUpload` with a `storageId`, `items.ts`                   |
-| `Abort`        | the `finally` call to `finishImageUpload` with no `storageId`, `http.ts` |
-| `Attach`       | `attachImageUploadForUser`, `items.ts`                               |
-| `Finalize`     | `finalizeImageImportForUser`, `items.ts`                             |
-| `DeleteItem`   | `deleteItem`, `items.ts`                                             |
-| `StaleCleanup` | `cleanupStaleImageImports`, `items.ts`                               |
-| `OrphanSweep`  | `cleanupOrphanStorage`, `items.ts`                                   |
-| `Unreferenced` | `isStorageUnreferenced`, `items.ts`                                  |
-| `Delete`       | `safeDeleteStorage`, `apps/native/convex/model/storage.ts`           |
+| `Finish`       | `finishImageUpload` with a `storageId`, `items.ts`                        |
+| `Abort`        | the `finally` call to `finishImageUpload` with no `storageId`, `http.ts`  |
+| `Attach`       | `attachImageUploadForUser`, `items.ts`                                    |
+| `Finalize`     | `finalizeImageImportForUser`, `items.ts`                                  |
+| `DeleteItem`   | `deleteItem`, `items.ts`                                                  |
+| `StaleCleanup` | `cleanupStaleImageImports`, `items.ts`                                    |
+| `OrphanSweep`  | `cleanupOrphanStorage`, `items.ts`                                        |
+| `Unreferenced` | `isStorageUnreferenced`, `items.ts`                                       |
+| `Delete`       | `safeDeleteStorage`, `apps/native/convex/model/storage.ts`                |
 
 To see whether covered code moved since the sync commit:
 

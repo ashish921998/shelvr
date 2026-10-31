@@ -1,7 +1,12 @@
 "use node";
 
 import type { Id } from "../_generated/dataModel";
-import { linkSource, shortFormSource, type LinkSource } from "./externalUrl";
+import {
+  isGoogleMapsUrl,
+  linkSource,
+  shortFormSource,
+  type LinkSource,
+} from "./externalUrl";
 import {
   safeFetch,
   BROWSER_USER_AGENT,
@@ -12,11 +17,12 @@ import {
   withLinkedRecipe,
   type PageData,
 } from "./pageReadCore";
-import { fetchTikTokOEmbed } from "./readers/tiktok";
+import { fetchTikTok } from "./readers/tiktok";
 import { fetchYouTube } from "./readers/youtube";
 import { fetchXPost } from "./readers/x";
 import { fetchInstagram } from "./readers/instagram";
 import { fetchPinterestPin } from "./readers/pinterest";
+import { fetchGoogleMapsList } from "./readers/googleMaps";
 
 export {
   extractBodyText,
@@ -110,22 +116,45 @@ async function asInstagramCaption(read: Promise<PageData>): Promise<PageData> {
   return page.content === undefined ? page : { ...page, caption: true };
 }
 
+type ReadOptions = {
+  /** Skip the linked-recipe fetches a caption may trigger, for callers that only want the caption. */
+  captionOnly?: boolean;
+  claimPaidRead?: () => Promise<boolean>;
+};
+
 const SOURCE_READERS = {
-  tiktok: async (url) =>
-    withLinkedRecipe(await asCaption(fetchTikTokOEmbed(url))),
+  tiktok: async (url, { captionOnly, claimPaidRead }) => {
+    const page = await asCaption(fetchTikTok(url, claimPaidRead));
+    return captionOnly ? page : withLinkedRecipe(page);
+  },
   x: async (url) => withLinkedRecipe(await asCaption(fetchXPost(url))),
-  instagram: async (url) =>
-    withLinkedRecipe(await asInstagramCaption(fetchInstagram(url))),
+  instagram: async (url, { captionOnly }) => {
+    const page = await asInstagramCaption(fetchInstagram(url));
+    return captionOnly ? page : withLinkedRecipe(page);
+  },
   pinterest: fetchPinterestPin,
   youtube: fetchYouTube,
-} satisfies Record<LinkSource, (url: string) => Promise<PageData>>;
+} satisfies Record<
+  LinkSource,
+  (url: string, options: ReadOptions) => Promise<PageData>
+>;
 
-export async function readPage(url: string): Promise<PageRead> {
+async function readUnsourced(url: string): Promise<PageData> {
+  const list = isGoogleMapsUrl(url)
+    ? await fetchGoogleMapsList(url)
+    : undefined;
+  return list ?? (await fetchPage(url));
+}
+
+export async function readPage(
+  url: string,
+  options: ReadOptions = {},
+): Promise<PageRead> {
   try {
     const source = linkSource(url);
     const page = source
-      ? await SOURCE_READERS[source](url)
-      : await fetchPage(url);
+      ? await SOURCE_READERS[source](url, options)
+      : await readUnsourced(url);
     const urlShortForm = shortFormSource(url);
     const shortForm = urlShortForm && {
       ...urlShortForm,

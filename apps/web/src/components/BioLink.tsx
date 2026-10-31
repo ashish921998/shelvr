@@ -75,11 +75,13 @@ export default function BioLink({
         className="h-16 w-16"
       />
       <h1 className="mt-7 font-display text-[44px] leading-[.98] text-ink text-balance">
-        Turn saved spots into <span className="text-terracotta">trips</span>.
+        Saved it.
+        <br />
+        Now <span className="text-terracotta">go there</span>.
       </h1>
-      <p className="mt-4 max-w-[28ch] text-[17px] leading-[1.4] text-muted">
-        Save food and travel finds from any video. Shelvr pins them and plans
-        the day.
+      <p className="mt-4 max-w-[30ch] text-[17px] leading-[1.4] text-muted">
+        Share a reel or TikTok to Shelvr. Its places land on a map of their
+        city, ready for a date night or a trip.
       </p>
       {platform === "android" && !PLAY_STORE_LIVE ? (
         <div className="mt-8 w-full max-w-[380px]">

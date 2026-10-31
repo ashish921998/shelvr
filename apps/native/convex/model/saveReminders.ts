@@ -1,7 +1,7 @@
 import type { Doc } from "../_generated/dataModel";
 import { env } from "../_generated/server";
 import { linkSource } from "./externalUrl";
-import { placeKey } from "./plan";
+import { isStreetAddress, placeKey, splitSavedPlace } from "./plan";
 
 export type ReminderKind = "read" | "cook" | "visit";
 
@@ -39,7 +39,9 @@ const LATEST_HOUR = 19;
 const MIN_HOUR_SAMPLES = 5;
 export const HOUR_SAMPLE_WINDOW_MS = 30 * DAY_MS;
 
-export function reminderKind(item: Doc<"items">): ReminderKind | undefined {
+export function reminderKind(
+  item: Doc<"items">,
+): Exclude<ReminderKind, "visit"> | undefined {
   if (item.status !== "ready") return undefined;
   if (
     item.recipe !== undefined &&
@@ -57,24 +59,29 @@ export function reminderKind(item: Doc<"items">): ReminderKind | undefined {
   return undefined;
 }
 
-/** The first place a ready save names that its owner has not marked "We went"; a recipe stays a recipe. */
 export function placeToVisit(
   item: Doc<"items">,
   visited: ReadonlySet<string>,
 ): string | undefined {
   if (item.status !== "ready" || reminderKind(item) === "cook")
     return undefined;
-  return item.places
-    ?.map((name) => name.trim())
-    .find((name) => name !== "" && !visited.has(placeKey(name)));
+  for (const label of item.places ?? []) {
+    const { name } = splitSavedPlace(label);
+    if (
+      name !== "" &&
+      !isStreetAddress(name) &&
+      !visited.has(placeKey(name)) &&
+      !visited.has(placeKey(label))
+    )
+      return name;
+  }
+  return undefined;
 }
 
 export function reminderSubject(
   item: Doc<"items">,
-  kind: ReminderKind,
-  visited: ReadonlySet<string> = new Set(),
+  kind: Exclude<ReminderKind, "visit">,
 ): string | undefined {
-  if (kind === "visit") return placeToVisit(item, visited);
   const subject =
     (kind === "cook" ? item.recipe?.name?.trim() : undefined) ||
     item.title?.trim();
@@ -87,7 +94,6 @@ type ReminderCandidate = {
   subject: string;
 };
 
-/** Places come first: they are what Shelvr is for. The kind sent last goes to the back. */
 const KIND_ORDER: readonly ReminderKind[] = ["visit", "read", "cook"];
 
 export function reminderCandidates(

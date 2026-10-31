@@ -1,5 +1,4 @@
-import { AiConsentCard } from "@/components/ai-consent";
-import { useAiConsent } from "@/lib/ai-consent";
+import { UnplacedToast } from "@/components/home/unplaced-toast";
 import { AppIntentsBridge } from "@/lib/app-intents";
 import { releaseSheetLink } from "@/lib/deferred-sheet-link";
 import { useForgetExitOffer } from "@/lib/forget-exit-offer";
@@ -28,24 +27,6 @@ import { Platform } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
 
 export default function AppLayout() {
-  useAppLocale();
-  const { onboarded } = useOnboarding();
-  const consent = useAiConsent();
-  const { entitled } = useEntitlement();
-
-  // Once past onboarding and the paywall (with Pro, so saves are possible), nothing
-  // is saved until the person answers the Gemini ask; before that the plan gate shows.
-  if (onboarded && entitled && consent.savesBlocked) {
-    return consent.asking ? (
-      <AiConsentCard />
-    ) : (
-      <ScreenLoader label={t("loading.app")} />
-    );
-  }
-  return <AppStack />;
-}
-
-function AppStack() {
   useAppLocale();
   const router = useRouter();
   const { isLoading, isAuthenticated } = useConvexAuth();
@@ -120,11 +101,19 @@ function AppStack() {
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
           <Stack.Screen
-            name="trip/[id]"
+            name="city/[name]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
           <Stack.Screen
-            name="city/[name]"
+            name="spots/[id]"
+            options={{ headerShown: false, gestureEnabled: false }}
+          />
+          <Stack.Screen
+            name="trip-plan/[id]"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
+          <Stack.Screen
+            name="date-plan"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
         </Stack.Protected>
@@ -160,6 +149,32 @@ function AppStack() {
                     contentStyle: { backgroundColor: theme.colors.background },
                   }
             }
+          />
+          <Stack.Screen
+            name="new-trip"
+            options={{
+              presentation: "modal",
+              headerShown: true,
+              headerTransparent: false,
+              headerShadowVisible: false,
+              headerStyle: { backgroundColor: theme.colors.background },
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
+          />
+          <Stack.Screen
+            name="edit-save-places"
+            options={{ headerShown: true, headerTransparent: false }}
+          />
+          <Stack.Screen
+            name="add-trip-stop"
+            options={{
+              presentation: "modal",
+              headerShown: true,
+              headerTransparent: false,
+              headerShadowVisible: false,
+              headerStyle: { backgroundColor: theme.colors.background },
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
           />
         </Stack.Protected>
         <Stack.Protected guard={onboarded} redirectTo="/onboarding">
@@ -206,6 +221,7 @@ function AppStack() {
         />
       </Stack>
       {onboarded && planUnknown ? <PlanLoadingCover /> : null}
+      {onboarded && !gated ? <UnplacedToast /> : null}
     </HomeFeedProvider>
   );
 }

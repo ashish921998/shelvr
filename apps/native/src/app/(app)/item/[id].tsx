@@ -20,7 +20,7 @@ import { AppEntityView } from "expo-app-intents";
 import * as Clipboard from "expo-clipboard";
 import { GlassView } from "@/components/glass";
 import { StatusBar } from "expo-status-bar";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import {
   Stack,
   useFocusEffect,
@@ -502,9 +502,7 @@ function ItemScreenContent() {
     await Clipboard.setStringAsync(activeItem.url);
     analytics.capture("item_link_copied");
     analytics.itemAction(activeItem, "copy");
-    if (process.env.EXPO_OS === "ios") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
+    void haptics.success();
   }, [activeItem]);
 
   const activeIsSuggested =
@@ -517,9 +515,6 @@ function ItemScreenContent() {
     if (!spaceId || !activeId || decisionPending.current) return;
     decisionPending.current = true;
     setDecisionBusy(true);
-    if (process.env.EXPO_OS === "ios") {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
     const membership = {
       itemId: activeId as Id<"items">,
       spaceId: spaceId as Id<"spaces">,
@@ -527,6 +522,7 @@ function ItemScreenContent() {
     try {
       const changed = await acceptSuggestion(membership);
       if (changed) {
+        void haptics.success();
         analytics.capture("suggestion_accepted");
         setAccepted(membership);
       }

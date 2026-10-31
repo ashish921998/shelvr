@@ -1,5 +1,7 @@
 import { type Infer, v } from "convex/values";
 
+import { placeKey } from "./plan";
+
 export const INTENT_KINDS = [
   "open_url",
   "copy",
@@ -24,8 +26,49 @@ export const intentValidator = v.object({
 });
 
 export const placePinsValidator = v.array(
-  v.object({ name: v.string(), lat: v.number(), lng: v.number() }),
+  v.object({
+    name: v.string(),
+    lat: v.number(),
+    lng: v.number(),
+    city: v.optional(v.string()),
+    appleId: v.optional(v.string()),
+    /** Apple Maps' point-of-interest category, e.g. "Bakery"; the Map tab's filters read it. */
+    category: v.optional(v.string()),
+  }),
 );
+
+export const placeLocationsValidator = v.array(
+  v.object({ name: v.string(), location: v.string() }),
+);
+
+export function savedPlaceKey(
+  name: string,
+  cities?: readonly string[],
+): string {
+  return placeKey(normalizePlaceName(name, cities));
+}
+
+export function normalizePlaceLocations(
+  cluesBestFirst: Infer<typeof placeLocationsValidator> | undefined,
+  places: readonly string[] | undefined,
+  cities: readonly string[] = [],
+): Infer<typeof placeLocationsValidator> {
+  const names = new Map<string, string>();
+  for (const name of normalizePlaces(places, cities)) {
+    const key = placeKey(name);
+    if (key !== "" && !names.has(key)) names.set(key, name);
+  }
+  const locations = new Map<string, { name: string; location: string }>();
+  for (const entry of cluesBestFirst ?? []) {
+    const key = savedPlaceKey(entry.name, cities);
+    const name = names.get(key);
+    const location = entry.location.replace(/\s+/g, " ").trim();
+    if (name && location && location.length <= 120 && !locations.has(key)) {
+      locations.set(key, { name, location });
+    }
+  }
+  return [...locations.values()];
+}
 
 export const postMediaValidator = v.object({
   kind: v.union(v.literal("photo"), v.literal("video"), v.literal("gif")),
@@ -86,7 +129,7 @@ export const MAX_ITEM_TITLE_CHARS = 200;
 
 export const MAX_NOTE_TEXT_CHARS = 100_000;
 
-export const MAX_ITEM_CITIES = 3;
+export const MAX_ITEM_CITIES = 30;
 
 const MAX_CITY_CHARS = 60;
 const NOT_A_CITY = new Set(["unknown", "n/a", "none", "various", "online"]);
@@ -120,15 +163,39 @@ export const MAX_ITEM_PLACES = 30;
 
 const MAX_PLACE_CHARS = 80;
 
-export function normalizePlaces(raw: readonly string[] | undefined): string[] {
+/** The place without a trailing ", <city>" qualifier, or null when it has none. Compares the whole city, so "Washington, D.C" works. */
+export function withoutCitySuffix(place: string, city: string): string | null {
+  const suffix = city.trim().toLowerCase();
+  if (suffix === "" || !place.toLowerCase().endsWith(suffix)) return null;
+  const head = place.slice(0, place.length - suffix.length).trimEnd();
+  if (!head.endsWith(",")) return null;
+  const name = head.slice(0, -1).trim();
+  return name === "" ? null : name;
+}
+
+/** A sole source city is lookup context, not part of the venue's name. */
+export function normalizePlaceName(
+  raw: string,
+  cities: readonly string[] = [],
+): string {
+  const place = raw
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/[.,;:!?]+$/, "")
+    .trim();
+  const sourceCities = normalizeCities(cities);
+  if (sourceCities.length !== 1) return place;
+  return withoutCitySuffix(place, sourceCities[0]) ?? place;
+}
+
+export function normalizePlaces(
+  raw: readonly string[] | undefined,
+  cities: readonly string[] = [],
+): string[] {
   const seen = new Set<string>();
   const places: string[] = [];
   for (const entry of raw ?? []) {
-    const place = entry
-      .replace(/\s+/g, " ")
-      .trim()
-      .replace(/[.,;:!?]+$/, "")
-      .trim();
+    const place = normalizePlaceName(entry, cities);
     const key = place.toLowerCase();
     if (place === "" || place.length > MAX_PLACE_CHARS || seen.has(key)) {
       continue;

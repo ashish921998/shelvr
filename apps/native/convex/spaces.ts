@@ -1,3 +1,4 @@
+import { userRemovals } from "./model/placeRemovals";
 import { ConvexError, v } from "convex/values";
 import { internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -27,15 +28,17 @@ import {
 } from "./model/memberships";
 import {
   enrichItem,
+  toItemCards,
   enrichedItemValidator,
   intentValidator,
+  itemCardValidator,
   CITY_SCAN_ROWS,
   readyCitySaves,
 } from "./items";
 import { deletePlanSharesForSpace } from "./planShares";
 import {
   beenPlaces,
-  claimSpaceForModel,
+  claimSpaceForPlanning,
   deleteTripsForSpace,
   planSaves,
   toPlanSource,
@@ -221,6 +224,7 @@ export const getSpace = authedQuery({
       return null;
     }
     const { saved, suggested } = await splitJoins(ctx, space._id);
+    const removals = await userRemovals(ctx, userId);
     const intentsByItem = new Map(
       saved.map((join) => [join.itemId, join.intents]),
     );
@@ -228,16 +232,39 @@ export const getSpace = authedQuery({
       loadItems(ctx, saved).then((rows) =>
         Promise.all(
           rows.map(async (item) => ({
-            ...(await enrichItem(ctx, item)),
+            ...(await enrichItem(ctx, item, removals)),
             spaceIntents: intentsByItem.get(item._id),
           })),
         ),
       ),
       loadItems(ctx, suggested).then((rows) =>
-        Promise.all(rows.map((item) => enrichItem(ctx, item))),
+        Promise.all(rows.map((item) => enrichItem(ctx, item, removals))),
       ),
     ]);
     return { ...space, items, suggestions };
+  },
+});
+
+/**
+ * A space with its saved items as card rows, for the plan and trip pages,
+ * which show titles, covers and a count. `getSpace` stays for builds that
+ * still read full rows and suggestions.
+ */
+export const getSpaceCards = authedQuery({
+  args: { id: v.id("spaces") },
+  returns: v.union(
+    v.object({ ...spaceFields, items: v.array(itemCardValidator) }),
+    v.null(),
+  ),
+  handler: async (ctx, args) => {
+    const space = await ctx.db.get(args.id);
+    if (space === null || space.userId !== ctx.userId) {
+      return null;
+    }
+    const { saved } = await splitJoins(ctx, space._id);
+    const rows = await loadItems(ctx, saved);
+    const items = await toItemCards(ctx, rows);
+    return { ...space, items };
   },
 });
 
@@ -772,9 +799,9 @@ export const claimPlanInternal = internalMutation({
     been: v.array(v.string()),
   }),
   handler: async (ctx, args) => {
-    const { userId, space } = await claimSpaceForModel(ctx, args.spaceId);
+    const { userId, space } = await claimSpaceForPlanning(ctx, args.spaceId);
     const sources = (await planSaves(ctx, args.spaceId, userId, args.city)).map(
-      ({ item, join }) => toPlanSource(item, join),
+      ({ item }) => toPlanSource(item, args.city),
     );
     if (sources.length === 0) {
       return { spaceName: space.name, sources, been: [] };
@@ -786,7 +813,7 @@ export const claimPlanInternal = internalMutation({
     return {
       spaceName: space.name,
       sources,
-      been: await beenPlaces(ctx, userId),
+      been: await beenPlaces(ctx, userId, sources),
     };
   },
 });

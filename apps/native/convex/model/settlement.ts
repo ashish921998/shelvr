@@ -10,6 +10,10 @@ import {
   enrichmentValidator,
   failureReasonValidator,
   intentValidator,
+  normalizePlaces,
+  savedPlaceKey,
+  normalizePlaceLocations,
+  placeLocationsValidator,
   postMediaValidator,
   recipeValidator,
   type Recipe,
@@ -38,6 +42,7 @@ const classificationValidator = v.object({
   intents: v.optional(v.array(intentValidator)),
   cities: v.optional(v.array(v.string())),
   places: v.optional(v.array(v.string())),
+  placeLocations: v.optional(placeLocationsValidator),
   placesHeard: v.optional(v.boolean()),
   recipe: v.optional(recipeValidator),
   embedding: v.optional(
@@ -65,6 +70,7 @@ type Words = {
   intents: Doc<"items">["intents"];
   cities: string[] | undefined;
   places: string[] | undefined;
+  placeLocations: Doc<"items">["placeLocations"];
   placesHeard: boolean | undefined;
   recipe: Recipe | undefined;
 };
@@ -82,6 +88,7 @@ function readingWords(item: Doc<"items">, reading: Reading): Words {
     intents: item.intents ?? [],
     cities: item.cities,
     places: item.places,
+    placeLocations: item.placeLocations,
     placesHeard: item.placesHeard,
     recipe: reading.recipe ?? item.recipe,
   };
@@ -97,8 +104,19 @@ function classifiedWords(
     tags: classification.tags,
     intents: classification.intents,
     cities: classification.cities,
-    places: classification.places,
+    places:
+      classification.places === undefined
+        ? undefined
+        : normalizePlaces(classification.places, classification.cities),
     placesHeard: classification.placesHeard,
+    placeLocations:
+      classification.placeLocations === undefined
+        ? undefined
+        : normalizePlaceLocations(
+            classification.placeLocations,
+            classification.places,
+            classification.cities,
+          ),
     recipe: reading.recipe ?? classification.recipe,
   };
 }
@@ -166,6 +184,14 @@ export function completionPatch(
 ): ItemPatch {
   const { reading } = run;
   const words = settledWords(item, run, aiAllowed);
+  if (item.placesEdited) {
+    words.cities = item.cities ?? [];
+    words.places = item.places ?? [];
+    words.placeLocations = item.placeLocations;
+    words.intents = words.intents?.filter(
+      (intent) => intent.kind !== "open_maps",
+    );
+  }
   const title = settledTitle(item, run.keepTitle, words);
   return {
     title,
@@ -185,6 +211,7 @@ export function completionPatch(
     intents: words.intents,
     ...(words.cities !== undefined ? { cities: words.cities } : {}),
     ...(words.places !== undefined ? { places: words.places } : {}),
+    ...replaceCluesAndDropTheirPins(item, words),
     ...(words.placesHeard !== undefined
       ? { placesHeard: words.placesHeard }
       : {}),
@@ -193,6 +220,9 @@ export function completionPatch(
     failureReason: undefined,
     searchText: buildSearchText({
       title,
+      cities: words.cities ?? item.cities,
+      places: words.places ?? item.places,
+      placePins: item.placePins,
       description: words.description,
       tags: words.tags,
       siteName: reading.siteName,
@@ -200,6 +230,37 @@ export function completionPatch(
       content: reading.content,
     }),
     ...embeddingPatch(item, run, aiAllowed),
+  };
+}
+
+function replaceCluesAndDropTheirPins(
+  item: Doc<"items">,
+  words: Words,
+): ItemPatch {
+  if (item.placesEdited || words.placeLocations === undefined) return {};
+  const cities = words.cities ?? item.cities;
+  const key = (name: string) => savedPlaceKey(name, cities);
+  const changed = new Set(
+    words.placeLocations
+      .filter(
+        (hint) =>
+          !item.placeLocations?.some(
+            (old) =>
+              key(old.name) === key(hint.name) &&
+              old.location === hint.location,
+          ),
+      )
+      .map((hint) => key(hint.name)),
+  );
+  const changedPin = (pin: NonNullable<Doc<"items">["placePins"]>[number]) =>
+    changed.has(key(pin.name));
+  return {
+    placeLocations: words.placeLocations,
+    ...(item.placePins?.some(changedPin)
+      ? {
+          placePins: item.placePins.filter((pin) => !changedPin(pin)),
+        }
+      : {}),
   };
 }
 

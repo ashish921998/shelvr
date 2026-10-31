@@ -19,13 +19,14 @@ import {
 } from "./model/notificationFields";
 import {
   openedTooRecently,
+  placeToVisit,
   remindersOn,
   reminderSubject,
   saveRemindersLive,
   type ReminderKind,
 } from "./model/saveReminders";
-import { placeKey } from "./model/plan";
-import { beenPlaces } from "./tripData";
+import { visibleSave } from "./model/placeRemovals";
+import { visitedPlaceKeys } from "./model/placeVisits";
 
 const NOTIFICATION_KIND = "weekly_shelf";
 const reminderNotificationKind = (kind: ReminderKind) => `${kind}_reminder`;
@@ -570,13 +571,12 @@ export const claimReminder = internalMutation({
       item !== null &&
       item.userId === reminder.userId &&
       item.status === "ready"
-        ? reminderSubject(
-            item,
-            reminder.kind,
-            reminder.kind === "visit"
-              ? new Set((await beenPlaces(ctx, reminder.userId)).map(placeKey))
-              : undefined,
-          )
+        ? reminder.kind === "visit"
+          ? placeToVisit(
+              await visibleSave(ctx, item),
+              await visitedPlaceKeys(ctx, reminder.userId),
+            )
+          : reminderSubject(item, reminder.kind)
         : undefined;
     const read = await ctx.db
       .query("itemReads")

@@ -64,6 +64,15 @@ describe("asking about a saved place", () => {
     );
   });
 
+  it("asks about the venue, not its area or a street address", () => {
+    const places = ["12 Main Street", "Time Out Market, Cais do Sodré, Lisbon"];
+    expect(placeToVisit(spot({ places }), new Set())).toBe("Time Out Market");
+    expect(
+      placeToVisit(spot({ places }), been("Time Out Market")),
+    ).toBeUndefined();
+    expect(placeToVisit(spot({ places }), been(places[1]))).toBeUndefined();
+  });
+
   it("has nothing to ask once every place is visited, or none is named", () => {
     expect(
       placeToVisit(

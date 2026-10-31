@@ -1,9 +1,11 @@
+import { visibleSave } from "./model/placeRemovals";
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
 
 import { newConvexTest } from "./test.setup";
 import { api } from "./_generated/api";
+import { toPlanSource } from "./tripData";
 import type { Id } from "./_generated/dataModel";
 
 type Save = {
@@ -11,7 +13,7 @@ type Save = {
   cities?: string[];
   status?: "ready" | "processing" | "failed";
   heroImageUrl?: string;
-  placePins?: { name: string; lat: number; lng: number }[];
+  placePins?: { name: string; lat: number; lng: number; city?: string }[];
 };
 
 async function setup(options: { pro?: boolean } = {}) {
@@ -102,6 +104,157 @@ describe("listCities", () => {
       { city: "Madrid", count: 1, placeCount: 1, cover: null },
       { city: "Porto", count: 1, placeCount: 1, cover: null },
     ]);
+  });
+
+  it("gives two cities from one reel different covers when another photo exists", async () => {
+    const { t, save, userId } = await setup();
+    await save(userId, {
+      title: "Sintra palace",
+      cities: ["Sintra"],
+      heroImageUrl: "https://img/sintra.jpg",
+    });
+    await save(userId, {
+      title: "Lisbon and a day in Sintra",
+      cities: ["Lisbon", "Sintra"],
+      heroImageUrl: "https://img/both.jpg",
+    });
+    await save(userId, { title: "Alfama", cities: ["Lisbon"] });
+
+    const covers = Object.fromEntries(
+      (await t.query(api.items.listCities, {})).map((c) => [c.city, c.cover]),
+    );
+    expect(covers).toEqual({
+      Lisbon: "https://img/both.jpg",
+      Sintra: "https://img/sintra.jpg",
+    });
+  });
+
+  it("prefers a photo no earlier city shows, and repeats one only when a city has no other", async () => {
+    const { t, save, userId } = await setup();
+    await save(userId, {
+      title: "Day trip",
+      cities: ["Lisbon", "Sintra"],
+      heroImageUrl: "https://img/both.jpg",
+    });
+    await save(userId, {
+      title: "Lisbon only",
+      cities: ["Lisbon"],
+      heroImageUrl: "https://img/lisbon.jpg",
+      placePins: [
+        { name: "A", lat: 38.7, lng: -9.1 },
+        { name: "B", lat: 38.71, lng: -9.1 },
+      ],
+    });
+
+    const covers = Object.fromEntries(
+      (await t.query(api.items.listCities, {})).map((c) => [c.city, c.cover]),
+    );
+    expect(covers).toEqual({
+      Lisbon: "https://img/lisbon.jpg",
+      Sintra: "https://img/both.jpg",
+    });
+  });
+
+  it("prefers a photo from a save naming only that city over a newer shared one", async () => {
+    const { t, save, userId } = await setup();
+    await save(userId, {
+      title: "Sintra palace",
+      cities: ["Sintra"],
+      heroImageUrl: "https://img/sintra.jpg",
+    });
+    await save(userId, {
+      title: "Day trip",
+      cities: ["Lisbon", "Sintra"],
+      heroImageUrl: "https://img/both.jpg",
+    });
+    await save(userId, {
+      title: "Lisbon only",
+      cities: ["Lisbon"],
+      heroImageUrl: "https://img/lisbon.jpg",
+    });
+
+    const covers = Object.fromEntries(
+      (await t.query(api.items.listCities, {})).map((c) => [c.city, c.cover]),
+    );
+    // Newest first alone would hand Sintra the unshown, newer both.jpg.
+    expect(covers).toEqual({
+      Lisbon: "https://img/lisbon.jpg",
+      Sintra: "https://img/sintra.jpg",
+    });
+  });
+
+  it("moves a later city to the next photo when an earlier city already shows the first", async () => {
+    const { t, save, userId } = await setup();
+    await save(userId, {
+      title: "Older trip",
+      cities: ["Lisbon", "Sintra", "Tomar"],
+      heroImageUrl: "https://img/older.jpg",
+    });
+    await save(userId, {
+      title: "Newer trip",
+      cities: ["Lisbon", "Sintra"],
+      heroImageUrl: "https://img/newer.jpg",
+    });
+
+    const covers = Object.fromEntries(
+      (await t.query(api.items.listCities, {})).map((c) => [c.city, c.cover]),
+    );
+    // No pin carries a city, so all three tie and sort by name. Lisbon takes
+    // the newer photo; Sintra, with the same two to choose from,
+    // takes the one Lisbon doesn't show; Tomar has only an already-shown photo
+    // and repeats it rather than go blank.
+    expect(covers).toEqual({
+      Lisbon: "https://img/newer.jpg",
+      Sintra: "https://img/older.jpg",
+      Tomar: "https://img/older.jpg",
+    });
+  });
+
+  it("creates separate city entries for one reel and counts only each city's places", async () => {
+    const { base, t, save, userId } = await setup();
+    const lisbon = { name: "Cafe", lat: 38.72, lng: -9.1, city: "Lisbon" };
+    const porto = { name: "Tower", lat: 41.15, lng: -8.6, city: "Porto" };
+    const id = await save(userId, {
+      title: "Portugal reel",
+      cities: ["Lisbon", "Porto"],
+      placePins: [lisbon, porto],
+    });
+    expect(await t.query(api.items.listCities, {})).toEqual([
+      { city: "Lisbon", count: 1, placeCount: 1, cover: null },
+      { city: "Porto", count: 1, placeCount: 1, cover: null },
+    ]);
+    for (const [city, pin] of [
+      ["Lisbon", lisbon],
+      ["Porto", porto],
+    ] as const) {
+      const items = await t.query(api.items.listCityItems, { city });
+      expect(items).toHaveLength(1);
+      expect(items[0].placePins).toEqual([pin]);
+      const source = await base.run(async (ctx) => {
+        const item = await ctx.db.get(id);
+        if (!item) throw new Error("Missing fixture");
+        return toPlanSource(await visibleSave(ctx, item), city);
+      });
+      expect(source.pins).toEqual([
+        { name: pin.name, lat: pin.lat, lng: pin.lng },
+      ]);
+      expect(source.places).toEqual([pin.name]);
+    }
+  });
+
+  it("keeps legacy multi-city saves reachable without putting unknown-city pins in both cities", async () => {
+    const { t, save, userId } = await setup();
+    await save(userId, {
+      title: "Old reel",
+      cities: ["Lisbon", "Porto"],
+      placePins: [{ name: "Unknown city", lat: 38.7, lng: -9.1 }],
+    });
+    expect(
+      (await t.query(api.items.listCities, {})).map((city) => city.placeCount),
+    ).toEqual([0, 0]);
+    expect(
+      (await t.query(api.items.listCityItems, { city: "Porto" }))[0].placePins,
+    ).toEqual([]);
   });
 
   it("refuses unauthenticated callers", async () => {

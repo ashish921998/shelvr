@@ -36,8 +36,17 @@ const reel = {
   type: "link" as const,
   url: "https://www.instagram.com/reel/Cabc123/",
   title: "3 spots for a perfect first day in Lisbon",
+  cities: ["Lisbon"],
   places: ["As Bifanas do Afonso", "Castelo de São Jorge"],
 };
+
+const removalOf = (name: string, userId: string) => ({
+  userId,
+  name,
+  city: "Lisbon",
+  lat: 38.71,
+  lng: -9.14,
+});
 
 type Save = [
   daysAgo: number,
@@ -210,6 +219,18 @@ describe("choosing a save reminder", () => {
           itemId: ids[0],
           visitedAt: NOW - DAY,
         });
+    });
+    await prepare();
+    expect(await reminders()).toEqual([]);
+  });
+
+  it("leaves a place alone once the user has removed all it names", async () => {
+    const { t, userId, prepare, reminders } = await setup({
+      saves: [[5, reel]],
+    });
+    await t.run(async (ctx) => {
+      for (const name of reel.places)
+        await ctx.db.insert("placeRemovals", removalOf(name, userId));
     });
     await prepare();
     expect(await reminders()).toEqual([]);
@@ -702,6 +723,23 @@ describe("delivering a save reminder", () => {
       body: "Still want to go to “As Bifanas do Afonso”?",
       data: { url: `/item/${reminder.itemId}`, kind: "visit_reminder" },
     });
+  });
+
+  it("does not name a place removed since it was queued", async () => {
+    const { t, userId, reminder } = await queued("visit");
+    await t.run((ctx) =>
+      ctx.db.insert("placeRemovals", removalOf("As Bifanas do Afonso", userId)),
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(json([{ status: "ok", id: "ticket-a" }]));
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.sendReminder, {
+      reminderId: reminder._id,
+    });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)[0].body).toBe(
+      "Still want to go to “Castelo de São Jorge”?",
+    );
   });
 
   it("moves on to the next place, or stays quiet, after a We went since", async () => {

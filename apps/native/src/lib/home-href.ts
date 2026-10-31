@@ -1,8 +1,13 @@
 const HOME = "/(app)/(tabs)/(home)";
+const MAP = "/(app)/(tabs)/(map)";
+
+// The Map tab's index adds no segment to the URL, so "/map" would match nothing.
+const MAP_ROUTE =
+  /^\/(?:\(app\)\/)?(?:\(tabs\)\/)?(?:\(map\)|map)\/?(?=[?#]|$)/;
 
 // Screens the app no longer has; old links, scheduled pushes and shortcuts to them open Home.
 const RETIRED_ROUTE =
-  /^\/(?:\(app\)\/)?(?:\(tabs\)\/)?(?:\((?:spaces|search|map)\)|spaces|search|map|space|digest|new-space|manage-spaces|camera)(?=[/?#]|$)/;
+  /^\/(?:\(app\)\/)?(?:\(tabs\)\/)?(?:\((?:spaces|search)\)|spaces|search|space|digest|new-space|manage-spaces|camera|trip)(?=[/?#]|$)/;
 
 /**
  * Since Expo Router 58, "/" matches the index of every tab group and the
@@ -12,6 +17,7 @@ const RETIRED_ROUTE =
  */
 export function resolveRootHref(url: string): string {
   if (RETIRED_ROUTE.test(url)) return HOME;
+  if (MAP_ROUTE.test(url)) return url.replace(MAP_ROUTE, MAP);
   return url.replace(/^\/(?=[?#]|$)/, HOME);
 }
 

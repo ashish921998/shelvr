@@ -64,6 +64,24 @@ module.exports = defineConfig([
     rules: { "no-console": ["error", { allow: ["warn"] }] },
   },
   {
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/lib/haptics.ts", "src/lib/haptics.test.ts"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "expo-haptics",
+              message:
+                "Use haptics from @/lib/haptics: selection, impact or success. It keeps one feel across the app and a failed haptic can never fail an action. See Haptics in docs/architecture/design-system.md.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ["convex/**/*.ts"],
     ignores: ["convex/**/*.test.ts", "convex/test.setup.ts"],
     rules: {

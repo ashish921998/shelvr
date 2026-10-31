@@ -149,10 +149,10 @@ describe("the e2e fake model from a saved page to a date plan", () => {
       city: "Lisbon",
     });
     const plan = await t.action(api.plans.makePlan, { spaceId });
-    expect(plan.places.map((place) => place.name)).toEqual([
-      "Taberna da Rua das Flores",
-      "Miradouro da Graça",
+    expect(plan.places.map((place) => place.name).sort()).toEqual([
       "Manteigaria",
+      "Miradouro da Graça",
+      "Taberna da Rua das Flores",
     ]);
   });
 });

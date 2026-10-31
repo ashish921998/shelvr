@@ -74,6 +74,7 @@ vi.mock("@expo/ui/swift-ui/modifiers", () => {
     foregroundStyle: modifier("foregroundStyle"),
     frame: modifier("frame"),
     lineLimit: modifier("lineLimit"),
+    multilineTextAlignment: modifier("multilineTextAlignment"),
     padding: modifier("padding"),
     resizable: modifier("resizable"),
     widgetURL: modifier("widgetURL"),

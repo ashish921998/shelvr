@@ -5,6 +5,7 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
+  node-forge@<1.4.1: 1.4.1
   zod@>=4.0.0 <4.6.6: 4.6.7
   undici@>=7.18.0 <7.30.1: 7.30.1
   shell-quote: ^1.11.0
@@ -113,9 +114,6 @@ importers:
       convex:
         specifier: 1.43.0
         version: 1.43.0(@clerk/clerk-react@5.61.5(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(@clerk/react@6.12.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(bufferutil@4.1.0)(react@19.3.0)
-      d3-geo:
-        specifier: 3.1.1
-        version: 3.1.1
       expo:
         specifier: ~58.0.14
         version: 58.0.14(@babel/core@7.29.0)(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.23)(expo-widgets@58.0.20)(react-dom@19.3.0(react@19.3.0))(react-native-web@0.21.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native-webview@13.16.0(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react-server-dom-webpack@19.0.5(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.106.2(esbuild@0.28.2)))(react@19.3.0)(typescript@6.0.3)
@@ -164,9 +162,6 @@ importers:
       expo-image-manipulator:
         specifier: ~58.0.14
         version: 58.0.14(expo@58.0.14)(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
-      expo-image-picker:
-        specifier: ~58.0.10
-        version: 58.0.10(expo@58.0.14)
       expo-linking:
         specifier: ~58.0.13
         version: 58.0.13(expo@58.0.14)(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)(typescript@6.0.3)
@@ -269,15 +264,9 @@ importers:
       react-native-unistyles:
         specifier: ^3.2.5
         version: 3.3.0(@react-native/normalize-colors@0.88.0)(react-native-nitro-modules@0.37.1(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native-reanimated@4.7.1(react-native-worklets@0.13.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
-      react-native-vision-camera:
-        specifier: ^5.2.3
-        version: 5.2.3(react-native-nitro-image@0.15.2(react-native-nitro-modules@0.37.1(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native-nitro-modules@0.37.1(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
       react-native-worklets:
         specifier: 0.13.0
         version: 0.13.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
-      topojson-client:
-        specifier: 3.1.0
-        version: 3.1.0
       undici:
         specifier: 7.30.1
         version: 7.30.1
@@ -291,21 +280,9 @@ importers:
       '@testing-library/react':
         specifier: ^16.3.3
         version: 16.3.3(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
-      '@types/d3-geo':
-        specifier: 3.1.0
-        version: 3.1.0
-      '@types/geojson':
-        specifier: 7946.0.16
-        version: 7946.0.16
       '@types/react':
         specifier: ~19.3.0
         version: 19.3.0
-      '@types/topojson-client':
-        specifier: 3.1.5
-        version: 3.1.5
-      '@types/topojson-specification':
-        specifier: 1.0.5
-        version: 1.0.5
       '@vitest/coverage-v8':
         specifier: 4.1.11
         version: 4.1.11(vitest@4.1.11)
@@ -2920,9 +2897,6 @@ packages:
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
 
-  '@types/d3-geo@3.1.0':
-    resolution: {integrity: sha512-856sckF0oP/diXtS4jNsiQw/UuK5fQG8l/a9VVLeSouf1/PPbBE1i1W852zVwKwYCBkFJJB7nCFTbk6UMEXBOQ==}
-
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
 
@@ -2937,9 +2911,6 @@ packages:
 
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
-
-  '@types/geojson@7946.0.16':
-    resolution: {integrity: sha512-6C8nqWur3j98U6+lXDfTUWIfgvZU+EumvpHKcYjujKH7woYyLj2sUmff0tRhrqM7BohUw7Pz3ZB1jj2gW9Fvmg==}
 
   '@types/istanbul-lib-coverage@2.0.6':
     resolution: {integrity: sha512-2QF/t/auWm0lsy8XtKVPG19v3sSOQlJe/YHZgfjb/KBBHOGSV+J2q/S671rcq9uTBrLAXmZpqJiaQbMT+zNU1w==}
@@ -2972,12 +2943,6 @@ packages:
 
   '@types/react@19.3.0':
     resolution: {integrity: sha512-N0rFCuH9YoxG9/m61l9MfpJKfmLOVU0em7ipIz6TRgSSkvReLB9vL85GB+yr8Bs5leqpvg96JSwF4ZS1s4viQg==}
-
-  '@types/topojson-client@3.1.5':
-    resolution: {integrity: sha512-C79rySTyPxnQNNguTZNI1Ct4D7IXgvyAs3p9HPecnl6mNrJ5+UhvGNYcZfpROYV2lMHI48kJPxwR+F9C6c7nmw==}
-
-  '@types/topojson-specification@1.0.5':
-    resolution: {integrity: sha512-C7KvcQh+C2nr6Y2Ub4YfgvWvWCgP2nOQMtfhlnwsRL4pYmmwzBS7HclGiS87eQfDOU/DLQpX6GEscviaz4yLIQ==}
 
   '@types/yargs-parser@21.0.3':
     resolution: {integrity: sha512-I4q9QU9MQv4oEOz4tAHJtNz1cwuLxn2F3xcc2iV5WdqLPpUnj30aUuxt1mAxYTG+oe8CZMV/+6rU4S4gRDzqtQ==}
@@ -3794,14 +3759,6 @@ packages:
   csstype@3.2.3:
     resolution: {integrity: sha512-z1HGKcYy2xA8AGQfwrn0PAy+PB7X/GSj3UVJW9qKyn43xWa+gl5nXmU4qqLMRzWVLFC8KusUX8T/0kCiOYpAIQ==}
 
-  d3-array@3.2.4:
-    resolution: {integrity: sha512-tdQAmyA18i4J7wprpYq8ClcxZy3SC31QMeByyCFyRt7BVHdREQZ5lpzoe5mFEYZUWe+oq8HBvk9JjpibyEV4Jg==}
-    engines: {node: '>=12'}
-
-  d3-geo@3.1.1:
-    resolution: {integrity: sha512-637ln3gXKXOwhalDzinUgY83KzNWZRKbYubaG+fGVuc/dxO64RRljtCTnf5ecMyE1RIdtqpkVcq0IbtU2S8j2Q==}
-    engines: {node: '>=12'}
-
   damerau-levenshtein@1.0.8:
     resolution: {integrity: sha512-sdQSFB7+llfUcQHUQO3+B8ERRj0Oa4w9POWMI/puGtuf7gFywGmkaLCElnudfTiKZV+NvHqL0ifzdrI8Ro7ESA==}
 
@@ -4365,11 +4322,6 @@ packages:
       react: '*'
       react-native: '*'
 
-  expo-image-picker@58.0.10:
-    resolution: {integrity: sha512-yqQC9UYMWSUxk6U0jaS1vE1w+b9Ru0FJmQ3KjUf9Q9oVg5xBxmg8+Ts+usazMAuPoskNIXJ++VZ+uK6br9yUGQ==}
-    peerDependencies:
-      expo: '*'
-
   expo-image@58.0.15:
     resolution: {integrity: sha512-6jGpKZUhQtDpwF0u7V7ETWNdOV1gkDTpdeAYHi3t+lk09fd+ltDrHq3Me0W6S4ajAtpNu92bFype/IAJQwtyjw==}
     peerDependencies:
@@ -4919,10 +4871,6 @@ packages:
   internal-slot@1.1.0:
     resolution: {integrity: sha512-4gd7VpWNQNB4UKKCFFVcp1AVv+FMOgs9NKzjHKusc8jTMhd5eL1NqQqOpE0KzMds804/yHlglp3uxgluOqAPLw==}
     engines: {node: '>= 0.4'}
-
-  internmap@2.0.3:
-    resolution: {integrity: sha512-5Hh7Y1wQbvY5ooGgPbDaL5iYLAPzMTUrjMulskHLH6wnv/A+1q5rgEaiuqEjB+oxGXIVZs1FF+R/KPN3ZSQYYg==}
-    engines: {node: '>=12'}
 
   invariant@2.2.4:
     resolution: {integrity: sha512-phJfQVBuaJM5raOpJjSfkiD6BpbCE4Ns//LaXl6wGYtUBY83nWS6Rf9tXm2e8VaK60JEjYldbPif/A2B1C2gNA==}
@@ -5652,8 +5600,8 @@ packages:
       encoding:
         optional: true
 
-  node-forge@1.4.0:
-    resolution: {integrity: sha512-LarFH0+6VfriEhqMMcLX2F7SwSXeWwnEAJEsYm5QKWchiVYVvJyV9v7UDvUv+w5HO23ZpQTXDv/GxdDdMyOuoQ==}
+  node-forge@1.4.1:
+    resolution: {integrity: sha512-w5/MfWaeMrpR/5ba6fZyAUTLSuE6aYz7H/3cYrqwZEmf5eQS3IaaLgJt4MBv7HglGFWmV22K8h4U18RJQmw/ow==}
     engines: {node: '>= 6.13.0'}
 
   node-gyp-build@4.8.4:
@@ -6115,17 +6063,6 @@ packages:
       react-native-edge-to-edge:
         optional: true
       react-native-reanimated:
-        optional: true
-
-  react-native-vision-camera@5.2.3:
-    resolution: {integrity: sha512-OHjgM8BPzxppTqbF1FEltj+fxvisj4xdghM7ypoT1p6cOe28HByhOJP1c7LkBiUiZuotbsdbQwGdJ8nU7ZvPzA==}
-    peerDependencies:
-      react: '*'
-      react-native: '*'
-      react-native-nitro-image: '*'
-      react-native-nitro-modules: '*'
-    peerDependenciesMeta:
-      react-native-nitro-modules:
         optional: true
 
   react-native-web@0.21.2:
@@ -6759,10 +6696,6 @@ packages:
   toidentifier@1.0.1:
     resolution: {integrity: sha512-o5sSPKEkg/DIQNmH43V0/uerLrpzVedkUh8tGNvaeXpfpuwjKenlSox/2O/BTlZUtEe+JG7s5YhEz608PlAHRA==}
     engines: {node: '>=0.6'}
-
-  topojson-client@3.1.0:
-    resolution: {integrity: sha512-605uxS6bcYxGXw9qi62XyrV6Q3xwbndjachmNxu8HWTtVPxZfEJN9fd/SZS1Q54Sn2y0TMyMxFj/cJINqGHrKw==}
-    hasBin: true
 
   toqr@0.1.1:
     resolution: {integrity: sha512-FWAPzCIHZHnrE/5/w9MPk0kK25hSQSH2IKhYh9PyjS3SG/+IEMvlwIHbhz+oF7xl54I+ueZlVnMjyzdSwLmAwA==}
@@ -8486,7 +8419,7 @@ snapshots:
       glob: 13.0.6
       lan-network: 0.2.1
       multitars: 1.0.2
-      node-forge: 1.4.0
+      node-forge: 1.4.1
       npm-package-arg: 11.0.3
       ora: 3.4.0
       picomatch: 4.0.5
@@ -8523,7 +8456,7 @@ snapshots:
 
   '@expo/code-signing-certificates@0.0.7':
     dependencies:
-      node-forge: 1.4.0
+      node-forge: 1.4.1
 
   '@expo/config-plugins@58.0.9(typescript@6.0.3)':
     dependencies:
@@ -9722,10 +9655,6 @@ snapshots:
       '@types/deep-eql': 4.0.2
       assertion-error: 2.0.1
 
-  '@types/d3-geo@3.1.0':
-    dependencies:
-      '@types/geojson': 7946.0.16
-
   '@types/deep-eql@4.0.2': {}
 
   '@types/eslint-scope@3.7.7':
@@ -9744,8 +9673,6 @@ snapshots:
 
   '@types/estree@1.0.9':
     optional: true
-
-  '@types/geojson@7946.0.16': {}
 
   '@types/istanbul-lib-coverage@2.0.6': {}
 
@@ -9780,15 +9707,6 @@ snapshots:
   '@types/react@19.3.0':
     dependencies:
       csstype: 3.2.3
-
-  '@types/topojson-client@3.1.5':
-    dependencies:
-      '@types/geojson': 7946.0.16
-      '@types/topojson-specification': 1.0.5
-
-  '@types/topojson-specification@1.0.5':
-    dependencies:
-      '@types/geojson': 7946.0.16
 
   '@types/yargs-parser@21.0.3': {}
 
@@ -10723,14 +10641,6 @@ snapshots:
 
   csstype@3.2.3: {}
 
-  d3-array@3.2.4:
-    dependencies:
-      internmap: 2.0.3
-
-  d3-geo@3.1.1:
-    dependencies:
-      d3-array: 3.2.4
-
   damerau-levenshtein@1.0.8: {}
 
   data-urls@5.0.0:
@@ -11536,11 +11446,6 @@ snapshots:
       react: 19.3.0
       react-native: 0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)
 
-  expo-image-picker@58.0.10(expo@58.0.14):
-    dependencies:
-      expo: 58.0.14(@babel/core@7.29.0)(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.23)(expo-widgets@58.0.20)(react-dom@19.3.0(react@19.3.0))(react-native-web@0.21.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native-webview@13.16.0(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react-server-dom-webpack@19.0.5(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.106.2(esbuild@0.28.2)))(react@19.3.0)(typescript@6.0.3)
-      expo-image-loader: 58.0.3(expo@58.0.14)
-
   expo-image@58.0.15(expo@58.0.14)(react-native-web@0.21.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0):
     dependencies:
       expo: 58.0.14(@babel/core@7.29.0)(@expo/dom-webview@58.0.2)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.23)(expo-widgets@58.0.20)(react-dom@19.3.0(react@19.3.0))(react-native-web@0.21.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(react-native-webview@13.16.0(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react-server-dom-webpack@19.0.5(react-dom@19.3.0(react@19.3.0))(react@19.3.0)(webpack@5.106.2(esbuild@0.28.2)))(react@19.3.0)(typescript@6.0.3)
@@ -12154,8 +12059,6 @@ snapshots:
       es-errors: 1.3.0
       hasown: 2.0.3
       side-channel: 1.1.0
-
-  internmap@2.0.3: {}
 
   invariant@2.2.4:
     dependencies:
@@ -12952,7 +12855,7 @@ snapshots:
       whatwg-url: 5.0.0
     optional: true
 
-  node-forge@1.4.0: {}
+  node-forge@1.4.1: {}
 
   node-gyp-build@4.8.4:
     optional: true
@@ -13389,14 +13292,6 @@ snapshots:
       react-native-nitro-modules: 0.37.1(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
     optionalDependencies:
       react-native-reanimated: 4.7.1(react-native-worklets@0.13.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
-
-  react-native-vision-camera@5.2.3(react-native-nitro-image@0.15.2(react-native-nitro-modules@0.37.1(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native-nitro-modules@0.37.1(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0):
-    dependencies:
-      react: 19.3.0
-      react-native: 0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)
-      react-native-nitro-image: 0.15.2(react-native-nitro-modules@0.37.1(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0))(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
-    optionalDependencies:
-      react-native-nitro-modules: 0.37.1(react-native@0.88.0(@babel/core@7.29.0)(@react-native/metro-config@0.88.0(@babel/core@7.29.0))(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
 
   react-native-web@0.21.2(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     dependencies:
@@ -14113,10 +14008,6 @@ snapshots:
       is-number: 7.0.0
 
   toidentifier@1.0.1: {}
-
-  topojson-client@3.1.0:
-    dependencies:
-      commander: 2.20.3
 
   toqr@0.1.1: {}
 

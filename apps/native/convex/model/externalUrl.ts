@@ -218,6 +218,25 @@ export function isPinterestShortUrl(url: string | undefined): boolean {
   }
 }
 
+/** A Google Maps link: a maps.app.goo.gl share link, goo.gl/maps, or a google.<tld>/maps page
+ * (google.com, google.de, google.co.uk or google.com.au; look-alikes such as google.evil.com are refused). */
+export function isGoogleMapsUrl(url: string | undefined): boolean {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase();
+    if (host === "maps.app.goo.gl") return true;
+    if (host === "goo.gl") return parsed.pathname.startsWith("/maps/");
+    if (host === "maps.google.com") return true;
+    return (
+      /^(?:www\.)?google\.(?:com|cat|(?:com?\.)?[a-z]{2})$/.test(host) &&
+      (parsed.pathname === "/maps" || parsed.pathname.startsWith("/maps/"))
+    );
+  } catch {
+    return false;
+  }
+}
+
 export type LinkSource = "tiktok" | "x" | "instagram" | "pinterest" | "youtube";
 
 export function linkSource(url: string | undefined): LinkSource | undefined {

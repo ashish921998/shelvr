@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { t, useAppLocale } from "@/lib/i18n";
 import { ProCard } from "@/components/home/pro-card";
+import { HomeSearch } from "@/components/home/home-search";
 import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
@@ -10,6 +11,7 @@ import {
   HomePlacesEmptyCard,
   UnplacedSaves,
 } from "@/components/home/home-places";
+import { ReviewSaves } from "@/components/home/review-saves";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { HeaderScrim } from "@/components/ui/header-scrim";
 import { useCurrentUser } from "@/lib/current-user";
@@ -100,6 +102,8 @@ export default function HomeScreen() {
   return (
     <View style={styles.container}>
       <ScrollView
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
         scrollEventThrottle={200}
@@ -116,15 +120,20 @@ export default function HomeScreen() {
         }}
       >
         {topCard ? <View style={styles.topCard}>{topCard}</View> : null}
-        {items.length > 0 ? (
-          <>
-            <HomePlaces />
-            <UnplacedSaves saves={items} />
-          </>
-        ) : locked ? null : (
-          <View style={styles.empty}>
-            <HomePlacesEmptyCard />
-          </View>
+        {locked ? null : (
+          <HomeSearch>
+            {items.length > 0 ? (
+              <>
+                <HomePlaces />
+                <UnplacedSaves saves={items} />
+                <ReviewSaves saves={items} />
+              </>
+            ) : (
+              <View style={styles.empty}>
+                <HomePlacesEmptyCard />
+              </View>
+            )}
+          </HomeSearch>
         )}
       </ScrollView>
       <HeaderScrim />

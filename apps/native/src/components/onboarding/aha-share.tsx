@@ -9,7 +9,7 @@ import {
 import type { AhaSample } from "@/lib/aha-sample";
 import { t, useAppLocale } from "@/lib/i18n";
 import { fadeIn } from "@/lib/motion";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
@@ -18,10 +18,10 @@ import { StyleSheet } from "react-native-unistyles";
 /** Long enough to read "Finding the spots…", short enough not to feel like waiting. */
 const READING_MS = 1200;
 
-/** The real path through a video app, one tap per screen, pinning Shelvr on the way as iOS lets you. */
+/** A practice share, one tap per screen, without changing system settings. */
 type Stage = "post" | "panel" | "sheet" | "apps" | "reading";
 
-/** The sample reel, shared to Shelvr the way they will from a real app: Share, Share, More, then pin Shelvr and tap it. */
+/** The sample reel: Share, Share to…, More, Shelvr, then its spots on the map. */
 export function AhaShareStep({
   sample,
   onShared,
@@ -37,9 +37,7 @@ export function AhaShareStep({
     setStage(next);
   };
   const pick = () => {
-    if (process.env.EXPO_OS === "ios") {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
+    void haptics.impact("medium");
     setStage("reading");
   };
 
@@ -64,12 +62,7 @@ export function AhaShareStep({
         />
         {stage === "panel" ? <AppPanel onShare={go("sheet")} /> : null}
         {stage === "sheet" ? (
-          <IosSheet
-            title={
-              sample.source === "reel" ? sample.creator : t("aha.shelvrExample")
-            }
-            onMore={go("apps")}
-          />
+          <IosSheet title={sample.creator} onMore={go("apps")} />
         ) : null}
         {stage === "apps" ? <AppsSheet onPick={pick} /> : null}
         {stage === "reading" ? (

@@ -21,10 +21,23 @@ describe("resolveRootHref", () => {
       "/new-space",
       "/manage-spaces?itemId=1",
       "/camera",
+      "/trip/abc?city=Lisbon",
     ]) {
       expect(resolveRootHref(path)).toBe("/(app)/(tabs)/(home)");
     }
     expect(resolveRootHref("/spaceship")).toBe("/spaceship");
+    expect(resolveRootHref("/trip-plan/abc")).toBe("/trip-plan/abc");
+    expect(resolveRootHref("/(trips)")).toBe("/(trips)");
+  });
+
+  it("opens the Map tab for its links, keeping the query", () => {
+    for (const path of ["/map", "/map/", "/(map)", "/(app)/(tabs)/(map)"]) {
+      expect(resolveRootHref(path)).toBe("/(app)/(tabs)/(map)");
+    }
+    expect(resolveRootHref("/map?from=push")).toBe(
+      "/(app)/(tabs)/(map)?from=push",
+    );
+    expect(resolveRootHref("/maple")).toBe("/maple");
   });
 });
 

@@ -17,7 +17,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { AppSymbolIcon } from "@/components/symbol";
 import { StitchRow } from "@/components/ui/stitch-loader";
 import { motion } from "@/lib/motion";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -146,7 +146,7 @@ export function OptionCard({
       accessibilityLabel={subtitle ? `${title}, ${subtitle}` : title}
       onPress={() => {
         // Same frame as the mark filling in.
-        if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
+        void haptics.selection();
         onPress();
       }}
       style={[styles.option, selected && styles.optionSelected]}

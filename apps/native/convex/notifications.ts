@@ -6,8 +6,8 @@ import { ConvexError, v } from "convex/values";
 import { internalMutation, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
-import { enrichItem, enrichedItemValidator } from "./items";
-import { beenPlaces, tripStopItemIds } from "./tripData";
+import { enrichItems, enrichedItemValidator } from "./items";
+import { tripStopItemIds } from "./tripData";
 import { liveOwner, authedMutation, authedQuery } from "./model/auth";
 import {
   localHour,
@@ -44,7 +44,8 @@ import {
   reminderCandidates,
   saveRemindersLive,
 } from "./model/saveReminders";
-import { placeKey } from "./model/plan";
+import { visibleItemPlaces, userRemovals } from "./model/placeRemovals";
+import { visitedPlaceKeys } from "./model/placeVisits";
 
 const digestResponseValidator = v.object({
   _id: v.id("weeklyDigests"),
@@ -371,7 +372,7 @@ export const getDigest = authedQuery({
       createdAt: digest.createdAt,
       openedAt: digest.openedAt,
       itemCount: items.length,
-      items: await Promise.all(items.map((item) => enrichItem(ctx, item))),
+      items: await enrichItems(ctx, items),
     };
   },
 });
@@ -709,12 +710,13 @@ export const prepareSaveReminder = internalMutation({
     if (reminderBlocked(now, sentAt, streak, shelf) !== undefined) return null;
 
     const checks = { read: 0, cook: 0, visit: 0 };
+    const removals = await userRemovals(ctx, userId);
     for (const candidate of reminderCandidates(
-      items,
+      items.map((item) => visibleItemPlaces(item, removals)),
       now,
       reminders[0]?.kind,
       await tripStopItemIds(ctx, userId),
-      new Set((await beenPlaces(ctx, userId)).map(placeKey)),
+      await visitedPlaceKeys(ctx, userId),
     )) {
       if (checks[candidate.kind]++ >= REMINDER_CHECKS_PER_KIND) continue;
       const earlier = await ctx.db

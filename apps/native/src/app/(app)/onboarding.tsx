@@ -38,6 +38,7 @@ import { SignInView } from "@/components/sign-in-view";
 import { AhaShareStep } from "@/components/onboarding/aha-share";
 import { AhaSpotsStep } from "@/components/onboarding/aha-spots";
 import { CityStep } from "@/components/onboarding/city-step";
+import { CommitmentStep } from "@/components/onboarding/commitment";
 import { OpenerStep } from "@/components/onboarding/opener";
 import { ProgressChartStep } from "@/components/onboarding/progress-chart";
 import { ScalePressable } from "@/components/onboarding/parts";
@@ -48,7 +49,7 @@ import {
 } from "@/components/onboarding/questions";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useConvexAuth } from "convex/react";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
@@ -213,9 +214,7 @@ export default function OnboardingScreen() {
   }, [signedIn, isAuthenticated, completeOnboarding]);
 
   const finish = () => {
-    if (process.env.EXPO_OS === "ios") {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
+    void haptics.success();
     analytics.capture(
       "onboarding_completed",
       onboardingCompletedProperties(spaces, {
@@ -229,18 +228,17 @@ export default function OnboardingScreen() {
     holdIncomingShare();
     setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
     // The reel they shared in the demo becomes their first real save once they have Pro.
-    if (sample.source === "reel") queueDemoUrl(sample.firstSaveUrl);
+    queueDemoUrl(sample.firstSaveUrl);
     noteOnboardingFinished();
     completeOnboarding();
   };
 
   const paywall = useOnboardingPaywall({
     onPro: finish,
-    onDecline: finish,
     onUnavailable: finish,
   });
 
-  const askAfterSpots = () => {
+  const askAfterCommitment = () => {
     recordCurrentStep();
     paywall.ask();
   };
@@ -307,11 +305,13 @@ export default function OnboardingScreen() {
       case "ahaShare":
         return <AhaShareStep sample={sample} onShared={advance} />;
       case "ahaSpots":
+        return <AhaSpotsStep sample={sample} onContinue={advance} />;
+      case "commitment":
         return (
-          <AhaSpotsStep
+          <CommitmentStep
             sample={sample}
             leaving={paywall.asked}
-            onContinue={askAfterSpots}
+            onContinue={askAfterCommitment}
           />
         );
     }

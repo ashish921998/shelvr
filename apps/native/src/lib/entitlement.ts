@@ -375,8 +375,7 @@ async function presentPaywallImpl(
       failed("identity_not_ready");
       return "unavailable";
     }
-    // The paywall has no close button, and only presentPaywallIfNeeded closes
-    // it after a restore that found Pro.
+    // Keep IfNeeded so a restore that finds Pro dismisses the paywall too.
     const present = () =>
       rcui.presentPaywallIfNeeded({
         requiredEntitlementIdentifier: REVENUECAT_PRO_ENTITLEMENT,

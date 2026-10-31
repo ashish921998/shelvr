@@ -20,8 +20,7 @@
         "plugins/with-android-share-new-intent.js"
       ],
       "project": ["**/*.{js,mjs,ts,tsx}"],
-      "ignore": ["convex/_generated/**"],
-      "ignoreDependencies": ["react-native-vision-camera"]
+      "ignore": ["convex/_generated/**"]
     },
     "tools/e2e": {
       "entry": ["e2e.config.ts", "tests/**/*.e2e.ts"],

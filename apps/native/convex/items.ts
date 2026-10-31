@@ -1,3 +1,9 @@
+import {
+  visibleSave,
+  visibleItemPlaces,
+  userRemovals,
+  type Removal,
+} from "./model/placeRemovals";
 import { ConvexError, v, type Infer } from "convex/values";
 import {
   paginationOptsValidator,
@@ -22,7 +28,12 @@ import {
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
 import { takeWithinBytes } from "./model/readBudget";
-import { cityKey, countCities, uniquePlacePins } from "./model/trip";
+import {
+  cityKey,
+  countCities,
+  uniquePlacePins,
+  pinsForCity,
+} from "./model/trip";
 import {
   deleteMembership,
   deleteMembershipsForItem,
@@ -31,6 +42,7 @@ import {
   insertMembership,
 } from "./model/memberships";
 import { normalizeExternalUrl } from "./model/externalUrl";
+import { MAX_LIST_PARTS, withListPins } from "./model/placeList";
 import { sha256Hex } from "./model/captureTokens";
 import {
   articleMediaValidator,
@@ -42,20 +54,14 @@ import {
   isTerminalFailure,
   MAX_ITEM_TITLE_CHARS,
   MAX_NOTE_TEXT_CHARS,
+  normalizeCities,
+  normalizePlaces,
+  placeLocationsValidator,
   placePinsValidator,
   postMediaValidator,
   PROCESSING_STALE_MS,
   recipeValidator,
 } from "./model/itemFields";
-import {
-  buildEmbeddingText,
-  CURRENT_EMBEDDING_VERSION,
-  EMBEDDING_SWEEP_PAGE,
-  isValidEmbedding,
-  MAX_HYDRATE_READ_BYTES,
-  MAX_EMBEDDING_ATTEMPTS,
-  MAX_SWEEP_READ_BYTES,
-} from "./model/embedding";
 import {
   imageSizeError,
   imageSizeErrorCode,
@@ -68,7 +74,7 @@ import { aiConsentRequiredError } from "./model/aiConsent";
 import { nextUpKind } from "./model/nextUp";
 import { openedTooRecently, reminderSubject } from "./model/saveReminders";
 import { saveSourceValidator, type SaveSource } from "./model/saveSource";
-import { buildSearchText } from "./model/searchText";
+import { buildSearchText, searchQueryText } from "./model/searchText";
 import {
   hasSimilarSignal,
   rankSimilar,
@@ -222,10 +228,14 @@ function stripEmbedding(
   | "productsSearchStartedAt"
   | "places"
   | "placesHeard"
+  | "placeLocations"
+  | "placesEdited"
 > {
   const {
+    placesEdited: _placesEdited,
     places: _places,
     placesHeard: _placesHeard,
+    placeLocations: _placeLocations,
     embedding: _embedding,
     embeddingVersion: _version,
     embeddingAttempts: _attempts,
@@ -235,20 +245,25 @@ function stripEmbedding(
   return rest;
 }
 
-export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
+export async function enrichItem(
+  ctx: QueryCtx,
+  item: Doc<"items">,
+  removals?: readonly Removal[],
+) {
   const imageUrl = item.storageId
     ? await ctx.storage.getUrl(item.storageId)
     : null;
   return {
-    ...stripEmbedding(item),
+    ...stripEmbedding(await visibleSave(ctx, item, removals)),
     imageUrl,
     heroImageUrl: item.type === "link" ? (imageUrl ?? undefined) : undefined,
   };
 }
 
-async function toItemCard(
+export async function toItemCard(
   ctx: QueryCtx,
   item: Doc<"items">,
+  removals?: readonly Removal[],
 ): Promise<ItemCard> {
   const {
     userId: _userId,
@@ -259,15 +274,29 @@ async function toItemCard(
     products: _products,
     productsStatus: _productsStatus,
     ...card
-  } = await enrichItem(ctx, item);
+  } = await enrichItem(ctx, item, removals);
   return recipe ? { ...card, hasRecipe: true } : card;
 }
 
-async function readySavesNewestFirst(
+export async function enrichItems(ctx: QueryCtx, items: Doc<"items">[]) {
+  const removals = items.length ? await userRemovals(ctx, items[0].userId) : [];
+  return await Promise.all(
+    items.map((item) => enrichItem(ctx, item, removals)),
+  );
+}
+
+export async function toItemCards(ctx: QueryCtx, items: Doc<"items">[]) {
+  const removals = items.length ? await userRemovals(ctx, items[0].userId) : [];
+  return await Promise.all(
+    items.map((item) => toItemCard(ctx, item, removals)),
+  );
+}
+
+export async function rawReadySavesNewestFirst(
   ctx: QueryCtx,
   userId: string,
 ): Promise<Doc<"items">[]> {
-  const { rows } = await takeWithinBytes(
+  const { rows, bytes } = await takeWithinBytes(
     ctx.db
       .query("items")
       .withIndex("by_user_and_status", (q) =>
@@ -276,7 +305,25 @@ async function readySavesNewestFirst(
       .order("desc"),
     { maxRows: CITY_SCAN_ROWS, maxBytes: CITY_SCAN_BYTES },
   );
+  // Home, Map and city pages show only these saves, so a cut here hides older cities.
+  if (rows.length >= CITY_SCAN_ROWS || bytes >= CITY_SCAN_BYTES) {
+    logEvent("info", "ready_scan_limit_reached", {
+      rows: rows.length,
+      limit: rows.length >= CITY_SCAN_ROWS ? "rows" : "bytes",
+    });
+  }
   return rows;
+}
+
+export async function readySavesNewestFirst(
+  ctx: QueryCtx,
+  userId: string,
+  removals?: readonly Removal[],
+): Promise<Doc<"items">[]> {
+  const decisions = removals ?? (await userRemovals(ctx, userId));
+  return (await rawReadySavesNewestFirst(ctx, userId)).map((item) =>
+    visibleItemPlaces(item, decisions),
+  );
 }
 
 /** The user's ready saves in one city, newest first, capped at `limit`. */
@@ -285,12 +332,68 @@ export async function readyCitySaves(
   userId: string,
   city: string,
   limit = CITY_ITEMS_MAX,
+  removals?: readonly Removal[],
 ): Promise<Doc<"items">[]> {
   const wanted = cityKey(city);
   if (wanted === "") return [];
-  return (await readySavesNewestFirst(ctx, userId))
+  return (await readySavesNewestFirst(ctx, userId, removals))
     .filter((item) => (item.cities ?? []).some((c) => cityKey(c) === wanted))
     .slice(0, limit);
+}
+
+/**
+ * One photo per city, in display order. A save naming several cities (a
+ * Lisbon reel with a Sintra day trip) would otherwise give each the same
+ * cover, so a city takes the newest photo from a save naming fewest cities
+ * that no earlier city already shows, and repeats one only when it has no other.
+ */
+async function cityCovers(
+  ctx: QueryCtx,
+  items: Doc<"items">[],
+  cities: string[],
+): Promise<Map<string, string>> {
+  const urls = new Map<Id<"items">, string | null>();
+  const photo = async (item: Doc<"items">) => {
+    if (!urls.has(item._id)) {
+      const url = item.storageId
+        ? await ctx.storage.getUrl(item.storageId)
+        : (item.heroImageUrl ?? null);
+      urls.set(item._id, url ?? null);
+    }
+    return urls.get(item._id) ?? null;
+  };
+  const shown = new Set<string>();
+  const covers = new Map<string, string>();
+  for (const city of cities) {
+    const key = cityKey(city);
+    if (key === "" || covers.has(key)) continue;
+    const candidates = items
+      .filter(
+        (item) =>
+          (item.storageId !== undefined || item.heroImageUrl !== undefined) &&
+          (item.cities ?? []).some((name) => cityKey(name) === key),
+      )
+      // Stable, so saves naming as many cities stay newest first.
+      .sort(
+        (a, b) =>
+          new Set((a.cities ?? []).map(cityKey)).size -
+          new Set((b.cities ?? []).map(cityKey)).size,
+      );
+    let fallback: string | null = null;
+    for (const item of candidates) {
+      const url = await photo(item);
+      if (url === null) continue;
+      fallback ??= url;
+      if (!shown.has(url)) {
+        covers.set(key, url);
+        break;
+      }
+    }
+    if (!covers.has(key) && fallback !== null) covers.set(key, fallback);
+    const cover = covers.get(key);
+    if (cover !== undefined) shown.add(cover);
+  }
+  return covers;
 }
 
 export const listCities = authedQuery({
@@ -305,18 +408,7 @@ export const listCities = authedQuery({
   ),
   handler: async (ctx) => {
     const items = await readySavesNewestFirst(ctx, ctx.userId);
-    const covers = new Map<string, string>();
-    for (const item of items) {
-      const keys = new Set((item.cities ?? []).map(cityKey));
-      for (const key of keys) {
-        if (key === "" || covers.has(key)) continue;
-        const url = item.storageId
-          ? await ctx.storage.getUrl(item.storageId)
-          : (item.heroImageUrl ?? null);
-        if (url !== null && url !== undefined) covers.set(key, url);
-      }
-    }
-    return countCities(items)
+    const cities = countCities(items)
       .map(({ city, count }) => ({
         city,
         // Older installed clients use count as the number of saves.
@@ -329,13 +421,21 @@ export const listCities = authedQuery({
               ),
             )
             .slice(0, CITY_ITEMS_MAX)
-            .flatMap((item) => item.placePins ?? []),
+            .flatMap((item) => pinsForCity(item, city)),
         ).length,
-        cover: covers.get(cityKey(city)) ?? null,
       }))
       .sort(
         (a, b) => b.placeCount - a.placeCount || (a.city < b.city ? -1 : 1),
       );
+    const covers = await cityCovers(
+      ctx,
+      items,
+      cities.map(({ city }) => city),
+    );
+    return cities.map((entry) => ({
+      ...entry,
+      cover: covers.get(cityKey(entry.city)) ?? null,
+    }));
   },
 });
 
@@ -344,7 +444,15 @@ export const listCityItems = authedQuery({
   returns: v.array(enrichedItemValidator),
   handler: async (ctx, args) => {
     const items = await readyCitySaves(ctx, ctx.userId, args.city);
-    return await Promise.all(items.map((item) => enrichItem(ctx, item)));
+    return await Promise.all(
+      items.map((item) =>
+        enrichItem(
+          ctx,
+          { ...item, placePins: pinsForCity(item, args.city) },
+          [],
+        ),
+      ),
+    );
   },
 });
 
@@ -358,7 +466,7 @@ export const listItems = authedQuery({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
       .take(LIST_CAP);
-    return await Promise.all(items.map((item) => enrichItem(ctx, item)));
+    return await enrichItems(ctx, items);
   },
 });
 
@@ -412,7 +520,7 @@ export const listItemsPage = authedQuery({
       });
     return {
       ...result,
-      page: await Promise.all(result.page.map((item) => toItemCard(ctx, item))),
+      page: await toItemCards(ctx, result.page),
     };
   },
 });
@@ -438,7 +546,7 @@ export const listRecentItems = authedQuery({
       )
       .order("desc")
       .take(limit);
-    return await Promise.all(ready.map((item) => toItemCard(ctx, item)));
+    return await toItemCards(ctx, ready);
   },
 });
 
@@ -568,20 +676,99 @@ export const getItem = authedQuery({
 
 export const searchItems = authedQuery({
   args: { query: v.string() },
-  returns: v.array(enrichedItemValidator),
+  returns: v.array(
+    enrichedItemValidator.extend({
+      places: v.optional(v.array(v.string())),
+    }),
+  ),
   handler: async (ctx, args) => {
     const { userId } = ctx;
-    const trimmed = args.query.trim();
-    if (trimmed === "") {
+    const query = searchQueryText(args.query);
+    if (query === "") {
       return [];
     }
     const items = await ctx.db
       .query("items")
       .withSearchIndex("search_text", (q) =>
-        q.search("searchText", trimmed.toLowerCase()).eq("userId", userId),
+        q.search("searchText", query).eq("userId", userId),
       )
       .take(50);
-    return await Promise.all(items.map((item) => enrichItem(ctx, item)));
+    const removals = await userRemovals(ctx, userId);
+    return await Promise.all(
+      items.map(async (raw) => {
+        const item = visibleItemPlaces(raw, removals);
+        return { ...(await enrichItem(ctx, item, [])), places: item.places };
+      }),
+    );
+  },
+});
+
+/** Run once after deploying city/place search; safe to restart from a null cursor. */
+export const backfillPlaceSearch = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, { cursor }) => {
+    const batch = await ctx.db.query("items").paginate({
+      cursor,
+      numItems: 25,
+      maximumBytesRead: 2 * 1024 * 1024,
+    });
+    for (const item of batch.page) {
+      if (!(await liveOwner(ctx, item.userId))) continue;
+      const searchText = buildSearchText(item);
+      if (searchText !== item.searchText) {
+        await ctx.db.patch(item._id, { searchText });
+      }
+    }
+    if (!batch.isDone) {
+      await ctx.scheduler.runAfter(0, internal.items.backfillPlaceSearch, {
+        cursor: batch.continueCursor,
+      });
+    }
+    return null;
+  },
+});
+
+/**
+ * Run once after deploying the end of embeddings, to shrink every save:
+ * convex run items:clearEmbeddings '{"cursor":null}'. Safe to restart from a null cursor.
+ */
+export const clearEmbeddings = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, { cursor }) => {
+    const batch = await ctx.db.query("items").paginate({
+      cursor,
+      numItems: 25,
+      maximumBytesRead: 2 * 1024 * 1024,
+    });
+    let cleared = 0;
+    for (const item of batch.page) {
+      if (
+        item.embedding === undefined &&
+        item.embeddingVersion === undefined &&
+        item.embeddingAttempts === undefined
+      ) {
+        continue;
+      }
+      await ctx.db.patch(item._id, {
+        embedding: undefined,
+        embeddingVersion: undefined,
+        embeddingAttempts: undefined,
+      });
+      cleared++;
+    }
+    logEvent("info", "embeddings_cleared", {
+      scanned: batch.page.length,
+      cleared,
+      done: batch.isDone,
+    });
+    if (!batch.isDone) {
+      await ctx.scheduler.runAfter(0, internal.items.clearEmbeddings, {
+        cursor: batch.continueCursor,
+      });
+    }
+    return null;
   },
 });
 
@@ -640,11 +827,7 @@ export const similarItems = authedQuery({
       candidates.set(candidate._id, candidate);
     }
 
-    return await Promise.all(
-      rankSimilar(item, candidates.values()).map((match) =>
-        toItemCard(ctx, match),
-      ),
-    );
+    return await toItemCards(ctx, rankSimilar(item, candidates.values()));
   },
 });
 
@@ -1659,7 +1842,10 @@ export const updateNoteItem = authedMutation({
       titleSource: typedTitle !== "" ? "user" : undefined,
       searchText: buildSearchText({
         title,
+        cities: item.cities,
+        places: item.places,
         description: item.description,
+        placePins: item.placePins,
         tags: item.tags,
         note: text,
         content: item.content,
@@ -1916,17 +2102,19 @@ export const getItemInternal = internalQuery({
       ...itemFields,
       places: v.optional(v.array(v.string())),
       placesHeard: v.optional(v.boolean()),
+      placeLocations: v.optional(placeLocationsValidator),
     }),
     v.null(),
   ),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     if (item === null) return null;
-    const { places, placesHeard } = item;
+    const { places, placesHeard, placeLocations } = item;
     return {
       ...stripEmbedding(item),
       ...(places ? { places } : {}),
       ...(placesHeard !== undefined ? { placesHeard } : {}),
+      ...(placeLocations !== undefined ? { placeLocations } : {}),
     };
   },
 });
@@ -1980,40 +2168,6 @@ export const listReadyItemsInternal = internalQuery({
       )
       .order("desc")
       .take(limit);
-    return rows.map(stripEmbedding);
-  },
-});
-
-/** Convex vector filters cannot AND fields, so non-ready and old-generation hits are dropped here. */
-export const listReadyItemsByIdInternal = internalQuery({
-  args: {
-    userId: v.string(),
-    itemIds: v.array(v.id("items")),
-    limit: v.number(),
-  },
-  returns: v.array(v.object(itemFields)),
-  handler: async (ctx, args) => {
-    const limit = Math.min(Math.max(1, Math.floor(args.limit)), 200);
-    const rows: Doc<"items">[] = [];
-    let bytes = 0;
-    for (const itemId of args.itemIds) {
-      if (rows.length >= limit || bytes >= MAX_HYDRATE_READ_BYTES) {
-        break;
-      }
-      const item = await ctx.db.get(itemId);
-      if (item === null) {
-        continue;
-      }
-      bytes += (item.content?.length ?? 0) + (item.note?.length ?? 0);
-      if (
-        item.userId !== args.userId ||
-        item.status !== "ready" ||
-        item.embeddingVersion !== CURRENT_EMBEDDING_VERSION
-      ) {
-        continue;
-      }
-      rows.push(item);
-    }
     return rows.map(stripEmbedding);
   },
 });
@@ -2089,6 +2243,143 @@ export const finalizeItem = internalMutation({
   },
 });
 
+const listPinsValidator = v.array(
+  v.object({ name: v.string(), lat: v.number(), lng: v.number() }),
+);
+
+const placeListPartValidator = v.object({
+  title: v.string(),
+  cities: v.array(v.string()),
+  places: v.array(v.string()),
+  pins: listPinsValidator,
+  content: v.string(),
+});
+
+/**
+ * Pins a list save's places at the points the list gives, before the run settles it, so the Apple lookup
+ * finalizeItem schedules finds them pinned and cannot move them to a same-named place elsewhere.
+ */
+export const pinListPlaces = internalMutation({
+  args: {
+    itemId: v.id("items"),
+    runId: v.optional(v.string()),
+    cities: v.array(v.string()),
+    pins: listPinsValidator,
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.itemId);
+    if (
+      item === null ||
+      !ownsRun(item, args.runId) ||
+      item.placesEdited ||
+      (await liveOwner(ctx, item.userId)) === null ||
+      !(await aiAllowed(ctx, item.userId))
+    ) {
+      return false;
+    }
+    await ctx.db.patch(args.itemId, {
+      placePins: withListPins(
+        item.placePins ?? [],
+        args.pins,
+        normalizeCities(args.cities),
+      ),
+    });
+    return true;
+  },
+});
+
+/**
+ * Once the run settled a list save: names its list pins, and adds the rest of the list as one ready save per
+ * part while the owner still has Pro; a part already saved stays as it is.
+ */
+export const addPlaceListParts = internalMutation({
+  args: {
+    itemId: v.id("items"),
+    runId: v.optional(v.string()),
+    parts: v.array(placeListPartValidator),
+  },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const item = await ctx.db.get(args.itemId);
+    const owner = item === null ? null : await liveOwner(ctx, item.userId);
+    if (
+      item === null ||
+      owner === null ||
+      item.url === undefined ||
+      item.status !== "ready" ||
+      !ownsRun(item, args.runId) ||
+      !(await aiAllowed(ctx, item.userId))
+    ) {
+      return 0;
+    }
+    if ((item.placePins?.length ?? 0) > 0) {
+      await ctx.scheduler.runAfter(0, internal.placePins.identifyPins, {
+        itemId: args.itemId,
+      });
+    }
+    // The other parts are new saves, so they need Pro now, not just when the list was saved.
+    if (!(await hasProEntitlement(ctx, owner._id))) return 0;
+    const url = item.url;
+    const saved = await ctx.db
+      .query("items")
+      .withIndex("by_user_and_url", (q) =>
+        q.eq("userId", item.userId).eq("url", url),
+      )
+      .take(MAX_LIST_PARTS * 2);
+    const titles = new Set(saved.map((row) => row.title));
+    let added = 0;
+    for (const part of args.parts.slice(0, MAX_LIST_PARTS)) {
+      if (titles.has(part.title)) continue;
+      titles.add(part.title);
+      const cities = normalizeCities(part.cities);
+      const places = normalizePlaces(part.places, cities);
+      const placePins = withListPins([], part.pins, cities);
+      const partId = await ctx.db.insert("items", {
+        userId: item.userId,
+        type: "link",
+        status: "ready",
+        url,
+        title: part.title,
+        ...(item.description !== undefined
+          ? { description: item.description }
+          : {}),
+        tags: item.tags,
+        content: part.content,
+        ...(item.siteName !== undefined ? { siteName: item.siteName } : {}),
+        ...(item.author !== undefined ? { author: item.author } : {}),
+        intents: [],
+        cities,
+        places,
+        placePins,
+        searchText: buildSearchText({
+          title: part.title,
+          cities,
+          places,
+          placePins,
+          description: item.description,
+          tags: item.tags,
+          siteName: item.siteName,
+          content: part.content,
+        }),
+      });
+      if (places.length > 0) {
+        // Finds a pin for any place the list gave no point for; pinned places are skipped.
+        await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
+          itemId: partId,
+        });
+      }
+      if (placePins.length > 0) {
+        await ctx.scheduler.runAfter(0, internal.placePins.identifyPins, {
+          itemId: partId,
+        });
+      }
+      added++;
+    }
+    return added;
+  },
+});
+
 export const deleteStorageIfUnreferenced = internalMutation({
   args: { storageId: v.id("_storage") },
   returns: v.null(),
@@ -2101,198 +2392,6 @@ export const deleteStorageIfUnreferenced = internalMutation({
       await safeDeleteStorage(ctx, args.storageId);
     }
     return null;
-  },
-});
-
-export const listItemsNeedingEmbeddingInternal = internalQuery({
-  args: { limit: v.number() },
-  returns: v.array(
-    v.object({
-      itemId: v.id("items"),
-      userId: v.string(),
-      text: v.string(),
-      aiDeclined: v.optional(v.boolean()),
-    }),
-  ),
-  handler: async (ctx, args) => {
-    const limit = Math.min(
-      Math.max(1, Math.floor(args.limit)),
-      EMBEDDING_SWEEP_PAGE,
-    );
-    // In a Convex index undefined sorts before every number, so this also matches rows never embedded.
-    const rows = ctx.db
-      .query("items")
-      .withIndex("by_status_and_embeddingVersion", (q) =>
-        q
-          .eq("status", "ready")
-          .lt("embeddingVersion", CURRENT_EMBEDDING_VERSION),
-      );
-    const page: {
-      itemId: Id<"items">;
-      userId: string;
-      text: string;
-      aiDeclined?: true;
-    }[] = [];
-    const allowedByUser = new Map<string, boolean>();
-    let bytes = 0;
-    for await (const item of rows) {
-      let allowed = allowedByUser.get(item.userId);
-      if (allowed === undefined) {
-        allowed = await aiAllowed(ctx, item.userId);
-        allowedByUser.set(item.userId, allowed);
-      }
-      page.push({
-        itemId: item._id,
-        userId: item.userId,
-        ...(allowed ? {} : { aiDeclined: true as const }),
-        text: buildEmbeddingText({
-          title: item.title,
-          description: item.description,
-          tags: item.tags,
-          siteName: item.siteName,
-          note: item.note,
-          content: item.content,
-        }),
-      });
-      bytes += (item.content?.length ?? 0) + (item.note?.length ?? 0);
-      if (page.length >= limit || bytes >= MAX_SWEEP_READ_BYTES) {
-        break;
-      }
-    }
-    return page;
-  },
-});
-
-const embeddingOutcomeValidator = v.union(
-  v.literal("ai_declined"),
-  v.literal("embedded"),
-  v.literal("nothing_to_embed"),
-  v.literal("failed"),
-  v.literal("deferred"),
-);
-
-export const setEmbeddingsInternal = internalMutation({
-  args: {
-    entries: v.array(
-      v.object({
-        itemId: v.id("items"),
-        text: v.string(),
-        embedding: v.optional(v.array(v.float64())),
-        outcome: embeddingOutcomeValidator,
-      }),
-    ),
-  },
-  returns: v.object({
-    written: v.number(),
-    stamped: v.number(),
-    deferred: v.number(),
-  }),
-  handler: async (
-    ctx,
-    args,
-  ): Promise<{ written: number; stamped: number; deferred: number }> => {
-    let written = 0;
-    let stamped = 0;
-    let deferred = 0;
-    for (const entry of args.entries) {
-      const item = await ctx.db.get(entry.itemId);
-      if (item === null) {
-        continue;
-      }
-      if ((item.embeddingVersion ?? -1) >= CURRENT_EMBEDDING_VERSION) {
-        continue;
-      }
-
-      const nextSearchText = buildSearchText({
-        title: item.title,
-        description: item.description,
-        tags: item.tags,
-        siteName: item.siteName,
-        note: item.note,
-        content: item.content,
-      });
-      const reindex =
-        nextSearchText === item.searchText
-          ? {}
-          : { searchText: nextSearchText };
-
-      if (entry.outcome === "ai_declined") {
-        if (await aiAllowed(ctx, item.userId)) continue;
-        await ctx.db.patch(entry.itemId, {
-          ...reindex,
-          embedding: undefined,
-          embeddingVersion: CURRENT_EMBEDDING_VERSION,
-          embeddingAttempts: undefined,
-        });
-        stamped++;
-        continue;
-      }
-
-      const currentText = buildEmbeddingText({
-        title: item.title,
-        description: item.description,
-        tags: item.tags,
-        siteName: item.siteName,
-        note: item.note,
-        content: item.content,
-      });
-      if (currentText !== entry.text) {
-        if (reindex.searchText !== undefined) {
-          await ctx.db.patch(entry.itemId, reindex);
-        }
-        deferred++;
-        continue;
-      }
-
-      const usable =
-        entry.outcome === "embedded" &&
-        entry.embedding !== undefined &&
-        isValidEmbedding(entry.embedding);
-
-      if (usable) {
-        if (!(await aiAllowed(ctx, item.userId))) continue;
-        await ctx.db.patch(entry.itemId, {
-          ...reindex,
-          embedding: entry.embedding,
-          embeddingVersion: CURRENT_EMBEDDING_VERSION,
-          embeddingAttempts: undefined,
-        });
-        written++;
-        stamped++;
-        continue;
-      }
-
-      if (entry.outcome === "nothing_to_embed") {
-        await ctx.db.patch(entry.itemId, {
-          ...reindex,
-          embeddingVersion: CURRENT_EMBEDDING_VERSION,
-        });
-        stamped++;
-        continue;
-      }
-
-      if (entry.outcome === "deferred") {
-        if (reindex.searchText !== undefined) {
-          await ctx.db.patch(entry.itemId, reindex);
-        }
-        deferred++;
-        continue;
-      }
-
-      const attempts = (item.embeddingAttempts ?? 0) + 1;
-      const givingUp = attempts >= MAX_EMBEDDING_ATTEMPTS;
-      await ctx.db.patch(entry.itemId, {
-        ...reindex,
-        embeddingAttempts: attempts,
-        ...(givingUp ? { embeddingVersion: CURRENT_EMBEDDING_VERSION } : {}),
-      });
-      if (givingUp) {
-        stamped++;
-      } else {
-        deferred++;
-      }
-    }
-    return { written, stamped, deferred };
   },
 });
 

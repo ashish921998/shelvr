@@ -11,14 +11,13 @@ export const metadata: Metadata = pageMetadata(
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="October 14, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="October 26, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
-          Shelvr is a save-it-for-later app: you capture links, images, and
-          notes, and Shelvr organizes them into spaces so you can find them
-          again. This policy explains what data is collected to make that work,
-          who handles it, and what you can control.
+          Shelvr helps you turn saved reels, TikToks, and links into places to
+          visit and plans for trips or nights out. This policy explains what
+          data we collect, how we use it, who handles it, and your choices.
         </p>
       </section>
 
@@ -40,19 +39,22 @@ export default function PrivacyPage() {
             <strong>{SUPPORT_EMAIL}</strong>.
           </li>
           <li>
-            <strong>Content you save.</strong> The links, notes, and images you
-            save, including URLs, note text, extracted page content, titles,
-            descriptions, tags, and space assignments, are stored in our backend
-            (Convex) so they sync to your devices. Images are only imported when
-            you capture them or pick them from your camera or photo library.
+            <strong>Content you save.</strong> For each link you save, such as a
+            reel or TikTok, we store the URL and, when they are available, the
+            caption or extracted page text, a copy of its cover image, its
+            title, description and tags, and the places found in it with their
+            map locations. We also store the plans you make. All of this is kept
+            in our backend (Convex) so it syncs to your devices. We do not store
+            the video itself. Earlier versions of the app also let you save
+            notes and photos; those stay in your account until you delete them.
           </li>
           <li>
-            <strong>Photo metadata.</strong> When you import a photo, EXIF
-            metadata is stripped from the uploaded file. Shelvr keeps the
-            capture time and GPS coordinates as fields in its own database so
-            the item can appear on your map and be sorted by when it was taken.
-            These fields are not sent to the AI provider. Shelvr does not track
-            your live device location.
+            <strong>Photo metadata.</strong> When you imported a photo with an
+            earlier version of the app, EXIF metadata is stripped from the
+            uploaded file. Shelvr keeps the capture time and GPS coordinates as
+            fields in its own database so the item can appear on your map and be
+            sorted by when it was taken. These fields are not sent to the AI
+            provider. Shelvr does not track your live device location.
           </li>
           <li>
             <strong>Purchase information.</strong> If you subscribe to Shelvr
@@ -105,16 +107,23 @@ export default function PrivacyPage() {
           to Google’s Gemini API (a generation model and Gemini embeddings).
           What is sent: link addresses, up to about 8,000 characters of
           extracted page text, a reel’s or TikTok’s caption, and what is said in
-          the video. When you make a plan, Shelvr also sends your saved places
-          and the ones you marked “We went”. Notes and photos saved with earlier
-          versions of the app are processed the same way.
+          the video. Notes and photos saved with earlier versions of the app may
+          also have been processed this way.
         </p>
         <p className="mt-2">
-          Before anything is sent, the app asks whether Shelvr may use Google’s
-          Gemini AI to find the places in your saves, and nothing goes to Gemini
-          until you tap Allow. You can change this at any time in Settings
-          (“Find places with AI”). If you choose Not now, your links are still
-          saved, but without places or plans.
+          Date and trip plans are selected within Shelvr from places already
+          saved in your chosen city. Places marked “We went” are excluded. Your
+          saved collection and visit history are not sent to Gemini to make
+          these plans. Shelvr sends place names to Apple Maps to locate trip
+          stops; it does not track your live location.
+        </p>
+        <p className="mt-2">
+          AI processing is part of saving content in Shelvr. It runs
+          automatically unless it is disabled for your account. With AI
+          disabled, links still save, but AI place extraction is unavailable.
+          Plans can still use places already saved in your account. To request a
+          change to your AI processing preference, use Contact Support in the
+          app or email <strong>{SUPPORT_EMAIL}</strong>.
         </p>
         <p className="mt-2">
           Shelvr uses Google’s paid Gemini API service. Google states that
@@ -128,10 +137,11 @@ export default function PrivacyPage() {
           only happens when you tap it.
         </p>
         <p className="mt-2">
-          If you save a cooking TikTok or Instagram reel whose caption has no
-          recipe, its public link is sent to Treg (treg.to), which uses
-          ScrapeCreators to return what is said in the video. That transcript is
-          then sent to Gemini to write the recipe.
+          To find places or recipes in a TikTok or Instagram reel, including
+          videos with no caption, Shelvr may send its public link to Treg
+          (treg.to), which uses ScrapeCreators to return what is said in the
+          video. That transcript is then sent to Gemini to extract the places or
+          recipe.
         </p>
         <p className="mt-2">
           Transient AI failures do not delete content you already captured.
@@ -168,7 +178,7 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Treg and ScrapeCreators:</strong> video transcripts for
-            recipes from cooking TikToks and reels.
+            finding places and recipes in TikToks and reels.
           </li>
           <li>
             <strong>Convex:</strong> database, file storage, and backend
@@ -194,14 +204,14 @@ export default function PrivacyPage() {
           </li>
         </ul>
         <p className="mt-3">
-          If you opt in through Shelvr’s updated-terms screen, RevenueCat may
-          share purchase identifiers, delivery status, and whether sample
-          content was provided with Apple to help review a refund request. This
-          does not include your saved links, notes, photos, or product analytics
-          events. We record your choice, the accepted terms version, and the
-          time of your decision. You can turn sharing off in Profile. Changes
-          are sent to RevenueCat; the app shows when an update is pending.
-          Previously shared information cannot be recalled.
+          If you opt in to Apple refund data sharing, RevenueCat may share
+          purchase identifiers, delivery status, and whether sample content was
+          provided with Apple to help review a refund request. This does not
+          include your saves, the places in them, or product analytics events.
+          We record your choice, the accepted terms version, and the time of
+          your decision. You can turn sharing off in Profile. Changes are sent
+          to RevenueCat; the app shows when an update is pending. Previously
+          shared information cannot be recalled.
         </p>
       </section>
 
@@ -239,7 +249,10 @@ export default function PrivacyPage() {
       <section>
         <h2 className="font-semibold text-ink text-lg">Your choices</h2>
         <ul className="mt-2 list-disc pl-5 space-y-2">
-          <li>Turn AI processing on or off in Settings.</li>
+          <li>
+            Request a change to your AI processing preference through Contact
+            Support in the app or by emailing <strong>{SUPPORT_EMAIL}</strong>.
+          </li>
           <li>
             Turn notifications on or off in Settings, including the weekly shelf
             and save reminders.

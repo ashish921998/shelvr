@@ -26,11 +26,31 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   },
   makePlan: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
   makeTrip: { kind: "token bucket", rate: 10, period: HOUR, capacity: 5 },
+  createTripPlan: {
+    kind: "token bucket",
+    rate: 10,
+    period: HOUR,
+    capacity: 5,
+  },
+  // Every drag, remove, add and rename is one write; this only stops a runaway client.
+  tripEdit: { kind: "token bucket", rate: 600, period: HOUR, capacity: 120 },
+  tripPlaceSearch: {
+    kind: "token bucket",
+    rate: 120,
+    period: HOUR,
+    capacity: 30,
+  },
   videoTranscript: {
     kind: "token bucket",
     rate: 20,
     period: DAY,
     capacity: 10,
+  },
+  tikTokCaption: {
+    kind: "token bucket",
+    rate: 50,
+    period: DAY,
+    capacity: 25,
   },
   videoTranscriptGlobal: {
     kind: "token bucket",
@@ -60,6 +80,19 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   },
   feedbackSubmit: { kind: "token bucket", rate: 6, period: DAY, capacity: 3 },
   oracleIp: { kind: "token bucket", rate: 10, period: HOUR, capacity: 4 },
+  reelPlacesIp: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
+  reelPlacesGlobal: {
+    kind: "token bucket",
+    rate: 60,
+    period: MINUTE,
+    capacity: 30,
+  },
+  reelPlacesCaption: {
+    kind: "token bucket",
+    rate: 200,
+    period: DAY,
+    capacity: 50,
+  },
   oracleGlobal: {
     kind: "token bucket",
     rate: 120,

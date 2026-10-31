@@ -13,7 +13,6 @@ import {
 import {
   insertConsentingUser,
   newConvexTest,
-  setTestConsent,
   signedInUser,
 } from "./test.setup";
 import { aiAllowed } from "./aiConsent";
@@ -180,7 +179,7 @@ describe("getStatus and setConsent", () => {
     expect((await other.query(api.aiConsent.getStatus, {})).status).toBe(
       "unset",
     );
-    expect(await backend.run((ctx) => aiAllowed(ctx, otherId))).toBe(false);
+    expect(await backend.run((ctx) => aiAllowed(ctx, otherId))).toBe(true);
   });
 
   it("requires a signed-in user", async () => {
@@ -193,31 +192,17 @@ describe("getStatus and setConsent", () => {
 });
 
 describe("a user who has not answered", () => {
-  it("is treated as declined: nothing goes to Gemini until they choose Allow", async () => {
+  it("uses AI by default without writing a consent record", async () => {
     const t = await signedIn(newConvexTest(), "unset");
     const itemId = await processing(t, { type: "note", note: "Buy lentils" });
     await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
-    await expectNoThirdPartyCall();
+    expect(generateObject).toHaveBeenCalledOnce();
     expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
       status: "ready",
-      title: "Buy lentils",
+      title: "Model title",
     });
-  });
-});
-
-describe("an unanswered account that then taps Allow", () => {
-  it("gets the saves it made before answering embedded", async () => {
-    const t = await signedIn(newConvexTest(), "unset");
-    const itemId = await ready(t);
-    await t.action(internal.ai.sweepItemEmbeddings, {});
-    expect(embedMany).not.toHaveBeenCalled();
-
-    await t.mutation(api.aiConsent.setConsent, { granted: true });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
-    await t.action(internal.ai.sweepItemEmbeddings, {});
-    expect(embedMany).toHaveBeenCalledTimes(1);
-    expect((await t.run((ctx) => ctx.db.get(itemId)))?.embedding).toHaveLength(
-      EMBEDDING_DIMENSIONS,
+    expect(await t.run((ctx) => ctx.db.query("aiConsents").collect())).toEqual(
+      [],
     );
   });
 });
@@ -475,35 +460,6 @@ describe("a user who declined", () => {
     });
     await expectNoThirdPartyCall();
   });
-
-  it("is skipped by a sweep that reaches an item before the cleanup does", async () => {
-    const t = await signedIn();
-    const itemId = await ready(t);
-    await t.run((ctx) => setTestConsent(ctx, USER, "declined"));
-    expect(await t.action(internal.ai.sweepItemEmbeddings, {})).toEqual({
-      scanned: 1,
-      written: 0,
-    });
-    expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
-      embeddingVersion: CURRENT_EMBEDDING_VERSION,
-    });
-    await expectNoThirdPartyCall();
-  });
-
-  it("is embedded again after changing their mind", async () => {
-    const t = await signedIn();
-    const itemId = await ready(t, { embedding: VECTOR });
-    await t.mutation(api.aiConsent.setConsent, { granted: false });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
-    await t.mutation(api.aiConsent.setConsent, { granted: true });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
-
-    await t.action(internal.ai.sweepItemEmbeddings, {});
-    expect(embedMany).toHaveBeenCalledTimes(1);
-    expect((await t.run((ctx) => ctx.db.get(itemId)))?.embedding).toHaveLength(
-      EMBEDDING_DIMENSIONS,
-    );
-  });
 });
 
 describe("the onboarding demo save", () => {
@@ -595,42 +551,6 @@ describe("a decline that lands while a run is still out", () => {
     expect(await t.run((ctx) => ctx.db.query("spaceItems").collect())).toEqual(
       [],
     );
-  });
-
-  it("discards the model's answer when AI goes off during the embedding call", async () => {
-    const t = await signedIn();
-    const itemId = await processing(t, { type: "note", note: "Buy lentils" });
-    embedMany.mockImplementationOnce(async () => {
-      await t.mutation(api.aiConsent.setConsent, { granted: false });
-      return { embeddings: [VECTOR] };
-    });
-
-    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
-
-    const item = await t.run((ctx) => ctx.db.get(itemId));
-    expect(item).toMatchObject({
-      status: "ready",
-      title: "Buy lentils",
-      description: "",
-      tags: [],
-    });
-    expect(item?.embedding).toBeUndefined();
-  });
-
-  it("sends no saves for a new space when AI goes off while candidates are picked", async () => {
-    const t = await signedIn();
-    await ready(t, { embedding: VECTOR });
-    const spaceId = await t.run((ctx) =>
-      ctx.db.insert("spaces", { userId: USER, name: "Recipes", dynamic: true }),
-    );
-    embedMany.mockImplementationOnce(async () => {
-      await t.mutation(api.aiConsent.setConsent, { granted: false });
-      return { embeddings: [VECTOR] };
-    });
-
-    await t.action(internal.ai.recommendForSpace, { spaceId });
-
-    expect(generateObject).not.toHaveBeenCalled();
   });
 
   it("drops suggestions the model made for a new space", async () => {

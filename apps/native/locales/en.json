@@ -1,8 +1,8 @@
 {
   "ios": {
-    "NSCameraUsageDescription": "Shelvr uses your camera so you can capture things you want to save for later.",
     "NSPhotoLibraryUsageDescription": "Shelvr lets you save photos and screenshots from your library into your hub, and tidy your photo library.",
     "NSCalendarsUsageDescription": "Shelvr adds events to your calendar from things you've saved.",
-    "NSCalendarsFullAccessUsageDescription": "Shelvr adds events to your calendar from things you've saved."
+    "NSCalendarsFullAccessUsageDescription": "Shelvr adds events to your calendar from things you've saved.",
+    "NSLocationWhenInUseUsageDescription": "Shelvr shows where you are on the map so you can find the places you saved nearby."
   }
 }

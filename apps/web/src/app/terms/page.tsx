@@ -11,13 +11,13 @@ export const metadata: Metadata = pageMetadata(
 
 export default function TermsPage() {
   return (
-    <LegalPage title="Terms of Service" lastUpdated="October 8, 2026">
+    <LegalPage title="Terms of Service" lastUpdated="October 26, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">1. The service</h2>
         <p className="mt-2">
-          Shelvr lets you save links, images, and notes and organizes them into
-          spaces. By creating an account or using the app you agree to these
-          terms.
+          Shelvr turns the reels, TikToks, and links you save into places on a
+          map of each city, and helps you plan a date or a trip from them. By
+          creating an account or using the app you agree to these terms.
         </p>
       </section>
 
@@ -35,9 +35,9 @@ export default function TermsPage() {
         <p className="mt-2">
           You own what you save. You grant us the limited license needed to
           store, process, and display your content back to you — including
-          automated AI processing that titles, tags, and organizes it. We claim
-          no other rights to it. Don&rsquo;t save content that is unlawful or
-          that you have no right to store.
+          automated AI processing that finds the places in it. We claim no other
+          rights to it. Don&rsquo;t save content that is unlawful or that you
+          have no right to store.
         </p>
       </section>
 
@@ -49,19 +49,19 @@ export default function TermsPage() {
           App Store subscription settings, and cancelling before the trial ends
           means you won&rsquo;t be charged. Prices are shown before purchase and
           may change with notice. Refunds are handled by Apple under App Store
-          policies. Pro includes storage for up to 1,000 photos per account;
-          links and notes are not limited.
+          policies. Links are not limited. Photos saved with earlier versions of
+          the app count toward a limit of 1,000 per account.
         </p>
         <p className="mt-2">
           Apple refund data sharing is optional. If you choose “Agree and allow
           sharing” on the updated-terms screen in Shelvr, you consent to Shelvr,
           through RevenueCat, sharing purchase identifiers, delivery status, and
           whether sample content was provided with Apple when reviewing your
-          refund request. Apple makes the final refund decision. Your saved
-          links, notes, and photos are not shared for this purpose. Using the
-          app or making a purchase alone does not enable this sharing. Declining
-          does not restrict app access or your ability to request a refund. You
-          can withdraw this consent in Profile under Apple refund data sharing.
+          refund request. Apple makes the final refund decision. Your saves and
+          the places in them are not shared for this purpose. Using the app or
+          making a purchase alone does not enable this sharing. Declining does
+          not restrict app access or your ability to request a refund. You can
+          withdraw this consent in Profile under Apple refund data sharing.
         </p>
       </section>
 

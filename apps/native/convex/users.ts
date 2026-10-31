@@ -350,7 +350,9 @@ async function deleteSharingAndPlansBatch(
   return (
     (await deleteShareLinksBatch(ctx, userId)) &&
     (await deletePlaceVisitsBatch(ctx, userId)) &&
+    (await deletePlaceRemovalsBatch(ctx, userId)) &&
     (await deleteTripsBatch(ctx, userId)) &&
+    (await deleteTripPlansBatch(ctx, userId)) &&
     (await deletePlanSharesForUser(ctx, userId))
   );
 }
@@ -367,6 +369,18 @@ async function deleteShareLinksBatch(
     await ctx.db.delete(link._id);
   }
   return links.length !== DELETE_BATCH;
+}
+
+async function deletePlaceRemovalsBatch(
+  ctx: MutationCtx,
+  userId: string,
+): Promise<boolean> {
+  const rows = await ctx.db
+    .query("placeRemovals")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .take(DELETE_BATCH);
+  for (const row of rows) await ctx.db.delete(row._id);
+  return rows.length !== DELETE_BATCH;
 }
 
 async function deletePlaceVisitsBatch(
@@ -395,6 +409,29 @@ async function deleteTripsBatch(
     await ctx.db.delete(trip._id);
   }
   return trips.length !== DELETE_BATCH;
+}
+
+/** Stops first, so no stop outlives its trip between passes. */
+async function deleteTripPlansBatch(
+  ctx: MutationCtx,
+  userId: string,
+): Promise<boolean> {
+  const stops = await ctx.db
+    .query("tripStops")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .take(DELETE_BATCH);
+  for (const stop of stops) {
+    await ctx.db.delete(stop._id);
+  }
+  if (stops.length === DELETE_BATCH) return false;
+  const plans = await ctx.db
+    .query("tripPlans")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .take(DELETE_BATCH);
+  for (const plan of plans) {
+    await ctx.db.delete(plan._id);
+  }
+  return plans.length !== DELETE_BATCH;
 }
 
 async function deleteAuthIdentity(

@@ -24,14 +24,20 @@ import {
   MAX_ITEM_PLACES,
   normalizeCities,
   normalizePlaces,
+  normalizePlaceLocations,
 } from "./model/itemFields";
 import { logEvent } from "./model/log";
-import { sanitizeRecipe } from "./model/recipeMarkup";
 import {
-  embeddingText,
-  type Classification,
-  type Reading,
-} from "./model/settlement";
+  PLACE_LIST_CITIES_SYSTEM,
+  PLACE_LIST_CITY_DESCRIPTION,
+  intentsForPart,
+  partIndexFor,
+  placeListCitiesPrompt,
+  splitPlaceList,
+  type PlaceListPart,
+} from "./model/placeList";
+import { sanitizeRecipe } from "./model/recipeMarkup";
+import { type Classification, type Reading } from "./model/settlement";
 import {
   deliverPostHogEvent,
   newDeliveryId,
@@ -47,7 +53,6 @@ import {
   isModelTimeout,
 } from "./model/aiProvider";
 import { fixturePage } from "./model/fakeAi";
-import { embedTexts } from "./aiEmbeddingSweep";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   fetchVideoTranscript,
@@ -169,6 +174,7 @@ const intentsPromptBlock = (maxIntents: number): string =>
   ].join("\n");
 
 const MAX_CONTENT_CHARS = 8000;
+const LIST_PINS_TAKE_NO_CLUES: { name: string; location: string }[] = [];
 
 async function scheduleSteeringFor(
   ctx: ActionCtx,
@@ -209,7 +215,18 @@ const intentSchema = z.object({
     ),
 });
 
-const PLACES_DESCRIPTION = `Every specific place this item names (restaurants, cafés, bars, bakeries, food stalls, markets, shops, hotels, museums, parks, sights), at most ${MAX_ITEM_PLACES}, each its name as written, e.g. 'Café de Flore', without address, city or description. Include a place named only by its @handle when the handle clearly is the place. Empty if it names none; never add a place it does not name.`;
+const PLACES_DESCRIPTION = `Every specific place this item names (restaurants, cafés, bars, bakeries, food stalls, markets, shops, hotels, museums, parks, sights), at most ${MAX_ITEM_PLACES}, each its name as written, e.g. 'Café de Flore', without address or description. For a single-city item, leave the city out of every place name. When more than one city is mentioned, append each place's explicitly stated city (e.g. 'Café de Flore, Paris'); never assign every place to the first city. Include a place named only by its @handle when the handle clearly is the place. Empty if it names none; never add a place it does not name.`;
+
+const placeListCitiesSchema = z.object({
+  cities: z
+    .array(
+      z.object({
+        index: z.number().int().describe("The place's number in the list"),
+        city: z.string().describe(PLACE_LIST_CITY_DESCRIPTION),
+      }),
+    )
+    .describe("One entry per numbered place, in list order"),
+});
 
 const itemAnalysisSchema = z.object({
   title: z
@@ -222,7 +239,9 @@ const itemAnalysisSchema = z.object({
     .describe("A 1-2 sentence summary of what this item is"),
   tags: z
     .array(z.string())
-    .describe("4-8 lowercase tags, each one or two words"),
+    .describe(
+      "4-8 lowercase tags, each one or two words. For places, include what kind they are and the occasion they suit when the item says so, e.g. 'dessert', 'coffee', 'cocktails', 'date night'",
+    ),
   spaceNames: z
     .array(z.string())
     .describe(
@@ -236,13 +255,28 @@ const itemAnalysisSchema = z.object({
   cities: z
     .array(z.string())
     .describe(
-      "The cities of the specific places this item names or shows (restaurants, bars, cafés, shops, hotels, sights), at most 3, city name only in English, e.g. 'Mumbai' or 'New York'. Empty if it names no place or the city is not stated or clearly shown; never guess.",
+      "The cities of the specific places this item names or shows (restaurants, bars, cafés, shops, hotels, sights), at most 30, city name only in English, e.g. 'Mumbai' or 'New York'. For a suburb or neighbourhood of a big city, name the big city instead, e.g. 'Chicago' for Oak Park or Evanston, 'New York' for Brooklyn. Empty if it names no place or the city is not stated or clearly shown; never guess.",
     ),
   places: z
     .array(z.string())
     .describe(
       PLACES_DESCRIPTION +
         " Read the whole text: a list of places often runs past the first lines.",
+    ),
+  placeLocations: z
+    .array(
+      z.object({
+        name: z.string().describe("The exact corresponding name from places"),
+        location: z
+          .string()
+          .describe(
+            "The address, branch or neighbourhood explicitly stated for this place, copied from the source, at most 120 characters. Preserve the specific street or square rather than only the city. Never substitute a nearby attraction for the stated location or guess a branch.",
+          ),
+      }),
+    )
+    .optional()
+    .describe(
+      "Location clues that distinguish branches of the named places. Preserve every explicit branch, street address or neighbourhood; omit entries without such evidence. These are lookup context, not display names.",
     ),
 });
 
@@ -293,6 +327,7 @@ const speechRecipeSchema = z.object({ recipe: recipeSchema });
 
 const speechPlacesSchema = z.object({
   places: z.array(z.string()).describe(PLACES_DESCRIPTION),
+  placeLocations: itemAnalysisSchema.shape.placeLocations,
   cities: itemAnalysisSchema.shape.cities,
 });
 
@@ -366,6 +401,10 @@ type Analysis = {
   result?: ModelResult;
   page?: PageData;
   linkRead?: LinkRead;
+  /** The part of a shared list this save becomes. */
+  listPart?: PlaceListPart;
+  /** The rest of a shared list, each part a save of its own city. */
+  listParts?: PlaceListPart[];
 };
 
 type AnalysisOutcome = Analysis | { terminal: true };
@@ -424,6 +463,15 @@ function classificationOf(model: ModelResult): Classification {
     intents: sanitizeIntents(model.intents),
     cities: normalizeCities(model.cities),
     places: normalizePlaces(model.places),
+    ...(model.placeLocations !== undefined
+      ? {
+          placeLocations: normalizePlaceLocations(
+            model.placeLocations,
+            model.places,
+            model.cities,
+          ),
+        }
+      : {}),
     ...(model.placesHeard !== undefined
       ? { placesHeard: model.placesHeard }
       : {}),
@@ -486,7 +534,13 @@ async function analyzeLinkItem(
   if (!item.url) {
     throw new Error("Link item has no url");
   }
-  const read = fixtureRead(item.url) ?? (await readPage(item.url));
+  const read =
+    fixtureRead(item.url) ??
+    (await readPage(item.url, {
+      claimPaidRead: async () =>
+        (await stillAllowed(ctx, aiAllowed, item)) &&
+        (await claimVideoRead(ctx, "tikTokCaption", item.userId)),
+    }));
   if (read.status === "gone") {
     logEvent("error", "process_item_gone", {
       item_id: args.itemId,
@@ -522,11 +576,83 @@ async function analyzeLinkItem(
     read.status === "ok" && read.shortForm?.video === true,
   );
   const spoken = await fromSpeech(ctx, item, read, result, aiAllowed);
+  const parts = page?.placeList
+    ? await placeListParts(ctx, item, page, aiAllowed)
+    : undefined;
+  if (page === undefined || parts === undefined || parts.length === 0) {
+    return { result: { ...result, ...spoken }, page, linkRead: read };
+  }
+  const index = partIndexFor(parts, item.title);
+  const part = parts[index];
   return {
-    result: { ...result, ...spoken },
-    page,
+    result: {
+      ...result,
+      ...spoken,
+      intents: intentsForPart(result.intents, part),
+      places: part.places,
+      cities: part.cities,
+      placeLocations: LIST_PINS_TAKE_NO_CLUES,
+      ...(parts.length > 1 ? { title: part.title } : {}),
+    },
+    page: { ...page, content: part.content },
     linkRead: read,
+    listPart: part,
+    listParts: parts.filter((_, i) => i !== index),
   };
+}
+
+/** A list save's places sit at the list's own points before it settles, so no lookup can move them. */
+async function pinListPart(
+  ctx: ActionCtx,
+  run: { itemId: Id<"items">; runId?: string },
+  part: PlaceListPart | undefined,
+): Promise<void> {
+  if (part === undefined || part.pins.length === 0) return;
+  await ctx.runMutation(internal.items.pinListPlaces, {
+    itemId: run.itemId,
+    runId: run.runId,
+    cities: part.cities,
+    pins: part.pins,
+  });
+}
+
+/** A shared list's places, one part per city; undefined when the model could not name their cities. */
+async function placeListParts(
+  ctx: ActionCtx,
+  item: Doc<"items">,
+  page: PageData,
+  aiAllowed: boolean,
+): Promise<PlaceListPart[] | undefined> {
+  const places = page.placeList ?? [];
+  if (places.length === 0 || !(await stillAllowed(ctx, aiAllowed, item))) {
+    return undefined;
+  }
+  try {
+    const { object } = await generateObject({
+      model: MODEL,
+      ...modelCallOptions(CLASSIFY_TIMEOUT_MS),
+      system: PLACE_LIST_CITIES_SYSTEM,
+      schema: placeListCitiesSchema,
+      prompt: placeListCitiesPrompt(places),
+    });
+    const parts = splitPlaceList(
+      page.title ?? item.title ?? "Google Maps",
+      places,
+      object,
+    );
+    logEvent("info", "place_list_split", {
+      item_id: item._id,
+      places: places.length,
+      parts: parts.length,
+    });
+    return parts;
+  } catch (error) {
+    logEvent("warn", "place_list_split_failed", {
+      item_id: item._id,
+      error_category: modelFailure(error),
+    });
+    return undefined;
+  }
 }
 
 function fixtureRead(
@@ -592,13 +718,12 @@ function speechWants(
   };
 }
 
-async function claimTranscript(
+async function claimVideoRead(
   ctx: ActionCtx,
+  limit: "videoTranscript" | "tikTokCaption",
   userId: Doc<"items">["userId"],
 ): Promise<boolean> {
-  const perUser = await rateLimiter.limit(ctx, "videoTranscript", {
-    key: userId,
-  });
+  const perUser = await rateLimiter.limit(ctx, limit, { key: userId });
   return (
     perUser.ok && (await rateLimiter.limit(ctx, "videoTranscriptGlobal")).ok
   );
@@ -625,7 +750,10 @@ function speechPlacesPrompt(page: PageData, transcript: string): string {
 }
 
 type Spoken = Partial<
-  Pick<LinkAnalysis, "recipe" | "places" | "cities" | "placesHeard">
+  Pick<
+    LinkAnalysis,
+    "recipe" | "places" | "cities" | "placesHeard" | "placeLocations"
+  >
 >;
 
 type SpeechEvent = "speech_recipe" | "speech_places";
@@ -642,16 +770,30 @@ async function fromSpeech(
   aiAllowed: boolean,
 ): Promise<Spoken> {
   const spoken = await readSpeech(ctx, item, read, result, aiAllowed);
+  const named = spoken.cities ?? result.cities;
+  const cities =
+    normalizeCities(named).length === 0 && item.cities?.length
+      ? item.cities
+      : named;
   if (!item.places?.length) {
-    return spoken;
+    return { ...spoken, cities };
   }
   return {
     ...spoken,
+    cities,
     places: normalizePlaces([
       ...(spoken.places ?? result.places ?? []),
       ...item.places,
     ]),
     placesHeard: spoken.placesHeard ?? item.placesHeard,
+    placeLocations: normalizePlaceLocations(
+      [
+        ...(spoken.placeLocations ?? result.placeLocations ?? []),
+        ...(item.placeLocations ?? []),
+      ],
+      [...(spoken.places ?? result.places ?? []), ...item.places],
+      cities,
+    ),
   };
 }
 
@@ -726,7 +868,7 @@ async function readTranscript(
   if (!(await stillAllowed(ctx, aiAllowed, item))) {
     return undefined;
   }
-  if (!(await claimTranscript(ctx, item.userId))) {
+  if (!(await claimVideoRead(ctx, "videoTranscript", item.userId))) {
     video.log("rate_limited");
     return undefined;
   }
@@ -780,7 +922,8 @@ async function speechPlaces(
   result: LinkAnalysis,
   log: (outcome: string) => void,
 ): Promise<
-  Pick<LinkAnalysis, "places" | "cities" | "placesHeard"> | undefined
+  | Pick<LinkAnalysis, "places" | "cities" | "placesHeard" | "placeLocations">
+  | undefined
 > {
   try {
     const { object } = await generateObject({
@@ -801,6 +944,11 @@ async function speechPlaces(
     );
     return {
       places,
+      placeLocations: normalizePlaceLocations(
+        [...(result.placeLocations ?? []), ...(object.placeLocations ?? [])],
+        places,
+        result.cities,
+      ),
       placesHeard: true,
       cities:
         normalizeCities(result.cities).length > 0
@@ -1004,12 +1152,6 @@ async function refreshClaimed(
   });
 }
 
-async function embedText(text: string): Promise<Classification["embedding"]> {
-  const { vectors } = await embedTexts([text]);
-  const vector = vectors[0];
-  return vector === undefined ? undefined : { text, vector };
-}
-
 export const processItem = internalAction({
   args: {
     itemId: v.id("items"),
@@ -1081,18 +1223,14 @@ export const processItem = internalAction({
       const keepTitle = args.refresh === true;
       const reading = readingOf(item, outcome, posterStorageId);
       const classification = model && classificationOf(model);
-      const embedding =
-        classification &&
-        (await embedText(
-          embeddingText(item, { keepTitle, reading, classification }),
-        ));
 
+      if (model) await pinListPart(ctx, args, outcome.listPart);
       const finalized = await ctx.runMutation(internal.items.finalizeItem, {
         itemId: args.itemId,
         runId: args.runId,
         keepTitle,
         reading,
-        classification: classification && { ...classification, embedding },
+        classification,
       });
       if (finalized !== "applied") {
         if (posterStorageId !== undefined) {
@@ -1101,6 +1239,13 @@ export const processItem = internalAction({
           });
         }
         return null;
+      }
+      if (model && outcome.listPart) {
+        await ctx.runMutation(internal.items.addPlaceListParts, {
+          itemId: args.itemId,
+          runId: args.runId,
+          parts: outcome.listParts ?? [],
+        });
       }
       const autoFiled = model
         ? await ctx.runMutation(internal.items.setSpacesForItem, {

@@ -1,58 +1,8 @@
-import { analytics } from "@/lib/analytics";
 import { formattingLocale } from "@/lib/i18n";
-import { api } from "@convex/_generated/api";
-import type { Id } from "@convex/_generated/dataModel";
-import { isAiConsentRequired } from "@convex/model/aiConsent";
-import { MAX_PLAN_ITEMS } from "@convex/model/plan";
-import {
-  STOPS_PER_DAY,
-  type TripPace,
-  type TripSlot,
-} from "@convex/model/trip";
-import type { FunctionReturnType } from "convex/server";
-import { useAction } from "convex/react";
-import { useCallback, useState } from "react";
-import { Platform } from "react-native";
+import type { TripPace } from "@convex/model/trip";
 
-export type { TripPace, TripSlot };
+export type { TripPace };
 export { MAX_TRIP_DAYS, MIN_TRIP_DAYS } from "@convex/model/trip";
-
-export type Trip = NonNullable<
-  FunctionReturnType<typeof api.tripData.getSpaceTrip>
->;
-export type TripDayView = Trip["days"][number];
-export type TripStopView = TripDayView["stops"][number];
-
-/** Estimates the saves a trip reads: that city's plus those naming no city, capped at MAX_PLAN_ITEMS. */
-export function tripSaveCount(
-  saveCount: number,
-  cities: { city: string; count: number }[],
-  city?: string,
-): number {
-  let count = saveCount;
-  if (city !== undefined) {
-    const named = cities.reduce((sum, c) => sum + c.count, 0);
-    const own = cities.find((c) => c.city === city)?.count ?? 0;
-    count = Math.min(saveCount, own + Math.max(0, saveCount - named));
-  }
-  return Math.min(count, MAX_PLAN_ITEMS);
-}
-
-export function daysSavesFill(saveCount: number, pace: TripPace): number {
-  return Math.max(1, Math.ceil(saveCount / STOPS_PER_DAY[pace]));
-}
-
-const TRIP_MIN_CITY_SAVES = 3;
-
-export function canPlanTrip(
-  items: { status: string; cities?: string[] }[],
-): boolean {
-  return (
-    items.filter(
-      (item) => item.status === "ready" && (item.cities ?? []).length > 0,
-    ).length >= TRIP_MIN_CITY_SAVES
-  );
-}
 
 export function toDateKey(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -78,24 +28,6 @@ export function formatTripDay(date: Date): string {
 }
 
 export type LatLng = { latitude: number; longitude: number };
-
-export function locatedStops(
-  stops: TripStopView[],
-): { stop: TripStopView; index: number; coordinates: LatLng }[] {
-  return stops.flatMap((stop, index) =>
-    stop.lat !== undefined && stop.lng !== undefined
-      ? [
-          {
-            stop,
-            index,
-            coordinates: { latitude: stop.lat, longitude: stop.lng },
-          },
-        ]
-      : [],
-  );
-}
-
-export const TRIP_PANEL_SHARE = 0.52;
 
 /** `worldWidth` is the points 360° of longitude spans at zoom 0; `centerY` is where the camera's center lands. */
 type MapView = {
@@ -143,92 +75,4 @@ export function fitCamera(
     },
     zoom,
   };
-}
-
-export type StopPick = { day: number; itemId: Id<"items">; name: string };
-
-export function pickedStop(
-  days: Pick<TripDayView, "stops">[] | undefined,
-  pick: StopPick | null,
-): { ref: { day: number; stop: number }; view: TripStopView } | null {
-  if (pick === null) return null;
-  const stops = days?.[pick.day]?.stops ?? [];
-  const stop = stops.findIndex(
-    (s) => s.itemId === pick.itemId && s.name === pick.name,
-  );
-  return stop === -1
-    ? null
-    : { ref: { day: pick.day, stop }, view: stops[stop] };
-}
-
-export function directionsUrl(
-  stop: Pick<TripStopView, "name" | "area" | "lat" | "lng">,
-  city: string | undefined,
-): string {
-  const label = [stop.name, stop.area, city].filter(Boolean).join(", ");
-  const destination =
-    stop.lat !== undefined && stop.lng !== undefined
-      ? `${stop.lat},${stop.lng}`
-      : label;
-  if (Platform.OS === "ios") {
-    return `https://maps.apple.com/?daddr=${encodeURIComponent(destination)}&q=${encodeURIComponent(stop.name)}&dirflg=w`;
-  }
-  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}&travelmode=walking`;
-}
-
-export type TripRequest = {
-  days: number;
-  pace: TripPace;
-  startDate?: string;
-  city?: string;
-};
-
-type BuildState =
-  | { status: "idle" }
-  | { status: "building" }
-  | { status: "arriving"; previous: Id<"trips"> | null }
-  | { status: "empty"; considered: number }
-  | { status: "ai_off" }
-  | { status: "error" };
-
-/** `arriving` lasts until the subscription shows a trip other than `previous`; an empty result keeps the old trip. */
-export function useBuildTrip(spaceId: Id<"spaces">, locale: string) {
-  const makeTrip = useAction(api.trips.makeTrip);
-  const [state, setState] = useState<BuildState>({ status: "idle" });
-
-  const build = useCallback(
-    async (
-      request: TripRequest,
-      previous: Id<"trips"> | null,
-    ): Promise<boolean> => {
-      setState({ status: "building" });
-      try {
-        const result = await makeTrip({ spaceId, locale, ...request });
-        analytics.capture("trip_made", {
-          considered: result.considered,
-          days: request.days,
-          pace: request.pace,
-          made: result.tripId !== null,
-        });
-        if (result.tripId === null) {
-          setState({ status: "empty", considered: result.considered });
-          return false;
-        }
-        setState({ status: "arriving", previous });
-        return true;
-      } catch (error) {
-        const aiOff = isAiConsentRequired(error);
-        analytics.capture("trip_failed", {
-          reason: aiOff ? "ai_consent" : "error",
-        });
-        if (!aiOff) analytics.captureError("make_trip_failed", error);
-        setState({ status: aiOff ? "ai_off" : "error" });
-        return false;
-      }
-    },
-    [makeTrip, spaceId, locale],
-  );
-
-  const reset = useCallback(() => setState({ status: "idle" }), []);
-  return { state, build, reset };
 }

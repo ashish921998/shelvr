@@ -5,11 +5,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { newConvexTest, insertConsentingUser } from "./test.setup";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import {
-  CURRENT_EMBEDDING_VERSION,
-  EMBEDDING_DIMENSIONS,
-  MAX_HYDRATE_READ_BYTES,
-} from "./model/embedding";
 
 const embedMany = vi.hoisted(() => vi.fn());
 const generateObject = vi.hoisted(() => vi.fn());
@@ -20,28 +15,13 @@ vi.mock("ai", () => ({
   wrapLanguageModel: vi.fn(() => ({})),
 }));
 
-function vec(components: Record<number, number>): number[] {
-  const v = Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0);
-  for (const [index, value] of Object.entries(components)) {
-    v[Number(index)] = value;
-  }
-  return v;
-}
-
-const ON_TOPIC = vec({ 0: 1 });
-const NEARBY = vec({ 0: 0.8, 1: 0.6 });
-const OFF_TOPIC = vec({ 1: 1 });
-
 let USER: string;
 
 type SeedItem = {
   title: string;
-  embedding?: number[];
   status?: "ready" | "failed" | "processing";
-  content?: string;
 };
 
-// convex-test vectorSearch throws on rows with no vector field; real Convex skips them.
 async function seed(items: SeedItem[]) {
   const t = newConvexTest();
   const ids = await t.run(async (ctx) => {
@@ -61,13 +41,6 @@ async function seed(items: SeedItem[]) {
         title: item.title,
         tags: [],
         searchText: item.title.toLowerCase(),
-        ...(item.content === undefined ? {} : { content: item.content }),
-        ...(item.embedding === undefined
-          ? {}
-          : {
-              embedding: item.embedding,
-              embeddingVersion: CURRENT_EMBEDDING_VERSION,
-            }),
       });
     }
     return { spaceId, itemIds };
@@ -98,46 +71,36 @@ async function suggestedTitles(t: Awaited<ReturnType<typeof seed>>["t"]) {
 beforeEach(() => {
   embedMany.mockReset();
   generateObject.mockReset();
-  embedMany.mockImplementation(async ({ values }: { values: string[] }) => ({
-    embeddings: values.map(() => ON_TOPIC),
-  }));
   generateObject.mockResolvedValue({ object: { itemNumbers: [] } });
 });
 
 describe("recommendForSpace candidate selection", () => {
-  it("embeds the space text as a query, not as a document", async () => {
+  it("never asks the embedding model", async () => {
+    const { t, spaceId } = await seed([{ title: "Carbonara" }]);
+
+    await t.action(internal.ai.recommendForSpace, { spaceId });
+
+    expect(embedMany).not.toHaveBeenCalled();
+    expect(generateObject).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers the newest ready saves, newest first", async () => {
     const { t, spaceId } = await seed([
-      { title: "Carbonara", embedding: ON_TOPIC },
+      { title: "Carbonara" },
+      { title: "Pesto" },
+      { title: "Kubernetes" },
     ]);
 
     await t.action(internal.ai.recommendForSpace, { spaceId });
 
-    expect(embedMany).toHaveBeenCalledTimes(1);
-    const call = embedMany.mock.calls[0][0];
-    expect(call.providerOptions.google.taskType).toBe("RETRIEVAL_QUERY");
-    expect(call.providerOptions.google.outputDimensionality).toBe(
-      EMBEDDING_DIMENSIONS,
-    );
-    expect(call.values).toEqual(["Pasta\nRecipes I want to cook"]);
+    expect(promptedTitles()).toEqual(["Kubernetes", "Pesto", "Carbonara"]);
   });
 
-  it("orders candidates by relevance rather than recency", async () => {
+  it("maps the model's numbers back onto the offered list", async () => {
     const { t, spaceId } = await seed([
-      { title: "Carbonara", embedding: ON_TOPIC },
-      { title: "Pesto", embedding: NEARBY },
-      { title: "Kubernetes", embedding: OFF_TOPIC },
-    ]);
-
-    await t.action(internal.ai.recommendForSpace, { spaceId });
-
-    expect(promptedTitles()).toEqual(["Carbonara", "Pesto", "Kubernetes"]);
-  });
-
-  it("maps the model's numbers back onto the ranked list", async () => {
-    const { t, spaceId } = await seed([
-      { title: "Carbonara", embedding: ON_TOPIC },
-      { title: "Pesto", embedding: NEARBY },
-      { title: "Kubernetes", embedding: OFF_TOPIC },
+      { title: "Carbonara" },
+      { title: "Pesto" },
+      { title: "Kubernetes" },
     ]);
     generateObject.mockResolvedValue({ object: { itemNumbers: [2] } });
 
@@ -148,8 +111,8 @@ describe("recommendForSpace candidate selection", () => {
 
   it("leaves items that are already in the space out of the candidates", async () => {
     const { t, spaceId, itemIds } = await seed([
-      { title: "Carbonara", embedding: ON_TOPIC },
-      { title: "Pesto", embedding: NEARBY },
+      { title: "Carbonara" },
+      { title: "Pesto" },
     ]);
     await t.run(async (ctx) => {
       await ctx.db.insert("spaceItems", {
@@ -165,10 +128,11 @@ describe("recommendForSpace candidate selection", () => {
     expect(promptedTitles()).toEqual(["Pesto"]);
   });
 
-  it("drops a hit whose vector outlived its ready status", async () => {
+  it("leaves out saves that are not ready", async () => {
     const { t, spaceId } = await seed([
-      { title: "Carbonara", embedding: ON_TOPIC, status: "failed" },
-      { title: "Pesto", embedding: NEARBY },
+      { title: "Carbonara", status: "failed" },
+      { title: "Risotto", status: "processing" },
+      { title: "Pesto" },
     ]);
 
     await t.action(internal.ai.recommendForSpace, { spaceId });
@@ -176,10 +140,8 @@ describe("recommendForSpace candidate selection", () => {
     expect(promptedTitles()).toEqual(["Pesto"]);
   });
 
-  it("suggests nothing when every hit is already filed", async () => {
-    const { t, spaceId, itemIds } = await seed([
-      { title: "Carbonara", embedding: ON_TOPIC },
-    ]);
+  it("suggests nothing when every save is already filed", async () => {
+    const { t, spaceId, itemIds } = await seed([{ title: "Carbonara" }]);
     await t.run(async (ctx) => {
       await ctx.db.insert("spaceItems", {
         userId: USER,
@@ -195,52 +157,9 @@ describe("recommendForSpace candidate selection", () => {
     expect(await suggestedTitles(t)).toEqual([]);
   });
 
-  it("falls back to the newest items when the query cannot be embedded", async () => {
-    const { t, spaceId } = await seed([
-      { title: "Carbonara", embedding: ON_TOPIC },
-      { title: "Pesto", embedding: NEARBY },
-      { title: "Kubernetes", embedding: OFF_TOPIC },
-    ]);
-    embedMany.mockRejectedValue(new Error("provider down"));
-    generateObject.mockResolvedValue({ object: { itemNumbers: [1] } });
-
-    await t.action(internal.ai.recommendForSpace, { spaceId });
-
-    expect(promptedTitles()).toEqual(["Kubernetes", "Pesto", "Carbonara"]);
-    expect(await suggestedTitles(t)).toEqual(["Kubernetes"]);
-  });
-
-  it("falls back to the newest items when the search itself fails", async () => {
-    const { t, spaceId } = await seed([
-      { title: "Carbonara", embedding: ON_TOPIC },
-      { title: "Pesto", embedding: NEARBY },
-    ]);
-    await t.run(async (ctx) => {
-      await ctx.db.insert("items", {
-        userId: USER,
-        type: "link" as const,
-        status: "ready" as const,
-        title: "Not yet embedded",
-        tags: [],
-        searchText: "not yet embedded",
-      });
-    });
-    generateObject.mockResolvedValue({ object: { itemNumbers: [1] } });
-
-    await t.action(internal.ai.recommendForSpace, { spaceId });
-
-    expect(promptedTitles()).toEqual([
-      "Not yet embedded",
-      "Pesto",
-      "Carbonara",
-    ]);
-    expect(await suggestedTitles(t)).toEqual(["Not yet embedded"]);
-  });
-
-  it("fills the whole candidate budget from the ranking alone", async () => {
+  it("offers at most the 100 newest saves", async () => {
     const shelf = Array.from({ length: 101 }, (_, index) => ({
       title: `Save ${index}`,
-      embedding: vec({ 0: 1 - index * 0.001, 1: index * 0.001 }),
     }));
     const { t, spaceId } = await seed(shelf);
 
@@ -248,39 +167,13 @@ describe("recommendForSpace candidate selection", () => {
 
     const prompted = promptedTitles();
     expect(prompted).toHaveLength(100);
-    expect(prompted[0]).toBe("Save 0");
-    expect(prompted[99]).toBe("Save 99");
-    expect(prompted).not.toContain("Save 100");
-  });
-
-  it("fills a short ranked list out with recent items", async () => {
-    const half = "x".repeat(Math.ceil(MAX_HYDRATE_READ_BYTES / 2) + 1);
-    const { t, spaceId } = await seed([
-      { title: "Carbonara", embedding: ON_TOPIC, content: half },
-      { title: "Pesto", embedding: NEARBY, content: half },
-      { title: "Kubernetes", embedding: OFF_TOPIC },
-    ]);
-
-    await t.action(internal.ai.recommendForSpace, { spaceId });
-
-    expect(promptedTitles()).toEqual(["Carbonara", "Pesto", "Kubernetes"]);
-  });
-
-  it("does not repeat an item that the ranked half already supplied", async () => {
-    const { t, spaceId } = await seed([
-      { title: "Carbonara", embedding: ON_TOPIC },
-      { title: "Pesto", embedding: NEARBY },
-    ]);
-
-    await t.action(internal.ai.recommendForSpace, { spaceId });
-
-    expect(promptedTitles()).toEqual(["Carbonara", "Pesto"]);
+    expect(prompted[0]).toBe("Save 100");
+    expect(prompted[99]).toBe("Save 1");
+    expect(prompted).not.toContain("Save 0");
   });
 
   it("never reaches across accounts", async () => {
-    const { t, spaceId } = await seed([
-      { title: "Carbonara", embedding: ON_TOPIC },
-    ]);
+    const { t, spaceId } = await seed([{ title: "Carbonara" }]);
     await t.run(async (ctx) => {
       await ctx.db.insert("items", {
         userId: "someone-else",
@@ -289,8 +182,6 @@ describe("recommendForSpace candidate selection", () => {
         title: "Somebody else's carbonara",
         tags: [],
         searchText: "somebody",
-        embedding: ON_TOPIC,
-        embeddingVersion: CURRENT_EMBEDDING_VERSION,
       });
     });
 

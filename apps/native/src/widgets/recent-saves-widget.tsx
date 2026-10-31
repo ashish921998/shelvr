@@ -16,6 +16,7 @@ import {
   foregroundStyle,
   frame,
   lineLimit,
+  multilineTextAlignment,
   padding,
   resizable,
   widgetURL,
@@ -82,6 +83,7 @@ const RecentSavesWidget = (
       <VStack
         spacing={6}
         modifiers={[
+          padding({ horizontal: 10 }),
           containerBackground(c.background, "widget"),
           widgetURL(`${scheme}:///${locked ? "" : "add"}`),
         ]}
@@ -95,11 +97,18 @@ const RecentSavesWidget = (
           modifiers={[
             font({ size: 12, weight: "medium" }),
             foregroundStyle(c.foreground),
+            multilineTextAlignment("center"),
           ]}
         >
           {props.emptyTitle ?? "Shelvr"}
         </Text>
-        <Text modifiers={[font({ size: 10 }), foregroundStyle(c.muted)]}>
+        <Text
+          modifiers={[
+            font({ size: 10 }),
+            foregroundStyle(c.muted),
+            multilineTextAlignment("center"),
+          ]}
+        >
           {props.emptyHint ?? ""}
         </Text>
       </VStack>

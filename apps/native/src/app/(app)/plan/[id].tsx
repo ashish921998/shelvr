@@ -24,9 +24,9 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { Image } from "expo-image";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { Platform, Pressable, ScrollView, Share, View } from "react-native";
 import Animated, {
@@ -43,11 +43,10 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 const tick = () => haptic("tick");
 
 function haptic(kind: "tick" | "done") {
-  if (process.env.EXPO_OS !== "ios") return;
   if (kind === "tick") {
-    void Haptics.selectionAsync();
+    void haptics.selection();
   } else {
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void haptics.success();
   }
 }
 
@@ -159,6 +158,7 @@ function AskButton({ busy, onPress }: { busy: boolean; onPress: () => void }) {
       style={({ pressed }) => [
         styles.action,
         styles.actionOpen,
+        styles.askAction,
         busy && styles.actionBusy,
         pressed && styles.pressed,
       ]}
@@ -168,7 +168,9 @@ function AskButton({ busy, onPress }: { busy: boolean; onPress: () => void }) {
         size={15}
         tintColor={theme.colors.foreground}
       />
-      <ThemedText variant="button">{t("plan.ask")}</ThemedText>
+      <ThemedText variant="button" style={styles.actionLabel}>
+        {t("plan.ask")}
+      </ThemedText>
     </Pressable>
   );
 }
@@ -231,13 +233,15 @@ function PlanFooter({
         </>
       ) : (
         <View style={styles.actions}>
-          <Button
-            title={t("plan.pick")}
-            onPress={onDeal}
-            disabled={spinning}
-            style={styles.deal}
-          />
-          {askButton}
+          <View style={styles.actionSlot}>
+            <Button
+              title={t("plan.pick")}
+              onPress={onDeal}
+              loading={spinning}
+              style={styles.pick}
+            />
+          </View>
+          <View style={styles.actionSlot}>{askButton}</View>
         </View>
       )}
     </View>
@@ -261,10 +265,9 @@ export default function PlanScreen() {
   // `city` is set when a city page opened this plan, so it plans that city's saves.
   const { id, city } = useLocalSearchParams<{ id: string; city?: string }>();
   const spaceId = id as Id<"spaces">;
-  const router = useRouter();
   const { theme } = useUnistyles();
   const { data: space } = useQuery(
-    convexQuery(api.spaces.getSpace, { id: spaceId }),
+    convexQuery(api.spaces.getSpaceCards, { id: spaceId }),
   );
   const { data: latestLink, isError: linkFailed } = useQuery(
     convexQuery(api.planShares.latestPlanShare, { spaceId }),
@@ -457,26 +460,6 @@ export default function PlanScreen() {
           </View>
         ) : null}
 
-        {state.status === "ai_off" ? (
-          <View style={styles.message}>
-            <EmptyState title={t("plan.make")} message={t("plan.aiOff")} />
-            <Button
-              title={t("profile.settings")}
-              onPress={() => router.push("/settings")}
-            />
-            <Pressable
-              accessibilityRole="button"
-              onPress={again}
-              hitSlop={8}
-              style={({ pressed }) => [styles.again, pressed && styles.pressed]}
-            >
-              <ThemedText variant="secondaryLabel" style={styles.muted}>
-                {t("common.tryAgain")}
-              </ThemedText>
-            </Pressable>
-          </View>
-        ) : null}
-
         {state.status === "error" ? (
           <View style={styles.message}>
             <EmptyState
@@ -578,11 +561,17 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: "center",
     justifyContent: "center",
     gap: theme.gap(1),
-    minHeight: theme.control.minHeight + theme.gap(0.5),
+    minHeight: theme.control.minHeight,
+    paddingHorizontal: theme.gap(1.5),
+    paddingVertical: theme.gap(1),
     borderRadius: 999,
     borderWidth: 2,
     borderColor: "transparent",
   },
+  actionSlot: { flex: 1 },
+  // flex: 1 gives a zero basis in the column slot, which clips a wrapped label.
+  askAction: { flex: 0, flexGrow: 1 },
+  pick: { minHeight: theme.control.minHeight },
   actionFilled: {
     backgroundColor: theme.colors.primary,
   },
@@ -595,8 +584,9 @@ const styles = StyleSheet.create((theme, rt) => ({
   actionBusy: {
     opacity: theme.opacity.disabled,
   },
-  deal: {
-    flex: 1,
+  actionLabel: {
+    flexShrink: 1,
+    textAlign: "center",
   },
   onTint: {
     color: theme.colors.onTint,

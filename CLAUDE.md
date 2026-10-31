@@ -82,6 +82,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `notificationPreferences`: weekly shelf opt-in, save reminder opt-out, timezone, and the
     next digest and reminder instants
   - `itemReads`: per-user read state, kept out of the item row
+  - `placeRemovals`: user-owned venue removal decisions, indexed by user; the account deletion drain removes them in batches through `deletePlaceRemovalsBatch`
   - `placeVisits`: places the user marked "We went" on a plan, one row per place name, so
     later plans rank them last
   - `planShares`: a plan's shortlist snapshot behind a random public vote link (one week),
@@ -89,7 +90,12 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `planVotes`: one visitor's ✓/✕ picks on a `planShares` link, keyed by a browser id,
     at most 20 voters per link
   - `trips`: one day-by-day trip per travel space ("Plan my trip"), every stop one of the
-    user's saves; a new trip replaces the old one
+    user's saves; a new trip replaces the old one. Old builds only; new trips are `tripPlans`
+  - `tripPlans`: one planned trip ("Plan a trip" v2) for a city: days, pace, interests,
+    optional start date and stay, plus stop and saved counts. Every new plan is a new row
+  - `tripStops`: one stop of a `tripPlans` trip, on day 1..dayCount or day 0 (unplanned),
+    from a save (`itemId`), an Apple Maps suggestion or a place found with Add a place, carrying its own name, pin, Apple id
+    and category. Deleting the save keeps the stop; a trip read opens only live saves
   - `shareLinks`: one random public token per shared item, the capability behind the
     branded preview page (`createShareLink`, `getSharePreview`, `/share/links/`)
   - `weeklyDigests`: the persisted weekly shelf and its delivery state
@@ -130,8 +136,22 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `photoUsage`, `getImportOperation`, and `listCities` / `listCityItems` (the cities Home
   lists and one city's ready saves, newest first, which the city page shows; `readyCitySaves`
   is the shared helper).
+  Home searches the caller's saved titles, cities and place names through `searchItems`,
+  using the existing account-filtered full-text index (at most 50 matches, with an
+  inline notice asking for a narrower search when that limit is reached). Mapped
+  pin names are indexed too, including pins sourced from Maps intents; storing
+  pins refreshes search text in the same transaction.
+  Its response includes optional `places` so unpinned matches can show their place
+  names; older clients can ignore the field. Query terms are split on punctuation
+  as well as whitespace and capped at 16 before searching. After
+  deploying the city/place search change, run from `apps/native`:
+  `pnpm exec convex run --prod items:backfillPlaceSearch '{"cursor":null}'`.
+  This internal, paginated repair updates only search text for live owners, schedules
+  its remaining pages, and is safe to restart. Deploy and finish it before releasing
+  the search UI so older saves match cities and places too.
   `listCities.count` retains the legacy save count for installed apps; optional
-  `placeCount` is the distinct mapped-place count. New clients hide an absent or
+  `placeCount` is the distinct mapped-place count for that city.
+  City reads filter pins by their resolved city; legacy unlabelled pins are shown only for single-city saves. New clients hide an absent or
   zero place count while retaining the city and its saves.
   Image saves run a three-step, idempotent import: `beginImageImport`, then
   `attachImageUpload`, then `finalizeImageImport`, all keyed on a
@@ -150,30 +170,30 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `suggestItemsForSpace`, `cleanupStaleImageImports`, and others). `enrichItem` resolves
   `storageId` to an `imageUrl` at read time.
 - **`spaces.ts`**: public space CRUD (`listSpaces`, `getSpace`, `createSpace`, `updateSpace`,
-  `deleteSpace`), membership writes (`addItemToSpace`, `removeItemFromSpace`), and the
+  `deleteSpace`), `getSpaceCards` (a space's saved items as card rows, which the plan and trip
+  pages read), membership writes (`addItemToSpace`, `removeItemFromSpace`), and the
   suggestion decisions (`acceptSuggestion`, `undoAcceptSuggestion`, `dismissSuggestion`,
   `acceptAllSuggestions`), `ensureCitySpace`, plus internal join helpers. `ensureCitySpace`
   finds or makes a hidden space named for a city and files that city's ready saves into it
-  as `saved`; the city page calls it before Plan a date / Plan a trip, and plan shares and
-  stored trips hang off that space. The app no longer shows spaces; the CRUD and suggestion
+  as `saved`; older builds call it before Plan a date (the current one opens `date-plan`,
+  which needs no space), and plan shares and stored trips hang off that space. The app no longer shows spaces; the CRUD and suggestion
   functions stay for old builds.
 - **`subscriptions.ts`**: `getEntitlement` query for the client and the
   `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
   `upsertSubscription`, `liveOwners`, and `applySnapshots` internals are driven by the
   RevenueCat webhook.
-- **`aiConsent.ts`**: consent to third-party AI processing (App Store guideline 5.1.2(i)):
-  `getStatus`, `setConsent`, and the `aiAllowed` helper / `isAllowed` internal query that
-  every path sending user content to Gemini or SerpAPI asks first. It refuses an owner whose
-  row is missing or `deleting` before it reads consent, and item-aware checks also require an
-  existing owned save. Among live owners, only an explicit Allow lets content go out; an
-  account that never answered counts as declined. The app asks once, full screen, right
-  after onboarding and its paywall, before anything is saved. A declined user's saves still finish `ready` from what Shelvr read
-  itself, with no tags, suggestions, intents or embedding. `model/aiConsent.ts` holds the
-  client-loadable `AI_CONSENT_VERSION` and the `ai_consent_required` error.
+- **`aiConsent.ts`**: legacy AI preferences and ownership checks. `getStatus` and
+  `setConsent` remain compatible with installed clients. Every path sending content to
+  Gemini, SerpAPI or Treg checks `aiAllowed` / `isAllowed`: missing or deleting owners,
+  missing or unowned saves, and explicit legacy declines are refused. Accounts with no
+  preference record use AI automatically; no grant record is fabricated. The current
+  client has no AI consent screen, prompt or Settings switch. Legacy `getStatus` still
+  reports `unset` for an unanswered account, so old clients retain their existing UI.
+  A declined user's saves still finish `ready` from what Shelvr read itself, without AI.
+  `model/aiConsent.ts` retains `AI_CONSENT_VERSION` and the `ai_consent_required` error.
   `spaces.ts` owns `recommendationContext` (space, permission and membership exclusions)
   and `survivingCandidates` (up to 100 candidate saves, loaded and checked again before
-  classification). The embedding sweep checks each cached save again in one batch and maps
-  vectors to the surviving list. These checks run before a request goes out. They cannot
+  classification). These checks run before a request goes out. They cannot
   cancel or recall a request already sent, because a database check and an external provider
   call cannot share a transaction.
 - **`appleRevoke.ts`** (`"use node"` action): revokes a Sign in with Apple refresh token
@@ -214,7 +234,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   monitors, backed by the `health.ts` `ping` query).
 - **`crons.ts`**: refund consent sync retry, stale image import cleanup, stale processing-item
   failure, waitlist Resend retry, weekly shelf and save reminder preparation, their delivery
-  recovery, hourly feedback inbox delivery retry, embedding sweep, daily payment-receipt
+  recovery, hourly feedback inbox delivery retry, daily payment-receipt
   retention purge, and the daily expired plan vote link purge.
 - **`auth.ts`**: `convexAuth()` setup with Google + Apple OAuth (Auth.js providers) and an optional
   Anonymous provider (dev only, gated on `AUTH_ENABLE_ANONYMOUS`). `appleProfile.ts` drops the
@@ -236,19 +256,28 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   title/description/tags/spaceNames/intents, maps space names back to ids, then `finalizeItem`
   flips status to `ready`. Only spaces marked `dynamic` are visible to the classifier, and its
   matches become `suggested` memberships (`saved` in a space set to auto-file). The model
-  also lists every place a save names into `items.places` (server-only: `enrichItem` strips
-  it; plans and trips read it through `toPlanSource`). A short video's speech is read once
+  also lists every place a save names into `items.places`. `enrichItem` strips it
+  from general item reads; `searchItems` explicitly returns it as an optional field
+  so unpinned matches can show their names. Plans and trips read it through
+  `toPlanSource`. A short video's speech is read once
   through Treg (`model/videoTranscript.ts`) when the model flags it as a cooking video whose
   caption and linked page gave no recipe, or as a video that recommends or visits places;
   a second call then lifts the recipe, the spoken places, or both. The file also holds
   `steerItemForSpace` (per-space intents, scheduled
   when an item is filed into a space), `findProductLinks` (SerpAPI Google Shopping, needs
   `SERPAPI_KEY`). Old sweep and recommendation exports forward queued jobs across deploys.
-- **`aiEmbeddingSweep.ts`** (`"use node"`): the embedding sweep cron and best-effort
-  `embedTexts` / `embedQuery` provider calls. See [embeddings](docs/architecture/embeddings.md).
-- **`aiRecommendForSpace.ts`** (`"use node"`): ranked-plus-recency recommendations,
-  scheduled by space creation and dynamic enabling; creates suggestions only.
-  Both modules and `ai.ts` share model setup and deadlines in `model/aiProvider.ts`.
+- **`aiEmbeddingSweep.ts`** (`"use node"`): retired. Saves no longer get embeddings, because
+  nothing the app shows read them, and each one made every save about 16 KB heavier in
+  the city scan's read budget. Its cron is gone; the action is a no-op kept so a queued
+  sweep ends quietly. `items:clearEmbeddings` removes old vectors; run it once after
+  deploying, from `apps/native`: `pnpm exec convex run --prod items:clearEmbeddings '{"cursor":null}'`.
+  It schedules its remaining pages and is safe to rerun. `items.embedding`,
+  `embeddingVersion` and `embeddingAttempts` stay declared until no row carries them.
+  See [embeddings](docs/architecture/embeddings.md).
+- **`aiRecommendForSpace.ts`** (`"use node"`): recommendations from the 100 newest ready
+  saves, scheduled by space creation and dynamic enabling (old builds only); creates
+  suggestions only.
+  It and `ai.ts` share model setup and deadlines in `model/aiProvider.ts`.
 - **`model/pageRead.ts`**: the single `readPage(url)` entry point and host dispatcher.
   **`model/pageReadCore.ts`** holds shared page data, bounded fetches, HTML extraction
   (Mozilla **Readability** via `linkedom`) and schema.org recipe helpers.
@@ -256,6 +285,20 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   **`model/readers/pinterest.ts`** and **`model/readers/tiktok.ts`** own each platform's
   reader and fallback. Full YouTube descriptions and verified Instagram captions follow linked
   recipe markup first, then the existing complete-caption recipe path.
+  **`model/readers/googleMaps.ts`** reads a shared Google Maps list (a `maps.app.goo.gl`
+  share link or a `/maps/placelists/list/` URL) through Google's undocumented public list
+  endpoint, the one its own list page calls; Google offers no API for lists, so a format
+  change breaks it and the save falls back to a plain page read. A private or deleted list
+  reads as gone. Other Google Maps links read as pages. The list's places (name, note,
+  address, point, at most 150) ride on `PageData.placeList`; `ai.ts` asks the model for
+  each place's city once and `model/placeList.ts` (pure) splits the list into one save per
+  city, at most 30 places each, biggest city first. The save itself
+  becomes the first part and `items.addPlaceListParts` inserts the rest as ready saves
+  (skipping a part whose title that link already has). Every listed place is pinned at the
+  list's own point (`items.pinListPlaces` before the save settles, so the Apple lookup finds
+  it pinned); `placePins.identifyPins` then adds Apple's place id and category only from a
+  match within 300 m, never moving the pin. A manual `backfillPage` refresh still re-looks
+  up a list pin that has no category.
   Host-specific knowledge stays in the page readers, never in `ai.ts`.
 - **`model/safeFetch.ts`**, **`model/externalUrl.ts`**: every backend fetch of an external URL
   goes through `safeFetch` (SSRF and resource-exhaustion defence, redirect and size limits).
@@ -266,39 +309,113 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   (`issueCaptureToken`, `revokeCaptureToken`); the `/app-intents/*` HTTP routes resolve it to a
   user and run the same save helpers, gates and limits as the app's own mutations.
 - **`plans.ts`** (`"use node"` action): "Make a plan". `makePlan` takes a space and an
-  optional `city`. With a city (sent from the city page) it plans that city's ready saves as
-  the page lists them (`readyCitySaves`), not the space's memberships; old builds send no
-  city and plan their space's saved items. One model call asks for up to ten candidates
-  (`MAX_PLAN_CANDIDATES`) the saves name, each with a reason and its source item; five
-  remain. Nothing is stored. `spaces.claimPlanInternal` claims Pro, AI consent and the
-  `makePlan` rate limit first; the pure prompt and sanitizing half (which drops a place no
-  save names) is `model/plan.ts`. Places marked "We went" (`placeVisits.ts`, `setVisited`)
-  go into the prompt and drop out of the shortlist, unless that would leave nothing; then
-  they stay, tagged `been`.
+  optional `city`. With a city it reads that city's ready saves; otherwise it reads saved
+  space memberships. `spaces.claimPlanInternal` enforces ownership, Pro and the rate
+  limit, then looks up each candidate's visit status using an index (no recent-visit cap).
+  `model/plan.ts` deduplicates and shuffles already-extracted places, returning at most
+  five with text from their source save. Street-address-only labels are excluded from
+  recommendations (saved pins remain intact). Alias merging requires the same saved map
+  point plus compatible name/type evidence; unlocated or conflicting aliases stay separate.
+  No AI call or AI permission is needed to plan.
+  "We went" places never return as fallback picks. A multi-city save contributes only
+  place labels explicitly carrying the chosen city; ambiguous labels are skipped.
+- **`datePlans.ts`** (`"use node"` action), **`datePlanData.ts`**: "Plan a date". `makeDatePlan`
+  takes a city and a kind (`classic`: dinner, then drinks or dessert; `lowkey`: coffee, then a
+  walk; `surprise`: one the saves can make) and returns ranked evenings of two stops a walk
+  (1.5 km) apart, at least one of them a saved, pinned, unvisited place. `claimDatePlanInternal`
+  checks Pro and spends the `makePlan` rate limit before reading the city's saves. The pure
+  rules (which category or tag fits which stop, pair ranking, Apple result filters) are in
+  `model/dateRank.ts`; the result shape and the swap rule the app shares are in
+  `model/datePlan.ts`. With fewer than three evenings from the saves alone, it asks Apple Maps
+  for the missing stop near up to three saved ones (one search each, 10 s deadline, none when
+  AI is declined or the Maps key is unset). Nothing is stored; the app shows the best evening and changes a
+  stop on the phone.
+- **`mapPlaces.ts`**: `listMapPlaces`, every mapped place across the caller's ready saves
+  (newest first, one entry per spot) for the Map tab, each with Apple's category (which picks
+  the pin's icon) and its filter kinds from
+  `model/placeKinds.ts`: Apple's point-of-interest category when the pin has one, otherwise
+  the save's tags; "date night" always comes from the tags.
+- **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark.
+  Planning reads these records inside Shelvr; they are not sent to an AI provider.
+- **`placeRemovals.ts`**: `removePlace` stores an owned venue decision; `undoRemovePlace`
+  deletes that decision idempotently. `model/placeRemovals.ts` projects a user's decisions over
+  raw saves and membership intents on read. A pin matches by the city page's row identity
+  (`uniquePlacePins`): one Apple id, or one name a few doors apart unless Apple ids differ.
+  A label without a pin matches by name and city. City, Map, search, planning and
+  automatic suggestions use the projection; source saves, existing trips and deliberate manual
+  additions remain. A save made after the removal shows the place again. Keep the
+  `placeRemovals` table on rollback once rows exist.
+- **`placeCorrections.ts`**, **`placeCorrectionSearch.ts`**: owner-only place editing and Apple Maps lookup. `items.placesEdited` preserves the chosen places across extraction retries and pin refreshes. A kept place with no pin still gets one from a lookup, which never changes a pin already on the save. Corrections update city grouping and search; existing trip stops remain unchanged. The editor leaves out removed places (`placeRemovals.ts`), and adding one back clears its removal.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
   link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and
   `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the
   web page at `apps/web/src/app/p`. Links and votes go with their space or account, and a
   daily cron deletes them a week after they close.
-- **`trips.ts`** (`"use node"` action), **`tripData.ts`**: "Plan my trip". `makeTrip` reads a
-  space's saved items, kept to one city (the one the city page sends, or else the most common), makes one model call that lists
-  the places they name with a time of day each, looks each up in the Apple Maps Server API
-  (`model/appleMaps.ts`), and groups them into one area a day (`model/trip.ts`, pure). A meal
-  with no saved place shows as a gap; the trip never adds a place the saves do not name.
-  `tripData.ts` holds the claim, the stored trip, and the `getSpaceTrip` / `tripCities`
-  reads. Without the Maps key, `makeTrip` still makes the trip, with no pins.
+- **`trips.ts`** (`"use node"` action), **`tripData.ts`**: "Plan my trip". `makeTrip` reads
+  the chosen city's ready saves (or the most common city in a space), shuffles stored
+  unvisited place names, resolves missing pins with Apple Maps (`model/appleMaps.ts`),
+  and groups nearby stops into days at the selected pace (`model/trip.ts`, pure).
+  It does not send saves or visit history to Gemini or infer new places from raw text.
+  Without a stored time-of-day category, stops use the existing "any"/afternoon slot;
+  the app shows neither that slot nor the lunch and dinner gaps, since neither is known. An empty selection leaves the previous trip intact.
+  `tripData.ts` stores the trip and serves `getSpaceTrip` / `tripCities`; swaps also skip
+  wishlist places marked visited after the trip was made. Explicit non-saved memberships
+  are excluded from selection, display and swaps. Stored city-less stops still use their
+  saved membership to remain visible, while city-matching saves need no membership row.
+  Without the Maps key, trips
+  still work using stored pins where available.
+- **`tripPlanner.ts`** (`"use node"` action), **`tripPlannerData.ts`**: "Plan a trip" v2.
+  `createTripPlan` (Pro only, `createTripPlan` rate limit) puts the city's unvisited, pinned
+  saves first, then adds suggestions from the Apple Maps Server API only (`/v1/search` with
+  `resultTypeFilter=Poi` and `includePoiCategories` per interest, from the centre and four
+  offset points; no Gemini or other source), with queries from the saves' own tags. With AI
+  declined it makes no Apple call at all and plans from stored pins. Chains, lodging, results
+  over 25 km from the centre, visited places and namesakes are dropped, and a trip makes at
+  most 24 Apple requests. The
+  pure rules (category map, queries, filters, balancing, day layout) are in
+  `model/tripSuggest.ts`; `model/appleMaps.ts` `appleMapsSearchPlaces` is the search.
+  Without the Maps key it plans from saves only. `tripPlannerData.ts` serves
+  `listTripPlans`, `getTripPlan` and `deleteTripPlan`, plus `claimTripPlanInternal` and
+  `saveTripPlanInternal`. `trips.ts` and `tripData.ts` stay for installed builds.
+  Editing (Pro, `tripEdit` rate limit) is single-row writes in `tripPlannerData.ts`:
+  `moveTripStop` (a day and position, day 0 is Unplanned), `removeTripStop` (to the top of
+  Unplanned, never a delete), `addTripStop` (a search result as an
+  `added` stop, or a pin the city's save already has), `renameTripPlan`, and
+  `tripSavePlaces` for Add a place. Moves and removes return where the stop was, which
+  the app's Undo sends back to `moveTripStop`. Stop ids survive every edit; only `deleteTripPlan` deletes
+  stops. `tripPlanner.ts` `searchTripPlaces` (`tripPlaceSearch` rate limit) is Add a
+  place's Apple search near the trip, refused like `createTripPlan` when AI is declined.
 - **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names, which the
   city page's map pins. `locateItem` looks up in Apple Maps the places read off the save
   (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),
-  and `storePins` writes at most five, dropping any place no longer named. Scheduled from
+  and `storePins` writes at most 30, dropping any place no longer named.
+  `items.placeLocations` keeps explicitly stated branch/address clues separately from display
+  names. Caption and speech extraction preserve these clues for Apple lookup. A reread that
+  learns a different clue clears only that place's old pin so the scheduled lookup replaces it;
+  a lookup that lands after such a reread drops its pin, since it searched with the old clue;
+  existing saves without clues keep their old behavior until reread. This optional field stays
+  declared through rollback and is stripped from public item responses.
+  Each pin also keeps Apple's place id (`appleId`) and point-of-interest `category` when the
+  search result carried them; the Map tab's filters read the category.
+  Every pin on a single-city save keeps its source city, including suburbs. For multi-city saves,
+  Apple locality is used only when it matches a source-declared city; unmatched pins remain unassigned.
+  Multi-city lookups keep explicit city qualifiers instead of using the first city as a bias.
+  Only source cities can disable single-city outlier rejection; returned localities cannot.
+  Pin lookup never expands `items.cities`; Home creates entries for the cities extracted from the source (up to 30). Scheduled from
   `finalizeItem` when a finished save has places or a Maps intent, from steering, and when a
-  membership carrying a Maps intent is removed or dismissed; `backfillPage` fills older saves, run by hand. Skipped
+  membership carrying a Maps intent is removed or dismissed; `backfillPage` refreshes older pins with no city or no category, run by hand after deployment:
+  `pnpm exec convex run --prod placePins:backfillPage '{"cursor":null}'` from `apps/native`. Skipped
   when AI is declined or the Maps key is unset.
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`. Onboarding no longer has a first-save step; the
   app still calls `createDemoItem` for a first save an older build queued before sign-in.
 - **`cancelSurvey.ts`**: the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the
   client boundary is `src/lib/cancel-survey.ts`.
+- **`reelPlaces.ts`** (`"use node"` action): the web reel place finder. The internal `find`
+  action reads one public Instagram or TikTok link with `readPage`, asks the model for the
+  places its caption names, and drops any the text never mentions (`model/reelPlaces.ts`).
+  Nothing is stored. Reached only through the `/reel-places` HTTP route, which
+  `apps/web/src/app/api/reel-places` calls; `oracleLimits.claimReelPlaces` is its rate limit.
 - **`oracle.ts`**, **`oracleLimits.ts`**: the web Oracle. The internal `consult` action reads
   pages and makes one model call inside the web route's deadline; `claim` is its rate limit.
   Reached only through the `/oracle` HTTP route, which `apps/web/src/app/api/oracle` calls.
@@ -348,9 +465,19 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - Next.js App Router marketing site only (no auth or product UI); server routes may call Convex
   for marketing forms such as platform waitlists
 - Landing page at `/`. The product experience lives in the native app
+- Free tool pages for search traffic, each with one App Store button: `/reel-place-finder`
+  takes a pasted Instagram reel or TikTok link and lists the places its caption names, with
+  Apple Maps and Google Maps links (`src/lib/reelPlaces.ts`). It posts to `/api/reel-places`,
+  which forwards to the Convex `/reel-places` route (`reelPlaces.ts`, the same shared-secret
+  and per-IP limits as the Oracle) and stores nothing
 
 ### Native (`apps/native`)
 
+- The current onboarding share demo always uses a real reel: `src/lib/aha-sample.ts`
+  picks the selected city and goal's reel, or Austin for that goal when no reel exists.
+  Completion queues that exact URL; `useReplayOnboarding` saves it through
+  `createLinkItem` once signed in with Pro, and normal reading and Maps lookup
+  populate Home. The selected city answer stays separate from the sample city.
 - UI localization uses `expo-localization` and the in-house `translate` in `src/lib/i18n-core.ts`,
   which falls back from the locale to its language to English, fills `%{name}` placeholders, and
   picks plural forms with the CLDR rules in `convex/model/localization.ts`. Read
@@ -368,15 +495,52 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
 - Convex Auth via `ConvexAuthProvider` (`@convex-dev/auth/react`) in `src/app/_layout.tsx`,
   backed by `expo-secure-store` token storage; `useConvexAuth()` (from `convex/react`) guards the
   `(auth)` / `(app)` route groups
-- `(app)/(tabs)` holds only `(home)`: Home, with no tab bar. It lists "Your cities" and a "No place
-  found" section for saves with no city. It loads more saves on scroll, and on its own only
+- `(app)/(tabs)` holds three native tabs, `(home)`, `(map)` and `(trips)`. `(trips)` is
+  "My trips", the person's trip plans newest first, each opening `trip-plan/[id]`, with
+  Plan a trip in the header and the empty state. `(map)` is every mapped place on
+  one full-screen map, opening on the person's location (iOS asks once, when the tab first opens)
+  unless none of their places is within 50 km; otherwise on the city with the most places, with a search field over your own places (name or city, matched on the phone) and filter chips
+  for the kinds that have three or more places (`src/lib/map-filters.ts`); tapping a place opens Apple's place card, or the save without one.
+  `(home)` is Home. It lists "Your cities" and
+  "Finding places…" for processing saves. Failed reads and finished saves without a city
+  sit behind one "N saves without a place · Review" line, whose sheet has Retry and Delete
+  (`src/components/home/review-saves.tsx`); a save that lands that way while the app is open
+  shows a toast instead (`unplaced-toast.tsx`). It loads more saves on scroll, and on its own only
   until five unplaced saves are loaded, never past 200. Old deep links, pushes and Siri
-  shortcuts to removed screens (spaces, search, map, digest, camera) open Home, through
+  shortcuts to removed screens (spaces, search, digest, camera, the old trip) open Home, through
   `src/lib/home-href.ts` and `src/app/+native-intent.ts`
-- `city/[name]` is the city page: a map of the city's pinned places on top and a sheet of the
-  city's saves, with Plan a date and Plan a trip
+- `city/[name]` is the city page: a map and numbered rows for distinct places from the
+  city's saves, plus a row for every save not represented by a place row, with Plan a date
+  and Plan a trip. A selected place row shows an info button that opens Apple's place card
+  (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`); tapping the row opens the save
 - Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
-  `profile`, `settings`, `item/[id]`, `city/[name]`, `plan/[id]`, `trip/[id]`
+  `profile`, `settings`, `item/[id]`, `city/[name]`, `spots/[id]`, `plan/[id]`, `date-plan`,
+  `new-trip`, `trip-plan/[id]`, `add-trip-stop`
+- `date-plan` is Plan a date, pushed from the city page with a `city` param: "What kind of
+  date?" (Classic, Low-key, Surprise me),
+  then the evening from `makeDatePlan`: both stops on a map, a card each with Hours and info
+  and Change (only when another nearby stop fits), the approximate walk between, Send to your
+  date (plain share text with Maps links) and Directions to stop 1 (Maps directions)
+- `spots/[id]` is the moment after sharing links: "Finding the spots…" while the first saved one is
+  read and pinned, then its pins drop onto the city most of them share, with Open <city> and
+  Done (`src/lib/spots-reveal.ts` holds the waits). A failed save, one with no place, or a wait
+  past 25 s goes Home, as every other share does. Creator videos film this moment
+- `new-trip` is the trip planner form, a modal with an optional `city` param (the city page's
+  Plan a trip opens it): city, days, optional start date, interests, pace and an optional
+  stay. It checks Pro on submit, calls `createTripPlan` behind a three-step reveal, then
+  replaces itself with `trip-plan/[id]`
+- `trip-plan/[id]` is a planned trip: a map of the stops (tap a day to focus it), then day by
+  day stops badged Yours or Suggested and an unplanned section. A save opens `item/[id]`, a
+  suggestion opens Apple's place card or Maps by coordinates. The header menu edits, adds a
+  place, or deletes it. Edit mode (`src/components/trip-planner/trip-edit-list.tsx`, rules in
+  `src/lib/trip-edit.ts`) lays stops out in fixed-height rows: hold one to drag it within a
+  day or onto another, minus sends it to Unplanned, plus puts an unplanned one on a day, the
+  name is editable, and an Undo bar takes back the last move or remove
+- `edit-save-places` edits the places on a ready save, with remove/replace/add and explicit Save.
+- `add-trip-stop` is Add a place, a modal with `tripId` and `day` params: Apple Maps search
+  near the trip plus the city's saved places not on it yet
+  The old `trip/[id]` screen is gone and its links open Home; `trips.ts` and `tripData.ts`
+  stay for installed builds
 - `plan-gate` is the hard paywall: a signed-in account past onboarding without an active
   entitlement sees it instead of every other route except `profile`, `settings` and `paywall`
 - `(auth)` holds a single `sign-in` route
@@ -499,8 +663,10 @@ needed at runtime by the features that use them:
 - `TREG_API_KEY` / `VIDEO_TRANSCRIPTS_ENABLED`: Treg token for the spoken transcript of a
   cooking TikTok or reel whose caption has no recipe, or one that recommends or visits places
   (`model/videoTranscript.ts`, about $0.002
-  each, rate limited per user and globally). Transcripts are fetched only while the switch is
-  `"true"` and the key is set; set the switch to anything else to stop them with no deploy
+  each, rate limited per user and globally). The same pair pays for a TikTok's caption when
+  oEmbed returns none (`model/readers/tiktok.ts`, about $0.002 each, its own per-user limit,
+  the shared global one; the web reel finder has its own budget). Both are fetched only while the switch is `"true"` and the key is
+  set; set the switch to anything else to stop them with no deploy
 - `RESEND_API_KEY`: Resend key for the waitlist contact projection. Without it, rows stay
   `unconfigured` and no attempt is spent
 - `RESEND_SEGMENT_ID`: Resend segment for `shelvr` waitlist signups

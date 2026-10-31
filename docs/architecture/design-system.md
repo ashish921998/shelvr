@@ -9,14 +9,14 @@ touch a file for other reasons, not in bulk.
 
 ## Type
 
-The type ramp is `theme.type`: 23 named steps from `hero` (48) down to `badge`
+The type ramp is `theme.type`: 24 named steps from `hero` (48) down to `badge`
 (10), each pairing a font family with a size. The steps were not invented.
 Each one names a family/size pair the app already renders as a literal, so the
 ramp is a census of the type in use rather than a wish list. Read it that way
 before pruning it: a step no component passes to `variant` yet still describes
 sizes written by hand across `src/`, and deleting it only means re-deriving it
 from those literals later. The display face (`CrimsonProRoman-Regular`) carries titles
-(`hero`, `largeTitle`, `sheetTitle`, `title`, `header`, `displaySmall`);
+(`hero`, `displayTitle`, `largeTitle`, `sheetTitle`, `title`, `header`, `displaySmall`);
 Satoshi regular/medium/bold carries body and label steps. `ThemedText` takes a
 `variant` prop keyed by ramp name, defaults its color to
 `theme.colors.foreground`, and applies `style` last so callers can override.
@@ -47,16 +47,17 @@ Components never hardcode hex values; they read `theme.colors.*` roles. Roles
 are semantic, not palette names: `background`, `surface`, `surfaceMuted`,
 `foreground`, `muted`, `faint`, `primary`, `primaryForeground`, `primarySoft`,
 `primaryText`, `border`, `imageBorder`, `frame`, `danger`, `overlay`,
-`onOverlay`, `onTint`, `keep`, `onKeep`, `tabTint`, and the Trip Reveal
-globe's `globeOcean`, `globeLand` and `globeLandEdge`. `frame` is the mat
+`onOverlay`, `onTint`, `keep`, `onKeep`, `tabTint`, the Trip Reveal
+globe's `globeOcean`, `globeLand` and `globeLandEdge`, and the trip page's
+`tripDays` palette with its `onTripDay` label color. `frame` is the mat
 around a saved picture (the save page's hero and the onboarding collage): paper
 white in the light theme and the card surface in the dark ones, so a photo
 never sits in a bright border at night. Content drawn on a filled tint
 uses the paired `on*` role: `onTint` on `primary` (a dark label, since white on
 the amber fill is 2.19:1), `onKeep` on `keep`, `onOverlay` on `overlay`.
-`tabTint` was the tab bar tint. The app has no tab bar now, so nothing reads it.
-iOS `NativeTabs` painted the selected tab's icon and its label with it, so it
-carried normal-size text: the light theme darkens
+`tabTint` is the tab bar tint (Home and Map).
+iOS `NativeTabs` paints the selected tab's icon and its label with it, so it
+carries normal-size text: the light theme darkens
 it to 5.03:1 on `surfaceMuted`, the darkest surface the bar sits over. The
 light theme's text colors are deliberately darkened to clear WCAG AA (`muted`
 4.92:1 on `surfaceMuted`, the darkest surface it renders on; `faint` uses the
@@ -65,6 +66,21 @@ same accessible color for small captions; `primaryText` and `danger` just over
 text color must clear 4.5:1 for body text or 3:1 for large text against every
 surface it renders on, including `surfaceMuted` and `primarySoft`, not the
 paper background alone. Check the dark themes for legibility too.
+
+`tripDays` is the one categorical palette: five calm hues, one per trip day, read
+through `dayColor(day, theme.colors.tripDays)` in `src/lib/trip-planner.ts`,
+which cycles past day five. A day's pins, its route, its chip, the swatch on
+its header and its stops' number badges all take the same slot, so the list
+and the map match, and each of them also carries the day or stop number, so
+color is never the only cue. The order is fixed (orange, green, violet, gold,
+blue) and has no red or pink: on a trip, red reads as an error. Neighbouring
+days, including the wrap from blue back to orange, stay at least ΔE 6 apart in
+OKLab under protanopia, deuteranopia and tritanopia, and day 1 and day 3 differ
+in hue as well as shade. The light steps are deep enough that `onTripDay`
+(white) clears 4.5:1 on every fill. The dark themes share lighter steps of the
+same hues with a near-black `onTripDay` (at least 6.4:1 on every fill). Re-run
+those contrast and separation checks before changing a value, and keep
+`tripDays` for trip days rather than using it as a general accent.
 
 ## Themes and appearance
 
@@ -133,6 +149,20 @@ fade instead of sliding, zoom transitions are suppressed, and the text morph fal
 (alongside Dynamic Type above 1x and complex scripts, which native text
 shapes correctly and per-glyph Skia cannot). Pure opacity changes may opt
 into `ReduceMotion.Never` to keep state changes legible.
+
+## Haptics
+
+Every haptic goes through `haptics` in `src/lib/haptics.ts`, and ESLint rejects
+a direct `expo-haptics` import. Onboarding is the reference for the feel.
+
+- `selection`: picking an option, or a drag crossing into a new slot.
+- `impact()`: a light press that starts something, such as picking up a stop.
+- `impact("medium")`: one deliberate moment on a screen, such as choosing
+  Shelvr in the practice share.
+- `success`: something finished. Fire it after the server confirms, not on press.
+
+Stay quiet on taps that only open a page, on scrolling and panning, and on a
+failed action.
 
 ## Primitives
 

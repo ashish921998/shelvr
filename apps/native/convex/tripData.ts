@@ -3,19 +3,19 @@ import { internalMutation } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { requireUserId, authedMutation, authedQuery } from "./model/auth";
-import { aiAllowed } from "./aiConsent";
-import { aiConsentRequiredError } from "./model/aiConsent";
 import {
-  MAX_BEEN_PLACES,
   MAX_PLAN_ITEMS,
   PLAN_CONTENT_CHARS,
   planSourceValidator,
+  placeKey,
+  splitSavedPlace,
   type PlanSource,
 } from "./model/plan";
 import { findVisit } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   cityKey,
+  pinsForCity,
   countCities,
   dayOf,
   swapStop,
@@ -28,7 +28,12 @@ import {
 } from "./model/trip";
 import { requireProEntitlement } from "./subscriptions";
 import { effectiveStatus, getMembership } from "./model/memberships";
-import { readyCitySaves } from "./items";
+import { rawReadySavesNewestFirst } from "./items";
+import {
+  visibleItemPlaces,
+  userRemovals,
+  type Removal,
+} from "./model/placeRemovals";
 
 const MAX_CITY_CHARS = 80;
 
@@ -36,7 +41,9 @@ export async function loadReadySaves(
   ctx: QueryCtx,
   spaceId: Id<"spaces">,
   userId: string,
+  removals?: readonly Removal[],
 ): Promise<{ item: Doc<"items">; join: Doc<"spaceItems"> }[]> {
+  const decisions = removals ?? (await userRemovals(ctx, userId));
   const [saved, legacy] = await Promise.all(
     (["saved", undefined] as const).map((status) =>
       ctx.db
@@ -56,7 +63,16 @@ export async function loadReadySaves(
     const item = await ctx.db.get(join.itemId);
     if (item === null || item.userId !== userId) continue;
     if (item.status !== "ready") continue;
-    saves.push({ item, join });
+    saves.push({
+      item: visibleItemPlaces(
+        {
+          ...item,
+          intents: [...(item.intents ?? []), ...(join.intents ?? [])],
+        },
+        decisions,
+      ),
+      join,
+    });
   }
   return saves;
 }
@@ -73,11 +89,31 @@ export async function planSaves(
   if (city === undefined || cityKey(city) === "") {
     return await loadReadySaves(ctx, spaceId, userId);
   }
-  const items = await readyCitySaves(ctx, userId, city, MAX_PLAN_ITEMS);
-  return items.map((item) => ({ item }));
+  const decisions = await userRemovals(ctx, userId);
+  const items = (await rawReadySavesNewestFirst(ctx, userId))
+    .filter((item) =>
+      (item.cities ?? []).some((value) => cityKey(value) === cityKey(city)),
+    )
+    .slice(0, MAX_PLAN_ITEMS);
+  const saves: PlanSave[] = [];
+  for (const item of items) {
+    const join = await getMembership(ctx, item._id, spaceId);
+    if (join !== null && effectiveStatus(join) !== "saved") continue;
+    saves.push({
+      item: visibleItemPlaces(
+        {
+          ...item,
+          intents: [...(item.intents ?? []), ...(join?.intents ?? [])],
+        },
+        decisions,
+      ),
+      ...(join === null ? {} : { join }),
+    });
+  }
+  return saves;
 }
 
-export async function claimSpaceForModel(
+export async function claimSpaceForPlanning(
   ctx: MutationCtx,
   spaceId: Id<"spaces">,
 ): Promise<{ userId: Id<"users">; space: Doc<"spaces"> }> {
@@ -87,30 +123,34 @@ export async function claimSpaceForModel(
     throw new Error("Space not found");
   }
   await requireProEntitlement(ctx, userId);
-  if (!(await aiAllowed(ctx, userId))) {
-    throw aiConsentRequiredError();
-  }
   return { userId, space };
 }
 
+/** Check each candidate by index, including visits older than the former 100-row window. */
 export async function beenPlaces(
   ctx: QueryCtx,
-  userId: string,
+  userId: Id<"users">,
+  sources: PlanSource[],
 ): Promise<string[]> {
-  const visits = await ctx.db
-    .query("placeVisits")
-    .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
-    .order("desc")
-    .take(MAX_BEEN_PLACES);
-  return visits.map((visit) => visit.name);
+  const visited = new Set<string>();
+  const checked = new Set<string>();
+  for (const raw of sources.flatMap((source) => source.places)) {
+    const { name } = splitSavedPlace(raw);
+    if (checked.has(placeKey(raw))) continue;
+    checked.add(placeKey(raw));
+    if (
+      (await findVisit(ctx, userId, name)) ||
+      (await findVisit(ctx, userId, raw))
+    )
+      visited.add(name);
+  }
+  return [...visited];
 }
 
-export function toPlanSource(
-  item: Doc<"items">,
-  join?: Doc<"spaceItems">,
-): PlanSource {
+export function toPlanSource(item: Doc<"items">, city?: string): PlanSource {
   return {
     itemId: item._id,
+    savedAt: item._creationTime,
     title: item.title,
     description: item.description,
     content:
@@ -121,12 +161,27 @@ export function toPlanSource(
     url: item.url,
     siteName: item.siteName,
     author: item.author,
+    pins: (city ? pinsForCity(item, city) : item.placePins)?.map(
+      ({ name, lat, lng }) => ({ name, lat, lng }),
+    ),
     places: [
-      ...[...(item.intents ?? []), ...(join?.intents ?? [])]
+      ...(item.intents ?? [])
         .filter((intent) => intent.kind === "open_maps")
         .map((intent) => intent.value),
       ...(item.places ?? []),
-    ],
+      ...(city ? pinsForCity(item, city) : (item.placePins ?? [])).map(
+        (pin) => pin.name,
+      ),
+    ].filter((name) => {
+      const cities = item.cities ?? [];
+      if (!city || cities.length <= 1) return true;
+      if (pinsForCity(item, city).some((pin) => pin.name === name)) return true;
+      // A multi-city save must explicitly identify this place's city; do not guess.
+      return name
+        .split(",")
+        .slice(1)
+        .some((part) => placeKey(part) === placeKey(city));
+    }),
   };
 }
 
@@ -147,23 +202,23 @@ export const claimTripInternal = internalMutation({
     ),
   }),
   handler: async (ctx, args) => {
-    const { userId, space } = await claimSpaceForModel(ctx, args.spaceId);
+    const { userId, space } = await claimSpaceForPlanning(ctx, args.spaceId);
     const asked =
       args.city !== undefined
         ? tidyCity(args.city).slice(0, MAX_CITY_CHARS)
         : undefined;
     const wanted = asked !== undefined ? cityKey(asked) : "";
-    const saves = (await loadReadySaves(ctx, args.spaceId, userId)).filter(
-      ({ item }) =>
-        wanted === "" ||
-        (item.cities ?? []).length === 0 ||
-        (item.cities ?? []).some((city) => cityKey(city) === wanted),
-    );
+    const initial = await planSaves(ctx, args.spaceId, userId, asked);
     const city =
       wanted !== ""
         ? asked
-        : countCities(saves.map(({ item }) => item))[0]?.city;
-    const sources = saves.map(({ item, join }) => toPlanSource(item, join));
+        : countCities(initial.map(({ item }) => item))[0]?.city;
+    const saves = city
+      ? initial.filter(({ item }) =>
+          (item.cities ?? []).some((value) => cityKey(value) === cityKey(city)),
+        )
+      : initial;
+    const sources = saves.map(({ item }) => toPlanSource(item, city));
     if (sources.length === 0) {
       return { spaceName: space.name, city, sources, been: [], pins: [] };
     }
@@ -172,9 +227,11 @@ export const claimTripInternal = internalMutation({
       spaceName: space.name,
       city,
       sources,
-      been: await beenPlaces(ctx, userId),
+      been: await beenPlaces(ctx, userId, sources),
       pins: saves.flatMap(({ item }) =>
-        (item.placePins ?? []).map((pin) => ({ itemId: item._id, ...pin })),
+        (city ? pinsForCity(item, city) : (item.placePins ?? [])).map(
+          ({ name, lat, lng }) => ({ itemId: item._id, name, lat, lng }),
+        ),
       ),
     };
   },
@@ -185,10 +242,19 @@ async function liveSave(
   stop: TripStop,
   userId: string,
   spaceId: Id<"spaces">,
+  city?: string,
 ): Promise<Doc<"items"> | null> {
   const item = await ctx.db.get(stop.itemId);
   if (item === null || item.userId !== userId) return null;
   const membership = await getMembership(ctx, stop.itemId, spaceId);
+  if (membership !== null && effectiveStatus(membership) !== "saved")
+    return null;
+  if (city !== undefined && (item.cities ?? []).length > 0) {
+    return item.status === "ready" &&
+      (item.cities ?? []).some((value) => cityKey(value) === cityKey(city))
+      ? item
+      : null;
+  }
   return membership !== null && effectiveStatus(membership) === "saved"
     ? item
     : null;
@@ -279,7 +345,8 @@ export const swapTripStop = authedMutation({
     }
     const live: TripStop[] = [];
     for (const stop of trip.wishlist) {
-      if (await liveSave(ctx, stop, userId, trip.spaceId)) live.push(stop);
+      const item = await liveSave(ctx, stop, userId, trip.spaceId, trip.city);
+      if (item && !(await findVisit(ctx, userId, stop.name))) live.push(stop);
     }
     const swapped = swapStop(
       { days: trip.days, wishlist: live },
@@ -336,7 +403,7 @@ export const getSpaceTrip = authedQuery({
     if (trip === null) return null;
 
     const view = async (stop: TripStop) => {
-      const item = await liveSave(ctx, stop, userId, args.spaceId);
+      const item = await liveSave(ctx, stop, userId, args.spaceId, trip.city);
       if (item === null) return null;
       const visit = await findVisit(ctx, userId, stop.name);
       const cover = item.storageId

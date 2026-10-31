@@ -6,37 +6,20 @@ import {
 } from "@/components/onboarding/sample-trip-map";
 import type { AhaSample } from "@/lib/aha-sample";
 import { t, useAppLocale } from "@/lib/i18n";
-import { motion, springIn } from "@/lib/motion";
+import { springIn } from "@/lib/motion";
+import { useDroppedPins } from "@/lib/use-dropped-pins";
 import { SAMPLE_CITIES } from "@/lib/sample-cities";
 import { SAMPLE_CROPS } from "@/lib/sample-trip";
-import { useEffect, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
-/** Pins dropped so far, one per stagger; all at once under Reduce Motion, where each row only fades in. */
-function useDroppedPins(count: number): number {
-  const reduced = useReducedMotion();
-  const [dropped, setDropped] = useState(reduced ? count : 0);
-  useEffect(() => {
-    if (dropped >= count) return;
-    const timer = setTimeout(
-      () => setDropped(reduced ? count : dropped + 1),
-      reduced ? 0 : motion.duration.stagger,
-    );
-    return () => clearTimeout(timer);
-  }, [dropped, count, reduced]);
-  return dropped;
-}
-
-/** The last step: the shared reel's spots dropping onto a preview of the city page they land on, then the paywall. */
+/** The shared reel's spots dropping onto a preview of the city page they land on. */
 export function AhaSpotsStep({
   sample,
-  leaving,
   onContinue,
 }: {
   sample: AhaSample;
-  leaving: boolean;
   onContinue: () => void;
 }) {
   useAppLocale();
@@ -66,9 +49,7 @@ export function AhaSpotsStep({
             {t("aha.cityPlaces", { city })}
           </Text>
           <Text style={styles.credit}>
-            {sample.source === "reel"
-              ? t("aha.fromReel", { handle: sample.creator })
-              : t("aha.sampleSource")}
+            {t("aha.fromReel", { handle: sample.creator })}
           </Text>
         </View>
         {/* With large text the rows scroll, after the map has given up its room. */}
@@ -84,13 +65,6 @@ export function AhaSpotsStep({
                 <PinBadge number={index + 1} day={0} />
                 <View style={styles.spotText}>
                   <Text style={styles.spotName}>{spot.name}</Text>
-                  {sample.source === "example" ? (
-                    <Text style={styles.quote}>
-                      {t("aha.quoted", {
-                        quote: t(sample.spots[index].quote),
-                      })}
-                    </Text>
-                  ) : null}
                 </View>
               </>
             );
@@ -119,7 +93,6 @@ export function AhaSpotsStep({
         label={t("common.continue")}
         onPress={onContinue}
         disabled={dropped < sample.spots.length}
-        busy={leaving}
       />
     </View>
   );
@@ -205,11 +178,5 @@ const styles = StyleSheet.create((theme) => ({
   spotName: {
     ...theme.type.headline,
     color: theme.colors.foreground,
-  },
-  quote: {
-    ...theme.type.subhead,
-    lineHeight: 21,
-    fontStyle: "italic",
-    color: theme.colors.muted,
   },
 }));
