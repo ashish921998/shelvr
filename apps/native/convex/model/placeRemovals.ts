@@ -76,7 +76,12 @@ function namesPlaceIn(item: Doc<"items">, city: string): boolean {
   return (
     pinsForCity(item, city).length > 0 ||
     item.placePins?.some((pin) => !pin.city) ||
-    placeLabels(item).some((label) => namesCity(label, city))
+    placeLabels(item).some(
+      (label) =>
+        namesCity(label, city) &&
+        (label.cities.length > 0 ||
+          !item.placePins?.some((pin) => venueKey(pin.name) === label.key)),
+    )
   );
 }
 

@@ -952,6 +952,42 @@ describe("place removals", () => {
       expect(await cityNames(t)).toEqual(["Porto"]);
     });
 
+    it("leaves a city when a place with no city in its name is pinned elsewhere", async () => {
+      const { t, itemId, pin, remove } = await setup();
+      await t.run((ctx) =>
+        ctx.db.patch(itemId, {
+          title: "Portugal",
+          cities: ["Lisbon", "Porto"],
+          places: [pin.name, "Sol"],
+          placePins: [
+            pin,
+            { name: "Sol", city: "Porto", lat: 41.1, lng: -8.6 },
+          ],
+        }),
+      );
+      await remove();
+      expect(await rowTitles(t, "Lisbon")).toEqual([]);
+      expect(await rowTitles(t, "Porto")).toEqual(["Portugal"]);
+      expect(await cityNames(t)).toEqual(["Porto"]);
+    });
+
+    it("stays for a place with no city in its name and no pin yet", async () => {
+      const { t, itemId, pin, remove } = await setup();
+      await t.run((ctx) =>
+        ctx.db.patch(itemId, {
+          title: "Portugal",
+          cities: ["Lisbon", "Porto"],
+          places: [pin.name, "Sol", "Prado"],
+          placePins: [
+            pin,
+            { name: "Sol", city: "Porto", lat: 41.1, lng: -8.6 },
+          ],
+        }),
+      );
+      await remove();
+      expect(await rowTitles(t, "Lisbon")).toEqual(["Portugal"]);
+    });
+
     it("does not hand a pin with no city to the city that is left", async () => {
       const { t, itemId, pin, remove } = await setup();
       await t.run((ctx) =>
