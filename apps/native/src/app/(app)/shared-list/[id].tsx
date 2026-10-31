@@ -254,7 +254,10 @@ function SharedList({
   };
   const open = (row: ListRow) => {
     if (!focused.current) return;
-    const action = listPlaceAction(row.place);
+    const action = listPlaceAction(
+      row.place,
+      canOpenPlaceCard(row.place.appleId),
+    );
     analytics.capture("shared_list_place_opened", { action: action.kind });
     switch (action.kind) {
       case "save":

@@ -1,5 +1,4 @@
 import { analytics } from "@/lib/analytics";
-import { canOpenPlaceCard } from "@/lib/apple-place-card";
 import type { CityPin } from "@/lib/city-pins";
 import type { CityPlanKind } from "@/lib/city-plan";
 import { t } from "@/lib/i18n";
@@ -24,7 +23,7 @@ export type SharedListDetail = NonNullable<
 >;
 export type SharedListPlace = SharedListDetail["places"][number];
 
-export const MAX_ALSO_ADD_LISTS = 3;
+const MAX_ALSO_ADD_LISTS = 3;
 
 export function useSharedLists(enabled = true) {
   const { isAuthenticated } = useConvexAuth();
@@ -59,7 +58,7 @@ export async function shareInvite(
 
 type NamedMember = { firstName?: string; isYou: boolean };
 
-export function otherNames(members: NamedMember[]): string[] {
+function otherNames(members: NamedMember[]): string[] {
   return members
     .filter((member) => !member.isYou)
     .map((member) => member.firstName ?? t("sharedLists.someone"));
@@ -119,7 +118,7 @@ export function listRows(
 
 export function listPlaceAction(
   place: Pick<SharedListPlace, "itemId" | "appleId" | "name" | "lat" | "lng">,
-  cardAvailable = canOpenPlaceCard(place.appleId),
+  cardAvailable: boolean,
 ): StopAction {
   return stopAction({ source: "save", ...place }, cardAvailable);
 }
@@ -131,7 +130,7 @@ export function savedByLine(place: SharedListPlace): string {
     : t("sharedLists.savedBy", { name: place.addedByName });
 }
 
-export type AlsoAddState = Record<string, "off" | "adding" | "on" | "removing">;
+type AlsoAddState = Record<string, "off" | "adding" | "on" | "removing">;
 
 export function alsoAddLists(
   lists: SharedListSummary[] | undefined,

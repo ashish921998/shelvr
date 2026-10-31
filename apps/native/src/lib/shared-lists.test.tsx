@@ -40,7 +40,6 @@ vi.mock("@/lib/i18n", () => ({
     values ? `${key}:${JSON.stringify(values)}` : key,
 }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock("@/lib/apple-place-card", () => ({ canOpenPlaceCard: () => false }));
 vi.mock("@/lib/share-link", () => ({ shareUrl: vi.fn() }));
 vi.mock("@tanstack/react-query", () => ({ useQuery: () => ({}) }));
 vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));

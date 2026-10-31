@@ -12,10 +12,6 @@ import { backOrHome } from "@/lib/screen-dismiss";
 import { shareInvite } from "@/lib/shared-lists";
 import type { TextMessageKey } from "@/locales/message-types";
 import { api } from "@convex/_generated/api";
-import {
-  MAX_LIST_CITIES,
-  MAX_LIST_NAME_CHARS,
-} from "@convex/model/sharedLists";
 import { MAX_CITY_CHARS } from "@convex/model/trip";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -31,6 +27,9 @@ import {
   View,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+
+const MAX_LIST_CITIES = 5;
+const MAX_LIST_NAME_CHARS = 60;
 
 const NAME_SUGGESTIONS: TextMessageKey[] = [
   "sharedLists.suggestDate",

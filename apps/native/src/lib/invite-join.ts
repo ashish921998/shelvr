@@ -14,14 +14,14 @@ import { useConvexAuth, useMutation } from "convex/react";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 
-export type InviteJoinInput = {
+type InviteJoinInput = {
   isLoading: boolean;
   isAuthenticated: boolean;
   token: string | null;
   inFlight: string | null;
 };
 
-export type InviteJoinStep = { kind: "wait" } | { kind: "join"; token: string };
+type InviteJoinStep = { kind: "wait" } | { kind: "join"; token: string };
 export function inviteJoinStep(input: InviteJoinInput): InviteJoinStep {
   if (input.token === null || input.isLoading || !input.isAuthenticated) {
     return { kind: "wait" };
@@ -30,7 +30,7 @@ export function inviteJoinStep(input: InviteJoinInput): InviteJoinStep {
   return { kind: "join", token: input.token };
 }
 
-export type InviteJoinOutcome = {
+type InviteJoinOutcome = {
   clearToken: boolean;
   completeOnboarding: boolean;
   href: string;

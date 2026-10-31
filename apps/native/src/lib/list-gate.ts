@@ -1,4 +1,4 @@
-export type ListGateInput = {
+type ListGateInput = {
   onboarded: boolean;
   gated: boolean;
   lists: { length: number } | undefined;
