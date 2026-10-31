@@ -37,6 +37,7 @@
   },
   "pnpm": {
     "overrides": {
+      "node-forge@<1.4.1": "1.4.1",
       "zod@>=4.0.0 <4.6.6": "4.6.7",
       "undici@>=7.18.0 <7.30.1": "7.30.1",
       "shell-quote": "^1.11.0",
@@ -63,7 +64,6 @@
         "GHSA-rv78-f8rc-xrxh",
         "GHSA-wx67-qw84-cm4g",
         "GHSA-w24r-5266-9c3c",
-        "GHSA-86w9-cpqp-85rv",
         "GHSA-vfj7-8cjw-p6xm"
       ]
     }
