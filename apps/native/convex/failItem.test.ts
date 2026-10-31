@@ -17,10 +17,15 @@ const EARLIER_RUN = {
   content: "Old content",
 };
 
-// reprocessItem clears failureReason and enrichment, so a retry looks the same
-// whether the save had failed or settled partial before.
+// reprocessItem clears failureReason and keeps enrichment, so "retriedPartial" is
+// a save that was ready before this run and "retried" one that had failed.
 const BEFORES = {
   retried: { status: "processing", ...EARLIER_RUN },
+  retriedPartial: {
+    status: "processing",
+    ...EARLIER_RUN,
+    enrichment: "partial",
+  },
   sweptFirst: { status: "failed", ...EARLIER_RUN, failureReason: "error" },
   settled: { status: "ready", ...EARLIER_RUN },
   settledPartial: { status: "ready", ...EARLIER_RUN, enrichment: "partial" },
@@ -92,6 +97,24 @@ it("writes only how the run ended and keeps what earlier runs gave the save", as
   }
 });
 
+it("puts a retried partial save back as it was when the run fails", async () => {
+  const t = newConvexTest();
+  for (const reason of REASONS) {
+    const { itemId, item } = await seed(t, "retriedPartial");
+    const outcome = await t.mutation(internal.items.failItem, {
+      itemId,
+      reason,
+      runId: RUN_ID,
+    });
+    expect(outcome, reason).toBe("applied");
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toEqual({
+      ...item,
+      status: "ready",
+    });
+    expect(await telemetry(t, itemId)).toEqual([`failed:${reason}`]);
+  }
+});
+
 it("leaves a save alone once its run settled it ready", async () => {
   const t = newConvexTest();
   for (const before of SETTLED) {
@@ -136,6 +159,18 @@ it("reports a deleted save as missing", async () => {
   });
   expect(outcome).toBe("missing");
   expect(await telemetry(t, itemId)).toEqual([]);
+});
+
+it("puts a stalled retry of a partial save back as it was", async () => {
+  const t = newConvexTest();
+  const { itemId, item } = await seed(t, "retriedPartial", STALE);
+  expect(await t.mutation(internal.items.failStaleProcessingItems, {})).toEqual(
+    { failed: 1, scanned: 1 },
+  );
+  expect(await t.run((ctx) => ctx.db.get(itemId))).toEqual({
+    ...item,
+    status: "ready",
+  });
 });
 
 it("sweeps only stale processing saves, as an error", async () => {

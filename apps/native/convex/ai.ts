@@ -523,6 +523,14 @@ function linkAnalysisPrompt(
     .join("\n\n");
 }
 
+function retryReadNothingNew(item: Doc<"items">, read: LinkRead): boolean {
+  if (item.enrichment !== "partial") return false;
+  if (read.status === "unreadable") return true;
+  return (
+    read.page.incomplete === true && !read.page.content && Boolean(item.content)
+  );
+}
+
 async function analyzeLinkItem(
   ctx: ActionCtx,
   args: { itemId: Id<"items">; runId?: string },
@@ -559,6 +567,15 @@ async function analyzeLinkItem(
       item_id: args.itemId,
       error_category: summarizeError(read.error),
     });
+  }
+  if (retryReadNothingNew(item, read)) {
+    await failItemAndRecordOutcome(
+      ctx,
+      args,
+      { itemType: item.type, startedAt },
+      { reason: "error", telemetry: "failed" },
+    );
+    return { terminal: true };
   }
   const page = read.status === "unreadable" ? undefined : read.page;
   if (!(await stillAllowed(ctx, aiAllowed, item))) {

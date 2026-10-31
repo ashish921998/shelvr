@@ -272,7 +272,7 @@ export function failurePatch(
   item: Doc<"items">,
   reason: Infer<typeof failureReasonValidator>,
 ): ItemPatch | null {
-  return item.status === "ready"
-    ? null
-    : { status: "failed", failureReason: reason };
+  if (item.status === "ready") return null;
+  if (item.enrichment === "partial") return { status: "ready" };
+  return { status: "failed", failureReason: reason };
 }

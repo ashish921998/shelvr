@@ -498,7 +498,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   Re-record that file only for a change you intend, and review its diff.
   A run that fails writes `failurePatch(reason)` from the same module: only the status and
   reason, so the save keeps what earlier runs gave it. A save the run already settled ready
-  stays ready, and `failItem` answers `settled`. `failItem` and the stale-processing cron are
+  stays ready, and `failItem` answers `settled`. `reprocessItem` leaves `enrichment` set, so a
+  failed Retry of a partial save goes back to ready and partial instead of leaving Home, and a
+  Retry that reads nothing new ends that way without asking the model. `failItem` and the stale-processing cron are
   its adapters, and `failItem.test.ts` tests them directly.
 
 **The AI model** is `gemini-3.1-flash-lite`, called directly through the `@ai-sdk/google` provider

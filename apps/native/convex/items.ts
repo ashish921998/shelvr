@@ -1968,7 +1968,6 @@ export const reprocessItem = authedMutation({
     await ctx.db.patch(args.id, {
       ...run,
       failureReason: undefined,
-      enrichment: undefined,
     });
     await ctx.scheduler.runAfter(0, internal.ai.processItem, {
       itemId: args.id,
