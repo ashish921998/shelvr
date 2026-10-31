@@ -21,11 +21,6 @@ vi.mock("@/lib/i18n", () => ({
 }));
 vi.mock("@/lib/motion", () => ({ sheetIn: () => undefined, fadeIn: {} }));
 vi.mock("@/lib/color", () => ({ withAlpha: (color: string) => color }));
-vi.mock("expo-haptics", () => ({
-  selectionAsync: vi.fn(),
-  impactAsync: vi.fn(),
-  ImpactFeedbackStyle: { Medium: "medium" },
-}));
 vi.mock("@/components/onboarding/reel-video", () => ({
   ReelVideo: vi.fn(() => null),
 }));

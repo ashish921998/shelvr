@@ -38,8 +38,7 @@ export function Chip({
       accessibilityState={{ checked: selected }}
       hitSlop={4}
       onPress={() => {
-        if (pick === "radio" && selected) return;
-        void haptics.selection();
+        if (pick !== "radio" || !selected) void haptics.selection();
         onPress();
       }}
       style={({ pressed }) => [

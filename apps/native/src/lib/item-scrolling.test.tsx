@@ -197,7 +197,6 @@ vi.mock("expo-app-intents", () => ({ AppEntityView: Container }));
 vi.mock("expo-status-bar", () => ({ StatusBar: vi.fn(() => null) }));
 vi.mock("expo-image", () => ({ Image: vi.fn(() => null) }));
 vi.mock("expo-clipboard", () => ({ setStringAsync: vi.fn() }));
-vi.mock("expo-haptics", () => ({ notificationAsync: vi.fn() }));
 
 function item(id: string): DetailItem {
   return { _id: id, type: "image", title: id, status: "ready" } as DetailItem;
