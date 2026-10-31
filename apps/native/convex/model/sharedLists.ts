@@ -4,6 +4,7 @@ import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { liveOwner } from "./auth";
 import { removalValidator } from "./placeRemovals";
 import {
+  cityKey,
   countCities,
   MAX_CITY_CHARS,
   pinsForCity,
@@ -40,7 +41,7 @@ export const sharedListPlaceValidator = v.object({
   name: v.string(),
   lat: v.number(),
   lng: v.number(),
-  city: v.optional(v.string()),
+  city: v.string(),
   appleId: v.optional(v.string()),
   category: v.optional(v.string()),
   itemId: v.optional(v.id("items")),
@@ -85,7 +86,7 @@ export const invitePreviewValidator = v.object({
 
 export const sharedPlaceInputValidator = v.object({
   ...tripPlaceValidator.fields,
-  city: v.optional(v.string()),
+  city: v.string(),
 });
 
 const listPlanPlaceValidator = v.object({
@@ -124,29 +125,32 @@ export function tidyListName(name: string): string {
   return tidy;
 }
 
-export function foundPlace(input: TripPlace & { city?: string }): NewListPlace {
+export function foundPlace(input: TripPlace & { city: string }): NewListPlace {
   const { area: _area, ...place } = tidyPlace(input);
   const city = tidyText(input.city, MAX_CITY_CHARS);
-  return { ...place, ...(city !== undefined ? { city } : {}) };
+  if (city === undefined) throw new Error("City required");
+  return { ...place, city };
 }
 
 export function savePlaces(item: Doc<"items">, city?: string): NewListPlace[] {
-  const pins = city ? pinsForCity(item, city) : (item.placePins ?? []);
   const only = item.cities?.length === 1 ? item.cities[0] : undefined;
   const tags = item.tags.slice(0, TAGS_PER_PLACE);
-  return uniquePlacePins(pins).map((pin) => {
-    const pinCity = pin.city ?? city ?? only;
-    return {
-      itemId: item._id,
-      name: pin.name,
-      lat: pin.lat,
-      lng: pin.lng,
-      ...(pinCity !== undefined ? { city: pinCity } : {}),
-      ...(pin.appleId !== undefined ? { appleId: pin.appleId } : {}),
-      ...(pin.category !== undefined ? { category: pin.category } : {}),
-      ...(tags.length > 0 ? { tags } : {}),
-    };
+  const pins = (
+    city ? pinsForCity(item, city) : (item.placePins ?? [])
+  ).flatMap((pin) => {
+    const pinCity = pin.city || city || only;
+    return pinCity ? [{ ...pin, city: pinCity }] : [];
   });
+  return uniquePlacePins(pins).map((pin) => ({
+    itemId: item._id,
+    name: pin.name,
+    lat: pin.lat,
+    lng: pin.lng,
+    city: pin.city,
+    ...(pin.appleId !== undefined ? { appleId: pin.appleId } : {}),
+    ...(pin.category !== undefined ? { category: pin.category } : {}),
+    ...(tags.length > 0 ? { tags } : {}),
+  }));
 }
 
 export function isNewPlace(
@@ -156,10 +160,20 @@ export function isNewPlace(
   return place.addedAt > member.seenAt && place.addedBy !== member.userId;
 }
 
-export function listCities(places: { city?: string }[]): string[] {
-  return countCities(
-    places.map((place) => ({ cities: place.city ? [place.city] : [] })),
-  ).map(({ city }) => city);
+export function uniqueCities(cities: string[]): string[] {
+  const byKey = new Map<string, string>();
+  for (const city of cities) {
+    if (!byKey.has(cityKey(city))) byKey.set(cityKey(city), city);
+  }
+  return [...byKey.values()];
+}
+
+export function listCities(
+  list: Doc<"sharedLists">,
+  places: { city: string }[],
+): string[] {
+  const carried = countCities(places.map(({ city }) => ({ cities: [city] })));
+  return uniqueCities([...list.cities, ...carried.map(({ city }) => city)]);
 }
 
 export function previewNames(places: { name: string }[]): string[] {

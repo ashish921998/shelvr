@@ -44,6 +44,7 @@ import {
   sharedListSummaryValidator,
   sharedPlaceInputValidator,
   tidyListName,
+  uniqueCities,
   type ListPlanClaim,
   type NewListPlace,
 } from "./model/sharedLists";
@@ -146,11 +147,10 @@ export const createSharedList = authedMutation({
     const { userId } = ctx;
     await requireProEntitlement(ctx, userId);
     const name = tidyListName(args.name);
-    const cities = [
-      ...new Set(
-        args.cities.flatMap((city) => tidyText(city, MAX_CITY_CHARS) ?? []),
-      ),
-    ].slice(0, MAX_LIST_CITIES);
+    const cities = uniqueCities(
+      args.cities.flatMap((city) => tidyText(city, MAX_CITY_CHARS) ?? []),
+    ).slice(0, MAX_LIST_CITIES);
+    if (cities.length === 0) throw new Error("City required");
     await requireListRoom(ctx, userId);
     await rateLimiter.limit(ctx, "sharedListCreate", {
       key: userId,
@@ -160,6 +160,7 @@ export const createSharedList = authedMutation({
     const listId = await ctx.db.insert("sharedLists", {
       ownerId: userId,
       name,
+      cities,
       inviteToken: inviteToken(),
       placeCount: 0,
       createdAt: now,
@@ -257,7 +258,7 @@ export const getSharedList = authedQuery({
         hasProEntitlementStatus(ctx, id),
       ),
       placeCount: list.placeCount,
-      cities: listCities(places),
+      cities: listCities(list, places),
       members: members.map((member) => {
         const firstName = names.get(member.userId);
         return {
@@ -276,7 +277,7 @@ export const getSharedList = authedQuery({
           name: place.name,
           lat: place.lat,
           lng: place.lng,
-          ...(place.city !== undefined ? { city: place.city } : {}),
+          city: place.city,
           ...(place.appleId !== undefined ? { appleId: place.appleId } : {}),
           ...(place.category !== undefined ? { category: place.category } : {}),
           ...(own && place.itemId !== undefined
@@ -305,7 +306,7 @@ async function invitePreviewOf(ctx: QueryCtx, token: string) {
     ...(inviterName !== undefined ? { inviterName } : {}),
     name: list.name,
     placeCount: list.placeCount,
-    cities: listCities(places),
+    cities: listCities(list, places),
     placeNames: previewNames(places),
   };
 }
@@ -611,7 +612,7 @@ export async function claimListPlan(
   const rows = (await listPlaces(ctx, list._id)).filter(
     (row) =>
       row.visitedAt === undefined &&
-      (row.city === undefined || cityKey(row.city) === wanted) &&
+      cityKey(row.city) === wanted &&
       !skipped.has(placeKey(row.name)),
   );
   const places: ListPlanClaim["places"] = [];
@@ -651,7 +652,7 @@ export const claimListSearchInternal = internalMutation({
       throws: true,
     });
     const places = await listPlaces(ctx, list._id);
-    const city = listCities(places)[0];
+    const city = listCities(list, places)[0];
     return {
       ...(city !== undefined ? { city } : {}),
       centre: middleOf(places),

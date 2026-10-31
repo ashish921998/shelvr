@@ -924,6 +924,7 @@ describe("a personal trip", () => {
       const listId = await ctx.db.insert("sharedLists", {
         ownerId: userId,
         name: "Ours",
+        cities: ["Lisbon"],
         inviteToken: "t",
         placeCount: 1,
         createdAt: 1,
