@@ -50,7 +50,7 @@ import {
 } from "./model/sharedLists";
 import { sameTripPlace } from "./model/placeIdentity";
 import { saveError } from "./model/saveErrors";
-import { cityKey, MAX_CITY_CHARS, middleOf } from "./model/trip";
+import { cityKey, MAX_CITY_CHARS } from "./model/trip";
 import { tidyText, tripSummary } from "./model/tripPlace";
 import {
   hasProEntitlement,
@@ -638,25 +638,21 @@ export async function claimListPlan(
 }
 
 export const claimListSearchInternal = internalMutation({
-  args: { listId: v.id("sharedLists") },
+  args: { listId: v.id("sharedLists"), city: v.string() },
   returns: v.object({
-    city: v.optional(v.string()),
-    centre: v.union(v.null(), v.object({ lat: v.number(), lng: v.number() })),
+    city: v.string(),
+    centre: v.null(),
     aiAllowed: v.boolean(),
   }),
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    const list = await requireCoveredList(ctx, args.listId, userId);
+    await requireCoveredList(ctx, args.listId, userId);
+    const city = tidyText(args.city, MAX_CITY_CHARS);
+    if (city === undefined) throw new Error("City required");
     await rateLimiter.limit(ctx, "sharedListSearch", {
       key: userId,
       throws: true,
     });
-    const places = await listPlaces(ctx, list._id);
-    const city = listCities(list, places)[0];
-    return {
-      ...(city !== undefined ? { city } : {}),
-      centre: middleOf(places),
-      aiAllowed: await listAiAllowed(ctx, userId, places),
-    };
+    return { city, centre: null, aiAllowed: await aiAllowed(ctx, userId) };
   },
 });

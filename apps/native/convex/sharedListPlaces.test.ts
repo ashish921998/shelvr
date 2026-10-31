@@ -12,7 +12,12 @@ import {
   near,
   seedSave,
 } from "./sharedLists.test.helpers";
-import { setTestConsent, signedInUser, type TestBackend } from "./test.setup";
+import {
+  newConvexTest,
+  setTestConsent,
+  signedInUser,
+  type TestBackend,
+} from "./test.setup";
 
 async function placeRows(base: TestBackend, listId: Id<"sharedLists">) {
   return await base.run((ctx) =>
@@ -336,6 +341,10 @@ async function stubMaps() {
   vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
 }
 
+const PORTO = { latitude: 41.1579, longitude: -8.6291 };
+const LISBON_CENTRE = { latitude: 38.7, longitude: -9.1 };
+const FARAWAY = { lat: 37.1234, lng: -7.6543 };
+
 function fakeApple() {
   return vi.fn(async (input: string) => {
     const url = new URL(input);
@@ -343,6 +352,10 @@ function fakeApple() {
       return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
     }
     const q = url.searchParams.get("q") ?? "";
+    if (url.pathname === "/v1/geocode") {
+      const coordinate = /porto/i.test(q) ? PORTO : LISBON_CENTRE;
+      return Response.json({ results: [{ name: q, coordinate }] });
+    }
     return Response.json({
       results: [
         {
@@ -364,8 +377,24 @@ function fakeApple() {
   });
 }
 
+function appleUrls(fetchMock: ReturnType<typeof fakeApple>): URL[] {
+  return fetchMock.mock.calls.map(([input]) => new URL(String(input)));
+}
+
+function searchLocation(fetchMock: ReturnType<typeof fakeApple>) {
+  return appleUrls(fetchMock)
+    .find((url) => url.pathname === "/v1/search")
+    ?.searchParams.get("searchLocation");
+}
+
+function geocodes(fetchMock: ReturnType<typeof fakeApple>) {
+  return appleUrls(fetchMock)
+    .filter((url) => url.pathname === "/v1/geocode")
+    .map((url) => url.searchParams.get("q"));
+}
+
 describe("searchListPlaces", () => {
-  it("searches Apple near the list for a covered free member", async () => {
+  it("searches near the chosen city for a covered free member", async () => {
     await stubMaps();
     const fetchMock = fakeApple();
     vi.stubGlobal("fetch", fetchMock);
@@ -373,15 +402,61 @@ describe("searchListPlaces", () => {
     const bo = await joiner(base, token);
     const result = await bo.t.action(api.tripPlanner.searchListPlaces, {
       listId,
+      city: " Lisbon ",
       query: "  ramen ",
     });
     expect(result.available).toBe(true);
     expect(result.places.map((place) => place.name)).toEqual(["ramen house"]);
-    const searched = fetchMock.mock.calls
-      .map(([input]) => new URL(String(input)))
-      .find((url) => url.pathname === "/v1/search");
+    expect(geocodes(fetchMock)).toEqual(["Lisbon"]);
+    const searched = appleUrls(fetchMock).find(
+      (url) => url.pathname === "/v1/search",
+    );
     expect(searched?.searchParams.get("q")).toBe("ramen");
-    expect(searched?.searchParams.get("searchLocation")).toMatch(/^38\.72/);
+    expect(searchLocation(fetchMock)).toMatch(/^38\.7,/);
+  });
+
+  it("works on a list with no places yet", async () => {
+    await stubMaps();
+    const fetchMock = fakeApple();
+    vi.stubGlobal("fetch", fetchMock);
+    const base = newConvexTest();
+    const owner = await signedInUser(base, { pro: true });
+    const listId = await owner.t.mutation(api.sharedLists.createSharedList, {
+      name: "Ours",
+      cities: ["Lisbon"],
+    });
+    const result = await owner.t.action(api.tripPlanner.searchListPlaces, {
+      listId,
+      city: "Lisbon",
+      query: "ramen",
+    });
+    expect(result.places.map((place) => place.name)).toEqual(["ramen house"]);
+  });
+
+  it("searches the city asked for, not the middle of a two-city list", async () => {
+    await stubMaps();
+    const fetchMock = fakeApple();
+    vi.stubGlobal("fetch", fetchMock);
+    const { owner, listId } = await listWithOwner();
+    await owner.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: {
+        name: "Majestic",
+        lat: PORTO.latitude,
+        lng: PORTO.longitude,
+        city: "Porto",
+      },
+    });
+    const result = await owner.t.action(api.tripPlanner.searchListPlaces, {
+      listId,
+      city: "Porto",
+      query: "ramen",
+    });
+    expect(geocodes(fetchMock)).toEqual(["Porto"]);
+    expect(searchLocation(fetchMock)).toMatch(/^41\.1579,/);
+    expect(result.places.map((place) => place.name)).toEqual([
+      "ramen in Porto",
+    ]);
   });
 
   it("answers nothing for a short query and refuses a stranger", async () => {
@@ -389,6 +464,7 @@ describe("searchListPlaces", () => {
     expect(
       await owner.t.action(api.tripPlanner.searchListPlaces, {
         listId,
+        city: "Lisbon",
         query: "r",
       }),
     ).toEqual({ available: true, places: [] });
@@ -396,9 +472,17 @@ describe("searchListPlaces", () => {
     await expect(
       stranger.t.action(api.tripPlanner.searchListPlaces, {
         listId,
+        city: "Lisbon",
         query: "ramen",
       }),
     ).rejects.toThrow(/List not found/);
+    await expect(
+      owner.t.action(api.tripPlanner.searchListPlaces, {
+        listId,
+        city: "   ",
+        query: "ramen",
+      }),
+    ).rejects.toThrow(/City required/);
   });
 
   it("is refused once neither the owner nor the caller has Pro", async () => {
@@ -414,23 +498,73 @@ describe("searchListPlaces", () => {
     await expect(
       bo.t.action(api.tripPlanner.searchListPlaces, {
         listId,
+        city: "Lisbon",
         query: "ramen",
       }),
     ).rejects.toThrow(/Pro required/);
   });
 
-  it("makes no Apple call when a contributor has declined AI", async () => {
+  it("never sends Apple a declined contributor's point", async () => {
     await stubMaps();
     const fetchMock = fakeApple();
     vi.stubGlobal("fetch", fetchMock);
     const { base, owner, token, listId } = await listWithOwner();
     const bo = await joiner(base, token);
-    await base.run((ctx) => setTestConsent(ctx, owner.userId, "declined"));
+    await base.run((ctx) => setTestConsent(ctx, bo.userId, "declined"));
+    await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: { name: "Hidden", ...FARAWAY, city: "Lisbon" },
+    });
+    const result = await owner.t.action(api.tripPlanner.searchListPlaces, {
+      listId,
+      city: "Lisbon",
+      query: "ramen",
+    });
+    expect(result.available).toBe(true);
+    expect(fetchMock).toHaveBeenCalled();
+    const sent = appleUrls(fetchMock).map(String).join(" ");
+    expect(sent).not.toContain(String(FARAWAY.lat));
+    expect(sent).not.toContain(String(FARAWAY.lng));
+    expect(sent).not.toContain("Hidden");
+  });
+
+  it("makes no Apple call when the caller has declined AI", async () => {
+    await stubMaps();
+    const fetchMock = fakeApple();
+    vi.stubGlobal("fetch", fetchMock);
+    const { base, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    await base.run((ctx) => setTestConsent(ctx, bo.userId, "declined"));
     const result = await bo.t.action(api.tripPlanner.searchListPlaces, {
       listId,
+      city: "Lisbon",
       query: "ramen",
     });
     expect(result).toEqual({ available: false, places: [] });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("searchTripPlaces on a trip made from a list", () => {
+  it("sends Apple only the city and the query, never the trip's stops", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const { owner, listId } = await listWithOwner();
+    const { tripId } = await owner.t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 1,
+      pace: "easy",
+      interests: [],
+      listId,
+    });
+    await stubMaps();
+    const fetchMock = fakeApple();
+    vi.stubGlobal("fetch", fetchMock);
+    expect(tripId).not.toBeNull();
+    await owner.t.action(api.tripPlanner.searchTripPlaces, {
+      tripId: tripId!,
+      query: "ramen",
+    });
+    expect(geocodes(fetchMock)).toEqual(["Lisbon"]);
+    expect(searchLocation(fetchMock)).toMatch(/^38\.7,/);
   });
 });

@@ -706,7 +706,10 @@ export const claimTripSearchInternal = internalMutation({
     const planned = stops.filter((stop) => stop.day !== UNPLANNED_DAY);
     return {
       city: plan.city,
-      centre: middleOf(planned.length > 0 ? planned : stops),
+      centre:
+        plan.listId !== undefined
+          ? null
+          : middleOf(planned.length > 0 ? planned : stops),
       aiAllowed: await aiAllowed(ctx, userId),
     };
   },
