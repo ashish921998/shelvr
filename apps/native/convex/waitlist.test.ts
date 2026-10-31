@@ -287,7 +287,7 @@ describe("POST /waitlist/join", () => {
   it("rate-limits repeated joins for the same email with 429", async () => {
     const t = setup();
 
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       expect(
         (await join(t, { email: "limited@example.com", source: "hero" }))
           .status,
@@ -299,6 +299,28 @@ describe("POST /waitlist/join", () => {
       source: "hero",
     });
     expect(limited.status).toBe(429);
+  });
+
+  it("lets a stranger send one address at most a few emails a day", async () => {
+    vi.useFakeTimers();
+    try {
+      const t = setup();
+      let accepted = 0;
+      for (let hour = 0; hour < 24; hour++) {
+        for (let tick = 0; tick < 5; tick++) {
+          const response = await join(
+            t,
+            { email: "victim@example.com", source: "hero" },
+            { ip: `203.0.113.${hour * 5 + tick + 1}` },
+          );
+          if (response.status === 200) accepted++;
+          vi.advanceTimersByTime(12 * 60 * 1000);
+        }
+      }
+      expect(accepted).toBeLessThanOrEqual(4);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("rate-limits one client IP that rotates email addresses", async () => {

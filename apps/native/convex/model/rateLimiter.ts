@@ -89,7 +89,7 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 200,
   },
   demoRetry: { kind: "token bucket", rate: 4, period: HOUR, capacity: 3 },
-  waitlistJoin: { kind: "token bucket", rate: 5, period: HOUR, capacity: 3 },
+  waitlistJoin: { kind: "token bucket", rate: 2, period: DAY, capacity: 2 },
   waitlistJoinIp: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
   waitlistJoinGlobal: {
     kind: "token bucket",
