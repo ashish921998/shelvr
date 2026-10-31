@@ -73,7 +73,7 @@ export function infoAction(stop: DateStop, cardAvailable: boolean): StopAction {
   if (stop.appleId !== undefined && cardAvailable) {
     return { kind: "card", appleId: stop.appleId };
   }
-  if (stop.source === "save" && stop.itemId !== undefined) {
+  if (stop.itemId !== undefined) {
     return { kind: "save", itemId: stop.itemId };
   }
   return { kind: "maps", url: placeMapsUrl(stop) };

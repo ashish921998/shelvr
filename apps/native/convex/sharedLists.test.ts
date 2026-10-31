@@ -3,7 +3,8 @@
 import { describe, expect, it } from "vitest";
 
 import { api, internal } from "./_generated/api";
-import { MAX_LIST_CITIES, MAX_LIST_MEMBERS } from "./model/sharedLists";
+import { MAX_LIST_CITIES } from "./model/sharedListLimits";
+import { MAX_LIST_MEMBERS } from "./model/sharedLists";
 import {
   joiner,
   LISBON,
@@ -68,7 +69,7 @@ describe("createSharedList", () => {
         days: [
           [
             {
-              source: "save",
+              source: "list",
               itemId,
               name: "Ramen Shop",
               lat: 38.71,
@@ -98,10 +99,10 @@ describe("createSharedList", () => {
         { name: "Brasileira", ...LISBON, city: "Lisbon" },
       ],
     });
-    const listId = await owner.t.mutation(api.sharedLists.createSharedList, {
-      name: "Lisbon",
-      cities: ["lisbon"],
-    });
+    const { listId } = await owner.t.mutation(
+      api.sharedLists.createSharedList,
+      { name: "Lisbon", cities: ["lisbon"] },
+    );
     const rows = await base.run((ctx) =>
       ctx.db
         .query("sharedListPlaces")
@@ -117,12 +118,9 @@ describe("a list's cities", () => {
   async function emptyList(cities: string[]) {
     const base = newConvexTest();
     const owner = await signedInUser(base, { pro: true });
-    const listId = await owner.t.mutation(api.sharedLists.createSharedList, {
-      name: "Ours",
-      cities,
-    });
-    const token = await base.run(
-      async (ctx) => (await ctx.db.get(listId))?.inviteToken ?? "",
+    const { listId, inviteToken: token } = await owner.t.mutation(
+      api.sharedLists.createSharedList,
+      { name: "Ours", cities },
     );
     return { base, owner, listId, token };
   }
