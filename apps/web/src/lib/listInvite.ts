@@ -1,7 +1,7 @@
 import { convexSiteUrl } from "@/lib/convexSiteUrl";
 import { serverLog } from "@/lib/serverLog";
 
-export type ListInvite = {
+type ListInvite = {
   inviterName?: string;
   name: string;
   placeCount: number;
