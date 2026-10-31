@@ -180,12 +180,11 @@ export function previewNames(places: { name: string }[]): string[] {
 export async function listMembers(
   ctx: QueryCtx,
   listId: Id<"sharedLists">,
-  limit = MEMBER_SCAN,
 ): Promise<Doc<"sharedListMembers">[]> {
   const rows = await ctx.db
     .query("sharedListMembers")
     .withIndex("by_list_and_user", (q) => q.eq("listId", listId))
-    .take(limit);
+    .take(MEMBER_SCAN);
   return rows.sort((a, b) => a.joinedAt - b.joinedAt);
 }
 
@@ -247,63 +246,30 @@ async function pickSuccessor(
   return null;
 }
 
-async function drainListChildren(
-  ctx: MutationCtx,
-  listId: Id<"sharedLists">,
-  departing: Id<"users">,
-  batch: number,
-): Promise<boolean> {
-  const places = await ctx.db
-    .query("sharedListPlaces")
-    .withIndex("by_list_and_added", (q) => q.eq("listId", listId))
-    .take(batch);
-  for (const place of places) {
-    await ctx.db.delete(place._id);
-  }
-  if (places.length === batch) return false;
-  const members = await ctx.db
-    .query("sharedListMembers")
-    .withIndex("by_list_and_user", (q) => q.eq("listId", listId))
-    .take(batch);
-  let anchored = false;
-  for (const member of members) {
-    if (member.userId === departing && !anchored) {
-      anchored = true;
-      continue;
-    }
-    await ctx.db.delete(member._id);
-  }
-  return members.length !== batch;
-}
-
 export async function departMember(
   ctx: MutationCtx,
   list: Doc<"sharedLists">,
   userId: Id<"users">,
-  batch = LIST_DRAIN_BATCH,
-): Promise<boolean> {
-  if (list.ownerId === userId) {
-    const others = (await listMembers(ctx, list._id, batch)).filter(
-      (member) => member.userId !== userId,
-    );
-    const successor = await pickSuccessor(ctx, others);
-    if (successor !== null) {
-      await ctx.db.patch(list._id, { ownerId: successor.userId });
-    } else {
-      if (!(await drainListChildren(ctx, list._id, userId, batch))) {
-        return false;
-      }
-      await ctx.db.delete(list._id);
+): Promise<void> {
+  const members = await listMembers(ctx, list._id);
+  const successor = await pickSuccessor(
+    ctx,
+    members.filter((member) => member.userId !== userId),
+  );
+  if (successor === null) {
+    for (const place of await listPlaces(ctx, list._id)) {
+      await ctx.db.delete(place._id);
     }
+    for (const member of members) {
+      await ctx.db.delete(member._id);
+    }
+    await ctx.db.delete(list._id);
+    return;
   }
-  const own = await ctx.db
-    .query("sharedListMembers")
-    .withIndex("by_list_and_user", (q) =>
-      q.eq("listId", list._id).eq("userId", userId),
-    )
-    .take(batch);
-  for (const row of own) {
-    await ctx.db.delete(row._id);
+  if (list.ownerId === userId) {
+    await ctx.db.patch(list._id, { ownerId: successor.userId });
   }
-  return true;
+  for (const member of members) {
+    if (member.userId === userId) await ctx.db.delete(member._id);
+  }
 }
