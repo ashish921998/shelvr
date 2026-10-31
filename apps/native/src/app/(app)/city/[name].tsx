@@ -79,7 +79,9 @@ export default function CityScreen() {
 
   // Stable while the query data is, so the map keeps the camera the person moved.
   const pins = useMemo(() => cityPins(items.data ?? []), [items.data]);
-  const hasMap = pins.length > 0;
+  const [hadPins, setHadPins] = useState(false);
+  if (pins.length > 0 && !hadPins) setHadPins(true);
+  const hasMap = pins.length > 0 || hadPins;
   // With no map behind it, the list stays open and does not drag.
   const restingSnaps = useMemo(
     () =>
@@ -121,7 +123,7 @@ export default function CityScreen() {
 
   return (
     <View style={styles.container}>
-      {pins.length > 0 ? (
+      {hasMap ? (
         <View style={styles.map}>
           <CityMap
             pins={pins}
@@ -205,10 +207,14 @@ export default function CityScreen() {
               );
             }}
             ListEmptyComponent={
-              <EmptyState
-                title={t("homePlaces.emptyTitle")}
-                message={t("homePlaces.emptyBody")}
-              />
+              <View style={styles.empty}>
+                <Text style={styles.emptyTitle}>
+                  {t("cityMap.noPlacesLeft")}
+                </Text>
+                <Text style={styles.emptyBody}>
+                  {t("cityMap.noPlacesLeftBody", { city })}
+                </Text>
+              </View>
             }
           />
         )}
@@ -251,6 +257,9 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   name: { ...theme.type.largeTitle, color: theme.colors.foreground },
   count: { ...theme.type.footnote, color: theme.colors.muted },
+  empty: { gap: theme.gap(0.5), paddingTop: theme.gap(0.5) },
+  emptyTitle: { ...theme.type.headline, color: theme.colors.foreground },
+  emptyBody: { ...theme.type.subhead, color: theme.colors.muted },
   plans: {
     position: "absolute",
     left: 0,

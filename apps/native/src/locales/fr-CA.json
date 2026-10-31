@@ -765,6 +765,8 @@
   "cityMap.placeDetails": "Détails du lieu : %{name}",
   "cityMap.removePlace": "Retirer %{name}",
   "cityMap.removedPlace": "%{name} retiré",
+  "cityMap.noPlacesLeft": "Plus aucun lieu",
+  "cityMap.noPlacesLeftBody": "Enregistrez un autre lieu à %{city} pour le voir ici.",
   "opener.tagline": "Enregistrez les adresses. On planifie le rendez-vous ou le voyage.",
   "onboardingQ.skip": "Passer",
   "onboardingQ.savedTitle": "Combien de lieux avez-vous enregistrés ?",

@@ -765,6 +765,8 @@
   "cityMap.placeDetails": "Detalhes de %{name}",
   "cityMap.removePlace": "Remover %{name}",
   "cityMap.removedPlace": "%{name} removido",
+  "cityMap.noPlacesLeft": "Não restam lugares",
+  "cityMap.noPlacesLeftBody": "Salve outro lugar em %{city} para vê-lo aqui.",
   "opener.tagline": "Salve os lugares. A gente planeja o encontro ou a viagem.",
   "onboardingQ.skip": "Pular",
   "onboardingQ.savedTitle": "Quantos lugares você já salvou?",
