@@ -192,6 +192,56 @@ it("still asks the model when a save has nothing to lose", async () => {
   expect(item?.title).toBe("Guessed from the URL");
 });
 
+it("takes a real title and keeps the rest when Retry finds no body", async () => {
+  servesPage(
+    `<html><head><title>Fresh tacos</title><meta name="description" content="A taco guide."><meta property="og:image" content="https://www.example.com/new.jpg"></head><body></body></html>`,
+  );
+  modelNames("Fresh tacos");
+
+  const item = await retried();
+
+  expect(generateObject).toHaveBeenCalled();
+  expect(item).toMatchObject({
+    title: "Fresh tacos",
+    content: GOOD_SAVE.content,
+    recipe: GOOD_SAVE.recipe,
+    author: GOOD_SAVE.author,
+    status: "ready",
+    enrichment: "partial",
+  });
+});
+
+it("keeps the words and the Retry when a blocked save reads an empty shell", async () => {
+  servesPage(
+    "<html><head><title>Just a moment</title></head><body></body></html>",
+  );
+  const blocked = {
+    title: GOOD_SAVE.title,
+    description: GOOD_SAVE.description,
+    tags: GOOD_SAVE.tags,
+  };
+
+  const item = await retried(PAGE, blocked);
+
+  expect(generateObject).not.toHaveBeenCalled();
+  expect(item).toMatchObject({
+    ...blocked,
+    status: "ready",
+    enrichment: "partial",
+  });
+});
+
+it("keeps the recipe and hero when Retry reads a body without them", async () => {
+  servesArticle();
+  modelNames("Fresh tacos guide");
+
+  const item = await retried();
+
+  expect(item?.content).toContain("breakfast tacos");
+  expect(item?.recipe).toEqual(GOOD_SAVE.recipe);
+  expect(item?.heroImageUrl).toBe(GOOD_SAVE.heroImageUrl);
+});
+
 it("takes the new reading when Retry reads the page", async () => {
   servesArticle();
   modelNames("Fresh tacos guide");
