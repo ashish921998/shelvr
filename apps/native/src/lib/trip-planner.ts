@@ -253,11 +253,16 @@ export function tripDayLabel(
     : t("tripPlanner.dayWithDate", { day, date: formatTripDay(date) });
 }
 
-export function stopBadge(source: TripPlanStop["source"]): TextMessageKey {
-  switch (source) {
+export function stopBadge(
+  stop: Pick<TripPlanStop, "source" | "itemId">,
+): TextMessageKey {
+  switch (stop.source) {
     case "save":
-    case "list":
       return "tripPlanner.badgeYours";
+    case "list":
+      return stop.itemId === undefined
+        ? "tripPlanner.badgeOnList"
+        : "tripPlanner.badgeYours";
     case "suggested":
       return "tripPlanner.badgeSuggested";
     case "added":
@@ -282,7 +287,7 @@ export function stopWhyLine(
  * "Stop 3, Kafeine, Yours, Alfama, From “Best of Lisbon”". Unplanned stops have no number.
  */
 export function stopRowLabel(
-  stop: Pick<TripPlanStop, "name" | "source" | "area" | "why">,
+  stop: Pick<TripPlanStop, "name" | "source" | "itemId" | "area" | "why">,
   { number, fromSave }: { number?: number; fromSave: boolean },
 ): string {
   return [
@@ -290,7 +295,7 @@ export function stopRowLabel(
       ? null
       : t("tripPlanner.stopNumber", { number: String(number) }),
     stop.name,
-    t(stopBadge(stop.source)),
+    t(stopBadge(stop)),
     stop.area,
     stopWhyLine(stop, fromSave),
   ]

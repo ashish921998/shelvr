@@ -59,7 +59,8 @@ export function DateStopCard({
   /** Absent when nothing nearby fits, so the card offers no change it cannot make. */
   onSwap?: () => void;
 }) {
-  const yours = stop.source === "save";
+  const badge = stopBadge(stop);
+  const yours = badge === "tripPlanner.badgeYours";
   return (
     <View style={styles.card}>
       <View style={styles.top}>
@@ -76,7 +77,7 @@ export function DateStopCard({
             variant="captionStrong"
             style={yours ? styles.badgeYoursText : styles.muted}
           >
-            {t(stopBadge(stop.source))}
+            {t(badge)}
           </ThemedText>
         </View>
       </View>

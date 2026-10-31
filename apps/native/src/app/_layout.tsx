@@ -25,6 +25,7 @@ import { useConvexQueryHealing } from "@/lib/convex-query-healing";
 import { useSignOutWhenAccountGone } from "@/lib/account-gone";
 import { posthog } from "@/lib/posthog";
 import { resolveRootHref } from "@/lib/home-href";
+import { useInviteJoinCoordinator } from "@/lib/invite-join";
 
 export { RootErrorBoundary as ErrorBoundary } from "@/components/root-error-boundary";
 
@@ -61,6 +62,11 @@ function ConvexQueryHealer() {
   return null;
 }
 
+function InviteJoinCoordinator() {
+  useInviteJoinCoordinator();
+  return null;
+}
+
 function EntitlementSync() {
   useEntitlementSync();
   return null;
@@ -74,6 +80,7 @@ export default function RootLayout() {
   const appContent = (
     <OnboardingProvider>
       <EntitlementSync />
+      <InviteJoinCoordinator />
       <NavThemeProvider>
         <SplashGate active={showSplash} onFinish={finishSplash}>
           <Slot />

@@ -8,6 +8,7 @@ import {
 } from "@/lib/trip-planner";
 import type { TextMessageKey } from "@/locales/message-types";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import {
   type DateAsk,
   type DateEvening,
@@ -107,24 +108,33 @@ export function dateShareText(
   ].join("\n");
 }
 
-export function emptyMessage(result: DatePlanResult): {
+export function emptyMessage(
+  result: DatePlanResult,
+  onList: boolean,
+): {
   title: string;
   message: string;
 } {
+  const { city } = result;
   if (result.status === "no_pair") {
     return {
       title: t("datePlan.noPairTitle"),
-      message: t("datePlan.noPairBody", { city: result.city }),
+      message: onList
+        ? t("sharedLists.noPairBody", { city })
+        : t("datePlan.noPairBody", { city }),
     };
   }
+  const classic = result.kind === "classic";
+  const anchorKey = onList
+    ? classic
+      ? "sharedLists.noAnchorClassic"
+      : "sharedLists.noAnchorLowkey"
+    : classic
+      ? "datePlan.noAnchorClassic"
+      : "datePlan.noAnchorLowkey";
   return {
     title: t("datePlan.noAnchorTitle"),
-    message: t(
-      result.kind === "classic"
-        ? "datePlan.noAnchorClassic"
-        : "datePlan.noAnchorLowkey",
-      { city: result.city },
-    ),
+    message: t(anchorKey, { city }),
   };
 }
 
@@ -142,7 +152,11 @@ type DatePlanState =
     };
 
 /** Plans a date for the city: asks the planner, then changes stops on the phone. */
-export function useDatePlan(city: string, locale: string) {
+export function useDatePlan(
+  city: string,
+  locale: string,
+  listId?: Id<"sharedLists">,
+) {
   const router = useRouter();
   const make = useAction(api.datePlans.makeDatePlan);
   const [state, setState] = useState<DatePlanState>({
@@ -166,7 +180,12 @@ export function useDatePlan(city: string, locale: string) {
       analytics.capture("date_plan_started", { kind: ask });
       let paywall = false;
       try {
-        const result = await make({ city, kind: ask, locale });
+        const result = await make({
+          city,
+          kind: ask,
+          locale,
+          ...(listId !== undefined ? { listId } : {}),
+        });
         analytics.capture("date_plan_made", {
           kind: result.kind,
           asked: ask,
@@ -204,7 +223,7 @@ export function useDatePlan(city: string, locale: string) {
       // joins (or, if iOS refused it, replaces) the same sheet instead of being dropped.
       if (paywall) await openPaywall(router, PLACEMENT);
     },
-    [make, city, locale, router],
+    [make, city, locale, listId, router],
   );
 
   /** Changes one stop; the screen offers it only when `canChange` says something fits. */

@@ -27,7 +27,10 @@ import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { haptics } from "@/lib/haptics";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { usePlanGate } from "@/lib/plan-gate";
+import { personalPlanAllowed } from "@/lib/list-gate";
+import type { Id } from "@convex/_generated/dataModel";
+import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Platform, ScrollView, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -36,11 +39,21 @@ export default function NewTripScreen() {
   const locale = useAppLocale();
   const router = useRouter();
   const { theme } = useUnistyles();
-  const { city: cityParam } = useLocalSearchParams<{ city?: string }>();
+  const { city: cityParam, listId } = useLocalSearchParams<{
+    city?: string;
+    listId?: string;
+  }>();
   const [form, setForm] = useState<TripForm>(() => initialTripForm(cityParam));
-  const cities = useQuery(convexQuery(api.items.listCities, {}));
+  const { gated } = usePlanGate();
+  const cities = useQuery(
+    convexQuery(api.items.listCities, gated ? "skip" : {}),
+  );
   const choices = useMemo(() => cityChoices(cities.data ?? []), [cities.data]);
-  const { state, submit, open, loading } = useCreateTripPlan(locale, choices);
+  const { state, submit, open, loading } = useCreateTripPlan(
+    locale,
+    choices,
+    listId as Id<"sharedLists"> | undefined,
+  );
   const update = (patch: Partial<TripForm>) =>
     setForm((current) => ({ ...current, ...patch }));
   const close = useCallback(() => backOrHome(router), [router]);
@@ -95,6 +108,9 @@ export default function NewTripScreen() {
     [theme, close, locale],
   );
 
+  if (!personalPlanAllowed(gated, listId))
+    return <Redirect href="/plan-gate" />;
+
   // The sheet is modal to VoiceOver too, so a swipe never leaves it for the Trips list behind.
   if (state.status !== "idle") {
     return (
@@ -115,11 +131,15 @@ export default function NewTripScreen() {
         contentContainerStyle={styles.content}
       >
         <FormSection title={t("tripPlanner.whereTo")}>
-          <CityPicker
-            cities={choices}
-            value={form.city}
-            onChange={(city) => update({ city })}
-          />
+          {listId === undefined ? (
+            <CityPicker
+              cities={choices}
+              value={form.city}
+              onChange={(city) => update({ city })}
+            />
+          ) : (
+            <ThemedText variant="body">{form.city}</ThemedText>
+          )}
         </FormSection>
 
         <FormSection title={t("trip.howManyDays")}>
