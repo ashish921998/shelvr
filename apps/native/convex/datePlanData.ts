@@ -1,3 +1,4 @@
+import { suggestionRemovals, removalValidator } from "./model/placeRemovals";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { internalMutation } from "./_generated/server";
@@ -66,6 +67,7 @@ export const claimDatePlanInternal = internalMutation({
     city: v.string(),
     sources: v.array(planSourceValidator),
     been: v.array(v.string()),
+    removed: v.array(removalValidator),
     pins: v.array(savedPinValidator),
     saves: v.array(
       v.object({
@@ -88,6 +90,7 @@ export const claimDatePlanInternal = internalMutation({
     return {
       city,
       sources,
+      removed: await suggestionRemovals(ctx, userId, city),
       been: [
         ...new Set([
           ...(await beenPlaces(ctx, userId, sources)),

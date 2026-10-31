@@ -96,7 +96,11 @@ export function SaveRow({
           onPress={onRemove}
           style={styles.details}
         >
-          <Text style={styles.title}>−</Text>
+          <AppSymbolIcon
+            name="minus"
+            size={22}
+            tintColor={theme.colors.foreground}
+          />
         </Pressable>
       ) : null}
       {selected && onPlaceDetails ? (

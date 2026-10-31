@@ -29,7 +29,12 @@ import {
 import { requireProEntitlement } from "./subscriptions";
 import { effectiveStatus, getMembership } from "./model/memberships";
 import { readyCitySaves } from "./items";
-import { visibleItemPlaces } from "./model/itemFields";
+import {
+  savedStopRemoved,
+  visibleWithIntents,
+  visibleSave,
+  type VisibleItem,
+} from "./model/placeRemovals";
 
 const MAX_CITY_CHARS = 80;
 
@@ -37,7 +42,7 @@ export async function loadReadySaves(
   ctx: QueryCtx,
   spaceId: Id<"spaces">,
   userId: string,
-): Promise<{ item: Doc<"items">; join: Doc<"spaceItems"> }[]> {
+): Promise<{ item: VisibleItem; join: Doc<"spaceItems"> }[]> {
   const [saved, legacy] = await Promise.all(
     (["saved", undefined] as const).map((status) =>
       ctx.db
@@ -52,17 +57,17 @@ export async function loadReadySaves(
   const joins = [...saved, ...legacy]
     .sort((a, b) => b._creationTime - a._creationTime)
     .slice(0, MAX_PLAN_ITEMS);
-  const saves: { item: Doc<"items">; join: Doc<"spaceItems"> }[] = [];
+  const saves: { item: VisibleItem; join: Doc<"spaceItems"> }[] = [];
   for (const join of joins) {
     const item = await ctx.db.get(join.itemId);
     if (item === null || item.userId !== userId) continue;
     if (item.status !== "ready") continue;
-    saves.push({ item, join });
+    saves.push({ item: await visibleSave(ctx, item), join });
   }
   return saves;
 }
 
-type PlanSave = { item: Doc<"items">; join?: Doc<"spaceItems"> };
+type PlanSave = { item: VisibleItem; join?: Doc<"spaceItems"> };
 
 /** A plan's saves: the city's as its page lists them, newest first; without a city, the space's. */
 export async function planSaves(
@@ -119,14 +124,14 @@ export async function beenPlaces(
 }
 
 export function toPlanSource(
-  item: Doc<"items">,
+  item: VisibleItem,
   join?: Doc<"spaceItems">,
   city?: string,
 ): PlanSource {
-  item = visibleItemPlaces({
-    ...item,
-    intents: [...(item.intents ?? []), ...(join?.intents ?? [])],
-  });
+  item = visibleWithIntents(item, [
+    ...(item.intents ?? []),
+    ...(join?.intents ?? []),
+  ]);
   return {
     itemId: item._id,
     title: item.title,
@@ -325,8 +330,10 @@ export const swapTripStop = authedMutation({
     }
     const live: TripStop[] = [];
     for (const stop of trip.wishlist) {
+      const item = await liveSave(ctx, stop, userId, trip.spaceId, trip.city);
       if (
-        (await liveSave(ctx, stop, userId, trip.spaceId, trip.city)) &&
+        item &&
+        !(await savedStopRemoved(ctx, item, stop, trip.city)) &&
         !(await findVisit(ctx, userId, stop.name))
       )
         live.push(stop);

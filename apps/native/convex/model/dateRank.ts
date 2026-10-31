@@ -1,3 +1,4 @@
+import { isRemovedSuggestion, type Removal } from "./placeRemovals";
 import type { Id } from "../_generated/dataModel";
 import type { ApplePoi } from "./appleMaps";
 import {
@@ -253,10 +254,12 @@ export function keepDateSuggestion(
     slot: DateSlot;
     anchor: DateStop;
     been: ReadonlySet<string>;
+    removed?: readonly Removal[];
     taken: readonly DateStop[];
     chains: ReadonlySet<string>;
   },
 ): boolean {
+  if (isRemovedSuggestion(context.removed ?? [], found)) return false;
   const key = placeKey(found.name);
   if (key === "" || context.been.has(key) || context.chains.has(key))
     return false;

@@ -1,3 +1,4 @@
+import { visibleSave, type VisibleItem } from "./model/placeRemovals";
 import { ConvexError, v, type Infer } from "convex/values";
 import {
   paginationOptsValidator,
@@ -40,7 +41,6 @@ import { MAX_LIST_PARTS, withListPins } from "./model/placeList";
 import { sha256Hex } from "./model/captureTokens";
 import {
   articleMediaValidator,
-  visibleItemPlaces,
   enrichmentValidator,
   failureReasonValidator,
   intentKindValidator,
@@ -222,11 +222,9 @@ function stripEmbedding(
   | "productsSearchStartedAt"
   | "places"
   | "placesHeard"
-  | "removedPlaces"
 > {
   const {
     places: _places,
-    removedPlaces: _removedPlaces,
     placesHeard: _placesHeard,
     embedding: _embedding,
     embeddingVersion: _version,
@@ -242,7 +240,7 @@ export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
     ? await ctx.storage.getUrl(item.storageId)
     : null;
   return {
-    ...stripEmbedding(visibleItemPlaces(item)),
+    ...stripEmbedding(await visibleSave(ctx, item)),
     imageUrl,
     heroImageUrl: item.type === "link" ? (imageUrl ?? undefined) : undefined,
   };
@@ -268,7 +266,7 @@ export async function toItemCard(
 export async function readySavesNewestFirst(
   ctx: QueryCtx,
   userId: string,
-): Promise<Doc<"items">[]> {
+): Promise<VisibleItem[]> {
   const { rows, bytes } = await takeWithinBytes(
     ctx.db
       .query("items")
@@ -285,7 +283,7 @@ export async function readySavesNewestFirst(
       limit: rows.length >= CITY_SCAN_ROWS ? "rows" : "bytes",
     });
   }
-  return rows.map(visibleItemPlaces);
+  return await Promise.all(rows.map((item) => visibleSave(ctx, item)));
 }
 
 /** The user's ready saves in one city, newest first, capped at `limit`. */
@@ -294,7 +292,7 @@ export async function readyCitySaves(
   userId: string,
   city: string,
   limit = CITY_ITEMS_MAX,
-): Promise<Doc<"items">[]> {
+): Promise<VisibleItem[]> {
   const wanted = cityKey(city);
   if (wanted === "") return [];
   return (await readySavesNewestFirst(ctx, userId))
@@ -653,7 +651,7 @@ export const searchItems = authedQuery({
     return await Promise.all(
       items.map(async (item) => ({
         ...(await enrichItem(ctx, item)),
-        places: visibleItemPlaces(item).places,
+        places: (await visibleSave(ctx, item)).places,
       })),
     );
   },

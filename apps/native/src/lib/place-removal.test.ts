@@ -7,20 +7,17 @@ import { usePlaceRemoval } from "./place-removal";
 const mocks = vi.hoisted(() => ({
   remove: vi.fn(),
   restore: vi.fn(),
-  announce: vi.fn(),
   alert: vi.fn(),
   error: vi.fn(),
 }));
 vi.mock("@convex/_generated/api", () => ({
-  api: { placeVisits: { removePlace: "remove", undoRemovePlace: "restore" } },
+  api: { placeRemovals: { removePlace: "remove", undoRemovePlace: "restore" } },
 }));
 vi.mock("convex/react", () => ({
   useMutation: (name: string) =>
     name === "remove" ? mocks.remove : mocks.restore,
 }));
-vi.mock("expo-crypto", () => ({ randomUUID: () => "operation" }));
 vi.mock("react-native", () => ({
-  AccessibilityInfo: { announceForAccessibility: mocks.announce },
   Alert: { alert: mocks.alert },
 }));
 vi.mock("@/lib/analytics", () => ({
@@ -32,7 +29,7 @@ const PIN = { name: "Tigre", lat: 38.7, lng: -9.1 };
 beforeEach(() => {
   vi.resetAllMocks();
   vi.useFakeTimers();
-  mocks.remove.mockResolvedValue([ITEM]);
+  mocks.remove.mockResolvedValue("removal1");
   mocks.restore.mockResolvedValue(null);
 });
 afterEach(() => {
@@ -47,14 +44,11 @@ it("offers Undo after the server removes the venue, then restores that operation
     itemId: ITEM,
     ...PIN,
     appleId: "tigre",
-    operationId: "operation",
   });
   expect(result.current.undo?.name).toBe("Tigre");
-  expect(mocks.announce).toHaveBeenCalledWith("Removed Tigre");
   await act(() => result.current.restore());
   expect(mocks.restore).toHaveBeenCalledWith({
-    itemIds: [ITEM],
-    operationId: "operation",
+    removalId: "removal1",
   });
   expect(result.current.undo).toBeNull();
 });
@@ -84,10 +78,10 @@ it("reports failed removal without offering Undo, and retains Undo when restorat
 });
 
 it("ignores repeated taps while a request is in progress", async () => {
-  let finish: (ids: Id<"items">[]) => void = () => {};
+  let finish: (id: Id<"placeRemovals">) => void = () => {};
   mocks.remove.mockImplementation(
     () =>
-      new Promise<Id<"items">[]>((resolve) => {
+      new Promise<Id<"placeRemovals">>((resolve) => {
         finish = resolve;
       }),
   );
@@ -100,8 +94,53 @@ it("ignores repeated taps while a request is in progress", async () => {
   await act(() => result.current.remove(ITEM, PIN));
   expect(mocks.remove).toHaveBeenCalledOnce();
   await act(async () => {
-    finish([ITEM]);
+    finish("removal1" as Id<"placeRemovals">);
     await pending;
   });
   expect(result.current.busy).toBe(false);
+});
+
+it("keeps consecutive removals recoverable, giving each its own Undo window", async () => {
+  mocks.remove.mockResolvedValueOnce("first").mockResolvedValueOnce("second");
+  const { result } = renderHook(usePlaceRemoval);
+  await act(() => result.current.remove(ITEM, PIN));
+  act(() => vi.advanceTimersByTime(5000));
+  await act(() => result.current.remove(ITEM, { ...PIN, name: "Other" }));
+  expect(result.current.undo?.removalId).toBe("first");
+  await act(() => result.current.restore());
+  expect(mocks.restore).toHaveBeenLastCalledWith({ removalId: "first" });
+  expect(result.current.undo?.name).toBe("Other");
+  act(() => vi.advanceTimersByTime(5999));
+  expect(result.current.undo?.name).toBe("Other");
+  await act(() => result.current.restore());
+  expect(mocks.restore).toHaveBeenLastCalledWith({ removalId: "second" });
+  expect(result.current.undo).toBeNull();
+});
+
+it("pauses expiry during a late Undo and offers a fresh retry window on failure", async () => {
+  let reject: (error: Error) => void = () => {};
+  mocks.restore.mockImplementationOnce(
+    () =>
+      new Promise((_, fail) => {
+        reject = fail;
+      }),
+  );
+  const { result } = renderHook(usePlaceRemoval);
+  await act(() => result.current.remove(ITEM, PIN));
+  act(() => vi.advanceTimersByTime(5900));
+  let restoring: Promise<void> = Promise.resolve();
+  act(() => {
+    restoring = result.current.restore();
+  });
+  act(() => vi.advanceTimersByTime(1000));
+  expect(result.current.undo).not.toBeNull();
+  await act(async () => {
+    reject(new Error("offline"));
+    await restoring;
+  });
+  expect(result.current.undo).not.toBeNull();
+  act(() => vi.advanceTimersByTime(5999));
+  expect(result.current.undo).not.toBeNull();
+  await act(() => result.current.restore());
+  expect(result.current.undo).toBeNull();
 });

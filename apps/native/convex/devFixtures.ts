@@ -99,7 +99,7 @@ async function seedFixtures(
   ctx: MutationCtx,
   userId: Id<"users">,
 ): Promise<{ items: number; spaces: number; memberships: number }> {
-  const [memberships, operations, items, spaces, subscriptions] =
+  const [memberships, operations, items, spaces, subscriptions, removals] =
     await Promise.all([
       ctx.db
         .query("spaceItems")
@@ -121,6 +121,10 @@ async function seedFixtures(
         .query("subscriptions")
         .withIndex("by_user", (q) => q.eq("userId", userId))
         .take(2),
+      ctx.db
+        .query("placeRemovals")
+        .withIndex("by_userId_and_key", (q) => q.eq("userId", userId))
+        .take(RESET_LIMIT + 1),
     ]);
 
   for (const [name, count] of [
@@ -128,6 +132,7 @@ async function seedFixtures(
     ["operations", operations.length],
     ["items", items.length],
     ["spaces", spaces.length],
+    ["removals", removals.length],
   ] as const) {
     if (count > RESET_LIMIT) {
       throw new Error(
@@ -149,6 +154,7 @@ async function seedFixtures(
     if (operation.storageId !== undefined) storageIds.add(operation.storageId);
   }
 
+  for (const row of removals) await ctx.db.delete(row._id);
   for (const row of memberships) await ctx.db.delete(row._id);
   for (const row of operations) await ctx.db.delete(row._id);
   for (const row of items) await ctx.db.delete(row._id);

@@ -1,37 +1,5 @@
 import { type Infer, v } from "convex/values";
 
-import { placeKey, splitSavedPlace } from "./plan";
-import type { Doc } from "../_generated/dataModel";
-import { uniquePlacePins } from "./trip";
-
-/** Project user removals over extraction results, including later reprocessing. */
-export function visibleItemPlaces(item: Doc<"items">): Doc<"items"> {
-  if (!item.removedPlaces?.length) return item;
-  const removed = new Set(item.removedPlaces.map((entry) => entry.key));
-  const placePins = item.placePins?.filter((pin) => {
-    const hidden = item.removedPlaces?.some(
-      (entry) => uniquePlacePins([pin, entry]).length === 1,
-    );
-    if (hidden) removed.add(placeKey(splitSavedPlace(pin.name).name));
-    return !hidden;
-  });
-  const kept = new Set(
-    placePins?.map((pin) => placeKey(splitSavedPlace(pin.name).name)),
-  );
-  const visible = (name: string) => {
-    const key = placeKey(splitSavedPlace(name).name);
-    return kept.has(key) || !removed.has(key);
-  };
-  return {
-    ...item,
-    places: item.places?.filter(visible),
-    placePins,
-    intents: item.intents?.filter(
-      (intent) => intent.kind !== "open_maps" || visible(intent.value),
-    ),
-  };
-}
-
 export const INTENT_KINDS = [
   "open_url",
   "copy",

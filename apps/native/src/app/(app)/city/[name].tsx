@@ -229,7 +229,10 @@ export default function CityScreen() {
                   removing={removal.busy}
                   onRemove={
                     row.kind === "place"
-                      ? () => void removal.remove(item._id, row.pin)
+                      ? () => {
+                          setSelected(null);
+                          void removal.remove(item._id, row.pin);
+                        }
                       : undefined
                   }
                   // First select the place's pin; a second tap opens its source save.

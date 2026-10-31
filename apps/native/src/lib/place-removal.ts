@@ -3,28 +3,26 @@ import { t } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
-import { randomUUID } from "expo-crypto";
 import { useEffect, useRef, useState } from "react";
-import { AccessibilityInfo, Alert } from "react-native";
+import { Alert } from "react-native";
 
 export function usePlaceRemoval() {
-  const remove = useMutation(api.placeVisits.removePlace);
-  const restore = useMutation(api.placeVisits.undoRemovePlace);
+  const remove = useMutation(api.placeRemovals.removePlace);
+  const restore = useMutation(api.placeRemovals.undoRemovePlace);
   const [busy, setBusy] = useState(false);
   const working = useRef(false);
-  const [undo, setUndo] = useState<{
-    itemIds: Id<"items">[];
-    operationId: string;
-    name: string;
-  } | null>(null);
+  const [pending, setPending] = useState<
+    { removalId: Id<"placeRemovals">; name: string }[]
+  >([]);
+  const undo = pending[0] ?? null;
   useEffect(() => {
-    if (!undo) return;
-    AccessibilityInfo.announceForAccessibility(
-      t("cityMap.removedPlace", { name: undo.name }),
+    if (!undo || busy) return;
+    const timer = setTimeout(
+      () => setPending((entries) => entries.slice(1)),
+      6000,
     );
-    const timer = setTimeout(() => setUndo(null), 6000);
     return () => clearTimeout(timer);
-  }, [undo]);
+  }, [undo, busy]);
 
   const run = async (action: () => Promise<void>) => {
     if (working.current) return;
@@ -48,22 +46,22 @@ export function usePlaceRemoval() {
       pin: { name: string; lat: number; lng: number; appleId?: string },
     ) =>
       run(async () => {
-        const operationId = randomUUID();
-        const itemIds = await remove({
+        const removalId = await remove({
           itemId,
           name: pin.name,
           lat: pin.lat,
           lng: pin.lng,
           ...(pin.appleId ? { appleId: pin.appleId } : {}),
-          operationId,
         });
-        if (itemIds.length) setUndo({ itemIds, operationId, name: pin.name });
+        setPending((entries) => [...entries, { removalId, name: pin.name }]);
       }),
     restore: () =>
       run(async () => {
         if (!undo) return;
-        await restore({ itemIds: undo.itemIds, operationId: undo.operationId });
-        setUndo(null);
+        await restore({ removalId: undo.removalId });
+        setPending((entries) =>
+          entries.filter((entry) => entry.removalId !== undo.removalId),
+        );
       }),
   };
 }

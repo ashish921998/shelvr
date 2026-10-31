@@ -243,7 +243,14 @@ async function suggestStops(
       for (const found of replies[i]) {
         seen.push(found);
         const suggestion = { ...found, interest: search.interest };
-        if (!keepSuggestion(suggestion, { centre, been, taken: kept }))
+        if (
+          !keepSuggestion(suggestion, {
+            centre,
+            been,
+            taken: kept,
+            removed: claim.removed,
+          })
+        )
           continue;
         lists.get(search.interest)?.push(suggestion);
         kept.push(suggestion);

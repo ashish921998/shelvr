@@ -82,6 +82,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `notificationPreferences`: weekly shelf opt-in, save reminder opt-out, timezone, and the
     next digest and reminder instants
   - `itemReads`: per-user read state, kept out of the item row
+  - `placeRemovals`: user-owned venue removal decisions, indexed by user and city/name; the account deletion drain removes them in batches through `deletePlaceRemovalsBatch`
   - `placeVisits`: places the user marked "We went" on a plan, one row per place name, so
     later plans rank them last
   - `planShares`: a plan's shortlist snapshot behind a random public vote link (one week),
@@ -335,11 +336,18 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `model/placeKinds.ts`: Apple's point-of-interest category when the pin has one, otherwise
   the save's tags; "date night" always comes from the tags.
 - **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark.
-  `removePlace` removes the selected venue across currently visible saves; `undoRemovePlace`
-  restores only that operation's removals. Optional `items.removedPlaces` overlays extraction
-  for city/map reads and future planning, survives reprocessing, and leaves source saves and
-  existing trip stops intact. The city page offers removal on its selected row and a six-second Undo. Planning
-  and trip swaps check these records inside Shelvr; they are not sent to an AI provider.
+- **`placeRemovals.ts`**: `removePlace` stores one city/venue decision without scanning or
+  rewriting saves; `undoRemovePlace` deletes only that owned decision, idempotently.
+  `model/placeRemovals.ts` projects decisions over saves created before removal, including
+  processing and unpinned copies. A deliberate new save shows the venue again. City, Map,
+  search and planning use the projection; planning sources require `VisibleItem`. Indexed
+  removal reads are shared per transaction and city rather than repeated per enriched save.
+  Automatic trip/date suggestions also exclude removed venues; manual search additions and
+  existing trip stops remain available. Names include neighborhood context to keep other branches.
+  The city page queues consecutive Undo actions, each with six visible seconds; expiry pauses
+  during a request and a failed restore gets a fresh retry window. The shared `ui/undo-bar.tsx`
+  supplies motion, pressed state and platform-specific announcements for places and trips.
+  No per-save removal field is added. Retain `placeRemovals` on rollback once rows exist.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
   link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and
   `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the

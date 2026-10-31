@@ -33,6 +33,7 @@ test("removes duplicate places, restores with Undo, and keeps removal after rela
   ).toBeVisible();
   await app.screenshot("place-restored");
 
+  await coffee.tap();
   await remove.tap();
   await expect(coffee).toBeHidden();
   await expect(other).toBeVisible();
@@ -60,4 +61,29 @@ test("removes duplicate places, restores with Undo, and keeps removal after rela
     screen.getByTestId("AnnotationContainer").getByLabel("Jo's Coffee"),
   ).toBeHidden();
   await app.screenshot("removal-persists-after-relaunch");
+});
+
+test("keeps both consecutive removals recoverable with queued Undo", async ({
+  app,
+  screen,
+}) => {
+  await screen.getByRole("button", /^Austin(?:,|$)/).tap();
+  const coffee = screen.getByRole("button", "Jo's Coffee");
+  const other = screen.getByRole("button", "Houndstooth Coffee");
+  await coffee.tap();
+  await screen.getByRole("button", "Remove Jo's Coffee").tap();
+  await other.tap();
+  await screen.getByRole("button", "Remove Houndstooth Coffee").tap();
+  await expect(coffee).toBeHidden();
+  await expect(other).toBeHidden();
+  await expect(screen.getByText("Removed Jo's Coffee")).toBeVisible();
+  await app.screenshot("two-removals-first-undo");
+  await screen.getByRole("button", "Undo").tap();
+  await expect(coffee).toBeVisible();
+  await expect(screen.getByText("Removed Houndstooth Coffee")).toBeVisible();
+  await app.screenshot("second-removal-still-undoable");
+  await screen.getByRole("button", "Undo").tap();
+  await expect(other).toBeVisible();
+  await expect(screen.getByRole("button", "Undo")).toBeHidden();
+  await app.screenshot("both-places-restored");
 });

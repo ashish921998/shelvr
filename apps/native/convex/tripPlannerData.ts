@@ -1,4 +1,9 @@
 import {
+  suggestionRemovals,
+  removalValidator,
+  visibleSave,
+} from "./model/placeRemovals";
+import {
   paginationOptsValidator,
   paginationResultValidator,
 } from "convex/server";
@@ -140,6 +145,7 @@ export const claimTripPlanInternal = internalMutation({
     stay: v.optional(v.string()),
     sources: v.array(planSourceValidator),
     been: v.array(v.string()),
+    removed: v.array(removalValidator),
     pins: v.array(savedPinValidator),
     tastes: v.array(saveTasteValidator),
     aiAllowed: v.boolean(),
@@ -165,6 +171,7 @@ export const claimTripPlanInternal = internalMutation({
       ...(startDate !== undefined ? { startDate } : {}),
       ...(stay !== undefined ? { stay } : {}),
       sources,
+      removed: await suggestionRemovals(ctx, userId, city),
       been: [
         ...new Set([
           ...(await beenPlaces(ctx, userId, sources)),
@@ -568,7 +575,7 @@ async function savedStop(
     throw new Error("Save not found");
   }
   // Only a pin the save already has in the trip's city, so a stop never lands somewhere made up.
-  const pin = pinsForCity(item, plan.city).find(
+  const pin = pinsForCity(await visibleSave(ctx, item), plan.city).find(
     (candidate) => candidate.name === name,
   );
   if (pin === undefined) throw new Error("Place not found");
