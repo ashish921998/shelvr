@@ -1,3 +1,4 @@
+import { t } from "@/lib/i18n";
 import { isTerminalFailure } from "@convex/model/itemFields";
 import { displayHost } from "@/lib/url";
 
@@ -72,4 +73,31 @@ export function canRetrySave(save: ReviewableSave): boolean {
 /** The site a save came from, never its raw URL. */
 export function saveSource(save: { siteName?: string; url?: string }): string {
   return save.siteName?.trim() || displayHost(save.url);
+}
+
+export function plannableCities(cities: City[]): City[] {
+  return cities.filter((entry) => entry.placeCount !== 0);
+}
+
+type CityRow =
+  | { kind: "pair"; cities: [City, City] }
+  | { kind: "wide"; city: City };
+
+export function cityRows(cities: City[]): CityRow[] {
+  const rows: CityRow[] = [];
+  for (let index = 0; index < cities.length; index += 2) {
+    const [first, second] = cities.slice(index, index + 2);
+    if (first && second) rows.push({ kind: "pair", cities: [first, second] });
+    else if (first) rows.push({ kind: "wide", city: first });
+  }
+  return rows;
+}
+
+export function cityCountLine(entry: City): string | null {
+  if (entry.placeCount === 0) {
+    return t("homePlaces.noPlaceYet", { count: entry.count });
+  }
+  return entry.placeCount
+    ? t("homePlaces.spotCount", { count: entry.placeCount })
+    : null;
 }

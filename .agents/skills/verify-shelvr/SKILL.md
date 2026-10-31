@@ -54,7 +54,7 @@ nothing is started by hand. Before a run:
 
 ```bash
 pnpm exec e2e list                          # loads the config, starts nothing; exit 0, one line per test file
-pnpm exec e2e run tests/home-cities.e2e.ts  # Metro up, app opens, dev sign-in, fixture reset, Home lists "Your cities" with a Lisbon card; exit 0
+pnpm exec e2e run tests/home-cities.e2e.ts  # Metro up, app opens, dev sign-in, fixture reset, Home lists a Lisbon city card; exit 0
 ```
 
 `list` failing is the config or a dependency (`pnpm install` from the

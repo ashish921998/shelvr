@@ -1,39 +1,75 @@
+import { AppSymbolIcon } from "@/components/symbol";
+import { type City, cityCountLine } from "@/lib/home-places";
 import { t } from "@/lib/i18n";
 import { Image } from "expo-image";
 import { Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+
+export type CoverLayout = "pair" | "wide" | "only";
+
+function CoverArt({ entry }: { entry: City }) {
+  const { theme } = useUnistyles();
+  if (entry.cover) {
+    return (
+      <Image
+        source={{ uri: entry.cover }}
+        style={[StyleSheet.absoluteFill, styles.tintMuted]}
+        contentFit="cover"
+      />
+    );
+  }
+  const pinless = entry.placeCount === 0;
+  return (
+    <View
+      style={[
+        StyleSheet.absoluteFill,
+        styles.tint,
+        pinless && styles.tintMuted,
+      ]}
+    >
+      <AppSymbolIcon
+        name="mappin"
+        size={22}
+        tintColor={pinless ? theme.colors.muted : theme.colors.primaryText}
+      />
+    </View>
+  );
+}
 
 export function CityCover({
-  city,
-  placeCount,
-  cover,
-  height,
+  entry,
+  layout,
 }: {
-  city: string;
-  placeCount?: number;
-  cover: string | null;
-  height: number;
+  entry: City;
+  layout: CoverLayout;
 }) {
-  const onPhoto = cover !== null;
+  const count = cityCountLine(entry);
+  if (layout === "pair") {
+    return (
+      <View style={styles.card}>
+        <View style={styles.art}>
+          <CoverArt entry={entry} />
+        </View>
+        <View style={styles.text}>
+          <Text style={styles.name} numberOfLines={1}>
+            {entry.city}
+          </Text>
+          {count ? <Text style={styles.count}>{count}</Text> : null}
+        </View>
+      </View>
+    );
+  }
   return (
-    <View style={[styles.frame, { height }]}>
-      {cover ? (
-        <Image
-          source={{ uri: cover }}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-        />
-      ) : null}
-      <View style={[styles.caption, onPhoto && styles.scrim]}>
-        <Text
-          style={[styles.name, onPhoto && styles.onPhoto]}
-          numberOfLines={2}
-        >
-          {city}
+    <View style={[styles.card, styles.wide, layout === "only" && styles.only]}>
+      <CoverArt entry={entry} />
+      <View style={styles.caption}>
+        <Text style={styles.name} numberOfLines={1}>
+          {entry.city}
         </Text>
-        {placeCount ? (
-          <Text style={[styles.count, onPhoto && styles.onPhoto]}>
-            {t("homePlaces.spotCount", { count: placeCount })}
+        {count ? <Text style={styles.count}>{count}</Text> : null}
+        {layout === "only" ? (
+          <Text style={styles.count}>
+            {t("homePlaces.fromSaves", { count: entry.count })}
           </Text>
         ) : null}
       </View>
@@ -42,19 +78,39 @@ export function CityCover({
 }
 
 const styles = StyleSheet.create((theme) => ({
-  frame: {
-    justifyContent: "flex-end",
+  card: {
     overflow: "hidden",
     borderRadius: theme.radius.lg,
     borderCurve: "continuous",
-    backgroundColor: theme.colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.surface,
   },
+  art: { height: 112, overflow: "hidden" },
+  tint: {
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.primarySoft,
+  },
+  tintMuted: { backgroundColor: theme.colors.surfaceMuted },
+  text: {
+    gap: theme.gap(0.125),
+    paddingHorizontal: theme.gap(1.5),
+    paddingTop: theme.gap(1.25),
+    paddingBottom: theme.gap(1.5),
+  },
+  wide: { minHeight: 140, justifyContent: "flex-end" },
+  only: { minHeight: 200 },
   caption: {
-    gap: theme.gap(0.25),
-    padding: theme.gap(1.5),
+    alignSelf: "flex-start",
+    maxWidth: 220,
+    margin: theme.gap(1.25),
+    paddingVertical: theme.gap(1),
+    paddingHorizontal: theme.gap(1.5),
+    borderRadius: theme.radius.md,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.surface,
   },
-  scrim: { backgroundColor: theme.colors.overlay },
   name: { ...theme.type.title, color: theme.colors.foreground },
-  count: { ...theme.type.footnote, color: theme.colors.muted },
-  onPhoto: { color: theme.colors.onOverlay },
+  count: { ...theme.type.caption, color: theme.colors.muted },
 }));

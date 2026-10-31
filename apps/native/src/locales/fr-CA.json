@@ -712,8 +712,20 @@
   "trip.slotCoffee": "Café",
   "goal.citySomewhere": "Ailleurs",
   "goal.citySearch": "Rechercher une ville",
-  "homePlaces.yourCities": "Vos villes",
-  "homePlaces.citiesHint": "Les lieux des reels et TikToks que vous avez enregistrés",
+  "homePlaces.planInCity": "À %{city}",
+  "homePlaces.planPickCity": "Choisir une ville",
+  "homePlaces.planWhichCity": "Quelle ville ?",
+  "homePlaces.noPlaceYet": {
+    "one": "%{formattedCount} élément, pas encore de lieu",
+    "many": "%{formattedCount} éléments, pas encore de lieu",
+    "other": "%{formattedCount} éléments, pas encore de lieu"
+  },
+  "homePlaces.fromSaves": {
+    "one": "D’après %{formattedCount} élément",
+    "many": "D’après %{formattedCount} éléments",
+    "other": "D’après %{formattedCount} éléments"
+  },
+  "homePlaces.shareTip": "Partagez un reel ou un TikTok avec Shelvr. Ses lieux arrivent ici, sous leur ville.",
   "homePlaces.noPlaceReading": "Recherche de lieux…",
   "homePlaces.noPlaceNone": "Aucun lieu dans celui-ci",
   "homePlaces.reviewCount": {

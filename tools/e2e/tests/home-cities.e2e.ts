@@ -6,11 +6,11 @@ import { startOnSeededHome } from "./seeded-home.ts";
 startOnSeededHome();
 
 test("opens Home on the seeded cities", async ({ screen }) => {
-  await expect(screen.getByText("Your cities")).toBeVisible({
+  await expect(screen.getByRole("button", /^Lisbon/)).toBeVisible({
     timeout: 30_000,
   });
   // The seeded save has no map pins: the city stays visible without a zero count.
-  const lisbon = screen.getByRole("button", /^Lisbon$/);
+  const lisbon = screen.getByRole("button", /^Lisbon/);
   await expect(lisbon).toBeVisible();
   await expect(screen.getByText("0 places")).toBeHidden();
   await lisbon.tap();
@@ -28,7 +28,7 @@ test("searches saved places from Home and clears back to cities", async ({
   await search.fill("Lisbon");
   const result = screen.getByRole("button", /^Belém Tower/);
   await expect(result).toBeVisible();
-  await expect(screen.getByText("Your cities")).toBeHidden();
+  await expect(screen.getByRole("button", /^Lisbon/)).toBeHidden();
   await app.screenshot("home-search-results");
   await search.fill("NoSuchSavedPlace");
   await expect(
@@ -36,7 +36,7 @@ test("searches saved places from Home and clears back to cities", async ({
   ).toBeVisible();
   await app.screenshot("home-search-no-results");
   await screen.getByRole("button", "Clear search").tap();
-  await expect(screen.getByText("Your cities")).toBeVisible();
+  await expect(screen.getByRole("button", /^Lisbon/)).toBeVisible();
   await search.fill("Belém");
   await expect(result).toBeVisible();
   await result.tap();

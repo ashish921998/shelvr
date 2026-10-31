@@ -712,8 +712,20 @@
   "trip.slotCoffee": "Café",
   "goal.citySomewhere": "En otro lugar",
   "goal.citySearch": "Buscar ciudades",
-  "homePlaces.yourCities": "Tus ciudades",
-  "homePlaces.citiesHint": "Lugares de los reels y TikToks que guardaste",
+  "homePlaces.planInCity": "En %{city}",
+  "homePlaces.planPickCity": "Elige una ciudad",
+  "homePlaces.planWhichCity": "¿Qué ciudad?",
+  "homePlaces.noPlaceYet": {
+    "one": "%{formattedCount} guardado, aún sin lugar",
+    "many": "%{formattedCount} guardados, aún sin lugar",
+    "other": "%{formattedCount} guardados, aún sin lugar"
+  },
+  "homePlaces.fromSaves": {
+    "one": "De %{formattedCount} guardado",
+    "many": "De %{formattedCount} guardados",
+    "other": "De %{formattedCount} guardados"
+  },
+  "homePlaces.shareTip": "Comparte un reel o TikTok con Shelvr. Sus lugares aparecerán aquí, en su ciudad.",
   "homePlaces.noPlaceReading": "Buscando lugares…",
   "homePlaces.noPlaceNone": "Aquí no se menciona ningún lugar",
   "homePlaces.reviewCount": {

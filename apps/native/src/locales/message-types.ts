@@ -637,8 +637,12 @@ export type MessageParams = {
   "trip.slotCoffee": undefined;
   "goal.citySomewhere": undefined;
   "goal.citySearch": undefined;
-  "homePlaces.yourCities": undefined;
-  "homePlaces.citiesHint": undefined;
+  "homePlaces.planInCity": { city: string };
+  "homePlaces.planPickCity": undefined;
+  "homePlaces.planWhichCity": undefined;
+  "homePlaces.noPlaceYet": { count: number };
+  "homePlaces.fromSaves": { count: number };
+  "homePlaces.shareTip": undefined;
   "homePlaces.noPlaceReading": undefined;
   "homePlaces.noPlaceNone": undefined;
   "homePlaces.reviewCount": { count: number };

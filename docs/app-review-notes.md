@@ -32,7 +32,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Core save loop
 
-- **Link:** tap Add, paste an Instagram Reel or TikTok link (any page link is accepted), and save. Processing saves appear under "Finding places…". Once processing finishes, saves with a city appear in Home's "Your cities". If a save the user is watching fails or names no place, a banner says "Couldn't find places in that link" with **Retry** (or **View** when a retry can't help). Every failed or placeless save is counted in one line under the cities (for example, 2 saves without a place), whose **Review** opens a sheet with **Retry** and **Delete** for each. Notes, photos and the camera are not part of this build.
+- **Link:** tap Add, paste an Instagram Reel or TikTok link (any page link is accepted), and save. Processing saves appear under "Finding places…". Once processing finishes, saves with a city appear as a city card on Home, under the Plan a date and Plan a trip tiles. If a save the user is watching fails or names no place, a banner says "Couldn't find places in that link" with **Retry** (or **View** when a retry can't help). Every failed or placeless save is counted in one line under the cities (for example, 2 saves without a place), whose **Review** opens a sheet with **Retry** and **Delete** for each. Notes, photos and the camera are not part of this build.
 - **Share Sheet:** From Safari, Instagram or TikTok, share to Shelvr. While signed in, content saves automatically. While signed out, Shelvr preserves the intent and resumes after sign-in. During onboarding, a shared link is held on the device until sign-in. If the app is relaunched or interrupted mid-save, the pending marker and local session resume the flow on the next launch; successful completion or explicit abandonment clears them. If native payload cleanup fails, the completed session stays available for **Try again** or **Cancel**.
 
 ## Pro / subscriptions (RevenueCat sandbox)
@@ -126,7 +126,7 @@ Subscription testing:
 
 Core review flow:
 
-1. From Home, tap Add, paste an Instagram Reel or TikTok link, and save. The save first shows processing, then the places it names appear under a city in "Your cities". A link that names no place shows a "Couldn't find places in that link" banner and is counted under the cities, with **Review**.
+1. From Home, tap Add, paste an Instagram Reel or TikTok link, and save. The save first shows processing, then the places it names appear on a city card on Home. A link that names no place shows a "Couldn't find places in that link" banner and is counted under the cities, with **Review**.
 2. Tap a city to open its page: a map with a pin per place, and a sheet listing the places.
 3. On the city page, tap "Plan a date" or "Plan a trip" to get a shortlist or a day-by-day trip selected within Shelvr from places already saved in that city. Places marked "We went" are excluded; planning does not send the saved collection or visit history to Gemini. Apple Maps locates trip stops.
 4. Tap a save to see its detail; the source link opens the original post.

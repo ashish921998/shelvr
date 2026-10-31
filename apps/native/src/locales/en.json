@@ -693,8 +693,18 @@
   "trip.slotCoffee": "Coffee",
   "goal.citySomewhere": "Somewhere else",
   "goal.citySearch": "Search cities",
-  "homePlaces.yourCities": "Your cities",
-  "homePlaces.citiesHint": "Places from the reels and TikToks you saved",
+  "homePlaces.planInCity": "In %{city}",
+  "homePlaces.planPickCity": "Pick a city",
+  "homePlaces.planWhichCity": "Which city?",
+  "homePlaces.noPlaceYet": {
+    "one": "%{formattedCount} save, no place yet",
+    "other": "%{formattedCount} saves, no place yet"
+  },
+  "homePlaces.fromSaves": {
+    "one": "From %{formattedCount} save",
+    "other": "From %{formattedCount} saves"
+  },
+  "homePlaces.shareTip": "Share a reel or TikTok to Shelvr. Its places land under their city here.",
   "homePlaces.noPlaceReading": "Finding places…",
   "homePlaces.noPlaceNone": "No place in this one",
   "homePlaces.reviewCount": {

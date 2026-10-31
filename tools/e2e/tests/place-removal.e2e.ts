@@ -112,7 +112,7 @@ test("takes an emptied city off Home once the person goes back", async ({
   await screen.getByRole("button", "Remove Houndstooth Coffee").tap();
   await expect(screen.getByText("No places left")).toBeVisible();
   await screen.getByTestId("BackButton").tap();
-  await expect(screen.getByText("Your cities")).toBeVisible();
+  await expect(screen.getByTestId("home-search-input")).toBeVisible();
   await expect(austin).toBeHidden();
   await app.screenshot("emptied-city-off-home");
 });
