@@ -19,7 +19,7 @@ const CITIES = [
 const NEIGHBOURHOODS = ["SoHo", "Chelsea", "Shoreditch", "Marais", "Shibuya"];
 
 function source(title: string): PlanSource {
-  return { itemId: "item1" as Id<"items">, places: [], title };
+  return { itemId: "item1" as Id<"items">, savedAt: 0, places: [], title };
 }
 
 const place = fc.record({

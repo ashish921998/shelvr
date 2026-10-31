@@ -1,3 +1,4 @@
+import { isRemovedSuggestion, type Removal } from "./placeRemovals";
 import type { Id } from "../_generated/dataModel";
 import type { ApplePoi } from "./appleMaps";
 import { nameWithin, nameWords, samePlace, type Placed } from "./placeIdentity";
@@ -388,9 +389,11 @@ export function keepSuggestion(
   context: {
     centre: LatLng;
     been: ReadonlySet<string>;
+    removed?: readonly Removal[];
     taken: Placed[];
   },
 ): boolean {
+  if (isRemovedSuggestion(context.removed ?? [], found)) return false;
   if (placeKey(found.name) === "") return false;
   if (distanceKm(found, context.centre) > SUGGEST_RADIUS_KM) return false;
   if (found.category !== undefined && LODGING_CATEGORIES.has(found.category))
