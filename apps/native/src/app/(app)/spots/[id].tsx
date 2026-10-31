@@ -116,7 +116,8 @@ function Spots({
   const mapHeight = rt.screen.height * MAP_SHARE;
   const openCity = () => {
     analytics.capture("share_spots_city_opened", { pin_count: pins.length });
-    router.replace({ pathname: "/city/[name]", params: { name: city } });
+    router.dismissTo("/(app)/(tabs)/(home)");
+    router.push({ pathname: "/city/[name]", params: { name: city } });
   };
   return (
     <View style={[styles.screen, { paddingTop: rt.insets.top }]}>

@@ -21,6 +21,8 @@ type Save = {
 const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   replace: vi.fn(),
+  dismissTo: vi.fn(),
+  push: vi.fn(),
   save: undefined as Save | null | undefined,
   impact: vi.fn(),
   success: vi.fn(),
@@ -39,7 +41,11 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
 vi.mock("expo-router", () => ({
-  useRouter: () => ({ replace: mocks.replace }),
+  useRouter: () => ({
+    replace: mocks.replace,
+    dismissTo: mocks.dismissTo,
+    push: mocks.push,
+  }),
   useLocalSearchParams: () => ({ id: "item-1" }),
 }));
 const fakes = vi.hoisted(() => ({
@@ -110,6 +116,8 @@ beforeEach(() => {
   vi.useFakeTimers();
   mocks.capture.mockReset();
   mocks.replace.mockReset();
+  mocks.dismissTo.mockReset();
+  mocks.push.mockReset();
   mocks.save = undefined;
   mocks.impact.mockReset();
   mocks.success.mockReset();
@@ -157,10 +165,15 @@ it("drops a pinned save's spots on its city and opens that city", () => {
     waited_ms: 0,
   });
   fireEvent.click(screen.getByText('spots.openCity {"city":"Austin"}'));
-  expect(mocks.replace).toHaveBeenCalledWith({
+  expect(mocks.dismissTo).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
+  expect(mocks.push).toHaveBeenCalledWith({
     pathname: "/city/[name]",
     params: { name: "Austin" },
   });
+  expect(mocks.dismissTo.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.push.mock.invocationCallOrder[0],
+  );
+  expect(mocks.replace).not.toHaveBeenCalled();
 });
 
 it("goes Home, as before, when the save has no place", () => {
