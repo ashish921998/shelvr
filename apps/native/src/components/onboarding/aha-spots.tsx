@@ -6,28 +6,13 @@ import {
 } from "@/components/onboarding/sample-trip-map";
 import type { AhaSample } from "@/lib/aha-sample";
 import { t, useAppLocale } from "@/lib/i18n";
-import { motion, springIn } from "@/lib/motion";
+import { springIn } from "@/lib/motion";
+import { useDroppedPins } from "@/lib/use-dropped-pins";
 import { SAMPLE_CITIES } from "@/lib/sample-cities";
 import { SAMPLE_CROPS } from "@/lib/sample-trip";
-import { useEffect, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
-
-/** Pins dropped so far, one per stagger; all at once under Reduce Motion, where each row only fades in. */
-function useDroppedPins(count: number): number {
-  const reduced = useReducedMotion();
-  const [dropped, setDropped] = useState(reduced ? count : 0);
-  useEffect(() => {
-    if (dropped >= count) return;
-    const timer = setTimeout(
-      () => setDropped(reduced ? count : dropped + 1),
-      reduced ? 0 : motion.duration.stagger,
-    );
-    return () => clearTimeout(timer);
-  }, [dropped, count, reduced]);
-  return dropped;
-}
 
 /** The shared reel's spots dropping onto a preview of the city page they land on. */
 export function AhaSpotsStep({

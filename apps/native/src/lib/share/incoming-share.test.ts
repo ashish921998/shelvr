@@ -165,6 +165,46 @@ describe("incoming share owner", () => {
     expect(state.phase.kind).toBe("complete");
   });
 
+  it("opens the spots reveal for the first saved link, and Home for a photo", () => {
+    const finish = (saved: ShareSession) => {
+      const { effects } = run(
+        [
+          { type: "reconciled", result: { kind: "new", session: saved } },
+          { type: "saveSettled", session: saved },
+          {
+            type: "nativeClearSettled",
+            ok: true,
+            for: { kind: "complete", session: saved },
+          },
+        ],
+        ctx(),
+        initialIncomingShare(false),
+      );
+      return effects[2].at(-1);
+    };
+    const one = session("s1", "saved");
+    one.entries[0].itemId = "item-1";
+    expect(finish(one)).toEqual({ type: "revealSpots", itemId: "item-1" });
+
+    const two = session("s2", "saved");
+    two.entries = [
+      { ...two.entries[0], itemId: "item-1" },
+      { ...two.entries[0], index: 1, itemId: "item-2" },
+    ];
+    expect(finish(two)).toEqual({ type: "revealSpots", itemId: "item-1" });
+
+    const mixed = session("s4", "saved");
+    mixed.entries = [
+      { ...mixed.entries[0], itemId: "item-1" },
+      { ...mixed.entries[0], index: 1, kind: "image", itemId: "item-2" },
+    ];
+    expect(finish(mixed)).toEqual({ type: "navigateHome" });
+
+    const image = session("s3", "saved");
+    image.entries[0] = { ...image.entries[0], kind: "image", itemId: "i" };
+    expect(finish(image)).toEqual({ type: "navigateHome" });
+  });
+
   it("never tombstones on iOS", () => {
     const { effects } = run(
       [

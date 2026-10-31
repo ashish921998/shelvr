@@ -28,6 +28,8 @@ import { hasResumableSharedPayloads } from "@/lib/share/resumable-payloads";
 
 type RawPayload = { value: string; shareType: string; mimeType?: string };
 
+const SPOTS = { pathname: "/spots/[id]", params: { id: "item-1" } };
+
 const mock = vi.hoisted(() => ({
   entitled: false,
   entitlementLoading: false,
@@ -228,9 +230,7 @@ it("presents one paywall per session across effect re-runs and saves once entitl
   expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
     url: link.value,
   });
-  await waitFor(() =>
-    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
-  );
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith(SPOTS));
   expect(mock.openPaywall).toHaveBeenCalledTimes(1);
 });
 
@@ -350,9 +350,7 @@ it("never records a tombstone on iOS, which does not replay shares", async () =>
   mock.platform = "ios";
   mock.entitled = true;
   render(<ShareScreen />);
-  await waitFor(() =>
-    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
-  );
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith(SPOTS));
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
   expect(mock.store.has(LAST_COMPLETED_SHARE_KEY)).toBe(false);
 });
@@ -385,9 +383,7 @@ it("clears the pending flag and the discard record once a share completes", asyn
     fingerprintSharePayloads([{ value: "https://old.test", shareType: "url" }]),
   );
   render(<ShareScreen />);
-  await waitFor(() =>
-    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
-  );
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith(SPOTS));
 
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
   expect(mock.secure.get(PENDING_SHARE_KEY)).toBe("");
@@ -421,9 +417,7 @@ it("still resumes and saves a different batch after a discard", async () => {
   mock.entitled = true;
   mock.router.replace.mockClear();
   render(<ShareScreen />);
-  await waitFor(() =>
-    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
-  );
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith(SPOTS));
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
   expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
     url: other.value,

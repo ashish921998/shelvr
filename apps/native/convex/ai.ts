@@ -24,6 +24,7 @@ import {
   MAX_ITEM_PLACES,
   normalizeCities,
   normalizePlaces,
+  normalizePlaceLocations,
 } from "./model/itemFields";
 import { logEvent } from "./model/log";
 import {
@@ -173,6 +174,7 @@ const intentsPromptBlock = (maxIntents: number): string =>
   ].join("\n");
 
 const MAX_CONTENT_CHARS = 8000;
+const LIST_PINS_TAKE_NO_CLUES: { name: string; location: string }[] = [];
 
 async function scheduleSteeringFor(
   ctx: ActionCtx,
@@ -261,6 +263,21 @@ const itemAnalysisSchema = z.object({
       PLACES_DESCRIPTION +
         " Read the whole text: a list of places often runs past the first lines.",
     ),
+  placeLocations: z
+    .array(
+      z.object({
+        name: z.string().describe("The exact corresponding name from places"),
+        location: z
+          .string()
+          .describe(
+            "The address, branch or neighbourhood explicitly stated for this place, copied from the source, at most 120 characters. Preserve the specific street or square rather than only the city. Never substitute a nearby attraction for the stated location or guess a branch.",
+          ),
+      }),
+    )
+    .optional()
+    .describe(
+      "Location clues that distinguish branches of the named places. Preserve every explicit branch, street address or neighbourhood; omit entries without such evidence. These are lookup context, not display names.",
+    ),
 });
 
 const recipeSchema = z
@@ -310,6 +327,7 @@ const speechRecipeSchema = z.object({ recipe: recipeSchema });
 
 const speechPlacesSchema = z.object({
   places: z.array(z.string()).describe(PLACES_DESCRIPTION),
+  placeLocations: itemAnalysisSchema.shape.placeLocations,
   cities: itemAnalysisSchema.shape.cities,
 });
 
@@ -445,6 +463,15 @@ function classificationOf(model: ModelResult): Classification {
     intents: sanitizeIntents(model.intents),
     cities: normalizeCities(model.cities),
     places: normalizePlaces(model.places),
+    ...(model.placeLocations !== undefined
+      ? {
+          placeLocations: normalizePlaceLocations(
+            model.placeLocations,
+            model.places,
+            model.cities,
+          ),
+        }
+      : {}),
     ...(model.placesHeard !== undefined
       ? { placesHeard: model.placesHeard }
       : {}),
@@ -558,6 +585,7 @@ async function analyzeLinkItem(
       intents: intentsForPart(result.intents, part),
       places: part.places,
       cities: part.cities,
+      placeLocations: LIST_PINS_TAKE_NO_CLUES,
       ...(parts.length > 1 ? { title: part.title } : {}),
     },
     page: { ...page, content: part.content },
@@ -717,7 +745,10 @@ function speechPlacesPrompt(page: PageData, transcript: string): string {
 }
 
 type Spoken = Partial<
-  Pick<LinkAnalysis, "recipe" | "places" | "cities" | "placesHeard">
+  Pick<
+    LinkAnalysis,
+    "recipe" | "places" | "cities" | "placesHeard" | "placeLocations"
+  >
 >;
 
 type SpeechEvent = "speech_recipe" | "speech_places";
@@ -744,6 +775,14 @@ async function fromSpeech(
       ...item.places,
     ]),
     placesHeard: spoken.placesHeard ?? item.placesHeard,
+    placeLocations: normalizePlaceLocations(
+      [
+        ...(spoken.placeLocations ?? result.placeLocations ?? []),
+        ...(item.placeLocations ?? []),
+      ],
+      [...(spoken.places ?? result.places ?? []), ...item.places],
+      result.cities,
+    ),
   };
 }
 
@@ -872,7 +911,8 @@ async function speechPlaces(
   result: LinkAnalysis,
   log: (outcome: string) => void,
 ): Promise<
-  Pick<LinkAnalysis, "places" | "cities" | "placesHeard"> | undefined
+  | Pick<LinkAnalysis, "places" | "cities" | "placesHeard" | "placeLocations">
+  | undefined
 > {
   try {
     const { object } = await generateObject({
@@ -893,6 +933,11 @@ async function speechPlaces(
     );
     return {
       places,
+      placeLocations: normalizePlaceLocations(
+        [...(result.placeLocations ?? []), ...(object.placeLocations ?? [])],
+        places,
+        result.cities,
+      ),
       placesHeard: true,
       cities:
         normalizeCities(result.cities).length > 0

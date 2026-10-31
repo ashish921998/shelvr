@@ -7,6 +7,7 @@ export type CityPin = {
   lat: number;
   lng: number;
   appleId?: string;
+  category?: string;
   number: number;
 };
 
@@ -23,6 +24,7 @@ export function cityPins(
       lat: number;
       lng: number;
       appleId?: string;
+      category?: string;
     }[];
   }[],
 ): CityPin[] {

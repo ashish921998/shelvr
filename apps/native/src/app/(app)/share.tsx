@@ -458,6 +458,12 @@ function runEffect(
     case "navigateHome":
       deps.router.replace("/(app)/(tabs)/(home)");
       return;
+    case "revealSpots":
+      deps.router.replace({
+        pathname: "/spots/[id]",
+        params: { id: effect.itemId },
+      });
+      return;
   }
 }
 
