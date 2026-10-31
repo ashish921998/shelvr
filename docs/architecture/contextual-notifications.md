@@ -12,13 +12,14 @@ record.
 
 Every notification about saves names one of them, or it is not sent.
 
-| Kind             | Example                                                  | When                                                             | Switch         |
-| ---------------- | -------------------------------------------------------- | ---------------------------------------------------------------- | -------------- |
-| `weekly_shelf`   | _"The 12-hour short rib" and 2 more you saved this week_ | Sunday 09:00 local, with 3 unopened saves, this week's and older | Weekly shelf   |
-| `read_reminder`  | _"Why bread rises" is ready when you are._               | An article unopened for a day or more (up to 90 days)            | Save reminders |
-| `cook_reminder`  | _Want to make "Lasagna" today?_                          | A recipe saved 3+ days ago, not opened in the past week          | Save reminders |
-| `visit_reminder` | _Still want to go to "As Bifanas do Afonso"?_            | A save naming a place not marked "We went", saved 3+ days ago    | Save reminders |
-| trial reminder   | _Your free trial ends in 2 days_                         | Local notification, 2 days before a trial renews (on `main`)     | OS permission  |
+| Kind             | Example                                                    | When                                                             | Switch         |
+| ---------------- | ---------------------------------------------------------- | ---------------------------------------------------------------- | -------------- |
+| `weekly_shelf`   | _"The 12-hour short rib" and 2 more you saved this week_   | Sunday 09:00 local, with 3 unopened saves, this week's and older | Weekly shelf   |
+| `read_reminder`  | _"Why bread rises" is ready when you are._                 | An article unopened for a day or more (up to 90 days)            | Save reminders |
+| `cook_reminder`  | _Want to make "Lasagna" today?_                            | A recipe saved 3+ days ago, not opened in the past week          | Save reminders |
+| `visit_reminder` | _Still want to go to "As Bifanas do Afonso"?_              | A save naming a place not marked "We went", saved 3+ days ago    | Save reminders |
+| `trip_eve`       | _Your Lisbon trip is tomorrow / You saved 6 places to go._ | 18:00 local the evening before a dated trip with saved stops     | Save reminders |
+| trial reminder   | _Your free trial ends in 2 days_                           | Local notification, 2 days before a trial renews (on `main`)     | OS permission  |
 
 ### Weekly shelf
 
@@ -75,6 +76,36 @@ functions in `convex/model/saveReminders.ts`, with tests next to them.
   `setSaveReminders` or the next `registerDevice` re-arms them.
 - **Where a tap goes.** Straight to the save (`/item/<id>`). The payload
   carries `kind` and `notificationId`, like the weekly shelf.
+
+### Trip eve
+
+`prepareDueTripEves` (hourly cron, `convex/notifications.ts`) reads the
+`tripPlans` whose `startDate` falls from UTC yesterday through two days ahead
+(`by_start_date`) and schedules `prepareTripEve` for each. `prepareTripEve`
+writes one `tripEveReminders` row per trip, and `sendTripEve` in
+`convex/notificationDelivery.ts` delivers it through the same claim, finish
+and recover machine as save reminders. The rules are pure functions in
+`convex/model/tripEve.ts`.
+
+- **When.** 18:00 in the owner's registered timezone on the day before
+  `startDate` (`tripEveAt`). A row is made only inside the two hours after
+  that, and only for a trip created before the eve, so a trip planned that
+  evening is not announced to the person who just made it.
+- **What.** The count is the stops on a planned day (1 or later) that came from
+  a save or a shared list, recounted at send time. Suggested and added stops
+  do not count. A trip with none, or one deleted after the row was made,
+  closes as `no_items` with no push.
+- **Who.** Save reminders on, the server switch on, a live owner, an enabled
+  device and a preferences row. The ignored-streak, weekly and gap limits do
+  not apply, because the person set this date.
+- **Budget.** A trip push counts as a send, so a save reminder waits 20 hours
+  after it. A save reminder also makes room for one: it is held when a trip
+  eve is due within the next 20 hours (`reminderBlocked`), looking at the
+  newest five trips only.
+- **Where a tap goes.** `/trip-plan/<id>`, `kind: "trip_eve"`.
+- **Rollback.** Keep `tripEveReminders` and the `by_start_date` index declared
+  once rows exist; a row outlives a deleted trip, so reverting the schema fails
+  the deploy.
 
 ### Events
 

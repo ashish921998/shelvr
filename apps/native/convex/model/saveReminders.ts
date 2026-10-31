@@ -159,10 +159,12 @@ export function reminderBlocked(
   sentAt: readonly number[],
   recentReminders: readonly { createdAt: number; opened: boolean }[],
   shelf?: { nextAt: number; sentThisWeek: boolean },
+  tripEveAt?: number,
 ): BudgetBlock | undefined {
   if (
     sentAt.some((at) => now - at < MIN_GAP_MS) ||
-    (shelf !== undefined && shelf.nextAt - now < MIN_GAP_MS)
+    (shelf !== undefined && shelf.nextAt - now < MIN_GAP_MS) ||
+    (tripEveAt !== undefined && tripEveAt - now < MIN_GAP_MS)
   )
     return "too_soon";
   const kept = shelf !== undefined && !shelf.sentThisWeek ? 1 : 0;

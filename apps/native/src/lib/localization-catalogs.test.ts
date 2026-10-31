@@ -120,6 +120,7 @@ describe("shipped localization resources", () => {
           "read" | "cook" | "visit",
           { title: string; body: string }
         >;
+        tripEve: { title: string; body: Record<string, string> };
       }
     > = notificationTranslations;
     expect(notificationCopy[locale]).toEqual({
@@ -142,6 +143,10 @@ describe("shipped localization resources", () => {
           title: messages["reminder.visitTitle"],
           body: messages["reminder.visitBody"],
         },
+      },
+      tripEve: {
+        title: messages["reminder.tripEveTitle"],
+        body: messages["reminder.tripEveBody"],
       },
     });
     const navigation = [

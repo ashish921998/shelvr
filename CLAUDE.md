@@ -92,7 +92,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `trips`: one day-by-day trip per travel space ("Plan my trip"), every stop one of the
     user's saves; a new trip replaces the old one. Old builds only; new trips are `tripPlans`
   - `tripPlans`: one planned trip ("Plan a trip" v2) for a city: days, pace, interests,
-    optional start date and stay, plus stop and saved counts. Every new plan is a new row.
+    optional start date (indexed by `by_start_date` for the trip eve sweep) and stay, plus stop and saved counts. Every new plan is a new row.
     Optional `listId` says the trip was planned from a shared list (provenance, one-way
     door, stays `v.optional`); the trip itself stays personal to the person who made it
   - `tripStops`: one stop of a `tripPlans` trip, on day 1..dayCount or day 0 (unplanned),
@@ -114,6 +114,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `weeklyDigests`: the persisted weekly shelf and its delivery state
   - `saveReminders`: one push naming one save (a place not yet visited, an unread article or a recipe),
     with its delivery state; also the reminder budget's memory
+  - `tripEveReminders`: one push the evening before a dated trip, one row per trip (`by_trip`),
+    with the same delivery state as `saveReminders`. Rows outlive a deleted trip so the claim
+    can close them; keep the table declared on rollback once rows exist
   - `waitlistSignups`: waitlist source of truth, projected to Resend
   - `feedbackSubmissions`: in-app feedback source of truth, projected to the Resend support inbox
     (see [feedback delivery](docs/architecture/feedback.md))
@@ -231,7 +234,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `setPreferences`, `setSaveReminders`, `registerDevice`, `unregisterDevice`, `markItemOpened`,
   `getDigest`, and `markDigestOpened`, plus internal digest and reminder preparation.
   `notificationDelivery.ts` holds the claim/finish/recover delivery machine for both, and
-  `model/saveReminders.ts` the reminder rules. See
+  `model/saveReminders.ts` the reminder rules. The trip eve push ("Your Lisbon trip is tomorrow",
+  18:00 local the day before a dated trip with saved stops) is `prepareDueTripEves` (hourly cron)
+  and `prepareTripEve`, delivered by `sendTripEve`, with its rules in `model/tripEve.ts`. See
   [contextual notifications](docs/architecture/contextual-notifications.md).
 - **`waitlist.ts`**: the public `join` action the web marketing site calls, plus the internal
   Resend projection and its bounded retry.
@@ -246,7 +251,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `model/appleJws.ts`), the shared list invite preview at `/list/invites/`, and
   `GET /health` (200/503 probe for uptime monitors, backed by the `health.ts` `ping` query).
 - **`crons.ts`**: refund consent sync retry, stale image import cleanup, stale processing-item
-  failure, waitlist Resend retry, weekly shelf and save reminder preparation, their delivery
+  failure, waitlist Resend retry, weekly shelf, save reminder and trip eve preparation, their delivery
   recovery, hourly feedback inbox delivery retry, daily payment-receipt
   retention purge, and the daily expired plan vote link purge.
 - **`auth.ts`**: `convexAuth()` setup with Google + Apple OAuth (Auth.js providers) and an optional

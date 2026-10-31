@@ -83,6 +83,7 @@ const catalogs: Record<
     namedShelf: Record<string, string>;
     namedShelfSingle: string;
     reminder: Record<ReminderKind, { title: string; body: string }>;
+    tripEve: { title: string; body: Record<string, string> };
   }
 > = translations;
 
@@ -143,5 +144,21 @@ export function reminderCopy(
   return {
     title: copy.title,
     body: copy.body.replace("%{title}", () => title),
+  };
+}
+
+export function tripEveCopy(
+  locale: string | undefined,
+  city: string,
+  count: number,
+) {
+  const selected = notificationLocale(locale) ?? "en";
+  const copy = catalogs[selected].tripEve;
+  return {
+    title: copy.title.replace("%{city}", () => truncateTitle(city) ?? city),
+    body: copy.body[pluralRules[selected](count)].replace(
+      "%{formattedCount}",
+      new Intl.NumberFormat(selected).format(count),
+    ),
   };
 }

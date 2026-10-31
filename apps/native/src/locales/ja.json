@@ -580,6 +580,10 @@
   "reminder.cookBody": "今日は「%{title}」を作ってみませんか？",
   "reminder.visitTitle": "保存した場所から",
   "reminder.visitBody": "「%{title}」、まだ行ってみたいですか？",
+  "reminder.tripEveTitle": "%{city}への旅行は明日です",
+  "reminder.tripEveBody": {
+    "other": "行きたい場所を%{formattedCount}件保存しています。"
+  },
   "search.noResults": "「%{query}」に一致する保存項目はありません。",
   "spaces.addedTo": "%{space}に追加しました",
   "spaces.removedFrom": "%{space}から取り除きました",

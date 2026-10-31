@@ -28,6 +28,13 @@
         "title": "Aus deinen gespeicherten Orten",
         "body": "Willst du noch zu „%{title}“?"
       }
+    },
+    "tripEve": {
+      "title": "Deine Reise nach %{city} ist morgen",
+      "body": {
+        "one": "Du hast %{formattedCount} Ort zum Besuchen gespeichert.",
+        "other": "Du hast %{formattedCount} Orte zum Besuchen gespeichert."
+      }
     }
   },
   "en": {
@@ -58,6 +65,13 @@
       "visit": {
         "title": "From your saved places",
         "body": "Still want to go to “%{title}”?"
+      }
+    },
+    "tripEve": {
+      "title": "Your %{city} trip is tomorrow",
+      "body": {
+        "one": "You saved %{formattedCount} place to go.",
+        "other": "You saved %{formattedCount} places to go."
       }
     }
   },
@@ -93,6 +107,14 @@
         "title": "De tus lugares guardados",
         "body": "¿Aún quieres ir a «%{title}»?"
       }
+    },
+    "tripEve": {
+      "title": "Tu viaje a %{city} es mañana",
+      "body": {
+        "one": "Guardaste %{formattedCount} lugar para visitar.",
+        "many": "Guardaste %{formattedCount} de lugares para visitar.",
+        "other": "Guardaste %{formattedCount} lugares para visitar."
+      }
     }
   },
   "es-MX": {
@@ -126,6 +148,14 @@
       "visit": {
         "title": "De tus lugares guardados",
         "body": "¿Todavía quieres ir a «%{title}»?"
+      }
+    },
+    "tripEve": {
+      "title": "Tu viaje a %{city} es mañana",
+      "body": {
+        "one": "Guardaste %{formattedCount} lugar para visitar.",
+        "many": "Guardaste %{formattedCount} de lugares para visitar.",
+        "other": "Guardaste %{formattedCount} lugares para visitar."
       }
     }
   },
@@ -161,6 +191,14 @@
         "title": "Parmi vos lieux enregistrés",
         "body": "Toujours envie d'aller à « %{title} » ?"
       }
+    },
+    "tripEve": {
+      "title": "Votre voyage à %{city} est demain",
+      "body": {
+        "one": "Vous avez enregistré %{formattedCount} lieu à visiter.",
+        "many": "Vous avez enregistré %{formattedCount} de lieux à visiter.",
+        "other": "Vous avez enregistré %{formattedCount} lieux à visiter."
+      }
     }
   },
   "fr-CA": {
@@ -195,6 +233,14 @@
         "title": "Parmi vos lieux enregistrés",
         "body": "Toujours envie d'aller à « %{title} » ?"
       }
+    },
+    "tripEve": {
+      "title": "Votre voyage à %{city} est demain",
+      "body": {
+        "one": "Vous avez enregistré %{formattedCount} lieu à visiter.",
+        "many": "Vous avez enregistré %{formattedCount} de lieux à visiter.",
+        "other": "Vous avez enregistré %{formattedCount} lieux à visiter."
+      }
     }
   },
   "ja": {
@@ -223,6 +269,12 @@
         "title": "保存した場所から",
         "body": "「%{title}」、まだ行ってみたいですか？"
       }
+    },
+    "tripEve": {
+      "title": "%{city}への旅行は明日です",
+      "body": {
+        "other": "行きたい場所を%{formattedCount}件保存しています。"
+      }
     }
   },
   "ko": {
@@ -250,6 +302,12 @@
       "visit": {
         "title": "저장한 장소에서",
         "body": "'%{title}', 아직 가 보고 싶나요?"
+      }
+    },
+    "tripEve": {
+      "title": "%{city} 여행이 내일이에요",
+      "body": {
+        "other": "가 볼 장소를 %{formattedCount}곳 저장했어요."
       }
     }
   },
@@ -284,6 +342,14 @@
       "visit": {
         "title": "Dos seus lugares salvos",
         "body": "Ainda quer ir a “%{title}”?"
+      }
+    },
+    "tripEve": {
+      "title": "Sua viagem para %{city} é amanhã",
+      "body": {
+        "one": "Você salvou %{formattedCount} lugar para visitar.",
+        "many": "Você salvou %{formattedCount} de lugares para visitar.",
+        "other": "Você salvou %{formattedCount} lugares para visitar."
       }
     }
   }

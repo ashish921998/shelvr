@@ -595,6 +595,11 @@
   "reminder.cookBody": "Want to make “%{title}” today?",
   "reminder.visitTitle": "From your saved places",
   "reminder.visitBody": "Still want to go to “%{title}”?",
+  "reminder.tripEveTitle": "Your %{city} trip is tomorrow",
+  "reminder.tripEveBody": {
+    "one": "You saved %{formattedCount} place to go.",
+    "other": "You saved %{formattedCount} places to go."
+  },
   "search.noResults": "No saves match “%{query}”.",
   "spaces.addedTo": "Added to %{space}",
   "spaces.removedFrom": "Removed from %{space}",
