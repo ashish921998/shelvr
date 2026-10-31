@@ -347,7 +347,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   The city page queues consecutive Undo actions, each with six visible seconds; expiry pauses
   during a request and a failed restore gets a fresh retry window. The shared `ui/undo-bar.tsx`
   supplies motion, pressed state and platform-specific announcements for places and trips.
-  No per-save removal field is added. Retain `placeRemovals` on rollback once rows exist.
+  No per-save removal field is added. Background list parts inherit the original save time in
+  optional `items.sourceSavedAt`, so late processing cannot bypass a removal by creating a new
+  child row. Retain `placeRemovals` and the optional lineage field on rollback once rows exist.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
   link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and
   `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the

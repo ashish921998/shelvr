@@ -279,6 +279,50 @@ describe("place removals", () => {
     ).resolves.toBeDefined();
   });
 
+  it("keeps late background split-list parts removed using the original save time", async () => {
+    const { t, userId, pin, remove, source } = await setup();
+    const parentId = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "processing",
+        tags: [],
+        searchText: "List",
+        url: "https://example.com/list",
+        title: "Original list",
+      }),
+    );
+    const removalId = await remove();
+    await t.run((ctx) => ctx.db.patch(parentId, { status: "ready" }));
+    expect(
+      await t.mutation(internal.items.addPlaceListParts, {
+        itemId: parentId,
+        parts: [
+          {
+            title: "List · Lisbon",
+            cities: ["Lisbon"],
+            places: [pin.name],
+            pins: [],
+            content: pin.name,
+          },
+        ],
+      }),
+    ).toBe(1);
+    const child = await t.run((ctx) =>
+      ctx.db
+        .query("items")
+        .withIndex("by_user_and_url", (q) =>
+          q.eq("userId", userId).eq("url", "https://example.com/list"),
+        )
+        .collect(),
+    );
+    const part = child.find((item) => item.title === "List · Lisbon");
+    expect(part).toBeDefined();
+    expect((await source(part!._id)).places).toEqual([]);
+    await t.mutation(api.placeRemovals.undoRemovePlace, { removalId });
+    expect((await source(part!._id)).places).toContain(pin.name);
+  });
+
   it("a deliberate new save is visible, while the old save stays removed", async () => {
     const { t, insert, itemId, remove, map } = await setup();
     const removalId = await remove();

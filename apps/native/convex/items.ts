@@ -222,10 +222,12 @@ function stripEmbedding(
   | "productsSearchStartedAt"
   | "places"
   | "placesHeard"
+  | "sourceSavedAt"
 > {
   const {
     places: _places,
     placesHeard: _placesHeard,
+    sourceSavedAt: _sourceSavedAt,
     embedding: _embedding,
     embeddingVersion: _version,
     embeddingAttempts: _attempts,
@@ -2292,6 +2294,7 @@ export const addPlaceListParts = internalMutation({
       const placePins = withListPins([], part.pins, cities);
       const partId = await ctx.db.insert("items", {
         userId: item.userId,
+        sourceSavedAt: item.sourceSavedAt ?? item._creationTime,
         type: "link",
         status: "ready",
         url,

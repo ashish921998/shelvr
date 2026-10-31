@@ -118,6 +118,7 @@ export default defineSchema({
     storageId: v.optional(v.id("_storage")),
     aspectRatio: v.optional(v.number()),
     capturedAt: v.optional(v.number()),
+    sourceSavedAt: v.optional(v.number()),
     latitude: v.optional(v.number()),
     longitude: v.optional(v.number()),
     placePins: v.optional(placePinsValidator),
