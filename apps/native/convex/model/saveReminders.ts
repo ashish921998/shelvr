@@ -1,7 +1,12 @@
 import type { Doc } from "../_generated/dataModel";
 import { env } from "../_generated/server";
 import { linkSource } from "./externalUrl";
-import { isStreetAddress, placeKey, splitSavedPlace } from "./plan";
+import {
+  isGenericPlaceName,
+  isStreetAddress,
+  placeKey,
+  splitSavedPlace,
+} from "./plan";
 
 export type ReminderKind = "read" | "cook" | "visit";
 
@@ -68,7 +73,7 @@ export function placeToVisit(
   for (const label of item.places ?? []) {
     const { name } = splitSavedPlace(label);
     if (
-      name !== "" &&
+      !isGenericPlaceName(name) &&
       !isStreetAddress(name) &&
       !visited.has(placeKey(name)) &&
       !visited.has(placeKey(label))
@@ -76,6 +81,13 @@ export function placeToVisit(
       return name;
   }
   return undefined;
+}
+
+export function savedPlaceKeys(item: Doc<"items">): string[] {
+  return (item.places ?? []).flatMap((label) => [
+    placeKey(label),
+    placeKey(splitSavedPlace(label).name),
+  ]);
 }
 
 export function reminderSubject(

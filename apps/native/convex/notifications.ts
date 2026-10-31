@@ -43,6 +43,7 @@ import {
   remindersOn,
   reminderCandidates,
   saveRemindersLive,
+  savedPlaceKeys,
 } from "./model/saveReminders";
 import { visibleItemPlaces, userRemovals } from "./model/placeRemovals";
 import { visitedPlaceKeys } from "./model/placeVisits";
@@ -711,12 +712,20 @@ export const prepareSaveReminder = internalMutation({
 
     const checks = { read: 0, cook: 0, visit: 0 };
     const removals = await userRemovals(ctx, userId);
+    const askedAbout = await Promise.all(
+      reminders
+        .filter((reminder) => reminder.kind === "visit")
+        .map((reminder) => ctx.db.get(reminder.itemId)),
+    );
     for (const candidate of reminderCandidates(
       items.map((item) => visibleItemPlaces(item, removals)),
       now,
       reminders[0]?.kind,
       await tripStopItemIds(ctx, userId),
-      await visitedPlaceKeys(ctx, userId),
+      new Set([
+        ...(await visitedPlaceKeys(ctx, userId)),
+        ...askedAbout.flatMap((item) => (item ? savedPlaceKeys(item) : [])),
+      ]),
     )) {
       if (checks[candidate.kind]++ >= REMINDER_CHECKS_PER_KIND) continue;
       const earlier = await ctx.db

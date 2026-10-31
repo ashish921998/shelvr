@@ -73,6 +73,13 @@ describe("asking about a saved place", () => {
     expect(placeToVisit(spot({ places }), been(places[1]))).toBeUndefined();
   });
 
+  it("never asks about a label that names no venue", () => {
+    for (const label of ["12, rue de la Paix, Paris", "Restaurant", "the bar"])
+      expect(
+        placeToVisit(spot({ places: [label] }), new Set()),
+      ).toBeUndefined();
+  });
+
   it("has nothing to ask once every place is visited, or none is named", () => {
     expect(
       placeToVisit(

@@ -331,6 +331,58 @@ describe("choosing a save reminder", () => {
     expect(await reminders()).toHaveLength(2);
   });
 
+  it("does not ask about a place it just asked about from another save", async () => {
+    const { prepare, due, reminders } = await setup({
+      saves: [
+        [
+          4,
+          { ...reel, title: "Lisbon again", places: ["As Bifanas do Afonso"] },
+        ],
+        [5, { ...reel, places: ["As Bifanas do Afonso"] }],
+      ],
+    });
+    await prepare();
+    expect(await reminders()).toHaveLength(1);
+    await due(NOW + DAY);
+    await prepare(NOW + DAY);
+    expect(await reminders()).toHaveLength(1);
+  });
+
+  it("leaves a place to the planned trip it is a stop of", async () => {
+    const { t, userId, ids, prepare, reminders } = await setup({
+      saves: [
+        [4, reel],
+        [5, { ...reel, places: ["Castelo de São Jorge"] }],
+      ],
+    });
+    await t.run(async (ctx) => {
+      const tripId = await ctx.db.insert("tripPlans", {
+        userId,
+        city: "Lisbon",
+        dayCount: 1,
+        pace: "easy",
+        interests: [],
+        stopCount: 1,
+        savedCount: 1,
+      });
+      await ctx.db.insert("tripStops", {
+        tripId,
+        userId,
+        day: 1,
+        order: 0,
+        source: "save",
+        itemId: ids[0],
+        name: "As Bifanas do Afonso",
+        lat: 38.71,
+        lng: -9.14,
+      });
+    });
+    await prepare();
+    expect(await reminders()).toMatchObject([
+      { itemId: ids[1], kind: "visit" },
+    ]);
+  });
+
   it("skips an article already planned as a trip stop", async () => {
     const { t, userId, ids, prepare, reminders } = await setup({
       saves: [
