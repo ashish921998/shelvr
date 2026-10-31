@@ -186,6 +186,7 @@ export const claimTripPlanInternal = internalMutation({
         ...asked,
         sources: [],
         been: await recentVisits(ctx, userId),
+        removed: await userRemovals(ctx, userId),
         pins: [],
         tastes: allowed
           ? places.map((place) => ({

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { LIST_DRAIN_BATCH } from "./model/sharedLists";
-import { joiner, listWithOwner, seedSave } from "./sharedLists.test";
+import { joiner, listWithOwner, seedSave } from "./sharedLists.test.helpers";
 import { seedNotes, signedInUser, type TestBackend } from "./test.setup";
 import { DELETE_BATCH } from "./users";
 

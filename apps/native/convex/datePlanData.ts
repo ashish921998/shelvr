@@ -94,6 +94,7 @@ export const claimDatePlanInternal = internalMutation({
       return {
         city,
         sources: [],
+        removed: await userRemovals(ctx, userId),
         been: await recentVisits(ctx, userId),
         pins: [],
         saves: [],

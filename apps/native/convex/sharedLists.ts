@@ -16,6 +16,7 @@ import {
   requireUserId,
   senderFirstName,
 } from "./model/auth";
+import { visibleSave } from "./model/placeRemovals";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   departMember,
@@ -485,7 +486,7 @@ export const addSavePlaces = authedMutation({
       ctx,
       list,
       userId,
-      savePlaces(item, city),
+      savePlaces(await visibleSave(ctx, item), city),
       Date.now(),
     );
   },
