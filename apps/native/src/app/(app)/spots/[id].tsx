@@ -1,5 +1,6 @@
 import { CityMap } from "@/components/city/city-map";
 import { SaveRow } from "@/components/city/save-row";
+import { AlsoAddTo } from "@/components/shared-list/also-add-to";
 import { PinBadge } from "@/components/onboarding/sample-trip-map";
 import { Button } from "@/components/ui/button";
 import { StitchMark } from "@/components/ui/stitch-mark";
@@ -15,7 +16,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import type { FunctionReturnType } from "convex/server";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
@@ -150,6 +151,7 @@ function Spots({
               reduced={reduced}
             />
           ))}
+          <AlsoAddTo itemId={save._id} city={city} count={pins.length} />
         </ScrollView>
         <View style={[styles.actions, { paddingBottom: rt.insets.bottom }]}>
           <Button title={t("spots.openCity", { city })} onPress={openCity} />
@@ -169,9 +171,7 @@ function Spots({
 function useLandingHaptics(dropped: number, total: number) {
   useEffect(() => {
     if (process.env.EXPO_OS !== "ios" || dropped === 0) return;
-    void (dropped >= total
-      ? Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
-      : Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light));
+    void (dropped >= total ? haptics.success() : haptics.impact());
   }, [dropped, total]);
 }
 
