@@ -14,6 +14,7 @@ import {
 import { cityPins, cityRows } from "@/lib/city-pins";
 import { useCityPlan } from "@/lib/city-plan";
 import { sheetSnaps } from "@/lib/city-sheet";
+import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { usePlaceRemoval } from "@/lib/place-removal";
 import { api } from "@convex/_generated/api";
@@ -108,6 +109,7 @@ export default function CityScreen() {
   if (items.data === undefined) return <ScreenLoader />;
 
   const select = (id: string) => {
+    if (id !== selected) void haptics.selection();
     setSelected(id);
     // A pin tapped with the list pulled down brings its row back into view.
     if (sheetTop.get() > snaps.middle) moveSheet(sheetTop, snaps.middle);
