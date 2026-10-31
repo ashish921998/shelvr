@@ -16,7 +16,7 @@ import type { FunctionReturnType } from "convex/server";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import * as Haptics from "expo-haptics";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useIsFocused, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
@@ -79,9 +79,10 @@ export default function SpotsScreen() {
   }, [reveal, waitedMs]);
 
   const gone = reveal.kind === "none";
+  const focused = useIsFocused();
   useEffect(() => {
-    if (gone) router.replace("/(app)/(tabs)/(home)");
-  }, [gone, router]);
+    if (gone && focused) router.replace("/(app)/(tabs)/(home)");
+  }, [gone, focused, router]);
 
   if (reveal.kind !== "spots" || !save) {
     return (
