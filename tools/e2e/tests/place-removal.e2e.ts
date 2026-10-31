@@ -36,31 +36,34 @@ test("removes duplicate places, restores with Undo, and keeps removal after rela
   await remove.tap();
   await expect(coffee).toBeHidden();
   await expect(other).toBeVisible();
-  await app.screenshot("place-removed-source-preserved");
+  await app.screenshot("place-removed-one-place-save-gone");
   await expect(
     screen.getByTestId("AnnotationContainer").getByLabel("Jo's Coffee"),
   ).toBeHidden();
   await expect(screen.getByRole("button", "Undo")).toBeHidden({
     timeout: 10_000,
   });
-  const source = screen.getByRole("button", "Austin favorites");
-  await expect(source).toBeVisible();
-  await source.tap();
-  await expect(
-    screen.getByTestId("fixture-item-detail-austin-favorites"),
-  ).toBeVisible();
-  await expect(screen.getByRole("button", "View on example.com")).toBeVisible();
-  await app.screenshot("source-save-preserved");
+  await expect(screen.getByRole("button", "Austin favorites")).toBeHidden();
 
   await app.open();
   await expect(austin).toBeVisible({ timeout: 30_000 });
   await austin.tap();
   await expect(coffee).toBeHidden();
   await expect(other).toBeVisible();
+  await expect(screen.getByRole("button", "Austin favorites")).toBeHidden();
   await expect(
     screen.getByTestId("AnnotationContainer").getByLabel("Jo's Coffee"),
   ).toBeHidden();
   await app.screenshot("removal-persists-after-relaunch");
+
+  await app.open();
+  await screen.getByLabel("Search your saves").fill("Austin favorites");
+  await screen.getByRole("button", /^Austin favorites/).tap();
+  await expect(
+    screen.getByTestId("fixture-item-detail-austin-favorites"),
+  ).toBeVisible();
+  await expect(screen.getByRole("button", "View on example.com")).toBeVisible();
+  await app.screenshot("removed-save-found-by-search");
 });
 
 test("keeps both consecutive removals recoverable with queued Undo", async ({
@@ -78,6 +81,12 @@ test("keeps both consecutive removals recoverable with queued Undo", async ({
   await screen.getByRole("button", "Remove Houndstooth Coffee").tap();
   await expect(coffee).toBeHidden();
   await expect(other).toBeHidden();
+  await expect(screen.getByText("No places left")).toBeVisible();
+  await expect(
+    screen.getByText("Save another place in Austin to see it here."),
+  ).toBeVisible();
+  await expect(screen.getByRole("button", "Plan a date")).toBeHidden();
+  await app.screenshot("city-empty-after-removals");
   await expect(screen.getByText("Removed Jo's Coffee")).toBeVisible();
   await screen.getByRole("button", "Undo").tap();
   await expect(coffee).toBeVisible();
@@ -86,4 +95,24 @@ test("keeps both consecutive removals recoverable with queued Undo", async ({
   await expect(other).toBeVisible();
   await expect(screen.getByRole("button", "Undo")).toBeHidden();
   await app.screenshot("both-places-restored");
+});
+
+test("takes an emptied city off Home once the person goes back", async ({
+  app,
+  screen,
+}) => {
+  const austin = screen.getByRole("button", /^Austin(?:,|$)/);
+  await austin.tap();
+  const coffee = screen.getByRole("button", "Jo's Coffee");
+  const other = screen.getByRole("button", "Houndstooth Coffee");
+  await coffee.tap();
+  await screen.getByRole("button", "Remove Jo's Coffee").tap();
+  await expect(coffee).toBeHidden();
+  await other.tap();
+  await screen.getByRole("button", "Remove Houndstooth Coffee").tap();
+  await expect(screen.getByText("No places left")).toBeVisible();
+  await screen.getByTestId("BackButton").tap();
+  await expect(screen.getByText("Your cities")).toBeVisible();
+  await expect(austin).toBeHidden();
+  await app.screenshot("emptied-city-off-home");
 });
