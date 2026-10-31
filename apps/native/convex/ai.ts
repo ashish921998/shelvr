@@ -526,9 +526,9 @@ function linkAnalysisPrompt(
 function retryReadNothingNew(item: Doc<"items">, read: LinkRead): boolean {
   if (item.enrichment !== "partial") return false;
   if (read.status === "unreadable") return true;
-  return (
-    read.page.incomplete === true && !read.page.content && Boolean(item.content)
-  );
+  const { content, recipe, placeList } = read.page;
+  if (content || recipe || placeList) return false;
+  return Boolean(item.content || item.recipe || item.places?.length);
 }
 
 async function analyzeLinkItem(
