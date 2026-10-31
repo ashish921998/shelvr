@@ -2,8 +2,7 @@ import * as Haptics from "expo-haptics";
 
 type Feedback = "selection" | "impact" | "success";
 
-/** Feedback is optional: unavailable hardware must never fail a save or edit. */
-async function play(kind: Feedback): Promise<void> {
+async function playOptionalFeedback(kind: Feedback): Promise<void> {
   if (process.env.EXPO_OS === "web") return;
   try {
     if (process.env.EXPO_OS === "android") {
@@ -21,12 +20,12 @@ async function play(kind: Feedback): Promise<void> {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
   } catch {
-    // System settings, device capabilities, and native availability can suppress feedback.
+    return;
   }
 }
 
 export const haptics = {
-  selection: () => play("selection"),
-  impact: () => play("impact"),
-  success: () => play("success"),
+  selection: () => playOptionalFeedback("selection"),
+  impact: () => playOptionalFeedback("impact"),
+  success: () => playOptionalFeedback("success"),
 };
