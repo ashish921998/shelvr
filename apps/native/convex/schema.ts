@@ -357,7 +357,6 @@ export default defineSchema({
 
   tripPlans: defineTable({
     userId: v.string(),
-    shareToken: v.optional(v.string()),
     name: v.optional(v.string()),
     city: v.string(),
     startDate: v.optional(v.string()),
@@ -367,9 +366,7 @@ export default defineSchema({
     stay: v.optional(tripStayValidator),
     stopCount: v.number(),
     savedCount: v.number(),
-  })
-    .index("by_user", ["userId"])
-    .index("by_share_token", ["shareToken"]),
+  }).index("by_user", ["userId"]),
 
   tripStops: defineTable({
     tripId: v.id("tripPlans"),

@@ -1039,9 +1039,5 @@
   "placeCorrection.search": "Buscar lugares",
   "placeCorrection.save": "Salvar lugares",
   "placeCorrection.retry": "Reabra este item para carregar os lugares atuais e tente novamente.",
-  "placeCorrection.wait": "Aguarde o processamento deste item terminar.",
-  "tripShare.title": "Compartilhar viagem",
-  "tripShare.hint": "Qualquer pessoa com o link pode ver seus dias, datas e paradas, incluindo alterações futuras. Sua hospedagem e fontes salvas continuam privadas.",
-  "tripShare.stop": "Parar de compartilhar",
-  "tripShare.stopHint": "Este link deixará de funcionar para todos."
+  "placeCorrection.wait": "Aguarde o processamento deste item terminar."
 }

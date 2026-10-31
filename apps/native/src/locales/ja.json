@@ -989,9 +989,5 @@
   "placeCorrection.search": "場所を検索",
   "placeCorrection.save": "場所を保存",
   "placeCorrection.retry": "この保存を開き直して最新の場所を読み込み、もう一度お試しください。",
-  "placeCorrection.wait": "この保存の処理が完了するまでお待ちください。",
-  "tripShare.title": "旅行を共有",
-  "tripShare.hint": "リンクを持つ人は、日程、日付、立ち寄り先と今後の変更を閲覧できます。宿泊先と保存元は公開されません。",
-  "tripShare.stop": "共有を停止",
-  "tripShare.stopHint": "このリンクは誰も開けなくなります。"
+  "placeCorrection.wait": "この保存の処理が完了するまでお待ちください。"
 }

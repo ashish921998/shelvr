@@ -16,7 +16,6 @@ import { analytics } from "@/lib/analytics";
 import { useDeleteTripPlan } from "@/lib/delete-trip-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
-import { useTripShare } from "@/lib/trip-share";
 import { useRenameTrip } from "@/lib/trip-edit";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
@@ -34,7 +33,6 @@ function TripHeader({
   onDone,
   onAddPlace,
   onDelete,
-  sharing,
 }: {
   overMap: boolean;
   editing: boolean;
@@ -42,14 +40,9 @@ function TripHeader({
   onDone: () => void;
   onAddPlace: () => void;
   onDelete: () => void;
-  sharing: ReturnType<typeof useTripShare>;
 }) {
   const { theme } = useUnistyles();
   const actions = [
-    { label: t("tripShare.title"), onPress: sharing.startSharing },
-    ...(sharing.shared
-      ? [{ label: t("tripShare.stop"), onPress: sharing.stopSharing }]
-      : []),
     { label: t("tripPlanner.edit"), onPress: onEdit },
     { label: t("tripPlanner.addPlace"), onPress: onAddPlace },
     { label: t("tripPlanner.delete"), destructive: true, onPress: onDelete },
@@ -116,17 +109,6 @@ function TripHeader({
       {iosHeader}
       <Stack.Toolbar placement="right">
         <Stack.Toolbar.Menu icon="ellipsis" tintColor={theme.colors.foreground}>
-          <Stack.Toolbar.MenuAction
-            icon="square.and.arrow.up"
-            onPress={sharing.startSharing}
-          >
-            {t("tripShare.title")}
-          </Stack.Toolbar.MenuAction>
-          {sharing.shared ? (
-            <Stack.Toolbar.MenuAction icon="link" onPress={sharing.stopSharing}>
-              {t("tripShare.stop")}
-            </Stack.Toolbar.MenuAction>
-          ) : null}
           <Stack.Toolbar.MenuAction icon="pencil" onPress={onEdit}>
             {t("tripPlanner.edit")}
           </Stack.Toolbar.MenuAction>
@@ -151,7 +133,6 @@ export default function TripPlanScreen() {
     convexQuery(api.tripPlannerData.getTripPlan, { tripId }),
   );
   const deleteTrip = useDeleteTripPlan();
-  const sharing = useTripShare(tripId);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState<string | null>(null);
   const rename = useRenameTrip(tripId, trip.data?.name);
@@ -213,7 +194,6 @@ export default function TripPlanScreen() {
     <>
       {backTitle}
       <TripHeader
-        sharing={sharing}
         overMap={hasMapPoints(data)}
         editing={editing}
         onEdit={() => {

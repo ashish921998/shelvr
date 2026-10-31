@@ -941,10 +941,6 @@ export type MessageParams = {
   "placeCorrection.save": undefined;
   "placeCorrection.retry": undefined;
   "placeCorrection.wait": undefined;
-  "tripShare.title": undefined;
-  "tripShare.hint": undefined;
-  "tripShare.stop": undefined;
-  "tripShare.stopHint": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

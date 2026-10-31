@@ -1014,9 +1014,5 @@
   "placeCorrection.search": "Orte suchen",
   "placeCorrection.save": "Orte speichern",
   "placeCorrection.retry": "Öffne diesen Eintrag erneut, um die aktuellen Orte zu laden, und versuche es noch einmal.",
-  "placeCorrection.wait": "Warte, bis dieser Eintrag verarbeitet wurde.",
-  "tripShare.title": "Reise teilen",
-  "tripShare.hint": "Alle mit dem Link können deine Tage, Daten und Stopps sehen, auch spätere Änderungen. Unterkunft und gespeicherte Quellen bleiben privat.",
-  "tripShare.stop": "Teilen beenden",
-  "tripShare.stopHint": "Dieser Link funktioniert dann für niemanden mehr."
+  "placeCorrection.wait": "Warte, bis dieser Eintrag verarbeitet wurde."
 }

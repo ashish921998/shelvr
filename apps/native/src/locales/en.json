@@ -1014,9 +1014,5 @@
   "placeCorrection.search": "Search places",
   "placeCorrection.save": "Save places",
   "placeCorrection.retry": "Reopen this save to load the latest places, then try again.",
-  "placeCorrection.wait": "Wait for this save to finish processing.",
-  "tripShare.title": "Share trip",
-  "tripShare.hint": "Anyone with the link can view your days, dates and stops, including later edits. Your accommodation and source saves stay private.",
-  "tripShare.stop": "Stop sharing",
-  "tripShare.stopHint": "This link will stop working for everyone who has it."
+  "placeCorrection.wait": "Wait for this save to finish processing."
 }

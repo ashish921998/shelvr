@@ -124,7 +124,6 @@ import type * as subscriptions from "../subscriptions.js";
 import type * as tripData from "../tripData.js";
 import type * as tripPlanner from "../tripPlanner.js";
 import type * as tripPlannerData from "../tripPlannerData.js";
-import type * as tripShares from "../tripShares.js";
 import type * as trips from "../trips.js";
 import type * as users from "../users.js";
 import type * as waitlist from "../waitlist.js";
@@ -252,7 +251,6 @@ declare const fullApi: ApiFromModules<{
   tripData: typeof tripData;
   tripPlanner: typeof tripPlanner;
   tripPlannerData: typeof tripPlannerData;
-  tripShares: typeof tripShares;
   trips: typeof trips;
   users: typeof users;
   waitlist: typeof waitlist;
