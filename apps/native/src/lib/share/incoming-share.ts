@@ -296,10 +296,6 @@ function complete(
   return { state: { ...state, completing: sid }, effects };
 }
 
-/**
- * A share of links opens the screen that drops the first saved one's spots on the map (Safari's
- * page Share sends the page twice); a photo, or nothing saved, goes Home.
- */
 function afterSave(session: ShareSession): ShareEffect {
   const first = session.entries.find(
     (e) => e.status === "saved" && e.itemId !== undefined,

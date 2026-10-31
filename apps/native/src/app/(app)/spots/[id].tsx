@@ -25,7 +25,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 const MAP_SHARE = 0.45;
 const TICK_MS = 500;
 
-/** The reveal for one save, re-read every half second so the waits can run out. */
 type Save = NonNullable<FunctionReturnType<typeof api.items.getItem>>;
 
 function useReveal(id: string): {
@@ -38,7 +37,6 @@ function useReveal(id: string): {
   );
   const [startedAt] = useState(() => Date.now());
   const [now, setNow] = useState(startedAt);
-  // When the save was first seen ready; set during render, the way city-map holds its camera.
   const [readyAt, setReadyAt] = useState<number | null>(null);
   const save = item.isError ? null : item.data;
   if (save?.status === "ready" && readyAt === null) setReadyAt(now);
@@ -57,7 +55,6 @@ function useReveal(id: string): {
   return { reveal, save, waitedMs };
 }
 
-/** After one shared link: its spots drop onto the city they belong to, or the share ends on Home as before. */
 export default function SpotsScreen() {
   useAppLocale();
   const router = useRouter();
@@ -109,7 +106,6 @@ function Spots({
   const router = useRouter();
   const { rt, theme } = useUnistyles();
   const reduced = useReducedMotion();
-  // Fixed once shown, so a late Apple lookup does not reshuffle the drop.
   const [pins] = useState<CityPin[]>(() =>
     cityPins([{ _id: save._id, placePins: found }]),
   );
@@ -166,7 +162,6 @@ function Spots({
   );
 }
 
-/** A light tap as each pin lands and a success when the last one does: the moment people film. */
 function useLandingHaptics(dropped: number, total: number) {
   useEffect(() => {
     if (process.env.EXPO_OS !== "ios" || dropped === 0) return;
@@ -176,7 +171,6 @@ function useLandingHaptics(dropped: number, total: number) {
   }, [dropped, total]);
 }
 
-/** Every row takes its room from the start, so the sheet's size stays put while the pins drop. */
 function SpotRow({
   pin,
   shown,

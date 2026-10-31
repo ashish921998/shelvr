@@ -285,7 +285,6 @@ export type AnalyticsEventProperties = {
       | "sheet_failed";
   };
   shared_content_saved: { item_count: number };
-  // The screen after one shared link: its spots dropped on the city map, or it went Home instead.
   share_spots_revealed: { pin_count: number; waited_ms: number };
   share_spots_skipped: {
     reason: "missing" | "failed" | "no_place" | "timeout";

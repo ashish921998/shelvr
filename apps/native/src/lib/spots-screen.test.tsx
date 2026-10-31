@@ -149,7 +149,6 @@ it("drops a pinned save's spots on its city and opens that city", () => {
   render(<SpotsScreen />);
   expect(screen.getByText('spots.addedTo {"city":"Austin"}')).toBeTruthy();
   expect(screen.getByText("Odd Duck")).toBeTruthy();
-  // The save the spots came from, and Apple's category only where it gave one.
   expect(screen.getByText("from Austin's best tacos")).toBeTruthy();
   expect(screen.getAllByText(/^label /)).toHaveLength(1);
   expect(mocks.success).toHaveBeenCalledWith("success");

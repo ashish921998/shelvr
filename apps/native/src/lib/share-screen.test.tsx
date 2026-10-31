@@ -28,7 +28,6 @@ import { hasResumableSharedPayloads } from "@/lib/share/resumable-payloads";
 
 type RawPayload = { value: string; shareType: string; mimeType?: string };
 
-// One saved link ends on the screen that drops its spots on the map.
 const SPOTS = { pathname: "/spots/[id]", params: { id: "item-1" } };
 
 const mock = vi.hoisted(() => ({

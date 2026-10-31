@@ -38,10 +38,6 @@ const LABEL = {
   Hotel: "placeCategory.hotel",
 } as const;
 
-/**
- * "☕ Café" for a pin Apple Maps matched to a category. Undefined when Apple gave none, or one this
- * list does not name, so a place is never labelled with a guess.
- */
 export function placeCategoryLabel(
   category: string | undefined,
 ): string | undefined {
