@@ -13,7 +13,7 @@ import {
   UNPLANNED_DAY,
 } from "@convex/model/tripPlan";
 import type { OptimisticLocalStore } from "convex/browser";
-import type { FunctionArgs } from "convex/server";
+import type { FunctionArgs, FunctionReturnType } from "convex/server";
 import { useAction, useMutation } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
@@ -352,6 +352,21 @@ export function useTripPlaceSearch(
   locale: string,
 ): PlaceSearch {
   const search = useAction(api.tripPlanner.searchTripPlaces);
+  const run = useCallback(
+    (text: string) => search({ tripId, query: text, locale }),
+    [search, tripId, locale],
+  );
+  return usePlaceSearch(run, query);
+}
+
+type SearchTripPlacesResult = FunctionReturnType<
+  typeof api.tripPlanner.searchTripPlaces
+>;
+
+export function usePlaceSearch(
+  run: (text: string) => Promise<SearchTripPlacesResult>,
+  query: string,
+): PlaceSearch {
   // The answer and the text it answers; any other text is still being searched.
   const [answer, setAnswer] = useState<{
     text: string;
@@ -364,7 +379,7 @@ export function useTripPlaceSearch(
     const ask = ++latest.current;
     if (short) return;
     const timer = setTimeout(() => {
-      search({ tripId, query: text, locale })
+      run(text)
         .then((result) => {
           if (ask !== latest.current) return;
           analytics.capture("trip_plan_place_searched", {
@@ -385,7 +400,7 @@ export function useTripPlaceSearch(
         });
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [locale, search, short, text, tripId]);
+  }, [run, short, text]);
   if (short) return { status: "idle" };
   return answer?.text === text ? answer.result : { status: "searching" };
 }

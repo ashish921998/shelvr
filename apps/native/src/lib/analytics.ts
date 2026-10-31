@@ -291,6 +291,14 @@ export type AnalyticsEventProperties = {
     waited_ms: number;
   };
   share_spots_city_opened: { pin_count: number };
+  shared_list_created: { cities: number };
+  shared_list_invite_sent: { shared: boolean; surface: "new" | "list" };
+  shared_list_join_tapped: { signed_in: boolean };
+  shared_list_joined: { joined: boolean; onboarded_before: boolean };
+  shared_list_opened: { places: number; members: number; fresh: number };
+  shared_list_place_opened: { action: "save" | "card" | "maps" };
+  shared_list_place_added: { from: "save" | "search" | "spots" };
+  shared_list_left: { owner: boolean };
   // Android replays a share on task restore; counts the replays the share screen skipped.
   share_ghost_skipped: Record<string, never>;
   save_recall_shown: { match_count: number };
