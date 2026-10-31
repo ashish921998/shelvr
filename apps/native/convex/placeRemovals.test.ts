@@ -952,6 +952,22 @@ describe("place removals", () => {
       expect(await cityNames(t)).toEqual(["Porto"]);
     });
 
+    it("does not hand a pin with no city to the city that is left", async () => {
+      const { t, itemId, pin, remove } = await setup();
+      await t.run((ctx) =>
+        ctx.db.patch(itemId, {
+          title: "Portugal",
+          cities: ["Lisbon", "Porto"],
+          places: ["Tigre, Alfama, Lisbon", "Sol, Porto"],
+          placePins: [pin, { name: "Belem", lat: 38.69, lng: -9.2 }],
+        }),
+      );
+      await remove();
+      const porto = await t.query(api.items.listCityItems, { city: "Porto" });
+      expect(porto.flatMap((save) => save.placePins ?? [])).toEqual([]);
+      expect(await rowTitles(t, "Lisbon")).toEqual(["Portugal"]);
+    });
+
     it("comes back in a new save of the same place", async () => {
       const { t, insert, remove } = await setup();
       await remove();
