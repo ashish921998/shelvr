@@ -64,6 +64,11 @@ function serveList() {
   });
 }
 
+const CLUES_READ_OFF_LIST_LINES = [
+  { name: "Marcy Land", location: "Minato City, Tokyo" },
+  { name: "Savoy Azabujuban", location: "Azabujuban, Tokyo" },
+];
+
 function model(cityCall: () => Promise<unknown>) {
   generateObject.mockImplementation(async (call: { system?: string }) =>
     call.system === PLACE_LIST_CITIES_SYSTEM
@@ -80,6 +85,7 @@ function model(cityCall: () => Promise<unknown>) {
             ],
             cities: ["Tokyo"],
             places: ["Marcy Land"],
+            placeLocations: CLUES_READ_OFF_LIST_LINES,
           },
         },
   );
