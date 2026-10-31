@@ -116,7 +116,10 @@ describe("shipped localization resources", () => {
         namedSingle: string;
         namedShelf: Record<string, string>;
         namedShelfSingle: string;
-        reminder: Record<"read" | "cook", { title: string; body: string }>;
+        reminder: Record<
+          "read" | "cook" | "visit",
+          { title: string; body: string }
+        >;
       }
     > = notificationTranslations;
     expect(notificationCopy[locale]).toEqual({
@@ -134,6 +137,10 @@ describe("shipped localization resources", () => {
         cook: {
           title: messages["reminder.cookTitle"],
           body: messages["reminder.cookBody"],
+        },
+        visit: {
+          title: messages["reminder.visitTitle"],
+          body: messages["reminder.visitBody"],
         },
       },
     });

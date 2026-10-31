@@ -543,6 +543,8 @@ export type MessageParams = {
   "reminder.readBody": { title: string };
   "reminder.cookTitle": undefined;
   "reminder.cookBody": { title: string };
+  "reminder.visitTitle": undefined;
+  "reminder.visitBody": { title: string };
   "search.noResults": { query: string };
   "spaces.addedTo": { space: string };
   "spaces.removedFrom": { space: string };

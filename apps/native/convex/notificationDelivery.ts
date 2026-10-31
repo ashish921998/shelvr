@@ -22,10 +22,13 @@ import {
   remindersOn,
   reminderSubject,
   saveRemindersLive,
+  type ReminderKind,
 } from "./model/saveReminders";
+import { placeKey } from "./model/plan";
+import { beenPlaces } from "./tripData";
 
 const NOTIFICATION_KIND = "weekly_shelf";
-const reminderNotificationKind = (kind: "read" | "cook") => `${kind}_reminder`;
+const reminderNotificationKind = (kind: ReminderKind) => `${kind}_reminder`;
 
 const LEASE_MS = 5 * 60 * 1000;
 const RECEIPT_DELAY_MS = 15 * 60 * 1000;
@@ -506,7 +509,7 @@ export const claimReminder = internalMutation({
     v.object({
       attempt: v.number(),
       recipients: v.array(recipientValidator),
-      kind: v.union(v.literal("read"), v.literal("cook")),
+      kind: v.union(v.literal("read"), v.literal("cook"), v.literal("visit")),
       itemId: v.id("items"),
       subject: v.string(),
     }),
@@ -567,7 +570,13 @@ export const claimReminder = internalMutation({
       item !== null &&
       item.userId === reminder.userId &&
       item.status === "ready"
-        ? reminderSubject(item, reminder.kind)
+        ? reminderSubject(
+            item,
+            reminder.kind,
+            reminder.kind === "visit"
+              ? new Set((await beenPlaces(ctx, reminder.userId)).map(placeKey))
+              : undefined,
+          )
         : undefined;
     const read = await ctx.db
       .query("itemReads")

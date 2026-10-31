@@ -7,7 +7,7 @@ import { internalMutation, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { enrichItem, enrichedItemValidator } from "./items";
-import { tripStopItemIds } from "./tripData";
+import { beenPlaces, tripStopItemIds } from "./tripData";
 import { liveOwner, authedMutation, authedQuery } from "./model/auth";
 import {
   localHour,
@@ -44,6 +44,7 @@ import {
   reminderCandidates,
   saveRemindersLive,
 } from "./model/saveReminders";
+import { placeKey } from "./model/plan";
 
 const digestResponseValidator = v.object({
   _id: v.id("weeklyDigests"),
@@ -707,12 +708,13 @@ export const prepareSaveReminder = internalMutation({
       : undefined;
     if (reminderBlocked(now, sentAt, streak, shelf) !== undefined) return null;
 
-    const checks = { read: 0, cook: 0 };
+    const checks = { read: 0, cook: 0, visit: 0 };
     for (const candidate of reminderCandidates(
       items,
       now,
       reminders[0]?.kind,
       await tripStopItemIds(ctx, userId),
+      new Set((await beenPlaces(ctx, userId)).map(placeKey)),
     )) {
       if (checks[candidate.kind]++ >= REMINDER_CHECKS_PER_KIND) continue;
       const earlier = await ctx.db

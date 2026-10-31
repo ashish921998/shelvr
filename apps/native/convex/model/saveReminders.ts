@@ -1,8 +1,9 @@
 import type { Doc } from "../_generated/dataModel";
 import { env } from "../_generated/server";
 import { linkSource } from "./externalUrl";
+import { placeKey } from "./plan";
 
-type ReminderKind = "read" | "cook";
+export type ReminderKind = "read" | "cook" | "visit";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -11,6 +12,7 @@ export const READ_MIN_AGE_MS = DAY_MS;
 export const READ_MAX_AGE_MS = 90 * DAY_MS;
 export const COOK_MIN_AGE_MS = 3 * DAY_MS;
 const COOK_RECENTLY_OPENED_MS = 7 * DAY_MS;
+export const VISIT_MIN_AGE_MS = 3 * DAY_MS;
 
 export const MIN_GAP_MS = 20 * HOUR_MS;
 export const WEEKLY_LIMIT = 4;
@@ -55,10 +57,24 @@ export function reminderKind(item: Doc<"items">): ReminderKind | undefined {
   return undefined;
 }
 
+/** The first place a ready save names that its owner has not marked "We went"; a recipe stays a recipe. */
+export function placeToVisit(
+  item: Doc<"items">,
+  visited: ReadonlySet<string>,
+): string | undefined {
+  if (item.status !== "ready" || reminderKind(item) === "cook")
+    return undefined;
+  return item.places
+    ?.map((name) => name.trim())
+    .find((name) => name !== "" && !visited.has(placeKey(name)));
+}
+
 export function reminderSubject(
   item: Doc<"items">,
   kind: ReminderKind,
+  visited: ReadonlySet<string> = new Set(),
 ): string | undefined {
+  if (kind === "visit") return placeToVisit(item, visited);
   const subject =
     (kind === "cook" ? item.recipe?.name?.trim() : undefined) ||
     item.title?.trim();
@@ -71,31 +87,47 @@ type ReminderCandidate = {
   subject: string;
 };
 
+/** Places come first: they are what Shelvr is for. The kind sent last goes to the back. */
+const KIND_ORDER: readonly ReminderKind[] = ["visit", "read", "cook"];
+
 export function reminderCandidates(
   newestFirst: readonly Doc<"items">[],
   now: number,
   previousKind: ReminderKind | undefined,
   tripStops: ReadonlySet<string>,
+  visited: ReadonlySet<string> = new Set(),
 ): ReminderCandidate[] {
-  const read: ReminderCandidate[] = [];
-  const cook: ReminderCandidate[] = [];
+  const byKind: Record<ReminderKind, ReminderCandidate[]> = {
+    visit: [],
+    read: [],
+    cook: [],
+  };
   for (const item of newestFirst) {
+    const age = now - item._creationTime;
+    const place = placeToVisit(item, visited);
+    if (place !== undefined) {
+      if (age >= VISIT_MIN_AGE_MS && !tripStops.has(item._id))
+        byKind.visit.push({ item, kind: "visit", subject: place });
+      continue;
+    }
     const kind = reminderKind(item);
     if (kind === undefined) continue;
     const subject = reminderSubject(item, kind);
     if (subject === undefined) continue;
-    const age = now - item._creationTime;
     if (
       kind === "read" &&
       age >= READ_MIN_AGE_MS &&
       age <= READ_MAX_AGE_MS &&
       !tripStops.has(item._id)
     )
-      read.push({ item, kind, subject });
+      byKind.read.push({ item, kind, subject });
     if (kind === "cook" && age >= COOK_MIN_AGE_MS)
-      cook.push({ item, kind, subject });
+      byKind.cook.push({ item, kind, subject });
   }
-  return previousKind === "read" ? [...cook, ...read] : [...read, ...cook];
+  return [
+    ...KIND_ORDER.filter((kind) => kind !== previousKind),
+    ...KIND_ORDER.filter((kind) => kind === previousKind),
+  ].flatMap((kind) => byKind[kind]);
 }
 
 export function openedTooRecently(
