@@ -606,13 +606,13 @@ export async function claimListPlan(
 ): Promise<ListPlanClaim> {
   const list = await requireCoveredList(ctx, listId, userId);
   const wanted = cityKey(city);
-  const been = await recentVisits(ctx, userId);
-  const skipped = new Set(been.map(placeKey));
-  const rows = (await listPlaces(ctx, list._id)).filter(
-    (row) =>
-      row.visitedAt === undefined &&
-      cityKey(row.city) === wanted &&
-      !skipped.has(placeKey(row.name)),
+  const inCity = (await listPlaces(ctx, list._id)).filter(
+    (row) => cityKey(row.city) === wanted,
+  );
+  const visited = await recentVisits(ctx, userId);
+  const skipped = new Set(visited.map(placeKey));
+  const rows = inCity.filter(
+    (row) => row.visitedAt === undefined && !skipped.has(placeKey(row.name)),
   );
   if (options.needsPlaces && rows.length === 0) {
     throw new Error("No places in this city");
@@ -634,7 +634,14 @@ export async function claimListPlan(
   }
   return {
     places,
-    been,
+    been: [
+      ...new Set([
+        ...visited,
+        ...inCity
+          .filter((row) => row.visitedAt !== undefined)
+          .map((row) => row.name),
+      ]),
+    ],
     removed: await userRemovals(ctx, userId),
     aiAllowed: await listAiAllowed(ctx, userId, rows),
   };

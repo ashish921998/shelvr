@@ -165,6 +165,111 @@ describe("makeDatePlan from a shared list", () => {
   });
 });
 
+function appleOffering(names: string[]) {
+  return vi.fn(async (input: string) => {
+    const url = new URL(input);
+    if (url.pathname === "/v1/token") {
+      return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
+    }
+    const category = url.searchParams
+      .get("includePoiCategories")
+      ?.split(",")[0];
+    return Response.json({
+      results: names.map((name, i) => ({
+        name,
+        id: `A-${i}`,
+        poiCategory: category,
+        structuredAddress: { locality: "Lisbon" },
+        coordinate: {
+          latitude: near(3 + i * 0.1).lat,
+          longitude: near(0).lng,
+        },
+      })),
+    });
+  });
+}
+
+describe("a place the list marked visited", () => {
+  it("is not suggested back on a date", async () => {
+    await stubMaps();
+    vi.stubGlobal("fetch", appleOffering(["Red Frog", "Blue Frog"]));
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const frog = await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: RED_FROG,
+    });
+    await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: frog,
+      visited: true,
+    });
+    const result = await owner.t.action(api.datePlans.makeDatePlan, {
+      city: "Lisbon",
+      kind: "classic",
+      listId,
+    });
+    expect(stopNames(result)).toContain("Blue Frog");
+    expect(stopNames(result)).not.toContain("Red Frog");
+  });
+
+  it("is not suggested back on a trip", async () => {
+    await stubMaps();
+    vi.stubGlobal("fetch", appleOffering(["Red Frog", "Blue Frog"]));
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const frog = await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: RED_FROG,
+    });
+    await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: frog,
+      visited: true,
+    });
+    const { tripId } = await owner.t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 2,
+      pace: "easy",
+      interests: ["food"],
+      listId,
+    });
+    const trip = await owner.t.query(api.tripPlannerData.getTripPlan, {
+      tripId: tripId!,
+    });
+    const names = [
+      ...(trip?.days.flat() ?? []),
+      ...(trip?.unplanned ?? []),
+    ].map((stop) => stop.name);
+    expect(names).toContain("Blue Frog");
+    expect(names).not.toContain("Red Frog");
+  });
+
+  it("still leaves another branch of that name on the plan", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const frog = await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: RED_FROG,
+    });
+    await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: { ...RED_FROG, ...near(40) },
+    });
+    await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: frog,
+      visited: true,
+    });
+    const { saves } = await owner.t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 1,
+      pace: "easy",
+      interests: [],
+      listId,
+    });
+    expect(saves).toBe(3);
+  });
+});
+
 describe("planning a city the list does not hold", () => {
   it("gives a date plan no Apple call and no stops", async () => {
     const fetchMock = await stubMaps();
