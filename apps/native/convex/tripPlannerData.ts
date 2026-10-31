@@ -32,7 +32,7 @@ import {
   tidyCity,
   tripPaceValidator,
 } from "./model/trip";
-import { tidyPlace, tidyText } from "./model/tripPlace";
+import { tidyPlace, tidyText, tripSummary } from "./model/tripPlace";
 import {
   MAX_TRIP_NAME_CHARS,
   tripInterestValidator,
@@ -46,7 +46,6 @@ import {
   UNPLANNED_DAY,
   type TripInterest,
   type TripPlace,
-  tripSummary,
   type TripPlanStop,
   type TripSavePlace,
 } from "./model/tripPlan";

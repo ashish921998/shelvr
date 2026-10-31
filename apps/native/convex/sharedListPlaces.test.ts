@@ -200,9 +200,18 @@ describe("addSharedListPlace", () => {
         place: { name: "Nowhere", lat: 91, lng: 0 },
       }),
     ).rejects.toThrow(/Place required/);
-    await base.run((ctx) =>
-      ctx.db.patch(listId, { placeCount: MAX_LIST_PLACES }),
-    );
+    await base.run(async (ctx) => {
+      for (let n = 2; n < MAX_LIST_PLACES; n++) {
+        await ctx.db.insert("sharedListPlaces", {
+          listId,
+          addedBy: owner.userId,
+          name: `Spot ${n}`,
+          lat: 38 + n * 0.01,
+          lng: -9,
+          addedAt: n,
+        });
+      }
+    });
     await expect(
       owner.t.mutation(api.sharedLists.addSharedListPlace, {
         listId,
@@ -326,7 +335,7 @@ describe("searchListPlaces", () => {
     vi.stubGlobal("fetch", fetchMock);
     const { base, token, listId } = await listWithOwner();
     const bo = await joiner(base, token);
-    const result = await bo.t.action(api.sharedListSearch.searchListPlaces, {
+    const result = await bo.t.action(api.tripPlanner.searchListPlaces, {
       listId,
       query: "  ramen ",
     });
@@ -342,14 +351,14 @@ describe("searchListPlaces", () => {
   it("answers nothing for a short query and refuses a stranger", async () => {
     const { base, owner, listId } = await listWithOwner();
     expect(
-      await owner.t.action(api.sharedListSearch.searchListPlaces, {
+      await owner.t.action(api.tripPlanner.searchListPlaces, {
         listId,
         query: "r",
       }),
     ).toEqual({ available: true, places: [] });
     const stranger = await signedInUser(base, { pro: true });
     await expect(
-      stranger.t.action(api.sharedListSearch.searchListPlaces, {
+      stranger.t.action(api.tripPlanner.searchListPlaces, {
         listId,
         query: "ramen",
       }),
@@ -367,7 +376,7 @@ describe("searchListPlaces", () => {
       if (sub) await ctx.db.delete(sub._id);
     });
     await expect(
-      bo.t.action(api.sharedListSearch.searchListPlaces, {
+      bo.t.action(api.tripPlanner.searchListPlaces, {
         listId,
         query: "ramen",
       }),
@@ -381,7 +390,7 @@ describe("searchListPlaces", () => {
     const { base, owner, token, listId } = await listWithOwner();
     const bo = await joiner(base, token);
     await base.run((ctx) => setTestConsent(ctx, owner.userId, "declined"));
-    const result = await bo.t.action(api.sharedListSearch.searchListPlaces, {
+    const result = await bo.t.action(api.tripPlanner.searchListPlaces, {
       listId,
       query: "ramen",
     });

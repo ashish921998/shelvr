@@ -2,16 +2,20 @@ import { type Infer, v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { liveOwner } from "./auth";
-import { sameTripPlace, type TripPlaceRef } from "./placeIdentity";
-import { countCities, pinsForCity, uniquePlacePins } from "./trip";
-import { tidyPlace } from "./tripPlace";
+import {
+  countCities,
+  MAX_CITY_CHARS,
+  pinsForCity,
+  uniquePlacePins,
+} from "./trip";
+import { tidyPlace, tidyText } from "./tripPlace";
 import {
   tripPlaceValidator,
   tripPlanSummaryValidator,
   type TripPlace,
 } from "./tripPlan";
 
-export const MAX_LIST_NAME_CHARS = 60;
+const MAX_LIST_NAME_CHARS = 60;
 export const MAX_LIST_CITIES = 5;
 export const MAX_LIST_PLACES = 200;
 export const MAX_LIST_MEMBERS = 8;
@@ -108,37 +112,15 @@ export function inviteToken(): string {
 }
 
 export function tidyListName(name: string): string {
-  const tidy = name.replace(/\s+/g, " ").trim().slice(0, MAX_LIST_NAME_CHARS);
-  if (tidy === "") throw new Error("Name required");
+  const tidy = tidyText(name, MAX_LIST_NAME_CHARS);
+  if (tidy === undefined) throw new Error("Name required");
   return tidy;
-}
-
-export function placeRef(
-  place: Pick<Doc<"sharedListPlaces">, "name" | "lat" | "lng"> & {
-    appleId?: string;
-    itemId?: Id<"items">;
-  },
-): TripPlaceRef {
-  return {
-    name: place.name,
-    lat: place.lat,
-    lng: place.lng,
-    ...(place.appleId !== undefined ? { appleId: place.appleId } : {}),
-    ...(place.itemId !== undefined ? { itemId: place.itemId } : {}),
-  };
-}
-
-export function sameListPlace(
-  a: Parameters<typeof placeRef>[0],
-  b: Parameters<typeof placeRef>[0],
-): boolean {
-  return sameTripPlace(placeRef(a), placeRef(b));
 }
 
 export function foundPlace(input: TripPlace & { city?: string }): NewListPlace {
   const { area: _area, ...place } = tidyPlace(input);
-  const city = input.city?.replace(/\s+/g, " ").trim();
-  return { ...place, ...(city ? { city } : {}) };
+  const city = tidyText(input.city, MAX_CITY_CHARS);
+  return { ...place, ...(city !== undefined ? { city } : {}) };
 }
 
 export function savePlaces(item: Doc<"items">, city?: string): NewListPlace[] {

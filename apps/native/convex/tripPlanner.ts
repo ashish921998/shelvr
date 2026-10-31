@@ -399,27 +399,22 @@ const MAX_SEARCH_RESULTS = 15;
 /** Add a place looks a little wider than suggestions do: a day trip out of town is fine. */
 const SEARCH_RADIUS_KM = SUGGEST_RADIUS_KM * 2;
 
-export type SearchClaim = {
+type SearchClaim = {
   city?: string;
   centre: LatLng | null;
   aiAllowed: boolean;
 };
 
-export type SearchResult = { available: boolean; places: TripPlace[] };
+type SearchResult = { available: boolean; places: TripPlace[] };
 
-export function tidyQuery(query: string): string {
-  return query.replace(/\s+/g, " ").trim().slice(0, MAX_SEARCH_CHARS);
-}
-
-export function shortQuery(query: string): boolean {
-  return query.length < MIN_SEARCH_CHARS;
-}
-
-export async function searchPlacesNear(
-  claim: SearchClaim,
-  query: string,
+async function placeSearch(
+  typed: string,
   locale: string | undefined,
+  claimSearch: () => Promise<SearchClaim>,
 ): Promise<SearchResult> {
+  const query = typed.replace(/\s+/g, " ").trim().slice(0, MAX_SEARCH_CHARS);
+  if (query.length < MIN_SEARCH_CHARS) return { available: true, places: [] };
+  const claim = await claimSearch();
   // The trip's centre comes from the saves' pins, so a declined account sends Apple nothing,
   // as createTripPlan does.
   const maps = claim.aiAllowed ? await openMaps(appleLang(locale)) : null;
@@ -455,13 +450,25 @@ export const searchTripPlaces = action({
     locale: v.optional(v.string()),
   },
   returns: searchTripPlacesResultValidator,
-  handler: async (ctx, args): Promise<SearchResult> => {
-    const query = tidyQuery(args.query);
-    if (shortQuery(query)) return { available: true, places: [] };
-    const claim = await ctx.runMutation(
-      internal.tripPlannerData.claimTripSearchInternal,
-      { tripId: args.tripId },
-    );
-    return await searchPlacesNear(claim, query, args.locale);
+  handler: async (ctx, args): Promise<SearchResult> =>
+    await placeSearch(args.query, args.locale, () =>
+      ctx.runMutation(internal.tripPlannerData.claimTripSearchInternal, {
+        tripId: args.tripId,
+      }),
+    ),
+});
+
+export const searchListPlaces = action({
+  args: {
+    listId: v.id("sharedLists"),
+    query: v.string(),
+    locale: v.optional(v.string()),
   },
+  returns: searchTripPlacesResultValidator,
+  handler: async (ctx, args): Promise<SearchResult> =>
+    await placeSearch(args.query, args.locale, () =>
+      ctx.runMutation(internal.sharedLists.claimListSearchInternal, {
+        listId: args.listId,
+      }),
+    ),
 });

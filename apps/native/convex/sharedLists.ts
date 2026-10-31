@@ -37,7 +37,6 @@ import {
   memberOf,
   newPlaceCount,
   previewNames,
-  sameListPlace,
   savePlaces,
   sharedListDetailValidator,
   sharedListSummaryValidator,
@@ -46,14 +45,15 @@ import {
   type ListPlanPlace,
   type NewListPlace,
 } from "./model/sharedLists";
+import { sameTripPlace } from "./model/placeIdentity";
 import { saveError } from "./model/saveErrors";
-import { cityKey, MAX_CITY_CHARS, middleOf, tidyCity } from "./model/trip";
+import { cityKey, MAX_CITY_CHARS, middleOf } from "./model/trip";
+import { tidyText, tripSummary } from "./model/tripPlace";
 import {
   hasProEntitlement,
   hasProEntitlementStatus,
   requireProEntitlement,
 } from "./subscriptions";
-import { tripSummary } from "./model/tripPlan";
 
 async function memberList(
   ctx: QueryCtx,
@@ -69,7 +69,7 @@ async function memberList(
   return membership === null ? null : { list, membership };
 }
 
-export async function requireMember(
+async function requireMember(
   ctx: QueryCtx,
   listId: Id<"sharedLists">,
   userId: Id<"users">,
@@ -92,35 +92,49 @@ async function liveList(
   return (await liveOwner(ctx, list.ownerId)) === null ? null : list;
 }
 
-export async function insertListPlaces(
+async function insertListPlaces(
   ctx: MutationCtx,
-  list: Doc<"sharedLists">,
+  listId: Id<"sharedLists">,
   userId: Id<"users">,
   places: NewListPlace[],
   now: number,
-): Promise<number> {
-  const existing = await listPlaces(ctx, list._id);
+): Promise<Id<"sharedListPlaces">[]> {
+  const existing = await listPlaces(ctx, listId);
   const kept: NewListPlace[] = [];
   for (const place of places) {
-    if (existing.some((row) => sameListPlace(row, place))) continue;
-    if (kept.some((row) => sameListPlace(row, place))) continue;
+    if (existing.some((row) => sameTripPlace(row, place))) continue;
+    if (kept.some((row) => sameTripPlace(row, place))) continue;
     if (existing.length + kept.length >= MAX_LIST_PLACES) break;
     kept.push(place);
   }
+  const ids: Id<"sharedListPlaces">[] = [];
   for (const place of kept) {
-    await ctx.db.insert("sharedListPlaces", {
-      ...place,
-      listId: list._id,
-      addedBy: userId,
-      addedAt: now,
-    });
+    ids.push(
+      await ctx.db.insert("sharedListPlaces", {
+        ...place,
+        listId,
+        addedBy: userId,
+        addedAt: now,
+      }),
+    );
   }
-  if (kept.length > 0) {
-    await ctx.db.patch(list._id, {
-      placeCount: existing.length + kept.length,
-    });
+  if (ids.length > 0) {
+    await ctx.db.patch(listId, { placeCount: existing.length + ids.length });
   }
-  return kept.length;
+  return ids;
+}
+
+async function requireListRoom(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+): Promise<void> {
+  const memberships = await ctx.db
+    .query("sharedListMembers")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .take(MAX_LISTS_PER_USER);
+  if (memberships.length >= MAX_LISTS_PER_USER) {
+    throw new Error("Too many lists");
+  }
 }
 
 export const createSharedList = authedMutation({
@@ -132,18 +146,10 @@ export const createSharedList = authedMutation({
     const name = tidyListName(args.name);
     const cities = [
       ...new Set(
-        args.cities
-          .map((city) => tidyCity(city).slice(0, MAX_CITY_CHARS))
-          .filter((city) => city !== ""),
+        args.cities.flatMap((city) => tidyText(city, MAX_CITY_CHARS) ?? []),
       ),
     ].slice(0, MAX_LIST_CITIES);
-    const memberships = await ctx.db
-      .query("sharedListMembers")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .take(MAX_LISTS_PER_USER);
-    if (memberships.length >= MAX_LISTS_PER_USER) {
-      throw new Error("Too many lists");
-    }
+    await requireListRoom(ctx, userId);
     await rateLimiter.limit(ctx, "sharedListCreate", {
       key: userId,
       throws: true,
@@ -162,8 +168,6 @@ export const createSharedList = authedMutation({
       joinedAt: now,
       seenAt: now,
     });
-    const list = await ctx.db.get(listId);
-    if (list === null) throw new Error("List not found");
     const places: NewListPlace[] = [];
     const saves = await readySavesNewestFirst(ctx, userId);
     for (const city of cities) {
@@ -174,7 +178,7 @@ export const createSharedList = authedMutation({
         }
       }
     }
-    await insertListPlaces(ctx, list, userId, places, now);
+    await insertListPlaces(ctx, listId, userId, places, now);
     return listId;
   },
 });
@@ -328,13 +332,7 @@ export const joinSharedList = authedMutation({
       key: userId,
       throws: true,
     });
-    const memberships = await ctx.db
-      .query("sharedListMembers")
-      .withIndex("by_user", (q) => q.eq("userId", userId))
-      .take(MAX_LISTS_PER_USER);
-    if (memberships.length >= MAX_LISTS_PER_USER) {
-      throw new Error("Too many lists");
-    }
+    await requireListRoom(ctx, userId);
     const members = await listMembers(ctx, list._id);
     if (members.length >= MAX_LIST_MEMBERS) throw new Error("List is full");
     const now = Date.now();
@@ -461,17 +459,15 @@ export const addSavePlaces = authedMutation({
     if (item === null || item.userId !== userId || item.status !== "ready") {
       throw new Error("Save not found");
     }
-    const city =
-      args.city === undefined
-        ? undefined
-        : tidyCity(args.city).slice(0, MAX_CITY_CHARS) || undefined;
-    return await insertListPlaces(
+    const city = tidyText(args.city, MAX_CITY_CHARS);
+    const inserted = await insertListPlaces(
       ctx,
-      list,
+      list._id,
       userId,
       savePlaces(await visibleSave(ctx, item), city),
       Date.now(),
     );
+    return inserted.length;
   },
 });
 
@@ -496,17 +492,17 @@ export const addSharedListPlace = authedMutation({
     const list = await requireEditableList(ctx, args.listId, userId);
     const next = foundPlace(args.place);
     const existing = (await listPlaces(ctx, list._id)).find((row) =>
-      sameListPlace(row, next),
+      sameTripPlace(row, next),
     );
     if (existing !== undefined) return existing._id;
-    if (list.placeCount >= MAX_LIST_PLACES) throw new Error("List is full");
-    const placeId = await ctx.db.insert("sharedListPlaces", {
-      ...next,
-      listId: list._id,
-      addedBy: userId,
-      addedAt: Date.now(),
-    });
-    await ctx.db.patch(list._id, { placeCount: list.placeCount + 1 });
+    const [placeId] = await insertListPlaces(
+      ctx,
+      list._id,
+      userId,
+      [next],
+      Date.now(),
+    );
+    if (placeId === undefined) throw new Error("List is full");
     return placeId;
   },
 });
@@ -556,16 +552,23 @@ export async function listAiAllowed(
   return true;
 }
 
+async function coveredNow(
+  ctx: MutationCtx,
+  list: Doc<"sharedLists">,
+  userId: Id<"users">,
+): Promise<boolean> {
+  return await listCovered(ctx, list, userId, (id) =>
+    hasProEntitlement(ctx, id),
+  );
+}
+
 export async function requireCoveredList(
   ctx: MutationCtx,
   listId: Id<"sharedLists">,
   userId: Id<"users">,
 ): Promise<Doc<"sharedLists">> {
   const { list } = await requireMember(ctx, listId, userId);
-  const covered = await listCovered(ctx, list, userId, (id) =>
-    hasProEntitlement(ctx, id),
-  );
-  if (!covered) throw saveError("pro_required");
+  if (!(await coveredNow(ctx, list, userId))) throw saveError("pro_required");
   return list;
 }
 
@@ -574,11 +577,9 @@ export async function requirePlanAccess(
   plan: Doc<"tripPlans">,
   userId: Id<"users">,
 ): Promise<void> {
-  if (
-    plan.listId !== undefined &&
-    (await coveredListMember(ctx, plan.listId, userId)) !== null
-  ) {
-    return;
+  if (plan.listId !== undefined) {
+    const found = await memberList(ctx, plan.listId, userId);
+    if (found !== null && (await coveredNow(ctx, found.list, userId))) return;
   }
   await requireProEntitlement(ctx, userId);
 }
@@ -616,19 +617,6 @@ export async function listPlanPlaces(
     });
   }
   return { rows, places };
-}
-
-export async function coveredListMember(
-  ctx: MutationCtx,
-  listId: Id<"sharedLists">,
-  userId: Id<"users">,
-): Promise<Doc<"sharedLists"> | null> {
-  const found = await memberList(ctx, listId, userId);
-  if (found === null) return null;
-  const covered = await listCovered(ctx, found.list, userId, (id) =>
-    hasProEntitlement(ctx, id),
-  );
-  return covered ? found.list : null;
 }
 
 export const claimListSearchInternal = internalMutation({
