@@ -49,6 +49,19 @@ function namesCity(label: Label, city: string | undefined): boolean {
   );
 }
 
+function namesPin(
+  label: Label,
+  pin: { name: string; city?: string },
+  cities: readonly string[],
+): boolean {
+  const own = parseLabel(pin.name, [...cities, pin.city ?? ""]);
+  return (
+    own.key === label.key &&
+    namesCity(label, pin.city) &&
+    (!label.area || !own.area || label.area === own.area)
+  );
+}
+
 export function isRemovedSuggestion(
   removals: readonly Removal[],
   pin: Placed,
@@ -80,7 +93,9 @@ function namesPlaceIn(item: Doc<"items">, city: string): boolean {
       (label) =>
         namesCity(label, city) &&
         (label.cities.length > 0 ||
-          !item.placePins?.some((pin) => venueKey(pin.name) === label.key)),
+          !item.placePins?.some((pin) =>
+            namesPin(label, pin, item.cities ?? []),
+          )),
     )
   );
 }
@@ -96,23 +111,12 @@ export function visibleItemPlaces(
     applicable.some((row) => removedPin(row, pin)),
   );
   const placePins = item.placePins?.filter((pin) => !hidden.includes(pin));
-  const namesPin = (
-    label: Label,
-    pin: { name: string; city?: string },
-  ): boolean => {
-    const own = parseLabel(pin.name, [...cities, pin.city ?? ""]);
-    return (
-      own.key === label.key &&
-      namesCity(label, pin.city) &&
-      (!label.area || !own.area || label.area === own.area)
-    );
-  };
   const labels = placeLabels(item);
   const hidesLabel = (
     label: Label,
     pin: Placed & { city?: string },
   ): boolean => {
-    if (!namesPin(label, pin)) return false;
+    if (!namesPin(label, pin, cities)) return false;
     if (!label.area || parseLabel(pin.name, [...cities, pin.city ?? ""]).area)
       return true;
     const branches = labels.filter(
@@ -128,7 +132,7 @@ export function visibleItemPlaces(
     (!label.area || label.area === parseLabel(row.name, [row.city]).area);
   const keep = (value: string): boolean => {
     const label = parseLabel(value, cities);
-    if (placePins?.some((pin) => namesPin(label, pin))) return true;
+    if (placePins?.some((pin) => namesPin(label, pin, cities))) return true;
     if (hidden.some((pin) => hidesLabel(label, pin))) return false;
     return !applicable.some((row) => namesRemoval(label, row));
   };
