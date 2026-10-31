@@ -92,14 +92,31 @@ describe("addSavePlaces", () => {
       addedBy: bo.userId,
       itemId,
       city: "Lisbon",
-      tags: ["seafood", "date night"],
     });
+    expect(ramiro?.tags).toBeUndefined();
     expect(JSON.stringify(rows)).not.toContain("Bo's picks");
     const seenByOwner = await owner.t.query(
       api.sharedLists.listSharedLists,
       {},
     );
     expect(seenByOwner[0]?.newCount).toBe(1);
+  });
+
+  it("keeps a save's tags only when the save names one place", async () => {
+    const { base, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const solo = await seedSave(base, bo.userId, {
+      pins: [{ name: "Solo Roasters", ...near(6) }],
+      tags: ["coffee"],
+    });
+    await bo.t.mutation(api.sharedLists.addSavePlaces, {
+      listId,
+      itemId: solo,
+    });
+    const rows = await placeRows(base, listId);
+    expect(rows.find((row) => row.name === "Solo Roasters")?.tags).toEqual([
+      "coffee",
+    ]);
   });
 
   it("keeps to the chosen city and refuses another person's save", async () => {

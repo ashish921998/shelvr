@@ -5,7 +5,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { DatePlanResult } from "./model/datePlan";
-import { joiner, listWithOwner, near } from "./sharedLists.test.helpers";
+import {
+  joiner,
+  listWithOwner,
+  near,
+  seedSave,
+} from "./sharedLists.test.helpers";
 import { setTestConsent, signedInUser, type TestBackend } from "./test.setup";
 
 const TRIP_BUCKET_CAPACITY = 5;
@@ -188,6 +193,42 @@ function appleOffering(names: string[]) {
     });
   });
 }
+
+describe("a save's tags on a shared list", () => {
+  it("speak for a place only when the save names that one place", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const { base, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const guide = await seedSave(base, bo.userId, {
+      pins: [
+        { name: "Bookshop Bertrand", ...near(5) },
+        { name: "Tile Museum", ...near(6) },
+      ],
+      tags: ["coffee"],
+    });
+    const solo = await seedSave(base, bo.userId, {
+      pins: [{ name: "Solo Roasters", ...near(7) }],
+      tags: ["coffee"],
+    });
+    for (const itemId of [guide, solo]) {
+      await bo.t.mutation(api.sharedLists.addSavePlaces, { listId, itemId });
+    }
+    await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: { name: "Jardim", ...near(8), category: "Park", city: "Lisbon" },
+    });
+    const result = await bo.t.action(api.datePlans.makeDatePlan, {
+      city: "Lisbon",
+      kind: "lowkey",
+      listId,
+    });
+    expect(stopNames(result)).toEqual(
+      expect.arrayContaining(["Solo Roasters", "Jardim"]),
+    );
+    expect(stopNames(result)).not.toContain("Bookshop Bertrand");
+    expect(stopNames(result)).not.toContain("Tile Museum");
+  });
+});
 
 describe("a place the list marked visited", () => {
   it("is not suggested back on a date", async () => {

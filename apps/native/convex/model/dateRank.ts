@@ -1,5 +1,5 @@
 import { isRemovedSuggestion, type Removal } from "./placeRemovals";
-import type { Id } from "../_generated/dataModel";
+import type { Doc, Id } from "../_generated/dataModel";
 import type { ApplePoi } from "./appleMaps";
 import {
   type DateEvening,
@@ -10,7 +10,7 @@ import {
   pairs,
   sameVenue,
 } from "./datePlan";
-import { placeKey } from "./plan";
+import { placeKey, splitSavedPlace } from "./plan";
 import { placeKinds } from "./placeKinds";
 import { distanceKm } from "./trip";
 import { samePlace } from "./placeIdentity";
@@ -124,6 +124,33 @@ export function dateSlotOf(
   return kind === "classic"
     ? classicSlot(category, known)
     : lowkeySlot(category, known);
+}
+
+export function namesOneVenue(item: Doc<"items">): boolean {
+  const pins = item.placePins ?? [];
+  const keyOf = (name: string) => placeKey(splitSavedPlace(name).name);
+  const venueOf = (pin: (typeof pins)[number]) => ({
+    ...pin,
+    name: splitSavedPlace(pin.name).name,
+  });
+  const names = [
+    ...(item.intents ?? [])
+      .filter((intent) => intent.kind === "open_maps")
+      .map((intent) => intent.value),
+    ...(item.places ?? []),
+    ...pins.map((pin) => pin.name),
+  ];
+  const venues = new Set(names.map(keyOf).filter((key) => key !== ""));
+  const branches = pins.some((pin, i) =>
+    pins
+      .slice(0, i)
+      .some(
+        (other) =>
+          keyOf(other.name) === keyOf(pin.name) &&
+          !sameVenue(venueOf(other), venueOf(pin)),
+      ),
+  );
+  return venues.size === 1 && !branches;
 }
 
 /** A saved place with a pin, and what the save it came from says about it. */
