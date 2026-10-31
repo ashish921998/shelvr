@@ -9,7 +9,7 @@ import {
 import type { AhaSample } from "@/lib/aha-sample";
 import { t, useAppLocale } from "@/lib/i18n";
 import { fadeIn } from "@/lib/motion";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
@@ -37,9 +37,7 @@ export function AhaShareStep({
     setStage(next);
   };
   const pick = () => {
-    if (process.env.EXPO_OS === "ios") {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    }
+    void haptics.impact("medium");
     setStage("reading");
   };
 

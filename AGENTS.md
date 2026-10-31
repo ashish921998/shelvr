@@ -30,7 +30,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   (`useTrialReminder` in `trial-reminder.ts`, `useHomeFeed` in `home-feed.tsx`),
   so search for the hook name, not the filename. Subfolders exist only for
   `src/lib/share` and `src/lib/splash`.
-- **Design tokens:** `src/unistyles.ts`. Motion: `src/lib/motion.ts`. Shared
+- **Design tokens:** `src/unistyles.ts`. Motion: `src/lib/motion.ts`. Haptics:
+  `src/lib/haptics.ts`. Shared
   primitives: `src/components/ui` (`themed-text.tsx`, `button.tsx`). See `docs/architecture/design-system.md`.
 - **Paywall and entitlement:** `src/lib/entitlement.ts` owns `useEntitlement`,
   `openPaywall`, `openPaywallOutcome`, `usePaywallGuard` and `restorePurchases`.
@@ -276,4 +277,5 @@ cannot happen.
 | `logEvent` scalars; `safeFetch`                                                                              | Review against `REVIEW.md`                                                                                       | nowhere                              |
 | Convex test harnesses come from `newConvexTest()`                                                            | ESLint `no-restricted-imports` on `convexTest` outside `convex/test.setup.ts`                                    | `lint`                               |
 | No test file under `src/app`                                                                                 | ESLint `no-restricted-syntax` on `src/app/**/*.{test,spec}.*`                                                    | `lint`                               |
+| Haptics go through `@/lib/haptics`                                                                           | ESLint `no-restricted-imports` on `expo-haptics` outside the helper and its test                                 | `lint`                               |
 | `captureError`                                                                                               | Review against `REVIEW.md`                                                                                       | nowhere                              |

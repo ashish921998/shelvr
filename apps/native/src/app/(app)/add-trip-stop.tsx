@@ -18,7 +18,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import { UNPLANNED_DAY } from "@convex/model/tripPlan";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -158,9 +158,7 @@ export default function AddTripStopScreen() {
     const added = await add(day, place);
     setBusy(false);
     if (!added) return;
-    if (process.env.EXPO_OS === "ios") {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
+    void haptics.success();
     close();
   };
 

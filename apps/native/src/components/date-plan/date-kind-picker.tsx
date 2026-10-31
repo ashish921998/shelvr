@@ -2,7 +2,7 @@ import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { DATE_OPTIONS, type DateOption } from "@/lib/date-plan";
 import { t } from "@/lib/i18n";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -27,7 +27,7 @@ function OptionRow({
       accessibilityRole="button"
       accessibilityLabel={`${label}, ${hint}`}
       onPress={() => {
-        if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
+        void haptics.selection();
         onPress();
       }}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}

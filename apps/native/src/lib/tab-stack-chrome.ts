@@ -1,4 +1,4 @@
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { type Href, useRouter } from "expo-router";
 import { PlatformColor } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
@@ -21,9 +21,7 @@ export function useTabStackChrome({
   const labelColor = isIos ? PlatformColor("label") : theme.colors.foreground;
 
   const haptic = () => {
-    if (isIos) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
+    void haptics.impact();
   };
 
   const tap = (href: Href) => () => {

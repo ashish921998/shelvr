@@ -12,6 +12,7 @@ import { AppsSheet } from "./share-sheets";
 import { AhaShareStep } from "./aha-share";
 import { AhaReel } from "./aha-reel";
 import { ahaSample } from "@/lib/aha-sample";
+import { haptics } from "@/lib/haptics";
 
 type Children = { children?: ReactNode };
 
@@ -21,11 +22,6 @@ vi.mock("@/lib/i18n", () => ({
 }));
 vi.mock("@/lib/motion", () => ({ sheetIn: () => undefined, fadeIn: {} }));
 vi.mock("@/lib/color", () => ({ withAlpha: (color: string) => color }));
-vi.mock("expo-haptics", () => ({
-  selectionAsync: vi.fn(),
-  impactAsync: vi.fn(),
-  ImpactFeedbackStyle: { Medium: "medium" },
-}));
 vi.mock("@/components/onboarding/reel-video", () => ({
   ReelVideo: vi.fn(() => null),
 }));
@@ -116,6 +112,20 @@ it.each(["date", "trip", "weekend"] as const)(
     );
   },
 );
+
+it("gives the Shelvr pick the medium impact, the only one in the practice share", () => {
+  const impact = vi.spyOn(haptics, "impact");
+  render(
+    <AhaShareStep sample={ahaSample("trip", "lisbon")} onShared={vi.fn()} />,
+  );
+  for (const label of ["common.share", "aha.sheetShareTo", "aha.sheetMore"]) {
+    fireEvent.click(screen.getByRole("button", { name: label }));
+  }
+  expect(impact).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Shelvr" }));
+  expect(impact.mock.calls).toEqual([["medium"]]);
+  impact.mockRestore();
+});
 
 it("reaches the map callback after only Share, Share to…, More and Shelvr", () => {
   vi.useFakeTimers();

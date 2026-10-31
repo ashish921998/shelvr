@@ -26,7 +26,7 @@ import {
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Platform, ScrollView, View } from "react-native";
@@ -48,8 +48,8 @@ export default function NewTripScreen() {
 
   const ready = state.status === "ready";
   useEffect(() => {
-    if (ready && process.env.EXPO_OS === "ios") {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (ready) {
+      void haptics.success();
     }
   }, [ready]);
 
