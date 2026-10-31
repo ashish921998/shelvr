@@ -59,7 +59,8 @@ function normalizeEmail(value: string): string {
 }
 
 function inboxKey(email: string): string {
-  const [local = "", domain = ""] = email.split("@");
+  const [local = "", rawDomain = ""] = email.split("@");
+  const domain = rawDomain.replace(/\.+$/, "");
   const base = local.split("+")[0] ?? local;
   const isGmail = domain === "gmail.com" || domain === "googlemail.com";
   return isGmail
