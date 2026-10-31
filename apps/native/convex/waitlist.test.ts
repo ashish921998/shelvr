@@ -330,6 +330,7 @@ describe("POST /waitlist/join", () => {
       "victim+1@gmail.com",
       "v.ictim@gmail.com",
       "victim+2@googlemail.com",
+      "victim@gmail.com.",
     ];
     const statuses: number[] = [];
     for (const [index, email] of aliases.entries()) {
@@ -340,7 +341,7 @@ describe("POST /waitlist/join", () => {
       );
       statuses.push(response.status);
     }
-    expect(statuses).toEqual([200, 200, 429, 429]);
+    expect(statuses).toEqual([200, 200, 429, 429, 429]);
   });
 
   it("rate-limits one client IP that rotates email addresses", async () => {
