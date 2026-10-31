@@ -46,6 +46,7 @@ import { isProHiddenForE2E } from "@/lib/e2e-hide-pro";
 import {
   claimPurchaseBeforeSignIn,
   clearPurchaseBeforeSignIn,
+  hasPurchaseBeforeSignIn,
 } from "@/lib/purchase-before-sign-in";
 import {
   notePurchaseLanding,
@@ -185,7 +186,9 @@ export function useEntitlementSync(): void {
       attach = startRevenueCatIdentitySync({
         sync: () =>
           attachPurchaseToAccount(sub, () => syncPurchaseRef.current({})),
-        onReady: clearPurchaseBeforeSignIn,
+        onReady: () => {
+          if (hasPurchaseBeforeSignIn()) clearPurchaseBeforeSignIn();
+        },
         onError: (error) =>
           analytics.captureError("purchase_sync_failed", error),
       });
