@@ -302,6 +302,7 @@ export function TripPlanBody({ trip }: { trip: TripPlanDetail }) {
                     on: theme.colors.onTripDay,
                   }}
                   fromSave={fromSave.has(stop._id)}
+                  onList={trip.listId !== undefined}
                   onPress={() => {
                     // The map follows the list: coming back, it shows the day this stop is on.
                     pick(index);
@@ -328,6 +329,7 @@ export function TripPlanBody({ trip }: { trip: TripPlanDetail }) {
                 key={stop._id}
                 stop={stop}
                 fromSave={fromSave.has(stop._id)}
+                onList={trip.listId !== undefined}
                 onPress={() => openStop(stop)}
               />
             ))}

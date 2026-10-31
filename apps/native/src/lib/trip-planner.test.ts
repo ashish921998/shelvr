@@ -177,9 +177,9 @@ describe("trip lines", () => {
   });
 
   it("lists a trip's interests by name so trips to one city read apart", () => {
-    expect(
-      tripInterestsLine({ interests: ["food", "coffee", "sights"] }),
-    ).toBe("Food, Coffee, Sights & landmarks");
+    expect(tripInterestsLine({ interests: ["food", "coffee", "sights"] })).toBe(
+      "Food, Coffee, Sights & landmarks",
+    );
     expect(tripInterestsLine({ interests: [] })).toBeNull();
   });
 
@@ -198,13 +198,24 @@ describe("trip lines", () => {
   it("describes the pace in stops a day", () => {
     expect(paceHint("easy")).toBe("About 3 stops a day");
   });
-
 });
 
 describe("stops", () => {
   it("badges saves and suggestions", () => {
-    expect(stopBadge("save")).toBe("tripPlanner.badgeYours");
-    expect(stopBadge("suggested")).toBe("tripPlanner.badgeSuggested");
+    expect(stopBadge({ source: "save" })).toBe("tripPlanner.badgeYours");
+    expect(stopBadge({ source: "suggested" })).toBe(
+      "tripPlanner.badgeSuggested",
+    );
+  });
+
+  it("calls a list stop with no save of yours 'On your list', never 'Yours'", () => {
+    expect(stopBadge({ source: "save" }, true)).toBe("tripPlanner.badgeOnList");
+    expect(
+      stopBadge({ source: "save", itemId: "i" as Id<"items"> }, true),
+    ).toBe("tripPlanner.badgeYours");
+    expect(stopBadge({ source: "suggested" }, true)).toBe(
+      "tripPlanner.badgeSuggested",
+    );
   });
 
   it("reads a stop row with its number and the line under it, as it shows", () => {
@@ -277,9 +288,7 @@ describe("stops", () => {
       [[stop(), stop({ name: "Tasca" })], [stop({ name: "LX Factory" })]],
       1,
     );
-    expect(
-      pins.map((pin) => [pin.id, pin.day, pin.active, pin.text]),
-    ).toEqual([
+    expect(pins.map((pin) => [pin.id, pin.day, pin.active, pin.text])).toEqual([
       ["0:0", 0, false, ""],
       ["0:1", 0, false, ""],
       ["1:0", 1, true, "1"],
@@ -302,10 +311,7 @@ describe("trip page focus", () => {
   });
 
   it("captions only the focused day's pins, with just the place name", () => {
-    const days = [
-      [stop(), stop({ name: "Tasca" })],
-      [stop({ name: "Prado" })],
-    ];
+    const days = [[stop(), stop({ name: "Tasca" })], [stop({ name: "Prado" })]];
     const focused = planPins(days, 0);
     expect(focused.map((pin) => [pin.title, pin.text, pin.active])).toEqual([
       ["Miradouro da Graça", "1", true],

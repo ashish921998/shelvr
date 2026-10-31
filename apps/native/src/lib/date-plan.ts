@@ -8,6 +8,7 @@ import {
 } from "@/lib/trip-planner";
 import type { TextMessageKey } from "@/locales/message-types";
 import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
 import {
   type DateAsk,
   type DateEvening,
@@ -142,7 +143,11 @@ type DatePlanState =
     };
 
 /** Plans a date for the city: asks the planner, then changes stops on the phone. */
-export function useDatePlan(city: string, locale: string) {
+export function useDatePlan(
+  city: string,
+  locale: string,
+  listId?: Id<"sharedLists">,
+) {
   const router = useRouter();
   const make = useAction(api.datePlans.makeDatePlan);
   const [state, setState] = useState<DatePlanState>({
@@ -166,7 +171,12 @@ export function useDatePlan(city: string, locale: string) {
       analytics.capture("date_plan_started", { kind: ask });
       let paywall = false;
       try {
-        const result = await make({ city, kind: ask, locale });
+        const result = await make({
+          city,
+          kind: ask,
+          locale,
+          ...(listId !== undefined ? { listId } : {}),
+        });
         analytics.capture("date_plan_made", {
           kind: result.kind,
           asked: ask,
@@ -204,7 +214,7 @@ export function useDatePlan(city: string, locale: string) {
       // joins (or, if iOS refused it, replaces) the same sheet instead of being dropped.
       if (paywall) await openPaywall(router, PLACEMENT);
     },
-    [make, city, locale, router],
+    [make, city, locale, listId, router],
   );
 
   /** Changes one stop; the screen offers it only when `canChange` says something fits. */

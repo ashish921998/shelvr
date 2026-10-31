@@ -21,7 +21,9 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useEntitlement } from "@/lib/entitlement";
+import { personalPlanAllowed } from "@/lib/list-gate";
+import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Platform, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -136,6 +138,8 @@ export default function TripPlanScreen() {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState<string | null>(null);
   const rename = useRenameTrip(tripId, trip.data?.name);
+  const entitlement = useEntitlement();
+  const gated = !entitlement.loading && !entitlement.entitled;
 
   const data = trip.data;
   const opened = useRef(false);
@@ -183,6 +187,10 @@ export default function TripPlanScreen() {
         />
       </View>
     );
+  }
+
+  if (!personalPlanAllowed(gated, data.listId)) {
+    return <Redirect href="/plan-gate" />;
   }
 
   const addPlace = (day: number) =>
