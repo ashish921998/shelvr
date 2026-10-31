@@ -526,11 +526,20 @@ function linkAnalysisPrompt(
 function retryReadNothingNew(item: Doc<"items">, read: LinkRead): boolean {
   if (item.enrichment !== "partial") return false;
   if (read.status === "unreadable") return true;
-  const { content, recipe, placeList, description, title, heroImageUrl } =
-    read.page;
+  const {
+    content,
+    recipe,
+    placeList,
+    description,
+    title,
+    heroImageUrl,
+    media,
+  } = read.page;
   if (content || recipe || placeList) return false;
   if (item.content || item.recipe) return true;
-  if (description || (title && heroImageUrl)) return false;
+  if (description || media?.length) return false;
+  if (heroImageUrl && (title || !item.heroImageUrl)) return false;
+  if (read.shortForm?.video && item.placesHeard !== true) return false;
   return Boolean(item.description || item.places?.length);
 }
 
