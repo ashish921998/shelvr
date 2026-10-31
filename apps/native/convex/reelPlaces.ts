@@ -6,6 +6,7 @@ import { internalAction } from "./_generated/server";
 import { MODEL, modelCallOptions } from "./model/aiProvider";
 import { logEvent } from "./model/log";
 import { readPage } from "./model/pageRead";
+import { rateLimiter } from "./model/rateLimiter";
 import {
   REEL_PLACES_SYSTEM,
   postText,
@@ -33,11 +34,15 @@ const placesValidator = v.object({
 export const find = internalAction({
   args: { url: v.string() },
   returns: placesValidator,
-  handler: async (_ctx, { url }) => {
+  handler: async (ctx, { url }) => {
     const startedAt = Date.now();
     let budget: ReturnType<typeof setTimeout> | undefined;
     const read = await Promise.race([
-      readPage(url, { captionOnly: true }),
+      readPage(url, {
+        captionOnly: true,
+        claimPaidRead: async () =>
+          (await rateLimiter.limit(ctx, "reelPlacesCaption")).ok,
+      }),
       new Promise<undefined>((resolve) => {
         budget = setTimeout(resolve, PAGE_READ_BUDGET_MS, undefined);
       }),

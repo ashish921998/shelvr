@@ -3,7 +3,7 @@ import { env } from "../_generated/server";
 
 const TREG_ORIGIN = "https://treg.to";
 
-const TRANSCRIPT_TIMEOUT_MS = 15_000;
+const TREG_TIMEOUT_MS = 15_000;
 
 const MAX_RESPONSE_CHARS = 512 * 1024;
 
@@ -16,22 +16,27 @@ export type TranscriptResult =
   | { status: "none" }
   | { status: "failed"; errorCategory: string };
 
+type TregReply =
+  | { status: "ok"; payload: unknown }
+  | { status: "none" }
+  | { status: "failed"; errorCategory: string };
+
 export function transcriptToken(): string | undefined {
   return env.VIDEO_TRANSCRIPTS_ENABLED === "true" && env.TREG_API_KEY
     ? env.TREG_API_KEY
     : undefined;
 }
 
-function endpoint(site: TranscriptSite, url: string): string {
-  const params =
-    site === "TikTok"
-      ? new URLSearchParams({ url, language: "en" })
-      : new URLSearchParams({ url, cache_max_age: "7d" });
-  const path =
-    site === "TikTok"
-      ? "scrapecreators.x.v1-tiktok-video-transcript"
-      : "scrapecreators.x.v2-instagram-media-transcript";
-  return `${TREG_ORIGIN}/call/${path}?${params.toString()}`;
+function transcriptEndpoint(site: TranscriptSite, url: string) {
+  return site === "TikTok"
+    ? {
+        path: "scrapecreators.x.v1-tiktok-video-transcript",
+        params: new URLSearchParams({ url, language: "en" }),
+      }
+    : {
+        path: "scrapecreators.x.v2-instagram-media-transcript",
+        params: new URLSearchParams({ url, cache_max_age: "7d" }),
+      };
 }
 
 const tikTokSchema = z.object({
@@ -93,17 +98,17 @@ function transcriptText(site: TranscriptSite, payload: unknown): string {
     : "";
 }
 
-export async function fetchVideoTranscript(
-  site: TranscriptSite,
-  url: string,
+export async function callTreg(
+  path: string,
+  params: URLSearchParams,
   token: string,
-): Promise<TranscriptResult> {
+): Promise<TregReply> {
   let response: Response;
   try {
-    response = await fetch(endpoint(site, url), {
+    response = await fetch(`${TREG_ORIGIN}/call/${path}?${params.toString()}`, {
       headers: { "X-Treg-Token": token, Accept: "application/json" },
       redirect: "error",
-      signal: AbortSignal.timeout(TRANSCRIPT_TIMEOUT_MS),
+      signal: AbortSignal.timeout(TREG_TIMEOUT_MS),
     });
   } catch (error) {
     const name =
@@ -137,9 +142,24 @@ export async function fetchVideoTranscript(
   }
   const payload = providerPayload(body);
   const error = providerError(payload);
-  if (error !== undefined) {
-    return { status: "failed", errorCategory: error };
+  return error === undefined
+    ? { status: "ok", payload }
+    : { status: "failed", errorCategory: error };
+}
+
+export async function fetchVideoTranscript(
+  site: TranscriptSite,
+  url: string,
+  token: string,
+): Promise<TranscriptResult> {
+  const { path, params } = transcriptEndpoint(site, url);
+  const reply = await callTreg(path, params, token);
+  if (reply.status !== "ok") {
+    return reply;
   }
-  const text = transcriptText(site, payload).slice(0, MAX_TRANSCRIPT_CHARS);
+  const text = transcriptText(site, reply.payload).slice(
+    0,
+    MAX_TRANSCRIPT_CHARS,
+  );
   return text === "" ? { status: "none" } : { status: "ok", text };
 }

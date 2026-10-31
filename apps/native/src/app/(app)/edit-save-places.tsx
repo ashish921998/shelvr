@@ -20,6 +20,7 @@ import { ThemedText } from "@/components/ui/themed-text";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { EmptyState } from "@/components/empty-state";
 import { analytics } from "@/lib/analytics";
+import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
 
@@ -74,6 +75,7 @@ function PlacesEditor({
     setBusy(true);
     try {
       await save({ itemId, version, places });
+      void haptics.success();
       backOrHome(router);
     } catch (error) {
       analytics.captureError("place_correction_save_failed", error);
