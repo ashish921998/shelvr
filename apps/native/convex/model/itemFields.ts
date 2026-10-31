@@ -1,5 +1,7 @@
 import { type Infer, v } from "convex/values";
 
+import { placeKey } from "./plan";
+
 export const INTENT_KINDS = [
   "open_url",
   "copy",
@@ -39,18 +41,26 @@ export const placeLocationsValidator = v.array(
   v.object({ name: v.string(), location: v.string() }),
 );
 
-/** Branch clues stay separate from names, and only belong to places in this save. */
+export function savedPlaceKey(
+  name: string,
+  cities?: readonly string[],
+): string {
+  return placeKey(normalizePlaceName(name, cities));
+}
+
 export function normalizePlaceLocations(
-  raw: Infer<typeof placeLocationsValidator> | undefined,
+  cluesBestFirst: Infer<typeof placeLocationsValidator> | undefined,
   places: readonly string[] | undefined,
   cities: readonly string[] = [],
 ): Infer<typeof placeLocationsValidator> {
-  const names = new Map(
-    normalizePlaces(places, cities).map((name) => [name.toLowerCase(), name]),
-  );
+  const names = new Map<string, string>();
+  for (const name of normalizePlaces(places, cities)) {
+    const key = placeKey(name);
+    if (key !== "" && !names.has(key)) names.set(key, name);
+  }
   const locations = new Map<string, { name: string; location: string }>();
-  for (const entry of raw ?? []) {
-    const key = normalizePlaceName(entry.name, cities).toLowerCase();
+  for (const entry of cluesBestFirst ?? []) {
+    const key = savedPlaceKey(entry.name, cities);
     const name = names.get(key);
     const location = entry.location.replace(/\s+/g, " ").trim();
     if (name && location && location.length <= 120 && !locations.has(key)) {

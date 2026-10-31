@@ -39,6 +39,10 @@ const CATEGORY_EMOJI: Record<string, string> = {
 };
 
 /** Without a known category, the most specific kind wins: a coffee save tagged food is a café. */
+export function categoryEmoji(category: string): string | undefined {
+  return CATEGORY_EMOJI[category];
+}
+
 const KIND_EMOJI: [PlaceKind, string][] = [
   ["coffee", "☕"],
   ["dessert", "🍰"],

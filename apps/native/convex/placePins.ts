@@ -6,6 +6,7 @@ import {
   internalAction,
   internalMutation,
   internalQuery,
+  type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
 import { aiAllowed } from "./aiConsent";
@@ -17,6 +18,7 @@ import {
 import {
   MAX_ITEM_PLACES,
   normalizePlaceName,
+  savedPlaceKey,
   normalizePlaces,
   normalizePlaceLocations,
   placeLocationsValidator,
@@ -90,22 +92,31 @@ function mapsNames(intents: Doc<"items">["intents"]): string[] {
     .map((intent) => intent.value.trim());
 }
 
-/** Distinct place names by key: the places read off the save, its Maps intents, then every space's. */
-async function wantedPlaces(
+async function placesFromAnySource(
   ctx: QueryCtx,
   item: Doc<"items">,
-): Promise<Map<string, string>> {
+): Promise<string[]> {
   const joins = await ctx.db
     .query("spaceItems")
     .withIndex("by_item", (q) => q.eq("itemId", item._id))
     .collect();
-  const names = [
+  return [
     ...(item.places ?? []),
     ...mapsNames(item.intents),
     ...joins
       .filter((join) => effectiveStatus(join) !== "dismissed")
       .flatMap((join) => mapsNames(join.intents)),
   ];
+}
+
+/** Distinct place names by key: an edited save's own list, otherwise what `placesFromAnySource` finds. */
+async function wantedPlaces(
+  ctx: QueryCtx,
+  item: Doc<"items">,
+): Promise<Map<string, string>> {
+  const names = item.placesEdited
+    ? (item.places ?? [])
+    : await placesFromAnySource(ctx, item);
   const wanted = new Map<string, string>();
   for (const raw of names) {
     const name = normalizePlaceName(raw, item.cities);
@@ -143,18 +154,17 @@ export const toLocate = internalQuery({
   ),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
-    if (item === null || item.placesEdited || item.status !== "ready")
-      return null;
+    if (item === null || item.status !== "ready") return null;
     if (!(await aiAllowed(ctx, item.userId))) return null;
     const pinned = new Set(
-      (item.placePins ?? []).map((p) =>
-        placeKey(normalizePlaceName(p.name, item.cities)),
-      ),
+      (item.placePins ?? []).map((p) => savedPlaceKey(p.name, item.cities)),
     );
     const wanted = [...(await wantedPlaces(ctx, item))];
     const kept = wanted.filter(([key]) => pinned.has(key)).length;
     const names = wanted
-      .filter(([key]) => args.refresh || !pinned.has(key))
+      .filter(
+        ([key]) => (args.refresh && !item.placesEdited) || !pinned.has(key),
+      )
       .map(([, name]) => name)
       // Look past the free slots: a stray match storePins drops must not keep the next place from a pin.
       .slice(0, !args.refresh && kept >= MAX_PINS ? 0 : MAX_PINS);
@@ -194,24 +204,84 @@ function keepAppleId(stored: Pin | undefined, found: Pin): Pin {
   };
 }
 
+function cluesByPlace(
+  locations: { name: string; location: string }[],
+  cities: string[] | undefined,
+): Map<string, string> {
+  return new Map(
+    locations.map(({ name, location }) => [
+      savedPlaceKey(name, cities),
+      location,
+    ]),
+  );
+}
+
+function dropPinsFoundUnderOldClues<P extends { name: string }>(
+  found: P[],
+  cluesSearched: { name: string; location: string }[] | undefined,
+  item: Doc<"items">,
+): P[] {
+  if (cluesSearched === undefined) return found;
+  const now = cluesByPlace(item.placeLocations ?? [], item.cities);
+  const then = cluesByPlace(cluesSearched, item.cities);
+  return found.filter((pin) => {
+    const key = savedPlaceKey(pin.name, item.cities);
+    return now.get(key) === then.get(key);
+  });
+}
+
+async function addPinsBesideOwnerPins(
+  ctx: MutationCtx,
+  item: Doc<"items">,
+  wanted: Map<string, string>,
+  found: Pin[],
+): Promise<void> {
+  const ownerPins = item.placePins ?? [];
+  const pinned = new Set(
+    ownerPins.map((pin) => savedPlaceKey(pin.name, item.cities)),
+  );
+  const fresh = found
+    .filter((pin) => {
+      const key = savedPlaceKey(pin.name, item.cities);
+      return wanted.has(key) && !pinned.has(key);
+    })
+    .map((pin) => inSourceCity(pin, item.cities ?? []));
+  const near = nearEachOther(
+    [...ownerPins, ...fresh],
+    lookupCity(item.cities ?? []),
+  );
+  const added = fresh.filter((pin) => near.includes(pin));
+  if (added.length === 0) return;
+  const placePins = [...ownerPins, ...added].slice(0, MAX_PINS);
+  await ctx.db.patch(item._id, {
+    placePins,
+    searchText: buildSearchText({ ...item, placePins }),
+  });
+}
+
 export const storePins = internalMutation({
   args: {
     itemId: v.id("items"),
     found: placePinsValidator,
+    cluesSearched: v.optional(placeLocationsValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
-    if (
-      item === null ||
-      item.placesEdited ||
-      !(await aiAllowed(ctx, item.userId))
-    )
-      return null;
+    if (item === null || !(await aiAllowed(ctx, item.userId))) return null;
     const wanted = await wantedPlaces(ctx, item);
+    const found = dropPinsFoundUnderOldClues(
+      args.found,
+      args.cluesSearched,
+      item,
+    );
+    if (item.placesEdited) {
+      await addPinsBesideOwnerPins(ctx, item, wanted, found);
+      return null;
+    }
     const next = new Map<string, Pin>();
-    for (const pin of [...(item.placePins ?? []), ...args.found]) {
-      const key = placeKey(normalizePlaceName(pin.name, item.cities));
+    for (const pin of [...(item.placePins ?? []), ...found]) {
+      const key = savedPlaceKey(pin.name, item.cities);
       if (wanted.has(key))
         next.set(
           key,
@@ -340,6 +410,7 @@ export const locateItem = internalAction({
     await ctx.runMutation(internal.placePins.storePins, {
       itemId: args.itemId,
       found,
+      cluesSearched: todo.locations,
     });
     return null;
   },

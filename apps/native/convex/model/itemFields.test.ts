@@ -40,7 +40,22 @@ describe("normalizePlaceLocations", () => {
         ["Cafe, Paris", "Cafe, Lyon"],
         ["Paris", "Lyon"],
       ),
-    ).toHaveLength(2);
+    ).toEqual([
+      { name: "Cafe, Paris", location: "Rue Royale" },
+      { name: "Cafe, Lyon", location: "Rue Victor Hugo" },
+    ]);
+  });
+  it("keeps the first clue listed for a respelled place, with its spelling", () => {
+    expect(
+      normalizePlaceLocations(
+        [
+          { name: "Café Joe’s", location: "Rue Neuve" },
+          { name: "Cafe Joe's", location: "Rue Vieille" },
+        ],
+        ["Café Joe’s", "Cafe Joe's"],
+        ["Paris"],
+      ),
+    ).toEqual([{ name: "Café Joe’s", location: "Rue Neuve" }]);
   });
 });
 

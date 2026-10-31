@@ -30,7 +30,7 @@ import {
   tripName,
 } from "@/lib/trip-planner";
 import type { TripPlanDetail, TripPlanStop } from "@convex/model/tripPlan";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useMemo, useReducer, useRef, useState } from "react";
 import {
@@ -138,7 +138,7 @@ function useStopOpener() {
   );
   return useCallback(
     (stop: TripPlanStop) => {
-      if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
+      void haptics.selection();
       const action = stopAction(stop, canOpenPlaceCard(stop.appleId));
       analytics.capture("trip_plan_stop_opened", {
         source: stop.source,

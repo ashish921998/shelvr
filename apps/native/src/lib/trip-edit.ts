@@ -1,4 +1,5 @@
 import { analytics } from "@/lib/analytics";
+import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
 import { tripDayLabel } from "@/lib/trip-planner";
 import { api } from "@convex/_generated/api";
@@ -236,6 +237,7 @@ export function useTripEditor(trip: TripPlanDetail) {
       offerUndo(null);
       try {
         const before = await optimistic.move({ stopId, ...to });
+        if (method === "menu") void haptics.selection();
         analytics.capture("trip_plan_stop_moved", {
           across_days: from.day !== to.day,
           method,
@@ -266,6 +268,7 @@ export function useTripEditor(trip: TripPlanDetail) {
       offerUndo(null);
       try {
         const before = await optimistic.remove({ stopId: stop._id });
+        void haptics.selection();
         analytics.capture("trip_plan_stop_removed", { source: stop.source });
         if (edit !== latest.current) return;
         offerUndo({
@@ -287,6 +290,7 @@ export function useTripEditor(trip: TripPlanDetail) {
     offerUndo(null);
     try {
       await optimistic.move({ stopId: undo.stopId, ...undo.before });
+      void haptics.selection();
       analytics.capture("trip_plan_edit_undone", { action: undo.kind });
     } catch (error) {
       showEditFailed(error);

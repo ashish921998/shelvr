@@ -82,6 +82,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `notificationPreferences`: weekly shelf opt-in, save reminder opt-out, timezone, and the
     next digest and reminder instants
   - `itemReads`: per-user read state, kept out of the item row
+  - `placeRemovals`: user-owned venue removal decisions, indexed by user; the account deletion drain removes them in batches through `deletePlaceRemovalsBatch`
   - `placeVisits`: places the user marked "We went" on a plan, one row per place name, so
     later plans rank them last
   - `planShares`: a plan's shortlist snapshot behind a random public vote link (one week),
@@ -334,11 +335,18 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   the pin's icon) and its filter kinds from
   `model/placeKinds.ts`: Apple's point-of-interest category when the pin has one, otherwise
   the save's tags; "date night" always comes from the tags.
-- **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark. Planning
-  and trip swaps check these records inside Shelvr; they are not sent to an AI provider.
-- **`placeCorrections.ts`**, **`placeCorrectionSearch.ts`**: owner-only place editing and Apple Maps lookup. `items.placesEdited` preserves the chosen places across extraction retries and pin refreshes. Corrections update city grouping and search; existing trip stops remain unchanged.
+- **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark.
+  Planning reads these records inside Shelvr; they are not sent to an AI provider.
+- **`placeRemovals.ts`**: `removePlace` stores an owned venue decision; `undoRemovePlace`
+  deletes that decision idempotently. `model/placeRemovals.ts` projects a user's decisions over
+  raw saves and membership intents on read. A pin matches by the city page's row identity
+  (`uniquePlacePins`): one Apple id, or one name a few doors apart unless Apple ids differ.
+  A label without a pin matches by name and city. City, Map, search, planning and
+  automatic suggestions use the projection; source saves, existing trips and deliberate manual
+  additions remain. A save made after the removal shows the place again. Keep the
+  `placeRemovals` table on rollback once rows exist.
+- **`placeCorrections.ts`**, **`placeCorrectionSearch.ts`**: owner-only place editing and Apple Maps lookup. `items.placesEdited` preserves the chosen places across extraction retries and pin refreshes. A kept place with no pin still gets one from a lookup, which never changes a pin already on the save. Corrections update city grouping and search; existing trip stops remain unchanged. The editor leaves out removed places (`placeRemovals.ts`), and adding one back clears its removal.
 - **`tripTravel.ts`**, **`tripTravelData.ts`**: Pro-only walking/driving estimates between adjacent stops on one trip day. The authenticated claim reads ordered owned stops, rejects stale layouts, respects AI eligibility and charges one rate-limit unit per leg. `model/appleTravel.ts` calls Apple ETA through bounded `safeFetch`; only the selected day is fetched and the client caches each layout/mode for five minutes. Route gaps have directions links rather than invented durations.
-- **`tripShares.ts`**: revocable view-only trip links. `tripPlans.shareToken` is indexed by token; `/trip/shares/` returns days, dates and stop names/coordinates only while the owner and trip exist. The web page is `/t/[token]`; stays, source saves and account details are private.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
   link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and
   `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the
@@ -385,6 +393,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `items.placeLocations` keeps explicitly stated branch/address clues separately from display
   names. Caption and speech extraction preserve these clues for Apple lookup. A reread that
   learns a different clue clears only that place's old pin so the scheduled lookup replaces it;
+  a lookup that lands after such a reread drops its pin, since it searched with the old clue;
   existing saves without clues keep their old behavior until reread. This optional field stays
   declared through rollback and is stripped from public item responses.
   Each pin also keeps Apple's place id (`appleId`) and point-of-interest `category` when the
@@ -506,13 +515,17 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   and Plan a trip. A selected place row shows an info button that opens Apple's place card
   (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`); tapping the row opens the save
 - Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
-  `profile`, `settings`, `item/[id]`, `city/[name]`, `plan/[id]`, `date-plan`, `new-trip`,
-  `trip-plan/[id]`, `add-trip-stop`
+  `profile`, `settings`, `item/[id]`, `city/[name]`, `spots/[id]`, `plan/[id]`, `date-plan`,
+  `new-trip`, `trip-plan/[id]`, `add-trip-stop`
 - `date-plan` is Plan a date, pushed from the city page with a `city` param: "What kind of
   date?" (Classic, Low-key, Surprise me),
   then the evening from `makeDatePlan`: both stops on a map, a card each with Hours and info
   and Change (only when another nearby stop fits), the approximate walk between, Send to your
   date (plain share text with Maps links) and Directions to stop 1 (Maps directions)
+- `spots/[id]` is the moment after sharing links: "Finding the spots…" while the first saved one is
+  read and pinned, then its pins drop onto the city most of them share, with Open <city> and
+  Done (`src/lib/spots-reveal.ts` holds the waits). A failed save, one with no place, or a wait
+  past 25 s goes Home, as every other share does. Creator videos film this moment
 - `new-trip` is the trip planner form, a modal with an optional `city` param (the city page's
   Plan a trip opens it): city, days, optional start date, interests, pace and an optional
   stay. It checks Pro on submit, calls `createTripPlan` behind a three-step reveal, then

@@ -1,8 +1,9 @@
+import { UndoBar } from "@/components/ui/undo-bar";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t } from "@/lib/i18n";
-import { fadeIn, fadeOut, motion } from "@/lib/motion";
+import { motion } from "@/lib/motion";
 import {
   dropPlace,
   EDIT_HEADER_HEIGHT,
@@ -25,7 +26,7 @@ import {
   type TripPlanStop,
   UNPLANNED_DAY,
 } from "@convex/model/tripPlan";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import {
   type ReactNode,
   useCallback,
@@ -35,7 +36,6 @@ import {
   useState,
 } from "react";
 import {
-  AccessibilityInfo,
   type AccessibilityActionEvent,
   Pressable,
   TextInput,
@@ -81,7 +81,7 @@ type DragValues = {
 };
 
 function tick() {
-  if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
+  void haptics.selection();
 }
 
 function useSlotTop(top: number, id: string, drag: DragValues) {
@@ -438,15 +438,21 @@ export function TripEditList({
         isStop: rest.map((entry) => entry.kind === "stop"),
         days: rest.map((entry) => entry.day),
       });
-      tick();
+      void haptics.impact();
       setDrag({ stopId, to: from });
     },
     [others, setDrag, trip],
   );
   const setTarget = useCallback(
     (day: number, index: number) => {
+      const current = dragRef.current;
+      if (
+        current === null ||
+        (current.to.day === day && current.to.index === index)
+      )
+        return;
       tick();
-      setDrag(dragRef.current && { ...dragRef.current, to: { day, index } });
+      setDrag({ ...current, to: { day, index } });
     },
     [setDrag],
   );
@@ -480,7 +486,6 @@ export function TripEditList({
   );
   const onMove = useCallback(
     (stop: TripPlanStop, to: StopPlace) => {
-      tick();
       void editor.moveStop(stop._id, to, "menu");
     },
     [editor],
@@ -489,7 +494,6 @@ export function TripEditList({
     (stop: TripPlanStop) => {
       if (Date.now() - removedAt.current < REMOVE_SETTLE_MS) return;
       removedAt.current = Date.now();
-      tick();
       void editor.removeStop(stop);
     },
     [editor],
@@ -649,43 +653,7 @@ function TripUndoBar({
   undo: TripUndo | null;
   onUndo: () => void;
 }) {
-  // The live region below speaks only on Android; VoiceOver needs telling.
-  const message = undo?.message;
-  useEffect(() => {
-    if (message && process.env.EXPO_OS === "ios") {
-      AccessibilityInfo.announceForAccessibility(message);
-    }
-  }, [message]);
-  if (undo === null) return null;
-  return (
-    <Animated.View
-      entering={fadeIn}
-      exiting={fadeOut}
-      style={editStyles.undoBar}
-      accessibilityLiveRegion="polite"
-    >
-      <ThemedText
-        variant="footnote"
-        numberOfLines={2}
-        style={editStyles.undoText}
-      >
-        {undo.message}
-      </ThemedText>
-      <Pressable
-        accessibilityRole="button"
-        hitSlop={8}
-        onPress={onUndo}
-        style={({ pressed }) => [
-          editStyles.undoButton,
-          pressed && styles.pressed,
-        ]}
-      >
-        <ThemedText variant="labelStrong" style={editStyles.undoAction}>
-          {t("common.undo")}
-        </ThemedText>
-      </Pressable>
-    </Animated.View>
-  );
+  return <UndoBar message={undo?.message ?? null} onUndo={onUndo} />;
 }
 
 const editStyles = StyleSheet.create((theme, rt) => ({
@@ -701,25 +669,4 @@ const editStyles = StyleSheet.create((theme, rt) => ({
     borderColor: theme.colors.border,
     color: theme.colors.foreground,
   },
-  undoBar: {
-    position: "absolute",
-    left: theme.gap(2),
-    right: theme.gap(2),
-    bottom: rt.insets.bottom + theme.gap(2),
-    minHeight: theme.control.minHeight,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.5),
-    paddingLeft: theme.gap(2),
-    paddingRight: theme.gap(1),
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.foreground,
-  },
-  undoText: { flex: 1, color: theme.colors.background },
-  undoButton: {
-    paddingHorizontal: theme.gap(1.5),
-    paddingVertical: theme.gap(1),
-  },
-  undoAction: { color: theme.colors.primary },
 }));

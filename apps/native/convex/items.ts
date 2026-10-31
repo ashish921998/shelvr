@@ -1,3 +1,9 @@
+import {
+  visibleSave,
+  visibleItemPlaces,
+  userRemovals,
+  type Removal,
+} from "./model/placeRemovals";
 import { ConvexError, v, type Infer } from "convex/values";
 import {
   paginationOptsValidator,
@@ -239,12 +245,16 @@ function stripEmbedding(
   return rest;
 }
 
-export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
+export async function enrichItem(
+  ctx: QueryCtx,
+  item: Doc<"items">,
+  removals?: readonly Removal[],
+) {
   const imageUrl = item.storageId
     ? await ctx.storage.getUrl(item.storageId)
     : null;
   return {
-    ...stripEmbedding(item),
+    ...stripEmbedding(await visibleSave(ctx, item, removals)),
     imageUrl,
     heroImageUrl: item.type === "link" ? (imageUrl ?? undefined) : undefined,
   };
@@ -253,6 +263,7 @@ export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
 export async function toItemCard(
   ctx: QueryCtx,
   item: Doc<"items">,
+  removals?: readonly Removal[],
 ): Promise<ItemCard> {
   const {
     userId: _userId,
@@ -263,11 +274,25 @@ export async function toItemCard(
     products: _products,
     productsStatus: _productsStatus,
     ...card
-  } = await enrichItem(ctx, item);
+  } = await enrichItem(ctx, item, removals);
   return recipe ? { ...card, hasRecipe: true } : card;
 }
 
-export async function readySavesNewestFirst(
+export async function enrichItems(ctx: QueryCtx, items: Doc<"items">[]) {
+  const removals = items.length ? await userRemovals(ctx, items[0].userId) : [];
+  return await Promise.all(
+    items.map((item) => enrichItem(ctx, item, removals)),
+  );
+}
+
+export async function toItemCards(ctx: QueryCtx, items: Doc<"items">[]) {
+  const removals = items.length ? await userRemovals(ctx, items[0].userId) : [];
+  return await Promise.all(
+    items.map((item) => toItemCard(ctx, item, removals)),
+  );
+}
+
+export async function rawReadySavesNewestFirst(
   ctx: QueryCtx,
   userId: string,
 ): Promise<Doc<"items">[]> {
@@ -290,16 +315,28 @@ export async function readySavesNewestFirst(
   return rows;
 }
 
+export async function readySavesNewestFirst(
+  ctx: QueryCtx,
+  userId: string,
+  removals?: readonly Removal[],
+): Promise<Doc<"items">[]> {
+  const decisions = removals ?? (await userRemovals(ctx, userId));
+  return (await rawReadySavesNewestFirst(ctx, userId)).map((item) =>
+    visibleItemPlaces(item, decisions),
+  );
+}
+
 /** The user's ready saves in one city, newest first, capped at `limit`. */
 export async function readyCitySaves(
   ctx: QueryCtx,
   userId: string,
   city: string,
   limit = CITY_ITEMS_MAX,
+  removals?: readonly Removal[],
 ): Promise<Doc<"items">[]> {
   const wanted = cityKey(city);
   if (wanted === "") return [];
-  return (await readySavesNewestFirst(ctx, userId))
+  return (await readySavesNewestFirst(ctx, userId, removals))
     .filter((item) => (item.cities ?? []).some((c) => cityKey(c) === wanted))
     .slice(0, limit);
 }
@@ -409,7 +446,11 @@ export const listCityItems = authedQuery({
     const items = await readyCitySaves(ctx, ctx.userId, args.city);
     return await Promise.all(
       items.map((item) =>
-        enrichItem(ctx, { ...item, placePins: pinsForCity(item, args.city) }),
+        enrichItem(
+          ctx,
+          { ...item, placePins: pinsForCity(item, args.city) },
+          [],
+        ),
       ),
     );
   },
@@ -425,7 +466,7 @@ export const listItems = authedQuery({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
       .take(LIST_CAP);
-    return await Promise.all(items.map((item) => enrichItem(ctx, item)));
+    return await enrichItems(ctx, items);
   },
 });
 
@@ -479,7 +520,7 @@ export const listItemsPage = authedQuery({
       });
     return {
       ...result,
-      page: await Promise.all(result.page.map((item) => toItemCard(ctx, item))),
+      page: await toItemCards(ctx, result.page),
     };
   },
 });
@@ -505,7 +546,7 @@ export const listRecentItems = authedQuery({
       )
       .order("desc")
       .take(limit);
-    return await Promise.all(ready.map((item) => toItemCard(ctx, item)));
+    return await toItemCards(ctx, ready);
   },
 });
 
@@ -652,11 +693,12 @@ export const searchItems = authedQuery({
         q.search("searchText", query).eq("userId", userId),
       )
       .take(50);
+    const removals = await userRemovals(ctx, userId);
     return await Promise.all(
-      items.map(async (item) => ({
-        ...(await enrichItem(ctx, item)),
-        places: item.places,
-      })),
+      items.map(async (raw) => {
+        const item = visibleItemPlaces(raw, removals);
+        return { ...(await enrichItem(ctx, item, [])), places: item.places };
+      }),
     );
   },
 });
@@ -785,11 +827,7 @@ export const similarItems = authedQuery({
       candidates.set(candidate._id, candidate);
     }
 
-    return await Promise.all(
-      rankSimilar(item, candidates.values()).map((match) =>
-        toItemCard(ctx, match),
-      ),
-    );
+    return await toItemCards(ctx, rankSimilar(item, candidates.values()));
   },
 });
 

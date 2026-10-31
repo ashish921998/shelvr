@@ -479,6 +479,82 @@ describe("createTripPlan without Apple Maps", () => {
 });
 
 describe("createTripPlan with Apple Maps", () => {
+  it("keeps a removed place out when Apple finds it again from a surviving label", async () => {
+    await stubMaps();
+    vi.stubGlobal("fetch", fakeApple());
+    const pin = { name: "Tigre", lat: 38.715, lng: -9.13 };
+    const { t, itemIds } = await setup([
+      { title: "Tigre", places: ["Tigre"], pins: [pin] },
+      { title: "Same place, another label", places: ["Tigre, Alfama"] },
+      {
+        title: "Another place",
+        places: ["Sol"],
+        pins: [{ ...pin, name: "Sol" }],
+      },
+    ]);
+    await t.mutation(api.placeRemovals.removePlace, {
+      itemId: itemIds[0],
+      ...pin,
+    });
+    const { tripId } = await t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 1,
+      pace: "balanced",
+      interests: [],
+      locale: "en-GB",
+    });
+    const trip = await t.query(api.tripPlannerData.getTripPlan, {
+      tripId: tripId!,
+    });
+    expect(
+      [...trip!.days.flat(), ...trip!.unplanned].map((s) => s.name),
+    ).toEqual(["Sol"]);
+  });
+
+  it("keeps a place the user saved again after removing it, when only Apple can pin it", async () => {
+    await stubMaps();
+    vi.stubGlobal("fetch", fakeApple());
+    const pin = { name: "Tigre", lat: 38.715, lng: -9.13 };
+    const { base, t, userId, itemIds } = await setup([
+      { title: "Tigre", places: ["Tigre"], pins: [pin] },
+      {
+        title: "Another place",
+        places: ["Sol"],
+        pins: [{ ...pin, name: "Sol" }],
+      },
+    ]);
+    await t.mutation(api.placeRemovals.removePlace, {
+      itemId: itemIds[0],
+      ...pin,
+    });
+    await base.run(async (ctx) => {
+      await ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Tigre again",
+        cities: ["Lisbon"],
+        places: ["Tigre"],
+        url: "https://www.tiktok.com/@someone/video/2",
+        tags: [],
+        searchText: "Tigre again",
+      });
+    });
+    const { tripId } = await t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 1,
+      pace: "balanced",
+      interests: [],
+      locale: "en-GB",
+    });
+    const trip = await t.query(api.tripPlannerData.getTripPlan, {
+      tripId: tripId!,
+    });
+    expect(
+      [...trip!.days.flat(), ...trip!.unplanned].map((s) => s.name).sort(),
+    ).toEqual(["Sol", "Tigre"]);
+  });
+
   it("adds suggestions from the saves' taste, balanced across interests, without chains or far results", async () => {
     await stubMaps();
     const fetchMock = fakeApple();

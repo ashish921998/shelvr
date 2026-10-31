@@ -27,6 +27,8 @@ type Props = {
   onPress?: () => void;
   /** Opens Apple's place card; its button shows while the row is selected. */
   onPlaceDetails?: () => void;
+  onRemove?: () => void;
+  removing?: boolean;
 };
 
 export function SaveRow({
@@ -36,6 +38,8 @@ export function SaveRow({
   selected,
   onPress,
   onPlaceDetails,
+  onRemove,
+  removing,
 }: Props) {
   const router = useRouter();
   const { theme } = useUnistyles();
@@ -84,6 +88,21 @@ export function SaveRow({
           ) : null}
         </View>
       </Pressable>
+      {selected && onRemove ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t("cityMap.removePlace", { name: title })}
+          disabled={removing}
+          onPress={onRemove}
+          style={styles.details}
+        >
+          <AppSymbolIcon
+            name="minus"
+            size={22}
+            tintColor={theme.colors.foreground}
+          />
+        </Pressable>
+      ) : null}
       {selected && onPlaceDetails ? (
         <Pressable
           accessibilityRole="button"

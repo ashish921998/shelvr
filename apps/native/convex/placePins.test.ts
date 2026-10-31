@@ -88,6 +88,25 @@ async function setup(
 }
 
 describe("placePins", () => {
+  it("finds a kept place on an edited save by its branch and leaves the owner's pin alone", async () => {
+    const { queries } = await withMaps();
+    const { t, itemId, pins } = await setup([], { read: ["Chosen", "Bakery"] });
+    const chosen = { name: "Chosen", city: "Lisbon", lat: 7, lng: 8 };
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        placesEdited: true,
+        placePins: [chosen],
+        placeLocations: [{ name: "Bakery", location: "Bairro Alto" }],
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId, refresh: true });
+    expect(queries()).toEqual(["Bakery, Bairro Alto, Lisbon"]);
+    const q = "Bakery, Bairro Alto, Lisbon".length;
+    expect(await pins()).toEqual([
+      chosen,
+      { name: "Bakery", city: "Lisbon", lat: q, lng: -q },
+    ]);
+  });
   it("looks up the source's branch while keeping its display name and public contract", async () => {
     await withMaps();
     const { t, itemId, pins } = await setup(["Carette"], { read: ["Carette"] });
@@ -138,6 +157,129 @@ describe("placePins", () => {
     expect(
       await client.query(api.items.getItem, { id: itemId }),
     ).not.toHaveProperty("placeLocations");
+  });
+
+  it.each([
+    ["after", true],
+    ["before", false],
+  ])(
+    "drops a pin an older lookup found once a reread names another branch (new lookup lands %s it)",
+    async (_order, newFirst) => {
+      vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+      vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+      vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: string) => {
+          const url = new URL(input);
+          if (url.pathname === "/v1/token")
+            return Response.json({
+              accessToken: "maps",
+              expiresInSeconds: 1800,
+            });
+          const trocadero = (url.searchParams.get("q") ?? "").includes(
+            "Trocadéro",
+          );
+          return Response.json({
+            results: [
+              {
+                name: "Carette",
+                id: trocadero ? "trocadero" : "vosges",
+                coordinate: {
+                  latitude: 48.862,
+                  longitude: trocadero ? 2.287 : 2.365,
+                },
+              },
+            ],
+          });
+        }),
+      );
+      const { t, itemId, pins } = await setup([], { read: ["Carette"] });
+      await t.run((ctx) => ctx.db.patch(itemId, { cities: ["Paris"] }));
+      const old = await t.query(internal.placePins.toLocate, { itemId });
+      if (old === null) throw new Error("Expected a lookup");
+      expect(old.locations).toEqual([]);
+      await t.run((ctx) => ctx.db.patch(itemId, { status: "processing" }));
+      expect(
+        await t.mutation(internal.items.finalizeItem, {
+          itemId,
+          reading: {},
+          classification: {
+            title: "Lisbon eats",
+            description: "",
+            tags: [],
+            cities: ["Paris"],
+            places: ["Carette"],
+            placeLocations: [
+              { name: "Carette", location: "Place du Trocadéro" },
+            ],
+          },
+        }),
+      ).toBe("applied");
+      const oldStores = () =>
+        t.mutation(internal.placePins.storePins, {
+          itemId,
+          found: [
+            { name: "Carette", lat: 48.862, lng: 2.365, appleId: "vosges" },
+          ],
+          cluesSearched: old.locations,
+        });
+      if (!newFirst) await oldStores();
+      await t.action(internal.placePins.locateItem, { itemId });
+      if (newFirst) await oldStores();
+      expect((await pins())?.map((pin) => pin.appleId)).toEqual(["trocadero"]);
+    },
+  );
+
+  it("pins the new branch when a reread respells the place and changes its branch", async () => {
+    vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+    vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+    vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
+        const neuve = (url.searchParams.get("q") ?? "").includes("Rue Neuve");
+        return Response.json({
+          results: [
+            {
+              name: "Cafe Joe",
+              id: neuve ? "neuve" : "vieille",
+              coordinate: { latitude: 48.86, longitude: neuve ? 2.29 : 2.36 },
+            },
+          ],
+        });
+      }),
+    );
+    const { t, itemId, pins } = await setup([], { read: ["Cafe Joe"] });
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        status: "processing",
+        cities: ["Paris"],
+        placeLocations: [{ name: "Cafe Joe", location: "Rue Vieille" }],
+        placePins: [{ name: "Cafe Joe", lat: 48.86, lng: 2.36, city: "Paris" }],
+      }),
+    );
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      reading: {},
+      classification: {
+        title: "Lisbon eats",
+        description: "",
+        tags: [],
+        cities: ["Paris"],
+        places: ["Café Joe", "Cafe Joe"],
+        placeLocations: [
+          { name: "Café Joe", location: "Rue Neuve" },
+          { name: "Cafe Joe", location: "Rue Vieille" },
+        ],
+      },
+    });
+    expect(await pins()).toEqual([]);
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect((await pins())?.map((pin) => pin.appleId)).toEqual(["neuve"]);
   });
 
   it("repairs suffixed places and pins without a new lookup, including legacy Maps intents", async () => {

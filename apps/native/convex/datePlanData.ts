@@ -1,3 +1,4 @@
+import { userRemovals, removalValidator } from "./model/placeRemovals";
 import { v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { internalMutation } from "./_generated/server";
@@ -66,6 +67,7 @@ export const claimDatePlanInternal = internalMutation({
     city: v.string(),
     sources: v.array(planSourceValidator),
     been: v.array(v.string()),
+    removed: v.array(removalValidator),
     pins: v.array(savedPinValidator),
     saves: v.array(
       v.object({
@@ -83,11 +85,19 @@ export const claimDatePlanInternal = internalMutation({
     const city = tidyCity(args.city).slice(0, MAX_CITY_CHARS);
     if (city === "") throw new Error("City required");
     await rateLimiter.limit(ctx, "makePlan", { key: userId, throws: true });
-    const items = await readyCitySaves(ctx, userId, city, MAX_PLAN_ITEMS);
-    const sources = items.map((item) => toPlanSource(item, undefined, city));
+    const removed = await userRemovals(ctx, userId);
+    const items = await readyCitySaves(
+      ctx,
+      userId,
+      city,
+      MAX_PLAN_ITEMS,
+      removed,
+    );
+    const sources = items.map((item) => toPlanSource(item, city));
     return {
       city,
       sources,
+      removed,
       been: [
         ...new Set([
           ...(await beenPlaces(ctx, userId, sources)),

@@ -134,6 +134,7 @@ async function suggestStops(
   been: ReadonlySet<string>,
   lang: string | undefined,
   signal: AbortSignal,
+  removed: Claim["removed"],
 ): Promise<{ stops: ScoredStop[]; searches: number }> {
   const config = appleMapsConfig(env);
   if (config === null) {
@@ -170,7 +171,15 @@ async function suggestStops(
     for (const found of replies[i]) {
       if (kept >= SUGGESTIONS_PER_ANCHOR) break;
       if (
-        !keepDateSuggestion(found, { kind, slot, anchor, been, taken, chains })
+        !keepDateSuggestion(found, {
+          kind,
+          slot,
+          anchor,
+          been,
+          taken,
+          chains,
+          removed,
+        })
       )
         continue;
       kept++;
@@ -229,6 +238,7 @@ export const makeDatePlan = action({
             been,
             appleLang(args.locale),
             signal,
+            claim.removed,
           ).catch((error: unknown) => {
             logEvent("warn", "date_plan_suggest_failed", {
               error_name: error instanceof Error ? error.name : "unknown",

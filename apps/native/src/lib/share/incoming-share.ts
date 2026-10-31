@@ -79,7 +79,8 @@ export type ShareEffect =
   | { type: "capture"; event: "share_ghost_skipped" }
   | { type: "sharedContentSaved"; itemCount: number }
   | { type: "openPaywall" }
-  | { type: "navigateHome" };
+  | { type: "navigateHome" }
+  | { type: "revealSpots"; itemId: string };
 
 type Step = { state: IncomingShareState; effects: ShareEffect[] };
 
@@ -295,6 +296,16 @@ function complete(
   return { state: { ...state, completing: sid }, effects };
 }
 
+function afterSave(session: ShareSession): ShareEffect {
+  const first = session.entries.find(
+    (e) => e.status === "saved" && e.itemId !== undefined,
+  );
+  return first?.itemId !== undefined &&
+    session.entries.every((e) => e.kind === "link")
+    ? { type: "revealSpots", itemId: first.itemId }
+    : { type: "navigateHome" };
+}
+
 function abandon(state: IncomingShareState, ctx: ShareContext): Step {
   return {
     state: { ...state, recordId: null },
@@ -355,7 +366,7 @@ function clearSettled(
       itemCount: session.entries.length,
     });
   }
-  effects.push({ type: "navigateHome" });
+  effects.push(afterSave(session));
   return {
     state: {
       ...state,

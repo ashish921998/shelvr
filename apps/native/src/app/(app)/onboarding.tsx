@@ -49,7 +49,7 @@ import {
 } from "@/components/onboarding/questions";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useConvexAuth } from "convex/react";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
@@ -214,9 +214,7 @@ export default function OnboardingScreen() {
   }, [signedIn, isAuthenticated, completeOnboarding]);
 
   const finish = () => {
-    if (process.env.EXPO_OS === "ios") {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
+    void haptics.success();
     analytics.capture(
       "onboarding_completed",
       onboardingCompletedProperties(spaces, {
