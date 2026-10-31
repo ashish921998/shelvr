@@ -707,6 +707,8 @@
   },
   "cityMap.placesList": "장소 목록",
   "cityMap.placeDetails": "%{name} 장소 정보",
+  "cityMap.removePlace": "%{name} 삭제",
+  "cityMap.removedPlace": "%{name} 삭제됨",
   "opener.tagline": "장소를 저장하세요. 데이트도 여행도 계획은 저희가 할게요.",
   "onboardingQ.skip": "건너뛰기",
   "onboardingQ.savedTitle": "장소를 얼마나 저장했나요?",

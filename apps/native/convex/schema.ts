@@ -120,6 +120,18 @@ export default defineSchema({
     intents: v.optional(v.array(intentValidator)),
     cities: v.optional(v.array(v.string())),
     places: v.optional(v.array(v.string())),
+    removedPlaces: v.optional(
+      v.array(
+        v.object({
+          key: v.string(),
+          name: v.string(),
+          lat: v.number(),
+          lng: v.number(),
+          appleId: v.optional(v.string()),
+          operationId: v.string(),
+        }),
+      ),
+    ),
     /** True once a run has read the video's speech for places; a rerun then reads it no more. */
     placesHeard: v.optional(v.boolean()),
     products: v.optional(

@@ -29,6 +29,7 @@ import {
 import { requireProEntitlement } from "./subscriptions";
 import { effectiveStatus, getMembership } from "./model/memberships";
 import { readyCitySaves } from "./items";
+import { visibleItemPlaces } from "./model/itemFields";
 
 const MAX_CITY_CHARS = 80;
 
@@ -122,6 +123,10 @@ export function toPlanSource(
   join?: Doc<"spaceItems">,
   city?: string,
 ): PlanSource {
+  item = visibleItemPlaces({
+    ...item,
+    intents: [...(item.intents ?? []), ...(join?.intents ?? [])],
+  });
   return {
     itemId: item._id,
     title: item.title,
@@ -138,7 +143,7 @@ export function toPlanSource(
       ({ name, lat, lng }) => ({ name, lat, lng }),
     ),
     places: [
-      ...[...(item.intents ?? []), ...(join?.intents ?? [])]
+      ...(item.intents ?? [])
         .filter((intent) => intent.kind === "open_maps")
         .map((intent) => intent.value),
       ...(item.places ?? []),

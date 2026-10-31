@@ -40,6 +40,7 @@ import { MAX_LIST_PARTS, withListPins } from "./model/placeList";
 import { sha256Hex } from "./model/captureTokens";
 import {
   articleMediaValidator,
+  visibleItemPlaces,
   enrichmentValidator,
   failureReasonValidator,
   intentKindValidator,
@@ -221,9 +222,11 @@ function stripEmbedding(
   | "productsSearchStartedAt"
   | "places"
   | "placesHeard"
+  | "removedPlaces"
 > {
   const {
     places: _places,
+    removedPlaces: _removedPlaces,
     placesHeard: _placesHeard,
     embedding: _embedding,
     embeddingVersion: _version,
@@ -239,7 +242,7 @@ export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
     ? await ctx.storage.getUrl(item.storageId)
     : null;
   return {
-    ...stripEmbedding(item),
+    ...stripEmbedding(visibleItemPlaces(item)),
     imageUrl,
     heroImageUrl: item.type === "link" ? (imageUrl ?? undefined) : undefined,
   };
@@ -282,7 +285,7 @@ export async function readySavesNewestFirst(
       limit: rows.length >= CITY_SCAN_ROWS ? "rows" : "bytes",
     });
   }
-  return rows;
+  return rows.map(visibleItemPlaces);
 }
 
 /** The user's ready saves in one city, newest first, capped at `limit`. */
@@ -650,7 +653,7 @@ export const searchItems = authedQuery({
     return await Promise.all(
       items.map(async (item) => ({
         ...(await enrichItem(ctx, item)),
-        places: item.places,
+        places: visibleItemPlaces(item).places,
       })),
     );
   },

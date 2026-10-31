@@ -664,6 +664,8 @@ export type MessageParams = {
   "cityMap.placesFromSaves": { count: number };
   "cityMap.placesList": undefined;
   "cityMap.placeDetails": { name: string };
+  "cityMap.removePlace": { name: string };
+  "cityMap.removedPlace": { name: string };
   "opener.tagline": undefined;
   "onboardingQ.skip": undefined;
   "onboardingQ.savedTitle": undefined;

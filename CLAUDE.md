@@ -334,7 +334,11 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   the pin's icon) and its filter kinds from
   `model/placeKinds.ts`: Apple's point-of-interest category when the pin has one, otherwise
   the save's tags; "date night" always comes from the tags.
-- **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark. Planning
+- **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark.
+  `removePlace` removes the selected venue across currently visible saves; `undoRemovePlace`
+  restores only that operation's removals. Optional `items.removedPlaces` overlays extraction
+  for city/map reads and future planning, survives reprocessing, and leaves source saves and
+  existing trip stops intact. The city page offers removal on its selected row and a six-second Undo. Planning
   and trip swaps check these records inside Shelvr; they are not sent to an AI provider.
 - **`planShares.ts`**: "Ask someone" on a plan. `createPlanShare` stores the plan as a vote
   link and `latestPlanShare` reads its tallies back; the public `/plan/shares/` and

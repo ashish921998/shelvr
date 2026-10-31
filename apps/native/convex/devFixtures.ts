@@ -227,6 +227,37 @@ async function seedFixtures(
       "the value of craft durable objects thoughtful design reading example journal",
   });
 
+  const coffeePin = {
+    name: "Jo's Coffee",
+    lat: 30.2502,
+    lng: -97.7496,
+    city: "Austin",
+  };
+  const bakeryPin = {
+    name: "Houndstooth Coffee",
+    lat: 30.2684,
+    lng: -97.7432,
+    city: "Austin",
+  };
+  for (const [fixtureKey, title, placePins] of [
+    ["austin-coffee", "Austin coffee stops", [coffeePin, bakeryPin]],
+    ["austin-favorites", "Austin favorites", [coffeePin]],
+  ] as const) {
+    await ctx.db.insert("items", {
+      userId,
+      fixtureKey,
+      title,
+      type: "link",
+      status: "ready",
+      url: `https://example.com/places/${fixtureKey}`,
+      tags: ["coffee"],
+      cities: ["Austin"],
+      places: placePins.map((pin) => pin.name),
+      placePins: [...placePins],
+      searchText: `${title} Austin Jo's Coffee Houndstooth Coffee`,
+    });
+  }
+
   const recipesId = await ctx.db.insert("spaces", {
     userId,
     fixtureKey: "recipes",
@@ -281,7 +312,7 @@ async function seedFixtures(
     updatedAt: Date.now(),
   });
 
-  return { items: 4, spaces: 3, memberships: 4 };
+  return { items: 6, spaces: 3, memberships: 4 };
 }
 
 export const locateTripStops = internalMutation({

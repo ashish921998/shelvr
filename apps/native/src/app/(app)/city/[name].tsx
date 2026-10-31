@@ -1,6 +1,7 @@
 import { CityMap } from "@/components/city/city-map";
 import { CitySheet, moveSheet } from "@/components/city/city-sheet";
 import { SaveRow } from "@/components/city/save-row";
+import { PlaceRemovalUndo } from "@/components/city/place-removal";
 import { EmptyState } from "@/components/empty-state";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
@@ -13,6 +14,7 @@ import { cityPins, cityRows } from "@/lib/city-pins";
 import { type CityPlanKind, useCityPlan } from "@/lib/city-plan";
 import { sheetSnaps } from "@/lib/city-sheet";
 import { t, useAppLocale } from "@/lib/i18n";
+import { usePlaceRemoval } from "@/lib/place-removal";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -89,6 +91,7 @@ export default function CityScreen() {
     }, []),
   );
   const city = name ?? "";
+  const removal = usePlaceRemoval();
   const items = useQuery(convexQuery(api.items.listCityItems, { city }));
   const { busy, start } = useCityPlan(city);
   const list = useRef<FlatList>(null);
@@ -223,6 +226,12 @@ export default function CityScreen() {
                   placeName={row.kind === "place" ? row.name : undefined}
                   number={row.kind === "place" ? row.number : undefined}
                   selected={selected === row.id}
+                  removing={removal.busy}
+                  onRemove={
+                    row.kind === "place"
+                      ? () => void removal.remove(item._id, row.pin)
+                      : undefined
+                  }
                   // First select the place's pin; a second tap opens its source save.
                   onPress={
                     row.kind === "place" && selected !== row.id
@@ -263,6 +272,7 @@ export default function CityScreen() {
           />
         </View>
       ) : null}
+      <PlaceRemovalUndo removal={removal} />
     </View>
   );
 }
