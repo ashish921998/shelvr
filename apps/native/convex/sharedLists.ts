@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
 import {
   internalMutation,
+  internalQuery,
   query,
   type MutationCtx,
   type QueryCtx,
@@ -301,6 +302,12 @@ async function invitePreviewOf(ctx: QueryCtx, token: string) {
 }
 
 export const invitePreview = query({
+  args: { token: v.string() },
+  returns: v.union(v.null(), invitePreviewValidator),
+  handler: async (ctx, args) => await invitePreviewOf(ctx, args.token),
+});
+
+export const getPublicInvite = internalQuery({
   args: { token: v.string() },
   returns: v.union(v.null(), invitePreviewValidator),
   handler: async (ctx, args) => await invitePreviewOf(ctx, args.token),

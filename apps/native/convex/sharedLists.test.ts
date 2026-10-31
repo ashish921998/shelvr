@@ -193,6 +193,22 @@ describe("invitePreview", () => {
   });
 });
 
+describe("the web invite route", () => {
+  it("serves the preview from the token and 404s otherwise", async () => {
+    const { base, owner, token } = await listWithOwner();
+    const found = await base.fetch(`/list/invites/${token}`);
+    expect(found.status).toBe(200);
+    expect(await found.json()).toMatchObject({
+      inviterName: "Ana",
+      name: "Lisbon weekend",
+      placeCount: 2,
+    });
+    expect((await base.fetch("/list/invites/nope")).status).toBe(404);
+    await base.run((ctx) => ctx.db.patch(owner.userId, { deleting: true }));
+    expect((await base.fetch(`/list/invites/${token}`)).status).toBe(404);
+  });
+});
+
 describe("joinSharedList", () => {
   it("lets a free person in, once, and shows them the owner's places as new", async () => {
     const { base, token, listId } = await listWithOwner();

@@ -240,8 +240,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   the waitlist receiver at `/waitlist/join`, the web Oracle at `/oracle`, the App Intents
   capture routes under `/app-intents/`, Apple's Get Retention Message endpoint at
   `/retention-messaging` (authenticated by the App Store's JWS signature, checked in
-  `model/appleJws.ts`), and `GET /health` (200/503 probe for uptime
-  monitors, backed by the `health.ts` `ping` query).
+  `model/appleJws.ts`), the shared list invite preview at `/list/invites/`, and
+  `GET /health` (200/503 probe for uptime monitors, backed by the `health.ts` `ping` query).
 - **`crons.ts`**: refund consent sync retry, stale image import cleanup, stale processing-item
   failure, waitlist Resend retry, weekly shelf and save reminder preparation, their delivery
   recovery, hourly feedback inbox delivery retry, daily payment-receipt
@@ -369,6 +369,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   member's leaving deletes it. Coverage (`listCovered`) is "the live owner has Pro or the
   caller has Pro"; reading, joining, leaving and marking places need no Pro. Rules and
   caps live in `model/sharedLists.ts`; place tidying shared with trips in `model/tripPlace.ts`.
+  The public `GET /list/invites/<token>` HTTP route (`getPublicInvite`, the same answer as
+  `invitePreview`) is for the web invite page, as `/plan/shares/` is for the vote page.
+  Rate buckets: `sharedListCreate`, `sharedListJoin`, `sharedListEdit`, `sharedListSearch`.
   Any member adds places: `addSavePlaces` copies a save's pins (the caller's own save, one
   city or all), `addSharedListPlace` stores an Apple search result, `removeSavePlaces` and
   `removeSharedListPlace` take them off, `setSharedListPlaceVisited` marks "We went" and
