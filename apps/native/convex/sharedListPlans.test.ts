@@ -5,14 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import type { DatePlanResult } from "./model/datePlan";
-import { joiner, listWithOwner } from "./sharedLists.test";
+import { joiner, listWithOwner, near } from "./sharedLists.test.helpers";
 import { setTestConsent, signedInUser, type TestBackend } from "./test.setup";
 
-const LISBON = { lat: 38.7223, lng: -9.1393 };
-const near = (steps: number) => ({
-  lat: LISBON.lat + steps * 0.001,
-  lng: LISBON.lng,
-});
 const RED_FROG = { name: "Red Frog", ...near(4), category: "Nightlife" };
 
 async function testKey(): Promise<string> {

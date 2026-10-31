@@ -5,14 +5,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { MAX_LIST_PLACES } from "./model/sharedLists";
-import { joiner, listWithOwner, seedSave } from "./sharedLists.test";
+import {
+  joiner,
+  listWithOwner,
+  near,
+  seedSave,
+} from "./sharedLists.test.helpers";
 import { setTestConsent, signedInUser, type TestBackend } from "./test.setup";
-
-const LISBON = { lat: 38.7223, lng: -9.1393 };
-const near = (steps: number) => ({
-  lat: LISBON.lat + steps * 0.001,
-  lng: LISBON.lng,
-});
 
 async function placeRows(base: TestBackend, listId: Id<"sharedLists">) {
   return await base.run((ctx) =>
@@ -39,6 +38,30 @@ afterEach(() => {
 });
 
 describe("addSavePlaces", () => {
+  it("leaves out a place the person removed from the save", async () => {
+    const { base, owner, listId } = await listWithOwner();
+    const itemId = await seedSave(base, owner.userId, {
+      title: "Ana's picks",
+      pins: [
+        { name: "Cervejaria Ramiro", ...near(10) },
+        { name: "Taberna da Rua", ...near(14) },
+      ],
+    });
+    await owner.t.mutation(api.placeRemovals.removePlace, {
+      itemId,
+      name: "Cervejaria Ramiro",
+      ...near(10),
+    });
+    const added = await owner.t.mutation(api.sharedLists.addSavePlaces, {
+      listId,
+      itemId,
+    });
+    expect(added).toBe(1);
+    const names = (await placeRows(base, listId)).map((row) => row.name);
+    expect(names).toContain("Taberna da Rua");
+    expect(names).not.toContain("Cervejaria Ramiro");
+  });
+
   it("copies a member's own save into the list, skipping places already on it", async () => {
     const { base, owner, token, listId } = await listWithOwner();
     const bo = await joiner(base, token, { pro: true });
