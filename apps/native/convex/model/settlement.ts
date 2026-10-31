@@ -11,7 +11,7 @@ import {
   failureReasonValidator,
   intentValidator,
   normalizePlaces,
-  normalizePlaceName,
+  savedPlaceKey,
   normalizePlaceLocations,
   placeLocationsValidator,
   postMediaValidator,
@@ -211,7 +211,7 @@ export function completionPatch(
     intents: words.intents,
     ...(words.cities !== undefined ? { cities: words.cities } : {}),
     ...(words.places !== undefined ? { places: words.places } : {}),
-    ...locationPatch(item, words),
+    ...replaceCluesAndDropTheirPins(item, words),
     ...(words.placesHeard !== undefined
       ? { placesHeard: words.placesHeard }
       : {}),
@@ -233,21 +233,27 @@ export function completionPatch(
   };
 }
 
-/** A newly learned branch must replace its old pin on the next lookup. */
-function locationPatch(item: Doc<"items">, words: Words): ItemPatch {
+function replaceCluesAndDropTheirPins(
+  item: Doc<"items">,
+  words: Words,
+): ItemPatch {
   if (item.placesEdited || words.placeLocations === undefined) return {};
+  const cities = words.cities ?? item.cities;
+  const key = (name: string) => savedPlaceKey(name, cities);
   const changed = new Set(
     words.placeLocations
       .filter(
         (hint) =>
           !item.placeLocations?.some(
-            (old) => old.name === hint.name && old.location === hint.location,
+            (old) =>
+              key(old.name) === key(hint.name) &&
+              old.location === hint.location,
           ),
       )
-      .map((hint) => hint.name.toLowerCase()),
+      .map((hint) => key(hint.name)),
   );
   const changedPin = (pin: NonNullable<Doc<"items">["placePins"]>[number]) =>
-    changed.has(normalizePlaceName(pin.name, words.cities).toLowerCase());
+    changed.has(key(pin.name));
   return {
     placeLocations: words.placeLocations,
     ...(item.placePins?.some(changedPin)

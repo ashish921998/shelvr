@@ -17,6 +17,7 @@ import {
 import {
   MAX_ITEM_PLACES,
   normalizePlaceName,
+  savedPlaceKey,
   normalizePlaces,
   normalizePlaceLocations,
   placeLocationsValidator,
@@ -147,9 +148,7 @@ export const toLocate = internalQuery({
       return null;
     if (!(await aiAllowed(ctx, item.userId))) return null;
     const pinned = new Set(
-      (item.placePins ?? []).map((p) =>
-        placeKey(normalizePlaceName(p.name, item.cities)),
-      ),
+      (item.placePins ?? []).map((p) => savedPlaceKey(p.name, item.cities)),
     );
     const wanted = [...(await wantedPlaces(ctx, item))];
     const kept = wanted.filter(([key]) => pinned.has(key)).length;
@@ -194,10 +193,37 @@ function keepAppleId(stored: Pin | undefined, found: Pin): Pin {
   };
 }
 
+function cluesByPlace(
+  locations: { name: string; location: string }[],
+  cities: string[] | undefined,
+): Map<string, string> {
+  return new Map(
+    locations.map(({ name, location }) => [
+      savedPlaceKey(name, cities),
+      location,
+    ]),
+  );
+}
+
+function dropPinsFoundUnderOldClues<P extends { name: string }>(
+  found: P[],
+  cluesSearched: { name: string; location: string }[] | undefined,
+  item: Doc<"items">,
+): P[] {
+  if (cluesSearched === undefined) return found;
+  const now = cluesByPlace(item.placeLocations ?? [], item.cities);
+  const then = cluesByPlace(cluesSearched, item.cities);
+  return found.filter((pin) => {
+    const key = savedPlaceKey(pin.name, item.cities);
+    return now.get(key) === then.get(key);
+  });
+}
+
 export const storePins = internalMutation({
   args: {
     itemId: v.id("items"),
     found: placePinsValidator,
+    cluesSearched: v.optional(placeLocationsValidator),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -209,9 +235,14 @@ export const storePins = internalMutation({
     )
       return null;
     const wanted = await wantedPlaces(ctx, item);
+    const found = dropPinsFoundUnderOldClues(
+      args.found,
+      args.cluesSearched,
+      item,
+    );
     const next = new Map<string, Pin>();
-    for (const pin of [...(item.placePins ?? []), ...args.found]) {
-      const key = placeKey(normalizePlaceName(pin.name, item.cities));
+    for (const pin of [...(item.placePins ?? []), ...found]) {
+      const key = savedPlaceKey(pin.name, item.cities);
       if (wanted.has(key))
         next.set(
           key,
@@ -340,6 +371,7 @@ export const locateItem = internalAction({
     await ctx.runMutation(internal.placePins.storePins, {
       itemId: args.itemId,
       found,
+      cluesSearched: todo.locations,
     });
     return null;
   },

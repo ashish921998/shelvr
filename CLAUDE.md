@@ -384,6 +384,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `items.placeLocations` keeps explicitly stated branch/address clues separately from display
   names. Caption and speech extraction preserve these clues for Apple lookup. A reread that
   learns a different clue clears only that place's old pin so the scheduled lookup replaces it;
+  a lookup that lands after such a reread drops its pin, since it searched with the old clue;
   existing saves without clues keep their old behavior until reread. This optional field stays
   declared through rollback and is stripped from public item responses.
   Each pin also keeps Apple's place id (`appleId`) and point-of-interest `category` when the
@@ -505,13 +506,17 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   and Plan a trip. A selected place row shows an info button that opens Apple's place card
   (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`); tapping the row opens the save
 - Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
-  `profile`, `settings`, `item/[id]`, `city/[name]`, `plan/[id]`, `date-plan`, `new-trip`,
-  `trip-plan/[id]`, `add-trip-stop`
+  `profile`, `settings`, `item/[id]`, `city/[name]`, `spots/[id]`, `plan/[id]`, `date-plan`,
+  `new-trip`, `trip-plan/[id]`, `add-trip-stop`
 - `date-plan` is Plan a date, pushed from the city page with a `city` param: "What kind of
   date?" (Classic, Low-key, Surprise me),
   then the evening from `makeDatePlan`: both stops on a map, a card each with Hours and info
   and Change (only when another nearby stop fits), the approximate walk between, Send to your
   date (plain share text with Maps links) and Directions to stop 1 (Maps directions)
+- `spots/[id]` is the moment after sharing links: "Finding the spots…" while the first saved one is
+  read and pinned, then its pins drop onto the city most of them share, with Open <city> and
+  Done (`src/lib/spots-reveal.ts` holds the waits). A failed save, one with no place, or a wait
+  past 25 s goes Home, as every other share does. Creator videos film this moment
 - `new-trip` is the trip planner form, a modal with an optional `city` param (the city page's
   Plan a trip opens it): city, days, optional start date, interests, pace and an optional
   stay. It checks Pro on submit, calls `createTripPlan` behind a three-step reveal, then

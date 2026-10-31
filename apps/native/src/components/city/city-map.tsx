@@ -21,6 +21,7 @@ type Props = {
   /** How much of the map's bottom the places sheet covers when the page opens. */
   coveredBottom: number;
   onSelect: (id: string) => void;
+  visible?: number;
 };
 
 export function CityMap({
@@ -29,6 +30,7 @@ export function CityMap({
   height,
   coveredBottom,
   onSelect,
+  visible = Infinity,
 }: Props) {
   const { theme, rt } = useUnistyles();
   const ref = useRef<AppleMaps.MapView>(null);
@@ -99,7 +101,7 @@ export function CityMap({
     );
   }, [steady, firstCamera]);
 
-  const annotations = pins.map((pin) => {
+  const annotations = pins.slice(0, visible).map((pin) => {
     const id = cityPinId(pin);
     const isSelected = id === selected;
     return {

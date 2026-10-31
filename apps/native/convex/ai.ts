@@ -174,6 +174,7 @@ const intentsPromptBlock = (maxIntents: number): string =>
   ].join("\n");
 
 const MAX_CONTENT_CHARS = 8000;
+const LIST_PINS_TAKE_NO_CLUES: { name: string; location: string }[] = [];
 
 async function scheduleSteeringFor(
   ctx: ActionCtx,
@@ -584,6 +585,7 @@ async function analyzeLinkItem(
       intents: intentsForPart(result.intents, part),
       places: part.places,
       cities: part.cities,
+      placeLocations: LIST_PINS_TAKE_NO_CLUES,
       ...(parts.length > 1 ? { title: part.title } : {}),
     },
     page: { ...page, content: part.content },

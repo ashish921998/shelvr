@@ -46,7 +46,6 @@ export const revokeShare = authedMutation({
   handler: async (ctx, { tripId, token }) => {
     const trip = await ctx.db.get(tripId);
     if (!trip || trip.userId !== ctx.userId) throw new Error("Trip not found");
-    // A late cancellation must not revoke a newer link.
     if (trip.shareToken === token)
       await ctx.db.patch(tripId, { shareToken: undefined });
     return null;
