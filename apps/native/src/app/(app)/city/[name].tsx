@@ -47,7 +47,7 @@ export default function CityScreen() {
   const city = name ?? "";
   const removal = usePlaceRemoval();
   const items = useQuery(convexQuery(api.items.listCityItems, { city }));
-  const { busy, start } = useCityPlan(city);
+  const { busy, start } = useCityPlan();
   const list = useRef<FlatList>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const { height: screenHeight } = rt.screen;
@@ -221,12 +221,12 @@ export default function CityScreen() {
           <PlanButton
             kind="date"
             busy={busy}
-            onPress={() => void start("date")}
+            onPress={() => void start("date", city)}
           />
           <PlanButton
             kind="trip"
             busy={busy}
-            onPress={() => void start("trip")}
+            onPress={() => void start("trip", city)}
           />
         </View>
       ) : null}

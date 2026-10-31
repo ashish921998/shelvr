@@ -548,8 +548,10 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   one full-screen map, opening on the person's location (iOS asks once, when the tab first opens)
   unless none of their places is within 50 km; otherwise on the city with the most places, with a search field over your own places (name or city, matched on the phone) and filter chips
   for the kinds that have three or more places (`src/lib/map-filters.ts`); tapping a place opens Apple's place card, or the save without one.
-  `(home)` is Home. It lists "Your cities" and
-  "Finding places…" for processing saves. Failed reads and finished saves without a city
+  `(home)` is Home. It shows two plan tiles, Plan a date and Plan a trip (they start straight
+  away when one city has a mapped place, otherwise a "Which city?" sheet picks it; none with no
+  mapped place), then the city cards (a cover or a pin on a tint, two to a row, a lone last
+  city wide) and "Finding places…" for processing saves. Failed reads and finished saves without a city
   sit behind one "N saves without a place · Review" line, whose sheet has Retry and Delete
   (`src/components/home/review-saves.tsx`); a save that lands that way while the app is open
   shows a toast instead (`unplaced-toast.tsx`). It loads more saves on scroll, and on its own only
@@ -560,7 +562,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   city's saves, plus a row for every save not represented by a place row, with Plan a date
   and Plan a trip. A selected place row shows an info button that opens Apple's place card
   (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`); tapping the row opens the save
-- Shared lists: Home shows a "Shared lists" section above "Your cities" (one card per list from
+- Shared lists: Home shows a "Shared lists" section above the plan tiles (one card per list from
   `listSharedLists`, or a quiet "Start a shared list" row when the person has none).
   `shared-list/[id]` is a list: the same map-and-sheet shape as the city page, "New from <name>"
   first, a row menu for We went and Remove from list, city chips when the list spans cities,

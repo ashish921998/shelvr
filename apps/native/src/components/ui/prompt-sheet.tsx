@@ -12,6 +12,7 @@ export function PromptSheet({
   children,
   actions,
   testID,
+  onDismiss,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -20,6 +21,7 @@ export function PromptSheet({
   children?: ReactNode;
   actions: ReactNode;
   testID?: string;
+  onDismiss?: () => void;
 }) {
   useAppLocale();
   const reducedMotion = useReducedMotion();
@@ -29,6 +31,7 @@ export function PromptSheet({
       transparent
       animationType={reducedMotion ? "fade" : "slide"}
       onRequestClose={onClose}
+      onDismiss={onDismiss}
     >
       <View style={styles.backdrop}>
         <Pressable

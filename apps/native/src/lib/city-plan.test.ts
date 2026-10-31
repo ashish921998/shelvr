@@ -34,11 +34,11 @@ beforeEach(() => {
 });
 
 it("opens the trip form once for a double tap on Plan a trip", async () => {
-  const { result } = renderHook(() => useCityPlan("Lisbon"));
+  const { result } = renderHook(() => useCityPlan());
   await act(async () => {
     await Promise.all([
-      result.current.start("trip"),
-      result.current.start("trip"),
+      result.current.start("trip", "Lisbon"),
+      result.current.start("trip", "Lisbon"),
     ]);
   });
   expect(mocks.push).toHaveBeenCalledTimes(1);
@@ -47,22 +47,22 @@ it("opens the trip form once for a double tap on Plan a trip", async () => {
 });
 
 it("opens the trip form again once the city page is back in focus", async () => {
-  const { result } = renderHook(() => useCityPlan("Lisbon"));
-  await act(() => result.current.start("trip"));
-  await act(() => result.current.start("trip"));
+  const { result } = renderHook(() => useCityPlan());
+  await act(() => result.current.start("trip", "Lisbon"));
+  await act(() => result.current.start("trip", "Lisbon"));
   expect(mocks.push).toHaveBeenCalledTimes(1);
 
   act(() => mocks.focus?.());
-  await act(() => result.current.start("trip"));
+  await act(() => result.current.start("trip", "Lisbon"));
   expect(mocks.push).toHaveBeenCalledTimes(2);
 });
 
 it("opens one date planner for a double tap on Plan a date", async () => {
-  const { result } = renderHook(() => useCityPlan("Lisbon"));
+  const { result } = renderHook(() => useCityPlan());
   await act(async () => {
     await Promise.all([
-      result.current.start("date"),
-      result.current.start("date"),
+      result.current.start("date", "Lisbon"),
+      result.current.start("date", "Lisbon"),
     ]);
   });
   expect(mocks.push).toHaveBeenCalledTimes(1);

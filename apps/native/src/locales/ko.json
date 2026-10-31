@@ -674,8 +674,16 @@
   "trip.slotCoffee": "커피",
   "goal.citySomewhere": "다른 곳",
   "goal.citySearch": "도시 검색",
-  "homePlaces.yourCities": "내 도시",
-  "homePlaces.citiesHint": "저장한 릴스와 TikTok에 나온 장소",
+  "homePlaces.planInCity": "%{city}에서",
+  "homePlaces.planPickCity": "도시 선택",
+  "homePlaces.planWhichCity": "어느 도시인가요?",
+  "homePlaces.noPlaceYet": {
+    "other": "저장 %{formattedCount}개, 아직 장소 없음"
+  },
+  "homePlaces.fromSaves": {
+    "other": "저장 %{formattedCount}개에서"
+  },
+  "homePlaces.shareTip": "릴스나 TikTok을 Shelvr에 공유하세요. 그 장소가 여기 해당 도시 아래에 담겨요.",
   "homePlaces.noPlaceReading": "장소 찾는 중…",
   "homePlaces.noPlaceNone": "장소가 없어요",
   "homePlaces.reviewCount": {

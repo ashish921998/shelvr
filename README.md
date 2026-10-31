@@ -179,7 +179,7 @@ environment by default and opt into jsdom per file when browser APIs are needed.
 
 `tools/e2e` drives the development build through the app's one flow with the
 [e2e](https://github.com/tester-army/e2e) framework: Home lists the seeded
-"Your cities" (`tests/home-cities.e2e.ts`), onboarding, the paywall, and saving
+city cards (`tests/home-cities.e2e.ts`), onboarding, the paywall, and saving
 a pasted link, which lands under "No place found" when it names no place, and
 planning a date from a city (`tests/plan-city-date.e2e.ts`): it saves a Lisbon
 fixture page, opens Lisbon from Home and checks Plan a date returns a shortlist.
