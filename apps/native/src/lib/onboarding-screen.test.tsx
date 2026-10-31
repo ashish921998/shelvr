@@ -35,6 +35,8 @@ const mocks = vi.hoisted(() => ({
   ),
   share: vi.fn((_props: { sample: Sample }) => null),
   commitment: vi.fn(),
+  notifications: vi.fn(),
+  permission: vi.fn<() => Promise<"granted" | "ask" | "blocked">>(),
   progress: {
     spaces: [] as string[],
     step: 0,
@@ -177,6 +179,17 @@ vi.mock("@/components/onboarding/commitment", () => ({
     return button("commitment:continue", props.onContinue);
   }),
 }));
+vi.mock("@/components/onboarding/notifications", () => ({
+  NotificationsStep: vi.fn(
+    (props: { sample: Sample; onContinue: () => void }) => {
+      mocks.notifications(props);
+      return button("notifications:continue", props.onContinue);
+    },
+  ),
+}));
+vi.mock("@/lib/notification-token", () => ({
+  notificationPermissionState: mocks.permission,
+}));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: false }),
 }));
@@ -208,6 +221,7 @@ const startAt = (step: (typeof ONBOARDING_STEPS)[number]) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.permission.mockReset().mockResolvedValue("ask");
   mocks.progress = {
     spaces: [],
     step: 0,
@@ -290,7 +304,43 @@ it("reuses the sample for the commitment after the spots, before opening the pay
   });
   expect(saved()?.step).toBe(ONBOARDING_STEPS.indexOf("commitment"));
   await act(async () => tap("commitment:continue"));
+  expect(mocks.ask).not.toHaveBeenCalled();
+  expect(mocks.notifications.mock.lastCall?.[0].sample).toMatchObject({
+    kind: "trip",
+    city: "austin",
+  });
+  expect(saved()?.step).toBe(ONBOARDING_STEPS.indexOf("notifications"));
+  await act(async () => tap("notifications:continue"));
   expect(mocks.ask).toHaveBeenCalledTimes(1);
+});
+
+it.each(["granted", "blocked"] as const)(
+  "skips the notifications step when iOS already says %s",
+  async (state) => {
+    mocks.permission.mockResolvedValue(state);
+    startAt("commitment");
+    render(<OnboardingScreen />);
+    await act(async () => tap("commitment:continue"));
+    expect(mocks.ask).toHaveBeenCalledTimes(1);
+    expect(mocks.notifications).not.toHaveBeenCalled();
+  },
+);
+
+it("opens the paywall when the permission cannot be read", async () => {
+  mocks.permission.mockRejectedValue(new Error("no"));
+  startAt("commitment");
+  render(<OnboardingScreen />);
+  await act(async () => tap("commitment:continue"));
+  expect(mocks.ask).toHaveBeenCalledTimes(1);
+});
+
+it("returns from the notifications step to the commitment", () => {
+  startAt("notifications");
+  render(<OnboardingScreen />);
+  tap("common.back");
+  expect(
+    screen.getByRole("button", { name: "commitment:continue" }),
+  ).toBeTruthy();
 });
 
 it("returns from commitment to the same spots without opening the paywall", () => {

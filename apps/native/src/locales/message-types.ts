@@ -711,6 +711,10 @@ export type MessageParams = {
   "onboardingChart.goalDate": undefined;
   "onboardingChart.goalTrip": undefined;
   "onboardingChart.goalWeekend": undefined;
+  "onboardingNotify.title": undefined;
+  "onboardingNotify.sub": undefined;
+  "onboardingNotify.allow": undefined;
+  "onboardingNotify.now": undefined;
   "onboardingChart.now": undefined;
   "onboardingChart.whenWeekend": undefined;
   "onboardingChart.whenTrip": undefined;

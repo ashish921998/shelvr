@@ -4,6 +4,7 @@ import { ahaSample } from "@/lib/aha-sample";
 import { stepTransition } from "@/lib/motion";
 import { useOnboarding } from "@/lib/onboarding";
 import { noteOnboardingFinished } from "@/lib/welcome-save";
+import { notificationPermissionState } from "@/lib/notification-token";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import type { SampleCityId } from "@/lib/sample-cities";
 import {
@@ -39,6 +40,7 @@ import { AhaShareStep } from "@/components/onboarding/aha-share";
 import { AhaSpotsStep } from "@/components/onboarding/aha-spots";
 import { CityStep } from "@/components/onboarding/city-step";
 import { CommitmentStep } from "@/components/onboarding/commitment";
+import { NotificationsStep } from "@/components/onboarding/notifications";
 import { OpenerStep } from "@/components/onboarding/opener";
 import { ProgressChartStep } from "@/components/onboarding/progress-chart";
 import { ScalePressable } from "@/components/onboarding/parts";
@@ -229,9 +231,15 @@ export default function OnboardingScreen() {
     onUnavailable: finish,
   });
 
-  const askAfterCommitment = () => {
+  const askForPlan = () => {
     recordCurrentStep();
     paywall.ask();
+  };
+
+  const leaveCommitment = () => {
+    void notificationPermissionState()
+      .catch(() => "blocked" as const)
+      .then((state) => (state === "ask" ? advance() : askForPlan()));
   };
 
   if (showSignIn) {
@@ -302,7 +310,15 @@ export default function OnboardingScreen() {
           <CommitmentStep
             sample={sample}
             leaving={paywall.asked}
-            onContinue={askAfterCommitment}
+            onContinue={leaveCommitment}
+          />
+        );
+      case "notifications":
+        return (
+          <NotificationsStep
+            sample={sample}
+            leaving={paywall.asked}
+            onContinue={askForPlan}
           />
         );
     }
