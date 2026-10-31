@@ -638,6 +638,20 @@ describe("a purchase made while signed in", () => {
     await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
   });
 
+  it("leaves the before-sign-in record alone when there is none", async () => {
+    const { openPaywall } = await loadReady();
+    const { getPurchaseBeforeSignInRevision } =
+      await import("./purchase-before-sign-in");
+    const before = getPurchaseBeforeSignInRevision();
+    mock.presentPaywallIfNeeded.mockResolvedValue("PURCHASED");
+
+    await openPaywall(router, "plan_gate");
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
+    await act(() => new Promise<void>((r) => setTimeout(r, 0)));
+
+    expect(getPurchaseBeforeSignInRevision()).toBe(before);
+  });
+
   it("reads a restore into the account", async () => {
     const { restorePurchases } = await loadReady();
     mock.restorePurchases.mockResolvedValue({
