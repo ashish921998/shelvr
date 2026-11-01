@@ -34,6 +34,7 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
   },
   // Every drag, remove, add and rename is one write; this only stops a runaway client.
   tripEdit: { kind: "token bucket", rate: 600, period: HOUR, capacity: 120 },
+  tripTravel: { kind: "token bucket", rate: 600, period: HOUR, capacity: 150 },
   tripPlaceSearch: {
     kind: "token bucket",
     rate: 120,
