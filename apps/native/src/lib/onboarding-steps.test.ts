@@ -35,6 +35,7 @@ describe("previousOnboardingStep", () => {
     ["ahaShare", "city"],
     ["ahaSpots", "ahaShare"],
     ["commitment", "ahaSpots"],
+    ["notifications", "commitment"],
   ] as const)("goes back from %s to %s", (step, expected) => {
     expect(previousOnboardingStep(step)).toBe(expected);
   });
@@ -45,13 +46,14 @@ describe("previousOnboardingStep", () => {
 });
 
 describe("nextOnboardingStep", () => {
-  it("walks the questions, city, sample and commitment, and stays on the commitment", () => {
+  it("walks the questions, city, sample, commitment and notifications, and stays on the last", () => {
     const walked: OnboardingStep[] = [ONBOARDING_STEPS[0]];
     while (walked.length < ONBOARDING_STEPS.length)
       walked.push(nextOnboardingStep(walked[walked.length - 1]));
     expect(walked).toEqual([...ONBOARDING_STEPS]);
     expect(nextOnboardingStep("ahaSpots")).toBe("commitment");
-    expect(nextOnboardingStep("commitment")).toBe("commitment");
+    expect(nextOnboardingStep("commitment")).toBe("notifications");
+    expect(nextOnboardingStep("notifications")).toBe("notifications");
   });
 });
 
@@ -63,7 +65,7 @@ describe("ONBOARDING_STEP_IDS", () => {
 });
 
 describe("onboardingProgress", () => {
-  it("has no bar on the opener and fills evenly to the commitment", () => {
+  it("has no bar on the opener and fills evenly to the last step", () => {
     expect(onboardingProgress("opener")).toBeNull();
     const bars = ONBOARDING_STEPS.slice(1).map(onboardingProgress);
     expect(bars.at(-1)).toBe(1);

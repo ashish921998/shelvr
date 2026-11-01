@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const ENTITLEMENT_WAIT_MS = 5000;
 
-/** Closing re-arms `ask` on the commitment screen, without completing onboarding. */
+/** Closing re-arms `ask` on the screen that opened it, without completing onboarding. */
 export function useOnboardingPaywall({
   onPro,
   onUnavailable,
