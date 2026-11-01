@@ -46,10 +46,13 @@ import { isProHiddenForE2E } from "@/lib/e2e-hide-pro";
 import {
   claimPurchaseBeforeSignIn,
   clearPurchaseBeforeSignIn,
+  hasPurchaseBeforeSignIn,
 } from "@/lib/purchase-before-sign-in";
 import {
   notePurchaseLanding,
+  readPurchaseLanding,
   reservePurchaseLanding,
+  subscribePurchaseLanding,
 } from "@/lib/purchase-landing";
 
 export type EntitlementStatus =
@@ -178,6 +181,18 @@ export function useEntitlementSync(): void {
     );
     if (claimed) notePurchaseLanding();
     let attach: ReturnType<typeof startRevenueCatIdentitySync> | null = null;
+    const attachPurchase = () => {
+      attach?.dispose();
+      attach = startRevenueCatIdentitySync({
+        sync: () =>
+          attachPurchaseToAccount(sub, () => syncPurchaseRef.current({})),
+        onReady: () => {
+          if (hasPurchaseBeforeSignIn()) clearPurchaseBeforeSignIn();
+        },
+        onError: (error) =>
+          analytics.captureError("purchase_sync_failed", error),
+      });
+    };
     const observer = startRevenueCatIdentitySync({
       sync: () => {
         const attempt = _rcIdentitySync.then(async () => {
@@ -194,15 +209,12 @@ export function useEntitlementSync(): void {
       onReady: () => {
         markRcUserSynced(sub);
         if (cancelled || !claimed) return;
-        attach = startRevenueCatIdentitySync({
-          sync: () =>
-            attachPurchaseBeforeSignIn(sub, () => syncPurchaseRef.current({})),
-          onReady: clearPurchaseBeforeSignIn,
-          onError: (error) =>
-            analytics.captureError("purchase_sync_failed", error),
-        });
+        attachPurchase();
       },
       onError: reportRevenueCatIdentityError,
+    });
+    const stopLanding = subscribePurchaseLanding(() => {
+      if (readPurchaseLanding() > 0) attachPurchase();
     });
     const subscription = AppState.addEventListener("change", (state) => {
       if (state !== "active") return;
@@ -214,6 +226,7 @@ export function useEntitlementSync(): void {
       cancelled = true;
       observer.dispose();
       attach?.dispose();
+      stopLanding();
       subscription.remove();
       if (_rcTargetUserId === sub) setRcTargetUserId(null);
     };
@@ -223,7 +236,7 @@ export function useEntitlementSync(): void {
 }
 
 // logIn merges an anonymous purchase only into an account with no anonymous history, so sync the receipt either way.
-async function attachPurchaseBeforeSignIn(
+async function attachPurchaseToAccount(
   sub: string,
   syncPurchase: () => Promise<boolean>,
 ): Promise<void> {

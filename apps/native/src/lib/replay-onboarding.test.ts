@@ -29,8 +29,18 @@ describe("useAwaitingOnboardingPurchase", () => {
     const { result } = renderHook(() => useAwaitingOnboardingPurchase(false));
     expect(result.current).toBe(true);
 
-    act(() => vi.advanceTimersByTime(10_000));
+    act(() => vi.advanceTimersByTime(40_000));
     expect(result.current).toBe(false);
+  });
+
+  it("keeps waiting through three slow reads of the purchase and the pauses between them", () => {
+    const slowestRead = 10_000;
+    const pauses = 2_000 + 4_000;
+    notePurchaseLanding();
+    const { result } = renderHook(() => useAwaitingOnboardingPurchase(false));
+
+    act(() => vi.advanceTimersByTime(3 * slowestRead + pauses));
+    expect(result.current).toBe(true);
   });
 
   it("stops waiting once the entitlement lands, and does not wait again if it lapses", () => {
@@ -60,7 +70,7 @@ describe("useAwaitingOnboardingPurchase", () => {
     act(() => notePurchaseLanding());
     expect(result.current).toBe(true);
 
-    act(() => vi.advanceTimersByTime(10_000));
+    act(() => vi.advanceTimersByTime(40_000));
     expect(result.current).toBe(false);
   });
 });
