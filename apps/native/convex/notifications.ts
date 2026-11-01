@@ -825,7 +825,6 @@ export const prepareDueTripEves = internalMutation({
       .withIndex("by_start_date", (q) =>
         q.gte("startDate", from).lte("startDate", to),
       )
-      .order("desc")
       .paginate({
         cursor: args.cursor ?? null,
         numItems: DUE_TRIP_EVE_BATCH_SIZE,
@@ -870,6 +869,29 @@ async function pushedRecently(
   );
 }
 
+async function newerTripTakesEve(
+  ctx: QueryCtx,
+  trip: Doc<"tripPlans">,
+  timezone: string | undefined,
+  now: number,
+): Promise<boolean> {
+  const newer = await ctx.db
+    .query("tripPlans")
+    .withIndex("by_user", (q) =>
+      q.eq("userId", trip.userId).gt("_creationTime", trip._creationTime),
+    )
+    .order("desc")
+    .take(UPCOMING_TRIPS_SCANNED);
+  for (const other of newer) {
+    if (
+      tripEveDue(other, timezone, now) &&
+      (await tripSavedStopCount(ctx, other._id)) >= 1
+    )
+      return true;
+  }
+  return false;
+}
+
 export const prepareTripEve = internalMutation({
   args: { tripId: v.id("tripPlans"), now: v.number() },
   returns: v.null(),
@@ -901,7 +923,11 @@ export const prepareTripEve = internalMutation({
       .first();
     if (earlier !== null || (await tripSavedStopCount(ctx, tripId)) < 1)
       return null;
-    if (await pushedRecently(ctx, trip.userId, now)) return null;
+    if (
+      (await newerTripTakesEve(ctx, trip, preferences.timezone, now)) ||
+      (await pushedRecently(ctx, trip.userId, now))
+    )
+      return null;
     const reminderId = await ctx.db.insert("tripEveReminders", {
       userId: trip.userId,
       tripId,

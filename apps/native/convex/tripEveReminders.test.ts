@@ -208,7 +208,24 @@ describe("choosing the trip eve push", () => {
     expect(await rows()).toHaveLength(1);
   });
 
-  it("sends one push when two trips start the same day, for the newest", async () => {
+  it("sends one push when two trips start the same day, for the newest, whichever runs first", async () => {
+    const {
+      t,
+      newerTripId: newer,
+      prepare,
+      rows,
+    } = await setup({ newerTrip: true });
+    await prepare();
+    expect(await rows()).toEqual([]);
+    await t.mutation(internal.notifications.prepareTripEve, {
+      tripId: newer!,
+      now: EVE,
+    });
+    await prepare();
+    expect(await rows()).toMatchObject([{ tripId: newer }]);
+  });
+
+  it("lets the older trip push when the newer one has no saved stops", async () => {
     const {
       t,
       tripId,
@@ -216,21 +233,43 @@ describe("choosing the trip eve push", () => {
       prepare,
       rows,
     } = await setup({ newerTrip: true });
-    await t.mutation(internal.notifications.prepareDueTripEves, { now: EVE });
-    const order = (
-      await t.run((ctx) =>
-        ctx.db.system.query("_scheduled_functions").collect(),
-      )
-    )
-      .filter((job) => job.name.includes("prepareTripEve"))
-      .map((job) => (job.args[0] as { tripId: Id<"tripPlans"> }).tripId);
-    expect(order).toEqual([newer, tripId]);
-    await t.mutation(internal.notifications.prepareTripEve, {
-      tripId: newer!,
-      now: EVE,
+    await t.run(async (ctx) => {
+      const stops = await ctx.db
+        .query("tripStops")
+        .withIndex("by_trip_and_day", (q) => q.eq("tripId", newer!))
+        .collect();
+      await Promise.all(stops.map((stop) => ctx.db.delete(stop._id)));
     });
     await prepare();
-    expect(await rows()).toMatchObject([{ tripId: newer }]);
+    expect(await rows()).toMatchObject([{ tripId }]);
+  });
+
+  it("lets the older trip push when the newer one was made that afternoon", async () => {
+    const { t, userId, tripId, prepare, rows } = await setup();
+    await t.run(async (ctx) => {
+      const id = await ctx.db.insert("tripPlans", {
+        userId,
+        city: "Porto",
+        startDate: START,
+        dayCount: 2,
+        pace: "balanced",
+        interests: [],
+        stopCount: 1,
+        savedCount: 1,
+      });
+      await ctx.db.insert("tripStops", {
+        tripId: id,
+        userId,
+        day: 1,
+        order: 0,
+        source: "save",
+        name: "Place",
+        lat: 38.7,
+        lng: -9.1,
+      });
+    });
+    await prepare();
+    expect(await rows()).toMatchObject([{ tripId }]);
   });
 
   it("does not stack on a save reminder sent earlier that day", async () => {

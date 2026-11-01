@@ -101,8 +101,8 @@ and recover machine as save reminders. The rules are pure functions in
   device and a preferences row. The ignored-streak, weekly and gap limits do
   not apply, because the person set this date. Each person gets one in any 20
   hours, whichever kind came first: someone who planned a city twice, or two
-  cities for one day, hears about the newest with saved stops, and a save
-  reminder sent earlier that day takes its place.
+  cities for one day, hears about the newest with saved stops whichever is
+  prepared first, and a save reminder sent earlier that day takes its place.
 - **Budget.** A trip push counts as a send, so a save reminder waits 20 hours
   after it. A save reminder also makes room for one: it is held when a trip
   eve is due within the next 20 hours (`reminderBlocked`), looking at the
