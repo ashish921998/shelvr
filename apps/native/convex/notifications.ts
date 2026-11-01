@@ -627,6 +627,28 @@ export const armSaveReminders = internalMutation({
   },
 });
 
+async function upcomingTripEveAt(
+  ctx: QueryCtx,
+  userId: string,
+  timezone: string | undefined,
+  now: number,
+): Promise<number | undefined> {
+  const trips = await ctx.db
+    .query("tripPlans")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .order("desc")
+    .take(UPCOMING_TRIPS_SCANNED);
+  const dated = trips.filter((trip) => trip.startDate !== undefined);
+  const counts = await Promise.all(
+    dated.map((trip) => tripSavedStopCount(ctx, trip._id)),
+  );
+  return nextTripEveAt(
+    dated.filter((_, index) => counts[index] >= 1),
+    timezone,
+    now,
+  );
+}
+
 export const prepareSaveReminder = internalMutation({
   args: { userId: v.string(), now: v.number() },
   returns: v.null(),
@@ -699,16 +721,13 @@ export const prepareSaveReminder = internalMutation({
         .query("tripEveReminders")
         .withIndex("by_user", (q) => q.eq("userId", userId))
         .order("desc")
-        .take(2)
+        .take(3 * WEEKLY_LIMIT)
     )
       .filter((eve) => eve.deliveryStatus !== "failed")
       .map((eve) => eve.createdAt);
-    const upcomingEveAt = nextTripEveAt(
-      await ctx.db
-        .query("tripPlans")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .order("desc")
-        .take(UPCOMING_TRIPS_SCANNED),
+    const upcomingEveAt = await upcomingTripEveAt(
+      ctx,
+      userId,
       preferences.timezone,
       now,
     );

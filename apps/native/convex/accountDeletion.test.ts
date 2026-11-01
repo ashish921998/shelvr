@@ -828,6 +828,23 @@ const RECIPES: Record<string, Recipe> = {
         now: eveAt,
       });
     },
+    claim: async (backend) => {
+      const reminderId = await backend.run(async (ctx) => {
+        const reminder = await ctx.db
+          .query("tripEveReminders")
+          .order("desc")
+          .first();
+        await ctx.db.patch(reminder!._id, {
+          createdAt: Date.now(),
+          deliveryNextAttemptAt: Date.now(),
+        });
+        return reminder!._id;
+      });
+      return await backend.mutation(
+        internal.notificationDelivery.claimTripEve,
+        { reminderId },
+      );
+    },
   },
   "planShares.ts#recordPlanVote": {
     fence:

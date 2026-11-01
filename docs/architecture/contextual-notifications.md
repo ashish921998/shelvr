@@ -89,7 +89,7 @@ and recover machine as save reminders. The rules are pure functions in
 
 - **When.** 18:00 in the owner's registered timezone on the day before
   `startDate` (`tripEveAt`). A row is made only inside the two hours after
-  that, and only for a trip created at least six hours before the eve, so a
+  that, and only for a trip created more than six hours before the eve, so a
   trip planned that afternoon is not announced to the person who just made it.
   A row expires three hours after it is made, so a retry can never say
   "tomorrow" on the day itself.

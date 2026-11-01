@@ -566,6 +566,57 @@ describe("sharing the budget with save reminders", () => {
     expect(await remind(EVE + 21 * HOUR)).toHaveLength(1);
   });
 
+  it("reports the saved places when a sent push expires", async () => {
+    const { prepare, rows, t, jobs } = await setup();
+    await prepare();
+    const [row] = await rows();
+    await t.run((ctx) =>
+      ctx.db.patch(row._id, {
+        createdAt: EVE - 4 * HOUR,
+        deliveryNextAttemptAt: EVE - HOUR,
+        deliveryRecipients: [
+          {
+            token: "token-a",
+            locale: "en",
+            state: "receipt",
+            ticketId: "ticket-a",
+          },
+        ],
+      }),
+    );
+    await t.mutation(internal.notificationDelivery.claimTripEve, {
+      reminderId: row._id,
+    });
+    const [job] = await jobs(/captureNotification/);
+    expect(job.args[0]).toMatchObject({ itemCount: 1 });
+  });
+
+  it("is not held by a trip with no saved stops", async () => {
+    const { remind, t, tripId } = await withSaves();
+    await t.run(async (ctx) => {
+      const stops = await ctx.db
+        .query("tripStops")
+        .withIndex("by_trip_and_day", (q) => q.eq("tripId", tripId))
+        .collect();
+      await Promise.all(stops.map((stop) => ctx.db.delete(stop._id)));
+    });
+    expect(await remind(EVE - 10 * HOUR)).toHaveLength(1);
+  });
+
+  it("counts every trip push of the last week against the weekly limit", async () => {
+    const { remind, t, userId, tripId } = await withSaves();
+    await t.run(async (ctx) => {
+      for (const daysAgo of [6, 5, 4, 3])
+        await ctx.db.insert("tripEveReminders", {
+          userId,
+          tripId,
+          createdAt: EVE - 21 * HOUR - daysAgo * DAY,
+          deliveryStatus: "complete",
+        });
+    });
+    expect(await remind(EVE - 21 * HOUR)).toEqual([]);
+  });
+
   it("is not held by a trip that will never push", async () => {
     const { remind, t, userId } = await withSaves();
     await t.run(async (ctx) => {

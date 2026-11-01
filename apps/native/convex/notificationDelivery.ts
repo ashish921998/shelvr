@@ -739,6 +739,11 @@ export const claimTripEve = internalMutation({
     const attempts = reminder.deliveryAttempts ?? 0;
     const disabled = preferences !== null && !remindersOn(preferences);
     const paused = !saveRemindersLive();
+    const trip = await ctx.db.get(reminder.tripId);
+    const count =
+      trip !== null && trip.userId === reminder.userId
+        ? await tripSavedStopCount(ctx, trip._id)
+        : 0;
     const fail = (deliveryError: string) =>
       closeBetweenAttempts(
         ctx,
@@ -749,7 +754,7 @@ export const claimTripEve = internalMutation({
           userId: reminder.userId,
           notificationId: reminderId,
           kind: TRIP_EVE_KIND,
-          itemCount: 0,
+          itemCount: count,
           sentAt: reminder.deliverySentAt,
         },
       );
@@ -770,11 +775,6 @@ export const claimTripEve = internalMutation({
       );
       return null;
     }
-    const trip = await ctx.db.get(reminder.tripId);
-    const count =
-      trip !== null && trip.userId === reminder.userId
-        ? await tripSavedStopCount(ctx, trip._id)
-        : 0;
     const recipients = await liveRecipients(
       ctx,
       reminder.userId,
