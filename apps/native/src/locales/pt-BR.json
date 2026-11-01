@@ -612,6 +612,12 @@
   "reminder.cookBody": "Que tal fazer “%{title}” hoje?",
   "reminder.visitTitle": "Dos seus lugares salvos",
   "reminder.visitBody": "Ainda quer ir a “%{title}”?",
+  "reminder.tripEveTitle": "Sua viagem para %{city} é amanhã",
+  "reminder.tripEveBody": {
+    "one": "Você salvou %{formattedCount} lugar para visitar.",
+    "many": "Você salvou %{formattedCount} de lugares para visitar.",
+    "other": "Você salvou %{formattedCount} lugares para visitar."
+  },
   "search.noResults": "Nenhum conteúdo corresponde a «%{query}».",
   "spaces.addedTo": "Adicionado a %{space}",
   "spaces.removedFrom": "Removido de %{space}",

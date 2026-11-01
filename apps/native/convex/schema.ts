@@ -378,7 +378,8 @@ export default defineSchema({
     savedCount: v.number(),
   })
     .index("by_user", ["userId"])
-    .index("by_user_and_list", ["userId", "listId"]),
+    .index("by_user_and_list", ["userId", "listId"])
+    .index("by_start_date", ["startDate"]),
 
   tripStops: defineTable({
     tripId: v.id("tripPlans"),
@@ -500,6 +501,29 @@ export default defineSchema({
     .index("by_user", ["userId"])
     .index("by_user_and_item", ["userId", "itemId"])
     .index("by_user_and_place_key", ["userId", "placeKey"])
+    .index("by_delivery_status_and_attempt", [
+      "deliveryStatus",
+      "deliveryNextAttemptAt",
+    ]),
+
+  tripEveReminders: defineTable({
+    userId: v.string(),
+    tripId: v.id("tripPlans"),
+    createdAt: v.number(),
+    deliveredAt: v.optional(v.number()),
+    deliveryStatus: v.union(
+      v.literal("pending"),
+      v.literal("complete"),
+      v.literal("failed"),
+    ),
+    deliveryNextAttemptAt: v.optional(v.number()),
+    deliveryAttempts: v.optional(v.number()),
+    deliveryRecipients: v.optional(v.array(recipientValidator)),
+    deliveryError: v.optional(v.string()),
+    deliverySentAt: v.optional(v.number()),
+  })
+    .index("by_user", ["userId"])
+    .index("by_trip", ["tripId"])
     .index("by_delivery_status_and_attempt", [
       "deliveryStatus",
       "deliveryNextAttemptAt",

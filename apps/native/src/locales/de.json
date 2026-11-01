@@ -595,6 +595,11 @@
   "reminder.cookBody": "Lust, heute „%{title}“ zu kochen?",
   "reminder.visitTitle": "Aus deinen gespeicherten Orten",
   "reminder.visitBody": "Willst du noch zu „%{title}“?",
+  "reminder.tripEveTitle": "Deine Reise nach %{city} ist morgen",
+  "reminder.tripEveBody": {
+    "one": "Du hast %{formattedCount} Ort zum Besuchen gespeichert.",
+    "other": "Du hast %{formattedCount} Orte zum Besuchen gespeichert."
+  },
   "search.noResults": "Keine gespeicherten Inhalte passen zu „%{query}“.",
   "spaces.addedTo": "Zu %{space} hinzugefügt",
   "spaces.removedFrom": "Aus %{space} entfernt",

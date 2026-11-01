@@ -35,6 +35,7 @@ import {
   HOUR_SAMPLE_WINDOW_MS,
   IGNORED_STREAK,
   MAX_LATE_MS,
+  MIN_GAP_MS,
   WEEK_MS,
   WEEKLY_LIMIT,
   openedTooRecently,
@@ -46,6 +47,12 @@ import {
   VISIT_REPEAT_AFTER_MS,
 } from "./model/saveReminders";
 import { placeKey } from "./model/plan";
+import {
+  nextTripEveAt,
+  tripEveDateRange,
+  tripEveDue,
+  tripSavedStopCount,
+} from "./model/tripEve";
 import { visibleItemPlaces, userRemovals } from "./model/placeRemovals";
 import { visitedPlaceKeys } from "./model/placeVisits";
 
@@ -67,6 +74,8 @@ const preferencesValidator = v.object({
 
 export const DUE_DIGEST_BATCH_SIZE = 50;
 const DUE_REMINDER_BATCH_SIZE = 50;
+const DUE_TRIP_EVE_BATCH_SIZE = 50;
+const UPCOMING_TRIPS_SCANNED = 5;
 const REMINDER_SCAN_ROWS = 500;
 const REMINDER_SCAN_BYTES = 6 * 1024 * 1024;
 const REMINDER_CHECKS_PER_KIND = 100;
@@ -618,6 +627,28 @@ export const armSaveReminders = internalMutation({
   },
 });
 
+async function upcomingTripEveAt(
+  ctx: QueryCtx,
+  userId: string,
+  timezone: string | undefined,
+  now: number,
+): Promise<number | undefined> {
+  const trips = await ctx.db
+    .query("tripPlans")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .order("desc")
+    .take(UPCOMING_TRIPS_SCANNED);
+  const dated = trips.filter((trip) => trip.startDate !== undefined);
+  const counts = await Promise.all(
+    dated.map((trip) => tripSavedStopCount(ctx, trip._id)),
+  );
+  return nextTripEveAt(
+    dated.filter((_, index) => counts[index] >= 1),
+    timezone,
+    now,
+  );
+}
+
 export const prepareSaveReminder = internalMutation({
   args: { userId: v.string(), now: v.number() },
   returns: v.null(),
@@ -685,9 +716,25 @@ export const prepareSaveReminder = internalMutation({
     const shelvesSent = digests
       .filter((digest) => digest.deliveryStatus !== "failed")
       .map((digest) => digest.createdAt);
+    const tripEvesSent = (
+      await ctx.db
+        .query("tripEveReminders")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .order("desc")
+        .take(3 * WEEKLY_LIMIT)
+    )
+      .filter((eve) => eve.deliveryStatus !== "failed")
+      .map((eve) => eve.createdAt);
+    const upcomingEveAt = await upcomingTripEveAt(
+      ctx,
+      userId,
+      preferences.timezone,
+      now,
+    );
     const sentAt = [
       ...reminders.map((reminder) => reminder.createdAt),
       ...shelvesSent,
+      ...tripEvesSent,
     ].filter((at) => now - at < WEEK_MS);
     const streak = await Promise.all(
       reminders.slice(0, IGNORED_STREAK).map(async (reminder) => {
@@ -709,7 +756,10 @@ export const prepareSaveReminder = internalMutation({
           sentThisWeek: shelvesSent.some((at) => now - at < WEEK_MS),
         }
       : undefined;
-    if (reminderBlocked(now, sentAt, streak, shelf) !== undefined) return null;
+    if (
+      reminderBlocked(now, sentAt, streak, shelf, upcomingEveAt) !== undefined
+    )
+      return null;
 
     const checks = { read: 0, cook: 0, visit: 0 };
     const removals = await userRemovals(ctx, userId);
@@ -775,6 +825,138 @@ export const prepareSaveReminder = internalMutation({
       );
       return null;
     }
+    return null;
+  },
+});
+
+export const prepareDueTripEves = internalMutation({
+  args: {
+    now: v.optional(v.number()),
+    cursor: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    if (!saveRemindersLive()) return null;
+    const now = args.now ?? Date.now();
+    const { from, to } = tripEveDateRange(now);
+    const page = await ctx.db
+      .query("tripPlans")
+      .withIndex("by_start_date", (q) =>
+        q.gte("startDate", from).lte("startDate", to),
+      )
+      .paginate({
+        cursor: args.cursor ?? null,
+        numItems: DUE_TRIP_EVE_BATCH_SIZE,
+      });
+    for (const trip of page.page) {
+      await ctx.scheduler.runAfter(0, internal.notifications.prepareTripEve, {
+        tripId: trip._id,
+        now,
+      });
+    }
+    if (!page.isDone) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.notifications.prepareDueTripEves,
+        { now, cursor: page.continueCursor },
+      );
+    }
+    return null;
+  },
+});
+
+async function pushedRecently(
+  ctx: QueryCtx,
+  userId: string,
+  now: number,
+): Promise<boolean> {
+  const [eves, reminders] = await Promise.all([
+    ctx.db
+      .query("tripEveReminders")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(2),
+    ctx.db
+      .query("saveReminders")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(2),
+  ]);
+  return [...eves, ...reminders].some(
+    (row) =>
+      row.deliveryStatus !== "failed" && now - row.createdAt < MIN_GAP_MS,
+  );
+}
+
+async function newerTripTakesEve(
+  ctx: QueryCtx,
+  trip: Doc<"tripPlans">,
+  timezone: string | undefined,
+  now: number,
+): Promise<boolean> {
+  const newer = await ctx.db
+    .query("tripPlans")
+    .withIndex("by_user", (q) =>
+      q.eq("userId", trip.userId).gt("_creationTime", trip._creationTime),
+    )
+    .order("desc")
+    .take(UPCOMING_TRIPS_SCANNED);
+  for (const other of newer) {
+    if (
+      tripEveDue(other, timezone, now) &&
+      (await tripSavedStopCount(ctx, other._id)) >= 1
+    )
+      return true;
+  }
+  return false;
+}
+
+export const prepareTripEve = internalMutation({
+  args: { tripId: v.id("tripPlans"), now: v.number() },
+  returns: v.null(),
+  handler: async (ctx, { tripId, now }) => {
+    if (!saveRemindersLive()) return null;
+    const trip = await ctx.db.get(tripId);
+    if (trip === null || (await liveOwner(ctx, trip.userId)) === null)
+      return null;
+    const preferences = await ctx.db
+      .query("notificationPreferences")
+      .withIndex("by_user", (q) => q.eq("userId", trip.userId))
+      .unique();
+    if (
+      preferences === null ||
+      !remindersOn(preferences) ||
+      !tripEveDue(trip, preferences.timezone, now)
+    )
+      return null;
+    const device = await ctx.db
+      .query("notificationDevices")
+      .withIndex("by_user_and_enabled", (q) =>
+        q.eq("userId", trip.userId).eq("enabled", true),
+      )
+      .first();
+    if (device === null) return null;
+    const earlier = await ctx.db
+      .query("tripEveReminders")
+      .withIndex("by_trip", (q) => q.eq("tripId", tripId))
+      .first();
+    if (earlier !== null || (await tripSavedStopCount(ctx, tripId)) < 1)
+      return null;
+    if (
+      (await newerTripTakesEve(ctx, trip, preferences.timezone, now)) ||
+      (await pushedRecently(ctx, trip.userId, now))
+    )
+      return null;
+    const reminderId = await ctx.db.insert("tripEveReminders", {
+      userId: trip.userId,
+      tripId,
+      createdAt: now,
+      deliveryStatus: "pending",
+      deliveryNextAttemptAt: now,
+    });
+    await ctx.scheduler.runAfter(0, internal.notificationDelivery.sendTripEve, {
+      reminderId,
+    });
     return null;
   },
 });

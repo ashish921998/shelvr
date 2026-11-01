@@ -313,7 +313,15 @@ async function deleteSentNotificationsBatch(
   for (const reminder of reminders) {
     await ctx.db.delete(reminder._id);
   }
-  return reminders.length !== DELETE_BATCH;
+  if (reminders.length === DELETE_BATCH) return false;
+  const tripEves = await ctx.db
+    .query("tripEveReminders")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .take(DELETE_BATCH);
+  for (const tripEve of tripEves) {
+    await ctx.db.delete(tripEve._id);
+  }
+  return tripEves.length !== DELETE_BATCH;
 }
 
 async function deleteFeedbackBatch(

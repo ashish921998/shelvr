@@ -545,6 +545,8 @@ export type MessageParams = {
   "reminder.cookBody": { title: string };
   "reminder.visitTitle": undefined;
   "reminder.visitBody": { title: string };
+  "reminder.tripEveTitle": { city: string };
+  "reminder.tripEveBody": { count: number };
   "search.noResults": { query: string };
   "spaces.addedTo": { space: string };
   "spaces.removedFrom": { space: string };

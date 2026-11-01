@@ -106,6 +106,7 @@ import type * as model_spaceName from "../model/spaceName.js";
 import type * as model_storage from "../model/storage.js";
 import type * as model_storedImage from "../model/storedImage.js";
 import type * as model_trip from "../model/trip.js";
+import type * as model_tripEve from "../model/tripEve.js";
 import type * as model_tripPlace from "../model/tripPlace.js";
 import type * as model_tripPlan from "../model/tripPlan.js";
 import type * as model_tripSuggest from "../model/tripSuggest.js";
@@ -239,6 +240,7 @@ declare const fullApi: ApiFromModules<{
   "model/storage": typeof model_storage;
   "model/storedImage": typeof model_storedImage;
   "model/trip": typeof model_trip;
+  "model/tripEve": typeof model_tripEve;
   "model/tripPlace": typeof model_tripPlace;
   "model/tripPlan": typeof model_tripPlan;
   "model/tripSuggest": typeof model_tripSuggest;

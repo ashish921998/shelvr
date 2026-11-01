@@ -33,6 +33,8 @@ const notificationPlaceholders = {
   "digest.namedShelfSingle": "%{title}",
   "reminder.readBody": "%{title}",
   "reminder.cookBody": "%{title}",
+  "reminder.tripEveTitle": "%{city}",
+  "reminder.tripEveBody": "%{formattedCount}",
 };
 
 const catalogs = locales.map((locale) => {
@@ -142,6 +144,10 @@ const notificationCopy = Object.fromEntries(
           title: messages["reminder.visitTitle"],
           body: messages["reminder.visitBody"],
         },
+      },
+      tripEve: {
+        title: messages["reminder.tripEveTitle"],
+        body: messages["reminder.tripEveBody"],
       },
     },
   ]),
