@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   mutations: {} as Record<string, (args: unknown) => Promise<unknown>>,
   search: { status: "idle" } as unknown,
   searchedFor: [] as string[],
+  searchRun: undefined as ((text: string) => unknown) | undefined,
+  searchAction: vi.fn(),
   gated: false,
   addStop: vi.fn(),
   capture: vi.fn(),
@@ -41,8 +43,9 @@ vi.mock("@/lib/shared-lists", () => ({
 }));
 vi.mock("@/lib/trip-edit", async (importActual) => ({
   ...(await importActual<typeof import("@/lib/trip-edit")>()),
-  usePlaceSearch: (_run: unknown, query: string) => {
+  usePlaceSearch: (run: (text: string) => unknown, query: string) => {
     mocks.searchedFor.push(query);
+    mocks.searchRun = run;
     return mocks.search;
   },
   useTripPlaceSearch: () => mocks.search,
@@ -68,7 +71,7 @@ vi.mock("convex/react", async () => {
   return {
     useMutation: (fn: never) => (args: unknown) =>
       mocks.mutations[getFunctionName(fn)]?.(args),
-    useAction: () => vi.fn(),
+    useAction: () => mocks.searchAction,
   };
 });
 vi.mock("expo-router", () => {
@@ -217,6 +220,7 @@ beforeEach(() => {
   mocks.mutations = {};
   mocks.search = { status: "idle" };
   mocks.searchedFor = [];
+  mocks.searchRun = undefined;
   mocks.gated = false;
   mocks.title = undefined;
 });
@@ -260,6 +264,38 @@ describe("Add a place on a list", () => {
     expect(mocks.searchedFor.at(-1)).toBe("");
     fireEvent.click(screen.getByText("planGate.seePlans"));
     expect(mocks.openPaywall).toHaveBeenCalledWith({}, "shared_list_search");
+  });
+
+  it("searches the list's city for what was typed", () => {
+    mocks.queries[LIST] = detail;
+    render(<AddListPlaceScreen />);
+    type("add-list-place-search", "taco");
+    expect(mocks.searchedFor.at(-1)).toBe("taco");
+    void mocks.searchRun?.("taco");
+    expect(mocks.searchAction).toHaveBeenCalledWith({
+      listId: "list-1",
+      city: "Austin",
+      query: "taco",
+      locale: "en",
+    });
+  });
+
+  it("stops searching what was typed once the list is not covered", () => {
+    mocks.queries[LIST] = detail;
+    const { rerender } = render(<AddListPlaceScreen />);
+    type("add-list-place-search", "taco");
+    expect(mocks.searchedFor.at(-1)).toBe("taco");
+    mocks.queries[LIST] = { ...detail, covered: false };
+    rerender(<AddListPlaceScreen />);
+    expect(mocks.searchedFor.at(-1)).toBe("");
+  });
+
+  it("does not search without a city", () => {
+    mocks.params = { listId: "list-1" };
+    mocks.queries[LIST] = { ...detail, cities: [] };
+    render(<AddListPlaceScreen />);
+    type("add-list-place-search", "taco");
+    expect(mocks.searchedFor.at(-1)).toBe("");
   });
 
   it("names the city in the search field and offers no day picker", () => {
