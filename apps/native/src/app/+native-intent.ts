@@ -31,6 +31,11 @@ export function redirectSystemPath({
       return "/sign-in";
     }
 
+    const invite = /^\/l\/([^/?#]+)\/?$/.exec(url.pathname);
+    if (invite !== null && url.hostname !== "expo-sharing") {
+      return `/list-invite/${invite[1]}`;
+    }
+
     if (url.hostname === "expo-sharing") {
       if (!onboardedOrUnknown()) return "/onboarding";
       markPendingShareQuietly();

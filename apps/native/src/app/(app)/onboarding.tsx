@@ -4,6 +4,7 @@ import { ahaSample } from "@/lib/aha-sample";
 import { stepTransition } from "@/lib/motion";
 import { useOnboarding } from "@/lib/onboarding";
 import { noteOnboardingFinished } from "@/lib/welcome-save";
+import { notificationPermissionState } from "@/lib/notification-token";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import type { SampleCityId } from "@/lib/sample-cities";
 import {
@@ -33,12 +34,13 @@ import {
   setOnboardingProgress,
   setPendingSpaces,
 } from "@/lib/pending-onboarding";
-import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
+import { holdIncomingShare } from "@/lib/onboarding-exit";
 import { SignInView } from "@/components/sign-in-view";
 import { AhaShareStep } from "@/components/onboarding/aha-share";
 import { AhaSpotsStep } from "@/components/onboarding/aha-spots";
 import { CityStep } from "@/components/onboarding/city-step";
 import { CommitmentStep } from "@/components/onboarding/commitment";
+import { NotificationsStep } from "@/components/onboarding/notifications";
 import { OpenerStep } from "@/components/onboarding/opener";
 import { ProgressChartStep } from "@/components/onboarding/progress-chart";
 import { ScalePressable } from "@/components/onboarding/parts";
@@ -50,7 +52,6 @@ import {
 import { AppSymbolIcon } from "@/components/symbol";
 import { useConvexAuth } from "convex/react";
 import { haptics } from "@/lib/haptics";
-import { getSharedPayloads } from "expo-sharing";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
@@ -64,14 +65,6 @@ const SKIPPABLE: ReadonlySet<OnboardingStep> = new Set([
   "planner",
   "city",
 ]);
-
-function holdIncomingShare() {
-  try {
-    if (getSharedPayloads().length > 0) markPendingShareOnDevice();
-  } catch (err) {
-    analytics.captureError("onboarding_hold_share_failed", err);
-  }
-}
 
 function useStepAnalytics(step: OnboardingStep) {
   const tracked = useRef(new Set<OnboardingStep>());
@@ -185,6 +178,11 @@ export default function OnboardingScreen() {
   const spaces = goalSpaces(goals);
   const sample = ahaSample(kind, travelCity);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
+  const currentStep = useRef(step);
+
+  useEffect(() => {
+    currentStep.current = step;
+  }, [step]);
 
   useEffect(() => {
     setOnboardingProgress({
@@ -238,9 +236,22 @@ export default function OnboardingScreen() {
     onUnavailable: finish,
   });
 
-  const askAfterCommitment = () => {
+  const askForPlan = () => {
     recordCurrentStep();
     paywall.ask();
+  };
+
+  const leaveCommitment = () => {
+    void notificationPermissionState()
+      .catch((error: unknown) => {
+        analytics.captureError("onboarding_notifications_check_failed", error);
+        return "blocked" as const;
+      })
+      .then((state) => {
+        if (currentStep.current !== "commitment") return;
+        if (state === "ask") advance();
+        else askForPlan();
+      });
   };
 
   if (showSignIn) {
@@ -311,7 +322,15 @@ export default function OnboardingScreen() {
           <CommitmentStep
             sample={sample}
             leaving={paywall.asked}
-            onContinue={askAfterCommitment}
+            onContinue={leaveCommitment}
+          />
+        );
+      case "notifications":
+        return (
+          <NotificationsStep
+            sample={sample}
+            leaving={paywall.asked}
+            onContinue={askForPlan}
           />
         );
     }

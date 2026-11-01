@@ -19,7 +19,9 @@ import { UNPLANNED_DAY } from "@convex/model/tripPlan";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { haptics } from "@/lib/haptics";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { personalPlanAllowed } from "@/lib/list-gate";
+import { usePlanGate } from "@/lib/plan-gate";
+import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -128,8 +130,12 @@ export default function AddTripStopScreen() {
   const trip = useQuery(
     convexQuery(api.tripPlannerData.getTripPlan, { tripId }),
   );
+  const { gated } = usePlanGate();
   const saves = useQuery(
-    convexQuery(api.tripPlannerData.tripSavePlaces, { tripId }),
+    convexQuery(
+      api.tripPlannerData.tripSavePlaces,
+      gated ? "skip" : { tripId },
+    ),
   );
   const asked = Number(params.day);
   const [day, setDay] = useState(Number.isInteger(asked) ? asked : 1);
@@ -198,6 +204,9 @@ export default function AddTripStopScreen() {
     </>
   );
 
+  if (data && !personalPlanAllowed(gated, data.listId)) {
+    return <Redirect href="/plan-gate" />;
+  }
   if (!data) {
     return (
       <View style={styles.screen} accessibilityViewIsModal>
@@ -282,32 +291,34 @@ export default function AddTripStopScreen() {
           </View>
         ) : null}
 
-        <View style={styles.section}>
-          <ThemedText variant="bodyLabel" accessibilityRole="header">
-            {t("tripPlanner.fromSaves")}
-          </ThemedText>
-          {saves.data !== undefined && saves.data.length === 0 ? (
-            <ThemedText variant="footnote" style={styles.muted}>
-              {t("tripPlanner.noSavesLeft")}
+        {gated ? null : (
+          <View style={styles.section}>
+            <ThemedText variant="bodyLabel" accessibilityRole="header">
+              {t("tripPlanner.fromSaves")}
             </ThemedText>
-          ) : null}
-          {savePlaces.map((place) => (
-            <PlaceRow
-              key={`${place.itemId}-${place.name}`}
-              name={place.name}
-              detail={place.title}
-              added={false}
-              disabled={busy}
-              onPress={() =>
-                void pick({
-                  kind: "save",
-                  itemId: place.itemId,
-                  name: place.name,
-                })
-              }
-            />
-          ))}
-        </View>
+            {saves.data !== undefined && saves.data.length === 0 ? (
+              <ThemedText variant="footnote" style={styles.muted}>
+                {t("tripPlanner.noSavesLeft")}
+              </ThemedText>
+            ) : null}
+            {savePlaces.map((place) => (
+              <PlaceRow
+                key={`${place.itemId}-${place.name}`}
+                name={place.name}
+                detail={place.title}
+                added={false}
+                disabled={busy}
+                onPress={() =>
+                  void pick({
+                    kind: "save",
+                    itemId: place.itemId,
+                    name: place.name,
+                  })
+                }
+              />
+            ))}
+          </View>
+        )}
       </ScrollView>
     </View>
   );

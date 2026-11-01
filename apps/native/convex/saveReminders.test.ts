@@ -5,6 +5,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { newConvexTest, signedInUser } from "./test.setup";
 import { nextLocalHourAt } from "./model/notificationSchedule";
 import { DEFAULT_REMINDER_HOUR } from "./model/saveReminders";
+import { placeKey } from "./model/plan";
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = Date.parse("2026-09-25T18:00:00Z");
@@ -30,6 +31,22 @@ const recipe = {
   title: "The best lasagna recipe you will ever make",
   recipe: { name: "Lasagna", ingredients: ["pasta"], steps: ["bake"] },
 };
+
+const reel = {
+  type: "link" as const,
+  url: "https://www.instagram.com/reel/Cabc123/",
+  title: "3 spots for a perfect first day in Lisbon",
+  cities: ["Lisbon"],
+  places: ["As Bifanas do Afonso", "Castelo de São Jorge"],
+};
+
+const removalOf = (name: string, userId: string) => ({
+  userId,
+  name,
+  city: "Lisbon",
+  lat: 38.71,
+  lng: -9.14,
+});
 
 type Save = [
   daysAgo: number,
@@ -177,6 +194,48 @@ describe("choosing a save reminder", () => {
     expect(sent[1].itemId).toBe(lasagna);
   });
 
+  it("asks about a saved place before an unread article", async () => {
+    const { ids, prepare, reminders } = await setup({
+      saves: [
+        [2, article],
+        [5, reel],
+      ],
+    });
+    await prepare();
+    const [sent] = await reminders();
+    expect(sent).toMatchObject({ kind: "visit", itemId: ids[1] });
+  });
+
+  it("leaves a place alone once the user has been to all it names", async () => {
+    const { t, userId, ids, prepare, reminders } = await setup({
+      saves: [[5, reel]],
+    });
+    await t.run(async (ctx) => {
+      for (const name of reel.places)
+        await ctx.db.insert("placeVisits", {
+          userId,
+          key: placeKey(name),
+          name,
+          itemId: ids[0],
+          visitedAt: NOW - DAY,
+        });
+    });
+    await prepare();
+    expect(await reminders()).toEqual([]);
+  });
+
+  it("leaves a place alone once the user has removed all it names", async () => {
+    const { t, userId, prepare, reminders } = await setup({
+      saves: [[5, reel]],
+    });
+    await t.run(async (ctx) => {
+      for (const name of reel.places)
+        await ctx.db.insert("placeRemovals", removalOf(name, userId));
+    });
+    await prepare();
+    expect(await reminders()).toEqual([]);
+  });
+
   it("never reminds about the same save twice", async () => {
     const { prepare, due, reminders } = await setup({ saves: [[2, article]] });
     await prepare();
@@ -270,6 +329,101 @@ describe("choosing a save reminder", () => {
     await due(NOW + DAY);
     await prepare(NOW + DAY);
     expect(await reminders()).toHaveLength(2);
+  });
+
+  it("remembers a place past the recent reminders", async () => {
+    const { t, userId, prepare, reminders, ids } = await setup({
+      saves: [[5, { ...reel, places: ["As Bifanas do Afonso"] }]],
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.insert("saveReminders", {
+        userId,
+        itemId: await ctx.db.insert("items", {
+          userId,
+          status: "ready",
+          type: "link",
+          tags: [],
+          searchText: "",
+        }),
+        kind: "visit",
+        placeKey: placeKey("As Bifanas do Afonso"),
+        createdAt: NOW - 30 * DAY,
+        deliveryStatus: "complete",
+      });
+      for (let day = 0; day < 13; day++)
+        await ctx.db.insert("saveReminders", {
+          userId,
+          itemId: ids[0],
+          kind: "read",
+          createdAt: NOW - (29 - day) * DAY,
+          deliveryStatus: "failed",
+        });
+    });
+    await prepare();
+    expect(await reminders()).toHaveLength(14);
+  });
+
+  it("does not ask about a place again from another save, until months later", async () => {
+    const afonso = "As Bifanas do Afonso";
+    const { t, prepare, due, reminders, ids } = await setup({
+      saves: [
+        [4, { ...reel, title: "Again", places: [afonso, "Zé dos Cornos"] }],
+        [5, { ...reel, places: [afonso] }],
+        [6, { ...reel, title: "Other", places: ["Castelo de São Jorge"] }],
+      ],
+    });
+    const pass = async (at: number) => {
+      await due(at);
+      await prepare(at);
+    };
+    await pass(NOW);
+    await pass(NOW + DAY);
+    await pass(NOW + 2 * DAY);
+    expect((await reminders()).map((row) => row.itemId)).toEqual([
+      ids[0],
+      ids[2],
+    ]);
+    await t.run((ctx) => ctx.db.delete(ids[0]));
+    await pass(NOW + 3 * DAY);
+    expect(await reminders()).toHaveLength(2);
+    await pass(NOW + 100 * DAY);
+    expect(await reminders()).toHaveLength(3);
+    expect((await reminders())[2].itemId).toBe(ids[1]);
+  });
+
+  it("leaves a place to the planned trip it is a stop of", async () => {
+    const { t, userId, ids, prepare, reminders } = await setup({
+      saves: [
+        [4, reel],
+        [5, { ...reel, places: ["Castelo de São Jorge"] }],
+      ],
+    });
+    await t.run(async (ctx) => {
+      const tripId = await ctx.db.insert("tripPlans", {
+        userId,
+        city: "Lisbon",
+        dayCount: 1,
+        pace: "easy",
+        interests: [],
+        stopCount: 1,
+        savedCount: 1,
+      });
+      await ctx.db.insert("tripStops", {
+        tripId,
+        userId,
+        day: 1,
+        order: 0,
+        source: "save",
+        itemId: ids[0],
+        name: "As Bifanas do Afonso",
+        lat: 38.71,
+        lng: -9.14,
+      });
+    });
+    await prepare();
+    expect(await reminders()).toMatchObject([
+      { itemId: ids[1], kind: "visit" },
+    ]);
   });
 
   it("skips an article already planned as a trip stop", async () => {
@@ -582,9 +736,15 @@ describe("the server switch", () => {
 });
 
 describe("delivering a save reminder", () => {
-  async function queued(kind: "read" | "cook" = "read") {
+  async function queued(kind: "read" | "cook" | "visit" = "read") {
     const context = await setup({
-      saves: [kind === "read" ? [2, article] : [40, recipe]],
+      saves: [
+        kind === "read"
+          ? [2, article]
+          : kind === "cook"
+            ? [40, recipe]
+            : [5, reel],
+      ],
     });
     await context.prepare();
     const [reminder] = await context.reminders();
@@ -641,6 +801,87 @@ describe("delivering a save reminder", () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)[0]).toMatchObject({
       body: "今日は「Lasagna」を作ってみませんか？",
       data: { kind: "cook_reminder" },
+    });
+  });
+
+  it("asks about the place and links to the save it came from", async () => {
+    const { t, reminder } = await queued("visit");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(json([{ status: "ok", id: "ticket-a" }]));
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.sendReminder, {
+      reminderId: reminder._id,
+    });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)[0]).toMatchObject({
+      title: "From your saved places",
+      body: "Still want to go to “As Bifanas do Afonso”?",
+      data: { url: `/item/${reminder.itemId}`, kind: "visit_reminder" },
+    });
+  });
+
+  it("does not name a place removed since it was queued", async () => {
+    const { t, userId, reminder } = await queued("visit");
+    await t.run((ctx) =>
+      ctx.db.insert("placeRemovals", removalOf("As Bifanas do Afonso", userId)),
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(json([{ status: "ok", id: "ticket-a" }]));
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.sendReminder, {
+      reminderId: reminder._id,
+    });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)[0].body).toBe(
+      "Still want to go to “Castelo de São Jorge”?",
+    );
+  });
+
+  it("moves on to the next place, or stays quiet, after a We went since", async () => {
+    const { t, userId, reminder } = await queued("visit");
+    const went = (name: string) =>
+      t.run((ctx) =>
+        ctx.db.insert("placeVisits", {
+          userId,
+          key: placeKey(name),
+          name,
+          itemId: reminder.itemId,
+          visitedAt: NOW,
+        }),
+      );
+    await went("As Bifanas do Afonso");
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(json([{ status: "ok", id: "ticket-a" }]));
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.sendReminder, {
+      reminderId: reminder._id,
+    });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)[0].body).toBe(
+      "Still want to go to “Castelo de São Jorge”?",
+    );
+
+    const second = await queued("visit");
+    for (const name of reel.places)
+      await second.t.run((ctx) =>
+        ctx.db.insert("placeVisits", {
+          userId: second.userId,
+          key: placeKey(name),
+          name,
+          itemId: second.reminder.itemId,
+          visitedAt: NOW,
+        }),
+      );
+    const quiet = vi.fn();
+    vi.stubGlobal("fetch", quiet);
+    await second.t.action(internal.notificationDelivery.sendReminder, {
+      reminderId: second.reminder._id,
+    });
+    expect(quiet).not.toHaveBeenCalled();
+    const [closed] = await second.reminders();
+    expect(closed).toMatchObject({
+      deliveryStatus: "failed",
+      deliveryError: "no_items",
     });
   });
 

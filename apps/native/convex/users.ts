@@ -20,6 +20,7 @@ import {
 import { takeWithinBytes } from "./model/readBudget";
 import { logEvent } from "./model/log";
 import { deletePlanSharesForUser } from "./planShares";
+import { deleteSharedListsBatch } from "./sharedLists";
 
 /** Null when unauthenticated or the account is being deleted. */
 export const getCurrentUser = query({
@@ -312,7 +313,15 @@ async function deleteSentNotificationsBatch(
   for (const reminder of reminders) {
     await ctx.db.delete(reminder._id);
   }
-  return reminders.length !== DELETE_BATCH;
+  if (reminders.length === DELETE_BATCH) return false;
+  const tripEves = await ctx.db
+    .query("tripEveReminders")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .take(DELETE_BATCH);
+  for (const tripEve of tripEves) {
+    await ctx.db.delete(tripEve._id);
+  }
+  return tripEves.length !== DELETE_BATCH;
 }
 
 async function deleteFeedbackBatch(
@@ -345,7 +354,7 @@ async function deleteCaptureTokensBatch(
 
 async function deleteSharingAndPlansBatch(
   ctx: MutationCtx,
-  userId: string,
+  userId: Id<"users">,
 ): Promise<boolean> {
   return (
     (await deleteShareLinksBatch(ctx, userId)) &&
@@ -353,7 +362,8 @@ async function deleteSharingAndPlansBatch(
     (await deletePlaceRemovalsBatch(ctx, userId)) &&
     (await deleteTripsBatch(ctx, userId)) &&
     (await deleteTripPlansBatch(ctx, userId)) &&
-    (await deletePlanSharesForUser(ctx, userId))
+    (await deletePlanSharesForUser(ctx, userId)) &&
+    (await deleteSharedListsBatch(ctx, userId))
   );
 }
 

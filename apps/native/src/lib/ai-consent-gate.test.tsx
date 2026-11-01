@@ -63,6 +63,9 @@ vi.mock("expo-router", () => {
   return { Stack, Redirect: nothing, useRouter: () => ({ push: mocks.push }) };
 });
 vi.mock("@/lib/app-intents", () => ({ AppIntentsBridge: nothing }));
+vi.mock("@/lib/shared-lists", () => ({
+  useSharedLists: () => ({ data: undefined }),
+}));
 vi.mock("@/lib/forget-exit-offer", () => ({ useForgetExitOffer: vi.fn() }));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,

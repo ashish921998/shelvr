@@ -7,7 +7,10 @@ import { emptyMessage, useDatePlan } from "@/lib/date-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { tidyCity } from "@convex/model/trip";
 import { haptics } from "@/lib/haptics";
-import { Stack, useLocalSearchParams } from "expo-router";
+import { usePlanGate } from "@/lib/plan-gate";
+import { personalPlanAllowed } from "@/lib/list-gate";
+import type { Id } from "@convex/_generated/dataModel";
+import { Redirect, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import { ScrollView, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -15,9 +18,17 @@ import { StyleSheet } from "react-native-unistyles";
 /** Plan a date: "What kind of date?", then an evening of two stops from the city's saves. */
 export default function DatePlanScreen() {
   const locale = useAppLocale();
-  const { city: cityParam } = useLocalSearchParams<{ city?: string }>();
+  const { city: cityParam, listId } = useLocalSearchParams<{
+    city?: string;
+    listId?: string;
+  }>();
   const city = tidyCity(cityParam ?? "");
-  const { state, plan, swap, restart } = useDatePlan(city, locale);
+  const { gated } = usePlanGate();
+  const { state, plan, swap, restart } = useDatePlan(
+    city,
+    locale,
+    listId as Id<"sharedLists"> | undefined,
+  );
 
   const ready = state.status === "ready";
   useEffect(() => {
@@ -30,6 +41,9 @@ export default function DatePlanScreen() {
   const backTitle = (
     <Stack.Screen options={{ headerBackTitle: t("common.back") }} />
   );
+
+  if (!personalPlanAllowed(gated, listId))
+    return <Redirect href="/plan-gate" />;
 
   switch (state.status) {
     case "planning":
@@ -54,7 +68,10 @@ export default function DatePlanScreen() {
         </>
       );
     case "empty": {
-      const { title, message } = emptyMessage(state.result);
+      const { title, message } = emptyMessage(
+        state.result,
+        listId !== undefined,
+      );
       return (
         <View style={styles.screen}>
           {backTitle}
@@ -76,6 +93,7 @@ export default function DatePlanScreen() {
           >
             <DateKindPicker
               city={city}
+              onList={listId !== undefined}
               problem={
                 state.problem === "rate_limited"
                   ? t("datePlan.rateLimited")

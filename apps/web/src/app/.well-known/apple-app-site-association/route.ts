@@ -7,7 +7,7 @@ export function GET() {
         details: [
           {
             appIDs: ["WJP847UZY2.app.shelvr.save"],
-            components: [{ "/": "/auth/callback" }],
+            components: [{ "/": "/auth/callback" }, { "/": "/l/*" }],
           },
         ],
       },

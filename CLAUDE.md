@@ -92,15 +92,31 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `trips`: one day-by-day trip per travel space ("Plan my trip"), every stop one of the
     user's saves; a new trip replaces the old one. Old builds only; new trips are `tripPlans`
   - `tripPlans`: one planned trip ("Plan a trip" v2) for a city: days, pace, interests,
-    optional start date and stay, plus stop and saved counts. Every new plan is a new row
+    optional start date (indexed by `by_start_date` for the trip eve sweep) and stay, plus stop and saved counts. Every new plan is a new row.
+    Optional `listId` says the trip was planned from a shared list (provenance, one-way
+    door, stays `v.optional`); the trip itself stays personal to the person who made it
   - `tripStops`: one stop of a `tripPlans` trip, on day 1..dayCount or day 0 (unplanned),
     from a save (`itemId`), an Apple Maps suggestion or a place found with Add a place, carrying its own name, pin, Apple id
     and category. Deleting the save keeps the stop; a trip read opens only live saves
+  - `sharedLists`: one list of places two people keep together: its owner (`ownerId`, a
+    users id), name, the `cities` chosen at creation, the random `inviteToken` behind its
+    join link, and a `placeCount`
+  - `sharedListMembers`: one row per person on a `sharedLists` list, the owner included,
+    with `joinedAt` and the `seenAt` that decides which places are new to them. At most
+    8 members a list and 20 lists a person
+  - `sharedListPlaces`: one copied place on a `sharedLists` list, modelled on `tripStops`:
+    its own name, pin, required city, Apple id, category and tags (copied only when the
+    save names one place), who added it (`addedBy`), the
+    save it came from (`itemId`, returned only to that person) and `visitedAt`. No save
+    title or text is copied, and a row outlives the save. At most 200 a list
   - `shareLinks`: one random public token per shared item, the capability behind the
     branded preview page (`createShareLink`, `getSharePreview`, `/share/links/`)
   - `weeklyDigests`: the persisted weekly shelf and its delivery state
-  - `saveReminders`: one push naming one save (an unread article or a recipe),
+  - `saveReminders`: one push naming one save (a place not yet visited, an unread article or a recipe),
     with its delivery state; also the reminder budget's memory
+  - `tripEveReminders`: one push the evening before a dated trip, one row per trip (`by_trip`),
+    with the same delivery state as `saveReminders`. Rows outlive a deleted trip so the claim
+    can close them; keep the table declared on rollback once rows exist
   - `waitlistSignups`: waitlist source of truth, projected to Resend
   - `feedbackSubmissions`: in-app feedback source of truth, projected to the Resend support inbox
     (see [feedback delivery](docs/architecture/feedback.md))
@@ -218,7 +234,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `setPreferences`, `setSaveReminders`, `registerDevice`, `unregisterDevice`, `markItemOpened`,
   `getDigest`, and `markDigestOpened`, plus internal digest and reminder preparation.
   `notificationDelivery.ts` holds the claim/finish/recover delivery machine for both, and
-  `model/saveReminders.ts` the reminder rules. See
+  `model/saveReminders.ts` the reminder rules. The trip eve push ("Your Lisbon trip is tomorrow",
+  18:00 local the day before a dated trip with saved stops) is `prepareDueTripEves` (hourly cron)
+  and `prepareTripEve`, delivered by `sendTripEve`, with its rules in `model/tripEve.ts`. See
   [contextual notifications](docs/architecture/contextual-notifications.md).
 - **`waitlist.ts`**: the public `join` action the web marketing site calls, plus the internal
   Resend projection and its bounded retry.
@@ -230,10 +248,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   the waitlist receiver at `/waitlist/join`, the web Oracle at `/oracle`, the App Intents
   capture routes under `/app-intents/`, Apple's Get Retention Message endpoint at
   `/retention-messaging` (authenticated by the App Store's JWS signature, checked in
-  `model/appleJws.ts`), and `GET /health` (200/503 probe for uptime
-  monitors, backed by the `health.ts` `ping` query).
+  `model/appleJws.ts`), the shared list invite preview at `/list/invites/`, and
+  `GET /health` (200/503 probe for uptime monitors, backed by the `health.ts` `ping` query).
 - **`crons.ts`**: refund consent sync retry, stale image import cleanup, stale processing-item
-  failure, waitlist Resend retry, weekly shelf and save reminder preparation, their delivery
+  failure, waitlist Resend retry, weekly shelf, save reminder and trip eve preparation, their delivery
   recovery, hourly feedback inbox delivery retry, daily payment-receipt
   retention purge, and the daily expired plan vote link purge.
 - **`auth.ts`**: `convexAuth()` setup with Google + Apple OAuth (Auth.js providers) and an optional
@@ -330,6 +348,14 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   for the missing stop near up to three saved ones (one search each, 10 s deadline, none when
   AI is declined or the Maps key is unset). Nothing is stored; the app shows the best evening and changes a
   stop on the phone.
+  With an optional `listId`, `makeDatePlan` and `createTripPlan` plan from a shared list
+  instead of the caller's saves: the claim checks membership and coverage (the live owner's
+  Pro or the caller's), reads the list's unvisited places for the city, and sets a stop's `itemId` only when the
+  caller owns that save. The names of the city's visited rows join `been`, so Apple can't
+  suggest one back. A trip for a city with no unvisited list places is refused before the
+  rate limit or any Apple call. AI permission for a list plan is the caller's plus every
+  contributor's, former members included, so one decline means no Apple call for that run.
+  Without `listId` nothing changes for old callers.
 - **`mapPlaces.ts`**: `listMapPlaces`, every mapped place across the caller's ready saves
   (newest first, one entry per spot) for the Map tab, each with Apple's category (which picks
   the pin's icon) and its filter kinds from
@@ -343,7 +369,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   (`uniquePlacePins`): one Apple id, or one name a few doors apart unless Apple ids differ.
   A label without a pin matches by name and city. City, Map, search, planning and
   automatic suggestions use the projection; source saves, existing trips and deliberate manual
-  additions remain. A save made after the removal shows the place again. Keep the
+  additions remain. A save a removal leaves with no place in a city leaves that city's reads
+  (`visibleCitySave`), so its row, and a city with nothing else, go away; it stays open by id
+  and in search. A save made after the removal shows the place again. Keep the
   `placeRemovals` table on rollback once rows exist.
 - **`placeCorrections.ts`**, **`placeCorrectionSearch.ts`**: owner-only place editing and Apple Maps lookup. `items.placesEdited` preserves the chosen places across extraction retries and pin refreshes. A kept place with no pin still gets one from a lookup, which never changes a pin already on the save. Corrections update city grouping and search; existing trip stops remain unchanged. The editor leaves out removed places (`placeRemovals.ts`), and adding one back clears its removal.
 - **`tripTravel.ts`**, **`tripTravelData.ts`**: Pro-only walking/driving estimates between adjacent stops on one trip day. The authenticated claim reads ordered owned stops, rejects stale layouts, respects AI eligibility and charges one rate-limit unit per leg. `model/appleTravel.ts` calls Apple ETA through bounded `safeFetch`; only the selected day is fetched and the client caches each layout/mode for five minutes. Route gaps have directions links rather than invented durations.
@@ -352,6 +380,25 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `/plan/votes` HTTP routes (votes behind the waitlist secret and a per-IP limit) serve the
   web page at `apps/web/src/app/p`. Links and votes go with their space or account, and a
   daily cron deletes them a week after they close.
+- **`sharedLists.ts`**: shared lists, the places two people keep together.
+  `createSharedList` (Pro) needs at least one city, keeps them on the list and
+  copies the caller's pins for them into `sharedListPlaces`; `listSharedLists` and `getSharedList` read a member's lists (members'
+  first names, new-place counts, the caller's own trips from the list). A list's cities, there
+  and in the invite preview, are the chosen ones first, then any others its places carry. `invitePreview`
+  answers a signed-out caller from the token alone (`PUBLIC_ON_PURPOSE`), `joinSharedList`
+  needs no Pro and is idempotent, `leaveSharedList` and the owner-only
+  `removeSharedListMember` (which always rotates the token, even if that person already left) run `departMember` from
+  `model/sharedLists.ts` in one transaction: the oldest live member inherits an owner's list,
+  and the last member's leaving deletes it. Account deletion runs it one membership a pass. Coverage (`listCovered`) is "the live owner has Pro or the
+  caller has Pro"; reading, joining, leaving and marking places need no Pro. Rules and
+  caps live in `model/sharedLists.ts`; place tidying shared with trips in `model/tripPlace.ts`.
+  The public `GET /list/invites/<token>` HTTP route (`getPublicInvite`, the same answer as
+  `invitePreview`) is for the web invite page, as `/plan/shares/` is for the vote page.
+  Rate buckets: `sharedListCreate`, `sharedListJoin`, `sharedListEdit`, `sharedListSearch`.
+  Any member adds places: `addSavePlaces` copies a save's pins (the caller's own save, one
+  city or all), `addSharedListPlace` stores an Apple search result, `removeSavePlaces` and
+  `removeSharedListPlace` take them off, `setSharedListPlaceVisited` marks "We went" and
+  `markSharedListSeen` resets what counts as new. Every add dedupes with `sameTripPlace`.
 - **`trips.ts`** (`"use node"` action), **`tripData.ts`**: "Plan my trip". `makeTrip` reads
   the chosen city's ready saves (or the most common city in a space), shuffles stored
   unvisited place names, resolves missing pins with Apple Maps (`model/appleMaps.ts`),
@@ -378,6 +425,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   Without the Maps key it plans from saves only. `tripPlannerData.ts` serves
   `listTripPlans`, `getTripPlan` and `deleteTripPlan`, plus `claimTripPlanInternal` and
   `saveTripPlanInternal`. `trips.ts` and `tripData.ts` stay for installed builds.
+  `getTripPlan` returns the trip's `listId` when it has one. Editing a list trip and
+  searching near it (`requirePlanAccess` in `sharedLists.ts`) need the list's coverage while
+  the caller is still a member; otherwise, as for a personal trip, the caller's own Pro.
   Editing (Pro, `tripEdit` rate limit) is single-row writes in `tripPlannerData.ts`:
   `moveTripStop` (a day and position, day 0 is Unplanned), `removeTripStop` (to the top of
   Unplanned, never a delete), `addTripStop` (a search result as an
@@ -386,6 +436,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   the app's Undo sends back to `moveTripStop`. Stop ids survive every edit; only `deleteTripPlan` deletes
   stops. `tripPlanner.ts` `searchTripPlaces` (`tripPlaceSearch` rate limit) is Add a
   place's Apple search near the trip, refused like `createTripPlan` when AI is declined.
+  `searchListPlaces` (`sharedListSearch` rate limit, through `claimListSearchInternal`) is
+  the same search for a shared list. It and `searchTripPlaces` on a trip made from a list
+  send Apple only the city name, never a point from someone's places, and need only the
+  caller's own AI permission.
 - **`placePins.ts`**: `placePins` on a save, the coordinates of the places it names, which the
   city page's map pins. `locateItem` looks up in Apple Maps the places read off the save
   (`items.places`) first, then its `open_maps` intent values (the save's own and its spaces'),
@@ -502,8 +556,10 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   one full-screen map, opening on the person's location (iOS asks once, when the tab first opens)
   unless none of their places is within 50 km; otherwise on the city with the most places, with a search field over your own places (name or city, matched on the phone) and filter chips
   for the kinds that have three or more places (`src/lib/map-filters.ts`); tapping a place opens Apple's place card, or the save without one.
-  `(home)` is Home. It lists "Your cities" and
-  "Finding places…" for processing saves. Failed reads and finished saves without a city
+  `(home)` is Home. It shows two plan tiles, Plan a date and Plan a trip (they start straight
+  away when one city has a mapped place, otherwise a "Which city?" sheet picks it; none with no
+  mapped place), then the city cards (a cover or a pin on a tint, two to a row, a lone last
+  city wide) and "Finding places…" for processing saves. Failed reads and finished saves without a city
   sit behind one "N saves without a place · Review" line, whose sheet has Retry and Delete
   (`src/components/home/review-saves.tsx`); a save that lands that way while the app is open
   shows a toast instead (`unplaced-toast.tsx`). It loads more saves on scroll, and on its own only
@@ -511,10 +567,26 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   shortcuts to removed screens (spaces, search, digest, camera, the old trip) open Home, through
   `src/lib/home-href.ts` and `src/app/+native-intent.ts`
 - `city/[name]` is the city page: a map and numbered rows for distinct places from the
-  city's saves, plus a row for every save not represented by a place row, with Plan a date
-  and Plan a trip. A selected place row shows an info button that opens Apple's place card
+  city's saves, plus a row for every other save a removal has not emptied, with Plan a date
+  and Plan a trip. Removing the last place keeps the map and says "No places left" until the
+  person goes back. A selected place row shows an info button that opens Apple's place card
   (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`); tapping the row opens the save
-- Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`,
+- Shared lists: Home shows a "Shared lists" section above the plan tiles (one card per list from
+  `listSharedLists`, or a quiet "Start a shared list" row when the person has none).
+  `shared-list/[id]` is a list: the same map-and-sheet shape as the city page, "New from <name>"
+  first, a row menu for We went and Remove from list, city chips when the list spans cities,
+  Plan a date and Plan a trip passing `listId`, Invite (the system share sheet with
+  `/l/<token>` on the web origin), the person's trips from the list, and for the owner the
+  member list. `new-shared-list` is the Invite form (Pro only): a name, a city or more,
+  Send invite. `add-list-place` is the list's Add a place (`searchListPlaces` near the chosen
+  city, plus the caller's saved places there). `spots/[id]` offers "Also add to" per list, off
+  by default. The root route `list-invite/[token]` (outside `(app)` and `(auth)`) is the Join
+  screen from `invitePreview`; Join stores the token in `src/lib/pending-invite.ts` and
+  `useInviteJoinCoordinator` (mounted at the root layout) finishes the join once signed in,
+  completing onboarding if needed. Gating: `src/lib/list-gate.ts`; a free member reaches
+  `shared-list/[id]`, `add-list-place`, `date-plan`, `new-trip` and `trip-plan/[id]` only
+  through a list, and a personal plan still redirects to `plan-gate`
+- Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`, `new-shared-list`, `add-list-place`,
   `profile`, `settings`, `item/[id]`, `city/[name]`, `spots/[id]`, `plan/[id]`, `date-plan`,
   `new-trip`, `trip-plan/[id]`, `add-trip-stop`
 - `date-plan` is Plan a date, pushed from the city page with a `city` param: "What kind of
@@ -543,7 +615,9 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   The old `trip/[id]` screen is gone and its links open Home; `trips.ts` and `tripData.ts`
   stay for installed builds
 - `plan-gate` is the hard paywall: a signed-in account past onboarding without an active
-  entitlement sees it instead of every other route except `profile`, `settings` and `paywall`
+  entitlement sees it instead of every other route except `profile`, `settings`, `paywall`
+  and, for a member of a shared list, that list and plans started from it; it shows the
+  person's lists above See plans
 - `(auth)` holds a single `sign-in` route
 - Scheme: `shelvr`. Bundle id: `app.shelvr.save` in production. `app.config.js` appends `.dev`
   or `.preview` for the other `APP_VARIANT` build profiles, so a dev install never collides

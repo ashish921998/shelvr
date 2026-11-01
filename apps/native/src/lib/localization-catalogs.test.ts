@@ -116,7 +116,11 @@ describe("shipped localization resources", () => {
         namedSingle: string;
         namedShelf: Record<string, string>;
         namedShelfSingle: string;
-        reminder: Record<"read" | "cook", { title: string; body: string }>;
+        reminder: Record<
+          "read" | "cook" | "visit",
+          { title: string; body: string }
+        >;
+        tripEve: { title: string; body: Record<string, string> };
       }
     > = notificationTranslations;
     expect(notificationCopy[locale]).toEqual({
@@ -135,6 +139,14 @@ describe("shipped localization resources", () => {
           title: messages["reminder.cookTitle"],
           body: messages["reminder.cookBody"],
         },
+        visit: {
+          title: messages["reminder.visitTitle"],
+          body: messages["reminder.visitBody"],
+        },
+      },
+      tripEve: {
+        title: messages["reminder.tripEveTitle"],
+        body: messages["reminder.tripEveBody"],
       },
     });
     const navigation = [

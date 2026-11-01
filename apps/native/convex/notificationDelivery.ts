@@ -15,17 +15,24 @@ import {
   reachedDevice,
   recipientError,
   reminderCopy,
+  tripEveCopy,
   type Recipient,
 } from "./model/notificationFields";
 import {
   openedTooRecently,
+  placeToVisit,
   remindersOn,
   reminderSubject,
   saveRemindersLive,
+  type ReminderKind,
 } from "./model/saveReminders";
+import { TRIP_EVE_MAX_AGE_MS, tripSavedStopCount } from "./model/tripEve";
+import { visibleSave } from "./model/placeRemovals";
+import { visitedPlaceKeys } from "./model/placeVisits";
 
 const NOTIFICATION_KIND = "weekly_shelf";
-const reminderNotificationKind = (kind: "read" | "cook") => `${kind}_reminder`;
+const reminderNotificationKind = (kind: ReminderKind) => `${kind}_reminder`;
+const TRIP_EVE_KIND = "trip_eve";
 
 const LEASE_MS = 5 * 60 * 1000;
 const RECEIPT_DELAY_MS = 15 * 60 * 1000;
@@ -84,6 +91,19 @@ export const recover = internalMutation({
         0,
         internal.notificationDelivery.sendReminder,
         { reminderId: reminder._id },
+      );
+    }
+    const tripEves = await ctx.db
+      .query("tripEveReminders")
+      .withIndex("by_delivery_status_and_attempt", (q) =>
+        q.eq("deliveryStatus", "pending").lte("deliveryNextAttemptAt", now),
+      )
+      .take(50);
+    for (const tripEve of tripEves) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.notificationDelivery.sendTripEve,
+        { reminderId: tripEve._id },
       );
     }
     return null;
@@ -506,7 +526,7 @@ export const claimReminder = internalMutation({
     v.object({
       attempt: v.number(),
       recipients: v.array(recipientValidator),
-      kind: v.union(v.literal("read"), v.literal("cook")),
+      kind: v.union(v.literal("read"), v.literal("cook"), v.literal("visit")),
       itemId: v.id("items"),
       subject: v.string(),
     }),
@@ -567,7 +587,12 @@ export const claimReminder = internalMutation({
       item !== null &&
       item.userId === reminder.userId &&
       item.status === "ready"
-        ? reminderSubject(item, reminder.kind)
+        ? reminder.kind === "visit"
+          ? placeToVisit(
+              await visibleSave(ctx, item),
+              await visitedPlaceKeys(ctx, reminder.userId),
+            )
+          : reminderSubject(item, reminder.kind)
         : undefined;
     const read = await ctx.db
       .query("itemReads")
@@ -677,6 +702,168 @@ export const sendReminder = internalAction({
       reminderId,
       attempt: delivery.attempt,
       recipients,
+    });
+    return null;
+  },
+});
+
+export const claimTripEve = internalMutation({
+  args: { reminderId: v.id("tripEveReminders") },
+  returns: v.union(
+    v.null(),
+    v.object({
+      attempt: v.number(),
+      recipients: v.array(recipientValidator),
+      tripId: v.id("tripPlans"),
+      city: v.string(),
+      count: v.number(),
+    }),
+  ),
+  handler: async (ctx, { reminderId }) => {
+    const reminder = await ctx.db.get(reminderId);
+    const now = Date.now();
+    if (
+      !reminder ||
+      reminder.deliveryStatus !== "pending" ||
+      (reminder.deliveryNextAttemptAt ?? 0) > now
+    )
+      return null;
+    if ((await liveOwner(ctx, reminder.userId)) === null) {
+      await ctx.db.patch(reminderId, OWNER_UNAVAILABLE);
+      return null;
+    }
+    const preferences = await ctx.db
+      .query("notificationPreferences")
+      .withIndex("by_user", (q) => q.eq("userId", reminder.userId))
+      .unique();
+    const attempts = reminder.deliveryAttempts ?? 0;
+    const disabled = preferences !== null && !remindersOn(preferences);
+    const paused = !saveRemindersLive();
+    const trip = await ctx.db.get(reminder.tripId);
+    const count =
+      trip !== null && trip.userId === reminder.userId
+        ? await tripSavedStopCount(ctx, trip._id)
+        : 0;
+    const fail = (deliveryError: string) =>
+      closeBetweenAttempts(
+        ctx,
+        (fields) => ctx.db.patch(reminderId, fields),
+        reminder.deliveryRecipients,
+        deliveryError,
+        {
+          userId: reminder.userId,
+          notificationId: reminderId,
+          kind: TRIP_EVE_KIND,
+          itemCount: count,
+          sentAt: reminder.deliverySentAt,
+        },
+      );
+    if (
+      paused ||
+      disabled ||
+      attempts >= MAX_ATTEMPTS ||
+      now - reminder.createdAt >= TRIP_EVE_MAX_AGE_MS
+    ) {
+      await fail(
+        paused
+          ? "reminders_paused"
+          : disabled
+            ? "notifications_disabled"
+            : attempts >= MAX_ATTEMPTS
+              ? "retry_limit_reached"
+              : "expired",
+      );
+      return null;
+    }
+    const recipients = await liveRecipients(
+      ctx,
+      reminder.userId,
+      reminder.deliveryRecipients,
+    );
+    if (trip === null || count === 0 || recipients.length === 0) {
+      await fail(trip === null || count === 0 ? "no_items" : "no_devices");
+      return null;
+    }
+    const attempt = attempts + 1;
+    await ctx.db.patch(reminderId, {
+      deliveryAttempts: attempt,
+      deliveryRecipients: recipients,
+      deliveryNextAttemptAt: now + LEASE_MS,
+    });
+    return { attempt, recipients, tripId: trip._id, city: trip.city, count };
+  },
+});
+
+export const finishTripEve = internalMutation({
+  args: {
+    reminderId: v.id("tripEveReminders"),
+    attempt: v.number(),
+    recipients: v.array(recipientValidator),
+    count: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const reminder = await ctx.db.get(args.reminderId);
+    if (
+      !reminder ||
+      reminder.deliveryStatus !== "pending" ||
+      reminder.deliveryAttempts !== args.attempt
+    )
+      return null;
+    await releaseUnregistered(ctx, reminder.userId, args.recipients);
+    const now = Date.now();
+    const { status, fields } = settle(
+      args.recipients,
+      args.attempt,
+      now - reminder.createdAt,
+      TRIP_EVE_MAX_AGE_MS,
+      now,
+    );
+    const sentAt = firstSendAt(reminder.deliverySentAt, args.recipients, now);
+    await ctx.db.patch(reminder._id, {
+      ...fields,
+      ...(sentAt !== undefined && { deliverySentAt: sentAt }),
+    });
+    if (
+      status !== "pending" &&
+      (await liveOwner(ctx, reminder.userId)) !== null
+    )
+      await ctx.scheduler.runAfter(0, internal.analytics.captureNotification, {
+        userId: reminder.userId,
+        notificationId: reminder._id,
+        kind: TRIP_EVE_KIND,
+        itemCount: args.count,
+        delivered: status === "complete",
+        sentAt: sentAt ?? now,
+      });
+    return null;
+  },
+});
+
+export const sendTripEve = internalAction({
+  args: { reminderId: v.id("tripEveReminders") },
+  returns: v.null(),
+  handler: async (ctx, { reminderId }) => {
+    const delivery = await ctx.runMutation(
+      internal.notificationDelivery.claimTripEve,
+      { reminderId },
+    );
+    if (!delivery) return null;
+    const recipients = await exchange(delivery.recipients, (recipient) => ({
+      ...tripEveCopy(recipient.locale, delivery.city, delivery.count),
+      data: {
+        url: `/trip-plan/${delivery.tripId}`,
+        kind: TRIP_EVE_KIND,
+        notificationId: reminderId,
+      },
+      sound: "default",
+      channelId: "save-reminders",
+    }));
+    await ctx.runMutation(internal.notificationDelivery.finishTripEve, {
+      reminderId,
+      attempt: delivery.attempt,
+      recipients,
+      count: delivery.count,
     });
     return null;
   },

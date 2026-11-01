@@ -10,15 +10,15 @@ import { HomeFeedProvider } from "@/lib/home-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { PlanLoadingCover } from "@/components/plan-loading-cover";
 import { TrialReminderPrimerSheet } from "@/components/trial-reminder-sheet";
-import {
-  useAwaitingOnboardingPurchase,
-  useReplayOnboarding,
-} from "@/lib/replay-onboarding";
+import { usePlanGate } from "@/lib/plan-gate";
+import { useReplayOnboarding } from "@/lib/replay-onboarding";
 import { useQueuedFirstSave } from "@/lib/queued-first-save";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
 import { useTrialReminder } from "@/lib/trial-reminder";
 import { useWelcomeSaveTracker } from "@/lib/welcome-save";
 import { RecentSavesWidgetSync } from "@/lib/widget-sync";
+import { listRouteAllowed } from "@/lib/list-gate";
+import { useSharedLists } from "@/lib/shared-lists";
 import { useConvexAuth } from "convex/react";
 import { Redirect, Stack, useRouter } from "expo-router";
 import { useReducedMotion } from "react-native-reanimated";
@@ -35,17 +35,13 @@ export default function AppLayout() {
   const reducedMotion = useReducedMotion();
 
   const entitlement = useEntitlement();
-  const awaitingPurchase = useAwaitingOnboardingPurchase(entitlement.entitled);
+  const { gated, planUnknown } = usePlanGate();
   useEffect(() => {
     if (!isAuthenticated && !isLoading) endPurchaseLandingSession();
   }, [isAuthenticated, isLoading]);
-  const planUnknown =
-    isAuthenticated && entitlement.loading && !awaitingPurchase;
-  const gated =
-    isAuthenticated &&
-    !entitlement.loading &&
-    !entitlement.entitled &&
-    !awaitingPurchase;
+
+  const lists = useSharedLists(isAuthenticated && onboarded);
+  const listRoutes = listRouteAllowed({ onboarded, gated, lists: lists.data });
 
   const planLoading = entitlement.loading;
   const entitled = entitlement.entitled;
@@ -69,6 +65,20 @@ export default function AppLayout() {
   if (!isAuthenticated && onboarded) {
     return <Redirect href="/(auth)/sign-in" />;
   }
+
+  const waitingRedirect = !onboarded
+    ? "/onboarding"
+    : gated
+      ? "/plan-gate"
+      : "/(app)/(tabs)/(home)";
+  const modal = {
+    presentation: "modal",
+    headerShown: true,
+    headerTransparent: false,
+    headerShadowVisible: false,
+    headerStyle: { backgroundColor: theme.colors.background },
+    contentStyle: { backgroundColor: theme.colors.background },
+  } as const;
 
   return (
     <HomeFeedProvider>
@@ -108,6 +118,11 @@ export default function AppLayout() {
             name="spots/[id]"
             options={{ headerShown: false, gestureEnabled: false }}
           />
+        </Stack.Protected>
+        <Stack.Protected
+          guard={listRoutes}
+          redirectTo={onboarded ? "/plan-gate" : "/onboarding"}
+        >
           <Stack.Screen
             name="trip-plan/[id]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
@@ -116,17 +131,23 @@ export default function AppLayout() {
             name="date-plan"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
+          <Stack.Screen
+            name="shared-list/[id]"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
         </Stack.Protected>
         {/* Native sheets and modals present above the loading cover, so they wait for the plan. */}
         <Stack.Protected
+          guard={listRoutes && !planUnknown}
+          redirectTo={waitingRedirect}
+        >
+          <Stack.Screen name="new-trip" options={modal} />
+          <Stack.Screen name="add-list-place" options={modal} />
+          <Stack.Screen name="add-trip-stop" options={modal} />
+        </Stack.Protected>
+        <Stack.Protected
           guard={onboarded && !gated && !planUnknown}
-          redirectTo={
-            !onboarded
-              ? "/onboarding"
-              : gated
-                ? "/plan-gate"
-                : "/(app)/(tabs)/(home)"
-          }
+          redirectTo={waitingRedirect}
         >
           <Stack.Screen
             name="add"
@@ -150,31 +171,10 @@ export default function AppLayout() {
                   }
             }
           />
-          <Stack.Screen
-            name="new-trip"
-            options={{
-              presentation: "modal",
-              headerShown: true,
-              headerTransparent: false,
-              headerShadowVisible: false,
-              headerStyle: { backgroundColor: theme.colors.background },
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          />
+          <Stack.Screen name="new-shared-list" options={modal} />
           <Stack.Screen
             name="edit-save-places"
             options={{ headerShown: true, headerTransparent: false }}
-          />
-          <Stack.Screen
-            name="add-trip-stop"
-            options={{
-              presentation: "modal",
-              headerShown: true,
-              headerTransparent: false,
-              headerShadowVisible: false,
-              headerStyle: { backgroundColor: theme.colors.background },
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
           />
         </Stack.Protected>
         <Stack.Protected guard={onboarded} redirectTo="/onboarding">
