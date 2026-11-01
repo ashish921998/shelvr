@@ -81,7 +81,12 @@ import {
   rankSimilar,
   similarSearchTerms,
 } from "./model/similarity";
-import { completionPatch, failurePatch, runFields } from "./model/settlement";
+import {
+  completionPatch,
+  failurePatch,
+  type ItemPatch,
+  runFields,
+} from "./model/settlement";
 import { safeDeleteStorage } from "./model/storage";
 
 export { intentKindValidator, intentValidator, PROCESSING_STALE_MS };
@@ -2433,6 +2438,28 @@ export const setProductsInternal = internalMutation({
   },
 });
 
+async function writeFailure(
+  ctx: MutationCtx,
+  item: Doc<"items">,
+  patch: ItemPatch,
+  reason: Infer<typeof failureReasonValidator>,
+): Promise<void> {
+  await ctx.db.patch(item._id, patch);
+  if (
+    patch.status === "ready" &&
+    ((item.places?.length ?? 0) > 0 ||
+      item.intents?.some((intent) => intent.kind === "open_maps"))
+  ) {
+    await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
+      itemId: item._id,
+    });
+  }
+  await scheduleProcessedTelemetry(ctx, item, {
+    status: "failed",
+    failureReason: reason,
+  });
+}
+
 export const failItem = internalMutation({
   args: {
     itemId: v.id("items"),
@@ -2452,11 +2479,7 @@ export const failItem = internalMutation({
     if (patch === null) {
       return "settled";
     }
-    await ctx.db.patch(args.itemId, patch);
-    await scheduleProcessedTelemetry(ctx, item, {
-      status: "failed",
-      failureReason: args.reason,
-    });
+    await writeFailure(ctx, item, patch, args.reason);
     return "applied";
   },
 });
@@ -2481,11 +2504,7 @@ export const failStaleProcessingItems = internalMutation({
       if (!isStaleProcessing(item, now) || patch === null) {
         continue;
       }
-      await ctx.db.patch(item._id, patch);
-      await scheduleProcessedTelemetry(ctx, item, {
-        status: "failed",
-        failureReason: "error",
-      });
+      await writeFailure(ctx, item, patch, "error");
       failed++;
     }
     if (candidates.length === STALE_PROCESSING_PAGE_SIZE && failed > 0) {

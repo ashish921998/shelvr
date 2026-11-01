@@ -173,6 +173,74 @@ it("puts a stalled retry of a partial save back as it was", async () => {
   });
 });
 
+async function pinLookups(t: TestBackend, itemId: Id<"items">) {
+  const jobs = await t.run((ctx) =>
+    ctx.db.system.query("_scheduled_functions").collect(),
+  );
+  return jobs.filter(
+    (job) =>
+      job.name === "placePins:locateItem" && job.args[0].itemId === itemId,
+  ).length;
+}
+
+async function seedNaming(
+  t: TestBackend,
+  before: Before,
+  names: Partial<Doc<"items">>,
+  age?: number,
+) {
+  const { itemId } = await seed(t, before, age);
+  await t.run((ctx) => ctx.db.patch(itemId, names));
+  return itemId;
+}
+
+it("looks up the places of a partial save a failed retry puts back", async () => {
+  const t = newConvexTest();
+  const named = await seedNaming(t, "retriedPartial", {
+    places: ["Luna Tacos"],
+  });
+  const mapped = await seedNaming(t, "retriedPartial", {
+    intents: [{ kind: "open_maps", label: "Map", value: "Luna Tacos" }],
+  });
+  for (const itemId of [named, mapped]) {
+    await t.mutation(internal.items.failItem, {
+      itemId,
+      reason: "error",
+      runId: RUN_ID,
+    });
+    expect(await pinLookups(t, itemId)).toBe(1);
+  }
+});
+
+it("looks up the places of a partial save a stalled retry puts back", async () => {
+  const t = newConvexTest();
+  const itemId = await seedNaming(
+    t,
+    "retriedPartial",
+    { places: ["Luna Tacos"] },
+    STALE,
+  );
+  await t.mutation(internal.items.failStaleProcessingItems, {});
+  expect(await pinLookups(t, itemId)).toBe(1);
+});
+
+it("schedules no lookup without a save put back or a place to find", async () => {
+  const t = newConvexTest();
+  const nothingNamed = (await seed(t, "retriedPartial")).itemId;
+  const failed = await seedNaming(t, "retried", { places: ["Luna Tacos"] });
+  const settled = await seedNaming(t, "settledPartial", {
+    places: ["Luna Tacos"],
+  });
+  for (const itemId of [nothingNamed, failed, settled]) {
+    await t.mutation(internal.items.failItem, {
+      itemId,
+      reason: "error",
+      runId: RUN_ID,
+    });
+    expect(await pinLookups(t, itemId)).toBe(0);
+  }
+});
+
 it("sweeps only stale processing saves, as an error", async () => {
   const t = newConvexTest();
   const stale = await seed(t, "retried", STALE);
