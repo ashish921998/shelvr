@@ -6,7 +6,6 @@ import { useCallback, useRef } from "react";
 import { Linking } from "react-native";
 
 export function usePlaceCardFocus() {
-  // A place card's Apple lookup can finish after the person has left; it must not present or navigate then.
   const focused = useRef(false);
   useFocusEffect(
     useCallback(() => {
@@ -38,7 +37,6 @@ export function usePlaceOpener<Place>(
             });
             return;
           case "card":
-            // Without a card (an older iOS, or no page at Apple), the save or Maps opens instead.
             void openPlaceDetails(action.appleId, () =>
               go(actionFor(place, false)),
             );
