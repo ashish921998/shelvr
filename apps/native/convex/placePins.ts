@@ -264,6 +264,7 @@ export const storePins = internalMutation({
     itemId: v.id("items"),
     found: placePinsValidator,
     cluesSearched: v.optional(placeLocationsValidator),
+    keepPins: v.optional(v.boolean()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -275,7 +276,7 @@ export const storePins = internalMutation({
       args.cluesSearched,
       item,
     );
-    if (item.placesEdited) {
+    if (item.placesEdited || args.keepPins) {
       await addPinsBesideOwnerPins(ctx, item, wanted, found);
       return null;
     }
@@ -392,10 +393,17 @@ async function lookUp(
 }
 
 export const locateItem = internalAction({
-  args: { itemId: v.id("items"), refresh: v.optional(v.boolean()) },
+  args: {
+    itemId: v.id("items"),
+    refresh: v.optional(v.boolean()),
+    keepPins: v.optional(v.boolean()),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const todo = await ctx.runQuery(internal.placePins.toLocate, args);
+    const todo = await ctx.runQuery(internal.placePins.toLocate, {
+      itemId: args.itemId,
+      refresh: args.refresh,
+    });
     if (todo === null) return null;
     const found =
       todo.names.length === 0
@@ -411,6 +419,7 @@ export const locateItem = internalAction({
       itemId: args.itemId,
       found,
       cluesSearched: todo.locations,
+      keepPins: args.keepPins,
     });
     return null;
   },

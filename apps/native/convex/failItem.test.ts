@@ -1,5 +1,5 @@
 // @vitest-environment edge-runtime
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import type { WithoutSystemFields } from "convex/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -171,6 +171,107 @@ it("puts a stalled retry of a partial save back as it was", async () => {
     ...item,
     status: "ready",
   });
+});
+
+async function pinLookups(t: TestBackend, itemId: Id<"items">) {
+  const jobs = await t.run((ctx) =>
+    ctx.db.system.query("_scheduled_functions").collect(),
+  );
+  return jobs.filter(
+    (job) =>
+      job.name === "placePins:locateItem" && job.args[0].itemId === itemId,
+  ).length;
+}
+
+it("looks up the places of a partial save a failed retry puts back", async () => {
+  const t = newConvexTest();
+  const { itemId } = await seed(t, "retriedPartial");
+  await t.run((ctx) => ctx.db.patch(itemId, { places: ["Luna Tacos"] }));
+  expect(await t.query(internal.placePins.toLocate, { itemId })).toBeNull();
+  await t.mutation(internal.items.failItem, {
+    itemId,
+    reason: "error",
+    runId: RUN_ID,
+  });
+  expect(await pinLookups(t, itemId)).toBe(1);
+  const todo = await t.query(internal.placePins.toLocate, { itemId });
+  expect(todo?.names).toEqual(["Luna Tacos"]);
+});
+
+it("finds a place a restored save holds only through its space", async () => {
+  const t = newConvexTest();
+  const { itemId, item } = await seed(t, "retriedPartial");
+  await t.run(async (ctx) => {
+    const spaceId = await ctx.db.insert("spaces", {
+      userId: item.userId,
+      name: "Austin",
+    });
+    await ctx.db.insert("spaceItems", {
+      userId: item.userId,
+      spaceId,
+      itemId,
+      status: "saved",
+      intents: [{ kind: "open_maps", label: "Map", value: "Luna Tacos" }],
+    });
+  });
+  await t.mutation(internal.items.failItem, {
+    itemId,
+    reason: "error",
+    runId: RUN_ID,
+  });
+  expect(await pinLookups(t, itemId)).toBe(1);
+  const todo = await t.query(internal.placePins.toLocate, { itemId });
+  expect(todo?.names).toEqual(["Luna Tacos"]);
+});
+
+it("looks up the places of a partial save a stalled retry puts back", async () => {
+  const t = newConvexTest();
+  const { itemId } = await seed(t, "retriedPartial", STALE);
+  await t.mutation(internal.items.failStaleProcessingItems, {});
+  expect(await pinLookups(t, itemId)).toBe(1);
+});
+
+it("schedules no lookup when the run does not put a save back", async () => {
+  const t = newConvexTest();
+  for (const before of ["retried", "settledPartial"] as const) {
+    const { itemId } = await seed(t, before);
+    await t.mutation(internal.items.failItem, {
+      itemId,
+      reason: "error",
+      runId: RUN_ID,
+    });
+    expect(await pinLookups(t, itemId), before).toBe(0);
+  }
+});
+
+it("keeps a pin its save no longer names when a failed retry puts it back", async () => {
+  vi.useFakeTimers();
+  try {
+    const t = newConvexTest();
+    const { itemId } = await seed(t, "retriedPartial");
+    const pin = { name: "Time Out Market", lat: 38.7, lng: -9.1 };
+    const searchText = "time out market";
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        cities: ["Lisbon"],
+        places: [],
+        placePins: [pin],
+        searchText,
+      }),
+    );
+    await t.mutation(internal.items.failItem, {
+      itemId,
+      reason: "not_found",
+      runId: RUN_ID,
+    });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    const after = await t.run((ctx) => ctx.db.get(itemId));
+    expect(after?.status).toBe("ready");
+    expect(after?.placePins).toEqual([pin]);
+    expect(after?.searchText).toBe(searchText);
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it("sweeps only stale processing saves, as an error", async () => {
