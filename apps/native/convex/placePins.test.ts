@@ -980,6 +980,63 @@ describe("placePins", () => {
     expect(await pins()).toEqual([]);
   });
 
+  it("adds a restored save's missing pin and keeps a pin it no longer names", async () => {
+    const { queries } = await withMaps();
+    const { t, itemId, pins } = await setup([], { read: ["Luna Tacos"] });
+    const stray = { name: "Time Out Market", lat: 17, lng: -17 };
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        status: "processing",
+        enrichment: "partial",
+        processingRunId: "run-1",
+        placePins: [stray],
+      }),
+    );
+    vi.useFakeTimers();
+    try {
+      await t.mutation(internal.items.failItem, {
+        itemId,
+        reason: "error",
+        runId: "run-1",
+      });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(queries()).toEqual(["Luna Tacos, Lisbon"]);
+    expect((await pins())?.map((pin) => pin.name)).toEqual([
+      "Time Out Market",
+      "Luna Tacos",
+    ]);
+  });
+
+  it("makes no Apple call for a restored save with nothing to look up", async () => {
+    const { queries } = await withMaps();
+    const { t, itemId, pins } = await setup([]);
+    const stray = { name: "Time Out Market", lat: 17, lng: -17 };
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        status: "processing",
+        enrichment: "partial",
+        processingRunId: "run-1",
+        placePins: [stray],
+      }),
+    );
+    vi.useFakeTimers();
+    try {
+      await t.mutation(internal.items.failItem, {
+        itemId,
+        reason: "not_found",
+        runId: "run-1",
+      });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(queries()).toEqual([]);
+    expect(await pins()).toEqual([stray]);
+  });
+
   it("backfill queues only ready saves that name a place and have no pins", async () => {
     await withMaps();
     const { t, itemId } = await setup(["Pink Street"]);

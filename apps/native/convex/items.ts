@@ -2448,6 +2448,7 @@ async function writeFailure(
   if (patch.status === "ready") {
     await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
       itemId: item._id,
+      keepPins: true,
     });
   }
   await scheduleProcessedTelemetry(ctx, item, {

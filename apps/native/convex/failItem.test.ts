@@ -1,5 +1,5 @@
 // @vitest-environment edge-runtime
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import type { WithoutSystemFields } from "convex/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
@@ -224,18 +224,6 @@ it("finds a place a restored save holds only through its space", async () => {
   expect(todo?.names).toEqual(["Luna Tacos"]);
 });
 
-it("has nothing to search for when a restored save names no place", async () => {
-  const t = newConvexTest();
-  const { itemId } = await seed(t, "retriedPartial");
-  await t.mutation(internal.items.failItem, {
-    itemId,
-    reason: "error",
-    runId: RUN_ID,
-  });
-  const todo = await t.query(internal.placePins.toLocate, { itemId });
-  expect(todo?.names).toEqual([]);
-});
-
 it("looks up the places of a partial save a stalled retry puts back", async () => {
   const t = newConvexTest();
   const { itemId } = await seed(t, "retriedPartial", STALE);
@@ -253,6 +241,36 @@ it("schedules no lookup when the run does not put a save back", async () => {
       runId: RUN_ID,
     });
     expect(await pinLookups(t, itemId), before).toBe(0);
+  }
+});
+
+it("keeps a pin its save no longer names when a failed retry puts it back", async () => {
+  vi.useFakeTimers();
+  try {
+    const t = newConvexTest();
+    const { itemId } = await seed(t, "retriedPartial");
+    const pin = { name: "Time Out Market", lat: 38.7, lng: -9.1 };
+    const searchText = "time out market";
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        cities: ["Lisbon"],
+        places: [],
+        placePins: [pin],
+        searchText,
+      }),
+    );
+    await t.mutation(internal.items.failItem, {
+      itemId,
+      reason: "not_found",
+      runId: RUN_ID,
+    });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    const after = await t.run((ctx) => ctx.db.get(itemId));
+    expect(after?.status).toBe("ready");
+    expect(after?.placePins).toEqual([pin]);
+    expect(after?.searchText).toBe(searchText);
+  } finally {
+    vi.useRealTimers();
   }
 });
 
