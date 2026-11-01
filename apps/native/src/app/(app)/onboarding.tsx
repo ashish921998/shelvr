@@ -178,6 +178,11 @@ export default function OnboardingScreen() {
   const spaces = goalSpaces(goals);
   const sample = ahaSample(kind, travelCity);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
+  const currentStep = useRef(step);
+
+  useEffect(() => {
+    currentStep.current = step;
+  }, [step]);
 
   useEffect(() => {
     setOnboardingProgress({
@@ -242,7 +247,11 @@ export default function OnboardingScreen() {
         analytics.captureError("onboarding_notifications_check_failed", error);
         return "blocked" as const;
       })
-      .then((state) => (state === "ask" ? advance() : askForPlan()));
+      .then((state) => {
+        if (currentStep.current !== "commitment") return;
+        if (state === "ask") advance();
+        else askForPlan();
+      });
   };
 
   if (showSignIn) {

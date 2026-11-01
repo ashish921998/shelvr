@@ -5,7 +5,7 @@ import { analytics } from "@/lib/analytics";
 import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
 import { requestNotificationPermission } from "@/lib/notification-token";
 import { SAMPLE_CITIES } from "@/lib/sample-cities";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -30,6 +30,14 @@ export function NotificationsStep({
   useAppLocale();
   const [asking, setAsking] = useState(false);
   const inFlight = useRef(false);
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const leave = (action: "allow" | "skip", granted: boolean) => {
     analytics.capture("onboarding_notifications", { action, granted });
@@ -46,6 +54,7 @@ export function NotificationsStep({
     } catch (error) {
       analytics.captureError("onboarding_notifications_failed", error);
     }
+    if (!mounted.current) return;
     inFlight.current = false;
     setAsking(false);
     leave("allow", granted);

@@ -173,6 +173,26 @@ it("asks once on a double tap", async () => {
   expect(mock.request).toHaveBeenCalledTimes(1);
 });
 
+it("drops the answer when Back left the screen while iOS was asking", async () => {
+  let answer: (granted: boolean) => void = () => undefined;
+  mock.request.mockImplementation(
+    () => new Promise((resolve) => (answer = resolve)),
+  );
+  const onContinue = vi.fn();
+  const { unmount } = render(
+    <NotificationsStep
+      sample={sample}
+      leaving={false}
+      onContinue={onContinue}
+    />,
+  );
+  fireEvent.click(screen.getByText("onboardingNotify.allow"));
+  unmount();
+  await act(async () => answer(true));
+  expect(onContinue).not.toHaveBeenCalled();
+  expect(mock.capture).not.toHaveBeenCalled();
+});
+
 it("does not ask iOS on Not now", () => {
   const onContinue = renderStep();
   fireEvent.click(screen.getByText("common.notNow"));

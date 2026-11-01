@@ -336,6 +336,23 @@ it("opens the paywall when the permission cannot be read", async () => {
   expect(mocks.captureError).toHaveBeenCalledTimes(1);
 });
 
+it.each(["granted", "blocked"] as const)(
+  "stays on the earlier step when Back lands before iOS answers %s",
+  async (state) => {
+    let answer: (value: typeof state) => void = () => undefined;
+    mocks.permission.mockImplementation(
+      () => new Promise((resolve) => (answer = resolve)),
+    );
+    startAt("commitment");
+    render(<OnboardingScreen />);
+    tap("commitment:continue");
+    tap("common.back");
+    await act(async () => answer(state));
+    expect(mocks.ask).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "aha:spots" })).toBeTruthy();
+  },
+);
+
 it("returns from the notifications step to the commitment", () => {
   startAt("notifications");
   render(<OnboardingScreen />);
