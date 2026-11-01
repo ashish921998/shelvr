@@ -2445,11 +2445,7 @@ async function writeFailure(
   reason: Infer<typeof failureReasonValidator>,
 ): Promise<void> {
   await ctx.db.patch(item._id, patch);
-  if (
-    patch.status === "ready" &&
-    ((item.places?.length ?? 0) > 0 ||
-      item.intents?.some((intent) => intent.kind === "open_maps"))
-  ) {
+  if (patch.status === "ready") {
     await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
       itemId: item._id,
     });

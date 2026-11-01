@@ -183,61 +183,76 @@ async function pinLookups(t: TestBackend, itemId: Id<"items">) {
   ).length;
 }
 
-async function seedNaming(
-  t: TestBackend,
-  before: Before,
-  names: Partial<Doc<"items">>,
-  age?: number,
-) {
-  const { itemId } = await seed(t, before, age);
-  await t.run((ctx) => ctx.db.patch(itemId, names));
-  return itemId;
-}
-
 it("looks up the places of a partial save a failed retry puts back", async () => {
   const t = newConvexTest();
-  const named = await seedNaming(t, "retriedPartial", {
-    places: ["Luna Tacos"],
+  const { itemId } = await seed(t, "retriedPartial");
+  await t.run((ctx) => ctx.db.patch(itemId, { places: ["Luna Tacos"] }));
+  expect(await t.query(internal.placePins.toLocate, { itemId })).toBeNull();
+  await t.mutation(internal.items.failItem, {
+    itemId,
+    reason: "error",
+    runId: RUN_ID,
   });
-  const mapped = await seedNaming(t, "retriedPartial", {
-    intents: [{ kind: "open_maps", label: "Map", value: "Luna Tacos" }],
-  });
-  for (const itemId of [named, mapped]) {
-    await t.mutation(internal.items.failItem, {
-      itemId,
-      reason: "error",
-      runId: RUN_ID,
+  expect(await pinLookups(t, itemId)).toBe(1);
+  const todo = await t.query(internal.placePins.toLocate, { itemId });
+  expect(todo?.names).toEqual(["Luna Tacos"]);
+});
+
+it("finds a place a restored save holds only through its space", async () => {
+  const t = newConvexTest();
+  const { itemId, item } = await seed(t, "retriedPartial");
+  await t.run(async (ctx) => {
+    const spaceId = await ctx.db.insert("spaces", {
+      userId: item.userId,
+      name: "Austin",
     });
-    expect(await pinLookups(t, itemId)).toBe(1);
-  }
+    await ctx.db.insert("spaceItems", {
+      userId: item.userId,
+      spaceId,
+      itemId,
+      status: "saved",
+      intents: [{ kind: "open_maps", label: "Map", value: "Luna Tacos" }],
+    });
+  });
+  await t.mutation(internal.items.failItem, {
+    itemId,
+    reason: "error",
+    runId: RUN_ID,
+  });
+  expect(await pinLookups(t, itemId)).toBe(1);
+  const todo = await t.query(internal.placePins.toLocate, { itemId });
+  expect(todo?.names).toEqual(["Luna Tacos"]);
+});
+
+it("has nothing to search for when a restored save names no place", async () => {
+  const t = newConvexTest();
+  const { itemId } = await seed(t, "retriedPartial");
+  await t.mutation(internal.items.failItem, {
+    itemId,
+    reason: "error",
+    runId: RUN_ID,
+  });
+  const todo = await t.query(internal.placePins.toLocate, { itemId });
+  expect(todo?.names).toEqual([]);
 });
 
 it("looks up the places of a partial save a stalled retry puts back", async () => {
   const t = newConvexTest();
-  const itemId = await seedNaming(
-    t,
-    "retriedPartial",
-    { places: ["Luna Tacos"] },
-    STALE,
-  );
+  const { itemId } = await seed(t, "retriedPartial", STALE);
   await t.mutation(internal.items.failStaleProcessingItems, {});
   expect(await pinLookups(t, itemId)).toBe(1);
 });
 
-it("schedules no lookup without a save put back or a place to find", async () => {
+it("schedules no lookup when the run does not put a save back", async () => {
   const t = newConvexTest();
-  const nothingNamed = (await seed(t, "retriedPartial")).itemId;
-  const failed = await seedNaming(t, "retried", { places: ["Luna Tacos"] });
-  const settled = await seedNaming(t, "settledPartial", {
-    places: ["Luna Tacos"],
-  });
-  for (const itemId of [nothingNamed, failed, settled]) {
+  for (const before of ["retried", "settledPartial"] as const) {
+    const { itemId } = await seed(t, before);
     await t.mutation(internal.items.failItem, {
       itemId,
       reason: "error",
       runId: RUN_ID,
     });
-    expect(await pinLookups(t, itemId)).toBe(0);
+    expect(await pinLookups(t, itemId), before).toBe(0);
   }
 });
 
