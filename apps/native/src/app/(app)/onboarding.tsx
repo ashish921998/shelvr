@@ -238,7 +238,10 @@ export default function OnboardingScreen() {
 
   const leaveCommitment = () => {
     void notificationPermissionState()
-      .catch(() => "blocked" as const)
+      .catch((error: unknown) => {
+        analytics.captureError("onboarding_notifications_failed", error);
+        return "blocked" as const;
+      })
       .then((state) => (state === "ask" ? advance() : askForPlan()));
   };
 

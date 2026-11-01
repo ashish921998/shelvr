@@ -118,7 +118,7 @@ Account access:
 
 Subscription testing:
 
-1. After the sample reel, tap "Continue" on the spots it found to reach the commitment screen. Make the optional promise and tap "Continue", or choose "Maybe later". On the notifications screen, tap "Turn on reminders" or "Not now" to open the RevenueCat paywall in Apple's sandbox environment. Close returns to the screen before it; it does not unlock app access. Continue to the plan picker to buy or start the trial. Sign-in follows the purchase or restore.
+1. After the sample reel, tap "Continue" on the spots it found to reach the commitment screen. Make the optional promise and tap "Continue", or choose "Maybe later". If the notifications screen appears, tap "Turn on reminders" or "Not now". The RevenueCat paywall then opens in Apple's sandbox environment. Close returns to the screen before it; it does not unlock app access. Continue to the plan picker to buy or start the trial. Sign-in follows the purchase or restore.
 2. The paywall has three screens: an intro ("Save the link. Shelvr does the filing."), a trial explainer ("Get a heads-up before you pay"), and the plan picker ("Pick a plan"). Tap Continue, then See plans. Buy a plan or start the trial with a sandbox account on the plan picker.
 3. Weekly and Annual auto-renewing subscriptions are available; the paywall labels Annual as Yearly. The Annual plan includes a 7-day free trial for accounts that have not used it before; the Weekly plan has no trial.
 4. Localized price, duration, renewal terms, Restore Purchases, Terms, and Privacy are shown on the plan picker.

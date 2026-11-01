@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   queueDemoUrl: vi.fn(),
   completeOnboarding: vi.fn(),
   capture: vi.fn(),
+  captureError: vi.fn(),
   ask: vi.fn(),
   view: ({ children }: Children) => <div>{children}</div>,
   text: ({ children }: Children) => <span>{children}</span>,
@@ -59,7 +60,7 @@ vi.mock("@/lib/i18n", () => ({
   useAppLocale: () => {},
 }));
 vi.mock("@/lib/analytics", () => ({
-  analytics: { capture: mocks.capture, captureError: vi.fn() },
+  analytics: { capture: mocks.capture, captureError: mocks.captureError },
 }));
 vi.mock("@/lib/motion", () => ({ stepTransition: () => ({}) }));
 vi.mock("@/lib/onboarding", () => ({
@@ -332,6 +333,7 @@ it("opens the paywall when the permission cannot be read", async () => {
   render(<OnboardingScreen />);
   await act(async () => tap("commitment:continue"));
   expect(mocks.ask).toHaveBeenCalledTimes(1);
+  expect(mocks.captureError).toHaveBeenCalledTimes(1);
 });
 
 it("returns from the notifications step to the commitment", () => {

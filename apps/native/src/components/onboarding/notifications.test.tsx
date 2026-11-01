@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -13,43 +14,50 @@ import { NotificationsStep } from "./notifications";
 
 type Children = { children?: ReactNode };
 
-const mock = vi.hoisted(() => ({
-  view: ({ children }: Children) => <div>{children}</div>,
-  text: ({ children }: Children) => <span>{children}</span>,
-  button: ({
-    label,
-    onPress,
-    busy,
-    disabled,
-  }: {
-    label: string;
-    onPress: () => void;
-    busy?: boolean;
-    disabled?: boolean;
-  }) => (
-    <button type="button" onClick={onPress} disabled={busy || disabled}>
-      {label}
-    </button>
-  ),
-  preview: ({
-    title,
-    body,
-    when,
-  }: {
-    title: string;
-    body: string;
-    when: string;
-  }) => (
-    <div>
-      <span>{when}</span>
-      <span>{title}</span>
-      <span>{body}</span>
-    </div>
-  ),
-  request: vi.fn<() => Promise<boolean>>(),
-  capture: vi.fn(),
-  captureError: vi.fn(),
-}));
+const mock = vi.hoisted(() => {
+  const presses: Record<string, () => void> = {};
+  return {
+    presses,
+    view: ({ children }: Children) => <div>{children}</div>,
+    text: ({ children }: Children) => <span>{children}</span>,
+    button: ({
+      label,
+      onPress,
+      busy,
+      disabled,
+    }: {
+      label: string;
+      onPress: () => void;
+      busy?: boolean;
+      disabled?: boolean;
+    }) => {
+      presses[label] = onPress;
+      return (
+        <button type="button" onClick={onPress} disabled={busy || disabled}>
+          {label}
+        </button>
+      );
+    },
+    preview: ({
+      title,
+      body,
+      when,
+    }: {
+      title: string;
+      body: string;
+      when: string;
+    }) => (
+      <div>
+        <span>{when}</span>
+        <span>{title}</span>
+        <span>{body}</span>
+      </div>
+    ),
+    request: vi.fn<() => Promise<boolean>>(),
+    capture: vi.fn(),
+    captureError: vi.fn(),
+  };
+});
 
 vi.mock("react-native", () => ({
   ScrollView: mock.view,
@@ -156,9 +164,10 @@ it("asks once on a double tap", async () => {
     () => new Promise((resolve) => (answer = resolve)),
   );
   const onContinue = renderStep();
-  const allow = screen.getByText("onboardingNotify.allow");
-  fireEvent.click(allow);
-  fireEvent.click(allow);
+  act(() => {
+    mock.presses["onboardingNotify.allow"]?.();
+    mock.presses["onboardingNotify.allow"]?.();
+  });
   answer(true);
   await waitFor(() => expect(onContinue).toHaveBeenCalledTimes(1));
   expect(mock.request).toHaveBeenCalledTimes(1);
