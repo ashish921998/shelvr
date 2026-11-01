@@ -523,6 +523,26 @@ function linkAnalysisPrompt(
     .join("\n\n");
 }
 
+function retryReadNothingNew(item: Doc<"items">, read: LinkRead): boolean {
+  if (item.enrichment !== "partial") return false;
+  if (read.status === "unreadable") return true;
+  const {
+    content,
+    recipe,
+    placeList,
+    description,
+    title,
+    heroImageUrl,
+    media,
+  } = read.page;
+  if (content || recipe || placeList) return false;
+  if (item.content || item.recipe) return true;
+  if (description || media?.length) return false;
+  if (heroImageUrl && (title || !item.heroImageUrl)) return false;
+  if (read.shortForm?.video && item.placesHeard !== true) return false;
+  return Boolean(item.description || item.places?.length);
+}
+
 async function analyzeLinkItem(
   ctx: ActionCtx,
   args: { itemId: Id<"items">; runId?: string },
@@ -559,6 +579,15 @@ async function analyzeLinkItem(
       item_id: args.itemId,
       error_category: summarizeError(read.error),
     });
+  }
+  if (retryReadNothingNew(item, read)) {
+    await failItemAndRecordOutcome(
+      ctx,
+      args,
+      { itemType: item.type, startedAt },
+      { reason: "error", telemetry: "failed" },
+    );
+    return { terminal: true };
   }
   const page = read.status === "unreadable" ? undefined : read.page;
   if (!(await stillAllowed(ctx, aiAllowed, item))) {
