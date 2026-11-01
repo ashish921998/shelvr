@@ -106,6 +106,8 @@ describe("usePlaceSearch", () => {
   it("searches once, for the last text, when typing pauses", async () => {
     const run = vi.fn<Run>().mockResolvedValue(answer("Veracruz"));
     const { result, rerender } = setup(run, "ta");
+    await act(() => vi.advanceTimersByTimeAsync(100));
+    expect(run).not.toHaveBeenCalled();
     rerender({ text: "taco" });
     expect(result.current).toEqual({ status: "searching" });
     await pause();
