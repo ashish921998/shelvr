@@ -35,8 +35,13 @@ const CARD: StopAction = { kind: "card", appleId: "apple-1" };
 const MAPS: StopAction = { kind: "maps", url: "https://maps.example/1" };
 
 function setup(fallback: StopAction = MAPS) {
-  const actionFor = () => fallback;
-  return renderHook(() => usePlaceOpener(actionFor, "test_maps_failed"));
+  const actionFor = vi.fn<
+    (place: object, cardAvailable: boolean) => StopAction
+  >(() => fallback);
+  return {
+    actionFor,
+    ...renderHook(() => usePlaceOpener(actionFor, "test_maps_failed")),
+  };
 }
 
 beforeEach(() => {
@@ -67,13 +72,16 @@ it.each([
   ["a save", SAVE, () => expect(mocks.push).toHaveBeenCalledTimes(1)],
   ["Maps", MAPS, () => expect(mocks.openUrl).toHaveBeenCalledTimes(1)],
 ])("falls back from a missing card to %s", (_, fallback, check) => {
-  const { result } = setup(fallback);
-  result.current.open({}, CARD);
+  const place = { name: "Cafe" };
+  const { result, actionFor } = setup(fallback);
+  result.current.open(place, CARD);
   expect(mocks.openPlaceDetails).toHaveBeenCalledWith(
     "apple-1",
     expect.any(Function),
   );
+  expect(actionFor).not.toHaveBeenCalled();
   (mocks.openPlaceDetails.mock.calls[0]?.[1] as () => void)();
+  expect(actionFor).toHaveBeenCalledWith(place, false);
   check();
 });
 
