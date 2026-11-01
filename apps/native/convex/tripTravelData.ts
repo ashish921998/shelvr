@@ -1,8 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { internalMutation } from "./_generated/server";
 import { requireUserId } from "./model/auth";
-import { requireProEntitlement } from "./subscriptions";
-import { aiAllowed } from "./aiConsent";
+import { planAiAllowed, requirePlanAccess } from "./sharedLists";
 import { rateLimiter } from "./model/rateLimiter";
 import { travelLayout, travelStopValidator } from "./model/tripTravel";
 
@@ -13,7 +12,7 @@ export const claimDay = internalMutation({
     const userId = await requireUserId(ctx);
     const trip = await ctx.db.get(tripId);
     if (!trip || trip.userId !== userId) throw new Error("Trip not found");
-    await requireProEntitlement(ctx, userId);
+    await requirePlanAccess(ctx, trip, userId);
     if (!Number.isInteger(day) || day < 1 || day > trip.dayCount)
       throw new Error("Invalid day");
     const rows = await ctx.db
@@ -27,7 +26,8 @@ export const claimDay = internalMutation({
       .map(({ _id, lat, lng }) => ({ _id, lat, lng }));
     if (travelLayout(stops) !== layout)
       throw new ConvexError("trip_layout_changed");
-    if (stops.length < 2 || !(await aiAllowed(ctx, userId))) return null;
+    if (stops.length < 2 || !(await planAiAllowed(ctx, trip, userId)))
+      return null;
     await rateLimiter.limit(ctx, "tripTravel", {
       key: userId,
       count: stops.length - 1,

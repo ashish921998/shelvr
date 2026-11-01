@@ -602,6 +602,16 @@ export async function requirePlanAccess(
   await requireProEntitlement(ctx, userId);
 }
 
+export async function planAiAllowed(
+  ctx: QueryCtx,
+  plan: Doc<"tripPlans">,
+  userId: Id<"users">,
+): Promise<boolean> {
+  if (plan.listId === undefined) return await aiAllowed(ctx, userId);
+  if ((await ctx.db.get(plan.listId)) === null) return false;
+  return await listAiAllowed(ctx, userId, await listPlaces(ctx, plan.listId));
+}
+
 async function ownSaveId(
   ctx: QueryCtx,
   place: Doc<"sharedListPlaces">,

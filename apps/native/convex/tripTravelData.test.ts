@@ -1,8 +1,50 @@
 // @vitest-environment edge-runtime
 import { describe, expect, it } from "vitest";
-import { internal } from "./_generated/api";
+import { api, internal } from "./_generated/api";
+import { joiner, listWithOwner, near } from "./sharedLists.test.helpers";
 import { newConvexTest, signedInUser, setTestConsent } from "./test.setup";
 import { travelLayout } from "./model/tripTravel";
+
+async function listTrip(options: { pro?: boolean } = {}) {
+  const { base, owner, token, listId } = await listWithOwner();
+  const member = await joiner(base, token, options);
+  const seeded = await base.run(async (ctx) => {
+    const tripId = await ctx.db.insert("tripPlans", {
+      userId: member.userId,
+      listId,
+      city: "Lisbon",
+      dayCount: 1,
+      pace: "balanced",
+      interests: [],
+      stopCount: 2,
+      savedCount: 0,
+    });
+    const ordered = [];
+    for (const [order, lat] of [
+      [0, 38.7],
+      [1, 38.71],
+    ]) {
+      const _id = await ctx.db.insert("tripStops", {
+        userId: member.userId,
+        tripId,
+        day: 1,
+        order,
+        source: "list",
+        name: "Fixture stop",
+        lat,
+        lng: -9.1,
+      });
+      ordered.push({ _id, lat, lng: -9.1 });
+    }
+    return { tripId, ordered };
+  });
+  const args = {
+    tripId: seeded.tripId,
+    day: 1,
+    layout: travelLayout(seeded.ordered),
+  };
+  return { base, owner, token, listId, member, args, ...seeded };
+}
 
 async function setup(pro = true) {
   const base = newConvexTest();
@@ -105,5 +147,48 @@ describe("travel time claims", () => {
     await expect(
       t.mutation(internal.tripTravelData.claimDay, args),
     ).rejects.toThrow();
+  });
+});
+
+describe("travel time claims on a trip from a shared list", () => {
+  it("covers a free member while the list is covered, and refuses them after they leave", async () => {
+    const { member, listId, args, ordered } = await listTrip();
+    expect(
+      await member.t.mutation(internal.tripTravelData.claimDay, args),
+    ).toEqual(ordered);
+    await member.t.mutation(api.sharedLists.leaveSharedList, { listId });
+    await expect(
+      member.t.mutation(internal.tripTravelData.claimDay, args),
+    ).rejects.toThrow();
+  });
+  it("sends nothing when anyone who added a place declined, former members included", async () => {
+    const { base, owner, token, listId, member, args, ordered } =
+      await listTrip();
+    await base.run((ctx) => setTestConsent(ctx, owner.userId, "declined"));
+    expect(
+      await member.t.mutation(internal.tripTravelData.claimDay, args),
+    ).toBeNull();
+    await base.run((ctx) => setTestConsent(ctx, owner.userId, "granted"));
+    const former = await joiner(base, token, { name: "Cy Lima" });
+    await former.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: { name: "Red Frog", ...near(4), city: "Lisbon" },
+    });
+    await former.t.mutation(api.sharedLists.leaveSharedList, { listId });
+    await base.run((ctx) => setTestConsent(ctx, former.userId, "declined"));
+    expect(
+      await member.t.mutation(internal.tripTravelData.claimDay, args),
+    ).toBeNull();
+    await base.run((ctx) => setTestConsent(ctx, former.userId, "granted"));
+    expect(
+      await member.t.mutation(internal.tripTravelData.claimDay, args),
+    ).toEqual(ordered);
+  });
+  it("sends nothing once the list is gone, since nobody can say who added a stop", async () => {
+    const { base, listId, member, args } = await listTrip({ pro: true });
+    await base.run((ctx) => ctx.db.delete(listId));
+    expect(
+      await member.t.mutation(internal.tripTravelData.claimDay, args),
+    ).toBeNull();
   });
 });
