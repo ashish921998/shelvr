@@ -35,6 +35,7 @@ async function setup({
   withPreferences = true,
   article = false,
   newerTrip = false,
+  newerTripAt = createdAt,
 }: {
   device?: boolean;
   preferences?: Partial<Doc<"notificationPreferences">>;
@@ -45,6 +46,7 @@ async function setup({
   withPreferences?: boolean;
   article?: boolean;
   newerTrip?: boolean;
+  newerTripAt?: number;
 } = {}) {
   const t = newConvexTest();
   vi.setSystemTime(EVE - 10 * DAY);
@@ -86,6 +88,7 @@ async function setup({
       });
     return id;
   });
+  vi.setSystemTime(newerTripAt);
   const newerTripId = !newerTrip
     ? undefined
     : await t.run(async (ctx) => {
@@ -245,28 +248,9 @@ describe("choosing the trip eve push", () => {
   });
 
   it("lets the older trip push when the newer one was made that afternoon", async () => {
-    const { t, userId, tripId, prepare, rows } = await setup();
-    await t.run(async (ctx) => {
-      const id = await ctx.db.insert("tripPlans", {
-        userId,
-        city: "Porto",
-        startDate: START,
-        dayCount: 2,
-        pace: "balanced",
-        interests: [],
-        stopCount: 1,
-        savedCount: 1,
-      });
-      await ctx.db.insert("tripStops", {
-        tripId: id,
-        userId,
-        day: 1,
-        order: 0,
-        source: "save",
-        name: "Place",
-        lat: 38.7,
-        lng: -9.1,
-      });
+    const { tripId, prepare, rows } = await setup({
+      newerTrip: true,
+      newerTripAt: EVE - 5 * HOUR,
     });
     await prepare();
     expect(await rows()).toMatchObject([{ tripId }]);
