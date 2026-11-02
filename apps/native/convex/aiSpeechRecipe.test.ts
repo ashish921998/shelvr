@@ -666,6 +666,41 @@ describe("processItem places from a video's speech", () => {
       expect(item?.cities).toEqual(["Porto"]);
     });
 
+    it("keeps the failed step when a rerun reads no caption and the speech fails again", async () => {
+      const t = newConvexTest();
+      placesModel(["Santelmo"], { caption: ["Antiga"] });
+      fetchMock.mockRejectedValue(new TypeError("network"));
+      const first = await process(t);
+      expect(first).toMatchObject({ enrichment: "partial", stepFailed: true });
+
+      safeFetch.mockImplementation(async (url: string) =>
+        url.startsWith("https://www.tiktok.com/oembed?")
+          ? {
+              ok: true,
+              finalUrl: url,
+              status: 200,
+              contentType: "application/json",
+              bytes: new TextEncoder().encode(
+                JSON.stringify({ embed_product_id: "7350000000000000000" }),
+              ),
+            }
+          : { ok: false, code: "http_error", status: 599 },
+      );
+      await t.run((ctx) =>
+        ctx.db.patch(first!._id, {
+          status: "processing",
+          processingRunId: "run-2",
+        }),
+      );
+      await t.action(internal.ai.processItem, {
+        itemId: first!._id,
+        runId: "run-2",
+      });
+      const item = await t.run((ctx) => ctx.db.get(first!._id));
+
+      expect(item).toMatchObject({ enrichment: "partial", stepFailed: true });
+    });
+
     it("reads the speech again when the first read failed", async () => {
       const t = newConvexTest();
       placesModel(["Santelmo"], { caption: ["Antiga"] });

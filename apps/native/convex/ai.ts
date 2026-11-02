@@ -441,8 +441,6 @@ function readingOf(
   posterStorageId: Id<"_storage"> | undefined,
   stepFailed: boolean,
 ): Reading {
-  const enrichment = linkEnrichment(linkRead);
-  const stepPartial = stepFailed && enrichment !== "partial";
   return {
     title: item.type === "note" ? firstLine(item.note ?? "") : page?.title,
     description: page?.description,
@@ -455,8 +453,8 @@ function readingOf(
     storageId: posterStorageId,
     aspectRatio:
       item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
-    enrichment: stepPartial ? "partial" : enrichment,
-    ...(stepPartial ? { stepFailed: true } : {}),
+    enrichment: stepFailed ? "partial" : linkEnrichment(linkRead),
+    ...(stepFailed ? { stepFailed: true } : {}),
   };
 }
 
