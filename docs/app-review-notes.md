@@ -44,7 +44,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 - With Shelvr installed, the link opens the Join screen, which says "Free to join. You don’t need Pro." and has "Join list". Without the app, the web page shows the invite. A person who isn't signed in joins after sign-in, finishing onboarding first if they need to.
 - Joining, opening the list, marking a place "We went" and leaving need no Pro. While the owner has Pro, a member without it can also add places and plan a date or a trip from the list. Everywhere else they still see the plan screen.
 - Members see the list's name, its places with their pins and cities, the first name of whoever added each place, and "We went" marks. They don't see each other's saves, titles or captions. A place's source save opens only for the person who saved it.
-- The owner can "Remove" a member. That member loses the list, the old invite link stops working, and the places they added stay. Anyone can "Leave list". When the owner leaves, the oldest member becomes the owner, and the last member's leaving deletes the list.
+- The owner can "Remove" a member. That member loses the list, the old invite link stops working, and the places they added stay. Anyone can "Leave list". When the owner leaves, the oldest member whose account isn't being deleted becomes the owner. When no such member is left, the list is deleted.
 - There is no report or block control. A list name is free text, and anyone holding a live link can join until the list is full. Removing a member is the only control, and it also replaces the link.
 
 ## Pro / subscriptions (RevenueCat sandbox)
@@ -146,7 +146,7 @@ Core review flow:
 1. From Home, tap Add, paste an Instagram Reel or TikTok link, and save. The save first shows processing, then the places it names appear under their city on Home. A link that names no place is counted in one line under the cities, with Review.
 2. Tap a city to open its page: a map with a pin per place and a list of the places.
 3. On the city page, tap "Plan a date", pick a kind of date, and get an evening of two stops a short walk apart (Apple Maps may suggest one). Tap "Plan a trip" (or use the Trips tab) for a day-by-day trip: saved places first, suggested places from Apple Maps filling the gaps. A trip's menu has Edit trip, Add a place and Delete trip.
-4. Tap Map for every saved place on one map, with search and filters. Shelvr asks for location only when Map first opens, to center it on you; Map works without it.
+4. Tap Map for every pinned place on one map, with search and filters. Shelvr asks for location only when Map first opens, to center it on you; Map works without it.
 
 Shared lists:
 
