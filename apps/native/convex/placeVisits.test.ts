@@ -472,4 +472,37 @@ describe("the passport", () => {
       }),
     ]);
   });
+
+  it("lists unstamped places with a city, newest save first, once each", async () => {
+    const { t, userId, itemId } = await setup();
+    const newer = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Porto and Lisbon",
+        tags: [],
+        searchText: "Porto and Lisbon",
+        cities: ["Porto", "Lisbon"],
+        placePins: [
+          { name: "Majestic", lat: 41.15, lng: -8.61, city: "Porto" },
+          { name: "Somewhere", lat: 40, lng: -8 },
+          { name: "Tigre", lat: PIN.lat, lng: PIN.lng, city: "Lisbon" },
+        ],
+      }),
+    );
+    await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [{ itemId, name: "Majestic" }],
+    });
+
+    expect(await t.query(api.placeVisits.listUnstampedPlaces, {})).toEqual([
+      {
+        itemId: newer,
+        name: "Tigre",
+        city: "Lisbon",
+        title: "Porto and Lisbon",
+        cover: null,
+      },
+    ]);
+  });
 });

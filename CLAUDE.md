@@ -367,7 +367,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   Planning reads these records inside Shelvr; they are not sent to an AI provider.
   `markVisitedBefore` marks up to 60 places from before Shelvr at once (one
   `placeVisitBatch` spend), and `getPassport` lists every mark newest first with its save's
-  cover, taking an old mark's pin from its save. `locateCountry` reverse geocodes a mark's
+  cover, taking an old mark's pin from its save. `listUnstampedPlaces` feeds the
+  "Already been?" picker: up to 200 pinned places with a city that carry no mark yet, one
+  per venue, newest save first, each with its save's title and cover. `locateCountry` reverse geocodes a mark's
   pin once with Apple Maps for its country, skipped when AI is declined or the Maps key is
   unset, and `storeCountry` drops an answer for a point the mark no longer has.
 - **`placeRemovals.ts`**: `removePlace` stores an owned venue decision; `undoRemovePlace`

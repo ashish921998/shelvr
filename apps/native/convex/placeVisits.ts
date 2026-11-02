@@ -9,6 +9,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { aiAllowed } from "./aiConsent";
+import { readySavesNewestFirst } from "./items";
 import {
   appleMapsAccessToken,
   appleMapsConfig,
@@ -19,6 +20,7 @@ import { logEvent } from "./model/log";
 import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
 import { findVisit } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
+import { uniquePlacePins } from "./model/trip";
 import { requireProEntitlement } from "./subscriptions";
 
 const MAX_BATCH_PLACES = 60;
@@ -227,6 +229,54 @@ export const getPassport = authedQuery({
       });
     }
     return stamps;
+  },
+});
+
+const MAX_UNSTAMPED_PLACES = 200;
+
+export const listUnstampedPlaces = authedQuery({
+  args: {},
+  returns: v.array(
+    v.object({
+      itemId: v.id("items"),
+      name: v.string(),
+      city: v.string(),
+      title: v.optional(v.string()),
+      cover: v.union(v.string(), v.null()),
+    }),
+  ),
+  handler: async (ctx) => {
+    const visits = await ctx.db
+      .query("placeVisits")
+      .withIndex("by_user_and_visited", (q) => q.eq("userId", ctx.userId))
+      .take(MAX_PASSPORT_STAMPS);
+    const stamped = new Set(visits.map((visit) => visit.key));
+    const pins = [];
+    for (const item of await readySavesNewestFirst(ctx, ctx.userId)) {
+      for (const pin of item.placePins ?? []) {
+        const city = visitPin(item, pin.name)?.city;
+        if (city === undefined || stamped.has(placeKey(pin.name))) continue;
+        pins.push({ ...pin, city, item });
+      }
+    }
+    const places = uniquePlacePins(pins).slice(0, MAX_UNSTAMPED_PLACES);
+    const covers = new Map<Id<"items">, Promise<string | null>>();
+    return await Promise.all(
+      places.map(async ({ name, city, item }) => {
+        let cover = covers.get(item._id);
+        if (cover === undefined) {
+          cover = coverOf(ctx, item);
+          covers.set(item._id, cover);
+        }
+        return {
+          itemId: item._id,
+          name,
+          city,
+          ...(item.title ? { title: item.title } : {}),
+          cover: await cover,
+        };
+      }),
+    );
   },
 });
 
