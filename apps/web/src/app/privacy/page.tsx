@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMetadata(
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="October 26, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="November 2, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
@@ -160,12 +160,30 @@ export default function PrivacyPage() {
       </section>
 
       <section>
+        <h2 className="font-semibold text-ink text-lg">Shared lists</h2>
+        <p className="mt-2">
+          When you start a shared list, the places you have saved in its chosen
+          cities are copied to it, up to 200. When you join one, its other
+          members can see your first name, if we have one, the places you add,
+          and which places have been marked visited. Anyone with the invite link
+          can join while the list has room. Before joining, they can see the
+          owner’s first name, the list’s name, its cities and a few of its
+          places. The owner can remove a member, which also stops the old link
+          working. A place on a list is a copy, so deleting your save does not
+          remove it. Places you added stay on the list if you leave, until its
+          last member leaves and the list is deleted. They are removed if you
+          delete your account.
+        </p>
+      </section>
+
+      <section>
         <h2 className="font-semibold text-ink text-lg">
           Who handles your data
         </h2>
         <p className="mt-2">
           We do not sell your data. We share it only with the providers needed
-          to run Shelvr, and where the law requires it. These providers are
+          to run Shelvr, with the people you choose through share links and
+          shared lists, and where the law requires it. These providers are
           required to protect data to the same standard we hold ourselves to.
         </p>
         <ul className="mt-2 list-disc pl-5 space-y-2">
