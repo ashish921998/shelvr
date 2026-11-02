@@ -1095,6 +1095,7 @@
   "sharedLists.savedBy": "Enregistré par %{name}",
   "sharedLists.youSaved": "Enregistré par vous",
   "sharedLists.pastMemberSaved": "Enregistré par quelqu’un qui a quitté la liste",
+  "sharedLists.someoneSaved": "Enregistré par quelqu’un",
   "sharedLists.notYet": "Pas encore",
   "sharedLists.removeFromList": "Retirer de la liste",
   "sharedLists.placeActions": "Actions du lieu",

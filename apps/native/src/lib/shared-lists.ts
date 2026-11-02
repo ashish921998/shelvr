@@ -139,8 +139,11 @@ export function listSectionRows(
 
 export function savedByLine(place: SharedListPlace): string {
   if (place.addedByYou) return t("sharedLists.youSaved");
+  if (place.addedByPastMember === true) {
+    return t("sharedLists.pastMemberSaved");
+  }
   return place.addedByName === undefined
-    ? t("sharedLists.pastMemberSaved")
+    ? t("sharedLists.someoneSaved")
     : t("sharedLists.savedBy", { name: place.addedByName });
 }
 
