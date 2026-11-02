@@ -199,13 +199,16 @@ export default function PrivacyPage() {
           web page for it. The page shows your first name, if we have one, the
           title, the AI description, the image, the source link, or the first
           500 characters of a note. A photo save gets no public page; sharing
-          one from the app sends the file itself. A plan can also be shared as
-          an unlisted vote link, which shows its city and places. Anyone with
-          the link can vote, up to 20 people, and we store each voter’s picks
-          with a random browser identifier. The link closes after a week, and we
-          delete it and its votes a week after that. Anyone with the link can
-          open it, and search engines are asked not to index it. You can remove
-          the page by deleting the save.
+          one from the app sends the file itself. Anyone with the link can open
+          it, and search engines are asked not to index it. You can remove the
+          page by deleting the save.
+        </p>
+        <p className="mt-2">
+          A plan can also be shared as an unlisted vote link, which shows its
+          city and places. Anyone with the link can vote, up to 20 people, and
+          we store each voter’s choices with a random browser identifier. The
+          link closes after a week, and we delete it and its votes a week after
+          that.
         </p>
       </section>
 
