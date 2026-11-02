@@ -25,7 +25,8 @@ async function testKey(): Promise<string> {
   return btoa(String.fromCharCode(...der));
 }
 
-async function withMaps() {
+async function withMaps(failures = 0) {
+  let failed = 0;
   vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
   vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
   vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
@@ -33,6 +34,10 @@ async function withMaps() {
     const url = new URL(input);
     if (url.pathname === "/v1/token") {
       return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
+    }
+    if (failed < failures) {
+      failed += 1;
+      return new Response("busy", { status: 429 });
     }
     return Response.json({
       results: [{ country: "Portugal", countryCode: "pt" }],
@@ -183,6 +188,33 @@ describe("the passport", () => {
     );
     expect(lookups()).toBe(1);
     expect(await visits()).toMatchObject([{ countryCode: "PT" }]);
+  });
+
+  it("tries a failed country lookup again, and gives up after three", async () => {
+    const lookups = await withMaps(1);
+    const { backend, t, itemId, visits } = await setup();
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    expect(lookups()).toBe(2);
+    expect(await visits()).toMatchObject([{ countryCode: "PT" }]);
+
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+    });
+    const failing = await withMaps(10);
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.markVisitedBefore, {
+        places: [{ itemId, name: "Tigre" }],
+      }),
+    );
+    expect(failing()).toBe(3);
   });
 
   it("asks Apple nothing for someone who declined AI", async () => {
