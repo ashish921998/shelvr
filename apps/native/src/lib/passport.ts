@@ -16,7 +16,13 @@ export type Stamp = FunctionReturnType<
   typeof api.placeVisits.getPassport
 >[number];
 
-export type StampSurface = "city";
+export type UnstampedPlace = FunctionReturnType<
+  typeof api.placeVisits.listUnstampedPlaces
+>[number];
+
+export type StampSurface = "city" | "passport";
+
+export type StampCity = { city: string | null; stamps: Stamp[] };
 
 export type OpenStamp = {
   itemId: Id<"items">;
@@ -59,6 +65,48 @@ export function passportCounts(stamps: readonly Stamp[]) {
 
 export function stampDate(stamp: Pick<Stamp, "visitedAt" | "backfilled">) {
   return stamp.backfilled ? null : stamp.visitedAt;
+}
+
+export function passportCities(stamps: readonly Stamp[]): StampCity[] {
+  const groups = new Map<string, StampCity>();
+  for (const stamp of stamps) {
+    const key = stamp.city ? cityKey(stamp.city) : "";
+    const group = groups.get(key);
+    if (group) group.stamps.push(stamp);
+    else groups.set(key, { city: stamp.city ?? null, stamps: [stamp] });
+  }
+  return [...groups.values()].sort(
+    (a, b) => Number(a.city === null) - Number(b.city === null),
+  );
+}
+
+export function unstampedCities(places: readonly UnstampedPlace[]) {
+  const groups = new Map<string, { city: string; places: UnstampedPlace[] }>();
+  for (const place of places) {
+    const key = cityKey(place.city);
+    const group = groups.get(key);
+    if (group) group.places.push(place);
+    else groups.set(key, { city: place.city, places: [place] });
+  }
+  return [...groups.values()];
+}
+
+export function wentInCity(stamps: readonly Stamp[] | undefined, city: string) {
+  const key = cityKey(city);
+  return (stamps ?? []).filter(
+    (stamp) => stamp.city && cityKey(stamp.city) === key,
+  ).length;
+}
+
+export function openStampOf(stamp: Stamp, city: string): OpenStamp {
+  return {
+    itemId: stamp.itemId,
+    name: stamp.name,
+    city: stamp.city ?? city,
+    cover: stamp.cover,
+    at: stampDate(stamp),
+    fresh: false,
+  };
 }
 
 export function useStamping(surface: StampSurface) {

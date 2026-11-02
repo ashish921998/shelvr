@@ -11,7 +11,12 @@ import { cityPins, cityRows } from "@/lib/city-pins";
 import { useCityPlan } from "@/lib/city-plan";
 import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
-import { stampDate, usePassport, useStamping } from "@/lib/passport";
+import {
+  openStampOf,
+  stampDate,
+  usePassport,
+  useStamping,
+} from "@/lib/passport";
 import { usePlaceRemoval } from "@/lib/place-removal";
 import { usePlaceCardFocus } from "@/lib/use-place-opener";
 import { api } from "@convex/_generated/api";
@@ -117,15 +122,7 @@ export default function CityScreen() {
               row.kind !== "place" || passport.stamps === undefined
                 ? undefined
                 : stamp
-                  ? () =>
-                      stamping.show({
-                        itemId: stamp.itemId,
-                        name: stamp.name,
-                        city: stamp.city ?? city,
-                        cover: stamp.cover,
-                        at: stampDate(stamp),
-                        fresh: false,
-                      })
+                  ? () => stamping.show(openStampOf(stamp, city))
                   : () =>
                       void stamping.stamp({
                         itemId: item._id,

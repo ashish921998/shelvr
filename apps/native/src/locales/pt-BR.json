@@ -1169,6 +1169,40 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "Imagem do post que você salvou",
   "passport.removeStamp": "Remover carimbo",
+  "passport.title": "Passaporte",
+  "passport.yourPassport": "Seu passaporte",
+  "passport.beenTitle": "Já foi a algum destes?",
+  "passport.beenBody": "Carimbe os lugares aonde você já foi",
+  "passport.beenSomewhere": "Já foi a algum lugar?",
+  "passport.rowCities": "%{places} · %{cities}",
+  "passport.placesCount": {
+    "one": "%{formattedCount} lugar",
+    "many": "%{formattedCount} lugares",
+    "other": "%{formattedCount} lugares"
+  },
+  "passport.citiesCount": {
+    "one": "%{formattedCount} cidade",
+    "many": "%{formattedCount} cidades",
+    "other": "%{formattedCount} cidades"
+  },
+  "passport.wentCount": {
+    "one": "%{formattedCount} visitado",
+    "many": "%{formattedCount} visitados",
+    "other": "%{formattedCount} visitados"
+  },
+  "passport.places": "Lugares",
+  "passport.cities": "Cidades",
+  "passport.countries": "Países",
+  "passport.elsewhere": "Outros lugares",
+  "passport.coversCredit": "Imagens dos posts que você salvou",
+  "passport.pickBody": "Marque os lugares aonde você foi antes de salvá-los aqui.",
+  "passport.nothingToStamp": "Todos os lugares que você salvou já estão no seu passaporte.",
+  "passport.pickNone": "Escolha os lugares aonde você foi",
+  "passport.stampCount": {
+    "one": "Carimbar %{formattedCount} lugar",
+    "many": "Carimbar %{formattedCount} lugares",
+    "other": "Carimbar %{formattedCount} lugares"
+  },
   "cityMap.stampedCount": {
     "one": "%{formattedCount} carimbado",
     "many": "%{formattedCount} carimbados",

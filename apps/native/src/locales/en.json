@@ -1137,6 +1137,36 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "Picture from the post you saved",
   "passport.removeStamp": "Remove stamp",
+  "passport.title": "Passport",
+  "passport.yourPassport": "Your passport",
+  "passport.beenTitle": "Been to any of these?",
+  "passport.beenBody": "Stamp places you already went",
+  "passport.beenSomewhere": "Already been somewhere?",
+  "passport.rowCities": "%{places} · %{cities}",
+  "passport.placesCount": {
+    "one": "%{formattedCount} place",
+    "other": "%{formattedCount} places"
+  },
+  "passport.citiesCount": {
+    "one": "%{formattedCount} city",
+    "other": "%{formattedCount} cities"
+  },
+  "passport.wentCount": {
+    "one": "%{formattedCount} went",
+    "other": "%{formattedCount} went"
+  },
+  "passport.places": "Places",
+  "passport.cities": "Cities",
+  "passport.countries": "Countries",
+  "passport.elsewhere": "Somewhere else",
+  "passport.coversCredit": "Pictures from the posts you saved",
+  "passport.pickBody": "Tick the places you went before you saved them here.",
+  "passport.nothingToStamp": "Every place you saved is already in your passport.",
+  "passport.pickNone": "Pick the places you went",
+  "passport.stampCount": {
+    "one": "Stamp %{formattedCount} place",
+    "other": "Stamp %{formattedCount} places"
+  },
   "cityMap.stampedCount": {
     "one": "%{formattedCount} stamped",
     "other": "%{formattedCount} stamped"

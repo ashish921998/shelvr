@@ -115,6 +115,10 @@ export default function AppLayout() {
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
           <Stack.Screen
+            name="passport"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
+          <Stack.Screen
             name="spots/[id]"
             options={{ headerShown: false, gestureEnabled: false }}
           />
@@ -172,6 +176,7 @@ export default function AppLayout() {
             }
           />
           <Stack.Screen name="new-shared-list" options={modal} />
+          <Stack.Screen name="already-been" options={modal} />
           <Stack.Screen
             name="edit-save-places"
             options={{ headerShown: true, headerTransparent: false }}

@@ -39,11 +39,17 @@ function CoverArt({ entry }: { entry: City }) {
 export function CityCover({
   entry,
   layout,
+  went = 0,
 }: {
   entry: City;
   layout: CoverLayout;
+  went?: number;
 }) {
-  const count = cityCountLine(entry);
+  const places = cityCountLine(entry);
+  const count =
+    places && went > 0
+      ? `${places} · ${t("passport.wentCount", { count: went })}`
+      : places;
   if (layout === "pair") {
     return (
       <View style={styles.card}>

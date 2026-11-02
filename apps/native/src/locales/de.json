@@ -1137,6 +1137,36 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "Bild aus dem gespeicherten Beitrag",
   "passport.removeStamp": "Stempel entfernen",
+  "passport.title": "Pass",
+  "passport.yourPassport": "Dein Pass",
+  "passport.beenTitle": "Schon mal dort gewesen?",
+  "passport.beenBody": "Stemple Orte, an denen du schon warst",
+  "passport.beenSomewhere": "Schon irgendwo gewesen?",
+  "passport.rowCities": "%{places} · %{cities}",
+  "passport.placesCount": {
+    "one": "%{formattedCount} Ort",
+    "other": "%{formattedCount} Orte"
+  },
+  "passport.citiesCount": {
+    "one": "%{formattedCount} Stadt",
+    "other": "%{formattedCount} Städte"
+  },
+  "passport.wentCount": {
+    "one": "%{formattedCount} besucht",
+    "other": "%{formattedCount} besucht"
+  },
+  "passport.places": "Orte",
+  "passport.cities": "Städte",
+  "passport.countries": "Länder",
+  "passport.elsewhere": "Anderswo",
+  "passport.coversCredit": "Bilder aus den gespeicherten Beiträgen",
+  "passport.pickBody": "Hake die Orte ab, an denen du schon warst, bevor du sie hier gespeichert hast.",
+  "passport.nothingToStamp": "Alle gespeicherten Orte sind schon in deinem Pass.",
+  "passport.pickNone": "Wähle die Orte, an denen du warst",
+  "passport.stampCount": {
+    "one": "%{formattedCount} Ort stempeln",
+    "other": "%{formattedCount} Orte stempeln"
+  },
   "cityMap.stampedCount": {
     "one": "%{formattedCount} gestempelt",
     "other": "%{formattedCount} gestempelt"

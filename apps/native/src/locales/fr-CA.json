@@ -1169,6 +1169,40 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "Image de la publication enregistrée",
   "passport.removeStamp": "Retirer le tampon",
+  "passport.title": "Passeport",
+  "passport.yourPassport": "Votre passeport",
+  "passport.beenTitle": "Déjà allé dans l'un d'eux ?",
+  "passport.beenBody": "Tamponnez les lieux où vous êtes déjà allé",
+  "passport.beenSomewhere": "Déjà allé quelque part ?",
+  "passport.rowCities": "%{places} · %{cities}",
+  "passport.placesCount": {
+    "one": "%{formattedCount} lieu",
+    "many": "%{formattedCount} lieux",
+    "other": "%{formattedCount} lieux"
+  },
+  "passport.citiesCount": {
+    "one": "%{formattedCount} ville",
+    "many": "%{formattedCount} villes",
+    "other": "%{formattedCount} villes"
+  },
+  "passport.wentCount": {
+    "one": "%{formattedCount} visité",
+    "many": "%{formattedCount} visités",
+    "other": "%{formattedCount} visités"
+  },
+  "passport.places": "Lieux",
+  "passport.cities": "Villes",
+  "passport.countries": "Pays",
+  "passport.elsewhere": "Ailleurs",
+  "passport.coversCredit": "Images des publications enregistrées",
+  "passport.pickBody": "Cochez les lieux où vous êtes allé avant de les enregistrer ici.",
+  "passport.nothingToStamp": "Tous vos lieux enregistrés sont déjà dans votre passeport.",
+  "passport.pickNone": "Choisissez les lieux visités",
+  "passport.stampCount": {
+    "one": "Tamponner %{formattedCount} lieu",
+    "many": "Tamponner %{formattedCount} lieux",
+    "other": "Tamponner %{formattedCount} lieux"
+  },
   "cityMap.stampedCount": {
     "one": "%{formattedCount} tamponné",
     "many": "%{formattedCount} tamponnés",
