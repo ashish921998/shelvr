@@ -42,7 +42,8 @@ function pinCity(
 
 function visitPin(item: Doc<"items">, name: string): VisitPin | null {
   const key = placeKey(name);
-  const pin = (item.placePins ?? []).find((p) => placeKey(p.name) === key);
+  const pins = (item.placePins ?? []).filter((p) => placeKey(p.name) === key);
+  const pin = pins.find((p) => pinCity(item, p) !== undefined) ?? pins[0];
   if (pin === undefined) return null;
   const city = pinCity(item, pin);
   return { lat: pin.lat, lng: pin.lng, ...(city ? { city } : {}) };

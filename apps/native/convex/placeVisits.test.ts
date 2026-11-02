@@ -524,7 +524,7 @@ describe("the passport", () => {
   });
 
   it("lists a name once, with its own pin's city, even across saves", async () => {
-    const { t, userId } = await setup();
+    const { t, userId, visits } = await setup();
     const save = (city: string, lat: number) =>
       t.run((ctx) =>
         ctx.db.insert("items", {
@@ -554,5 +554,10 @@ describe("the passport", () => {
         cover: null,
       },
     ]);
+
+    await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [{ itemId: newer, name: "Cafe Uno" }],
+    });
+    expect(await visits()).toMatchObject([{ lat: 38.7, city: "Lisbon" }]);
   });
 });
