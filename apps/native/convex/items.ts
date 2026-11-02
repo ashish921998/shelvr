@@ -29,6 +29,7 @@ import {
 import {
   claimSave,
   isFreeSave,
+  reclaimFreeSave,
   recordFreeSave,
   settleFreeSave,
 } from "./freeSaves";
@@ -1953,7 +1954,8 @@ export const reprocessItem = authedMutation({
   handler: async (ctx, args) => {
     const { userId } = ctx;
     const freeDemo = await freeDemoRetry(ctx, userId, args.id);
-    if (freeDemo === null && !(await isFreeSave(ctx, args.id))) {
+    const freeSave = freeDemo === null && (await isFreeSave(ctx, args.id));
+    if (freeDemo === null && !freeSave) {
       await requireProEntitlement(ctx, userId);
     }
     const item = await ctx.db.get(args.id);
@@ -1967,6 +1969,7 @@ export const reprocessItem = authedMutation({
     if (!retryable) {
       return false;
     }
+    if (freeSave) await reclaimFreeSave(ctx, userId, args.id);
     if (freeDemo !== null) {
       await rateLimiter.limit(ctx, "demoRetry", { key: userId, throws: true });
       await ctx.db.patch(freeDemo._id, {

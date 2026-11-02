@@ -135,16 +135,36 @@ describe("free saves with the switch on", () => {
     expect(await rows(user)).toHaveLength(FREE_SAVE_LIMIT);
   });
 
-  it("lets a failed free save be retried with no slots left", async () => {
+  it("takes a slot again when a failed free save is retried", async () => {
     const user = await freeUser(true);
     const failed = await saveLink(user, 0);
     await fail(user, failed);
-    for (let n = 1; n <= FREE_SAVE_LIMIT; n++) await saveLink(user, n);
+    expect(await user.t.query(api.freeSaves.getFreeSaves, {})).toMatchObject({
+      used: 0,
+    });
     expect(await user.t.mutation(api.items.reprocessItem, { id: failed })).toBe(
       true,
     );
     await settle(user, failed, ["Lisbon"]);
     expect(await user.t.query(api.freeSaves.getFreeSaves, {})).toMatchObject({
+      used: 1,
+    });
+  });
+
+  it("refuses to retry a failed free save once ten are held", async () => {
+    const user = await freeUser(true);
+    const failed = await saveLink(user, 0);
+    await fail(user, failed);
+    for (let n = 1; n <= FREE_SAVE_LIMIT; n++) {
+      await settle(user, await saveLink(user, n), ["Lisbon"]);
+    }
+    expect(
+      await errorCode(user.t.mutation(api.items.reprocessItem, { id: failed })),
+    ).toBe("pro_required");
+    const item = await user.t.run((ctx) => ctx.db.get(failed));
+    expect(item?.status).toBe("failed");
+    expect(await user.t.query(api.freeSaves.getFreeSaves, {})).toEqual({
+      limit: FREE_SAVE_LIMIT,
       used: FREE_SAVE_LIMIT,
       left: 0,
     });

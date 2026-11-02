@@ -470,8 +470,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `pro_required` while the switch is off or 10 are held. A save holds its slot while
   processing and keeps it only if it finishes ready with a city (`settleFreeSave`, run
   from `finalizeItem`, the failure path and `deleteItem`); deleting a placed save gives
-  nothing back. Retrying a free save and adding a Maps list's other city parts need no
-  Pro. Photo saves and every plan stay Pro. `getFreeSaves` is the client's counter (null
+  nothing back. Retrying a free save needs no Pro, but one that gave its slot back takes a
+  slot again (`reclaimFreeSave`). Adding a Maps list's other city parts needs no Pro. Photo saves and every plan stay Pro. `getFreeSaves` is the client's counter (null
   with Pro or the switch off).
 - **`cancelSurvey.ts`**: the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the
   client boundary is `src/lib/cancel-survey.ts`.

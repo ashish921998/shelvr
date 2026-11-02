@@ -61,6 +61,21 @@ export async function isFreeSave(
   return row !== null;
 }
 
+export async function reclaimFreeSave(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  itemId: Id<"items">,
+): Promise<void> {
+  const row = await ctx.db
+    .query("freeSaves")
+    .withIndex("by_item", (q) => q.eq("itemId", itemId))
+    .unique();
+  if (row === null || row.status !== "released") return;
+  if (await claimSave(ctx, userId)) {
+    await ctx.db.patch(row._id, { status: "pending" });
+  }
+}
+
 export async function settleFreeSave(
   ctx: MutationCtx,
   itemId: Id<"items">,
@@ -91,7 +106,7 @@ export const getFreeSaves = authedQuery({
     const { userId } = ctx;
     if (!freeSavesEnabled()) return null;
     if (await hasProEntitlementAt(ctx, userId, Date.now())) return null;
-    const used = Math.min(FREE_SAVE_LIMIT, await heldFreeSaves(ctx, userId));
+    const used = await heldFreeSaves(ctx, userId);
     return {
       limit: FREE_SAVE_LIMIT,
       used,
