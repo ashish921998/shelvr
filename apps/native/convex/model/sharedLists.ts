@@ -47,6 +47,7 @@ export const sharedListPlaceValidator = v.object({
   itemId: v.optional(v.id("items")),
   addedByYou: v.boolean(),
   addedByName: v.optional(v.string()),
+  addedByPastMember: v.optional(v.boolean()),
   addedAt: v.number(),
   isNew: v.boolean(),
   visitedAt: v.optional(v.number()),

@@ -139,9 +139,12 @@ export function listSectionRows(
 
 export function savedByLine(place: SharedListPlace): string {
   if (place.addedByYou) return t("sharedLists.youSaved");
-  return place.addedByName === undefined
-    ? t("sharedLists.pastMemberSaved")
-    : t("sharedLists.savedBy", { name: place.addedByName });
+  if (place.addedByPastMember === true) {
+    return t("sharedLists.pastMemberSaved");
+  }
+  return t("sharedLists.savedBy", {
+    name: place.addedByName ?? t("sharedLists.someone"),
+  });
 }
 
 type AlsoAddState = Record<string, "off" | "adding" | "on" | "removing">;

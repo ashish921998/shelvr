@@ -9,6 +9,7 @@ import {
   listRows,
   listSectionRows,
   nextAlsoAddState,
+  savedByLine,
   type SharedListPlace,
   useAlsoAddTo,
   withLine,
@@ -143,6 +144,23 @@ describe("listSectionRows", () => {
       "heading",
       "place",
     ]);
+  });
+});
+
+describe("savedByLine", () => {
+  it("says someone left only when the server says so, not for a missing name", () => {
+    expect(savedByLine(place({ addedByName: "Maya" }))).toBe(
+      'sharedLists.savedBy:{"name":"Maya"}',
+    );
+    expect(savedByLine(place())).toBe(
+      'sharedLists.savedBy:{"name":"sharedLists.someone"}',
+    );
+    expect(savedByLine(place({ addedByPastMember: true }))).toBe(
+      "sharedLists.pastMemberSaved",
+    );
+    expect(savedByLine(place({ addedByYou: true }))).toBe(
+      "sharedLists.youSaved",
+    );
   });
 });
 

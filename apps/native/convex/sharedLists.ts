@@ -287,6 +287,7 @@ export const getSharedList = authedQuery({
             ...(itemId !== undefined ? { itemId } : {}),
             addedByYou: place.addedBy === userId,
             ...(addedByName !== undefined ? { addedByName } : {}),
+            ...(names.has(place.addedBy) ? {} : { addedByPastMember: true }),
             addedAt: place.addedAt,
             isNew: isNewPlace(place, membership),
             ...(place.visitedAt !== undefined

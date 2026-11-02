@@ -335,6 +335,25 @@ describe("leaveSharedList", () => {
     expect(list?.ownerId).toBe(cy.userId);
   });
 
+  it("marks a place as a past member's only once its adder has left, named or not", async () => {
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token, { name: "" });
+    await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: { name: "Rossio", ...LISBON, city: "Lisbon" },
+    });
+    const rossio = async () =>
+      (
+        await owner.t.query(api.sharedLists.getSharedList, { listId })
+      )?.places.find((place) => place.name === "Rossio");
+    expect(await rossio()).toEqual(
+      expect.not.objectContaining({ addedByName: expect.anything() }),
+    );
+    expect((await rossio())?.addedByPastMember).toBeUndefined();
+    await bo.t.mutation(api.sharedLists.leaveSharedList, { listId });
+    expect((await rossio())?.addedByPastMember).toBe(true);
+  });
+
   it("deletes the list and its places when the last member leaves", async () => {
     const { base, owner, listId } = await listWithOwner();
     await owner.t.mutation(api.sharedLists.leaveSharedList, { listId });
