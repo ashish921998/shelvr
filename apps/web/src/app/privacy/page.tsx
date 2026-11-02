@@ -204,11 +204,11 @@ export default function PrivacyPage() {
           sends the file itself.
         </p>
         <p className="mt-2">
-          A plan can also be shared as an unlisted vote link, which shows its
-          city and places. Anyone with the link can vote, up to 20 people, and
-          we store each voter’s choices with a random browser identifier. The
-          link closes after a week, and we delete it and its votes a week after
-          that.
+          A plan can also be shared as an unlisted vote link, which shows your
+          first name, if we have one, and the plan’s city and places. Anyone
+          with the link can vote, up to 20 people at a time, and we store each
+          voter’s choices with a random browser identifier. The link closes
+          after a week, and we delete it and its votes about a week after that.
         </p>
       </section>
 
