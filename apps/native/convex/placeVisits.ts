@@ -68,14 +68,16 @@ async function markVisit(
     pin !== null &&
     existing.lat === pin.lat &&
     existing.lng === pin.lng;
+  const countryCode = samePoint ? existing.countryCode : undefined;
+  const location =
+    pin === null
+      ? {}
+      : { lat: pin.lat, lng: pin.lng, city: pin.city, countryCode };
   const visit = {
     name: name.replace(/\s+/g, " ").trim().slice(0, MAX_PLACE_NAME_CHARS),
     itemId: item._id,
     visitedAt: Date.now(),
-    lat: pin?.lat,
-    lng: pin?.lng,
-    city: pin?.city,
-    countryCode: samePoint ? existing.countryCode : undefined,
+    ...location,
     backfilled: backfilled ? true : undefined,
   };
   let visitId = existing?._id;
@@ -84,7 +86,7 @@ async function markVisit(
   } else {
     await ctx.db.patch(visitId, visit);
   }
-  if (pin !== null && visit.countryCode === undefined) {
+  if (pin !== null && countryCode === undefined) {
     await ctx.scheduler.runAfter(
       lookupDelayMs,
       internal.placeVisits.locateCountry,
@@ -127,24 +129,30 @@ export const markVisitedBefore = authedMutation({
     const places = args.places.filter(({ name }) => placeKey(name) !== "");
     if (places.length === 0) return 0;
     await requireProEntitlement(ctx, userId);
+    const items = await Promise.all(
+      places.map(({ itemId }) => ownedItem(ctx, userId, itemId)),
+    );
+    const unique = new Map(
+      places.map(({ name }, i) => [placeKey(name), { name, item: items[i] }]),
+    );
     await rateLimiter.limit(ctx, "placeVisitBatch", {
       key: userId,
+      count: unique.size,
       throws: true,
     });
-    const keys = new Set<string>();
-    for (const { itemId, name } of places) {
-      if (keys.has(placeKey(name))) continue;
-      keys.add(placeKey(name));
+    let order = 0;
+    for (const { name, item } of unique.values()) {
       await markVisit(
         ctx,
         userId,
-        await ownedItem(ctx, userId, itemId),
+        item,
         name,
         true,
-        (keys.size - 1) * COUNTRY_SPACING_MS,
+        order * COUNTRY_SPACING_MS,
       );
+      order += 1;
     }
-    return keys.size;
+    return unique.size;
   },
 });
 
@@ -181,10 +189,23 @@ export const getPassport = authedQuery({
       .withIndex("by_user_and_visited", (q) => q.eq("userId", ctx.userId))
       .order("desc")
       .take(MAX_PASSPORT_STAMPS);
+    const itemIds = [...new Set(visits.map((visit) => visit.itemId))];
+    const saves = new Map(
+      await Promise.all(
+        itemIds.map(async (itemId) => {
+          const item = await ctx.db.get(itemId);
+          const owned =
+            item !== null && item.userId === ctx.userId ? item : null;
+          return [itemId, { owned, cover: await coverOf(ctx, owned) }] as const;
+        }),
+      ),
+    );
     const stamps = [];
     for (const visit of visits) {
-      const item = await ctx.db.get(visit.itemId);
-      const owned = item !== null && item.userId === ctx.userId ? item : null;
+      const { owned, cover } = saves.get(visit.itemId) ?? {
+        owned: null,
+        cover: null,
+      };
       const pin =
         visit.lat !== undefined && visit.lng !== undefined
           ? { lat: visit.lat, lng: visit.lng, city: visit.city }
@@ -198,7 +219,7 @@ export const getPassport = authedQuery({
         ...(pin ? { lat: pin.lat, lng: pin.lng } : {}),
         ...(pin?.city ? { city: pin.city } : {}),
         ...(visit.countryCode ? { countryCode: visit.countryCode } : {}),
-        cover: await coverOf(ctx, owned),
+        cover,
       });
     }
     return stamps;

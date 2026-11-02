@@ -119,7 +119,10 @@ export function firstPlace(
 
 const countrySchema = z.object({
   results: z.array(
-    z.object({ countryCode: z.string().regex(/^[A-Za-z]{2}$/) }).partial(),
+    z
+      .object({ countryCode: z.string().regex(/^[A-Za-z]{2}$/) })
+      .partial()
+      .catch({}),
   ),
 });
 

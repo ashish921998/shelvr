@@ -276,11 +276,88 @@ describe("the passport", () => {
   it("refuses a batch over another user's save, and marks nothing", async () => {
     const { backend, itemId } = await setup();
     const other = await signedInUser(backend, { pro: true });
+    const ownItem = await other.t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId: other.userId,
+        type: "link",
+        status: "ready",
+        title: "Tigre",
+        tags: [],
+        searchText: "Tigre",
+        placePins: [PIN],
+      }),
+    );
     await expect(
       other.t.mutation(api.placeVisits.markVisitedBefore, {
-        places: [{ itemId, name: "Tigre" }],
+        places: [
+          { itemId: ownItem, name: "Tigre" },
+          { itemId, name: "Tigre" },
+        ],
       }),
     ).rejects.toThrow("Item not found");
+    expect(
+      await other.t.run((ctx) =>
+        ctx.db
+          .query("placeVisits")
+          .withIndex("by_user_and_visited", (q) => q.eq("userId", other.userId))
+          .take(5),
+      ),
+    ).toEqual([]);
+  });
+
+  it("keeps a visit's pin and country when a save without that pin marks it again", async () => {
+    await withMaps();
+    const { backend, t, userId, itemId, visits } = await setup();
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    const bare = await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Tigre again",
+        tags: [],
+        searchText: "Tigre",
+      }),
+    );
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId: bare,
+      name: "Tigre",
+      visited: true,
+    });
+    expect(await visits()).toMatchObject([
+      { itemId: bare, lat: PIN.lat, city: "Lisbon", countryCode: "PT" },
+    ]);
+  });
+
+  it("finds the country past a malformed result", async () => {
+    vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+    vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+    vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) =>
+        new URL(input).pathname === "/v1/token"
+          ? Response.json({ accessToken: "maps", expiresInSeconds: 1800 })
+          : Response.json({
+              results: [{ countryCode: "PRT" }, { countryCode: "pt" }],
+            }),
+      ),
+    );
+    const { backend, t, itemId, visits } = await setup();
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    expect(await visits()).toMatchObject([{ countryCode: "PT" }]);
   });
 
   it("lists stamps newest first with covers, and pins old plan marks from their save", async () => {
