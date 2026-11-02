@@ -17,6 +17,7 @@ import {
 } from "./model/appleMaps";
 import { authedMutation, authedQuery } from "./model/auth";
 import { logEvent } from "./model/log";
+import { linkSource } from "./model/externalUrl";
 import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
 import { findVisit } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
@@ -179,8 +180,14 @@ const stampValidator = v.object({
   lng: v.optional(v.number()),
   city: v.optional(v.string()),
   countryCode: v.optional(v.string()),
+  source: v.optional(v.union(v.literal("instagram"), v.literal("tiktok"))),
   cover: v.union(v.string(), v.null()),
 });
+
+function reelSource(item: Doc<"items"> | null) {
+  const source = linkSource(item?.url);
+  return source === "instagram" || source === "tiktok" ? source : undefined;
+}
 
 async function coverOf(
   ctx: QueryCtx,
@@ -223,6 +230,7 @@ export const getPassport = authedQuery({
         visit.lat !== undefined && visit.lng !== undefined
           ? { lat: visit.lat, lng: visit.lng, city: visit.city }
           : owned && visitPin(owned, visit.name);
+      const source = reelSource(owned);
       stamps.push({
         key: visit.key,
         name: visit.name,
@@ -232,6 +240,7 @@ export const getPassport = authedQuery({
         ...(pin ? { lat: pin.lat, lng: pin.lng } : {}),
         ...(pin?.city ? { city: pin.city } : {}),
         ...(visit.countryCode ? { countryCode: visit.countryCode } : {}),
+        ...(source ? { source } : {}),
         cover,
       });
     }

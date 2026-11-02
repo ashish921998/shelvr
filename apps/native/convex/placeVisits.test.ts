@@ -473,6 +473,23 @@ describe("the passport", () => {
     ]);
   });
 
+  it("names the app a stamp's reel was saved from", async () => {
+    const { t, itemId } = await setup();
+    const app = async (url: string) => {
+      await t.run((ctx) => ctx.db.patch(itemId, { url }));
+      const [stamp] = await t.query(api.placeVisits.getPassport, {});
+      return stamp.source;
+    };
+    await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [{ itemId, name: "Tigre" }],
+    });
+    expect(await app("https://www.instagram.com/reel/abc/")).toBe("instagram");
+    expect(await app("https://www.tiktok.com/@a/video/123")).toBe("tiktok");
+    expect(await app("https://www.youtube.com/watch?v=abcdefghijk")).toBe(
+      undefined,
+    );
+  });
+
   it("lists unstamped places with a city, newest save first, once each", async () => {
     const { t, userId, itemId } = await setup();
     const newer = await t.run((ctx) =>
