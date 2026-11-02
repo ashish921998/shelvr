@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMetadata(
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="October 26, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="November 2, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
@@ -156,6 +156,16 @@ export default function PrivacyPage() {
           source link, or the first 500 characters of a note. Anyone with the
           link can open it, and search engines are asked not to index it. You
           can remove the page by deleting the save.
+        </p>
+      </section>
+
+      <section>
+        <h2 className="font-semibold text-ink text-lg">Shared lists</h2>
+        <p className="mt-2">
+          When you join a shared list, its other members see your first name and
+          the places you add. Anyone with the invite link can join until the
+          owner removes them. Places you added stay on the list if you leave,
+          and are removed if you delete your account.
         </p>
       </section>
 
