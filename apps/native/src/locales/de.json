@@ -491,6 +491,7 @@
   "item.pageFailed": "Shelvr konnte diese Seite nicht lesen.",
   "item.stalled": "Das dauert länger als erwartet.",
   "item.partial": "Nur anhand des Links gespeichert — die Seite ließ sich nicht laden, daher sind diese Angaben geschätzt.",
+  "item.detailsMissing": "Einige Details wurden nicht geladen. Versuche es erneut, um den Inhalt noch einmal zu lesen.",
   "recipe.ingredients": "Zutaten",
   "recipe.steps": "Zubereitung",
   "recipe.stepNumber": "Schritt %{number}",

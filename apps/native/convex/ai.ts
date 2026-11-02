@@ -405,6 +405,7 @@ type Analysis = {
   listPart?: PlaceListPart;
   /** The rest of a shared list, each part a save of its own city. */
   listParts?: PlaceListPart[];
+  stepFailed?: boolean;
 };
 
 type AnalysisOutcome = Analysis | { terminal: true };
@@ -438,7 +439,10 @@ function readingOf(
   item: Doc<"items">,
   { page, linkRead }: Analysis,
   posterStorageId: Id<"_storage"> | undefined,
+  stepFailed: boolean,
 ): Reading {
+  const enrichment = linkEnrichment(linkRead);
+  const stepPartial = stepFailed && enrichment !== "partial";
   return {
     title: item.type === "note" ? firstLine(item.note ?? "") : page?.title,
     description: page?.description,
@@ -451,7 +455,8 @@ function readingOf(
     storageId: posterStorageId,
     aspectRatio:
       item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
-    enrichment: linkEnrichment(linkRead),
+    enrichment: stepPartial ? "partial" : enrichment,
+    ...(stepPartial ? { stepFailed: true } : {}),
   };
 }
 
@@ -526,6 +531,7 @@ function linkAnalysisPrompt(
 function retryReadNothingNew(item: Doc<"items">, read: LinkRead): boolean {
   if (item.enrichment !== "partial") return false;
   if (read.status === "unreadable") return true;
+  if (item.stepFailed) return false;
   const {
     content,
     recipe,
@@ -604,12 +610,24 @@ async function analyzeLinkItem(
     askForRecipe,
     read.status === "ok" && read.shortForm?.video === true,
   );
-  const spoken = await fromSpeech(ctx, item, read, result, aiAllowed);
+  const { spoken, failed } = await fromSpeech(
+    ctx,
+    item,
+    read,
+    result,
+    aiAllowed,
+  );
   const parts = page?.placeList
     ? await placeListParts(ctx, item, page, aiAllowed)
     : undefined;
-  if (page === undefined || parts === undefined || parts.length === 0) {
-    return { result: { ...result, ...spoken }, page, linkRead: read };
+  const stepFailed = failed || parts === "failed";
+  if (page === undefined || !Array.isArray(parts) || parts.length === 0) {
+    return {
+      result: { ...result, ...spoken },
+      page,
+      linkRead: read,
+      stepFailed,
+    };
   }
   const index = partIndexFor(parts, item.title);
   const part = parts[index];
@@ -627,6 +645,7 @@ async function analyzeLinkItem(
     linkRead: read,
     listPart: part,
     listParts: parts.filter((_, i) => i !== index),
+    stepFailed,
   };
 }
 
@@ -645,13 +664,13 @@ async function pinListPart(
   });
 }
 
-/** A shared list's places, one part per city; undefined when the model could not name their cities. */
+/** A shared list's places, one part per city; "failed" when the model could not name their cities. */
 async function placeListParts(
   ctx: ActionCtx,
   item: Doc<"items">,
   page: PageData,
   aiAllowed: boolean,
-): Promise<PlaceListPart[] | undefined> {
+): Promise<PlaceListPart[] | "failed" | undefined> {
   const places = page.placeList ?? [];
   if (places.length === 0 || !(await stillAllowed(ctx, aiAllowed, item))) {
     return undefined;
@@ -680,7 +699,7 @@ async function placeListParts(
       item_id: item._id,
       error_category: modelFailure(error),
     });
-    return undefined;
+    return "failed";
   }
 }
 
@@ -797,33 +816,51 @@ async function fromSpeech(
   read: LinkRead,
   result: LinkAnalysis,
   aiAllowed: boolean,
-): Promise<Spoken> {
-  const spoken = await readSpeech(ctx, item, read, result, aiAllowed);
+): Promise<{ spoken: Spoken; failed: boolean }> {
+  const { spoken, failed } = await readSpeech(
+    ctx,
+    item,
+    read,
+    result,
+    aiAllowed,
+  );
   const named = spoken.cities ?? result.cities;
   const cities =
     normalizeCities(named).length === 0 && item.cities?.length
       ? item.cities
       : named;
   if (!item.places?.length) {
-    return { ...spoken, cities };
+    return { spoken: { ...spoken, cities }, failed };
   }
   return {
-    ...spoken,
-    cities,
-    places: normalizePlaces([
-      ...(spoken.places ?? result.places ?? []),
-      ...item.places,
-    ]),
-    placesHeard: spoken.placesHeard ?? item.placesHeard,
-    placeLocations: normalizePlaceLocations(
-      [
-        ...(spoken.placeLocations ?? result.placeLocations ?? []),
-        ...(item.placeLocations ?? []),
-      ],
-      [...(spoken.places ?? result.places ?? []), ...item.places],
+    failed,
+    spoken: {
+      ...spoken,
       cities,
-    ),
+      places: normalizePlaces([
+        ...(spoken.places ?? result.places ?? []),
+        ...item.places,
+      ]),
+      placesHeard: spoken.placesHeard ?? item.placesHeard,
+      placeLocations: normalizePlaceLocations(
+        [
+          ...(spoken.placeLocations ?? result.placeLocations ?? []),
+          ...(item.placeLocations ?? []),
+        ],
+        [...(spoken.places ?? result.places ?? []), ...item.places],
+        cities,
+      ),
+    },
   };
+}
+
+function speechStepFailed(outcome: string): boolean {
+  return (
+    outcome === "failed" ||
+    outcome === "model_timeout" ||
+    outcome === "rate_limited" ||
+    outcome.startsWith("transcript_")
+  );
 }
 
 async function readSpeech(
@@ -832,7 +869,7 @@ async function readSpeech(
   read: LinkRead,
   result: LinkAnalysis,
   aiAllowed: boolean,
-): Promise<Spoken> {
+): Promise<{ spoken: Spoken; failed: boolean }> {
   const wants = speechWants(item, read, result);
   const token = transcriptToken();
   const site = read.status === "ok" ? read.shortForm?.site : undefined;
@@ -845,10 +882,13 @@ async function readSpeech(
     !url ||
     read.status !== "ok"
   ) {
-    return {};
+    return { spoken: {}, failed: false };
   }
-  const log = (event: SpeechEvent, outcome: string) =>
+  let failed = false;
+  const log = (event: SpeechEvent, outcome: string) => {
+    failed ||= speechStepFailed(outcome);
     logEvent("info", event, { item_id: item._id, site, outcome });
+  };
   const logWanted = (outcome: string) => {
     if (wants.recipe) log("speech_recipe", outcome);
     if (wants.places) log("speech_places", outcome);
@@ -863,10 +903,10 @@ async function readSpeech(
     });
   } catch {
     logWanted("failed");
-    return {};
+    return { spoken: {}, failed: true };
   }
   if (transcript === undefined) {
-    return {};
+    return { spoken: {}, failed };
   }
   const [recipe, places] = await Promise.all([
     wants.recipe
@@ -880,7 +920,7 @@ async function readSpeech(
         )
       : undefined,
   ]);
-  return { ...(recipe ? { recipe } : {}), ...places };
+  return { spoken: { ...(recipe ? { recipe } : {}), ...places }, failed };
 }
 
 async function readTranscript(
@@ -1240,7 +1280,7 @@ export const processItem = internalAction({
       if ("terminal" in outcome) {
         return null;
       }
-      const { page, linkRead } = outcome;
+      const { page } = outcome;
 
       posterStorageId = page?.heroImageUrl
         ? await storePoster(ctx, page.heroImageUrl)
@@ -1250,7 +1290,12 @@ export const processItem = internalAction({
         ? outcome.result
         : undefined;
       const keepTitle = args.refresh === true;
-      const reading = readingOf(item, outcome, posterStorageId);
+      const reading = readingOf(
+        item,
+        outcome,
+        posterStorageId,
+        model !== undefined && outcome.stepFailed === true,
+      );
       const classification = model && classificationOf(model);
 
       if (model) await pinListPart(ctx, args, outcome.listPart);
@@ -1296,8 +1341,7 @@ export const processItem = internalAction({
       );
       await scheduleSteeringFor(ctx, args.itemId, savedSpaceIds);
       await captureCategorizationTelemetry(ctx, {
-        outcome:
-          linkEnrichment(linkRead) === "partial" ? "partial" : "succeeded",
+        outcome: reading.enrichment === "partial" ? "partial" : "succeeded",
         itemType: item.type,
         durationMs: Date.now() - startedAt,
       });

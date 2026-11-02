@@ -465,6 +465,7 @@ export type MessageParams = {
   "item.pageFailed": undefined;
   "item.stalled": undefined;
   "item.partial": undefined;
+  "item.detailsMissing": undefined;
   "recipe.ingredients": undefined;
   "recipe.steps": undefined;
   "recipe.stepNumber": { number: string };

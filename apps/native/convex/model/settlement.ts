@@ -33,6 +33,7 @@ const readingValidator = v.object({
   storageId: v.optional(v.id("_storage")),
   aspectRatio: v.optional(v.number()),
   enrichment: v.optional(enrichmentValidator),
+  stepFailed: v.optional(v.boolean()),
 });
 
 const classificationValidator = v.object({
@@ -224,6 +225,7 @@ export function completionPatch(
       earlier && !reading.content && reading.enrichment === "no_article"
         ? "partial"
         : reading.enrichment,
+    stepFailed: reading.stepFailed,
     failureReason: undefined,
     searchText: buildSearchText({
       title,
