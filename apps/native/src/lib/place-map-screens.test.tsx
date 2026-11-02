@@ -232,6 +232,9 @@ vi.mock("@/components/shared-list/list-place-row", () => ({
       rowFake({ name: place.name, ...rest }),
   ),
 }));
+vi.mock("@/components/shared-list/name-sheet", () => ({
+  NameSheet: vi.fn(() => null),
+}));
 vi.mock("@/components/shared-list/list-footer", () => ({
   ListFooter: vi.fn(({ city }: { city: string }) => (
     <span>{`footer ${city}`}</span>

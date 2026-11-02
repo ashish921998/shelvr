@@ -1105,6 +1105,15 @@
   "sharedLists.joinBody": "Add what you find, see what they find, and plan from both.",
   "sharedLists.joinFree": "Free to join. You don’t need Pro.",
   "sharedLists.join": "Join list",
+  "sharedLists.nameTitle": "What should we call you?",
+  "sharedLists.nameBodyJoin": "Your name goes next to every place you add, so %{name} knows who found it. Without one, you’ll show up as “Someone”.",
+  "sharedLists.nameBodyJoinNoName": "Your name goes next to every place you add, so people know who found it. Without one, you’ll show up as “Someone”.",
+  "sharedLists.nameBodyCreate": "Your invite and every place you add carry your name, so people know who it’s from. Without one, you’ll show up as “Someone”.",
+  "sharedLists.firstNamePlaceholder": "First name",
+  "sharedLists.yourName": "Your name",
+  "sharedLists.namePreviewPlace": "A place you add",
+  "sharedLists.nameSkip": "Skip for now",
+  "sharedLists.nameFailed": "Couldn’t save your name. Try again.",
   "sharedLists.andMore": {
     "one": "and %{formattedCount} more",
     "other": "and %{formattedCount} more"

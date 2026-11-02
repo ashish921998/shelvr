@@ -5,13 +5,14 @@ export function normalizeAppleProfile(
   profile: AppleProfile,
   tokens: { refresh_token?: string },
 ) {
-  const name = profile.user
-    ? `${profile.user.name.firstName} ${profile.user.name.lastName}`
-    : profile.email;
+  const name = [profile.user?.name.firstName, profile.user?.name.lastName]
+    .map((part) => part?.trim() ?? "")
+    .filter(Boolean)
+    .join(" ");
 
   return {
     id: profile.sub,
-    name,
+    ...(name ? { name } : {}),
     email: profile.email,
     ...(tokens.refresh_token
       ? { appleRefreshToken: tokens.refresh_token }

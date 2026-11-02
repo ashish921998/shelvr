@@ -1016,6 +1016,15 @@ export type MessageParams = {
   "sharedLists.joinBody": undefined;
   "sharedLists.joinFree": undefined;
   "sharedLists.join": undefined;
+  "sharedLists.nameTitle": undefined;
+  "sharedLists.nameBodyJoin": { name: string };
+  "sharedLists.nameBodyJoinNoName": undefined;
+  "sharedLists.nameBodyCreate": undefined;
+  "sharedLists.firstNamePlaceholder": undefined;
+  "sharedLists.yourName": undefined;
+  "sharedLists.namePreviewPlace": undefined;
+  "sharedLists.nameSkip": undefined;
+  "sharedLists.nameFailed": undefined;
   "sharedLists.andMore": { count: number };
   "sharedLists.deadTitle": undefined;
   "sharedLists.deadBody": undefined;

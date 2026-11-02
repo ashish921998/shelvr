@@ -13,6 +13,7 @@ import {
   type QueryCtx,
 } from "../_generated/server";
 import type { Doc, Id } from "../_generated/dataModel";
+import { firstNameOf } from "./firstName";
 
 const NOT_AUTHENTICATED = "Not authenticated";
 
@@ -132,17 +133,11 @@ export async function isDevelopmentAnonymousUser(
   return account !== null;
 }
 
-const MAX_SENDER_NAME_CHARS = 40;
-
 export async function senderFirstName(
   ctx: QueryCtx,
   userId: string,
 ): Promise<string | undefined> {
   const id = ctx.db.normalizeId("users", userId);
   const user = id === null ? null : await ctx.db.get(id);
-  const first = user?.name?.trim().split(/\s+/)[0];
-  if (!first || first.length > MAX_SENDER_NAME_CHARS || first.includes("@")) {
-    return undefined;
-  }
-  return first;
+  return firstNameOf(user?.name);
 }

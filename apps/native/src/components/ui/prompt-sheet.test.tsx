@@ -30,6 +30,10 @@ vi.mock("react-native", () => ({
     },
   ),
   View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
+  KeyboardAvoidingView: vi.fn(({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  )),
+  Platform: { OS: "ios" },
   Text: vi.fn(({ children }: { children: ReactNode }) => (
     <span>{children}</span>
   )),

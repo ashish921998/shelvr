@@ -12,6 +12,7 @@ import {
   savedByLine,
   type SharedListPlace,
   useAlsoAddTo,
+  useNameGate,
   withLine,
 } from "./shared-lists";
 
@@ -20,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   remove: vi.fn(),
   capture: vi.fn(),
   captureError: vi.fn(),
+  query: vi.fn((): { data?: unknown } => ({})),
 }));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: true }),
@@ -33,6 +35,7 @@ vi.mock("@convex/_generated/api", () => ({
       addSavePlaces: { name: "add" },
       removeSavePlaces: { name: "remove" },
     },
+    users: { getMyFirstName: { name: "firstName" } },
   },
 }));
 vi.mock("@/lib/analytics", () => ({
@@ -44,7 +47,7 @@ vi.mock("@/lib/i18n", () => ({
 }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/lib/share-link", () => ({ shareUrl: vi.fn() }));
-vi.mock("@tanstack/react-query", () => ({ useQuery: () => ({}) }));
+vi.mock("@tanstack/react-query", () => ({ useQuery: () => mocks.query() }));
 vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
 vi.mock("react-native", () => ({
   Platform: { OS: "ios" },
@@ -212,5 +215,33 @@ describe("useAlsoAddTo", () => {
   it("ignores a tap while a call is running", () => {
     expect(nextAlsoAddState("adding")).toBeNull();
     expect(nextAlsoAddState("removing")).toBeNull();
+  });
+});
+
+describe("useNameGate", () => {
+  it("goes straight on for someone with a name", () => {
+    mocks.query.mockReturnValue({ data: "Maya" });
+    const action = vi.fn();
+    const { result } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(result.current.asking).toBe(false);
+  });
+
+  it("asks a nameless person once, then carries on whatever they chose", () => {
+    mocks.query.mockReturnValue({ data: null });
+    const action = vi.fn();
+    const { result } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    expect(result.current.asking).toBe(true);
+    expect(action).not.toHaveBeenCalled();
+
+    act(() => result.current.finish());
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(result.current.asking).toBe(false);
+
+    act(() => result.current.gate(action));
+    expect(action).toHaveBeenCalledTimes(2);
+    expect(result.current.asking).toBe(false);
   });
 });

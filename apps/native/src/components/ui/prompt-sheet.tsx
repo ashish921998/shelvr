@@ -1,6 +1,13 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import type { ReactNode } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  Text,
+  View,
+} from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -33,7 +40,10 @@ export function PromptSheet({
       onRequestClose={onClose}
       onDismiss={onDismiss}
     >
-      <View style={styles.backdrop}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.backdrop}
+      >
         <Pressable
           style={styles.scrim}
           onPress={onClose}
@@ -47,7 +57,7 @@ export function PromptSheet({
           {children}
           <View style={styles.actions}>{actions}</View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

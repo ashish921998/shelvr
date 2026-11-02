@@ -9,7 +9,14 @@ import {
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { liveOwner } from "./model/auth";
+import {
+  authedMutation,
+  authedQuery,
+  liveOwner,
+  senderFirstName,
+} from "./model/auth";
+import { firstNameOf } from "./model/firstName";
+import { rateLimiter } from "./model/rateLimiter";
 import { safeDeleteStorage } from "./model/storage";
 import { revoke } from "./legalConsent";
 import {
@@ -38,6 +45,32 @@ export const getCurrentUser = query({
     const user = await liveOwner(ctx, userId);
     if (user === null) return null;
     return { _id: user._id, email: user.email };
+  },
+});
+
+const MAX_TYPED_NAME_CHARS = 80;
+
+export const getMyFirstName = authedQuery({
+  args: {},
+  returns: v.union(v.null(), v.string()),
+  handler: async (ctx) => (await senderFirstName(ctx, ctx.userId)) ?? null,
+});
+
+export const setMyName = authedMutation({
+  args: { name: v.string() },
+  returns: v.string(),
+  handler: async (ctx, args) => {
+    const name = args.name.replace(/\s+/g, " ").trim();
+    const first = firstNameOf(name);
+    if (first === undefined || name.length > MAX_TYPED_NAME_CHARS) {
+      throw new Error("Invalid name");
+    }
+    await rateLimiter.limit(ctx, "sharedListEdit", {
+      key: ctx.userId,
+      throws: true,
+    });
+    await ctx.db.patch(ctx.userId, { name });
+    return first;
   },
 });
 

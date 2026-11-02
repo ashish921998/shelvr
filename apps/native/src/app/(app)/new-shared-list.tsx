@@ -1,3 +1,4 @@
+import { NameSheet } from "@/components/shared-list/name-sheet";
 import { AppSymbolIcon } from "@/components/symbol";
 import { Chip } from "@/components/trip-planner/chip";
 import { FormSection } from "@/components/trip-planner/trip-planner-form";
@@ -9,7 +10,7 @@ import { usePaywallGuard } from "@/lib/entitlement";
 import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
-import { shareInvite } from "@/lib/shared-lists";
+import { shareInvite, useNameGate } from "@/lib/shared-lists";
 import type { TextMessageKey } from "@/locales/message-types";
 import { api } from "@convex/_generated/api";
 import {
@@ -92,6 +93,7 @@ export default function NewSharedListScreen() {
   const [picked, setPicked] = useState<string[]>([]);
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
+  const nameGate = useNameGate();
   const close = useCallback(() => backOrHome(router), [router]);
   const known = (cities.data ?? []).slice(0, MAX_LIST_CITIES);
   const custom = picked.filter(
@@ -254,9 +256,15 @@ export default function NewSharedListScreen() {
           title={t("sharedLists.sendInvite")}
           disabled={name.trim() === "" || picked.length === 0}
           loading={busy || loading}
-          onPress={() => void submit()}
+          onPress={() => nameGate.gate(() => void submit())}
         />
       </View>
+      <NameSheet
+        visible={nameGate.asking}
+        kind="create"
+        onDone={nameGate.finish}
+        onCancel={nameGate.cancel}
+      />
     </View>
   );
 }

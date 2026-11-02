@@ -1075,6 +1075,15 @@
   "sharedLists.joinBody": "見つけた場所を追加し、相手が見つけた場所を見て、両方から計画しましょう。",
   "sharedLists.joinFree": "参加は無料です。Proは必要ありません。",
   "sharedLists.join": "リストに参加",
+  "sharedLists.nameTitle": "お名前を教えてください",
+  "sharedLists.nameBodyJoin": "追加した場所の横にあなたの名前が表示され、%{name}さんが誰が見つけたかわかります。名前がないと「誰か」と表示されます。",
+  "sharedLists.nameBodyJoinNoName": "追加した場所の横にあなたの名前が表示され、誰が見つけたかわかります。名前がないと「誰か」と表示されます。",
+  "sharedLists.nameBodyCreate": "招待と追加した場所にはあなたの名前が表示され、誰からかわかります。名前がないと「誰か」と表示されます。",
+  "sharedLists.firstNamePlaceholder": "名",
+  "sharedLists.yourName": "あなたの名前",
+  "sharedLists.namePreviewPlace": "追加した場所",
+  "sharedLists.nameSkip": "あとで",
+  "sharedLists.nameFailed": "名前を保存できませんでした。もう一度お試しください。",
   "sharedLists.andMore": {
     "other": "ほか%{formattedCount}件"
   },

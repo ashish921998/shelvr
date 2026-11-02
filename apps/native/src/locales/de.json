@@ -1105,6 +1105,15 @@
   "sharedLists.joinBody": "Füge hinzu, was du findest, sieh, was die andere Person findet, und plant aus beidem.",
   "sharedLists.joinFree": "Kostenlos beitreten. Du brauchst kein Pro.",
   "sharedLists.join": "Liste beitreten",
+  "sharedLists.nameTitle": "Wie sollen wir dich nennen?",
+  "sharedLists.nameBodyJoin": "Dein Name steht neben jedem Ort, den du hinzufügst, damit %{name} weiß, wer ihn gefunden hat. Ohne Namen erscheinst du als „Jemand“.",
+  "sharedLists.nameBodyJoinNoName": "Dein Name steht neben jedem Ort, den du hinzufügst, damit alle wissen, wer ihn gefunden hat. Ohne Namen erscheinst du als „Jemand“.",
+  "sharedLists.nameBodyCreate": "Deine Einladung und jeder Ort, den du hinzufügst, tragen deinen Namen, damit alle wissen, von wem sie kommen. Ohne Namen erscheinst du als „Jemand“.",
+  "sharedLists.firstNamePlaceholder": "Vorname",
+  "sharedLists.yourName": "Dein Name",
+  "sharedLists.namePreviewPlace": "Ein Ort von dir",
+  "sharedLists.nameSkip": "Jetzt nicht",
+  "sharedLists.nameFailed": "Dein Name konnte nicht gespeichert werden. Versuch es noch einmal.",
   "sharedLists.andMore": {
     "one": "und %{formattedCount} weiterer",
     "other": "und %{formattedCount} weitere"

@@ -1,3 +1,4 @@
+import { NameSheet } from "@/components/shared-list/name-sheet";
 import { SignInView } from "@/components/sign-in-view";
 import { AppSymbolIcon } from "@/components/symbol";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { clearPendingInvite, setPendingInvite } from "@/lib/pending-invite";
+import { useNameGate } from "@/lib/shared-lists";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -27,6 +29,7 @@ export default function ListInviteScreen() {
     convexQuery(api.sharedLists.invitePreview, { token }),
   );
   const [signingIn, setSigningIn] = useState(false);
+  const nameGate = useNameGate();
   const leave = () => {
     clearPendingInvite();
     if (router.canGoBack()) router.back();
@@ -36,8 +39,12 @@ export default function ListInviteScreen() {
     analytics.capture("shared_list_join_tapped", {
       signed_in: isAuthenticated,
     });
-    setPendingInvite(token);
-    if (!isAuthenticated) setSigningIn(true);
+    if (!isAuthenticated) {
+      setPendingInvite(token);
+      setSigningIn(true);
+      return;
+    }
+    nameGate.gate(() => setPendingInvite(token));
   };
 
   if (signingIn && !isAuthenticated) {
@@ -130,6 +137,14 @@ export default function ListInviteScreen() {
           </Pressable>
         </View>
       </ScrollView>
+      <NameSheet
+        visible={nameGate.asking}
+        kind="join"
+        {...(inviterName !== undefined ? { partner: inviterName } : {})}
+        {...(placeNames[0] !== undefined ? { placeName: placeNames[0] } : {})}
+        onDone={nameGate.finish}
+        onCancel={nameGate.cancel}
+      />
     </SafeAreaView>
   );
 }

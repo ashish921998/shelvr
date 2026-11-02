@@ -70,7 +70,9 @@ describe("useInviteJoinCoordinator", () => {
   it("keeps a queued reel when an onboarded person joins from the paywall", async () => {
     await joinWith(true, "list1");
     expect(mocks.clearPending).not.toHaveBeenCalled();
-    expect(mocks.router.replace).toHaveBeenCalledWith("/shared-list/list1");
+    expect(mocks.router.replace).toHaveBeenCalledWith(
+      "/shared-list/list1?joined=1",
+    );
   });
 
   it("keeps onboarding's answers when the invite is dead", async () => {
@@ -132,7 +134,7 @@ describe("inviteJoinOutcome", () => {
   it("opens the list and spends the token", () => {
     expect(inviteJoinOutcome(listId, "abc", true)).toEqual({
       completeOnboarding: false,
-      href: "/shared-list/list1",
+      href: "/shared-list/list1?joined=1",
     });
   });
 
