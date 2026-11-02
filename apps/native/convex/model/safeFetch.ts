@@ -481,45 +481,12 @@ function decodeWindows1252(bytes: Uint8Array): string {
   return out;
 }
 
-const META_PRESCAN_BYTES = 4096;
-
-function metaCharset(bytes: Uint8Array): string | undefined {
-  if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
-    return undefined;
-  }
-  const head = decodeWindows1252(bytes.subarray(0, META_PRESCAN_BYTES)).replace(
-    /<!--[\s\S]*?(?:-->|$)/g,
-    "",
-  );
-  for (const [tag] of head.matchAll(/<meta\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi)) {
-    const label = metaTagCharset(tag)?.toLowerCase();
-    if (label) return label.startsWith("utf-16") ? undefined : label;
-  }
-  return undefined;
-}
-
-function metaTagCharset(tag: string): string | undefined {
-  const attributes = new Map<string, string>();
-  for (const [, name, double, single, bare] of tag
-    .slice(5)
-    .matchAll(/([^\s=/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+)))?/g)) {
-    attributes.set(name.toLowerCase(), double ?? single ?? bare ?? "");
-  }
-  const charset = attributes.get("charset")?.trim();
-  if (charset) return charset;
-  if (attributes.get("http-equiv")?.toLowerCase() !== "content-type") {
-    return undefined;
-  }
-  return attributes.get("content")?.match(/charset\s*=\s*([\w.:-]+)/i)?.[1];
-}
-
 export function decodeWithContentType(
   bytes: Uint8Array,
   contentType: string,
 ): string {
-  const charset =
-    contentType.match(/charset\s*=\s*["']?([\w.:-]+)/i)?.[1]?.toLowerCase() ??
-    (/html/i.test(contentType) ? metaCharset(bytes) : undefined);
+  const match = contentType.match(/charset\s*=\s*["']?([\w.:-]+)/i);
+  const charset = match?.[1]?.toLowerCase();
   if (charset && charset !== "utf-8" && charset !== "utf8") {
     if (WINDOWS_1252_LABELS.has(charset)) {
       return decodeWindows1252(bytes);
