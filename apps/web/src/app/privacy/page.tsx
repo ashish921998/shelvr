@@ -162,10 +162,14 @@ export default function PrivacyPage() {
       <section>
         <h2 className="font-semibold text-ink text-lg">Shared lists</h2>
         <p className="mt-2">
-          When you join a shared list, its other members see your first name and
-          the places you add. Anyone with the invite link can join until the
-          owner removes them. Places you added stay on the list if you leave,
-          and are removed if you delete your account.
+          When you join a shared list, its other members can see your first
+          name, if we have one, and the places you add. Anyone with the invite
+          link can join. Before joining, they can see the owner’s first name,
+          the list’s name, its cities and a few of its places. The owner can
+          remove a member, which also stops the old link working. A place on a
+          list is a copy, so deleting your save does not remove it. Places you
+          added stay on the list if you leave, until its last member leaves and
+          the list is deleted. They are removed if you delete your account.
         </p>
       </section>
 
@@ -175,7 +179,8 @@ export default function PrivacyPage() {
         </h2>
         <p className="mt-2">
           We do not sell your data. We share it only with the providers needed
-          to run Shelvr, and where the law requires it. These providers are
+          to run Shelvr, with the people you choose through share links and
+          shared lists, and where the law requires it. These providers are
           required to protect data to the same standard we hold ourselves to.
         </p>
         <ul className="mt-2 list-disc pl-5 space-y-2">
