@@ -1204,6 +1204,21 @@
     "many": "Carimbar %{formattedCount} lugares",
     "other": "Carimbar %{formattedCount} lugares"
   },
+  "passport.cardKicker": "Saiu do grupo",
+  "passport.cardTitle": {
+    "one": "%{formattedCount} lugar salvo onde finalmente fomos",
+    "many": "%{formattedCount} lugares salvos onde finalmente fomos",
+    "other": "%{formattedCount} lugares salvos onde finalmente fomos"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "one": "+%{formattedCount} a mais",
+    "many": "+%{formattedCount} a mais",
+    "other": "+%{formattedCount} a mais"
+  },
+  "passport.cardSaved": "Salvo no Instagram.",
+  "passport.cardWent": "Fomos com o Shelvr.",
+  "passport.shareCity": "Compartilhar %{city}",
   "cityMap.stampedCount": {
     "one": "%{formattedCount} carimbado",
     "many": "%{formattedCount} carimbados",

@@ -1132,6 +1132,17 @@
   "passport.stampCount": {
     "other": "%{formattedCount}か所にスタンプ"
   },
+  "passport.cardKicker": "グループチャットから現実へ",
+  "passport.cardTitle": {
+    "other": "保存して、ついに行けた%{formattedCount}か所"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "other": "ほか%{formattedCount}か所"
+  },
+  "passport.cardSaved": "Instagramで保存。",
+  "passport.cardWent": "Shelvrで行った。",
+  "passport.shareCity": "%{city}を共有",
   "cityMap.stampedCount": {
     "other": "スタンプ%{formattedCount}個"
   }

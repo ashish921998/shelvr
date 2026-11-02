@@ -116,7 +116,11 @@ export function CityMap({
         : went?.(pin.name)
           ? theme.colors.primaryText
           : theme.colors.primary,
-      textColor: isSelected ? theme.colors.primary : theme.colors.onTint,
+      textColor: isSelected
+        ? theme.colors.primary
+        : went?.(pin.name)
+          ? theme.colors.surface
+          : theme.colors.onTint,
     };
   });
   const select = (id: string | undefined) => {

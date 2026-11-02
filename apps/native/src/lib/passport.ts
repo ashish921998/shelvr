@@ -20,9 +20,9 @@ export type UnstampedPlace = FunctionReturnType<
   typeof api.placeVisits.listUnstampedPlaces
 >[number];
 
-export type StampSurface = "city" | "passport";
+type StampSurface = "city" | "passport";
 
-export type StampCity = { city: string | null; stamps: Stamp[] };
+type StampCity = { city: string | null; stamps: Stamp[] };
 
 export type OpenStamp = {
   itemId: Id<"items">;
@@ -108,6 +108,42 @@ export function wentInCity(stamps: readonly Stamp[] | undefined, city: string) {
   return (stamps ?? []).filter(
     (stamp) => stamp.city && cityKey(stamp.city) === key,
   ).length;
+}
+
+export const CARD_PLACES = 6;
+
+export type CardPlace = {
+  number: number;
+  name: string;
+  lat?: number;
+  lng?: number;
+};
+
+export function shareCardOf(stamps: readonly Stamp[], city: string) {
+  const key = cityKey(city);
+  const inCity = stamps.filter(
+    (stamp) => stamp.city && cityKey(stamp.city) === key,
+  );
+  const dated = inCity.find((stamp) => stampDate(stamp) !== null);
+  return {
+    total: inCity.length,
+    month: dated ? dated.visitedAt : null,
+    places: inCity.slice(0, CARD_PLACES).map(
+      (stamp, index): CardPlace => ({
+        number: index + 1,
+        name: stamp.name,
+        ...(stamp.lat !== undefined && stamp.lng !== undefined
+          ? { lat: stamp.lat, lng: stamp.lng }
+          : {}),
+      }),
+    ),
+  };
+}
+
+type CardSurface = "stamp" | "passport";
+
+export function shareCardHref(city: string, surface: CardSurface) {
+  return { pathname: "/passport-card", params: { city, surface } } as const;
 }
 
 export function openStampOf(stamp: Stamp, city: string): OpenStamp {

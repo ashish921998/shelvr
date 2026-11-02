@@ -1204,6 +1204,21 @@
     "many": "Sellar %{formattedCount} lugares",
     "other": "Sellar %{formattedCount} lugares"
   },
+  "passport.cardKicker": "Fuera del chat del grupo",
+  "passport.cardTitle": {
+    "one": "%{formattedCount} sitio guardado al que por fin fuimos",
+    "many": "%{formattedCount} sitios guardados a los que por fin fuimos",
+    "other": "%{formattedCount} sitios guardados a los que por fin fuimos"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "one": "+%{formattedCount} más",
+    "many": "+%{formattedCount} más",
+    "other": "+%{formattedCount} más"
+  },
+  "passport.cardSaved": "Guardado en Instagram.",
+  "passport.cardWent": "Fuimos con Shelvr.",
+  "passport.shareCity": "Compartir %{city}",
   "cityMap.stampedCount": {
     "one": "%{formattedCount} sellado",
     "many": "%{formattedCount} sellados",

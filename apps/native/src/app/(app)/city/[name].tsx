@@ -13,6 +13,7 @@ import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
   openStampOf,
+  shareCardHref,
   stampDate,
   usePassport,
   useStamping,
@@ -186,6 +187,10 @@ export default function CityScreen() {
         busy={stamping.busy}
         onClose={stamping.close}
         onRemove={() => void stamping.remove()}
+        onShare={(stampCity) => {
+          stamping.close();
+          router.push(shareCardHref(stampCity, "stamp"));
+        }}
       />
     </PlaceMapScreen>
   );

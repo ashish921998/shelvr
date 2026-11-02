@@ -1132,6 +1132,17 @@
   "passport.stampCount": {
     "other": "%{formattedCount}곳에 스탬프"
   },
+  "passport.cardKicker": "단톡방에서 현실로",
+  "passport.cardTitle": {
+    "other": "저장해 두고 드디어 간 %{formattedCount}곳"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "other": "외 %{formattedCount}곳"
+  },
+  "passport.cardSaved": "Instagram에 저장.",
+  "passport.cardWent": "Shelvr로 다녀옴.",
+  "passport.shareCity": "%{city} 공유",
   "cityMap.stampedCount": {
     "other": "스탬프 %{formattedCount}개"
   }

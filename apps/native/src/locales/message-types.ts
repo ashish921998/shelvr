@@ -1061,6 +1061,13 @@ export type MessageParams = {
   "passport.nothingToStamp": undefined;
   "passport.pickNone": undefined;
   "passport.stampCount": { count: number };
+  "passport.cardKicker": undefined;
+  "passport.cardTitle": { count: number };
+  "passport.cardSub": { city: string; month: string };
+  "passport.cardMore": { count: number };
+  "passport.cardSaved": undefined;
+  "passport.cardWent": undefined;
+  "passport.shareCity": { city: string };
   "cityMap.stampedCount": { count: number };
 };
 export type MessageKey = keyof MessageParams;

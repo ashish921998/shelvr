@@ -22,6 +22,13 @@ vi.mock("@/components/city/city-cover", () => ({
   )),
 }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
+vi.mock("@/components/passport/passport-row", () => ({
+  PassportRow: vi.fn(() => null),
+}));
+vi.mock("@/lib/passport", () => ({
+  usePassport: () => ({ stamps: [] }),
+  wentInCity: () => 0,
+}));
 vi.mock("@/components/ui/prompt-sheet", () => ({
   PromptSheet: vi.fn(
     ({

@@ -9,6 +9,7 @@ import {
   openStampOf,
   passportCities,
   passportCounts,
+  shareCardHref,
   stampDate,
   usePassport,
   useStamping,
@@ -121,6 +122,30 @@ export default function PassportScreen() {
             <Text style={styles.cityCount}>
               {t("passport.placesCount", { count: group.stamps.length })}
             </Text>
+            {group.city ? (
+              <Pressable
+                testID="passport-city-share"
+                accessibilityRole="button"
+                accessibilityLabel={t("passport.shareCity", {
+                  city: group.city,
+                })}
+                hitSlop={12}
+                onPress={() =>
+                  router.push(shareCardHref(group.city ?? "", "passport"))
+                }
+                style={({ pressed }) => [
+                  styles.cityShare,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <AppSymbolIcon
+                  name="square.and.arrow.up"
+                  size={14}
+                  tintColor={theme.colors.primaryText}
+                />
+                <Text style={styles.cityShareText}>{t("common.share")}</Text>
+              </Pressable>
+            ) : null}
           </View>
           <ScrollView
             horizontal
@@ -149,6 +174,10 @@ export default function PassportScreen() {
         busy={stamping.busy}
         onClose={stamping.close}
         onRemove={() => void stamping.remove()}
+        onShare={(city) => {
+          stamping.close();
+          router.push(shareCardHref(city, "stamp"));
+        }}
       />
     </ScrollView>
   );
@@ -213,6 +242,16 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.foreground,
   },
   cityCount: { ...theme.type.footnote, color: theme.colors.muted },
+  cityShare: {
+    marginLeft: "auto",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(0.5),
+  },
+  cityShareText: {
+    ...theme.type.subheadStrong,
+    color: theme.colors.primaryText,
+  },
   stamps: { gap: theme.gap(2), paddingVertical: theme.gap(1) },
   tile: { width: STAMP_SIZE + 8, alignItems: "center", gap: theme.gap(1) },
   tileName: {

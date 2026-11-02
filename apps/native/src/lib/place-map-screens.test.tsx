@@ -265,6 +265,9 @@ vi.mock("@/components/ui/button", () => ({
     ),
   ),
 }));
+vi.mock("@/components/passport/stamp-sheet", () => ({
+  StampSheet: vi.fn(() => null),
+}));
 vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: vi.fn(() => <span>loader</span>),
 }));

@@ -1204,6 +1204,21 @@
     "many": "Tamponner %{formattedCount} lieux",
     "other": "Tamponner %{formattedCount} lieux"
   },
+  "passport.cardKicker": "Sorti du chat de groupe",
+  "passport.cardTitle": {
+    "one": "%{formattedCount} endroit enregistré où on est enfin allés",
+    "many": "%{formattedCount} endroits enregistrés où on est enfin allés",
+    "other": "%{formattedCount} endroits enregistrés où on est enfin allés"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "one": "+%{formattedCount} autre",
+    "many": "+%{formattedCount} autres",
+    "other": "+%{formattedCount} autres"
+  },
+  "passport.cardSaved": "Enregistré sur Instagram.",
+  "passport.cardWent": "Visité avec Shelvr.",
+  "passport.shareCity": "Partager %{city}",
   "cityMap.stampedCount": {
     "one": "%{formattedCount} tamponné",
     "many": "%{formattedCount} tamponnés",

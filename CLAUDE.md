@@ -600,13 +600,16 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   through a list, and a personal plan still redirects to `plan-gate`
 - Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`, `new-shared-list`, `add-list-place`,
   `profile`, `settings`, `item/[id]`, `city/[name]`, `spots/[id]`, `plan/[id]`, `date-plan`,
-  `new-trip`, `trip-plan/[id]`, `add-trip-stop`, `passport`, `already-been`
+  `new-trip`, `trip-plan/[id]`, `add-trip-stop`, `passport`, `already-been`, `passport-card`
 - `passport` is the Passport page, pushed from the Passport row on Home (under the plan
   tiles): counts of places, cities and countries, then stamps grouped by city, each a saved
   post's cover tilted like a stamp. Tapping one opens the stamp sheet with Remove stamp.
   `already-been` is the "Already been?" modal from that row's empty state or the page's
   "Already been somewhere?" button: every unstamped place from `listUnstampedPlaces`,
   grouped by city, ticked and stamped at once through `markVisitedBefore` (dateless stamps).
+  `passport-card` is a modal with a `city` param, opened by Share on the stamp sheet or a
+  city on the Passport page: a 9:16 card (map with numbered pins, the places, "Went with
+  Shelvr") that Share captures with Skia's view snapshot into a PNG for the share sheet.
   Helpers in `src/lib/passport.ts`, components in `src/components/passport`
 - `date-plan` is Plan a date, pushed from the city page with a `city` param: "What kind of
   date?" (Classic, Low-key, Surprise me),

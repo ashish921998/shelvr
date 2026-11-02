@@ -1168,6 +1168,19 @@
     "one": "%{formattedCount} Ort stempeln",
     "other": "%{formattedCount} Orte stempeln"
   },
+  "passport.cardKicker": "Raus aus dem Gruppenchat",
+  "passport.cardTitle": {
+    "one": "%{formattedCount} gespeicherter Ort, an dem wir endlich waren",
+    "other": "%{formattedCount} gespeicherte Orte, an denen wir endlich waren"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "one": "+%{formattedCount} weiterer",
+    "other": "+%{formattedCount} weitere"
+  },
+  "passport.cardSaved": "Auf Instagram gespeichert.",
+  "passport.cardWent": "Mit Shelvr dort gewesen.",
+  "passport.shareCity": "%{city} teilen",
   "cityMap.stampedCount": {
     "one": "%{formattedCount} gestempelt",
     "other": "%{formattedCount} gestempelt"

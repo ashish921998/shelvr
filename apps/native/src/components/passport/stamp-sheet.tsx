@@ -50,12 +50,14 @@ export function StampSheet({
   busy,
   onClose,
   onRemove,
+  onShare,
 }: {
   stamp: OpenStamp | null;
   count: number;
   busy: boolean;
   onClose: () => void;
   onRemove: () => void;
+  onShare?: (city: string) => void;
 }) {
   const ink =
     stamp === null
@@ -75,7 +77,27 @@ export function StampSheet({
       body={stamp ? t("passport.stampedBody", { name: stamp.name, count }) : ""}
       actions={
         <>
-          <Button title={t("common.done")} onPress={onClose} />
+          {onShare && stamp?.city ? (
+            <>
+              <Button
+                testID="stamp-sheet-share"
+                title={t("passport.shareCity", { city: stamp.city })}
+                onPress={() => onShare(stamp.city)}
+              />
+              <Pressable
+                accessibilityRole="button"
+                onPress={onClose}
+                style={({ pressed }) => [
+                  styles.secondary,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.secondaryText}>{t("common.done")}</Text>
+              </Pressable>
+            </>
+          ) : (
+            <Button title={t("common.done")} onPress={onClose} />
+          )}
           <Pressable
             accessibilityRole="button"
             disabled={busy}
@@ -148,5 +170,14 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
   },
   removeText: { ...theme.type.bodyLabel, color: theme.colors.muted },
+  secondary: {
+    minHeight: theme.control.minHeight,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+  },
+  secondaryText: { ...theme.type.button, color: theme.colors.foreground },
   pressed: { opacity: theme.opacity.pressed },
 }));

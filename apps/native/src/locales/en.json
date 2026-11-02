@@ -1168,6 +1168,19 @@
     "one": "Stamp %{formattedCount} place",
     "other": "Stamp %{formattedCount} places"
   },
+  "passport.cardKicker": "Out of the group chat",
+  "passport.cardTitle": {
+    "one": "%{formattedCount} saved spot we finally went to",
+    "other": "%{formattedCount} saved spots we finally went to"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "one": "+%{formattedCount} more",
+    "other": "+%{formattedCount} more"
+  },
+  "passport.cardSaved": "Saved on Instagram.",
+  "passport.cardWent": "Went with Shelvr.",
+  "passport.shareCity": "Share %{city}",
   "cityMap.stampedCount": {
     "one": "%{formattedCount} stamped",
     "other": "%{formattedCount} stamped"
