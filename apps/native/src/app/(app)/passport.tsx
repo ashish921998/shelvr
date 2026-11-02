@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/empty-state";
 import { StampArt, StampSheet } from "@/components/passport/stamp-sheet";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ScreenLoader } from "@/components/ui/screen-loader";
@@ -51,7 +52,11 @@ function StampTile({
       <View style={{ transform: [{ rotate: TILTS[index % TILTS.length] }] }}>
         <StampArt
           cover={stamp.cover}
-          ink={at === null ? (stamp.city ?? "") : formatRecentDate(at)}
+          ink={
+            at === null
+              ? (stamp.city ?? t("passport.wentNoDate"))
+              : formatRecentDate(at)
+          }
           size={STAMP_SIZE}
         />
       </View>
@@ -66,7 +71,7 @@ export default function PassportScreen() {
   useAppLocale();
   const router = useRouter();
   const { theme } = useUnistyles();
-  const { stamps } = usePassport();
+  const { stamps, failed } = usePassport();
   const stamping = useStamping("passport");
 
   const opened = useRef(false);
@@ -76,6 +81,14 @@ export default function PassportScreen() {
     analytics.capture("passport_opened", { places: stamps.length });
   }, [stamps]);
 
+  if (failed) {
+    return (
+      <EmptyState
+        title={t("errors.unexpectedTitle")}
+        message={t("errors.retrySoon")}
+      />
+    );
+  }
   if (stamps === undefined) return <ScreenLoader />;
   const counts = passportCounts(stamps);
 

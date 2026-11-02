@@ -1,9 +1,11 @@
 import { analytics } from "@/lib/analytics";
+import { usePaywallGuard } from "@/lib/entitlement";
 import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { placeKey } from "@convex/model/plan";
+import { saveErrorCode } from "@convex/model/saveErrors";
 import { cityKey } from "@convex/model/trip";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -47,7 +49,7 @@ export function usePassport() {
     (name: string) => byKey.get(placeKey(name)),
     [byKey],
   );
-  return { stamps, stampFor };
+  return { stamps, stampFor, failed: passport.isError };
 }
 
 export function passportCounts(stamps: readonly Stamp[]) {
@@ -170,6 +172,7 @@ export function openStampOf(stamp: Stamp, city: string): OpenStamp {
 
 export function useStamping(surface: StampSurface) {
   const setVisited = useMutation(api.placeVisits.setVisited);
+  const { guard } = usePaywallGuard("passport");
   const working = useRef(false);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<OpenStamp | null>(null);
@@ -186,8 +189,15 @@ export function useStamping(surface: StampSurface) {
       });
       return true;
     } catch (error) {
-      analytics.captureError("place_stamp_failed", error);
-      Alert.alert(t("errors.unexpectedTitle"), t("errors.retrySoon"));
+      analytics.captureError(
+        visited ? "place_stamp_failed" : "place_unstamp_failed",
+        error,
+      );
+      const paywalled =
+        saveErrorCode(error) === "pro_required" && !(await guard());
+      if (!paywalled) {
+        Alert.alert(t("errors.unexpectedTitle"), t("errors.retrySoon"));
+      }
       return false;
     } finally {
       working.current = false;

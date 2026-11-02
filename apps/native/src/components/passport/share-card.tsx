@@ -1,3 +1,4 @@
+import { isDarkThemeName } from "@/lib/appearance";
 import { appleZoom } from "@/lib/city-pins";
 import { t } from "@/lib/i18n";
 import type { CardPlace, SavedOn } from "@/lib/passport";
@@ -20,12 +21,14 @@ function CardMap({
   places,
   width,
   height,
+  margin,
 }: {
   places: CardPlace[];
   width: number;
   height: number;
+  margin: number;
 }) {
-  const { theme } = useUnistyles();
+  const { theme, rt } = useUnistyles();
   const located = places.filter(
     (place): place is Required<CardPlace> =>
       place.lat !== undefined && place.lng !== undefined,
@@ -50,11 +53,18 @@ function CardMap({
     ),
   };
   return (
-    <View style={[styles.map, { height }]} pointerEvents="none">
+    <View
+      style={[styles.map, { height, marginTop: margin }]}
+      pointerEvents="none"
+    >
       <AppleMaps.View
         style={StyleSheet.absoluteFill}
         cameraPosition={camera}
-        colorScheme={AppleMaps.MapColorScheme.LIGHT}
+        colorScheme={
+          isDarkThemeName(rt.themeName)
+            ? AppleMaps.MapColorScheme.DARK
+            : AppleMaps.MapColorScheme.LIGHT
+        }
         uiSettings={{ compassEnabled: false, myLocationButtonEnabled: false }}
         annotations={located.map((place) => ({
           id: String(place.number),
@@ -102,16 +112,21 @@ export function ShareCard({
           styles.title,
           { fontSize: 38 * s, lineHeight: 40 * s, marginTop: 6 * s },
         ]}
+        numberOfLines={2}
+        adjustsFontSizeToFit
       >
         {t("passport.cardTitle", { count: total })}
       </Text>
       <Text style={[styles.sub, { fontSize: 14 * s, marginTop: 8 * s }]}>
         {month ? t("passport.cardSub", { city, month }) : city}
       </Text>
-      <View style={{ marginVertical: 16 * s }}>
-        <CardMap places={places} width={width - 44 * s} height={230 * s} />
-      </View>
-      <View style={{ gap: 8 * s }}>
+      <CardMap
+        places={places}
+        width={width - 44 * s}
+        height={(places.length > 3 ? 150 : 230) * s}
+        margin={16 * s}
+      />
+      <View style={{ gap: 8 * s, marginTop: 16 * s }}>
         {places.map((place) => (
           <View key={place.number} style={[styles.row, { gap: 10 * s }]}>
             <View

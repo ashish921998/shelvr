@@ -35,7 +35,7 @@ function CityCard({
   went: number;
 }) {
   const router = useRouter();
-  const count = cityCountLine(entry);
+  const count = cityCountLine(entry, went);
   return (
     <Pressable
       accessibilityRole="button"
@@ -295,6 +295,7 @@ export function HomePlaces() {
   if (cities.data.length === 0) {
     return (
       <View style={styles.container}>
+        <PassportRow hideEmpty />
         <HomePlacesEmptyCard />
       </View>
     );

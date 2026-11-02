@@ -45,11 +45,7 @@ export function CityCover({
   layout: CoverLayout;
   went?: number;
 }) {
-  const places = cityCountLine(entry);
-  const count =
-    places && went > 0
-      ? `${places} · ${t("passport.wentCount", { count: went })}`
-      : places;
+  const count = cityCountLine(entry, went);
   if (layout === "pair") {
     return (
       <View style={styles.card}>

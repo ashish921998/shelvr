@@ -209,7 +209,11 @@ export function PlacesMap({
           coordinates: { latitude: pin.lat, longitude: pin.lng },
           title: pin.name,
           monogram: pin.emoji,
-          tintColor: pin.went ? theme.colors.primaryText : theme.colors.primary,
+          tintColor: !pin.went
+            ? theme.colors.primary
+            : isDarkThemeName(rt.themeName)
+              ? theme.colors.primarySoft
+              : theme.colors.primaryText,
         }))}
         onMarkerClick={(marker) => select(marker.id)}
         onCameraMove={trackCamera}

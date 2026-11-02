@@ -8,12 +8,13 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const TILTS = ["-8deg", "3deg", "10deg"];
 
-export function PassportRow() {
+export function PassportRow({ hideEmpty = false }: { hideEmpty?: boolean }) {
   const router = useRouter();
   const { theme } = useUnistyles();
   const { stamps } = usePassport();
   if (stamps === undefined) return null;
   const empty = stamps.length === 0;
+  if (empty && hideEmpty) return null;
   const counts = passportCounts(stamps);
   const title = empty ? t("passport.beenTitle") : t("passport.yourPassport");
   const subtitle = empty

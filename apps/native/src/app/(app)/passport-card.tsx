@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/empty-state";
 import { ShareCard } from "@/components/passport/share-card";
 import { Button } from "@/components/ui/button";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
@@ -22,7 +23,7 @@ export default function PassportCardScreen() {
     city: string;
     surface?: string;
   }>();
-  const { stamps } = usePassport();
+  const { stamps, failed } = usePassport();
   const card = useRef<ComponentRef<typeof View>>(null);
   const [busy, setBusy] = useState(false);
   const close = useCallback(() => backOrHome(router), [router]);
@@ -89,11 +90,18 @@ export default function PassportCardScreen() {
     </>
   );
 
-  if (stamps === undefined) {
+  if (failed || stamps === undefined) {
     return (
       <View style={styles.screen}>
         {header}
-        <ScreenLoader />
+        {failed ? (
+          <EmptyState
+            title={t("errors.unexpectedTitle")}
+            message={t("errors.retrySoon")}
+          />
+        ) : (
+          <ScreenLoader />
+        )}
       </View>
     );
   }

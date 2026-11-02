@@ -63,11 +63,13 @@ export function StampSheet({
     stamp === null
       ? ""
       : stamp.at === null
-        ? stamp.city
-        : t("passport.stampInk", {
-            city: stamp.city,
-            date: formatShortDate(stamp.at),
-          });
+        ? stamp.city || t("passport.wentNoDate")
+        : stamp.city
+          ? t("passport.stampInk", {
+              city: stamp.city,
+              date: formatShortDate(stamp.at),
+            })
+          : formatShortDate(stamp.at);
   return (
     <PromptSheet
       visible={stamp !== null}
@@ -102,7 +104,10 @@ export function StampSheet({
             accessibilityRole="button"
             disabled={busy}
             onPress={onRemove}
-            style={({ pressed }) => [styles.remove, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.remove,
+              (pressed || busy) && styles.pressed,
+            ]}
           >
             <Text style={styles.removeText}>
               {stamp?.fresh ? t("common.undo") : t("passport.removeStamp")}

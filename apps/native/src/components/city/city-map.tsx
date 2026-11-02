@@ -103,6 +103,7 @@ export function CityMap({
     );
   }, [steady, firstCamera]);
 
+  const dark = isDarkThemeName(rt.themeName);
   const annotations = pins.slice(0, visible).map((pin) => {
     const id = cityPinId(pin);
     const isSelected = id === selected;
@@ -114,12 +115,16 @@ export function CityMap({
       backgroundColor: isSelected
         ? theme.colors.foreground
         : went?.(pin.name)
-          ? theme.colors.primaryText
+          ? dark
+            ? theme.colors.primarySoft
+            : theme.colors.primaryText
           : theme.colors.primary,
       textColor: isSelected
         ? theme.colors.primary
         : went?.(pin.name)
-          ? theme.colors.surface
+          ? dark
+            ? theme.colors.primaryText
+            : theme.colors.surface
           : theme.colors.onTint,
     };
   });

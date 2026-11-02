@@ -78,16 +78,16 @@ export default function MapScreen() {
   const [wentFilter, setWentFilter] = useState<WentFilter>("all");
   const anyWent = (all ?? []).some((place) => stampFor(place.name));
   const went = anyWent ? wentFilter : "all";
-  const filters = useMemo(() => mapFilters(all ?? []), [all]);
+  const wentPlaces = useMemo(
+    () => filterByWent(all ?? [], went, (name) => stampFor(name) !== undefined),
+    [all, went, stampFor],
+  );
+  const filters = useMemo(() => mapFilters(wentPlaces), [wentPlaces]);
   // A filter that no longer has enough places (a save was deleted) falls back to All.
   const active = filters.some((filter) => filter.kind === kind) ? kind : null;
   const shown = useMemo(
-    () =>
-      filterPlaces(
-        filterByWent(all ?? [], went, (name) => stampFor(name) !== undefined),
-        active,
-      ),
-    [all, went, active, stampFor],
+    () => filterPlaces(wentPlaces, active),
+    [wentPlaces, active],
   );
   const searching = searchText.trim() !== "";
   // Search narrows whatever the filter shows; every match stays on the map, the first few are listed.

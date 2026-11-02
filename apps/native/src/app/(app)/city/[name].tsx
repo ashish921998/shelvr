@@ -59,9 +59,11 @@ export default function CityScreen() {
     [items.data, pins],
   );
 
-  const stamped = rows.filter(
-    (row) => row.kind === "place" && passport.stampFor(row.name),
-  ).length;
+  const stamped = new Set(
+    rows.flatMap((row) =>
+      row.kind === "place" ? (passport.stampFor(row.name)?.key ?? []) : [],
+    ),
+  ).size;
 
   if (items.isError) {
     return (

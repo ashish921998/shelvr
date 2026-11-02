@@ -2,6 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
+import { ConvexError } from "convex/values";
 import {
   CARD_PLACES,
   filterByWent,
@@ -22,6 +23,10 @@ const mocks = vi.hoisted(() => ({
   captureError: vi.fn(),
   alert: vi.fn(),
   query: vi.fn((): { data?: unknown } => ({})),
+  guard: vi.fn(async () => false),
+}));
+vi.mock("@/lib/entitlement", () => ({
+  usePaywallGuard: () => ({ guard: mocks.guard }),
 }));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: true }),
@@ -45,6 +50,7 @@ afterEach(() => {
   mocks.setVisited.mockReset();
   mocks.capture.mockReset();
   mocks.alert.mockReset();
+  mocks.guard.mockClear();
 });
 
 const ITEM = "item1" as Id<"items">;
@@ -220,6 +226,45 @@ describe("useStamping", () => {
       visited: false,
     });
     expect(result.current.open).toBeNull();
+  });
+
+  it("keeps the stamp open and says so when taking it back fails", async () => {
+    mocks.setVisited.mockResolvedValueOnce(null);
+    const { result } = renderHook(() => useStamping("passport"));
+    await act(() => result.current.stamp(place));
+    mocks.setVisited.mockRejectedValueOnce(new Error("offline"));
+    await act(() => result.current.remove());
+    expect(result.current.open).toMatchObject({ name: "Tigre" });
+    expect(mocks.alert).toHaveBeenCalled();
+    expect(mocks.captureError).toHaveBeenLastCalledWith(
+      "place_unstamp_failed",
+      expect.any(Error),
+    );
+  });
+
+  it("sends one mark for a double tap", async () => {
+    let finish = () => {};
+    mocks.setVisited.mockImplementation(
+      () => new Promise<null>((resolve) => (finish = () => resolve(null))),
+    );
+    const { result } = renderHook(() => useStamping("city"));
+    await act(async () => {
+      const first = result.current.stamp(place);
+      void result.current.stamp(place);
+      finish();
+      await first;
+    });
+    expect(mocks.setVisited).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens the paywall, not an error, for someone without Pro", async () => {
+    mocks.setVisited.mockRejectedValue(
+      new ConvexError({ code: "pro_required" }),
+    );
+    const { result } = renderHook(() => useStamping("city"));
+    await act(() => result.current.stamp(place));
+    expect(mocks.guard).toHaveBeenCalled();
+    expect(mocks.alert).not.toHaveBeenCalled();
   });
 
   it("opens nothing and says so when the mark fails", async () => {

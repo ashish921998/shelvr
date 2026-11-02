@@ -8,6 +8,12 @@ import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+function wentLabel(at: number | null) {
+  return at === null
+    ? t("passport.wentNoDate")
+    : t("passport.went", { date: formatRecentDate(at) });
+}
+
 type SaveRowItem = {
   _id: Id<"items">;
   title?: string;
@@ -97,7 +103,9 @@ export function SaveRow({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={
-            went ? undefined : t("passport.markLabel", { name: title })
+            went
+              ? `${title}, ${wentLabel(went.at)}`
+              : t("passport.markLabel", { name: title })
           }
           onPress={onWent}
           hitSlop={8}
@@ -108,11 +116,7 @@ export function SaveRow({
           ]}
         >
           <Text style={[styles.wentText, went && styles.wentDoneText]}>
-            {!went
-              ? t("passport.iWent")
-              : went.at === null
-                ? t("passport.wentNoDate")
-                : t("passport.went", { date: formatRecentDate(went.at) })}
+            {went ? wentLabel(went.at) : t("passport.iWent")}
           </Text>
         </Pressable>
       ) : null}

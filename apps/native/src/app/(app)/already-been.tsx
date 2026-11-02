@@ -1,3 +1,4 @@
+import { EmptyState } from "@/components/empty-state";
 import { AppSymbolIcon } from "@/components/symbol";
 import { Button } from "@/components/ui/button";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
@@ -160,11 +161,18 @@ export default function AlreadyBeenScreen() {
     </>
   );
 
-  if (places.data === undefined) {
+  if (places.isError || places.data === undefined) {
     return (
       <View style={styles.screen}>
         {header}
-        <ScreenLoader />
+        {places.isError ? (
+          <EmptyState
+            title={t("errors.unexpectedTitle")}
+            message={t("errors.retrySoon")}
+          />
+        ) : (
+          <ScreenLoader />
+        )}
       </View>
     );
   }

@@ -47,6 +47,9 @@ vi.mock("@/lib/analytics", () => ({
 }));
 vi.mock("@/lib/haptics", () => ({ haptics: { selection: mocks.selection } }));
 vi.mock("@/lib/screen-dismiss", () => ({ backOrHome: mocks.backOrHome }));
+vi.mock("@/lib/entitlement", () => ({
+  usePaywallGuard: () => ({ guard: vi.fn() }),
+}));
 vi.mock("@/lib/apple-place-card", () => ({
   canOpenPlaceCard: (appleId?: string) =>
     appleId !== undefined && mocks.cardAvailable,
