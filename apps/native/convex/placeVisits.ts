@@ -232,7 +232,7 @@ export const claimCountryLookup = internalMutation({
   args: { visitId: v.id("placeVisits") },
   returns: v.union(
     v.null(),
-    v.literal("busy"),
+    v.object({ busyMs: v.number() }),
     v.object({ lat: v.number(), lng: v.number() }),
   ),
   handler: async (ctx, args) => {
@@ -240,9 +240,8 @@ export const claimCountryLookup = internalMutation({
     if (visit?.lat === undefined || visit.lng === undefined) return null;
     if (visit.countryCode !== undefined) return null;
     if (!(await aiAllowed(ctx, visit.userId))) return null;
-    if (!(await rateLimiter.limit(ctx, "visitCountryGlobal")).ok) {
-      return "busy";
-    }
+    const budget = await rateLimiter.limit(ctx, "visitCountryGlobal");
+    if (!budget.ok) return { busyMs: budget.retryAfter };
     return { lat: visit.lat, lng: visit.lng };
   },
 });
@@ -276,23 +275,31 @@ export const locateCountry = internalAction({
       { visitId: args.visitId },
     );
     if (point === null) return null;
-    let failure = "busy";
-    if (point !== "busy") {
-      const token = await appleMapsAccessToken(config);
-      const countryCode =
-        token === null ? null : await appleMapsCountry(token, point);
-      if (countryCode !== null) {
-        await ctx.runMutation(internal.placeVisits.storeCountry, {
-          visitId: args.visitId,
-          ...point,
-          countryCode,
-        });
-        return null;
-      }
-      failure = token === null ? "token" : "lookup";
+    if (point.busyMs !== undefined) {
+      await ctx.scheduler.runAfter(
+        point.busyMs + Math.random() * COUNTRY_SPACING_MS * 60,
+        internal.placeVisits.locateCountry,
+        args,
+      );
+      return null;
+    }
+    const token = await appleMapsAccessToken(config);
+    const countryCode =
+      token === null ? null : await appleMapsCountry(token, point);
+    if (countryCode !== null) {
+      await ctx.runMutation(internal.placeVisits.storeCountry, {
+        visitId: args.visitId,
+        lat: point.lat,
+        lng: point.lng,
+        countryCode,
+      });
+      return null;
     }
     const attempt = (args.attempt ?? 0) + 1;
-    logEvent("warn", "visit_country_failed", { failure, attempt });
+    logEvent("warn", "visit_country_failed", {
+      token: token !== null,
+      attempt,
+    });
     if (attempt < MAX_COUNTRY_ATTEMPTS) {
       await ctx.scheduler.runAfter(
         COUNTRY_RETRY_MS * attempt,

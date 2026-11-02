@@ -1,12 +1,24 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import type { FunctionReference } from "convex/server";
-import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  expectTypeOf,
+  it,
+  vi,
+} from "vitest";
 
 import { rateLimiter } from "./model/rateLimiter";
 import { newConvexTest, setTestConsent, signedInUser } from "./test.setup";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+
+beforeEach(() => {
+  vi.useFakeTimers();
+});
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -155,13 +167,8 @@ async function settle(
   t: Awaited<ReturnType<typeof setup>>["t"],
   run: () => Promise<unknown>,
 ) {
-  vi.useFakeTimers();
-  try {
-    await run();
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
-  } finally {
-    vi.useRealTimers();
-  }
+  await run();
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
 }
 
 describe("the passport", () => {
