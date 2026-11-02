@@ -232,9 +232,9 @@ it("replaces a root Profile with Home before Customer Center", () => {
   expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
 });
 
-it("keeps another root, such as a linked plan, under Customer Center", () => {
+it("keeps another root, such as a linked trip, under Customer Center", () => {
   mocks.status = "pro";
-  mocks.stackRoot = "plan/[id]";
+  mocks.stackRoot = "trip-plan/[id]";
   render(<SettingsScreen />);
   fireEvent.click(screen.getByText("account.delete"));
   lastAlert().buttons[1].onPress?.();

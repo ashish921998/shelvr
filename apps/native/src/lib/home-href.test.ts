@@ -22,11 +22,19 @@ describe("resolveRootHref", () => {
       "/manage-spaces?itemId=1",
       "/camera",
       "/trip/abc?city=Lisbon",
+      "/plan/abc",
+      "/plan/abc?city=Lisbon",
+      "/(app)/plan/abc",
     ]) {
       expect(resolveRootHref(path)).toBe("/(app)/(tabs)/(home)");
     }
     expect(resolveRootHref("/spaceship")).toBe("/spaceship");
     expect(resolveRootHref("/trip-plan/abc")).toBe("/trip-plan/abc");
+    expect(resolveRootHref("/plan-gate")).toBe("/plan-gate");
+    expect(resolveRootHref("/date-plan?city=Lisbon")).toBe(
+      "/date-plan?city=Lisbon",
+    );
+    expect(resolveRootHref("/planner")).toBe("/planner");
     expect(resolveRootHref("/(trips)")).toBe("/(trips)");
   });
 
