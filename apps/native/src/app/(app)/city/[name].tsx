@@ -75,6 +75,7 @@ export default function CityScreen() {
   return (
     <PlaceMapScreen
       pins={pins}
+      went={(name) => passport.stampFor(name) !== undefined}
       hasMap={pins.length > 0 || hadPins}
       rows={rows}
       rowGap={1.5}

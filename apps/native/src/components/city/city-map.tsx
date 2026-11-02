@@ -22,6 +22,7 @@ type Props = {
   coveredBottom: number;
   onSelect: (id: string) => void;
   visible?: number;
+  went?: (name: string) => boolean;
 };
 
 export function CityMap({
@@ -31,6 +32,7 @@ export function CityMap({
   coveredBottom,
   onSelect,
   visible = Infinity,
+  went,
 }: Props) {
   const { theme, rt } = useUnistyles();
   const ref = useRef<AppleMaps.MapView>(null);
@@ -111,7 +113,9 @@ export function CityMap({
       text: String(pin.number),
       backgroundColor: isSelected
         ? theme.colors.foreground
-        : theme.colors.primary,
+        : went?.(pin.name)
+          ? theme.colors.primaryText
+          : theme.colors.primary,
       textColor: isSelected ? theme.colors.primary : theme.colors.onTint,
     };
   });

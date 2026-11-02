@@ -1169,6 +1169,7 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "Imagen de la publicación que guardaste",
   "passport.removeStamp": "Quitar sello",
+  "passport.wantToGo": "Quiero ir",
   "passport.title": "Pasaporte",
   "passport.yourPassport": "Tu pasaporte",
   "passport.beenTitle": "¿Ya fuiste a alguno?",

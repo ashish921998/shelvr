@@ -21,6 +21,7 @@ export type MapPin = {
   lng: number;
   /** iOS: the emoji inside the pin, saying what the place is. */
   emoji?: string;
+  went?: boolean;
 };
 
 /** A place the camera flies to; a new key moves it again even to the same spot. */
@@ -208,7 +209,7 @@ export function PlacesMap({
           coordinates: { latitude: pin.lat, longitude: pin.lng },
           title: pin.name,
           monogram: pin.emoji,
-          tintColor: theme.colors.primary,
+          tintColor: pin.went ? theme.colors.primaryText : theme.colors.primary,
         }))}
         onMarkerClick={(marker) => select(marker.id)}
         onCameraMove={trackCamera}

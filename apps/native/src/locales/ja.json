@@ -1105,6 +1105,7 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "保存した投稿の画像",
   "passport.removeStamp": "スタンプを削除",
+  "passport.wantToGo": "行きたい",
   "passport.title": "パスポート",
   "passport.yourPassport": "あなたのパスポート",
   "passport.beenTitle": "行ったことのある場所は？",

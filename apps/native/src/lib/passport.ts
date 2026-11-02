@@ -9,7 +9,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth, useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
 
 export type Stamp = FunctionReturnType<
@@ -43,10 +43,11 @@ export function usePassport() {
     () => new Map((stamps ?? []).map((stamp) => [stamp.key, stamp])),
     [stamps],
   );
-  return {
-    stamps,
-    stampFor: (name: string) => byKey.get(placeKey(name)),
-  };
+  const stampFor = useCallback(
+    (name: string) => byKey.get(placeKey(name)),
+    [byKey],
+  );
+  return { stamps, stampFor };
 }
 
 export function passportCounts(stamps: readonly Stamp[]) {
@@ -89,6 +90,17 @@ export function unstampedCities(places: readonly UnstampedPlace[]) {
     else groups.set(key, { city: place.city, places: [place] });
   }
   return [...groups.values()];
+}
+
+export type WentFilter = "all" | "want" | "went";
+
+export function filterByWent<Place extends { name: string }>(
+  places: readonly Place[],
+  filter: WentFilter,
+  went: (name: string) => boolean,
+): Place[] {
+  if (filter === "all") return [...places];
+  return places.filter((place) => went(place.name) === (filter === "went"));
 }
 
 export function wentInCity(stamps: readonly Stamp[] | undefined, city: string) {

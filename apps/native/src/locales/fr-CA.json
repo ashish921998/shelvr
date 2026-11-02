@@ -1169,6 +1169,7 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "Image de la publication enregistrée",
   "passport.removeStamp": "Retirer le tampon",
+  "passport.wantToGo": "À visiter",
   "passport.title": "Passeport",
   "passport.yourPassport": "Votre passeport",
   "passport.beenTitle": "Déjà allé dans l'un d'eux ?",

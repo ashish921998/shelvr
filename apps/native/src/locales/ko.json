@@ -1105,6 +1105,7 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "저장한 게시물의 이미지",
   "passport.removeStamp": "스탬프 삭제",
+  "passport.wantToGo": "가고 싶어요",
   "passport.title": "여권",
   "passport.yourPassport": "내 여권",
   "passport.beenTitle": "이미 가본 곳이 있나요?",

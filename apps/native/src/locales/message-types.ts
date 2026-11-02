@@ -1042,6 +1042,7 @@ export type MessageParams = {
   "passport.stampInk": { city: string; date: string };
   "passport.coverCredit": undefined;
   "passport.removeStamp": undefined;
+  "passport.wantToGo": undefined;
   "passport.title": undefined;
   "passport.yourPassport": undefined;
   "passport.beenTitle": undefined;
