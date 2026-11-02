@@ -500,6 +500,7 @@
   "item.pageFailed": "Shelvr n'a pas pu lire cette page.",
   "item.stalled": "Cela prend plus de temps que prévu.",
   "item.partial": "Enregistré à partir du lien uniquement — la page n'a pas chargé, ces détails sont donc estimés.",
+  "item.detailsMissing": "Certains détails n'ont pas pu être chargés. Réessayez pour relancer la lecture.",
   "recipe.ingredients": "Ingrédients",
   "recipe.steps": "Préparation",
   "recipe.stepNumber": "Étape %{number}",

@@ -491,6 +491,7 @@
   "item.pageFailed": "Shelvr couldn't read this page.",
   "item.stalled": "This is taking longer than it should.",
   "item.partial": "Saved from the link alone — the page wouldn't load, so these details are a guess.",
+  "item.detailsMissing": "Some details didn't load. Retry to read it again.",
   "recipe.ingredients": "Ingredients",
   "recipe.steps": "Directions",
   "recipe.stepNumber": "Step %{number}",

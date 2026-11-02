@@ -158,6 +158,8 @@ describe("processItem recipe from a video's speech", () => {
 
     expect(item?.recipe).toBeUndefined();
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(item?.enrichment).toBeUndefined();
+    expect(item?.stepFailed).toBeUndefined();
   });
 
   it("keeps the save ready when the speech holds no recipe", async () => {
@@ -167,6 +169,47 @@ describe("processItem recipe from a video's speech", () => {
 
     expect(item?.status).toBe("ready");
     expect(item?.recipe).toBeUndefined();
+    expect(item?.enrichment).toBeUndefined();
+    expect(item?.stepFailed).toBeUndefined();
+  });
+
+  it.each([
+    ["Treg has no transcript", () => new Response("", { status: 404 })],
+    [
+      "the transcript is empty",
+      () =>
+        new Response(JSON.stringify({ success: true, transcript: "" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+    ],
+  ])("settles the save whole when %s", async (_name, reply) => {
+    model(true);
+    fetchMock.mockImplementation(async () => reply());
+    const item = await process(newConvexTest());
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(item?.status).toBe("ready");
+    expect(item?.enrichment).toBeUndefined();
+    expect(item?.stepFailed).toBeUndefined();
+  });
+
+  it("settles the save whole for an account that declined AI", async () => {
+    model(true);
+    transcript("Butter and cream.");
+    const t = newConvexTest();
+    const itemId = await tiktok(t);
+    await t.run(async (ctx) => {
+      const item = await ctx.db.get(itemId);
+      await setTestConsent(ctx, item!.userId, "declined");
+    });
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+    const item = await t.run((ctx) => ctx.db.get(itemId));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(item?.status).toBe("ready");
+    expect(item?.enrichment).toBeUndefined();
+    expect(item?.stepFailed).toBeUndefined();
   });
 
   it("keeps the save ready when Treg fails", async () => {
@@ -177,6 +220,7 @@ describe("processItem recipe from a video's speech", () => {
     expect(item?.status).toBe("ready");
     expect(item?.recipe).toBeUndefined();
     expect(generateObject).toHaveBeenCalledTimes(1);
+    expect(item).toMatchObject({ enrichment: "partial", stepFailed: true });
   });
 
   it("keeps the save ready when the recipe call fails", async () => {
@@ -202,6 +246,7 @@ describe("processItem recipe from a video's speech", () => {
 
     expect(item?.status).toBe("ready");
     expect(item?.recipe).toBeUndefined();
+    expect(item).toMatchObject({ enrichment: "partial", stepFailed: true });
   });
 
   it("asks for a short link's transcript by the video it resolved to", async () => {
@@ -254,6 +299,7 @@ describe("processItem recipe from a video's speech", () => {
     expect(item?.status).toBe("ready");
     expect(item?.recipe).toBeUndefined();
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(item).toMatchObject({ enrichment: "partial", stepFailed: true });
   });
 
   it("stops fetching transcripts for one user past the daily burst", async () => {
@@ -261,8 +307,9 @@ describe("processItem recipe from a video's speech", () => {
     transcript("Butter and cream.");
     const t = newConvexTest();
     const userId = await t.run((ctx) => insertConsentingUser(ctx));
+    let itemId;
     for (let i = 0; i < 11; i++) {
-      const itemId = await t.run((ctx) =>
+      itemId = await t.run((ctx) =>
         ctx.db.insert("items", {
           userId,
           type: "link",
@@ -277,6 +324,8 @@ describe("processItem recipe from a video's speech", () => {
       await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
     }
     expect(fetchMock).toHaveBeenCalledTimes(10);
+    const limited = await t.run((ctx) => ctx.db.get(itemId!));
+    expect(limited).toMatchObject({ enrichment: "partial", stepFailed: true });
   });
 });
 
@@ -495,7 +544,12 @@ describe("processItem places from a video's speech", () => {
     transcript("Santelmo.");
     const item = await process(newConvexTest());
 
-    expect(item).toMatchObject({ status: "ready", places: ["Antiga"] });
+    expect(item).toMatchObject({
+      status: "ready",
+      places: ["Antiga"],
+      enrichment: "partial",
+      stepFailed: true,
+    });
   });
 
   it("reads no speech for a video that names no places", async () => {
@@ -513,6 +567,8 @@ describe("processItem places from a video's speech", () => {
 
     expect(item?.places).toEqual(["Antiga"]);
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(item?.enrichment).toBeUndefined();
+    expect(item?.stepFailed).toBeUndefined();
   });
 
   it("keeps the city of a save with no places when a rerun names none", async () => {
@@ -610,6 +666,41 @@ describe("processItem places from a video's speech", () => {
       expect(item?.cities).toEqual(["Porto"]);
     });
 
+    it("keeps the failed step when a rerun reads no caption and the speech fails again", async () => {
+      const t = newConvexTest();
+      placesModel(["Santelmo"], { caption: ["Antiga"] });
+      fetchMock.mockRejectedValue(new TypeError("network"));
+      const first = await process(t);
+      expect(first).toMatchObject({ enrichment: "partial", stepFailed: true });
+
+      safeFetch.mockImplementation(async (url: string) =>
+        url.startsWith("https://www.tiktok.com/oembed?")
+          ? {
+              ok: true,
+              finalUrl: url,
+              status: 200,
+              contentType: "application/json",
+              bytes: new TextEncoder().encode(
+                JSON.stringify({ embed_product_id: "7350000000000000000" }),
+              ),
+            }
+          : { ok: false, code: "http_error", status: 599 },
+      );
+      await t.run((ctx) =>
+        ctx.db.patch(first!._id, {
+          status: "processing",
+          processingRunId: "run-2",
+        }),
+      );
+      await t.action(internal.ai.processItem, {
+        itemId: first!._id,
+        runId: "run-2",
+      });
+      const item = await t.run((ctx) => ctx.db.get(first!._id));
+
+      expect(item).toMatchObject({ enrichment: "partial", stepFailed: true });
+    });
+
     it("reads the speech again when the first read failed", async () => {
       const t = newConvexTest();
       placesModel(["Santelmo"], { caption: ["Antiga"] });
@@ -617,6 +708,7 @@ describe("processItem places from a video's speech", () => {
       const first = await process(t);
       expect(first?.places).toEqual(["Antiga"]);
       expect(first?.placesHeard).toBeUndefined();
+      expect(first).toMatchObject({ enrichment: "partial", stepFailed: true });
 
       placesModel(["Santelmo"], { caption: [] });
       transcript("Antiga, then Santelmo.");
@@ -636,6 +728,8 @@ describe("processItem places from a video's speech", () => {
         places: ["Santelmo", "Antiga"],
         placesHeard: true,
       });
+      expect(item?.enrichment).toBeUndefined();
+      expect(item?.stepFailed).toBeUndefined();
     });
   });
 });

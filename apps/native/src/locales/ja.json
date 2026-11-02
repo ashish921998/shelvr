@@ -484,6 +484,7 @@
   "item.pageFailed": "Shelvrはこのページを読み取れませんでした。",
   "item.stalled": "通常より時間がかかっています。",
   "item.partial": "ページを読み込めなかったため、リンクのみから保存しました。詳細は推定です。",
+  "item.detailsMissing": "一部の詳細を読み込めませんでした。再試行すると、もう一度読み込みます。",
   "recipe.ingredients": "材料",
   "recipe.steps": "作り方",
   "recipe.stepNumber": "手順 %{number}",

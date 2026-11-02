@@ -290,6 +290,13 @@ describe("a plain link's page", () => {
     expect(screen.getByText("item.partial")).toBeTruthy();
     expect(screen.getByText("common.tryAgain")).toBeTruthy();
   });
+
+  it("says some details missed when a later step of the read failed", () => {
+    renderPage({ ...product, enrichment: "partial", stepFailed: true });
+    expect(screen.getByText("item.detailsMissing")).toBeTruthy();
+    expect(screen.queryByText("item.partial")).toBeNull();
+    expect(screen.getByText("common.tryAgain")).toBeTruthy();
+  });
 });
 
 it("keeps a post's source line instead of the site button", () => {

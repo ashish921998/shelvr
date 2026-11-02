@@ -156,6 +156,7 @@ export default defineSchema({
     productsSearchStartedAt: v.optional(v.number()),
     failureReason: v.optional(failureReasonValidator),
     enrichment: v.optional(enrichmentValidator),
+    stepFailed: v.optional(v.boolean()),
     processingRunId: v.optional(v.string()),
     processingStartedAt: v.optional(v.number()),
     searchText: v.string(),

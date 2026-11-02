@@ -167,6 +167,7 @@ const itemFields = {
   productsStatus: v.optional(productsStatusValidator),
   failureReason: v.optional(failureReasonValidator),
   enrichment: v.optional(enrichmentValidator),
+  stepFailed: v.optional(v.boolean()),
   processingRunId: v.optional(v.string()),
   processingStartedAt: v.optional(v.number()),
   searchText: v.string(),
