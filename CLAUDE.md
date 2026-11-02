@@ -480,8 +480,9 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   a caller with no live account skip the builders and are listed, each with a reason, in
   `PUBLIC_ON_PURPOSE` (`model/publicFunctions.ts`). `model/publicFunctions.test.ts` fails on any
   public query or mutation that is neither built nor listed, and calls every built one as a
-  signed-out caller and as a deleting account, failing unless it throws "Not authenticated"
-  before the handler runs. So a function moved onto the builders adds no refusal test of its own.
+  signed-out caller and as a deleting account, failing unless it throws "Not authenticated". It
+  also builds a query and a mutation and fails if either builder calls the handler for those
+  callers. So a function moved onto the builders adds no refusal test of its own.
   `.github/CODEOWNERS` names the owner for the list.
   Public actions have no builder yet; an action derives the caller through the internal
   mutation or query it runs (as `issueCaptureToken` does through `storeCaptureToken`), so
