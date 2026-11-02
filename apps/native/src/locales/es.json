@@ -1155,5 +1155,23 @@
   "tripPlanner.badgeOnList": "En tu lista",
   "sharedLists.startWithHint": "Elige al menos una ciudad. Los lugares que ya guardaste allí vienen incluidos.",
   "sharedLists.cityPlaceholder": "O escribe una ciudad",
-  "sharedLists.typedCity": "Escrita por ti"
+  "sharedLists.typedCity": "Escrita por ti",
+  "passport.iWent": "Fui",
+  "passport.went": "Fui · %{date}",
+  "passport.wentNoDate": "Fui",
+  "passport.markLabel": "Fui a %{name}",
+  "passport.stampedTitle": "Sellado",
+  "passport.stampedBody": {
+    "one": "%{name} ya está en tu pasaporte. Llevas %{formattedCount} lugar.",
+    "many": "%{name} ya está en tu pasaporte. Llevas %{formattedCount} lugares.",
+    "other": "%{name} ya está en tu pasaporte. Llevas %{formattedCount} lugares."
+  },
+  "passport.stampInk": "%{city} · %{date}",
+  "passport.coverCredit": "Imagen de la publicación que guardaste",
+  "passport.removeStamp": "Quitar sello",
+  "cityMap.stampedCount": {
+    "one": "%{formattedCount} sellado",
+    "many": "%{formattedCount} sellados",
+    "other": "%{formattedCount} sellados"
+  }
 }

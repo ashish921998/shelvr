@@ -1093,5 +1093,19 @@
   "tripPlanner.badgeOnList": "リストの場所",
   "sharedLists.startWithHint": "都市を1つ以上選んでください。そこに保存済みの場所も一緒に入ります。",
   "sharedLists.cityPlaceholder": "または都市名を入力",
-  "sharedLists.typedCity": "入力した都市"
+  "sharedLists.typedCity": "入力した都市",
+  "passport.iWent": "行った",
+  "passport.went": "行った · %{date}",
+  "passport.wentNoDate": "行った",
+  "passport.markLabel": "%{name}に行った",
+  "passport.stampedTitle": "スタンプ完了",
+  "passport.stampedBody": {
+    "other": "%{name}をパスポートに追加しました。行った場所は%{formattedCount}か所です。"
+  },
+  "passport.stampInk": "%{city} · %{date}",
+  "passport.coverCredit": "保存した投稿の画像",
+  "passport.removeStamp": "スタンプを削除",
+  "cityMap.stampedCount": {
+    "other": "スタンプ%{formattedCount}個"
+  }
 }

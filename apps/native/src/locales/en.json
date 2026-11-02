@@ -1124,5 +1124,21 @@
   "tripPlanner.badgeOnList": "On your list",
   "sharedLists.startWithHint": "Pick at least one city. Places you already saved there come along.",
   "sharedLists.cityPlaceholder": "Or type a city",
-  "sharedLists.typedCity": "Typed by you"
+  "sharedLists.typedCity": "Typed by you",
+  "passport.iWent": "I went",
+  "passport.went": "Went · %{date}",
+  "passport.wentNoDate": "Went",
+  "passport.markLabel": "I went to %{name}",
+  "passport.stampedTitle": "Stamped",
+  "passport.stampedBody": {
+    "one": "%{name} is in your passport. %{formattedCount} place so far.",
+    "other": "%{name} is in your passport. %{formattedCount} places so far."
+  },
+  "passport.stampInk": "%{city} · %{date}",
+  "passport.coverCredit": "Picture from the post you saved",
+  "passport.removeStamp": "Remove stamp",
+  "cityMap.stampedCount": {
+    "one": "%{formattedCount} stamped",
+    "other": "%{formattedCount} stamped"
+  }
 }

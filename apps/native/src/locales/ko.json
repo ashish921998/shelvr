@@ -1093,5 +1093,19 @@
   "tripPlanner.badgeOnList": "내 목록",
   "sharedLists.startWithHint": "도시를 하나 이상 고르세요. 그곳에 이미 저장한 장소도 함께 들어가요.",
   "sharedLists.cityPlaceholder": "또는 도시 입력",
-  "sharedLists.typedCity": "직접 입력한 도시"
+  "sharedLists.typedCity": "직접 입력한 도시",
+  "passport.iWent": "가봤어요",
+  "passport.went": "가봄 · %{date}",
+  "passport.wentNoDate": "가봄",
+  "passport.markLabel": "%{name}에 가봤어요",
+  "passport.stampedTitle": "스탬프 완료",
+  "passport.stampedBody": {
+    "other": "%{name}이(가) 여권에 추가됐어요. 지금까지 %{formattedCount}곳에 가봤어요."
+  },
+  "passport.stampInk": "%{city} · %{date}",
+  "passport.coverCredit": "저장한 게시물의 이미지",
+  "passport.removeStamp": "스탬프 삭제",
+  "cityMap.stampedCount": {
+    "other": "스탬프 %{formattedCount}개"
+  }
 }

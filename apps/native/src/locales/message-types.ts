@@ -1033,6 +1033,16 @@ export type MessageParams = {
   "sharedLists.startWithHint": undefined;
   "sharedLists.cityPlaceholder": undefined;
   "sharedLists.typedCity": undefined;
+  "passport.iWent": undefined;
+  "passport.went": { date: string };
+  "passport.wentNoDate": undefined;
+  "passport.markLabel": { name: string };
+  "passport.stampedTitle": undefined;
+  "passport.stampedBody": { name: string; count: number };
+  "passport.stampInk": { city: string; date: string };
+  "passport.coverCredit": undefined;
+  "passport.removeStamp": undefined;
+  "cityMap.stampedCount": { count: number };
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

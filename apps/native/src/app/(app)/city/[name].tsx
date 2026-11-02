@@ -2,6 +2,7 @@ import { PlaceMapScreen } from "@/components/city/place-map-screen";
 import { PlanButton } from "@/components/city/plan-button";
 import { SaveRow } from "@/components/city/save-row";
 import { PlaceRemovalUndo } from "@/components/city/place-removal";
+import { StampSheet } from "@/components/passport/stamp-sheet";
 import { EmptyState } from "@/components/empty-state";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
@@ -10,6 +11,7 @@ import { cityPins, cityRows } from "@/lib/city-pins";
 import { useCityPlan } from "@/lib/city-plan";
 import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
+import { stampDate, usePassport, useStamping } from "@/lib/passport";
 import { usePlaceRemoval } from "@/lib/place-removal";
 import { usePlaceCardFocus } from "@/lib/use-place-opener";
 import { api } from "@convex/_generated/api";
@@ -29,6 +31,8 @@ export default function CityScreen() {
   const removal = usePlaceRemoval();
   const items = useQuery(convexQuery(api.items.listCityItems, { city }));
   const { busy, start } = useCityPlan();
+  const passport = usePassport();
+  const stamping = useStamping("city");
   const [selected, setSelected] = useState<string | null>(null);
   const loaded = items.data !== undefined;
   const count = items.data?.length ?? 0;
@@ -48,6 +52,10 @@ export default function CityScreen() {
     () => cityRows(items.data ?? [], pins),
     [items.data, pins],
   );
+
+  const stamped = rows.filter(
+    (row) => row.kind === "place" && passport.stampFor(row.name),
+  ).length;
 
   if (items.isError) {
     return (
@@ -78,6 +86,9 @@ export default function CityScreen() {
           {pins.length > 0 ? (
             <Text style={styles.count}>
               {t("cityMap.placesFromSaves", { count: pins.length })}
+              {stamped > 0
+                ? ` · ${t("cityMap.stampedCount", { count: stamped })}`
+                : ""}
             </Text>
           ) : null}
         </View>
@@ -85,6 +96,8 @@ export default function CityScreen() {
       renderRow={(row, select) => {
         const { item } = row;
         const appleId = row.kind === "place" ? row.pin.appleId : undefined;
+        const stamp =
+          row.kind === "place" ? passport.stampFor(row.name) : undefined;
         const openSave = () => {
           if (!focused.current) return;
           router.push({
@@ -99,6 +112,28 @@ export default function CityScreen() {
             number={row.kind === "place" ? row.number : undefined}
             selected={selected === row.id}
             removing={removal.busy}
+            went={stamp ? { at: stampDate(stamp) } : null}
+            onWent={
+              row.kind !== "place" || passport.stamps === undefined
+                ? undefined
+                : stamp
+                  ? () =>
+                      stamping.show({
+                        itemId: stamp.itemId,
+                        name: stamp.name,
+                        city: stamp.city ?? city,
+                        cover: stamp.cover,
+                        at: stampDate(stamp),
+                        fresh: false,
+                      })
+                  : () =>
+                      void stamping.stamp({
+                        itemId: item._id,
+                        name: row.name,
+                        city,
+                        cover: item.imageUrl ?? item.heroImageUrl ?? null,
+                      })
+            }
             onRemove={
               row.kind === "place"
                 ? () => {
@@ -147,6 +182,13 @@ export default function CityScreen() {
       }
     >
       <PlaceRemovalUndo removal={removal} />
+      <StampSheet
+        stamp={stamping.open}
+        count={passport.stamps?.length ?? 0}
+        busy={stamping.busy}
+        onClose={stamping.close}
+        onRemove={() => void stamping.remove()}
+      />
     </PlaceMapScreen>
   );
 }

@@ -1155,5 +1155,23 @@
   "tripPlanner.badgeOnList": "Sur votre liste",
   "sharedLists.startWithHint": "Choisissez au moins une ville. Les lieux que vous y avez déjà enregistrés viennent avec.",
   "sharedLists.cityPlaceholder": "Ou saisissez une ville",
-  "sharedLists.typedCity": "Saisie par vous"
+  "sharedLists.typedCity": "Saisie par vous",
+  "passport.iWent": "J'y suis allé",
+  "passport.went": "Visité · %{date}",
+  "passport.wentNoDate": "Visité",
+  "passport.markLabel": "Vous êtes allé à %{name}",
+  "passport.stampedTitle": "Tamponné",
+  "passport.stampedBody": {
+    "one": "%{name} est dans votre passeport. %{formattedCount} lieu pour l'instant.",
+    "many": "%{name} est dans votre passeport. %{formattedCount} lieux pour l'instant.",
+    "other": "%{name} est dans votre passeport. %{formattedCount} lieux pour l'instant."
+  },
+  "passport.stampInk": "%{city} · %{date}",
+  "passport.coverCredit": "Image de la publication enregistrée",
+  "passport.removeStamp": "Retirer le tampon",
+  "cityMap.stampedCount": {
+    "one": "%{formattedCount} tamponné",
+    "many": "%{formattedCount} tamponnés",
+    "other": "%{formattedCount} tamponnés"
+  }
 }

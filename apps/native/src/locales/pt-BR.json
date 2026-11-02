@@ -1155,5 +1155,23 @@
   "tripPlanner.badgeOnList": "Na sua lista",
   "sharedLists.startWithHint": "Escolha ao menos uma cidade. Os lugares que você já salvou lá vêm junto.",
   "sharedLists.cityPlaceholder": "Ou digite uma cidade",
-  "sharedLists.typedCity": "Digitada por você"
+  "sharedLists.typedCity": "Digitada por você",
+  "passport.iWent": "Fui",
+  "passport.went": "Fui · %{date}",
+  "passport.wentNoDate": "Fui",
+  "passport.markLabel": "Fui a %{name}",
+  "passport.stampedTitle": "Carimbado",
+  "passport.stampedBody": {
+    "one": "%{name} está no seu passaporte. %{formattedCount} lugar até agora.",
+    "many": "%{name} está no seu passaporte. %{formattedCount} lugares até agora.",
+    "other": "%{name} está no seu passaporte. %{formattedCount} lugares até agora."
+  },
+  "passport.stampInk": "%{city} · %{date}",
+  "passport.coverCredit": "Imagem do post que você salvou",
+  "passport.removeStamp": "Remover carimbo",
+  "cityMap.stampedCount": {
+    "one": "%{formattedCount} carimbado",
+    "many": "%{formattedCount} carimbados",
+    "other": "%{formattedCount} carimbados"
+  }
 }
