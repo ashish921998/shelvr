@@ -45,7 +45,7 @@ export function inviteJoinOutcome(
     href:
       listId === null
         ? `/list-invite/${encodeURIComponent(token)}`
-        : `/shared-list/${listId}`,
+        : `/shared-list/${listId}?joined=1`,
   };
 }
 export function useInviteJoinCoordinator() {

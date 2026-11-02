@@ -54,6 +54,7 @@ import type * as model_entitlement from "../model/entitlement.js";
 import type * as model_externalUrl from "../model/externalUrl.js";
 import type * as model_fakeAi from "../model/fakeAi.js";
 import type * as model_feedbackFields from "../model/feedbackFields.js";
+import type * as model_firstName from "../model/firstName.js";
 import type * as model_imagePolicy from "../model/imagePolicy.js";
 import type * as model_imageSize from "../model/imageSize.js";
 import type * as model_itemFields from "../model/itemFields.js";
@@ -188,6 +189,7 @@ declare const fullApi: ApiFromModules<{
   "model/externalUrl": typeof model_externalUrl;
   "model/fakeAi": typeof model_fakeAi;
   "model/feedbackFields": typeof model_feedbackFields;
+  "model/firstName": typeof model_firstName;
   "model/imagePolicy": typeof model_imagePolicy;
   "model/imageSize": typeof model_imageSize;
   "model/itemFields": typeof model_itemFields;

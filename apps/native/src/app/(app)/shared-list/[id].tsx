@@ -4,6 +4,7 @@ import { EmptyState } from "@/components/empty-state";
 import { ListPlaceRow } from "@/components/shared-list/list-place-row";
 import { ListFooter } from "@/components/shared-list/list-footer";
 import { ListHeaderRight } from "@/components/shared-list/list-header-right";
+import { NameSheet } from "@/components/shared-list/name-sheet";
 import { Chip } from "@/components/trip-planner/chip";
 import { Button } from "@/components/ui/button";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
@@ -21,6 +22,7 @@ import {
   partnerName,
   type SharedListDetail,
   type SharedListPlace,
+  useAskNameOnce,
   useListPlan,
   withLine,
 } from "@/lib/shared-lists";
@@ -160,6 +162,10 @@ export default function SharedListScreen() {
 
 function SharedList({ detail }: { detail: SharedListDetail }) {
   const { theme } = useUnistyles();
+  const { joined } = useLocalSearchParams<{ joined?: string }>();
+  const askName = useAskNameOnce(joined === "1");
+  const inviter = detail.members.find((member) => !member.isYou)?.firstName;
+  const firstPlace = detail.places[0]?.name;
   const [picked, setPicked] = useState<string | null>(null);
   const city =
     picked !== null && detail.cities.includes(picked)
@@ -314,6 +320,14 @@ function SharedList({ detail }: { detail: SharedListDetail }) {
             </>
           ) : null
         }
+      />
+      <NameSheet
+        visible={askName.asking}
+        kind="joined"
+        {...(inviter !== undefined ? { partner: inviter } : {})}
+        {...(firstPlace !== undefined ? { placeName: firstPlace } : {})}
+        onDone={askName.close}
+        onCancel={askName.close}
       />
     </>
   );

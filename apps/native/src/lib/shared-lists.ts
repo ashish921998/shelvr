@@ -12,7 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth, useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Share } from "react-native";
 
 export type SharedListSummary = FunctionReturnType<
@@ -33,6 +33,55 @@ export function useSharedLists(enabled = true) {
       enabled && isAuthenticated ? {} : "skip",
     ),
   );
+}
+
+let nameAsked = false;
+
+function useMyFirstName() {
+  const { isAuthenticated } = useConvexAuth();
+  return useQuery(
+    convexQuery(api.users.getMyFirstName, isAuthenticated ? {} : "skip"),
+  ).data;
+}
+
+export function useNameGate() {
+  const firstName = useMyFirstName();
+  const [pending, setPending] = useState<(() => void) | null>(null);
+  const gate = useCallback(
+    (action: () => void) => {
+      if (firstName !== null || nameAsked) {
+        action();
+        return;
+      }
+      nameAsked = true;
+      setPending(() => action);
+    },
+    [firstName],
+  );
+  return {
+    gate,
+    asking: pending !== null,
+    finish: () => {
+      setPending(null);
+      pending?.();
+    },
+    cancel: () => setPending(null),
+  };
+}
+
+export function useAskNameOnce(when: boolean): {
+  asking: boolean;
+  close: () => void;
+} {
+  const firstName = useMyFirstName();
+  const [asking, setAsking] = useState(() => when && !nameAsked);
+  useEffect(() => {
+    if (asking) nameAsked = true;
+  }, [asking]);
+  return {
+    asking: asking && firstName === null,
+    close: () => setAsking(false),
+  };
 }
 
 export function inviteUrl(token: string): string {

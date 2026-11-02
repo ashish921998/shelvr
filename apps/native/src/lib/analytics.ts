@@ -295,6 +295,10 @@ export type AnalyticsEventProperties = {
   shared_list_invite_sent: { shared: boolean; surface: "new" | "list" };
   shared_list_join_tapped: { signed_in: boolean };
   shared_list_joined: { joined: boolean; onboarded_before: boolean };
+  shared_list_name_prompt: {
+    kind: "join" | "create" | "joined";
+    outcome: "named" | "skipped";
+  };
   shared_list_opened: { places: number; members: number; fresh: number };
   shared_list_place_opened: { action: "save" | "card" | "maps" };
   shared_list_place_added: { from: "save" | "search" | "spots" };

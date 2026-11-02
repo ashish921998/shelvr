@@ -1074,6 +1074,15 @@
   "sharedLists.joinBody": "내가 찾은 곳을 추가하고, 상대가 찾은 곳을 보고, 둘 다로 계획하세요.",
   "sharedLists.joinFree": "참여는 무료예요. Pro가 필요하지 않아요.",
   "sharedLists.join": "목록 참여",
+  "sharedLists.nameTitle": "뭐라고 불러 드릴까요?",
+  "sharedLists.nameBodyJoin": "추가한 장소마다 내 이름이 표시돼서 %{name}님이 누가 찾았는지 알 수 있어요. 이름이 없으면 ‘누군가’로 표시돼요.",
+  "sharedLists.nameBodyJoinNoName": "추가한 장소마다 내 이름이 표시돼서 누가 찾았는지 알 수 있어요. 이름이 없으면 ‘누군가’로 표시돼요.",
+  "sharedLists.nameBodyCreate": "초대와 추가한 장소에 내 이름이 표시돼서 누가 보냈는지 알 수 있어요. 이름이 없으면 ‘누군가’로 표시돼요.",
+  "sharedLists.firstNamePlaceholder": "이름",
+  "sharedLists.yourName": "내 이름",
+  "sharedLists.namePreviewPlace": "내가 추가한 장소",
+  "sharedLists.nameSkip": "나중에",
+  "sharedLists.nameFailed": "이름을 저장하지 못했어요. 다시 시도해 주세요.",
   "sharedLists.andMore": {
     "other": "외 %{formattedCount}곳"
   },
