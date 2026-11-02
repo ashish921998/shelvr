@@ -12,7 +12,6 @@ import {
   queueDemoUrl,
   setOnboardingProgress,
   setPendingSpaces,
-  updatePendingSpaces,
 } from "./pending-onboarding";
 
 const storage = vi.hoisted(() => new Map<string, string>());
@@ -35,7 +34,7 @@ describe("onboarding recovery", () => {
     expect(hasPending()).toBe(false);
   });
 
-  it("retains an older queued link and its operation id through partial replay", () => {
+  it("retains an older queued link and its operation id when onboarding finishes again", () => {
     storage.set(
       "shelvr.pending.onboarding",
       JSON.stringify({
@@ -45,7 +44,6 @@ describe("onboarding recovery", () => {
       }),
     );
     setPendingSpaces(["Recipes", "Inspiration"]);
-    updatePendingSpaces([]);
     expect(getPendingDemoUrl()).toBe("https://example.com");
     expect(getOrCreatePendingOperationId()).toBe("legacy-operation");
     expect(hasPending()).toBe(true);
