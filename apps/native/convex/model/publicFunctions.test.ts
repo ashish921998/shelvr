@@ -1,7 +1,8 @@
 /// <reference types="vite/client" />
+import { v } from "convex/values";
 import { describe, expect, it } from "vitest";
 
-import { isAuthedFunction } from "./auth";
+import { authedMutation, authedQuery, isAuthedFunction } from "./auth";
 import { PUBLIC_ON_PURPOSE } from "./publicFunctions";
 
 /** Every file Convex registers as a module: not generated, and no second dot in its name (tests, configs). */
@@ -42,7 +43,7 @@ async function publicQueriesAndMutations(): Promise<Map<string, Registered>> {
   return found;
 }
 
-/** A ctx with only what `requireUserId` reads; any other read throws, so a handler that runs before the caller is refused fails. */
+/** A ctx with only what `requireUserId` reads; any other read of it throws. */
 function ctxStub(members: object): object {
   return new Proxy(members, {
     get(target, property) {
@@ -68,7 +69,7 @@ const REFUSED_CALLERS: readonly [string, object][] = [
   ],
 ];
 
-/** Why `fn` does not refuse both callers before anything else runs, or null when it does. */
+/** Why `fn` does not refuse both callers with "Not authenticated", or null when it does. */
 async function refusalProblem(fn: Registered): Promise<string | null> {
   if (typeof fn._handler !== "function") return "has no handler to call";
   for (const [caller, ctx] of REFUSED_CALLERS) {
@@ -129,4 +130,39 @@ describe("public queries and mutations", () => {
 
     expect(violations.sort()).toEqual([]);
   });
+});
+
+describe("authedQuery and authedMutation", () => {
+  const handlerSaw: unknown[] = [];
+  const definition = {
+    args: {},
+    returns: v.null(),
+    handler: (ctx: { userId: unknown }) => {
+      handlerSaw.push(ctx.userId);
+      return null;
+    },
+  };
+  const liveCaller = ctxStub({
+    auth: { getUserIdentity: async () => ({ subject: "user|session" }) },
+    db: { normalizeId: () => "user", get: async () => ({}) },
+  });
+
+  it.each([
+    ["authedQuery", authedQuery(definition) as Registered],
+    ["authedMutation", authedMutation(definition) as Registered],
+  ])(
+    "%s refuses a caller with no live account without calling the handler",
+    async (_builder, fn) => {
+      handlerSaw.length = 0;
+      for (const [, ctx] of REFUSED_CALLERS) {
+        await expect(fn._handler?.(ctx, {})).rejects.toThrow(
+          "Not authenticated",
+        );
+      }
+      expect(handlerSaw).toEqual([]);
+
+      await fn._handler?.(liveCaller, {});
+      expect(handlerSaw).toEqual(["user"]);
+    },
+  );
 });
