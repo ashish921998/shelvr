@@ -1,4 +1,8 @@
 import { analytics } from "@/lib/analytics";
+import {
+  drainInvocations,
+  isSaveInvocation,
+} from "@/lib/app-intent-invocations";
 import { useCurrentUser } from "@/lib/current-user";
 import { useEntitlement } from "@/lib/entitlement";
 import { useHomeFeed } from "@/lib/home-feed";
@@ -8,7 +12,7 @@ import { useSaveImages } from "@/lib/use-save-image";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { MAX_URL_LENGTH } from "@convex/model/externalUrl";
-import { saveErrorCode } from "@convex/model/saveErrors";
+import { saveError } from "@convex/model/saveErrors";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useAction, useConvexAuth, useMutation } from "convex/react";
@@ -321,7 +325,7 @@ function spaceParam(
   return param(invocation, "spaceId") as Id<"spaces"> | undefined;
 }
 
-function useInvocationHandler() {
+function useInvocationHandler(entitled: boolean) {
   const router = useRouter();
   const navigation = useNavigationContainerRef();
   const createNoteItem = useMutation(api.items.createNoteItem);
@@ -412,36 +416,45 @@ function useInvocationHandler() {
           })),
           { spaceId: spaceParam(invocation), saveSource: "siri" },
         );
-        const retry = results.find(
-          (result) => result.status === "failed" && result.code === undefined,
+        const failed = results.flatMap((result) =>
+          result.status === "failed" ? [result.code] : [],
         );
-        if (retry) throw new Error("app_intents_image_save_failed");
+        if (failed.includes("pro_required")) throw saveError("pro_required");
+        if (failed.includes(undefined))
+          throw new Error("app_intents_image_save_failed");
         for (const file of files) file.delete();
         return;
       }
     }
   }
 
-  AppIntents.useAppIntents(async (pending) => {
-    for (const invocation of pending) {
-      if (inFlight.current.has(invocation.id)) continue;
-      inFlight.current.add(invocation.id);
-      try {
-        await handle(invocation);
-        await AppIntents.removePendingInvocationAsync(invocation.id);
-      } catch (error) {
-        if (saveErrorCode(error) !== null) {
-          await AppIntents.removePendingInvocationAsync(invocation.id);
-        } else {
-          analytics.captureError("app_intents_invocation_failed", error, {
-            invocation: invocation.name,
-          });
-        }
-      } finally {
-        inFlight.current.delete(invocation.id);
-      }
-    }
+  const drain = (pending: AppIntents.AppIntentInvocation[]) =>
+    drainInvocations(pending, {
+      entitled,
+      inFlight: inFlight.current,
+      handle,
+      remove: AppIntents.removePendingInvocationAsync,
+      report: (invocation, error) =>
+        analytics.captureError("app_intents_invocation_failed", error, {
+          invocation: invocation.name,
+        }),
+    });
+
+  AppIntents.useAppIntents(drain);
+
+  const drainRef = useRef(drain);
+  useEffect(() => {
+    drainRef.current = drain;
   });
+
+  useEffect(() => {
+    if (!entitled) return;
+    AppIntents.getPendingInvocationsAsync()
+      .then((pending) => drainRef.current(pending.filter(isSaveInvocation)))
+      .catch((error: unknown) =>
+        analytics.captureError("app_intents_pending_read_failed", error),
+      );
+  }, [entitled]);
 }
 
 export function AppIntentsBridge() {
@@ -453,7 +466,7 @@ function SignedInAppIntents() {
   const { isAuthenticated } = useConvexAuth();
   const { data: user } = useCurrentUser();
   const { entitled, loading } = useEntitlement();
-  useInvocationHandler();
+  useInvocationHandler(entitled);
   useCaptureCredentials(isAuthenticated ? user?._id : undefined);
   useCatalogSync(isAuthenticated && entitled, loading);
   return null;
