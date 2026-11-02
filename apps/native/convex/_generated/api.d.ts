@@ -25,6 +25,7 @@ import type * as datePlans from "../datePlans.js";
 import type * as demo from "../demo.js";
 import type * as devFixtures from "../devFixtures.js";
 import type * as feedback from "../feedback.js";
+import type * as freeSaves from "../freeSaves.js";
 import type * as health from "../health.js";
 import type * as http from "../http.js";
 import type * as items from "../items.js";
@@ -160,6 +161,7 @@ declare const fullApi: ApiFromModules<{
   demo: typeof demo;
   devFixtures: typeof devFixtures;
   feedback: typeof feedback;
+  freeSaves: typeof freeSaves;
   health: typeof health;
   http: typeof http;
   items: typeof items;

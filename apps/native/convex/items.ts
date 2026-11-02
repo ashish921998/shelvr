@@ -26,6 +26,12 @@ import {
   hasProEntitlementStatus,
   requireProEntitlement,
 } from "./subscriptions";
+import {
+  claimSave,
+  isFreeSave,
+  recordFreeSave,
+  settleFreeSave,
+} from "./freeSaves";
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
 import { takeWithinBytes } from "./model/readBudget";
@@ -1438,7 +1444,7 @@ export const cleanupOrphanStorage = internalMutation({
 
 export async function createItemWithOperation(
   ctx: MutationCtx,
-  userId: string,
+  userId: Id<"users">,
   kind: Extract<OperationKind, "link" | "note">,
   payload: { url: string } | { note: string },
   options: {
@@ -1515,7 +1521,7 @@ function validateLinkOrNotePayload(
 
 async function createLinkOrNote(
   ctx: MutationCtx,
-  userId: string,
+  userId: Id<"users">,
   kind: Extract<OperationKind, "link" | "note">,
   payload: { url: string } | { note: string },
   options: {
@@ -1526,6 +1532,7 @@ async function createLinkOrNote(
     captureContext?: string;
   },
 ): Promise<Id<"items">> {
+  const free = await claimSave(ctx, userId);
   const run = beginProcessingRun();
   const itemId = await ctx.db.insert("items", {
     userId,
@@ -1539,6 +1546,7 @@ async function createLinkOrNote(
         ? buildSearchText({ tags: [], note: payload.note })
         : "",
   });
+  if (free) await recordFreeSave(ctx, userId, itemId);
   if (options.spaceId !== undefined) {
     await saveIntoSpace(ctx, userId, itemId, options.spaceId);
   }
@@ -1619,7 +1627,6 @@ export const createLinkItem = authedMutation({
   returns: v.id("items"),
   handler: async (ctx, args) => {
     const { userId } = ctx;
-    await requireProEntitlement(ctx, userId);
     const url = normalizeExternalUrl(args.url);
     return await createItemWithOperation(
       ctx,
@@ -1647,7 +1654,6 @@ export const createNoteItem = authedMutation({
   returns: v.id("items"),
   handler: async (ctx, args) => {
     const { userId } = ctx;
-    await requireProEntitlement(ctx, userId);
     return await createItemWithOperation(
       ctx,
       userId,
@@ -1947,7 +1953,9 @@ export const reprocessItem = authedMutation({
   handler: async (ctx, args) => {
     const { userId } = ctx;
     const freeDemo = await freeDemoRetry(ctx, userId, args.id);
-    if (freeDemo === null) await requireProEntitlement(ctx, userId);
+    if (freeDemo === null && !(await isFreeSave(ctx, args.id))) {
+      await requireProEntitlement(ctx, userId);
+    }
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");
@@ -2018,6 +2026,7 @@ export const deleteItem = authedMutation({
       await safeDeleteStorage(ctx, item.storageId);
     }
     await ctx.db.delete(item._id);
+    await settleFreeSave(ctx, item._id);
     return null;
   },
 });
@@ -2219,6 +2228,7 @@ export const finalizeItem = internalMutation({
     }
     const patch = completionPatch(item, args, allowed);
     await ctx.db.patch(args.itemId, patch);
+    await settleFreeSave(ctx, args.itemId);
     if (
       allowed &&
       ((patch.places?.length ?? 0) > 0 ||
@@ -2324,7 +2334,12 @@ export const addPlaceListParts = internalMutation({
       });
     }
     // The other parts are new saves, so they need Pro now, not just when the list was saved.
-    if (!(await hasProEntitlement(ctx, owner._id))) return 0;
+    if (
+      !(await isFreeSave(ctx, item._id)) &&
+      !(await hasProEntitlement(ctx, owner._id))
+    ) {
+      return 0;
+    }
     const url = item.url;
     const saved = await ctx.db
       .query("items")
@@ -2445,6 +2460,7 @@ async function writeFailure(
   reason: Infer<typeof failureReasonValidator>,
 ): Promise<void> {
   await ctx.db.patch(item._id, patch);
+  await settleFreeSave(ctx, item._id);
   if (patch.status === "ready") {
     await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
       itemId: item._id,
