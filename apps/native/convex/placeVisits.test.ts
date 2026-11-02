@@ -297,7 +297,7 @@ describe("the passport", () => {
     expect(await visits()).toMatchObject([{ itemId, city: "Lisbon" }]);
   });
 
-  it("marks the place but skips the country once the shared budget is spent", async () => {
+  it("waits for the shared budget, then finds the country", async () => {
     const lookups = await withMaps();
     const { backend, t, itemId, visits } = await setup();
     await backend.run((ctx) =>
@@ -310,8 +310,27 @@ describe("the passport", () => {
         visited: true,
       }),
     );
-    expect(lookups()).toBe(0);
-    expect(await visits()).toMatchObject([{ city: "Lisbon" }]);
+    expect(lookups()).toBe(1);
+    expect(await visits()).toMatchObject([
+      { city: "Lisbon", countryCode: "PT" },
+    ]);
+  });
+
+  it("spends no shared budget for someone who declined AI", async () => {
+    await withMaps();
+    const { backend, t, userId, itemId } = await setup();
+    await backend.run((ctx) => setTestConsent(ctx, userId, "declined"));
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    const left = await backend.run((ctx) =>
+      rateLimiter.check(ctx, "visitCountryGlobal", { count: 100 }),
+    );
+    expect(left.ok).toBe(true);
   });
 
   it("refuses a batch over another user's save, and marks nothing", async () => {

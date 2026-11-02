@@ -5,7 +5,6 @@ import {
   env,
   internalAction,
   internalMutation,
-  internalQuery,
   type MutationCtx,
   type QueryCtx,
 } from "./_generated/server";
@@ -86,11 +85,7 @@ async function markVisit(
   } else {
     await ctx.db.patch(visitId, visit);
   }
-  if (
-    pin !== null &&
-    countryCode === undefined &&
-    (await rateLimiter.limit(ctx, "visitCountryGlobal")).ok
-  ) {
+  if (pin !== null && countryCode === undefined) {
     await ctx.scheduler.runAfter(
       lookupDelayMs,
       internal.placeVisits.locateCountry,
@@ -233,14 +228,21 @@ export const getPassport = authedQuery({
   },
 });
 
-export const countryTarget = internalQuery({
+export const claimCountryLookup = internalMutation({
   args: { visitId: v.id("placeVisits") },
-  returns: v.union(v.null(), v.object({ lat: v.number(), lng: v.number() })),
+  returns: v.union(
+    v.null(),
+    v.literal("busy"),
+    v.object({ lat: v.number(), lng: v.number() }),
+  ),
   handler: async (ctx, args) => {
     const visit = await ctx.db.get(args.visitId);
     if (visit?.lat === undefined || visit.lng === undefined) return null;
     if (visit.countryCode !== undefined) return null;
     if (!(await aiAllowed(ctx, visit.userId))) return null;
+    if (!(await rateLimiter.limit(ctx, "visitCountryGlobal")).ok) {
+      return "busy";
+    }
     return { lat: visit.lat, lng: visit.lng };
   },
 });
@@ -267,35 +269,37 @@ export const locateCountry = internalAction({
   args: { visitId: v.id("placeVisits"), attempt: v.optional(v.number()) },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const point = await ctx.runQuery(internal.placeVisits.countryTarget, {
-      visitId: args.visitId,
-    });
-    if (point === null) return null;
     const config = appleMapsConfig(env);
     if (config === null) return null;
-    const token = await appleMapsAccessToken(config);
-    const countryCode =
-      token === null ? null : await appleMapsCountry(token, point);
-    if (countryCode === null) {
-      const attempt = (args.attempt ?? 0) + 1;
-      logEvent("warn", "visit_country_failed", {
-        token: token !== null,
-        attempt,
-      });
-      if (attempt < MAX_COUNTRY_ATTEMPTS) {
-        await ctx.scheduler.runAfter(
-          COUNTRY_RETRY_MS * attempt,
-          internal.placeVisits.locateCountry,
-          { visitId: args.visitId, attempt },
-        );
+    const point = await ctx.runMutation(
+      internal.placeVisits.claimCountryLookup,
+      { visitId: args.visitId },
+    );
+    if (point === null) return null;
+    let failure = "busy";
+    if (point !== "busy") {
+      const token = await appleMapsAccessToken(config);
+      const countryCode =
+        token === null ? null : await appleMapsCountry(token, point);
+      if (countryCode !== null) {
+        await ctx.runMutation(internal.placeVisits.storeCountry, {
+          visitId: args.visitId,
+          ...point,
+          countryCode,
+        });
+        return null;
       }
-      return null;
+      failure = token === null ? "token" : "lookup";
     }
-    await ctx.runMutation(internal.placeVisits.storeCountry, {
-      visitId: args.visitId,
-      ...point,
-      countryCode,
-    });
+    const attempt = (args.attempt ?? 0) + 1;
+    logEvent("warn", "visit_country_failed", { failure, attempt });
+    if (attempt < MAX_COUNTRY_ATTEMPTS) {
+      await ctx.scheduler.runAfter(
+        COUNTRY_RETRY_MS * attempt,
+        internal.placeVisits.locateCountry,
+        { visitId: args.visitId, attempt },
+      );
+    }
     return null;
   },
 });
