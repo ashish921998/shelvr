@@ -828,6 +828,28 @@ describe("decodeWithContentType", () => {
     expect(decodeWithContentType(bytes, "text/html")).toContain("café €5 ’");
   });
 
+  it("ignores a meta charset inside a comment or another attribute's text", () => {
+    const utf8 = [...new TextEncoder().encode("café 東京")];
+    expect(
+      decodeWithContentType(
+        html(
+          '<!-- <meta charset="windows-1252"> --><meta charset="utf-8">',
+          utf8,
+        ),
+        "text/html",
+      ),
+    ).toContain("café 東京");
+    expect(
+      decodeWithContentType(
+        html(
+          '<meta name="description" content="Tips; charset=windows-1252"><meta charset="utf-8">',
+          utf8,
+        ),
+        "text/html",
+      ),
+    ).toContain("café 東京");
+  });
+
   it("keeps the header charset over a meta tag that disagrees", () => {
     const bytes = html('<meta charset="shift_jis">', [
       ...new TextEncoder().encode("café"),
