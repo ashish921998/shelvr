@@ -23,7 +23,7 @@ async function errorCode(run: Promise<unknown>) {
 }
 
 async function freeUser(enabled: boolean) {
-  if (enabled) vi.stubEnv("FREE_SAVES_ENABLED", "true");
+  vi.stubEnv("FREE_SAVES_ENABLED", enabled ? "true" : "false");
   return await signedInUser(newConvexTest());
 }
 
@@ -98,6 +98,18 @@ describe("free saves with the switch on", () => {
       limit: FREE_SAVE_LIMIT,
       used: FREE_SAVE_LIMIT,
       left: 0,
+    });
+  });
+
+  it("counts a free note save like a link", async () => {
+    const user = await freeUser(true);
+    const noteId = await user.t.mutation(api.items.createNoteItem, {
+      text: "Tacos at Lupe's in Austin",
+    });
+    expect((await rows(user)).map((row) => row.itemId)).toEqual([noteId]);
+    await settle(user, noteId, ["Austin"]);
+    expect(await user.t.query(api.freeSaves.getFreeSaves, {})).toMatchObject({
+      used: 1,
     });
   });
 
