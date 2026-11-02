@@ -99,7 +99,7 @@ export function listRows(places: SharedListPlace[], city: string): ListRow[] {
   }));
 }
 
-export type ListSectionRow =
+type ListSectionRow =
   | { kind: "heading"; id: string; label: string; fresh: boolean }
   | { kind: "place"; id: string; row: ListRow };
 

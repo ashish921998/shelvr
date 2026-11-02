@@ -1,7 +1,9 @@
-import { AppSymbolIcon } from "@/components/symbol";
+import {
+  AddPlaceSearch,
+  AddPlaceSection,
+  AddPlaceSheet,
+} from "@/components/add-place-sheet";
 import { Chip } from "@/components/trip-planner/chip";
-import { HeaderIconButton } from "@/components/ui/header-icon-button";
-import { ThemedText } from "@/components/ui/themed-text";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
 import {
@@ -9,7 +11,6 @@ import {
   matchSavePlaces,
   type NewTripStop,
   onTrip,
-  type PlaceSearch,
   useAddTripStop,
   useTripPlaceSearch,
 } from "@/lib/trip-edit";
@@ -21,104 +22,10 @@ import { useQuery } from "@tanstack/react-query";
 import { haptics } from "@/lib/haptics";
 import { personalPlanAllowed } from "@/lib/list-gate";
 import { usePlanGate } from "@/lib/plan-gate";
-import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Platform,
-  Pressable,
-  ScrollView,
-  TextInput,
-  View,
-} from "react-native";
+import { ScrollView } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-
-const MAX_QUERY_LENGTH = 100;
-
-function PlaceRow({
-  name,
-  detail,
-  added,
-  disabled,
-  onPress,
-}: {
-  name: string;
-  detail: string | undefined;
-  added: boolean;
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  const { theme } = useUnistyles();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={[name, detail, added ? t("tripPlanner.onTrip") : null]
-        .filter(Boolean)
-        .join(", ")}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [styles.place, pressed && styles.pressed]}
-    >
-      <View style={styles.placeText}>
-        <ThemedText variant="subheadStrong" numberOfLines={2}>
-          {name}
-        </ThemedText>
-        {detail ? (
-          <ThemedText variant="footnote" numberOfLines={1} style={styles.muted}>
-            {detail}
-          </ThemedText>
-        ) : null}
-      </View>
-      {added ? (
-        <ThemedText variant="caption" style={styles.muted}>
-          {t("tripPlanner.onTrip")}
-        </ThemedText>
-      ) : (
-        <AppSymbolIcon
-          name="plus.circle.fill"
-          size={24}
-          tintColor={theme.colors.primary}
-        />
-      )}
-    </Pressable>
-  );
-}
-
-function SearchNote({ search }: { search: PlaceSearch }) {
-  const { theme } = useUnistyles();
-  switch (search.status) {
-    case "searching":
-      return (
-        <View
-          style={styles.note}
-          accessibilityLabel={t("tripPlanner.searching")}
-        >
-          <ActivityIndicator color={theme.colors.muted} />
-        </View>
-      );
-    case "unavailable":
-      return (
-        <ThemedText variant="footnote" style={[styles.note, styles.muted]}>
-          {t("tripPlanner.searchUnavailable")}
-        </ThemedText>
-      );
-    case "failed":
-      return (
-        <ThemedText variant="footnote" style={[styles.note, styles.muted]}>
-          {t("tripPlanner.searchUnavailable")}
-        </ThemedText>
-      );
-    case "done":
-      return search.places.length === 0 ? (
-        <ThemedText variant="footnote" style={[styles.note, styles.muted]}>
-          {t("tripPlanner.searchEmpty")}
-        </ThemedText>
-      ) : null;
-    case "idle":
-      return null;
-  }
-}
 
 /** Add a place: search Apple Maps near the trip, or pick a place from the city's saves. */
 export default function AddTripStopScreen() {
@@ -168,91 +75,50 @@ export default function AddTripStopScreen() {
     close();
   };
 
-  const header = (
-    <>
-      <Stack.Screen
-        options={{
-          title: t("tripPlanner.addPlace"),
-          headerTitleStyle: {
-            ...theme.type.title,
-            color: theme.colors.foreground,
-          },
-          ...(Platform.OS === "android"
-            ? {
-                headerLeft: () => (
-                  <HeaderIconButton
-                    icon="xmark"
-                    label={t("common.close")}
-                    onPress={close}
-                  />
-                ),
-              }
-            : {}),
-        }}
-      />
-      {Platform.OS === "ios" ? (
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button
-            icon="xmark"
-            tintColor={theme.colors.foreground}
-            onPress={close}
-          >
-            {t("common.close")}
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
-      ) : null}
-    </>
-  );
-
   if (data && !personalPlanAllowed(gated, data.listId)) {
     return <Redirect href="/plan-gate" />;
   }
-  if (!data) {
-    return (
-      <View style={styles.screen} accessibilityViewIsModal>
-        {header}
-      </View>
-    );
-  }
+  if (!data) return <AddPlaceSheet onClose={close} />;
 
   const fill = {
     background: theme.colors.primary,
     foreground: theme.colors.onTint,
   };
-  const results = search.status === "done" ? search.places : [];
 
   return (
-    <View style={styles.screen} accessibilityViewIsModal>
-      {header}
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        contentContainerStyle={styles.content}
+    <AddPlaceSheet onClose={close}>
+      <AddPlaceSearch
+        testID="add-trip-stop-search"
+        city={data.city}
+        query={query}
+        onQueryChange={setQuery}
+        search={search}
+        busy={busy}
+        addedLabel={t("tripPlanner.onTrip")}
+        isAdded={(place) => onTrip(data, place)}
+        onPickFound={(place) => void pick({ kind: "search", place })}
+        saved={
+          gated
+            ? null
+            : {
+                ...(saves.data?.length === 0
+                  ? { note: t("tripPlanner.noSavesLeft") }
+                  : {}),
+                rows: savePlaces.map((place) => ({
+                  key: `${place.itemId}-${place.name}`,
+                  name: place.name,
+                  detail: place.title,
+                  onPress: () =>
+                    void pick({
+                      kind: "save",
+                      itemId: place.itemId,
+                      name: place.name,
+                    }),
+                })),
+              }
+        }
       >
-        <TextInput
-          testID="add-trip-stop-search"
-          value={query}
-          onChangeText={setQuery}
-          autoFocus
-          placeholder={t("tripPlanner.searchPlaceholder", {
-            city: data.city,
-          })}
-          placeholderTextColor={theme.colors.muted}
-          accessibilityLabel={t("tripPlanner.searchPlaceholder", {
-            city: data.city,
-          })}
-          maxLength={MAX_QUERY_LENGTH}
-          autoCorrect={false}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-          style={styles.input}
-        />
-
-        <View style={styles.section}>
-          <ThemedText variant="bodyLabel" accessibilityRole="header">
-            {t("tripPlanner.addTo")}
-          </ThemedText>
+        <AddPlaceSection title={t("tripPlanner.addTo")}>
           <ScrollView
             horizontal
             keyboardShouldPersistTaps="handled"
@@ -270,92 +136,12 @@ export default function AddTripStopScreen() {
               />
             ))}
           </ScrollView>
-        </View>
-
-        {query.trim().length > 0 ? (
-          <View style={styles.section}>
-            <ThemedText variant="bodyLabel" accessibilityRole="header">
-              {t("tripPlanner.onAppleMaps")}
-            </ThemedText>
-            <SearchNote search={search} />
-            {results.map((place) => (
-              <PlaceRow
-                key={place.appleId ?? `${place.name}-${place.lat}`}
-                name={place.name}
-                detail={place.area}
-                added={onTrip(data, place)}
-                disabled={busy}
-                onPress={() => void pick({ kind: "search", place })}
-              />
-            ))}
-          </View>
-        ) : null}
-
-        {gated ? null : (
-          <View style={styles.section}>
-            <ThemedText variant="bodyLabel" accessibilityRole="header">
-              {t("tripPlanner.fromSaves")}
-            </ThemedText>
-            {saves.data !== undefined && saves.data.length === 0 ? (
-              <ThemedText variant="footnote" style={styles.muted}>
-                {t("tripPlanner.noSavesLeft")}
-              </ThemedText>
-            ) : null}
-            {savePlaces.map((place) => (
-              <PlaceRow
-                key={`${place.itemId}-${place.name}`}
-                name={place.name}
-                detail={place.title}
-                added={false}
-                disabled={busy}
-                onPress={() =>
-                  void pick({
-                    kind: "save",
-                    itemId: place.itemId,
-                    name: place.name,
-                  })
-                }
-              />
-            ))}
-          </View>
-        )}
-      </ScrollView>
-    </View>
+        </AddPlaceSection>
+      </AddPlaceSearch>
+    </AddPlaceSheet>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  screen: { flex: 1, backgroundColor: theme.colors.background },
-  content: {
-    gap: theme.gap(3),
-    paddingHorizontal: theme.gap(2.5),
-    paddingTop: theme.gap(2),
-    paddingBottom: theme.gap(4),
-  },
-  input: {
-    ...theme.type.body,
-    minHeight: theme.control.minHeight,
-    paddingHorizontal: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    color: theme.colors.foreground,
-  },
-  section: { gap: theme.gap(1) },
   chips: { gap: theme.gap(1) },
-  place: {
-    minHeight: theme.control.minHeight,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.5),
-    paddingVertical: theme.gap(1.25),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.border,
-  },
-  placeText: { flex: 1, gap: theme.gap(0.25) },
-  note: { paddingVertical: theme.gap(1) },
-  muted: { color: theme.colors.muted },
-  pressed: { opacity: theme.opacity.pressed },
 }));

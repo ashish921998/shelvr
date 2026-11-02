@@ -3,11 +3,7 @@ import { TripPlannerMap } from "@/components/trip-planner/trip-planner-map";
 import { TripStopRow } from "@/components/trip-planner/trip-stop-row";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
-import {
-  canOpenPlaceCard,
-  cancelPlaceDetails,
-  openPlaceDetails,
-} from "@/lib/apple-place-card";
+import { canOpenPlaceCard } from "@/lib/apple-place-card";
 import { t } from "@/lib/i18n";
 import {
   dayAtScroll,
@@ -17,7 +13,6 @@ import {
   nextDayFocus,
   scrolledToEnd,
   sharedSaveStops,
-  type StopAction,
   stopAction,
   tripDayLabel,
   tripLengthLine,
@@ -26,10 +21,9 @@ import {
 } from "@/lib/trip-planner";
 import type { TripPlanDetail, TripPlanStop } from "@convex/model/tripPlan";
 import { haptics } from "@/lib/haptics";
-import { useFocusEffect, useRouter } from "expo-router";
+import { usePlaceOpener } from "@/lib/use-place-opener";
 import { useCallback, useMemo, useReducer, useRef } from "react";
 import {
-  Linking,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
@@ -92,44 +86,9 @@ export function hasMapPoints(trip: TripPlanDetail): boolean {
 }
 
 function useStopOpener() {
-  const router = useRouter();
-  // A place card's Apple lookup can finish after the person has left; it must not present or navigate then.
-  const focused = useRef(false);
-  useFocusEffect(
-    useCallback(() => {
-      focused.current = true;
-      return () => {
-        focused.current = false;
-        cancelPlaceDetails();
-      };
-    }, []),
-  );
-  const run = useCallback(
-    (stop: TripPlanStop, first: StopAction) => {
-      const go = (action: StopAction): void => {
-        if (!focused.current) return;
-        switch (action.kind) {
-          case "save":
-            router.push({
-              pathname: "/item/[id]",
-              params: { id: action.itemId },
-            });
-            return;
-          case "card":
-            // Without a card (an older iOS, or no page at Apple), the save or Maps opens instead.
-            void openPlaceDetails(action.appleId, () =>
-              go(stopAction(stop, false)),
-            );
-            return;
-          case "maps":
-            Linking.openURL(action.url).catch((error: unknown) =>
-              analytics.captureError("trip_plan_maps_failed", error),
-            );
-        }
-      };
-      go(first);
-    },
-    [router],
+  const { open } = usePlaceOpener<TripPlanStop>(
+    stopAction,
+    "trip_plan_maps_failed",
   );
   return useCallback(
     (stop: TripPlanStop) => {
@@ -139,9 +98,9 @@ function useStopOpener() {
         source: stop.source,
         action: action.kind,
       });
-      run(stop, action);
+      open(stop, action);
     },
-    [run],
+    [open],
   );
 }
 

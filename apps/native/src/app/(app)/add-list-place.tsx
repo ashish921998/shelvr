@@ -1,6 +1,5 @@
-import { AppSymbolIcon } from "@/components/symbol";
+import { AddPlaceSearch, AddPlaceSheet } from "@/components/add-place-sheet";
 import { Button } from "@/components/ui/button";
-import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
 import { openPaywall } from "@/lib/entitlement";
@@ -8,7 +7,7 @@ import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
 import { inCity, type SharedListDetail } from "@/lib/shared-lists";
-import { type PlaceSearch, usePlaceSearch } from "@/lib/trip-edit";
+import { usePlaceSearch } from "@/lib/trip-edit";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { sameTripPlace } from "@convex/model/placeIdentity";
@@ -16,100 +15,10 @@ import type { TripPlace } from "@convex/model/tripPlan";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useAction, useMutation } from "convex/react";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Platform,
-  Pressable,
-  ScrollView,
-  TextInput,
-  View,
-} from "react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
-
-const MAX_QUERY_LENGTH = 100;
-
-function PlaceRow({
-  name,
-  detail,
-  added,
-  disabled,
-  onPress,
-}: {
-  name: string;
-  detail: string | undefined;
-  added: boolean;
-  disabled: boolean;
-  onPress: () => void;
-}) {
-  const { theme } = useUnistyles();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={[name, detail, added ? t("sharedLists.onList") : null]
-        .filter(Boolean)
-        .join(", ")}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [styles.place, pressed && styles.pressed]}
-    >
-      <View style={styles.placeText}>
-        <ThemedText variant="subheadStrong" numberOfLines={2}>
-          {name}
-        </ThemedText>
-        {detail ? (
-          <ThemedText variant="footnote" numberOfLines={1} style={styles.muted}>
-            {detail}
-          </ThemedText>
-        ) : null}
-      </View>
-      {added ? (
-        <ThemedText variant="caption" style={styles.muted}>
-          {t("sharedLists.onList")}
-        </ThemedText>
-      ) : (
-        <AppSymbolIcon
-          name="plus.circle.fill"
-          size={24}
-          tintColor={theme.colors.primary}
-        />
-      )}
-    </Pressable>
-  );
-}
-
-function SearchNote({ search }: { search: PlaceSearch }) {
-  const { theme } = useUnistyles();
-  switch (search.status) {
-    case "searching":
-      return (
-        <View
-          style={styles.note}
-          accessibilityLabel={t("tripPlanner.searching")}
-        >
-          <ActivityIndicator color={theme.colors.muted} />
-        </View>
-      );
-    case "unavailable":
-    case "failed":
-      return (
-        <ThemedText variant="footnote" style={[styles.note, styles.muted]}>
-          {t("tripPlanner.searchUnavailable")}
-        </ThemedText>
-      );
-    case "done":
-      return search.places.length === 0 ? (
-        <ThemedText variant="footnote" style={[styles.note, styles.muted]}>
-          {t("tripPlanner.searchEmpty")}
-        </ThemedText>
-      ) : null;
-    case "idle":
-      return null;
-  }
-}
+import { Alert, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
 function onList(detail: SharedListDetail, place: TripPlace): boolean {
   return detail.places.some((row) => sameTripPlace(row, place));
@@ -135,7 +44,6 @@ function useSavedPlaces(
 export default function AddListPlaceScreen() {
   const locale = useAppLocale();
   const router = useRouter();
-  const { theme } = useUnistyles();
   const params = useLocalSearchParams<{ listId: string; city?: string }>();
   const listId = params.listId as Id<"sharedLists">;
   const detail = useQuery(
@@ -175,53 +83,10 @@ export default function AddListPlaceScreen() {
     }
   };
 
-  const header = (
-    <>
-      <Stack.Screen
-        options={{
-          title: t("tripPlanner.addPlace"),
-          headerTitleStyle: {
-            ...theme.type.title,
-            color: theme.colors.foreground,
-          },
-          ...(Platform.OS === "android"
-            ? {
-                headerLeft: () => (
-                  <HeaderIconButton
-                    icon="xmark"
-                    label={t("common.close")}
-                    onPress={close}
-                  />
-                ),
-              }
-            : {}),
-        }}
-      />
-      {Platform.OS === "ios" ? (
-        <Stack.Toolbar placement="left">
-          <Stack.Toolbar.Button
-            icon="xmark"
-            tintColor={theme.colors.foreground}
-            onPress={close}
-          >
-            {t("common.close")}
-          </Stack.Toolbar.Button>
-        </Stack.Toolbar>
-      ) : null}
-    </>
-  );
-
-  if (!data) {
-    return (
-      <View style={styles.screen} accessibilityViewIsModal>
-        {header}
-      </View>
-    );
-  }
+  if (!data) return <AddPlaceSheet onClose={close} />;
   if (!data.covered) {
     return (
-      <View style={styles.screen} accessibilityViewIsModal>
-        {header}
+      <AddPlaceSheet onClose={close}>
         <View style={styles.content}>
           <ThemedText variant="title">
             {t("sharedLists.notCoveredTitle")}
@@ -234,125 +99,60 @@ export default function AddListPlaceScreen() {
             onPress={() => void openPaywall(router, "shared_list_search")}
           />
         </View>
-      </View>
+      </AddPlaceSheet>
     );
   }
 
-  const placeholder = t("tripPlanner.searchPlaceholder", { city });
-  const results = search.status === "done" ? search.places : [];
-
   return (
-    <View style={styles.screen} accessibilityViewIsModal>
-      {header}
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        contentContainerStyle={styles.content}
-      >
-        <TextInput
-          testID="add-list-place-search"
-          value={query}
-          onChangeText={setQuery}
-          autoFocus
-          placeholder={placeholder}
-          placeholderTextColor={theme.colors.muted}
-          accessibilityLabel={placeholder}
-          maxLength={MAX_QUERY_LENGTH}
-          autoCorrect={false}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-          style={styles.input}
-        />
-
-        {query.trim().length > 0 ? (
-          <View style={styles.section}>
-            <ThemedText variant="bodyLabel" accessibilityRole="header">
-              {t("tripPlanner.onAppleMaps")}
-            </ThemedText>
-            <SearchNote search={search} />
-            {results.map((place) => (
-              <PlaceRow
-                key={place.appleId ?? `${place.name}-${place.lat}`}
-                name={place.name}
-                detail={place.area}
-                added={onList(data, place)}
-                disabled={busy}
-                onPress={() =>
-                  void pick("search", () =>
-                    addFound({
-                      listId,
-                      place: { ...place, city },
-                    }),
-                  )
-                }
-              />
-            ))}
-          </View>
-        ) : null}
-
-        {saved.length > 0 ? (
-          <View style={styles.section}>
-            <ThemedText variant="bodyLabel" accessibilityRole="header">
-              {t("tripPlanner.fromSaves")}
-            </ThemedText>
-            {saved.map((place) => (
-              <PlaceRow
-                key={`${place.itemId}-${place.name}`}
-                name={place.name}
-                detail={place.city}
-                added={false}
-                disabled={busy}
-                onPress={() =>
-                  void pick("save", () =>
-                    addSave({
-                      listId,
-                      itemId: place.itemId,
-                      name: place.name,
-                      ...(place.city ? { city: place.city } : {}),
-                    }),
-                  )
-                }
-              />
-            ))}
-          </View>
-        ) : null}
-      </ScrollView>
-    </View>
+    <AddPlaceSheet onClose={close}>
+      <AddPlaceSearch
+        testID="add-list-place-search"
+        city={city}
+        query={query}
+        onQueryChange={setQuery}
+        search={search}
+        busy={busy}
+        addedLabel={t("sharedLists.onList")}
+        isAdded={(place) => onList(data, place)}
+        onPickFound={(place) =>
+          void pick("search", () =>
+            addFound({
+              listId,
+              place: { ...place, city },
+            }),
+          )
+        }
+        saved={
+          saved.length > 0
+            ? {
+                rows: saved.map((place) => ({
+                  key: `${place.itemId}-${place.name}`,
+                  name: place.name,
+                  detail: place.city,
+                  onPress: () =>
+                    void pick("save", () =>
+                      addSave({
+                        listId,
+                        itemId: place.itemId,
+                        name: place.name,
+                        ...(place.city ? { city: place.city } : {}),
+                      }),
+                    ),
+                })),
+              }
+            : null
+        }
+      />
+    </AddPlaceSheet>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  screen: { flex: 1, backgroundColor: theme.colors.background },
   content: {
     gap: theme.gap(3),
     paddingHorizontal: theme.gap(2.5),
     paddingTop: theme.gap(2),
     paddingBottom: theme.gap(4),
   },
-  input: {
-    ...theme.type.body,
-    minHeight: theme.control.minHeight,
-    paddingHorizontal: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.surface,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    color: theme.colors.foreground,
-  },
-  section: { gap: theme.gap(1) },
-  place: {
-    minHeight: theme.control.minHeight,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.5),
-    paddingVertical: theme.gap(1.25),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.border,
-  },
-  placeText: { flex: 1, gap: theme.gap(0.25) },
-  note: { paddingVertical: theme.gap(1) },
   muted: { color: theme.colors.muted },
-  pressed: { opacity: theme.opacity.pressed },
 }));

@@ -1,5 +1,4 @@
-import { CityMap } from "@/components/city/city-map";
-import { CitySheet, moveSheet } from "@/components/city/city-sheet";
+import { PlaceMapScreen } from "@/components/city/place-map-screen";
 import { PlanButton } from "@/components/city/plan-button";
 import { EmptyState } from "@/components/empty-state";
 import { ListPlaceRow } from "@/components/shared-list/list-place-row";
@@ -11,25 +10,21 @@ import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
-import {
-  canOpenPlaceCard,
-  cancelPlaceDetails,
-  openPlaceDetails,
-} from "@/lib/apple-place-card";
-import { sheetSnaps } from "@/lib/city-sheet";
+import { canOpenPlaceCard } from "@/lib/apple-place-card";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
 import { stopAction } from "@/lib/trip-planner";
 import {
   type ListRow,
-  type ListSectionRow,
   listRows,
   listSectionRows,
   partnerName,
   type SharedListDetail,
+  type SharedListPlace,
   useListPlan,
   withLine,
 } from "@/lib/shared-lists";
+import { usePlaceOpener } from "@/lib/use-place-opener";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
@@ -43,28 +38,14 @@ import {
   useRouter,
 } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Alert,
-  FlatList,
-  Linking,
-  Platform,
-  ScrollView,
-  View,
-} from "react-native";
-import Animated, { useSharedValue } from "react-native-reanimated";
+import { Alert, Platform, ScrollView, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-
-const MAP_SHARE = 0.4;
 
 function useSeenOnLeave(listId: Id<"sharedLists">, loaded: boolean) {
   const markSeen = useMutation(api.sharedLists.markSharedListSeen);
-  const focused = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      focused.current = true;
       return () => {
-        focused.current = false;
-        cancelPlaceDetails();
         if (loaded) {
           markSeen({ listId }).catch((error: unknown) =>
             analytics.captureError("shared_list_seen_failed", error),
@@ -73,7 +54,6 @@ function useSeenOnLeave(listId: Id<"sharedLists">, loaded: boolean) {
       };
     }, [listId, loaded, markSeen]),
   );
-  return focused;
 }
 
 function usePlaceEdits() {
@@ -99,7 +79,7 @@ export default function SharedListScreen() {
   const detail = useQuery(
     convexQuery(api.sharedLists.getSharedList, { listId }),
   );
-  const focused = useSeenOnLeave(listId, detail.data != null);
+  useSeenOnLeave(listId, detail.data != null);
   const { theme } = useUnistyles();
   const stranded = useNavigationState((state) => state.index === 0);
   const goHome = () => backOrHome(router);
@@ -173,20 +153,13 @@ export default function SharedListScreen() {
   return (
     <>
       {backTitle}
-      <SharedList detail={detail.data} focused={focused} />
+      <SharedList detail={detail.data} />
     </>
   );
 }
 
-function SharedList({
-  detail,
-  focused,
-}: {
-  detail: SharedListDetail;
-  focused: React.RefObject<boolean>;
-}) {
-  const router = useRouter();
-  const { theme, rt } = useUnistyles();
+function SharedList({ detail }: { detail: SharedListDetail }) {
+  const { theme } = useUnistyles();
   const [picked, setPicked] = useState<string | null>(null);
   const city =
     picked !== null && detail.cities.includes(picked)
@@ -205,37 +178,12 @@ function SharedList({
   const canTrip = places.some((row) => row.place.visitedAt === undefined);
   const edits = usePlaceEdits();
   const plan = useListPlan(detail._id, city);
-  const list = useRef<FlatList<ListSectionRow>>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const { height: screenHeight } = rt.screen;
-  const [headerHeight, setHeaderHeight] = useState<number | null>(null);
-  const [plansHeight, setPlansHeight] = useState<number | null>(null);
-  const snaps = useMemo(
-    () =>
-      sheetSnaps({
-        height: screenHeight,
-        insetTop: rt.insets.top,
-        insetBottom: rt.insets.bottom,
-        middle: screenHeight * MAP_SHARE - theme.gap(3),
-        ...(headerHeight !== null && plansHeight !== null
-          ? { collapsedVisible: headerHeight + plansHeight - rt.insets.bottom }
-          : {}),
-      }),
-    [screenHeight, rt.insets, theme, headerHeight, plansHeight],
-  );
   const hasMap = pins.length > 0;
-  const restingSnaps = useMemo(
-    () =>
-      hasMap
-        ? snaps
-        : { ...snaps, middle: snaps.expanded, collapsed: snaps.expanded },
-    [hasMap, snaps],
+  const opener = usePlaceOpener<SharedListPlace>(
+    stopAction,
+    "shared_list_maps_failed",
   );
-  const sheetTop = useSharedValue(restingSnaps.middle);
-  const restingMiddle = restingSnaps.middle;
-  useEffect(() => {
-    sheetTop.set(restingMiddle);
-  }, [restingMiddle, sheetTop]);
 
   const opened = useRef(false);
   useEffect(() => {
@@ -248,56 +196,23 @@ function SharedList({
     });
   }, [detail]);
 
-  const select = (pinId: string) => {
-    setSelected(pinId);
-    if (sheetTop.get() > snaps.middle) moveSheet(sheetTop, snaps.middle);
-    const index = rows.findIndex((row) => row.id === pinId);
-    if (index >= 0) list.current?.scrollToIndex({ index, viewPosition: 0.3 });
-  };
   const open = (row: ListRow) => {
-    if (!focused.current) return;
+    if (!opener.focused.current) return;
     const action = stopAction(row.place, canOpenPlaceCard(row.place.appleId));
     analytics.capture("shared_list_place_opened", { action: action.kind });
-    switch (action.kind) {
-      case "save":
-        router.push({ pathname: "/item/[id]", params: { id: action.itemId } });
-        return;
-      case "card":
-        void openPlaceDetails(action.appleId, () => {
-          if (!focused.current) return;
-          const fallback = stopAction(row.place, false);
-          if (fallback.kind === "maps") {
-            Linking.openURL(fallback.url).catch((error: unknown) =>
-              analytics.captureError("shared_list_maps_failed", error),
-            );
-          }
-        });
-        return;
-      case "maps":
-        Linking.openURL(action.url).catch((error: unknown) =>
-          analytics.captureError("shared_list_maps_failed", error),
-        );
-    }
+    opener.open(row.place, action);
   };
 
   return (
-    <View style={styles.container}>
+    <>
       <ListHeaderRight detail={detail} />
-      {hasMap ? (
-        <View style={styles.map}>
-          <CityMap
-            pins={pins}
-            selected={selected}
-            height={screenHeight}
-            coveredBottom={screenHeight - snaps.middle}
-            onSelect={select}
-          />
-        </View>
-      ) : null}
-      <CitySheet
-        snaps={restingSnaps}
-        onHeaderHeight={setHeaderHeight}
-        top={sheetTop}
+      <PlaceMapScreen
+        pins={pins}
+        hasMap={hasMap}
+        rows={rows}
+        rowGap={1}
+        selected={selected}
+        onSelect={setSelected}
         header={
           <View style={styles.header}>
             <View style={styles.titleRow}>
@@ -343,89 +258,72 @@ function SharedList({
             ) : null}
           </View>
         }
-        list={(scroll) => (
-          <Animated.FlatList
-            ref={list}
-            scrollEnabled={scroll.scrollEnabled}
-            onScroll={scroll.onScroll}
-            scrollEventThrottle={16}
-            bounces={scroll.bounces}
-            data={rows}
-            keyExtractor={(row) => row.id}
-            contentInsetAdjustmentBehavior="automatic"
-            contentContainerStyle={styles.content}
-            onScrollToIndexFailed={(info) =>
-              list.current?.scrollToOffset({
-                offset: info.averageItemLength * info.index,
-              })
-            }
-            renderItem={({ item }) =>
-              item.kind === "heading" ? (
-                <ThemedText
-                  variant="captionStrong"
-                  style={[styles.section, item.fresh && styles.freshLabel]}
-                >
-                  {item.label}
-                </ThemedText>
-              ) : (
-                <ListPlaceRow
-                  place={item.row.place}
-                  number={item.row.pin.number}
-                  selected={selected === item.id}
-                  onPress={() =>
-                    selected === item.id ? open(item.row) : select(item.id)
-                  }
-                  onPlaceDetails={
-                    canOpenPlaceCard(item.row.place.appleId)
-                      ? () => open(item.row)
-                      : undefined
-                  }
-                  onVisited={(visited) =>
-                    void edits.visited(item.row.place._id, visited)
-                  }
-                  onRemove={() => {
-                    setSelected(null);
-                    void edits.remove(item.row.place._id);
-                  }}
-                />
-              )
-            }
-            ListEmptyComponent={
-              <EmptyState
-                title={t("sharedLists.emptyTitle")}
-                message={t("sharedLists.emptyBody")}
-              />
-            }
-            ListFooterComponent={<ListFooter detail={detail} city={city} />}
+        renderRow={(item, select) =>
+          item.kind === "heading" ? (
+            <ThemedText
+              variant="captionStrong"
+              style={[styles.section, item.fresh && styles.freshLabel]}
+            >
+              {item.label}
+            </ThemedText>
+          ) : (
+            <ListPlaceRow
+              place={item.row.place}
+              number={item.row.pin.number}
+              selected={selected === item.id}
+              onPress={() =>
+                selected === item.id ? open(item.row) : select(item.id)
+              }
+              onPlaceDetails={
+                canOpenPlaceCard(item.row.place.appleId)
+                  ? () => open(item.row)
+                  : undefined
+              }
+              onVisited={(visited) =>
+                void edits.visited(item.row.place._id, visited)
+              }
+              onRemove={() => {
+                setSelected(null);
+                void edits.remove(item.row.place._id);
+              }}
+            />
+          )
+        }
+        empty={
+          <EmptyState
+            title={t("sharedLists.emptyTitle")}
+            message={t("sharedLists.emptyBody")}
           />
-        )}
+        }
+        footer={<ListFooter detail={detail} city={city} />}
+        plans={
+          hasMap ? (
+            <>
+              <PlanButton
+                kind="date"
+                busy={null}
+                onPress={() => plan("date")}
+              />
+              {canTrip ? (
+                <PlanButton
+                  kind="trip"
+                  busy={null}
+                  onPress={() => plan("trip")}
+                />
+              ) : null}
+            </>
+          ) : null
+        }
       />
-      {hasMap ? (
-        <View
-          style={styles.plans}
-          onLayout={(event) => setPlansHeight(event.nativeEvent.layout.height)}
-        >
-          <PlanButton kind="date" busy={null} onPress={() => plan("date")} />
-          {canTrip ? (
-            <PlanButton kind="trip" busy={null} onPress={() => plan("trip")} />
-          ) : null}
-        </View>
-      ) : null}
-    </View>
+    </>
   );
 }
 
 const styles = StyleSheet.create((theme, rt) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  map: { ...StyleSheet.absoluteFillObject },
   gone: {
     paddingHorizontal: theme.gap(3),
     paddingBottom: rt.insets.bottom + theme.gap(3),
-  },
-  content: {
-    gap: theme.gap(1),
-    paddingHorizontal: theme.gap(2),
-    paddingBottom: rt.insets.bottom + theme.gap(12),
   },
   header: {
     gap: theme.gap(0.5),
@@ -448,18 +346,4 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingTop: theme.gap(1),
   },
   freshLabel: { color: theme.colors.primaryText },
-  plans: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    flexDirection: "row",
-    gap: theme.gap(1.5),
-    paddingHorizontal: theme.gap(2),
-    paddingTop: theme.gap(1.5),
-    paddingBottom: rt.insets.bottom + theme.gap(1),
-    backgroundColor: theme.colors.background,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: theme.colors.border,
-  },
 }));
