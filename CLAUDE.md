@@ -83,8 +83,10 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
     next digest and reminder instants
   - `itemReads`: per-user read state, kept out of the item row
   - `placeRemovals`: user-owned venue removal decisions, indexed by user; the account deletion drain removes them in batches through `deletePlaceRemovalsBatch`
-  - `placeVisits`: places the user marked "We went" on a plan, one row per place name, so
-    later plans rank them last
+  - `placeVisits`: places the user marked "We went" or "I went", one row per place name
+    across all cities, so later plans rank them last and the Passport shows them. New marks
+    copy the save's pin (`lat`, `lng`, `city`) and get a `countryCode`; `backfilled` marks a
+    place from before Shelvr, which has no real date. Keep the optional fields on rollback
   - `planShares`: a plan's shortlist snapshot behind a random public vote link (one week),
     so someone without the app can vote on its places at `/p/<token>`
   - `planVotes`: one visitor's ✓/✕ picks on a `planShares` link, keyed by a browser id,
@@ -363,6 +365,11 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   the save's tags; "date night" always comes from the tags.
 - **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark.
   Planning reads these records inside Shelvr; they are not sent to an AI provider.
+  `markVisitedBefore` marks up to 60 places from before Shelvr at once (one
+  `placeVisitBatch` spend), and `getPassport` lists every mark newest first with its save's
+  cover, taking an old mark's pin from its save. `locateCountry` reverse geocodes a mark's
+  pin once with Apple Maps for its country, skipped when AI is declined or the Maps key is
+  unset, and `storeCountry` drops an answer for a point the mark no longer has.
 - **`placeRemovals.ts`**: `removePlace` stores an owned venue decision; `undoRemovePlace`
   deletes that decision idempotently. `model/placeRemovals.ts` projects a user's decisions over
   raw saves and membership intents on read. A pin matches by the city page's row identity

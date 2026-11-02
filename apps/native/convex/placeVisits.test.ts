@@ -1,11 +1,51 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import type { FunctionReference } from "convex/server";
-import { describe, expect, expectTypeOf, it } from "vitest";
+import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
-import { newConvexTest, signedInUser } from "./test.setup";
-import { api } from "./_generated/api";
+import { newConvexTest, setTestConsent, signedInUser } from "./test.setup";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
+
+async function testKey(): Promise<string> {
+  const pair = await crypto.subtle.generateKey(
+    { name: "ECDSA", namedCurve: "P-256" },
+    true,
+    ["sign", "verify"],
+  );
+  const der = new Uint8Array(
+    await crypto.subtle.exportKey("pkcs8", pair.privateKey),
+  );
+  return btoa(String.fromCharCode(...der));
+}
+
+async function withMaps() {
+  vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+  vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+  vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+  const fetchMock = vi.fn(async (input: string) => {
+    const url = new URL(input);
+    if (url.pathname === "/v1/token") {
+      return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
+    }
+    return Response.json({
+      results: [{ country: "Portugal", countryCode: "pt" }],
+    });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return () =>
+    fetchMock.mock.calls.filter(
+      ([input]) => new URL(input).pathname === "/v1/reverseGeocode",
+    ).length;
+}
+
+const PIN = { name: "Tigre", lat: 38.71, lng: -9.14 };
 
 async function setup(options: { pro?: boolean } = {}) {
   const backend = newConvexTest();
@@ -20,6 +60,9 @@ async function setup(options: { pro?: boolean } = {}) {
       title: "Tigre",
       tags: [],
       searchText: "Tigre",
+      cities: ["Lisbon"],
+      heroImageUrl: "https://example.com/tigre.jpg",
+      placePins: [PIN],
     }),
   );
   const visits = () =>
@@ -99,5 +142,142 @@ describe("setVisited", () => {
         visited: true,
       }),
     ).rejects.toThrow("Place name is empty");
+  });
+});
+
+async function settle(
+  t: Awaited<ReturnType<typeof setup>>["t"],
+  run: () => Promise<unknown>,
+) {
+  vi.useFakeTimers();
+  try {
+    await run();
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
+describe("the passport", () => {
+  it("keeps the pin, city and country of a place marked I went", async () => {
+    const lookups = await withMaps();
+    const { backend, t, itemId, visits } = await setup();
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    expect(await visits()).toMatchObject([
+      { lat: PIN.lat, lng: PIN.lng, city: "Lisbon", countryCode: "PT" },
+    ]);
+    expect((await visits())[0]?.backfilled).toBeUndefined();
+
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    expect(lookups()).toBe(1);
+    expect(await visits()).toMatchObject([{ countryCode: "PT" }]);
+  });
+
+  it("asks Apple nothing for someone who declined AI", async () => {
+    const lookups = await withMaps();
+    const { backend, t, userId, itemId, visits } = await setup();
+    await backend.run((ctx) => setTestConsent(ctx, userId, "declined"));
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    expect(lookups()).toBe(0);
+    expect(await visits()).toMatchObject([{ city: "Lisbon" }]);
+    expect((await visits())[0]?.countryCode).toBeUndefined();
+  });
+
+  it("drops a country found for a point the visit no longer has", async () => {
+    const { t, itemId, visits } = await setup();
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: true,
+    });
+    const [visit] = await visits();
+    await t.mutation(internal.placeVisits.storeCountry, {
+      visitId: visit!._id,
+      lat: 1,
+      lng: 2,
+      countryCode: "ES",
+    });
+    expect((await visits())[0]?.countryCode).toBeUndefined();
+  });
+
+  it("marks places from before Shelvr without a date, in one go, past the single-mark limit", async () => {
+    const { t, itemId, visits } = await setup();
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: true,
+    });
+    const [kept] = await visits();
+    const names = Array.from({ length: 30 }, (_, i) => `Spot ${i + 1}`);
+    const count = await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [...names, "Tigre", "spot 1"].map((name) => ({ itemId, name })),
+    });
+    expect(count).toBe(31);
+    const all = await visits();
+    expect(all).toHaveLength(31);
+    expect(all.find((visit) => visit.key === "tigre")).toEqual(kept);
+    expect(
+      all
+        .filter((visit) => visit.key !== "tigre")
+        .every((visit) => visit.backfilled),
+    ).toBe(true);
+  });
+
+  it("refuses a batch over another user's save, and marks nothing", async () => {
+    const { backend, itemId } = await setup();
+    const other = await signedInUser(backend, { pro: true });
+    await expect(
+      other.t.mutation(api.placeVisits.markVisitedBefore, {
+        places: [{ itemId, name: "Tigre" }],
+      }),
+    ).rejects.toThrow("Item not found");
+  });
+
+  it("lists stamps newest first with covers, and pins old plan marks from their save", async () => {
+    const { t, userId, itemId } = await setup();
+    await t.run((ctx) =>
+      ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+      }),
+    );
+    await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [{ itemId, name: "Cervejaria" }],
+    });
+    expect(await t.query(api.placeVisits.getPassport, {})).toEqual([
+      expect.objectContaining({
+        key: "cervejaria",
+        backfilled: true,
+        cover: "https://example.com/tigre.jpg",
+      }),
+      expect.objectContaining({
+        key: "tigre",
+        lat: PIN.lat,
+        lng: PIN.lng,
+        city: "Lisbon",
+        cover: "https://example.com/tigre.jpg",
+      }),
+    ]);
   });
 });
