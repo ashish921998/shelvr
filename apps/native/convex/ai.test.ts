@@ -1705,4 +1705,36 @@ describe("readPage recipe eligibility", () => {
     expect(read).toMatchObject({ status: "ok", askForRecipe: false });
     expect(read).not.toHaveProperty("shortForm");
   });
+
+  it("caps a page's title, description and site name at the reader boundary", async () => {
+    safeFetch.mockImplementation(async (url: string) => ({
+      ok: true,
+      finalUrl: url,
+      status: 200,
+      contentType: "text/html; charset=utf-8",
+      bytes: new TextEncoder().encode(
+        `<html><head><title>${"T".repeat(299)}😀 tail</title><meta property="og:description" content="${"d".repeat(5000)}"><meta property="og:site_name" content="${"s".repeat(1000)}"></head><body><p>Hi.</p></body></html>`,
+      ),
+    }));
+    const read = await readPage("https://example.com/post");
+    expect(read.status).toBe("ok");
+    const page = read.status === "ok" ? read.page : undefined;
+    expect(page?.title).toBe("T".repeat(299));
+    expect(page?.description).toBe("d".repeat(2000));
+    expect(page?.siteName).toBe("s".repeat(200));
+  });
+
+  it("caps an author a platform reader returned", async () => {
+    safeFetch.mockImplementation(async (url: string) => ({
+      ok: true,
+      finalUrl: url,
+      status: 200,
+      contentType: "application/json",
+      bytes: new TextEncoder().encode(
+        JSON.stringify({ title: "Caption", author_name: "a".repeat(5000) }),
+      ),
+    }));
+    const read = await readPage(TIKTOK_URL);
+    expect(read.status === "ok" && read.page.author).toBe("a".repeat(200));
+  });
 });

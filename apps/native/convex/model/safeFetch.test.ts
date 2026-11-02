@@ -803,4 +803,53 @@ describe("decodeWithContentType", () => {
       decodeWithContentType(bytes, 'text/html; charset="iso-8859-1"'),
     ).toBe("é");
   });
+
+  function html(head: string, body: number[]): Uint8Array {
+    return new Uint8Array([
+      ...new TextEncoder().encode(`<html><head>${head}</head><body>`),
+      ...body,
+    ]);
+  }
+
+  const TOKYO_CAFE_SHIFT_JIS = [
+    0x93, 0x8c, 0x8b, 0x9e, 0x82, 0xcc, 0x83, 0x4a, 0x83, 0x74, 0x83, 0x46,
+  ];
+
+  it("decodes a Shift_JIS page that declares its charset only in a meta tag", () => {
+    const bytes = html('<meta charset="Shift_JIS">', TOKYO_CAFE_SHIFT_JIS);
+    expect(decodeWithContentType(bytes, "text/html")).toContain("東京のカフェ");
+  });
+
+  it("decodes a windows-1252 page declared through http-equiv", () => {
+    const bytes = html(
+      '<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">',
+      [0x63, 0x61, 0x66, 0xe9, 0x20, 0x80, 0x35, 0x20, 0x92],
+    );
+    expect(decodeWithContentType(bytes, "text/html")).toContain("café €5 ’");
+  });
+
+  it("keeps the header charset over a meta tag that disagrees", () => {
+    const bytes = html('<meta charset="shift_jis">', [
+      ...new TextEncoder().encode("café"),
+    ]);
+    expect(decodeWithContentType(bytes, "text/html; charset=utf-8")).toContain(
+      "café",
+    );
+  });
+
+  it("decodes as UTF-8 when the meta charset is unknown or the body is not HTML", () => {
+    const utf8 = [...new TextEncoder().encode("café")];
+    expect(
+      decodeWithContentType(
+        html('<meta charset="no-such-charset">', utf8),
+        "text/html",
+      ),
+    ).toContain("café");
+    expect(
+      decodeWithContentType(
+        html('<meta charset="shift_jis">', utf8),
+        "application/json",
+      ),
+    ).toContain("café");
+  });
 });

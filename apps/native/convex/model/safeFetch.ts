@@ -481,12 +481,26 @@ function decodeWindows1252(bytes: Uint8Array): string {
   return out;
 }
 
+const META_PRESCAN_BYTES = 4096;
+
+function metaCharset(bytes: Uint8Array): string | undefined {
+  if (bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
+    return undefined;
+  }
+  const head = decodeWindows1252(bytes.subarray(0, META_PRESCAN_BYTES));
+  const label = head
+    .match(/<meta[^>]+charset\s*=\s*["']?([\w.:-]+)/i)?.[1]
+    ?.toLowerCase();
+  return label?.startsWith("utf-16") ? undefined : label;
+}
+
 export function decodeWithContentType(
   bytes: Uint8Array,
   contentType: string,
 ): string {
-  const match = contentType.match(/charset\s*=\s*["']?([\w.:-]+)/i);
-  const charset = match?.[1]?.toLowerCase();
+  const charset =
+    contentType.match(/charset\s*=\s*["']?([\w.:-]+)/i)?.[1]?.toLowerCase() ??
+    (/html/i.test(contentType) ? metaCharset(bytes) : undefined);
   if (charset && charset !== "utf-8" && charset !== "utf8") {
     if (WINDOWS_1252_LABELS.has(charset)) {
       return decodeWindows1252(bytes);
