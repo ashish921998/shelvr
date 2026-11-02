@@ -442,10 +442,15 @@ function useInvocationHandler(entitled: boolean) {
 
   AppIntents.useAppIntents(drain);
 
+  const drainRef = useRef(drain);
+  useEffect(() => {
+    drainRef.current = drain;
+  });
+
   useEffect(() => {
     if (!entitled) return;
     AppIntents.getPendingInvocationsAsync()
-      .then((pending) => drain(pending.filter(isSaveInvocation)))
+      .then((pending) => drainRef.current(pending.filter(isSaveInvocation)))
       .catch((error: unknown) =>
         analytics.captureError("app_intents_pending_read_failed", error),
       );
