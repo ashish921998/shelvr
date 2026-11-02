@@ -18,7 +18,7 @@ import {
 import { authedMutation, authedQuery } from "./model/auth";
 import { logEvent } from "./model/log";
 import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
-import { findVisit, visitedPlaceKeys } from "./model/placeVisits";
+import { findVisit } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import { uniquePlacePins } from "./model/trip";
 import { requireProEntitlement } from "./subscriptions";
@@ -240,6 +240,29 @@ export const getPassport = authedQuery({
 });
 
 const MAX_UNSTAMPED_PLACES = 200;
+const MAX_VISIT_CHECKS = 1_000;
+
+async function unstampedPins(ctx: QueryCtx, userId: Id<"users">) {
+  const checked = new Set<string>();
+  const pins = [];
+  for (const item of await readySavesNewestFirst(ctx, userId)) {
+    for (const pin of item.placePins ?? []) {
+      const city = pinCity(item, pin);
+      const key = placeKey(pin.name);
+      if (city === undefined || checked.has(key)) continue;
+      if (
+        checked.size >= MAX_VISIT_CHECKS ||
+        pins.length >= MAX_UNSTAMPED_PLACES
+      ) {
+        return pins;
+      }
+      checked.add(key);
+      if ((await findVisit(ctx, userId, pin.name)) !== null) continue;
+      pins.push({ ...pin, city, item });
+    }
+  }
+  return pins;
+}
 
 export const listUnstampedPlaces = authedQuery({
   args: {},
@@ -253,18 +276,7 @@ export const listUnstampedPlaces = authedQuery({
     }),
   ),
   handler: async (ctx) => {
-    const taken = await visitedPlaceKeys(ctx, ctx.userId);
-    const pins = [];
-    for (const item of await readySavesNewestFirst(ctx, ctx.userId)) {
-      for (const pin of item.placePins ?? []) {
-        const city = pinCity(item, pin);
-        const key = placeKey(pin.name);
-        if (city === undefined || taken.has(key)) continue;
-        taken.add(key);
-        pins.push({ ...pin, city, item });
-      }
-    }
-    const places = uniquePlacePins(pins).slice(0, MAX_UNSTAMPED_PLACES);
+    const places = uniquePlacePins(await unstampedPins(ctx, ctx.userId));
     const covers = new Map<Id<"items">, Promise<string | null>>();
     return await Promise.all(
       places.map(async ({ name, city, item }) => {
