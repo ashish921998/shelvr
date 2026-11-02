@@ -54,8 +54,8 @@ export default function PrivacyPage() {
             from another app, Shelvr normally removes its EXIF metadata before
             uploading it. A photo saved through Siri, Shortcuts, or the Save an
             Image action can keep its metadata, which can include when and where
-            it was taken. That file is stored as it is and sent to Gemini as it
-            is, and the metadata goes with the file if you share that photo from
+            it was taken. Any metadata the file keeps is stored with it, sent to
+            Gemini with it, and goes with the file if you share that photo from
             the app. Earlier versions of the app could also keep a photo’s
             capture time and GPS coordinates as fields in our database so the
             item could appear on your map and be sorted by when it was taken.
@@ -184,7 +184,8 @@ export default function PrivacyPage() {
           you give it, such as titles or a screenshot, to Gemini for a reading.
           We do not store what you submit or the results. We do keep a rate
           limit record keyed to your IP address, to limit how often these tools
-          can be used. The waitlist and plan vote pages do the same.
+          can be used. The waitlist and plan vote pages use the same kind of
+          rate limit.
         </p>
         <p className="mt-2">
           Transient AI failures do not delete content you already captured.
@@ -198,9 +199,13 @@ export default function PrivacyPage() {
           web page for it. The page shows your first name, if we have one, the
           title, the AI description, the image, the source link, or the first
           500 characters of a note. A photo save gets no public page; sharing
-          one from the app sends the file itself. Anyone with the link can open
-          it, and search engines are asked not to index it. You can remove the
-          page by deleting the save.
+          one from the app sends the file itself. A plan can also be shared as
+          an unlisted vote link, which shows its city and places. Anyone with
+          the link can vote, up to 20 people, and we store each voter’s picks
+          with a random browser identifier. The link closes after a week, and we
+          delete it and its votes a week after that. Anyone with the link can
+          open it, and search engines are asked not to index it. You can remove
+          the page by deleting the save.
         </p>
       </section>
 
