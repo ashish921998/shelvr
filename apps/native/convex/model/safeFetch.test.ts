@@ -848,6 +848,15 @@ describe("decodeWithContentType", () => {
         "text/html",
       ),
     ).toContain("café 東京");
+    expect(
+      decodeWithContentType(
+        html(
+          '<meta name="description" content="Tips charset=windows-1252 > more"><meta charset="utf-8">',
+          utf8,
+        ),
+        "text/html",
+      ),
+    ).toContain("café 東京");
   });
 
   it("keeps the header charset over a meta tag that disagrees", () => {

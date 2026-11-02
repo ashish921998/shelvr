@@ -491,7 +491,7 @@ function metaCharset(bytes: Uint8Array): string | undefined {
     /<!--[\s\S]*?(?:-->|$)/g,
     "",
   );
-  for (const [tag] of head.matchAll(/<meta\b[^>]*>/gi)) {
+  for (const [tag] of head.matchAll(/<meta\b(?:[^>"']|"[^"]*"|'[^']*')*>/gi)) {
     const label = metaTagCharset(tag)?.toLowerCase();
     if (label) return label.startsWith("utf-16") ? undefined : label;
   }
