@@ -272,16 +272,22 @@ describe("city cards", () => {
   });
 
   it("adds how many places someone went to, for screen readers too", () => {
-    mocks.went = (city) => (city === "Lisbon" ? 2 : 0);
     mocks.cities = [
       { city: "Lisbon", count: 2, placeCount: 3, cover: null },
       { city: "Rome", count: 1, placeCount: 1, cover: null },
+      { city: "Porto", count: 2, placeCount: 0, cover: null },
     ];
+    mocks.went = (city) => (city === "Lisbon" ? 2 : city === "Porto" ? 1 : 0);
     render(<HomePlaces />);
     expect(
       screen.getByRole("button", { name: "Lisbon, 3 places · 2 went" }),
     ).toBeTruthy();
     expect(screen.getByRole("button", { name: "Rome, 1 place" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", {
+        name: "Porto, 2 saves, no place yet · 1 went",
+      }),
+    ).toBeTruthy();
     mocks.went = () => 0;
   });
 

@@ -94,11 +94,11 @@ export function cityRows(cities: City[]): CityRow[] {
 }
 
 export function cityCountLine(entry: City, went = 0): string | null {
-  if (entry.placeCount === 0) {
-    return t("homePlaces.noPlaceYet", { count: entry.count });
-  }
-  if (!entry.placeCount) return null;
-  const places = t("homePlaces.spotCount", { count: entry.placeCount });
+  if (entry.placeCount === undefined) return null;
+  const places =
+    entry.placeCount === 0
+      ? t("homePlaces.noPlaceYet", { count: entry.count })
+      : t("homePlaces.spotCount", { count: entry.placeCount });
   return went > 0
     ? `${places} · ${t("passport.wentCount", { count: went })}`
     : places;
