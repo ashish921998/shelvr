@@ -3,6 +3,7 @@
 import type { FunctionReference } from "convex/server";
 import { afterEach, describe, expect, expectTypeOf, it, vi } from "vitest";
 
+import { rateLimiter } from "./model/rateLimiter";
 import { newConvexTest, setTestConsent, signedInUser } from "./test.setup";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
@@ -271,6 +272,46 @@ describe("the passport", () => {
         .filter((visit) => visit.key !== "tigre")
         .every((visit) => visit.backfilled),
     ).toBe(true);
+  });
+
+  it("keeps the first save when a batch names one place twice", async () => {
+    const { t, userId, itemId, visits } = await setup();
+    const porto = await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Tigre Porto",
+        tags: [],
+        searchText: "Tigre",
+        cities: ["Porto"],
+        placePins: [{ ...PIN, lat: 41.15, lng: -8.61 }],
+      }),
+    );
+    await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [
+        { itemId, name: "Tigre" },
+        { itemId: porto, name: "tigre" },
+      ],
+    });
+    expect(await visits()).toMatchObject([{ itemId, city: "Lisbon" }]);
+  });
+
+  it("marks the place but skips the country once the shared budget is spent", async () => {
+    const lookups = await withMaps();
+    const { backend, t, itemId, visits } = await setup();
+    await backend.run((ctx) =>
+      rateLimiter.limit(ctx, "visitCountryGlobal", { count: 100 }),
+    );
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    expect(lookups()).toBe(0);
+    expect(await visits()).toMatchObject([{ city: "Lisbon" }]);
   });
 
   it("refuses a batch over another user's save, and marks nothing", async () => {

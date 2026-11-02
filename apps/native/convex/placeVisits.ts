@@ -86,7 +86,11 @@ async function markVisit(
   } else {
     await ctx.db.patch(visitId, visit);
   }
-  if (pin !== null && countryCode === undefined) {
+  if (
+    pin !== null &&
+    countryCode === undefined &&
+    (await rateLimiter.limit(ctx, "visitCountryGlobal")).ok
+  ) {
     await ctx.scheduler.runAfter(
       lookupDelayMs,
       internal.placeVisits.locateCountry,
@@ -132,9 +136,12 @@ export const markVisitedBefore = authedMutation({
     const items = await Promise.all(
       places.map(({ itemId }) => ownedItem(ctx, userId, itemId)),
     );
-    const unique = new Map(
-      places.map(({ name }, i) => [placeKey(name), { name, item: items[i] }]),
-    );
+    const unique = new Map<string, { name: string; item: Doc<"items"> }>();
+    places.forEach(({ name }, i) => {
+      if (!unique.has(placeKey(name))) {
+        unique.set(placeKey(name), { name, item: items[i] });
+      }
+    });
     await rateLimiter.limit(ctx, "placeVisitBatch", {
       key: userId,
       count: unique.size,
