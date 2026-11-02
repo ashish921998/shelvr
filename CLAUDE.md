@@ -572,7 +572,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   (`src/components/home/review-saves.tsx`); a save that lands that way while the app is open
   shows a toast instead (`unplaced-toast.tsx`). It loads more saves on scroll, and on its own only
   until five unplaced saves are loaded, never past 200. Old deep links, pushes and Siri
-  shortcuts to removed screens (spaces, search, digest, camera, the old trip) open Home, through
+  shortcuts to removed screens (spaces, search, digest, camera, the old trip, the old plan deck) open Home, through
   `src/lib/home-href.ts` and `src/app/+native-intent.ts`
 - `city/[name]` is the city page: a map and numbered rows for distinct places from the
   city's saves, plus a row for every other save a removal has not emptied, with Plan a date
@@ -595,7 +595,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   `shared-list/[id]`, `add-list-place`, `date-plan`, `new-trip` and `trip-plan/[id]` only
   through a list, and a personal plan still redirects to `plan-gate`
 - Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`, `new-shared-list`, `add-list-place`,
-  `profile`, `settings`, `item/[id]`, `city/[name]`, `spots/[id]`, `plan/[id]`, `date-plan`,
+  `profile`, `settings`, `item/[id]`, `city/[name]`, `spots/[id]`, `date-plan`,
   `new-trip`, `trip-plan/[id]`, `add-trip-stop`
 - `date-plan` is Plan a date, pushed from the city page with a `city` param: "What kind of
   date?" (Classic, Low-key, Surprise me),
