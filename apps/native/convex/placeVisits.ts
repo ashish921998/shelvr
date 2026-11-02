@@ -99,13 +99,15 @@ export const setVisited = authedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const { userId } = ctx;
-    const item = await ownedItem(ctx, userId, args.itemId);
+    const item = args.visited
+      ? await ownedItem(ctx, userId, args.itemId)
+      : null;
     await requireProEntitlement(ctx, userId);
     if (placeKey(args.name) === "") {
       throw new Error("Place name is empty");
     }
     await rateLimiter.limit(ctx, "placeVisit", { key: userId, throws: true });
-    if (args.visited) {
+    if (item !== null) {
       await markVisit(ctx, userId, item, args.name, false);
     } else {
       const existing = await findVisit(ctx, userId, args.name);

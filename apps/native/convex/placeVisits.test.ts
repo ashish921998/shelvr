@@ -142,6 +142,22 @@ describe("setVisited", () => {
     expect(await visits()).toHaveLength(0);
   });
 
+  it("unmarks a place whose save was deleted", async () => {
+    const { t, itemId, visits } = await setup();
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: true,
+    });
+    await t.run((ctx) => ctx.db.delete(itemId));
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+    });
+    expect(await visits()).toHaveLength(0);
+  });
+
   it("refuses another user's save and a name with no letters", async () => {
     const { backend, t, itemId } = await setup();
     const other = await signedInUser(backend, { pro: true });
