@@ -505,4 +505,37 @@ describe("the passport", () => {
       },
     ]);
   });
+
+  it("lists a name once, with its own pin's city, even across saves", async () => {
+    const { t, userId } = await setup();
+    const save = (city: string, lat: number) =>
+      t.run((ctx) =>
+        ctx.db.insert("items", {
+          userId,
+          type: "link",
+          status: "ready",
+          title: city,
+          tags: [],
+          searchText: city,
+          cities: ["Lisbon", "Porto"],
+          placePins: [
+            { name: "Cafe Uno", lat: lat + 1, lng: -8 },
+            { name: "Cafe Uno", lat, lng: -8, city },
+          ],
+        }),
+      );
+    await save("Porto", 41.15);
+    const newer = await save("Lisbon", 38.7);
+
+    const rows = await t.query(api.placeVisits.listUnstampedPlaces, {});
+    expect(rows.filter((row) => row.name === "Cafe Uno")).toEqual([
+      {
+        itemId: newer,
+        name: "Cafe Uno",
+        city: "Lisbon",
+        title: "Lisbon",
+        cover: null,
+      },
+    ]);
+  });
 });

@@ -18,7 +18,7 @@ import {
 import { authedMutation, authedQuery } from "./model/auth";
 import { logEvent } from "./model/log";
 import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
-import { findVisit } from "./model/placeVisits";
+import { findVisit, visitedPlaceKeys } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import { uniquePlacePins } from "./model/trip";
 import { requireProEntitlement } from "./subscriptions";
@@ -31,12 +31,19 @@ const MAX_COUNTRY_ATTEMPTS = 3;
 
 type VisitPin = { lat: number; lng: number; city?: string };
 
+function pinCity(
+  item: Doc<"items">,
+  pin: { city?: string },
+): string | undefined {
+  const cities = item.cities ?? [];
+  return pin.city ?? (cities.length === 1 ? cities[0] : undefined);
+}
+
 function visitPin(item: Doc<"items">, name: string): VisitPin | null {
   const key = placeKey(name);
   const pin = (item.placePins ?? []).find((p) => placeKey(p.name) === key);
   if (pin === undefined) return null;
-  const cities = item.cities ?? [];
-  const city = pin.city ?? (cities.length === 1 ? cities[0] : undefined);
+  const city = pinCity(item, pin);
   return { lat: pin.lat, lng: pin.lng, ...(city ? { city } : {}) };
 }
 
@@ -246,16 +253,14 @@ export const listUnstampedPlaces = authedQuery({
     }),
   ),
   handler: async (ctx) => {
-    const visits = await ctx.db
-      .query("placeVisits")
-      .withIndex("by_user_and_visited", (q) => q.eq("userId", ctx.userId))
-      .take(MAX_PASSPORT_STAMPS);
-    const stamped = new Set(visits.map((visit) => visit.key));
+    const taken = await visitedPlaceKeys(ctx, ctx.userId);
     const pins = [];
     for (const item of await readySavesNewestFirst(ctx, ctx.userId)) {
       for (const pin of item.placePins ?? []) {
-        const city = visitPin(item, pin.name)?.city;
-        if (city === undefined || stamped.has(placeKey(pin.name))) continue;
+        const city = pinCity(item, pin);
+        const key = placeKey(pin.name);
+        if (city === undefined || taken.has(key)) continue;
+        taken.add(key);
         pins.push({ ...pin, city, item });
       }
     }
