@@ -36,6 +36,17 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 - **Link:** tap Add, paste an Instagram Reel or TikTok link (any page link is accepted), and save. Processing saves appear under "Finding places…". Once processing finishes, saves with a city appear as a city card on Home, under the Plan a date and Plan a trip tiles. If a save the user is watching fails or names no place, a banner says "Couldn't find places in that link" with **Retry** (or **View** when a retry can't help). Every failed or placeless save is counted in one line under the cities (for example, 2 saves without a place), whose **Review** opens a sheet with **Retry** and **Delete** for each. Notes, photos and the camera are not part of this build.
 - **Share Sheet:** From Safari, Instagram or TikTok, share to Shelvr. While signed in, content saves automatically. While signed out, Shelvr preserves the intent and resumes after sign-in. During onboarding, a shared link is held on the device until sign-in. If the app is relaunched or interrupted mid-save, the pending marker and local session resume the flow on the next launch; successful completion or explicit abandonment clears them. If native payload cleanup fails, the completed session stays available for **Try again** or **Cancel**.
 
+## Shared lists
+
+- A shared list is one list of places that up to 8 people keep together. A person can be on 20 lists, and a list holds up to 200 places.
+- Home shows the person's lists above the Plan a date and Plan a trip tiles, or a quiet "Start a shared list" row when they have none.
+- Starting a list needs Pro. The form takes a name and at least one city; places the owner already saved in those cities come along. "Send invite" opens the share sheet with a link to `https://shelvr-web.vercel.app/l/<token>`.
+- With Shelvr installed, the link opens the Join screen, which says "Free to join. You don’t need Pro." and has "Join list". Without the app, the web page shows the invite. A person who isn't signed in joins after sign-in, finishing onboarding first if they need to.
+- Joining, opening the list, marking a place "We went" and leaving need no Pro. While the owner has Pro, a member without it can also add places and plan a date or a trip from the list. Everywhere else they still see the plan screen.
+- Members see the list's name, its places with their pins and cities, the first name of whoever added each place, and "We went" marks. They don't see each other's saves, titles or captions. A place's source save opens only for the person who saved it.
+- The owner can "Remove" a member. That member loses the list, the old invite link stops working, and the places they added stay. Anyone can "Leave list". When the owner leaves, the oldest member becomes the owner, and the last member's leaving deletes the list.
+- There is no report or block control. A list name is free text, and anyone holding a live link can join until the list is full. Removing a member is the only control, and it also replaces the link.
+
 ## Pro / subscriptions (RevenueCat sandbox)
 
 - Shelvr Pro gates new saves, Plan a date and Plan a trip.
@@ -58,6 +69,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 - Profile → Settings → **Delete account**.
 - Deleting an account that used Sign in with Apple also revokes its Apple token, when Shelvr holds one. Shelvr started keeping that token with this release, so an account that last signed in before it has none: its deletion still removes everything, the revocation is skipped, and signing in again once stores a token.
 - Confirmation explains what is deleted (saves, places, identity) and that **App Store subscriptions are not cancelled** by account deletion. A user with an active subscription or trial also gets a **Manage subscription** button on that confirmation.
+- Deletion also removes the places the user added to shared lists and takes them off every list, as if they had left it.
 - After success the user is signed out.
 
 ## Legal and support
@@ -68,9 +80,11 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Permissions
 
-| Permission | When requested                         | Why                                      |
-| ---------- | -------------------------------------- | ---------------------------------------- |
-| Calendar   | User adds an event from an item intent | Create calendar event from saved content |
+| Permission    | When requested                                                 | Why                                               |
+| ------------- | -------------------------------------------------------------- | ------------------------------------------------- |
+| Calendar      | User adds an event from an item intent                         | Create calendar event from saved content          |
+| Location      | The Map tab opens for the first time                           | Center the map on the user; Map works without it  |
+| Notifications | "Turn on reminders" in onboarding, or the trial reminder sheet | Reminders about saved places, trips and the trial |
 
 Shelvr does **not** record microphone audio and does not request microphone access in production.
 
@@ -79,6 +93,7 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 - Account email via Apple/Google.
 - Saved URLs, extracted page content and spoken words, and the places Gemini finds in them (AI runs automatically unless the account has a previously recorded opt-out).
 - Place names sent to Apple Maps to pin a trip's stops (no live location tracking).
+- Shared list members see the list's places and each other's first names.
 - RevenueCat subscription status.
 - PostHog product analytics (not ads).
 
@@ -107,46 +122,47 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 
 ## Paste-ready App Review notes
 
-Shelvr is a private save-it-for-later app for Instagram Reels and TikToks. It uses AI to find the places a post names and file them under a city. It has no feed and no messaging. A user can share one save through an unlisted link, which goes away when the save is deleted or the share sheet is cancelled.
+This is the text submitted with 1.0.13 (build 53), except that its first core review step named a Home heading that does not exist. It now says the places appear under their city on Home. App Store Connect allows 4,000 characters, and it is about 4,000, so cut a line for each line you add.
+
+New in 1.0.13: shared lists, and a Trips tab that plans and edits a day-by-day trip for a city.
+
+Shelvr is a private save-it-for-later app for Instagram Reels and TikToks. It uses AI to find the places a post names and file them under a city. It has no feed, no messaging and no public profiles. A user can share one save through an unlisted link, or invite people to a shared list.
 
 Account access:
 
-1. Launch Shelvr and tap "Get started". If you already have an account, tap "Already have an account? Sign in" instead.
+1. Launch Shelvr and tap "Get started".
 2. Answer "How many places have you saved?", "What would you like to plan?" and "How do you like to plan?" (tap an answer, then "Continue", or "Skip"), tap "Continue" under the chart, then tap a city on "Pick a city to try.".
 3. On the sample reel, follow the pills: Share, Share to…, More, then Shelvr. This is a demonstration drawn inside the app; the reel becomes a real save after onboarding, sign-in and Pro access.
-4. After the purchase in the next section, Shelvr asks you to sign in: choose Continue with Apple. App Review may use its own Apple account; no invitation, one-time code, or preconfigured account state is required. Sign in completes through Apple's system authentication flow.
+4. After the purchase in the next section, Shelvr asks you to sign in: choose Continue with Apple. App Review may use its own Apple account; no invitation or code is needed.
 
 Subscription testing:
 
-1. After the sample reel, tap "Continue" on the spots it found to reach the commitment screen. Make the optional promise and tap "Continue", or choose "Maybe later". If the notifications screen appears, tap "Turn on reminders" or "Not now". The RevenueCat paywall then opens in Apple's sandbox environment. Close returns to the screen before it; it does not unlock app access. Continue to the plan picker to buy or start the trial. Sign-in follows the purchase or restore.
-2. The paywall has three screens: an intro ("Save the link. Shelvr does the filing."), a trial explainer ("Get a heads-up before you pay"), and the plan picker ("Pick a plan"). Tap Continue, then See plans. Buy a plan or start the trial with a sandbox account on the plan picker.
-3. Weekly and Annual auto-renewing subscriptions are available; the paywall labels Annual as Yearly. The Annual plan includes a 7-day free trial for accounts that have not used it before; the Weekly plan has no trial.
-4. Localized price, duration, renewal terms, Restore Purchases, Terms, and Privacy are shown on the plan picker.
-5. Restore Purchases is also available from Profile > Settings.
-6. If subscription status takes a moment to refresh after purchase or restore, reopen Profile.
+1. After the sample reel, tap "Continue" on its spots, then make the optional promise or tap "Maybe later". If a reminders screen appears, tap "Turn on reminders" or "Not now". The RevenueCat paywall (Apple sandbox) opens. Close returns to the screen before it without unlocking the app.
+2. The paywall has three screens: "Save the link. Shelvr does the filing.", "Get a heads-up before you pay", and "Pick a plan". Tap Continue, then See plans, then buy or start the trial with a sandbox account. Sign-in follows the purchase or restore.
+3. Weekly and Annual (labelled Yearly) auto-renewing subscriptions are available. Annual includes a 7-day free trial for accounts that have not used one; Weekly has no trial.
 
 Core review flow:
 
-1. From Home, tap Add, paste an Instagram Reel or TikTok link, and save. The save first shows processing, then the places it names appear on a city card on Home. A link that names no place shows a "Couldn't find places in that link" banner and is counted under the cities, with **Review**.
-2. Tap a city to open its page: a map with a pin per place, and a sheet listing the places.
-3. On the city page, tap "Plan a date" or "Plan a trip" to get a shortlist or a day-by-day trip selected within Shelvr from places already saved in that city. Places marked "We went" are excluded; planning does not send the saved collection or visit history to Gemini. Apple Maps locates trip stops.
-4. Tap a save to see its detail; the source link opens the original post.
-5. Shelvr does not request camera or photo access, and does not request or track live device location.
+1. From Home, tap Add, paste an Instagram Reel or TikTok link, and save. The save first shows processing, then the places it names appear under their city on Home. A link that names no place is counted in one line under the cities, with Review.
+2. Tap a city to open its page: a map with a pin per place and a list of the places.
+3. On the city page, tap "Plan a date", pick a kind of date, and get an evening of two stops a short walk apart (Apple Maps may suggest one). Tap "Plan a trip" (or use the Trips tab) for a day-by-day trip: saved places first, suggested places from Apple Maps filling the gaps. A trip's menu has Edit trip, Add a place and Delete trip.
+4. Tap Map for every saved place on one map, with search and filters. Shelvr asks for location only when Map first opens, to center it on you; Map works without it.
+
+Shared lists:
+
+A list holds places kept by people its owner invites, at most 8. On Home, tap "Start a shared list", enter a name and a city, then "Send invite" to get a link in the share sheet. Anyone with the link can join; joining needs a second account, the list works with one. Members see the list's name, its places and each other's first names. The owner can "Remove" a member, which also stops the old link. Anyone can "Leave list".
 
 Share extension, Siri and widget:
 
-1. In Safari or the Instagram or TikTok app, open a post, tap Share, and choose Shelvr. The link is saved without leaving Safari.
+1. In Safari, Instagram or TikTok, tap Share on a post and choose Shelvr. The link saves without leaving that app.
 2. In the Shortcuts app, open Shelvr and run "Save a Link". The same action works through Siri.
-3. Add the "Recent Saves" widget to the Home Screen to see the latest saves.
+3. The "Recent Saves" widget shows the latest saves.
 
 Third-party AI:
 
-To find the places in a saved reel or TikTok, Shelvr sends its caption and spoken words to Google Gemini. Date and trip planning happens within Shelvr using places already saved in the selected city and excluding places marked "We went". The saved collection and visit history are not sent to Gemini for planning; Apple Maps still resolves trip stops. Home opens after onboarding and its paywall without an AI permission prompt or Settings switch. Accounts without a recorded preference use AI automatically for incoming saves; previously recorded opt-outs remain honored. Plans can still use previously saved places when AI processing is disabled.
+To find the places in a saved reel or TikTok, Shelvr sends its caption and spoken words to Google Gemini. Planning does not send the saved collection or visit history to Gemini.
 
 Account and support controls:
 
 - Profile contains subscription management and Sign out. Profile > Settings contains Contact Support, Restore Purchases, Terms of Service, Privacy Policy, and Delete account.
-- To delete an account: Profile > Settings > Delete account.
-- Delete account permanently removes the user's saves, places, subscription record, and authentication identity. It does not cancel an App Store subscription, which remains managed by Apple.
-
-Internet access is required for sign-in, subscriptions, cloud sync, and AI organization. Shelvr does not request an App Store rating during onboarding. It may ask once, after at least three saves, when the user returns to Home from a save they opened.
+- Delete account permanently removes the user's saves, places (shared list additions too), subscription record, and authentication identity. It does not cancel an App Store subscription, which remains managed by Apple.
