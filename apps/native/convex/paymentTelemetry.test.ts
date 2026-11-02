@@ -567,3 +567,88 @@ describe("receipt retention", () => {
     expect(remaining.map((row) => row.eventId)).toEqual(["live"]);
   });
 });
+
+describe("payment owner", () => {
+  async function webhook() {
+    vi.stubEnv("REVENUECAT_WEBHOOK_SECRET", "test-secret");
+    const t = newConvexTest();
+    const userId = await t.run((ctx) => ctx.db.insert("users", {}));
+    const post = async (fields: Record<string, unknown>) => {
+      const response = await t.fetch("/webhooks/revenuecat", {
+        method: "POST",
+        body: JSON.stringify({
+          event: {
+            ...event,
+            environment: "SANDBOX",
+            event_timestamp_ms: event.purchased_at_ms,
+            expiration_at_ms: event.purchased_at_ms + 86400000,
+            ...fields,
+          },
+        }),
+        headers: { authorization: "Bearer test-secret" },
+      });
+      expect(response.status).toBe(200);
+    };
+    const captured = async () => {
+      const jobs = await t.run((ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      );
+      return jobs
+        .filter((job) => job.name.includes("capturePayment"))
+        .map((job) => job.args[0].payment);
+    };
+    const receipts = () =>
+      t.run((ctx) => ctx.db.query("paymentAnalyticsReceipts").collect());
+    return { userId, post, captured, receipts };
+  }
+
+  it("attributes a signed-in purchase to the account", async () => {
+    const w = await webhook();
+    await w.post({
+      id: "signed-in",
+      app_user_id: w.userId,
+      period_type: "TRIAL",
+      price: 0,
+    });
+    expect(await w.captured()).toMatchObject([
+      { eventId: "signed-in", userId: w.userId, event: "trial_started" },
+    ]);
+    expect(await w.receipts()).toHaveLength(1);
+  });
+
+  it("attributes a purchase made before sign-in to the account it attaches to", async () => {
+    const w = await webhook();
+    const anonymous = "$RCAnonymousID:0f1e2d3c";
+    const conversion = {
+      id: "conversion",
+      type: "RENEWAL",
+      is_trial_conversion: true,
+      app_user_id: anonymous,
+      aliases: [anonymous, w.userId],
+      event_timestamp_ms: event.purchased_at_ms + 86400000,
+      purchased_at_ms: event.purchased_at_ms + 86400000,
+    };
+
+    await w.post({
+      id: "anonymous-trial",
+      app_user_id: anonymous,
+      aliases: [anonymous],
+      period_type: "TRIAL",
+      price: 0,
+    });
+    expect(await w.captured()).toEqual([]);
+    expect(await w.receipts()).toEqual([]);
+
+    await w.post(conversion);
+    await w.post(conversion);
+    expect(await w.captured()).toMatchObject([
+      {
+        eventId: "conversion",
+        userId: w.userId,
+        event: "payment_succeeded",
+        payment_kind: "trial_conversion",
+      },
+    ]);
+    expect(await w.receipts()).toHaveLength(1);
+  });
+});
