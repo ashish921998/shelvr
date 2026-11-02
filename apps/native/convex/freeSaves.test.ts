@@ -182,6 +182,48 @@ describe("free saves with the switch on", () => {
     });
   });
 
+  it("keeps a retry paid for with Pro out of the free count", async () => {
+    const user = await freeUser(true);
+    const failed = await saveLink(user, 0);
+    await fail(user, failed);
+    const subscriptionId = await user.t.run((ctx) =>
+      ctx.db.insert("subscriptions", {
+        userId: user.userId,
+        status: "pro",
+        expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+        updatedAt: Date.now(),
+      }),
+    );
+    await user.t.mutation(api.items.reprocessItem, { id: failed });
+    await settle(user, failed, ["Lisbon"]);
+    await user.t.run((ctx) => ctx.db.delete(subscriptionId));
+    expect(await user.t.query(api.freeSaves.getFreeSaves, {})).toMatchObject({
+      used: 0,
+    });
+  });
+
+  it("does not count a run that lands after its slot was given back", async () => {
+    const user = await freeUser(true);
+    const itemId = await saveLink(user, 1);
+    const runId = (await user.t.run((ctx) => ctx.db.get(itemId)))
+      ?.processingRunId;
+    await fail(user, itemId);
+    await user.t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId,
+      reading: {},
+      classification: {
+        title: "Spot",
+        description: "",
+        tags: [],
+        cities: ["Lisbon"],
+      },
+    });
+    expect(await user.t.query(api.freeSaves.getFreeSaves, {})).toMatchObject({
+      used: 0,
+    });
+  });
+
   it("writes no rows for someone with Pro", async () => {
     vi.stubEnv("FREE_SAVES_ENABLED", "true");
     const user = await signedInUser(newConvexTest(), { pro: true });

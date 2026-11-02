@@ -84,7 +84,7 @@ export async function settleFreeSave(
     .query("freeSaves")
     .withIndex("by_item", (q) => q.eq("itemId", itemId))
     .unique();
-  if (row === null || row.status === "placed") return;
+  if (row === null || row.status !== "pending") return;
   const item = await ctx.db.get(itemId);
   const placed =
     item !== null && item.status === "ready" && (item.cities?.length ?? 0) > 0;
@@ -92,7 +92,7 @@ export async function settleFreeSave(
     ? "placed"
     : item === null || item.status !== "processing"
       ? "released"
-      : row.status;
+      : "pending";
   if (status !== row.status) await ctx.db.patch(row._id, { status });
 }
 
