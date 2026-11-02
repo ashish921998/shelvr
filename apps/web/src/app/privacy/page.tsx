@@ -45,16 +45,28 @@ export default function PrivacyPage() {
             title, description and tags, and the places found in it with their
             map locations. We also store the plans you make. All of this is kept
             in our backend (Convex) so it syncs to your devices. We do not store
-            the video itself. Earlier versions of the app also let you save
-            notes and photos; those stay in your account until you delete them.
+            the video itself. If you share a photo or text to Shelvr, including
+            through Siri or Shortcuts, we store that too. Photos and notes stay
+            in your account until you delete them.
           </li>
           <li>
-            <strong>Photo metadata.</strong> When you imported a photo with an
-            earlier version of the app, EXIF metadata is stripped from the
-            uploaded file. Shelvr keeps the capture time and GPS coordinates as
-            fields in its own database so the item can appear on your map and be
-            sorted by when it was taken. These fields are not sent to the AI
-            provider. Shelvr does not track your live device location.
+            <strong>Photo metadata.</strong> When you send a photo to Shelvr
+            from another app, Shelvr normally removes its EXIF metadata before
+            uploading it. A photo saved through Siri, Shortcuts, or the Save an
+            Image action can keep its metadata, which can include when and where
+            it was taken. Any metadata the file keeps is stored with it, sent to
+            Gemini with it, and goes with the file if you share that photo from
+            the app. Earlier versions of the app could also keep a photo’s
+            capture time and GPS coordinates as fields in our database so the
+            item could appear on your map and be sorted by when it was taken.
+            Those database fields are not sent to the AI provider.
+          </li>
+          <li>
+            <strong>Your location.</strong> On iPhone, the Map tab asks for
+            permission to show where you are. If you allow it, the map uses your
+            location on your device to open near you and to show your position.
+            The map does not send your location to us, and we do not track your
+            live location.
           </li>
           <li>
             <strong>Purchase information.</strong> If you subscribe to Shelvr
@@ -104,18 +116,38 @@ export default function PrivacyPage() {
         </h2>
         <p className="mt-2">
           To find the places in your saves, Shelvr sends content from its server
-          to Google’s Gemini API (a generation model and Gemini embeddings).
-          What is sent: link addresses, up to about 8,000 characters of
-          extracted page text, a reel’s or TikTok’s caption, and what is said in
-          the video. Notes and photos saved with earlier versions of the app may
-          also have been processed this way.
+          to Google’s Gemini API. What is sent: a link’s address and what we
+          read from it, such as its title, creator, description, and up to about
+          6,000 characters of page text; a reel’s or TikTok’s caption and what
+          is said in the video; the places in a shared Google Maps list, with
+          their addresses, map points, and notes; a note’s title and up to about
+          8,000 characters of its text; and photos you save, with any text you
+          send with them through Siri or Shortcuts and any text the app reads
+          from them on your device. If your account has spaces, their names and
+          descriptions can also be sent, and so can the titles, descriptions,
+          tags, and links of saves being matched to them.
         </p>
         <p className="mt-2">
-          Date and trip plans are selected within Shelvr from places already
-          saved in your chosen city. Places marked “We went” are excluded. Your
-          saved collection and visit history are not sent to Gemini to make
-          these plans. Shelvr sends place names to Apple Maps to locate trip
-          stops; it does not track your live location.
+          To read a link you save, our server requests it from the site it
+          points to, such as TikTok, Instagram, YouTube, X, Pinterest, or Google
+          Maps, and may follow a link in its caption to find a recipe. The
+          request can carry the link as you shared it, including that platform’s
+          share code, but not your Shelvr name or account.
+        </p>
+        <p className="mt-2">
+          Date and trip plans start from places already saved in your chosen
+          city, or on the shared list you plan from, and can add nearby
+          suggestions from Apple Maps. Places marked “We went” are normally left
+          out. Your saved collection and visit history are not sent to Gemini to
+          make these plans.
+        </p>
+        <p className="mt-2">
+          To put places on a map and to make suggestions, our server sends
+          search text to Apple Maps. This can be a place’s name or address, a
+          city, a kind of place, a word from a save’s tags, the stay you enter
+          for a trip, or what you type when adding a place. It can include a map
+          point to search near, such as a saved place or the city centre, and
+          your language. It does not include your name or account.
         </p>
         <p className="mt-2">
           AI processing is part of saving content in Shelvr. It runs
@@ -132,16 +164,28 @@ export default function PrivacyPage() {
           models and does not share it for advertising.
         </p>
         <p className="mt-2">
-          If you use “Find links” on a save, a shopping search query derived
-          from that save is sent to SerpAPI, which returns product results. This
-          only happens when you tap it.
+          Older versions of the app have a “Find links” button, which the
+          current app does not. If you tap it, Gemini writes a shopping search
+          query from that save, and the query is sent to SerpAPI, which returns
+          product results. This only happens when you tap it.
         </p>
         <p className="mt-2">
           To find places or recipes in a TikTok or Instagram reel, including
           videos with no caption, Shelvr may send its public link to Treg
-          (treg.to), which uses ScrapeCreators to return what is said in the
-          video. That transcript is then sent to Gemini to extract the places or
-          recipe.
+          (treg.to), which uses ScrapeCreators to return a TikTok’s caption or
+          what is said in the video. That text is then sent to Gemini to extract
+          the places or recipe.
+        </p>
+        <p className="mt-2">
+          The reel place finder and the Oracle on this website work without an
+          account. The reel place finder reads the link you paste, as above, and
+          sends what it reads to Gemini to list the places. The Oracle reads any
+          links you give it and sends what it reads, along with anything else
+          you give it, such as titles or a screenshot, to Gemini for a reading.
+          We do not store what you submit or the results. We do keep a rate
+          limit record keyed to your IP address, to limit how often these tools
+          can be used. The waitlist and plan vote pages use the same kind of
+          rate limit.
         </p>
         <p className="mt-2">
           Transient AI failures do not delete content you already captured.
@@ -151,11 +195,20 @@ export default function PrivacyPage() {
       <section>
         <h2 className="font-semibold text-ink text-lg">Public share links</h2>
         <p className="mt-2">
-          When you share a save, Shelvr creates an unlisted public web page for
-          it. The page shows the title, the AI description, the image, the
-          source link, or the first 500 characters of a note. Anyone with the
-          link can open it, and search engines are asked not to index it. You
-          can remove the page by deleting the save.
+          When you share a link or note save, Shelvr creates an unlisted public
+          web page for it. The page shows your first name, if we have one, the
+          title, the AI description, the image, the source link, or the first
+          500 characters of a note. Anyone with the link can open it, and search
+          engines are asked not to index it. You can remove the page by deleting
+          the save. A photo save gets no public page; sharing one from the app
+          sends the file itself.
+        </p>
+        <p className="mt-2">
+          A plan can also be shared as an unlisted vote link, which shows your
+          first name, if we have one, and the plan’s city and places. Anyone
+          with the link can vote, up to 20 people at a time, and we store each
+          voter’s choices with a random browser identifier. The link closes
+          after a week, and we delete it and its votes about a week after that.
         </p>
       </section>
 
@@ -182,21 +235,30 @@ export default function PrivacyPage() {
         </h2>
         <p className="mt-2">
           We do not sell your data. We share it only with the providers needed
-          to run Shelvr, with the people you choose through share links and
-          shared lists, and where the law requires it. These providers are
-          required to protect data to the same standard we hold ourselves to.
+          to run Shelvr, with the sites we request when reading your saved
+          links, with the people you choose through share links and shared
+          lists, and where the law requires it. These providers are required to
+          protect data to the same standard we hold ourselves to.
         </p>
         <ul className="mt-2 list-disc pl-5 space-y-2">
           <li>
-            <strong>Google (Gemini API):</strong> AI processing and embeddings,
-            as described above.
+            <strong>Google (Gemini API):</strong> AI processing, as described
+            above.
           </li>
           <li>
-            <strong>SerpAPI:</strong> shopping search for “Find links”.
+            <strong>Apple Maps:</strong> map locations for places, suggestions
+            for plans, and the map in the iPhone app.
           </li>
           <li>
-            <strong>Treg and ScrapeCreators:</strong> video transcripts for
-            finding places and recipes in TikToks and reels.
+            <strong>Google Maps:</strong> the map in the Android app.
+          </li>
+          <li>
+            <strong>SerpAPI:</strong> shopping search for “Find links” in older
+            versions of the app.
+          </li>
+          <li>
+            <strong>Treg and ScrapeCreators:</strong> TikTok captions and video
+            transcripts for finding places and recipes in TikToks and reels.
           </li>
           <li>
             <strong>Convex:</strong> database, file storage, and backend
@@ -217,10 +279,17 @@ export default function PrivacyPage() {
             <strong>Expo:</strong> push notification delivery.
           </li>
           <li>
+            <strong>Vercel:</strong> hosting for this website.
+          </li>
+          <li>
             <strong>Apple and Google:</strong> sign-in, and the App Store for
             purchases.
           </li>
         </ul>
+        <p className="mt-3">
+          The sites we request when reading your saved links are not our
+          providers, and their own privacy policies apply.
+        </p>
         <p className="mt-3">
           If you opt in to Apple refund data sharing, RevenueCat may share
           purchase identifiers, delivery status, and whether sample content was
