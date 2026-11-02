@@ -446,7 +446,12 @@ export const locateItem = internalAction({
       await ctx.scheduler.runAfter(
         LOOKUP_RETRY_MS * attempt,
         internal.placePins.locateItem,
-        { itemId: args.itemId, keepPins: args.keepPins, attempt: attempt + 1 },
+        {
+          itemId: args.itemId,
+          refresh: args.refresh,
+          keepPins: args.keepPins,
+          attempt: attempt + 1,
+        },
       );
     }
     return null;

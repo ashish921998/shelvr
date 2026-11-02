@@ -462,8 +462,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   `pnpm exec convex run --prod placePins:backfillPage '{"cursor":null}'` from `apps/native`. Skipped
   when AI is declined or the Maps key is unset. `model/appleMaps.ts` tells a temporary Apple failure
   (429, 5xx, network error, timeout) apart from no match and logs it as `apple_maps_unavailable`;
-  `locateItem` then runs again for the still-unpinned places, at most three attempts, 10 and 20
-  minutes apart, keeping its `keepPins` flag.
+  `locateItem` then runs again, at most three attempts, 10 and 20 minutes apart, keeping its
+  `refresh` and `keepPins` flags.
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`. Onboarding no longer has a first-save step; the
   app still calls `createDemoItem` for a first save an older build queued before sign-in.

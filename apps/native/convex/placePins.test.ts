@@ -1136,6 +1136,29 @@ describe("placePins", () => {
     ]);
   });
 
+  it("retries a refresh Apple could not answer as a refresh", async () => {
+    await withMaps(true);
+    const { t, itemId, pins } = await setup(["Micho"]);
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        placePins: [{ name: "Micho", lat: 13, lng: -13, city: "Lisbon" }],
+      }),
+    );
+    appleAnswers(503);
+    vi.useFakeTimers();
+    try {
+      await t.action(internal.placePins.locateItem, { itemId, refresh: true });
+      expect(await lookupJobs(t)).toEqual([
+        { itemId, refresh: true, attempt: 2 },
+      ]);
+      await withMaps(true);
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect((await pins())?.[0].category).toBe("Cafe");
+  });
+
   it("stops retrying after the last attempt and never retries a place Apple does not know", async () => {
     await withMaps();
     const { t, itemId } = await setup(["Pink Street"]);
