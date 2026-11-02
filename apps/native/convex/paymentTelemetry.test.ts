@@ -1,7 +1,11 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { parsePaymentTelemetry } from "./model/paymentTelemetry";
-import { newConvexTest } from "./test.setup";
+import {
+  newConvexTest,
+  revenuecatSnapshot,
+  stubRevenueCatFetch,
+} from "./test.setup";
 import { internal } from "./_generated/api";
 import { RECEIPT_RETENTION_MS } from "./paymentTelemetry";
 
@@ -198,6 +202,8 @@ describe("server-confirmed payments", () => {
       period_type: "TRIAL",
       event_timestamp_ms: 1700090000000,
     });
+    vi.stubEnv("REVENUECAT_API_KEY", "appl_test");
+    stubRevenueCatFetch(revenuecatSnapshot());
     await post("rc-4", {
       type: "EXPIRATION",
       period_type: "TRIAL",

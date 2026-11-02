@@ -82,14 +82,12 @@ export function eventOwner(
 export function mapRevenueCatStatus(
   type: string,
   periodType?: string,
-): "trialing" | "pro" | "lapsed" | undefined {
+): "trialing" | "pro" | undefined {
   switch (type) {
     case "INITIAL_PURCHASE":
     case "RENEWAL":
     case "UNCANCELLATION":
       return periodType === "TRIAL" ? "trialing" : "pro";
-    case "EXPIRATION":
-      return "lapsed";
     case "NON_RENEWING_PURCHASE":
       return periodType === "PROMOTIONAL" ? "pro" : undefined;
     default:
@@ -119,9 +117,7 @@ export function requiresAuthoritativeReconciliation(
         isDashboardGrant(event)
       );
     case "EXPIRATION":
-      return (
-        event.expirationReason === "CUSTOMER_SUPPORT" || isDashboardGrant(event)
-      );
+      return true;
     default:
       return false;
   }
