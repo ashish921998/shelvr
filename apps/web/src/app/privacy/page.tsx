@@ -198,10 +198,10 @@ export default function PrivacyPage() {
           When you share a link or note save, Shelvr creates an unlisted public
           web page for it. The page shows your first name, if we have one, the
           title, the AI description, the image, the source link, or the first
-          500 characters of a note. A photo save gets no public page; sharing
-          one from the app sends the file itself. Anyone with the link can open
-          it, and search engines are asked not to index it. You can remove the
-          page by deleting the save.
+          500 characters of a note. Anyone with the link can open it, and search
+          engines are asked not to index it. You can remove the page by deleting
+          the save. A photo save gets no public page; sharing one from the app
+          sends the file itself.
         </p>
         <p className="mt-2">
           A plan can also be shared as an unlisted vote link, which shows its
