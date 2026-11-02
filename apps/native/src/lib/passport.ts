@@ -119,6 +119,16 @@ export type CardPlace = {
   lng?: number;
 };
 
+export type SavedOn = "instagram" | "tiktok" | "both" | "elsewhere";
+
+function savedOnOf(stamps: readonly Stamp[]): SavedOn {
+  const apps = new Set(stamps.map((stamp) => stamp.source));
+  if (apps.has("instagram") && apps.has("tiktok")) return "both";
+  if (apps.has("instagram")) return "instagram";
+  if (apps.has("tiktok")) return "tiktok";
+  return "elsewhere";
+}
+
 export function shareCardOf(stamps: readonly Stamp[], city: string) {
   const key = cityKey(city);
   const inCity = stamps.filter(
@@ -128,6 +138,7 @@ export function shareCardOf(stamps: readonly Stamp[], city: string) {
   return {
     total: inCity.length,
     month: dated ? dated.visitedAt : null,
+    savedOn: savedOnOf(inCity),
     places: inCity.slice(0, CARD_PLACES).map(
       (stamp, index): CardPlace => ({
         number: index + 1,

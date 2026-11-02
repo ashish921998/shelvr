@@ -1178,7 +1178,10 @@
     "one": "+%{formattedCount} weiterer",
     "other": "+%{formattedCount} weitere"
   },
-  "passport.cardSaved": "Auf Instagram gespeichert.",
+  "passport.cardSavedInstagram": "Auf Instagram gespeichert.",
+  "passport.cardSavedTiktok": "Auf TikTok gespeichert.",
+  "passport.cardSavedBoth": "Auf Instagram und TikTok gespeichert.",
+  "passport.cardSavedElsewhere": "Für später gespeichert.",
   "passport.cardWent": "Mit Shelvr dort gewesen.",
   "passport.shareCity": "%{city} teilen",
   "cityMap.stampedCount": {

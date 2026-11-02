@@ -1140,7 +1140,10 @@
   "passport.cardMore": {
     "other": "외 %{formattedCount}곳"
   },
-  "passport.cardSaved": "Instagram에 저장.",
+  "passport.cardSavedInstagram": "Instagram에 저장.",
+  "passport.cardSavedTiktok": "TikTok에 저장.",
+  "passport.cardSavedBoth": "Instagram과 TikTok에 저장.",
+  "passport.cardSavedElsewhere": "나중을 위해 저장.",
   "passport.cardWent": "Shelvr로 다녀옴.",
   "passport.shareCity": "%{city} 공유",
   "cityMap.stampedCount": {

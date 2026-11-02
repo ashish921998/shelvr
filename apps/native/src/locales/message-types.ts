@@ -1065,7 +1065,10 @@ export type MessageParams = {
   "passport.cardTitle": { count: number };
   "passport.cardSub": { city: string; month: string };
   "passport.cardMore": { count: number };
-  "passport.cardSaved": undefined;
+  "passport.cardSavedInstagram": undefined;
+  "passport.cardSavedTiktok": undefined;
+  "passport.cardSavedBoth": undefined;
+  "passport.cardSavedElsewhere": undefined;
   "passport.cardWent": undefined;
   "passport.shareCity": { city: string };
   "cityMap.stampedCount": { count: number };

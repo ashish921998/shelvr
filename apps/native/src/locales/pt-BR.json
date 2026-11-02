@@ -1216,7 +1216,10 @@
     "many": "+%{formattedCount} a mais",
     "other": "+%{formattedCount} a mais"
   },
-  "passport.cardSaved": "Salvo no Instagram.",
+  "passport.cardSavedInstagram": "Salvo no Instagram.",
+  "passport.cardSavedTiktok": "Salvo no TikTok.",
+  "passport.cardSavedBoth": "Salvo no Instagram e no TikTok.",
+  "passport.cardSavedElsewhere": "Salvo para depois.",
   "passport.cardWent": "Fomos com o Shelvr.",
   "passport.shareCity": "Compartilhar %{city}",
   "cityMap.stampedCount": {

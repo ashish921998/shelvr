@@ -120,6 +120,7 @@ export default function PassportCardScreen() {
           city={city}
           total={data.total}
           month={month}
+          savedOn={data.savedOn}
           places={data.places}
           width={width}
         />

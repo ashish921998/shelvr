@@ -147,11 +147,26 @@ describe("shareCardOf", () => {
     expect(card).toEqual({
       total: 2,
       month: 5,
+      savedOn: "elsewhere",
       places: [
         { number: 1, name: "Tigre", lat: 1, lng: 2 },
         { number: 2, name: "Dante" },
       ],
     });
+  });
+
+  it("names the app the city's places were saved from", () => {
+    const savedOn = (...sources: Stamp["source"][]) =>
+      shareCardOf(
+        sources.map((source, index) =>
+          stamp({ key: String(index), city: "Lisbon", source }),
+        ),
+        "Lisbon",
+      ).savedOn;
+    expect(savedOn("instagram", undefined)).toBe("instagram");
+    expect(savedOn("tiktok")).toBe("tiktok");
+    expect(savedOn("tiktok", "instagram")).toBe("both");
+    expect(savedOn(undefined)).toBe("elsewhere");
   });
 
   it("has no month when every place was stamped as from before", () => {

@@ -1,6 +1,6 @@
 import { appleZoom } from "@/lib/city-pins";
 import { t } from "@/lib/i18n";
-import type { CardPlace } from "@/lib/passport";
+import type { CardPlace, SavedOn } from "@/lib/passport";
 import { fitCamera } from "@/lib/trip";
 import { AppleMaps } from "expo-maps";
 import type { ComponentRef, Ref } from "react";
@@ -8,6 +8,13 @@ import { Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const BASE_WIDTH = 360;
+
+const SAVED_ON = {
+  instagram: "passport.cardSavedInstagram",
+  tiktok: "passport.cardSavedTiktok",
+  both: "passport.cardSavedBoth",
+  elsewhere: "passport.cardSavedElsewhere",
+} as const;
 
 function CardMap({
   places,
@@ -66,6 +73,7 @@ export function ShareCard({
   city,
   total,
   month,
+  savedOn,
   places,
   width,
 }: {
@@ -73,6 +81,7 @@ export function ShareCard({
   city: string;
   total: number;
   month: string | null;
+  savedOn: SavedOn;
   places: CardPlace[];
   width: number;
 }) {
@@ -131,7 +140,7 @@ export function ShareCard({
       </View>
       <View style={styles.footer}>
         <Text style={[styles.sub, { fontSize: 13 * s, lineHeight: 18 * s }]}>
-          {t("passport.cardSaved")}
+          {t(SAVED_ON[savedOn])}
           {"\n"}
           {t("passport.cardWent")}
         </Text>

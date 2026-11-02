@@ -1178,7 +1178,10 @@
     "one": "+%{formattedCount} more",
     "other": "+%{formattedCount} more"
   },
-  "passport.cardSaved": "Saved on Instagram.",
+  "passport.cardSavedInstagram": "Saved on Instagram.",
+  "passport.cardSavedTiktok": "Saved on TikTok.",
+  "passport.cardSavedBoth": "Saved on Instagram and TikTok.",
+  "passport.cardSavedElsewhere": "Saved for later.",
   "passport.cardWent": "Went with Shelvr.",
   "passport.shareCity": "Share %{city}",
   "cityMap.stampedCount": {

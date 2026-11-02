@@ -1140,7 +1140,10 @@
   "passport.cardMore": {
     "other": "ほか%{formattedCount}か所"
   },
-  "passport.cardSaved": "Instagramで保存。",
+  "passport.cardSavedInstagram": "Instagramで保存。",
+  "passport.cardSavedTiktok": "TikTokで保存。",
+  "passport.cardSavedBoth": "InstagramとTikTokで保存。",
+  "passport.cardSavedElsewhere": "あとで行く用に保存。",
   "passport.cardWent": "Shelvrで行った。",
   "passport.shareCity": "%{city}を共有",
   "cityMap.stampedCount": {
