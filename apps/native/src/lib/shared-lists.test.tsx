@@ -152,9 +152,7 @@ describe("savedByLine", () => {
     expect(savedByLine(place({ addedByName: "Maya" }))).toBe(
       'sharedLists.savedBy:{"name":"Maya"}',
     );
-    expect(savedByLine(place())).toBe(
-      'sharedLists.savedBy:{"name":"sharedLists.someone"}',
-    );
+    expect(savedByLine(place())).toBe("sharedLists.someoneSaved");
     expect(savedByLine(place({ addedByPastMember: true }))).toBe(
       "sharedLists.pastMemberSaved",
     );

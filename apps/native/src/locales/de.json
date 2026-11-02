@@ -1065,6 +1065,7 @@
   "sharedLists.savedBy": "Von %{name} gespeichert",
   "sharedLists.youSaved": "Von dir gespeichert",
   "sharedLists.pastMemberSaved": "Von jemandem gespeichert, der die Liste verlassen hat",
+  "sharedLists.someoneSaved": "Von jemandem gespeichert",
   "sharedLists.notYet": "Noch nicht",
   "sharedLists.removeFromList": "Von der Liste entfernen",
   "sharedLists.placeActions": "Aktionen für den Ort",

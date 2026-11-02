@@ -1095,6 +1095,7 @@
   "sharedLists.savedBy": "Lo guardó %{name}",
   "sharedLists.youSaved": "Lo guardaste tú",
   "sharedLists.pastMemberSaved": "Lo guardó alguien que salió de la lista",
+  "sharedLists.someoneSaved": "Lo guardó alguien",
   "sharedLists.notYet": "Todavía no",
   "sharedLists.removeFromList": "Quitar de la lista",
   "sharedLists.placeActions": "Acciones del lugar",

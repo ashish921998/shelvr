@@ -976,6 +976,7 @@ export type MessageParams = {
   "sharedLists.savedBy": { name: string };
   "sharedLists.youSaved": undefined;
   "sharedLists.pastMemberSaved": undefined;
+  "sharedLists.someoneSaved": undefined;
   "sharedLists.notYet": undefined;
   "sharedLists.removeFromList": undefined;
   "sharedLists.placeActions": undefined;

@@ -1035,6 +1035,7 @@
   "sharedLists.savedBy": "%{name}이(가) 저장함",
   "sharedLists.youSaved": "내가 저장함",
   "sharedLists.pastMemberSaved": "나간 사람이 저장함",
+  "sharedLists.someoneSaved": "누군가 저장함",
   "sharedLists.notYet": "아직",
   "sharedLists.removeFromList": "목록에서 제거",
   "sharedLists.placeActions": "장소 작업",

@@ -1035,6 +1035,7 @@
   "sharedLists.savedBy": "%{name}が保存",
   "sharedLists.youSaved": "あなたが保存",
   "sharedLists.pastMemberSaved": "退出した人が保存",
+  "sharedLists.someoneSaved": "誰かが保存",
   "sharedLists.notYet": "まだ",
   "sharedLists.removeFromList": "リストから削除",
   "sharedLists.placeActions": "場所の操作",

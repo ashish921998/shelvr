@@ -1065,6 +1065,7 @@
   "sharedLists.savedBy": "%{name} saved this",
   "sharedLists.youSaved": "You saved this",
   "sharedLists.pastMemberSaved": "Someone who left saved this",
+  "sharedLists.someoneSaved": "Someone saved this",
   "sharedLists.notYet": "Not yet",
   "sharedLists.removeFromList": "Remove from list",
   "sharedLists.placeActions": "Place actions",
