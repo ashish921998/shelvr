@@ -37,7 +37,8 @@ function pinCity(
   pin: { city?: string },
 ): string | undefined {
   const cities = item.cities ?? [];
-  return pin.city ?? (cities.length === 1 ? cities[0] : undefined);
+  const city = pin.city || (cities.length === 1 ? cities[0] : undefined);
+  return city || undefined;
 }
 
 function visitPin(item: Doc<"items">, name: string): VisitPin | null {

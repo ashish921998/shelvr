@@ -560,4 +560,19 @@ describe("the passport", () => {
     });
     expect(await visits()).toMatchObject([{ lat: 38.7, city: "Lisbon" }]);
   });
+
+  it("reads a pin's empty city as the save's own city, in the list and the stamp", async () => {
+    const { t, itemId, visits } = await setup();
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, { placePins: [{ ...PIN, city: "" }] }),
+    );
+
+    const rows = await t.query(api.placeVisits.listUnstampedPlaces, {});
+    expect(rows).toMatchObject([{ name: "Tigre", city: "Lisbon" }]);
+
+    await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [{ itemId, name: "Tigre" }],
+    });
+    expect(await visits()).toMatchObject([{ city: "Lisbon" }]);
+  });
 });
