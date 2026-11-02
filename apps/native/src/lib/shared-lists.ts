@@ -12,7 +12,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth, useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Share } from "react-native";
 
 export type SharedListSummary = FunctionReturnType<
@@ -81,6 +81,24 @@ export function useAskNameOnce(when: boolean): {
   return {
     asking: asking && firstName === null,
     close: () => setAsking(false),
+  };
+}
+
+export function useTypedCity(add: (city: string) => void) {
+  const latest = useRef("");
+  const [typed, setTyped] = useState("");
+  return {
+    typed,
+    change: (text: string) => {
+      latest.current = text;
+      setTyped(text);
+    },
+    commit: () => {
+      const city = latest.current.replace(/\s+/g, " ").trim();
+      latest.current = "";
+      setTyped("");
+      if (city !== "") add(city);
+    },
   };
 }
 

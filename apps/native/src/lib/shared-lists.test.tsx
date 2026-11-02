@@ -13,6 +13,7 @@ import {
   type SharedListPlace,
   useAlsoAddTo,
   useNameGate,
+  useTypedCity,
   withLine,
 } from "./shared-lists";
 
@@ -215,6 +216,33 @@ describe("useAlsoAddTo", () => {
   it("ignores a tap while a call is running", () => {
     expect(nextAlsoAddState("adding")).toBeNull();
     expect(nextAlsoAddState("removing")).toBeNull();
+  });
+});
+
+describe("useTypedCity", () => {
+  it("adds the whole city once when return and blur land with the last letter", () => {
+    const add = vi.fn();
+    const { result } = renderHook(() => useTypedCity(add));
+    act(() => result.current.change("Lisbo"));
+    act(() => {
+      result.current.change("Lisbon");
+      result.current.commit();
+      result.current.commit();
+    });
+    expect(add.mock.calls).toEqual([["Lisbon"]]);
+    expect(result.current.typed).toBe("");
+  });
+
+  it("tidies spaces and ignores a blank field", () => {
+    const add = vi.fn();
+    const { result } = renderHook(() => useTypedCity(add));
+    act(() => {
+      result.current.change("   ");
+      result.current.commit();
+      result.current.change("  New   York ");
+      result.current.commit();
+    });
+    expect(add.mock.calls).toEqual([["New York"]]);
   });
 });
 

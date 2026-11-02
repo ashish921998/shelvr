@@ -10,7 +10,7 @@ import { usePaywallGuard } from "@/lib/entitlement";
 import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
-import { shareInvite, useNameGate } from "@/lib/shared-lists";
+import { shareInvite, useNameGate, useTypedCity } from "@/lib/shared-lists";
 import type { TextMessageKey } from "@/locales/message-types";
 import { api } from "@convex/_generated/api";
 import {
@@ -91,7 +91,13 @@ export default function NewSharedListScreen() {
   const { guard, loading } = usePaywallGuard("shared_list");
   const [name, setName] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
-  const [typed, setTyped] = useState("");
+  const city = useTypedCity((typed) =>
+    setPicked((current) =>
+      current.length >= MAX_LIST_CITIES || current.includes(typed)
+        ? current
+        : [...current, typed],
+    ),
+  );
   const [busy, setBusy] = useState(false);
   const nameGate = useNameGate();
   const close = useCallback(() => backOrHome(router), [router]);
@@ -99,12 +105,6 @@ export default function NewSharedListScreen() {
   const custom = picked.filter(
     (city) => !known.some((choice) => choice.city === city),
   );
-  const addTyped = () => {
-    const city = typed.replace(/\s+/g, " ").trim();
-    if (city === "" || picked.length >= MAX_LIST_CITIES) return;
-    if (!picked.includes(city)) setPicked((current) => [...current, city]);
-    setTyped("");
-  };
   const fill = {
     background: theme.colors.primary,
     foreground: theme.colors.onTint,
@@ -232,10 +232,10 @@ export default function NewSharedListScreen() {
           {picked.length < MAX_LIST_CITIES ? (
             <TextInput
               testID="new-shared-list-city"
-              value={typed}
-              onChangeText={setTyped}
-              onSubmitEditing={addTyped}
-              onBlur={addTyped}
+              value={city.typed}
+              onChangeText={city.change}
+              onSubmitEditing={city.commit}
+              onBlur={city.commit}
               placeholder={t("sharedLists.cityPlaceholder")}
               placeholderTextColor={theme.colors.muted}
               accessibilityLabel={t("sharedLists.cityPlaceholder")}
