@@ -70,7 +70,7 @@ function isTestStore(store: unknown): boolean {
 const ANONYMOUS_PREFIX = "$RCAnonymousID:";
 
 /** RevenueCat's `logIn` makes the anonymous id of a pre-sign-in purchase an alias of the account's own. */
-function eventOwner(
+export function eventOwner(
   appUserId: string | undefined,
   aliases: string[] | undefined,
 ): string | undefined {
@@ -127,7 +127,7 @@ export function requiresAuthoritativeReconciliation(
   }
 }
 
-function readStringArray(value: unknown): string[] | undefined {
+export function readStringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value) || value.length > 100) return undefined;
   if (
     !value.every(
