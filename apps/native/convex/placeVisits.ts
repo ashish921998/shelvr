@@ -250,12 +250,7 @@ async function unstampedPins(ctx: QueryCtx, userId: Id<"users">) {
       const city = pinCity(item, pin);
       const key = placeKey(pin.name);
       if (city === undefined || checked.has(key)) continue;
-      if (
-        checked.size >= MAX_VISIT_CHECKS ||
-        pins.length >= MAX_UNSTAMPED_PLACES
-      ) {
-        return pins;
-      }
+      if (checked.size >= MAX_VISIT_CHECKS) return pins;
       checked.add(key);
       if ((await findVisit(ctx, userId, pin.name)) !== null) continue;
       pins.push({ ...pin, city, item });
@@ -276,7 +271,10 @@ export const listUnstampedPlaces = authedQuery({
     }),
   ),
   handler: async (ctx) => {
-    const places = uniquePlacePins(await unstampedPins(ctx, ctx.userId));
+    const places = uniquePlacePins(await unstampedPins(ctx, ctx.userId)).slice(
+      0,
+      MAX_UNSTAMPED_PLACES,
+    );
     const covers = new Map<Id<"items">, Promise<string | null>>();
     return await Promise.all(
       places.map(async ({ name, city, item }) => {
