@@ -26,10 +26,12 @@ const pickId = (place: UnstampedPlace) => `${place.itemId}|${place.name}`;
 function PlaceRow({
   place,
   selected,
+  disabled,
   onPress,
 }: {
   place: UnstampedPlace;
   selected: boolean;
+  disabled: boolean;
   onPress: () => void;
 }) {
   const { theme } = useUnistyles();
@@ -37,9 +39,14 @@ function PlaceRow({
     <Pressable
       accessibilityRole="checkbox"
       accessibilityLabel={place.name}
-      accessibilityState={{ checked: selected }}
+      accessibilityState={{ checked: selected, disabled }}
+      disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.row,
+        disabled && styles.disabled,
+        pressed && styles.pressed,
+      ]}
     >
       <View style={styles.thumb}>
         {place.cover ? (
@@ -197,6 +204,9 @@ export default function AlreadyBeenScreen() {
                 key={pickId(place)}
                 place={place}
                 selected={picked.has(pickId(place))}
+                disabled={
+                  picked.size >= MAX_PICKS && !picked.has(pickId(place))
+                }
                 onPress={() => toggle(place)}
               />
             ))}
@@ -272,4 +282,5 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.background,
   },
   pressed: { opacity: theme.opacity.pressed },
+  disabled: { opacity: theme.opacity.disabled },
 }));

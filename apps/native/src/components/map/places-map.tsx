@@ -1,6 +1,7 @@
 import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
 import { appleZoom } from "@/lib/city-pins";
+import { t } from "@/lib/i18n";
 import { moveCamera } from "@/lib/map-camera";
 import { hasPlaceNear } from "@/lib/map-filters";
 import { fitCamera } from "@/lib/trip";
@@ -229,6 +230,7 @@ export function PlacesMap({
         id: pin.id,
         coordinates: { latitude: pin.lat, longitude: pin.lng },
         title: pin.name,
+        snippet: pin.went ? t("passport.wentNoDate") : undefined,
       }))}
       onMarkerClick={(marker) => select(marker.id)}
       onCameraMove={trackCamera}

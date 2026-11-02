@@ -1156,10 +1156,10 @@
   "sharedLists.startWithHint": "Choisissez au moins une ville. Les lieux que vous y avez déjà enregistrés viennent avec.",
   "sharedLists.cityPlaceholder": "Ou saisissez une ville",
   "sharedLists.typedCity": "Saisie par vous",
-  "passport.iWent": "J'y suis allé",
+  "passport.iWent": "J'y étais",
   "passport.went": "Visité · %{date}",
   "passport.wentNoDate": "Visité",
-  "passport.markLabel": "Vous êtes allé à %{name}",
+  "passport.markLabel": "J'étais à %{name}",
   "passport.stampedTitle": "Tamponné",
   "passport.stampedBody": {
     "one": "%{name} est dans votre passeport. %{formattedCount} lieu pour l'instant.",
@@ -1172,9 +1172,9 @@
   "passport.wantToGo": "À visiter",
   "passport.title": "Passeport",
   "passport.yourPassport": "Votre passeport",
-  "passport.beenTitle": "Déjà allé dans l'un d'eux ?",
-  "passport.beenBody": "Tamponnez les lieux où vous êtes déjà allé",
-  "passport.beenSomewhere": "Déjà allé quelque part ?",
+  "passport.beenTitle": "Déjà visité l'un d'eux ?",
+  "passport.beenBody": "Tamponnez les lieux que vous avez déjà visités",
+  "passport.beenSomewhere": "Déjà visité un lieu ?",
   "passport.rowCities": "%{places} · %{cities}",
   "passport.placesCount": {
     "one": "%{formattedCount} lieu",
@@ -1196,7 +1196,7 @@
   "passport.countries": "Pays",
   "passport.elsewhere": "Ailleurs",
   "passport.coversCredit": "Images des publications enregistrées",
-  "passport.pickBody": "Cochez les lieux où vous êtes allé avant de les enregistrer ici.",
+  "passport.pickBody": "Cochez les lieux que vous avez visités avant de les enregistrer ici.",
   "passport.nothingToStamp": "Tous vos lieux enregistrés sont déjà dans votre passeport.",
   "passport.pickNone": "Choisissez les lieux visités",
   "passport.stampCount": {
@@ -1206,9 +1206,9 @@
   },
   "passport.cardKicker": "Sorti du chat de groupe",
   "passport.cardTitle": {
-    "one": "%{formattedCount} endroit enregistré où on est enfin allés",
-    "many": "%{formattedCount} endroits enregistrés où on est enfin allés",
-    "other": "%{formattedCount} endroits enregistrés où on est enfin allés"
+    "one": "%{formattedCount} endroit enregistré, enfin visité",
+    "many": "%{formattedCount} endroits enregistrés, enfin visités",
+    "other": "%{formattedCount} endroits enregistrés, enfin visités"
   },
   "passport.cardSub": "%{city} · %{month}",
   "passport.cardMore": {
