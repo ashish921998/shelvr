@@ -162,14 +162,17 @@ export default function PrivacyPage() {
       <section>
         <h2 className="font-semibold text-ink text-lg">Shared lists</h2>
         <p className="mt-2">
-          When you join a shared list, its other members can see your first
-          name, if we have one, and the places you add. Anyone with the invite
-          link can join. Before joining, they can see the owner’s first name,
-          the list’s name, its cities and a few of its places. The owner can
-          remove a member, which also stops the old link working. A place on a
-          list is a copy, so deleting your save does not remove it. Places you
-          added stay on the list if you leave, until its last member leaves and
-          the list is deleted. They are removed if you delete your account.
+          When you start a shared list, the places you have saved in its chosen
+          cities are copied to it, up to 200. When you join one, its other
+          members can see your first name, if we have one, the places you add,
+          and which places have been marked visited. Anyone with the invite link
+          can join while the list has room. Before joining, they can see the
+          owner’s first name, the list’s name, its cities and a few of its
+          places. The owner can remove a member, which also stops the old link
+          working. A place on a list is a copy, so deleting your save does not
+          remove it. Places you added stay on the list if you leave, until its
+          last member leaves and the list is deleted. They are removed if you
+          delete your account.
         </p>
       </section>
 
