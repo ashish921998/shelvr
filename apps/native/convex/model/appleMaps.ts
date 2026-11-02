@@ -1,10 +1,44 @@
 import { z } from "zod";
 import { signEs256Jwt } from "./appleSigning";
+import { logEvent } from "./log";
 import { keepNearby, type LatLng } from "./trip";
 
 const API = "https://maps-api.apple.com/v1";
 const TOKEN_TIMEOUT_MS = 8_000;
 const SEARCH_TIMEOUT_MS = 8_000;
+
+export const UNAVAILABLE = "unavailable";
+
+function isTemporary(status: number): boolean {
+  return status === 429 || status >= 500;
+}
+
+function reportUnavailable(
+  path: "token" | "search" | "geocode",
+  failure: { status: number } | { error: unknown },
+): void {
+  const name =
+    "error" in failure &&
+    typeof failure.error === "object" &&
+    failure.error !== null &&
+    "name" in failure.error
+      ? String(failure.error.name)
+      : undefined;
+  const category =
+    "status" in failure
+      ? failure.status === 429
+        ? "rate_limited"
+        : "server_error"
+      : name === "TimeoutError"
+        ? "timeout"
+        : "network";
+  logEvent("warn", "apple_maps_unavailable", {
+    path,
+    category,
+    status: "status" in failure ? failure.status : null,
+    error: name,
+  });
+}
 
 export type AppleMapsConfig = {
   privateKey: string;
@@ -44,14 +78,19 @@ export async function appleMapsAccessToken(
       headers: { Authorization: `Bearer ${authToken}` },
       signal: AbortSignal.timeout(TOKEN_TIMEOUT_MS),
     });
-    if (!response.ok) return null;
+    if (!response.ok) {
+      if (isTemporary(response.status))
+        reportUnavailable("token", { status: response.status });
+      return null;
+    }
     const body: unknown = await response.json().catch(() => null);
     const token =
       typeof body === "object" && body !== null && "accessToken" in body
         ? body.accessToken
         : undefined;
     return typeof token === "string" && token !== "" ? token : null;
-  } catch {
+  } catch (error) {
+    reportUnavailable("token", { error });
     return null;
   }
 }
@@ -129,37 +168,49 @@ function appleGet(
   });
 }
 
-export async function appleMapsLookup(
+export async function appleMapsFind(
   accessToken: string,
   kind: "search" | "geocode",
   query: string,
   near?: LatLng,
   fetchImpl: typeof fetch = fetch,
   includeCity = false,
-): Promise<FoundPlace | null> {
+): Promise<FoundPlace | null | typeof UNAVAILABLE> {
   const params = new URLSearchParams({ q: query.slice(0, 200) });
   if (near !== undefined) {
     params.set("searchLocation", `${near.lat},${near.lng}`);
   }
-  try {
-    // Preserve exact street addresses. If Apple answers with only a city centre,
-    // retry as a point of interest instead of pretending that centre is the place.
-    for (const filter of kind === "search" ? ["Poi,Address", "Poi"] : [""]) {
-      if (filter) params.set("resultTypeFilter", filter);
+  // Preserve exact street addresses. If Apple answers with only a city centre,
+  // retry as a point of interest instead of pretending that centre is the place.
+  for (const filter of kind === "search" ? ["Poi,Address", "Poi"] : [""]) {
+    if (filter) params.set("resultTypeFilter", filter);
+    let body: unknown;
+    try {
       const response = await appleGet(accessToken, kind, params, fetchImpl);
-      if (!response.ok) return null;
-      const found = firstPlace(
-        await response.json().catch(() => null),
-        near,
-        kind === "search",
-        includeCity,
-      );
-      if (found) return found;
+      if (!response.ok) {
+        if (!isTemporary(response.status)) return null;
+        reportUnavailable(kind, { status: response.status });
+        return UNAVAILABLE;
+      }
+      body = await response.json().catch((error: unknown) => {
+        if (error instanceof SyntaxError) return null;
+        throw error;
+      });
+    } catch (error) {
+      reportUnavailable(kind, { error });
+      return UNAVAILABLE;
     }
-    return null;
-  } catch {
-    return null;
+    const found = firstPlace(body, near, kind === "search", includeCity);
+    if (found) return found;
   }
+  return null;
+}
+
+export async function appleMapsLookup(
+  ...args: Parameters<typeof appleMapsFind>
+): Promise<FoundPlace | null> {
+  const found = await appleMapsFind(...args);
+  return found === UNAVAILABLE ? null : found;
 }
 
 const poiSchema = placeSchema.extend({
@@ -230,9 +281,14 @@ export async function appleMapsSearchPlaces(
   if (options.lang !== undefined) params.set("lang", options.lang);
   try {
     const response = await appleGet(accessToken, "search", params, fetchImpl);
-    if (!response.ok) return [];
+    if (!response.ok) {
+      if (isTemporary(response.status))
+        reportUnavailable("search", { status: response.status });
+      return [];
+    }
     return placesOf(await response.json().catch(() => null));
-  } catch {
+  } catch (error) {
+    reportUnavailable("search", { error });
     return [];
   }
 }
