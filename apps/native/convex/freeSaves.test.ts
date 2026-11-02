@@ -52,6 +52,26 @@ async function settle(
   });
 }
 
+async function addTokyoPart(
+  { t }: Signed,
+  itemId: Id<"items">,
+): Promise<number> {
+  const item = await t.run((ctx) => ctx.db.get(itemId));
+  return await t.mutation(internal.items.addPlaceListParts, {
+    itemId,
+    runId: item?.processingRunId,
+    parts: [
+      {
+        title: "List · Tokyo",
+        cities: ["Tokyo"],
+        places: ["Ippodo"],
+        pins: [],
+        content: "Ippodo",
+      },
+    ],
+  });
+}
+
 async function fail({ t }: Signed, itemId: Id<"items">): Promise<void> {
   const item = await t.run((ctx) => ctx.db.get(itemId));
   await t.mutation(internal.items.failItem, {
@@ -230,6 +250,29 @@ describe("free saves with the switch on", () => {
     for (let n = 1; n <= FREE_SAVE_LIMIT + 1; n++) await saveLink(user, n);
     expect(await rows(user)).toEqual([]);
     expect(await user.t.query(api.freeSaves.getFreeSaves, {})).toBeNull();
+  });
+
+  it("counts a free list whose own part has no city once its other parts do", async () => {
+    const user = await freeUser(true);
+    const itemId = await saveLink(user, 1);
+    await settle(user, itemId, []);
+    expect(await addTokyoPart(user, itemId)).toBe(1);
+    expect(await user.t.query(api.freeSaves.getFreeSaves, {})).toMatchObject({
+      used: 1,
+    });
+  });
+
+  it("adds no city parts to a free list with no slot left", async () => {
+    const user = await freeUser(true);
+    const itemId = await saveLink(user, 0);
+    await settle(user, itemId, []);
+    for (let n = 1; n <= FREE_SAVE_LIMIT; n++) {
+      await settle(user, await saveLink(user, n), ["Lisbon"]);
+    }
+    expect(await addTokyoPart(user, itemId)).toBe(0);
+    expect(await user.t.query(api.freeSaves.getFreeSaves, {})).toMatchObject({
+      used: FREE_SAVE_LIMIT,
+    });
   });
 
   it("adds the other city parts of a free Google Maps list", async () => {

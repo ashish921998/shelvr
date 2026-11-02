@@ -76,6 +76,24 @@ export async function reclaimFreeSave(
   }
 }
 
+export async function coversListParts(
+  ctx: MutationCtx,
+  userId: string,
+  itemId: Id<"items">,
+  partsHaveCity: boolean,
+): Promise<boolean> {
+  const row = await ctx.db
+    .query("freeSaves")
+    .withIndex("by_item", (q) => q.eq("itemId", itemId))
+    .unique();
+  if (row === null) return false;
+  if (row.status !== "released" || !partsHaveCity) return true;
+  if (!freeSavesEnabled()) return false;
+  if ((await heldFreeSaves(ctx, userId)) >= FREE_SAVE_LIMIT) return false;
+  await ctx.db.patch(row._id, { status: "placed" });
+  return true;
+}
+
 export async function settleFreeSave(
   ctx: MutationCtx,
   itemId: Id<"items">,

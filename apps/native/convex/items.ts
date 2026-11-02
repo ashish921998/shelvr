@@ -28,6 +28,7 @@ import {
 } from "./subscriptions";
 import {
   claimSave,
+  coversListParts,
   isFreeSave,
   reclaimFreeSave,
   recordFreeSave,
@@ -2338,8 +2339,13 @@ export const addPlaceListParts = internalMutation({
     }
     // The other parts are new saves, so they need Pro now, not just when the list was saved.
     if (
-      !(await isFreeSave(ctx, item._id)) &&
-      !(await hasProEntitlement(ctx, owner._id))
+      !(await hasProEntitlement(ctx, owner._id)) &&
+      !(await coversListParts(
+        ctx,
+        owner._id,
+        item._id,
+        args.parts.some((part) => part.cities.length > 0),
+      ))
     ) {
       return 0;
     }
