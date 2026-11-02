@@ -1588,6 +1588,20 @@ ${STEPS.map((s) => `<li>${s}</li>`).join("\n")}
       });
     });
   });
+
+  it("gives the model a long article well past its first 6,000 characters", async () => {
+    const paragraph = (marker: string) =>
+      `<p>${"The coffee here is worth the trip across town. ".repeat(20)}${marker}</p>`;
+    const body = Array.from({ length: 60 }, (_, i) =>
+      paragraph(i === 15 ? "Cafe Fifteen" : i === 50 ? "Cafe Fifty" : ""),
+    ).join("");
+    await save(
+      `<!DOCTYPE html><html><head><title>30 best cafes</title></head><body><article>${body}</article></body></html>`,
+    );
+    const prompt = generateObject.mock.calls[0][0].prompt as string;
+    expect(prompt).toContain("Cafe Fifteen");
+    expect(prompt).not.toContain("Cafe Fifty");
+  });
 });
 
 describe("readPage recipe eligibility", () => {

@@ -61,6 +61,7 @@ import {
 } from "./model/videoTranscript";
 
 const CLASSIFY_TIMEOUT_MS = 60_000;
+const LINK_PROMPT_CONTENT_CHARS = 30_000;
 const SMALL_TIMEOUT_MS = 30_000;
 
 type CategorizationOutcome =
@@ -512,7 +513,7 @@ function linkAnalysisPrompt(
       ? `Links to: ${page.linkedTitle} (${page.linkedUrl})`
       : "",
     page?.content
-      ? `${captionIntro(linkRead?.status === "ok" ? linkRead.shortForm : undefined)}\n${page.content.slice(0, PROMPT_CONTENT_CHARS)}`
+      ? `${captionIntro(linkRead?.status === "ok" ? linkRead.shortForm : undefined)}\n${page.content.slice(0, LINK_PROMPT_CONTENT_CHARS)}`
       : "No page content could be extracted.",
     linkRead?.status === "unreadable"
       ? "The page could not be read, so you have ONLY the URL. Base the title, description, and tags strictly on what the URL itself reveals (site, section, slug). Do NOT invent specifics — no facts, quotes, prices, names, or claims that are not literally present in the URL. Prefer a plain descriptive title over a confident-sounding one."
