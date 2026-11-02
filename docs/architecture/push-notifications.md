@@ -60,14 +60,15 @@ Select the installed binary's build profile. The workflow maps it to:
 
 | Build profile         | Channel       | Environment / app variant | Android architectures |
 | --------------------- | ------------- | ------------------------- | --------------------- |
-| production            | production    | production                | production defaults   |
 | internal-test         | internal-test | production                | production defaults   |
 | preview               | preview       | preview                   | preview defaults      |
 | development           | development   | development               | arm64-v8a             |
 | development-simulator | development   | development               | x86_64                |
 
 The workflow is manual and checks both backend URLs plus the Firebase file for
-Android. Release or distribute a build with the new fingerprint first. An OTA targets only binaries with a matching
+Android. It refuses the production profile: production updates ship from the
+GitHub `release.yml` workflow in `ota` mode, which deploys the same commit's
+Convex backend before it publishes. Release or distribute a build with the new fingerprint first. An OTA targets only binaries with a matching
 runtime; publishing it does not upgrade an old binary's native configuration.
 
 ### What the fingerprint hashes
@@ -154,8 +155,9 @@ again. Reaching people still on the recorded build without a store build is
 possible, but only by publishing from a tree that fingerprints to it, which the
 limits below cover.
 
-The gate only runs inside `native-update.yml`, so that workflow is the only
-sanctioned way to publish. An `eas update` from a laptop bypasses the check
+The gate only runs inside `native-update.yml` and the `ota` mode of
+`release.yml`, so those are the only sanctioned ways to publish, and production
+goes through `release.yml` alone. An `eas update` from a laptop bypasses the check
 entirely and can strand an update on a runtime version nobody has.
 
 Two limits of the check are worth knowing. The registry holds one build per
