@@ -711,6 +711,12 @@
   "homePlaces.emptyTitle": "TikTok이나 Instagram에서 장소 저장하기",
   "homePlaces.emptyBody": "릴스를 Shelvr에 공유하면 해당 도시에 담겨요.",
   "homePlaces.addSpot": "장소 추가",
+  "homePlaces.greetingName": "안녕하세요, %{name}님",
+  "homePlaces.greeting": "안녕하세요",
+  "homePlaces.cityCount": {
+    "other": "도시 %{formattedCount}곳"
+  },
+  "homePlaces.invite": "릴스나 TikTok을 공유하면 그 장소가 여기에 담겨요.",
   "homePlaces.everythingSaved": "저장한 모든 것",
   "homePlaces.untitled": "제목 없음",
   "homePlaces.planDate": "데이트 계획하기",

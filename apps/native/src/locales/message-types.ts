@@ -664,6 +664,10 @@ export type MessageParams = {
   "homePlaces.emptyTitle": undefined;
   "homePlaces.emptyBody": undefined;
   "homePlaces.addSpot": undefined;
+  "homePlaces.greetingName": { name: string };
+  "homePlaces.greeting": undefined;
+  "homePlaces.cityCount": { count: number };
+  "homePlaces.invite": undefined;
   "homePlaces.everythingSaved": undefined;
   "homePlaces.untitled": undefined;
   "homePlaces.planDate": undefined;

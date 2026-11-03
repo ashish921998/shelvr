@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   canRetrySave,
   cityRows,
+  greetingSubtitle,
   newlyUnplaced,
   plannableCities,
   savesToReview,
@@ -143,5 +144,53 @@ describe("cityRows", () => {
       (row) => row.kind,
     );
     expect(kinds).toEqual(["pair", "wide"]);
+  });
+});
+
+describe("greetingSubtitle", () => {
+  const save = (
+    status: "processing" | "ready" | "failed",
+    cities?: string[],
+  ) => ({
+    _id: status,
+    status,
+    cities,
+  });
+  const placed = (name: string, placeCount?: number) => ({
+    ...city(name),
+    placeCount,
+  });
+
+  it("says nothing while the cities are loading", () => {
+    expect(greetingSubtitle(undefined, [])).toBeNull();
+  });
+
+  it("counts cities and places when every city reports its places", () => {
+    expect(
+      greetingSubtitle([placed("Lisbon", 8), placed("Austin", 4)], []),
+    ).toBe("2 cities · 12 places");
+  });
+
+  it("drops the place count when one city has no count or none are mapped", () => {
+    expect(greetingSubtitle([placed("Lisbon", 8), placed("Austin")], [])).toBe(
+      "2 cities",
+    );
+    expect(greetingSubtitle([placed("Lisbon", 0)], [])).toBe("1 city");
+  });
+
+  it("keeps the stats while another save is processing", () => {
+    expect(greetingSubtitle([placed("Lisbon", 1)], [save("processing")])).toBe(
+      "1 city · 1 place",
+    );
+  });
+
+  it("reads processing, invites an empty shelf, and stays quiet otherwise", () => {
+    expect(greetingSubtitle([], [save("processing")])).toBe("Finding places…");
+    expect(greetingSubtitle([], [])).toBe(
+      "Share a reel or TikTok and its places land here.",
+    );
+    expect(
+      greetingSubtitle([], [save("failed"), save("ready", [])]),
+    ).toBeNull();
   });
 });

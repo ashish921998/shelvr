@@ -759,6 +759,14 @@
   "homePlaces.emptyTitle": "Guarda lugares de TikTok o Instagram",
   "homePlaces.emptyBody": "Comparte un reel con Shelvr y aparecerá en su ciudad.",
   "homePlaces.addSpot": "Agregar un lugar",
+  "homePlaces.greetingName": "Hola, %{name}",
+  "homePlaces.greeting": "Hola",
+  "homePlaces.cityCount": {
+    "one": "%{formattedCount} ciudad",
+    "many": "%{formattedCount} ciudades",
+    "other": "%{formattedCount} ciudades"
+  },
+  "homePlaces.invite": "Comparte un reel o TikTok y sus lugares aparecerán aquí.",
   "homePlaces.everythingSaved": "Todo lo que has guardado",
   "homePlaces.untitled": "Sin título",
   "homePlaces.planDate": "Planear una cita",

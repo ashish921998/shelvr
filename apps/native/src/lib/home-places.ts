@@ -101,3 +101,21 @@ export function cityCountLine(entry: City): string | null {
     ? t("homePlaces.spotCount", { count: entry.placeCount })
     : null;
 }
+
+export function greetingSubtitle(
+  cities: City[] | undefined,
+  saves: PlaceableSave[],
+): string | null {
+  if (cities === undefined) return null;
+  if (cities.length > 0) {
+    const cityLine = t("homePlaces.cityCount", { count: cities.length });
+    const places = cities.map((entry) => entry.placeCount);
+    const total = places.reduce<number>((sum, n) => sum + (n ?? 0), 0);
+    if (places.some((n) => n === undefined) || total === 0) return cityLine;
+    return `${cityLine} · ${t("homePlaces.spotCount", { count: total })}`;
+  }
+  if (saves.some((save) => save.status === "processing")) {
+    return t("homePlaces.noPlaceReading");
+  }
+  return saves.length === 0 ? t("homePlaces.invite") : null;
+}

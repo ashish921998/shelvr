@@ -735,6 +735,13 @@
   "homePlaces.emptyTitle": "Save places from TikTok or Instagram",
   "homePlaces.emptyBody": "Share a reel to Shelvr and it lands under its city.",
   "homePlaces.addSpot": "Add a spot",
+  "homePlaces.greetingName": "Hi, %{name}",
+  "homePlaces.greeting": "Hi",
+  "homePlaces.cityCount": {
+    "one": "%{formattedCount} city",
+    "other": "%{formattedCount} cities"
+  },
+  "homePlaces.invite": "Share a reel or TikTok and its places land here.",
   "homePlaces.everythingSaved": "Everything you saved",
   "homePlaces.untitled": "Untitled save",
   "homePlaces.planDate": "Plan a date",

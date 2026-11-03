@@ -711,6 +711,12 @@
   "homePlaces.emptyTitle": "TikTokやInstagramから場所を保存",
   "homePlaces.emptyBody": "リールをShelvrに共有すると、その都市に入ります。",
   "homePlaces.addSpot": "スポットを追加",
+  "homePlaces.greetingName": "こんにちは、%{name}さん",
+  "homePlaces.greeting": "こんにちは",
+  "homePlaces.cityCount": {
+    "other": "%{formattedCount}都市"
+  },
+  "homePlaces.invite": "リールやTikTokを共有すると、その場所がここに入ります。",
   "homePlaces.everythingSaved": "保存したものすべて",
   "homePlaces.untitled": "無題",
   "homePlaces.planDate": "デートを計画",

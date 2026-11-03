@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { t, useAppLocale } from "@/lib/i18n";
 import { ProCard } from "@/components/home/pro-card";
+import { HomeGreeting } from "@/components/home/home-greeting";
 import { HomeSearch } from "@/components/home/home-search";
 import { SharedListsSection } from "@/components/home/shared-lists-section";
 import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
@@ -121,6 +122,7 @@ export default function HomeScreen() {
         }}
       >
         {topCard ? <View style={styles.topCard}>{topCard}</View> : null}
+        {locked ? null : <HomeGreeting saves={items} />}
         {locked ? null : (
           <HomeSearch>
             <SharedListsSection />

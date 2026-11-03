@@ -735,6 +735,13 @@
   "homePlaces.emptyTitle": "Speichere Orte von TikTok oder Instagram",
   "homePlaces.emptyBody": "Teile ein Reel mit Shelvr, und es landet unter seiner Stadt.",
   "homePlaces.addSpot": "Spot hinzufügen",
+  "homePlaces.greetingName": "Hallo, %{name}",
+  "homePlaces.greeting": "Hallo",
+  "homePlaces.cityCount": {
+    "one": "%{formattedCount} Stadt",
+    "other": "%{formattedCount} Städte"
+  },
+  "homePlaces.invite": "Teile ein Reel oder TikTok, und die Orte landen hier.",
   "homePlaces.everythingSaved": "Alles, was du gespeichert hast",
   "homePlaces.untitled": "Ohne Titel",
   "homePlaces.planDate": "Date planen",
