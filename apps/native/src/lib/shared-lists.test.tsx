@@ -256,6 +256,20 @@ describe("useNameGate", () => {
     expect(result.current.asking).toBe(false);
   });
 
+  it("waits for the name to load before deciding", () => {
+    mocks.query.mockReturnValue({});
+    const action = vi.fn();
+    const { result, rerender } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    expect(action).not.toHaveBeenCalled();
+    expect(result.current.asking).toBe(false);
+
+    mocks.query.mockReturnValue({ data: "Maya" });
+    rerender();
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(result.current.asking).toBe(false);
+  });
+
   it("asks a nameless person once, then carries on whatever they chose", () => {
     mocks.query.mockReturnValue({ data: null });
     const action = vi.fn();

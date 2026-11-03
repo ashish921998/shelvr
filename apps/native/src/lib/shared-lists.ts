@@ -39,15 +39,20 @@ let nameAsked = false;
 
 function useMyFirstName() {
   const { isAuthenticated } = useConvexAuth();
-  return useQuery(
+  const { data, isError } = useQuery(
     convexQuery(api.users.getMyFirstName, isAuthenticated ? {} : "skip"),
-  ).data;
+  );
+  return {
+    firstName: data,
+    loading: isAuthenticated && data === undefined && !isError,
+  };
 }
 
 export function useNameGate() {
-  const firstName = useMyFirstName();
+  const { firstName, loading } = useMyFirstName();
   const [pending, setPending] = useState<(() => void) | null>(null);
-  const gate = useCallback(
+  const waiting = useRef<(() => void) | null>(null);
+  const decide = useCallback(
     (action: () => void) => {
       if (firstName !== null || nameAsked) {
         action();
@@ -57,6 +62,19 @@ export function useNameGate() {
       setPending(() => action);
     },
     [firstName],
+  );
+  useEffect(() => {
+    const action = waiting.current;
+    if (action === null || loading) return;
+    waiting.current = null;
+    decide(action);
+  }, [loading, decide]);
+  const gate = useCallback(
+    (action: () => void) => {
+      if (loading) waiting.current = action;
+      else decide(action);
+    },
+    [loading, decide],
   );
   return {
     gate,
@@ -73,7 +91,7 @@ export function useAskNameOnce(when: boolean): {
   asking: boolean;
   close: () => void;
 } {
-  const firstName = useMyFirstName();
+  const { firstName } = useMyFirstName();
   const [asking, setAsking] = useState(() => when && !nameAsked);
   useEffect(() => {
     if (asking) nameAsked = true;
