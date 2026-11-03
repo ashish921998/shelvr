@@ -230,7 +230,10 @@ export default function ShareScreen() {
   const nothingResolved =
     !isResolving && rawPayloads.length === 0 && phase.kind === "idle";
 
-  if (entitlementLoading && phase.kind === "idle") {
+  if (
+    entitlementLoading &&
+    (phase.kind === "idle" || phase.kind === "locked")
+  ) {
     return (
       <Centered
         phaseKey="checking-entitlement"

@@ -20,7 +20,7 @@ export function useAccess(): Access {
     signedIn: isAuthenticated,
     entitlement,
     awaitingPurchase,
-    freeSaves: data ?? (isError ? null : undefined),
+    freeSaves: isError && data === undefined ? null : data,
   });
 }
 

@@ -300,6 +300,17 @@ it("saves a held link with the free slot a pending save gives back", async () =>
   expect(mock.openPaywall).not.toHaveBeenCalled();
 });
 
+it("shows the check instead of the limit while a purchase lands on a held link", async () => {
+  const view = render(<ShareScreen />);
+  await waitFor(() =>
+    expect(screen.getByText("freePlan.usedTitle")).toBeDefined(),
+  );
+  mock.syncing = true;
+  view.rerender(<ShareScreen />);
+  expect(screen.getByText("pro.checking")).toBeDefined();
+  expect(screen.queryByText("freePlan.usedTitle")).toBeNull();
+});
+
 it("waits for a purchase that is still landing before saving", async () => {
   mock.syncing = true;
   mock.resolvedSharedPayloads = [resolvedLink];
