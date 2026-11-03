@@ -294,6 +294,17 @@ describe("useNameGate", () => {
     expect(action).not.toHaveBeenCalled();
   });
 
+  it("drops a parked action when the person cancels", () => {
+    vi.useFakeTimers();
+    mocks.query.mockReturnValue({});
+    const action = vi.fn();
+    const { result } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    act(() => result.current.cancel());
+    act(() => vi.advanceTimersByTime(3000));
+    expect(action).not.toHaveBeenCalled();
+  });
+
   it("asks a nameless person once, then carries on whatever they chose", () => {
     mocks.query.mockReturnValue({});
     const action = vi.fn();

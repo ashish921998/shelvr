@@ -103,7 +103,11 @@ export function useNameGate() {
       setPending(null);
       pending?.();
     },
-    cancel: () => setPending(null),
+    cancel: () => {
+      waiting.current = null;
+      clearTimeout(timer.current);
+      setPending(null);
+    },
   };
 }
 
