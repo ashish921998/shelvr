@@ -109,6 +109,42 @@ describe("free saves with the switch off", () => {
   });
 });
 
+describe("free plan status", () => {
+  it("tells a signed-out caller whether the free plan is open", async () => {
+    vi.stubEnv("FREE_SAVES_ENABLED", "true");
+    const t = newConvexTest();
+    expect(await t.query(api.freeSaves.freePlanOpen, {})).toBe(true);
+    vi.stubEnv("FREE_SAVES_ENABLED", "false");
+    expect(await t.query(api.freeSaves.freePlanOpen, {})).toBe(false);
+  });
+
+  it("counts a save still being read apart from a placed one", async () => {
+    const user = await freeUser(true);
+    await settle(user, await saveLink(user, 1), ["Lisbon"]);
+    await saveLink(user, 2);
+    expect(await user.t.query(api.freeSaves.getFreeSaves, {})).toEqual({
+      limit: FREE_SAVE_LIMIT,
+      used: 2,
+      left: FREE_SAVE_LIMIT - 2,
+      pending: 1,
+      open: true,
+    });
+  });
+
+  it("keeps a closed plan's saves visible with none left to spend", async () => {
+    const user = await freeUser(true);
+    await settle(user, await saveLink(user, 1), ["Lisbon"]);
+    vi.stubEnv("FREE_SAVES_ENABLED", "false");
+    expect(await user.t.query(api.freeSaves.getFreeSaves, {})).toEqual({
+      limit: FREE_SAVE_LIMIT,
+      used: 1,
+      left: 0,
+      pending: 0,
+      open: false,
+    });
+  });
+});
+
 describe("free saves with the switch on", () => {
   it("allows ten saves and refuses the eleventh", async () => {
     const user = await freeUser(true);
@@ -118,6 +154,8 @@ describe("free saves with the switch on", () => {
       limit: FREE_SAVE_LIMIT,
       used: FREE_SAVE_LIMIT,
       left: 0,
+      pending: FREE_SAVE_LIMIT,
+      open: true,
     });
   });
 
@@ -195,8 +233,7 @@ describe("free saves with the switch on", () => {
     ).toBe("pro_required");
     const item = await user.t.run((ctx) => ctx.db.get(failed));
     expect(item?.status).toBe("failed");
-    expect(await user.t.query(api.freeSaves.getFreeSaves, {})).toEqual({
-      limit: FREE_SAVE_LIMIT,
+    expect(await user.t.query(api.freeSaves.getFreeSaves, {})).toMatchObject({
       used: FREE_SAVE_LIMIT,
       left: 0,
     });
