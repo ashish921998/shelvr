@@ -2,7 +2,11 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { captureWebAnalyticsEvent, captureWebException } from "./analytics";
+import {
+  captureWebAnalyticsEvent,
+  captureWebException,
+  webSessionId,
+} from "./analytics";
 
 const fetchMock = vi.fn();
 
@@ -63,6 +67,41 @@ describe("web analytics", () => {
     });
     expect(payload.properties.$exception_list[0].value).toBe(
       "Could not send [email] to [url]",
+    );
+  });
+
+  it("sends one UUIDv7 session id across events in a session", () => {
+    captureWebAnalyticsEvent("$pageview");
+    captureWebAnalyticsEvent("$pageleave");
+
+    const [first, second] = fetchMock.mock.calls.map(
+      ([, init]) => JSON.parse(String((init as RequestInit).body)).properties,
+    );
+    expect(first.$session_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(second.$session_id).toBe(first.$session_id);
+  });
+
+  it("starts a new session after 30 idle minutes", () => {
+    const start = Date.UTC(2026, 10, 3, 12);
+    const id = webSessionId(start);
+
+    expect(webSessionId(start + 29 * 60 * 1000)).toBe(id);
+    expect(webSessionId(start + 58 * 60 * 1000)).toBe(id);
+    const next = webSessionId(start + 89 * 60 * 1000);
+    expect(next).not.toBe(id);
+    expect(parseInt(next.replace(/-/g, "").slice(0, 12), 16)).toBe(
+      start + 89 * 60 * 1000,
+    );
+  });
+
+  it("redacts a page the caller names", () => {
+    captureWebAnalyticsEvent("$pageleave", {}, { pathname: "/p/private" });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).properties.$current_url).toBe(
+      `${window.location.origin}/p/[token]`,
     );
   });
 
