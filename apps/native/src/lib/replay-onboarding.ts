@@ -74,14 +74,21 @@ function pendingWorkKey(): string {
 }
 
 /** Mount once: after onboarding and sign-in, shows the paywall and saves the queued sample reel. */
-export function useReplayOnboarding() {
+export function useReplayOnboarding(
+  freeSaves: { left: boolean; loading: boolean } = {
+    left: false,
+    loading: false,
+  },
+) {
   const { isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
   const { data: user } = useCurrentUser();
   const accountLoaded = user != null;
   const userId = user?._id ?? null;
   const router = useRouter();
-  const { entitled, loading: entitlementLoading } = useEntitlement();
+  const entitlement = useEntitlement();
+  const entitled = entitlement.entitled || freeSaves.left;
+  const entitlementLoading = entitlement.loading || freeSaves.loading;
   const createSpace = useMutation(api.spaces.createSpace);
   const createLinkItem = useMutation(api.items.createLinkItem);
   const runningRef = useRef(false);

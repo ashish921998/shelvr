@@ -1,6 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { CtaButton } from "@/components/onboarding/parts";
 import { openPaywall, readTrialEligible } from "@/lib/entitlement";
+import { freeSavesTitle } from "@/lib/free-saves-title";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
@@ -36,6 +37,33 @@ export function ProCard({ lapsed }: { lapsed: boolean }) {
         onPress={() =>
           void openPaywall(router, lapsed ? "home_lapsed" : "home_card")
         }
+      />
+    </View>
+  );
+}
+
+export function FreeSavesCard({
+  left,
+  limit,
+  open,
+}: {
+  left: number;
+  limit: number;
+  open: boolean;
+}) {
+  useAppLocale();
+  const router = useRouter();
+  return (
+    <View style={styles.card}>
+      <View style={styles.head}>
+        <Text style={styles.title}>
+          {freeSavesTitle({ open, left, limit })}
+        </Text>
+        <Text style={styles.body}>{t("freePlan.leftBody")}</Text>
+      </View>
+      <CtaButton
+        label={t("freePlan.seePlans")}
+        onPress={() => void openPaywall(router, "home_free_limit")}
       />
     </View>
   );

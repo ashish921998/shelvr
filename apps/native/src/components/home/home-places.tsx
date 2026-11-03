@@ -2,7 +2,8 @@ import { CityCover, type CoverLayout } from "@/components/city/city-cover";
 import { PlanCitySheet } from "@/components/home/plan-city-sheet";
 import { AppSymbolIcon } from "@/components/symbol";
 import { type CityPlanKind, useCityPlan } from "@/lib/city-plan";
-import { useEntitlement, usePaywallGuard } from "@/lib/entitlement";
+import { canBrowse } from "@/lib/access";
+import { useAccess, useSaveGuard } from "@/lib/free-plan";
 import {
   type City,
   cityCountLine,
@@ -103,11 +104,13 @@ function PlanTile({
   kind,
   subtitle,
   disabled,
+  locked,
   onPress,
 }: {
   kind: CityPlanKind;
   subtitle: string;
   disabled: boolean;
+  locked: boolean;
   onPress: () => void;
 }) {
   const { theme } = useUnistyles();
@@ -117,7 +120,11 @@ function PlanTile({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`${title}, ${subtitle}`}
+      accessibilityLabel={
+        locked
+          ? `${title}, ${subtitle}, ${t("freePlan.proTag")}`
+          : `${title}, ${subtitle}`
+      }
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
@@ -137,15 +144,20 @@ function PlanTile({
         <Text style={styles.tileTitle} numberOfLines={1}>
           {title}
         </Text>
-        <Text style={styles.tileSubtitle} numberOfLines={1}>
-          {subtitle}
-        </Text>
+        <View style={styles.tileSubtitleRow}>
+          <Text style={styles.tileSubtitle} numberOfLines={1}>
+            {subtitle}
+          </Text>
+          {locked ? (
+            <Text style={styles.proTag}>{t("freePlan.proTag")}</Text>
+          ) : null}
+        </View>
       </View>
     </Pressable>
   );
 }
 
-function PlanTiles({ cities }: { cities: City[] }) {
+function PlanTiles({ cities, pro }: { cities: City[]; pro: boolean }) {
   const { busy, start } = useCityPlan();
   const [picking, setPicking] = useState<{ kind: CityPlanKind; open: boolean }>(
     { kind: "date", open: false },
@@ -168,6 +180,7 @@ function PlanTiles({ cities }: { cities: City[] }) {
             kind={kind}
             subtitle={subtitle}
             disabled={busy !== null}
+            locked={!pro}
             onPress={() => press(kind)}
           />
         </View>
@@ -261,7 +274,7 @@ export function UnplacedSaves({ saves }: { saves: UnplacedSave[] }) {
 /** The places pitch for an empty shelf; Home shows it before the first save. */
 export function HomePlacesEmptyCard() {
   const router = useRouter();
-  const { guard } = usePaywallGuard("home");
+  const { guard } = useSaveGuard("home");
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>{t("homePlaces.emptyTitle")}</Text>
@@ -280,11 +293,12 @@ export function HomePlacesEmptyCard() {
 
 export function HomePlaces() {
   useAppLocale();
-  const { entitled } = useEntitlement();
+  const access = useAccess();
+  const browsing = canBrowse(access);
   const cities = useQuery(
-    convexQuery(api.items.listCities, entitled ? {} : "skip"),
+    convexQuery(api.items.listCities, browsing ? {} : "skip"),
   );
-  if (!entitled || cities.data === undefined) return null;
+  if (!browsing || cities.data === undefined) return null;
   if (cities.data.length === 0) {
     return (
       <View style={styles.container}>
@@ -294,7 +308,10 @@ export function HomePlaces() {
   }
   return (
     <View style={styles.container}>
-      <PlanTiles cities={plannableCities(cities.data)} />
+      <PlanTiles
+        cities={plannableCities(cities.data)}
+        pro={access.kind === "pro"}
+      />
       <CityGrid cities={cities.data} />
     </View>
   );
@@ -342,7 +359,25 @@ const styles = StyleSheet.create((theme) => ({
   },
   tileText: { flex: 1 },
   tileTitle: { ...theme.type.subheadLabel, color: theme.colors.foreground },
-  tileSubtitle: { ...theme.type.caption, color: theme.colors.muted },
+  tileSubtitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(0.75),
+  },
+  tileSubtitle: {
+    ...theme.type.caption,
+    flexShrink: 1,
+    color: theme.colors.muted,
+  },
+  proTag: {
+    ...theme.type.captionStrong,
+    color: theme.colors.primaryText,
+    paddingHorizontal: theme.gap(0.75),
+    paddingVertical: theme.gap(0.25),
+    borderRadius: theme.radius.sm,
+    overflow: "hidden",
+    backgroundColor: theme.colors.primarySoft,
+  },
   tip: {
     flexDirection: "row",
     alignItems: "center",

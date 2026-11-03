@@ -207,8 +207,6 @@
   "account.deleting": "削除中…",
   "pro.checking": "サブスクリプションを確認中…",
   "pro.unlockShelvr": "Shelvr Proを利用する",
-  "share.proHelp": "共有したコンテンツの保存はProの機能です。ハブに保存するには、Shelvr Proのプランをご覧ください。",
-  "pro.unlock": "Proを利用する",
   "share.reading": "共有コンテンツを読み取り中…",
   "share.empty": "保存するものがありません",
   "share.pending": "まだ処理中の項目があります。",
@@ -1094,5 +1092,21 @@
   "tripPlanner.badgeOnList": "リストの場所",
   "sharedLists.startWithHint": "都市を1つ以上選んでください。そこに保存済みの場所も一緒に入ります。",
   "sharedLists.cityPlaceholder": "または都市名を入力",
-  "sharedLists.typedCity": "入力した都市"
+  "sharedLists.typedCity": "入力した都市",
+  "freePlan.proTag": "Pro",
+  "freePlan.leftTitle": {
+    "other": "無料保存は残り%{formattedCount}件"
+  },
+  "freePlan.usedTitle": "無料保存%{limit}件を使い切りました",
+  "freePlan.leftBody": "Proにすると場所を保存し続けられます。",
+  "freePlan.seePlans": "プランを見る",
+  "freePlan.outBody": "保存した場所はこれからも見られます。Proにすると、このリンクをすぐに保存します。別のリンクを共有すると、このリンクは置き換えられます。",
+  "freePlan.keepLink": "リンクを後で使うために残す",
+  "freePlan.discardLink": "リンクを破棄",
+  "freePlan.readingTitle": "最後の無料保存はまだ読み込み中です",
+  "freePlan.readingBody": "場所が見つからなければ、その保存は戻ります。このリンクは残しておき、そのときにもう一度試します。別のリンクを共有すると、このリンクは置き換えられます。",
+  "freePlan.ok": "OK",
+  "freePlan.photosNeedPro": "写真にはProが必要です",
+  "freePlan.photosBody": "無料の保存はリンク用です。Proにすると写真も保存でき、この写真もすぐに保存します。",
+  "freePlan.discardPhoto": "写真を破棄"
 }

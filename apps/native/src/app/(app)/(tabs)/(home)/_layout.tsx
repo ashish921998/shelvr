@@ -1,7 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { Wordmark } from "@/components/wordmark";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
-import { usePaywallGuard } from "@/lib/entitlement";
+import { useSaveGuard } from "@/lib/free-plan";
 import { Stack, useRouter } from "expo-router";
 import { Platform } from "react-native";
 import { useTabStackChrome } from "@/lib/tab-stack-chrome";
@@ -12,7 +12,7 @@ export default function HomeStackLayout() {
   const { labelColor, screenOptions, tap } = useTabStackChrome({
     softScrollEdge: true,
   });
-  const { guard, loading: entitlementLoading } = usePaywallGuard("home");
+  const { guard, loading: entitlementLoading } = useSaveGuard("home");
 
   const guardedTap = (href: "/add") => () => {
     if (entitlementLoading) return;

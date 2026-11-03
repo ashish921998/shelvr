@@ -206,8 +206,6 @@ export type MessageParams = {
   "account.deleting": undefined;
   "pro.checking": undefined;
   "pro.unlockShelvr": undefined;
-  "share.proHelp": undefined;
-  "pro.unlock": undefined;
   "share.reading": undefined;
   "share.empty": undefined;
   "share.pending": undefined;
@@ -1034,6 +1032,20 @@ export type MessageParams = {
   "sharedLists.startWithHint": undefined;
   "sharedLists.cityPlaceholder": undefined;
   "sharedLists.typedCity": undefined;
+  "freePlan.proTag": undefined;
+  "freePlan.leftTitle": { count: number };
+  "freePlan.usedTitle": { limit: number };
+  "freePlan.leftBody": undefined;
+  "freePlan.seePlans": undefined;
+  "freePlan.outBody": undefined;
+  "freePlan.keepLink": undefined;
+  "freePlan.discardLink": undefined;
+  "freePlan.readingTitle": undefined;
+  "freePlan.readingBody": undefined;
+  "freePlan.ok": undefined;
+  "freePlan.photosNeedPro": undefined;
+  "freePlan.photosBody": undefined;
+  "freePlan.discardPhoto": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

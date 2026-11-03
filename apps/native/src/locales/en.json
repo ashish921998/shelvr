@@ -208,8 +208,6 @@
   "account.deleting": "Deleting…",
   "pro.checking": "Checking subscription…",
   "pro.unlockShelvr": "Unlock Shelvr Pro",
-  "share.proHelp": "Saving shared content is a Pro feature. View Shelvr Pro plans to save it to your hub.",
-  "pro.unlock": "Unlock Pro",
   "share.reading": "Reading shared content…",
   "share.empty": "Nothing to save",
   "share.pending": "Some items are still pending.",
@@ -1125,5 +1123,22 @@
   "tripPlanner.badgeOnList": "On your list",
   "sharedLists.startWithHint": "Pick at least one city. Places you already saved there come along.",
   "sharedLists.cityPlaceholder": "Or type a city",
-  "sharedLists.typedCity": "Typed by you"
+  "sharedLists.typedCity": "Typed by you",
+  "freePlan.proTag": "Pro",
+  "freePlan.leftTitle": {
+    "one": "%{formattedCount} free save left",
+    "other": "%{formattedCount} free saves left"
+  },
+  "freePlan.usedTitle": "You’ve used your %{limit} free saves",
+  "freePlan.leftBody": "Go Pro to keep saving places.",
+  "freePlan.seePlans": "See plans",
+  "freePlan.outBody": "You can still view your saved places. Go Pro and we’ll save this link right after. If you share another link, it replaces this one.",
+  "freePlan.keepLink": "Keep link for later",
+  "freePlan.discardLink": "Discard link",
+  "freePlan.readingTitle": "Your last free save is still being read",
+  "freePlan.readingBody": "If it finds no place, you get that save back. We’ll keep this link and try again then. If you share another link, it replaces this one.",
+  "freePlan.ok": "OK",
+  "freePlan.photosNeedPro": "Photos need Pro",
+  "freePlan.photosBody": "Free saves are for links. Go Pro to save photos, and we’ll save this one right after.",
+  "freePlan.discardPhoto": "Discard photo"
 }

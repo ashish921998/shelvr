@@ -209,8 +209,6 @@
   "account.deleting": "Eliminando…",
   "pro.checking": "Comprobando suscripción…",
   "pro.unlockShelvr": "Desbloquear Shelvr Pro",
-  "share.proHelp": "Guardar contenido compartido es una función Pro. Consulta los planes de Shelvr Pro para guardarlo en tu biblioteca.",
-  "pro.unlock": "Desbloquear Pro",
   "share.reading": "Leyendo contenido compartido…",
   "share.empty": "Nada que guardar",
   "share.pending": "Algunos elementos siguen pendientes.",
@@ -1156,5 +1154,23 @@
   "tripPlanner.badgeOnList": "En tu lista",
   "sharedLists.startWithHint": "Elige al menos una ciudad. Los lugares que ya guardaste allí vienen incluidos.",
   "sharedLists.cityPlaceholder": "O escribe una ciudad",
-  "sharedLists.typedCity": "Escrita por ti"
+  "sharedLists.typedCity": "Escrita por ti",
+  "freePlan.proTag": "Pro",
+  "freePlan.leftTitle": {
+    "one": "Te queda %{formattedCount} guardado gratis",
+    "many": "Te quedan %{formattedCount} guardados gratis",
+    "other": "Te quedan %{formattedCount} guardados gratis"
+  },
+  "freePlan.usedTitle": "Ya usaste tus %{limit} guardados gratis",
+  "freePlan.leftBody": "Hazte Pro para seguir guardando lugares.",
+  "freePlan.seePlans": "Ver planes",
+  "freePlan.outBody": "Puedes seguir viendo tus lugares guardados. Hazte Pro y guardaremos este enlace justo después. Si compartes otro enlace, reemplazará a este.",
+  "freePlan.keepLink": "Guardar enlace para después",
+  "freePlan.discardLink": "Descartar enlace",
+  "freePlan.readingTitle": "Tu último guardado gratis aún se está leyendo",
+  "freePlan.readingBody": "Si no encuentra ningún lugar, lo recuperas. Guardaremos este enlace y lo intentaremos de nuevo entonces. Si compartes otro enlace, reemplazará a este.",
+  "freePlan.ok": "OK",
+  "freePlan.photosNeedPro": "Las fotos requieren Pro",
+  "freePlan.photosBody": "Los guardados gratis son para enlaces. Hazte Pro para guardar fotos y guardaremos esta justo después.",
+  "freePlan.discardPhoto": "Descartar foto"
 }
