@@ -358,6 +358,39 @@ it("waits for the first resolution before saving a shared image", async () => {
   );
 });
 
+it("asks a free account to go Pro for a shared photo instead of saving it", async () => {
+  mock.left = 5;
+  const image: RawPayload = {
+    value: "content://media/1",
+    shareType: "image",
+    mimeType: "image/jpeg",
+  };
+  mock.sharedPayloads = [image];
+  let settleResolution: (payloads: unknown[]) => void = () => {};
+  mock.resolution = new Promise((resolve) => {
+    settleResolution = resolve;
+  });
+  render(<ShareScreen />);
+  await settle();
+  await act(async () => {
+    settleResolution([
+      {
+        contentType: "image",
+        value: image.value,
+        contentUri: "file:///cache/1.jpg",
+        contentMimeType: image.mimeType,
+      },
+    ]);
+  });
+  await waitFor(() =>
+    expect(screen.getByText("freePlan.photosNeedPro")).toBeDefined(),
+  );
+  expect(screen.queryByText("freePlan.keepLink")).toBeNull();
+  fireEvent.click(screen.getByText("freePlan.seePlans"));
+  expect(mock.openPaywall).toHaveBeenCalledWith(mock.router, "share");
+  expect(mock.saveImages).not.toHaveBeenCalled();
+});
+
 it("holds a retry again when the saves run out after a held session ran", async () => {
   mock.createLinkItem.mockRejectedValue(new Error("save failed"));
   const view = render(<ShareScreen />);

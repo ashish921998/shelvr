@@ -116,6 +116,7 @@ export default function ShareScreen() {
   const access = useAccess();
   const saveAllowed = canSave(access);
   const entitlementLoading = saveWaiting(access);
+  const photosAllowed = access.kind === "pro";
   const {
     sharedPayloads,
     resolvedSharedPayloads,
@@ -184,6 +185,7 @@ export default function ShareScreen() {
       const next = stepIncomingShare(owner.current, event, {
         userId: user?._id ?? null,
         canSave: saveAllowed,
+        photosAllowed,
         entitlementLoading,
         rawPayloads,
         resolved: processorPayloads,
@@ -198,6 +200,7 @@ export default function ShareScreen() {
     [
       user,
       saveAllowed,
+      photosAllowed,
       entitlementLoading,
       rawPayloads,
       processorPayloads,
@@ -241,6 +244,28 @@ export default function ShareScreen() {
         spinner
         theme={theme}
       />
+    );
+  }
+
+  if (phase.kind === "locked" && phase.reason === "photos") {
+    return (
+      <PhaseSurface key="locked-photos" phaseKey="locked-photos">
+        <Text style={styles.title(theme)}>{t("freePlan.photosNeedPro")}</Text>
+        <Text style={styles.subtitle(theme)}>{t("freePlan.photosBody")}</Text>
+        <View style={styles.actions}>
+          <Button
+            label={t("freePlan.discardPhoto")}
+            theme={theme}
+            onPress={() => dispatch({ type: "cancel" })}
+          />
+          <Button
+            label={t("freePlan.seePlans")}
+            theme={theme}
+            primary
+            onPress={() => dispatch({ type: "unlock" })}
+          />
+        </View>
+      </PhaseSurface>
     );
   }
 

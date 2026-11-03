@@ -1044,6 +1044,8 @@ export type MessageParams = {
   "freePlan.readingBody": undefined;
   "freePlan.ok": undefined;
   "freePlan.photosNeedPro": undefined;
+  "freePlan.photosBody": undefined;
+  "freePlan.discardPhoto": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

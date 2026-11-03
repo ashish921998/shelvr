@@ -12,11 +12,13 @@ import {
 
 export type SharePhase =
   | { kind: "idle" }
-  | { kind: "locked" }
+  | { kind: "locked"; reason: LockReason }
   | { kind: "saving"; session: ShareSession }
   | { kind: "partial"; session: ShareSession }
   | { kind: "clearFailed"; session: ShareSession }
   | { kind: "complete" };
+
+export type LockReason = "saves" | "photos";
 
 export type IncomingShareState = {
   phase: SharePhase;
@@ -32,6 +34,7 @@ export type IncomingShareState = {
 export type ShareContext = {
   userId: string | null;
   canSave: boolean;
+  photosAllowed: boolean;
   entitlementLoading: boolean;
   rawPayloads: RawSharePayload[];
   resolved: ResolvedPayload[];
@@ -229,16 +232,23 @@ function requestSave(
   const sid = session.sessionId;
   if (state.running === sid) return none(state);
   if (ctx.entitlementLoading) return none(state);
-  if (!ctx.canSave) {
-    if (state.locked === sid) return none(state);
+  const fresh = session.entries.every((e) => e.status === "pending");
+  const reason = lockReason(session, fresh, ctx);
+  if (reason !== null) {
+    const { phase } = state;
+    if (
+      state.locked === sid &&
+      phase.kind === "locked" &&
+      phase.reason === reason
+    )
+      return none(state);
     return none({
       ...state,
       locked: sid,
       partial: null,
-      phase: { kind: "locked" },
+      phase: { kind: "locked", reason },
     });
   }
-  const fresh = session.entries.every((e) => e.status === "pending");
   let working = session;
   if (fresh) {
     try {
@@ -275,6 +285,18 @@ function requestSave(
       },
     ],
   };
+}
+
+function lockReason(
+  session: ShareSession,
+  fresh: boolean,
+  ctx: ShareContext,
+): LockReason | null {
+  const photo = fresh
+    ? ctx.resolved.some((p) => p.contentType === "image")
+    : session.entries.some((e) => e.kind === "image" && e.status !== "saved");
+  if (photo && !ctx.photosAllowed) return "photos";
+  return ctx.canSave ? null : "saves";
 }
 
 function releaseRun(state: IncomingShareState, sid: string) {

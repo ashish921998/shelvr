@@ -1132,11 +1132,13 @@
   "freePlan.usedTitle": "Du hast deine %{limit} kostenlosen Speicherungen genutzt",
   "freePlan.leftBody": "Mit Pro speicherst du weiter Orte.",
   "freePlan.seePlans": "Abos ansehen",
-  "freePlan.outBody": "Deine gespeicherten Orte siehst du weiterhin. Hol dir Pro, dann speichern wir diesen Link gleich danach.",
+  "freePlan.outBody": "Deine gespeicherten Orte siehst du weiterhin. Hol dir Pro, dann speichern wir diesen Link gleich danach. Teilst du einen anderen Link, ersetzt er diesen.",
   "freePlan.keepLink": "Link für später behalten",
   "freePlan.discardLink": "Link verwerfen",
   "freePlan.readingTitle": "Deine letzte kostenlose Speicherung wird noch gelesen",
-  "freePlan.readingBody": "Findet sie keinen Ort, bekommst du sie zurück. Wir behalten diesen Link und versuchen es dann erneut.",
+  "freePlan.readingBody": "Findet sie keinen Ort, bekommst du sie zurück. Wir behalten diesen Link und versuchen es dann erneut. Teilst du einen anderen Link, ersetzt er diesen.",
   "freePlan.ok": "OK",
-  "freePlan.photosNeedPro": "Fotos brauchen Pro"
+  "freePlan.photosNeedPro": "Fotos brauchen Pro",
+  "freePlan.photosBody": "Kostenlose Inhalte gelten nur für Links. Hol dir Pro, um Fotos zu speichern. Dieses speichern wir gleich danach.",
+  "freePlan.discardPhoto": "Foto verwerfen"
 }

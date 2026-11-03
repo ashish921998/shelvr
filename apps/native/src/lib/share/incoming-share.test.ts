@@ -23,6 +23,7 @@ const raw: RawSharePayload[] = [
 const ctx = (over: Partial<ShareContext> = {}): ShareContext => ({
   userId: "user-1",
   canSave: true,
+  photosAllowed: true,
   entitlementLoading: false,
   rawPayloads: raw,
   resolved: [
@@ -324,6 +325,35 @@ describe("incoming share owner", () => {
         ),
       ),
     ).toEqual(["save"]);
+  });
+
+  it("stops a photo share on Photos need Pro without trying to save it", () => {
+    const photo = {
+      contentType: "image" as const,
+      value: "photo",
+      contentUri: "file://photo.jpg",
+      contentMimeType: "image/jpeg",
+    };
+    const { state, effects } = run(
+      [{ type: "reconciled", result: { kind: "new", session: session("s1") } }],
+      ctx({ photosAllowed: false, resolved: [photo] }),
+    );
+    expect(effects).toEqual([[]]);
+    expect(state.phase).toEqual({ kind: "locked", reason: "photos" });
+  });
+
+  it("stops Retry of a failed photo on Photos need Pro", () => {
+    const failed = session("s1", "failed");
+    const photo: ShareSession = {
+      ...failed,
+      entries: [{ ...failed.entries[0], kind: "image" }],
+    };
+    const { state, effects } = run(
+      [{ type: "retry", live: photo }],
+      ctx({ photosAllowed: false }),
+    );
+    expect(effects).toEqual([[]]);
+    expect(state.phase).toEqual({ kind: "locked", reason: "photos" });
   });
 
   it("keeps a held link for later without dropping it", () => {
