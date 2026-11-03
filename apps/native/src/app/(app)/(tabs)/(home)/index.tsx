@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { t, useAppLocale } from "@/lib/i18n";
-import { ProCard } from "@/components/home/pro-card";
+import { FreeSavesCard, ProCard } from "@/components/home/pro-card";
 import { HomeGreeting } from "@/components/home/home-greeting";
 import { HomeSearch } from "@/components/home/home-search";
 import { SharedListsSection } from "@/components/home/shared-lists-section";
@@ -18,6 +18,8 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 import { HeaderScrim } from "@/components/ui/header-scrim";
 import { useCurrentUser } from "@/lib/current-user";
 import { type Entitlement, useEntitlement } from "@/lib/entitlement";
+import { FREE_SAVES_NUDGE_AT } from "@/lib/access";
+import { useAccess } from "@/lib/free-plan";
 import { useHomeFeed } from "@/lib/home-feed";
 import { unplacedSaves } from "@/lib/home-places";
 import {
@@ -69,7 +71,10 @@ export default function HomeScreen() {
   ]);
   const cancelSurvey = useCancelSurvey();
   const entitlement = useEntitlement();
-  const locked = !entitlement.loading && !entitlement.entitled;
+  const access = useAccess();
+  const locked = access.kind === "locked";
+  const nearLimit =
+    access.kind === "free" && access.left <= FREE_SAVES_NUDGE_AT;
   const { data: user } = useCurrentUser();
   const welcomePending = welcomeSave.usePending(user?._id);
   const deferPrompts =
@@ -94,6 +99,8 @@ export default function HomeScreen() {
     />
   ) : locked ? (
     <ProCard lapsed={entitlement.status === "lapsed"} />
+  ) : nearLimit ? (
+    <FreeSavesCard left={access.left} limit={access.limit} open={access.open} />
   ) : feedback.invitationVisible && !busySaving ? (
     <FeedbackInvitation
       onSendFeedback={feedback.openFeedbackFromInvitation}

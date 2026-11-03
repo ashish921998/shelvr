@@ -105,6 +105,29 @@ describe("useReplayOnboarding and the account", () => {
     expect(createLinkItem).toHaveBeenCalledOnce();
   });
 
+  it("spends a free save on the sample reel without a paywall", async () => {
+    const sample = ahaSample("trip", null);
+    entitlement.entitled = false;
+    queueDemoUrl(sample.firstSaveUrl);
+    createLinkItem.mockResolvedValue("item");
+    renderHook(() => useReplayOnboarding({ left: true, loading: false }));
+    await settle();
+    expect(openPaywall).not.toHaveBeenCalled();
+    expect(createLinkItem).toHaveBeenCalledOnce();
+    expect(createLinkItem).toHaveBeenCalledWith(
+      expect.objectContaining({ url: sample.firstSaveUrl }),
+    );
+  });
+
+  it("waits for the free count before asking a free account to pay", async () => {
+    entitlement.entitled = false;
+    queueDemoUrl(ahaSample("trip", null).firstSaveUrl);
+    renderHook(() => useReplayOnboarding({ left: false, loading: true }));
+    await settle();
+    expect(openPaywall).not.toHaveBeenCalled();
+    expect(createLinkItem).not.toHaveBeenCalled();
+  });
+
   it.each(["date", "trip", "weekend"] as const)(
     "saves the fallback %s reel after the account becomes available, once",
     async (kind) => {

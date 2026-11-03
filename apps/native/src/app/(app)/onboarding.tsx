@@ -6,6 +6,7 @@ import { useOnboarding } from "@/lib/onboarding";
 import { noteOnboardingFinished } from "@/lib/welcome-save";
 import { notificationPermissionState } from "@/lib/notification-token";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
+import { useFreePlanOpen } from "@/lib/free-plan";
 import type { SampleCityId } from "@/lib/sample-cities";
 import {
   GOALS,
@@ -225,15 +226,17 @@ export default function OnboardingScreen() {
     recordCurrentStep();
     holdIncomingShare();
     setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
-    // The reel they shared in the demo becomes their first real save once they have Pro.
+    // The reel they shared in the demo becomes their first real save once they can save.
     queueDemoUrl(sample.firstSaveUrl);
     noteOnboardingFinished();
     completeOnboarding();
   };
 
+  const freePlanOpen = useFreePlanOpen();
   const paywall = useOnboardingPaywall({
     onPro: finish,
     onUnavailable: finish,
+    onClosed: freePlanOpen === false ? undefined : finish,
   });
 
   const askForPlan = () => {

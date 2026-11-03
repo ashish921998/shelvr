@@ -31,6 +31,7 @@ const app = defineApp({
     RESEND_FEEDBACK_INBOX_EMAIL: v.optional(v.string()),
     RESEND_FEEDBACK_FROM_EMAIL: v.optional(v.string()),
     SAVE_REMINDERS_ENABLED: v.optional(v.string()),
+    FREE_SAVES_ENABLED: v.optional(v.string()),
     SERPAPI_KEY: v.optional(v.string()),
     YOUTUBE_API_KEY: v.optional(v.string()),
     TREG_API_KEY: v.optional(v.string()),

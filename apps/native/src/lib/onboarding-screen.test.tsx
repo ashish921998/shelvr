@@ -67,6 +67,7 @@ vi.mock("@/lib/onboarding", () => ({
   useOnboarding: () => ({ completeOnboarding: mocks.completeOnboarding }),
 }));
 vi.mock("@/lib/welcome-save", () => ({ noteOnboardingFinished: vi.fn() }));
+vi.mock("@/lib/free-plan", () => ({ useFreePlanOpen: () => false }));
 vi.mock("@/lib/onboarding-paywall", () => ({
   useOnboardingPaywall: (options: { onPro: () => void }) => {
     mocks.paywall = options;

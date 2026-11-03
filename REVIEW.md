@@ -29,7 +29,8 @@ Backend (`apps/native/convex`):
       `requireUserId(ctx)` inside the internal function it runs. No `userId` argument from
       the client. Code that acts for an account checks it is still live (`liveOwner`), not
       mid-deletion.
-- [ ] Every save and Pro feature calls `requireProEntitlement(ctx, userId)`.
+- [ ] Every Pro feature calls `requireProEntitlement(ctx, userId)`; every new link or note
+      save path goes through `createLinkOrNote`, whose `claimSave` counts free saves.
 - [ ] Anything that sends user content to Gemini, SerpAPI or Treg checks AI
       eligibility first (`aiAllowed` in `aiConsent.ts`, `internal.aiConsent.isAllowed`
       from actions): live ownership and legacy opt-outs remain enforced. New accounts

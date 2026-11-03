@@ -10,10 +10,10 @@ export type CityPlanKind = "date" | "trip";
 /** Opens the date planner for the city's saves, or the trip planner with the city filled in. */
 export function useCityPlan() {
   const router = useRouter();
-  const dateGuard = usePaywallGuard("make_plan").guard;
+  const planGuard = usePaywallGuard("make_plan").guard;
   const [busy, setBusy] = useState<CityPlanKind | null>(null);
   // A ref, not `busy`: a second tap can land before React re-renders with the first one's state.
-  // The trip form opens without `busy`, so its lock is released when this screen is back in focus.
+  // The trip form stays open after `busy` clears, so its lock is released when this screen is back in focus.
   const locked = useRef(false);
   useFocusEffect(
     useCallback(() => {
@@ -24,23 +24,22 @@ export function useCityPlan() {
   const start = async (kind: CityPlanKind, city: string) => {
     if (busy !== null || locked.current) return;
     locked.current = true;
-    if (kind === "trip") {
-      // The planner asks for Pro when it plans, so the form opens straight away.
-      analytics.capture("city_plan_started", { kind });
-      router.push({ pathname: "/new-trip", params: { city } });
-      return;
-    }
     setBusy(kind);
+    let formOpen = false;
     try {
-      const allowed = await dateGuard(() => undefined);
+      const allowed = await planGuard(() => undefined);
       if (!allowed) return;
       analytics.capture("city_plan_started", { kind });
-      router.push({ pathname: "/date-plan", params: { city } });
+      router.push({
+        pathname: kind === "trip" ? "/new-trip" : "/date-plan",
+        params: { city },
+      });
+      formOpen = kind === "trip";
     } catch (error) {
       analytics.captureError("city_plan_failed", error);
       Alert.alert(t("errors.tryAgain"));
     } finally {
-      locked.current = false;
+      if (!formOpen) locked.current = false;
       setBusy(null);
     }
   };

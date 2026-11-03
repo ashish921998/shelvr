@@ -56,6 +56,7 @@ vi.mock("expo-router", () => ({
       ),
     },
   ),
+  useRouter: () => ({ push: retry.push }),
 }));
 vi.mock("@convex/_generated/api", () => ({
   api: {
@@ -73,7 +74,11 @@ const fullRow = vi.hoisted(() => ({ loading: false }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: undefined, isError: !fullRow.loading }),
 }));
-const retry = vi.hoisted(() => ({ reprocess: vi.fn(), guard: vi.fn() }));
+const retry = vi.hoisted(() => ({
+  reprocess: vi.fn(),
+  guard: vi.fn(),
+  push: vi.fn(),
+}));
 vi.mock("convex/react", () => ({ useMutation: () => retry.reprocess }));
 vi.mock("@/lib/entitlement", () => ({
   usePaywallGuard: () => ({ guard: retry.guard, loading: false }),
@@ -321,6 +326,11 @@ it("shows a note's own text, read-only", () => {
 });
 
 it("offers place correction on a ready save", () => {
+  retry.guard.mockReset().mockImplementation(async (action?: () => void) => {
+    action?.();
+    return true;
+  });
+  retry.push.mockReset();
   render(
     <ItemDetail
       item={product}
@@ -329,13 +339,12 @@ it("offers place correction on a ready save", () => {
       reserveFooter={false}
     />,
   );
-  expect(
+  fireEvent.click(
     screen.getByRole("button", { name: "placeCorrection.title" }),
-  ).toBeTruthy();
-  expect(Link).toHaveBeenCalledWith(
-    expect.objectContaining({
-      href: { pathname: "/edit-save-places", params: { itemId: "item-1" } },
-    }),
-    undefined,
   );
+  expect(retry.guard).toHaveBeenCalledOnce();
+  expect(retry.push).toHaveBeenCalledWith({
+    pathname: "/edit-save-places",
+    params: { itemId: product._id },
+  });
 });

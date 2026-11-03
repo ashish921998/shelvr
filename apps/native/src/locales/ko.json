@@ -207,8 +207,6 @@
   "account.deleting": "삭제 중…",
   "pro.checking": "구독 확인 중…",
   "pro.unlockShelvr": "Shelvr Pro 이용하기",
-  "share.proHelp": "공유받은 콘텐츠 저장은 Pro 기능이에요. 내 보관함에 저장하려면 Shelvr Pro 요금제를 확인하세요.",
-  "pro.unlock": "Pro 이용하기",
   "share.reading": "공유받은 콘텐츠 읽는 중…",
   "share.empty": "저장할 항목이 없어요",
   "share.pending": "일부 항목은 아직 대기 중이에요.",
@@ -1100,5 +1098,21 @@
   "tripPlanner.badgeOnList": "내 목록",
   "sharedLists.startWithHint": "도시를 하나 이상 고르세요. 그곳에 이미 저장한 장소도 함께 들어가요.",
   "sharedLists.cityPlaceholder": "또는 도시 입력",
-  "sharedLists.typedCity": "직접 입력한 도시"
+  "sharedLists.typedCity": "직접 입력한 도시",
+  "freePlan.proTag": "Pro",
+  "freePlan.leftTitle": {
+    "other": "무료 저장 %{formattedCount}개 남음"
+  },
+  "freePlan.usedTitle": "무료 저장 %{limit}개를 모두 사용했어요",
+  "freePlan.leftBody": "Pro로 장소를 계속 저장하세요.",
+  "freePlan.seePlans": "요금제 보기",
+  "freePlan.outBody": "저장한 장소는 계속 볼 수 있어요. Pro로 바꾸면 이 링크를 바로 저장해 드려요. 다른 링크를 공유하면 이 링크는 바뀌어요.",
+  "freePlan.keepLink": "나중을 위해 링크 남기기",
+  "freePlan.discardLink": "링크 버리기",
+  "freePlan.readingTitle": "마지막 무료 저장을 아직 읽고 있어요",
+  "freePlan.readingBody": "장소를 찾지 못하면 그 저장은 돌려드려요. 이 링크는 남겨 두었다가 그때 다시 시도할게요. 다른 링크를 공유하면 이 링크는 바뀌어요.",
+  "freePlan.ok": "확인",
+  "freePlan.photosNeedPro": "사진은 Pro가 필요해요",
+  "freePlan.photosBody": "무료 저장은 링크에만 쓸 수 있어요. Pro로 바꾸면 사진도 저장할 수 있고, 이 사진도 바로 저장해 드려요.",
+  "freePlan.discardPhoto": "사진 버리기"
 }

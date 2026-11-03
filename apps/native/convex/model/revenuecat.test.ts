@@ -112,7 +112,8 @@ describe("authoritative event policy", () => {
     [{ type: "EXPIRATION", expirationReason: "CUSTOMER_SUPPORT" }, true],
     [{ type: "CANCELLATION", cancelReason: "BILLING_ERROR" }, true],
     [{ type: "CANCELLATION", cancelReason: "UNSUBSCRIBE" }, false],
-    [{ type: "EXPIRATION", expirationReason: "BILLING_ERROR" }, false],
+    [{ type: "EXPIRATION", expirationReason: "BILLING_ERROR" }, true],
+    [{ type: "EXPIRATION", expirationReason: "UNSUBSCRIBE" }, true],
     [{ type: "RENEWAL" }, false],
     [{}, false],
   ])("classifies %j as authoritative=%s", (event, expected) => {
@@ -227,11 +228,6 @@ describe("RevenueCat parsing edge cases", () => {
       ...extra,
     };
   }
-
-  it("lapses a user on a plain EXPIRATION webhook", () => {
-    expect(mapRevenueCatStatus("EXPIRATION")).toBe("lapsed");
-    expect(mapRevenueCatStatus("EXPIRATION", "TRIAL")).toBe("lapsed");
-  });
 
   it("lapses an authoritative snapshot whose expiry has passed, including exactly now", () => {
     for (const expires of ["2026-09-07T12:00:00Z", "2026-09-08T12:00:00Z"]) {

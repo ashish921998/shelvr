@@ -125,6 +125,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   - `cancelSurveys`: one next-visit cancel-survey ask per user; the first recorded outcome wins
   - `captureTokens`: hashed per-device tokens the iOS App Intents use in place of a JWT
   - `onboardingDemos`: the one pre-payment demo save each user is allowed
+  - `freeSaves`: one row per link or note save made without Pro while `FREE_SAVES_ENABLED`
+    is on, `pending` until it settles, then `placed` (counts toward the 10) or `released`
   - `aiConsents`: one row per user holding their answer to the third-party AI processing
     disclosure (`granted` or `declined`) and the disclosure version it answered
   - `appleTokens`: the latest Sign in with Apple refresh token per user, kept only to
@@ -195,7 +197,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   which needs no space), and plan shares and stored trips hang off that space. The app no longer shows spaces; the CRUD and suggestion
   functions stay for old builds.
 - **`subscriptions.ts`**: `getEntitlement` query for the client and the
-  `requireProEntitlement(ctx, userId)` helper that gates every save and Pro feature. The
+  `requireProEntitlement(ctx, userId)` helper that gates Pro features and photo saves. The
   `upsertSubscription`, `liveOwners`, and `applySnapshots` internals are driven by the
   RevenueCat webhook.
 - **`aiConsent.ts`**: legacy AI preferences and ownership checks. `getStatus` and
@@ -467,6 +469,16 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
 - **`demo.ts`**: the pre-payment onboarding demo save (`createDemoItem`, `retryDemoItem`), one
   per user, tracked in `onboardingDemos`. Onboarding no longer has a first-save step; the
   app still calls `createDemoItem` for a first save an older build queued before sign-in.
+- **`freeSaves.ts`**: the free plan's 10 saves. `claimSave` runs in `createLinkOrNote` (app,
+  share sheet and Siri link and note saves): Pro passes, otherwise it refuses with
+  `pro_required` while the switch is off or 10 are held. A save holds its slot while
+  processing and keeps it only if it finishes ready with a city (`settleFreeSave`, run
+  from `finalizeItem`, the failure path and `deleteItem`); deleting a placed save gives
+  nothing back. Retrying a free save needs no Pro, but one that gave its slot back takes a
+  slot again (`reclaimFreeSave`). Adding a Maps list's other city parts needs no Pro. Photo saves and every plan stay Pro. `getFreeSaves` is the client's counter: null
+  with Pro, or with the switch off for someone holding no free save (none pending or placed); `pending` counts saves
+  still being read, and `open` is false once the switch is off, with `left` then 0.
+  `freePlanOpen` answers a signed-out caller whether the switch is on, for onboarding's paywall.
 - **`cancelSurvey.ts`**: the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the
   client boundary is `src/lib/cancel-survey.ts`.
 - **`reelPlaces.ts`** (`"use node"` action): the web reel place finder. The internal `find`
@@ -731,7 +743,8 @@ needed at runtime by the features that use them:
 - `REVENUECAT_WEBHOOK_SECRET`: shared bearer secret authenticating RevenueCat webhook posts.
   The route answers 500 when it is unset
 - `REVENUECAT_API_KEY`: RevenueCat REST key used to re-read subscribers when reconciling a
-  `TRANSFER`, `BILLING_ISSUE`, refund, or `REFUND_REVERSED` webhook event. Billing-issue and refund reconciliation return
+  `TRANSFER`, `BILLING_ISSUE`, refund, `REFUND_REVERSED` or `EXPIRATION` webhook event (an expiring
+  product says nothing about a dated grant that still covers the account). Those reconciliations return
   503 without this key so RevenueCat retries instead of leaving access silently out of sync
 - `REVENUECAT_ENTITLEMENT_ID`: entitlement name read from the RevenueCat subscriber snapshot.
   Defaults to `Shelvr Pro`
@@ -739,6 +752,8 @@ needed at runtime by the features that use them:
   default, so a deploy never starts them; set it back to anything else to stop them, queued
   ones included, without a deploy. See
   [contextual notifications](docs/architecture/contextual-notifications.md)
+- `FREE_SAVES_ENABLED`: the free plan's 10 saves (`freeSaves.ts`) work only while this is
+  `"true"`. Unset, every save without Pro is refused as before
 - `SERPAPI_KEY`: SerpAPI key for `findProductLinks`. The search fails without it
 - `YOUTUBE_API_KEY` — optional YouTube Data API v3 key for video descriptions and metadata.
   Missing key, quota/auth rejection, network failure or unusable responses preserve the existing
@@ -786,8 +801,8 @@ needed at runtime by the features that use them:
   expand half of the sequence, with a `Convex-Api: changed` trailer on a commit in the
   range. It cannot yet tell widening from narrowing, so an added field asks for the
   trailer too.
-- Gate every save and Pro feature with `requireProEntitlement(ctx, userId)` from
-  `subscriptions.ts`.
+- Gate every Pro feature with `requireProEntitlement(ctx, userId)` from `subscriptions.ts`.
+  Link and note saves are gated by `claimSave` in `freeSaves.ts`, which also counts free saves.
 - Never log raw `console.*`: use `logEvent` (Convex), `serverLog` (web server), or
   `analytics.captureError` (native app) so events land in the Convex log stream or PostHog
   error tracking in a queryable shape. Keep messages, URLs, and user content out of log

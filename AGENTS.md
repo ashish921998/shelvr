@@ -234,7 +234,7 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   `userId` in a public Convex function.
 - Use indexes or search indexes for growing Convex tables. Keep every Convex
   function's `args` and `returns` validators accurate.
-- Gate saves and Pro features with `requireProEntitlement`.
+- Gate Pro features with `requireProEntitlement`, and link and note saves with `claimSave`.
 - AI passes may change only `suggested` memberships, except that the classifier
   inserts new matches as `saved` into a space the user set to auto-file.
   User-owned `saved` and `dismissed` decisions stay intact.

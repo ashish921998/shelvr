@@ -208,8 +208,6 @@
   "account.deleting": "Löschen…",
   "pro.checking": "Abo wird geprüft…",
   "pro.unlockShelvr": "Shelvr Pro freischalten",
-  "share.proHelp": "Das Speichern geteilter Inhalte ist eine Pro-Funktion. Sieh dir die Shelvr Pro-Abos an, um sie in deiner Bibliothek zu speichern.",
-  "pro.unlock": "Pro freischalten",
   "share.reading": "Geteilte Inhalte werden gelesen…",
   "share.empty": "Nichts zu speichern",
   "share.pending": "Einige Inhalte sind noch ausstehend.",
@@ -1132,5 +1130,22 @@
   "tripPlanner.badgeOnList": "Auf deiner Liste",
   "sharedLists.startWithHint": "Wähle mindestens eine Stadt. Orte, die du dort schon gespeichert hast, kommen mit.",
   "sharedLists.cityPlaceholder": "Oder eine Stadt eingeben",
-  "sharedLists.typedCity": "Von dir eingegeben"
+  "sharedLists.typedCity": "Von dir eingegeben",
+  "freePlan.proTag": "Pro",
+  "freePlan.leftTitle": {
+    "one": "Noch %{formattedCount} kostenlose Speicherung",
+    "other": "Noch %{formattedCount} kostenlose Speicherungen"
+  },
+  "freePlan.usedTitle": "Du hast deine %{limit} kostenlosen Speicherungen genutzt",
+  "freePlan.leftBody": "Mit Pro speicherst du weiter Orte.",
+  "freePlan.seePlans": "Abos ansehen",
+  "freePlan.outBody": "Deine gespeicherten Orte siehst du weiterhin. Hol dir Pro, dann speichern wir diesen Link gleich danach. Teilst du einen anderen Link, ersetzt er diesen.",
+  "freePlan.keepLink": "Link für später behalten",
+  "freePlan.discardLink": "Link verwerfen",
+  "freePlan.readingTitle": "Deine letzte kostenlose Speicherung wird noch gelesen",
+  "freePlan.readingBody": "Findet sie keinen Ort, bekommst du sie zurück. Wir behalten diesen Link und versuchen es dann erneut. Teilst du einen anderen Link, ersetzt er diesen.",
+  "freePlan.ok": "OK",
+  "freePlan.photosNeedPro": "Fotos brauchen Pro",
+  "freePlan.photosBody": "Kostenlose Inhalte gelten nur für Links. Hol dir Pro, um Fotos zu speichern. Dieses speichern wir gleich danach.",
+  "freePlan.discardPhoto": "Foto verwerfen"
 }

@@ -1,5 +1,6 @@
 import { greetingSubtitle } from "@/lib/home-places";
-import { useEntitlement } from "@/lib/entitlement";
+import { canBrowse } from "@/lib/access";
+import { useAccess } from "@/lib/free-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
@@ -11,7 +12,7 @@ type GreetingSave = Parameters<typeof greetingSubtitle>[1][number];
 
 export function HomeGreeting({ saves }: { saves: GreetingSave[] }) {
   useAppLocale();
-  const { entitled } = useEntitlement();
+  const entitled = canBrowse(useAccess());
   const name = useQuery(
     convexQuery(api.users.getMyFirstName, entitled ? {} : "skip"),
   ).data;
