@@ -90,7 +90,7 @@ describe("useOnboardingPaywall", () => {
     expect(onPro).not.toHaveBeenCalled();
   });
 
-  it("moves on to Home when the paywall is closed while free saves are open", async () => {
+  it("runs onClosed instead of re-asking when the caller gives one", async () => {
     state.signedIn = false;
     state.open.mockResolvedValue("cancelled");
     const onPro = vi.fn();

@@ -41,7 +41,7 @@ import { analytics } from "@/lib/analytics";
 import { bestEffort } from "@/lib/best-effort";
 import { saveFailureStage } from "@convex/model/saveErrors";
 import { openPaywall } from "@/lib/entitlement";
-import { canSave } from "@/lib/access";
+import { canSave, saveWaiting } from "@/lib/access";
 import { useAccess } from "@/lib/free-plan";
 import { useCurrentUser } from "@/lib/current-user";
 import { api } from "@convex/_generated/api";
@@ -115,7 +115,7 @@ export default function ShareScreen() {
   const { data: user } = useCurrentUser();
   const access = useAccess();
   const saveAllowed = canSave(access);
-  const entitlementLoading = access.kind === "loading";
+  const entitlementLoading = saveWaiting(access);
   const {
     sharedPayloads,
     resolvedSharedPayloads,

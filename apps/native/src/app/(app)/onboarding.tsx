@@ -236,7 +236,7 @@ export default function OnboardingScreen() {
   const paywall = useOnboardingPaywall({
     onPro: finish,
     onUnavailable: finish,
-    onClosed: freePlanOpen ? finish : undefined,
+    onClosed: freePlanOpen === false ? undefined : finish,
   });
 
   const askForPlan = () => {

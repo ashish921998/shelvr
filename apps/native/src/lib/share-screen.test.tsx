@@ -33,7 +33,9 @@ const SPOTS = { pathname: "/spots/[id]", params: { id: "item-1" } };
 const mock = vi.hoisted(() => ({
   entitled: false,
   entitlementLoading: false,
+  syncing: false,
   pending: 0,
+  left: 0,
   user: { _id: "user-1" },
   sharedPayloads: [] as RawPayload[],
   resolvedSharedPayloads: [] as unknown[],
@@ -86,16 +88,18 @@ vi.mock("@/lib/free-plan", () => ({
   useAccess: () =>
     mock.entitlementLoading
       ? { kind: "loading" }
-      : mock.entitled
-        ? { kind: "pro" }
-        : {
-            kind: "free",
-            limit: 10,
-            used: 10,
-            left: 0,
-            pending: mock.pending,
-            open: true,
-          },
+      : mock.syncing
+        ? { kind: "pro", syncing: true }
+        : mock.entitled
+          ? { kind: "pro", syncing: false }
+          : {
+              kind: "free",
+              limit: 10,
+              used: 10 - mock.left,
+              left: mock.left,
+              pending: mock.pending,
+              open: true,
+            },
 }));
 vi.mock("@/lib/current-user", () => ({
   useCurrentUser: () => ({ data: mock.user }),
@@ -216,7 +220,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   mock.entitled = false;
   mock.entitlementLoading = false;
+  mock.syncing = false;
   mock.pending = 0;
+  mock.left = 0;
   mock.sharedPayloads = [link];
   mock.resolvedSharedPayloads = [];
   mock.isResolving = false;
@@ -273,6 +279,38 @@ it("says the last free save is still being read while it is", async () => {
   fireEvent.click(screen.getByText("freePlan.ok"));
   expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
   expect(mock.createLinkItem).not.toHaveBeenCalled();
+});
+
+it("saves a held link with the free slot a pending save gives back", async () => {
+  mock.pending = 1;
+  mock.resolvedSharedPayloads = [resolvedLink];
+  const view = render(<ShareScreen />);
+  await waitFor(() =>
+    expect(screen.getByText("freePlan.readingTitle")).toBeDefined(),
+  );
+  expect(mock.createLinkItem).not.toHaveBeenCalled();
+
+  mock.pending = 0;
+  mock.left = 1;
+  view.rerender(<ShareScreen />);
+  await waitFor(() => expect(mock.createLinkItem).toHaveBeenCalledTimes(1));
+  expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
+    url: link.value,
+  });
+  expect(mock.openPaywall).not.toHaveBeenCalled();
+});
+
+it("waits for a purchase that is still landing before saving", async () => {
+  mock.syncing = true;
+  mock.resolvedSharedPayloads = [resolvedLink];
+  const view = render(<ShareScreen />);
+  await settle();
+  expect(mock.createLinkItem).not.toHaveBeenCalled();
+
+  mock.syncing = false;
+  mock.entitled = true;
+  view.rerender(<ShareScreen />);
+  await waitFor(() => expect(mock.createLinkItem).toHaveBeenCalledTimes(1));
 });
 
 it("waits for the first resolution before saving a shared image", async () => {

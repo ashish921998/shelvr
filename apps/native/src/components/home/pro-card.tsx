@@ -1,6 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { CtaButton } from "@/components/onboarding/parts";
 import { openPaywall, readTrialEligible } from "@/lib/entitlement";
+import { freeSavesTitle } from "@/lib/free-saves-title";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
@@ -56,11 +57,7 @@ export function FreeSavesCard({
     <View style={styles.card}>
       <View style={styles.head}>
         <Text style={styles.title}>
-          {!open
-            ? t("pro.unlockShelvr")
-            : left > 0
-              ? t("freePlan.leftTitle", { count: left })
-              : t("freePlan.usedTitle", { limit })}
+          {freeSavesTitle({ open, left, limit })}
         </Text>
         <Text style={styles.body}>{t("freePlan.leftBody")}</Text>
       </View>

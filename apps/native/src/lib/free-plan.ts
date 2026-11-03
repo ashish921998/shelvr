@@ -5,7 +5,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth } from "convex/react";
 import { useCallback } from "react";
-import { accessOf, canSave, type Access } from "@/lib/access";
+import { accessOf, canSave, saveWaiting, type Access } from "@/lib/access";
 
 export function useAccess(): Access {
   const { isAuthenticated } = useConvexAuth();
@@ -20,7 +20,7 @@ export function useAccess(): Access {
     signedIn: isAuthenticated,
     entitlement,
     awaitingPurchase,
-    freeSaves: isError ? null : data,
+    freeSaves: data ?? (isError ? null : undefined),
   });
 }
 
@@ -35,15 +35,17 @@ export function useSaveGuard(placement = "home"): {
 } {
   const access = useAccess();
   const paywall = usePaywallGuard(placement);
+  const waiting = saveWaiting(access);
   const free = access.kind === "free" && canSave(access);
   const paywallGuard = paywall.guard;
   const guard = useCallback(
     async (action?: () => void) => {
+      if (waiting) return false;
       if (!free) return paywallGuard(action);
       action?.();
       return true;
     },
-    [free, paywallGuard],
+    [waiting, free, paywallGuard],
   );
-  return { guard, loading: access.kind === "loading" || paywall.loading };
+  return { guard, loading: waiting || paywall.loading };
 }

@@ -46,9 +46,10 @@ export default function AppLayout() {
 
   useEffect(() => {
     const link = releaseSheetLink(planUnknown);
-    if (!link || (link.sheet && !(onboarded && !gated))) return;
+    if (!link || (link.sheet && !(isAuthenticated && onboarded && !gated)))
+      return;
     router.push(link.route as never);
-  }, [planUnknown, gated, onboarded, router]);
+  }, [planUnknown, gated, onboarded, isAuthenticated, router]);
 
   useReplayOnboarding({
     left: access.kind === "free" && canSave(access),

@@ -8,6 +8,7 @@ import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { useCurrentUser } from "@/lib/current-user";
 import { openPaywall, useEntitlement } from "@/lib/entitlement";
 import { useAccess } from "@/lib/free-plan";
+import { freeSavesTitle } from "@/lib/free-saves-title";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS, SUPPORT_EMAIL, SUPPORT_URL } from "@/lib/legal";
 import { manageSubscription } from "@/lib/manage-subscription";
@@ -271,9 +272,12 @@ export default function SettingsScreen() {
         <SettingsGroup>
           <SettingsRow
             divider={false}
-            label={t("freePlan.leftTitle", { count: access.left })}
+            label={freeSavesTitle(access)}
             value={t("freePlan.seePlans")}
-            onPress={() => void openPaywall(router, "settings_free_saves")}
+            onPress={async () => {
+              await closeScreen(navigation, closeAllSheets);
+              void openPaywall(router, "settings_free_saves");
+            }}
           />
         </SettingsGroup>
       ) : null}

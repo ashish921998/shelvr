@@ -7,6 +7,7 @@ import {
 } from "@expo/ui/community/bottom-sheet";
 import { openPaywall } from "@/lib/entitlement";
 import { useAccess } from "@/lib/free-plan";
+import { freeSavesTitle } from "@/lib/free-saves-title";
 import { backOrHome } from "@/lib/screen-dismiss";
 import { saveErrorCode, saveFailureStage } from "@convex/model/saveErrors";
 import { api } from "@convex/_generated/api";
@@ -202,7 +203,7 @@ function AddContent({ close }: { close: () => void }) {
       <Text style={styles.hint}>{t("capture.linkHint")}</Text>
       {access.kind === "free" ? (
         <Text style={styles.hint}>
-          {`${t("freePlan.leftTitle", { count: access.left })} · ${t("freePlan.photosNeedPro")}`}
+          {`${freeSavesTitle(access)} · ${t("freePlan.photosNeedPro")}`}
         </Text>
       ) : null}
     </View>

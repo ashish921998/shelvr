@@ -512,11 +512,12 @@ function ItemPageBody({
 
 function EditPlacesLink({ item }: { item: DetailItem }) {
   const router = useRouter();
-  const { guard } = usePaywallGuard("edit_places");
+  const { guard, loading } = usePaywallGuard("edit_places");
   if (item.status !== "ready") return null;
   return (
     <Pressable
       accessibilityRole="button"
+      disabled={loading}
       style={{ paddingVertical: 12 }}
       onPress={() =>
         void guard(() =>

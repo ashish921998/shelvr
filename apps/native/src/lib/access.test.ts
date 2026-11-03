@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { accessOf, canSave, type FreeSaves } from "./access";
+import { accessOf, canSave, saveWaiting, type FreeSaves } from "./access";
 
 const settled = { entitled: false, loading: false };
 const free = (over: Partial<FreeSaves> = {}): FreeSaves => ({
@@ -51,7 +51,7 @@ describe("accessOf", () => {
 
 describe("canSave", () => {
   it("lets Pro and a free person with saves left save", () => {
-    expect(canSave({ kind: "pro" })).toBe(true);
+    expect(canSave({ kind: "pro", syncing: false })).toBe(true);
     expect(canSave(access())).toBe(true);
   });
 
@@ -59,10 +59,21 @@ describe("canSave", () => {
     expect(canSave(access({ freeSaves: free({ used: 10, left: 0 }) }))).toBe(
       false,
     );
-    expect(canSave(access({ freeSaves: free({ open: false, left: 0 }) }))).toBe(
+    expect(canSave(access({ freeSaves: free({ open: false, left: 1 }) }))).toBe(
       false,
     );
     expect(canSave({ kind: "loading" })).toBe(false);
     expect(canSave({ kind: "locked" })).toBe(false);
+  });
+});
+
+describe("saveWaiting", () => {
+  it("holds saves while a purchase is still landing or access is loading", () => {
+    expect(saveWaiting(access({ awaitingPurchase: true }))).toBe(true);
+    expect(saveWaiting({ kind: "loading" })).toBe(true);
+    expect(
+      saveWaiting(access({ entitlement: { entitled: true, loading: false } })),
+    ).toBe(false);
+    expect(saveWaiting(access())).toBe(false);
   });
 });
