@@ -4,7 +4,6 @@ import { releaseSheetLink } from "@/lib/deferred-sheet-link";
 import { useForgetExitOffer } from "@/lib/forget-exit-offer";
 import { endPurchaseLandingSession } from "@/lib/purchase-landing";
 import { t, useAppLocale } from "@/lib/i18n";
-import { useEntitlement } from "@/lib/entitlement";
 import { useOnboarding } from "@/lib/onboarding";
 import { HomeFeedProvider } from "@/lib/home-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
@@ -34,7 +33,6 @@ export default function AppLayout() {
   const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
 
-  const entitlement = useEntitlement();
   const { gated, planUnknown } = usePlanGate();
   useEffect(() => {
     if (!isAuthenticated && !isLoading) endPurchaseLandingSession();
@@ -43,13 +41,11 @@ export default function AppLayout() {
   const lists = useSharedLists(isAuthenticated && onboarded);
   const listRoutes = listRouteAllowed({ onboarded, gated, lists: lists.data });
 
-  const planLoading = entitlement.loading;
-  const entitled = entitlement.entitled;
   useEffect(() => {
-    const link = releaseSheetLink(planLoading);
-    if (!link || (link.sheet && !(onboarded && entitled))) return;
+    const link = releaseSheetLink(planUnknown);
+    if (!link || (link.sheet && !(onboarded && !gated))) return;
     router.push(link.route as never);
-  }, [planLoading, entitled, onboarded, router]);
+  }, [planUnknown, gated, onboarded, router]);
 
   useReplayOnboarding();
   useQueuedFirstSave();
