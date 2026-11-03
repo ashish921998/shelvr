@@ -306,6 +306,7 @@ describe("useNameGate", () => {
   });
 
   it("asks a nameless person once, then carries on whatever they chose", () => {
+    vi.useFakeTimers();
     mocks.query.mockReturnValue({});
     const action = vi.fn();
     const { result, rerender } = renderHook(() => useNameGate());
@@ -313,6 +314,7 @@ describe("useNameGate", () => {
     expect(result.current.asking).toBe(false);
     mocks.query.mockReturnValue({ data: null });
     rerender();
+    act(() => vi.advanceTimersByTime(3000));
     expect(result.current.asking).toBe(true);
     expect(action).not.toHaveBeenCalled();
 
