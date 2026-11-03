@@ -1164,13 +1164,13 @@
   "freePlan.usedTitle": "Você usou seus %{limit} salvamentos grátis",
   "freePlan.leftBody": "Assine o Pro para continuar salvando lugares.",
   "freePlan.seePlans": "Ver planos",
-  "freePlan.outBody": "Você ainda pode ver seus lugares salvos. Assine o Pro e salvaremos este link logo depois. Se você compartilhar outro link, ele substitui este.",
+  "freePlan.outBody": "Você ainda pode ver seus lugares salvos. Assine o Pro e salvaremos este link logo depois. Se você compartilhar outra coisa, ela substitui este link.",
   "freePlan.keepLink": "Guardar link para depois",
   "freePlan.discardLink": "Descartar link",
   "freePlan.readingTitle": "Seu último salvamento grátis ainda está sendo lido",
-  "freePlan.readingBody": "Se não encontrar nenhum lugar, você recebe esse salvamento de volta. Guardaremos este link e tentaremos de novo nessa hora. Se você compartilhar outro link, ele substitui este.",
+  "freePlan.readingBody": "Se não encontrar nenhum lugar, você recebe esse salvamento de volta. Guardaremos este link e tentaremos de novo nessa hora. Se você compartilhar outra coisa, ela substitui este link.",
   "freePlan.ok": "OK",
   "freePlan.photosNeedPro": "Fotos exigem Pro",
-  "freePlan.photosBody": "Os salvamentos grátis são para links. Assine o Pro para salvar fotos, e salvaremos esta logo depois.",
+  "freePlan.photosBody": "Fotos não fazem parte dos salvamentos grátis. Assine o Pro para salvar fotos, e salvaremos esta logo depois.",
   "freePlan.discardPhoto": "Descartar foto"
 }

@@ -1164,13 +1164,13 @@
   "freePlan.usedTitle": "Vous avez utilisé vos %{limit} enregistrements gratuits",
   "freePlan.leftBody": "Passez à Pro pour continuer à enregistrer des lieux.",
   "freePlan.seePlans": "Voir les offres",
-  "freePlan.outBody": "Vous pouvez toujours consulter vos lieux enregistrés. Passez à Pro et nous enregistrerons ce lien juste après. Si vous partagez un autre lien, il remplace celui-ci.",
+  "freePlan.outBody": "Vous pouvez toujours consulter vos lieux enregistrés. Passez à Pro et nous enregistrerons ce lien juste après. Si vous partagez autre chose, cela remplace ce lien.",
   "freePlan.keepLink": "Garder le lien pour plus tard",
   "freePlan.discardLink": "Supprimer le lien",
   "freePlan.readingTitle": "Votre dernier enregistrement gratuit est encore en cours de lecture",
-  "freePlan.readingBody": "S’il ne trouve aucun lieu, il vous est rendu. Nous gardons ce lien et réessaierons à ce moment-là. Si vous partagez un autre lien, il remplace celui-ci.",
+  "freePlan.readingBody": "S’il ne trouve aucun lieu, il vous est rendu. Nous gardons ce lien et réessaierons à ce moment-là. Si vous partagez autre chose, cela remplace ce lien.",
   "freePlan.ok": "OK",
   "freePlan.photosNeedPro": "Les photos nécessitent Pro",
-  "freePlan.photosBody": "Les enregistrements gratuits concernent les liens. Passez à Pro pour enregistrer des photos, et nous enregistrerons celle-ci juste après.",
+  "freePlan.photosBody": "Les photos ne font pas partie des enregistrements gratuits. Passez à Pro pour enregistrer des photos, et nous enregistrerons celle-ci juste après.",
   "freePlan.discardPhoto": "Supprimer la photo"
 }
