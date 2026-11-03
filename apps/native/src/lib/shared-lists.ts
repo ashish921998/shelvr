@@ -54,6 +54,14 @@ export function useNameGate() {
   const { firstName, loading } = useMyFirstName();
   const [pending, setPending] = useState<(() => void) | null>(null);
   const waiting = useRef<(() => void) | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(
+    () => () => {
+      waiting.current = null;
+      clearTimeout(timer.current);
+    },
+    [],
+  );
   const decide = useCallback(
     (action: () => void) => {
       if (firstName !== null || nameAsked) {
@@ -69,6 +77,7 @@ export function useNameGate() {
     const action = waiting.current;
     if (action === null || loading) return;
     waiting.current = null;
+    clearTimeout(timer.current);
     decide(action);
   }, [loading, decide]);
   const gate = useCallback(
@@ -78,7 +87,8 @@ export function useNameGate() {
         return;
       }
       waiting.current = action;
-      setTimeout(() => {
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
         if (waiting.current !== action) return;
         waiting.current = null;
         action();

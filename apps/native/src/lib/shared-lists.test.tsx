@@ -56,6 +56,7 @@ vi.mock("react-native", () => ({
 }));
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   mocks.add.mockReset();
   mocks.remove.mockReset();
@@ -280,14 +281,27 @@ describe("useNameGate", () => {
     act(() => vi.advanceTimersByTime(3000));
     expect(action).toHaveBeenCalledTimes(1);
     expect(result.current.asking).toBe(false);
-    vi.useRealTimers();
+  });
+
+  it("drops a parked action when the screen goes away", () => {
+    vi.useFakeTimers();
+    mocks.query.mockReturnValue({});
+    const action = vi.fn();
+    const { result, unmount } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    unmount();
+    act(() => vi.advanceTimersByTime(3000));
+    expect(action).not.toHaveBeenCalled();
   });
 
   it("asks a nameless person once, then carries on whatever they chose", () => {
-    mocks.query.mockReturnValue({ data: null });
+    mocks.query.mockReturnValue({});
     const action = vi.fn();
-    const { result } = renderHook(() => useNameGate());
+    const { result, rerender } = renderHook(() => useNameGate());
     act(() => result.current.gate(action));
+    expect(result.current.asking).toBe(false);
+    mocks.query.mockReturnValue({ data: null });
+    rerender();
     expect(result.current.asking).toBe(true);
     expect(action).not.toHaveBeenCalled();
 
