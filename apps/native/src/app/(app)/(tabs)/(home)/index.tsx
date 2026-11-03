@@ -17,7 +17,8 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 import { HeaderScrim } from "@/components/ui/header-scrim";
 import { useCurrentUser } from "@/lib/current-user";
 import { type Entitlement, useEntitlement } from "@/lib/entitlement";
-import { FREE_SAVES_NUDGE_AT, useAccess } from "@/lib/free-plan";
+import { FREE_SAVES_NUDGE_AT } from "@/lib/access";
+import { useAccess } from "@/lib/free-plan";
 import { useHomeFeed } from "@/lib/home-feed";
 import { unplacedSaves } from "@/lib/home-places";
 import {

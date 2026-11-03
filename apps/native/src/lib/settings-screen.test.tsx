@@ -48,6 +48,7 @@ vi.mock("@/lib/entitlement", () => ({
   restorePurchases: mocks.restorePurchases,
   useEntitlement: () => ({ status: mocks.status }),
 }));
+vi.mock("@/lib/free-plan", () => ({ useAccess: () => ({ kind: "pro" }) }));
 vi.mock("@/lib/manage-subscription", () => ({
   manageSubscription: mocks.manageSubscription,
 }));

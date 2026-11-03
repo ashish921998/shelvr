@@ -56,6 +56,7 @@ vi.mock("expo-router", () => ({
       ),
     },
   ),
+  useRouter: () => ({ push: vi.fn() }),
 }));
 vi.mock("@convex/_generated/api", () => ({
   api: {
@@ -329,13 +330,8 @@ it("offers place correction on a ready save", () => {
       reserveFooter={false}
     />,
   );
-  expect(
+  fireEvent.click(
     screen.getByRole("button", { name: "placeCorrection.title" }),
-  ).toBeTruthy();
-  expect(Link).toHaveBeenCalledWith(
-    expect.objectContaining({
-      href: { pathname: "/edit-save-places", params: { itemId: "item-1" } },
-    }),
-    undefined,
   );
+  expect(retry.guard).toHaveBeenCalledOnce();
 });

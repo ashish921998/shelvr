@@ -5,7 +5,8 @@ import {
 } from "@/lib/app-intent-invocations";
 import { useCurrentUser } from "@/lib/current-user";
 import { useEntitlement } from "@/lib/entitlement";
-import { canSave, useAccess } from "@/lib/free-plan";
+import { canSave } from "@/lib/access";
+import { useAccess } from "@/lib/free-plan";
 import { useHomeFeed } from "@/lib/home-feed";
 import { t } from "@/lib/i18n";
 import { displayHost } from "@/lib/url";

@@ -11,6 +11,13 @@ const mocks = vi.hoisted(() => ({
   replay: vi.fn(),
   resumeShare: vi.fn(),
   awaitingPurchase: false,
+  freeSaves: null as null | {
+    limit: number;
+    used: number;
+    left: number;
+    pending: number;
+    open: boolean;
+  },
   push: vi.fn(),
 }));
 const nothing = vi.hoisted(() => () => null);
@@ -37,6 +44,19 @@ vi.mock("convex/react", () => ({
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => mocks.entitlement,
 }));
+vi.mock("@/lib/free-plan", async () => {
+  const { accessOf } =
+    await vi.importActual<typeof import("@/lib/access")>("@/lib/access");
+  return {
+    useAccess: () =>
+      accessOf({
+        signedIn: mocks.status !== "signed-out",
+        entitlement: mocks.entitlement,
+        awaitingPurchase: mocks.awaitingPurchase,
+        freeSaves: mocks.freeSaves,
+      }),
+  };
+});
 vi.mock("expo-router", () => {
   const screen = ({ name }: { name: string }) => (
     <span>{`screen:${name}`}</span>
@@ -109,6 +129,7 @@ beforeEach(() => {
   mocks.onboarded = true;
   mocks.status = "unset";
   mocks.entitlement = { entitled: true, loading: false };
+  mocks.freeSaves = null;
 });
 
 it.each(["unset", "loading", "granted", "declined"])(
@@ -139,6 +160,21 @@ describe("plan gate", () => {
     expect(shows("screen:profile")).toBe(true);
     expect(shows("screen:settings")).toBe(true);
     expect(shows("screen:paywall")).toBe(true);
+  });
+
+  it("opens the app to a free account, and holds shares only once its saves run out", () => {
+    mocks.entitlement = { entitled: false, loading: false };
+    mocks.freeSaves = { limit: 10, used: 3, left: 7, pending: 0, open: true };
+    const view = render(<AppLayout />);
+    expect(shows("screen:(tabs)")).toBe(true);
+    expect(shows("screen:add")).toBe(true);
+    expect(shows("screen:plan-gate")).toBe(false);
+    expect(mocks.resumeShare).toHaveBeenLastCalledWith(false);
+
+    mocks.freeSaves = { limit: 10, used: 10, left: 0, pending: 0, open: true };
+    view.rerender(<AppLayout />);
+    expect(shows("screen:(tabs)")).toBe(true);
+    expect(mocks.resumeShare).toHaveBeenLastCalledWith(true);
   });
 
   it("opens the app with a plan", () => {

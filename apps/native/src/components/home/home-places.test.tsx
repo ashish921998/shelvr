@@ -54,6 +54,10 @@ vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => ({ entitled: true }),
   usePaywallGuard: vi.fn(),
 }));
+vi.mock("@/lib/free-plan", () => ({
+  useAccess: () => ({ kind: "pro" }),
+  useSaveGuard: () => ({ guard: vi.fn(), loading: false }),
+}));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: mocks.cities }),
 }));

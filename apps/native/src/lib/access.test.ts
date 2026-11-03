@@ -1,10 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { accessOf, canSave, type FreeSaves } from "./free-plan";
-
-vi.mock("@/lib/entitlement", () => ({ useEntitlement: vi.fn() }));
-vi.mock("@/lib/replay-onboarding", () => ({
-  useAwaitingOnboardingPurchase: vi.fn(),
-}));
+import { describe, expect, it } from "vitest";
+import { accessOf, canSave, type FreeSaves } from "./access";
 
 const settled = { entitled: false, loading: false };
 const free = (over: Partial<FreeSaves> = {}): FreeSaves => ({

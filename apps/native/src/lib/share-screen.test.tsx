@@ -82,10 +82,7 @@ vi.mock("@/lib/entitlement", () => ({
     loading: mock.entitlementLoading,
   }),
 }));
-vi.mock("@/lib/free-plan", async () => ({
-  canSave: (
-    await vi.importActual<typeof import("@/lib/free-plan")>("@/lib/free-plan")
-  ).canSave,
+vi.mock("@/lib/free-plan", () => ({
   useAccess: () =>
     mock.entitlementLoading
       ? { kind: "loading" }

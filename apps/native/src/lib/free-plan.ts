@@ -5,51 +5,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth } from "convex/react";
 import { useCallback } from "react";
-
-export const FREE_SAVES_NUDGE_AT = 2;
-
-export type FreeSaves = {
-  limit: number;
-  used: number;
-  left: number;
-  pending: number;
-  open: boolean;
-};
-
-export type Access =
-  | { kind: "signedOut" }
-  | { kind: "loading" }
-  | { kind: "pro" }
-  | ({ kind: "free" } & FreeSaves)
-  | { kind: "locked" };
-
-export function accessOf({
-  signedIn,
-  entitlement,
-  awaitingPurchase,
-  freeSaves,
-}: {
-  signedIn: boolean;
-  entitlement: { entitled: boolean; loading: boolean };
-  awaitingPurchase: boolean;
-  freeSaves: FreeSaves | null | undefined;
-}): Access {
-  if (!signedIn) return { kind: "signedOut" };
-  if (entitlement.entitled || awaitingPurchase) return { kind: "pro" };
-  if (entitlement.loading || freeSaves === undefined)
-    return { kind: "loading" };
-  if (freeSaves === null) return { kind: "locked" };
-  return { kind: "free", ...freeSaves };
-}
-
-export function canBrowse(access: Access): boolean {
-  return access.kind === "pro" || access.kind === "free";
-}
-
-export function canSave(access: Access): boolean {
-  if (access.kind === "pro") return true;
-  return access.kind === "free" && access.open && access.left > 0;
-}
+import { accessOf, canSave, type Access } from "@/lib/access";
 
 export function useAccess(): Access {
   const { isAuthenticated } = useConvexAuth();
@@ -57,14 +13,14 @@ export function useAccess(): Access {
   const awaitingPurchase = useAwaitingOnboardingPurchase(entitlement.entitled);
   const wantsFreeSaves =
     isAuthenticated && !entitlement.loading && !entitlement.entitled;
-  const { data } = useQuery(
+  const { data, isError } = useQuery(
     convexQuery(api.freeSaves.getFreeSaves, wantsFreeSaves ? {} : "skip"),
   );
   return accessOf({
     signedIn: isAuthenticated,
     entitlement,
     awaitingPurchase,
-    freeSaves: data,
+    freeSaves: isError ? null : data,
   });
 }
 
@@ -73,7 +29,6 @@ export function useFreePlanOpen(): boolean | undefined {
   return data;
 }
 
-/** Runs `action` while the person can still save (Pro, or free saves left), else opens the paywall. */
 export function useSaveGuard(placement = "home"): {
   guard: (action?: () => void) => Promise<boolean>;
   loading: boolean;
@@ -81,13 +36,14 @@ export function useSaveGuard(placement = "home"): {
   const access = useAccess();
   const paywall = usePaywallGuard(placement);
   const free = access.kind === "free" && canSave(access);
+  const paywallGuard = paywall.guard;
   const guard = useCallback(
     async (action?: () => void) => {
-      if (!free) return paywall.guard(action);
+      if (!free) return paywallGuard(action);
       action?.();
       return true;
     },
-    [free, paywall],
+    [free, paywallGuard],
   );
   return { guard, loading: access.kind === "loading" || paywall.loading };
 }

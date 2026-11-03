@@ -2,7 +2,8 @@ import { CityCover, type CoverLayout } from "@/components/city/city-cover";
 import { PlanCitySheet } from "@/components/home/plan-city-sheet";
 import { AppSymbolIcon } from "@/components/symbol";
 import { type CityPlanKind, useCityPlan } from "@/lib/city-plan";
-import { canBrowse, useAccess, useSaveGuard } from "@/lib/free-plan";
+import { canBrowse } from "@/lib/access";
+import { useAccess, useSaveGuard } from "@/lib/free-plan";
 import {
   type City,
   cityCountLine,

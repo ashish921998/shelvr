@@ -41,7 +41,6 @@ export function ProCard({ lapsed }: { lapsed: boolean }) {
   );
 }
 
-/** The quiet nudge Home shows once a free account is down to its last few saves. */
 export function FreeSavesCard({
   left,
   limit,
