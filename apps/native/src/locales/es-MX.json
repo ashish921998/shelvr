@@ -1164,13 +1164,13 @@
   "freePlan.usedTitle": "Ya usaste tus %{limit} guardados gratis",
   "freePlan.leftBody": "Hazte Pro para seguir guardando lugares.",
   "freePlan.seePlans": "Ver planes",
-  "freePlan.outBody": "Puedes seguir viendo tus lugares guardados. Hazte Pro y guardaremos este enlace justo después. Si compartes otro enlace, reemplazará a este.",
+  "freePlan.outBody": "Puedes seguir viendo tus lugares guardados. Hazte Pro y guardaremos este enlace justo después. Si compartes otra cosa, reemplazará este enlace.",
   "freePlan.keepLink": "Guardar enlace para después",
   "freePlan.discardLink": "Descartar enlace",
   "freePlan.readingTitle": "Tu último guardado gratis aún se está leyendo",
-  "freePlan.readingBody": "Si no encuentra ningún lugar, lo recuperas. Guardaremos este enlace y lo intentaremos de nuevo entonces. Si compartes otro enlace, reemplazará a este.",
+  "freePlan.readingBody": "Si no encuentra ningún lugar, lo recuperas. Guardaremos este enlace y lo intentaremos de nuevo entonces. Si compartes otra cosa, reemplazará este enlace.",
   "freePlan.ok": "OK",
   "freePlan.photosNeedPro": "Las fotos requieren Pro",
-  "freePlan.photosBody": "Los guardados gratis son para enlaces. Hazte Pro para guardar fotos y guardaremos esta justo después.",
+  "freePlan.photosBody": "Las fotos no entran en los guardados gratis. Hazte Pro para guardar fotos y guardaremos esta justo después.",
   "freePlan.discardPhoto": "Descartar foto"
 }

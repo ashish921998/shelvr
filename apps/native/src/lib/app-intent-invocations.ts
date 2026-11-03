@@ -9,6 +9,7 @@ export function isSaveInvocation(invocation: AppIntentInvocation): boolean {
 
 type DrainDeps = {
   entitled: boolean;
+  photosAllowed: boolean;
   inFlight: Set<string>;
   handle: (invocation: AppIntentInvocation) => Promise<void>;
   remove: (id: string) => Promise<void>;
@@ -17,11 +18,12 @@ type DrainDeps = {
 
 export async function drainInvocations(
   pending: AppIntentInvocation[],
-  { entitled, inFlight, handle, remove, report }: DrainDeps,
+  { entitled, photosAllowed, inFlight, handle, remove, report }: DrainDeps,
 ): Promise<void> {
   for (const invocation of pending) {
     if (inFlight.has(invocation.id)) continue;
     if (!entitled && isSaveInvocation(invocation)) continue;
+    if (!photosAllowed && invocation.name === "saveImages") continue;
     inFlight.add(invocation.id);
     try {
       await handle(invocation);

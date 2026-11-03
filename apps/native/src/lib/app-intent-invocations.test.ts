@@ -7,9 +7,10 @@ function invocation(name: string, id = name): AppIntentInvocation {
   return { id, name, params: {}, createdAt: 0 };
 }
 
-function deps(entitled: boolean, failWith?: unknown) {
+function deps(entitled: boolean, failWith?: unknown, photosAllowed = true) {
   return {
     entitled,
+    photosAllowed,
     inFlight: new Set<string>(),
     handle: vi.fn(async () => {
       if (failWith !== undefined) throw failWith;
@@ -48,6 +49,17 @@ describe("drainInvocations", () => {
     expect(d.handle).toHaveBeenCalledWith(invocation("openItem"));
     expect(d.remove).toHaveBeenCalledWith("openItem");
     expect(d.remove).not.toHaveBeenCalledWith("saveLink");
+  });
+
+  it("leaves a Siri photo queued for a free account that can still save links", async () => {
+    const d = deps(true, undefined, false);
+    await drainInvocations(
+      [invocation("saveImages"), invocation("saveLink")],
+      d,
+    );
+    expect(d.handle).toHaveBeenCalledTimes(1);
+    expect(d.handle).toHaveBeenCalledWith(invocation("saveLink"));
+    expect(d.remove).not.toHaveBeenCalledWith("saveImages");
   });
 
   it("saves and removes a queued save once the account has Pro", async () => {

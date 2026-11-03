@@ -327,7 +327,7 @@ function spaceParam(
   return param(invocation, "spaceId") as Id<"spaces"> | undefined;
 }
 
-function useInvocationHandler(entitled: boolean) {
+function useInvocationHandler(entitled: boolean, photosAllowed: boolean) {
   const router = useRouter();
   const navigation = useNavigationContainerRef();
   const createNoteItem = useMutation(api.items.createNoteItem);
@@ -433,6 +433,7 @@ function useInvocationHandler(entitled: boolean) {
   const drain = (pending: AppIntents.AppIntentInvocation[]) =>
     drainInvocations(pending, {
       entitled,
+      photosAllowed,
       inFlight: inFlight.current,
       handle,
       remove: AppIntents.removePendingInvocationAsync,
@@ -456,7 +457,7 @@ function useInvocationHandler(entitled: boolean) {
       .catch((error: unknown) =>
         analytics.captureError("app_intents_pending_read_failed", error),
       );
-  }, [entitled]);
+  }, [entitled, photosAllowed]);
 }
 
 export function AppIntentsBridge() {
@@ -468,7 +469,8 @@ function SignedInAppIntents() {
   const { isAuthenticated } = useConvexAuth();
   const { data: user } = useCurrentUser();
   const { entitled, loading } = useEntitlement();
-  useInvocationHandler(canSave(useAccess()));
+  const access = useAccess();
+  useInvocationHandler(canSave(access), access.kind === "pro");
   useCaptureCredentials(isAuthenticated ? user?._id : undefined);
   useCatalogSync(isAuthenticated && entitled, loading);
   return null;

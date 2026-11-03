@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   replay: vi.fn(),
   resumeShare: vi.fn(),
   awaitingPurchase: false,
+  authLoading: false,
   freeSaves: null as null | {
     limit: number;
     used: number;
@@ -37,8 +38,8 @@ vi.mock("@/lib/share/use-resume-pending-share", () => ({
 }));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({
-    isLoading: false,
-    isAuthenticated: mocks.status !== "signed-out",
+    isLoading: mocks.authLoading,
+    isAuthenticated: !mocks.authLoading && mocks.status !== "signed-out",
   }),
 }));
 vi.mock("@/lib/entitlement", () => ({
@@ -130,6 +131,7 @@ beforeEach(() => {
   mocks.status = "unset";
   mocks.entitlement = { entitled: true, loading: false };
   mocks.freeSaves = null;
+  mocks.authLoading = false;
 });
 
 it.each(["unset", "loading", "granted", "declined"])(
@@ -231,6 +233,20 @@ describe("plan gate", () => {
     expect(mocks.push).not.toHaveBeenCalled();
 
     mocks.entitlement = { entitled: true, loading: false };
+    rerender(<AppLayout />);
+    expect(mocks.push).toHaveBeenCalledWith("/add?mode=note");
+  });
+
+  it("keeps a sheet deep link while sign-in is still loading", async () => {
+    const { releaseSheetLink, rememberSheetLink } =
+      await import("@/lib/deferred-sheet-link");
+    releaseSheetLink(true);
+    rememberSheetLink("shelvr://add?mode=note");
+    mocks.authLoading = true;
+    const { rerender } = render(<AppLayout />);
+    expect(mocks.push).not.toHaveBeenCalled();
+
+    mocks.authLoading = false;
     rerender(<AppLayout />);
     expect(mocks.push).toHaveBeenCalledWith("/add?mode=note");
   });
