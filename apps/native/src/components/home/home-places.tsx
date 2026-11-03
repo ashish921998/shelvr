@@ -144,13 +144,15 @@ function PlanTile({
         <Text style={styles.tileTitle} numberOfLines={1}>
           {title}
         </Text>
-        <Text style={styles.tileSubtitle} numberOfLines={1}>
-          {subtitle}
-        </Text>
+        <View style={styles.tileSubtitleRow}>
+          <Text style={styles.tileSubtitle} numberOfLines={1}>
+            {subtitle}
+          </Text>
+          {locked ? (
+            <Text style={styles.proTag}>{t("freePlan.proTag")}</Text>
+          ) : null}
+        </View>
       </View>
-      {locked ? (
-        <Text style={styles.proTag}>{t("freePlan.proTag")}</Text>
-      ) : null}
     </Pressable>
   );
 }
@@ -357,7 +359,16 @@ const styles = StyleSheet.create((theme) => ({
   },
   tileText: { flex: 1 },
   tileTitle: { ...theme.type.subheadLabel, color: theme.colors.foreground },
-  tileSubtitle: { ...theme.type.caption, color: theme.colors.muted },
+  tileSubtitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(0.75),
+  },
+  tileSubtitle: {
+    ...theme.type.caption,
+    flexShrink: 1,
+    color: theme.colors.muted,
+  },
   proTag: {
     ...theme.type.captionStrong,
     color: theme.colors.primaryText,
