@@ -530,6 +530,18 @@ export default defineSchema({
       "deliveryNextAttemptAt",
     ]),
 
+  freeSaves: defineTable({
+    userId: v.string(),
+    itemId: v.id("items"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("placed"),
+      v.literal("released"),
+    ),
+  })
+    .index("by_user_and_status", ["userId", "status"])
+    .index("by_item", ["itemId"]),
+
   onboardingDemos: defineTable({
     userId: v.string(),
     itemId: v.id("items"),
