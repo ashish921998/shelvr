@@ -1,3 +1,5 @@
+import { pageViewPath } from "@/lib/pageView";
+
 type AnalyticsProperties = Record<
   string,
   boolean | number | string | unknown[]
@@ -7,18 +9,8 @@ const SESSION_KEY = "shelvr_web_session";
 const SESSION_IDLE_MS = 30 * 60 * 1000;
 
 function uuidV7(now: number): string {
-  const bytes = window.crypto.getRandomValues(new Uint8Array(16));
-  let time = now;
-  for (let i = 5; i >= 0; i -= 1) {
-    bytes[i] = time % 256;
-    time = Math.floor(time / 256);
-  }
-  bytes[6] = (bytes[6] & 0x0f) | 0x70;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join(
-    "",
-  );
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  const time = now.toString(16).padStart(12, "0");
+  return `${time.slice(0, 8)}-${time.slice(8)}-7${window.crypto.randomUUID().slice(15)}`;
 }
 
 function storedSession(): { id: string; lastActivity: number } | null {
@@ -33,7 +25,8 @@ function storedSession(): { id: string; lastActivity: number } | null {
   }
 }
 
-export function webSessionId(now = Date.now()): string {
+function webSessionId(): string {
+  const now = Date.now();
   const session = storedSession();
   const id =
     session && now - session.lastActivity < SESSION_IDLE_MS
@@ -100,7 +93,7 @@ export function captureWebAnalyticsEvent(
           distinct_id: distinctId,
           ...properties,
           $session_id: webSessionId(),
-          $current_url: `${window.location.origin}${(pathname ?? window.location.pathname).replace(/^\/(i|p)\/[^/]+/, "/$1/[token]")}`,
+          $current_url: `${window.location.origin}${pageViewPath(pathname ?? window.location.pathname)}`,
         },
       }),
       keepalive: true,

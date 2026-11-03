@@ -57,10 +57,10 @@ describe("PageViewTracker", () => {
     act(() => {
       window.dispatchEvent(new Event("pagehide"));
     });
-    act(() => root.unmount());
-    root = createRoot(document.createElement("div"));
+    mocks.pathname = "/privacy";
+    act(() => root.render(<PageViewTracker />));
 
-    expect(events()).toEqual(["$pageview", "$pageleave"]);
+    expect(events()).toEqual(["$pageview", "$pageleave", "$pageview"]);
   });
 
   it("reports web vitals", () => {

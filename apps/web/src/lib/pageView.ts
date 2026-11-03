@@ -2,7 +2,7 @@ import { arrivalCampaign } from "@/lib/appStore";
 
 type PageLocation = Pick<Location, "origin" | "pathname" | "search">;
 
-function pageViewPath(pathname: string): string {
+export function pageViewPath(pathname: string): string {
   if (pathname.startsWith("/i/")) return "/i/[token]";
   if (pathname.startsWith("/p/")) return "/p/[token]";
   return pathname;

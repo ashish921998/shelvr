@@ -2,11 +2,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  captureWebAnalyticsEvent,
-  captureWebException,
-  webSessionId,
-} from "./analytics";
+import { captureWebAnalyticsEvent, captureWebException } from "./analytics";
 
 const fetchMock = vi.fn();
 
@@ -84,16 +80,20 @@ describe("web analytics", () => {
   });
 
   it("starts a new session after 30 idle minutes", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
     const start = Date.UTC(2026, 10, 3, 12);
-    const id = webSessionId(start);
+    const sessionAt = (minutes: number) => {
+      vi.setSystemTime(start + minutes * 60 * 1000);
+      captureWebAnalyticsEvent("$pageview");
+      const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+      return JSON.parse(String(init.body)).properties.$session_id;
+    };
 
-    expect(webSessionId(start + 29 * 60 * 1000)).toBe(id);
-    expect(webSessionId(start + 58 * 60 * 1000)).toBe(id);
-    const next = webSessionId(start + 89 * 60 * 1000);
-    expect(next).not.toBe(id);
-    expect(parseInt(next.replace(/-/g, "").slice(0, 12), 16)).toBe(
-      start + 89 * 60 * 1000,
-    );
+    const first = sessionAt(0);
+    expect(sessionAt(29)).toBe(first);
+    expect(sessionAt(58)).toBe(first);
+    expect(sessionAt(89)).not.toBe(first);
+    vi.useRealTimers();
   });
 
   it("redacts a page the caller names", () => {
