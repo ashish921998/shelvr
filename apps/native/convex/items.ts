@@ -2339,17 +2339,6 @@ export const addPlaceListParts = internalMutation({
       });
     }
     // The other parts are new saves, so they need Pro now, not just when the list was saved.
-    if (
-      !(await hasProEntitlement(ctx, owner._id)) &&
-      !(await coversListParts(
-        ctx,
-        owner._id,
-        item._id,
-        args.parts.some((part) => part.cities.length > 0),
-      ))
-    ) {
-      return 0;
-    }
     const url = item.url;
     const saved = await ctx.db
       .query("items")
@@ -2358,10 +2347,24 @@ export const addPlaceListParts = internalMutation({
       )
       .take(MAX_LIST_PARTS * 2);
     const titles = new Set(saved.map((row) => row.title));
-    let added = 0;
-    for (const part of args.parts.slice(0, MAX_LIST_PARTS)) {
-      if (titles.has(part.title)) continue;
+    const fresh = args.parts.slice(0, MAX_LIST_PARTS).filter((part) => {
+      if (titles.has(part.title)) return false;
       titles.add(part.title);
+      return true;
+    });
+    if (
+      !(await hasProEntitlement(ctx, owner._id)) &&
+      !(await coversListParts(
+        ctx,
+        owner._id,
+        item._id,
+        fresh.some((part) => normalizeCities(part.cities).length > 0),
+      ))
+    ) {
+      return 0;
+    }
+    let added = 0;
+    for (const part of fresh) {
       const cities = normalizeCities(part.cities);
       const places = normalizePlaces(part.places, cities);
       const placePins = withListPins([], part.pins, cities);

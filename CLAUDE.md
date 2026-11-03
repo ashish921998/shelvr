@@ -476,7 +476,7 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   from `finalizeItem`, the failure path and `deleteItem`); deleting a placed save gives
   nothing back. Retrying a free save needs no Pro, but one that gave its slot back takes a
   slot again (`reclaimFreeSave`). Adding a Maps list's other city parts needs no Pro. Photo saves and every plan stay Pro. `getFreeSaves` is the client's counter: null
-  with Pro, or with the switch off for someone who never made a free save; `pending` counts saves
+  with Pro, or with the switch off for someone holding no free save (none pending or placed); `pending` counts saves
   still being read, and `open` is false once the switch is off, with `left` then 0.
   `freePlanOpen` answers a signed-out caller whether the switch is on, for onboarding's paywall.
 - **`cancelSurvey.ts`**: the next-visit cancel survey (`getStatus`, `markShown`, `respond`); the
