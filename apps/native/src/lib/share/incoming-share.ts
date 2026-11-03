@@ -231,7 +231,12 @@ function requestSave(
   if (ctx.entitlementLoading) return none(state);
   if (!ctx.canSave) {
     if (state.locked === sid) return none(state);
-    return none({ ...state, locked: sid, phase: { kind: "locked" } });
+    return none({
+      ...state,
+      locked: sid,
+      partial: null,
+      phase: { kind: "locked" },
+    });
   }
   const fresh = session.entries.every((e) => e.status === "pending");
   let working = session;

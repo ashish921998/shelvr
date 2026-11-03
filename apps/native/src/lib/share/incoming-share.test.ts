@@ -304,6 +304,28 @@ describe("incoming share owner", () => {
     expect(state.phase.kind).toBe("saving");
   });
 
+  it("saves a partly saved share once access returns after Retry hit the limit", () => {
+    const s1 = session("s1", "failed");
+    let state: IncomingShareState = initialIncomingShare(true);
+    const step = (event: ShareEvent, context: ShareContext) => {
+      const next = stepIncomingShare(state, event, context);
+      state = next.state;
+      return next.effects;
+    };
+    step({ type: "saveSettled", session: s1 }, ctx());
+    expect(state.phase.kind).toBe("partial");
+    step({ type: "retry", live: s1 }, ctx({ canSave: false }));
+    expect(state.phase.kind).toBe("locked");
+    expect(
+      types(
+        step(
+          { type: "reconciled", result: { kind: "resume", session: s1 } },
+          ctx(),
+        ),
+      ),
+    ).toEqual(["save"]);
+  });
+
   it("keeps a held link for later without dropping it", () => {
     const held = stepIncomingShare(
       initialIncomingShare(false),
