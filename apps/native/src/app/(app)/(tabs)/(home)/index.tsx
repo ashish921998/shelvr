@@ -98,11 +98,7 @@ export default function HomeScreen() {
   ) : locked ? (
     <ProCard lapsed={entitlement.status === "lapsed"} />
   ) : nearLimit ? (
-    <FreeSavesCard
-      left={access.left}
-      limit={access.limit}
-      open={access.open}
-    />
+    <FreeSavesCard left={access.left} limit={access.limit} open={access.open} />
   ) : feedback.invitationVisible && !busySaving ? (
     <FeedbackInvitation
       onSendFeedback={feedback.openFeedbackFromInvitation}

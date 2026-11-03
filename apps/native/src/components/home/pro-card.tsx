@@ -61,7 +61,7 @@ export function FreeSavesCard({
             ? t("pro.unlockShelvr")
             : left > 0
               ? t("freePlan.leftTitle", { count: left })
-              : t("freePlan.usedTitle", { limit: String(limit) })}
+              : t("freePlan.usedTitle", { limit })}
         </Text>
         <Text style={styles.body}>{t("freePlan.leftBody")}</Text>
       </View>

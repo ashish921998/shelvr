@@ -269,7 +269,7 @@ export default function ShareScreen() {
       <PhaseSurface key="locked" phaseKey="locked">
         <Text style={styles.title(theme)}>
           {access.kind === "free" && access.open
-            ? t("freePlan.usedTitle", { limit: String(access.limit) })
+            ? t("freePlan.usedTitle", { limit: access.limit })
             : t("pro.unlockShelvr")}
         </Text>
         <Text style={styles.subtitle(theme)}>{t("freePlan.outBody")}</Text>

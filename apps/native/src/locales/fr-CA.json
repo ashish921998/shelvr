@@ -209,8 +209,6 @@
   "account.deleting": "Suppression…",
   "pro.checking": "Vérification de l'abonnement…",
   "pro.unlockShelvr": "Débloquer Shelvr Pro",
-  "share.proHelp": "L'enregistrement de contenus partagés est une fonction Pro. Consultez les offres Shelvr Pro pour les conserver dans votre bibliothèque.",
-  "pro.unlock": "Débloquer Pro",
   "share.reading": "Lecture du contenu partagé…",
   "share.empty": "Rien à enregistrer",
   "share.pending": "Certains éléments sont encore en attente.",
@@ -1156,5 +1154,21 @@
   "tripPlanner.badgeOnList": "Sur votre liste",
   "sharedLists.startWithHint": "Choisissez au moins une ville. Les lieux que vous y avez déjà enregistrés viennent avec.",
   "sharedLists.cityPlaceholder": "Ou saisissez une ville",
-  "sharedLists.typedCity": "Saisie par vous"
+  "sharedLists.typedCity": "Saisie par vous",
+  "freePlan.proTag": "Pro",
+  "freePlan.leftTitle": {
+    "one": "Il vous reste %{formattedCount} enregistrement gratuit",
+    "many": "Il vous reste %{formattedCount} enregistrements gratuits",
+    "other": "Il vous reste %{formattedCount} enregistrements gratuits"
+  },
+  "freePlan.usedTitle": "Vous avez utilisé vos %{limit} enregistrements gratuits",
+  "freePlan.leftBody": "Passez à Pro pour continuer à enregistrer des lieux.",
+  "freePlan.seePlans": "Voir les offres",
+  "freePlan.outBody": "Vous pouvez toujours consulter vos lieux enregistrés. Passez à Pro et nous enregistrerons ce lien juste après.",
+  "freePlan.keepLink": "Garder le lien pour plus tard",
+  "freePlan.discardLink": "Supprimer le lien",
+  "freePlan.readingTitle": "Votre dernier enregistrement gratuit est encore en cours de lecture",
+  "freePlan.readingBody": "S’il ne trouve aucun lieu, il vous est rendu. Nous gardons ce lien et réessaierons à ce moment-là.",
+  "freePlan.ok": "OK",
+  "freePlan.photosNeedPro": "Les photos nécessitent Pro"
 }
