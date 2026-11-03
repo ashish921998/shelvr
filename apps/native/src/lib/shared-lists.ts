@@ -35,6 +35,8 @@ export function useSharedLists(enabled = true) {
   );
 }
 
+const NAME_LOAD_WAIT_MS = 3000;
+
 let nameAsked = false;
 
 function useMyFirstName() {
@@ -71,8 +73,16 @@ export function useNameGate() {
   }, [loading, decide]);
   const gate = useCallback(
     (action: () => void) => {
-      if (loading) waiting.current = action;
-      else decide(action);
+      if (!loading) {
+        decide(action);
+        return;
+      }
+      waiting.current = action;
+      setTimeout(() => {
+        if (waiting.current !== action) return;
+        waiting.current = null;
+        action();
+      }, NAME_LOAD_WAIT_MS);
     },
     [loading, decide],
   );
