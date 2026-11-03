@@ -6,7 +6,8 @@ import { SettingsGroup, SettingsRow } from "@/components/ui/settings-list";
 import { analytics } from "@/lib/analytics";
 import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { useCurrentUser } from "@/lib/current-user";
-import { useEntitlement } from "@/lib/entitlement";
+import { openPaywall, useEntitlement } from "@/lib/entitlement";
+import { useAccess } from "@/lib/free-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS, SUPPORT_EMAIL, SUPPORT_URL } from "@/lib/legal";
 import { manageSubscription } from "@/lib/manage-subscription";
@@ -57,6 +58,7 @@ export default function SettingsScreen() {
   const notificationsAllowed =
     permission === undefined || permission === "granted";
   const { status: entitlementStatus } = useEntitlement();
+  const access = useAccess();
   const hasLiveSubscription =
     entitlementStatus === "trialing" || entitlementStatus === "pro";
   const { restoring, restore } = useRestorePurchases();
@@ -264,6 +266,17 @@ export default function SettingsScreen() {
       <UpdateSetting />
 
       <LegalConsentPreference />
+
+      {access.kind === "free" ? (
+        <SettingsGroup>
+          <SettingsRow
+            divider={false}
+            label={t("freePlan.leftTitle", { count: access.left })}
+            value={t("freePlan.seePlans")}
+            onPress={() => void openPaywall(router, "settings_free_saves")}
+          />
+        </SettingsGroup>
+      ) : null}
 
       <SettingsGroup>
         <SettingsRow

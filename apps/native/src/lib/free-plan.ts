@@ -1,9 +1,12 @@
 import { api } from "@convex/_generated/api";
-import { useEntitlement } from "@/lib/entitlement";
+import { useEntitlement, usePaywallGuard } from "@/lib/entitlement";
 import { useAwaitingOnboardingPurchase } from "@/lib/replay-onboarding";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth } from "convex/react";
+import { useCallback } from "react";
+
+export const FREE_SAVES_NUDGE_AT = 2;
 
 export type FreeSaves = {
   limit: number;
@@ -14,6 +17,7 @@ export type FreeSaves = {
 };
 
 export type Access =
+  | { kind: "signedOut" }
   | { kind: "loading" }
   | { kind: "pro" }
   | ({ kind: "free" } & FreeSaves)
@@ -30,13 +34,16 @@ export function accessOf({
   awaitingPurchase: boolean;
   freeSaves: FreeSaves | null | undefined;
 }): Access {
-  if (!signedIn || entitlement.entitled || awaitingPurchase) {
-    return { kind: "pro" };
-  }
+  if (!signedIn) return { kind: "signedOut" };
+  if (entitlement.entitled || awaitingPurchase) return { kind: "pro" };
   if (entitlement.loading || freeSaves === undefined)
     return { kind: "loading" };
   if (freeSaves === null) return { kind: "locked" };
   return { kind: "free", ...freeSaves };
+}
+
+export function canBrowse(access: Access): boolean {
+  return access.kind === "pro" || access.kind === "free";
 }
 
 export function canSave(access: Access): boolean {
@@ -64,4 +71,23 @@ export function useAccess(): Access {
 export function useFreePlanOpen(): boolean | undefined {
   const { data } = useQuery(convexQuery(api.freeSaves.freePlanOpen, {}));
   return data;
+}
+
+/** Runs `action` while the person can still save (Pro, or free saves left), else opens the paywall. */
+export function useSaveGuard(placement = "home"): {
+  guard: (action?: () => void) => Promise<boolean>;
+  loading: boolean;
+} {
+  const access = useAccess();
+  const paywall = usePaywallGuard(placement);
+  const free = access.kind === "free" && canSave(access);
+  const guard = useCallback(
+    async (action?: () => void) => {
+      if (!free) return paywall.guard(action);
+      action?.();
+      return true;
+    },
+    [free, paywall],
+  );
+  return { guard, loading: access.kind === "loading" || paywall.loading };
 }

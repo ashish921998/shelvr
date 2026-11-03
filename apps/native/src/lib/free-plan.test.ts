@@ -26,7 +26,9 @@ const access = (over: Partial<Parameters<typeof accessOf>[0]> = {}) =>
 
 describe("accessOf", () => {
   it("never locks a signed-out person out", () => {
-    expect(access({ signedIn: false, freeSaves: null }).kind).toBe("pro");
+    expect(access({ signedIn: false, freeSaves: null }).kind).toBe(
+      "signedOut",
+    );
   });
 
   it("treats a subscriber or a purchase still landing as Pro", () => {

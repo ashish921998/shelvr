@@ -41,6 +41,38 @@ export function ProCard({ lapsed }: { lapsed: boolean }) {
   );
 }
 
+/** The quiet nudge Home shows once a free account is down to its last few saves. */
+export function FreeSavesCard({
+  left,
+  limit,
+  open,
+}: {
+  left: number;
+  limit: number;
+  open: boolean;
+}) {
+  useAppLocale();
+  const router = useRouter();
+  return (
+    <View style={styles.card}>
+      <View style={styles.head}>
+        <Text style={styles.title}>
+          {!open
+            ? t("pro.unlockShelvr")
+            : left > 0
+              ? t("freePlan.leftTitle", { count: left })
+              : t("freePlan.usedTitle", { limit: String(limit) })}
+        </Text>
+        <Text style={styles.body}>{t("freePlan.leftBody")}</Text>
+      </View>
+      <CtaButton
+        label={t("freePlan.seePlans")}
+        onPress={() => void openPaywall(router, "home_free_limit")}
+      />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create((theme) => ({
   card: {
     gap: theme.gap(2),

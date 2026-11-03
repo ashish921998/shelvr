@@ -5,6 +5,7 @@ import {
 } from "@/lib/app-intent-invocations";
 import { useCurrentUser } from "@/lib/current-user";
 import { useEntitlement } from "@/lib/entitlement";
+import { canSave, useAccess } from "@/lib/free-plan";
 import { useHomeFeed } from "@/lib/home-feed";
 import { t } from "@/lib/i18n";
 import { displayHost } from "@/lib/url";
@@ -466,7 +467,7 @@ function SignedInAppIntents() {
   const { isAuthenticated } = useConvexAuth();
   const { data: user } = useCurrentUser();
   const { entitled, loading } = useEntitlement();
-  useInvocationHandler(entitled);
+  useInvocationHandler(canSave(useAccess()));
   useCaptureCredentials(isAuthenticated ? user?._id : undefined);
   useCatalogSync(isAuthenticated && entitled, loading);
   return null;

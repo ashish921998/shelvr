@@ -22,7 +22,7 @@ const raw: RawSharePayload[] = [
 
 const ctx = (over: Partial<ShareContext> = {}): ShareContext => ({
   userId: "user-1",
-  entitled: true,
+  canSave: true,
   entitlementLoading: false,
   rawPayloads: raw,
   resolved: [
@@ -264,9 +264,9 @@ describe("incoming share owner", () => {
     expect(state.running).toBeNull();
   });
 
-  it("presents one paywall per locked session, then saves once entitled", () => {
+  it("holds a session while no save is left, then saves once one is", () => {
     const s1 = session("s1");
-    const locked = ctx({ entitled: false });
+    const locked = ctx({ canSave: false });
     let state: IncomingShareState = initialIncomingShare(true);
     const step = (event: ShareEvent, context: ShareContext) => {
       const next = stepIncomingShare(state, event, context);
@@ -278,7 +278,7 @@ describe("incoming share owner", () => {
         { type: "reconciled", result: { kind: "new", session: s1 } },
         locked,
       ),
-    ).toEqual([{ type: "openPaywall" }]);
+    ).toEqual([]);
     expect(state.phase.kind).toBe("locked");
     expect(
       step(
@@ -302,6 +302,18 @@ describe("incoming share owner", () => {
     ).toEqual(["save"]);
     expect(state.locked).toBeNull();
     expect(state.phase.kind).toBe("saving");
+  });
+
+  it("keeps a held link for later without dropping it", () => {
+    const held = stepIncomingShare(
+      initialIncomingShare(false),
+      { type: "reconciled", result: { kind: "new", session: session("s1") } },
+      ctx({ canSave: false }),
+    );
+    expect(
+      stepIncomingShare(held.state, { type: "keep" }, ctx({ canSave: false }))
+        .effects,
+    ).toEqual([{ type: "navigateHome" }]);
   });
 
   it("classifies a fresh session and persists its terminal entries first", () => {

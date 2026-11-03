@@ -10,6 +10,7 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 import { PlanLoadingCover } from "@/components/plan-loading-cover";
 import { TrialReminderPrimerSheet } from "@/components/trial-reminder-sheet";
 import { usePlanGate } from "@/lib/plan-gate";
+import { canSave, useAccess } from "@/lib/free-plan";
 import { useReplayOnboarding } from "@/lib/replay-onboarding";
 import { useQueuedFirstSave } from "@/lib/queued-first-save";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
@@ -34,6 +35,7 @@ export default function AppLayout() {
   const reducedMotion = useReducedMotion();
 
   const { gated, planUnknown } = usePlanGate();
+  const access = useAccess();
   useEffect(() => {
     if (!isAuthenticated && !isLoading) endPurchaseLandingSession();
   }, [isAuthenticated, isLoading]);
@@ -47,9 +49,12 @@ export default function AppLayout() {
     router.push(link.route as never);
   }, [planUnknown, gated, onboarded, router]);
 
-  useReplayOnboarding();
+  useReplayOnboarding({
+    left: access.kind === "free" && canSave(access),
+    loading: access.kind === "loading",
+  });
   useQueuedFirstSave();
-  useResumePendingShare(gated || planUnknown);
+  useResumePendingShare(!canSave(access));
   useTrialReminder();
   useWelcomeSaveTracker();
   useForgetExitOffer();

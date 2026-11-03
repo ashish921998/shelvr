@@ -90,6 +90,22 @@ describe("useOnboardingPaywall", () => {
     expect(onPro).not.toHaveBeenCalled();
   });
 
+  it("moves on to Home when the paywall is closed while free saves are open", async () => {
+    state.signedIn = false;
+    state.open.mockResolvedValue("cancelled");
+    const onPro = vi.fn();
+    const onClosed = vi.fn();
+    const hook = renderHook(() =>
+      useOnboardingPaywall({ onPro, onUnavailable: vi.fn(), onClosed }),
+    );
+    await act(async () => {
+      hook.result.current.ask();
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => expect(onClosed).toHaveBeenCalledOnce());
+    expect(onPro).not.toHaveBeenCalled();
+  });
+
   it("keeps a signed-out person on the promise step when the paywall is closed", async () => {
     state.signedIn = false;
     state.open.mockResolvedValue("cancelled");

@@ -31,7 +31,7 @@ export type IncomingShareState = {
 
 export type ShareContext = {
   userId: string | null;
-  entitled: boolean;
+  canSave: boolean;
   entitlementLoading: boolean;
   rawPayloads: RawSharePayload[];
   resolved: ResolvedPayload[];
@@ -51,6 +51,7 @@ export type ShareEvent =
   | { type: "complete"; session: ShareSession }
   | { type: "retry"; live: ShareSession | null }
   | { type: "cancel" }
+  | { type: "keep" }
   | { type: "unlock" };
 
 export type ShareEffect =
@@ -169,6 +170,8 @@ export function stepIncomingShare(
         : requestSave(state, event.live, ctx);
     case "cancel":
       return abandon(state, ctx);
+    case "keep":
+      return { state, effects: [{ type: "navigateHome" }] };
     case "unlock":
       return { state, effects: [{ type: "openPaywall" }] };
   }
@@ -226,12 +229,9 @@ function requestSave(
   const sid = session.sessionId;
   if (state.running === sid) return none(state);
   if (ctx.entitlementLoading) return none(state);
-  if (!ctx.entitled) {
+  if (!ctx.canSave) {
     if (state.locked === sid) return none(state);
-    return {
-      state: { ...state, locked: sid, phase: { kind: "locked" } },
-      effects: [{ type: "openPaywall" }],
-    };
+    return none({ ...state, locked: sid, phase: { kind: "locked" } });
   }
   const fresh = session.entries.every((e) => e.status === "pending");
   let working = session;

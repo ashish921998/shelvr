@@ -40,8 +40,8 @@ import { useSaveImages } from "@/lib/use-save-image";
 import { analytics } from "@/lib/analytics";
 import { bestEffort } from "@/lib/best-effort";
 import { saveFailureStage } from "@convex/model/saveErrors";
-import { openPaywall, useEntitlement } from "@/lib/entitlement";
-import { useAwaitingOnboardingPurchase } from "@/lib/replay-onboarding";
+import { openPaywall } from "@/lib/entitlement";
+import { canSave, useAccess } from "@/lib/free-plan";
 import { useCurrentUser } from "@/lib/current-user";
 import { api } from "@convex/_generated/api";
 import { useMutation } from "convex/react";
@@ -112,10 +112,9 @@ export default function ShareScreen() {
   const router = useRouter();
   const { theme } = useUnistyles();
   const { data: user } = useCurrentUser();
-  const entitlement = useEntitlement();
-  const { entitled } = entitlement;
-  const awaitingPurchase = useAwaitingOnboardingPurchase(entitled);
-  const entitlementLoading = entitlement.loading || awaitingPurchase;
+  const access = useAccess();
+  const saveAllowed = canSave(access);
+  const entitlementLoading = access.kind === "loading";
   const {
     sharedPayloads,
     resolvedSharedPayloads,
@@ -183,7 +182,7 @@ export default function ShareScreen() {
     function dispatch(event: ShareEvent): void {
       const next = stepIncomingShare(owner.current, event, {
         userId: user?._id ?? null,
-        entitled,
+        canSave: saveAllowed,
         entitlementLoading,
         rawPayloads,
         resolved: processorPayloads,
@@ -197,7 +196,7 @@ export default function ShareScreen() {
     },
     [
       user,
-      entitled,
+      saveAllowed,
       entitlementLoading,
       rawPayloads,
       processorPayloads,
@@ -242,18 +241,51 @@ export default function ShareScreen() {
   }
 
   if (phase.kind === "locked") {
+    const reading = access.kind === "free" && access.pending > 0;
+    if (reading) {
+      return (
+        <PhaseSurface key="locked-reading" phaseKey="locked-reading">
+          <Text style={styles.title(theme)}>{t("freePlan.readingTitle")}</Text>
+          <Text style={styles.subtitle(theme)}>
+            {t("freePlan.readingBody")}
+          </Text>
+          <View style={styles.actions}>
+            <Button
+              label={t("freePlan.seePlans")}
+              theme={theme}
+              onPress={() => dispatch({ type: "unlock" })}
+            />
+            <Button
+              label={t("freePlan.ok")}
+              theme={theme}
+              primary
+              onPress={() => dispatch({ type: "keep" })}
+            />
+          </View>
+        </PhaseSurface>
+      );
+    }
     return (
       <PhaseSurface key="locked" phaseKey="locked">
-        <Text style={styles.title(theme)}>{t("pro.unlockShelvr")}</Text>
-        <Text style={styles.subtitle(theme)}>{t("share.proHelp")}</Text>
+        <Text style={styles.title(theme)}>
+          {access.kind === "free" && access.open
+            ? t("freePlan.usedTitle", { limit: String(access.limit) })
+            : t("pro.unlockShelvr")}
+        </Text>
+        <Text style={styles.subtitle(theme)}>{t("freePlan.outBody")}</Text>
         <View style={styles.actions}>
           <Button
-            label={t("common.cancel")}
+            label={t("freePlan.discardLink")}
             theme={theme}
             onPress={() => dispatch({ type: "cancel" })}
           />
           <Button
-            label={t("pro.unlock")}
+            label={t("freePlan.keepLink")}
+            theme={theme}
+            onPress={() => dispatch({ type: "keep" })}
+          />
+          <Button
+            label={t("freePlan.seePlans")}
             theme={theme}
             primary
             onPress={() => dispatch({ type: "unlock" })}

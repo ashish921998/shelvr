@@ -3,6 +3,7 @@ import { t, useAppLocale } from "./i18n";
 import type { FeedItem } from "@/lib/feed-item";
 import { analytics } from "@/lib/analytics";
 import { useEntitlement } from "@/lib/entitlement";
+import { canBrowse, useAccess } from "@/lib/free-plan";
 import { displayHost } from "@/lib/url";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
@@ -375,12 +376,10 @@ export function RecentSavesWidgetSync() {
     hasPendingCleanup,
   );
   const locale = useAppLocale();
-  const {
-    status,
-    entitled,
-    loading: entitlementLoading,
-    expiresAt,
-  } = useEntitlement();
+  const { status, entitled: pro, expiresAt } = useEntitlement();
+  const access = useAccess();
+  const entitled = canBrowse(access);
+  const entitlementLoading = access.kind === "loading";
   const { data: recent } = useQuery(
     convexQuery(
       api.items.listRecentItems,
@@ -398,7 +397,7 @@ export function RecentSavesWidgetSync() {
       return;
     const items = entitled ? (recent ?? []) : [];
     const validUntil =
-      entitled && status !== "lifetime" && expiresAt !== undefined
+      pro && status !== "lifetime" && expiresAt !== undefined
         ? expiresAt + WIDGET_LOCK_GRACE_MS
         : undefined;
     const key =
@@ -430,6 +429,7 @@ export function RecentSavesWidgetSync() {
       });
   }, [
     status,
+    pro,
     entitled,
     entitlementLoading,
     expiresAt,
