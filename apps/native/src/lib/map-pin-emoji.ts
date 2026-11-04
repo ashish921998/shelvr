@@ -103,9 +103,13 @@ const NAME_WORDS: [string[], string][] = [
 
 function nameEmoji(name: string): string | undefined {
   const padded = ` ${nameWords(name).join(" ")} `;
-  return NAME_WORDS.find(([words]) =>
-    words.some((word) => padded.includes(` ${word} `)),
-  )?.[1];
+  let best: { at: number; emoji: string } | undefined;
+  for (const [words, emoji] of NAME_WORDS)
+    for (const word of words) {
+      const at = padded.indexOf(` ${word} `);
+      if (at >= 0 && (best === undefined || at < best.at)) best = { at, emoji };
+    }
+  return best?.emoji;
 }
 
 /**

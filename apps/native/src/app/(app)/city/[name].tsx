@@ -132,7 +132,7 @@ export default function CityScreen() {
           <SaveRow
             item={item}
             placeName={row.kind === "place" ? row.name : undefined}
-            number={row.kind === "place" ? (row.pin.emoji ?? "📍") : undefined}
+            emoji={row.kind === "place" ? (row.pin.emoji ?? "📍") : undefined}
             selected={selected === row.id}
             removing={removal.busy}
             onRemove={

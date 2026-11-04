@@ -36,7 +36,10 @@ the same rules as `places` (`model/settlement.ts`):
 
 - Not written when AI is declined.
 - Cleared with `places` when a re-read changes them.
-- Kept when the person edits the save's places (`placesEdited`), for the places that remain.
+- Dropped when the person edits the save's places (`placesEdited`). An edited place list has no
+  stable identity to match a name-keyed kind against (a renamed or replaced place would keep the old
+  cuisine), so the save loses `placeKinds` and its pins fall back to the name and Apple's category
+  until a later re-read writes them again.
 
 It is a new optional field, so it stays declared `v.optional` on rollback once rows carry it.
 
@@ -59,13 +62,18 @@ installed apps ignore. This counts as a public return change: the commit needs t
 5. The save's tags.
 
 Steps 1, 3, 4 and 5 ship in PR 0, on the phone with no deploy, and work for old saves too.
-`placeKinds` in `convex/model/placeKinds.ts` maps a cuisine to a filter kind (coffee to `coffee`,
-cocktails to `drinks`), so the chips get more precise too.
+For the filter chips, `placeKinds(category, tags)` in `convex/model/placeKinds.ts` gains a
+`cuisine` argument that maps it to a kind (coffee to `coffee`, cocktails to `drinks`) and decides the
+food or drink kind ahead of the category and the save's tags. Both callers pass `pin.cuisine`:
+`cityPins` in `src/lib/city-pins.ts` (the city page) and `listMapPlaces` in `convex/mapPlaces.ts`
+(the Map tab). Without that threading the chips stay per-save while the emoji is per-place.
 
 ### Old saves
 
 A paginated internal `items:backfillPlaceKinds` can re-run extraction for ready saves that have
-places but no `placeKinds`. It costs a model call per save, so run it only after the new field has
+places but no `placeKinds`, only where `aiAllowed` passes for the save and its owner. It checks before
+scheduling each save and again in the action right before the model call, so a save kept AI-free on
+purpose is never sent to the model. It costs a model call per save, so run it only after the new field has
 proved its worth on new saves. Until then old saves fall back to name matching and Apple's category.
 
 ## Rollout

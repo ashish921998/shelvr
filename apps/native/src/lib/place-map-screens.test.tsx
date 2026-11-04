@@ -181,6 +181,28 @@ vi.mock("@/components/city/plan-button", () => ({
     <button onClick={onPress}>invite</button>
   )),
 }));
+vi.mock("@/components/map/map-filter-chips", () => ({
+  MapFilterChips: vi.fn(
+    ({
+      kinds,
+      selected,
+      onSelect,
+    }: {
+      kinds: string[];
+      selected: string | null;
+      onSelect: (kind: string | null) => void;
+    }) => (
+      <div data-testid="chips" data-selected={selected ?? "all"}>
+        <button onClick={() => onSelect(null)}>chip all</button>
+        {kinds.map((kind) => (
+          <button key={kind} onClick={() => onSelect(kind)}>
+            {`chip ${kind}`}
+          </button>
+        ))}
+      </div>
+    ),
+  ),
+}));
 vi.mock("@/components/city/place-removal", () => ({
   PlaceRemovalUndo: vi.fn(() => <span>undo bar</span>),
 }));
@@ -221,12 +243,15 @@ vi.mock("@/components/city/save-row", () => ({
     ({
       item,
       placeName,
+      emoji,
       ...rest
     }: {
       item: { title?: string };
       placeName?: string;
+      emoji?: string;
       onPress: () => void;
-    }) => rowFake({ name: placeName ?? item.title ?? "", ...rest }),
+    }) =>
+      rowFake({ name: placeName ?? item.title ?? "", number: emoji, ...rest }),
   ),
 }));
 vi.mock("@/components/shared-list/list-place-row", () => ({
@@ -507,6 +532,42 @@ describe("city page", () => {
     mocks.queries[CITY_ITEMS] = [unplaced];
     rerender(<CityScreen />);
     expect(screen.getByTestId("map")).toBeTruthy();
+  });
+
+  it("narrows the map and rows to a kind, keeps the count, and falls back to All", () => {
+    const cafe = (name: string, lat: number) => ({
+      name,
+      lat,
+      lng: -97.5,
+      city: "Austin",
+      category: "Cafe",
+    });
+    const cafes = [cafe("Bean One", 30.3), cafe("Bean Two", 30.4)];
+    const third = cafe("Bean Three", 30.5);
+    mocks.queries[CITY_ITEMS] = [
+      { ...save, placePins: [taco, bbq, ...cafes, third] },
+      unplaced,
+    ];
+    const { rerender } = render(<CityScreen />);
+    fireEvent.click(screen.getByText("chip coffee"));
+    const pins = () =>
+      screen.getAllByTestId(/^pin-/).map((pin) => pin.textContent);
+    expect(pins()).toEqual(["Bean One", "Bean Two", "Bean Three"]);
+    expect(screen.getByText("☕ Bean One")).toBeTruthy();
+    expect(screen.queryByText(/Taco Spot/)).toBeNull();
+    expect(screen.queryByText(/No places/)).toBeNull();
+    expect(
+      screen.getByText('cityMap.placesFromSaves {"count":5}'),
+    ).toBeTruthy();
+
+    mocks.queries[CITY_ITEMS] = [
+      { ...save, placePins: [taco, bbq, ...cafes] },
+      unplaced,
+    ];
+    rerender(<CityScreen />);
+    expect(screen.queryByTestId("chips")).toBeNull();
+    expect(pins()).toEqual(["Taco Spot", "BBQ Pit", "Bean One", "Bean Two"]);
+    expect(screen.getByText("- No places")).toBeTruthy();
   });
 
   it("selects with a tick, then a second tap opens the save", () => {

@@ -71,6 +71,11 @@ describe("placeEmoji", () => {
     ).toBe("🎟️");
   });
 
+  it("takes the word that comes first in the name", () => {
+    expect(placeEmoji({ name: "Coffee & Donuts", kinds: [] })).toBe("☕");
+    expect(placeEmoji({ name: "Bagel Bakery", kinds: [] })).toBe("🥯");
+  });
+
   it("matches whole words only", () => {
     expect(placeEmoji({ name: "Teatro", kinds: [] })).toBeUndefined();
     expect(
