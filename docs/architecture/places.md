@@ -71,8 +71,7 @@ food or drink kind ahead of the category and the save's tags. Both callers pass 
 `cityPins` in `src/lib/city-pins.ts` (the city page) and `listMapPlaces` in `convex/mapPlaces.ts`
 (the Map tab). Without that threading the chips stay per-save while the emoji is per-place.
 Both dedupe a venue across saves with `mergeVenueKinds` (`convex/model/placeKinds.ts`), which PR 2
-extends with the same rule it has for `category`: the kept pin's `cuisine` wins, and a later
-duplicate's fills it only when the kept one has none. PR 2 tests both duplicate orders.
+extends with the same rule it has for `category`: the kept pin's `cuisine` wins, and a later duplicate's `cuisine` fills it only when the kept one has none. PR 2 tests both duplicate orders.
 
 ### Old saves
 
