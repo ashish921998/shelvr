@@ -64,6 +64,7 @@ import {
   MAX_ITEM_TITLE_CHARS,
   MAX_NOTE_TEXT_CHARS,
   normalizeCities,
+  normalizePlaceCuisines,
   normalizePlaces,
   placeCuisinesValidator,
   placeLocationsValidator,
@@ -2323,6 +2324,7 @@ export const addPlaceListParts = internalMutation({
     itemId: v.id("items"),
     runId: v.optional(v.string()),
     parts: v.array(placeListPartValidator),
+    placeCuisines: v.optional(placeCuisinesValidator),
   },
   returns: v.number(),
   handler: async (ctx, args) => {
@@ -2373,6 +2375,11 @@ export const addPlaceListParts = internalMutation({
       const cities = normalizeCities(part.cities);
       const places = normalizePlaces(part.places, cities);
       const placePins = withListPins([], part.pins, cities);
+      const placeCuisines = normalizePlaceCuisines(
+        args.placeCuisines,
+        places,
+        cities,
+      );
       const partId = await ctx.db.insert("items", {
         userId: item.userId,
         type: "link",
@@ -2389,6 +2396,7 @@ export const addPlaceListParts = internalMutation({
         intents: [],
         cities,
         places,
+        ...(placeCuisines.length > 0 ? { placeCuisines } : {}),
         placePins,
         searchText: buildSearchText({
           title: part.title,

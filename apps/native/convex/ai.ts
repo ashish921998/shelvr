@@ -1362,6 +1362,7 @@ export const processItem = internalAction({
           itemId: args.itemId,
           runId: args.runId,
           parts: outcome.listParts ?? [],
+          placeCuisines: model.placeCuisines,
         });
       }
       const autoFiled = model

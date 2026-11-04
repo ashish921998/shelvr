@@ -40,6 +40,8 @@ the same rules as `places` (`model/settlement.ts`):
   stable identity to match a name-keyed kind against (a renamed or replaced place would keep the old
   cuisine), so the save loses `placeCuisines` for good (a re-read keeps the person's places and writes
   none) and its pins fall back to the name and Apple's category.
+- Split with `places` when a Google Maps list becomes one save per city: each save keeps only the
+  cuisines of its own places (`items.addPlaceListParts`), under the same AI permission check.
 
 Public item reads strip it, as they strip `placeLocations`, so no public return changes in PR 1.
 It is a new optional field, so it stays declared `v.optional` on rollback once rows carry it.
