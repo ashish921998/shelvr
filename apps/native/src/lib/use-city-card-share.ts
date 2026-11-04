@@ -39,7 +39,7 @@ export function useCityCardShare(
       }
       const file = new File(Paths.cache, cardFileName(city));
       if (file.exists) file.delete();
-      file.write(image.encodeToBytes());
+      await file.write(image.encodeToBytes());
       await Sharing.shareAsync(file.uri, {
         mimeType: "image/png",
         UTI: "public.png",

@@ -8,7 +8,7 @@ import { cityProgress } from "@/lib/city-progress";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
 import { useCityCardShare } from "@/lib/use-city-card-share";
-import { useVisitedKeys } from "@/lib/use-place-visit";
+import { useVisitedKeysState } from "@/lib/use-place-visit";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -25,7 +25,8 @@ export default function CityCardScreen() {
   const { theme, rt } = useUnistyles();
   const { city = "" } = useLocalSearchParams<{ city: string }>();
   const items = useQuery(convexQuery(api.items.listCityItems, { city }));
-  const visited = useVisitedKeys();
+  const visits = useVisitedKeysState();
+  const visited = visits.keys;
   const pins = useMemo(() => cityPins(items.data ?? []), [items.data]);
   const progress = cityProgress(pins, visited);
   const card = useRef<ComponentRef<typeof View>>(null);
@@ -69,12 +70,12 @@ export default function CityCardScreen() {
           </Stack.Toolbar.Button>
         </Stack.Toolbar>
       ) : null}
-      {items.isError ? (
+      {items.isError || visits.isError ? (
         <EmptyState
           title={t("errors.unexpectedTitle")}
           message={t("errors.retrySoon")}
         />
-      ) : items.data === undefined ? (
+      ) : items.data === undefined || !visits.loaded ? (
         <ScreenLoader />
       ) : (
         <ScrollView

@@ -266,6 +266,7 @@ vi.mock("@/components/city/save-row", () => ({
       placeName?: string;
       emoji?: string;
       visited?: boolean;
+      selected?: boolean;
       onToggleVisited?: () => void;
       onPress: () => void;
     }) =>
@@ -273,7 +274,9 @@ vi.mock("@/components/city/save-row", () => ({
         name: `${placeName ?? item.title ?? ""}${visited ? " ✓" : ""}`,
         number: emoji,
         ...rest,
-        ...(onToggleVisited ? { onVisited: () => onToggleVisited() } : {}),
+        ...(onToggleVisited && rest.selected
+          ? { onVisited: () => onToggleVisited() }
+          : {}),
       }),
   ),
 }));
@@ -529,6 +532,8 @@ describe("city page", () => {
     ).toBeTruthy();
     expect(screen.getByTestId("progress").textContent).toBe("0.5");
     expect(screen.getByText("🌮 Taco Spot ✓")).toBeTruthy();
+    expect(screen.queryByText("went BBQ Pit")).toBeNull();
+    fireEvent.click(screen.getByText("🍖 BBQ Pit"));
     fireEvent.click(screen.getByText("went BBQ Pit"));
     expect(mocks.toggleVisit).toHaveBeenCalledWith("item-1", "BBQ Pit", true);
   });

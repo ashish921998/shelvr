@@ -15,8 +15,20 @@ import { Alert } from "react-native";
 const EMPTY: ReadonlySet<string> = new Set();
 
 export function useVisitedKeys(): ReadonlySet<string> {
-  const keys = useQuery(convexQuery(api.placeVisits.visitedKeys, {}));
-  return useMemo(() => (keys.data ? new Set(keys.data) : EMPTY), [keys.data]);
+  return useVisitedKeysState().keys;
+}
+
+export function useVisitedKeysState(): {
+  keys: ReadonlySet<string>;
+  loaded: boolean;
+  isError: boolean;
+} {
+  const query = useQuery(convexQuery(api.placeVisits.visitedKeys, {}));
+  const keys = useMemo(
+    () => (query.data ? new Set(query.data) : EMPTY),
+    [query.data],
+  );
+  return { keys, loaded: query.data !== undefined, isError: query.isError };
 }
 
 export function usePlaceVisit() {

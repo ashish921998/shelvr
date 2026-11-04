@@ -124,6 +124,7 @@ export function CityMap({
       icon:
         (isSelected ? selectedBubble : went ? visitedBubble : bubble) ??
         undefined,
+      went,
       anchor: { x: 0.5, y: 0.5 },
       backgroundColor: theme.colors.surface,
       textColor: theme.colors.foreground,
@@ -157,7 +158,7 @@ export function CityMap({
       markers={annotations.map((pin) => ({
         id: pin.id,
         coordinates: pin.coordinates,
-        title: `${pin.text} ${pin.title}`,
+        title: `${pin.went ? "✓ " : ""}${pin.text} ${pin.title}`,
       }))}
       onMarkerClick={(marker) => select(marker.id)}
     />
