@@ -115,7 +115,11 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.border,
   },
-  label: { ...theme.type.secondaryLabel, color: theme.colors.foreground },
+  label: {
+    ...theme.type.secondaryLabel,
+    lineHeight: 20,
+    color: theme.colors.foreground,
+  },
   labelSelected: { color: theme.colors.onTint },
   pressed: { opacity: theme.opacity.pressed },
 }));
