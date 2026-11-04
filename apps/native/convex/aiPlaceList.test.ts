@@ -69,7 +69,7 @@ const CLUES_READ_OFF_LIST_LINES = [
   { name: "Savoy Azabujuban", location: "Azabujuban, Tokyo" },
 ];
 
-function model(cityCall: () => Promise<unknown>) {
+function model(cityCall: () => Promise<unknown>, extra: object = {}) {
   generateObject.mockImplementation(async (call: { system?: string }) =>
     call.system === PLACE_LIST_CITIES_SYSTEM
       ? await cityCall()
@@ -86,6 +86,7 @@ function model(cityCall: () => Promise<unknown>) {
             cities: ["Tokyo"],
             places: ["Marcy Land"],
             placeLocations: CLUES_READ_OFF_LIST_LINES,
+            ...extra,
           },
         },
   );
@@ -211,6 +212,38 @@ describe("processItem on a shared Google Maps list", () => {
         { name: "Noyanopan", lat: 35.63, lng: 139.7, city: "Tokyo" },
       ],
       [{ name: "Mori Mori Tei", lat: 35.62, lng: 139.7, city: "Karuizawa" }],
+    ]);
+  });
+
+  it("puts each listed place's cuisine on the save of its own city", async () => {
+    model(NAMED, {
+      placeCuisines: [
+        { name: "Marcy Land", cuisine: "noodles" },
+        { name: "Mori Mori Tei", cuisine: "burger" },
+        { name: "Savoy Azabujuban", cuisine: "pizza" },
+      ],
+    });
+    const t = newConvexTest();
+    const { userId, itemId } = await saveList(t);
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+
+    expect(
+      (await savesOf(t, userId)).map(({ title, placeCuisines }) => ({
+        title,
+        placeCuisines,
+      })),
+    ).toEqual([
+      {
+        title: "Tokyo",
+        placeCuisines: [
+          { name: "Marcy Land", cuisine: "noodles" },
+          { name: "Savoy Azabujuban", cuisine: "pizza" },
+        ],
+      },
+      {
+        title: "Karuizawa · Tokyo",
+        placeCuisines: [{ name: "Mori Mori Tei", cuisine: "burger" }],
+      },
     ]);
   });
 
