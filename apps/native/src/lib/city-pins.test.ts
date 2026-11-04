@@ -282,3 +282,41 @@ describe("framedPins", () => {
     expect(framedPins(two)).toEqual(two);
   });
 });
+
+describe("cuisine", () => {
+  it("picks a city pin's emoji and kind", () => {
+    const [pin] = cityPins([
+      {
+        _id: "a",
+        tags: ["food"],
+        placePins: [
+          {
+            name: "Lucy's",
+            lat: 29.75,
+            lng: -95.36,
+            category: "Restaurant",
+            cuisine: "coffee",
+          },
+        ],
+      },
+    ]);
+    expect(pin).toMatchObject({
+      cuisine: "coffee",
+      emoji: "☕",
+      kinds: ["coffee"],
+    });
+  });
+
+  it("keeps the newer save's cuisine for a venue two saves share", () => {
+    const pin = { name: "Lucy's", lat: 29.75, lng: -95.36 };
+    const [merged] = cityPins([
+      { _id: "newer", placePins: [pin] },
+      { _id: "older", placePins: [{ ...pin, cuisine: "burger" as const }] },
+    ]);
+    expect(merged).toMatchObject({
+      itemId: "newer",
+      cuisine: "burger",
+      emoji: "🍔",
+    });
+  });
+});

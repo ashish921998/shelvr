@@ -600,6 +600,27 @@ describe("placePins", () => {
     expect(await pins()).toEqual([{ ...pin, category: "Cafe" }]);
   });
 
+  it("copies the save's cuisine onto each pin it names, the first entry winning", async () => {
+    const { t, itemId, pins } = await setup([]);
+    const lucys = { name: "Lucy's", lat: 38.7, lng: -9.1, city: "Lisbon" };
+    const bar = { name: "Bar", lat: 38.71, lng: -9.14, city: "Lisbon" };
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        places: ["Lucy's", "Bar"],
+        placeCuisines: [
+          { name: "lucy's", cuisine: "burger" },
+          { name: "Lucy's", cuisine: "pizza" },
+        ],
+        placePins: [{ ...bar, cuisine: "wine" }],
+      }),
+    );
+    await t.mutation(internal.placePins.storePins, {
+      itemId,
+      found: [lucys, bar],
+    });
+    expect(await pins()).toEqual([bar, { ...lucys, cuisine: "burger" }]);
+  });
+
   it("keeps a stored id when a refresh finds the same pin without one, but not when the pin moves", async () => {
     const { t, itemId, pins } = await setup([]);
     await t.run(async (ctx) =>

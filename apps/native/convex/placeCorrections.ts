@@ -33,7 +33,7 @@ function currentPlaces(item: Doc<"items">): EditablePlace[] {
   const pins = item.placePins ?? [];
   const names = new Set(pins.map((pin) => pin.name.toLowerCase()));
   return [
-    ...pins.map((pin) => ({
+    ...pins.map(({ cuisine: _cuisine, ...pin }) => ({
       ...pin,
       ...(pin.city === undefined && item.cities?.length === 1
         ? { city: item.cities[0] }

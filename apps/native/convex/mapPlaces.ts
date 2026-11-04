@@ -2,9 +2,11 @@ import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
 import { readySavesNewestFirst } from "./items";
 import { authedQuery } from "./model/auth";
+import { cuisineValidator } from "./model/itemFields";
 import {
   mergeVenueKinds,
   placeKinds,
+  type Cuisine,
   type PlaceKind,
 } from "./model/placeKinds";
 import { uniquePlacePins } from "./model/trip";
@@ -21,6 +23,7 @@ const mapPlaceValidator = v.object({
   appleId: v.optional(v.string()),
   /** Apple's point-of-interest category, which picks the pin's icon. */
   category: v.optional(v.string()),
+  cuisine: v.optional(cuisineValidator),
   /** Ids from `PLACE_KINDS`; a client skips an id it has no label for. */
   kinds: v.array(v.string()),
 });
@@ -33,6 +36,7 @@ type MapPlace = {
   city?: string;
   appleId?: string;
   category?: string;
+  cuisine?: Cuisine;
   kinds: PlaceKind[];
 };
 
@@ -52,7 +56,8 @@ export const listMapPlaces = authedQuery({
           ...(pin.city ? { city: pin.city } : {}),
           ...(pin.appleId ? { appleId: pin.appleId } : {}),
           ...(pin.category ? { category: pin.category } : {}),
-          kinds: placeKinds(pin.category, item.tags),
+          ...(pin.cuisine ? { cuisine: pin.cuisine } : {}),
+          kinds: placeKinds(pin.category, item.tags, pin.cuisine),
         });
     // One venue across saves, by the city page's identity rules: it keeps the newest save and every
     // kind any of its saves gave it, and the first category any of them found.

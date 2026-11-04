@@ -12,6 +12,7 @@ type Pin = {
   city?: string;
   appleId?: string;
   category?: string;
+  cuisine?: "coffee";
 };
 
 async function setup() {
@@ -151,5 +152,25 @@ describe("listMapPlaces", () => {
     ]);
     const places = await t.query(api.mapPlaces.listMapPlaces, {});
     expect(places.map((place) => place.name)).toEqual(["Cloud Gate"]);
+  });
+
+  it("returns a pin's cuisine and lets it pick the kind", async () => {
+    const { t, save, userId } = await setup();
+    await save(
+      userId,
+      [
+        {
+          name: "Lucy's",
+          lat: 30.26,
+          lng: -97.74,
+          category: "Restaurant",
+          cuisine: "coffee",
+        },
+      ],
+      { tags: ["food"] },
+    );
+    expect(await t.query(api.mapPlaces.listMapPlaces, {})).toMatchObject([
+      { name: "Lucy's", cuisine: "coffee", kinds: ["coffee"] },
+    ]);
   });
 });
