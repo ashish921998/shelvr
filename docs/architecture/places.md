@@ -46,7 +46,10 @@ It is a new optional field, so it stays declared `v.optional` on rollback once r
 ### 3. Pins carry it
 
 `placePins.storePins` copies `cuisine` onto each pin whose name matches a `placeKinds` entry, as it
-already copies `city`, `appleId` and `category`. The pin validators gain an optional `cuisine`, which
+already copies `city`, `appleId` and `category`. The match is by name only, since `placeKinds`
+carries no Apple id or point: both sides go through `placeKey`, and when one save names two places
+with the same key the first `placeKinds` entry wins. A renamed place matches nothing and keeps no
+cuisine; edits drop `placeKinds` anyway (section 2). The pin validators gain an optional `cuisine`, which
 installed apps ignore. This counts as a public return change: the commit needs the
 `Convex-Api: changed` trailer.
 
@@ -73,7 +76,8 @@ food or drink kind ahead of the category and the save's tags. Both callers pass 
 A paginated internal `items:backfillPlaceKinds` can re-run extraction for ready saves that have
 places but no `placeKinds`, only where `aiAllowed` passes for the save and its owner. It checks before
 scheduling each save and again in the action right before the model call, so a save kept AI-free on
-purpose is never sent to the model. It costs a model call per save, so run it only after the new field has
+purpose is never sent to the model. A save that is deleted, or whose owner is gone or `deleting`
+(`liveOwner`), is skipped. It costs a model call per save, so run it only after the new field has
 proved its worth on new saves. Until then old saves fall back to name matching and Apple's category.
 
 ## Rollout

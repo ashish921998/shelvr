@@ -101,6 +101,7 @@ describe("cityPins", () => {
     expect(merged.itemId).toBe("newer");
     expect(merged.category).toBe("Nightlife");
     expect(merged.kinds).toContain("dateNight");
+    expect(merged.kinds).toContain("food");
     expect(merged.emoji).toBe("🍸");
   });
 
