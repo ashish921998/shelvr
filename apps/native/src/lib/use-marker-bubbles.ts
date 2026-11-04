@@ -2,6 +2,7 @@ import { analytics } from "@/lib/analytics";
 import {
   bubbleKey,
   bubbleSignature,
+  loadWithRetry,
   parseBubbleKey,
   signatureKeys,
   type BubbleRequest,
@@ -90,19 +91,19 @@ export function useMarkerBubbles(requests: BubbleRequest[]) {
   );
 
   useEffect(() => {
-    let live = true;
-    for (const key of signatureKeys(signature)) {
-      void bubbleImage(key).then((image) => {
-        if (!live || !image) return;
-        setImages((current) =>
-          current.get(key) === image
-            ? current
-            : new Map(current).set(key, image),
-        );
-      });
-    }
+    const cancels = signatureKeys(signature).map((key) =>
+      loadWithRetry(
+        () => bubbleImage(key),
+        (image) =>
+          setImages((current) =>
+            current.get(key) === image
+              ? current
+              : new Map(current).set(key, image),
+          ),
+      ),
+    );
     return () => {
-      live = false;
+      for (const cancel of cancels) cancel();
     };
   }, [signature]);
 
