@@ -151,7 +151,7 @@ Core review flow:
 
 Shared lists:
 
-A list holds places kept by people its owner invites, at most 8. Open a city from Home, tap "Invite", enter a name (the city is already picked), then "Send invite" to get a link in the share sheet. Anyone with the link can join; joining needs a second account, the list works with one. Members see the list's name, its places and each other's first names. The owner can "Remove" a member, which also stops the old link. Anyone can "Leave list".
+A list holds places kept by people its owner invites, at most 8. Open a city from Home, tap "Invite", enter a name, then "Send invite" to get a link in the share sheet. Anyone with the link can join; joining needs a second account, the list works with one. Members see the list's name, its places and each other's first names. The owner can "Remove" a member, which also stops the old link. Anyone can "Leave list".
 
 Share extension, Siri and widget:
 

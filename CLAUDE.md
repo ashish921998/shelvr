@@ -593,7 +593,7 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`); tapping the row opens the save
 - Shared lists: Home shows a "Shared lists" section above the plan tiles (one card per list from
   `listSharedLists`, nothing when the person has none). A list starts from the city page's Invite
-  button beside the city's name, which opens `new-shared-list` with that city picked.
+  button beside the city's name (shown when the city has saves), which opens `new-shared-list` with that city picked.
   `shared-list/[id]` is a list: the same map-and-sheet shape as the city page, "New from <name>"
   first, a row menu for We went and Remove from list, city chips when the list spans cities,
   Plan a date and Plan a trip passing `listId`, Invite (the system share sheet with

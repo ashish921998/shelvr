@@ -58,7 +58,8 @@ export function InviteButton({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={t("sharedLists.start")}
+      accessibilityLabel={label}
+      accessibilityHint={t("sharedLists.start")}
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
