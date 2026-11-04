@@ -621,50 +621,6 @@ describe("placePins", () => {
     expect(await pins()).toEqual([bar, { ...lucys, cuisine: "burger" }]);
   });
 
-  it("sets the save's cuisines on kept pins too, with nothing new to add", async () => {
-    const { t, itemId, pins } = await setup([]);
-    const lucys = { name: "Lucy's", lat: 38.7, lng: -9.1, city: "Lisbon" };
-    const bar = { name: "Bar", lat: 38.71, lng: -9.14, city: "Lisbon" };
-    await t.run(async (ctx) =>
-      ctx.db.patch(itemId, {
-        places: ["Lucy's", "Bar"],
-        placeCuisines: [{ name: "Lucy's", cuisine: "burger" }],
-        placePins: [lucys, { ...bar, cuisine: "wine" }],
-      }),
-    );
-    await t.mutation(internal.placePins.storePins, {
-      itemId,
-      found: [],
-      keepPins: true,
-    });
-    expect(await pins()).toEqual([{ ...lucys, cuisine: "burger" }, bar]);
-  });
-
-  it("sets the save's cuisines on kept and added pins alike", async () => {
-    const { t, itemId, pins } = await setup([]);
-    const lucys = { name: "Lucy's", lat: 38.7, lng: -9.1, city: "Lisbon" };
-    const bar = { name: "Bar", lat: 38.71, lng: -9.14, city: "Lisbon" };
-    await t.run(async (ctx) =>
-      ctx.db.patch(itemId, {
-        places: ["Lucy's", "Bar"],
-        placeCuisines: [
-          { name: "Lucy's", cuisine: "burger" },
-          { name: "Bar", cuisine: "wine" },
-        ],
-        placePins: [lucys],
-      }),
-    );
-    await t.mutation(internal.placePins.storePins, {
-      itemId,
-      found: [{ ...bar, lat: 38.72 }],
-      keepPins: true,
-    });
-    expect(await pins()).toEqual([
-      { ...lucys, cuisine: "burger" },
-      { ...bar, lat: 38.72, cuisine: "wine" },
-    ]);
-  });
-
   it("keeps a stored id when a refresh finds the same pin without one, but not when the pin moves", async () => {
     const { t, itemId, pins } = await setup([]);
     await t.run(async (ctx) =>
@@ -1149,36 +1105,6 @@ describe("placePins", () => {
     expect((await pins())?.[0].category).toBe("Cafe");
   });
 
-  it("backfill sets the save's cuisines on located pins without an Apple call", async () => {
-    const { queries } = await withMaps(true);
-    const { t, itemId, pins } = await setup([]);
-    const micho = {
-      name: "Micho",
-      lat: 13,
-      lng: -13,
-      city: "Lisbon",
-      appleId: "I1",
-      category: "Restaurant",
-    };
-    const bar = { ...micho, name: "Bar", appleId: "I2" };
-    await t.run(async (ctx) =>
-      ctx.db.patch(itemId, {
-        places: ["Micho", "Bar"],
-        placeCuisines: [{ name: "Micho", cuisine: "tacos" }],
-        placePins: [micho, { ...bar, cuisine: "wine" }],
-      }),
-    );
-    vi.useFakeTimers();
-    try {
-      await t.mutation(internal.placePins.backfillPage, { cursor: null });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
-    } finally {
-      vi.useRealTimers();
-    }
-    expect(queries()).toEqual([]);
-    expect(await pins()).toEqual([{ ...micho, cuisine: "tacos" }, bar]);
-  });
-
   function appleAnswers(status: number) {
     vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.spyOn(console, "error").mockImplementation(() => {});
@@ -1290,6 +1216,82 @@ describe("placePins", () => {
     });
     await t.mutation(internal.placePins.backfillPage, { cursor: null });
     expect(await lookupJobs(t)).toEqual([{ itemId }]);
+  });
+});
+
+describe("pin cuisines", () => {
+  it("sets the save's cuisines on kept pins too, with nothing new to add", async () => {
+    const { t, itemId, pins } = await setup([]);
+    const lucys = { name: "Lucy's", lat: 38.7, lng: -9.1, city: "Lisbon" };
+    const bar = { name: "Bar", lat: 38.71, lng: -9.14, city: "Lisbon" };
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        places: ["Lucy's", "Bar"],
+        placeCuisines: [{ name: "Lucy's", cuisine: "burger" }],
+        placePins: [lucys, { ...bar, cuisine: "wine" }],
+      }),
+    );
+    await t.mutation(internal.placePins.storePins, {
+      itemId,
+      found: [],
+      keepPins: true,
+    });
+    expect(await pins()).toEqual([{ ...lucys, cuisine: "burger" }, bar]);
+  });
+
+  it("sets the save's cuisines on kept and added pins alike", async () => {
+    const { t, itemId, pins } = await setup([]);
+    const lucys = { name: "Lucy's", lat: 38.7, lng: -9.1, city: "Lisbon" };
+    const bar = { name: "Bar", lat: 38.71, lng: -9.14, city: "Lisbon" };
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        places: ["Lucy's", "Bar"],
+        placeCuisines: [
+          { name: "Lucy's", cuisine: "burger" },
+          { name: "Bar", cuisine: "wine" },
+        ],
+        placePins: [lucys],
+      }),
+    );
+    await t.mutation(internal.placePins.storePins, {
+      itemId,
+      found: [{ ...bar, lat: 38.72 }],
+      keepPins: true,
+    });
+    expect(await pins()).toEqual([
+      { ...lucys, cuisine: "burger" },
+      { ...bar, lat: 38.72, cuisine: "wine" },
+    ]);
+  });
+
+  it("backfill sets the save's cuisines on located pins without an Apple call", async () => {
+    const { queries } = await withMaps(true);
+    const { t, itemId, pins } = await setup([]);
+    const micho = {
+      name: "Micho",
+      lat: 13,
+      lng: -13,
+      city: "Lisbon",
+      appleId: "I1",
+      category: "Restaurant",
+    };
+    const bar = { ...micho, name: "Bar", appleId: "I2" };
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        places: ["Micho", "Bar"],
+        placeCuisines: [{ name: "Micho", cuisine: "tacos" }],
+        placePins: [micho, { ...bar, cuisine: "wine" }],
+      }),
+    );
+    vi.useFakeTimers();
+    try {
+      await t.mutation(internal.placePins.backfillPage, { cursor: null });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(queries()).toEqual([]);
+    expect(await pins()).toEqual([{ ...micho, cuisine: "tacos" }, bar]);
   });
 });
 
