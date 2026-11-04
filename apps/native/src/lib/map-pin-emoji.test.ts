@@ -61,6 +61,16 @@ describe("placeEmoji", () => {
     ).toBe("🏛️");
   });
 
+  it("ignores the name under a category it has no emoji for", () => {
+    expect(
+      placeEmoji({
+        name: "Indian Creek Golf Club",
+        category: "GolfCourse",
+        kinds: ["activities"],
+      }),
+    ).toBe("🎟️");
+  });
+
   it("matches whole words only", () => {
     expect(placeEmoji({ name: "Teatro", kinds: [] })).toBeUndefined();
     expect(

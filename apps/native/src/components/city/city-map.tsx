@@ -148,7 +148,7 @@ export function CityMap({
       markers={annotations.map((pin) => ({
         id: pin.id,
         coordinates: pin.coordinates,
-        title: pin.title,
+        title: `${pin.text} ${pin.title}`,
       }))}
       onMarkerClick={(marker) => select(marker.id)}
     />

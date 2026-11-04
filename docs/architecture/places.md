@@ -22,10 +22,12 @@ next to the pins it describes.
 ### 1. The model names each place's kind
 
 The extraction schema in `ai.ts` already returns `places` (names) and `placeLocations` (name and
-location clue). Add an optional `placeKinds` list of `{ name, cuisine?, emoji? }`, one per place, in
-the same call. `cuisine` is one value from a fixed list (burger, pizza, tacos, sushi, ramen, coffee,
-bakery, dessert, ice cream, cocktails, wine, beer, and so on), and `emoji` is derived from it in code,
-not written by the model. A free-form emoji from the model is not stored.
+location clue). Add an optional `placeKinds` list of `{ name, cuisine? }`, one per place, in the same
+call. `cuisine` is one value of a closed enum that PR 1 defines in `convex/model/placeKinds.ts`, with
+one entry for each emoji `NAME_WORDS` in `src/lib/map-pin-emoji.ts` can give (burger, pizza, tacos,
+sushi, noodles, dumplings, bbq, steak, seafood, curry, pasta, donuts, ice cream, bakery, bagels,
+dessert, coffee, tea, beer, wine, cocktails, brunch, sandwiches, salad, chicken). The model never
+writes an emoji; code derives it from `cuisine`, and nothing stores one.
 
 ### 2. The save stores it
 
@@ -47,15 +49,18 @@ installed apps ignore. This counts as a public return change: the commit needs t
 
 ### 4. The phone picks the emoji
 
-`placeEmoji` in `src/lib/map-pin-emoji.ts` tries, in order: the pin's `cuisine`, Apple's category,
-then the save's tags. `placeKinds` in `convex/model/placeKinds.ts` maps a cuisine to a filter kind
-(coffee to `coffee`, cocktails to `drinks`), so the chips get more precise too.
+`placeEmoji` in `src/lib/map-pin-emoji.ts` tries, in order:
 
-### Before any backend work
+1. Apple's category, when it is a specific one (Museum, Park, Brewery).
+2. The pin's `cuisine` (after PR 2).
+3. A whole word of the place name ("Burger", "Taquería", "Café"), only when the category is missing
+   or broad (Restaurant, FoodMarket, Cafe, Bakery, Nightlife).
+4. A broad category's emoji.
+5. The save's tags.
 
-Matching the place name on the phone ("Burger", "Taco", "Coffee", "Pizza", "Bakery" in the name)
-fixes many pins with no backend change and no deploy. It works for old saves too. It is worth
-shipping first, and stays as the step after `cuisine` and before Apple's category.
+Steps 1, 3, 4 and 5 ship in PR 0, on the phone with no deploy, and work for old saves too.
+`placeKinds` in `convex/model/placeKinds.ts` maps a cuisine to a filter kind (coffee to `coffee`,
+cocktails to `drinks`), so the chips get more precise too.
 
 ### Old saves
 

@@ -44,14 +44,25 @@ export function categoryEmoji(category: string): string | undefined {
   return CATEGORY_EMOJI[category];
 }
 
-const KIND_EMOJI: [PlaceKind, string][] = [
-  ["coffee", "☕"],
-  ["dessert", "🍰"],
-  ["drinks", "🍸"],
-  ["food", "🍽️"],
-  ["stay", "🛏️"],
-  ["shopping", "🛍️"],
-  ["activities", "🎟️"],
+export const KIND_EMOJI: Record<PlaceKind, string> = {
+  food: "🍽️",
+  coffee: "☕",
+  dessert: "🍰",
+  drinks: "🍸",
+  dateNight: "💕",
+  activities: "🎟️",
+  shopping: "🛍️",
+  stay: "🛏️",
+};
+
+const PIN_KIND_ORDER: PlaceKind[] = [
+  "coffee",
+  "dessert",
+  "drinks",
+  "food",
+  "stay",
+  "shopping",
+  "activities",
 ];
 
 const BROAD_CATEGORIES = new Set([
@@ -99,7 +110,7 @@ function nameEmoji(name: string): string | undefined {
 
 /**
  * The emoji a pin shows, so a steakhouse, a bar and a museum no longer look alike.
- * Apple's category wins unless it is a broad food or drink one; then the name, then the save's tags.
+ * Apple's category wins unless it is a broad food or drink one; then the name (only with no or a broad category), then the save's tags.
  * Undefined when nothing says what the place is, which leaves the plain pin.
  */
 export function placeEmoji(place: {
@@ -110,11 +121,14 @@ export function placeEmoji(place: {
   const fromCategory = place.category
     ? CATEGORY_EMOJI[place.category]
     : undefined;
-  if (fromCategory && !BROAD_CATEGORIES.has(place.category ?? "")) {
-    return fromCategory;
-  }
-  const fromName = place.name ? nameEmoji(place.name) : undefined;
+  const nameDecides = !place.category || BROAD_CATEGORIES.has(place.category);
+  if (fromCategory && !nameDecides) return fromCategory;
+  const fromName =
+    nameDecides && place.name ? nameEmoji(place.name) : undefined;
   if (fromName) return fromName;
   if (fromCategory) return fromCategory;
-  return KIND_EMOJI.find(([kind]) => place.kinds.includes(kind))?.[1];
+  const kind = PIN_KIND_ORDER.find((candidate) =>
+    place.kinds.includes(candidate),
+  );
+  return kind ? KIND_EMOJI[kind] : undefined;
 }
