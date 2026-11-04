@@ -1,5 +1,5 @@
 import { nameWords } from "@convex/model/placeIdentity";
-import type { PlaceKind } from "@convex/model/placeKinds";
+import type { Cuisine, PlaceKind } from "@convex/model/placeKinds";
 
 /** Apple Maps' point-of-interest categories; any other category falls back to the place's kinds. */
 const CATEGORY_EMOJI: Record<string, string> = {
@@ -73,53 +73,83 @@ const BROAD_CATEGORIES = new Set([
   "Nightlife",
 ]);
 
-const NAME_WORDS: [string[], string][] = [
-  [["burger", "burgers", "smash"], "🍔"],
-  [["pizza", "pizzas", "pizzeria"], "🍕"],
-  [["taco", "tacos", "taqueria", "cantina", "mexican"], "🌮"],
-  [["sushi", "omakase", "izakaya"], "🍣"],
-  [["ramen", "noodle", "noodles", "pho", "udon", "thai"], "🍜"],
-  [["dumpling", "dumplings", "dim sum", "bao"], "🥟"],
-  [["bbq", "barbecue", "smokehouse"], "🍖"],
-  [["steakhouse", "steak", "grill"], "🥩"],
-  [["seafood", "oyster", "oysters", "fish", "crab", "lobster"], "🦞"],
-  [["curry", "indian", "tandoori", "masala"], "🍛"],
-  [["pasta", "trattoria", "osteria"], "🍝"],
-  [["donut", "donuts", "doughnut", "doughnuts"], "🍩"],
-  [["ice cream", "ice creams", "gelato", "gelateria", "creamery"], "🍨"],
-  [["bakery", "boulangerie", "patisserie", "croissant"], "🥐"],
-  [["bagel", "bagels"], "🥯"],
-  [["cake", "cakes", "dessert", "desserts", "sweets"], "🍰"],
-  [["coffee", "espresso", "cafe", "roaster", "roasters"], "☕"],
-  [["tea", "matcha", "boba"], "🍵"],
-  [["brewery", "brewing", "taproom", "beer", "pub"], "🍺"],
-  [["wine", "vino", "enoteca"], "🍷"],
-  [["cocktail", "cocktails", "speakeasy", "lounge"], "🍸"],
-  [["brunch", "breakfast", "diner", "pancake", "pancakes"], "🥞"],
-  [["sandwich", "sandwiches", "deli"], "🥪"],
-  [["salad", "poke", "bowl", "bowls"], "🥗"],
-  [["chicken", "wings"], "🍗"],
+const CUISINE_EMOJI: Record<Cuisine, string> = {
+  burger: "🍔",
+  pizza: "🍕",
+  tacos: "🌮",
+  sushi: "🍣",
+  noodles: "🍜",
+  dumplings: "🥟",
+  bbq: "🍖",
+  steak: "🥩",
+  seafood: "🦞",
+  curry: "🍛",
+  pasta: "🍝",
+  donuts: "🍩",
+  "ice cream": "🍨",
+  bakery: "🥐",
+  bagels: "🥯",
+  dessert: "🍰",
+  coffee: "☕",
+  tea: "🍵",
+  beer: "🍺",
+  wine: "🍷",
+  cocktails: "🍸",
+  brunch: "🥞",
+  sandwiches: "🥪",
+  salad: "🥗",
+  chicken: "🍗",
+};
+
+const NAME_WORDS: [string[], Cuisine][] = [
+  [["burger", "burgers", "smash"], "burger"],
+  [["pizza", "pizzas", "pizzeria"], "pizza"],
+  [["taco", "tacos", "taqueria", "cantina", "mexican"], "tacos"],
+  [["sushi", "omakase", "izakaya"], "sushi"],
+  [["ramen", "noodle", "noodles", "pho", "udon", "thai"], "noodles"],
+  [["dumpling", "dumplings", "dim sum", "bao"], "dumplings"],
+  [["bbq", "barbecue", "smokehouse"], "bbq"],
+  [["steakhouse", "steak", "grill"], "steak"],
+  [["seafood", "oyster", "oysters", "fish", "crab", "lobster"], "seafood"],
+  [["curry", "indian", "tandoori", "masala"], "curry"],
+  [["pasta", "trattoria", "osteria"], "pasta"],
+  [["donut", "donuts", "doughnut", "doughnuts"], "donuts"],
+  [["ice cream", "ice creams", "gelato", "gelateria", "creamery"], "ice cream"],
+  [["bakery", "boulangerie", "patisserie", "croissant"], "bakery"],
+  [["bagel", "bagels"], "bagels"],
+  [["cake", "cakes", "dessert", "desserts", "sweets"], "dessert"],
+  [["coffee", "espresso", "cafe", "roaster", "roasters"], "coffee"],
+  [["tea", "matcha", "boba"], "tea"],
+  [["brewery", "brewing", "taproom", "beer", "pub"], "beer"],
+  [["wine", "vino", "enoteca"], "wine"],
+  [["cocktail", "cocktails", "speakeasy", "lounge"], "cocktails"],
+  [["brunch", "breakfast", "diner", "pancake", "pancakes"], "brunch"],
+  [["sandwich", "sandwiches", "deli"], "sandwiches"],
+  [["salad", "poke", "bowl", "bowls"], "salad"],
+  [["chicken", "wings"], "chicken"],
 ];
 
 function nameEmoji(name: string): string | undefined {
   const padded = ` ${nameWords(name).join(" ")} `;
-  let best: { at: number; emoji: string } | undefined;
-  for (const [words, emoji] of NAME_WORDS)
+  let best: { at: number; cuisine: Cuisine } | undefined;
+  for (const [words, cuisine] of NAME_WORDS)
     for (const word of words) {
       const at = padded.indexOf(` ${word} `);
-      if (at >= 0 && (best === undefined || at < best.at)) best = { at, emoji };
+      if (at >= 0 && (best === undefined || at < best.at))
+        best = { at, cuisine };
     }
-  return best?.emoji;
+  return best && CUISINE_EMOJI[best.cuisine];
 }
 
 /**
  * The emoji a pin shows, so a steakhouse, a bar and a museum no longer look alike.
- * Apple's category wins unless it is a broad food or drink one; then the name (only with no or a broad category), then the save's tags.
+ * Apple's category wins unless it is a broad food or drink one; then the place's cuisine, then the name (only with no or a broad category), then the save's tags.
  * Undefined when nothing says what the place is, which leaves the plain pin.
  */
 export function placeEmoji(place: {
   name?: string;
   category?: string;
+  cuisine?: Cuisine;
   kinds: readonly string[];
 }): string | undefined {
   const fromCategory = place.category
@@ -127,6 +157,7 @@ export function placeEmoji(place: {
     : undefined;
   const nameDecides = !place.category || BROAD_CATEGORIES.has(place.category);
   if (fromCategory && !nameDecides) return fromCategory;
+  if (place.cuisine) return CUISINE_EMOJI[place.cuisine];
   const fromName =
     nameDecides && place.name ? nameEmoji(place.name) : undefined;
   if (fromName) return fromName;

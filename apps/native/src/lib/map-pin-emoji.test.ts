@@ -82,4 +82,29 @@ describe("placeEmoji", () => {
       placeEmoji({ name: "Grillhaus", category: "Restaurant", kinds: [] }),
     ).toBe("🍽️");
   });
+
+  it("draws the place's cuisine ahead of the name and a broad category", () => {
+    expect(
+      placeEmoji({
+        name: "Lucy's Pizza",
+        category: "Restaurant",
+        cuisine: "burger",
+        kinds: ["food"],
+      }),
+    ).toBe("🍔");
+    expect(
+      placeEmoji({ name: "Lucy's", cuisine: "ice cream", kinds: [] }),
+    ).toBe("🍨");
+  });
+
+  it("keeps a specific category over the cuisine", () => {
+    expect(
+      placeEmoji({
+        name: "Lucy's",
+        category: "Brewery",
+        cuisine: "burger",
+        kinds: [],
+      }),
+    ).toBe("🍺");
+  });
 });

@@ -30,6 +30,7 @@ import {
 import { logEvent } from "./model/log";
 import { buildSearchText } from "./model/searchText";
 import { effectiveStatus } from "./model/memberships";
+import type { Cuisine } from "./model/placeKinds";
 import { placeKey } from "./model/plan";
 import { SAME_SPOT_KM } from "./model/placeList";
 import {
@@ -54,7 +55,38 @@ type Pin = {
   city?: string;
   appleId?: string;
   category?: string;
+  cuisine?: Cuisine;
 };
+
+function cuisinesByPlace(item: Doc<"items">): Map<string, Cuisine> {
+  const cuisines = new Map<string, Cuisine>();
+  for (const entry of item.placeCuisines ?? []) {
+    const key = savedPlaceKey(entry.name, item.cities);
+    if (!cuisines.has(key)) cuisines.set(key, entry.cuisine);
+  }
+  return cuisines;
+}
+
+function withCuisine(
+  pin: Pin,
+  cuisines: Map<string, Cuisine>,
+  cities: string[] | undefined,
+): Pin {
+  const { cuisine: _stored, ...rest } = pin;
+  const cuisine = cuisines.get(savedPlaceKey(pin.name, cities));
+  return cuisine ? { ...rest, cuisine } : rest;
+}
+
+function withCuisines(item: Doc<"items">, pins: Pin[]): Pin[] {
+  const cuisines = cuisinesByPlace(item);
+  return pins.map((pin) => withCuisine(pin, cuisines, item.cities));
+}
+
+function sameCuisines(a: Pin[], b: Pin[]): boolean {
+  return (
+    a.length === b.length && a.every((pin, i) => pin.cuisine === b[i].cuisine)
+  );
+}
 
 /** Source cities establish the scope; lookup results cannot bypass outlier rejection. */
 function lookupCity(cities: string[]): string | undefined {
@@ -248,23 +280,27 @@ async function addPinsBesideOwnerPins(
   wanted: Map<string, string>,
   found: Pin[],
 ): Promise<void> {
-  const ownerPins = item.placePins ?? [];
+  const ownerPins = withCuisines(item, item.placePins ?? []);
   const pinned = new Set(
     ownerPins.map((pin) => savedPlaceKey(pin.name, item.cities)),
   );
+  const cuisines = cuisinesByPlace(item);
   const fresh = found
     .filter((pin) => {
       const key = savedPlaceKey(pin.name, item.cities);
       return wanted.has(key) && !pinned.has(key);
     })
-    .map((pin) => inSourceCity(pin, item.cities ?? []));
+    .map((pin) =>
+      withCuisine(inSourceCity(pin, item.cities ?? []), cuisines, item.cities),
+    );
   const near = nearEachOther(
     [...ownerPins, ...fresh],
     lookupCity(item.cities ?? []),
   );
   const added = fresh.filter((pin) => near.includes(pin));
-  if (added.length === 0) return;
   const placePins = [...ownerPins, ...added].slice(0, MAX_PINS);
+  if (added.length === 0 && sameCuisines(ownerPins, item.placePins ?? []))
+    return;
   await ctx.db.patch(item._id, {
     placePins,
     searchText: buildSearchText({ ...item, placePins }),
@@ -302,7 +338,10 @@ export const storePins = internalMutation({
         );
     }
     const city = lookupCity(item.cities ?? []);
-    const pins = nearEachOther([...next.values()], city).slice(0, MAX_PINS);
+    const cuisines = cuisinesByPlace(item);
+    const pins = nearEachOther([...next.values()], city)
+      .slice(0, MAX_PINS)
+      .map((pin) => withCuisine(pin, cuisines, item.cities));
     const before = item.placePins ?? [];
     const same =
       pins.length === before.length &&
@@ -313,7 +352,8 @@ export const storePins = internalMutation({
           pin.lng === before[i].lng &&
           pin.city === before[i].city &&
           pin.appleId === before[i].appleId &&
-          pin.category === before[i].category,
+          pin.category === before[i].category &&
+          pin.cuisine === before[i].cuisine,
       );
     const places =
       item.places === undefined
@@ -532,6 +572,10 @@ export const backfillPage = internalMutation({
     const todo: { itemId: Id<"items">; refresh?: true }[] = [];
     for (const item of page) {
       if (item.status !== "ready") continue;
+      const pins = item.placePins ?? [];
+      const cuisined = withCuisines(item, pins);
+      if (!sameCuisines(cuisined, pins) && (await aiAllowed(ctx, item.userId)))
+        await ctx.db.patch(item._id, { placePins: cuisined });
       const named =
         mapsNames(item.intents).length > 0 || (item.places?.length ?? 0) > 0;
       // A pin without a category predates the Map tab's filters.

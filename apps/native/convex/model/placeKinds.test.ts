@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { placeKinds } from "./placeKinds";
+import {
+  mergeVenueKinds,
+  placeKinds,
+  type Cuisine,
+  type PlaceKind,
+} from "./placeKinds";
 
 describe("placeKinds", () => {
   it("trusts Apple's category over the save's tags", () => {
@@ -66,5 +71,51 @@ describe("placeKinds", () => {
 
   it("ignores a category it does not know", () => {
     expect(placeKinds("Pharmacy", ["food"])).toEqual([]);
+  });
+
+  it("lets the place's cuisine decide its food or drink kind", () => {
+    expect(placeKinds("Restaurant", ["dessert"], "coffee")).toEqual(["coffee"]);
+    expect(placeKinds(undefined, ["food"], "cocktails")).toEqual(["drinks"]);
+    expect(placeKinds("Bakery", [], "ice cream")).toEqual(["dessert"]);
+    expect(placeKinds("Restaurant", ["coffee"], "tacos")).toEqual(["food"]);
+    expect(placeKinds(undefined, [], "tea")).toEqual(["coffee"]);
+    expect(placeKinds("Bakery", [], "bakery")).toEqual(["dessert"]);
+  });
+
+  it("keeps a coffee or drinks category beside a food cuisine", () => {
+    expect(placeKinds("Cafe", ["coffee"], "brunch")).toEqual([
+      "food",
+      "coffee",
+    ]);
+    expect(placeKinds("Nightlife", [], "tacos")).toEqual(["food", "drinks"]);
+    expect(placeKinds("Restaurant", [], "burger")).toEqual(["food"]);
+  });
+
+  it("keeps a category's other kind and date night beside the cuisine", () => {
+    expect(placeKinds("Museum", [], "coffee")).toEqual([
+      "coffee",
+      "activities",
+    ]);
+    expect(placeKinds("Restaurant", ["date night"], "wine")).toEqual([
+      "drinks",
+      "dateNight",
+    ]);
+  });
+});
+
+describe("mergeVenueKinds", () => {
+  type Venue = { cuisine?: Cuisine; kinds: PlaceKind[] };
+  const plain: Venue = { kinds: ["food"] };
+  const burger: Venue = { cuisine: "burger", kinds: ["food"] };
+  const pizza: Venue = { cuisine: "pizza", kinds: ["food"] };
+
+  it("keeps the kept pin's cuisine over a repeat's", () => {
+    expect(mergeVenueKinds(burger, pizza).cuisine).toBe("burger");
+    expect(mergeVenueKinds(pizza, burger).cuisine).toBe("pizza");
+  });
+
+  it("takes a repeat's cuisine only when the kept pin has none", () => {
+    expect(mergeVenueKinds(plain, burger).cuisine).toBe("burger");
+    expect(mergeVenueKinds(burger, plain).cuisine).toBe("burger");
   });
 });

@@ -52,7 +52,10 @@ It is a new optional field, so it stays declared `v.optional` on rollback once r
 already copies `city`, `appleId` and `category`. The match is by name only, since `placeCuisines`
 carries no Apple id or point: both sides go through `placeKey`, and when one save names two places
 with the same key the first `placeCuisines` entry wins. A renamed place matches nothing and keeps no
-cuisine; edits drop `placeCuisines` anyway (section 2). The pin validators gain an optional `cuisine`, which
+cuisine; edits drop `placeCuisines` anyway (section 2). Every pin write sets the cuisine of every pin
+from the save's current `placeCuisines`, kept pins included (`keepPins` and edited saves), and takes it
+off a pin the save no longer gives one; no pin moves. `placePins:backfillPage` repairs pins whose
+cuisines differ from their save's by patching them directly, with no Apple Maps call. The pin validators gain an optional `cuisine`, which
 installed apps ignore. This counts as a public return change: the commit needs the
 `Convex-Api: changed` trailer.
 
