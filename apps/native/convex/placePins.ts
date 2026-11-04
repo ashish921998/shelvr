@@ -77,6 +77,17 @@ function withCuisine(
   return cuisine ? { ...rest, cuisine } : rest;
 }
 
+function withCuisines(item: Doc<"items">, pins: Pin[]): Pin[] {
+  const cuisines = cuisinesByPlace(item);
+  return pins.map((pin) => withCuisine(pin, cuisines, item.cities));
+}
+
+function sameCuisines(a: Pin[], b: Pin[]): boolean {
+  return (
+    a.length === b.length && a.every((pin, i) => pin.cuisine === b[i].cuisine)
+  );
+}
+
 /** Source cities establish the scope; lookup results cannot bypass outlier rejection. */
 function lookupCity(cities: string[]): string | undefined {
   return cities.length === 1 ? cities[0] : undefined;
@@ -269,7 +280,7 @@ async function addPinsBesideOwnerPins(
   wanted: Map<string, string>,
   found: Pin[],
 ): Promise<void> {
-  const ownerPins = item.placePins ?? [];
+  const ownerPins = withCuisines(item, item.placePins ?? []);
   const pinned = new Set(
     ownerPins.map((pin) => savedPlaceKey(pin.name, item.cities)),
   );
@@ -287,8 +298,9 @@ async function addPinsBesideOwnerPins(
     lookupCity(item.cities ?? []),
   );
   const added = fresh.filter((pin) => near.includes(pin));
-  if (added.length === 0) return;
   const placePins = [...ownerPins, ...added].slice(0, MAX_PINS);
+  if (added.length === 0 && sameCuisines(ownerPins, item.placePins ?? []))
+    return;
   await ctx.db.patch(item._id, {
     placePins,
     searchText: buildSearchText({ ...item, placePins }),
@@ -560,6 +572,10 @@ export const backfillPage = internalMutation({
     const todo: { itemId: Id<"items">; refresh?: true }[] = [];
     for (const item of page) {
       if (item.status !== "ready") continue;
+      const pins = item.placePins ?? [];
+      const cuisined = withCuisines(item, pins);
+      if (!sameCuisines(cuisined, pins) && (await aiAllowed(ctx, item.userId)))
+        await ctx.db.patch(item._id, { placePins: cuisined });
       const named =
         mapsNames(item.intents).length > 0 || (item.places?.length ?? 0) > 0;
       // A pin without a category predates the Map tab's filters.

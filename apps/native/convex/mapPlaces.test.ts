@@ -12,7 +12,7 @@ type Pin = {
   city?: string;
   appleId?: string;
   category?: string;
-  cuisine?: "coffee";
+  cuisine?: "coffee" | "burger";
 };
 
 async function setup() {
@@ -171,6 +171,17 @@ describe("listMapPlaces", () => {
     );
     expect(await t.query(api.mapPlaces.listMapPlaces, {})).toMatchObject([
       { name: "Lucy's", cuisine: "coffee", kinds: ["coffee"] },
+    ]);
+  });
+
+  it("fills a venue's cuisine from the newest older save that has one, with every save's kinds", async () => {
+    const { t, save, userId } = await setup();
+    const pin = { name: "Lucy's", lat: 30.26, lng: -97.74 };
+    await save(userId, [{ ...pin, cuisine: "burger" }]);
+    await save(userId, [{ ...pin, cuisine: "coffee" }]);
+    const newest = await save(userId, [pin]);
+    expect(await t.query(api.mapPlaces.listMapPlaces, {})).toMatchObject([
+      { itemId: newest, cuisine: "coffee", kinds: ["food", "coffee"] },
     ]);
   });
 });

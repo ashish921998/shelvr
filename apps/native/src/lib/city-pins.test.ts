@@ -317,6 +317,7 @@ describe("cuisine", () => {
       itemId: "newer",
       cuisine: "burger",
       emoji: "🍔",
+      kinds: ["food"],
     });
   });
 
@@ -324,12 +325,13 @@ describe("cuisine", () => {
     const pin = { name: "Lucy's", lat: 29.75, lng: -95.36 };
     const [merged] = cityPins([
       { _id: "newer", placePins: [{ ...pin, cuisine: "tacos" as const }] },
-      { _id: "older", placePins: [{ ...pin, cuisine: "burger" as const }] },
+      { _id: "older", placePins: [{ ...pin, cuisine: "coffee" as const }] },
     ]);
     expect(merged).toMatchObject({
       itemId: "newer",
       cuisine: "tacos",
       emoji: "🌮",
+      kinds: ["food", "coffee"],
     });
   });
 });
