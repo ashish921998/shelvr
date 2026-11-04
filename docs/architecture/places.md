@@ -1,6 +1,6 @@
 # Place emoji and cuisine
 
-Status: proposal, not built. Replaces an earlier draft that added shared `places`, `userPlaces` and
+Status: PR 0 shipped in #695; PRs 1 and 2 in review. Replaces an earlier draft that added shared `places`, `userPlaces` and
 `userPlaceSources` tables. A Codex review on 2026-11-04 rejected that draft; why is under "The larger
 design, and why not now".
 
@@ -22,7 +22,7 @@ next to the pins it describes.
 ### 1. The model names each place's kind
 
 The extraction schema in `ai.ts` already returns `places` (names) and `placeLocations` (name and
-location clue). Add an optional `placeKinds` list of `{ name, cuisine? }`, one per place, in the same
+location clue). Add an optional `placeCuisines` list of `{ name, cuisine }`, one per place, in the same
 call. `cuisine` is one value of a closed enum that PR 1 defines in `convex/model/placeKinds.ts`, with
 one entry for each emoji `NAME_WORDS` in `src/lib/map-pin-emoji.ts` can give (burger, pizza, tacos,
 sushi, noodles, dumplings, bbq, steak, seafood, curry, pasta, donuts, ice cream, bakery, bagels,
@@ -31,25 +31,26 @@ writes an emoji; code derives it from `cuisine`, and nothing stores one.
 
 ### 2. The save stores it
 
-`items.placeKinds`, an optional array, written by `finalizeItem` from the run's classification under
+`items.placeCuisines`, an optional array, written by `finalizeItem` from the run's classification under
 the same rules as `places` (`model/settlement.ts`):
 
 - Not written when AI is declined.
 - Cleared with `places` when a re-read changes them.
 - Dropped when the person edits the save's places (`placesEdited`). An edited place list has no
   stable identity to match a name-keyed kind against (a renamed or replaced place would keep the old
-  cuisine), so the save loses `placeKinds` and its pins fall back to the name and Apple's category
-  until a later re-read writes them again.
+  cuisine), so the save loses `placeCuisines` for good (a re-read keeps the person's places and writes
+  none) and its pins fall back to the name and Apple's category.
 
+Public item reads strip it, as they strip `placeLocations`, so no public return changes in PR 1.
 It is a new optional field, so it stays declared `v.optional` on rollback once rows carry it.
 
 ### 3. Pins carry it
 
-`placePins.storePins` copies `cuisine` onto each pin whose name matches a `placeKinds` entry, as it
-already copies `city`, `appleId` and `category`. The match is by name only, since `placeKinds`
+`placePins.storePins` copies `cuisine` onto each pin whose name matches a `placeCuisines` entry, as it
+already copies `city`, `appleId` and `category`. The match is by name only, since `placeCuisines`
 carries no Apple id or point: both sides go through `placeKey`, and when one save names two places
-with the same key the first `placeKinds` entry wins. A renamed place matches nothing and keeps no
-cuisine; edits drop `placeKinds` anyway (section 2). The pin validators gain an optional `cuisine`, which
+with the same key the first `placeCuisines` entry wins. A renamed place matches nothing and keeps no
+cuisine; edits drop `placeCuisines` anyway (section 2). The pin validators gain an optional `cuisine`, which
 installed apps ignore. This counts as a public return change: the commit needs the
 `Convex-Api: changed` trailer.
 
@@ -75,8 +76,8 @@ extends with the same rule it has for `category`: the kept pin's `cuisine` wins,
 
 ### Old saves
 
-A paginated internal `items:backfillPlaceKinds` can re-run extraction for ready saves that have
-places but no `placeKinds`, only where `aiAllowed` passes for the save and its owner. It checks before
+A paginated internal `items:backfillPlaceCuisines` can re-run extraction for ready saves that have
+places but no `placeCuisines`, only where `aiAllowed` passes for the save and its owner. It checks before
 scheduling each save and again in the action right before the model call, so a save kept AI-free on
 purpose is never sent to the model. A save that is deleted, or whose owner is gone or `deleting`
 (`liveOwner`), is skipped. It costs a model call per save, so run it only after the new field has
@@ -84,12 +85,12 @@ proved its worth on new saves. Until then old saves fall back to name matching a
 
 ## Rollout
 
-| PR  | Change                                                                                                                     |
-| --- | -------------------------------------------------------------------------------------------------------------------------- |
-| 0   | Name matching in `placeEmoji`. Client only                                                                                 |
-| 1   | `placeKinds` in the extraction schema, `items.placeKinds`, settlement rules, tests against `testdata/settlement/rows.json` |
-| 2   | `cuisine` on pins in `storePins`, the optional validator field, the client reading it. Deploy the backend first            |
-| 3   | Optional backfill, run by hand                                                                                             |
+| PR  | Change                                                                                                          |
+| --- | --------------------------------------------------------------------------------------------------------------- |
+| 0   | Name matching in `placeEmoji`. Client only                                                                      |
+| 1   | `placeCuisines` in the extraction schema, `items.placeCuisines`, settlement rules and their tests               |
+| 2   | `cuisine` on pins in `storePins`, the optional validator field, the client reading it. Deploy the backend first |
+| 3   | Optional backfill, run by hand                                                                                  |
 
 ## The larger design, and why not now
 

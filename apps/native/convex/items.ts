@@ -65,6 +65,7 @@ import {
   MAX_NOTE_TEXT_CHARS,
   normalizeCities,
   normalizePlaces,
+  placeCuisinesValidator,
   placeLocationsValidator,
   placePinsValidator,
   postMediaValidator,
@@ -244,6 +245,7 @@ function stripEmbedding(
   | "places"
   | "placesHeard"
   | "placeLocations"
+  | "placeCuisines"
   | "placesEdited"
 > {
   const {
@@ -251,6 +253,7 @@ function stripEmbedding(
     places: _places,
     placesHeard: _placesHeard,
     placeLocations: _placeLocations,
+    placeCuisines: _placeCuisines,
     embedding: _embedding,
     embeddingVersion: _version,
     embeddingAttempts: _attempts,
@@ -2122,18 +2125,20 @@ export const getItemInternal = internalQuery({
       places: v.optional(v.array(v.string())),
       placesHeard: v.optional(v.boolean()),
       placeLocations: v.optional(placeLocationsValidator),
+      placeCuisines: v.optional(placeCuisinesValidator),
     }),
     v.null(),
   ),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     if (item === null) return null;
-    const { places, placesHeard, placeLocations } = item;
+    const { places, placesHeard, placeLocations, placeCuisines } = item;
     return {
       ...stripEmbedding(item),
       ...(places ? { places } : {}),
       ...(placesHeard !== undefined ? { placesHeard } : {}),
       ...(placeLocations !== undefined ? { placeLocations } : {}),
+      ...(placeCuisines !== undefined ? { placeCuisines } : {}),
     };
   },
 });

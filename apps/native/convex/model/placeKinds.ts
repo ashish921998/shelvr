@@ -16,6 +16,36 @@ export const PLACE_KINDS = [
 
 export type PlaceKind = (typeof PLACE_KINDS)[number];
 
+export const CUISINES = [
+  "burger",
+  "pizza",
+  "tacos",
+  "sushi",
+  "noodles",
+  "dumplings",
+  "bbq",
+  "steak",
+  "seafood",
+  "curry",
+  "pasta",
+  "donuts",
+  "ice cream",
+  "bakery",
+  "bagels",
+  "dessert",
+  "coffee",
+  "tea",
+  "beer",
+  "wine",
+  "cocktails",
+  "brunch",
+  "sandwiches",
+  "salad",
+  "chicken",
+] as const;
+
+export type Cuisine = (typeof CUISINES)[number];
+
 type CategoryKind = Exclude<PlaceKind, "dateNight">;
 
 const CATEGORY_KINDS: Record<string, CategoryKind> = {
