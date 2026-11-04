@@ -307,7 +307,7 @@ describe("cuisine", () => {
     });
   });
 
-  it("keeps the newer save's cuisine for a venue two saves share", () => {
+  it("fills a venue's cuisine from an older save when the newer has none", () => {
     const pin = { name: "Lucy's", lat: 29.75, lng: -95.36 };
     const [merged] = cityPins([
       { _id: "newer", placePins: [pin] },
@@ -317,6 +317,19 @@ describe("cuisine", () => {
       itemId: "newer",
       cuisine: "burger",
       emoji: "🍔",
+    });
+  });
+
+  it("keeps the newer save's cuisine when two saves disagree", () => {
+    const pin = { name: "Lucy's", lat: 29.75, lng: -95.36 };
+    const [merged] = cityPins([
+      { _id: "newer", placePins: [{ ...pin, cuisine: "tacos" as const }] },
+      { _id: "older", placePins: [{ ...pin, cuisine: "burger" as const }] },
+    ]);
+    expect(merged).toMatchObject({
+      itemId: "newer",
+      cuisine: "tacos",
+      emoji: "🌮",
     });
   });
 });
