@@ -21,7 +21,7 @@ import { MAX_CITY_CHARS } from "@convex/model/trip";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
-import { Stack, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
 import {
   Alert,
@@ -90,7 +90,10 @@ export default function NewSharedListScreen() {
   const create = useMutation(api.sharedLists.createSharedList);
   const { guard, loading } = usePaywallGuard("shared_list");
   const [name, setName] = useState("");
-  const [picked, setPicked] = useState<string[]>([]);
+  const { city: cityParam } = useLocalSearchParams<{ city?: string }>();
+  const [picked, setPicked] = useState<string[]>(() =>
+    cityParam ? [cityParam.slice(0, MAX_CITY_CHARS)] : [],
+  );
   const city = useTypedCity((typed) =>
     setPicked((current) =>
       current.length >= MAX_LIST_CITIES || current.includes(typed)
@@ -114,7 +117,9 @@ export default function NewSharedListScreen() {
     setPicked((current) =>
       current.includes(city)
         ? current.filter((entry) => entry !== city)
-        : [...current, city],
+        : current.length >= MAX_LIST_CITIES
+          ? current
+          : [...current, city],
     );
 
   const submit = async () => {

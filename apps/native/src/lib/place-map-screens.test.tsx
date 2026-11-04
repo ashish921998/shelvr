@@ -177,6 +177,9 @@ vi.mock("@/components/city/plan-button", () => ({
       <button onClick={onPress}>{`plan ${kind}`}</button>
     ),
   ),
+  InviteButton: vi.fn(({ onPress }: { onPress: () => void }) => (
+    <button onClick={onPress}>invite</button>
+  )),
 }));
 vi.mock("@/components/city/place-removal", () => ({
   PlaceRemovalUndo: vi.fn(() => <span>undo bar</span>),
@@ -451,6 +454,16 @@ describe("city page", () => {
     ]);
   });
 
+  it("starts a shared list for this city from Invite", () => {
+    mocks.queries[CITY_ITEMS] = [save];
+    render(<CityScreen />);
+    fireEvent.click(screen.getByText("invite"));
+    expect(mocks.push).toHaveBeenCalledWith({
+      pathname: "/new-shared-list",
+      params: { city: "Austin" },
+    });
+  });
+
   it("with no saves shows its empty copy and no map or plans", () => {
     mocks.queries[CITY_ITEMS] = [];
     render(<CityScreen />);
@@ -460,6 +473,7 @@ describe("city page", () => {
     ).toBeTruthy();
     expect(screen.queryByTestId("map")).toBeNull();
     expect(screen.queryByText("plan date")).toBeNull();
+    expect(screen.queryByText("invite")).toBeNull();
   });
 
   it("keeps the list open and undraggable without a map", () => {

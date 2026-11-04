@@ -1,7 +1,4 @@
-import {
-  SharedListCard,
-  StartListRow,
-} from "@/components/shared-list/list-card";
+import { SharedListCard } from "@/components/shared-list/list-card";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t, useAppLocale } from "@/lib/i18n";
 import { useSharedLists } from "@/lib/shared-lists";
@@ -11,14 +8,7 @@ import { StyleSheet } from "react-native-unistyles";
 export function SharedListsSection() {
   useAppLocale();
   const lists = useSharedLists();
-  if (lists.data === undefined) return null;
-  if (lists.data.length === 0) {
-    return (
-      <View style={styles.quiet}>
-        <StartListRow />
-      </View>
-    );
-  }
+  if (!lists.data?.length) return null;
   return (
     <View style={styles.container}>
       <View style={styles.heading}>
@@ -30,7 +20,6 @@ export function SharedListsSection() {
       {lists.data.map((list) => (
         <SharedListCard key={list._id} list={list} />
       ))}
-      <StartListRow />
     </View>
   );
 }
@@ -41,7 +30,6 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.gap(2),
     paddingBottom: theme.gap(2),
   },
-  quiet: { paddingHorizontal: theme.gap(2) },
   heading: { gap: theme.gap(0.25) },
   muted: { color: theme.colors.muted },
 }));

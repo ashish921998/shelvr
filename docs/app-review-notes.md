@@ -40,7 +40,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 ## Shared lists
 
 - A shared list is one list of places that up to 8 people keep together. A person can be on 20 lists, and a list holds up to 200 places.
-- Home shows the person's lists above the Plan a date and Plan a trip tiles, or a quiet "Start a shared list" row when they have none.
+- Home shows the person's lists above the Plan a date and Plan a trip tiles. A list starts from a city page's "Invite" button, beside the city's name.
 - Starting a list needs Pro. The form takes a name and at least one city; places the owner already saved in those cities come along. "Send invite" opens the share sheet with a link to `https://shelvr-web.vercel.app/l/<token>`.
 - With Shelvr installed, the link opens the Join screen, which says "Free to join. You don’t need Pro." and has "Join list". Without the app, the web page shows the invite. A person who isn't signed in joins after sign-in, finishing onboarding first if they need to.
 - Joining, opening the list, marking a place "We went" and leaving need no Pro. While the owner has Pro, a member without it can also add places and plan a date or a trip from the list. Everywhere else they still see the plan screen.
@@ -151,7 +151,7 @@ Core review flow:
 
 Shared lists:
 
-A list holds places kept by people its owner invites, at most 8. On Home, tap "Start a shared list", enter a name and a city, then "Send invite" to get a link in the share sheet. Anyone with the link can join; joining needs a second account, the list works with one. Members see the list's name, its places and each other's first names. The owner can "Remove" a member, which also stops the old link. Anyone can "Leave list".
+A list holds places kept by people its owner invites, at most 8. Open a city from Home, tap "Invite", enter a name, then "Send invite" to get a link in the share sheet. Anyone with the link can join; joining needs a second account, the list works with one. Members see the list's name, its places and each other's first names. The owner can "Remove" a member, which also stops the old link. Anyone can "Leave list".
 
 Share extension, Siri and widget:
 

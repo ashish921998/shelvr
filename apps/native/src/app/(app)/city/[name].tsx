@@ -1,5 +1,5 @@
 import { PlaceMapScreen } from "@/components/city/place-map-screen";
-import { PlanButton } from "@/components/city/plan-button";
+import { InviteButton, PlanButton } from "@/components/city/plan-button";
 import { SaveRow } from "@/components/city/save-row";
 import { PlaceRemovalUndo } from "@/components/city/place-removal";
 import { EmptyState } from "@/components/empty-state";
@@ -72,9 +72,22 @@ export default function CityScreen() {
       }}
       header={
         <View style={styles.header}>
-          <Text style={styles.name} numberOfLines={2}>
-            {city}
-          </Text>
+          <View style={styles.titleRow}>
+            <Text style={styles.name} numberOfLines={2}>
+              {city}
+            </Text>
+            {count > 0 ? (
+              <InviteButton
+                disabled={busy !== null}
+                onPress={() =>
+                  router.push({
+                    pathname: "/new-shared-list",
+                    params: { city },
+                  })
+                }
+              />
+            ) : null}
+          </View>
           {pins.length > 0 ? (
             <Text style={styles.count}>
               {t("cityMap.placesFromSaves", { count: pins.length })}
@@ -157,7 +170,12 @@ const styles = StyleSheet.create((theme) => ({
     paddingTop: theme.gap(1),
     paddingBottom: theme.gap(1.5),
   },
-  name: { ...theme.type.largeTitle, color: theme.colors.foreground },
+  titleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1.5),
+  },
+  name: { ...theme.type.largeTitle, color: theme.colors.foreground, flex: 1 },
   count: { ...theme.type.footnote, color: theme.colors.muted },
   empty: { gap: theme.gap(0.5), paddingTop: theme.gap(0.5) },
   emptyTitle: { ...theme.type.headline, color: theme.colors.foreground },
