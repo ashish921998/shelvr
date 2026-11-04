@@ -35,6 +35,7 @@ function baseImage(selected: boolean): Promise<SkImage> {
   let base = bases.get(selected);
   if (!base) {
     base = decodeBase(selected);
+    base.catch(() => bases.delete(selected));
     bases.set(selected, base);
   }
   return base;
@@ -74,6 +75,7 @@ function bubbleImage(key: string): Promise<ImageRef | null> {
   if (!image) {
     image = renderBubble(parseBubbleKey(key)).catch((error: unknown) => {
       analytics.captureError("map_marker_bubble_failed", error);
+      rendered.delete(key);
       return null;
     });
     rendered.set(key, image);
