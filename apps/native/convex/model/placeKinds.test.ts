@@ -78,7 +78,17 @@ describe("placeKinds", () => {
     expect(placeKinds(undefined, ["food"], "cocktails")).toEqual(["drinks"]);
     expect(placeKinds("Bakery", [], "ice cream")).toEqual(["dessert"]);
     expect(placeKinds("Restaurant", ["coffee"], "tacos")).toEqual(["food"]);
-    expect(placeKinds(undefined, [], "tea")).toEqual(["food"]);
+    expect(placeKinds(undefined, [], "tea")).toEqual(["coffee"]);
+    expect(placeKinds("Bakery", [], "bakery")).toEqual(["dessert"]);
+  });
+
+  it("keeps a coffee or drinks category beside a food cuisine", () => {
+    expect(placeKinds("Cafe", ["coffee"], "brunch")).toEqual([
+      "food",
+      "coffee",
+    ]);
+    expect(placeKinds("Nightlife", [], "tacos")).toEqual(["food", "drinks"]);
+    expect(placeKinds("Restaurant", [], "burger")).toEqual(["food"]);
   });
 
   it("keeps a category's other kind and date night beside the cuisine", () => {

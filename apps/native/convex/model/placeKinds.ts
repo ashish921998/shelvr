@@ -211,6 +211,8 @@ function tagged(tags: ReadonlySet<string>, words: readonly string[]): boolean {
 
 const CUISINE_KINDS: Partial<Record<Cuisine, CategoryKind>> = {
   coffee: "coffee",
+  tea: "coffee",
+  bakery: "dessert",
   cocktails: "drinks",
   wine: "drinks",
   beer: "drinks",
@@ -235,9 +237,12 @@ export function placeKinds(
   const kinds = new Set<PlaceKind>();
   const fromCategory = category ? CATEGORY_KINDS[category] : undefined;
   if (cuisine) {
-    kinds.add(CUISINE_KINDS[cuisine] ?? "food");
-    if (fromCategory && !FOOD_AND_DRINK_KINDS.has(fromCategory))
-      kinds.add(fromCategory);
+    const fromCuisine = CUISINE_KINDS[cuisine] ?? "food";
+    kinds.add(fromCuisine);
+    const categoryAdds =
+      !FOOD_AND_DRINK_KINDS.has(fromCategory ?? "food") ||
+      (fromCuisine === "food" && fromCategory !== "food");
+    if (fromCategory && categoryAdds) kinds.add(fromCategory);
   } else {
     if (fromCategory) kinds.add(fromCategory);
     for (const kind of tagKinds(category, tags)) kinds.add(kind);
