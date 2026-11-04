@@ -88,6 +88,22 @@ describe("cityPins", () => {
       ]),
     ).toEqual([{ ...pin, itemId: "newer", kinds: [], number: 1 }]);
   });
+  it("keeps every kind and the first category across a venue's saves", () => {
+    const pin = { name: "Micho", lat: 48.8660723, lng: 2.3371738 };
+    const [merged] = cityPins([
+      { _id: "newer", tags: ["dinner"], placePins: [pin] },
+      {
+        _id: "older",
+        tags: ["date night"],
+        placePins: [{ ...pin, category: "Nightlife" }],
+      },
+    ]);
+    expect(merged.itemId).toBe("newer");
+    expect(merged.category).toBe("Nightlife");
+    expect(merged.kinds).toContain("dateNight");
+    expect(merged.emoji).toBe("🍸");
+  });
+
   it("shows a place once when two lookups land it a few doors apart", () => {
     expect(
       cityPins([

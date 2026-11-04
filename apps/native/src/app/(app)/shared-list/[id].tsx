@@ -275,7 +275,7 @@ function SharedList({ detail }: { detail: SharedListDetail }) {
           ) : (
             <ListPlaceRow
               place={item.row.place}
-              number={item.row.pin.number}
+              emoji={item.row.pin.emoji ?? "📍"}
               selected={selected === item.id}
               onPress={() =>
                 selected === item.id ? open(item.row) : select(item.id)

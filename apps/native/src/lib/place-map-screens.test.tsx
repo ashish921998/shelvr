@@ -194,7 +194,7 @@ function rowFake({
   onVisited,
 }: {
   name: string;
-  number?: number;
+  number?: number | string;
   selected?: boolean;
   onPress: () => void;
   onPlaceDetails?: () => void;
@@ -231,8 +231,15 @@ vi.mock("@/components/city/save-row", () => ({
 }));
 vi.mock("@/components/shared-list/list-place-row", () => ({
   ListPlaceRow: vi.fn(
-    ({ place, ...rest }: { place: { name: string }; onPress: () => void }) =>
-      rowFake({ name: place.name, ...rest }),
+    ({
+      place,
+      emoji,
+      ...rest
+    }: {
+      place: { name: string };
+      emoji: string;
+      onPress: () => void;
+    }) => rowFake({ name: place.name, number: emoji, ...rest }),
   ),
 }));
 vi.mock("@/components/shared-list/name-sheet", () => ({
@@ -670,11 +677,11 @@ describe("list page", () => {
     });
     render(<SharedListScreen />);
     expect(screen.queryByText(/Dallas Deli$/)).toBeNull();
-    fireEvent.click(screen.getByText("1 Taco Spot"));
+    fireEvent.click(screen.getByText("🌮 Taco Spot"));
     expect(screen.getByTestId("map").dataset.selected).toBeTruthy();
     fireEvent.click(screen.getByText("chip Dallas"));
-    expect(screen.getByText("1 Dallas Deli")).toBeTruthy();
-    expect(screen.queryByText("1 Taco Spot")).toBeNull();
+    expect(screen.getByText("🥪 Dallas Deli")).toBeTruthy();
+    expect(screen.queryByText("🌮 Taco Spot")).toBeNull();
     expect(screen.getByTestId("map").dataset.selected).toBe("");
     expect(screen.getByText("footer Dallas")).toBeTruthy();
   });
@@ -749,9 +756,9 @@ describe("list page", () => {
       placeCount: 1,
     });
     render(<SharedListScreen />);
-    fireEvent.click(screen.getByText("1 Taco Spot"));
+    fireEvent.click(screen.getByText("🌮 Taco Spot"));
     expect(mocks.push).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText("1 Taco Spot"));
+    fireEvent.click(screen.getByText("🌮 Taco Spot"));
     expect(mocks.push).toHaveBeenCalledWith({
       pathname: "/item/[id]",
       params: { id: "item-9" },
@@ -786,9 +793,9 @@ describe("list page", () => {
     mocks.openUrl.mockRejectedValue(failure);
     mocks.queries[LIST] = listDetail();
     render(<SharedListScreen />);
-    fireEvent.click(screen.getByText("1 Taco Spot"));
+    fireEvent.click(screen.getByText("🌮 Taco Spot"));
     await act(async () => {
-      fireEvent.click(screen.getByText("1 Taco Spot"));
+      fireEvent.click(screen.getByText("🌮 Taco Spot"));
     });
     expect(mocks.capture).toHaveBeenCalledWith("shared_list_place_opened", {
       action: "maps",
@@ -819,7 +826,7 @@ describe("list page", () => {
   it("marks a place visited, and removing one clears the selection", async () => {
     mocks.queries[LIST] = listDetail();
     render(<SharedListScreen />);
-    fireEvent.click(screen.getByText("1 Taco Spot"));
+    fireEvent.click(screen.getByText("🌮 Taco Spot"));
     await act(async () => {
       fireEvent.click(screen.getByText("went Taco Spot"));
     });
