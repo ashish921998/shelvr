@@ -505,14 +505,14 @@ describe("city page", () => {
   it("selects with a tick, then a second tap opens the save", () => {
     mocks.queries[CITY_ITEMS] = [save];
     render(<CityScreen />);
-    fireEvent.click(screen.getByText("1 Taco Spot"));
+    fireEvent.click(screen.getByText("🌮 Taco Spot"));
     expect(mocks.selection).toHaveBeenCalledTimes(1);
     expect(mocks.scrollToIndex).toHaveBeenCalledWith({
       index: 0,
       viewPosition: 0.3,
     });
     expect(mocks.push).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText("1 Taco Spot"));
+    fireEvent.click(screen.getByText("🌮 Taco Spot"));
     expect(mocks.push).toHaveBeenCalledWith({
       pathname: "/item/[id]",
       params: { id: "item-1" },
@@ -571,7 +571,7 @@ describe("city page", () => {
   it("clears the selection when a place is removed", () => {
     mocks.queries[CITY_ITEMS] = [save];
     render(<CityScreen />);
-    fireEvent.click(screen.getByText("1 Taco Spot"));
+    fireEvent.click(screen.getByText("🌮 Taco Spot"));
     fireEvent.click(screen.getByText("remove Taco Spot"));
     expect(screen.getByTestId("map").dataset.selected).toBe("");
     expect(mocks.remove).toHaveBeenCalledWith(

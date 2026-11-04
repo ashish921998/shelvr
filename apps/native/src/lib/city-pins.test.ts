@@ -86,7 +86,7 @@ describe("cityPins", () => {
         { _id: "newer", placePins: [pin] },
         { _id: "older", placePins: [pin] },
       ]),
-    ).toEqual([{ ...pin, itemId: "newer", number: 1 }]);
+    ).toEqual([{ ...pin, itemId: "newer", kinds: [], number: 1 }]);
   });
   it("shows a place once when two lookups land it a few doors apart", () => {
     expect(
@@ -204,7 +204,14 @@ describe("cityPins", () => {
       { _id: "b" },
     ];
     expect(cityPins(saves)).toEqual([
-      { itemId: "a", name: "Time Out Market", lat: 38.7, lng: -9.1, number: 1 },
+      {
+        itemId: "a",
+        name: "Time Out Market",
+        lat: 38.7,
+        lng: -9.1,
+        kinds: [],
+        number: 1,
+      },
     ]);
   });
 });

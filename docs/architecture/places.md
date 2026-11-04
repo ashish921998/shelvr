@@ -1,0 +1,111 @@
+# Place emoji and cuisine
+
+Status: proposal, not built. Replaces an earlier draft that added shared `places`, `userPlaces` and
+`userPlaceSources` tables. A Codex review on 2026-11-04 rejected that draft; why is under "The larger
+design, and why not now".
+
+## Goal
+
+The city map and the Map tab show each place as an emoji, with filter chips by kind. Today the emoji
+comes from Apple's category, then the save's tags (`src/lib/map-pin-emoji.ts`). In Austin nearly
+every pin is 🍽️, because Apple calls them all `Restaurant` and a save's tags describe the whole reel,
+not each place. A burger bar should be 🍔, a taco truck 🌮, a coffee shop ☕.
+
+That needs one fact per place: what kind of food or drink it serves.
+
+## Design
+
+Keep everything about places where it is: pins on the save, visits in `placeVisits`, removals in
+`placeRemovals`, copies in `sharedListPlaces` and `tripStops`. Add the per-place kind to the save,
+next to the pins it describes.
+
+### 1. The model names each place's kind
+
+The extraction schema in `ai.ts` already returns `places` (names) and `placeLocations` (name and
+location clue). Add an optional `placeKinds` list of `{ name, cuisine?, emoji? }`, one per place, in
+the same call. `cuisine` is one value from a fixed list (burger, pizza, tacos, sushi, ramen, coffee,
+bakery, dessert, ice cream, cocktails, wine, beer, and so on), and `emoji` is derived from it in code,
+not written by the model. A free-form emoji from the model is not stored.
+
+### 2. The save stores it
+
+`items.placeKinds`, an optional array, written by `finalizeItem` from the run's classification under
+the same rules as `places` (`model/settlement.ts`):
+
+- Not written when AI is declined.
+- Cleared with `places` when a re-read changes them.
+- Kept when the person edits the save's places (`placesEdited`), for the places that remain.
+
+It is a new optional field, so it stays declared `v.optional` on rollback once rows carry it.
+
+### 3. Pins carry it
+
+`placePins.storePins` copies `cuisine` onto each pin whose name matches a `placeKinds` entry, as it
+already copies `city`, `appleId` and `category`. The pin validators gain an optional `cuisine`, which
+installed apps ignore. This counts as a public return change: the commit needs the
+`Convex-Api: changed` trailer.
+
+### 4. The phone picks the emoji
+
+`placeEmoji` in `src/lib/map-pin-emoji.ts` tries, in order: the pin's `cuisine`, Apple's category,
+then the save's tags. `placeKinds` in `convex/model/placeKinds.ts` maps a cuisine to a filter kind
+(coffee to `coffee`, cocktails to `drinks`), so the chips get more precise too.
+
+### Before any backend work
+
+Matching the place name on the phone ("Burger", "Taco", "Coffee", "Pizza", "Bakery" in the name)
+fixes many pins with no backend change and no deploy. It works for old saves too. It is worth
+shipping first, and stays as the step after `cuisine` and before Apple's category.
+
+### Old saves
+
+A paginated internal `items:backfillPlaceKinds` can re-run extraction for ready saves that have
+places but no `placeKinds`. It costs a model call per save, so run it only after the new field has
+proved its worth on new saves. Until then old saves fall back to name matching and Apple's category.
+
+## Rollout
+
+| PR  | Change                                                                                                                     |
+| --- | -------------------------------------------------------------------------------------------------------------------------- |
+| 0   | Name matching in `placeEmoji`. Client only                                                                                 |
+| 1   | `placeKinds` in the extraction schema, `items.placeKinds`, settlement rules, tests against `testdata/settlement/rows.json` |
+| 2   | `cuisine` on pins in `storePins`, the optional validator field, the client reading it. Deploy the backend first            |
+| 3   | Optional backfill, run by hand                                                                                             |
+
+## The larger design, and why not now
+
+The rejected draft made a shared catalog of places, one per Apple id, and one row per person per place
+holding their city, visits and removals. Codex found these problems in it, checked against the code:
+
+1. **The catalog would not be free of personal data.** Pin names are the source's own words, not
+   Apple's (`placePins.ts:391`). List pins keep the list's coordinates. Place editing accepts names,
+   points and Apple ids from the client (`placeCorrections.ts:73`). The Apple lookup also accepts
+   street addresses (`model/appleMaps.ts:183`). Refreshing a shared row from any of these would let
+   one person's input change another person's place.
+2. **One city per person per place is wrong.** The same venue can sit under Lisbon in one save and
+   Belém in another, and a multi-city save can leave a pin with no city (`placePins.ts:70`).
+3. **One `removedAt` loses today's removal rules.** A removal matches by Apple id, or by name within
+   300 m unless the Apple ids differ (`model/placeRemovals.ts:22`). A newer save shows the place
+   again while the older one stays hidden (`placeRemovals.test.ts:271`).
+4. **Unmatched places had no safe identity.** Two "Central Cafe"s in one account would merge. One that
+   later gained an Apple id would become a second row, leaving its visit behind.
+5. **The rollout had two sources of truth.** Readers would switch before every write (We went, Remove,
+   Undo, corrections) wrote both places.
+6. **A popular place's row would be written by every save that names it.** That causes write conflicts
+   across unrelated people's saves.
+7. **The first model guess would become everyone's.** One misleading caption could label a steakhouse
+   as sushi for every later user.
+8. **Account deletion** would need a `liveOwner` check inside every write, so a late write cannot
+   recreate rows after the drain.
+
+A shared catalog is worth revisiting only if cross-user reuse becomes a product feature (for example
+skipping the Apple lookup or showing what others saved). It would then admit only Apple-verified
+public places, keep a person's own names, points and cities on their own rows, and keep the existing
+visit and removal tables.
+
+## Open question
+
+Apple's developer agreement (Schedule 6) is reported to allow keeping Maps data only temporarily, and
+Apple engineers have declined to interpret it on the developer forums
+([thread](https://developer.apple.com/forums/thread/708672)). This design stores no more Apple data
+than today: `cuisine` comes from the model, not from Apple.

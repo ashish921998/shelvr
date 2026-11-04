@@ -33,4 +33,38 @@ describe("placeEmoji", () => {
     expect(placeEmoji({ kinds: ["dateNight"] })).toBeUndefined();
     expect(placeEmoji({ category: "Pharmacy", kinds: [] })).toBeUndefined();
   });
+
+  it("reads a food place's name when Apple only says Restaurant", () => {
+    expect(
+      placeEmoji({
+        name: "P. Terry's Burger Stand",
+        category: "Restaurant",
+        kinds: ["food"],
+      }),
+    ).toBe("🍔");
+    expect(placeEmoji({ name: "Veracruz All Natural", kinds: ["food"] })).toBe(
+      "🍽️",
+    );
+    expect(placeEmoji({ name: "Taquería Arandas", kinds: [] })).toBe("🌮");
+    expect(
+      placeEmoji({ name: "Café Luna", category: "Restaurant", kinds: [] }),
+    ).toBe("☕");
+    expect(placeEmoji({ name: "Phở Saigon", kinds: [] })).toBe("🍜");
+    expect(placeEmoji({ name: "Lick Honest Ice Creams", kinds: [] })).toBe(
+      "🍨",
+    );
+  });
+
+  it("keeps a specific category over the name", () => {
+    expect(
+      placeEmoji({ name: "Pizza Museum", category: "Museum", kinds: [] }),
+    ).toBe("🏛️");
+  });
+
+  it("matches whole words only", () => {
+    expect(placeEmoji({ name: "Teatro", kinds: [] })).toBeUndefined();
+    expect(
+      placeEmoji({ name: "Grillhaus", category: "Restaurant", kinds: [] }),
+    ).toBe("🍽️");
+  });
 });

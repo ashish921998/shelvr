@@ -21,7 +21,7 @@ type Props = {
   item: SaveRowItem;
   placeName?: string;
   /** The matching map number when this row represents a located place. */
-  number?: number;
+  number?: number | string;
   selected?: boolean;
   /** Replaces opening the save, so the city page can select its pin first. */
   onPress?: () => void;
@@ -62,8 +62,18 @@ export function SaveRow({
         style={({ pressed }) => [styles.body, pressed && styles.pressed]}
       >
         {number !== undefined ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{number}</Text>
+          <View
+            style={typeof number === "string" ? styles.bubble : styles.badge}
+          >
+            <Text
+              style={
+                typeof number === "string"
+                  ? styles.bubbleText
+                  : styles.badgeText
+              }
+            >
+              {number}
+            </Text>
           </View>
         ) : null}
         {!placeName ? (
@@ -155,6 +165,16 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.primary,
   },
   badgeText: { ...theme.type.badge, color: theme.colors.onTint },
+  bubble: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.surface,
+    boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
+  },
+  bubbleText: { fontSize: 20 },
   thumb: {
     width: 56,
     height: 56,
