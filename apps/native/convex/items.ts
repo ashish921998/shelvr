@@ -37,6 +37,8 @@ import {
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
 import { takeWithinBytes } from "./model/readBudget";
+import { placeKey } from "./model/plan";
+import { visitedPlaceKeys } from "./model/placeVisits";
 import {
   cityKey,
   countCities,
@@ -418,17 +420,16 @@ export const listCities = authedQuery({
       city: v.string(),
       count: v.number(),
       placeCount: v.optional(v.number()),
+      visitedCount: v.optional(v.number()),
       cover: v.union(v.string(), v.null()),
     }),
   ),
   handler: async (ctx) => {
     const items = await readySavesNewestFirst(ctx, ctx.userId);
+    const visited = await visitedPlaceKeys(ctx, ctx.userId);
     const cities = countCities(items)
-      .map(({ city, count }) => ({
-        city,
-        // Older installed clients use count as the number of saves.
-        count,
-        placeCount: uniquePlacePins(
+      .map(({ city, count }) => {
+        const pins = uniquePlacePins(
           items
             .filter((item) =>
               (item.cities ?? []).some(
@@ -437,8 +438,18 @@ export const listCities = authedQuery({
             )
             .slice(0, CITY_ITEMS_MAX)
             .flatMap((item) => pinsForCity(item, city)),
-        ).length,
-      }))
+        );
+        const visitedCount = pins.filter((pin) =>
+          visited.has(placeKey(pin.name)),
+        ).length;
+        return {
+          city,
+          // Older installed clients use count as the number of saves.
+          count,
+          placeCount: pins.length,
+          ...(visitedCount > 0 ? { visitedCount } : {}),
+        };
+      })
       .sort(
         (a, b) => b.placeCount - a.placeCount || (a.city < b.city ? -1 : 1),
       );

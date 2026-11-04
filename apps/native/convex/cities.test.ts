@@ -74,6 +74,39 @@ describe("listCities", () => {
       { city: "Paris", count: 3, placeCount: 5, cover: null },
     ]);
   });
+  it("counts the city's places marked We went", async () => {
+    const { base, t, save, userId } = await setup();
+    const itemId = await save(userId, {
+      title: "Three spots",
+      cities: ["Paris"],
+      placePins: ["Café Kitsuné", "Blend", "Micho"].map((name, i) => ({
+        name,
+        lat: 48.86 + i / 1000,
+        lng: 2.35,
+      })),
+    });
+    await save(userId, { title: "Porto", cities: ["Porto"] });
+    await base.run(async (ctx) => {
+      for (const [key, name] of [
+        ["cafekitsune", "Café Kitsuné"],
+        ["blend", "Blend"],
+        ["elsewhere", "Elsewhere"],
+      ]) {
+        await ctx.db.insert("placeVisits", {
+          userId,
+          key,
+          name,
+          itemId,
+          visitedAt: 1,
+        });
+      }
+    });
+    expect(await t.query(api.items.listCities, {})).toEqual([
+      { city: "Paris", count: 1, placeCount: 3, visitedCount: 2, cover: null },
+      { city: "Porto", count: 1, placeCount: 1, cover: null },
+    ]);
+  });
+
   it("groups spellings, orders by count then name, and picks the newest cover", async () => {
     const { t, save, userId, otherId } = await setup();
     await save(userId, {

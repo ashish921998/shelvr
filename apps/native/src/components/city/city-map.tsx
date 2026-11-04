@@ -6,6 +6,7 @@ import {
   framedPins,
   type CityPin,
 } from "@/lib/city-pins";
+import { isVisited } from "@/lib/city-progress";
 import { moveCamera, sameCamera } from "@/lib/map-camera";
 import { fitCamera } from "@/lib/trip";
 import { useImage } from "expo-image";
@@ -23,6 +24,7 @@ type Props = {
   coveredBottom: number;
   onSelect: (id: string) => void;
   visible?: number;
+  visited?: ReadonlySet<string>;
 };
 
 export function CityMap({
@@ -32,6 +34,7 @@ export function CityMap({
   coveredBottom,
   onSelect,
   visible = Infinity,
+  visited,
 }: Props) {
   const { theme, rt } = useUnistyles();
   const ref = useRef<AppleMaps.MapView>(null);
@@ -106,15 +109,21 @@ export function CityMap({
   const selectedBubble = useImage(
     require("../../../assets/map/place-bubble-selected.png"),
   );
+  const visitedBubble = useImage(
+    require("../../../assets/map/place-bubble-visited.png"),
+  );
   const annotations = pins.slice(0, visible).map((pin) => {
     const id = cityPinId(pin);
     const isSelected = id === selected;
+    const went = visited !== undefined && isVisited(pin.name, visited);
     return {
       id,
       coordinates: { latitude: pin.lat, longitude: pin.lng },
       title: pin.name,
       text: pin.emoji ?? "📍",
-      icon: (isSelected ? selectedBubble : bubble) ?? undefined,
+      icon:
+        (isSelected ? selectedBubble : went ? visitedBubble : bubble) ??
+        undefined,
       anchor: { x: 0.5, y: 0.5 },
       backgroundColor: theme.colors.surface,
       textColor: theme.colors.foreground,

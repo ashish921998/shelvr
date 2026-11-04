@@ -1,7 +1,7 @@
 import { v } from "convex/values";
-import { authedMutation } from "./model/auth";
+import { authedMutation, authedQuery } from "./model/auth";
 import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
-import { findVisit } from "./model/placeVisits";
+import { findVisit, visitedPlaceKeys } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import { requireProEntitlement } from "./subscriptions";
 
@@ -40,4 +40,10 @@ export const setVisited = authedMutation({
     }
     return null;
   },
+});
+
+export const visitedKeys = authedQuery({
+  args: {},
+  returns: v.array(v.string()),
+  handler: async (ctx) => [...(await visitedPlaceKeys(ctx, ctx.userId))],
 });

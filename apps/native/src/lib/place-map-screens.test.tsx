@@ -35,6 +35,8 @@ const mocks = vi.hoisted(() => ({
   markSeen: vi.fn(),
   setVisited: vi.fn(),
   removeListPlace: vi.fn(),
+  visitedKeys: new Set<string>(),
+  toggleVisit: vi.fn(),
 }));
 
 vi.mock("@/lib/i18n", () => ({
@@ -58,6 +60,15 @@ vi.mock("@/lib/city-plan", () => ({
 }));
 vi.mock("@/lib/place-removal", () => ({
   usePlaceRemoval: () => ({ busy: false, undo: null, remove: mocks.remove }),
+}));
+vi.mock("@/lib/use-place-visit", () => ({
+  useVisitedKeys: () => mocks.visitedKeys,
+  usePlaceVisit: () => ({ busy: false, toggle: mocks.toggleVisit }),
+}));
+vi.mock("@/components/city/progress-bar", () => ({
+  ProgressBar: vi.fn(({ value }: { value: number }) => (
+    <div data-testid="progress">{value}</div>
+  )),
 }));
 vi.mock("@/lib/share-link", () => ({ shareUrl: vi.fn() }));
 vi.mock("@/lib/shared-lists", async (importActual) => ({
@@ -180,6 +191,9 @@ vi.mock("@/components/city/plan-button", () => ({
   InviteButton: vi.fn(({ onPress }: { onPress: () => void }) => (
     <button onClick={onPress}>invite</button>
   )),
+  ShareMapButton: vi.fn(({ onPress }: { onPress: () => void }) => (
+    <button onClick={onPress}>share map</button>
+  )),
 }));
 vi.mock("@/components/map/map-filter-chips", () => ({
   MapFilterChips: vi.fn(
@@ -244,14 +258,23 @@ vi.mock("@/components/city/save-row", () => ({
       item,
       placeName,
       emoji,
+      visited,
+      onToggleVisited,
       ...rest
     }: {
       item: { title?: string };
       placeName?: string;
       emoji?: string;
+      visited?: boolean;
+      onToggleVisited?: () => void;
       onPress: () => void;
     }) =>
-      rowFake({ name: placeName ?? item.title ?? "", number: emoji, ...rest }),
+      rowFake({
+        name: `${placeName ?? item.title ?? ""}${visited ? " ✓" : ""}`,
+        number: emoji,
+        ...rest,
+        ...(onToggleVisited ? { onVisited: () => onToggleVisited() } : {}),
+      }),
   ),
 }));
 vi.mock("@/components/shared-list/list-place-row", () => ({
@@ -442,6 +465,7 @@ beforeEach(() => {
   mocks.sheetTop = 0;
   mocks.snaps = undefined;
   mocks.cardAvailable = true;
+  mocks.visitedKeys = new Set();
   mocks.markSeen.mockResolvedValue(null);
   mocks.setVisited.mockResolvedValue(null);
   mocks.removeListPlace.mockResolvedValue(null);
@@ -492,6 +516,29 @@ describe("city page", () => {
     fireEvent.click(screen.getByText("invite"));
     expect(mocks.push).toHaveBeenCalledWith({
       pathname: "/new-shared-list",
+      params: { city: "Austin" },
+    });
+  });
+
+  it("counts visited places, ticks their rows and marks another", () => {
+    mocks.queries[CITY_ITEMS] = [save];
+    mocks.visitedKeys = new Set(["tacospot"]);
+    render(<CityScreen />);
+    expect(
+      screen.getByText('cityProgress.visited {"count":2,"visited":"1"}'),
+    ).toBeTruthy();
+    expect(screen.getByTestId("progress").textContent).toBe("0.5");
+    expect(screen.getByText("🌮 Taco Spot ✓")).toBeTruthy();
+    fireEvent.click(screen.getByText("went BBQ Pit"));
+    expect(mocks.toggleVisit).toHaveBeenCalledWith("item-1", "BBQ Pit", true);
+  });
+
+  it("opens the city's story card from Share map", () => {
+    mocks.queries[CITY_ITEMS] = [save];
+    render(<CityScreen />);
+    fireEvent.click(screen.getByText("share map"));
+    expect(mocks.push).toHaveBeenCalledWith({
+      pathname: "/city-card",
       params: { city: "Austin" },
     });
   });

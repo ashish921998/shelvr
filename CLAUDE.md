@@ -168,7 +168,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   its remaining pages, and is safe to restart. Deploy and finish it before releasing
   the search UI so older saves match cities and places too.
   `listCities.count` retains the legacy save count for installed apps; optional
-  `placeCount` is the distinct mapped-place count for that city.
+  `placeCount` is the distinct mapped-place count for that city, and optional
+  `visitedCount` (absent when none) how many of those carry a "We went" mark.
   City reads filter pins by their resolved city; legacy unlabelled pins are shown only for single-city saves. New clients hide an absent or
   zero place count while retaining the city and its saves.
   Image saves run a three-step, idempotent import: `beginImageImport`, then
@@ -363,7 +364,8 @@ id, and `model/auth.ts` extracts the stable users-table id used by every app tab
   the pin's icon) and its filter kinds from
   `model/placeKinds.ts`: Apple's point-of-interest category when the pin has one, otherwise
   the save's tags; "date night" always comes from the tags.
-- **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark.
+- **`placeVisits.ts`**: `setVisited` records or removes a user's "We went" mark, and
+  `visitedKeys` lists the caller's marks as place keys, so the city page ticks its rows.
   Planning reads these records inside Shelvr; they are not sent to an AI provider.
 - **`placeRemovals.ts`**: `removePlace` stores an owned venue decision; `undoRemovePlace`
   deletes that decision idempotently. `model/placeRemovals.ts` projects a user's decisions over
@@ -590,7 +592,10 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   city's saves, plus a row for every other save a removal has not emptied, with Plan a date
   and Plan a trip. Removing the last place keeps the map and says "No places left" until the
   person goes back. A selected place row shows an info button that opens Apple's place card
-  (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`); tapping the row opens the save
+  (iOS 18+, `modules/apple-place-card`, needs the pin's `appleId`) and a check that marks it
+  "We went" (`setVisited`); tapping the row opens the save. Visited places get a green ring on
+  the map and a badge on the row, and the header and Home's city card say "7 of 23 places
+  visited" (`src/lib/city-progress.ts`). The header's share button opens `city-card`
 - Shared lists: Home shows a "Shared lists" section above the plan tiles (one card per list from
   `listSharedLists`, nothing when the person has none). A list starts from the city page's Invite
   button beside the city's name (shown when the city has saves), which opens `new-shared-list` with that city picked.
@@ -608,8 +613,13 @@ When editing anything in `convex/`, prefer the `convex-expert` skill. It covers 
   `shared-list/[id]`, `add-list-place`, `date-plan`, `new-trip` and `trip-plan/[id]` only
   through a list, and a personal plan still redirects to `plan-gate`
 - Other `(app)` routes: `add` (a pasted link only), `share`, `onboarding`, `paywall`, `plan-gate`, `new-shared-list`, `add-list-place`,
-  `profile`, `settings`, `item/[id]`, `city/[name]`, `spots/[id]`, `date-plan`,
+  `profile`, `settings`, `item/[id]`, `city/[name]`, `city-card`, `spots/[id]`, `date-plan`,
   `new-trip`, `trip-plan/[id]`, `add-trip-stop`
+- `city-card` is the city's 9:16 story card, a modal with a `city` param: the city's pins
+  drawn on a plain street sketch (`src/components/city/city-story-card.tsx`, placed by
+  `src/lib/city-card.ts`), visited ones ringed green, the visited count and a "Saved with
+  Shelvr" footer. Share captures it with Skia's `makeImageFromView` and opens the system
+  share sheet with the PNG (`src/lib/use-city-card-share.ts`)
 - `date-plan` is Plan a date, pushed from the city page with a `city` param: "What kind of
   date?" (Classic, Low-key, Surprise me),
   then the evening from `makeDatePlan`: both stops on a map, a card each with Hours and info

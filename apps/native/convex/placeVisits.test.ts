@@ -101,3 +101,19 @@ describe("setVisited", () => {
     ).rejects.toThrow("Place name is empty");
   });
 });
+
+describe("visitedKeys", () => {
+  it("lists only the caller's marks as place keys", async () => {
+    const { backend, t, itemId } = await setup();
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Caffé Dante",
+      visited: true,
+    });
+    const other = await signedInUser(backend, { pro: true });
+    expect(await t.query(api.placeVisits.visitedKeys, {})).toEqual([
+      "caffedante",
+    ]);
+    expect(await other.t.query(api.placeVisits.visitedKeys, {})).toEqual([]);
+  });
+});
