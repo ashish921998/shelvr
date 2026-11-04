@@ -878,10 +878,7 @@ async function fromSpeech(
         cities,
       ),
       placeCuisines: normalizePlaceCuisines(
-        [
-          ...(spoken.placeCuisines ?? result.placeCuisines ?? []),
-          ...(item.placeCuisines ?? []),
-        ],
+        spoken.placeCuisines ?? result.placeCuisines ?? [],
         [...(spoken.places ?? result.places ?? []), ...item.places],
         cities,
       ),

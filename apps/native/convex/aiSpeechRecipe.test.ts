@@ -339,6 +339,8 @@ function placesModel(
     cookingVideo?: boolean;
     captionLocations?: { name: string; location: string }[];
     spokenLocations?: { name: string; location: string }[];
+    captionCuisines?: { name: string; cuisine: string }[];
+    spokenCuisines?: { name: string; cuisine: string }[];
   } = {},
 ) {
   generateObject.mockImplementation(async (call: { prompt?: string }) => {
@@ -349,6 +351,7 @@ function placesModel(
           places: spoken,
           cities: video.spokenCities ?? [],
           placeLocations: video.spokenLocations,
+          placeCuisines: video.spokenCuisines,
         },
       };
     }
@@ -366,6 +369,7 @@ function placesModel(
         cities: video.cities ?? [],
         places: video.caption ?? [],
         placeLocations: video.captionLocations,
+        placeCuisines: video.captionCuisines,
         cookingVideo: video.cookingVideo ?? false,
         placesVideo: video.placesVideo ?? true,
       },
@@ -539,6 +543,24 @@ describe("processItem places from a video's speech", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("lets the caption's cuisine win over the speech's for the same place", async () => {
+    placesModel(["Antiga", "Santelmo"], {
+      caption: ["Antiga"],
+      captionCuisines: [{ name: "Antiga", cuisine: "burger" }],
+      spokenCuisines: [
+        { name: "Antiga", cuisine: "tacos" },
+        { name: "Santelmo", cuisine: "sushi" },
+      ],
+    });
+    transcript("Antiga, then Santelmo.");
+    const item = await process(newConvexTest());
+
+    expect(item?.placeCuisines).toEqual([
+      { name: "Antiga", cuisine: "burger" },
+      { name: "Santelmo", cuisine: "sushi" },
+    ]);
+  });
+
   it("keeps the caption's places when the speech call fails", async () => {
     placesModel(new Error("provider down"), { caption: ["Antiga"] });
     transcript("Santelmo.");
@@ -664,6 +686,57 @@ describe("processItem places from a video's speech", () => {
       );
 
       expect(item?.cities).toEqual(["Porto"]);
+    });
+
+    it("drops the cuisines an earlier run gave when this run gives none", async () => {
+      const item = await rerun(() => placesModel([], { caption: ["Antiga"] }), {
+        captionCuisines: [{ name: "Antiga", cuisine: "burger" }],
+        spokenCuisines: [{ name: "Santelmo", cuisine: "tacos" }],
+      });
+
+      expect(item?.places).toEqual(["Antiga", "Santelmo", "Intenso"]);
+      expect(item?.placeCuisines).toEqual([]);
+    });
+
+    it("takes the cuisine this run gives over the stored one", async () => {
+      const item = await rerun(
+        () =>
+          placesModel([], {
+            caption: ["Antiga"],
+            captionCuisines: [{ name: "Antiga", cuisine: "steak" }],
+          }),
+        { captionCuisines: [{ name: "Antiga", cuisine: "sushi" }] },
+      );
+
+      expect(item?.placeCuisines).toEqual([
+        { name: "Antiga", cuisine: "steak" },
+      ]);
+    });
+
+    it("keeps the stored cuisines when the rerun's read fails", async () => {
+      const t = newConvexTest();
+      placesModel(["Santelmo"], {
+        caption: ["Antiga"],
+        captionCuisines: [{ name: "Antiga", cuisine: "burger" }],
+      });
+      transcript("Antiga, then Santelmo.");
+      const first = await process(t);
+      generateObject.mockReset();
+      generateObject.mockRejectedValue(new Error("provider down"));
+      await t.run((ctx) =>
+        ctx.db.patch(first!._id, {
+          status: "processing",
+          processingRunId: "run-2",
+        }),
+      );
+      await t
+        .action(internal.ai.processItem, { itemId: first!._id, runId: "run-2" })
+        .catch(() => undefined);
+      const item = await t.run((ctx) => ctx.db.get(first!._id));
+
+      expect(item?.placeCuisines).toEqual([
+        { name: "Antiga", cuisine: "burger" },
+      ]);
     });
 
     it("keeps the failed step when a rerun reads no caption and the speech fails again", async () => {
