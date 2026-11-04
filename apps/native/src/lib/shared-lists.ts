@@ -6,7 +6,9 @@ import { shareUrl } from "@/lib/share-link";
 import { webUrl } from "@/lib/web-url";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { placeKinds } from "@convex/model/placeKinds";
 import { cityKey } from "@convex/model/trip";
+import { placeEmoji } from "@/lib/map-pin-emoji";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth, useMutation } from "convex/react";
@@ -194,18 +196,27 @@ export function listRows(places: SharedListPlace[], city: string): ListRow[] {
     ...shown.filter((place) => place.isNew),
     ...shown.filter((place) => !place.isNew),
   ];
-  return ordered.map((place, index) => ({
-    place,
-    pin: {
-      itemId: place._id,
-      name: place.name,
-      lat: place.lat,
-      lng: place.lng,
-      ...(place.appleId !== undefined ? { appleId: place.appleId } : {}),
-      ...(place.category !== undefined ? { category: place.category } : {}),
-      number: index + 1,
-    },
-  }));
+  return ordered.map((place, index) => {
+    const kinds = placeKinds(place.category, []);
+    return {
+      place,
+      pin: {
+        itemId: place._id,
+        name: place.name,
+        lat: place.lat,
+        lng: place.lng,
+        ...(place.appleId !== undefined ? { appleId: place.appleId } : {}),
+        ...(place.category !== undefined ? { category: place.category } : {}),
+        kinds,
+        emoji: placeEmoji({
+          name: place.name,
+          category: place.category,
+          kinds,
+        }),
+        number: index + 1,
+      },
+    };
+  });
 }
 
 type ListSectionRow =

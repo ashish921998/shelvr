@@ -1,4 +1,5 @@
 import { PlaceMapScreen } from "@/components/city/place-map-screen";
+import { MapFilterChips } from "@/components/map/map-filter-chips";
 import { InviteButton, PlanButton } from "@/components/city/plan-button";
 import { SaveRow } from "@/components/city/save-row";
 import { PlaceRemovalUndo } from "@/components/city/place-removal";
@@ -9,6 +10,8 @@ import { canOpenPlaceCard, openPlaceDetails } from "@/lib/apple-place-card";
 import { cityPins, cityRows } from "@/lib/city-pins";
 import { useCityPlan } from "@/lib/city-plan";
 import { haptics } from "@/lib/haptics";
+import { filterPlaces, mapFilters } from "@/lib/map-filters";
+import type { PlaceKind } from "@convex/model/placeKinds";
 import { t, useAppLocale } from "@/lib/i18n";
 import { usePlaceRemoval } from "@/lib/place-removal";
 import { usePlaceCardFocus } from "@/lib/use-place-opener";
@@ -41,12 +44,19 @@ export default function CityScreen() {
   }, [loaded, count]);
 
   // Stable while the query data is, so the map keeps the camera the person moved.
-  const pins = useMemo(() => cityPins(items.data ?? []), [items.data]);
+  const allPins = useMemo(() => cityPins(items.data ?? []), [items.data]);
+  const [kind, setKind] = useState<PlaceKind | null>(null);
+  const filters = useMemo(() => mapFilters(allPins), [allPins]);
+  const active = filters.some((filter) => filter.kind === kind) ? kind : null;
+  const pins = useMemo(() => filterPlaces(allPins, active), [allPins, active]);
   const [hadPins, setHadPins] = useState(false);
   if (pins.length > 0 && !hadPins) setHadPins(true);
   const rows = useMemo(
-    () => cityRows(items.data ?? [], pins),
-    [items.data, pins],
+    () =>
+      cityRows(items.data ?? [], pins).filter(
+        (row) => active === null || row.kind === "place",
+      ),
+    [items.data, pins, active],
   );
 
   if (items.isError) {
@@ -90,8 +100,21 @@ export default function CityScreen() {
           </View>
           {pins.length > 0 ? (
             <Text style={styles.count}>
-              {t("cityMap.placesFromSaves", { count: pins.length })}
+              {t("cityMap.placesFromSaves", { count: allPins.length })}
             </Text>
+          ) : null}
+          {filters.length > 0 ? (
+            <View style={styles.chips}>
+              <MapFilterChips
+                kinds={filters.map((filter) => filter.kind)}
+                selected={active}
+                inset={false}
+                onSelect={(next) => {
+                  setSelected(null);
+                  setKind(next);
+                }}
+              />
+            </View>
           ) : null}
         </View>
       }
@@ -109,7 +132,7 @@ export default function CityScreen() {
           <SaveRow
             item={item}
             placeName={row.kind === "place" ? row.name : undefined}
-            number={row.kind === "place" ? row.number : undefined}
+            emoji={row.kind === "place" ? (row.pin.emoji ?? "📍") : undefined}
             selected={selected === row.id}
             removing={removal.busy}
             onRemove={
@@ -177,6 +200,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   name: { ...theme.type.largeTitle, color: theme.colors.foreground, flex: 1 },
   count: { ...theme.type.footnote, color: theme.colors.muted },
+  chips: { marginTop: theme.gap(1), marginHorizontal: -theme.gap(0.5) },
   empty: { gap: theme.gap(0.5), paddingTop: theme.gap(0.5) },
   emptyTitle: { ...theme.type.headline, color: theme.colors.foreground },
   emptyBody: { ...theme.type.subhead, color: theme.colors.muted },

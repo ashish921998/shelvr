@@ -181,6 +181,28 @@ vi.mock("@/components/city/plan-button", () => ({
     <button onClick={onPress}>invite</button>
   )),
 }));
+vi.mock("@/components/map/map-filter-chips", () => ({
+  MapFilterChips: vi.fn(
+    ({
+      kinds,
+      selected,
+      onSelect,
+    }: {
+      kinds: string[];
+      selected: string | null;
+      onSelect: (kind: string | null) => void;
+    }) => (
+      <div data-testid="chips" data-selected={selected ?? "all"}>
+        <button onClick={() => onSelect(null)}>chip all</button>
+        {kinds.map((kind) => (
+          <button key={kind} onClick={() => onSelect(kind)}>
+            {`chip ${kind}`}
+          </button>
+        ))}
+      </div>
+    ),
+  ),
+}));
 vi.mock("@/components/city/place-removal", () => ({
   PlaceRemovalUndo: vi.fn(() => <span>undo bar</span>),
 }));
@@ -194,7 +216,7 @@ function rowFake({
   onVisited,
 }: {
   name: string;
-  number?: number;
+  number?: number | string;
   selected?: boolean;
   onPress: () => void;
   onPlaceDetails?: () => void;
@@ -221,18 +243,28 @@ vi.mock("@/components/city/save-row", () => ({
     ({
       item,
       placeName,
+      emoji,
       ...rest
     }: {
       item: { title?: string };
       placeName?: string;
+      emoji?: string;
       onPress: () => void;
-    }) => rowFake({ name: placeName ?? item.title ?? "", ...rest }),
+    }) =>
+      rowFake({ name: placeName ?? item.title ?? "", number: emoji, ...rest }),
   ),
 }));
 vi.mock("@/components/shared-list/list-place-row", () => ({
   ListPlaceRow: vi.fn(
-    ({ place, ...rest }: { place: { name: string }; onPress: () => void }) =>
-      rowFake({ name: place.name, ...rest }),
+    ({
+      place,
+      emoji,
+      ...rest
+    }: {
+      place: { name: string };
+      emoji: string;
+      onPress: () => void;
+    }) => rowFake({ name: place.name, number: emoji, ...rest }),
   ),
 }));
 vi.mock("@/components/shared-list/name-sheet", () => ({
@@ -502,17 +534,53 @@ describe("city page", () => {
     expect(screen.getByTestId("map")).toBeTruthy();
   });
 
+  it("narrows the map and rows to a kind, keeps the count, and falls back to All", () => {
+    const cafe = (name: string, lat: number) => ({
+      name,
+      lat,
+      lng: -97.5,
+      city: "Austin",
+      category: "Cafe",
+    });
+    const cafes = [cafe("Bean One", 30.3), cafe("Bean Two", 30.4)];
+    const third = cafe("Bean Three", 30.5);
+    mocks.queries[CITY_ITEMS] = [
+      { ...save, placePins: [taco, bbq, ...cafes, third] },
+      unplaced,
+    ];
+    const { rerender } = render(<CityScreen />);
+    fireEvent.click(screen.getByText("chip coffee"));
+    const pins = () =>
+      screen.getAllByTestId(/^pin-/).map((pin) => pin.textContent);
+    expect(pins()).toEqual(["Bean One", "Bean Two", "Bean Three"]);
+    expect(screen.getByText("☕ Bean One")).toBeTruthy();
+    expect(screen.queryByText(/Taco Spot/)).toBeNull();
+    expect(screen.queryByText(/No places/)).toBeNull();
+    expect(
+      screen.getByText('cityMap.placesFromSaves {"count":5}'),
+    ).toBeTruthy();
+
+    mocks.queries[CITY_ITEMS] = [
+      { ...save, placePins: [taco, bbq, ...cafes] },
+      unplaced,
+    ];
+    rerender(<CityScreen />);
+    expect(screen.queryByTestId("chips")).toBeNull();
+    expect(pins()).toEqual(["Taco Spot", "BBQ Pit", "Bean One", "Bean Two"]);
+    expect(screen.getByText("- No places")).toBeTruthy();
+  });
+
   it("selects with a tick, then a second tap opens the save", () => {
     mocks.queries[CITY_ITEMS] = [save];
     render(<CityScreen />);
-    fireEvent.click(screen.getByText("1 Taco Spot"));
+    fireEvent.click(screen.getByText("🌮 Taco Spot"));
     expect(mocks.selection).toHaveBeenCalledTimes(1);
     expect(mocks.scrollToIndex).toHaveBeenCalledWith({
       index: 0,
       viewPosition: 0.3,
     });
     expect(mocks.push).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText("1 Taco Spot"));
+    fireEvent.click(screen.getByText("🌮 Taco Spot"));
     expect(mocks.push).toHaveBeenCalledWith({
       pathname: "/item/[id]",
       params: { id: "item-1" },
@@ -571,7 +639,7 @@ describe("city page", () => {
   it("clears the selection when a place is removed", () => {
     mocks.queries[CITY_ITEMS] = [save];
     render(<CityScreen />);
-    fireEvent.click(screen.getByText("1 Taco Spot"));
+    fireEvent.click(screen.getByText("🌮 Taco Spot"));
     fireEvent.click(screen.getByText("remove Taco Spot"));
     expect(screen.getByTestId("map").dataset.selected).toBe("");
     expect(mocks.remove).toHaveBeenCalledWith(
@@ -670,11 +738,11 @@ describe("list page", () => {
     });
     render(<SharedListScreen />);
     expect(screen.queryByText(/Dallas Deli$/)).toBeNull();
-    fireEvent.click(screen.getByText("1 Taco Spot"));
+    fireEvent.click(screen.getByText("🌮 Taco Spot"));
     expect(screen.getByTestId("map").dataset.selected).toBeTruthy();
     fireEvent.click(screen.getByText("chip Dallas"));
-    expect(screen.getByText("1 Dallas Deli")).toBeTruthy();
-    expect(screen.queryByText("1 Taco Spot")).toBeNull();
+    expect(screen.getByText("🥪 Dallas Deli")).toBeTruthy();
+    expect(screen.queryByText("🌮 Taco Spot")).toBeNull();
     expect(screen.getByTestId("map").dataset.selected).toBe("");
     expect(screen.getByText("footer Dallas")).toBeTruthy();
   });
@@ -749,9 +817,9 @@ describe("list page", () => {
       placeCount: 1,
     });
     render(<SharedListScreen />);
-    fireEvent.click(screen.getByText("1 Taco Spot"));
+    fireEvent.click(screen.getByText("🌮 Taco Spot"));
     expect(mocks.push).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText("1 Taco Spot"));
+    fireEvent.click(screen.getByText("🌮 Taco Spot"));
     expect(mocks.push).toHaveBeenCalledWith({
       pathname: "/item/[id]",
       params: { id: "item-9" },
@@ -786,9 +854,9 @@ describe("list page", () => {
     mocks.openUrl.mockRejectedValue(failure);
     mocks.queries[LIST] = listDetail();
     render(<SharedListScreen />);
-    fireEvent.click(screen.getByText("1 Taco Spot"));
+    fireEvent.click(screen.getByText("🌮 Taco Spot"));
     await act(async () => {
-      fireEvent.click(screen.getByText("1 Taco Spot"));
+      fireEvent.click(screen.getByText("🌮 Taco Spot"));
     });
     expect(mocks.capture).toHaveBeenCalledWith("shared_list_place_opened", {
       action: "maps",
@@ -819,7 +887,7 @@ describe("list page", () => {
   it("marks a place visited, and removing one clears the selection", async () => {
     mocks.queries[LIST] = listDetail();
     render(<SharedListScreen />);
-    fireEvent.click(screen.getByText("1 Taco Spot"));
+    fireEvent.click(screen.getByText("🌮 Taco Spot"));
     await act(async () => {
       fireEvent.click(screen.getByText("went Taco Spot"));
     });
