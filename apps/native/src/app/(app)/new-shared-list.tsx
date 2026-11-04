@@ -117,7 +117,9 @@ export default function NewSharedListScreen() {
     setPicked((current) =>
       current.includes(city)
         ? current.filter((entry) => entry !== city)
-        : [...current, city],
+        : current.length >= MAX_LIST_CITIES
+          ? current
+          : [...current, city],
     );
 
   const submit = async () => {
