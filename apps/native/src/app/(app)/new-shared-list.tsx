@@ -43,11 +43,13 @@ function CityRow({
   title,
   detail,
   selected,
+  disabled = false,
   onPress,
 }: {
   title: string;
   detail: string;
   selected: boolean;
+  disabled?: boolean;
   onPress: () => void;
 }) {
   const { theme } = useUnistyles();
@@ -55,12 +57,16 @@ function CityRow({
     <Pressable
       accessibilityRole="checkbox"
       accessibilityLabel={`${title}, ${detail}`}
-      accessibilityState={{ checked: selected }}
+      accessibilityState={{ checked: selected, disabled }}
+      disabled={disabled}
       onPress={() => {
         void haptics.selection();
         onPress();
       }}
-      style={({ pressed }) => [styles.cityRow, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.cityRow,
+        (pressed || disabled) && styles.pressed,
+      ]}
     >
       <View style={styles.cityText}>
         <ThemedText variant="subheadStrong">{title}</ThemedText>
@@ -222,6 +228,10 @@ export default function NewSharedListScreen() {
                 count: choice.placeCount ?? choice.count,
               })}
               selected={picked.includes(choice.city)}
+              disabled={
+                !picked.includes(choice.city) &&
+                picked.length >= MAX_LIST_CITIES
+              }
               onPress={() => toggleCity(choice.city)}
             />
           ))}
