@@ -774,6 +774,37 @@ describe("processItem places from a video's speech", () => {
       expect(item).toMatchObject({ enrichment: "partial", stepFailed: true });
     });
 
+    it("keeps the stored cuisines when the speech fails again on a rerun", async () => {
+      const t = newConvexTest();
+      placesModel(["Santelmo"], {
+        caption: ["Antiga"],
+        captionCuisines: [{ name: "Antiga", cuisine: "burger" }],
+      });
+      fetchMock.mockRejectedValue(new TypeError("network"));
+      const first = await process(t);
+      expect(first?.placeCuisines).toEqual([
+        { name: "Antiga", cuisine: "burger" },
+      ]);
+
+      placesModel(["Santelmo"], { caption: ["Antiga"] });
+      await t.run((ctx) =>
+        ctx.db.patch(first!._id, {
+          status: "processing",
+          processingRunId: "run-2",
+        }),
+      );
+      await t.action(internal.ai.processItem, {
+        itemId: first!._id,
+        runId: "run-2",
+      });
+      const item = await t.run((ctx) => ctx.db.get(first!._id));
+
+      expect(item).toMatchObject({ enrichment: "partial", stepFailed: true });
+      expect(item?.placeCuisines).toEqual([
+        { name: "Antiga", cuisine: "burger" },
+      ]);
+    });
+
     it("reads the speech again when the first read failed", async () => {
       const t = newConvexTest();
       placesModel(["Santelmo"], { caption: ["Antiga"] });
