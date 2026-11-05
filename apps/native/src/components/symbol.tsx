@@ -38,6 +38,7 @@ const SF_TO_MATERIAL = {
   safari: "language",
   map: "map",
   airplane: "flight",
+  "suitcase.fill": "luggage",
   "arrow.triangle.turn.up.right.diamond.fill": "directions",
   "arrow.left.arrow.right": "swap_horiz",
   minus: "remove",

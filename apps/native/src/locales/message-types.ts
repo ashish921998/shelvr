@@ -661,6 +661,10 @@ export type MessageParams = {
   "homePlaces.seeAll": undefined;
   "homePlaces.yourCities": undefined;
   "homePlaces.recentSaves": undefined;
+  "homePlaces.allSaves": undefined;
+  "homePlaces.today": undefined;
+  "homePlaces.yesterday": undefined;
+  "homePlaces.countAtLeast": { n: string };
   "homePlaces.emptyTitle": undefined;
   "homePlaces.emptyBody": undefined;
   "homePlaces.addSpot": undefined;

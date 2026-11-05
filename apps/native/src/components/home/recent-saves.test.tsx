@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { RecentSaves } from "@/components/home/recent-saves";
 
@@ -9,8 +9,19 @@ const mocks = vi.hoisted(() => ({ push: vi.fn() }));
 
 vi.mock("@/components/city/save-row", () => ({
   SaveRow: vi.fn(
-    ({ item, onPress }: { item: { title?: string }; onPress: () => void }) => (
-      <button onClick={onPress}>{item.title}</button>
+    ({
+      item,
+      detail,
+      onPress,
+    }: {
+      item: { title?: string };
+      detail?: string;
+      onPress: () => void;
+    }) => (
+      <>
+        <button onClick={onPress}>{item.title}</button>
+        <small>{detail}</small>
+      </>
     ),
   ),
 }));
@@ -35,14 +46,21 @@ const save = (
   overrides: Partial<Props["saves"][number]> = {},
 ): Props["saves"][number] => ({
   _id: id as Props["saves"][number]["_id"],
+  _creationTime: new Date(2026, 10, 6, 9).getTime(),
   status: "ready",
   cities: ["Lisbon"],
+  tags: [],
   title: `Save ${id}`,
   imageUrl: null,
   ...overrides,
 });
 
-beforeEach(() => mocks.push.mockReset());
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date(2026, 10, 6, 15));
+  mocks.push.mockReset();
+});
+afterEach(() => vi.useRealTimers());
 
 it("lists only ready saves that have a city", () => {
   render(
@@ -86,4 +104,22 @@ it("opens a save from Home", () => {
     pathname: "/item/[id]",
     params: { id: "abc", from: "home" },
   });
+});
+
+it("puts each save under the day it was saved, with its kind and city", () => {
+  render(
+    <RecentSaves
+      saves={[
+        save("today", { tags: ["coffee"] }),
+        save("yesterday", {
+          _creationTime: new Date(2026, 10, 5, 22).getTime(),
+        }),
+      ]}
+    />,
+  );
+  expect(
+    screen.getAllByRole("heading").map((title) => title.textContent),
+  ).toEqual(["Recent saves", "Today", "Yesterday"]);
+  expect(screen.getByText("Coffee · Lisbon")).toBeTruthy();
+  expect(screen.getByText("Lisbon")).toBeTruthy();
 });

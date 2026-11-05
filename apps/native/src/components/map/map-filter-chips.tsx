@@ -1,21 +1,10 @@
 import type { PlaceKind } from "@convex/model/placeKinds";
 import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
+import { KIND_LABELS } from "@/lib/map-filters";
 import { KIND_EMOJI } from "@/lib/map-pin-emoji";
-import type { TextMessageKey } from "@/locales/message-types";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-
-const KIND_LABELS: Record<PlaceKind, TextMessageKey> = {
-  food: "map.kindFood",
-  coffee: "map.kindCoffee",
-  dessert: "map.kindDessert",
-  drinks: "map.kindDrinks",
-  dateNight: "map.kindDateNight",
-  activities: "map.kindActivities",
-  shopping: "map.kindShopping",
-  stay: "map.kindStay",
-};
 
 function Chip({
   label,

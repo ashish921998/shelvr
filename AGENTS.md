@@ -41,7 +41,9 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Home:** `src/lib/home-feed.tsx` (`HomeFeedProvider`, `useHomeFeed`); the
   cities list and processing section are in `src/components/home`
   (`home-places.tsx`); failed and placeless saves are in `review-saves.tsx` and
-  `unplaced-toast.tsx`. The city page is `src/app/(app)/city/[name].tsx`, with its
+  `unplaced-toast.tsx`. The All saves and Trips rows are `library-rows.tsx`; the
+  All saves screen is `src/app/(app)/saves.tsx` (`all-saves.tsx`), and saves are
+  grouped by day in `src/lib/save-list.ts`. The city page is `src/app/(app)/city/[name].tsx`, with its
   map in `src/components/city` and Plan a date / Plan a trip in `src/lib/city-plan.ts`.
   Plan a date is the `src/app/(app)/date-plan.tsx` route, with its screens in
   `src/components/date-plan`, state in `src/lib/date-plan.ts` and backend in

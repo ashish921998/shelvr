@@ -1,5 +1,6 @@
 import { CityCover, type CoverLayout } from "@/components/city/city-cover";
 import { HomeRow } from "@/components/home/home-row";
+import { LibraryRows } from "@/components/home/library-rows";
 import { PlanCitySheet } from "@/components/home/plan-city-sheet";
 import { ReviewSaves, type ReviewSave } from "@/components/home/review-saves";
 import { SharedListsSection } from "@/components/home/shared-lists-section";
@@ -275,6 +276,7 @@ export function HomePlaces({ saves }: { saves: ReviewSave[] }) {
   return (
     <>
       <View style={styles.rows}>
+        <LibraryRows />
         {loaded ? (
           <PlanRows
             cities={plannableCities(loaded)}

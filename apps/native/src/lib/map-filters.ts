@@ -1,5 +1,17 @@
 import { PLACE_KINDS, type PlaceKind } from "@convex/model/placeKinds";
 import { cityKey, distanceKm, type LatLng } from "@convex/model/trip";
+import type { TextMessageKey } from "@/locales/message-types";
+
+export const KIND_LABELS: Record<PlaceKind, TextMessageKey> = {
+  food: "map.kindFood",
+  coffee: "map.kindCoffee",
+  dessert: "map.kindDessert",
+  drinks: "map.kindDrinks",
+  dateNight: "map.kindDateNight",
+  activities: "map.kindActivities",
+  shopping: "map.kindShopping",
+  stay: "map.kindStay",
+};
 
 /** How far from the person, or from the map's centre, a saved place still counts as nearby. */
 const NEARBY_KM = 50;

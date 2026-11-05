@@ -56,6 +56,9 @@ vi.mock("@/components/home/review-saves", async () => {
     ),
   };
 });
+vi.mock("@/components/home/library-rows", () => ({
+  LibraryRows: vi.fn(() => null),
+}));
 vi.mock("@/components/home/shared-lists-section", () => ({
   SharedListsSection: vi.fn(() => <span>Shared lists</span>),
 }));

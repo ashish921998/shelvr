@@ -1,6 +1,7 @@
 import { SaveRow } from "@/components/city/save-row";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t, useAppLocale } from "@/lib/i18n";
+import { saveDays, saveDetail } from "@/lib/save-list";
 import type { Id } from "@convex/_generated/dataModel";
 import { useRouter } from "expo-router";
 import { View } from "react-native";
@@ -10,8 +11,10 @@ const MAX_RECENT = 8;
 
 type RecentSave = {
   _id: Id<"items">;
+  _creationTime: number;
   status: "processing" | "ready" | "failed";
   cities?: string[];
+  tags: string[];
   title?: string;
   url?: string;
   imageUrl: string | null;
@@ -32,20 +35,30 @@ export function RecentSaves({ saves }: { saves: RecentSave[] }) {
       <ThemedText variant="title" accessibilityRole="header">
         {t("homePlaces.recentSaves")}
       </ThemedText>
-      <View>
-        {recent.map((save) => (
-          <SaveRow
-            key={save._id}
-            item={save}
-            onPress={() =>
-              router.push({
-                pathname: "/item/[id]",
-                params: { id: save._id, from: "home" },
-              })
-            }
-          />
-        ))}
-      </View>
+      {saveDays(recent).map((day) => (
+        <View key={day.key}>
+          <ThemedText
+            variant="labelStrong"
+            accessibilityRole="header"
+            style={styles.day}
+          >
+            {day.title}
+          </ThemedText>
+          {day.saves.map((save) => (
+            <SaveRow
+              key={save._id}
+              item={save}
+              detail={saveDetail(save)}
+              onPress={() =>
+                router.push({
+                  pathname: "/item/[id]",
+                  params: { id: save._id, from: "home" },
+                })
+              }
+            />
+          ))}
+        </View>
+      ))}
     </View>
   );
 }
@@ -56,4 +69,5 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.gap(2),
     paddingTop: theme.gap(3),
   },
+  day: { color: theme.colors.muted, paddingBottom: theme.gap(0.25) },
 }));

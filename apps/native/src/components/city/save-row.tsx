@@ -20,6 +20,7 @@ type SaveRowItem = {
 type Props = {
   item: SaveRowItem;
   placeName?: string;
+  detail?: string;
   /** The place's map emoji when this row represents a located place. */
   emoji?: string;
   selected?: boolean;
@@ -34,6 +35,7 @@ type Props = {
 export function SaveRow({
   item,
   placeName,
+  detail,
   emoji,
   selected,
   onPress,
@@ -44,9 +46,8 @@ export function SaveRow({
   const router = useRouter();
   const { theme } = useUnistyles();
   const image = item.imageUrl ?? item.heroImageUrl;
-  const source = placeName
-    ? (item.title ?? saveSource(item))
-    : saveSource(item);
+  const source =
+    detail ?? (placeName ? (item.title ?? saveSource(item)) : saveSource(item));
   const title = placeName ?? item.title ?? t("homePlaces.untitled");
   return (
     <View style={[styles.row, selected && styles.selected]}>
