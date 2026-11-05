@@ -9,6 +9,7 @@ import {
   isOwnerFile,
   isUiFile,
   OWNER_LABEL,
+  ownerApproved,
   section,
   WAIVER_LABEL,
 } from "./verify-pr-evidence.mjs";
@@ -63,18 +64,63 @@ test("an empty Review section fails", () => {
   assert.match(problems[0], /"### Review" is empty/);
 });
 
-test("owner files need the owner label, and a push drops it", () => {
+test("owner files fail until approved; other files do not", () => {
   const files = ["apps/native/convex/subscriptions.ts"];
   assert.match(evidenceProblems(filled(), files)[0], /owner-reviewed/);
-  assert.deepEqual(evidenceProblems(filled(), files, [OWNER_LABEL]), []);
-  assert.equal(
-    evidenceProblems(filled(), files, [OWNER_LABEL], { pushed: true }).length,
-    1,
+  assert.deepEqual(
+    evidenceProblems(filled(), files, [], { approved: true }),
+    [],
   );
   assert.deepEqual(
     evidenceProblems(filled(), ["apps/native/convex/items.ts"]),
     [],
   );
+});
+
+test("a dependency bot skips the description but not the owner gate", () => {
+  const bot = { author: "renovate[bot]" };
+  assert.deepEqual(evidenceProblems("", ["package.json"], [], bot), []);
+  const problems = evidenceProblems("", [".github/workflows/ci.yml"], [], bot);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /owner-reviewed/);
+});
+
+test("the owner label counts only when added after the head commit", () => {
+  const labeled = (at) => ({
+    event: "labeled",
+    label: { name: OWNER_LABEL },
+    created_at: at,
+  });
+  const unlabeled = (at) => ({ ...labeled(at), event: "unlabeled" });
+  const head = "2026-11-05T10:00:00Z";
+  assert.equal(ownerApproved([labeled("2026-11-05T10:05:00Z")], head), true);
+  assert.equal(ownerApproved([labeled("2026-11-05T09:55:00Z")], head), false);
+  assert.equal(
+    ownerApproved(
+      [labeled("2026-11-05T10:05:00Z"), unlabeled("2026-11-05T10:06:00Z")],
+      head,
+    ),
+    false,
+  );
+  assert.equal(
+    ownerApproved(
+      [
+        labeled("2026-11-05T09:00:00Z"),
+        unlabeled("2026-11-05T10:06:00Z"),
+        labeled("2026-11-05T10:07:00Z"),
+      ],
+      head,
+    ),
+    true,
+  );
+  assert.equal(
+    ownerApproved(
+      [{ ...labeled("2026-11-05T10:05:00Z"), label: { name: "no-ui-change" } }],
+      head,
+    ),
+    false,
+  );
+  assert.equal(ownerApproved([], head), false);
 });
 
 test("the owner paths cover billing, auth, release and CI", () => {
@@ -87,6 +133,12 @@ test("the owner paths cover billing, auth, release and CI", () => {
     "apps/native/convex/model/publicFunctions.ts",
     "apps/native/src/lib/entitlement.ts",
     "apps/native/src/lib/revenuecat-sync.ts",
+    "apps/native/src/lib/paywall-funnel.ts",
+    "apps/native/src/lib/onboarding-paywall.ts",
+    "apps/native/src/lib/plan-gate.ts",
+    "apps/native/src/lib/trial-reminder.ts",
+    "apps/native/src/app/(app)/paywall.tsx",
+    "apps/native/src/app/(app)/plan-gate.tsx",
     "apps/native/eas.json",
     "apps/native/app.config.js",
     "apps/native/released-builds.json",
@@ -102,6 +154,8 @@ test("the owner paths cover billing, auth, release and CI", () => {
     "apps/native/convex/model/authHelpers.ts",
     "apps/native/convex/subscriptions.test.ts",
     "apps/native/src/lib/entitlement-copy.ts",
+    "apps/native/src/lib/paywall-funnel.test.ts",
+    "apps/native/src/app/(app)/settings.tsx",
     "docs/architecture/local-qa.md",
   ]) {
     assert.equal(isOwnerFile(path), false, path);

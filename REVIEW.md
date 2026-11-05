@@ -87,11 +87,13 @@ the app, a real device, or production data.
 Paths under `convex/` and `src/` are in `apps/native`. A change that touches any of these
 waits for Ashish to read the evidence, whatever the review says. Say so in the report's first
 line. The `verification evidence` check enforces it: the PR fails until Ashish adds the
-`owner-reviewed` label, and every new push removes the label. An agent never adds it.
+`owner-reviewed` label. It counts only for commits made before it was added, so after a
+new push he removes and re-adds it. Dependency-bot PRs are held too. An agent never adds it.
 The paths are `OWNER_PATTERNS` in `tools/verify-pr-evidence.mjs`:
 
 - billing and entitlement: `convex/subscriptions.ts`, the RevenueCat webhook in
-  `convex/http.ts`, `src/lib/entitlement.ts`, paywall code
+  `convex/http.ts`, `src/lib/entitlement.ts`, the paywall, plan gate and trial modules in `src/lib`, and
+  the `paywall` and `plan-gate` routes
 - auth and accounts: `convex/model/auth.ts`, `convex/model/publicFunctions.ts`,
   `convex/auth.ts`, account deletion in `convex/users.ts`
 - release and CI: `.github/workflows/`, `apps/native/eas.json`, `apps/native/app.config.js`,

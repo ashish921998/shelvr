@@ -36,7 +36,8 @@ export const WAIVER_LABEL = "no-ui-change";
 const OWNER_PATTERNS = [
   /^apps\/native\/convex\/(subscriptions|http|auth|auth\.config|users)\.ts$/,
   /^apps\/native\/convex\/model\/(auth|publicFunctions)\.ts$/,
-  /^apps\/native\/src\/lib\/(entitlement|revenuecat-[\w-]+)\.ts$/,
+  /^apps\/native\/src\/lib\/(entitlement|revenuecat-[\w-]+|paywall-[\w-]+|onboarding-paywall|plan-gate|trial-[\w-]+)\.ts$/,
+  /^apps\/native\/src\/app\/\(app\)\/(paywall|plan-gate)\.tsx$/,
   /^apps\/native\/(eas\.json|app\.json|app\.config\.js|released-builds\.json)$/,
   /^\.github\/(workflows|actions)\//,
   /^\.github\/CODEOWNERS$/,
@@ -46,6 +47,25 @@ const OWNER_PATTERNS = [
 export const isOwnerFile = (path) => OWNER_PATTERNS.some((re) => re.test(path));
 
 export const OWNER_LABEL = "owner-reviewed";
+
+export const DEPENDENCY_BOTS = ["renovate[bot]", "dependabot[bot]"];
+
+/**
+ * Whether the owner label stands for this head commit: it is on the pull
+ * request now and was last added after the head commit was made. A label kept
+ * across a push no longer counts, so one approval covers one commit.
+ */
+export function ownerApproved(events, headCommittedAt) {
+  let labeledAt = null;
+  for (const event of events) {
+    if (event.label?.name !== OWNER_LABEL) continue;
+    if (event.event === "labeled") labeledAt = event.created_at;
+    if (event.event === "unlabeled") labeledAt = null;
+  }
+  return (
+    labeledAt !== null && Date.parse(labeledAt) > Date.parse(headCommittedAt)
+  );
+}
 
 const markdown = new MarkdownIt({ html: true, linkify: true });
 
@@ -217,9 +237,22 @@ export function evidenceProblems(
   body,
   changedFiles,
   labels = [],
-  { pushed = false } = {},
+  { approved = false, author = "" } = {},
 ) {
   const problems = [];
+  const ownerFiles = changedFiles.filter(isOwnerFile);
+  if (ownerFiles.length > 0 && !approved) {
+    const list = ownerFiles.slice(0, 5).join(", ");
+    const more =
+      ownerFiles.length > 5 ? ` and ${ownerFiles.length - 5} more` : "";
+    problems.push(
+      `This pull request changes files only the owner may approve (${list}${more}). ` +
+        `Ashish reads the evidence and adds the "${OWNER_LABEL}" label; an agent never adds it. ` +
+        "The label covers the commits made before it was added: after a new push, remove it and add it again.",
+    );
+  }
+  if (DEPENDENCY_BOTS.includes(author)) return problems;
+
   const tokens = parse(body);
 
   const verification = sectionTokens(tokens, "Verification");
@@ -263,18 +296,6 @@ export function evidenceProblems(
     );
   }
 
-  const ownerFiles = changedFiles.filter(isOwnerFile);
-  if (ownerFiles.length > 0 && (pushed || !labels.includes(OWNER_LABEL))) {
-    const list = ownerFiles.slice(0, 5).join(", ");
-    const more =
-      ownerFiles.length > 5 ? ` and ${ownerFiles.length - 5} more` : "";
-    problems.push(
-      `This pull request changes files only the owner may approve (${list}${more}). ` +
-        `Ashish reads the evidence and adds the "${OWNER_LABEL}" label; an agent never adds it. ` +
-        "The label is removed on every new push, so it covers one commit.",
-    );
-  }
-
   return problems;
 }
 
@@ -286,11 +307,28 @@ function changedFilesSince(base, head) {
     .filter(Boolean);
 }
 
+function headCommittedAt(head) {
+  return execFileSync("git", ["show", "-s", "--format=%cI", head], {
+    encoding: "utf8",
+  }).trim();
+}
+
+function labelEvents() {
+  const { GITHUB_REPOSITORY: repo, PR_NUMBER: number } = process.env;
+  if (!repo || !number) return [];
+  const pages = execFileSync(
+    "gh",
+    ["api", "--paginate", "--slurp", `repos/${repo}/issues/${number}/events`],
+    { encoding: "utf8" },
+  );
+  return JSON.parse(pages).flat();
+}
+
 function main() {
   const [base, head = "HEAD"] = process.argv.slice(2);
   if (!base) {
     console.error(
-      "usage: verify-pr-evidence.mjs <base-sha> [head-sha]  (PR_BODY, PR_LABELS, PR_ACTION in env)",
+      "usage: verify-pr-evidence.mjs <base-sha> [head-sha]  (PR_BODY, PR_LABELS, PR_AUTHOR, PR_NUMBER, GH_TOKEN in env)",
     );
     process.exit(2);
   }
@@ -299,7 +337,12 @@ function main() {
     process.env.PR_BODY ?? "",
     changedFilesSince(base, head),
     labels,
-    { pushed: process.env.PR_ACTION === "synchronize" },
+    {
+      approved:
+        labels.includes(OWNER_LABEL) &&
+        ownerApproved(labelEvents(), headCommittedAt(head)),
+      author: process.env.PR_AUTHOR ?? "",
+    },
   );
   const summary = process.env.GITHUB_STEP_SUMMARY;
   if (problems.length === 0) {
