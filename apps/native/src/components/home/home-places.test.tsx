@@ -5,6 +5,22 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HomePlaces, UnplacedSaves } from "@/components/home/home-places";
 
+vi.mock("@/lib/motion", () => ({
+  motion: { duration: { feedback: 120, state: 180 }, easing: { out: "out" } },
+}));
+vi.mock("react-native-reanimated", () => ({
+  default: {
+    View: vi.fn(({ children }: { children: ReactNode }) => (
+      <div>{children}</div>
+    )),
+  },
+  useReducedMotion: () => false,
+  ReduceMotion: { Never: "never" },
+  FadeIn: {
+    duration: () => ({ easing: () => ({ reduceMotion: () => undefined }) }),
+  },
+}));
+
 const mocks = vi.hoisted(() => ({
   cities: [] as {
     city: string;

@@ -1,5 +1,6 @@
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { ThemedText } from "@/components/ui/themed-text";
+import { Crossfade } from "@/components/ui/crossfade";
 import { t } from "@/lib/i18n";
 import { stopBadge } from "@/lib/trip-planner";
 import type { DateStop } from "@convex/model/datePlan";
@@ -81,19 +82,27 @@ export function DateStopCard({
           </ThemedText>
         </View>
       </View>
-      <ThemedText variant="header" numberOfLines={2}>
-        {stop.name}
-      </ThemedText>
-      {stop.area ? (
-        <ThemedText variant="footnote" numberOfLines={1} style={styles.muted}>
-          {stop.area}
-        </ThemedText>
-      ) : null}
-      {stop.why ? (
-        <ThemedText variant="footnote" numberOfLines={2}>
-          {stop.why}
-        </ThemedText>
-      ) : null}
+      <Crossfade identity={JSON.stringify([stop.name, stop.area, stop.why])}>
+        <View style={styles.details}>
+          <ThemedText variant="header" numberOfLines={2}>
+            {stop.name}
+          </ThemedText>
+          {stop.area ? (
+            <ThemedText
+              variant="footnote"
+              numberOfLines={1}
+              style={styles.muted}
+            >
+              {stop.area}
+            </ThemedText>
+          ) : null}
+          {stop.why ? (
+            <ThemedText variant="footnote" numberOfLines={2}>
+              {stop.why}
+            </ThemedText>
+          ) : null}
+        </View>
+      </Crossfade>
       <View style={styles.actions}>
         <CardAction
           icon="info.circle"
@@ -115,6 +124,7 @@ export function DateStopCard({
 }
 
 const styles = StyleSheet.create((theme) => ({
+  details: { gap: theme.gap(0.75) },
   card: {
     gap: theme.gap(0.75),
     padding: theme.gap(2),

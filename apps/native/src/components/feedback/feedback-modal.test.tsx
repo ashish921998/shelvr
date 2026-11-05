@@ -9,6 +9,13 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FeedbackModal } from "./feedback-modal";
 
+vi.mock("@/components/ui/crossfade", () => ({
+  Crossfade: vi.fn(({ children }: { children: React.ReactNode }) => (
+    <div>{children}</div>
+  )),
+}));
+vi.mock("@/lib/motion", () => ({ motion: { duration: { state: 180 } } }));
+
 const mocks = vi.hoisted(() => ({
   submit: vi.fn(),
   user: { _id: "user-1" } as { _id: string } | null,

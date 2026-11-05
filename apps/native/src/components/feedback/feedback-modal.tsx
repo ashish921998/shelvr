@@ -26,6 +26,8 @@ import {
   type FeedbackSurface,
 } from "@/lib/feedback";
 import { SUPPORT_URL } from "@/lib/legal";
+import { Crossfade } from "@/components/ui/crossfade";
+import { motion } from "@/lib/motion";
 
 function submissionContext() {
   const version = Constants.expoConfig?.version;
@@ -141,95 +143,104 @@ export function FeedbackModal({
               {t("feedback.open")}
             </Text>
 
-            {flow === "sent" ? (
-              <>
-                <Text style={styles.body}>{t("feedback.thanks")}</Text>
-                <View style={styles.buttonRow}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t("common.done")}
-                    style={({ pressed }) => [
-                      styles.primaryButton,
-                      pressed && { opacity: 0.7 },
-                    ]}
-                    onPress={onClose}
-                  >
-                    <Text style={styles.primaryButtonText}>
-                      {t("common.done")}
-                    </Text>
-                  </Pressable>
-                </View>
-              </>
-            ) : !available ? (
-              <>
-                <Text style={styles.body}>
-                  {t("feedback.unavailableContact")}
-                </Text>
-                <SupportLink />
-              </>
-            ) : (
-              <>
-                {flow === "failed" ? (
+            <Crossfade
+              identity={flow === "sent" ? "sent" : "form"}
+              duration={motion.duration.state}
+            >
+              <View style={styles.fields}>
+                {flow === "sent" ? (
+                  <>
+                    <Text style={styles.body}>{t("feedback.thanks")}</Text>
+                    <View style={styles.buttonRow}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t("common.done")}
+                        style={({ pressed }) => [
+                          styles.primaryButton,
+                          pressed && { opacity: 0.7 },
+                        ]}
+                        onPress={onClose}
+                      >
+                        <Text style={styles.primaryButtonText}>
+                          {t("common.done")}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </>
+                ) : !available ? (
                   <>
                     <Text style={styles.body}>
-                      {t("feedback.sendFailedContact")}
+                      {t("feedback.unavailableContact")}
                     </Text>
                     <SupportLink />
                   </>
-                ) : null}
-                <Text style={styles.body}>{t("feedback.prompt")}</Text>
-                <Text style={styles.notice}>{t("feedback.replyNotice")}</Text>
-                <TextInput
-                  accessibilityLabel={t("feedback.messageLabel")}
-                  style={styles.input}
-                  value={message}
-                  onChangeText={setMessage}
-                  placeholder={t("feedback.placeholder")}
-                  placeholderTextColor={theme.colors.faint}
-                  multiline
-                  maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
-                  autoCapitalize="sentences"
-                  autoCorrect
-                />
-                <Text style={styles.counter}>
-                  {message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}
-                </Text>
-                <View style={styles.buttonRow}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t("feedback.cancel")}
-                    style={({ pressed }) => [
-                      styles.secondaryButton,
-                      pressed && { opacity: 0.7 },
-                    ]}
-                    disabled={flow === "sending"}
-                    onPress={onClose}
-                  >
-                    <Text style={styles.secondaryButtonText}>
-                      {t("common.cancel")}
+                ) : (
+                  <>
+                    {flow === "failed" ? (
+                      <>
+                        <Text style={styles.body}>
+                          {t("feedback.sendFailedContact")}
+                        </Text>
+                        <SupportLink />
+                      </>
+                    ) : null}
+                    <Text style={styles.body}>{t("feedback.prompt")}</Text>
+                    <Text style={styles.notice}>
+                      {t("feedback.replyNotice")}
                     </Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t("feedback.open")}
-                    accessibilityState={{ disabled: !canSend }}
-                    style={({ pressed }) => [
-                      styles.primaryButton,
-                      pressed && { opacity: 0.7 },
-                      !canSend && { opacity: 0.4 },
-                    ]}
-                    disabled={!canSend}
-                    onPress={() => void send()}
-                  >
-                    <Text style={styles.primaryButtonText}>
-                      {flow === "sending"
-                        ? t("feedback.sending")
-                        : t("feedback.send")}
+                    <TextInput
+                      accessibilityLabel={t("feedback.messageLabel")}
+                      style={styles.input}
+                      value={message}
+                      onChangeText={setMessage}
+                      placeholder={t("feedback.placeholder")}
+                      placeholderTextColor={theme.colors.faint}
+                      multiline
+                      maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
+                      autoCapitalize="sentences"
+                      autoCorrect
+                    />
+                    <Text style={styles.counter}>
+                      {message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}
                     </Text>
-                  </Pressable>
-                </View>
-              </>
-            )}
+                    <View style={styles.buttonRow}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t("feedback.cancel")}
+                        style={({ pressed }) => [
+                          styles.secondaryButton,
+                          pressed && { opacity: 0.7 },
+                        ]}
+                        disabled={flow === "sending"}
+                        onPress={onClose}
+                      >
+                        <Text style={styles.secondaryButtonText}>
+                          {t("common.cancel")}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t("feedback.open")}
+                        accessibilityState={{ disabled: !canSend }}
+                        style={({ pressed }) => [
+                          styles.primaryButton,
+                          pressed && { opacity: 0.7 },
+                          !canSend && { opacity: 0.4 },
+                        ]}
+                        disabled={!canSend}
+                        onPress={() => void send()}
+                      >
+                        <Text style={styles.primaryButtonText}>
+                          {flow === "sending"
+                            ? t("feedback.sending")
+                            : t("feedback.send")}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </>
+                )}
+              </View>
+            </Crossfade>
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
@@ -279,6 +290,7 @@ const styles = StyleSheet.create((theme) => ({
     padding: theme.gap(3),
     gap: theme.gap(1.5),
   },
+  fields: { gap: theme.gap(1.5) },
   title: {
     fontFamily: theme.fonts.bold,
     fontSize: 18,

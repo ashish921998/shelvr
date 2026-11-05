@@ -5,6 +5,8 @@ import { t } from "@/lib/i18n";
 import { savedByLine, type SharedListPlace } from "@/lib/shared-lists";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import Animated, { useReducedMotion } from "react-native-reanimated";
+import { motion, motionCSS } from "@/lib/motion";
 
 type Props = {
   place: SharedListPlace;
@@ -26,6 +28,7 @@ export function ListPlaceRow({
   onRemove,
 }: Props) {
   const { theme } = useUnistyles();
+  const reduced = useReducedMotion();
   const by = savedByLine(place);
   const went = place.visitedAt !== undefined;
   return (
@@ -56,13 +59,26 @@ export function ListPlaceRow({
             {by}
           </ThemedText>
         </View>
-        {went ? (
-          <View style={styles.went}>
-            <ThemedText variant="captionStrong" style={styles.muted}>
-              {t("plan.weWent")}
-            </ThemedText>
-          </View>
-        ) : null}
+        <Animated.View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={[
+            styles.went,
+            {
+              opacity: went ? 1 : 0,
+              transitionProperty: "opacity",
+              transitionDuration:
+                went && !reduced
+                  ? motion.duration.state
+                  : motion.duration.feedback,
+              transitionTimingFunction: motionCSS.out,
+            },
+          ]}
+        >
+          <ThemedText variant="captionStrong" style={styles.muted}>
+            {t("plan.weWent")}
+          </ThemedText>
+        </Animated.View>
       </Pressable>
       {selected && onPlaceDetails ? (
         <Pressable

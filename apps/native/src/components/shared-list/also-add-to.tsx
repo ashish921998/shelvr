@@ -12,6 +12,8 @@ import {
 import type { Id } from "@convex/_generated/dataModel";
 import { Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import Animated, { useReducedMotion } from "react-native-reanimated";
+import { motion, motionCSS } from "@/lib/motion";
 
 export function AlsoAddTo({
   itemId,
@@ -23,6 +25,7 @@ export function AlsoAddTo({
   count: number;
 }) {
   const { theme } = useUnistyles();
+  const reduced = useReducedMotion();
   const lists = alsoAddLists(useSharedLists().data);
   const { state, toggle } = useAlsoAddTo(itemId, city);
   if (lists.length === 0) return null;
@@ -70,14 +73,26 @@ export function AlsoAddTo({
               </ThemedText>
             </View>
             <View style={[styles.check, on && styles.checkOn]}>
-              {on ? (
+              <Animated.View
+                style={{
+                  opacity: on ? 1 : 0,
+                  transform: [
+                    { scale: on || reduced ? 1 : motion.scale.pressed },
+                  ],
+                  transitionProperty: ["opacity", "transform"],
+                  transitionDuration: motion.duration.feedback,
+                  transitionTimingFunction: motionCSS.out,
+                }}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+              >
                 <AppSymbolIcon
                   name="checkmark"
                   size={14}
                   weight="bold"
                   tintColor={theme.colors.surface}
                 />
-              ) : null}
+              </Animated.View>
             </View>
           </Pressable>
         );
