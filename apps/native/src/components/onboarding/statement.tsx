@@ -1,20 +1,17 @@
 import { PillButton } from "@/components/onboarding/parts";
 import { t, useAppLocale } from "@/lib/i18n";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
-import type { TextMessageKey } from "@/locales/message-types";
 import type { ReactNode } from "react";
 import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 export function StatementStep({
   text,
-  cta,
   centered,
   onContinue,
   children,
 }: {
   text: string;
-  cta?: TextMessageKey;
   centered?: boolean;
   onContinue: () => void;
   children?: ReactNode;
@@ -36,7 +33,7 @@ export function StatementStep({
           {text}
         </Text>
       </ScrollView>
-      <PillButton label={t(cta ?? "common.continue")} onPress={onContinue} />
+      <PillButton label={t("common.continue")} onPress={onContinue} />
     </View>
   );
 }

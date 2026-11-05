@@ -61,7 +61,10 @@ export async function walkToSampleReel(
     timeout: 30_000,
   });
   await skip.tap();
-  await screen.getByRole("button", "That’s me 😩").tap({ timeout: 30_000 });
+  await expect(screen.getByText("Let’s put your saves to use.")).toBeVisible({
+    timeout: 30_000,
+  });
+  await screen.getByTestId("onboarding-chart-continue").tap();
   await expect(screen.getByText("Where do you go out?")).toBeVisible({
     timeout: 30_000,
   });

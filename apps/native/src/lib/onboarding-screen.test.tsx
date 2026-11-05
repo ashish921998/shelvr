@@ -151,38 +151,18 @@ vi.mock("@/components/onboarding/questions", () => ({
 }));
 vi.mock("@/components/onboarding/statement", () => ({
   StatementStep: vi.fn(
-    ({
-      text,
-      cta,
-      onContinue,
-    }: {
-      text: string;
-      cta?: string;
-      onContinue: () => void;
-    }) => (
+    ({ text, onContinue }: { text: string; onContinue: () => void }) => (
       <div>
         <p>{text}</p>
-        {button(`statement:${cta ?? "default"}`, onContinue)}
+        {button("statement", onContinue)}
       </div>
     ),
   ),
 }));
 vi.mock("@/components/onboarding/progress-chart", () => ({
   ProgressChartStep: vi.fn(
-    ({
-      kind,
-      text,
-      onContinue,
-    }: {
-      kind: string;
-      text: string;
-      onContinue: () => void;
-    }) => (
-      <div>
-        <p>{text}</p>
-        {button(`chart:${kind}`, onContinue)}
-      </div>
-    ),
+    ({ kind, onContinue }: { kind: string; onContinue: () => void }) =>
+      button(`chart:${kind}`, onContinue),
   ),
 }));
 vi.mock("@/components/onboarding/first-save", () => ({
@@ -280,7 +260,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("walks the questions, the trip question and the echoes into a sample for the goal that leads, and keeps every answer", () => {
+it("walks the questions, the trip question, the chart and the city echo into a sample for the goal that leads, and keeps every answer", () => {
   render(<OnboardingScreen />);
   tap("opener:start");
   tap("count:hundreds");
@@ -291,7 +271,6 @@ it("walks the questions, the trip question and the echoes into a sample for the 
   tap("trip:soon");
   tap("planner:explorer");
   tap("planner:continue");
-  expect(screen.getByText("onboardingStatement.savedHundreds")).toBeTruthy();
   tap("chart:trip");
   tap("city:trip:trip:lisbon");
   expect(saved()).toMatchObject({
@@ -304,7 +283,7 @@ it("walks the questions, the trip question and the echoes into a sample for the 
     step: ONBOARDING_STEPS.indexOf("cityEcho"),
   });
   expect(screen.getByText("onboardingStatement.cityFirst")).toBeTruthy();
-  tap("statement:default");
+  tap("statement");
   expect(mocks.share.mock.lastCall?.[0].sample).toMatchObject({
     kind: "trip",
     city: "austin",

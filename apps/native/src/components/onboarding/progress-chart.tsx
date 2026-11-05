@@ -203,11 +203,9 @@ function Chart({ kind }: { kind: PlanKind }) {
 
 export function ProgressChartStep({
   kind,
-  text,
   onContinue,
 }: {
   kind: PlanKind;
-  text: string;
   onContinue: () => void;
 }) {
   useAppLocale();
@@ -223,12 +221,12 @@ export function ProgressChartStep({
           maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
           accessibilityRole="header"
         >
-          {text}
+          {t("onboardingChart.title")}
         </Text>
         <Chart kind={kind} />
       </ScrollView>
       <PillButton
-        label={t("onboardingStatement.savedCta")}
+        label={t("common.continue")}
         onPress={onContinue}
         testID="onboarding-chart-continue"
       />

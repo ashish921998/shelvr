@@ -1027,12 +1027,7 @@ export type MessageParams = {
   "onboardingQ.cityTitleTrip": undefined;
   "onboardingQ.cityTitleOut": undefined;
   "onboardingQ.cityTitleDream": undefined;
-  "onboardingStatement.savedFew": undefined;
-  "onboardingStatement.savedTenToFifty": undefined;
-  "onboardingStatement.savedFiftyToTwoHundred": undefined;
-  "onboardingStatement.savedHundreds": undefined;
-  "onboardingStatement.savedLostCount": undefined;
-  "onboardingStatement.savedCta": undefined;
+  "onboardingChart.title": undefined;
   "onboardingChart.lost": undefined;
   "onboardingChart.goalDate": undefined;
   "onboardingChart.goalTrip": undefined;

@@ -19,7 +19,7 @@ import {
   type SavedCount,
   type TripSoon,
 } from "@/lib/onboarding-goals";
-import { cityEchoText, savedEchoText } from "@/lib/onboarding-echo";
+import { cityEchoText } from "@/lib/onboarding-echo";
 import { onboardingCompletedProperties } from "@/lib/onboarding-completed";
 import {
   ONBOARDING_FLOW_VERSION,
@@ -310,14 +310,8 @@ export default function OnboardingScreen() {
             onContinue={advance}
           />
         );
-      case "savedEcho":
-        return (
-          <ProgressChartStep
-            kind={kind}
-            text={savedEchoText(savedCount)}
-            onContinue={advance}
-          />
-        );
+      case "chart":
+        return <ProgressChartStep kind={kind} onContinue={advance} />;
       case "goal":
         return (
           <GoalStep picked={goals} onChange={setGoals} onContinue={advance} />
