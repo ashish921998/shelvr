@@ -108,7 +108,9 @@ export async function walkToCarouselEnd(screen: Screen): Promise<Locator> {
   ).toBeVisible({ timeout: 30_000 });
   await next.tap();
   await next.tap();
-  await expect(next).toBeVisible({ timeout: 30_000 });
+  await expect(
+    screen.getByText("Every place you saved, on one map."),
+  ).toBeVisible({ timeout: 30_000 });
   return next;
 }
 

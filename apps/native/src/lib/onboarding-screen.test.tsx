@@ -455,6 +455,23 @@ it.each(["granted", "blocked"] as const)(
   },
 );
 
+it("ignores an answer from an earlier carousel visit", async () => {
+  let answer: (value: "granted") => void = () => undefined;
+  mocks.permission.mockImplementation(
+    () => new Promise((resolve) => (answer = resolve)),
+  );
+  startAt("carousel");
+  render(<OnboardingScreen />);
+  tap("carousel:continue");
+  tap("common.back");
+  tap("aha:spots");
+  await act(async () => answer("granted"));
+  expect(mocks.ask).not.toHaveBeenCalled();
+  expect(
+    screen.getByRole("button", { name: "carousel:continue" }),
+  ).toBeTruthy();
+});
+
 it("returns from the notifications step to the same carousel without opening the paywall", () => {
   startAt("notifications");
   render(<OnboardingScreen />);

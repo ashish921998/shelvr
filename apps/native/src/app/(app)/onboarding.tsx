@@ -190,9 +190,11 @@ export default function OnboardingScreen() {
   const sample = ahaSample(kind, travelCity);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
   const currentStep = useRef(step);
+  const stepVisit = useRef(0);
 
   useEffect(() => {
     currentStep.current = step;
+    stepVisit.current += 1;
   }, [step]);
 
   useEffect(() => {
@@ -258,13 +260,14 @@ export default function OnboardingScreen() {
   };
 
   const leaveCarousel = () => {
+    const visit = stepVisit.current;
     void notificationPermissionState()
       .catch((error: unknown) => {
         analytics.captureError("onboarding_notifications_check_failed", error);
         return "blocked" as const;
       })
       .then((state) => {
-        if (currentStep.current !== "carousel") return;
+        if (stepVisit.current !== visit) return;
         if (state === "ask") advance();
         else askForPlan();
       });
