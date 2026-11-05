@@ -2,6 +2,7 @@ import { useMyFirstName } from "@/lib/shared-lists";
 import { whenSheetSettled } from "@/lib/entitlement";
 import { whenTrialPrimerDone } from "@/lib/trial-reminder";
 import { welcomeName } from "@/lib/welcome-save";
+import { useIsFocused } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 
 export function useWelcomeName(
@@ -10,6 +11,7 @@ export function useWelcomeName(
 ): { open: boolean; holding: boolean; close: () => void } {
   const pending = welcomeName.usePending(userId);
   const { firstName } = useMyFirstName();
+  const focused = useIsFocused();
   const [open, setOpen] = useState(false);
   const started = useRef<string | null>(null);
   useEffect(() => {
@@ -18,6 +20,7 @@ export function useWelcomeName(
       started.current === userId ||
       !pending ||
       !ready ||
+      !focused ||
       firstName === undefined
     )
       return;
@@ -38,6 +41,6 @@ export function useWelcomeName(
       live = false;
       started.current = null;
     };
-  }, [userId, pending, ready, firstName]);
+  }, [userId, pending, ready, focused, firstName]);
   return { open, holding: open || pending, close: () => setOpen(false) };
 }

@@ -8,7 +8,9 @@ const mock = vi.hoisted(() => ({
   store: new Map<string, string>(),
   firstName: null as string | null | undefined,
   settle: [] as (() => void)[],
+  focused: true,
 }));
+vi.mock("expo-router", () => ({ useIsFocused: () => mock.focused }));
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => mock.store.get(key) ?? null,
   setItem: (key: string, value: string) => {
@@ -43,6 +45,7 @@ beforeEach(() => {
   mock.store.clear();
   mock.firstName = null;
   mock.settle.length = 0;
+  mock.focused = true;
 });
 
 describe("useWelcomeName", () => {
@@ -60,6 +63,20 @@ describe("useWelcomeName", () => {
     await settleSheets();
     expect(result.current.open).toBe(true);
     expect(welcomeName.isPending("u1")).toBe(false);
+  });
+
+  it("keeps the ask while another screen is in front of Home", async () => {
+    welcomeName.mark("u1");
+    const { result, rerender } = renderHook(() => useWelcomeName("u1", true));
+    mock.focused = false;
+    rerender();
+    await settleSheets();
+    expect(result.current.open).toBe(false);
+    expect(welcomeName.isPending("u1")).toBe(true);
+    mock.focused = true;
+    rerender();
+    await settleSheets();
+    expect(result.current.open).toBe(true);
   });
 
   it("opens once for a new account with no name, after other sheets have settled", async () => {
