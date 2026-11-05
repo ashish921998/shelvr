@@ -1,5 +1,6 @@
+export const ROOT_TAB = "(map)";
 const HOME = "/(app)/(tabs)/(home)";
-const MAP = "/(app)/(tabs)/(map)";
+const MAP = `/(app)/(tabs)/${ROOT_TAB}`;
 
 // The Map tab's index adds no segment to the URL, so "/map" would match nothing.
 const MAP_ROUTE =
@@ -9,12 +10,6 @@ const MAP_ROUTE =
 const RETIRED_ROUTE =
   /^\/(?:\(app\)\/)?(?:\(tabs\)\/)?(?:\((?:spaces|search)\)|spaces|search|space|digest|new-space|manage-spaces|camera|trip|plan)(?=[/?#]|$)/;
 
-/**
- * Since Expo Router 58, "/" matches the index of every tab group and the
- * router picks the shortest group name. Runtime URLs (a notification already
- * scheduled with "/", the Convex Auth sign-in return) go through this so the
- * root opens the Map, and any retired screen opens Home.
- */
 export function resolveRootHref(url: string): string {
   if (RETIRED_ROUTE.test(url)) return HOME;
   if (MAP_ROUTE.test(url)) return url.replace(MAP_ROUTE, MAP);

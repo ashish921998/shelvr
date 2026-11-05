@@ -1,10 +1,10 @@
 import { TabBar } from "@/components/tab-bar";
+import { ROOT_TAB } from "@/lib/home-href";
 import { t, useAppLocale } from "@/lib/i18n";
 import { Tabs } from "expo-router/js-tabs";
 
-// The tab a link opens when it names none. A plain launch reaches the Map through +native-intent.
 // eslint-disable-next-line @typescript-eslint/naming-convention -- Expo Router reads this exact export name.
-export const unstable_settings = { anchor: "(map)" };
+export const unstable_settings = { anchor: ROOT_TAB };
 
 export default function TabsLayout() {
   useAppLocale();

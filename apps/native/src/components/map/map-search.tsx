@@ -6,7 +6,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type Result = { id: string; name: string; city?: string };
 
-/** The search field that takes the place of the title while search is open. */
 export function MapSearchField({
   text,
   onChangeText,
@@ -47,7 +46,6 @@ export function MapSearchField({
   );
 }
 
-/** The matches listed under the header while the field holds text. */
 export function MapSearchResults({
   text,
   results,

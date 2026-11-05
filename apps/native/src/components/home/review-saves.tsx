@@ -84,7 +84,6 @@ function ReviewRow({ save, onOpen }: { save: ReviewSave; onOpen: () => void }) {
   );
 }
 
-/** One of Home's rows for saves Home couldn't place, opening a sheet to fix them. */
 export function ReviewSaves({ saves }: { saves: ReviewSave[] }) {
   useAppLocale();
   const router = useRouter();
