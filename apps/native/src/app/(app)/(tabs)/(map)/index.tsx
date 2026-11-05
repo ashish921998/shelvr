@@ -1,6 +1,9 @@
 import { EmptyState } from "@/components/empty-state";
 import { MapFilterChips } from "@/components/map/map-filter-chips";
-import { MapSearch } from "@/components/map/map-search";
+import { MapEmpty } from "@/components/map/map-empty";
+import { MapHeader, MAP_HEADER_HEIGHT } from "@/components/map/map-header";
+import { MapRoundButton } from "@/components/map/map-round-button";
+import { MapSearchResults } from "@/components/map/map-search";
 import {
   type MapFocus,
   type MapPin,
@@ -24,6 +27,7 @@ import {
   topSearchResults,
 } from "@/lib/map-filters";
 import { useMapLocation } from "@/lib/map-location";
+import { useMapCity } from "@/lib/use-map-city";
 import { placeEmoji } from "@/lib/map-pin-emoji";
 import { api } from "@convex/_generated/api";
 import type { PlaceKind } from "@convex/model/placeKinds";
@@ -34,8 +38,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/** Room left at the right of the filter row for MapKit's my-location button. */
-const LOCATE_BUTTON_CLEARANCE = 64;
+const NO_PLACES: never[] = [];
 
 function placeId(place: {
   itemId: string;
@@ -70,8 +73,11 @@ export default function MapScreen() {
   // Closed once a result is picked, so the map and place card get the room; typing opens it again.
   const [listOpen, setListOpen] = useState(true);
   const [focus, setFocus] = useState<MapFocus | undefined>(undefined);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [locate, setLocate] = useState(0);
 
   const all = places.data;
+  const { city, onCentreChange } = useMapCity(all ?? NO_PLACES);
   const filters = useMemo(() => mapFilters(all ?? []), [all]);
   // A filter that no longer has enough places (a save was deleted) falls back to All.
   const active = filters.some((filter) => filter.kind === kind) ? kind : null;
@@ -122,20 +128,8 @@ export default function MapScreen() {
     );
   }
   if (all === undefined || location === "asking") return <ScreenLoader />;
-  if (all.length === 0) {
-    return (
-      <View style={styles.empty}>
-        <EmptyState title={t("map.emptyTitle")} message={t("map.emptyBody")} />
-      </View>
-    );
-  }
-
-  const top = rt.insets.top + theme.gap(1);
+  const headerBottom = rt.insets.top + MAP_HEADER_HEIGHT;
   const located = location === "granted";
-  // The search field, then the chips under it.
-  const overlayHeight =
-    theme.control.minHeight +
-    (filters.length > 0 ? theme.gap(1) + theme.control.minHeight : 0);
   const select = (id: string) => {
     const place = shown.find((candidate) => placeId(candidate) === id);
     if (!place || !focused.current) return;
@@ -169,67 +163,102 @@ export default function MapScreen() {
     if (next !== null) analytics.capture("map_filter_selected", { kind: next });
   };
 
+  const cancelSearch = () => {
+    setSearchText("");
+    setListOpen(true);
+    setSearchOpen(false);
+    Keyboard.dismiss();
+  };
+
   return (
     <View style={styles.container}>
-      <PlacesMap
-        pins={pins}
-        framed={framed}
-        showsUser={located}
-        topInset={top + overlayHeight}
-        focus={focus}
-        onSelect={select}
-      />
-      <View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: top + overlayHeight + theme.gap(2),
-          // Built in render: Unistyles drops a stylesheet's backgroundImage on theme change.
-          experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0.92)} 0%, ${withAlpha(theme.colors.background, 0.6)} 60%, ${withAlpha(theme.colors.background, 0)} 100%)`,
-        }}
-      />
-      <View
-        style={[
-          styles.overlay,
-          // Kept clear of MapKit's my-location button in the top right corner, which it would cover.
-          { top, right: located ? LOCATE_BUTTON_CLEARANCE : 0 },
-        ]}
-      >
-        <MapSearch
+      <View style={styles.mapArea}>
+        <PlacesMap
+          pins={pins}
+          framed={framed}
+          showsUser={located}
+          topInset={headerBottom + theme.gap(1)}
+          focus={focus}
+          locate={locate}
+          onCentreChange={onCentreChange}
+          onSelect={select}
+        />
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: headerBottom + theme.gap(2),
+            // Built in render: Unistyles drops a stylesheet's backgroundImage on theme change.
+            experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0.92)} 0%, ${withAlpha(theme.colors.background, 0.6)} 60%, ${withAlpha(theme.colors.background, 0)} 100%)`,
+          }}
+        />
+        <MapHeader
+          city={city}
+          canSearch={all.length > 0}
+          searchOpen={searchOpen}
           text={searchText}
           onChangeText={(text) => {
             setSearchText(text);
             setListOpen(true);
           }}
-          total={matches.length}
-          results={
-            searching && listOpen
-              ? topSearchResults(matches).map((place) => ({
-                  id: placeId(place),
-                  name: place.name,
-                  city: place.city,
-                }))
-              : undefined
-          }
-          onSelect={pickResult}
+          onOpenSearch={() => setSearchOpen(true)}
+          onCancel={cancelSearch}
         />
-        {filters.length > 0 && !searching ? (
+        {searchOpen && searching && listOpen ? (
+          <View style={[styles.results, { top: headerBottom }]}>
+            <MapSearchResults
+              text={searchText}
+              total={matches.length}
+              results={topSearchResults(matches).map((place) => ({
+                id: placeId(place),
+                name: place.name,
+                city: place.city,
+              }))}
+              onSelect={pickResult}
+            />
+          </View>
+        ) : null}
+        {all.length === 0 ? (
+          <MapEmpty
+            located={located}
+            onLocate={() => setLocate((n) => n + 1)}
+          />
+        ) : null}
+        {all.length > 0 && located ? (
+          <View style={styles.locate}>
+            <MapRoundButton
+              icon="location"
+              label={t("map.showMyLocation")}
+              onPress={() => setLocate((n) => n + 1)}
+            />
+          </View>
+        ) : null}
+      </View>
+      {filters.length > 0 ? (
+        <View style={styles.strip}>
           <MapFilterChips
             kinds={filters.map((filter) => filter.kind)}
             selected={active}
             onSelect={choose}
           />
-        ) : null}
-      </View>
+        </View>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  empty: { flex: 1, backgroundColor: theme.colors.background },
-  overlay: { position: "absolute", left: 0, gap: theme.gap(1) },
+  mapArea: { flex: 1 },
+  results: { position: "absolute", left: theme.gap(2), right: theme.gap(2) },
+  locate: { position: "absolute", right: theme.gap(2), bottom: theme.gap(2) },
+  strip: {
+    paddingVertical: theme.gap(1),
+    backgroundColor: theme.colors.background,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.border,
+  },
 }));
