@@ -258,8 +258,8 @@ JWT `sub`), never from a client argument.
 `ignoreCommand` runs `turbo-ignore`, so Vercel builds and publishes only when a
 push changes something the web app depends on, and cancels the deployment for
 the rest, such as a native-only change. Keep the `turbo-ignore` version in step with `turbo` in the root
-`package.json`. Android waitlist signup needs `CONVEX_URL` (or `CONVEX_SITE_URL`) and
-`WAITLIST_SHARED_SECRET` at runtime:
+`package.json`. Android waitlist signup needs `WAITLIST_SHARED_SECRET` and a Convex site origin at
+runtime: `CONVEX_SITE_URL`, or a `CONVEX_URL` containing `.convex.cloud`:
 
 ```sh
 pnpm --filter web-app build
