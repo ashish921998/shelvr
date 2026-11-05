@@ -1167,7 +1167,7 @@
   "onboardingChart.now": "Maintenant",
   "onboardingChart.whenWeekend": "Cette fin de semaine",
   "onboardingChart.whenTrip": "Votre prochain voyage",
-  "onboardingChart.chartLabel": "Une courbe de %{lost} maintenant à %{goal}. %{when}",
+  "onboardingChart.chartLabel": "Une courbe allant de %{lost}, maintenant, à %{goal}. %{when}",
   "onboardingStatement.cityPicked": "%{city}. Excellent choix.\n\nEnregistrons vos premiers lieux à %{city}.",
   "onboardingStatement.cityFirst": "%{picked}. Excellent choix.\n\nEssayons d’abord avec un vrai reel de %{city}.",
   "onboardingStatement.cityStart": "Enregistrons vos premiers lieux à %{city}.",
