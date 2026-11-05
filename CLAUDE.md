@@ -215,8 +215,9 @@ each. These rules need more than a line:
   client, then contract once the production channel shows no old bundle calling it.
   `tools/verify-convex-api.mjs` fails a pull request that changes or removes a public
   function's `args`, `returns`, `export` or kind (`query`, `mutation`, `action`).
-  Acknowledge an intended change with a `Convex-Api: changed` trailer. It cannot tell
-  widening from narrowing, so an added field needs the trailer too.
+  Add a `Convex-Api: changed` trailer only for a change an installed app survives, or for
+  the expand step; the trailer passes the check either way. It cannot tell widening from
+  narrowing, so an added field needs the trailer too.
 - **AI passes write only `suggested` memberships** in `spaceItems`. Two exceptions: in a
   space with `autoFile` on (only while `dynamic` is on) the classifier inserts new matches
   as `saved`, for saves made after auto-file was turned on, never changing an existing

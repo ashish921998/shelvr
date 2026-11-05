@@ -5,9 +5,10 @@ Every variable the web app, the native app and the Convex deployment read.
 **Client**
 
 - Web (`apps/web/.env.example`): `CONVEX_URL` is optional unless a server-backed marketing form
-  is enabled; the Android waitlist route returns 503 without it. No auth env vars
-- Web: `CONVEX_SITE_URL`: optional HTTP Actions origin (`*.convex.site`) for the server
-  routes; derived from `CONVEX_URL` when empty
+  is enabled. No auth env vars
+- Web: `CONVEX_SITE_URL`: HTTP Actions origin (`*.convex.site`) for the server routes. When
+  empty it is derived from `CONVEX_URL`, but only from a `*.convex.cloud` URL. The Android
+  waitlist route answers 503 when neither gives an origin or `WAITLIST_SHARED_SECRET` is unset
 - Web: `WAITLIST_SHARED_SECRET`: must equal the Convex deployment's `WAITLIST_SHARED_SECRET`.
   The web server routes (waitlist, plan votes, the reel place finder, the Oracle) send it to
   the Convex HTTP routes. The web server also signs Oracle share links with it, and
@@ -18,6 +19,11 @@ Every variable the web app, the native app and the Convex deployment read.
   it, App Store links carry `ct=` campaign tokens; see
   [growth funnel](../analytics/growth-funnel.md)
 - Native (copy `apps/native/.example.env` to `.env.local`):
+  - `APP_VARIANT`: `development` (default), `preview` or `production`. Picks the bundle id
+    suffix, scheme, icon and which keys `app.config.js` accepts. The EAS profiles set it
+  - `ANDROID_BUILD_ARCHS`: optional comma-separated Android ABIs. Unset, production builds
+    `arm64-v8a,armeabi-v7a` and other variants add `x86,x86_64`. The EAS profiles and the
+    native-update workflow set it
   - `EXPO_PUBLIC_CONVEX_URL`: the Convex deployment URL the client connects to. `app.config.js`
     rejects the production URL on dev and preview builds
   - `EXPO_PUBLIC_CONVEX_SITE_URL`: the deployment's HTTP Actions origin
