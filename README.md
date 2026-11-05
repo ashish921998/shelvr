@@ -137,6 +137,7 @@ analytics are optional (copy `apps/web/.env.example` to
 
 ```sh
 CONVEX_URL=<deployment-url>
+CONVEX_SITE_URL=<deployment-site-url>
 WAITLIST_SHARED_SECRET=<same value as on the Convex deployment>
 NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN=<project-token>
 NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com

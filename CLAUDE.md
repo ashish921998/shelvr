@@ -216,8 +216,9 @@ anywhere else.
 ## Working conventions
 
 `AGENTS.md` lists the one-line boundaries (no client `userId`, indexes, accurate validators,
-`requireProEntitlement` and `claimSave`, logging, `newConvexTest()`) and what enforces
-each. These rules need more than a line:
+`requireProEntitlement` and `claimSave`, logging, `newConvexTest()`); its table says what
+enforces most of them, and `REVIEW.md` covers the review-only ones. These rules need more
+than a line:
 
 - **Public Convex functions are contracts.** The backend deploys on its own, OTA updates
   land one launch later and store builds lag for weeks, so an installed app keeps calling
@@ -226,7 +227,8 @@ each. These rules need more than a line:
   client, then contract once the production channel shows no old bundle calling it.
   `tools/verify-convex-api.mjs` fails a pull request that changes or removes a public
   function's `args`, `returns`, `export` or kind (`query`, `mutation`, `action`).
-  Add a `Convex-Api: changed` trailer only for a change an installed app survives: the
+  Add a `Convex-Api: changed` trailer, on a commit in the pull request (the check reads
+  only commits after the merge base), only for a change an installed app survives: the
   expand step, or the contract step once no old bundle calls the old shape. The trailer
   passes the check either way. It cannot tell widening from narrowing, so an added field
   needs the trailer too.
@@ -236,9 +238,9 @@ each. These rules need more than a line:
   row; and `steerItemForSpace` may update `intents` on `saved` memberships without
   changing their status. `saved` and `dismissed` belong to the user, and no AI pass
   overwrites them.
-- **A table field is a one-way door.** Convex validates every row against the schema on
-  deploy and rejects an undeclared field, so reverting the commit that added a field
-  fails the deploy. To back one out, stop writing it, keep it declared `v.optional(...)`,
+- **A table field is a one-way door once a row stores it.** Convex validates every row
+  against the schema on deploy and rejects an undeclared field, so reverting the commit
+  that added a field some row now carries fails the deploy. To back one out, stop writing it, keep it declared `v.optional(...)`,
   and drop the declaration once no row has it.
 - **A moved native fingerprint strands OTA updates.** A change to a native module, a
   config plugin, `app.json` or `app.config.js` may move it, and the diff does not show
