@@ -196,13 +196,19 @@ Scheme `shelvr`; bundle id `app.shelvr.save`, with `.dev` / `.preview` appended 
 
 ## Environment variables
 
-The variables are listed in code, not here: `apps/native/.example.env` and `app.config.js`
-(native app; the EAS profiles set `APP_VARIANT` and `ANDROID_BUILD_ARCHS`), `apps/web/.env.example`
-(web app), and the `env` block in `apps/native/convex/convex.config.ts` (Convex deployment, where
-only `GOOGLE_GENERATIVE_AI_API_KEY` is required; Convex Auth reads its own `JWT_*` and `AUTH_*`
-variables). For the app, copy
-`apps/native/.example.env` to `.env.local`. To see what a variable does, read the code that
-reads it. Feature switches such as `FREE_SAVES_ENABLED`, `SAVE_REMINDERS_ENABLED` and
+The variables are listed in code, not here:
+
+- Native app: `apps/native/.example.env`, plus `apps/native/app.config.js` and the profiles in
+  `apps/native/eas.json`, which set `APP_VARIANT` (and `ANDROID_BUILD_ARCHS` on the
+  development profiles)
+- Web app: `apps/web/.env.example`
+- Convex deployment: the `env` block in `apps/native/convex/convex.config.ts`, where the schema
+  requires only `GOOGLE_GENERATIVE_AI_API_KEY`. Convex Auth's `JWT_PRIVATE_KEY`, `JWKS`,
+  `AUTH_GOOGLE_*` and `AUTH_APPLE_*` are not declared there; `README.md` → Convex Auth sets
+  them up
+
+For the app, copy `apps/native/.example.env` to `.env.local`. To see what a variable does,
+read the code that reads it. Feature switches such as `FREE_SAVES_ENABLED`, `SAVE_REMINDERS_ENABLED` and
 `VIDEO_TRANSCRIPTS_ENABLED` stay off until set to `"true"`, so a deploy never turns one on.
 `E2E_FAKE_AI` swaps Gemini for `model/fakeAi.ts` only on the local e2e backend, and is refused
 anywhere else.
