@@ -235,8 +235,10 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   inserts new matches as `saved` into a space the user set to auto-file.
   User-owned `saved` and `dismissed` decisions stay intact.
 - Keep secrets and user content out of source, logs, tests, and reports.
-- Do not reintroduce the retired notes-app domain (`notes` table, OpenAI summary action, `/notes` routes) or edit generated Convex files
-  unless the Convex workflow explicitly requires regeneration.
+- Do not reintroduce the retired notes-app domain (`notes` table, OpenAI summary
+  action, `/notes` routes).
+- Do not edit generated Convex files unless the Convex workflow explicitly
+  requires regeneration.
 
 ## Rules and what enforces them
 

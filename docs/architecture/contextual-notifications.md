@@ -384,7 +384,7 @@ arms, not open rates.
 `reason` is a closed set: `budget`, `quiet_hours`, `cadence_reduced`,
 `user_disabled`, `no_content`, `no_devices`, `holdout`. All properties are
 categorical; item titles appear in notification bodies but never in event
-properties, per the rule in `AGENTS.md` → Observability.
+properties.
 
 ### What the first release must answer
 
