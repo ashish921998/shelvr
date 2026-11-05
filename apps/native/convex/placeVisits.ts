@@ -15,7 +15,7 @@ import {
   appleMapsConfig,
   appleMapsCountry,
 } from "./model/appleMaps";
-import { authedMutation, authedQuery } from "./model/auth";
+import { authedMutation, authedQuery, liveOwner } from "./model/auth";
 import { logEvent } from "./model/log";
 import { linkSource } from "./model/externalUrl";
 import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
@@ -401,6 +401,7 @@ export const backfillCountries = internalMutation({
     let queued = 0;
     for (const visit of page) {
       if (visit.countryCode !== undefined) continue;
+      if ((await liveOwner(ctx, visit.userId)) === null) continue;
       if (visit.lat === undefined) {
         const item = await ctx.db.get(visit.itemId);
         const pin =

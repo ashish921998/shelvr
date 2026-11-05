@@ -209,6 +209,26 @@ describe("the passport", () => {
     expect(lookups()).toBe(1);
   });
 
+  it("leaves a deleting account's marks alone in the backfill", async () => {
+    const lookups = await withMaps();
+    const { t, userId, itemId, visits } = await setup();
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+      });
+      await ctx.db.patch(userId, { deleting: true });
+    });
+    await settle(t, () =>
+      t.mutation(internal.placeVisits.backfillCountries, { cursor: null }),
+    );
+    expect((await visits())[0].lat).toBeUndefined();
+    expect(lookups()).toBe(0);
+  });
+
   it("keeps the pin, city and country of a place marked I went", async () => {
     const lookups = await withMaps();
     const { backend, t, itemId, visits } = await setup();
