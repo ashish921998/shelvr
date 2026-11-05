@@ -1038,7 +1038,7 @@ in-plan experiment, `reading_time` in R2, that decides whether to build it.
 Treat geofencing as research and Screen Time as gated work whose entitlement
 paperwork is already moving.
 
-Each release respects the deploy order in `CLAUDE.md`: the Convex deploy lands
+Each release respects the deploy order in `AGENTS.md` → Deployment: the Convex deploy lands
 before the client update that needs it, public shapes expand before clients
 move, and nothing contracts until the production channel shows no old bundle
 calling it.

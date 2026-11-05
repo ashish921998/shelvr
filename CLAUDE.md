@@ -14,70 +14,29 @@ running: its findings must meet `REVIEW.md`'s proof rule and use its tags and re
 
 ## What this is
 
-**Shelvr** is a "save-it-for-later" hub. Users capture links, images, and notes; a Convex
-backend action fetches/extracts content and an LLM classifies each item (title, description,
-tags, cities, places, and which "spaces" it belongs to). The app today has one flow: save a
-reel, TikTok or link, and its places show under its city on Home; a city page has a map of
-those places and Plan a date / Plan a trip. Items can be organized into **spaces** (themed
-collections). The app no longer shows spaces, but the backend keeps them for old builds and
-for the hidden space behind each city's plans. Creating a new space runs one recommendation
-pass over existing items. That pass writes `suggested` memberships only. The user accepts or
-dismisses each suggestion.
+**Shelvr** is a "save-it-for-later" app. A user saves a reel, TikTok or link; a Convex action
+reads it and an LLM classifies it (title, tags, cities, places, spaces). Its places show under
+their city on Home, and a city page has a map of them plus Plan a date / Plan a trip. The app
+no longer shows **spaces**, but the backend keeps them for old builds and for the hidden space
+behind each city's plans.
 
-## Monorepo layout
+`apps/native` is the Expo app with its Convex backend in `apps/native/convex` (the source of
+truth); `apps/web` is the marketing site only, with no auth or product UI, whose server routes
+forward to Convex HTTP routes and store nothing. Business notes, marketing assets, metric
+snapshots and store media live in the separate `shelvr-notes` repo; do not add them here.
 
-| Path          | Role                                                                               |
-| ------------- | ---------------------------------------------------------------------------------- |
-| `apps/web`    | Next.js marketing / landing site; server routes may call Convex for waitlists      |
-| `apps/native` | Expo Router native app (includes `convex/` backend)                                |
-| `tools/e2e`   | End-to-end flow tests for the iOS simulator (pilot; see the README's Test section) |
+## Commands
 
-Convex types/API are imported as `@convex/_generated/*` (path alias resolves to `./convex/*`).
+Use `pnpm`. `pnpm run check` from the repo root is the whole gate; `check:code` (everything but
+the dependency audit) is what CI and the pre-push hook run. `pnpm dev` does not start the
+backend: run `pnpm --filter native-app exec convex dev` in a second terminal, which also keeps
+`convex/_generated/*` in sync. After changing copy, run `pnpm localization:generate`.
 
-This repo holds product code, tests, release tooling, and agent configuration only. `docs/`
-carries what an agent needs to change the product safely: analytics event methodology and SQL,
-the App Store review process, and architecture decisions. Business notes, marketing copy and
-assets, dated metric snapshots, research, and store media (videos, screenshots) live in the
-separate `shelvr-notes` repo. Do not add them here.
+Before UI work read [design system](docs/architecture/design-system.md); before visible copy
+read [localization](docs/architecture/localization.md); before simulator QA read
+[local QA](docs/architecture/local-qa.md).
 
-## Toolchain & commands
-
-**Use `pnpm`** (workspace package manager). Root scripts go through Turbo.
-
-- `pnpm install`: install deps
-- `pnpm dev`: run web (`next dev`) + native (`expo start`) via Turbo. It does not start the
-  Convex backend; run `convex dev` in a second terminal
-- `pnpm typecheck`: typecheck all packages
-- `pnpm --filter native-app start`: Expo Metro
-- `pnpm --filter native-app exec convex dev`:
-  Convex backend against the dev deployment; keeps `convex/_generated/*` in sync
-- `pnpm --filter web-app dev`: Next.js dev server
-- `pnpm --filter web-app lint`: ESLint
-- `pnpm --filter native-app test`: Vitest suite (`vitest run`)
-- `pnpm run check`: the whole gate, from the repo root. `check:code` is the part CI runs on
-  every push and the pre-push hook runs; `check` adds the dependency audit
-
-Tests live next to the code as `*.test.ts` under `apps/native/convex/` and `apps/native/src/`.
-`apps/native/vitest.config.ts` includes both trees and runs Node as the default environment.
-Convex function tests use [`convex-test`](https://docs.convex.dev/testing/convex-test) and opt
-into the edge runtime per file with a `// @vitest-environment edge-runtime` pragma. Build the
-test harness through `newConvexTest()` in `apps/native/convex/test.setup.ts`; it registers the
-rate-limiter component, without which any mutation that calls `rateLimiter.limit` fails.
-
-## Architecture
-
-This section is an index: read the code for how a module behaves. `tools/verify-agent-docs.mjs`
-requires every table, module and route to appear here in backticks. What the code cannot tell
-you is under "What grep won't tell you" below.
-
-### Backend (`apps/native/convex/`), the source of truth
-
-Convex is the database, file storage, scheduler and AI orchestration. Auth is
-[Convex Auth](https://labs.convex.dev/auth/) (`auth.ts`, `auth.config.ts`); it issues its own
-JWTs, and `model/auth.ts` turns the JWT `sub` into the stable users-table id every app table
-keys on.
-
-Rules that cross modules:
+## Backend rules that cross modules
 
 - **Callers.** A public query or mutation is built with `authedQuery` / `authedMutation`
   (`model/auth.ts`) and reads `ctx.userId`. One that must answer a signed-out or deleting
@@ -98,41 +57,9 @@ Rules that cross modules:
 - **External fetches** go through `model/safeFetch.ts`; host knowledge lives in the page readers
   under `model/readers/`, never in `ai.ts`.
 - **Logging** goes through `logEvent` (`model/log.ts`): one JSON line, scalar fields only.
-- **AI model:** `gemini-3.1-flash-lite` through `@ai-sdk/google`
-  (`GOOGLE_GENERATIVE_AI_API_KEY`).
 - For any edit in `convex/`, prefer the `convex-expert` skill.
 
-**Tables** (`schema.ts`, plus Convex Auth's `authTables`):
-
-- Saves: `items` (`processing`, then `ready` or `failed`; `search_text` full-text index),
-  `itemOperations` (import idempotency), `itemReads`, `shareLinks`, `onboardingDemos`,
-  `freeSaves` (the free plan's 10 saves)
-- Spaces (old builds, and the hidden space behind a city's plans): `spaces`, `spaceItems`
-  (`suggested` / `saved` / `dismissed`)
-- Places and plans: `placeRemovals`, `placeVisits`, `planShares`, `planVotes`, `trips` (old
-  builds), `tripPlans`, `tripStops`
-- Shared lists: `sharedLists`, `sharedListMembers`, `sharedListPlaces`
-- Notifications: `notificationDevices`, `notificationPreferences`, `weeklyDigests`,
-  `saveReminders`, `tripEveReminders`
-- Account and billing: `users` (redeclared with optional `appleRefreshToken` and `deleting`),
-  `subscriptions`, `paymentAnalyticsReceipts`, `legalConsents`, `aiConsents`, `cancelSurveys`,
-  `captureTokens`, `appleTokens`, `detachedAppleTokens`
-- Inbound: `waitlistSignups`, `feedbackSubmissions`
-
-**Modules:**
-
-| Area            | Modules                                                                                                                                                                      |
-| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Saves           | `items.ts`, `ai.ts` (processing pipeline), `freeSaves.ts`, `demo.ts`, `appIntents.ts` (Siri and Shortcuts), `reelPlaces.ts` and `oracle.ts` / `oracleLimits.ts` (web tools)  |
-| Places          | `placePins.ts`, `placeCorrections.ts`, `placeCorrectionSearch.ts`, `placeRemovals.ts`, `placeVisits.ts`, `mapPlaces.ts`                                                      |
-| Plans and trips | `datePlans.ts` / `datePlanData.ts`, `tripPlanner.ts` / `tripPlannerData.ts`, `planShares.ts`, `sharedLists.ts`; old builds: `plans.ts`, `trips.ts` / `tripData.ts`           |
-| Spaces          | `spaces.ts`, `aiRecommendForSpace.ts`, `aiEmbeddingSweep.ts` (retired no-op)                                                                                                 |
-| Account         | `users.ts`, `auth.ts`, `auth.config.ts`, `appleProfile.ts`, `appleRevoke.ts`, `aiConsent.ts`, `legalConsent.ts`, `legalConsentSync.ts`, `devFixtures.ts`                     |
-| Billing         | `subscriptions.ts` (`requireProEntitlement`), `cancelSurvey.ts`, `paymentTelemetry.ts`                                                                                       |
-| Notifications   | `notifications.ts`, `notificationDelivery.ts`                                                                                                                                |
-| Plumbing        | `http.ts` (every HTTP route), `crons.ts`, `health.ts`, `schema.ts`, `convex.config.ts`, `waitlist.ts`, `feedback.ts`, `analytics.ts`, `accountTelemetry.ts`, `test.setup.ts` |
-
-#### What grep won't tell you
+## What grep won't tell you
 
 - **Old-build code looks dead but is a live contract.** `trips.ts`, `tripData.ts`, `plans.ts`,
   the space CRUD and suggestion functions in `spaces.ts`, `ensureCitySpace`,
@@ -158,41 +85,8 @@ Rules that cross modules:
 - **Rows outlive saves.** Deleting a save keeps its `tripStops` and `sharedListPlaces` rows.
 - **Google Maps lists** are read through Google's undocumented list endpoint
   (`model/readers/googleMaps.ts`). A format change fails quietly to a plain page read.
-
-### Web (`apps/web`)
-
-Next.js App Router marketing site only, no auth or product UI. Server routes may call Convex
-for marketing forms and the free tools (`/reel-place-finder`, the Oracle), which forward to the
-Convex HTTP routes and store nothing.
-
-### Native (`apps/native`)
-
-Expo Router under `src/app`, with `(auth)` (one `sign-in` route) and `(app)` groups; Convex
-Auth via `ConvexAuthProvider` with `expo-secure-store`. Before UI work read
-[design system](docs/architecture/design-system.md); before visible copy read
-[localization](docs/architecture/localization.md) and run `pnpm localization:generate` from the
-repo root; before simulator QA read [local QA](docs/architecture/local-qa.md).
-
-Routes in `(app)`:
-
-- Tabs: `(home)` (Home: plan tiles, city cards, shared lists, review line), `(map)` (every
-  mapped place), `(trips)` (My trips)
-- Places: `city/[name]`, `spots/[id]` (after sharing), `item/[id]`, `edit-save-places`
-- Plans: `date-plan`, `new-trip`, `trip-plan/[id]`, `add-trip-stop`
-- Shared lists: `shared-list/[id]`, `new-shared-list`, `add-list-place` (the Join screen is the
-  root route `list-invite/[token]`)
-- Saving: `add` (a pasted link), `share`
-- Account: `onboarding`, `paywall`, `plan-gate` (hard paywall), `profile`, `settings`
-
-Retired screens' links open Home through `src/lib/home-href.ts` and `src/app/+native-intent.ts`.
-Scheme `shelvr`; bundle id `app.shelvr.save`, with `.dev` / `.preview` appended for the other
-`APP_VARIANT` profiles.
-
-## Path aliases
-
-- Web: `@/*` maps to `apps/web/src/*`
-- Native: `@/*` maps to `apps/native/src/*`, `@convex/*` to `apps/native/convex/*`
-- Import Convex API as `@convex/_generated/api`
+- **Retired screens' links** open Home through `src/lib/home-href.ts` and
+  `src/app/+native-intent.ts`, so an old link or notification never lands on a missing screen.
 
 ## Environment variables
 
@@ -212,6 +106,8 @@ read the code that reads it. Feature switches such as `FREE_SAVES_ENABLED`, `SAV
 `VIDEO_TRANSCRIPTS_ENABLED` stay off until set to `"true"`, so a deploy never turns one on.
 `E2E_FAKE_AI` swaps Gemini for `model/fakeAi.ts` only on the local e2e backend, and is refused
 anywhere else.
+
+## Working conventions
 
 ## Working conventions
 
@@ -259,8 +155,6 @@ than a line:
   request (`gh pr create --label no-ui-change`), or to an open one with
   `gh pr edit --add-label no-ui-change`. The `PR evidence` check fails a ready pull
   request otherwise.
-- **A new table, top-level Convex module or `(app)` route needs a line in this file.**
-  `tools/verify-agent-docs.mjs` fails until the name appears here in backticks.
 
 <!-- convex-ai-start -->
 
