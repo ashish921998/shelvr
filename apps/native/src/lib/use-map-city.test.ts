@@ -28,4 +28,16 @@ describe("useMapCity", () => {
     act(() => result.current.onCentreChange({ lat: 38.72, lng: -9.14 }));
     expect(result.current.city).toBe("Lisbon");
   });
+
+  it("renames the city when the places under a still map change", () => {
+    const { result, rerender } = renderHook(({ saved }) => useMapCity(saved), {
+      initialProps: { saved: places },
+    });
+    act(() => result.current.onCentreChange({ lat: 41.14, lng: -8.6 }));
+    expect(result.current.city).toBe("Porto");
+    rerender({ saved: places.filter((place) => place.city !== "Porto") });
+    expect(result.current.city).toBeUndefined();
+    rerender({ saved: places });
+    expect(result.current.city).toBe("Porto");
+  });
 });

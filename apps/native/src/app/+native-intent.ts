@@ -15,6 +15,7 @@ export function redirectSystemPath({
     markDirectLaunch();
     rememberSheetLink(path);
   }
+  if (path.startsWith("/")) return resolveRootHref(path);
 
   try {
     const url = new URL(path);

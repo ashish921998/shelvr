@@ -55,7 +55,8 @@ white in the light theme and the card surface in the dark ones, so a photo
 never sits in a bright border at night. Content drawn on a filled tint
 uses the paired `on*` role: `onTint` on `primary` (a dark label, since white on
 the amber fill is 2.19:1), `onKeep` on `keep`, `onOverlay` on `overlay`.
-`tabTint` is the + on the tab bar's Add button (`src/components/tab-bar.tsx`).
+`tabTint` is the tint color for the plus icon on the tab bar's Add button
+(`src/components/tab-bar.tsx`).
 The button is `surface`, where the light theme's value is 5.82:1, and it still
 clears 5.03:1 on `surfaceMuted`. The tab bar's other two buttons are emoji
 with a `muted` label, and they always lead to the two tabs you are not on. The

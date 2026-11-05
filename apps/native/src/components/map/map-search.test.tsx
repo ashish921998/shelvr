@@ -79,6 +79,13 @@ it("says when nothing matches", () => {
   expect(screen.getByText("map.searchNoResults:sushi")).toBeTruthy();
 });
 
+it.each(["", "  "])("shows no list for the empty query %j", (text) => {
+  const { container } = render(
+    <MapSearchResults text={text} total={3} results={[]} onSelect={vi.fn()} />,
+  );
+  expect(container.textContent).toBe("");
+});
+
 it("clearing empties the field", () => {
   const onChangeText = vi.fn();
   render(<MapSearchField text="sushi" onChangeText={onChangeText} />);

@@ -67,9 +67,9 @@ it("shows at most eight, keeping the first eight in order", () => {
       saves={Array.from({ length: 10 }, (_, i) => save(String(i)))}
     />,
   );
-  expect(screen.getAllByRole("button")).toHaveLength(8);
-  expect(screen.getByText("Save 7")).toBeTruthy();
-  expect(screen.queryByText("Save 8")).toBeNull();
+  expect(
+    screen.getAllByRole("button").map((button) => button.textContent),
+  ).toEqual(Array.from({ length: 8 }, (_, i) => `Save ${i}`));
 });
 
 it("renders nothing when no save qualifies", () => {

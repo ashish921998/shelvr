@@ -101,6 +101,7 @@ export function PlacesMap({
   // Set while the camera travels to the person; once it rests, a map with none of their places in
   // reach moves on to the city they saved the most in.
   const checkNearby = useRef<(() => void) | undefined>(undefined);
+  const cancelOpening = useRef<(() => void) | undefined>(undefined);
   const waitForRest = () => {
     clearTimeout(settle.current);
     settle.current = setTimeout(() => checkNearby.current?.(), SETTLE_MS);
@@ -131,6 +132,7 @@ export function PlacesMap({
         showCity();
       },
     );
+    cancelOpening.current = cancel;
     // Only the opening move may be redirected; a later pan or my-location tap is the person's own.
     const disarm = setTimeout(() => {
       checkNearby.current = undefined;
@@ -147,6 +149,7 @@ export function PlacesMap({
     if (!focus) return;
     // A place the person picked wins over the opening check.
     checkNearby.current = undefined;
+    cancelOpening.current?.();
     return moveCamera(
       () =>
         map()?.setCameraPosition({
@@ -160,6 +163,7 @@ export function PlacesMap({
   useEffect(() => {
     if (!locate) return;
     checkNearby.current = undefined;
+    cancelOpening.current?.();
     return moveCamera(
       () => map()?.setCameraPosition(),
       (error) => analytics.captureError("places_map_camera_failed", error),

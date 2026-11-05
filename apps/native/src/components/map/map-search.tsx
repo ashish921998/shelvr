@@ -58,6 +58,7 @@ export function MapSearchResults({
   total: number;
   onSelect: (id: string) => void;
 }) {
+  if (text.trim() === "") return null;
   return (
     <View style={styles.results}>
       {results.length === 0 ? (

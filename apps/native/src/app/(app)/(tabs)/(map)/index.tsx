@@ -219,7 +219,7 @@ export default function MapScreen() {
         onOpenSearch={() => setSearchOpen(true)}
         onCancel={cancelSearch}
       />
-      {searchOpen && searching && listOpen ? (
+      {searchOpen && listOpen ? (
         <View style={[styles.results, { top: headerBottom }]}>
           <MapSearchResults
             text={searchText}

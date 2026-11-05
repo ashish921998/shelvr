@@ -113,6 +113,11 @@ describe("redirectSystemPath and the launch animation", () => {
       "shelvr://",
       "/(app)/(tabs)/(map)",
     ],
+    [
+      "the bare root the router falls back to without a scheme",
+      "/",
+      "/(app)/(tabs)/(map)",
+    ],
     ["a path that is not a link at all", "/share", "/share"],
   ])("leaves the splash alone for %s", (_name, path, href) => {
     expect(redirectSystemPath({ path, initial: true })).toBe(href);
