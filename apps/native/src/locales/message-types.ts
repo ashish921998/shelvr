@@ -659,6 +659,8 @@ export type MessageParams = {
   "homePlaces.moreCities": { n: string };
   "homePlaces.yourSpaces": undefined;
   "homePlaces.seeAll": undefined;
+  "homePlaces.yourCities": undefined;
+  "homePlaces.recentSaves": undefined;
   "homePlaces.emptyTitle": undefined;
   "homePlaces.emptyBody": undefined;
   "homePlaces.addSpot": undefined;
@@ -961,7 +963,6 @@ export type MessageParams = {
   "sharedLists.noAnchorClassic": { city: string };
   "sharedLists.noAnchorLowkey": { city: string };
   "sharedLists.noPairBody": { city: string };
-  "sharedLists.hint": undefined;
   "sharedLists.start": undefined;
   "sharedLists.with": { names: string };
   "sharedLists.onlyYou": undefined;

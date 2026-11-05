@@ -1,6 +1,12 @@
 import { CityCover, type CoverLayout } from "@/components/city/city-cover";
+import { HomeRow } from "@/components/home/home-row";
 import { PlanCitySheet } from "@/components/home/plan-city-sheet";
+import { ReviewSaves, type ReviewSave } from "@/components/home/review-saves";
+import { SharedListsSection } from "@/components/home/shared-lists-section";
 import { AppSymbolIcon } from "@/components/symbol";
+import { Button } from "@/components/ui/button";
+import { ThemedText } from "@/components/ui/themed-text";
+import { withAlpha } from "@/lib/color";
 import { type CityPlanKind, useCityPlan } from "@/lib/city-plan";
 import { canBrowse } from "@/lib/access";
 import { useAccess, useSaveGuard } from "@/lib/free-plan";
@@ -53,7 +59,25 @@ function CityGrid({ cities }: { cities: City[] }) {
   const { shown, hidden } = visibleCities(cities, expanded);
   const only = cities.length === 1;
   return (
-    <View style={styles.grid}>
+    <View style={styles.cities}>
+      <View style={styles.heading}>
+        <ThemedText variant="title" accessibilityRole="header">
+          {t("homePlaces.yourCities")}
+        </ThemedText>
+        {hidden > 0 ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("homePlaces.seeAll")}
+            hitSlop={12}
+            onPress={() => setExpanded(true)}
+            style={({ pressed }) => pressed && styles.pressed}
+          >
+            <ThemedText variant="subheadLabel" style={styles.seeAll}>
+              {t("homePlaces.seeAll")}
+            </ThemedText>
+          </Pressable>
+        ) : null}
+      </View>
       {cityRows(shown).map((row) =>
         row.kind === "pair" ? (
           <View key={row.cities[0].city} style={styles.pair}>
@@ -74,18 +98,6 @@ function CityGrid({ cities }: { cities: City[] }) {
           />
         ),
       )}
-      {hidden > 0 ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("homePlaces.moreCities", { n: String(hidden) })}
-          onPress={() => setExpanded(true)}
-          style={({ pressed }) => [styles.more, pressed && styles.pressed]}
-        >
-          <Text style={styles.moreLabel}>
-            {t("homePlaces.moreCities", { n: String(hidden) })}
-          </Text>
-        </Pressable>
-      ) : null}
       {only ? (
         <View style={styles.tip}>
           <AppSymbolIcon
@@ -100,64 +112,7 @@ function CityGrid({ cities }: { cities: City[] }) {
   );
 }
 
-function PlanTile({
-  kind,
-  subtitle,
-  disabled,
-  locked,
-  onPress,
-}: {
-  kind: CityPlanKind;
-  subtitle: string;
-  disabled: boolean;
-  locked: boolean;
-  onPress: () => void;
-}) {
-  const { theme } = useUnistyles();
-  const title = t(
-    kind === "date" ? "homePlaces.planDate" : "homePlaces.planTrip",
-  );
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={
-        locked
-          ? `${title}, ${subtitle}, ${t("freePlan.proTag")}`
-          : `${title}, ${subtitle}`
-      }
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.tile,
-        (pressed || disabled) && styles.pressed,
-      ]}
-    >
-      <View style={styles.tileIcon}>
-        <AppSymbolIcon
-          name={kind === "date" ? "heart" : "airplane"}
-          size={18}
-          tintColor={theme.colors.primaryText}
-        />
-      </View>
-      <View style={styles.tileText}>
-        <Text style={styles.tileTitle} numberOfLines={1}>
-          {title}
-        </Text>
-        <View style={styles.tileSubtitleRow}>
-          <Text style={styles.tileSubtitle} numberOfLines={1}>
-            {subtitle}
-          </Text>
-          {locked ? (
-            <Text style={styles.proTag}>{t("freePlan.proTag")}</Text>
-          ) : null}
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-function PlanTiles({ cities, pro }: { cities: City[]; pro: boolean }) {
+function PlanRows({ cities, pro }: { cities: City[]; pro: boolean }) {
   const { busy, start } = useCityPlan();
   const [picking, setPicking] = useState<{ kind: CityPlanKind; open: boolean }>(
     { kind: "date", open: false },
@@ -172,19 +127,28 @@ function PlanTiles({ cities, pro }: { cities: City[]; pro: boolean }) {
     cities.length === 1
       ? void start(kind, only.city)
       : setPicking({ kind, open: true });
+  const proTag = t("freePlan.proTag");
   return (
-    <View style={styles.pair}>
-      {(["date", "trip"] as const).map((kind) => (
-        <View key={kind} style={styles.half}>
-          <PlanTile
-            kind={kind}
-            subtitle={subtitle}
+    <>
+      {(["date", "trip"] as const).map((kind) => {
+        const title = t(
+          kind === "date" ? "homePlaces.planDate" : "homePlaces.planTrip",
+        );
+        return (
+          <HomeRow
+            key={kind}
+            icon={kind === "date" ? "heart.fill" : "airplane"}
+            title={title}
+            value={subtitle}
+            tag={pro ? undefined : proTag}
+            label={
+              pro ? `${title}, ${subtitle}` : `${title}, ${subtitle}, ${proTag}`
+            }
             disabled={busy !== null}
-            locked={!pro}
             onPress={() => press(kind)}
           />
-        </View>
-      ))}
+        );
+      })}
       <PlanCitySheet
         visible={picking.open}
         kind={picking.kind}
@@ -192,7 +156,7 @@ function PlanTiles({ cities, pro }: { cities: City[]; pro: boolean }) {
         onClose={() => setPicking({ ...picking, open: false })}
         onPick={(city) => void start(picking.kind, city)}
       />
-    </View>
+    </>
   );
 }
 
@@ -274,24 +238,33 @@ export function UnplacedSaves({ saves }: { saves: UnplacedSave[] }) {
 /** The places pitch for an empty shelf; Home shows it before the first save. */
 export function HomePlacesEmptyCard() {
   const router = useRouter();
+  const { theme } = useUnistyles();
   const { guard } = useSaveGuard("home");
   return (
     <View style={styles.card}>
-      <Text style={styles.cardTitle}>{t("homePlaces.emptyTitle")}</Text>
-      <Text style={styles.muted}>{t("homePlaces.emptyBody")}</Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("homePlaces.addSpot")}
+      <View style={styles.cardIcon}>
+        <AppSymbolIcon
+          name="mappin"
+          size={26}
+          tintColor={theme.colors.primaryText}
+        />
+      </View>
+      <ThemedText variant="title" style={styles.centered}>
+        {t("homePlaces.emptyTitle")}
+      </ThemedText>
+      <ThemedText variant="subhead" style={[styles.centered, styles.muted]}>
+        {t("homePlaces.emptyBody")}
+      </ThemedText>
+      <Button
+        title={t("homePlaces.addSpot")}
         onPress={() => void guard(() => router.push("/add"))}
-        style={({ pressed }) => [styles.button, pressed && styles.pressed]}
-      >
-        <Text style={styles.buttonLabel}>{t("homePlaces.addSpot")}</Text>
-      </Pressable>
+        style={styles.cardButton}
+      />
     </View>
   );
 }
 
-export function HomePlaces() {
+export function HomePlaces({ saves }: { saves: ReviewSave[] }) {
   useAppLocale();
   const access = useAccess();
   const browsing = canBrowse(access);
@@ -299,85 +272,46 @@ export function HomePlaces() {
     convexQuery(api.items.listCities, browsing ? {} : "skip"),
   );
   if (!browsing || cities.data === undefined) return null;
-  if (cities.data.length === 0) {
-    return (
-      <View style={styles.container}>
-        <HomePlacesEmptyCard />
-      </View>
-    );
-  }
   return (
-    <View style={styles.container}>
-      <PlanTiles
-        cities={plannableCities(cities.data)}
-        pro={access.kind === "pro"}
-      />
-      <CityGrid cities={cities.data} />
-    </View>
+    <>
+      <View style={styles.rows}>
+        <PlanRows
+          cities={plannableCities(cities.data)}
+          pro={access.kind === "pro"}
+        />
+        <ReviewSaves saves={saves} />
+      </View>
+      <SharedListsSection />
+      {cities.data.length === 0 ? (
+        <View style={styles.emptyCities}>
+          <HomePlacesEmptyCard />
+        </View>
+      ) : (
+        <CityGrid cities={cities.data} />
+      )}
+    </>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  container: {
+  rows: { paddingHorizontal: theme.gap(2) },
+  cities: {
     gap: theme.gap(1.5),
     paddingHorizontal: theme.gap(2),
-    paddingBottom: theme.gap(1.5),
+    paddingTop: theme.gap(3),
   },
-  grid: { gap: theme.gap(1.5) },
+  heading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.gap(1),
+  },
+  seeAll: { color: theme.colors.primaryText },
+  emptyCities: { paddingHorizontal: theme.gap(2), paddingTop: theme.gap(3) },
   pair: { flexDirection: "row", gap: theme.gap(1.5) },
   half: { flex: 1 },
   pressed: { opacity: theme.opacity.pressed },
-  more: {
-    minHeight: theme.control.minHeight,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.surfaceMuted,
-  },
   moreLabel: { ...theme.type.subheadStrong, color: theme.colors.foreground },
-  tile: {
-    minHeight: 64,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.25),
-    paddingVertical: theme.gap(1.25),
-    paddingHorizontal: theme.gap(1.5),
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  tileIcon: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 18,
-    backgroundColor: theme.colors.primarySoft,
-  },
-  tileText: { flex: 1 },
-  tileTitle: { ...theme.type.subheadLabel, color: theme.colors.foreground },
-  tileSubtitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(0.75),
-  },
-  tileSubtitle: {
-    ...theme.type.caption,
-    flexShrink: 1,
-    color: theme.colors.muted,
-  },
-  proTag: {
-    ...theme.type.captionStrong,
-    color: theme.colors.primaryText,
-    paddingHorizontal: theme.gap(0.75),
-    paddingVertical: theme.gap(0.25),
-    borderRadius: theme.radius.sm,
-    overflow: "hidden",
-    backgroundColor: theme.colors.primarySoft,
-  },
   tip: {
     flexDirection: "row",
     alignItems: "center",
@@ -388,11 +322,11 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surfaceMuted,
   },
   tipText: { flex: 1, ...theme.type.footnote, color: theme.colors.muted },
-  muted: { ...theme.type.footnote, color: theme.colors.muted },
+  muted: { color: theme.colors.muted },
   unplaced: {
     gap: theme.gap(0.5),
     paddingHorizontal: theme.gap(2),
-    paddingTop: theme.gap(2),
+    paddingTop: theme.gap(3),
   },
   sectionLabel: {
     ...theme.type.labelStrong,
@@ -412,23 +346,25 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
   },
   card: {
-    gap: theme.gap(1.5),
-    padding: theme.gap(2),
+    alignItems: "center",
+    gap: theme.gap(1.25),
+    paddingHorizontal: theme.gap(2.5),
+    paddingTop: theme.gap(3.5),
+    paddingBottom: theme.gap(3),
     borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: withAlpha(theme.colors.muted, 0.5),
+    backgroundColor: theme.colors.surfaceMuted,
   },
-  cardTitle: { ...theme.type.title, color: theme.colors.foreground },
-  button: {
-    minHeight: theme.control.minHeight,
+  cardIcon: {
+    width: 56,
+    height: 56,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: theme.gap(3),
-    borderRadius: theme.radius.xl,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.foreground,
+    borderRadius: 28,
+    backgroundColor: theme.colors.primarySoft,
   },
-  buttonLabel: { ...theme.type.button, color: theme.colors.surface },
+  centered: { textAlign: "center" },
+  cardButton: { alignSelf: "stretch", marginTop: theme.gap(1) },
 }));

@@ -1,8 +1,9 @@
 import { AppSymbolIcon } from "@/components/symbol";
+import { ThemedText } from "@/components/ui/themed-text";
 import { type City, cityCountLine } from "@/lib/home-places";
 import { t } from "@/lib/i18n";
 import { Image } from "expo-image";
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 export type CoverLayout = "pair" | "wide" | "only";
@@ -44,33 +45,30 @@ export function CityCover({
   layout: CoverLayout;
 }) {
   const count = cityCountLine(entry);
-  if (layout === "pair") {
-    return (
-      <View style={styles.card}>
-        <View style={styles.art}>
-          <CoverArt entry={entry} />
-        </View>
-        <View style={styles.text}>
-          <Text style={styles.name} numberOfLines={1}>
-            {entry.city}
-          </Text>
-          {count ? <Text style={styles.count}>{count}</Text> : null}
-        </View>
-      </View>
-    );
-  }
   return (
-    <View style={[styles.card, styles.wide, layout === "only" && styles.only]}>
-      <CoverArt entry={entry} />
-      <View style={styles.caption}>
-        <Text style={styles.name} numberOfLines={1}>
+    <View style={styles.card}>
+      <View
+        style={[
+          styles.art,
+          layout === "wide" && styles.artWide,
+          layout === "only" && styles.artOnly,
+        ]}
+      >
+        <CoverArt entry={entry} />
+      </View>
+      <View style={styles.text}>
+        <ThemedText variant="header" numberOfLines={1}>
           {entry.city}
-        </Text>
-        {count ? <Text style={styles.count}>{count}</Text> : null}
+        </ThemedText>
+        {count ? (
+          <ThemedText variant="caption" style={styles.count}>
+            {count}
+          </ThemedText>
+        ) : null}
         {layout === "only" ? (
-          <Text style={styles.count}>
+          <ThemedText variant="caption" style={styles.count}>
             {t("homePlaces.fromSaves", { count: entry.count })}
-          </Text>
+          </ThemedText>
         ) : null}
       </View>
     </View>
@@ -78,39 +76,23 @@ export function CityCover({
 }
 
 const styles = StyleSheet.create((theme) => ({
-  card: {
+  card: { gap: theme.gap(1) },
+  art: {
+    height: 180,
     overflow: "hidden",
     borderRadius: theme.radius.lg,
     borderCurve: "continuous",
     borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.imageBorder,
   },
-  art: { height: 112, overflow: "hidden" },
+  artWide: { height: 168 },
+  artOnly: { height: 220 },
   tint: {
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: theme.colors.primarySoft,
   },
   tintMuted: { backgroundColor: theme.colors.surfaceMuted },
-  text: {
-    gap: theme.gap(0.125),
-    paddingHorizontal: theme.gap(1.5),
-    paddingTop: theme.gap(1.25),
-    paddingBottom: theme.gap(1.5),
-  },
-  wide: { minHeight: 140, justifyContent: "flex-end" },
-  only: { minHeight: 200 },
-  caption: {
-    alignSelf: "flex-start",
-    maxWidth: 220,
-    margin: theme.gap(1.25),
-    paddingVertical: theme.gap(1),
-    paddingHorizontal: theme.gap(1.5),
-    borderRadius: theme.radius.md,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.surface,
-  },
-  name: { ...theme.type.title, color: theme.colors.foreground },
-  count: { ...theme.type.caption, color: theme.colors.muted },
+  text: { gap: theme.gap(0.125) },
+  count: { color: theme.colors.muted },
 }));

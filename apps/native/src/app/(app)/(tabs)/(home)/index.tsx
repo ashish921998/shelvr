@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { t, useAppLocale } from "@/lib/i18n";
 import { FreeSavesCard, ProCard } from "@/components/home/pro-card";
+import { HomeHeader } from "@/components/home/home-header";
 import { HomeSearch } from "@/components/home/home-search";
+import { RecentSaves } from "@/components/home/recent-saves";
 import { SharedListsSection } from "@/components/home/shared-lists-section";
 import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
@@ -12,9 +14,7 @@ import {
   HomePlacesEmptyCard,
   UnplacedSaves,
 } from "@/components/home/home-places";
-import { ReviewSaves } from "@/components/home/review-saves";
 import { ScreenLoader } from "@/components/ui/screen-loader";
-import { HeaderScrim } from "@/components/ui/header-scrim";
 import { useCurrentUser } from "@/lib/current-user";
 import { type Entitlement, useEntitlement } from "@/lib/entitlement";
 import { FREE_SAVES_NUDGE_AT } from "@/lib/access";
@@ -106,6 +106,7 @@ export default function HomeScreen() {
       onDismiss={feedback.dismissInvitation}
     />
   ) : null;
+  const top = topCard ? <View style={styles.topCard}>{topCard}</View> : null;
 
   return (
     <View style={styles.container}>
@@ -127,25 +128,30 @@ export default function HomeScreen() {
             loadMore();
         }}
       >
-        {topCard ? <View style={styles.topCard}>{topCard}</View> : null}
-        {locked ? null : (
-          <HomeSearch>
-            <SharedListsSection />
+        {locked ? (
+          <>
+            <HomeHeader />
+            {top}
+          </>
+        ) : (
+          <HomeSearch top={top}>
             {items.length > 0 ? (
               <>
-                <HomePlaces />
+                <HomePlaces saves={items} />
                 <UnplacedSaves saves={items} />
-                <ReviewSaves saves={items} />
+                <RecentSaves saves={items} />
               </>
             ) : (
-              <View style={styles.empty}>
-                <HomePlacesEmptyCard />
-              </View>
+              <>
+                <View style={styles.empty}>
+                  <HomePlacesEmptyCard />
+                </View>
+                <SharedListsSection />
+              </>
             )}
           </HomeSearch>
         )}
       </ScrollView>
-      <HeaderScrim />
       {user ? (
         <WelcomeSaveSheet
           userId={user._id}
@@ -160,12 +166,12 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
+    paddingTop: rt.insets.top,
   },
   content: {
-    paddingTop: theme.gap(1),
     paddingBottom: theme.gap(6),
   },
   topCard: {
@@ -174,6 +180,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   empty: {
     paddingHorizontal: theme.gap(2),
-    paddingTop: theme.gap(4),
+    paddingTop: theme.gap(1),
   },
 }));
