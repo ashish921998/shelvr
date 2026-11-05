@@ -49,6 +49,7 @@ export function useMyFirstName() {
   return {
     firstName: data,
     loading: isAuthenticated && data === undefined && !isError,
+    failed: isError,
   };
 }
 

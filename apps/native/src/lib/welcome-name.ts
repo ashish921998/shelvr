@@ -10,7 +10,7 @@ export function useWelcomeName(
   ready: boolean,
 ): { open: boolean; holding: boolean; close: () => void } {
   const pending = welcomeName.usePending(userId);
-  const { firstName } = useMyFirstName();
+  const { firstName, failed } = useMyFirstName();
   const focused = useIsFocused();
   const [open, setOpen] = useState(false);
   const started = useRef<string | null>(null);
@@ -21,7 +21,7 @@ export function useWelcomeName(
       !pending ||
       !ready ||
       !focused ||
-      firstName === undefined
+      (firstName === undefined && !failed)
     )
       return;
     started.current = userId;
@@ -41,6 +41,6 @@ export function useWelcomeName(
       live = false;
       started.current = null;
     };
-  }, [userId, pending, ready, focused, firstName]);
+  }, [userId, pending, ready, focused, firstName, failed]);
   return { open, holding: open || pending, close: () => setOpen(false) };
 }

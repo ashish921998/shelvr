@@ -7,6 +7,7 @@ import { welcomeName } from "./welcome-save";
 const mock = vi.hoisted(() => ({
   store: new Map<string, string>(),
   firstName: null as string | null | undefined,
+  failed: false,
   settle: [] as (() => void)[],
   focused: true,
 }));
@@ -19,7 +20,7 @@ vi.mock("expo-secure-store", () => ({
 }));
 vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
 vi.mock("@/lib/shared-lists", () => ({
-  useMyFirstName: () => ({ firstName: mock.firstName }),
+  useMyFirstName: () => ({ firstName: mock.firstName, failed: mock.failed }),
 }));
 vi.mock("@/lib/entitlement", () => ({
   whenSheetSettled: () =>
@@ -46,6 +47,7 @@ beforeEach(() => {
   mock.firstName = null;
   mock.settle.length = 0;
   mock.focused = true;
+  mock.failed = false;
 });
 
 describe("useWelcomeName", () => {
@@ -117,6 +119,16 @@ describe("useWelcomeName", () => {
     rerender();
     await settleSheets();
     expect(result.current.open).toBe(true);
+  });
+
+  it("spends its turn without asking when the name cannot be read", async () => {
+    mock.firstName = undefined;
+    mock.failed = true;
+    welcomeName.mark("u5");
+    const { result } = renderHook(() => useWelcomeName("u5", true));
+    expect(result.current.open).toBe(false);
+    expect(welcomeName.isPending("u5")).toBe(false);
+    expect(result.current.holding).toBe(false);
   });
 
   it("stays shut for an account the flag was never set for", async () => {
