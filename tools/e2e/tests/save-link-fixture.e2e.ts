@@ -9,7 +9,7 @@ const FIXTURE_URL = "https://fixtures.e2e.invalid/quince-paste";
 const TITLE = "Quince paste for beginners";
 
 test(
-  "saves a link that names no place and offers it for review under the cities",
+  "saves a link that names no place and offers it for review above the cities",
   {
     skip:
       process.env.E2E_FAKE_AI !== "local-v1" &&
