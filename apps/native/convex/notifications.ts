@@ -9,6 +9,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { enrichItems, enrichedItemValidator } from "./items";
 import { tripStopItemIds } from "./tripData";
 import { liveOwner, authedMutation, authedQuery } from "./model/auth";
+import { MAX_CAPTURE_TOKEN_LENGTH, sha256Hex } from "./model/captureTokens";
 import {
   localHour,
   nextLocalHourAt,
@@ -171,6 +172,7 @@ export const registerDevice = authedMutation({
     platform: v.union(v.literal("ios"), v.literal("android")),
     nextDigestAt: v.optional(v.number()),
     timezone: v.optional(v.string()),
+    installSecret: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -179,6 +181,17 @@ export const registerDevice = authedMutation({
     if (token.length === 0 || token.length > 4096) {
       throw new Error("Invalid notification token");
     }
+    if (
+      args.installSecret !== undefined &&
+      (args.installSecret.length === 0 ||
+        args.installSecret.length > MAX_CAPTURE_TOKEN_LENGTH)
+    ) {
+      throw new Error("Invalid install secret");
+    }
+    const installSecretHash =
+      args.installSecret === undefined
+        ? undefined
+        : await sha256Hex(args.installSecret);
     const timezone = parseTimezoneInput(args.timezone);
     const locale = notificationLocale(args.locale);
     const languageFields = locale === undefined ? {} : { locale };
@@ -194,12 +207,19 @@ export const registerDevice = authedMutation({
         token,
         platform: args.platform,
         ...languageFields,
+        installSecretHash,
         enabled: true,
         lastSeenAt: now,
       });
-    } else if (existingToken.userId === userId || !existingToken.enabled) {
+    } else if (
+      existingToken.userId === userId ||
+      !existingToken.enabled ||
+      (installSecretHash !== undefined &&
+        existingToken.installSecretHash === installSecretHash)
+    ) {
       await ctx.db.patch(existingToken._id, {
         userId,
+        installSecretHash: installSecretHash ?? existingToken.installSecretHash,
         platform: args.platform,
         ...languageFields,
         enabled: true,

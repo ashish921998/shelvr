@@ -158,6 +158,59 @@ describe("weekly shelf notifications", () => {
     ).toHaveLength(1);
   });
 
+  it("moves another account's enabled token to a caller on the same install", async () => {
+    const t = newConvexTest();
+    const owner = await signInA(t);
+    const next = await signInB(t);
+    await owner.mutation(api.notifications.registerDevice, {
+      token: "token-a",
+      platform: "ios",
+      installSecret: "install-1",
+    });
+    await next.mutation(api.notifications.registerDevice, {
+      token: "token-a",
+      platform: "ios",
+      installSecret: "install-1",
+    });
+    expect(
+      await t.run((ctx) => ctx.db.query("notificationDevices").unique()),
+    ).toMatchObject({ userId: userB, enabled: true });
+  });
+
+  it("refuses a takeover with another install's secret, no secret, or a row that has none", async () => {
+    const t = newConvexTest();
+    const owner = await signInA(t);
+    const attacker = await signInB(t);
+    await owner.mutation(api.notifications.registerDevice, {
+      token: "token-a",
+      platform: "ios",
+      installSecret: "install-1",
+    });
+    await owner.mutation(api.notifications.registerDevice, {
+      token: "token-legacy",
+      platform: "ios",
+    });
+    for (const attempt of [
+      { token: "token-a", installSecret: "install-2" },
+      { token: "token-a" },
+      { token: "token-legacy", installSecret: "install-1" },
+    ]) {
+      await expect(
+        attacker.mutation(api.notifications.registerDevice, {
+          ...attempt,
+          platform: "ios",
+        }),
+      ).rejects.toMatchObject({
+        data: { code: "notification_token_owned_by_another_account" },
+      });
+    }
+    const devices = await t.run((ctx) =>
+      ctx.db.query("notificationDevices").collect(),
+    );
+    expect(devices.every((device) => device.userId === userA)).toBe(true);
+    expect(devices.some((device) => "installSecret" in device)).toBe(false);
+  });
+
   it("lets the owner refresh their own enabled token", async () => {
     const t = await signInA();
     await t.mutation(api.notifications.registerDevice, {
