@@ -188,6 +188,27 @@ async function settle(
 }
 
 describe("the passport", () => {
+  it("backfills the pin and country of a mark made before the Passport", async () => {
+    const lookups = await withMaps();
+    const { t, userId, itemId, visits } = await setup();
+    await t.run((ctx) =>
+      ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+      }),
+    );
+    await settle(t, () =>
+      t.mutation(internal.placeVisits.backfillCountries, { cursor: null }),
+    );
+    expect(await visits()).toMatchObject([
+      { lat: PIN.lat, lng: PIN.lng, city: "Lisbon", countryCode: "PT" },
+    ]);
+    expect(lookups()).toBe(1);
+  });
+
   it("keeps the pin, city and country of a place marked I went", async () => {
     const lookups = await withMaps();
     const { backend, t, itemId, visits } = await setup();
