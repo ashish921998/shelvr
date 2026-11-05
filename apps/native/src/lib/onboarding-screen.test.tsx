@@ -327,6 +327,15 @@ it("asks about a trip when the goal question is skipped, and plans for every goa
   expect(screen.getByRole("button", { name: "trip:soon" })).toBeTruthy();
 });
 
+it("asks about a trip when the goal question is skipped after picking a goal without travel", () => {
+  startAt("goal");
+  render(<OnboardingScreen />);
+  tap("goal:food");
+  tap("onboardingQ.skip");
+  expect(saved()?.goals).toEqual(["date", "travel", "food"]);
+  expect(screen.getByRole("button", { name: "trip:soon" })).toBeTruthy();
+});
+
 it("skips the trip question when the goals carry no travel", () => {
   startAt("goal");
   render(<OnboardingScreen />);

@@ -209,13 +209,14 @@ export default function OnboardingScreen() {
   }, [travelCity, goals, savedCount, planner, tripSoon, stepIndex]);
 
   const [backward, setBackward] = useState(false);
-  const advance = () => {
+  const advanceWith = (nextGoals: readonly Goal[]) => {
     recordCurrentStep();
     setBackward(false);
     setStep((current) =>
-      current === step ? nextOnboardingStep(current, goals) : current,
+      current === step ? nextOnboardingStep(current, nextGoals) : current,
     );
   };
+  const advance = () => advanceWith(goals);
 
   useEffect(() => {
     if (!signedIn || !isAuthenticated) return;
@@ -281,9 +282,11 @@ export default function OnboardingScreen() {
 
   const previous = previousOnboardingStep(step, goals);
   const skip = () => {
-    if (step === "goal") setGoals([...GOALS]);
     if (step === "city") setTravelCity(null);
-    advance();
+    if (step !== "goal") return advance();
+    const all = [...GOALS];
+    setGoals(all);
+    advanceWith(all);
   };
 
   const body = (() => {
