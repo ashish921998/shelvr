@@ -1154,11 +1154,11 @@
   "onboardingQ.cityTitleTrip": "Para onde você vai?",
   "onboardingQ.cityTitleOut": "Onde você costuma sair?",
   "onboardingQ.cityTitleDream": "Qual é a sua cidade dos sonhos?",
-  "onboardingStatement.savedFew": "Você salvou alguns lugares.\nVocê foi a quase nenhum.\nSoa familiar? 💀",
-  "onboardingStatement.savedTenToFifty": "Você salvou de 10 a 50 lugares.\nVocê foi a quase nenhum.\nSoa familiar? 💀",
-  "onboardingStatement.savedFiftyToTwoHundred": "Você salvou de 50 a 200 lugares.\nVocê foi a quase nenhum.\nSoa familiar? 💀",
-  "onboardingStatement.savedHundreds": "Você salvou centenas de lugares.\nVocê foi a quase nenhum.\nSoa familiar? 💀",
-  "onboardingStatement.savedLostCount": "Você salvou mais lugares do que dá para contar.\nVocê foi a quase nenhum.\nSoa familiar? 💀",
+  "onboardingStatement.savedFew": "Você salvou alguns lugares.\nVocê quase não foi a nenhum deles.\nSoa familiar? 💀",
+  "onboardingStatement.savedTenToFifty": "Você salvou de 10 a 50 lugares.\nVocê quase não foi a nenhum deles.\nSoa familiar? 💀",
+  "onboardingStatement.savedFiftyToTwoHundred": "Você salvou de 50 a 200 lugares.\nVocê quase não foi a nenhum deles.\nSoa familiar? 💀",
+  "onboardingStatement.savedHundreds": "Você salvou centenas de lugares.\nVocê quase não foi a nenhum deles.\nSoa familiar? 💀",
+  "onboardingStatement.savedLostCount": "Você salvou mais lugares do que dá para contar.\nVocê quase não foi a nenhum deles.\nSoa familiar? 💀",
   "onboardingStatement.savedCta": "Sou eu 😩",
   "onboardingStatement.cityPicked": "%{city}. Ótima escolha.\n\nVamos salvar seus primeiros lugares em %{city}.",
   "onboardingStatement.cityFirst": "%{picked}. Ótima escolha.\n\nPrimeiro, vamos testar com um reel real de %{city}.",
@@ -1173,5 +1173,5 @@
   "onboardingRate.stars": "Cinco estrelas",
   "onboardingRate.love": "Adorei, continuar",
   "onboardingRate.later": "Agora não",
-  "sharedLists.nameBodyWelcome": "As pessoas das suas listas compartilhadas veem."
+  "sharedLists.nameBodyWelcome": "As pessoas das suas listas compartilhadas verão seu nome."
 }

@@ -16,11 +16,13 @@ export function RateStep({
 }) {
   useAppLocale();
   const [asked, setAsked] = useState(false);
+  const [asking, setAsking] = useState(false);
   const love = () => {
     if (asked) return onContinue();
     analytics.capture("onboarding_rate", { action: "love" });
     setAsked(true);
-    void requestReviewOnce();
+    setAsking(true);
+    void requestReviewOnce().finally(() => setAsking(false));
   };
   const later = () => {
     analytics.capture("onboarding_rate", { action: "later" });
@@ -51,7 +53,7 @@ export function RateStep({
         <PillButton
           label={t(asked ? "common.continue" : "onboardingRate.love")}
           onPress={love}
-          busy={leaving}
+          busy={leaving || asking}
         />
         {asked ? null : (
           <GhostButton

@@ -7,21 +7,21 @@ import { useEffect, useRef, useState } from "react";
 export function useWelcomeName(
   userId: string | undefined,
   ready: boolean,
-): { open: boolean; close: () => void } {
+): { open: boolean; holding: boolean; close: () => void } {
   const pending = welcomeName.usePending(userId);
   const { firstName } = useMyFirstName();
   const [open, setOpen] = useState(false);
-  const started = useRef(false);
+  const started = useRef<string | null>(null);
   useEffect(() => {
     if (
       userId === undefined ||
-      started.current ||
+      started.current === userId ||
       !pending ||
       !ready ||
       firstName === undefined
     )
       return;
-    started.current = true;
+    started.current = userId;
     if (firstName !== null) {
       welcomeName.finish(userId);
       return;
@@ -33,5 +33,5 @@ export function useWelcomeName(
         setOpen(true);
       });
   }, [userId, pending, ready, firstName]);
-  return { open, close: () => setOpen(false) };
+  return { open, holding: open || pending, close: () => setOpen(false) };
 }

@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { RateStep } from "./rate";
@@ -62,7 +68,7 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("asks for the review on Love it and waits for Continue", () => {
+it("asks for the review on Love it and waits for Continue", async () => {
   const onContinue = vi.fn();
   render(<RateStep leaving={false} onContinue={onContinue} />);
   fireEvent.click(screen.getByRole("button", { name: "onboardingRate.love" }));
@@ -74,7 +80,10 @@ it("asks for the review on Love it and waits for Continue", () => {
   expect(screen.queryByRole("button", { name: "onboardingRate.later" })).toBe(
     null,
   );
-  fireEvent.click(screen.getByRole("button", { name: "common.continue" }));
+  const next = screen.getByRole("button", { name: "common.continue" });
+  expect(next.hasAttribute("disabled")).toBe(true);
+  await waitFor(() => expect(next.hasAttribute("disabled")).toBe(false));
+  fireEvent.click(next);
   expect(onContinue).toHaveBeenCalledTimes(1);
   expect(mocks.requestReviewOnce).toHaveBeenCalledTimes(1);
 });

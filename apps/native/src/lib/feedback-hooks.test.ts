@@ -523,6 +523,12 @@ describe("requestReviewOnce", () => {
     expect(mock.requestReview).not.toHaveBeenCalled();
   });
 
+  it("asks Apple only once", async () => {
+    await requestReviewOnce();
+    await requestReviewOnce();
+    expect(mock.requestReview).toHaveBeenCalledTimes(1);
+  });
+
   it("resolves and reports when the request throws", async () => {
     mock.requestReview.mockRejectedValueOnce(new Error("no sheet"));
     await expect(requestReviewOnce()).resolves.toBeUndefined();

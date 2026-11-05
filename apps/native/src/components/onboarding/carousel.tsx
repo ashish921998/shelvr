@@ -50,13 +50,19 @@ function SpotRow({ emoji, name }: { emoji: string; name: string }) {
   );
 }
 
+function planLabel(sample: AhaSample): string {
+  return t(
+    sample.kind === "trip" ? "homePlaces.planTrip" : "homePlaces.planDate",
+  );
+}
+
 function TogetherCard({ sample }: { sample: AhaSample }) {
   return (
     <View style={styles.cardBody}>
       <Text style={styles.cardTitle}>{t(SAMPLE_CITIES[sample.city].name)}</Text>
       <View style={styles.chips}>
         <Chip label={t("sharedLists.invite")} />
-        <Chip label={t("homePlaces.planDate")} strong />
+        <Chip label={planLabel(sample)} strong />
       </View>
       {sample.spots.map((spot) => (
         <SpotRow
@@ -72,7 +78,7 @@ function TogetherCard({ sample }: { sample: AhaSample }) {
 function EatCard({ sample }: { sample: AhaSample }) {
   return (
     <View style={styles.cardBody}>
-      <Text style={styles.eyebrow}>{t("homePlaces.planDate")}</Text>
+      <Text style={styles.eyebrow}>{planLabel(sample)}</Text>
       {sample.spots.slice(0, 2).map((spot) => (
         <SpotRow
           key={spot.name}
@@ -80,7 +86,10 @@ function EatCard({ sample }: { sample: AhaSample }) {
           name={spot.name}
         />
       ))}
-      <Chip label={t("datePlan.send")} strong />
+      <Chip
+        label={t(sample.kind === "date" ? "datePlan.send" : "common.share")}
+        strong
+      />
     </View>
   );
 }

@@ -89,7 +89,7 @@ export default function HomeScreen() {
     entitlement.loading ||
     locked ||
     welcomePending ||
-    welcomeName.open;
+    welcomeName.holding;
   const feedback = useFeedbackInvitation(items, { defer: deferPrompts });
   useReviewPrompt(items, {
     defer: deferPrompts || feedback.invitationVisible || feedback.modalOpen,

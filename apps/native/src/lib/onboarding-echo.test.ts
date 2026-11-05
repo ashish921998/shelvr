@@ -20,8 +20,14 @@ describe("savedEchoText", () => {
 
 describe("cityEchoText", () => {
   it("names the picked city and the city whose reel the demo plays", () => {
-    expect(cityEchoText("austin", "austin")).toMatch(/cityPicked/);
-    expect(cityEchoText("lisbon", "austin")).toMatch(/cityFirst/);
-    expect(cityEchoText(null, "austin")).toMatch(/cityStart/);
+    expect(cityEchoText("austin", "austin")).toBe(
+      "onboardingStatement.cityPicked:tripTeaser.cityAustin",
+    );
+    expect(cityEchoText("lisbon", "austin")).toBe(
+      "onboardingStatement.cityFirst:tripTeaser.cityLisbon,tripTeaser.cityAustin",
+    );
+    expect(cityEchoText(null, "austin")).toBe(
+      "onboardingStatement.cityStart:tripTeaser.cityAustin",
+    );
   });
 });

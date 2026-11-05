@@ -31,8 +31,9 @@ function markReviewPrompted(): void {
 }
 
 export async function requestReviewOnce(): Promise<void> {
-  markReviewPrompted();
   try {
+    if (SecureStore.getItem(PROMPTED_KEY) === "true") return;
+    markReviewPrompted();
     if (await StoreReview.hasAction()) await StoreReview.requestReview();
   } catch (error) {
     analytics.captureError("onboarding_review_failed", error);
