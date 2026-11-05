@@ -211,6 +211,40 @@ describe("weekly shelf notifications", () => {
     expect(devices.some((device) => "installSecret" in device)).toBe(false);
   });
 
+  it("drops a secret planted on a disabled token once its owner takes it back", async () => {
+    const t = newConvexTest();
+    const owner = await signInA(t);
+    const attacker = await signInB(t);
+    await owner.mutation(api.notifications.registerDevice, {
+      token: "token-a",
+      platform: "ios",
+    });
+    await owner.mutation(api.notifications.unregisterDevice, {
+      token: "token-a",
+    });
+    await attacker.mutation(api.notifications.registerDevice, {
+      token: "token-a",
+      platform: "ios",
+      installSecret: "planted",
+    });
+    await attacker.mutation(api.notifications.unregisterDevice, {
+      token: "token-a",
+    });
+    await owner.mutation(api.notifications.registerDevice, {
+      token: "token-a",
+      platform: "ios",
+    });
+    await expect(
+      attacker.mutation(api.notifications.registerDevice, {
+        token: "token-a",
+        platform: "ios",
+        installSecret: "planted",
+      }),
+    ).rejects.toMatchObject({
+      data: { code: "notification_token_owned_by_another_account" },
+    });
+  });
+
   it("lets the owner refresh their own enabled token", async () => {
     const t = await signInA();
     await t.mutation(api.notifications.registerDevice, {

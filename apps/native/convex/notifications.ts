@@ -219,7 +219,11 @@ export const registerDevice = authedMutation({
     ) {
       await ctx.db.patch(existingToken._id, {
         userId,
-        installSecretHash: installSecretHash ?? existingToken.installSecretHash,
+        installSecretHash:
+          installSecretHash ??
+          (existingToken.userId === userId
+            ? existingToken.installSecretHash
+            : undefined),
         platform: args.platform,
         ...languageFields,
         enabled: true,
