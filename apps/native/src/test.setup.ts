@@ -21,11 +21,12 @@ vi.mock("expo-haptics", () => ({
   impactAsync: vi.fn(async () => {}),
   notificationAsync: vi.fn(async () => {}),
   performAndroidHapticsAsync: vi.fn(async () => {}),
-  ImpactFeedbackStyle: { Light: "light", Medium: "medium" },
+  ImpactFeedbackStyle: { Light: "light", Medium: "medium", Soft: "soft" },
   NotificationFeedbackType: { Success: "success" },
   AndroidHaptics: {
     Segment_Tick: "segment-tick",
     Drag_Start: "drag-start",
+    Gesture_End: "gesture-end",
     Confirm: "confirm",
   },
 }));

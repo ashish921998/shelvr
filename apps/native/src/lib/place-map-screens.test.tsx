@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   captureError: vi.fn(),
   selection: vi.fn(),
+  success: vi.fn(),
   moveSheet: vi.fn(),
   scrollToIndex: vi.fn(),
   sheetTop: 0,
@@ -45,7 +46,9 @@ vi.mock("@/lib/i18n", () => ({
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mocks.capture, captureError: mocks.captureError },
 }));
-vi.mock("@/lib/haptics", () => ({ haptics: { selection: mocks.selection } }));
+vi.mock("@/lib/haptics", () => ({
+  haptics: { selection: mocks.selection, success: mocks.success },
+}));
 vi.mock("@/lib/screen-dismiss", () => ({ backOrHome: mocks.backOrHome }));
 vi.mock("@/lib/apple-place-card", () => ({
   canOpenPlaceCard: (appleId?: string) =>
@@ -233,7 +236,10 @@ function rowFake({
       ) : null}
       {onRemove ? <button onClick={onRemove}>{`remove ${name}`}</button> : null}
       {onVisited ? (
-        <button onClick={() => onVisited(true)}>{`went ${name}`}</button>
+        <>
+          <button onClick={() => onVisited(true)}>{`went ${name}`}</button>
+          <button onClick={() => onVisited(false)}>{`not yet ${name}`}</button>
+        </>
       ) : null}
     </div>
   );
@@ -895,6 +901,15 @@ describe("list page", () => {
       placeId: "p1",
       visited: true,
     });
+    expect(mocks.success).toHaveBeenCalledOnce();
+    await act(async () => {
+      fireEvent.click(screen.getByText("not yet Taco Spot"));
+    });
+    expect(mocks.setVisited).toHaveBeenLastCalledWith({
+      placeId: "p1",
+      visited: false,
+    });
+    expect(mocks.success).toHaveBeenCalledOnce();
     await act(async () => {
       fireEvent.click(screen.getByText("remove Taco Spot"));
     });
@@ -915,5 +930,6 @@ describe("list page", () => {
       failure,
     );
     expect(mocks.alert).toHaveBeenCalledWith("sharedLists.failed");
+    expect(mocks.success).not.toHaveBeenCalled();
   });
 });
