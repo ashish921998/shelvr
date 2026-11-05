@@ -149,9 +149,10 @@ origin. It takes the origin from `CONVEX_SITE_URL`, or derives it from a `.conve
 cannot be sent, which includes whenever `RESEND_API_KEY` or `RESEND_FEEDBACK_FROM_EMAIL` is
 unset on the Convex deployment. Without the
 PostHog public variables, signup and App Store downloads still work and web
-analytics become a no-op. Waitlist rows are stored in Convex and optionally
-synced to Resend. Set `RESEND_API_KEY` and `RESEND_ANDROID_SEGMENT_ID` on the
-Convex deployment to add Android signups to a dedicated Resend segment.
+analytics become a no-op. Waitlist rows are stored in Convex. Resend sends the
+confirmation email, so the waitlist needs `RESEND_API_KEY` and `RESEND_FEEDBACK_FROM_EMAIL`
+on the Convex deployment; add `RESEND_ANDROID_SEGMENT_ID` there to put Android signups in a
+dedicated Resend segment.
 
 ### 5. Run
 
