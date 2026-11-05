@@ -80,7 +80,8 @@ export default function HomeScreen() {
   const welcomePending = welcomeSave.usePending(user?._id);
   const welcomeName = useWelcomeName(
     user?._id,
-    !cancelSurvey.visible &&
+    items !== undefined &&
+      !cancelSurvey.visible &&
       !entitlement.loading &&
       !(welcomePending && entitlement.entitled),
   );
