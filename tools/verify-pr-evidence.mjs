@@ -33,6 +33,20 @@ export function isUiFile(path) {
 
 export const WAIVER_LABEL = "no-ui-change";
 
+const OWNER_PATTERNS = [
+  /^apps\/native\/convex\/(subscriptions|http|auth|auth\.config|users)\.ts$/,
+  /^apps\/native\/convex\/model\/(auth|publicFunctions)\.ts$/,
+  /^apps\/native\/src\/lib\/(entitlement|revenuecat-[\w-]+)\.ts$/,
+  /^apps\/native\/(eas\.json|app\.json|app\.config\.js|released-builds\.json)$/,
+  /^\.github\/(workflows|actions)\//,
+  /^\.github\/CODEOWNERS$/,
+  /^tools\/verify-pr-evidence\.mjs$/,
+];
+
+export const isOwnerFile = (path) => OWNER_PATTERNS.some((re) => re.test(path));
+
+export const OWNER_LABEL = "owner-reviewed";
+
 const markdown = new MarkdownIt({ html: true, linkify: true });
 
 const parse = (body) => markdown.parse(body ?? "", {});
@@ -199,7 +213,12 @@ export function hasVisualEvidence(text) {
   return tokensShowMedia(parse(text));
 }
 
-export function evidenceProblems(body, changedFiles, labels = []) {
+export function evidenceProblems(
+  body,
+  changedFiles,
+  labels = [],
+  { pushed = false } = {},
+) {
   const problems = [];
   const tokens = parse(body);
 
@@ -221,6 +240,11 @@ export function evidenceProblems(body, changedFiles, labels = []) {
         '"### Evidence" is empty. Link the CI run, paste the output, or add screenshots.',
       );
     }
+    if (!tokensHaveContent(sectionTokens(verification, "Review"))) {
+      problems.push(
+        '"### Review" is empty. Run a REVIEW.md review in a fresh context and give its count line, and what happened to each Important finding.',
+      );
+    }
     if (!tokensHaveContent(sectionTokens(verification, "Not verified"))) {
       problems.push(
         '"### Not verified" is empty. Say what was not checked (for example real device, Android, TikTok), or write "Nothing".',
@@ -239,6 +263,18 @@ export function evidenceProblems(body, changedFiles, labels = []) {
     );
   }
 
+  const ownerFiles = changedFiles.filter(isOwnerFile);
+  if (ownerFiles.length > 0 && (pushed || !labels.includes(OWNER_LABEL))) {
+    const list = ownerFiles.slice(0, 5).join(", ");
+    const more =
+      ownerFiles.length > 5 ? ` and ${ownerFiles.length - 5} more` : "";
+    problems.push(
+      `This pull request changes files only the owner may approve (${list}${more}). ` +
+        `Ashish reads the evidence and adds the "${OWNER_LABEL}" label; an agent never adds it. ` +
+        "The label is removed on every new push, so it covers one commit.",
+    );
+  }
+
   return problems;
 }
 
@@ -254,7 +290,7 @@ function main() {
   const [base, head = "HEAD"] = process.argv.slice(2);
   if (!base) {
     console.error(
-      "usage: verify-pr-evidence.mjs <base-sha> [head-sha]  (PR_BODY, PR_LABELS in env)",
+      "usage: verify-pr-evidence.mjs <base-sha> [head-sha]  (PR_BODY, PR_LABELS, PR_ACTION in env)",
     );
     process.exit(2);
   }
@@ -263,6 +299,7 @@ function main() {
     process.env.PR_BODY ?? "",
     changedFilesSince(base, head),
     labels,
+    { pushed: process.env.PR_ACTION === "synchronize" },
   );
   const summary = process.env.GITHUB_STEP_SUMMARY;
   if (problems.length === 0) {

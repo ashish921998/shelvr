@@ -78,6 +78,26 @@ jobs:
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+          PR_ACTION: ${{ github.event.action }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: node tools/verify-pr-evidence.mjs "$BASE_SHA" "$HEAD_SHA"
+
+  # An owner-reviewed label covers the commit it was given on. A new push takes
+  # it off, so the owner looks again. Nothing is checked out: the job only
+  # calls the API, which is why it may hold a write token.
+  owner-label-reset:
+    name: owner label reset
+    if: >-
+      github.event.action == 'synchronize' &&
+      contains(github.event.pull_request.labels.*.name, 'owner-reviewed')
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Remove the owner-reviewed label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh api --method DELETE "repos/$REPO/issues/$PR_NUMBER/labels/owner-reviewed"

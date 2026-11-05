@@ -85,7 +85,10 @@ the app, a real device, or production data.
 ## Always for the owner
 
 Paths under `convex/` and `src/` are in `apps/native`. A change that touches any of these
-waits for Ashish to read the evidence, whatever the review says. Say so in the report's first line:
+waits for Ashish to read the evidence, whatever the review says. Say so in the report's first
+line. The `verification evidence` check enforces it: the PR fails until Ashish adds the
+`owner-reviewed` label, and every new push removes the label. An agent never adds it.
+The paths are `OWNER_PATTERNS` in `tools/verify-pr-evidence.mjs`:
 
 - billing and entitlement: `convex/subscriptions.ts`, the RevenueCat webhook in
   `convex/http.ts`, `src/lib/entitlement.ts`, paywall code
@@ -94,7 +97,8 @@ waits for Ashish to read the evidence, whatever the review says. Say so in the r
 - release and CI: `.github/workflows/`, `apps/native/eas.json`, `apps/native/app.config.js`,
   `apps/native/app.json`,
   `apps/native/released-builds.json`
-- `convex/schema.ts` when a field or table is removed or narrowed
+- `convex/schema.ts` when a field or table is removed or narrowed (not gated: say so in the
+  report)
 
 ## After the review
 
