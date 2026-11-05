@@ -33,6 +33,14 @@ file in the prompt.
    - What happens on a retry, a second run, or two writes at once?
    - Can an automatic or AI write overwrite something the person chose?
    - Does a person's content, or a deleting account's data, go where it should not?
+
+   When the change touches a flow with steps that can happen in any order (onboarding and
+   the paywall, a save being processed and edited, push devices across accounts, account
+   deletion, reminders, shared lists), model it with the `pstack:statechart` skill. Write
+   rules about what the person sees, what they chose, and what gets recorded, such as "a
+   person is never charged twice" or "a choice the person takes back is undone".
+   Confirm each broken rule against the code before reporting it.
+
 5. **Prove it.** Each finding needs a test or command you ran that fails, or a path from a
    real input to the wrong result with `file:line` at each step. Two reviewers agreeing is
    not proof. Drop what you cannot prove, or list up to three under "Could not prove".
