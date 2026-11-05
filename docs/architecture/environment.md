@@ -7,7 +7,7 @@ Every variable the web app, the native app and the Convex deployment read.
 - Web (`apps/web/.env.example`): `CONVEX_URL` is optional unless a server-backed marketing form
   is enabled. No auth env vars
 - Web: `CONVEX_SITE_URL`: HTTP Actions origin (`*.convex.site`) for the server routes. When
-  empty it is derived from `CONVEX_URL`, but only from a `*.convex.cloud` URL. The Android
+  empty it is derived from `CONVEX_URL` when that URL contains `.convex.cloud`. The Android
   waitlist route answers 503 when neither gives an origin or `WAITLIST_SHARED_SECRET` is unset
 - Web: `WAITLIST_SHARED_SECRET`: must equal the Convex deployment's `WAITLIST_SHARED_SECRET`.
   The web server routes (waitlist, plan votes, the reel place finder, the Oracle) send it to

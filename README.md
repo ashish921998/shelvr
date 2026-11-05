@@ -137,11 +137,14 @@ analytics are optional (copy `apps/web/.env.example` to
 
 ```sh
 CONVEX_URL=<deployment-url>
+WAITLIST_SHARED_SECRET=<same value as on the Convex deployment>
 NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN=<project-token>
 NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 ```
 
-Without `CONVEX_URL`, the Android waitlist route returns 503. Without the
+The Android waitlist route returns 503 without `WAITLIST_SHARED_SECRET` or a Convex site
+origin. It takes the origin from `CONVEX_SITE_URL`, or derives it from a `.convex.cloud`
+`CONVEX_URL`. Without the
 PostHog public variables, signup and App Store downloads still work and web
 analytics become a no-op. Waitlist rows are stored in Convex and optionally
 synced to Resend. Set `RESEND_API_KEY` and `RESEND_ANDROID_SEGMENT_ID` on the
@@ -255,7 +258,8 @@ JWT `sub`), never from a client argument.
 `ignoreCommand` runs `turbo-ignore`, so Vercel builds and publishes only when a
 push changes something the web app depends on, and cancels the deployment for
 the rest, such as a native-only change. Keep the `turbo-ignore` version in step with `turbo` in the root
-`package.json`. Android waitlist signup needs `CONVEX_URL` at runtime:
+`package.json`. Android waitlist signup needs `CONVEX_URL` (or `CONVEX_SITE_URL`) and
+`WAITLIST_SHARED_SECRET` at runtime:
 
 ```sh
 pnpm --filter web-app build
