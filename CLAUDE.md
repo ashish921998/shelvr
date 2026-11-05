@@ -63,10 +63,9 @@ rate-limiter component, without which any mutation that calls `rateLimiter.limit
 
 ## Architecture
 
-This section is an index. Each table, module and route has a full entry in
-[architecture reference](docs/architecture/modules.md): read that entry before changing it,
-and update it there when behaviour changes. `tools/verify-agent-docs.mjs` still requires every
-name to appear here in backticks.
+This section is an index: read the code for how a module behaves. `tools/verify-agent-docs.mjs`
+requires every table, module and route to appear here in backticks. What the code cannot tell
+you is under "What grep won't tell you" below.
 
 ### Backend (`apps/native/convex/`), the source of truth
 
@@ -130,8 +129,32 @@ Rules that cross modules:
 | Notifications   | `notifications.ts`, `notificationDelivery.ts`                                                                                                                                |
 | Plumbing        | `http.ts` (every HTTP route), `crons.ts`, `health.ts`, `schema.ts`, `convex.config.ts`, `waitlist.ts`, `feedback.ts`, `analytics.ts`, `accountTelemetry.ts`, `test.setup.ts` |
 
-Some modules carry run-by-hand backfills (`items:backfillPlaceSearch`, `items:clearEmbeddings`,
-`placePins:backfillPage`); their commands are in the architecture reference.
+#### What grep won't tell you
+
+- **Old-build code looks dead but is a live contract.** `trips.ts`, `tripData.ts`, `plans.ts`,
+  the space CRUD and suggestion functions in `spaces.ts`, `ensureCitySpace`,
+  `aiRecommendForSpace.ts`, the no-op `aiEmbeddingSweep.ts` and the old sweep exports in `ai.ts`
+  have no caller in the current app. Installed builds and queued jobs still call them: do not
+  delete or narrow them (see the contract rule under Working conventions).
+- **Declared because rows carry them.** Keep these in the schema through any rollback:
+  `users.deleting`, `items.embedding` / `embeddingVersion` /
+  `embeddingAttempts`, `items.placeLocations`, `tripPlans.listId`, and the `placeRemovals` and
+  `tripEveReminders` tables.
+- **Run-by-hand backfills** after deploying the change that needs them, from `apps/native`:
+  `pnpm exec convex run --prod <fn> '{"cursor":null}'` with `items:backfillPlaceSearch`
+  (finish it before releasing the search UI), `items:clearEmbeddings` or
+  `placePins:backfillPage`. Each schedules its remaining pages and is safe to restart.
+- **Privacy rules the code enforces on purpose:** a shared list's place search sends Apple only
+  the city name, never a member's pin; a plan from a shared list needs every contributor's AI
+  permission, former members included; `sharedListPlaces` copies no save title or text, and
+  its `itemId` goes only to the person who added it; an Apple refresh token is never returned,
+  logged or passed as a scheduled job argument (`detachedAppleTokens` holds it instead); public
+  item reads strip `places` and `placeLocations`.
+- **An AI check cannot recall a request.** `aiAllowed` runs before a request goes out; a decline
+  that lands mid-run is handled at settlement, which ignores the classification.
+- **Rows outlive saves.** Deleting a save keeps its `tripStops` and `sharedListPlaces` rows.
+- **Google Maps lists** are read through Google's undocumented list endpoint
+  (`model/readers/googleMaps.ts`). A format change fails quietly to a plain page read.
 
 ### Web (`apps/web`)
 
