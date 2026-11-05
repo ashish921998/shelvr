@@ -145,8 +145,9 @@ Rules that cross modules:
   `tripEveReminders` tables.
 - **Run-by-hand backfills** after deploying the change that needs them, from `apps/native`:
   `pnpm exec convex run --prod <fn> '{"cursor":null}'` with `items:backfillPlaceSearch`
-  (finish it before releasing the search UI), `items:clearEmbeddings` or
-  `placePins:backfillPage`. Each schedules its remaining pages and is safe to restart.
+  (finish it before releasing the search UI), `items:clearEmbeddings`,
+  `placePins:backfillPage` or `placeVisits:backfillCountries` (old "We went" marks get a pin
+  and country; run it before the Passport client ships). Each schedules its remaining pages and is safe to restart.
 - **Privacy rules the code enforces on purpose:** a shared list's place search sends Apple only
   the city name, never a member's pin; a plan from a shared list needs every contributor's AI
   permission, former members included; `sharedListPlaces` copies no save title or text, and

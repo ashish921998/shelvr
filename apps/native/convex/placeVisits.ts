@@ -388,3 +388,41 @@ export const locateCountry = internalAction({
     return null;
   },
 });
+
+const BACKFILL_PAGE = 100;
+
+export const backfillCountries = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { page, isDone, continueCursor } = await ctx.db
+      .query("placeVisits")
+      .paginate({ numItems: BACKFILL_PAGE, cursor: args.cursor });
+    let queued = 0;
+    for (const visit of page) {
+      if (visit.countryCode !== undefined) continue;
+      if (visit.lat === undefined) {
+        const item = await ctx.db.get(visit.itemId);
+        const pin =
+          item !== null && item.userId === visit.userId
+            ? visitPin(item, visit.name)
+            : null;
+        if (pin === null) continue;
+        await ctx.db.patch(visit._id, pin);
+      }
+      await ctx.scheduler.runAfter(
+        queued++ * COUNTRY_SPACING_MS,
+        internal.placeVisits.locateCountry,
+        { visitId: visit._id },
+      );
+    }
+    if (!isDone) {
+      await ctx.scheduler.runAfter(
+        queued * COUNTRY_SPACING_MS,
+        internal.placeVisits.backfillCountries,
+        { cursor: continueCursor },
+      );
+    }
+    return null;
+  },
+});
