@@ -40,4 +40,31 @@ describe("useMapCity", () => {
     rerender({ saved: places });
     expect(result.current.city).toBe("Porto");
   });
+
+  it("names a city saved under a still map after panning over empty land", () => {
+    const { result, rerender } = renderHook(({ saved }) => useMapCity(saved), {
+      initialProps: { saved: places },
+    });
+    act(() => result.current.onCentreChange({ lat: 40.42, lng: -3.7 }));
+    act(() => result.current.onCentreChange({ lat: 37.39, lng: -5.98 }));
+    expect(result.current.city).toBeUndefined();
+    rerender({
+      saved: [...places, { lat: 37.38, lng: -5.99, city: "Seville" }],
+    });
+    expect(result.current.city).toBe("Seville");
+  });
+
+  it("does not re-render while the map moves within one city", () => {
+    let renders = 0;
+    const { result } = renderHook(() => {
+      renders += 1;
+      return useMapCity(places);
+    });
+    act(() => result.current.onCentreChange({ lat: 38.72, lng: -9.14 }));
+    const settled = renders;
+    act(() => result.current.onCentreChange({ lat: 38.71, lng: -9.13 }));
+    act(() => result.current.onCentreChange({ lat: 38.73, lng: -9.15 }));
+    expect(renders).toBe(settled);
+    expect(result.current.city).toBe("Lisbon");
+  });
 });
