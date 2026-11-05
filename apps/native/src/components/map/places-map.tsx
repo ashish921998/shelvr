@@ -35,10 +35,8 @@ type Props = {
   framed: MapPin[];
   /** iOS: open on the person's location and show it. */
   showsUser: boolean;
-  /** Clears the floating header above the map. */
   topInset: number;
   focus?: MapFocus;
-  /** A counter: each rise moves the camera to the person. */
   locate?: number;
   onCentreChange?: (centre: LatLng) => void;
   onSelect: (id: string) => void;

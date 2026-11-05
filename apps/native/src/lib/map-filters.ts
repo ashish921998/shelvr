@@ -53,7 +53,6 @@ export function busiestCityPlaces<T extends { city?: string }>(
     : places.filter((place) => cityKey(place.city ?? "") === top);
 }
 
-/** The city of the saved place nearest the centre; places with no city are skipped. */
 export function cityNear(
   places: readonly (LatLng & { city?: string })[],
   centre: LatLng,
