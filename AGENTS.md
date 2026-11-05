@@ -114,8 +114,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   (`tools/formal/image-import`). Use it before changing those functions, the
   storage cleanup crons, or any code that deletes a `_storage` blob.
 - **Pull requests:** fill in `.github/pull_request_template.md`.
-- **Reviewing a pull request:** read `REVIEW.md` first. It is the checklist
-  every reviewer (CI Claude, Codex, any agent) works from.
+- **Reviewing a pull request:** follow `REVIEW.md`. It is the whole
+  procedure, so any agent can review without a review bot.
 - **Measuring a reviewer:** `tools/review-eval` holds past PRs that shipped a
   bug, plus clean ones, to score catch rate and false alarms.
 
@@ -268,6 +268,7 @@ cannot happen.
 | No new code comments: run `/pstack:no-comments`. A comment on a rule we cannot change takes `Comments: kept` | `tools/verify-comments.mjs` fails a file whose comment count rises from the fork point                           | CI `convex api contract`             |
 | OTA reaches only builds with the same native fingerprint                                                     | `tools/verify-ota-compatibility.mjs` blocks the publish; `tools/verify-native-fingerprint.mjs` only warns on PRs | OTA `before_update`; CI warns        |
 | A PR shows how it was verified; UI shows a screenshot                                                        | `tools/verify-pr-evidence.mjs`                                                                                   | CI `PR evidence`                     |
+| A PR records a REVIEW.md review; owner paths wait for Ashish's `/approve <commit>` naming the head           | `tools/verify-pr-evidence.mjs` (`OWNER_PATTERNS`, `ownerApproved`); `owner-approve.yml` re-runs the check        | CI `PR evidence`                     |
 | No high or critical advisories                                                                               | `pnpm run audit`                                                                                                 | `check`, CI on dependency PRs, daily |
 | Public queries and mutations use the auth builders or are in `PUBLIC_ON_PURPOSE`                             | `convex/model/publicFunctions.test.ts`; public actions stay review-only                                          | `check:code`                         |
 | A built function refuses a signed-out and a deleting caller before its handler                               | The same test calls each one with a ctx stub and fails if a builder calls the handler first                      | `check:code`                         |
