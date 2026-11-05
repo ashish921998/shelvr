@@ -26,12 +26,18 @@ export function useWelcomeName(
       welcomeName.finish(userId);
       return;
     }
+    let live = true;
     void whenSheetSettled()
       .then(whenTrialPrimerDone)
       .then(() => {
+        if (!live) return;
         welcomeName.finish(userId);
         setOpen(true);
       });
+    return () => {
+      live = false;
+      started.current = null;
+    };
   }, [userId, pending, ready, firstName]);
   return { open, holding: open || pending, close: () => setOpen(false) };
 }

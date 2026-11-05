@@ -46,6 +46,22 @@ beforeEach(() => {
 });
 
 describe("useWelcomeName", () => {
+  it("keeps the ask when Home stops being ready while it waits, and asks once it is ready again", async () => {
+    welcomeName.mark("u1");
+    let ready = true;
+    const { result, rerender } = renderHook(() => useWelcomeName("u1", ready));
+    ready = false;
+    rerender();
+    await settleSheets();
+    expect(result.current.open).toBe(false);
+    expect(welcomeName.isPending("u1")).toBe(true);
+    ready = true;
+    rerender();
+    await settleSheets();
+    expect(result.current.open).toBe(true);
+    expect(welcomeName.isPending("u1")).toBe(false);
+  });
+
   it("opens once for a new account with no name, after other sheets have settled", async () => {
     welcomeName.mark("u1");
     const { result, rerender } = renderHook(() => useWelcomeName("u1", true));
