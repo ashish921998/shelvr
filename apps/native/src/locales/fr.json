@@ -1175,6 +1175,7 @@
   "passport.beenBody": "Tamponnez les lieux que vous avez déjà visités",
   "passport.beenSomewhere": "Déjà visité un lieu ?",
   "passport.rowCities": "%{places} · %{cities}",
+  "passport.withWent": "%{places} · %{went}",
   "passport.placesCount": {
     "one": "%{formattedCount} lieu",
     "many": "%{formattedCount} lieux",

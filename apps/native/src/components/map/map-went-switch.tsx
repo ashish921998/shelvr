@@ -1,5 +1,5 @@
 import { haptics } from "@/lib/haptics";
-import { t } from "@/lib/i18n";
+import { t, useAppLocale } from "@/lib/i18n";
 import type { WentFilter } from "@/lib/passport";
 import type { TextMessageKey } from "@/locales/message-types";
 import { Pressable, Text, View } from "react-native";
@@ -18,6 +18,7 @@ export function MapWentSwitch({
   selected: WentFilter;
   onSelect: (value: WentFilter) => void;
 }) {
+  useAppLocale();
   return (
     <View style={styles.wrap}>
       <View style={styles.track} accessibilityRole="tablist">
@@ -34,6 +35,7 @@ export function MapWentSwitch({
                 void haptics.selection();
                 onSelect(value);
               }}
+              hitSlop={{ top: 8, bottom: 8 }}
               style={[styles.segment, on && styles.segmentOn]}
             >
               <Text style={[styles.label, on && styles.labelOn]}>

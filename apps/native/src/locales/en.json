@@ -1143,6 +1143,7 @@
   "passport.beenBody": "Stamp places you already went",
   "passport.beenSomewhere": "Already been somewhere?",
   "passport.rowCities": "%{places} · %{cities}",
+  "passport.withWent": "%{places} · %{went}",
   "passport.placesCount": {
     "one": "%{formattedCount} place",
     "other": "%{formattedCount} places"

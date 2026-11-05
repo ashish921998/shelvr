@@ -1111,6 +1111,7 @@
   "passport.beenBody": "もう行った場所にスタンプを押しましょう",
   "passport.beenSomewhere": "もう行った場所がある？",
   "passport.rowCities": "%{places} · %{cities}",
+  "passport.withWent": "%{places} · %{went}",
   "passport.placesCount": {
     "other": "%{formattedCount}か所"
   },

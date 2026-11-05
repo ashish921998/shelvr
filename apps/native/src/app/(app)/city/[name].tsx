@@ -115,10 +115,14 @@ export default function CityScreen() {
           </View>
           {pins.length > 0 ? (
             <Text style={styles.count}>
-              {t("cityMap.placesFromSaves", { count: allPins.length })}
               {stamped > 0
-                ? ` · ${t("cityMap.stampedCount", { count: stamped })}`
-                : ""}
+                ? t("passport.withWent", {
+                    places: t("cityMap.placesFromSaves", {
+                      count: allPins.length,
+                    }),
+                    went: t("cityMap.stampedCount", { count: stamped }),
+                  })
+                : t("cityMap.placesFromSaves", { count: allPins.length })}
             </Text>
           ) : null}
           {filters.length > 0 ? (
@@ -224,7 +228,6 @@ export default function CityScreen() {
         onClose={stamping.close}
         onRemove={() => void stamping.remove()}
         onShare={(stampCity) => {
-          stamping.close();
           router.push(shareCardHref(stampCity, "stamp"));
         }}
       />

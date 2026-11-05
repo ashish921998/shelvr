@@ -1,5 +1,5 @@
 import { AppSymbolIcon } from "@/components/symbol";
-import { t } from "@/lib/i18n";
+import { t, useAppLocale } from "@/lib/i18n";
 import { passportCounts, usePassport } from "@/lib/passport";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
@@ -9,6 +9,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 const TILTS = ["-8deg", "3deg", "10deg"];
 
 export function PassportRow({ hideEmpty = false }: { hideEmpty?: boolean }) {
+  useAppLocale();
   const router = useRouter();
   const { theme } = useUnistyles();
   const { stamps } = usePassport();

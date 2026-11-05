@@ -1111,6 +1111,7 @@
   "passport.beenBody": "이미 가본 곳에 스탬프를 찍어요",
   "passport.beenSomewhere": "이미 가본 곳이 있나요?",
   "passport.rowCities": "%{places} · %{cities}",
+  "passport.withWent": "%{places} · %{went}",
   "passport.placesCount": {
     "other": "%{formattedCount}곳"
   },

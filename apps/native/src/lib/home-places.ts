@@ -100,6 +100,9 @@ export function cityCountLine(entry: City, went = 0): string | null {
       ? t("homePlaces.noPlaceYet", { count: entry.count })
       : t("homePlaces.spotCount", { count: entry.placeCount });
   return went > 0
-    ? `${places} · ${t("passport.wentCount", { count: went })}`
+    ? t("passport.withWent", {
+        places,
+        went: t("passport.wentCount", { count: went }),
+      })
     : places;
 }

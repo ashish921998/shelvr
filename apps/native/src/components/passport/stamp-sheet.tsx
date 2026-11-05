@@ -2,9 +2,10 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { Button } from "@/components/ui/button";
 import { PromptSheet } from "@/components/ui/prompt-sheet";
 import { formatShortDate } from "@/lib/date";
-import { t } from "@/lib/i18n";
+import { t, useAppLocale } from "@/lib/i18n";
 import type { OpenStamp } from "@/lib/passport";
 import { Image } from "expo-image";
+import { useRef } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -59,6 +60,13 @@ export function StampSheet({
   onRemove: () => void;
   onShare?: (city: string) => void;
 }) {
+  useAppLocale();
+  const sharing = useRef<string | null>(null);
+  const flush = () => {
+    const city = sharing.current;
+    sharing.current = null;
+    if (city !== null) onShare?.(city);
+  };
   const ink =
     stamp === null
       ? ""
@@ -74,6 +82,7 @@ export function StampSheet({
     <PromptSheet
       visible={stamp !== null}
       onClose={onClose}
+      onDismiss={flush}
       testID="stamp-sheet"
       title={t("passport.stampedTitle")}
       body={stamp ? t("passport.stampedBody", { name: stamp.name, count }) : ""}
@@ -84,7 +93,10 @@ export function StampSheet({
               <Button
                 testID="stamp-sheet-share"
                 title={t("passport.shareCity", { city: stamp.city })}
-                onPress={() => onShare(stamp.city)}
+                onPress={() => {
+                  sharing.current = stamp.city;
+                  onClose();
+                }}
               />
               <Pressable
                 accessibilityRole="button"

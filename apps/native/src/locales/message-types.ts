@@ -1048,6 +1048,7 @@ export type MessageParams = {
   "passport.beenBody": undefined;
   "passport.beenSomewhere": undefined;
   "passport.rowCities": { places: string; cities: string };
+  "passport.withWent": { places: string; went: string };
   "passport.placesCount": { count: number };
   "passport.citiesCount": { count: number };
   "passport.wentCount": { count: number };

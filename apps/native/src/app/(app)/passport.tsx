@@ -188,7 +188,6 @@ export default function PassportScreen() {
         onClose={stamping.close}
         onRemove={() => void stamping.remove()}
         onShare={(city) => {
-          stamping.close();
           router.push(shareCardHref(city, "stamp"));
         }}
       />

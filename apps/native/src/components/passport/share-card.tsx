@@ -1,6 +1,6 @@
 import { isDarkThemeName } from "@/lib/appearance";
 import { appleZoom } from "@/lib/city-pins";
-import { t } from "@/lib/i18n";
+import { t, useAppLocale } from "@/lib/i18n";
 import type { CardPlace, SavedOn } from "@/lib/passport";
 import { fitCamera } from "@/lib/trip";
 import { AppleMaps } from "expo-maps";
@@ -95,6 +95,7 @@ export function ShareCard({
   places: CardPlace[];
   width: number;
 }) {
+  useAppLocale();
   const s = width / BASE_WIDTH;
   const height = Math.round((width * 16) / 9);
   const more = total - places.length;

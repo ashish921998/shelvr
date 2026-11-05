@@ -1175,6 +1175,7 @@
   "passport.beenBody": "Sella los lugares a los que ya fuiste",
   "passport.beenSomewhere": "¿Ya fuiste a algún lugar?",
   "passport.rowCities": "%{places} · %{cities}",
+  "passport.withWent": "%{places} · %{went}",
   "passport.placesCount": {
     "one": "%{formattedCount} lugar",
     "many": "%{formattedCount} lugares",

@@ -1175,6 +1175,7 @@
   "passport.beenBody": "Carimbe os lugares aonde você já foi",
   "passport.beenSomewhere": "Já foi a algum lugar?",
   "passport.rowCities": "%{places} · %{cities}",
+  "passport.withWent": "%{places} · %{went}",
   "passport.placesCount": {
     "one": "%{formattedCount} lugar",
     "many": "%{formattedCount} lugares",

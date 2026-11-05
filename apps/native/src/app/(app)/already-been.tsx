@@ -95,9 +95,11 @@ export default function AlreadyBeenScreen() {
   const { theme } = useUnistyles();
   const places = useQuery(convexQuery(api.placeVisits.listUnstampedPlaces, {}));
   const markVisitedBefore = useMutation(api.placeVisits.markVisitedBefore);
-  const [picked, setPicked] = useState<ReadonlyMap<string, UnstampedPlace>>(
+  const [chosen, setPicked] = useState<ReadonlyMap<string, UnstampedPlace>>(
     new Map(),
   );
+  const live = new Set(places.data?.map(pickId));
+  const picked = new Map([...chosen].filter(([id]) => live.has(id)));
   const [busy, setBusy] = useState(false);
   const close = useCallback(() => backOrHome(router), [router]);
 
@@ -213,7 +215,8 @@ export default function AlreadyBeenScreen() {
                 place={place}
                 selected={picked.has(pickId(place))}
                 disabled={
-                  picked.size >= MAX_PICKS && !picked.has(pickId(place))
+                  busy ||
+                  (picked.size >= MAX_PICKS && !picked.has(pickId(place)))
                 }
                 onPress={() => toggle(place)}
               />

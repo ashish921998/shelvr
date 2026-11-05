@@ -5,7 +5,10 @@ import { expect, it, vi } from "vitest";
 import { haptics } from "@/lib/haptics";
 import { MapWentSwitch } from "./map-went-switch";
 
-vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
+vi.mock("@/lib/i18n", () => ({
+  t: (key: string) => key,
+  useAppLocale: () => "en",
+}));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}), hairlineWidth: 1 },
 }));
