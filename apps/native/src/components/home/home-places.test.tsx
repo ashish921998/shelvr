@@ -3,11 +3,13 @@ import type { ReactNode } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { Id } from "@convex/_generated/dataModel";
 import {
   HomePlaces,
   HomePlacesEmptyCard,
   UnplacedSaves,
 } from "@/components/home/home-places";
+import type { ReviewSave } from "@/components/home/review-saves";
 
 const mocks = vi.hoisted(() => ({
   cities: [] as
@@ -46,9 +48,14 @@ vi.mock("@/components/ui/button", () => ({
     ),
   ),
 }));
-vi.mock("@/components/home/review-saves", () => ({
-  ReviewSaves: vi.fn(() => <span>Review row</span>),
-}));
+vi.mock("@/components/home/review-saves", async () => {
+  const { savesToReview } = await import("@/lib/home-places");
+  return {
+    ReviewSaves: vi.fn(({ saves }: { saves: ReviewSave[] }) =>
+      savesToReview(saves).length > 0 ? <span>Review row</span> : null,
+    ),
+  };
+});
 vi.mock("@/components/home/shared-lists-section", () => ({
   SharedListsSection: vi.fn(() => <span>Shared lists</span>),
 }));
@@ -331,13 +338,20 @@ describe("city cards", () => {
 });
 
 describe("before the cities load", () => {
+  const failed: ReviewSave = {
+    _id: "failed" as Id<"items">,
+    _creationTime: 0,
+    type: "link",
+    status: "failed",
+  };
+
   afterEach(() => {
     mocks.access = { kind: "pro", syncing: false };
   });
 
   it("still shows the review row and shared lists, with no plan rows or cities", () => {
     mocks.cities = undefined;
-    render(<HomePlaces saves={[]} />);
+    render(<HomePlaces saves={[failed]} />);
     expect(screen.getByText("Review row")).toBeTruthy();
     expect(screen.getByText("Shared lists")).toBeTruthy();
     expect(screen.queryByText("Plan a date")).toBeNull();
@@ -347,7 +361,7 @@ describe("before the cities load", () => {
   it("shows them while the account's access is still loading", () => {
     mocks.access = { kind: "loading" };
     mocks.cities = [{ city: "Lisbon", count: 1, placeCount: 1, cover: null }];
-    render(<HomePlaces saves={[]} />);
+    render(<HomePlaces saves={[failed]} />);
     expect(screen.getByText("Review row")).toBeTruthy();
     expect(screen.getByText("Shared lists")).toBeTruthy();
     expect(screen.queryByText("Lisbon")).toBeNull();
