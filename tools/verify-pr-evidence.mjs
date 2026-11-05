@@ -46,30 +46,19 @@ const OWNER_PATTERNS = [
 
 export const isOwnerFile = (path) => OWNER_PATTERNS.some((re) => re.test(path));
 
-export const OWNER_LABEL = "owner-reviewed";
-
 export const DEPENDENCY_BOTS = ["renovate[bot]", "dependabot[bot]"];
 
-export function headSince(runs, head) {
-  let since = null;
-  let previous = null;
-  for (const run of [...runs].sort((a, b) =>
-    a.created_at.localeCompare(b.created_at),
-  )) {
-    if (run.head_sha === head && previous !== head) since = run.created_at;
-    previous = run.head_sha;
-  }
-  return previous === head ? since : null;
-}
+const APPROVE = /^\/approve\s+([0-9a-f]{7,40})\b/i;
 
-export function ownerApproved(events, headSeenAt) {
-  let labeledAt = null;
-  for (const event of events) {
-    if (event.label?.name !== OWNER_LABEL) continue;
-    if (event.event === "labeled") labeledAt = event.created_at;
-    if (event.event === "unlabeled") labeledAt = null;
-  }
-  return labeledAt !== null && Date.parse(labeledAt) > Date.parse(headSeenAt);
+export function ownerApproved(comments, owner, head) {
+  return comments.some((comment) => {
+    const named = APPROVE.exec(comment.body?.trim() ?? "")?.[1];
+    return (
+      comment.user?.login === owner &&
+      named !== undefined &&
+      head.toLowerCase().startsWith(named.toLowerCase())
+    );
+  });
 }
 
 const markdown = new MarkdownIt({ html: true, linkify: true });
@@ -252,8 +241,8 @@ export function evidenceProblems(
       ownerFiles.length > 5 ? ` and ${ownerFiles.length - 5} more` : "";
     problems.push(
       `This pull request changes files only the owner may approve (${list}${more}). ` +
-        `Ashish reads the evidence and adds the "${OWNER_LABEL}" label; an agent never adds it. ` +
-        "It covers only commits GitHub had seen before it was added: after a new push, remove it and add it again.",
+        'Ashish reads the change and comments "/approve <commit>" naming the commit he read; an agent never posts it. ' +
+        "A later push needs a new /approve for its commit.",
     );
   }
   if (DEPENDENCY_BOTS.includes(author)) return problems;
@@ -312,33 +301,19 @@ function changedFilesSince(base, head) {
     .filter(Boolean);
 }
 
-function headSeenAt(head) {
-  const { GITHUB_REPOSITORY: repo, PR_HEAD_REF: ref } = process.env;
-  const now = new Date().toISOString();
-  if (!repo || !ref) return now;
-  const pages = execFileSync(
-    "gh",
-    [
-      "api",
-      "--paginate",
-      "--slurp",
-      `repos/${repo}/actions/runs?event=pull_request_target&per_page=100&branch=${encodeURIComponent(ref)}`,
-    ],
-    { encoding: "utf8" },
-  );
-  const runs = JSON.parse(pages).flatMap((page) => page.workflow_runs);
-  return headSince(runs, head) ?? now;
-}
-
-function labelEvents() {
+function prComments() {
   const { GITHUB_REPOSITORY: repo, PR_NUMBER: number } = process.env;
   if (!repo || !number) return [];
   const pages = execFileSync(
     "gh",
-    ["api", "--paginate", "--slurp", `repos/${repo}/issues/${number}/events`],
+    ["api", "--paginate", "--slurp", `repos/${repo}/issues/${number}/comments`],
     { encoding: "utf8" },
   );
   return JSON.parse(pages).flat();
+}
+
+function resolve(ref) {
+  return execFileSync("git", ["rev-parse", ref], { encoding: "utf8" }).trim();
 }
 
 function main() {
@@ -355,9 +330,11 @@ function main() {
     changedFilesSince(base, head),
     labels,
     {
-      approved:
-        labels.includes(OWNER_LABEL) &&
-        ownerApproved(labelEvents(), headSeenAt(head)),
+      approved: ownerApproved(
+        prComments(),
+        process.env.GITHUB_REPOSITORY_OWNER ?? "",
+        resolve(head),
+      ),
       author: process.env.PR_AUTHOR ?? "",
     },
   );

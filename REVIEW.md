@@ -78,9 +78,10 @@ Billing, sign-in, account deletion, release config and CI wait for Ashish, whate
 review says. Put that in the report's first line. The exact files are `OWNER_PATTERNS` in
 `tools/verify-pr-evidence.mjs`.
 
-The `verification evidence` check fails these PRs until Ashish adds the `owner-reviewed`
-label. The label counts only if it was added after the PR's latest push, so he re-adds it
-after each one. Bot PRs are held too. An agent never adds it.
+The `verification evidence` check fails these PRs until Ashish comments
+`/approve <commit>`, naming the commit he read. It counts only for that commit, so a later
+push needs a new `/approve`. The comment re-runs the check. Bot PRs are held too. An agent
+never posts it.
 
 Removing or narrowing a field in `convex/schema.ts` is owner-only too, but no check can
 see it. Flag it in the report.

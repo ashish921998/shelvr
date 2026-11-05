@@ -8,8 +8,6 @@ import {
   hasVisualEvidence,
   isOwnerFile,
   isUiFile,
-  OWNER_LABEL,
-  headSince,
   ownerApproved,
   section,
   WAIVER_LABEL,
@@ -67,7 +65,7 @@ test("an empty Review section fails", () => {
 
 test("owner files fail until approved; other files do not", () => {
   const files = ["apps/native/convex/subscriptions.ts"];
-  assert.match(evidenceProblems(filled(), files)[0], /owner-reviewed/);
+  assert.match(evidenceProblems(filled(), files)[0], /\/approve/);
   assert.deepEqual(
     evidenceProblems(filled(), files, [], { approved: true }),
     [],
@@ -83,59 +81,45 @@ test("a dependency bot skips the description but not the owner gate", () => {
   assert.deepEqual(evidenceProblems("", ["package.json"], [], bot), []);
   const problems = evidenceProblems("", [".github/workflows/ci.yml"], [], bot);
   assert.equal(problems.length, 1);
-  assert.match(problems[0], /owner-reviewed/);
+  assert.match(problems[0], /\/approve/);
 });
 
-test("the owner label counts only when added after the head commit", () => {
-  const labeled = (at) => ({
-    event: "labeled",
-    label: { name: OWNER_LABEL },
-    created_at: at,
-  });
-  const unlabeled = (at) => ({ ...labeled(at), event: "unlabeled" });
-  const head = "2026-11-05T10:00:00Z";
-  assert.equal(ownerApproved([labeled("2026-11-05T10:05:00Z")], head), true);
-  assert.equal(ownerApproved([labeled("2026-11-05T09:55:00Z")], head), false);
+test("an approval counts only from the owner and only for the commit it names", () => {
+  const head = "34b374cf0a1b2c3d4e5f60718293a4b5c6d7e8f9";
+  const said = (login, body) => ({ user: { login }, body });
   assert.equal(
-    ownerApproved(
-      [labeled("2026-11-05T10:05:00Z"), unlabeled("2026-11-05T10:06:00Z")],
-      head,
-    ),
+    ownerApproved([said("ash", "/approve 34b374cf")], "ash", head),
+    true,
+  );
+  assert.equal(
+    ownerApproved([said("ash", "  /APPROVE 34B374CF0A1B ")], "ash", head),
+    true,
+  );
+  assert.equal(
+    ownerApproved([said("ash", "/approve ee774599")], "ash", head),
+    false,
+  );
+  assert.equal(
+    ownerApproved([said("bot", "/approve 34b374cf")], "ash", head),
+    false,
+  );
+  assert.equal(
+    ownerApproved([said("ash", "/approve 34b37")], "ash", head),
+    false,
+  );
+  assert.equal(
+    ownerApproved([said("ash", "looks good, /approve 34b374cf")], "ash", head),
     false,
   );
   assert.equal(
     ownerApproved(
-      [
-        labeled("2026-11-05T09:00:00Z"),
-        unlabeled("2026-11-05T10:06:00Z"),
-        labeled("2026-11-05T10:07:00Z"),
-      ],
+      [said("ash", "/approve ee774599"), said("ash", "/approve 34b374cf")],
+      "ash",
       head,
     ),
     true,
   );
-  assert.equal(
-    ownerApproved(
-      [{ ...labeled("2026-11-05T10:05:00Z"), label: { name: "no-ui-change" } }],
-      head,
-    ),
-    false,
-  );
-  assert.equal(ownerApproved([], head), false);
-});
-
-test("the head counts from when this PR last moved to it", () => {
-  const run = (at, sha) => ({ created_at: at, head_sha: sha });
-  const runs = [
-    run("2026-11-05T10:00:00Z", "a"),
-    run("2026-11-05T10:01:00Z", "a"),
-    run("2026-11-05T10:10:00Z", "b"),
-    run("2026-11-05T10:30:00Z", "a"),
-  ];
-  assert.equal(headSince(runs, "a"), "2026-11-05T10:30:00Z");
-  assert.equal(headSince(runs.slice(0, 3), "b"), "2026-11-05T10:10:00Z");
-  assert.equal(headSince(runs.slice(0, 3), "a"), null);
-  assert.equal(headSince([], "a"), null);
+  assert.equal(ownerApproved([], "ash", head), false);
 });
 
 test("the owner paths cover billing, auth, release and CI", () => {
