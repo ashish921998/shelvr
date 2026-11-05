@@ -38,6 +38,9 @@ vi.mock("@/components/city/save-row", () => ({
     ),
   ),
 }));
+vi.mock("@/components/home/home-places", () => ({
+  HomePlacesEmptyCard: vi.fn(() => <p>Add your first spot</p>),
+}));
 vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: vi.fn(({ label }: { label: string }) => <p>{label}</p>),
 }));
@@ -54,11 +57,13 @@ vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
 }));
 vi.mock("react-native", () => ({
+  View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
   SectionList: vi.fn(
     ({
       sections,
       keyExtractor,
       ListHeaderComponent: header,
+      ListEmptyComponent: empty,
       renderSectionHeader,
       renderItem,
       onEndReached,
@@ -66,12 +71,14 @@ vi.mock("react-native", () => ({
       sections: { key: string; data: Save[] }[];
       keyExtractor: (save: Save) => string;
       ListHeaderComponent: ReactNode;
+      ListEmptyComponent: ReactNode;
       renderSectionHeader: (info: { section: unknown }) => ReactNode;
       renderItem: (info: { item: Save }) => ReactNode;
       onEndReached: () => void;
     }) => (
       <div>
         {header}
+        {sections.length === 0 ? empty : null}
         {sections.map((section) => (
           <section key={section.key}>
             {renderSectionHeader({ section })}
@@ -154,4 +161,13 @@ it("loads the next page at the end of the list", () => {
   render(<AllSaves />);
   fireEvent.click(screen.getByText("end of list"));
   expect(mocks.loadMore).toHaveBeenCalled();
+});
+
+it("offers the first save when the account has none", () => {
+  mocks.items = [];
+  render(<AllSaves />);
+  expect(screen.getByText("Add your first spot")).toBeTruthy();
+  expect(
+    screen.getAllByRole("heading").map((title) => title.textContent),
+  ).toEqual(["All saves"]);
 });

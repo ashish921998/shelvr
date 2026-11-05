@@ -1,11 +1,12 @@
 import { SaveRow } from "@/components/city/save-row";
+import { HomePlacesEmptyCard } from "@/components/home/home-places";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ThemedText } from "@/components/ui/themed-text";
 import { useHomeFeed } from "@/lib/home-feed";
 import { t, useAppLocale } from "@/lib/i18n";
 import { saveDays, saveDetail } from "@/lib/save-list";
 import { useRouter } from "expo-router";
-import { SectionList } from "react-native";
+import { SectionList, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 export function AllSaves() {
@@ -29,6 +30,11 @@ export function AllSaves() {
         >
           {t("homePlaces.allSaves")}
         </ThemedText>
+      }
+      ListEmptyComponent={
+        <View style={styles.empty}>
+          <HomePlacesEmptyCard />
+        </View>
       }
       renderSectionHeader={({ section }) => (
         <ThemedText
@@ -64,6 +70,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingBottom: rt.insets.bottom + theme.gap(4),
   },
   title: { color: theme.colors.foreground, paddingBottom: theme.gap(0.5) },
+  empty: { paddingTop: theme.gap(1) },
   day: {
     color: theme.colors.muted,
     paddingTop: theme.gap(2),

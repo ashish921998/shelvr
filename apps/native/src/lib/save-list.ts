@@ -3,7 +3,7 @@ import { canRetrySave } from "@/lib/home-places";
 import { formattingLocale, t } from "@/lib/i18n";
 import { KIND_LABELS } from "@/lib/map-filters";
 
-export type SaveDay<T> = { key: string; title: string; saves: T[] };
+type SaveDay<T> = { key: string; title: string; saves: T[] };
 
 function startOfDay(time: number): number {
   const day = new Date(time);
