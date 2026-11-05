@@ -34,11 +34,11 @@ describe("restoreOnboardingStep", () => {
 describe("previousOnboardingStep", () => {
   it.each([
     ["savedCount", "opener"],
-    ["savedEcho", "savedCount"],
-    ["goal", "savedEcho"],
+    ["goal", "savedCount"],
     ["tripSoon", "goal"],
     ["planner", "tripSoon"],
-    ["city", "planner"],
+    ["savedEcho", "planner"],
+    ["city", "savedEcho"],
     ["cityEcho", "city"],
     ["ahaShare", "cityEcho"],
     ["firstSave", "ahaShare"],

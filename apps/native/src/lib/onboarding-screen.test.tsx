@@ -167,6 +167,24 @@ vi.mock("@/components/onboarding/statement", () => ({
     ),
   ),
 }));
+vi.mock("@/components/onboarding/progress-chart", () => ({
+  ProgressChartStep: vi.fn(
+    ({
+      kind,
+      text,
+      onContinue,
+    }: {
+      kind: string;
+      text: string;
+      onContinue: () => void;
+    }) => (
+      <div>
+        <p>{text}</p>
+        {button(`chart:${kind}`, onContinue)}
+      </div>
+    ),
+  ),
+}));
 vi.mock("@/components/onboarding/first-save", () => ({
   FirstSaveStep: vi.fn(({ onContinue }: { onContinue: () => void }) =>
     button("firstSave:continue", onContinue),
@@ -267,14 +285,14 @@ it("walks the questions, the trip question and the echoes into a sample for the 
   tap("opener:start");
   tap("count:hundreds");
   tap("count:continue");
-  expect(screen.getByText("onboardingStatement.savedHundreds")).toBeTruthy();
-  tap("statement:onboardingStatement.savedCta");
   tap("goal:food");
   tap("goal:travel");
   tap("goal:continue");
   tap("trip:soon");
   tap("planner:explorer");
   tap("planner:continue");
+  expect(screen.getByText("onboardingStatement.savedHundreds")).toBeTruthy();
+  tap("chart:trip");
   tap("city:trip:trip:lisbon");
   expect(saved()).toMatchObject({
     goals: ["food", "travel"],
@@ -345,6 +363,7 @@ it("moves on from the trip question on one tap and asks for a dream city after a
   tap("trip:notYet");
   expect(saved()).toMatchObject({ tripSoon: "notYet" });
   tap("planner:continue");
+  tap("chart:date");
   expect(
     screen.getByRole("button", { name: "city:date:dream:lisbon" }),
   ).toBeTruthy();
@@ -355,6 +374,7 @@ it("asks where a person goes out when no trip is planned", () => {
   startAt("planner");
   render(<OnboardingScreen />);
   tap("planner:continue");
+  tap("chart:date");
   expect(
     screen.getByRole("button", { name: "city:date:out:lisbon" }),
   ).toBeTruthy();

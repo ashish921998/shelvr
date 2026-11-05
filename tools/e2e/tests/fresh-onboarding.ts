@@ -39,7 +39,6 @@ export async function walkToSampleReel(
   );
   const skip = screen.getByRole("button", "Skip");
   await skip.tap();
-  await screen.getByRole("button", "That’s me 😩").tap({ timeout: 30_000 });
   await expect(screen.getByText("What would you like to plan?")).toBeVisible({
     timeout: 30_000,
   });
@@ -62,6 +61,7 @@ export async function walkToSampleReel(
     timeout: 30_000,
   });
   await skip.tap();
+  await screen.getByRole("button", "That’s me 😩").tap({ timeout: 30_000 });
   await expect(screen.getByText("Where do you go out?")).toBeVisible({
     timeout: 30_000,
   });

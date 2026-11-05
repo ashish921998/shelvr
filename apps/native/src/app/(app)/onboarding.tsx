@@ -50,6 +50,7 @@ import { NotificationsStep } from "@/components/onboarding/notifications";
 import { OpenerStep } from "@/components/onboarding/opener";
 import { ScalePressable } from "@/components/onboarding/parts";
 import { StatementStep } from "@/components/onboarding/statement";
+import { ProgressChartStep } from "@/components/onboarding/progress-chart";
 import {
   GoalStep,
   PlannerStep,
@@ -311,9 +312,9 @@ export default function OnboardingScreen() {
         );
       case "savedEcho":
         return (
-          <StatementStep
+          <ProgressChartStep
+            kind={kind}
             text={savedEchoText(savedCount)}
-            cta="onboardingStatement.savedCta"
             onContinue={advance}
           />
         );

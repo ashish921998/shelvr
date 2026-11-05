@@ -1033,6 +1033,14 @@ export type MessageParams = {
   "onboardingStatement.savedHundreds": undefined;
   "onboardingStatement.savedLostCount": undefined;
   "onboardingStatement.savedCta": undefined;
+  "onboardingChart.lost": undefined;
+  "onboardingChart.goalDate": undefined;
+  "onboardingChart.goalTrip": undefined;
+  "onboardingChart.goalWeekend": undefined;
+  "onboardingChart.now": undefined;
+  "onboardingChart.whenWeekend": undefined;
+  "onboardingChart.whenTrip": undefined;
+  "onboardingChart.chartLabel": { lost: string; goal: string; when: string };
   "onboardingStatement.cityPicked": { city: string };
   "onboardingStatement.cityFirst": { picked: string; city: string };
   "onboardingStatement.cityStart": { city: string };

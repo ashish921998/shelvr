@@ -3,10 +3,10 @@ import { asksTripSoon, type Goal } from "@/lib/onboarding-goals";
 export const ONBOARDING_STEPS = [
   "opener",
   "savedCount",
-  "savedEcho",
   "goal",
   "tripSoon",
   "planner",
+  "savedEcho",
   "city",
   "cityEcho",
   "ahaShare",
