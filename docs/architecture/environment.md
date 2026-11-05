@@ -6,6 +6,12 @@ Every variable the web app, the native app and the Convex deployment read.
 
 - Web (`apps/web/.env.example`): `CONVEX_URL` is optional unless a server-backed marketing form
   is enabled; the Android waitlist route returns 503 without it. No auth env vars
+- Web: `CONVEX_SITE_URL`: optional HTTP Actions origin (`*.convex.site`) for the server
+  routes; derived from `CONVEX_URL` when empty
+- Web: `WAITLIST_SHARED_SECRET`: must equal the Convex deployment's `WAITLIST_SHARED_SECRET`.
+  The web server routes (waitlist, plan votes, the reel place finder, the Oracle) send it to
+  the Convex HTTP routes. The web server also signs Oracle share links with it, and
+  `/oracle/og` answers 503 without it
 - Web: `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` / `NEXT_PUBLIC_POSTHOG_HOST`: web analytics keys.
   Analytics is a no-op when either is unset
 - Web: `NEXT_PUBLIC_APP_STORE_PROVIDER_TOKEN`: optional App Store Connect provider token. With
@@ -116,6 +122,10 @@ needed at runtime by the features that use them:
   oEmbed returns none (`model/readers/tiktok.ts`, about $0.002 each, its own per-user limit,
   the shared global one; the web reel finder has its own budget). Both are fetched only while the switch is `"true"` and the key is
   set; set the switch to anything else to stop them with no deploy
+- `WAITLIST_SHARED_SECRET`: shared secret the web server sends to the Convex HTTP routes it
+  calls. Set the same value on the web deployment. Unset, `/waitlist/join`, `/reel-places`,
+  `/oracle` and `/plan/votes` answer 500, and `/request-body` and `/waitlist/confirm`
+  answer 401
 - `RESEND_API_KEY`: Resend key for the waitlist contact projection. Without it, rows stay
   `unconfigured` and no attempt is spent
 - `RESEND_SEGMENT_ID`: Resend segment for `shelvr` waitlist signups

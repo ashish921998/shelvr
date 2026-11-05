@@ -240,8 +240,9 @@ each. These rules need more than a line:
   (Renovate and Dependabot aside): what ran and its result, evidence a reviewer can open,
   and what was not verified. A pull request that touches UI files (`UI_PATTERNS` in
   `tools/verify-pr-evidence.mjs`) embeds a screenshot or recording. If nothing on screen
-  changed, say why under Evidence and add the `no-ui-change` label
-  (`gh pr create --label no-ui-change`). The `PR evidence` check fails a ready pull
+  changed, say why under Evidence and add the `no-ui-change` label when opening the pull
+  request (`gh pr create --label no-ui-change`), or to an open one with
+  `gh pr edit --add-label no-ui-change`. The `PR evidence` check fails a ready pull
   request otherwise.
 - **A new table, top-level Convex module or `(app)` route needs a line in this file.**
   `tools/verify-agent-docs.mjs` fails until the name appears here in backticks.
