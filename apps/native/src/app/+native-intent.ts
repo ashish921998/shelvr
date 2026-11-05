@@ -43,7 +43,7 @@ export function redirectSystemPath({
     }
 
     const route = appSchemeRoute(path);
-    if (route !== null && route !== "/") {
+    if (route !== null) {
       const href = resolveRootHref(route);
       if (href !== route) return href;
     }
