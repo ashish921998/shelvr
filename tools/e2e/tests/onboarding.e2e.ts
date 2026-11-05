@@ -7,7 +7,7 @@ import {
   shareTheSampleReel,
   startFreshOnboarding,
   walkToSampleReel,
-  walkToRate,
+  walkToCarouselEnd,
 } from "./fresh-onboarding.ts";
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import {
@@ -17,8 +17,8 @@ import {
   paywallTitle,
 } from "./paywall-sheet.ts";
 
-async function closeToRate(screen: Screen, rate: Locator) {
-  await closePaywallTo(screen, rate);
+async function closeToCarousel(screen: Screen, last: Locator) {
+  await closePaywallTo(screen, last);
   await expect(screen.getByTestId("dev-login-button")).toBeHidden();
   await expect(screen.getByRole("button", "Add")).toBeHidden();
 }
@@ -45,26 +45,25 @@ test(
     );
 
     await shareTheSampleReel(screen);
-    await walkToRate(screen);
-    // Not right now moves on to the paywall; closing returns to the screen before it.
-    const rateAsk = await continueToPaywall(
+    // The carousel's last Continue moves on to the paywall; closing returns to that slide.
+    const lastSlide = await continueToPaywall(
       screen,
-      screen.getByRole("button", "Not right now"),
+      await walkToCarouselEnd(screen),
     );
 
-    await closeToRate(screen, rateAsk);
-    await expect(rateAsk).toBeVisible({ timeout: 30_000 });
+    await closeToCarousel(screen, lastSlide);
+    await expect(lastSlide).toBeVisible({ timeout: 30_000 });
     await expect(screen.getByTestId("dev-login-button")).toBeHidden();
-    await rateAsk.tap();
+    await lastSlide.tap();
     await expectPaywall(screen);
-    await closeToRate(screen, rateAsk);
-    await expect(rateAsk).toBeVisible({ timeout: 30_000 });
+    await closeToCarousel(screen, lastSlide);
+    await expect(lastSlide).toBeVisible({ timeout: 30_000 });
 
     await device.openApp(BUNDLE_ID, {
       relaunch: true,
       launchArguments: [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
     });
-    await expect(rateAsk).toBeVisible({ timeout: 180_000 });
+    await expect(lastSlide).toBeVisible({ timeout: 180_000 });
     await expect(screen.getByTestId("SplashScreenLogo")).toBeHidden({
       timeout: 30_000,
     });
@@ -85,9 +84,9 @@ test(
     for (const place of ["Austin Motel", "Heritage Boot Co.", "Jo's Coffee"]) {
       await expect(screen.getByText(place).first()).toBeVisible();
     }
-    await walkToRate(screen);
+    await walkToCarouselEnd(screen);
     await expect(paywallTitle(screen)).toBeHidden();
-    await app.screenshot("austin-rate");
+    await app.screenshot("austin-carousel");
   },
 );
 
@@ -111,15 +110,12 @@ test(
         timeout: 10_000,
       });
     }
-    await walkToRate(screen);
+    const last = await walkToCarouselEnd(screen);
     await expect(paywallTitle(screen)).toBeHidden();
-    await app.screenshot("rate-before");
-    const rateAsk = await continueToPaywall(
-      screen,
-      screen.getByRole("button", "Not right now"),
-    );
-    await closeToRate(screen, rateAsk);
-    await expect(rateAsk).toBeVisible({ timeout: 30_000 });
+    await app.screenshot("carousel-before");
+    const lastSlide = await continueToPaywall(screen, last);
+    await closeToCarousel(screen, lastSlide);
+    await expect(lastSlide).toBeVisible({ timeout: 30_000 });
     await expect(screen.getByTestId("dev-login-button")).toBeHidden();
   },
 );

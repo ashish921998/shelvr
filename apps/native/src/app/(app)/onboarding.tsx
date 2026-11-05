@@ -48,7 +48,6 @@ import { CarouselStep } from "@/components/onboarding/carousel";
 import { FirstSaveStep } from "@/components/onboarding/first-save";
 import { NotificationsStep } from "@/components/onboarding/notifications";
 import { OpenerStep } from "@/components/onboarding/opener";
-import { RateStep } from "@/components/onboarding/rate";
 import { ScalePressable } from "@/components/onboarding/parts";
 import { StatementStep } from "@/components/onboarding/statement";
 import {
@@ -258,14 +257,14 @@ export default function OnboardingScreen() {
     paywall.ask();
   };
 
-  const leaveRate = () => {
+  const leaveCarousel = () => {
     void notificationPermissionState()
       .catch((error: unknown) => {
         analytics.captureError("onboarding_notifications_check_failed", error);
         return "blocked" as const;
       })
       .then((state) => {
-        if (currentStep.current !== "rate") return;
+        if (currentStep.current !== "carousel") return;
         if (state === "ask") advance();
         else askForPlan();
       });
@@ -363,9 +362,7 @@ export default function OnboardingScreen() {
       case "ahaSpots":
         return <AhaSpotsStep sample={sample} onContinue={advance} />;
       case "carousel":
-        return <CarouselStep sample={sample} onContinue={advance} />;
-      case "rate":
-        return <RateStep leaving={paywall.asked} onContinue={leaveRate} />;
+        return <CarouselStep sample={sample} onContinue={leaveCarousel} />;
       case "notifications":
         return (
           <NotificationsStep

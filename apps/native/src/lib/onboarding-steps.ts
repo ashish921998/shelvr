@@ -13,7 +13,6 @@ export const ONBOARDING_STEPS = [
   "firstSave",
   "ahaSpots",
   "carousel",
-  "rate",
   "notifications",
 ] as const;
 export const ONBOARDING_FLOW_VERSION = 24;
@@ -33,7 +32,6 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   firstSave: "first_save",
   ahaSpots: "aha_spots",
   carousel: "carousel",
-  rate: "rate",
   notifications: "notification_ask",
 };
 

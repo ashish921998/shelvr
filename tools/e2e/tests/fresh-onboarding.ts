@@ -1,5 +1,5 @@
 import type { Device } from "@e2e-dev/mobile";
-import { expect, type Screen } from "e2e";
+import { expect, type Locator, type Screen } from "e2e";
 
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { pollUntil } from "./poll.ts";
@@ -99,8 +99,8 @@ export async function shareTheSampleReel(screen: Screen): Promise<void> {
   });
 }
 
-/** The map reveal leads to a three-slide carousel, then the rating ask; neither opens the paywall on its own. */
-export async function walkToRate(screen: Screen): Promise<void> {
+/** The map reveal leads to a three-slide carousel; the last slide's Continue is returned, and nothing opens the paywall on its own. */
+export async function walkToCarouselEnd(screen: Screen): Promise<Locator> {
   const next = screen.getByRole("button", "Continue");
   await next.tap();
   await expect(
@@ -108,13 +108,8 @@ export async function walkToRate(screen: Screen): Promise<void> {
   ).toBeVisible({ timeout: 30_000 });
   await next.tap();
   await next.tap();
-  await next.tap();
-  await expect(screen.getByRole("button", "Love it, continue")).toBeVisible({
-    timeout: 30_000,
-  });
-  await expect(screen.getByRole("button", "Not right now")).toBeVisible({
-    timeout: 10_000,
-  });
+  await expect(next).toBeVisible({ timeout: 30_000 });
+  return next;
 }
 
 const STALLED_LAUNCH_MS = 75_000;

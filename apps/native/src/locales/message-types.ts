@@ -1041,11 +1041,6 @@ export type MessageParams = {
   "onboardingCarousel.eat": undefined;
   "onboardingCarousel.map": undefined;
   "onboardingCarousel.next": undefined;
-  "onboardingRate.title": undefined;
-  "onboardingRate.body": undefined;
-  "onboardingRate.stars": undefined;
-  "onboardingRate.love": undefined;
-  "onboardingRate.later": undefined;
   "sharedLists.nameBodyWelcome": undefined;
 };
 export type MessageKey = keyof MessageParams;

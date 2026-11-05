@@ -36,7 +36,6 @@ const mocks = vi.hoisted(() => ({
   ),
   share: vi.fn((_props: { sample: Sample }) => null),
   carousel: vi.fn(),
-  rate: vi.fn(),
   notifications: vi.fn(),
   permission: vi.fn<() => Promise<"granted" | "ask" | "blocked">>(),
   progress: {
@@ -206,12 +205,6 @@ vi.mock("@/components/onboarding/carousel", () => ({
   CarouselStep: vi.fn((props: { sample: Sample; onContinue: () => void }) => {
     mocks.carousel(props);
     return button("carousel:continue", props.onContinue);
-  }),
-}));
-vi.mock("@/components/onboarding/rate", () => ({
-  RateStep: vi.fn((props: { leaving: boolean; onContinue: () => void }) => {
-    mocks.rate(props);
-    return button("rate:continue", props.onContinue);
   }),
 }));
 vi.mock("@/components/onboarding/notifications", () => ({
@@ -399,7 +392,7 @@ it("moves one step on a double tap", () => {
   ).toBeTruthy();
 });
 
-it("reuses the sample for the carousel after the spots, before the rating ask and the paywall", async () => {
+it("reuses the sample for the carousel after the spots, before the paywall", async () => {
   mocks.progress = {
     ...mocks.progress,
     goals: ["travel"],
@@ -415,9 +408,6 @@ it("reuses the sample for the carousel after the spots, before the rating ask an
   });
   await act(async () => tap("carousel:continue"));
   expect(mocks.ask).not.toHaveBeenCalled();
-  expect(saved()?.step).toBe(ONBOARDING_STEPS.indexOf("rate"));
-  await act(async () => tap("rate:continue"));
-  expect(mocks.ask).not.toHaveBeenCalled();
   expect(mocks.notifications.mock.lastCall?.[0].sample).toMatchObject({
     kind: "trip",
     city: "austin",
@@ -431,9 +421,9 @@ it.each(["granted", "blocked"] as const)(
   "skips the notifications step when iOS already says %s",
   async (state) => {
     mocks.permission.mockResolvedValue(state);
-    startAt("rate");
+    startAt("carousel");
     render(<OnboardingScreen />);
-    await act(async () => tap("rate:continue"));
+    await act(async () => tap("carousel:continue"));
     expect(mocks.ask).toHaveBeenCalledTimes(1);
     expect(mocks.notifications).not.toHaveBeenCalled();
   },
@@ -441,9 +431,9 @@ it.each(["granted", "blocked"] as const)(
 
 it("opens the paywall when the permission cannot be read", async () => {
   mocks.permission.mockRejectedValue(new Error("no"));
-  startAt("rate");
+  startAt("carousel");
   render(<OnboardingScreen />);
-  await act(async () => tap("rate:continue"));
+  await act(async () => tap("carousel:continue"));
   expect(mocks.ask).toHaveBeenCalledTimes(1);
   expect(mocks.captureError).toHaveBeenCalledTimes(1);
 });
@@ -455,27 +445,18 @@ it.each(["granted", "blocked"] as const)(
     mocks.permission.mockImplementation(
       () => new Promise((resolve) => (answer = resolve)),
     );
-    startAt("rate");
+    startAt("carousel");
     render(<OnboardingScreen />);
-    tap("rate:continue");
+    tap("carousel:continue");
     tap("common.back");
     await act(async () => answer(state));
     expect(mocks.ask).not.toHaveBeenCalled();
-    expect(
-      screen.getByRole("button", { name: "carousel:continue" }),
-    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "aha:spots" })).toBeTruthy();
   },
 );
 
-it("returns from the notifications step to the rating ask", () => {
+it("returns from the notifications step to the same carousel without opening the paywall", () => {
   startAt("notifications");
-  render(<OnboardingScreen />);
-  tap("common.back");
-  expect(screen.getByRole("button", { name: "rate:continue" })).toBeTruthy();
-});
-
-it("returns from the rating ask to the same carousel without opening the paywall", () => {
-  startAt("rate");
   render(<OnboardingScreen />);
   tap("common.back");
   expect(
@@ -530,7 +511,7 @@ it("queues the real reel it played as the first save when onboarding ends", () =
 it("queues the default reel before leaving onboarding when the city question was skipped", () => {
   mocks.progress = {
     ...mocks.progress,
-    step: ONBOARDING_STEPS.indexOf("rate"),
+    step: ONBOARDING_STEPS.indexOf("carousel"),
     goals: ["travel"],
     travelCity: null,
   };

@@ -44,8 +44,7 @@ describe("previousOnboardingStep", () => {
     ["firstSave", "ahaShare"],
     ["ahaSpots", "firstSave"],
     ["carousel", "ahaSpots"],
-    ["rate", "carousel"],
-    ["notifications", "rate"],
+    ["notifications", "carousel"],
   ] as const)("goes back from %s to %s", (step, expected) => {
     expect(previousOnboardingStep(step, ["travel"])).toBe(expected);
   });

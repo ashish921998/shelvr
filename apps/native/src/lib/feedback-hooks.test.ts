@@ -5,11 +5,7 @@ import {
   setNativeReviewAttemptInFlight,
 } from "./feedback";
 import { useFeedbackInvitation } from "./feedback-invitation";
-import {
-  REVIEW_PROMPT_SETTLE_MS,
-  requestReviewOnce,
-  useReviewPrompt,
-} from "./review-prompt";
+import { REVIEW_PROMPT_SETTLE_MS, useReviewPrompt } from "./review-prompt";
 import { reactStandIn as react } from "../test/react-stand-in";
 
 vi.mock("react", async () => {
@@ -30,7 +26,6 @@ const mock = vi.hoisted(() => ({
   hasAction: vi.fn(async () => true),
   requestReview: vi.fn(async () => undefined),
   capture: vi.fn(),
-  captureError: vi.fn(),
   markNativeReviewPrompted: vi.fn(),
   secure: new Map<string, string>(),
   kv: new Map<string, string>(),
@@ -63,9 +58,7 @@ vi.mock("@/lib/current-user", () => ({
 vi.mock("@/lib/entitlement", () => ({
   isPaywallPending: () => mock.paywallPending,
 }));
-vi.mock("@/lib/analytics", () => ({
-  analytics: { capture: mock.capture, captureError: mock.captureError },
-}));
+vi.mock("@/lib/analytics", () => ({ analytics: { capture: mock.capture } }));
 vi.mock("@/lib/posthog", () => ({
   posthog: mock.posthog,
   isAnalyticsAvailable: () =>
@@ -505,37 +498,5 @@ describe("useReviewPrompt", () => {
     expect(mock.hasAction).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
     expect(mock.requestReview).toHaveBeenCalledOnce();
-  });
-});
-
-describe("requestReviewOnce", () => {
-  it("spends Home's prompt and asks Apple for the sheet", async () => {
-    await requestReviewOnce();
-    expect(mock.secure.get(PROMPTED_KEY)).toBe("true");
-    expect(mock.markNativeReviewPrompted).toHaveBeenCalledTimes(1);
-    expect(mock.requestReview).toHaveBeenCalledTimes(1);
-  });
-
-  it("still spends the prompt when Apple has no sheet to show", async () => {
-    mock.hasAction.mockResolvedValueOnce(false);
-    await requestReviewOnce();
-    expect(mock.secure.get(PROMPTED_KEY)).toBe("true");
-    expect(mock.requestReview).not.toHaveBeenCalled();
-  });
-
-  it("asks Apple only once", async () => {
-    await requestReviewOnce();
-    await requestReviewOnce();
-    expect(mock.requestReview).toHaveBeenCalledTimes(1);
-  });
-
-  it("resolves and reports when the request throws", async () => {
-    mock.requestReview.mockRejectedValueOnce(new Error("no sheet"));
-    await expect(requestReviewOnce()).resolves.toBeUndefined();
-    expect(mock.secure.get(PROMPTED_KEY)).toBe("true");
-    expect(mock.captureError).toHaveBeenCalledWith(
-      "onboarding_review_failed",
-      expect.any(Error),
-    );
   });
 });
