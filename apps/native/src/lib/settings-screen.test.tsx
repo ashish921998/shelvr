@@ -23,6 +23,8 @@ const mocks = vi.hoisted(() => ({
   manageSubscription: vi.fn(),
   dismissAll: vi.fn(),
   replace: vi.fn(),
+  openPaywall: vi.fn(),
+  access: { kind: "pro", syncing: false } as Record<string, unknown>,
   stackRoot: "(tabs)",
   status: "none",
   permission: "granted" as "granted" | "ask" | "blocked" | undefined,
@@ -45,8 +47,13 @@ vi.mock("@/lib/current-user", () => ({
   useCurrentUser: () => ({ data: null }),
 }));
 vi.mock("@/lib/entitlement", () => ({
+  openPaywall: mocks.openPaywall,
   restorePurchases: mocks.restorePurchases,
   useEntitlement: () => ({ status: mocks.status }),
+}));
+vi.mock("@/lib/free-plan", () => ({ useAccess: () => mocks.access }));
+vi.mock("@/lib/free-saves-title", () => ({
+  freeSavesTitle: ({ left }: { left: number }) => `free:${left}`,
 }));
 vi.mock("@/lib/manage-subscription", () => ({
   manageSubscription: mocks.manageSubscription,
@@ -162,8 +169,12 @@ beforeEach(() => {
   mocks.status = "none";
   mocks.permission = "granted";
   mocks.stackRoot = "(tabs)";
+  mocks.access = { kind: "pro", syncing: false };
 });
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 it("deletes the account only after the destructive confirm", async () => {
   mocks.deleteAccount.mockResolvedValue(undefined);
@@ -232,9 +243,9 @@ it("replaces a root Profile with Home before Customer Center", () => {
   expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
 });
 
-it("keeps another root, such as a linked plan, under Customer Center", () => {
+it("keeps another root, such as a linked trip, under Customer Center", () => {
   mocks.status = "pro";
-  mocks.stackRoot = "plan/[id]";
+  mocks.stackRoot = "trip-plan/[id]";
   render(<SettingsScreen />);
   fireEvent.click(screen.getByText("account.delete"));
   lastAlert().buttons[1].onPress?.();
@@ -345,4 +356,32 @@ it("turns a toggle shown off for a blocked device on, which leads to system sett
   );
   expect(mocks.setWeeklyShelf).toHaveBeenCalledWith(true);
   expect(lastAlert().title).toBe("notifications.disabledTitle");
+});
+
+it("shows a free account its count and closes Settings before the paywall", async () => {
+  vi.useFakeTimers();
+  mocks.access = {
+    kind: "free",
+    limit: 10,
+    used: 7,
+    left: 3,
+    pending: 0,
+    open: true,
+  };
+  render(<SettingsScreen />);
+  fireEvent.click(screen.getByText("free:3"));
+  expect(mocks.dismissAll).toHaveBeenCalledTimes(1);
+  expect(mocks.openPaywall).not.toHaveBeenCalled();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(3000);
+  });
+  expect(mocks.openPaywall).toHaveBeenCalledWith(
+    expect.anything(),
+    "settings_free_saves",
+  );
+});
+
+it("shows no free count to a Pro account", () => {
+  render(<SettingsScreen />);
+  expect(screen.queryByText(/^free:/)).toBeNull();
 });

@@ -209,8 +209,6 @@
   "account.deleting": "Suppression…",
   "pro.checking": "Vérification de l'abonnement…",
   "pro.unlockShelvr": "Débloquer Shelvr Pro",
-  "share.proHelp": "L'enregistrement de contenus partagés est une fonction Pro. Consultez les offres Shelvr Pro pour les conserver dans votre bibliothèque.",
-  "pro.unlock": "Débloquer Pro",
   "share.reading": "Lecture du contenu partagé…",
   "share.empty": "Rien à enregistrer",
   "share.pending": "Certains éléments sont encore en attente.",
@@ -500,6 +498,7 @@
   "item.pageFailed": "Shelvr n'a pas pu lire cette page.",
   "item.stalled": "Cela prend plus de temps que prévu.",
   "item.partial": "Enregistré à partir du lien uniquement — la page n'a pas chargé, ces détails sont donc estimés.",
+  "item.detailsMissing": "Certains détails n'ont pas pu être chargés. Réessayez pour relancer la lecture.",
   "recipe.ingredients": "Ingrédients",
   "recipe.steps": "Préparation",
   "recipe.stepNumber": "Étape %{number}",
@@ -1226,5 +1225,23 @@
     "one": "%{formattedCount} tamponné",
     "many": "%{formattedCount} tamponnés",
     "other": "%{formattedCount} tamponnés"
-  }
+  },
+  "freePlan.proTag": "Pro",
+  "freePlan.leftTitle": {
+    "one": "Il vous reste %{formattedCount} enregistrement gratuit",
+    "many": "Il vous reste %{formattedCount} enregistrements gratuits",
+    "other": "Il vous reste %{formattedCount} enregistrements gratuits"
+  },
+  "freePlan.usedTitle": "Vous avez utilisé vos %{limit} enregistrements gratuits",
+  "freePlan.leftBody": "Passez à Pro pour continuer à enregistrer des lieux.",
+  "freePlan.seePlans": "Voir les offres",
+  "freePlan.outBody": "Vous pouvez toujours consulter vos lieux enregistrés. Passez à Pro et nous enregistrerons ce lien juste après. Si vous partagez autre chose, cela remplace ce lien.",
+  "freePlan.keepLink": "Garder le lien pour plus tard",
+  "freePlan.discardLink": "Supprimer le lien",
+  "freePlan.readingTitle": "Votre dernier enregistrement gratuit est encore en cours de lecture",
+  "freePlan.readingBody": "S’il ne trouve aucun lieu, il vous est rendu. Nous gardons ce lien et réessaierons à ce moment-là. Si vous partagez autre chose, cela remplace ce lien.",
+  "freePlan.ok": "OK",
+  "freePlan.photosNeedPro": "Les photos nécessitent Pro",
+  "freePlan.photosBody": "Les photos ne font pas partie des enregistrements gratuits. Passez à Pro pour enregistrer des photos, et nous enregistrerons celle-ci juste après.",
+  "freePlan.discardPhoto": "Supprimer la photo"
 }

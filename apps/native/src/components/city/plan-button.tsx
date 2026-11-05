@@ -1,7 +1,8 @@
 import type { CityPlanKind } from "@/lib/city-plan";
 import { t } from "@/lib/i18n";
 import { ActivityIndicator, Pressable, Text } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { AppSymbolIcon } from "@/components/symbol";
 
 export function PlanButton({
   kind,
@@ -45,7 +46,51 @@ export function PlanButton({
   );
 }
 
+export function InviteButton({
+  disabled,
+  onPress,
+}: {
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const { theme } = useUnistyles();
+  const label = t("sharedLists.invite");
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={t("sharedLists.start")}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={8}
+      style={({ pressed }) => [
+        styles.invite,
+        (pressed || disabled) && styles.pressed,
+      ]}
+    >
+      <AppSymbolIcon
+        name="person.badge.plus"
+        size={15}
+        tintColor={theme.colors.foreground}
+      />
+      <Text style={styles.inviteLabel}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create((theme) => ({
+  invite: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(0.75),
+    paddingVertical: theme.gap(0.75),
+    paddingHorizontal: theme.gap(1.5),
+    borderRadius: theme.radius.xl,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  inviteLabel: { ...theme.type.subhead, color: theme.colors.foreground },
   planButton: {
     flex: 1,
     minHeight: theme.control.minHeight,

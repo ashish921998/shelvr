@@ -9,8 +9,11 @@ const mocks = vi.hoisted(() => ({
   move: Object.assign(vi.fn(), { withOptimisticUpdate: vi.fn() }),
   remove: Object.assign(vi.fn(), { withOptimisticUpdate: vi.fn() }),
   selection: vi.fn(),
+  landing: vi.fn(),
 }));
-vi.mock("@/lib/haptics", () => ({ haptics: { selection: mocks.selection } }));
+vi.mock("@/lib/haptics", () => ({
+  haptics: { selection: mocks.selection, landing: mocks.landing },
+}));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: vi.fn(), captureError: vi.fn() },
 }));
@@ -54,8 +57,31 @@ it("does not add a delayed tick to drag feedback or unchanged moves", async () =
   const { result } = renderHook(() => useTripEditor(TRIP));
   await act(() => result.current.moveStop(STOP, { day: 1, index: 0 }, "menu"));
   expect(mocks.move).not.toHaveBeenCalled();
+  await act(() => result.current.moveStop(STOP, { day: 1, index: 0 }, "drag"));
+  expect(mocks.landing).not.toHaveBeenCalled();
   await act(() => result.current.moveStop(STOP, { day: 2, index: 0 }, "drag"));
   expect(mocks.selection).not.toHaveBeenCalled();
+  expect(mocks.landing).toHaveBeenCalledOnce();
+});
+
+it("plays the changed drop before the server answers", async () => {
+  let finish = () => {};
+  mocks.move.mockReturnValueOnce(
+    new Promise((resolve) => {
+      finish = () => resolve({ day: 1, index: 0 });
+    }),
+  );
+  const { result } = renderHook(() => useTripEditor(TRIP));
+  let move: Promise<void>;
+  act(() => {
+    move = result.current.moveStop(STOP, { day: 2, index: 0 }, "drag");
+  });
+  expect(mocks.landing).toHaveBeenCalledOnce();
+  await act(async () => {
+    finish();
+    await move;
+  });
+  expect(mocks.landing).toHaveBeenCalledOnce();
 });
 
 it("ticks on successful removal, and stays quiet when an edit fails", async () => {

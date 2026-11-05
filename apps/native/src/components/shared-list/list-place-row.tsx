@@ -3,12 +3,12 @@ import { ActionMenu } from "@/components/ui/action-menu";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t } from "@/lib/i18n";
 import { savedByLine, type SharedListPlace } from "@/lib/shared-lists";
-import { Pressable, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type Props = {
   place: SharedListPlace;
-  number: number;
+  emoji: string;
   selected: boolean;
   onPress: () => void;
   onPlaceDetails?: () => void;
@@ -18,7 +18,7 @@ type Props = {
 
 export function ListPlaceRow({
   place,
-  number,
+  emoji,
   selected,
   onPress,
   onPlaceDetails,
@@ -45,10 +45,8 @@ export function ListPlaceRow({
         onPress={onPress}
         style={({ pressed }) => [styles.body, pressed && styles.pressed]}
       >
-        <View style={styles.badge}>
-          <ThemedText variant="badge" style={styles.badgeText}>
-            {number}
-          </ThemedText>
+        <View style={styles.bubble}>
+          <Text style={styles.bubbleText}>{emoji}</Text>
         </View>
         <View style={styles.text}>
           <ThemedText variant="subheadStrong" numberOfLines={2}>
@@ -128,15 +126,16 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(1.5),
     padding: theme.gap(0.75),
   },
-  badge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  bubble: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.surface,
+    boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
   },
-  badgeText: { color: theme.colors.onTint },
+  bubbleText: { fontSize: 20 },
   text: { flex: 1, gap: theme.gap(0.25) },
   muted: { color: theme.colors.muted },
   went: {

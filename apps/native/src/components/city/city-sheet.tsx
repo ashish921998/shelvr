@@ -122,26 +122,31 @@ export function CitySheet({ snaps, top, header, list, onHeaderHeight }: Props) {
     <Animated.View style={[styles.sheet, placed]}>
       <GestureDetector gesture={headerDrag}>
         <View
-          accessible
-          accessibilityRole="adjustable"
-          accessibilityLabel={t("cityMap.placesList")}
-          accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
-          onAccessibilityAction={(event) =>
-            moveSheet(
-              top,
-              stepSheet(
-                top.get(),
-                event.nativeEvent.actionName === "increment" ? -1 : 1,
-                snaps,
-              ),
-            )
-          }
           style={styles.header}
           onLayout={(event) =>
             onHeaderHeight?.(event.nativeEvent.layout.height)
           }
         >
-          <View style={styles.grabber} />
+          <View
+            accessible
+            accessibilityRole="adjustable"
+            accessibilityLabel={t("cityMap.placesList")}
+            accessibilityActions={[
+              { name: "increment" },
+              { name: "decrement" },
+            ]}
+            onAccessibilityAction={(event) =>
+              moveSheet(
+                top,
+                stepSheet(
+                  top.get(),
+                  event.nativeEvent.actionName === "increment" ? -1 : 1,
+                  snaps,
+                ),
+              )
+            }
+            style={styles.grabber}
+          />
           {header}
         </View>
       </GestureDetector>

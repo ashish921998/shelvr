@@ -9,11 +9,10 @@ import type { DetailItem } from "@/components/item-detail";
 
 const mock = vi.hoisted(() => ({
   reducedMotion: false,
-  params: { id: "b", from: "space", spaceId: "space-1" },
+  params: { id: "b", from: "home" },
   items: [] as DetailItem[],
   scroll: vi.fn(),
   detailsScroll: vi.fn(),
-  dismiss: vi.fn(),
   delete: vi.fn(),
   alert: vi.fn(),
   forget: vi.fn(),
@@ -119,13 +118,7 @@ vi.mock("@shopify/flash-list", () => ({
 }));
 vi.mock("@convex/_generated/api", () => ({
   api: {
-    items: { deleteItem: "delete", searchItems: "search", getItem: "single" },
-    spaces: {
-      getSpace: "space",
-      dismissSuggestion: "dismiss",
-      acceptSuggestion: "accept",
-      undoAcceptSuggestion: "undo",
-    },
+    items: { deleteItem: "delete", getItem: "single" },
     notifications: { markItemOpened: "opened" },
   },
 }));
@@ -135,20 +128,14 @@ vi.mock("@convex-dev/react-query", () => ({
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (ref: string) => ({
     data:
-      ref === "space"
-        ? { suggestions: mock.items, items: [], name: "Space" }
-        : ref === "single"
-          ? mock.items.find((item) => item._id === mock.params.id)
-          : undefined,
+      ref === "single"
+        ? mock.items.find((item) => item._id === mock.params.id)
+        : undefined,
   }),
 }));
 vi.mock("convex/react", () => ({
   useMutation: (ref: string) =>
-    ref === "delete"
-      ? mock.delete
-      : ref === "dismiss"
-        ? mock.dismiss
-        : mock.mutation,
+    ref === "delete" ? mock.delete : mock.mutation,
 }));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
@@ -236,8 +223,7 @@ function deferred() {
 beforeEach(() => {
   vi.clearAllMocks();
   mock.items = ["a", "b", "c"].map(item);
-  mock.params = { id: "b", from: "space", spaceId: "space-1" };
-  mock.dismiss.mockResolvedValue(true);
+  mock.params = { id: "b", from: "home" };
   mock.delete.mockResolvedValue(undefined);
   mock.router.canGoBack.mockReturnValue(true);
 });
@@ -270,43 +256,6 @@ describe.each([false, true])("reduced motion %s", (reducedMotion) => {
       y: 700,
       animated: !reducedMotion,
     });
-  });
-
-  it.each([
-    ["b", "c", 2],
-    ["c", "b", 1],
-  ])("dismisses %s after scrolling to %s", async (id, neighbor, index) => {
-    mock.params.id = id;
-    render(<ItemScreen />);
-    await press("common.dismiss");
-    expect(mock.scroll).toHaveBeenCalledWith({
-      index,
-      animated: !reducedMotion,
-    });
-    expect(mock.scroll.mock.invocationCallOrder[0]).toBeLessThan(
-      mock.dismiss.mock.invocationCallOrder[0]!,
-    );
-    expect(mock.dismiss).toHaveBeenCalledWith({
-      itemId: id,
-      spaceId: "space-1",
-    });
-    selected(neighbor);
-    expect(mock.navigation.setParams).toHaveBeenCalledWith({ id: neighbor });
-  });
-
-  it("backs out before dismissing the only suggestion", async () => {
-    mock.items = [item("b")];
-    render(<ItemScreen />);
-    await press("common.dismiss");
-    expect(mock.router.back).toHaveBeenCalledOnce();
-    expect(mock.router.back.mock.invocationCallOrder[0]).toBeLessThan(
-      mock.dismiss.mock.invocationCallOrder[0]!,
-    );
-    expect(mock.dismiss).toHaveBeenCalledWith({
-      itemId: "b",
-      spaceId: "space-1",
-    });
-    expect(mock.scroll).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -387,37 +336,26 @@ describe.each([false, true])("reduced motion %s", (reducedMotion) => {
     expect(mock.forget).not.toHaveBeenCalled();
   });
 
-  it.each(["common.dismiss", "common.delete"])(
-    "cancels a stale swipe param write when pressing %s",
-    async (label) => {
-      vi.useFakeTimers();
-      try {
-        mock.params.id = "a";
-        const view = render(<ItemScreen />);
-        act(() =>
-          mock.viewable?.({ viewableItems: [{ item: mock.items[1]! }] }),
-        );
-        selected("b");
-        await (label === "common.delete" ? pressDelete() : press(label));
-        selected("c");
-        expect(mock.navigation.setParams).toHaveBeenCalledExactlyOnceWith({
-          id: "c",
-        });
-        act(() => vi.advanceTimersByTime(400));
-        expect(mock.navigation.setParams).toHaveBeenCalledExactlyOnceWith({
-          id: "c",
-        });
-        expect(
-          label === "common.delete" ? mock.delete : mock.dismiss,
-        ).toHaveBeenCalledWith(
-          label === "common.delete"
-            ? { id: "b" }
-            : { itemId: "b", spaceId: "space-1" },
-        );
-        view.unmount();
-      } finally {
-        vi.useRealTimers();
-      }
-    },
-  );
+  it("cancels a stale swipe param write when deleting", async () => {
+    vi.useFakeTimers();
+    try {
+      mock.params.id = "a";
+      const view = render(<ItemScreen />);
+      act(() => mock.viewable?.({ viewableItems: [{ item: mock.items[1]! }] }));
+      selected("b");
+      await pressDelete();
+      selected("c");
+      expect(mock.navigation.setParams).toHaveBeenCalledExactlyOnceWith({
+        id: "c",
+      });
+      act(() => vi.advanceTimersByTime(400));
+      expect(mock.navigation.setParams).toHaveBeenCalledExactlyOnceWith({
+        id: "c",
+      });
+      expect(mock.delete).toHaveBeenCalledWith({ id: "b" });
+      view.unmount();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

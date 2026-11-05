@@ -200,3 +200,15 @@ export function placeKinds(
   if (datable && tagged(tags, DATE_TAGS)) kinds.add("dateNight");
   return PLACE_KINDS.filter((kind) => kinds.has(kind));
 }
+
+export function mergeVenueKinds<
+  T extends { category?: string; kinds: readonly PlaceKind[] },
+>(kept: T, repeat: T): T {
+  return {
+    ...kept,
+    ...(kept.category || !repeat.category ? {} : { category: repeat.category }),
+    kinds: PLACE_KINDS.filter(
+      (kind) => kept.kinds.includes(kind) || repeat.kinds.includes(kind),
+    ),
+  };
+}

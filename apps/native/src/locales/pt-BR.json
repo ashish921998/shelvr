@@ -209,8 +209,6 @@
   "account.deleting": "Excluindo…",
   "pro.checking": "Verificando assinatura…",
   "pro.unlockShelvr": "Desbloquear Shelvr Pro",
-  "share.proHelp": "Salvar conteúdo compartilhado é uma função Pro. Confira os planos do Shelvr Pro para guardar esse conteúdo na sua biblioteca.",
-  "pro.unlock": "Desbloquear Pro",
   "share.reading": "Lendo conteúdo compartilhado…",
   "share.empty": "Nada para salvar",
   "share.pending": "Alguns itens ainda estão pendentes.",
@@ -500,6 +498,7 @@
   "item.pageFailed": "O Shelvr não conseguiu ler esta página.",
   "item.stalled": "Isso está demorando mais que o esperado.",
   "item.partial": "Salvo apenas a partir do link — a página não carregou, então estes detalhes são estimativas.",
+  "item.detailsMissing": "Alguns detalhes não carregaram. Tente novamente para lê-lo outra vez.",
   "recipe.ingredients": "Ingredientes",
   "recipe.steps": "Modo de preparo",
   "recipe.stepNumber": "Passo %{number}",
@@ -1226,5 +1225,23 @@
     "one": "%{formattedCount} carimbado",
     "many": "%{formattedCount} carimbados",
     "other": "%{formattedCount} carimbados"
-  }
+  },
+  "freePlan.proTag": "Pro",
+  "freePlan.leftTitle": {
+    "one": "Resta %{formattedCount} salvamento grátis",
+    "many": "Restam %{formattedCount} salvamentos grátis",
+    "other": "Restam %{formattedCount} salvamentos grátis"
+  },
+  "freePlan.usedTitle": "Você usou seus %{limit} salvamentos grátis",
+  "freePlan.leftBody": "Assine o Pro para continuar salvando lugares.",
+  "freePlan.seePlans": "Ver planos",
+  "freePlan.outBody": "Você ainda pode ver seus lugares salvos. Assine o Pro e salvaremos este link logo depois. Se você compartilhar outra coisa, ela substitui este link.",
+  "freePlan.keepLink": "Guardar link para depois",
+  "freePlan.discardLink": "Descartar link",
+  "freePlan.readingTitle": "Seu último salvamento grátis ainda está sendo lido",
+  "freePlan.readingBody": "Se não encontrar nenhum lugar, você recebe esse salvamento de volta. Guardaremos este link e tentaremos de novo nessa hora. Se você compartilhar outra coisa, ela substitui este link.",
+  "freePlan.ok": "OK",
+  "freePlan.photosNeedPro": "Fotos exigem Pro",
+  "freePlan.photosBody": "Fotos não fazem parte dos salvamentos grátis. Assine o Pro para salvar fotos, e salvaremos esta logo depois.",
+  "freePlan.discardPhoto": "Descartar foto"
 }

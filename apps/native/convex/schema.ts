@@ -156,6 +156,7 @@ export default defineSchema({
     productsSearchStartedAt: v.optional(v.number()),
     failureReason: v.optional(failureReasonValidator),
     enrichment: v.optional(enrichmentValidator),
+    stepFailed: v.optional(v.boolean()),
     processingRunId: v.optional(v.string()),
     processingStartedAt: v.optional(v.number()),
     searchText: v.string(),
@@ -279,6 +280,7 @@ export default defineSchema({
     locale: v.optional(v.string()),
     token: v.string(),
     platform: v.union(v.literal("ios"), v.literal("android")),
+    installSecretHash: v.optional(v.string()),
     enabled: v.boolean(),
     lastSeenAt: v.number(),
   })
@@ -533,6 +535,18 @@ export default defineSchema({
       "deliveryStatus",
       "deliveryNextAttemptAt",
     ]),
+
+  freeSaves: defineTable({
+    userId: v.string(),
+    itemId: v.id("items"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("placed"),
+      v.literal("released"),
+    ),
+  })
+    .index("by_user_and_status", ["userId", "status"])
+    .index("by_item", ["itemId"]),
 
   onboardingDemos: defineTable({
     userId: v.string(),

@@ -17,7 +17,6 @@ import {
   hasPending,
   subscribePendingOnboarding,
   getPendingOnboardingRevision,
-  updatePendingSpaces,
 } from "@/lib/pending-onboarding";
 import {
   getPurchaseBeforeSignInRevision,
@@ -74,15 +73,22 @@ function pendingWorkKey(): string {
   ]);
 }
 
-/** Mount once: after onboarding and sign-in, creates the deferred spaces and shows the paywall. */
-export function useReplayOnboarding() {
+/** Mount once: after onboarding and sign-in, shows the paywall and saves the queued sample reel. */
+export function useReplayOnboarding(
+  freeSaves: { left: boolean; loading: boolean } = {
+    left: false,
+    loading: false,
+  },
+) {
   const { isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
   const { data: user } = useCurrentUser();
   const accountLoaded = user != null;
   const userId = user?._id ?? null;
   const router = useRouter();
-  const { entitled, loading: entitlementLoading } = useEntitlement();
+  const entitlement = useEntitlement();
+  const entitled = entitlement.entitled || freeSaves.left;
+  const entitlementLoading = entitlement.loading || freeSaves.loading;
   const createSpace = useMutation(api.spaces.createSpace);
   const createLinkItem = useMutation(api.items.createLinkItem);
   const runningRef = useRef(false);
@@ -137,8 +143,6 @@ export function useReplayOnboarding() {
     )
       return;
 
-    const spaces = getPendingSpaces();
-
     const legacyDemoUrl = getPendingDemoUrl();
     const legacyDemoSpace = getPendingDemoSpace();
 
@@ -169,17 +173,7 @@ export function useReplayOnboarding() {
         onboardingPaywall = "unseen";
         if (!sameAccount()) return;
 
-        const spaceResults = await Promise.allSettled(
-          spaces.map((name) => createSpace({ name, dynamic: true })),
-        );
-        const failedSpaces = spaceResults
-          .map((result, index) =>
-            result.status === "rejected" ? spaces[index] : null,
-          )
-          .filter((name): name is string => name !== null);
-        updatePendingSpaces(failedSpaces);
         remainderKey = pendingWorkKey();
-        const allSpacesOk = failedSpaces.length === 0;
 
         if (legacyDemoUrl) {
           if (!sameAccount()) return;
@@ -204,7 +198,6 @@ export function useReplayOnboarding() {
           }
         }
 
-        if (!allSpacesOk) return;
         if (!sameAccount()) return;
 
         if (getPendingDemoUrl() !== null) {

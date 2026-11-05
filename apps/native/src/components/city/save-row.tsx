@@ -27,8 +27,8 @@ type SaveRowItem = {
 type Props = {
   item: SaveRowItem;
   placeName?: string;
-  /** The matching map number when this row represents a located place. */
-  number?: number;
+  /** The place's map emoji when this row represents a located place. */
+  emoji?: string;
   selected?: boolean;
   /** Replaces opening the save, so the city page can select its pin first. */
   onPress?: () => void;
@@ -43,7 +43,7 @@ type Props = {
 export function SaveRow({
   item,
   placeName,
-  number,
+  emoji,
   selected,
   onPress,
   onPlaceDetails,
@@ -72,9 +72,9 @@ export function SaveRow({
         }
         style={({ pressed }) => [styles.body, pressed && styles.pressed]}
       >
-        {number !== undefined ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{number}</Text>
+        {emoji !== undefined ? (
+          <View style={styles.bubble}>
+            <Text style={styles.bubbleText}>{emoji}</Text>
           </View>
         ) : null}
         {!placeName ? (
@@ -197,15 +197,16 @@ const styles = StyleSheet.create((theme) => ({
     letterSpacing: 0.4,
   },
   pressed: { opacity: theme.opacity.pressed },
-  badge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  bubble: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.surface,
+    boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
   },
-  badgeText: { ...theme.type.badge, color: theme.colors.onTint },
+  bubbleText: { fontSize: 20 },
   thumb: {
     width: 56,
     height: 56,

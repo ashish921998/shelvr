@@ -37,12 +37,14 @@ function pinCity(
   pin: { city?: string },
 ): string | undefined {
   const cities = item.cities ?? [];
-  return pin.city ?? (cities.length === 1 ? cities[0] : undefined);
+  const city = pin.city || (cities.length === 1 ? cities[0] : undefined);
+  return city || undefined;
 }
 
 function visitPin(item: Doc<"items">, name: string): VisitPin | null {
   const key = placeKey(name);
-  const pin = (item.placePins ?? []).find((p) => placeKey(p.name) === key);
+  const pins = (item.placePins ?? []).filter((p) => placeKey(p.name) === key);
+  const pin = pins.find((p) => pinCity(item, p) !== undefined) ?? pins[0];
   if (pin === undefined) return null;
   const city = pinCity(item, pin);
   return { lat: pin.lat, lng: pin.lng, ...(city ? { city } : {}) };

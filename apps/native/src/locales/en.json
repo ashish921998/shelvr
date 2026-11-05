@@ -208,8 +208,6 @@
   "account.deleting": "Deleting…",
   "pro.checking": "Checking subscription…",
   "pro.unlockShelvr": "Unlock Shelvr Pro",
-  "share.proHelp": "Saving shared content is a Pro feature. View Shelvr Pro plans to save it to your hub.",
-  "pro.unlock": "Unlock Pro",
   "share.reading": "Reading shared content…",
   "share.empty": "Nothing to save",
   "share.pending": "Some items are still pending.",
@@ -491,6 +489,7 @@
   "item.pageFailed": "Shelvr couldn't read this page.",
   "item.stalled": "This is taking longer than it should.",
   "item.partial": "Saved from the link alone — the page wouldn't load, so these details are a guess.",
+  "item.detailsMissing": "Some details didn't load. Retry to read it again.",
   "recipe.ingredients": "Ingredients",
   "recipe.steps": "Directions",
   "recipe.stepNumber": "Step %{number}",
@@ -1187,5 +1186,22 @@
   "cityMap.stampedCount": {
     "one": "%{formattedCount} stamped",
     "other": "%{formattedCount} stamped"
-  }
+  },
+  "freePlan.proTag": "Pro",
+  "freePlan.leftTitle": {
+    "one": "%{formattedCount} free save left",
+    "other": "%{formattedCount} free saves left"
+  },
+  "freePlan.usedTitle": "You’ve used your %{limit} free saves",
+  "freePlan.leftBody": "Go Pro to keep saving places.",
+  "freePlan.seePlans": "See plans",
+  "freePlan.outBody": "You can still view your saved places. Go Pro and we’ll save this link right after. If you share something else, it replaces this link.",
+  "freePlan.keepLink": "Keep link for later",
+  "freePlan.discardLink": "Discard link",
+  "freePlan.readingTitle": "Your last free save is still being read",
+  "freePlan.readingBody": "If it finds no place, you get that save back. We’ll keep this link and try again then. If you share something else, it replaces this link.",
+  "freePlan.ok": "OK",
+  "freePlan.photosNeedPro": "Photos need Pro",
+  "freePlan.photosBody": "Photos aren’t part of free saves. Go Pro to save photos, and we’ll save this one right after.",
+  "freePlan.discardPhoto": "Discard photo"
 }

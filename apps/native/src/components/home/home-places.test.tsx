@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   start: vi.fn(),
   busy: null as "date" | "trip" | null,
   went: (_city: string): number => 0,
+  access: { kind: "pro", syncing: false } as Record<string, unknown>,
 }));
 
 vi.mock("@/components/city/city-cover", () => ({
@@ -63,6 +64,10 @@ vi.mock("@/lib/city-plan", () => ({
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => ({ entitled: true }),
   usePaywallGuard: () => ({ guard: vi.fn() }),
+}));
+vi.mock("@/lib/free-plan", () => ({
+  useAccess: () => mocks.access,
+  useSaveGuard: () => ({ guard: vi.fn(), loading: false }),
 }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: mocks.cities }),
@@ -185,7 +190,28 @@ describe("plan tiles", () => {
   beforeEach(() => {
     mocks.start.mockReset();
     mocks.busy = null;
+    mocks.access = { kind: "pro", syncing: false };
     vi.unstubAllEnvs();
+  });
+
+  it("tags both tiles Pro for a free account and still starts the plan", () => {
+    mocks.access = {
+      kind: "free",
+      limit: 10,
+      used: 4,
+      left: 6,
+      pending: 0,
+      open: true,
+    };
+    mocks.cities = [entry("Lisbon", 3)];
+    render(<HomePlaces />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Plan a date, In Lisbon, Pro" }),
+    );
+    expect(mocks.start).toHaveBeenCalledWith("date", "Lisbon");
+    expect(
+      screen.getByRole("button", { name: "Plan a trip, In Lisbon, Pro" }),
+    ).toBeTruthy();
   });
 
   it("shows no tiles when no city has a mapped place", () => {

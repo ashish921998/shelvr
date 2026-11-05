@@ -8,6 +8,16 @@ afterEach(() => {
 });
 
 describe("haptics", () => {
+  it("uses a soft landing on iOS and a gesture end on Android", async () => {
+    vi.stubEnv("EXPO_OS", "ios");
+    await haptics.landing();
+    expect(Haptics.impactAsync).toHaveBeenCalledWith("soft");
+    vi.stubEnv("EXPO_OS", "android");
+    await haptics.landing();
+    expect(Haptics.performAndroidHapticsAsync).toHaveBeenCalledWith(
+      "gesture-end",
+    );
+  });
   it("uses a selection tick, light impact, and success pulse on iOS", async () => {
     vi.stubEnv("EXPO_OS", "ios");
     await haptics.selection();
@@ -46,6 +56,7 @@ describe("haptics", () => {
 
   it("keeps the web quiet", async () => {
     vi.stubEnv("EXPO_OS", "web");
+    await haptics.landing();
     await haptics.selection();
     await haptics.impact();
     await haptics.success();

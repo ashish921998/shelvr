@@ -6,7 +6,9 @@ import { shareUrl } from "@/lib/share-link";
 import { webUrl } from "@/lib/web-url";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { placeKinds } from "@convex/model/placeKinds";
 import { cityKey } from "@convex/model/trip";
+import { placeEmoji } from "@/lib/map-pin-emoji";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth, useMutation } from "convex/react";
@@ -35,19 +37,34 @@ export function useSharedLists(enabled = true) {
   );
 }
 
+const NAME_LOAD_WAIT_MS = 3000;
+
 let nameAsked = false;
 
 function useMyFirstName() {
   const { isAuthenticated } = useConvexAuth();
-  return useQuery(
+  const { data, isError } = useQuery(
     convexQuery(api.users.getMyFirstName, isAuthenticated ? {} : "skip"),
-  ).data;
+  );
+  return {
+    firstName: data,
+    loading: isAuthenticated && data === undefined && !isError,
+  };
 }
 
 export function useNameGate() {
-  const firstName = useMyFirstName();
+  const { firstName, loading } = useMyFirstName();
   const [pending, setPending] = useState<(() => void) | null>(null);
-  const gate = useCallback(
+  const waiting = useRef<(() => void) | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(
+    () => () => {
+      waiting.current = null;
+      clearTimeout(timer.current);
+    },
+    [],
+  );
+  const decide = useCallback(
     (action: () => void) => {
       if (firstName !== null || nameAsked) {
         action();
@@ -58,6 +75,29 @@ export function useNameGate() {
     },
     [firstName],
   );
+  useEffect(() => {
+    const action = waiting.current;
+    if (action === null || loading) return;
+    waiting.current = null;
+    clearTimeout(timer.current);
+    decide(action);
+  }, [loading, decide]);
+  const gate = useCallback(
+    (action: () => void) => {
+      if (!loading) {
+        decide(action);
+        return;
+      }
+      waiting.current = action;
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        if (waiting.current !== action) return;
+        waiting.current = null;
+        action();
+      }, NAME_LOAD_WAIT_MS);
+    },
+    [loading, decide],
+  );
   return {
     gate,
     asking: pending !== null,
@@ -65,7 +105,11 @@ export function useNameGate() {
       setPending(null);
       pending?.();
     },
-    cancel: () => setPending(null),
+    cancel: () => {
+      waiting.current = null;
+      clearTimeout(timer.current);
+      setPending(null);
+    },
   };
 }
 
@@ -73,7 +117,7 @@ export function useAskNameOnce(when: boolean): {
   asking: boolean;
   close: () => void;
 } {
-  const firstName = useMyFirstName();
+  const { firstName } = useMyFirstName();
   const [asking, setAsking] = useState(() => when && !nameAsked);
   useEffect(() => {
     if (asking) nameAsked = true;
@@ -152,18 +196,27 @@ export function listRows(places: SharedListPlace[], city: string): ListRow[] {
     ...shown.filter((place) => place.isNew),
     ...shown.filter((place) => !place.isNew),
   ];
-  return ordered.map((place, index) => ({
-    place,
-    pin: {
-      itemId: place._id,
-      name: place.name,
-      lat: place.lat,
-      lng: place.lng,
-      ...(place.appleId !== undefined ? { appleId: place.appleId } : {}),
-      ...(place.category !== undefined ? { category: place.category } : {}),
-      number: index + 1,
-    },
-  }));
+  return ordered.map((place, index) => {
+    const kinds = placeKinds(place.category, []);
+    return {
+      place,
+      pin: {
+        itemId: place._id,
+        name: place.name,
+        lat: place.lat,
+        lng: place.lng,
+        ...(place.appleId !== undefined ? { appleId: place.appleId } : {}),
+        ...(place.category !== undefined ? { category: place.category } : {}),
+        kinds,
+        emoji: placeEmoji({
+          name: place.name,
+          category: place.category,
+          kinds,
+        }),
+        number: index + 1,
+      },
+    };
+  });
 }
 
 type ListSectionRow =

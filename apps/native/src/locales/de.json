@@ -208,8 +208,6 @@
   "account.deleting": "Löschen…",
   "pro.checking": "Abo wird geprüft…",
   "pro.unlockShelvr": "Shelvr Pro freischalten",
-  "share.proHelp": "Das Speichern geteilter Inhalte ist eine Pro-Funktion. Sieh dir die Shelvr Pro-Abos an, um sie in deiner Bibliothek zu speichern.",
-  "pro.unlock": "Pro freischalten",
   "share.reading": "Geteilte Inhalte werden gelesen…",
   "share.empty": "Nichts zu speichern",
   "share.pending": "Einige Inhalte sind noch ausstehend.",
@@ -491,6 +489,7 @@
   "item.pageFailed": "Shelvr konnte diese Seite nicht lesen.",
   "item.stalled": "Das dauert länger als erwartet.",
   "item.partial": "Nur anhand des Links gespeichert — die Seite ließ sich nicht laden, daher sind diese Angaben geschätzt.",
+  "item.detailsMissing": "Einige Details wurden nicht geladen. Versuche es erneut, um den Inhalt noch einmal zu lesen.",
   "recipe.ingredients": "Zutaten",
   "recipe.steps": "Zubereitung",
   "recipe.stepNumber": "Schritt %{number}",
@@ -1187,5 +1186,22 @@
   "cityMap.stampedCount": {
     "one": "%{formattedCount} gestempelt",
     "other": "%{formattedCount} gestempelt"
-  }
+  },
+  "freePlan.proTag": "Pro",
+  "freePlan.leftTitle": {
+    "one": "Noch %{formattedCount} kostenlose Speicherung",
+    "other": "Noch %{formattedCount} kostenlose Speicherungen"
+  },
+  "freePlan.usedTitle": "Du hast deine %{limit} kostenlosen Speicherungen genutzt",
+  "freePlan.leftBody": "Mit Pro speicherst du weiter Orte.",
+  "freePlan.seePlans": "Abos ansehen",
+  "freePlan.outBody": "Deine gespeicherten Orte siehst du weiterhin. Hol dir Pro, dann speichern wir diesen Link gleich danach. Teilst du etwas anderes, ersetzt es diesen Link.",
+  "freePlan.keepLink": "Link für später behalten",
+  "freePlan.discardLink": "Link verwerfen",
+  "freePlan.readingTitle": "Deine letzte kostenlose Speicherung wird noch gelesen",
+  "freePlan.readingBody": "Findet sie keinen Ort, bekommst du sie zurück. Wir behalten diesen Link und versuchen es dann erneut. Teilst du etwas anderes, ersetzt es diesen Link.",
+  "freePlan.ok": "OK",
+  "freePlan.photosNeedPro": "Fotos brauchen Pro",
+  "freePlan.photosBody": "Fotos gehören nicht zu den kostenlosen Inhalten. Hol dir Pro, um Fotos zu speichern. Dieses Foto speichern wir gleich danach.",
+  "freePlan.discardPhoto": "Foto verwerfen"
 }

@@ -256,7 +256,32 @@ describe("processItem on a shared Google Maps list", () => {
       status: "ready",
       title: "Tokyo food",
       places: ["Marcy Land"],
+      enrichment: "partial",
+      stepFailed: true,
     });
+  });
+
+  it("splits the list on a Retry after the city call failed", async () => {
+    model(async () => {
+      throw new Error("model down");
+    });
+    const t = newConvexTest();
+    const { userId, itemId } = await saveList(t);
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+
+    model(NAMED);
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, { status: "processing", processingRunId: "run-2" }),
+    );
+    await t.action(internal.ai.processItem, { itemId, runId: "run-2" });
+
+    const saves = await savesOf(t, userId);
+    expect(saves).toHaveLength(2);
+    for (const save of saves) {
+      expect(save.status).toBe("ready");
+      expect(save.enrichment).toBeUndefined();
+      expect(save.stepFailed).toBeUndefined();
+    }
   });
 });
 
