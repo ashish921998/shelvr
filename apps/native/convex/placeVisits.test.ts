@@ -11,6 +11,7 @@ import {
   vi,
 } from "vitest";
 
+import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
 import { rateLimiter } from "./model/rateLimiter";
 import { newConvexTest, setTestConsent, signedInUser } from "./test.setup";
 import { api, internal } from "./_generated/api";
@@ -207,6 +208,26 @@ describe("the passport", () => {
       { lat: PIN.lat, lng: PIN.lng, city: "Lisbon", countryCode: "PT" },
     ]);
     expect(lookups()).toBe(1);
+  });
+
+  it("finds the pin of an old mark whose name was cut short", async () => {
+    await withMaps();
+    const { t, userId, itemId, visits } = await setup();
+    const long = `Tigre ${"x".repeat(120)}`;
+    await t.run(async (ctx) => {
+      await ctx.db.patch(itemId, { placePins: [{ ...PIN, name: long }] });
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: placeKey(long),
+        name: long.slice(0, MAX_PLACE_NAME_CHARS),
+        itemId,
+        visitedAt: 1,
+      });
+    });
+    await settle(t, () =>
+      t.mutation(internal.placeVisits.backfillCountries, { cursor: null }),
+    );
+    expect(await visits()).toMatchObject([{ lat: PIN.lat, countryCode: "PT" }]);
   });
 
   it("leaves a deleting account's marks alone in the backfill", async () => {

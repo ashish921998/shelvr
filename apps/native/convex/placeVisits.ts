@@ -41,8 +41,7 @@ function pinCity(
   return city || undefined;
 }
 
-function visitPin(item: Doc<"items">, name: string): VisitPin | null {
-  const key = placeKey(name);
+function visitPin(item: Doc<"items">, key: string): VisitPin | null {
   const pins = (item.placePins ?? []).filter((p) => placeKey(p.name) === key);
   const pin = pins.find((p) => pinCity(item, p) !== undefined) ?? pins[0];
   if (pin === undefined) return null;
@@ -73,7 +72,7 @@ async function markVisit(
   const key = placeKey(name);
   const existing = await findVisit(ctx, userId, name);
   if (backfilled && existing !== null) return;
-  const pin = visitPin(item, name);
+  const pin = visitPin(item, key);
   const samePoint =
     existing !== null &&
     pin !== null &&
@@ -231,7 +230,7 @@ export const getPassport = authedQuery({
       const pin =
         visit.lat !== undefined && visit.lng !== undefined
           ? { lat: visit.lat, lng: visit.lng, city: visit.city }
-          : owned && visitPin(owned, visit.name);
+          : owned && visitPin(owned, visit.key);
       const source = reelSource(owned);
       stamps.push({
         key: visit.key,
@@ -406,7 +405,7 @@ export const backfillCountries = internalMutation({
         const item = await ctx.db.get(visit.itemId);
         const pin =
           item !== null && item.userId === visit.userId
-            ? visitPin(item, visit.name)
+            ? visitPin(item, visit.key)
             : null;
         if (pin === null) continue;
         await ctx.db.patch(visit._id, pin);
