@@ -152,7 +152,8 @@ PostHog public variables, signup and App Store downloads still work and web
 analytics become a no-op. Waitlist rows are stored in Convex. Resend sends the
 confirmation email, so the waitlist needs `RESEND_API_KEY` and `RESEND_FEEDBACK_FROM_EMAIL`
 on the Convex deployment. Confirmed Android signups sync to Resend only once
-`RESEND_ANDROID_SEGMENT_ID` is also set there; until then their rows stay `unconfigured`.
+`RESEND_ANDROID_SEGMENT_ID` is also set there. Until then their rows stay `unconfigured`,
+and the hourly `retryFailedResendSyncs` cron syncs them once it is set.
 
 ### 5. Run
 
