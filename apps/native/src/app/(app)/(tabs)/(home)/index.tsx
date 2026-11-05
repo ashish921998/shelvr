@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useIsFocused } from "expo-router";
 import { t, useAppLocale } from "@/lib/i18n";
 import { FreeSavesCard, ProCard } from "@/components/home/pro-card";
 import { HomeSearch } from "@/components/home/home-search";
@@ -78,9 +79,11 @@ export default function HomeScreen() {
     access.kind === "free" && access.left <= FREE_SAVES_NUDGE_AT;
   const { data: user } = useCurrentUser();
   const welcomePending = welcomeSave.usePending(user?._id);
+  const focused = useIsFocused();
   const welcomeName = useWelcomeName(
     user?._id,
-    items !== undefined &&
+    focused &&
+      items !== undefined &&
       !cancelSurvey.visible &&
       !entitlement.loading &&
       !(welcomePending && entitlement.entitled),

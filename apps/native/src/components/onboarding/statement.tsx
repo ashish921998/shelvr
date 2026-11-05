@@ -3,7 +3,7 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import type { TextMessageKey } from "@/locales/message-types";
 import type { ReactNode } from "react";
-import { Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 export function StatementStep({
@@ -23,7 +23,11 @@ export function StatementStep({
   return (
     <View style={styles.wrap}>
       {children}
-      <View style={styles.middle}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.middle}
+        showsVerticalScrollIndicator={false}
+      >
         <Text
           style={[styles.text, centered && styles.centered]}
           maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
@@ -31,7 +35,7 @@ export function StatementStep({
         >
           {text}
         </Text>
-      </View>
+      </ScrollView>
       <PillButton label={t(cta ?? "common.continue")} onPress={onContinue} />
     </View>
   );
@@ -39,7 +43,8 @@ export function StatementStep({
 
 const styles = StyleSheet.create((theme) => ({
   wrap: { flex: 1 },
-  middle: { flex: 1, justifyContent: "center" },
+  scroll: { flex: 1 },
+  middle: { flexGrow: 1, justifyContent: "center" },
   text: {
     ...theme.type.hero,
     lineHeight: 54,
