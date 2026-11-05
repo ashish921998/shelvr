@@ -38,14 +38,14 @@ export default function PassportCardScreen() {
       const file = new File(Paths.cache, "shelvr-passport.png");
       if (file.exists) file.delete();
       file.write(image.encodeToBytes());
+      analytics.capture("passport_card_share_opened", {
+        places: shareCardOf(stamps, city).total,
+        surface: surface === "stamp" ? "stamp" : "passport",
+      });
       await Sharing.shareAsync(file.uri, {
         mimeType: "image/png",
         UTI: "public.png",
         dialogTitle: t("passport.shareCity", { city }),
-      });
-      analytics.capture("passport_card_share_opened", {
-        places: shareCardOf(stamps, city).total,
-        surface: surface === "stamp" ? "stamp" : "passport",
       });
     } catch (error) {
       analytics.captureError("passport_card_share_failed", error);
