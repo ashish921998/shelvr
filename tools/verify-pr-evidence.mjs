@@ -34,9 +34,9 @@ export function isUiFile(path) {
 export const WAIVER_LABEL = "no-ui-change";
 
 const OWNER_PATTERNS = [
-  /^apps\/native\/convex\/(subscriptions|http|auth|auth\.config|users)\.ts$/,
+  /^apps\/native\/convex\/(subscriptions|http|auth|auth\.config|users|freeSaves)\.ts$/,
   /^apps\/native\/convex\/model\/(auth|publicFunctions)\.ts$/,
-  /^apps\/native\/src\/lib\/(entitlement|revenuecat-[\w-]+|paywall-[\w-]+|onboarding-paywall|plan-gate|trial-[\w-]+)\.ts$/,
+  /^apps\/native\/src\/lib\/(entitlement|revenuecat-[\w-]+|paywall-[\w-]+|onboarding-paywall|plan-gate|trial-[\w-]+|purchase-[\w-]+|use-restore-purchases|manage-subscription|list-gate)\.ts$/,
   /^apps\/native\/src\/app\/\(app\)\/(paywall|plan-gate)\.tsx$/,
   /^apps\/native\/(eas\.json|app\.json|app\.config\.js|released-builds\.json)$/,
   /^\.github\/(workflows|actions)\//,
@@ -49,6 +49,18 @@ export const isOwnerFile = (path) => OWNER_PATTERNS.some((re) => re.test(path));
 export const OWNER_LABEL = "owner-reviewed";
 
 export const DEPENDENCY_BOTS = ["renovate[bot]", "dependabot[bot]"];
+
+export function headSince(runs, head) {
+  let since = null;
+  let previous = null;
+  for (const run of [...runs].sort((a, b) =>
+    a.created_at.localeCompare(b.created_at),
+  )) {
+    if (run.head_sha === head && previous !== head) since = run.created_at;
+    previous = run.head_sha;
+  }
+  return previous === head ? since : null;
+}
 
 export function ownerApproved(events, headSeenAt) {
   let labeledAt = null;
@@ -301,19 +313,21 @@ function changedFilesSince(base, head) {
 }
 
 function headSeenAt(head) {
-  const { GITHUB_REPOSITORY: repo } = process.env;
-  if (!repo) return new Date().toISOString();
-  const first = execFileSync(
+  const { GITHUB_REPOSITORY: repo, PR_HEAD_REF: ref } = process.env;
+  const now = new Date().toISOString();
+  if (!repo || !ref) return now;
+  const pages = execFileSync(
     "gh",
     [
       "api",
-      `repos/${repo}/actions/runs?head_sha=${head}&event=pull_request_target`,
-      "--jq",
-      "[.workflow_runs[].created_at] | min // empty",
+      "--paginate",
+      "--slurp",
+      `repos/${repo}/actions/runs?event=pull_request_target&per_page=100&branch=${encodeURIComponent(ref)}`,
     ],
     { encoding: "utf8" },
-  ).trim();
-  return first || new Date().toISOString();
+  );
+  const runs = JSON.parse(pages).flatMap((page) => page.workflow_runs);
+  return headSince(runs, head) ?? now;
 }
 
 function labelEvents() {

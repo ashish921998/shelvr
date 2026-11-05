@@ -9,6 +9,7 @@ import {
   isOwnerFile,
   isUiFile,
   OWNER_LABEL,
+  headSince,
   ownerApproved,
   section,
   WAIVER_LABEL,
@@ -123,6 +124,20 @@ test("the owner label counts only when added after the head commit", () => {
   assert.equal(ownerApproved([], head), false);
 });
 
+test("the head counts from when this PR last moved to it", () => {
+  const run = (at, sha) => ({ created_at: at, head_sha: sha });
+  const runs = [
+    run("2026-11-05T10:00:00Z", "a"),
+    run("2026-11-05T10:01:00Z", "a"),
+    run("2026-11-05T10:10:00Z", "b"),
+    run("2026-11-05T10:30:00Z", "a"),
+  ];
+  assert.equal(headSince(runs, "a"), "2026-11-05T10:30:00Z");
+  assert.equal(headSince(runs.slice(0, 3), "b"), "2026-11-05T10:10:00Z");
+  assert.equal(headSince(runs.slice(0, 3), "a"), null);
+  assert.equal(headSince([], "a"), null);
+});
+
 test("the owner paths cover billing, auth, release and CI", () => {
   for (const path of [
     "apps/native/convex/subscriptions.ts",
@@ -139,6 +154,10 @@ test("the owner paths cover billing, auth, release and CI", () => {
     "apps/native/src/lib/trial-reminder.ts",
     "apps/native/src/app/(app)/paywall.tsx",
     "apps/native/src/app/(app)/plan-gate.tsx",
+    "apps/native/src/lib/purchase-before-sign-in.ts",
+    "apps/native/src/lib/manage-subscription.ts",
+    "apps/native/src/lib/list-gate.ts",
+    "apps/native/convex/freeSaves.ts",
     "apps/native/eas.json",
     "apps/native/app.config.js",
     "apps/native/released-builds.json",
