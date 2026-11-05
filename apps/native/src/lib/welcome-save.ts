@@ -15,6 +15,7 @@ import { useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 export const welcomeSave = oncePerAccount("welcomeSave");
+export const welcomeName = oncePerAccount("welcomeName");
 
 const ONBOARDED_HERE_KEY = "shelvr.welcomeAfterOnboarding";
 
@@ -35,6 +36,7 @@ export function noteOnboardingFinished(): void {
 function claimOnboardingWelcome(userId: string, priorSaves: number): void {
   if (SecureStore.getItem(ONBOARDED_HERE_KEY) !== "true") return;
   SecureStore.setItem(ONBOARDED_HERE_KEY, "");
+  welcomeName.mark(userId);
   if (priorSaves === 0) welcomeSave.mark(userId);
 }
 

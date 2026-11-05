@@ -27,6 +27,8 @@ import {
 } from "@/lib/feedback-invitation";
 import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
+import { NameSheet } from "@/components/shared-list/name-sheet";
+import { useWelcomeName } from "@/lib/welcome-name";
 import { welcomeSave } from "@/lib/welcome-save";
 import {
   type NativeScrollEvent,
@@ -76,8 +78,18 @@ export default function HomeScreen() {
     access.kind === "free" && access.left <= FREE_SAVES_NUDGE_AT;
   const { data: user } = useCurrentUser();
   const welcomePending = welcomeSave.usePending(user?._id);
+  const welcomeName = useWelcomeName(
+    user?._id,
+    !cancelSurvey.visible &&
+      !entitlement.loading &&
+      !(welcomePending && entitlement.entitled),
+  );
   const deferPrompts =
-    cancelSurvey.visible || entitlement.loading || locked || welcomePending;
+    cancelSurvey.visible ||
+    entitlement.loading ||
+    locked ||
+    welcomePending ||
+    welcomeName.open;
   const feedback = useFeedbackInvitation(items, { defer: deferPrompts });
   useReviewPrompt(items, {
     defer: deferPrompts || feedback.invitationVisible || feedback.modalOpen,
@@ -153,6 +165,12 @@ export default function HomeScreen() {
           trialEndsAt={trialEnd(entitlement)}
         />
       ) : null}
+      <NameSheet
+        visible={welcomeName.open}
+        kind="welcome"
+        onDone={welcomeName.close}
+        onCancel={welcomeName.close}
+      />
       {feedback.modalOpen ? (
         <FeedbackModal surface="home" onClose={feedback.closeFeedback} />
       ) : null}

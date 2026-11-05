@@ -1,0 +1,37 @@
+import { useMyFirstName } from "@/lib/shared-lists";
+import { whenSheetSettled } from "@/lib/entitlement";
+import { whenTrialPrimerDone } from "@/lib/trial-reminder";
+import { welcomeName } from "@/lib/welcome-save";
+import { useEffect, useRef, useState } from "react";
+
+export function useWelcomeName(
+  userId: string | undefined,
+  ready: boolean,
+): { open: boolean; close: () => void } {
+  const pending = welcomeName.usePending(userId);
+  const { firstName } = useMyFirstName();
+  const [open, setOpen] = useState(false);
+  const started = useRef(false);
+  useEffect(() => {
+    if (
+      userId === undefined ||
+      started.current ||
+      !pending ||
+      !ready ||
+      firstName === undefined
+    )
+      return;
+    started.current = true;
+    if (firstName !== null) {
+      welcomeName.finish(userId);
+      return;
+    }
+    void whenSheetSettled()
+      .then(whenTrialPrimerDone)
+      .then(() => {
+        welcomeName.finish(userId);
+        setOpen(true);
+      });
+  }, [userId, pending, ready, firstName]);
+  return { open, close: () => setOpen(false) };
+}

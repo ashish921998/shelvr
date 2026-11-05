@@ -4,16 +4,18 @@ import { onboardingLabel } from "@/lib/onboarding-labels";
 import {
   isPlanner,
   isSavedCount,
+  isTripSoon,
   readGoals,
   type Goal,
   type Planner,
   type SavedCount,
+  type TripSoon,
 } from "@/lib/onboarding-goals";
 import { isSampleCity, type SampleCityId } from "@/lib/sample-cities";
 
 const PENDING_KEY = "shelvr.pending.onboarding";
 
-const PROGRESS_VERSION = 11;
+const PROGRESS_VERSION = 12;
 
 export type PendingDemo = {
   url: string;
@@ -34,6 +36,7 @@ type PendingRecord = {
   goals?: Goal[];
   savedCount?: SavedCount | null;
   planner?: Planner | null;
+  tripSoon?: TripSoon | null;
 };
 
 type OnboardingAnswers = {
@@ -41,6 +44,7 @@ type OnboardingAnswers = {
   goals: Goal[];
   savedCount: SavedCount | null;
   planner: Planner | null;
+  tripSoon: TripSoon | null;
 };
 
 type OnboardingProgress = OnboardingAnswers & {
@@ -53,6 +57,7 @@ const NO_ANSWERS: OnboardingAnswers = {
   goals: [],
   savedCount: null,
   planner: null,
+  tripSoon: null,
 };
 
 function answersOf(record: Partial<OnboardingAnswers>): OnboardingAnswers {
@@ -61,6 +66,7 @@ function answersOf(record: Partial<OnboardingAnswers>): OnboardingAnswers {
     goals: readGoals(record.goals),
     savedCount: isSavedCount(record.savedCount) ? record.savedCount : null,
     planner: isPlanner(record.planner) ? record.planner : null,
+    tripSoon: isTripSoon(record.tripSoon) ? record.tripSoon : null,
   };
 }
 

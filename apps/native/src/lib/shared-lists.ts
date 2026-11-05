@@ -41,7 +41,7 @@ const NAME_LOAD_WAIT_MS = 3000;
 
 let nameAsked = false;
 
-function useMyFirstName() {
+export function useMyFirstName() {
   const { isAuthenticated } = useConvexAuth();
   const { data, isError } = useQuery(
     convexQuery(api.users.getMyFirstName, isAuthenticated ? {} : "skip"),

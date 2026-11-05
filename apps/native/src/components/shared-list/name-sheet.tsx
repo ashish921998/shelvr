@@ -13,10 +13,11 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const MAX_NAME_CHARS = 40;
 
-type NameSheetKind = "join" | "create" | "joined";
+type NameSheetKind = "join" | "create" | "joined" | "welcome";
 
 function bodyFor(kind: NameSheetKind, partner: string | undefined): string {
   if (kind === "create") return t("sharedLists.nameBodyCreate");
+  if (kind === "welcome") return t("sharedLists.nameBodyWelcome");
   return partner === undefined
     ? t("sharedLists.nameBodyJoinNoName")
     : t("sharedLists.nameBodyJoin", { name: partner });
@@ -29,6 +30,7 @@ function actionFor(kind: NameSheetKind): string {
     case "create":
       return t("sharedLists.sendInvite");
     case "joined":
+    case "welcome":
       return t("common.save");
   }
 }
@@ -77,7 +79,7 @@ export function NameSheet({
   return (
     <PromptSheet
       visible={visible}
-      onClose={kind === "joined" ? skip : onCancel}
+      onClose={kind === "joined" || kind === "welcome" ? skip : onCancel}
       title={t("sharedLists.nameTitle")}
       body={bodyFor(kind, partner)}
       testID="list-name-sheet"

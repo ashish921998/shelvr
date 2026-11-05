@@ -7,7 +7,7 @@ import {
   shareTheSampleReel,
   startFreshOnboarding,
   walkToSampleReel,
-  walkToCommitment,
+  walkToRate,
 } from "./fresh-onboarding.ts";
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import {
@@ -17,8 +17,8 @@ import {
   paywallTitle,
 } from "./paywall-sheet.ts";
 
-async function closeToCommitment(screen: Screen, commitment: Locator) {
-  await closePaywallTo(screen, commitment);
+async function closeToRate(screen: Screen, rate: Locator) {
+  await closePaywallTo(screen, rate);
   await expect(screen.getByTestId("dev-login-button")).toBeHidden();
   await expect(screen.getByRole("button", "Add")).toBeHidden();
 }
@@ -45,26 +45,26 @@ test(
     );
 
     await shareTheSampleReel(screen);
-    await walkToCommitment(screen);
-    // Skipping the optional promise moves on to the paywall; closing returns to the screen before it.
-    const commit = await continueToPaywall(
+    await walkToRate(screen);
+    // Not right now moves on to the paywall; closing returns to the screen before it.
+    const rateAsk = await continueToPaywall(
       screen,
-      screen.getByRole("button", "Maybe later"),
+      screen.getByRole("button", "Not right now"),
     );
 
-    await closeToCommitment(screen, commit);
-    await expect(commit).toBeVisible({ timeout: 30_000 });
+    await closeToRate(screen, rateAsk);
+    await expect(rateAsk).toBeVisible({ timeout: 30_000 });
     await expect(screen.getByTestId("dev-login-button")).toBeHidden();
-    await commit.tap();
+    await rateAsk.tap();
     await expectPaywall(screen);
-    await closeToCommitment(screen, commit);
-    await expect(commit).toBeVisible({ timeout: 30_000 });
+    await closeToRate(screen, rateAsk);
+    await expect(rateAsk).toBeVisible({ timeout: 30_000 });
 
     await device.openApp(BUNDLE_ID, {
       relaunch: true,
       launchArguments: [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
     });
-    await expect(commit).toBeVisible({ timeout: 180_000 });
+    await expect(rateAsk).toBeVisible({ timeout: 180_000 });
     await expect(screen.getByTestId("SplashScreenLogo")).toBeHidden({
       timeout: 30_000,
     });
@@ -73,7 +73,7 @@ test(
 );
 
 test(
-  "uses a real Austin trip reel for a city without one and keeps confirmation on the same screen",
+  "uses a real Austin trip reel for a city without one",
   { retries: 0, timeout: 600_000 },
   async ({ device, screen, app }) => {
     await startFreshOnboarding({ device, screen });
@@ -82,30 +82,12 @@ test(
     await app.screenshot("austin-fallback-reel");
     await shareTheSampleReel(screen);
     await expect(screen.getByText("Austin · 3 places")).toBeVisible();
-    await walkToCommitment(screen);
-    const promise = screen.getByText(
-      "I’ll visit one saved place on my Austin trip.",
-    );
-    await expect(promise).toBeVisible();
     for (const place of ["Austin Motel", "Heritage Boot Co.", "Jo's Coffee"]) {
       await expect(screen.getByText(place).first()).toBeVisible();
     }
-    await app.screenshot("austin-commitment-before");
-    const hold = screen.getByRole("button", "Hold to commit");
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      await hold.longPress({ duration: 600 });
-      await expect(
-        screen.getByRole("button", "Tap to commit instead"),
-      ).toBeVisible();
-      await expect(screen.getByText("You’re in.")).toBeHidden();
-      await expect(screen.getByRole("button", "Continue")).toBeHidden();
-    }
-    await hold.longPress({ duration: 1200 });
-    await expect(screen.getByText("You’re in.")).toBeVisible();
-    await expect(promise).toBeVisible();
-    await expect(screen.getByRole("button", "Continue")).toBeVisible();
+    await walkToRate(screen);
     await expect(paywallTitle(screen)).toBeHidden();
-    await app.screenshot("austin-commitment-confirmed");
+    await app.screenshot("austin-rate");
   },
 );
 
@@ -129,25 +111,15 @@ test(
         timeout: 10_000,
       });
     }
-    await walkToCommitment(screen);
-    await expect(
-      screen.getByText("I’ll visit one place I saved in Austin this week."),
-    ).toBeVisible();
-    for (const place of ["Eberly", "The Guest House", "Jupiter Supper Club"]) {
-      await expect(screen.getByText(place).first()).toBeVisible();
-    }
-    await app.screenshot("commitment-before");
-    const hold = screen.getByRole("button", "Hold to commit");
-    await hold.longPress({ duration: 1200 });
-    await expect(screen.getByText("You’re in.")).toBeVisible();
+    await walkToRate(screen);
     await expect(paywallTitle(screen)).toBeHidden();
-    await app.screenshot("commitment-confirmed");
-    const commit = await continueToPaywall(
+    await app.screenshot("rate-before");
+    const rateAsk = await continueToPaywall(
       screen,
-      screen.getByRole("button", "Continue"),
+      screen.getByRole("button", "Not right now"),
     );
-    await closeToCommitment(screen, commit);
-    await expect(commit).toBeVisible({ timeout: 30_000 });
+    await closeToRate(screen, rateAsk);
+    await expect(rateAsk).toBeVisible({ timeout: 30_000 });
     await expect(screen.getByTestId("dev-login-button")).toBeHidden();
   },
 );

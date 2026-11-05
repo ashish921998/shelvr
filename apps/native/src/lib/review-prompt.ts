@@ -25,6 +25,20 @@ const READY_ITEM_THRESHOLD = 3;
  */
 export const REVIEW_PROMPT_SETTLE_MS = 1500;
 
+function markReviewPrompted(): void {
+  SecureStore.setItem(PROMPTED_KEY, "true");
+  markNativeReviewPrompted();
+}
+
+export async function requestReviewOnce(): Promise<void> {
+  markReviewPrompted();
+  try {
+    if (await StoreReview.hasAction()) await StoreReview.requestReview();
+  } catch (error) {
+    analytics.captureError("onboarding_review_failed", error);
+  }
+}
+
 export function useReviewPrompt(
   items: FeedbackFeedItem[] | undefined,
   { defer = false }: { defer?: boolean } = {},
@@ -92,8 +106,7 @@ export function useReviewPrompt(
           !isPaywallPending() &&
           AppState.currentState === "active"
         ) {
-          SecureStore.setItem(PROMPTED_KEY, "true");
-          markNativeReviewPrompted();
+          markReviewPrompted();
           analytics.capture("review_prompted", { ready_count: count });
           await StoreReview.requestReview();
         }

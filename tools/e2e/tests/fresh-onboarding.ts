@@ -39,6 +39,7 @@ export async function walkToSampleReel(
   );
   const skip = screen.getByRole("button", "Skip");
   await skip.tap();
+  await screen.getByRole("button", "That’s me 😩").tap({ timeout: 30_000 });
   await expect(screen.getByText("What would you like to plan?")).toBeVisible({
     timeout: 30_000,
   });
@@ -51,15 +52,17 @@ export async function walkToSampleReel(
   const next = screen.getByRole("button", "Continue");
   await expect(next).toBeEnabled({ timeout: 10_000 });
   await next.tap();
+  if (options.goal === "travel") {
+    await expect(screen.getByText("Are you planning a trip soon?")).toBeVisible(
+      { timeout: 30_000 },
+    );
+    await screen.getByRole("radio", "Not yet").tap();
+  }
   await expect(screen.getByText("How do you like to plan?")).toBeVisible({
     timeout: 30_000,
   });
   await skip.tap();
-  await expect(screen.getByText("Let’s put your saves to use.")).toBeVisible({
-    timeout: 30_000,
-  });
-  await screen.getByTestId("onboarding-chart-continue").tap();
-  await expect(screen.getByText("Pick a city to try.")).toBeVisible({
+  await expect(screen.getByText("Where do you go out?")).toBeVisible({
     timeout: 30_000,
   });
   if (options.city) {
@@ -68,6 +71,7 @@ export async function walkToSampleReel(
   } else {
     await skip.tap();
   }
+  await screen.getByRole("button", "Continue").tap({ timeout: 30_000 });
   await expect(screen.getByRole("button", SHARE_ON_REEL)).toBeVisible({
     timeout: 30_000,
   });
@@ -83,6 +87,10 @@ export async function shareTheSampleReel(screen: Screen): Promise<void> {
     screen.getByRole("button", "Add Shelvr to Favorites"),
   ).toBeHidden();
   await screen.getByRole("button", SHARE_TO_SHELVR).tap({ timeout: 30_000 });
+  await expect(screen.getByText(/^Your first save!/)).toBeVisible({
+    timeout: 30_000,
+  });
+  await screen.getByRole("button", "Continue").tap();
   await expect(screen.getByText(/· 3 places$/)).toBeVisible({
     timeout: 30_000,
   });
@@ -91,13 +99,20 @@ export async function shareTheSampleReel(screen: Screen): Promise<void> {
   });
 }
 
-/** The map reveal leads to one commitment screen; confirming never opens the paywall on its own. */
-export async function walkToCommitment(screen: Screen): Promise<void> {
-  await screen.getByRole("button", "Continue").tap();
-  await expect(screen.getByText("Visit a place you’ve saved.")).toBeVisible({
+/** The map reveal leads to a three-slide carousel, then the rating ask; neither opens the paywall on its own. */
+export async function walkToRate(screen: Screen): Promise<void> {
+  const next = screen.getByRole("button", "Continue");
+  await next.tap();
+  await expect(
+    screen.getByText("Plan it together with your people."),
+  ).toBeVisible({ timeout: 30_000 });
+  await next.tap();
+  await next.tap();
+  await next.tap();
+  await expect(screen.getByRole("button", "Love it, continue")).toBeVisible({
     timeout: 30_000,
   });
-  await expect(screen.getByRole("button", "Hold to commit")).toBeVisible({
+  await expect(screen.getByRole("button", "Not right now")).toBeVisible({
     timeout: 10_000,
   });
 }

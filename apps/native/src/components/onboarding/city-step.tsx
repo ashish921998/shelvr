@@ -3,7 +3,9 @@ import { QuestionTitle, ScalePressable } from "@/components/onboarding/parts";
 import { AppSymbolIcon } from "@/components/symbol";
 import { t, useAppLocale } from "@/lib/i18n";
 import { SAMPLE_CITIES, type SampleCityId } from "@/lib/sample-cities";
+import type { CityQuestion } from "@/lib/onboarding-goals";
 import { planCities, type PlanKind } from "@/lib/sample-plans";
+import type { TextMessageKey } from "@/locales/message-types";
 import { Image } from "expo-image";
 import { useState } from "react";
 import { ScrollView, Text, TextInput, View } from "react-native";
@@ -17,6 +19,12 @@ const fold = (text: string) =>
     .normalize("NFD")
     .replace(/\p{Diacritic}/gu, "")
     .toLowerCase();
+
+const CITY_TITLES: Record<CityQuestion, TextMessageKey> = {
+  trip: "onboardingQ.cityTitleTrip",
+  out: "onboardingQ.cityTitleOut",
+  dream: "onboardingQ.cityTitleDream",
+};
 
 function CityTile({
   id,
@@ -52,10 +60,12 @@ function CityTile({
 
 export function CityStep({
   kind,
+  question,
   city,
   onPick,
 }: {
   kind: PlanKind;
+  question: CityQuestion;
   city: SampleCityId | null;
   onPick: (city: SampleCityId | null) => void;
 }) {
@@ -73,7 +83,7 @@ export function CityStep({
   return (
     <View style={styles.wrap}>
       <QuestionTitle
-        title={t("onboardingQ.cityTitle")}
+        title={t(CITY_TITLES[question])}
         body={t("onboardingQ.cityBody")}
       />
       {all.length > SEARCH_FROM ? (
