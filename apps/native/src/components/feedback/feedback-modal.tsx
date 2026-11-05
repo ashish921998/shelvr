@@ -2,6 +2,7 @@ import { t, useAppLocale } from "@/lib/i18n";
 import Constants from "expo-constants";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -26,8 +27,12 @@ import {
   type FeedbackSurface,
 } from "@/lib/feedback";
 import { SUPPORT_URL } from "@/lib/legal";
-import { Crossfade } from "@/components/ui/crossfade";
-import { motion } from "@/lib/motion";
+import { motion, motionCSS } from "@/lib/motion";
+import Animated, {
+  FadeIn,
+  ReduceMotion,
+  useReducedMotion,
+} from "react-native-reanimated";
 
 function submissionContext() {
   const version = Constants.expoConfig?.version;
@@ -53,6 +58,10 @@ export function FeedbackModal({
   onClose: () => void;
 }) {
   useAppLocale();
+  const reduced = useReducedMotion();
+  const fadeDuration = reduced
+    ? motion.duration.feedback
+    : motion.duration.state;
   const { theme } = useUnistyles();
   const { data: user } = useCurrentUser();
   const submitFeedback = useMutation(api.feedback.submitFeedback);
@@ -71,7 +80,11 @@ export function FeedbackModal({
     feedbackAnalytics.feedbackOpened(surface);
   }, [surface]);
 
-  const canSend = flow !== "sending" && !!user && message.trim().length > 0;
+  const canSend =
+    flow !== "sending" &&
+    flow !== "sent" &&
+    !!user &&
+    message.trim().length > 0;
 
   const sendFeedback = useCallback(
     async (rawMessage: string): Promise<"accepted" | "failed"> => {
@@ -105,6 +118,7 @@ export function FeedbackModal({
     const trimmed = message.trim();
     if (trimmed.length === 0) return;
     sendingRef.current = true;
+    Keyboard.dismiss();
     setFlow("sending");
     const result = await sendFeedback(trimmed);
     sendingRef.current = false;
@@ -143,31 +157,24 @@ export function FeedbackModal({
               {t("feedback.open")}
             </Text>
 
-            <Crossfade
-              identity={flow === "sent" ? "sent" : "form"}
-              duration={motion.duration.state}
-            >
-              <View style={styles.fields}>
-                {flow === "sent" ? (
-                  <>
-                    <Text style={styles.body}>{t("feedback.thanks")}</Text>
-                    <View style={styles.buttonRow}>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={t("common.done")}
-                        style={({ pressed }) => [
-                          styles.primaryButton,
-                          pressed && { opacity: 0.7 },
-                        ]}
-                        onPress={onClose}
-                      >
-                        <Text style={styles.primaryButtonText}>
-                          {t("common.done")}
-                        </Text>
-                      </Pressable>
-                    </View>
-                  </>
-                ) : !available ? (
+            <View>
+              <Animated.View
+                pointerEvents={flow === "sent" ? "none" : "auto"}
+                accessibilityElementsHidden={flow === "sent"}
+                importantForAccessibility={
+                  flow === "sent" ? "no-hide-descendants" : "auto"
+                }
+                style={[
+                  styles.fields,
+                  {
+                    opacity: flow === "sent" ? 0 : 1,
+                    transitionProperty: "opacity",
+                    transitionDuration: fadeDuration,
+                    transitionTimingFunction: motionCSS.out,
+                  },
+                ]}
+              >
+                {!available ? (
                   <>
                     <Text style={styles.body}>
                       {t("feedback.unavailableContact")}
@@ -195,6 +202,7 @@ export function FeedbackModal({
                       onChangeText={setMessage}
                       placeholder={t("feedback.placeholder")}
                       placeholderTextColor={theme.colors.faint}
+                      editable={flow !== "sent"}
                       multiline
                       maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
                       autoCapitalize="sentences"
@@ -239,8 +247,35 @@ export function FeedbackModal({
                     </View>
                   </>
                 )}
-              </View>
-            </Crossfade>
+              </Animated.View>
+              {flow === "sent" ? (
+                <Animated.View
+                  style={styles.confirmation}
+                  entering={FadeIn.duration(fadeDuration)
+                    .easing(motion.easing.out)
+                    .reduceMotion(ReduceMotion.Never)}
+                >
+                  <>
+                    <Text style={styles.body}>{t("feedback.thanks")}</Text>
+                    <View style={styles.buttonRow}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t("common.done")}
+                        style={({ pressed }) => [
+                          styles.primaryButton,
+                          pressed && { opacity: 0.7 },
+                        ]}
+                        onPress={onClose}
+                      >
+                        <Text style={styles.primaryButtonText}>
+                          {t("common.done")}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </>
+                </Animated.View>
+              ) : null}
+            </View>
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
@@ -291,6 +326,11 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(1.5),
   },
   fields: { gap: theme.gap(1.5) },
+  confirmation: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "space-between",
+    gap: theme.gap(1.5),
+  },
   title: {
     fontFamily: theme.fonts.bold,
     fontSize: 18,
