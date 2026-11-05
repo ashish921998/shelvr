@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   HomePlaces,
@@ -10,12 +10,14 @@ import {
 } from "@/components/home/home-places";
 
 const mocks = vi.hoisted(() => ({
-  cities: [] as {
-    city: string;
-    count: number;
-    placeCount?: number;
-    cover: string | null;
-  }[],
+  cities: [] as
+    | {
+        city: string;
+        count: number;
+        placeCount?: number;
+        cover: string | null;
+      }[]
+    | undefined,
   start: vi.fn(),
   push: vi.fn(),
   guard: vi.fn(async (action?: () => void) => {
@@ -45,10 +47,10 @@ vi.mock("@/components/ui/button", () => ({
   ),
 }));
 vi.mock("@/components/home/review-saves", () => ({
-  ReviewSaves: vi.fn(() => null),
+  ReviewSaves: vi.fn(() => <span>Review row</span>),
 }));
 vi.mock("@/components/home/shared-lists-section", () => ({
-  SharedListsSection: vi.fn(() => null),
+  SharedListsSection: vi.fn(() => <span>Shared lists</span>),
 }));
 vi.mock("@/components/ui/prompt-sheet", () => ({
   PromptSheet: vi.fn(
@@ -325,6 +327,30 @@ describe("city cards", () => {
     ];
     render(<HomePlaces saves={[]} />);
     expect(screen.queryByText(/Share a reel or TikTok to Shelvr/)).toBeNull();
+  });
+});
+
+describe("before the cities load", () => {
+  afterEach(() => {
+    mocks.access = { kind: "pro", syncing: false };
+  });
+
+  it("still shows the review row and shared lists, with no plan rows or cities", () => {
+    mocks.cities = undefined;
+    render(<HomePlaces saves={[]} />);
+    expect(screen.getByText("Review row")).toBeTruthy();
+    expect(screen.getByText("Shared lists")).toBeTruthy();
+    expect(screen.queryByText("Plan a date")).toBeNull();
+    expect(screen.queryByText("Your cities")).toBeNull();
+  });
+
+  it("shows them while the account's access is still loading", () => {
+    mocks.access = { kind: "loading" };
+    mocks.cities = [{ city: "Lisbon", count: 1, placeCount: 1, cover: null }];
+    render(<HomePlaces saves={[]} />);
+    expect(screen.getByText("Review row")).toBeTruthy();
+    expect(screen.getByText("Shared lists")).toBeTruthy();
+    expect(screen.queryByText("Lisbon")).toBeNull();
   });
 });
 

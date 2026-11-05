@@ -271,24 +271,25 @@ export function HomePlaces({ saves }: { saves: ReviewSave[] }) {
   const cities = useQuery(
     convexQuery(api.items.listCities, browsing ? {} : "skip"),
   );
-  if (!browsing || cities.data === undefined) return null;
+  const loaded = browsing ? cities.data : undefined;
   return (
     <>
       <View style={styles.rows}>
-        <PlanRows
-          cities={plannableCities(cities.data)}
-          pro={access.kind === "pro"}
-        />
+        {loaded ? (
+          <PlanRows
+            cities={plannableCities(loaded)}
+            pro={access.kind === "pro"}
+          />
+        ) : null}
         <ReviewSaves saves={saves} />
       </View>
       <SharedListsSection />
-      {cities.data.length === 0 ? (
+      {loaded?.length === 0 ? (
         <View style={styles.emptyCities}>
           <HomePlacesEmptyCard />
         </View>
-      ) : (
-        <CityGrid cities={cities.data} />
-      )}
+      ) : null}
+      {loaded && loaded.length > 0 ? <CityGrid cities={loaded} /> : null}
     </>
   );
 }

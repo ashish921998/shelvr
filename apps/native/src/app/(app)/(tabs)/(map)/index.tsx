@@ -75,6 +75,7 @@ export default function MapScreen() {
   const [focus, setFocus] = useState<MapFocus | undefined>(undefined);
   const [searchOpen, setSearchOpen] = useState(false);
   const [locate, setLocate] = useState(0);
+  const [mapHeight, setMapHeight] = useState(0);
 
   const all = places.data;
   const { city, onCentreChange } = useMapCity(all ?? NO_PLACES);
@@ -172,17 +173,23 @@ export default function MapScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.mapArea}>
-        <PlacesMap
-          pins={pins}
-          framed={framed}
-          showsUser={located}
-          topInset={headerBottom + theme.gap(1)}
-          focus={focus}
-          locate={locate}
-          onCentreChange={onCentreChange}
-          onSelect={select}
-        />
+      <View
+        style={styles.mapArea}
+        onLayout={(event) => setMapHeight(event.nativeEvent.layout.height)}
+      >
+        {mapHeight > 0 ? (
+          <PlacesMap
+            pins={pins}
+            framed={framed}
+            showsUser={located}
+            height={mapHeight}
+            topInset={headerBottom + theme.gap(1)}
+            focus={focus}
+            locate={locate}
+            onCentreChange={onCentreChange}
+            onSelect={select}
+          />
+        ) : null}
         <View
           pointerEvents="none"
           style={{

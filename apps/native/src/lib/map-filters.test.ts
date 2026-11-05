@@ -79,6 +79,12 @@ describe("cityNear", () => {
     expect(cityNear([spots[2]], { lat: 41, lng: -8 })).toBeUndefined();
     expect(cityNear([], { lat: 41, lng: -8 })).toBeUndefined();
   });
+
+  it("is undefined when every place with a city is more than 50 km from the centre", () => {
+    expect(cityNear(spots, { lat: 40.42, lng: -3.7 })).toBeUndefined();
+    expect(cityNear(spots, { lat: 39.2, lng: -9.1 })).toBeUndefined();
+    expect(cityNear(spots, { lat: 38.9, lng: -9.1 })).toBe("Lisbon");
+  });
 });
 
 describe("hasPlaceNear", () => {

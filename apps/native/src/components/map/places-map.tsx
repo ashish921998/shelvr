@@ -35,6 +35,7 @@ type Props = {
   framed: MapPin[];
   /** iOS: open on the person's location and show it. */
   showsUser: boolean;
+  height: number;
   topInset: number;
   focus?: MapFocus;
   locate?: number;
@@ -46,6 +47,7 @@ export function PlacesMap({
   pins,
   framed,
   showsUser,
+  height,
   topInset,
   focus,
   locate,
@@ -57,7 +59,7 @@ export function PlacesMap({
   const googleRef = useRef<GoogleMaps.MapView>(null);
   // Whichever map this platform rendered.
   const map = () => appleRef.current ?? googleRef.current;
-  const { width, height } = rt.screen;
+  const { width } = rt.screen;
 
   const fit = useMemo(() => {
     const camera = fitCamera(
@@ -66,7 +68,7 @@ export function PlacesMap({
         width,
         height,
         top: topInset,
-        bottom: rt.insets.bottom + theme.gap(10),
+        bottom: theme.gap(3),
         worldWidth: 256,
         centerY: height / 2,
       },
@@ -82,7 +84,7 @@ export function PlacesMap({
           ),
         }
       : camera;
-  }, [framed, width, height, topInset, rt.insets.bottom, theme]);
+  }, [framed, width, height, topInset, theme]);
 
   // expo-maps applies a cameraPosition prop without animation, so it only ever holds the first camera.
   const [firstCamera] = useState(showsUser ? undefined : fit);

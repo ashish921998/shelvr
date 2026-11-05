@@ -1,7 +1,7 @@
 import { PLACE_KINDS, type PlaceKind } from "@convex/model/placeKinds";
 import { cityKey, distanceKm, type LatLng } from "@convex/model/trip";
 
-/** How far from the person a saved place still counts as nearby when the map opens on them. */
+/** How far from the person, or from the map's centre, a saved place still counts as nearby. */
 const NEARBY_KM = 50;
 
 /** A filter shows only once enough of your places fit it to be worth a tap. */
@@ -61,8 +61,8 @@ export function cityNear(
   let best = Infinity;
   for (const place of places) {
     if (!place.city) continue;
-    const gap = (place.lat - centre.lat) ** 2 + (place.lng - centre.lng) ** 2;
-    if (gap < best) {
+    const gap = distanceKm(centre, place);
+    if (gap <= NEARBY_KM && gap < best) {
       best = gap;
       nearest = place.city;
     }
