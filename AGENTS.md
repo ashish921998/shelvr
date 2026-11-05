@@ -3,8 +3,7 @@
 ## Start here
 
 Read `CLAUDE.md` before changing code. It is the detailed source of truth for
-the product model, architecture, commands, and conventions. Environment
-variables are listed in `docs/architecture/environment.md`. Keep this file
+the product model, architecture, commands, and conventions. Keep this file
 short and use it as the routing layer rather than duplicating that reference.
 
 Before editing native app code, consult the Expo SDK 58 documentation linked in
