@@ -89,7 +89,7 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `convex/failItem.test.ts` tests it through `failItem` and the stale cron.
   Re-record only for a change you intend, with the command in the test header,
   and review the row diff.
-- **Large files:** `convex/items.ts` (about 2,500 lines), `convex/ai.ts` (about 1,400)
+- **Large files:** `convex/items.ts` (about 2,600 lines), `convex/ai.ts` (about 1,650)
   and `convex/model/pageReadCore.ts` (about 500). Embedding and recommendation actions
   live in `convex/aiEmbeddingSweep.ts` and `convex/aiRecommendForSpace.ts`.
   Search for the export name first and read that range, not the whole file.
@@ -216,13 +216,9 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   The verifier also requires readable `GOOGLE_MAPS_API_KEY`,
   `POSTHOG_PROJECT_TOKEN`, and `POSTHOG_HOST` to keep fingerprint inputs
   consistent. Validation and publication both pin `APP_VARIANT=production`.
-- OTA updates reach installs by EAS fingerprint. A change to a native module, a
-  config plugin, `app.json` or `app.config.js` may move the fingerprint, and a
-  moved fingerprint makes new updates invisible to binaries built from the old
-  one: cut a fresh store build before resuming OTA publishes. Do not predict a
-  move; run `pnpm run verify:fingerprint origin/main HEAD`. What the
-  fingerprint hashes, and what it cannot see, is in
-  `docs/architecture/push-notifications.md#what-the-fingerprint-hashes`.
+- OTA updates reach installs only by matching native fingerprint. The rule, the
+  `Native-Fingerprint: changed` trailer and the check commands are under Working
+  conventions in `CLAUDE.md`.
 - Web deploys via the Vercel Git integration on `main`; no workflow needed.
 - Backend-first ordering: deploy compatible Convex changes before the client
   that needs them. Breaking changes go out as expand/contract, so an installed
