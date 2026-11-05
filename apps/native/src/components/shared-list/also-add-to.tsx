@@ -12,8 +12,9 @@ import {
 import type { Id } from "@convex/_generated/dataModel";
 import { Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import Animated, { useReducedMotion } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { motion, motionCSS } from "@/lib/motion";
+import { useLiveReducedMotion } from "@/lib/use-live-reduced-motion";
 
 export function AlsoAddTo({
   itemId,
@@ -25,7 +26,7 @@ export function AlsoAddTo({
   count: number;
 }) {
   const { theme } = useUnistyles();
-  const reduced = useReducedMotion();
+  const reduced = useLiveReducedMotion();
   const lists = alsoAddLists(useSharedLists().data);
   const { state, toggle } = useAlsoAddTo(itemId, city);
   if (lists.length === 0) return null;
@@ -79,7 +80,9 @@ export function AlsoAddTo({
                   transform: [
                     { scale: on || reduced ? 1 : motion.scale.pressed },
                   ],
-                  transitionProperty: ["opacity", "transform"],
+                  transitionProperty: reduced
+                    ? "opacity"
+                    : ["opacity", "transform"],
                   transitionDuration: motion.duration.feedback,
                   transitionTimingFunction: motionCSS.out,
                 }}

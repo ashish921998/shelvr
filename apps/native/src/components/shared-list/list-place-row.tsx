@@ -52,33 +52,39 @@ export function ListPlaceRow({
           <Text style={styles.bubbleText}>{emoji}</Text>
         </View>
         <View style={styles.text}>
-          <ThemedText variant="subheadStrong" numberOfLines={2}>
-            {place.name}
-          </ThemedText>
-          <ThemedText variant="footnote" style={styles.muted} numberOfLines={1}>
-            {by}
-          </ThemedText>
+          <View style={styles.labels}>
+            <ThemedText variant="subheadStrong" numberOfLines={2}>
+              {place.name}
+            </ThemedText>
+            <ThemedText
+              variant="footnote"
+              style={styles.muted}
+              numberOfLines={1}
+            >
+              {by}
+            </ThemedText>
+          </View>
+          <Animated.View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={[
+              styles.went,
+              {
+                opacity: went ? 1 : 0,
+                transitionProperty: "opacity",
+                transitionDuration:
+                  went && !reduced
+                    ? motion.duration.state
+                    : motion.duration.feedback,
+                transitionTimingFunction: motionCSS.out,
+              },
+            ]}
+          >
+            <ThemedText variant="captionStrong" style={styles.muted}>
+              {t("plan.weWent")}
+            </ThemedText>
+          </Animated.View>
         </View>
-        <Animated.View
-          accessibilityElementsHidden
-          importantForAccessibility="no-hide-descendants"
-          style={[
-            styles.went,
-            {
-              opacity: went ? 1 : 0,
-              transitionProperty: "opacity",
-              transitionDuration:
-                went && !reduced
-                  ? motion.duration.state
-                  : motion.duration.feedback,
-              transitionTimingFunction: motionCSS.out,
-            },
-          ]}
-        >
-          <ThemedText variant="captionStrong" style={styles.muted}>
-            {t("plan.weWent")}
-          </ThemedText>
-        </Animated.View>
       </Pressable>
       {selected && onPlaceDetails ? (
         <Pressable
@@ -152,9 +158,18 @@ const styles = StyleSheet.create((theme) => ({
     boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
   },
   bubbleText: { fontSize: 20 },
-  text: { flex: 1, gap: theme.gap(0.25) },
+  text: {
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: theme.gap(1.5),
+    rowGap: theme.gap(0.5),
+  },
+  labels: { flexGrow: 1, flexBasis: "60%", minWidth: 0, gap: theme.gap(0.25) },
   muted: { color: theme.colors.muted },
   went: {
+    maxWidth: "100%",
     paddingVertical: theme.gap(0.5),
     paddingHorizontal: theme.gap(1.25),
     borderRadius: theme.radius.md,

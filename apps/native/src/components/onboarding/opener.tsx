@@ -2,6 +2,7 @@ import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { motion, motionCSS } from "@/lib/motion";
 import { HEADLINE_MAX_SCALE, useLargeText } from "@/lib/use-large-text";
+import { useLiveReducedMotion } from "@/lib/use-live-reduced-motion";
 import type { TextMessageKey } from "@/locales/message-types";
 import { PhoneFrame } from "@/components/onboarding/opener-phone";
 import {
@@ -14,7 +15,6 @@ import {
 import { CtaButton } from "@/components/onboarding/parts";
 import { useEffect, useRef, useState, type ComponentType } from "react";
 import {
-  AccessibilityInfo,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -24,7 +24,7 @@ import {
   Text,
   View,
 } from "react-native";
-import Animated, { useReducedMotion } from "react-native-reanimated";
+import Animated from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
 type Page = {
@@ -63,29 +63,6 @@ const PAGES: Page[] = [
 
 const COPY_MIN_HEIGHT = 150;
 const AUTO_ADVANCE_MS = 4000;
-
-function useLiveReducedMotion() {
-  const [reduced, setReduced] = useState(useReducedMotion());
-  useEffect(() => {
-    let mounted = true;
-    let changed = false;
-    const subscription = AccessibilityInfo.addEventListener(
-      "reduceMotionChanged",
-      (enabled) => {
-        changed = true;
-        setReduced(enabled);
-      },
-    );
-    void AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
-      if (mounted && !changed) setReduced(enabled);
-    });
-    return () => {
-      mounted = false;
-      subscription.remove();
-    };
-  }, []);
-  return reduced;
-}
 
 export function OpenerStep({
   onStart,
