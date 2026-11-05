@@ -142,7 +142,10 @@ export const claimDelivery = internalMutation({
       return null;
     }
     const user = await liveOwner(ctx, row.userId);
-    if (user === null) return null;
+    if (user === null) {
+      await ctx.db.delete(args.submissionId);
+      return null;
+    }
     const attempt = row.attempts + 1;
     await ctx.db.patch(args.submissionId, { attempts: attempt });
     return {

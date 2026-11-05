@@ -344,10 +344,7 @@ describe("account deletion", () => {
     await t.action(internal.feedback.deliver, { submissionId: id });
 
     expect(fetchMock).not.toHaveBeenCalled();
-    expect(await getSubmission(t, id)).toMatchObject({
-      status: "failed",
-      attempts: 0,
-    });
+    expect(await getSubmission(t, id)).toBeNull();
   });
 
   it("never sends feedback whose owner row is already gone", async () => {
@@ -361,10 +358,38 @@ describe("account deletion", () => {
     });
     const id = await insertSubmission(t, { userId, status: "pending" });
 
-    expect(
-      await t.mutation(internal.feedback.claimDelivery, { submissionId: id }),
-    ).toBeNull();
+    await t.action(internal.feedback.deliver, { submissionId: id });
+
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(await getSubmission(t, id)).toBeNull();
+  });
+
+  it("keeps retrying a live owner's feedback behind many from deleting accounts", async () => {
+    const t = setup();
+    vi.useFakeTimers();
+    const fetchMock = okFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 101; i++) {
+        const owner = await ctx.db.insert("users", { deleting: true });
+        await ctx.db.insert("feedbackSubmissions", {
+          userId: owner,
+          message: "from a deleting account",
+          surface: "home",
+          status: "failed",
+          attempts: 0,
+        });
+      }
+    });
+    const live = await insertSubmission(t, { status: "failed", attempts: 1 });
+
+    await t.action(internal.feedback.retryFailedDeliveries, {});
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.action(internal.feedback.retryFailedDeliveries, {});
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(await getSubmission(t, live)).toMatchObject({ status: "delivered" });
   });
 });
 
