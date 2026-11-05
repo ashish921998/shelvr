@@ -37,6 +37,7 @@ type Props = {
   showsUser: boolean;
   height: number;
   topInset: number;
+  bottomInset: number;
   focus?: MapFocus;
   locate?: number;
   onCentreChange?: (centre: LatLng) => void;
@@ -49,6 +50,7 @@ export function PlacesMap({
   showsUser,
   height,
   topInset,
+  bottomInset,
   focus,
   locate,
   onCentreChange,
@@ -68,7 +70,7 @@ export function PlacesMap({
         width,
         height,
         top: topInset,
-        bottom: theme.gap(3),
+        bottom: bottomInset,
         worldWidth: 256,
         centerY: height / 2,
       },
@@ -84,7 +86,7 @@ export function PlacesMap({
           ),
         }
       : camera;
-  }, [framed, width, height, topInset, theme]);
+  }, [framed, width, height, topInset, bottomInset]);
 
   // expo-maps applies a cameraPosition prop without animation, so it only ever holds the first camera.
   const [firstCamera] = useState(showsUser ? undefined : fit);

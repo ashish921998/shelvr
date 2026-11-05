@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
-import type { BottomTabBarProps } from "expo-router/js-tabs";
+import {
+  BottomTabBarHeightCallbackContext,
+  type BottomTabBarProps,
+} from "expo-router/js-tabs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TabBar } from "@/components/tab-bar";
@@ -30,38 +33,59 @@ vi.mock("@/lib/use-keyboard-visible", () => ({
   useKeyboardVisible: () => mocks.keyboard,
 }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: mocks.push }) }));
+vi.mock("expo-router/js-tabs", async () => {
+  const { createContext } = await import("react");
+  return {
+    BottomTabBarHeightCallbackContext: createContext<
+      ((height: number) => void) | undefined
+    >(undefined),
+  };
+});
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
   useUnistyles: () => ({ theme: { colors: {} } }),
 }));
-vi.mock("react-native", () => ({
-  Platform: {
-    get OS() {
-      return mocks.os;
+vi.mock("react-native", async () => {
+  const { useEffect } = await import("react");
+  function View({
+    children,
+    onLayout,
+  }: {
+    children?: ReactNode;
+    onLayout?: (event: { nativeEvent: { layout: { height: number } } }) => void;
+  }) {
+    useEffect(() => {
+      onLayout?.({ nativeEvent: { layout: { height: 112 } } });
+    });
+    return <section>{children}</section>;
+  }
+  return {
+    Platform: {
+      get OS() {
+        return mocks.os;
+      },
     },
-  },
-  View: vi.fn(({ children }: { children: ReactNode }) => (
-    <section>{children}</section>
-  )),
-  Text: vi.fn(({ children }: { children: ReactNode }) => (
-    <span>{children}</span>
-  )),
-  Pressable: vi.fn(
-    ({
-      children,
-      onPress,
-      accessibilityLabel,
-    }: {
-      children: ReactNode;
-      onPress: () => void;
-      accessibilityLabel?: string;
-    }) => (
-      <button onClick={onPress} aria-label={accessibilityLabel}>
-        {children}
-      </button>
+    View,
+    Text: vi.fn(({ children }: { children: ReactNode }) => (
+      <span>{children}</span>
+    )),
+    Pressable: vi.fn(
+      ({
+        children,
+        onPress,
+        accessibilityLabel,
+      }: {
+        children: ReactNode;
+        onPress: () => void;
+        accessibilityLabel?: string;
+      }) => (
+        <button onClick={onPress} aria-label={accessibilityLabel}>
+          {children}
+        </button>
+      ),
     ),
-  ),
-}));
+  };
+});
 
 const routes = [
   { key: "home-key", name: "(home)" },
@@ -74,7 +98,11 @@ const titles: Record<string, string> = {
   "trips-key": "My trips",
 };
 
-function bar(index: number, prevented = false) {
+function bar(
+  index: number,
+  prevented = false,
+  onHeight?: (height: number) => void,
+) {
   const emit = vi.fn(() => ({ defaultPrevented: prevented }));
   const navigateToTab = vi.fn();
   const props = {
@@ -85,7 +113,11 @@ function bar(index: number, prevented = false) {
     emitter: { emit },
     navigateToTab,
   } as unknown as BottomTabBarProps;
-  render(<TabBar {...props} />);
+  render(
+    <BottomTabBarHeightCallbackContext.Provider value={onHeight}>
+      <TabBar {...props} />
+    </BottomTabBarHeightCallbackContext.Provider>,
+  );
   return { emit, navigateToTab };
 }
 
@@ -154,5 +186,22 @@ describe("keyboard", () => {
     mocks.keyboard = true;
     bar(0);
     expect(screen.getByRole("button", { name: "Add" })).toBeTruthy();
+  });
+});
+
+describe("height", () => {
+  it("tells the screens under it how tall it is", () => {
+    const onHeight = vi.fn();
+    bar(0, false, onHeight);
+    expect(onHeight).toHaveBeenCalledWith(112);
+  });
+
+  it("tells them it takes no room while the keyboard hides it on Android", () => {
+    mocks.os = "android";
+    mocks.keyboard = true;
+    const onHeight = vi.fn();
+    bar(0, false, onHeight);
+    expect(onHeight).toHaveBeenCalledWith(0);
+    expect(onHeight).not.toHaveBeenCalledWith(112);
   });
 });

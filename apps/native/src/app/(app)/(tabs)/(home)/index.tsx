@@ -28,13 +28,14 @@ import {
 import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
 import { welcomeSave } from "@/lib/welcome-save";
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   ScrollView,
   View,
 } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // Older saves with no place sit past the first feed page, so Home pages on like a list would.
 const LOAD_MORE_DISTANCE = 600;
@@ -48,6 +49,8 @@ function trialEnd(entitlement: Entitlement): number | undefined {
 
 export default function HomeScreen() {
   useAppLocale();
+  const { theme } = useUnistyles();
+  const barHeight = useBottomTabBarHeight();
   const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
   const [viewportHeight, setViewportHeight] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
@@ -113,8 +116,7 @@ export default function HomeScreen() {
       <ScrollView
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
+        contentContainerStyle={{ paddingBottom: barHeight + theme.gap(2) }}
         scrollEventThrottle={200}
         onLayout={(e) => setViewportHeight(e.nativeEvent.layout.height)}
         onContentSizeChange={(_, height) => setContentHeight(height)}
@@ -170,9 +172,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
     paddingTop: rt.insets.top,
-  },
-  content: {
-    paddingBottom: theme.gap(6),
   },
   topCard: {
     paddingHorizontal: theme.gap(2),

@@ -5,7 +5,11 @@ import { useSaveGuard } from "@/lib/free-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { useKeyboardVisible } from "@/lib/use-keyboard-visible";
 import { useRouter } from "expo-router";
-import type { BottomTabBarProps } from "expo-router/js-tabs";
+import {
+  BottomTabBarHeightCallbackContext,
+  type BottomTabBarProps,
+} from "expo-router/js-tabs";
+import { useContext, useEffect } from "react";
 import { Platform, Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -16,8 +20,6 @@ const TAB_EMOJI: Record<string, string> = {
   "(map)": "🗺️",
   "(trips)": "🧳",
 };
-
-const FADE_HEIGHT = 28;
 
 function TabButton({
   route,
@@ -57,7 +59,12 @@ export function TabBar({
   const { theme } = useUnistyles();
   const { guard, loading } = useSaveGuard("tab_bar");
   const keyboardVisible = useKeyboardVisible();
-  if (Platform.OS === "android" && keyboardVisible) return null;
+  const onHeightChange = useContext(BottomTabBarHeightCallbackContext);
+  const hidden = Platform.OS === "android" && keyboardVisible;
+  useEffect(() => {
+    if (hidden) onHeightChange?.(0);
+  }, [hidden, onHeightChange]);
+  if (hidden) return null;
   const current = state.routes[state.index];
   const [left, right] = state.routes.filter(
     (route) => route.key !== current?.key,
@@ -74,20 +81,15 @@ export function TabBar({
     if (!event.defaultPrevented) navigateToTab(route.key);
   };
   return (
-    <View style={styles.bar}>
-      {current?.name === "(map)" ? null : (
-        <View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: "100%",
-            height: FADE_HEIGHT,
-            experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0)} 0%, ${theme.colors.background} 100%)`,
-          }}
-        />
-      )}
+    <View
+      onLayout={(event) => onHeightChange?.(event.nativeEvent.layout.height)}
+      style={[
+        styles.bar,
+        {
+          experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0)} 0%, ${withAlpha(theme.colors.background, 0.85)} 35%, ${theme.colors.background} 60%)`,
+        },
+      ]}
+    >
       <TabButton route={left} label={label(left)} onPress={open(left)} />
       <Pressable
         accessibilityRole="button"
@@ -111,13 +113,16 @@ export function TabBar({
 
 const styles = StyleSheet.create((theme, rt) => ({
   bar: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "flex-start",
     gap: theme.gap(1.5),
     paddingTop: theme.gap(1),
     paddingBottom: Math.max(rt.insets.bottom, theme.gap(1.5)),
-    backgroundColor: theme.colors.background,
   },
   side: {
     width: 96,

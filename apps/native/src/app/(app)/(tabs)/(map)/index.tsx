@@ -34,6 +34,7 @@ import type { PlaceKind } from "@convex/model/placeKinds";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -76,6 +77,8 @@ export default function MapScreen() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [locate, setLocate] = useState(0);
   const [mapHeight, setMapHeight] = useState(0);
+  const [stripHeight, setStripHeight] = useState(0);
+  const barHeight = useBottomTabBarHeight();
 
   const all = places.data;
   const { city, onCentreChange } = useMapCity(all ?? NO_PLACES);
@@ -172,62 +175,68 @@ export default function MapScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <View
+      style={styles.container}
+      onLayout={(event) => setMapHeight(event.nativeEvent.layout.height)}
+    >
+      {mapHeight > 0 ? (
+        <PlacesMap
+          pins={pins}
+          framed={framed}
+          showsUser={located}
+          height={mapHeight}
+          topInset={headerBottom + theme.gap(1)}
+          bottomInset={
+            barHeight + (filters.length > 0 ? stripHeight : 0) + theme.gap(1)
+          }
+          focus={focus}
+          locate={locate}
+          onCentreChange={onCentreChange}
+          onSelect={select}
+        />
+      ) : null}
       <View
-        style={styles.mapArea}
-        onLayout={(event) => setMapHeight(event.nativeEvent.layout.height)}
-      >
-        {mapHeight > 0 ? (
-          <PlacesMap
-            pins={pins}
-            framed={framed}
-            showsUser={located}
-            height={mapHeight}
-            topInset={headerBottom + theme.gap(1)}
-            focus={focus}
-            locate={locate}
-            onCentreChange={onCentreChange}
-            onSelect={select}
+        pointerEvents="none"
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          height: headerBottom + theme.gap(2),
+          // Built in render: Unistyles drops a stylesheet's backgroundImage on theme change.
+          experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0.92)} 0%, ${withAlpha(theme.colors.background, 0.6)} 60%, ${withAlpha(theme.colors.background, 0)} 100%)`,
+        }}
+      />
+      <MapHeader
+        city={city}
+        canSearch={all.length > 0}
+        searchOpen={searchOpen}
+        text={searchText}
+        onChangeText={(text) => {
+          setSearchText(text);
+          setListOpen(true);
+        }}
+        onOpenSearch={() => setSearchOpen(true)}
+        onCancel={cancelSearch}
+      />
+      {searchOpen && searching && listOpen ? (
+        <View style={[styles.results, { top: headerBottom }]}>
+          <MapSearchResults
+            text={searchText}
+            total={matches.length}
+            results={topSearchResults(matches).map((place) => ({
+              id: placeId(place),
+              name: place.name,
+              city: place.city,
+            }))}
+            onSelect={pickResult}
           />
-        ) : null}
-        <View
-          pointerEvents="none"
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: headerBottom + theme.gap(2),
-            // Built in render: Unistyles drops a stylesheet's backgroundImage on theme change.
-            experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0.92)} 0%, ${withAlpha(theme.colors.background, 0.6)} 60%, ${withAlpha(theme.colors.background, 0)} 100%)`,
-          }}
-        />
-        <MapHeader
-          city={city}
-          canSearch={all.length > 0}
-          searchOpen={searchOpen}
-          text={searchText}
-          onChangeText={(text) => {
-            setSearchText(text);
-            setListOpen(true);
-          }}
-          onOpenSearch={() => setSearchOpen(true)}
-          onCancel={cancelSearch}
-        />
-        {searchOpen && searching && listOpen ? (
-          <View style={[styles.results, { top: headerBottom }]}>
-            <MapSearchResults
-              text={searchText}
-              total={matches.length}
-              results={topSearchResults(matches).map((place) => ({
-                id: placeId(place),
-                name: place.name,
-                city: place.city,
-              }))}
-              onSelect={pickResult}
-            />
-          </View>
-        ) : null}
+        </View>
+      ) : null}
+      <View
+        pointerEvents="box-none"
+        style={[styles.aboveBar, { bottom: barHeight }]}
+      >
         {all.length === 0 ? (
           <MapEmpty
             located={located}
@@ -243,29 +252,33 @@ export default function MapScreen() {
             />
           </View>
         ) : null}
+        {filters.length > 0 ? (
+          <View
+            style={styles.strip}
+            onLayout={(event) =>
+              setStripHeight(event.nativeEvent.layout.height)
+            }
+          >
+            <MapFilterChips
+              kinds={filters.map((filter) => filter.kind)}
+              selected={active}
+              onSelect={choose}
+            />
+          </View>
+        ) : null}
       </View>
-      {filters.length > 0 ? (
-        <View style={styles.strip}>
-          <MapFilterChips
-            kinds={filters.map((filter) => filter.kind)}
-            selected={active}
-            onSelect={choose}
-          />
-        </View>
-      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  mapArea: { flex: 1 },
   results: { position: "absolute", left: theme.gap(2), right: theme.gap(2) },
-  locate: { position: "absolute", right: theme.gap(2), bottom: theme.gap(2) },
-  strip: {
-    paddingVertical: theme.gap(1),
-    backgroundColor: theme.colors.background,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: theme.colors.border,
+  aboveBar: { ...StyleSheet.absoluteFillObject, justifyContent: "flex-end" },
+  locate: {
+    alignSelf: "flex-end",
+    marginRight: theme.gap(2),
+    marginBottom: theme.gap(1),
   },
+  strip: { paddingVertical: theme.gap(1) },
 }));
