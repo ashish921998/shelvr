@@ -17,6 +17,7 @@ const SF_TO_MATERIAL = {
   "exclamationmark.circle": "error",
   "info.circle": "info",
   "person.fill": "person",
+  "person.badge.plus": "person_add",
   envelope: "mail",
   message: "chat",
   phone: "call",

@@ -546,6 +546,7 @@ describe("placePins", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("pins every place a save names, searched near its city", async () => {
@@ -1081,6 +1082,119 @@ describe("placePins", () => {
       vi.useRealTimers();
     }
     expect((await pins())?.[0].category).toBe("Cafe");
+  });
+
+  function appleAnswers(status: number) {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) =>
+        new URL(input).pathname === "/v1/token"
+          ? Response.json({ accessToken: "maps", expiresInSeconds: 1800 })
+          : status === 200
+            ? Response.json({ results: [] })
+            : new Response("", { status }),
+      ),
+    );
+  }
+
+  async function lookupJobs(t: ReturnType<typeof newConvexTest>) {
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    return jobs
+      .filter((job) => job.name === "placePins:locateItem")
+      .map((job) => job.args[0] as Record<string, unknown>);
+  }
+
+  it("retries a lookup Apple could not answer, keeping the owner's pins", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup(
+      ["Pink Street", "Time Out Market"],
+      {
+        pins: true,
+      },
+    );
+    appleAnswers(429);
+    vi.useFakeTimers();
+    try {
+      await t.action(internal.placePins.locateItem, { itemId, keepPins: true });
+      expect(await pins()).toEqual([{ name: "Pink Street", lat: 1, lng: 2 }]);
+      expect(await lookupJobs(t)).toEqual([
+        { itemId, keepPins: true, attempt: 2 },
+      ]);
+      await withMaps();
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+    } finally {
+      vi.useRealTimers();
+    }
+    const q = "Time Out Market, Lisbon".length;
+    expect(await pins()).toEqual([
+      { name: "Pink Street", lat: 1, lng: 2 },
+      { name: "Time Out Market", city: "Lisbon", lat: q, lng: -q },
+    ]);
+  });
+
+  it("retries a refresh Apple could not answer as a refresh", async () => {
+    await withMaps(true);
+    const { t, itemId, pins } = await setup(["Micho"]);
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        placePins: [{ name: "Micho", lat: 13, lng: -13, city: "Lisbon" }],
+      }),
+    );
+    appleAnswers(503);
+    vi.useFakeTimers();
+    try {
+      await t.action(internal.placePins.locateItem, { itemId, refresh: true });
+      expect(await lookupJobs(t)).toEqual([
+        { itemId, refresh: true, attempt: 2 },
+      ]);
+      await withMaps(true);
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect((await pins())?.[0].category).toBe("Cafe");
+  });
+
+  it("stops retrying after the last attempt and never retries a place Apple does not know", async () => {
+    await withMaps();
+    const { t, itemId } = await setup(["Pink Street"]);
+    appleAnswers(503);
+    await t.action(internal.placePins.locateItem, { itemId, attempt: 3 });
+    appleAnswers(200);
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(await lookupJobs(t)).toEqual([]);
+  });
+
+  it("backfill queues a save with a place still unpinned, not one fully pinned", async () => {
+    await withMaps(true);
+    const { t, itemId } = await setup(["Pink Street", "Time Out Market"]);
+    const pinned = (name: string) => ({
+      name,
+      lat: 1,
+      lng: 2,
+      city: "Lisbon",
+      category: "Cafe",
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.patch(itemId, { placePins: [pinned("Pink Street")] });
+      const item = (await ctx.db.get(itemId))!;
+      await ctx.db.insert("items", {
+        userId: item.userId,
+        type: "link",
+        status: "ready",
+        tags: [],
+        searchText: "",
+        cities: ["Lisbon"],
+        intents: item.intents,
+        placePins: [pinned("Pink Street"), pinned("Time Out Market")],
+      });
+    });
+    await t.mutation(internal.placePins.backfillPage, { cursor: null });
+    expect(await lookupJobs(t)).toEqual([{ itemId }]);
   });
 });
 

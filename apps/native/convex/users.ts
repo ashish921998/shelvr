@@ -261,6 +261,8 @@ async function deleteUserOwnedDataBatch(
   }
   if (demos.length === DELETE_BATCH) return false;
 
+  if (!(await deleteFreeSavesBatch(ctx, userId))) return false;
+
   const reads = await ctx.db
     .query("itemReads")
     .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -412,6 +414,23 @@ async function deleteShareLinksBatch(
     await ctx.db.delete(link._id);
   }
   return links.length !== DELETE_BATCH;
+}
+
+async function deleteFreeSavesBatch(
+  ctx: MutationCtx,
+  userId: string,
+): Promise<boolean> {
+  for (const status of ["pending", "placed", "released"] as const) {
+    const rows = await ctx.db
+      .query("freeSaves")
+      .withIndex("by_user_and_status", (q) =>
+        q.eq("userId", userId).eq("status", status),
+      )
+      .take(DELETE_BATCH);
+    for (const row of rows) await ctx.db.delete(row._id);
+    if (rows.length === DELETE_BATCH) return false;
+  }
+  return true;
 }
 
 async function deletePlaceRemovalsBatch(

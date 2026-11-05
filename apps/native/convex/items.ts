@@ -26,6 +26,14 @@ import {
   hasProEntitlementStatus,
   requireProEntitlement,
 } from "./subscriptions";
+import {
+  claimSave,
+  coversListParts,
+  isFreeSave,
+  reclaimFreeSave,
+  recordFreeSave,
+  settleFreeSave,
+} from "./freeSaves";
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
 import { takeWithinBytes } from "./model/readBudget";
@@ -167,6 +175,7 @@ const itemFields = {
   productsStatus: v.optional(productsStatusValidator),
   failureReason: v.optional(failureReasonValidator),
   enrichment: v.optional(enrichmentValidator),
+  stepFailed: v.optional(v.boolean()),
   processingRunId: v.optional(v.string()),
   processingStartedAt: v.optional(v.number()),
   searchText: v.string(),
@@ -1438,7 +1447,7 @@ export const cleanupOrphanStorage = internalMutation({
 
 export async function createItemWithOperation(
   ctx: MutationCtx,
-  userId: string,
+  userId: Id<"users">,
   kind: Extract<OperationKind, "link" | "note">,
   payload: { url: string } | { note: string },
   options: {
@@ -1515,7 +1524,7 @@ function validateLinkOrNotePayload(
 
 async function createLinkOrNote(
   ctx: MutationCtx,
-  userId: string,
+  userId: Id<"users">,
   kind: Extract<OperationKind, "link" | "note">,
   payload: { url: string } | { note: string },
   options: {
@@ -1526,6 +1535,7 @@ async function createLinkOrNote(
     captureContext?: string;
   },
 ): Promise<Id<"items">> {
+  const free = await claimSave(ctx, userId);
   const run = beginProcessingRun();
   const itemId = await ctx.db.insert("items", {
     userId,
@@ -1539,6 +1549,7 @@ async function createLinkOrNote(
         ? buildSearchText({ tags: [], note: payload.note })
         : "",
   });
+  if (free) await recordFreeSave(ctx, userId, itemId);
   if (options.spaceId !== undefined) {
     await saveIntoSpace(ctx, userId, itemId, options.spaceId);
   }
@@ -1619,7 +1630,6 @@ export const createLinkItem = authedMutation({
   returns: v.id("items"),
   handler: async (ctx, args) => {
     const { userId } = ctx;
-    await requireProEntitlement(ctx, userId);
     const url = normalizeExternalUrl(args.url);
     return await createItemWithOperation(
       ctx,
@@ -1647,7 +1657,6 @@ export const createNoteItem = authedMutation({
   returns: v.id("items"),
   handler: async (ctx, args) => {
     const { userId } = ctx;
-    await requireProEntitlement(ctx, userId);
     return await createItemWithOperation(
       ctx,
       userId,
@@ -1947,7 +1956,10 @@ export const reprocessItem = authedMutation({
   handler: async (ctx, args) => {
     const { userId } = ctx;
     const freeDemo = await freeDemoRetry(ctx, userId, args.id);
-    if (freeDemo === null) await requireProEntitlement(ctx, userId);
+    const freeSave = freeDemo === null && (await isFreeSave(ctx, args.id));
+    if (freeDemo === null && !freeSave) {
+      await requireProEntitlement(ctx, userId);
+    }
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");
@@ -1959,6 +1971,7 @@ export const reprocessItem = authedMutation({
     if (!retryable) {
       return false;
     }
+    if (freeSave) await reclaimFreeSave(ctx, userId, args.id);
     if (freeDemo !== null) {
       await rateLimiter.limit(ctx, "demoRetry", { key: userId, throws: true });
       await ctx.db.patch(freeDemo._id, {
@@ -2018,6 +2031,7 @@ export const deleteItem = authedMutation({
       await safeDeleteStorage(ctx, item.storageId);
     }
     await ctx.db.delete(item._id);
+    await settleFreeSave(ctx, item._id);
     return null;
   },
 });
@@ -2219,6 +2233,7 @@ export const finalizeItem = internalMutation({
     }
     const patch = completionPatch(item, args, allowed);
     await ctx.db.patch(args.itemId, patch);
+    await settleFreeSave(ctx, args.itemId);
     if (
       allowed &&
       ((patch.places?.length ?? 0) > 0 ||
@@ -2324,7 +2339,6 @@ export const addPlaceListParts = internalMutation({
       });
     }
     // The other parts are new saves, so they need Pro now, not just when the list was saved.
-    if (!(await hasProEntitlement(ctx, owner._id))) return 0;
     const url = item.url;
     const saved = await ctx.db
       .query("items")
@@ -2333,10 +2347,24 @@ export const addPlaceListParts = internalMutation({
       )
       .take(MAX_LIST_PARTS * 2);
     const titles = new Set(saved.map((row) => row.title));
-    let added = 0;
-    for (const part of args.parts.slice(0, MAX_LIST_PARTS)) {
-      if (titles.has(part.title)) continue;
+    const fresh = args.parts.slice(0, MAX_LIST_PARTS).filter((part) => {
+      if (titles.has(part.title)) return false;
       titles.add(part.title);
+      return true;
+    });
+    if (
+      !(await hasProEntitlement(ctx, owner._id)) &&
+      !(await coversListParts(
+        ctx,
+        owner._id,
+        item._id,
+        fresh.some((part) => normalizeCities(part.cities).length > 0),
+      ))
+    ) {
+      return 0;
+    }
+    let added = 0;
+    for (const part of fresh) {
       const cities = normalizeCities(part.cities);
       const places = normalizePlaces(part.places, cities);
       const placePins = withListPins([], part.pins, cities);
@@ -2445,12 +2473,14 @@ async function writeFailure(
   reason: Infer<typeof failureReasonValidator>,
 ): Promise<void> {
   await ctx.db.patch(item._id, patch);
+  await settleFreeSave(ctx, item._id);
   if (patch.status === "ready") {
     await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
       itemId: item._id,
       keepPins: true,
     });
   }
+  if (item.status === "failed") return;
   await scheduleProcessedTelemetry(ctx, item, {
     status: "failed",
     failureReason: reason,

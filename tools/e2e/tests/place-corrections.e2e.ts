@@ -10,11 +10,11 @@ test("opens saved-place corrections and saves the chosen places", async ({
 }) => {
   await screen.getByLabel("Search your saves").fill("Belém");
   await screen.getByRole("button", /^Belém Tower/).tap();
-  await screen.getByRole("link", "Edit places").tap();
+  await screen.getByRole("button", "Edit places").tap();
   await expect(screen.getByLabel("City")).toBeVisible();
   await app.screenshot("edit-save-places");
   await screen.getByRole("button", "Save places").tap();
-  await expect(screen.getByRole("link", "Edit places")).toBeVisible();
+  await expect(screen.getByRole("button", "Edit places")).toBeVisible();
 });
 
 test(
@@ -27,7 +27,7 @@ test(
   async ({ screen, app }) => {
     await screen.getByLabel("Search your saves").fill("Belém");
     await screen.getByRole("button", /^Belém Tower/).tap();
-    await screen.getByRole("link", "Edit places").tap();
+    await screen.getByRole("button", "Edit places").tap();
     await screen.getByLabel("City").fill("Lisbon");
     await screen.getByTestId("place-correction-search").fill("Time Out Market");
     await screen.getByRole("button", "Search places").tap();
@@ -36,7 +36,7 @@ test(
     await app.screenshot("live-place-search-results");
     await market.tap();
     await screen.getByRole("button", "Save places").tap();
-    await screen.getByRole("link", "Edit places").tap();
+    await screen.getByRole("button", "Edit places").tap();
     await expect(screen.getByText(/Time Out Market/i)).toBeVisible();
     await app.screenshot("live-place-added-and-persisted");
     await screen.getByRole("button", "Replace place").tap();
@@ -48,13 +48,13 @@ test(
     await expect(monastery).toBeVisible({ timeout: 30_000 });
     await monastery.tap();
     await screen.getByRole("button", "Save places").tap();
-    await screen.getByRole("link", "Edit places").tap();
+    await screen.getByRole("button", "Edit places").tap();
     await expect(screen.getByText(/Jer.nimos/i)).toBeVisible();
     await expect(screen.getByText(/Time Out Market/i)).toBeHidden();
     await app.screenshot("live-place-replaced-and-persisted");
     await screen.getByRole("button", "Remove").tap();
     await screen.getByRole("button", "Save places").tap();
-    await screen.getByRole("link", "Edit places").tap();
+    await screen.getByRole("button", "Edit places").tap();
     await expect(screen.getByRole("button", "Remove")).toBeHidden();
     await app.screenshot("live-place-removal-persisted");
   },

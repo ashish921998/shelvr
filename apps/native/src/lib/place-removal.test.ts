@@ -2,6 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
+import { ConvexError } from "convex/values";
 import { usePlaceRemoval } from "./place-removal";
 
 const mocks = vi.hoisted(() => ({
@@ -10,7 +11,10 @@ const mocks = vi.hoisted(() => ({
   alert: vi.fn(),
   error: vi.fn(),
   success: vi.fn(),
+  openPaywall: vi.fn(),
 }));
+vi.mock("@/lib/entitlement", () => ({ openPaywall: mocks.openPaywall }));
+vi.mock("expo-router", () => ({ useRouter: () => ({}) }));
 vi.mock("@/lib/haptics", () => ({ haptics: { success: mocks.success } }));
 vi.mock("@convex/_generated/api", () => ({
   api: { placeRemovals: { removePlace: "remove", undoRemovePlace: "restore" } },
@@ -159,4 +163,12 @@ it("pauses expiry during a late Undo and offers a fresh retry window on failure"
   expect(result.current.undo).not.toBeNull();
   await act(() => result.current.restore());
   expect(result.current.undo).toBeNull();
+});
+
+it("opens the paywall instead of an error when removing needs Pro", async () => {
+  const { result } = renderHook(usePlaceRemoval);
+  mocks.remove.mockRejectedValueOnce(new ConvexError({ code: "pro_required" }));
+  await act(() => result.current.remove(ITEM, PIN));
+  expect(mocks.openPaywall).toHaveBeenCalledWith({}, "remove_place");
+  expect(mocks.alert).not.toHaveBeenCalled();
 });

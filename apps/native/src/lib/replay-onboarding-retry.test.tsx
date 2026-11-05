@@ -3,7 +3,6 @@ import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   getPendingDemoUrl,
-  getPendingSpaces,
   hasPending,
   queueDemoUrl,
   setPendingSpaces,
@@ -69,7 +68,7 @@ async function settle() {
 
 function failingServer() {
   return () =>
-    createSpace.mock.calls.length > 20
+    createLinkItem.mock.calls.length > 20
       ? Promise.resolve("space")
       : Promise.reject(new Error("server error"));
 }
@@ -106,6 +105,29 @@ describe("useReplayOnboarding and the account", () => {
     expect(createLinkItem).toHaveBeenCalledOnce();
   });
 
+  it("spends a free save on the sample reel without a paywall", async () => {
+    const sample = ahaSample("trip", null);
+    entitlement.entitled = false;
+    queueDemoUrl(sample.firstSaveUrl);
+    createLinkItem.mockResolvedValue("item");
+    renderHook(() => useReplayOnboarding({ left: true, loading: false }));
+    await settle();
+    expect(openPaywall).not.toHaveBeenCalled();
+    expect(createLinkItem).toHaveBeenCalledOnce();
+    expect(createLinkItem).toHaveBeenCalledWith(
+      expect.objectContaining({ url: sample.firstSaveUrl }),
+    );
+  });
+
+  it("waits for the free count before asking a free account to pay", async () => {
+    entitlement.entitled = false;
+    queueDemoUrl(ahaSample("trip", null).firstSaveUrl);
+    renderHook(() => useReplayOnboarding({ left: false, loading: true }));
+    await settle();
+    expect(openPaywall).not.toHaveBeenCalled();
+    expect(createLinkItem).not.toHaveBeenCalled();
+  });
+
   it.each(["date", "trip", "weekend"] as const)(
     "saves the fallback %s reel after the account becomes available, once",
     async (kind) => {
@@ -136,7 +158,6 @@ describe("useReplayOnboarding and the account", () => {
   );
 
   it("never saves a link handed over for another account", async () => {
-    createSpace.mockResolvedValue("space");
     createLinkItem.mockResolvedValue("item");
     queueDemoUrl("https://example.com/recipe", null, "user_other");
     setPendingSpaces([]);
@@ -149,7 +170,6 @@ describe("useReplayOnboarding and the account", () => {
   });
 
   it("saves a link handed over for this account", async () => {
-    createSpace.mockResolvedValue("space");
     createLinkItem.mockResolvedValue("item");
     queueDemoUrl("https://example.com/recipe", null, "user_1");
     setPendingSpaces([]);
@@ -167,7 +187,6 @@ describe("useReplayOnboarding and the account", () => {
   });
 
   it("reports a handed-over link that fails to save and keeps it queued", async () => {
-    createSpace.mockResolvedValue("space");
     createLinkItem.mockRejectedValue(new Error("server error"));
     queueDemoUrl("https://example.com/recipe", null, "user_1");
     setPendingSpaces([]);
@@ -189,8 +208,7 @@ describe("useReplayOnboarding and the account", () => {
     );
     createSpace.mockResolvedValue("space");
     createLinkItem.mockResolvedValue("item");
-    setPendingSpaces(["Articles"]);
-    queueDemoUrl("https://example.com/recipe", null, "user_1");
+    queueDemoUrl("https://example.com/recipe", "Articles", "user_1");
 
     const hook = renderHook(() => useReplayOnboarding());
     await settle();
@@ -211,8 +229,7 @@ describe("useReplayOnboarding and the account", () => {
       () => new Promise((resolve) => (finishSpace = resolve)),
     );
     createLinkItem.mockResolvedValue("item");
-    setPendingSpaces(["Articles"]);
-    queueDemoUrl("https://example.com/recipe", null, "user_1");
+    queueDemoUrl("https://example.com/recipe", "Articles", "user_1");
 
     const hook = renderHook(() => useReplayOnboarding());
     await settle();
@@ -246,69 +263,56 @@ describe("useReplayOnboarding and the account", () => {
 });
 
 describe("useReplayOnboarding retries", () => {
-  it("does not retry failed spaces just because it saved the failure", async () => {
-    createSpace.mockImplementation(failingServer());
-    setPendingSpaces(["Recipes", "Trips"]);
+  it("does not retry a failed save just because it saved the failure", async () => {
+    createLinkItem.mockImplementation(failingServer());
+    queueDemoUrl("https://example.com/a");
 
     renderHook(() => useReplayOnboarding());
     await settle();
 
-    expect(createSpace).toHaveBeenCalledTimes(2);
-    expect(getPendingSpaces()).toEqual(["Recipes", "Trips"]);
-  });
-
-  it("keeps only the failed space after a partial success, without retrying it", async () => {
-    createSpace.mockImplementation(({ name }: { name: string }) =>
-      name === "Trips" ? failingServer()() : Promise.resolve("space"),
-    );
-    setPendingSpaces(["Recipes", "Trips"]);
-
-    renderHook(() => useReplayOnboarding());
-    await settle();
-
-    expect(createSpace).toHaveBeenCalledTimes(2);
-    expect(getPendingSpaces()).toEqual(["Trips"]);
+    expect(createLinkItem).toHaveBeenCalledOnce();
+    expect(getPendingDemoUrl()).toBe("https://example.com/a");
   });
 
   it("retries failed work on the next mount", async () => {
-    createSpace.mockImplementation(failingServer());
-    setPendingSpaces(["Trips"]);
+    createLinkItem.mockImplementation(failingServer());
+    queueDemoUrl("https://example.com/a");
     const first = renderHook(() => useReplayOnboarding());
     await settle();
     first.unmount();
 
-    createSpace.mockResolvedValue("space");
+    createLinkItem.mockResolvedValue("item");
     renderHook(() => useReplayOnboarding());
     await settle();
 
-    expect(createSpace).toHaveBeenCalledTimes(2);
+    expect(createLinkItem).toHaveBeenCalledTimes(2);
     expect(hasPending()).toBe(false);
   });
 
   it("retries failed work after the entitlement comes back", async () => {
-    createSpace.mockImplementation(failingServer());
-    setPendingSpaces(["Trips"]);
+    createLinkItem.mockImplementation(failingServer());
+    queueDemoUrl("https://example.com/a");
     const hook = renderHook(() => useReplayOnboarding());
     await settle();
 
     entitlement.entitled = false;
     hook.rerender();
     await settle();
-    createSpace.mockResolvedValue("space");
+    createLinkItem.mockResolvedValue("item");
     entitlement.entitled = true;
     hook.rerender();
     await settle();
 
-    expect(createSpace).toHaveBeenCalledTimes(2);
+    expect(createLinkItem).toHaveBeenCalledTimes(2);
     expect(hasPending()).toBe(false);
   });
 
   it("retries when the entitlement changes while a pass is in flight", async () => {
     let failFirst: (error: Error) => void = () => {};
-    createSpace.mockImplementationOnce(
+    createLinkItem.mockImplementationOnce(
       () => new Promise((_, reject) => (failFirst = reject)),
     );
-    setPendingSpaces(["Trips"]);
+    queueDemoUrl("https://example.com/a");
     const hook = renderHook(() => useReplayOnboarding());
     await settle();
 
@@ -316,72 +320,71 @@ describe("useReplayOnboarding retries", () => {
     hook.rerender();
     entitlement.entitled = true;
     hook.rerender();
-    createSpace.mockResolvedValue("space");
+    createLinkItem.mockResolvedValue("item");
     await act(async () => failFirst(new Error("server error")));
     await settle();
 
-    expect(createSpace).toHaveBeenCalledTimes(2);
-    expect(hasPending()).toBe(false);
-  });
-
-  it("runs a new submission of the same spaces", async () => {
-    createSpace.mockImplementation(failingServer());
-    setPendingSpaces(["Trips"]);
-    renderHook(() => useReplayOnboarding());
-    await settle();
-
-    createSpace.mockResolvedValue("space");
-    act(() => setPendingSpaces(["Trips"]));
-    await settle();
-
-    expect(createSpace).toHaveBeenCalledTimes(2);
+    expect(createLinkItem).toHaveBeenCalledTimes(2);
     expect(hasPending()).toBe(false);
   });
 
   it("runs work that arrives while a pass is in flight", async () => {
-    storage.set(
-      "shelvr.pending.onboarding",
-      JSON.stringify({
-        operationId: "op",
-        spaces: ["Trips"],
-        demoUrl: "https://example.com/a",
-      }),
-    );
-    createSpace.mockImplementation(failingServer());
     let failLink: (error: Error) => void = () => {};
     createLinkItem.mockImplementationOnce(
       () => new Promise((_, reject) => (failLink = reject)),
     );
+    queueDemoUrl("https://example.com/a");
     renderHook(() => useReplayOnboarding());
     await settle();
 
-    createSpace.mockResolvedValue("space");
+    createLinkItem.mockResolvedValue("item");
     await act(async () => {
-      setPendingSpaces(["Books"]);
+      queueDemoUrl("https://example.com/b");
       failLink(new Error("server error"));
     });
     await settle();
 
-    expect(createSpace).toHaveBeenLastCalledWith({
-      name: "Books",
-      dynamic: true,
-    });
+    expect(createLinkItem).toHaveBeenLastCalledWith(
+      expect.objectContaining({ url: "https://example.com/b" }),
+    );
+    expect(hasPending()).toBe(false);
   });
 
   it("runs new pending work without a remount", async () => {
-    createSpace.mockImplementation(failingServer());
-    setPendingSpaces(["Trips"]);
+    createLinkItem.mockImplementation(failingServer());
+    queueDemoUrl("https://example.com/a");
     renderHook(() => useReplayOnboarding());
     await settle();
 
-    createSpace.mockResolvedValue("space");
-    act(() => setPendingSpaces(["Books"]));
+    createLinkItem.mockResolvedValue("item");
+    act(() => queueDemoUrl("https://example.com/b"));
     await settle();
 
-    expect(createSpace).toHaveBeenLastCalledWith({
-      name: "Books",
-      dynamic: true,
-    });
+    expect(createLinkItem).toHaveBeenLastCalledWith(
+      expect.objectContaining({ url: "https://example.com/b" }),
+    );
+    expect(hasPending()).toBe(false);
+  });
+});
+
+describe("the goals picked in onboarding", () => {
+  it("save the sample reel without creating a space for each goal", async () => {
+    createLinkItem.mockResolvedValue("item");
+    setPendingSpaces(["Recipes", "Trips"]);
+    queueDemoUrl("https://example.com/reel");
+
+    renderHook(() => useReplayOnboarding());
+    await settle();
+
+    expect(createSpace).not.toHaveBeenCalled();
+    expect(createLinkItem).toHaveBeenCalledOnce();
+    expect(createLinkItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://example.com/reel",
+        spaceId: undefined,
+        saveSource: "onboarding_demo",
+      }),
+    );
     expect(hasPending()).toBe(false);
   });
 });
@@ -406,10 +409,7 @@ describe("a purchase made before sign-in", () => {
     hook.rerender();
     await settle();
 
-    expect(createSpace).toHaveBeenCalledWith({
-      name: "Recipes",
-      dynamic: true,
-    });
+    expect(createSpace).not.toHaveBeenCalled();
     expect(createLinkItem).toHaveBeenCalledWith(
       expect.objectContaining({ url: "https://example.com/recipe" }),
     );
@@ -459,19 +459,19 @@ describe("a purchase made before sign-in", () => {
 });
 
 describe("a link handed to the replay while it runs", () => {
-  it("is saved by a fresh pass instead of cleared with the spaces", async () => {
-    let finishSpace: (id: string) => void = () => {};
-    createSpace.mockImplementationOnce(
-      () => new Promise((resolve) => (finishSpace = resolve)),
+  it("is saved by a fresh pass instead of cleared with the first link", async () => {
+    let finishFirst: (id: string) => void = () => {};
+    createLinkItem.mockImplementationOnce(
+      () => new Promise((resolve) => (finishFirst = resolve)),
     );
     createLinkItem.mockResolvedValue("item");
-    setPendingSpaces(["Recipes"]);
+    queueDemoUrl("https://example.com/first");
     renderHook(() => useReplayOnboarding());
     await settle();
 
     await act(async () => {
       queueDemoUrl("https://example.com/late");
-      finishSpace("space");
+      finishFirst("item");
     });
     await settle();
 

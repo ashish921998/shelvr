@@ -49,3 +49,9 @@ export function restoreOnboardingStep(step: number | null): OnboardingStep {
   if (step === null || !Number.isInteger(step)) return "opener";
   return ONBOARDING_STEPS[step] ?? "opener";
 }
+
+export function viewedBeforeResume(step: number | null): OnboardingStep[] {
+  if (step === null || !Number.isInteger(step) || !ONBOARDING_STEPS[step])
+    return [];
+  return ONBOARDING_STEPS.slice(0, step + 1);
+}

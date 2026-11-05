@@ -22,7 +22,7 @@ import { api } from "@convex/_generated/api";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { Image } from "expo-image";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import type { FunctionReturnType } from "convex/server";
 import {
@@ -511,16 +511,25 @@ function ItemPageBody({
 }
 
 function EditPlacesLink({ item }: { item: DetailItem }) {
+  const router = useRouter();
+  const { guard, loading } = usePaywallGuard("edit_places");
   if (item.status !== "ready") return null;
   return (
-    <Link
-      href={{ pathname: "/edit-save-places", params: { itemId: item._id } }}
-      asChild
+    <Pressable
+      accessibilityRole="button"
+      disabled={loading}
+      style={{ paddingVertical: 12 }}
+      onPress={() =>
+        void guard(() =>
+          router.push({
+            pathname: "/edit-save-places",
+            params: { itemId: item._id },
+          }),
+        )
+      }
     >
-      <Pressable accessibilityRole="button" style={{ paddingVertical: 12 }}>
-        <Text style={styles.description}>{t("placeCorrection.title")}</Text>
-      </Pressable>
-    </Link>
+      <Text style={styles.description}>{t("placeCorrection.title")}</Text>
+    </Pressable>
   );
 }
 
@@ -622,7 +631,13 @@ function TagsRow({ tags }: { tags: string[] }) {
   );
 }
 
-type SaveState = "image_too_large" | "gone" | "failed" | "stalled" | "partial";
+type SaveState =
+  | "image_too_large"
+  | "gone"
+  | "failed"
+  | "stalled"
+  | "partial"
+  | "detailsMissing";
 
 function saveState(item: DetailItem, now: number): SaveState | null {
   if (item.status === "failed") {
@@ -635,7 +650,8 @@ function saveState(item: DetailItem, now: number): SaveState | null {
   if (item.status !== "ready") {
     return null;
   }
-  return item.enrichment === "partial" ? "partial" : null;
+  if (item.enrichment !== "partial") return null;
+  return item.stepFailed ? "detailsMissing" : "partial";
 }
 
 const SAVE_STATE_NOTICE: Record<SaveState, TextMessageKey> = {
@@ -644,6 +660,7 @@ const SAVE_STATE_NOTICE: Record<SaveState, TextMessageKey> = {
   failed: "item.pageFailed",
   stalled: "item.stalled",
   partial: "item.partial",
+  detailsMissing: "item.detailsMissing",
 };
 
 function noticeFor(state: SaveState, type: DetailItem["type"]): string {

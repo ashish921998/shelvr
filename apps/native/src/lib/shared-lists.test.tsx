@@ -56,6 +56,7 @@ vi.mock("react-native", () => ({
 }));
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   mocks.add.mockReset();
   mocks.remove.mockReset();
@@ -256,11 +257,64 @@ describe("useNameGate", () => {
     expect(result.current.asking).toBe(false);
   });
 
-  it("asks a nameless person once, then carries on whatever they chose", () => {
-    mocks.query.mockReturnValue({ data: null });
+  it("waits for the name to load before deciding", () => {
+    mocks.query.mockReturnValue({});
+    const action = vi.fn();
+    const { result, rerender } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    expect(action).not.toHaveBeenCalled();
+    expect(result.current.asking).toBe(false);
+
+    mocks.query.mockReturnValue({ data: "Maya" });
+    rerender();
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(result.current.asking).toBe(false);
+  });
+
+  it("goes on without asking if the name never loads", () => {
+    vi.useFakeTimers();
+    mocks.query.mockReturnValue({});
     const action = vi.fn();
     const { result } = renderHook(() => useNameGate());
     act(() => result.current.gate(action));
+    expect(action).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(3000));
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(result.current.asking).toBe(false);
+  });
+
+  it("drops a parked action when the screen goes away", () => {
+    vi.useFakeTimers();
+    mocks.query.mockReturnValue({});
+    const action = vi.fn();
+    const { result, unmount } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    unmount();
+    act(() => vi.advanceTimersByTime(3000));
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("drops a parked action when the person cancels", () => {
+    vi.useFakeTimers();
+    mocks.query.mockReturnValue({});
+    const action = vi.fn();
+    const { result } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    act(() => result.current.cancel());
+    act(() => vi.advanceTimersByTime(3000));
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("asks a nameless person once, then carries on whatever they chose", () => {
+    vi.useFakeTimers();
+    mocks.query.mockReturnValue({});
+    const action = vi.fn();
+    const { result, rerender } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    expect(result.current.asking).toBe(false);
+    mocks.query.mockReturnValue({ data: null });
+    rerender();
+    act(() => vi.advanceTimersByTime(3000));
     expect(result.current.asking).toBe(true);
     expect(action).not.toHaveBeenCalled();
 

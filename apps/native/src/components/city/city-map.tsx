@@ -8,6 +8,7 @@ import {
 } from "@/lib/city-pins";
 import { moveCamera, sameCamera } from "@/lib/map-camera";
 import { fitCamera } from "@/lib/trip";
+import { useImage } from "expo-image";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -101,6 +102,10 @@ export function CityMap({
     );
   }, [steady, firstCamera]);
 
+  const bubble = useImage(require("../../../assets/map/place-bubble.png"));
+  const selectedBubble = useImage(
+    require("../../../assets/map/place-bubble-selected.png"),
+  );
   const annotations = pins.slice(0, visible).map((pin) => {
     const id = cityPinId(pin);
     const isSelected = id === selected;
@@ -108,11 +113,11 @@ export function CityMap({
       id,
       coordinates: { latitude: pin.lat, longitude: pin.lng },
       title: pin.name,
-      text: String(pin.number),
-      backgroundColor: isSelected
-        ? theme.colors.foreground
-        : theme.colors.primary,
-      textColor: isSelected ? theme.colors.primary : theme.colors.onTint,
+      text: pin.emoji ?? "📍",
+      icon: (isSelected ? selectedBubble : bubble) ?? undefined,
+      anchor: { x: 0.5, y: 0.5 },
+      backgroundColor: theme.colors.surface,
+      textColor: theme.colors.foreground,
     };
   });
   const select = (id: string | undefined) => {
@@ -143,7 +148,7 @@ export function CityMap({
       markers={annotations.map((pin) => ({
         id: pin.id,
         coordinates: pin.coordinates,
-        title: `${pin.text}. ${pin.title}`,
+        title: `${pin.text} ${pin.title}`,
       }))}
       onMarkerClick={(marker) => select(marker.id)}
     />

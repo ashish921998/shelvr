@@ -77,6 +77,23 @@ describe("a run without the model", () => {
   });
 });
 
+it("marks a save whose later step failed and clears the mark on a whole run", () => {
+  const failed = completionPatch(
+    savedItem(),
+    { reading: { enrichment: "partial", stepFailed: true } },
+    true,
+  );
+  expect(failed).toMatchObject({ enrichment: "partial", stepFailed: true });
+
+  const whole = completionPatch(
+    savedItem({ status: "ready", enrichment: "partial", stepFailed: true }),
+    { reading: { content: "Body" } },
+    true,
+  );
+  expect(whole).toHaveProperty("stepFailed", undefined);
+  expect(whole.enrichment).toBeUndefined();
+});
+
 it("replaces only pins whose branch clue changed and retains them without AI permission", () => {
   const oldPins = [
     { name: "Carette, Paris", lat: 48.855, lng: 2.365 },
