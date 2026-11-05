@@ -206,3 +206,10 @@ export function normalizePlaces(
   }
   return places;
 }
+
+const MAX_NOTE_LINE_TITLE_CHARS = 80;
+
+export function noteLineTitle(note: string): string | undefined {
+  const line = note.split("\n").find((l) => l.trim() !== "");
+  return line?.trim().slice(0, MAX_NOTE_LINE_TITLE_CHARS);
+}

@@ -25,6 +25,7 @@ import {
   normalizeCities,
   normalizePlaces,
   normalizePlaceLocations,
+  noteLineTitle,
 } from "./model/itemFields";
 import { logEvent } from "./model/log";
 import {
@@ -429,13 +430,6 @@ async function itemAllowed(
   });
 }
 
-const MAX_NOTE_LINE_TITLE_CHARS = 80;
-
-function firstLine(note: string): string | undefined {
-  const line = note.split("\n").find((l) => l.trim() !== "");
-  return line?.trim().slice(0, MAX_NOTE_LINE_TITLE_CHARS);
-}
-
 function readingOf(
   item: Doc<"items">,
   { page, linkRead }: Analysis,
@@ -443,7 +437,7 @@ function readingOf(
   stepFailed: boolean,
 ): Reading {
   return {
-    title: item.type === "note" ? firstLine(item.note ?? "") : page?.title,
+    title: item.type === "note" ? noteLineTitle(item.note ?? "") : page?.title,
     description: page?.description,
     recipe: page?.recipe,
     content: page?.content,
@@ -1225,6 +1219,7 @@ export const processItem = internalAction({
     itemId: v.id("items"),
     runId: v.optional(v.string()),
     refresh: v.optional(v.boolean()),
+    retitle: v.optional(v.boolean()),
     captureContext: v.optional(v.string()),
   },
   returns: v.null(),
@@ -1288,7 +1283,7 @@ export const processItem = internalAction({
       const model = (await stillAllowed(ctx, allowedAtStart, item))
         ? outcome.result
         : undefined;
-      const keepTitle = args.refresh === true;
+      const keepTitle = args.refresh === true && args.retitle !== true;
       const reading = readingOf(
         item,
         outcome,

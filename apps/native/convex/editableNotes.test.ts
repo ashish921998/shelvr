@@ -85,6 +85,7 @@ describe("updateNoteItem", () => {
       itemId: id,
       runId: note?.processingRunId,
       refresh: true,
+      retitle: false,
     });
     expect(jobs[0].scheduledTime).toBeGreaterThanOrEqual(
       before + NOTE_REFRESH_DELAY_MS,
@@ -138,9 +139,11 @@ describe("updateNoteItem", () => {
     });
 
     const note = await t.run((ctx) => ctx.db.get(id));
-    expect(note?.title).toBeUndefined();
+    expect(note?.title).toBe("Buy oat milk");
     expect(note?.titleSource).toBeUndefined();
-    expect(await refreshJobs(t)).toHaveLength(1);
+    const jobs = await refreshJobs(t);
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0]?.args[0]).toMatchObject({ refresh: true, retitle: true });
   });
 
   it("rejects other users' notes, other item types, empty or long text and long titles", async () => {

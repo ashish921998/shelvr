@@ -70,6 +70,7 @@ import {
   postMediaValidator,
   PROCESSING_STALE_MS,
   recipeValidator,
+  noteLineTitle,
 } from "./model/itemFields";
 import {
   imageSizeError,
@@ -1838,11 +1839,12 @@ export const updateNoteItem = authedMutation({
     if (!textChanged && !titleChanged) {
       return null;
     }
+    const retitle = typedTitle === "" && item.titleSource === "user";
     const title =
       typedTitle !== ""
         ? typedTitle
-        : item.titleSource === "user"
-          ? undefined
+        : retitle
+          ? noteLineTitle(text)
           : item.title;
     const runDelay =
       (textChanged || (titleChanged && typedTitle === "")) &&
@@ -1880,6 +1882,7 @@ export const updateNoteItem = authedMutation({
           itemId: item._id,
           runId: refreshRunId,
           refresh: item.status === "ready",
+          retitle,
         },
       );
     }
