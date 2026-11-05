@@ -46,7 +46,7 @@ const OWNER_PATTERNS = [
 
 export const isOwnerFile = (path) => OWNER_PATTERNS.some((re) => re.test(path));
 
-export const DEPENDENCY_BOTS = ["renovate[bot]", "dependabot[bot]"];
+const DEPENDENCY_BOTS = ["renovate[bot]", "dependabot[bot]"];
 
 const APPROVE = /^\/approve\s+([0-9a-f]{7,40})\b/i;
 
