@@ -114,8 +114,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   (`tools/formal/image-import`). Use it before changing those functions, the
   storage cleanup crons, or any code that deletes a `_storage` blob.
 - **Pull requests:** fill in `.github/pull_request_template.md`.
-- **Reviewing a pull request:** read `REVIEW.md` first. It is the checklist
-  every reviewer (CI Claude, Codex, any agent) works from.
+- **Reviewing a pull request:** follow `REVIEW.md`. It is the whole
+  procedure, so any agent can review without a review bot.
 - **Measuring a reviewer:** `tools/review-eval` holds past PRs that shipped a
   bug, plus clean ones, to score catch rate and false alarms.
 

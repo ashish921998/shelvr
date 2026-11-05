@@ -1,8 +1,47 @@
-# Review checklist
+# Reviewing a change
 
-Every reviewer of a Shelvr pull request reads this first: the CI Claude review, Codex, and
-any agent asked to review. It is a checklist, not the rules themselves. Each line points to
-where the rule lives in `CLAUDE.md` or `AGENTS.md`; when they disagree, those files win.
+Any agent can review a Shelvr change with this file alone: Claude Code, Codex, or a fresh
+session. No review bot or subscription is needed. Each checklist line points to where the
+rule lives in `CLAUDE.md` or `AGENTS.md`; when they disagree, those files win.
+
+Ask for a review with: "Review this branch against REVIEW.md." The procedure below is the
+whole job.
+
+## Who reviews
+
+Review in a fresh context: a subagent, a new session, or another model, never the session
+that wrote the code. It carries the author's assumptions. A second model is worth it on a
+risky change (see "Always for the owner" below); for Codex use
+`codex exec --sandbox read-only --ephemeral` with this file named in the prompt.
+
+## Procedure
+
+1. **Scope.** Review from the fork point, not the tip of main:
+   `base=$(git merge-base origin/main HEAD)`, then `git diff $base...HEAD` and
+   `git log $base..HEAD`. Read the PR description (`gh pr view`) or the commit messages:
+   they say what the change claims to do.
+2. **Read the connected code, not just the hunks.** For each changed function, read the
+   whole function and grep its callers. For a public Convex function, look for app callers
+   in `apps/native/src` and remember installed builds you cannot grep.
+3. **Run what is cheap.** Tests next to the changed files
+   (`pnpm --filter native-app test <paths>`), and for a Convex change
+   `pnpm run verify:convex-api`. Run `pnpm run check:code` only when the change is wide.
+   A failure here is a finding.
+4. **Hunt in two passes.** First the house rules checklist below. Then ask what breaks:
+   an installed app calling the old shape, a deleting account, a retry or a second run, an
+   empty or missing value, two writes racing, a user's content leaving the backend, and an
+   automatic or AI write landing on something the person typed or chose.
+5. **Prove every finding before you report it.** A finding needs one of: a failing test or
+   command you ran, or a concrete path from a real input or caller to the wrong result,
+   with `file:line` at each step. Two reviewers agreeing is not proof. What you cannot
+   prove, drop; if it still worries you, put it under "Could not prove", at most three.
+6. **Tag each finding:**
+   - **Important:** this change makes something wrong for a person or the business (see
+     "What to report"). It blocks the merge.
+   - **Nit:** worth a minute, never blocks. At most three a review.
+   - **Pre-existing:** `git blame` shows the line is older than `$base`. Report it once,
+     never as a reason to block this change.
+7. **Report** in the format below, and stop.
 
 ## What to report
 
@@ -13,8 +52,56 @@ Report only what would hurt a person using the app or the business:
 - a broken contract with installed apps, a stuck deploy, or a stranded OTA
 - evidence that does not prove what the pull request claims
 
-Skip style, naming, formatting, and "could be cleaner" notes. Do not report the same
-finding twice across reruns, and do not count two reviewers agreeing as proof: check it.
+Skip style, naming, formatting, and "could be cleaner" notes. Name the class of bug once
+with every place it occurs, not one finding per line.
+
+## Report format
+
+The first line is the count: `2 Important, 1 Nit, 0 Pre-existing.` or
+`Nothing to fix.` Say the second plainly when it is true; an empty review is a good result.
+
+Then each finding:
+
+```
+[Important] apps/native/convex/items.ts:812
+What fails: <one sentence a person would notice>
+How: <the input or caller, and the path to the wrong result>
+Proof: <the command and its output, or the file:line chain>
+Fix: <the smallest change that removes it>
+```
+
+End with "Could not prove" (if any) and "Not checked": what you skipped, such as running
+the app, a real device, or production data.
+
+## Rounds
+
+- A re-review reads only the commits since the last reviewed one, and never repeats a
+  finding already reported.
+- Every Important finding ends fixed, or answered in the PR or a commit with a reason
+  ("intended because", "wrong because"). An unanswered one blocks the merge.
+- After three rounds that each found something Important, stop reviewing lines and say
+  the approach needs rethinking.
+
+## Always for the owner
+
+Paths under `convex/` and `src/` are in `apps/native`. A change that touches any of these
+waits for Ashish to read the evidence, whatever the review says. Say so in the report's first line:
+
+- billing and entitlement: `convex/subscriptions.ts`, the RevenueCat webhook in
+  `convex/http.ts`, `src/lib/entitlement.ts`, paywall code
+- auth and accounts: `convex/model/auth.ts`, `convex/model/publicFunctions.ts`,
+  `convex/auth.ts`, account deletion in `convex/users.ts`
+- release and CI: `.github/workflows/`, `apps/native/eas.json`, `apps/native/app.config.js`,
+  `apps/native/app.json`,
+  `apps/native/released-builds.json`
+- `convex/schema.ts` when a field or table is removed or narrowed
+
+## After the review
+
+- The same kind of finding twice means the rule should be enforced, not remembered: add a
+  lint, type or test and a row in the `AGENTS.md` rules table.
+- A bug that shipped past review becomes a case in `tools/review-eval` before this file
+  changes, and any change to this file is scored against those cases.
 
 ## Shelvr house rules
 
