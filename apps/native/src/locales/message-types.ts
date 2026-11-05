@@ -1034,7 +1034,8 @@ export type MessageParams = {
   "onboardingStatement.savedLostCount": undefined;
   "onboardingStatement.savedCta": undefined;
   "onboardingStatement.cityPicked": { city: string };
-  "onboardingStatement.cityFirst": { city: string };
+  "onboardingStatement.cityFirst": { picked: string; city: string };
+  "onboardingStatement.cityStart": { city: string };
   "onboardingStatement.firstSave": undefined;
   "onboardingCarousel.together": undefined;
   "onboardingCarousel.eat": undefined;

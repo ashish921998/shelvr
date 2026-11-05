@@ -1,6 +1,7 @@
 import { PillButton, ScalePressable } from "@/components/onboarding/parts";
 import type { AhaSample } from "@/lib/aha-sample";
 import { t, useAppLocale } from "@/lib/i18n";
+import { placeEmoji } from "@/lib/map-pin-emoji";
 import { SAMPLE_CITIES } from "@/lib/sample-cities";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import type { TextMessageKey } from "@/locales/message-types";
@@ -9,7 +10,6 @@ import { ScrollView, Text, View, type ScrollViewInstance } from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
-const SPOT_EMOJI = ["🍜", "☕", "🍷"] as const;
 const MAP_PINS = [
   { emoji: "🍜", left: "12%", top: "28%" },
   { emoji: "☕", left: "62%", top: "18%" },
@@ -58,10 +58,10 @@ function TogetherCard({ sample }: { sample: AhaSample }) {
         <Chip label={t("sharedLists.invite")} />
         <Chip label={t("homePlaces.planDate")} strong />
       </View>
-      {sample.spots.map((spot, index) => (
+      {sample.spots.map((spot) => (
         <SpotRow
           key={spot.name}
-          emoji={SPOT_EMOJI[index % SPOT_EMOJI.length]}
+          emoji={placeEmoji({ name: spot.name, kinds: [] }) ?? "📍"}
           name={spot.name}
         />
       ))}
@@ -72,8 +72,14 @@ function TogetherCard({ sample }: { sample: AhaSample }) {
 function EatCard({ sample }: { sample: AhaSample }) {
   return (
     <View style={styles.cardBody}>
-      <Text style={styles.eyebrow}>{t("datePlan.slotDinner")}</Text>
-      <Text style={styles.cardTitle}>{sample.spots[0].name}</Text>
+      <Text style={styles.eyebrow}>{t("homePlaces.planDate")}</Text>
+      {sample.spots.slice(0, 2).map((spot) => (
+        <SpotRow
+          key={spot.name}
+          emoji={placeEmoji({ name: spot.name, kinds: [] }) ?? "📍"}
+          name={spot.name}
+        />
+      ))}
       <Chip label={t("datePlan.send")} strong />
     </View>
   );
@@ -194,10 +200,8 @@ const styles = StyleSheet.create((theme) => ({
     color: theme.colors.foreground,
   },
   card: {
-    flex: 1,
     overflow: "hidden",
-    borderTopLeftRadius: theme.radius.xl,
-    borderTopRightRadius: theme.radius.xl,
+    borderRadius: theme.radius.xl,
     borderCurve: "continuous",
     borderWidth: 1.5,
     borderColor: theme.colors.border,
@@ -236,7 +240,7 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     color: theme.colors.foreground,
   },
-  map: { flex: 1, backgroundColor: theme.colors.globeOcean },
+  map: { height: 320, backgroundColor: theme.colors.globeOcean },
   search: {
     margin: theme.gap(2),
     paddingVertical: theme.gap(1),

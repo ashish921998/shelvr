@@ -3,6 +3,7 @@ import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { requestReviewOnce } from "@/lib/review-prompt";
 import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
+import { useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -14,9 +15,15 @@ export function RateStep({
   onContinue: () => void;
 }) {
   useAppLocale();
-  const answer = (action: "love" | "later") => {
-    analytics.capture("onboarding_rate", { action });
-    if (action === "love") void requestReviewOnce();
+  const [asked, setAsked] = useState(false);
+  const love = () => {
+    if (asked) return onContinue();
+    analytics.capture("onboarding_rate", { action: "love" });
+    setAsked(true);
+    void requestReviewOnce();
+  };
+  const later = () => {
+    analytics.capture("onboarding_rate", { action: "later" });
     onContinue();
   };
   return (
@@ -42,15 +49,17 @@ export function RateStep({
       </View>
       <View style={styles.actions}>
         <PillButton
-          label={t("onboardingRate.love")}
-          onPress={() => answer("love")}
+          label={t(asked ? "common.continue" : "onboardingRate.love")}
+          onPress={love}
           busy={leaving}
         />
-        <GhostButton
-          label={t("onboardingRate.later")}
-          onPress={() => answer("later")}
-          disabled={leaving}
-        />
+        {asked ? null : (
+          <GhostButton
+            label={t("onboardingRate.later")}
+            onPress={later}
+            disabled={leaving}
+          />
+        )}
       </View>
     </View>
   );

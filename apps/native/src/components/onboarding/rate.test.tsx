@@ -62,16 +62,21 @@ beforeEach(() => {
 });
 afterEach(cleanup);
 
-it("asks for the review and moves on at once on Love it", () => {
+it("asks for the review on Love it and waits for Continue", () => {
   const onContinue = vi.fn();
-  mocks.requestReviewOnce.mockReturnValue(new Promise(() => undefined));
   render(<RateStep leaving={false} onContinue={onContinue} />);
   fireEvent.click(screen.getByRole("button", { name: "onboardingRate.love" }));
   expect(mocks.requestReviewOnce).toHaveBeenCalledTimes(1);
-  expect(onContinue).toHaveBeenCalledTimes(1);
+  expect(onContinue).not.toHaveBeenCalled();
   expect(mocks.capture).toHaveBeenCalledWith("onboarding_rate", {
     action: "love",
   });
+  expect(screen.queryByRole("button", { name: "onboardingRate.later" })).toBe(
+    null,
+  );
+  fireEvent.click(screen.getByRole("button", { name: "common.continue" }));
+  expect(onContinue).toHaveBeenCalledTimes(1);
+  expect(mocks.requestReviewOnce).toHaveBeenCalledTimes(1);
 });
 
 it("moves on without asking on Not right now", () => {

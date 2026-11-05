@@ -19,9 +19,9 @@ describe("savedEchoText", () => {
 });
 
 describe("cityEchoText", () => {
-  it("praises the pick only when the demo plays that city's reel", () => {
+  it("names the picked city and the city whose reel the demo plays", () => {
     expect(cityEchoText("austin", "austin")).toMatch(/cityPicked/);
     expect(cityEchoText("lisbon", "austin")).toMatch(/cityFirst/);
-    expect(cityEchoText(null, "austin")).toMatch(/cityFirst/);
+    expect(cityEchoText(null, "austin")).toMatch(/cityStart/);
   });
 });
