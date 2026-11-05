@@ -14,8 +14,8 @@ running: its findings must meet `REVIEW.md`'s proof rule and use its tags and re
 
 ## What this is
 
-**Shelvr** is a "save-it-for-later" app. A user saves a reel, TikTok or link; a Convex action
-reads it and an LLM classifies it (title, tags, cities, places, spaces). Its places show under
+**Shelvr** is a "save-it-for-later" app. A user saves a link, image or note (most often a reel or
+TikTok); a Convex action reads it and an LLM classifies it (title, tags, cities, places, spaces). Its places show under
 their city on Home, and a city page has a map of them plus Plan a date / Plan a trip. The app
 no longer shows **spaces**, but the backend keeps them for old builds and for the hidden space
 behind each city's plans.
@@ -109,8 +109,6 @@ anywhere else.
 
 ## Working conventions
 
-## Working conventions
-
 `AGENTS.md` lists the one-line boundaries (no client `userId`, indexes, accurate validators,
 `requireProEntitlement` and `claimSave`, logging, `newConvexTest()`); its table says what
 enforces most of them, and `REVIEW.md` covers the review-only ones. These rules need more
@@ -141,10 +139,12 @@ than a line:
 - **A moved native fingerprint strands OTA updates.** A change to a native module, a
   config plugin, `app.json` or `app.config.js` may move it, and the diff does not show
   it. Run `pnpm run verify:fingerprint origin/main HEAD` instead of guessing, and
-  acknowledge an intended move with a `Native-Fingerprint: changed` trailer. The OTA
-  workflow's `before_update` hook (`tools/verify-ota-compatibility.mjs`) blocks a publish
-  whose fingerprint does not match `apps/native/released-builds.json`; the fix is a store
-  build, then recording the release. The pull-request check covers only the production
+  acknowledge an intended move with a `Native-Fingerprint: changed` trailer.
+  `tools/verify-ota-compatibility.mjs` blocks a publish whose fingerprint does not match
+  `apps/native/released-builds.json`: for production it runs as the `Verify the update can
+reach the released build` step in `.github/workflows/release.yml`, for other profiles as
+  the `before_update` hook in `native-update.yml`. The fix is a store build, then recording
+  the release. The pull-request check covers only the production
   variant and cannot see `eas.json` build fields, `.easignore` edits or pnpm patches.
   Details: [push notification builds and updates](docs/architecture/push-notifications.md#what-the-fingerprint-hashes).
 - **Every pull request shows how it was verified** in the template's Verification section

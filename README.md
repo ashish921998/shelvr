@@ -145,7 +145,8 @@ NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 
 The Android waitlist route returns 503 without `WAITLIST_SHARED_SECRET` or a Convex site
 origin. It takes the origin from `CONVEX_SITE_URL`, or derives it from a `.convex.cloud`
-`CONVEX_URL`. Without the
+`CONVEX_URL`. It also answers 503 after saving the signup when the confirmation email
+cannot be sent. Without the
 PostHog public variables, signup and App Store downloads still work and web
 analytics become a no-op. Waitlist rows are stored in Convex and optionally
 synced to Resend. Set `RESEND_API_KEY` and `RESEND_ANDROID_SEGMENT_ID` on the
