@@ -1,5 +1,4 @@
 import { google } from "@ai-sdk/google";
-import { limrun } from "@e2e-dev/limrun";
 import { mobile } from "@e2e-dev/mobile";
 import { mobileTools } from "@e2e-dev/mobile/tools";
 import type { E2EConfig } from "e2e";
@@ -7,7 +6,6 @@ import type { E2EConfig } from "e2e";
 import {
   BUNDLE_ID,
   LAUNCH_ARGUMENTS,
-  LIMRUN_APP,
   METRO_PORT,
   METRO_URL,
 } from "./tests/launch.ts";
@@ -15,7 +13,7 @@ import { SHEET_TRANSITION_MS } from "./tests/seeded-home.ts";
 
 const ios = mobile({
   platform: "ios",
-  device: LIMRUN_APP ? limrun() : process.env.E2E_DEVICE,
+  device: process.env.E2E_DEVICE,
   transition: SHEET_TRANSITION_MS,
 });
 
@@ -27,25 +25,14 @@ export default {
       app: {
         bundleId: BUNDLE_ID,
         launchArguments: LAUNCH_ARGUMENTS,
-        ...(LIMRUN_APP
-          ? { appPath: LIMRUN_APP }
-          : {
-              command: {
-                executable: "pnpm",
-                args: [
-                  "exec",
-                  "expo",
-                  "start",
-                  "--dev-client",
-                  "--port",
-                  METRO_PORT,
-                ],
-                cwd: "../../apps/native",
-                startupTimeout: 120_000,
-                log: ".e2e/metro.log",
-              },
-              readyUrl: `${METRO_URL}/status`,
-            }),
+        command: {
+          executable: "pnpm",
+          args: ["exec", "expo", "start", "--dev-client", "--port", METRO_PORT],
+          cwd: "../../apps/native",
+          startupTimeout: 120_000,
+          log: ".e2e/metro.log",
+        },
+        readyUrl: `${METRO_URL}/status`,
       },
     },
   ],

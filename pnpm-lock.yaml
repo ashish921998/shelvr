@@ -324,7 +324,7 @@ importers:
         version: 2.2.0(react@19.3.0)
       next:
         specifier: ^16.4.2
-        version: 16.4.2(@babel/core@7.29.0)(@types/node@25.6.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+        version: 16.4.2(@types/node@25.6.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
       react:
         specifier: 19.3.0
         version: 19.3.0
@@ -377,18 +377,12 @@ importers:
       '@ai-sdk/google':
         specifier: ^4.0.39
         version: 4.0.39(zod@4.6.7)
-      '@e2e-dev/limrun':
-        specifier: 0.2.2
-        version: 0.2.2(@e2e-dev/mobile@0.12.4(ai@7.0.51(zod@4.6.7))(e2e@0.21.3(@ai-sdk/google@4.0.39(zod@4.6.7))(ai@7.0.51(zod@4.6.7))))(@limrun/api@0.66.0(bufferutil@4.1.0))(ai@7.0.51(zod@4.6.7))(e2e@0.21.3(@ai-sdk/google@4.0.39(zod@4.6.7))(ai@7.0.51(zod@4.6.7)))
       '@e2e-dev/mobile':
         specifier: 0.12.4
         version: 0.12.4(ai@7.0.51(zod@4.6.7))(e2e@0.21.3(@ai-sdk/google@4.0.39(zod@4.6.7))(ai@7.0.51(zod@4.6.7)))
       '@eslint/js':
         specifier: ^9.39.4
         version: 9.39.4
-      '@limrun/api':
-        specifier: 0.66.0
-        version: 0.66.0(bufferutil@4.1.0)
       '@types/node':
         specifier: ^25.6.0
         version: 25.6.0
@@ -1240,14 +1234,6 @@ packages:
     resolution: {integrity: sha512-Vd/9EVDiu6PPJt9yAh6roZP6El1xHrdvIVGjyBsHR0RYwNHgL7FJPyIIW4fANJNG6FtyZfvlRPpFI4ZM/lubvw==}
     engines: {node: '>=18'}
 
-  '@e2e-dev/limrun@0.2.2':
-    resolution: {integrity: sha512-SyXEkJwmrYQf6Soge6tpf+J6y/b23Bd87mZQqljwrpHoeVs3PfMcjkz9Ty4UomOY5eut+0kvWxmLstwHNufoZA==}
-    engines: {node: ^22.22.3 || >=24.8.0}
-    peerDependencies:
-      '@e2e-dev/mobile': '>=0.11.1 <1'
-      '@limrun/api': '>=0.59.0 <1'
-      e2e: '>=0.15.0 <1'
-
   '@e2e-dev/mobile@0.12.4':
     resolution: {integrity: sha512-vciASBS2iVArOa43N2a4f9IzC6KsTNCE/e4S3IOdvRCMJ0/oNAtLW8i95FptrLI2A4tBu0dAzjzOUssi0PhLbA==}
     engines: {node: ^22.22.3 || >=24.8.0}
@@ -2053,12 +2039,6 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
-
-  '@limrun/api@0.66.0':
-    resolution: {integrity: sha512-VWcs27h5GLA8I5gRLIyqgyMeeRuG/rHxXC4SHMjM3gt45Ms97BaBgqW1rVw01oFwesKJExMujx0+6EQrikwi3g==}
-
-  '@limrun/xdelta3-wasm@0.2.0':
-    resolution: {integrity: sha512-mEohO7CYj4Gdc0v1Gr/AjlBhfbXQnIz6+2wmMhRfwz8hXZrsIC/yqYQhfoDhu1ysqQwBnU5lDDLPUGdUu+8hPQ==}
 
   '@modelcontextprotocol/core@2.3.1':
     resolution: {integrity: sha512-laVmIhPGpWi7rG9q+0UigblRN0Hws/Yjlb6qLFtVqryXVLkc4h+yN8z731POD2LnAGQlFe7/tXhUm7Bi0YB91g==}
@@ -3179,9 +3159,6 @@ packages:
 
   '@types/estree@1.0.9':
     resolution: {integrity: sha512-GhdPgy1el4/ImP05X05Uw4cw2/M93BCUmnEvWZNStlCzEKME4Fkk+YpoA5OiHNQmoS7Cafb8Xa3Pya8m1Qrzeg==}
-
-  '@types/har-format@1.2.16':
-    resolution: {integrity: sha512-fluxdy7ryD3MV6h8pTfTYpy/xQzCFC7m89nOH9y94cNqJ1mDIDPut7MnRHI3F6qRmh/cT2fUjG1MLdCNb4hE9A==}
 
   '@types/istanbul-lib-coverage@2.0.6':
     resolution: {integrity: sha512-2QF/t/auWm0lsy8XtKVPG19v3sSOQlJe/YHZgfjb/KBBHOGSV+J2q/S671rcq9uTBrLAXmZpqJiaQbMT+zNU1w==}
@@ -4470,10 +4447,6 @@ packages:
   events@3.3.0:
     resolution: {integrity: sha512-mQw+2fkQbALzQ7V0MY0IqdnXNOeTtP4r0lN9z7AAawCXgqea7bDii20AYrIBrFd/Hx0M2Ocz6S111CaFkUcb0Q==}
     engines: {node: '>=0.8.x'}
-
-  eventsource-client@1.2.0:
-    resolution: {integrity: sha512-kDI75RSzO3TwyG/K9w1ap8XwqSPcwi6jaMkNulfVeZmSeUM49U8kUzk1s+vKNt0tGrXgK47i+620Yasn1ccFiw==}
-    engines: {node: '>=18.0.0'}
 
   eventsource-parser@3.1.0:
     resolution: {integrity: sha512-kJezFj9YFAMLeORyi7aCLxLbD5/qWMQnoMVlVPyHIll7lgRJCc3JVln9Vgl9nwQi0YkMnhdGTMNn7CkRRAptMg==}
@@ -6071,9 +6044,6 @@ packages:
   pathe@2.0.3:
     resolution: {integrity: sha512-WUjGcAqP1gQacoQe+OBJsFA7Ld4DyXuUIjZ5cc75cLHvJ7dtNsTugphxIADwspS+AraAUePCKrSVtPLFj/F88w==}
 
-  pend@1.2.0:
-    resolution: {integrity: sha512-F3asv42UuXchdzt+xXqfW1OGlVBe+mxa2mqI0pg5yAHZPvFmY3Y6drSf/GQ1A86WgWEN9Kzh/WrgKa6iGcHXLg==}
-
   picocolors@1.1.1:
     resolution: {integrity: sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA==}
 
@@ -6209,10 +6179,6 @@ packages:
 
   prop-types@15.8.1:
     resolution: {integrity: sha512-oj87CgZICdulUohogVAR7AjlC0327U4el4L6eAvOqCeudMDVU0NThNaV+b9Df4dXgSP1gXMTnPdhfe/2qDH5cg==}
-
-  proxy-from-env@2.1.0:
-    resolution: {integrity: sha512-cJ+oHTW1VAEa8cJslgmUZrc+sjRKgAKl3Zyse6+PV38hZe/V6Z14TbCuXcan9F9ghlz4QrFr2c92TNF82UkYHA==}
-    engines: {node: '>=10'}
 
   punycode.js@2.3.1:
     resolution: {integrity: sha512-uxFIHU0YlHYhDQtV4R9J6a52SLx28BCjT+4ieh7IGbgwVJWO+km431c4yRlREUAsAmt/uMjQUyQHNEPf0M39CA==}
@@ -7398,18 +7364,6 @@ packages:
       utf-8-validate:
         optional: true
 
-  ws@8.22.1:
-    resolution: {integrity: sha512-oyL6OPYme/CmiFvNuGzeoxCJ4nOrZE2O1FwM9MWM1AsGri6nLXB2pg+lNA8aLeXMSav0J6eIVS1j6vUPzUtK9g==}
-    engines: {node: '>=10.0.0'}
-    peerDependencies:
-      bufferutil: ^4.0.1
-      utf-8-validate: '>=5.0.2'
-    peerDependenciesMeta:
-      bufferutil:
-        optional: true
-      utf-8-validate:
-        optional: true
-
   xcode@3.0.1:
     resolution: {integrity: sha512-kCz5k7J7XbJtjABOvkc5lJmkiDh8VhjVCGNiqdKCscmVpdVUpEAyXv1xmCLkQJ5dsHqx3IPO4XW+NTDhU/fatA==}
     engines: {node: '>=10.0.0'}
@@ -7451,10 +7405,6 @@ packages:
 
   yargs@17.7.2:
     resolution: {integrity: sha512-7dSzzRQ++CKnNI/krKnYRV7JKKPUXMEh61soaHKg9mrWEhzFWhFnxPxGl+69cD1Ou63C13NUPCnmIcrvqCuM6w==}
-    engines: {node: '>=12'}
-
-  yauzl@3.4.0:
-    resolution: {integrity: sha512-jIH9yLR9wqr0wOS0TpBvo/g/2UgZH5qePVbjgRliiF0BYvOZyaBknKsF+x9Iht0O6sqgnB93rCICdOZFecJuDw==}
     engines: {node: '>=12'}
 
   yocto-queue@0.1.0:
@@ -8468,15 +8418,6 @@ snapshots:
 
   '@csstools/css-tokenizer@3.0.4': {}
 
-  '@e2e-dev/limrun@0.2.2(@e2e-dev/mobile@0.12.4(ai@7.0.51(zod@4.6.7))(e2e@0.21.3(@ai-sdk/google@4.0.39(zod@4.6.7))(ai@7.0.51(zod@4.6.7))))(@limrun/api@0.66.0(bufferutil@4.1.0))(ai@7.0.51(zod@4.6.7))(e2e@0.21.3(@ai-sdk/google@4.0.39(zod@4.6.7))(ai@7.0.51(zod@4.6.7)))':
-    dependencies:
-      '@e2e-dev/mobile': 0.12.4(ai@7.0.51(zod@4.6.7))(e2e@0.21.3(@ai-sdk/google@4.0.39(zod@4.6.7))(ai@7.0.51(zod@4.6.7)))
-      '@limrun/api': 0.66.0(bufferutil@4.1.0)
-      agent-device: 0.21.29(ai@7.0.51(zod@4.6.7))
-      e2e: 0.21.3(@ai-sdk/google@4.0.39(zod@4.6.7))(ai@7.0.51(zod@4.6.7))
-    transitivePeerDependencies:
-      - ai
-
   '@e2e-dev/mobile@0.12.4(ai@7.0.51(zod@4.6.7))(e2e@0.21.3(@ai-sdk/google@4.0.39(zod@4.6.7))(ai@7.0.51(zod@4.6.7)))':
     dependencies:
       agent-device: 0.21.29(ai@7.0.51(zod@4.6.7))
@@ -9281,24 +9222,6 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
-
-  '@limrun/api@0.66.0(bufferutil@4.1.0)':
-    dependencies:
-      '@limrun/xdelta3-wasm': 0.2.0
-      '@types/har-format': 1.2.16
-      eventsource-client: 1.2.0
-      https-proxy-agent: 7.0.6
-      ignore: 7.0.5
-      proxy-from-env: 2.1.0
-      undici: 7.30.1
-      ws: 8.22.1(bufferutil@4.1.0)
-      yauzl: 3.4.0
-    transitivePeerDependencies:
-      - bufferutil
-      - supports-color
-      - utf-8-validate
-
-  '@limrun/xdelta3-wasm@0.2.0': {}
 
   '@modelcontextprotocol/core@2.3.1':
     dependencies:
@@ -10152,8 +10075,6 @@ snapshots:
 
   '@types/estree@1.0.9':
     optional: true
-
-  '@types/har-format@1.2.16': {}
 
   '@types/istanbul-lib-coverage@2.0.6': {}
 
@@ -11500,7 +11421,7 @@ snapshots:
       eslint: 9.39.4(jiti@2.6.1)
       eslint-import-resolver-node: 0.3.10
       eslint-import-resolver-typescript: 3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.6.1)))(eslint@9.39.4(jiti@2.6.1))
-      eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.6.1))
+      eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.6.1)))(eslint@9.39.4(jiti@2.6.1)))(eslint@9.39.4(jiti@2.6.1))
       eslint-plugin-jsx-a11y: 6.10.2(eslint@9.39.4(jiti@2.6.1))
       eslint-plugin-react: 7.37.5(eslint@9.39.4(jiti@2.6.1))
       eslint-plugin-react-hooks: 7.1.1(eslint@9.39.4(jiti@2.6.1))
@@ -11533,7 +11454,7 @@ snapshots:
       tinyglobby: 0.2.17
       unrs-resolver: 1.11.1
     optionalDependencies:
-      eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.6.1))
+      eslint-plugin-import: 2.32.0(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.6.1)))(eslint@9.39.4(jiti@2.6.1)))(eslint@9.39.4(jiti@2.6.1))
     transitivePeerDependencies:
       - supports-color
 
@@ -11617,7 +11538,7 @@ snapshots:
       - eslint-import-resolver-webpack
       - supports-color
 
-  eslint-plugin-import@2.32.0(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.4(jiti@2.6.1)):
+  eslint-plugin-import@2.32.0(eslint-import-resolver-typescript@3.10.1(eslint-plugin-import@2.32.0(eslint@9.39.4(jiti@2.6.1)))(eslint@9.39.4(jiti@2.6.1)))(eslint@9.39.4(jiti@2.6.1)):
     dependencies:
       '@rtsao/scc': 1.1.0
       array-includes: 3.1.9
@@ -11787,10 +11708,6 @@ snapshots:
 
   events@3.3.0:
     optional: true
-
-  eventsource-client@1.2.0:
-    dependencies:
-      eventsource-parser: 3.1.0
 
   eventsource-parser@3.1.0: {}
 
@@ -13324,7 +13241,7 @@ snapshots:
   neo-async@2.6.2:
     optional: true
 
-  next@16.4.2(@babel/core@7.29.0)(@types/node@25.6.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
+  next@16.4.2(@types/node@25.6.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0):
     dependencies:
       '@next/env': 16.4.2
       '@swc/helpers': 0.5.23
@@ -13333,7 +13250,7 @@ snapshots:
       postcss: 8.5.23
       react: 19.3.0
       react-dom: 19.3.0(react@19.3.0)
-      styled-jsx: 5.1.6(@babel/core@7.29.0)(react@19.3.0)
+      styled-jsx: 5.1.6(react@19.3.0)
     optionalDependencies:
       '@next/swc-darwin-arm64': 16.4.2
       '@next/swc-darwin-x64': 16.4.2
@@ -13610,8 +13527,6 @@ snapshots:
 
   pathe@2.0.3: {}
 
-  pend@1.2.0: {}
-
   picocolors@1.1.1: {}
 
   picomatch@2.3.2: {}
@@ -13708,8 +13623,6 @@ snapshots:
       loose-envify: 1.4.0
       object-assign: 4.1.1
       react-is: 16.13.1
-
-  proxy-from-env@2.1.0: {}
 
   punycode.js@2.3.1: {}
 
@@ -14437,12 +14350,10 @@ snapshots:
 
   structured-headers@0.4.1: {}
 
-  styled-jsx@5.1.6(@babel/core@7.29.0)(react@19.3.0):
+  styled-jsx@5.1.6(react@19.3.0):
     dependencies:
       client-only: 0.0.1
       react: 19.3.0
-    optionalDependencies:
-      '@babel/core': 7.29.0
 
   styleq@0.1.3:
     optional: true
@@ -15019,10 +14930,6 @@ snapshots:
     optionalDependencies:
       bufferutil: 4.1.0
 
-  ws@8.22.1(bufferutil@4.1.0):
-    optionalDependencies:
-      bufferutil: 4.1.0
-
   xcode@3.0.1:
     dependencies:
       simple-plist: 1.3.1
@@ -15058,10 +14965,6 @@ snapshots:
       string-width: 4.2.3
       y18n: 5.0.8
       yargs-parser: 21.1.1
-
-  yauzl@3.4.0:
-    dependencies:
-      pend: 1.2.0
 
   yocto-queue@0.1.0: {}
 

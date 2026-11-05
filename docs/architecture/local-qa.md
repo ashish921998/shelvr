@@ -121,24 +121,6 @@ red-boxes. `pnpm check` does not catch it, because Vitest runs the file fine.
 Put screen tests in `src/lib` and import the route through the `@/app/...`
 alias.
 
-## Limrun iOS checks
-
-Build the development variant on a Limrun Xcode sandbox with
-`EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS=true`. A Release configuration embeds the
-JavaScript bundle, so the hosted simulator does not need Metro on your Mac.
-
-On the cloud test host, configure `LIMRUN_API_KEY` and run from `tools/e2e`:
-
-```bash
-E2E_LIMRUN_APP=/absolute/path/to/ShelvrDev.app pnpm exec e2e run tests/home-cities.e2e.ts --video on
-```
-
-`E2E_LIMRUN_APP` selects the Limrun device provider and installs that bundle.
-It also omits the local Metro command and initial bundle URL. Without it, the
-existing local-simulator configuration is unchanged. The provider releases its
-device after the run. Use a development backend and an anonymous QA account:
-the Home fixtures are reset through Settings for this run.
-
 ## Android
 
 - **Local emulator.** `adb reverse tcp:<port> tcp:<port>`, then open the dev

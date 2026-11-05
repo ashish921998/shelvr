@@ -2,7 +2,6 @@ export const METRO_PORT = process.env.E2E_METRO_PORT ?? "8091";
 export const METRO_URL = `http://localhost:${METRO_PORT}`;
 
 export const BUNDLE_ID = "app.shelvr.save.dev";
-export const LIMRUN_APP = process.env.E2E_LIMRUN_APP;
 
 const BUNDLE_URL = `${METRO_URL}/apps/native/index.ts.bundle?${new URLSearchParams(
   {
@@ -18,7 +17,8 @@ const BUNDLE_URL = `${METRO_URL}/apps/native/index.ts.bundle?${new URLSearchPara
 )}`;
 
 export const LAUNCH_ARGUMENTS = [
-  ...(LIMRUN_APP ? [] : ["--initialUrl", BUNDLE_URL]),
+  "--initialUrl",
+  BUNDLE_URL,
   "-AppleLanguages",
   "(en)",
   "-AppleLocale",
