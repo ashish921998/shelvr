@@ -54,7 +54,9 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `src/lib/invite-join.ts` with its SecureStore slot `pending-invite.ts`, gating in
   `list-gate.ts`; backend `convex/sharedLists.ts` and `convex/model/sharedLists.ts`.
 - **Map tab:** route `src/app/(app)/(tabs)/(map)/index.tsx`, map, search and filter chips in
-  `src/components/map`, filter rules in `src/lib/map-filters.ts` and
+  `src/components/map` (`map-header.tsx` is the city title, search field and Cancel, with
+  `map-round-button.tsx` behind the search, profile and locate buttons; `map-empty.tsx` is the
+  no-places card; the title's city comes from `src/lib/use-map-city.ts`), filter rules in `src/lib/map-filters.ts` and
   `convex/model/placeKinds.ts`, each pin's emoji in `src/lib/map-pin-emoji.ts`, data from
   `convex/mapPlaces.ts`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body

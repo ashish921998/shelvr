@@ -176,7 +176,7 @@ repo root; before simulator QA read [local QA](docs/architecture/local-qa.md).
 Routes in `(app)`:
 
 - Tabs: `(home)` (Home: plan tiles, city cards, shared lists, review line), `(map)` (every
-  mapped place), `(trips)` (My trips)
+  mapped place; the app opens here), `(trips)` (My trips)
 - Places: `city/[name]`, `spots/[id]` (after sharing), `item/[id]`, `edit-save-places`
 - Plans: `date-plan`, `new-trip`, `trip-plan/[id]`, `add-trip-stop`
 - Shared lists: `shared-list/[id]`, `new-shared-list`, `add-list-place` (the Join screen is the
