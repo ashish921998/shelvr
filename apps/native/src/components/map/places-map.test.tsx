@@ -7,7 +7,7 @@ import { type MapFocus, PlacesMap } from "./places-map";
 
 type Camera = { coordinates: object; zoom: number };
 
-const mock = vi.hoisted(() => ({ moves: [] as (Camera | undefined)[] }));
+const mock = vi.hoisted(() => ({ moves: [] as (Camera | "person")[] }));
 
 vi.mock("expo-maps", () => ({
   AppleMaps: {
@@ -15,7 +15,7 @@ vi.mock("expo-maps", () => ({
     View: forwardRef(function MapView(_props: object, ref) {
       useImperativeHandle(ref, () => ({
         setCameraPosition: (camera?: Camera) => {
-          mock.moves.push(camera);
+          mock.moves.push(camera ?? "person");
           return camera
             ? Promise.resolve()
             : Promise.reject(new Error("no location yet"));
@@ -58,8 +58,6 @@ function map(person: { locate?: number; focus?: MapFocus } = {}) {
   );
 }
 
-const placedMoves = () => mock.moves.filter((camera) => camera !== undefined);
-
 beforeEach(() => {
   vi.useFakeTimers();
   vi.stubEnv("EXPO_OS", "ios");
@@ -73,23 +71,32 @@ afterEach(() => {
 it("shows the busiest city when it cannot find the person", async () => {
   render(map());
   await act(() => vi.advanceTimersByTimeAsync(2000));
-  expect(placedMoves()).toHaveLength(1);
+  expect(mock.moves.filter((move) => move !== "person")).toEqual([
+    {
+      coordinates: {
+        latitude: expect.closeTo(30.27, 2),
+        longitude: expect.closeTo(-97.73, 2),
+      },
+      zoom: expect.closeTo(13.8, 1),
+    },
+  ]);
 });
 
 it.each([
-  ["asks for their location", { locate: 1 }, []],
+  ["ask for their location", { locate: 1 }, "person"],
   [
-    "picks a place from search",
+    "pick a place from search",
     { focus: FOCUS },
-    [{ coordinates: { latitude: 30.27, longitude: -97.73 }, zoom: 15 }],
+    { coordinates: { latitude: 30.27, longitude: -97.73 }, zoom: 15 },
   ],
 ])(
-  "never pulls the camera to the city after the person %s",
-  async (_name, person, moves) => {
+  "moves only where the person asks once they %s",
+  async (_name, person, request) => {
     const { rerender } = render(map());
     await act(() => vi.advanceTimersByTimeAsync(200));
+    const before = mock.moves.length;
     rerender(map(person));
     await act(() => vi.advanceTimersByTimeAsync(2000));
-    expect(placedMoves()).toEqual(moves);
+    expect(new Set(mock.moves.slice(before))).toEqual(new Set([request]));
   },
 );
