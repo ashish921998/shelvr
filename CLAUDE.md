@@ -196,209 +196,55 @@ Scheme `shelvr`; bundle id `app.shelvr.save`, with `.dev` / `.preview` appended 
 
 ## Environment variables
 
-**Client**
-
-- Web (`apps/web/.env.example`): `CONVEX_URL` is optional unless a server-backed marketing form
-  is enabled; the Android waitlist route returns 503 without it. No auth env vars
-- Web: `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` / `NEXT_PUBLIC_POSTHOG_HOST`: web analytics keys.
-  Analytics is a no-op when either is unset
-- Web: `NEXT_PUBLIC_APP_STORE_PROVIDER_TOKEN`: optional App Store Connect provider token. With
-  it, App Store links carry `ct=` campaign tokens; see
-  [growth funnel](docs/analytics/growth-funnel.md)
-- Native (copy `apps/native/.example.env` to `.env.local`):
-  - `EXPO_PUBLIC_CONVEX_URL`: the Convex deployment URL the client connects to. `app.config.js`
-    rejects the production URL on dev and preview builds
-  - `EXPO_PUBLIC_CONVEX_SITE_URL`: the deployment's HTTP Actions origin
-  - `EXPO_PUBLIC_WEB_URL`: optional web origin for plan voting links. Local QA uses
-    a web server connected to the same development Convex backend; unset uses the
-    production website.
-  - `EXPO_PUBLIC_AUTH_ENABLE_ANONYMOUS`: optional, mirrors the backend `AUTH_ENABLE_ANONYMOUS`
-    to show the passwordless dev-login button and fixture reset on development builds
-    (release-mode included); preview and production builds never show either
-  - `EXPO_PUBLIC_REVENUECAT_TEST_KEY`: RevenueCat Development Test Store key used by
-    non-production debug builds only; release-mode dev and preview builds skip RevenueCat
-    configuration because the SDK rejects test keys outside debug. `app.config.js` pins it
-    to one exact value
-  - `EXPO_PUBLIC_REVENUECAT_IOS_KEY` / `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY`: RevenueCat public
-    SDK keys used only by production builds. The entitlement stays `none` until a key is set and
-    a subscription row is written
-  - `GOOGLE_MAPS_API_KEY`: Google Maps key injected into the Android config, needed by
-    `expo-maps` on the map screen. A production Android EAS build fails without it, so the map
-    screen never ships unconfigured
-  - `GOOGLE_SERVICES_JSON`: EAS secret file variable containing Firebase's
-    `google-services.json`; required by every Android EAS build, with a Firebase
-    client matching that variant's package, so `expo-notifications` can obtain an
-    FCM token. See [push notification builds and updates](docs/architecture/push-notifications.md)
-    for credentials, rebuilding existing installs, and OTA fingerprint consistency
-  - `POSTHOG_PROJECT_TOKEN` / `POSTHOG_HOST`: build-time PostHog config baked into
-    `expoConfig.extra`. The client analytics module is undefined unless both resolve
-  - `POSTHOG_CLI_API_KEY`: PostHog personal API key (scopes: error tracking write, organization
-    read). `app.config.js` adds the `posthog-react-native/expo` source map upload plugin only when
-    this is set, so a build without it keeps working and uploads switch on the moment the EAS
-    secret is added. The upload runs inside the native build and needs `@posthog/cli` available
-    there, plus `POSTHOG_CLI_PROJECT_ID` and `POSTHOG_CLI_HOST` set beside it as EAS environment
-    variables. Turning the upload on adds a config plugin, so it moves the fingerprint and needs a
-    store build.
-    `metro.config.js` stamps the matching debug id into every bundle regardless
-
-**Convex deployment** (via `convex env set` or dashboard). The app-owned names are declared in
-`apps/native/convex/convex.config.ts`; Convex Auth reads its `JWT_PRIVATE_KEY`, `JWKS`, and
-`AUTH_*` variables itself. Only `GOOGLE_GENERATIVE_AI_API_KEY` is marked required there, so a
-deploy fails without it. The auth and integration variables are optional at deploy time and are
-needed at runtime by the features that use them:
-
-- `JWT_PRIVATE_KEY` / `JWKS`: RS256 keypair Convex Auth uses to sign its JWTs (generate via
-  `node generateKeys.mjs`, see [Manual Setup](https://labs.convex.dev/auth/setup/manual))
-- `CONVEX_SITE_URL`: set by Convex; `auth.config.ts` uses it as the JWT issuer domain
-- `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET`: Google OAuth client credentials
-- `AUTH_APPLE_ID` / `AUTH_APPLE_SECRET`: Sign-in-with-Apple Service ID + signed JWT secret
-- `APPLE_RETENTION_MESSAGE_ID`: id of the Apple-approved retention message
-  `/retention-messaging` names on the cancel sheet. Unset, the reply is empty and Apple shows
-  the default message configured for the product
-- `APPLE_RETENTION_OFFERS`: JSON from product id to `{ offerIdentifier, messageIdentifier }`.
-  A listed product gets that App Store Connect promotional offer on the cancel sheet, signed
-  for the subscriber's original transaction; any other product gets the plain message
-- `APPLE_IAP_PRIVATE_KEY` / `APPLE_IAP_KEY_ID` / `APPLE_IAP_ISSUER_ID`: the Apple In-App
-  Purchase key (`.p8` contents), its key id and issuer id, which sign those offers. Unset,
-  `/retention-messaging` sends the plain message and logs `retention_offer_skipped`
-- `APPLE_REVOKE_PRIVATE_KEY` / `APPLE_REVOKE_KEY_ID` / `APPLE_REVOKE_TEAM_ID`: the Sign in
-  with Apple key (`.p8` contents), its key id, and the Apple team id. `appleRevoke.ts` signs
-  the client secret with them to revoke a deleted account's Apple token. All optional:
-  without them deletion still completes and the revocation is skipped with a log line
-- `APPLE_MAPS_PRIVATE_KEY` / `APPLE_MAPS_KEY_ID` / `APPLE_MAPS_TEAM_ID`: a MapKit key
-  (`.p8` contents), its key id, and the Apple team id. `trips.ts` signs the Apple Maps Server
-  API token with them to pin a trip's stops (free up to 25,000 calls a day per team; past
-  that Apple answers 429 and stops show without pins). All optional: without them trips have
-  no pins
-- `AUTH_ENABLE_ANONYMOUS`: set to `"true"` on the dev deployment only to enable passwordless
-  dev sign-in and the fixture reset in `devFixtures.ts`
-- `GOOGLE_GENERATIVE_AI_API_KEY`: Google AI Studio API key for classification (used directly by
-  `@ai-sdk/google`, no gateway). The only required entry
-- `E2E_FAKE_AI`: set to `local-v1` only by the `e2e ios` workflow's local backend. It swaps
-  Gemini for the deterministic fake in `model/fakeAi.ts` (which also serves its fixture pages
-  at `https://fixtures.e2e.invalid/` to link saves, reads cities and places off them, and
-  answers plan calls), and only when the backend is on
-  127.0.0.1, `AUTH_ENABLE_ANONYMOUS` is `"true"` and the model key is the `ci-no-model`
-  placeholder. Anywhere else it is refused and logged as `fake_ai_refused`
-- `POSTHOG_PROJECT_TOKEN`: server-side PostHog ingestion key. All backend capture is skipped
-  when it is unset
-- `POSTHOG_HOST`: PostHog ingestion host. Defaults to `https://us.i.posthog.com`
-- `OBSERVABILITY_ENV`: tags captured events with an `environment` property. Set it to
-  `production` on the production deployment
-- `REVENUECAT_WEBHOOK_SECRET`: shared bearer secret authenticating RevenueCat webhook posts.
-  The route answers 500 when it is unset
-- `REVENUECAT_API_KEY`: RevenueCat REST key used to re-read subscribers when reconciling a
-  `TRANSFER`, `BILLING_ISSUE`, refund, `REFUND_REVERSED` or `EXPIRATION` webhook event (an expiring
-  product says nothing about a dated grant that still covers the account). Those reconciliations return
-  503 without this key so RevenueCat retries instead of leaving access silently out of sync
-- `REVENUECAT_ENTITLEMENT_ID`: entitlement name read from the RevenueCat subscriber snapshot.
-  Defaults to `Shelvr Pro`
-- `SAVE_REMINDERS_ENABLED`: save reminders send only while this is `"true"`. Unset by
-  default, so a deploy never starts them; set it back to anything else to stop them, queued
-  ones included, without a deploy. See
-  [contextual notifications](docs/architecture/contextual-notifications.md)
-- `FREE_SAVES_ENABLED`: the free plan's 10 saves (`freeSaves.ts`) work only while this is
-  `"true"`. Unset, every save without Pro is refused as before
-- `SERPAPI_KEY`: SerpAPI key for `findProductLinks`. The search fails without it
-- `YOUTUBE_API_KEY` — optional YouTube Data API v3 key for video descriptions and metadata.
-  Missing key, quota/auth rejection, network failure or unusable responses preserve the existing
-  oEmbed fallback; oEmbed-only metadata never enables caption recipe extraction.
-- `TREG_API_KEY` / `VIDEO_TRANSCRIPTS_ENABLED`: Treg token for the spoken transcript of a
-  cooking TikTok or reel whose caption has no recipe, or one that recommends or visits places
-  (`model/videoTranscript.ts`, about $0.002
-  each, rate limited per user and globally). The same pair pays for a TikTok's caption when
-  oEmbed returns none (`model/readers/tiktok.ts`, about $0.002 each, its own per-user limit,
-  the shared global one; the web reel finder has its own budget). Both are fetched only while the switch is `"true"` and the key is
-  set; set the switch to anything else to stop them with no deploy
-- `RESEND_API_KEY`: Resend key for the waitlist contact projection. Without it, rows stay
-  `unconfigured` and no attempt is spent
-- `RESEND_SEGMENT_ID`: Resend segment for `shelvr` waitlist signups
-- `RESEND_ANDROID_SEGMENT_ID`: Resend segment for `shelvr-android` signups. Android rows stay
-  `unconfigured` until it is set
-- `RESEND_TOPIC_ID`: Resend topic the contact is opted into
-- `RESEND_FEEDBACK_INBOX_EMAIL`: Resend address in-app feedback is projected to. Together with
-  `RESEND_FEEDBACK_FROM_EMAIL` and `RESEND_API_KEY` it gates configured delivery; submissions stay
-  `unconfigured` until all three are set
-- `RESEND_FEEDBACK_FROM_EMAIL`: verified Resend sending address for feedback email, required with
-  the inbox address and `RESEND_API_KEY` for delivery
+[Environment variables](docs/architecture/environment.md) lists every client and Convex
+variable. For the app, copy `apps/native/.example.env` to `.env.local`. On the Convex
+deployment only `GOOGLE_GENERATIVE_AI_API_KEY` is required. Feature switches such as
+`FREE_SAVES_ENABLED`, `SAVE_REMINDERS_ENABLED` and `VIDEO_TRANSCRIPTS_ENABLED` stay off
+until set to `"true"`, so a deploy never turns one on.
 
 ## Working conventions
 
-- Do not reintroduce the old notes-app domain (`notes` table, OpenAI summary action, `/notes`
-  routes). The product domain is **items + spaces**. `GLOSSARY.md` names the domain's terms: say
-  "save" in copy and docs while tables and code keep `items`.
-- Never pass `userId` from the client into Convex public functions. Build a public query or
-  mutation with `authedQuery` or `authedMutation` from `model/auth.ts` and read `ctx.userId`. A
-  function that must answer a signed-out or deleting caller goes in `PUBLIC_ON_PURPOSE` in
-  `model/publicFunctions.ts` with a reason.
-- Keep `returns:` validators accurate. Convex enforces them at runtime.
-- Prefer `withIndex` / search indexes over `.filter()` on growing tables.
-- Public Convex functions are contracts with every app build in the wild, and the backend
-  deploys independently of the app (`npx convex deploy` is manual; OTA updates land one launch
-  later; store builds lag for weeks). Never change a public function's argument or return shape
-  in the same release that moves the client. Expand first (add a new function or accept both
-  shapes), deploy, move the client, then contract once the production update channel shows no
-  old bundle still calling it. CI enforces the first half: `tools/verify-convex-api.mjs`
-  resolves every public function's `args` and `returns` to their full text, following the
-  shared validators they reference, and fails a pull request that changes or removes one.
-  Withdrawing a function's `export`, or switching it between `query`, `mutation` and
-  `action`, counts the same way. Acknowledge a change an installed app survives, or the
-  expand half of the sequence, with a `Convex-Api: changed` trailer on a commit in the
-  range. It cannot yet tell widening from narrowing, so an added field asks for the
-  trailer too.
-- Gate every Pro feature with `requireProEntitlement(ctx, userId)` from `subscriptions.ts`.
-  Link and note saves are gated by `claimSave` in `freeSaves.ts`, which also counts free saves.
-- Never log raw `console.*`: use `logEvent` (Convex), `serverLog` (web server), or
-  `analytics.captureError` (native app) so events land in the Convex log stream or PostHog
-  error tracking in a queryable shape. Keep messages, URLs, and user content out of log
-  fields. Log categories and codes instead.
-- The classifier and recommendation passes may only create or remove `suggested` memberships in
-  `spaceItems`. The one exception is a space the user set to auto-file (`spaces.autoFile`, only
-  while `dynamic` is on): the classifier inserts its new matches there as `saved`, the user's
-  standing opt-in replacing the per-item accept. It applies only to saves made after auto-file was
-  turned on, and never changes an existing `saved`, `dismissed` or legacy row. Purpose
-  steering (`steerItemForSpace`) may update `intents` on `saved` memberships without changing
-  their status. `saved` and `dismissed` statuses are user-owned, so no AI pass ever overwrites a
-  user decision.
-- Deploy the backend before the client that needs it; `AGENTS.md` → Deployment says how
-  `deploy.yml` and `release.yml` keep that order.
-- An OTA update only reaches installs whose store build shares its native fingerprint. A
-  change to a native module, a config plugin, `app.json` or `app.config.js` may move the
-  fingerprint, and a moved fingerprint strands every later OTA until a store build ships.
-  The diff does not say so. Two layers cover it. On a pull request CI runs
-  `tools/verify-native-fingerprint.mjs --warn-only`, which names every source that moved
-  and never fails the check; acknowledge an intended move with the
-  `Native-Fingerprint: changed` trailer on a commit in the range. At publish time the OTA
-  workflow's `before_update` hook runs `tools/verify-ota-compatibility.mjs`, which
-  compares the fingerprint the update is about to carry against
-  `apps/native/released-builds.json` and blocks the publish on anything but a match,
-  including a profile or platform with no recorded release. A blocked publish means
-  nothing published from this tree reaches the recorded binary, so the usual fix is a
-  store build, and recording the release afterwards. Do not predict a move: run
-  `pnpm run verify:fingerprint origin/main HEAD`. The warning checks the production variant
-  only, and it cannot see `eas.json` build fields, `.easignore` edits or pnpm patches, so
-  decide those by hand. What the fingerprint hashes, and what it cannot see, is in
-  [push notification builds and updates](docs/architecture/push-notifications.md#what-the-fingerprint-hashes).
-- Adding a field to a table is a one-way door once rows carry it. Convex validates
-  every existing document against the new schema on deploy, and a table validator
-  rejects a field it does not declare, failing with an "Unexpected field" error
-  naming it. So reverting the commit that added the field fails the deploy instead
-  of rolling it back. To back a field out, stop writing it and leave it declared
-  `v.optional(...)`; drop the declaration only once no row still has it.
-- Every pull request (Renovate and Dependabot aside) fills in the template's Verification section: what was run and its result,
-  the evidence, and what was not verified. Never call work "done" or "verified" without evidence
-  a reviewer can open. A pull request that touches UI files (`apps/native/src/**/*.tsx`, locales,
-  assets, native view modules, app config, push copy, `apps/web` UI; `UI_PATTERNS` in
-  `tools/verify-pr-evidence.mjs` is the full list) embeds a screenshot or recording under Evidence. When those files
-  changed but nothing on screen did, the author (an agent included) says why under Evidence and
-  adds the `no-ui-change` label when opening the pull request (`gh pr create --label no-ui-change`);
-  a visible change never takes the label. The `PR evidence` workflow (`tools/verify-pr-evidence.mjs`, run as the base
-  branch has it via `pull_request_target`) fails a ready pull request otherwise and re-runs on description and label edits.
-- Build Convex test harnesses with `newConvexTest()` from `convex/test.setup.ts`, never with a
-  bare `convexTest(schema, ...)`.
-- A new schema table, top-level Convex module or `(app)` route needs a line in this file.
-  `tools/verify-agent-docs.mjs` (`pnpm run verify:agent-docs`, part of `pnpm run check` and CI)
-  fails until the name appears here in backticks.
+`AGENTS.md` lists the one-line boundaries (no client `userId`, indexes, accurate validators,
+`requireProEntitlement` and `claimSave`, logging, `newConvexTest()`) and what enforces
+each. These rules need more than a line:
+
+- **Public Convex functions are contracts.** The backend deploys on its own, OTA updates
+  land one launch later and store builds lag for weeks, so an installed app keeps calling
+  old shapes. Never change a public function's `args` or `returns` in the release that
+  moves the client: expand (add a function or accept both shapes), deploy, move the
+  client, then contract once the production channel shows no old bundle calling it.
+  `tools/verify-convex-api.mjs` fails a pull request that changes or removes a public
+  function's `args`, `returns`, `export` or kind (`query`, `mutation`, `action`).
+  Acknowledge an intended change with a `Convex-Api: changed` trailer. It cannot tell
+  widening from narrowing, so an added field needs the trailer too.
+- **AI passes write only `suggested` memberships** in `spaceItems`. Two exceptions: in a
+  space with `autoFile` on (only while `dynamic` is on) the classifier inserts new matches
+  as `saved`, for saves made after auto-file was turned on, never changing an existing
+  row; and `steerItemForSpace` may update `intents` on `saved` memberships without
+  changing their status. `saved` and `dismissed` belong to the user, and no AI pass
+  overwrites them.
+- **A table field is a one-way door.** Convex validates every row against the schema on
+  deploy and rejects an undeclared field, so reverting the commit that added a field
+  fails the deploy. To back one out, stop writing it, keep it declared `v.optional(...)`,
+  and drop the declaration once no row has it.
+- **A moved native fingerprint strands OTA updates.** A change to a native module, a
+  config plugin, `app.json` or `app.config.js` may move it, and the diff does not show
+  it. Run `pnpm run verify:fingerprint origin/main HEAD` instead of guessing, and
+  acknowledge an intended move with a `Native-Fingerprint: changed` trailer. The OTA
+  workflow's `before_update` hook (`tools/verify-ota-compatibility.mjs`) blocks a publish
+  whose fingerprint does not match `apps/native/released-builds.json`; the fix is a store
+  build, then recording the release. The pull-request check covers only the production
+  variant and cannot see `eas.json` build fields, `.easignore` edits or pnpm patches.
+  Details: [push notification builds and updates](docs/architecture/push-notifications.md#what-the-fingerprint-hashes).
+- **Every pull request shows how it was verified** in the template's Verification section
+  (Renovate and Dependabot aside): what ran and its result, evidence a reviewer can open,
+  and what was not verified. A pull request that touches UI files (`UI_PATTERNS` in
+  `tools/verify-pr-evidence.mjs`) embeds a screenshot or recording. If nothing on screen
+  changed, say why under Evidence and add the `no-ui-change` label
+  (`gh pr create --label no-ui-change`). The `PR evidence` check fails a ready pull
+  request otherwise.
+- **A new table, top-level Convex module or `(app)` route needs a line in this file.**
+  `tools/verify-agent-docs.mjs` fails until the name appears here in backticks.
 
 <!-- convex-ai-start -->
 
