@@ -50,21 +50,14 @@ export const OWNER_LABEL = "owner-reviewed";
 
 export const DEPENDENCY_BOTS = ["renovate[bot]", "dependabot[bot]"];
 
-/**
- * Whether the owner label stands for this head commit: it is on the pull
- * request now and was last added after the head commit was made. A label kept
- * across a push no longer counts, so one approval covers one commit.
- */
-export function ownerApproved(events, headCommittedAt) {
+export function ownerApproved(events, headSeenAt) {
   let labeledAt = null;
   for (const event of events) {
     if (event.label?.name !== OWNER_LABEL) continue;
     if (event.event === "labeled") labeledAt = event.created_at;
     if (event.event === "unlabeled") labeledAt = null;
   }
-  return (
-    labeledAt !== null && Date.parse(labeledAt) > Date.parse(headCommittedAt)
-  );
+  return labeledAt !== null && Date.parse(labeledAt) > Date.parse(headSeenAt);
 }
 
 const markdown = new MarkdownIt({ html: true, linkify: true });
@@ -248,7 +241,7 @@ export function evidenceProblems(
     problems.push(
       `This pull request changes files only the owner may approve (${list}${more}). ` +
         `Ashish reads the evidence and adds the "${OWNER_LABEL}" label; an agent never adds it. ` +
-        "The label covers the commits made before it was added: after a new push, remove it and add it again.",
+        "It covers only commits GitHub had seen before it was added: after a new push, remove it and add it again.",
     );
   }
   if (DEPENDENCY_BOTS.includes(author)) return problems;
@@ -307,10 +300,20 @@ function changedFilesSince(base, head) {
     .filter(Boolean);
 }
 
-function headCommittedAt(head) {
-  return execFileSync("git", ["show", "-s", "--format=%cI", head], {
-    encoding: "utf8",
-  }).trim();
+function headSeenAt(head) {
+  const { GITHUB_REPOSITORY: repo } = process.env;
+  if (!repo) return new Date().toISOString();
+  const first = execFileSync(
+    "gh",
+    [
+      "api",
+      `repos/${repo}/actions/runs?head_sha=${head}&event=pull_request_target`,
+      "--jq",
+      "[.workflow_runs[].created_at] | min // empty",
+    ],
+    { encoding: "utf8" },
+  ).trim();
+  return first || new Date().toISOString();
 }
 
 function labelEvents() {
@@ -340,7 +343,7 @@ function main() {
     {
       approved:
         labels.includes(OWNER_LABEL) &&
-        ownerApproved(labelEvents(), headCommittedAt(head)),
+        ownerApproved(labelEvents(), headSeenAt(head)),
       author: process.env.PR_AUTHOR ?? "",
     },
   );

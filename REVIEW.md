@@ -87,7 +87,7 @@ the app, a real device, or production data.
 Paths under `convex/` and `src/` are in `apps/native`. A change that touches any of these
 waits for Ashish to read the evidence, whatever the review says. Say so in the report's first
 line. The `verification evidence` check enforces it: the PR fails until Ashish adds the
-`owner-reviewed` label. It counts only for commits made before it was added, so after a
+`owner-reviewed` label. It counts only for commits GitHub had seen before it was added, so after a
 new push he removes and re-adds it. Dependency-bot PRs are held too. An agent never adds it.
 The paths are `OWNER_PATTERNS` in `tools/verify-pr-evidence.mjs`:
 
