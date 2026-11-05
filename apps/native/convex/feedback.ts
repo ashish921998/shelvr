@@ -8,7 +8,7 @@ import {
   type ActionCtx,
 } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
-import { authedMutation } from "./model/auth";
+import { authedMutation, liveOwner } from "./model/auth";
 import {
   feedbackDeliveryStatusValidator,
   feedbackPlatformValidator,
@@ -141,9 +141,10 @@ export const claimDelivery = internalMutation({
       }
       return null;
     }
+    const user = await liveOwner(ctx, row.userId);
+    if (user === null) return null;
     const attempt = row.attempts + 1;
     await ctx.db.patch(args.submissionId, { attempts: attempt });
-    const user = await ctx.db.get(row.userId as Id<"users">);
     return {
       attempt,
       submittedAt: row._creationTime,
@@ -154,7 +155,7 @@ export const claimDelivery = internalMutation({
       ...(row.buildVariant !== undefined
         ? { buildVariant: row.buildVariant }
         : {}),
-      ...(user?.email !== undefined ? { accountEmail: user.email } : {}),
+      ...(user.email !== undefined ? { accountEmail: user.email } : {}),
     };
   },
 });

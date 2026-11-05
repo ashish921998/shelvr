@@ -59,7 +59,7 @@ async function insertSubmission(
 ): Promise<Id<"feedbackSubmissions">> {
   return await t.run(async (ctx) =>
     ctx.db.insert("feedbackSubmissions", {
-      userId: fields.userId ?? "user-seed",
+      userId: fields.userId ?? (await ctx.db.insert("users", {})),
       message: fields.message ?? "seeded",
       surface: fields.surface ?? "home",
       status: fields.status ?? "pending",
@@ -327,6 +327,43 @@ describe("delivery retries", () => {
       status: "pending",
       attempts: 1,
     });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("account deletion", () => {
+  it("never sends feedback once its owner has started deleting the account", async () => {
+    const t = setup();
+    const fetchMock = okFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const userId = await t.run(async (ctx) =>
+      ctx.db.insert("users", { email: "gone@example.com", deleting: true }),
+    );
+    const id = await insertSubmission(t, { userId, status: "failed" });
+
+    await t.action(internal.feedback.deliver, { submissionId: id });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await getSubmission(t, id)).toMatchObject({
+      status: "failed",
+      attempts: 0,
+    });
+  });
+
+  it("never sends feedback whose owner row is already gone", async () => {
+    const t = setup();
+    const fetchMock = okFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const userId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("users", {});
+      await ctx.db.delete(id);
+      return id;
+    });
+    const id = await insertSubmission(t, { userId, status: "pending" });
+
+    expect(
+      await t.mutation(internal.feedback.claimDelivery, { submissionId: id }),
+    ).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
