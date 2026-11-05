@@ -874,6 +874,7 @@
   "map.searchPlaceholder": "Deine Orte durchsuchen",
   "map.searchNoResults": "Keine Orte passen zu „%{query}“.",
   "map.searchMore": "%{count} von %{total} angezeigt. Tippe weiter, um einzugrenzen.",
+  "map.showMyLocation": "Meinen Standort zeigen",
   "navigation.trips": "Reisen",
   "tripPlanner.listTitle": "Meine Reisen",
   "tripPlanner.loading": "Deine Reisen werden geladen",

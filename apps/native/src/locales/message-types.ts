@@ -800,6 +800,7 @@ export type MessageParams = {
   "map.searchPlaceholder": undefined;
   "map.searchNoResults": { query: string };
   "map.searchMore": { count: number; total: number };
+  "map.showMyLocation": undefined;
   "navigation.trips": undefined;
   "tripPlanner.listTitle": undefined;
   "tripPlanner.loading": undefined;

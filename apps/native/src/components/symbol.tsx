@@ -69,6 +69,7 @@ const SF_TO_MATERIAL = {
   "doc.text": "description",
   "fork.knife": "restaurant",
   mappin: "location_on",
+  location: "my_location",
   lock: "lock",
   "arrow.triangle.2.circlepath.camera": "cameraswitch",
   "heart.fill": "favorite",

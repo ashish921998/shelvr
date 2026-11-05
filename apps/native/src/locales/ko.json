@@ -849,6 +849,7 @@
   "map.searchPlaceholder": "저장한 장소 검색",
   "map.searchNoResults": "“%{query}”에 맞는 장소가 없어요.",
   "map.searchMore": "%{total}개 중 %{count}개 표시 중. 더 입력하면 좁혀져요.",
+  "map.showMyLocation": "내 위치 보기",
   "navigation.trips": "여행",
   "tripPlanner.listTitle": "내 여행",
   "tripPlanner.loading": "여행을 불러오는 중",

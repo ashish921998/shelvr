@@ -899,6 +899,7 @@
   "map.searchPlaceholder": "Rechercher dans vos lieux",
   "map.searchNoResults": "Aucun lieu ne correspond à « %{query} ».",
   "map.searchMore": "%{count} sur %{total} affichés. Continuez à taper pour affiner.",
+  "map.showMyLocation": "Afficher ma position",
   "navigation.trips": "Voyages",
   "tripPlanner.listTitle": "Mes voyages",
   "tripPlanner.loading": "Chargement de vos voyages",
