@@ -143,8 +143,9 @@ NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN=<project-token>
 NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 ```
 
-The Android waitlist route returns 503 without `WAITLIST_SHARED_SECRET` or a Convex site
-origin. It takes the origin from `CONVEX_SITE_URL`, or derives it from a `.convex.cloud`
+The Android waitlist route returns 503 when the web deployment lacks `WAITLIST_SHARED_SECRET`
+or a Convex site origin, and 502 when the Convex deployment's `WAITLIST_SHARED_SECRET` is unset
+or different. It takes the origin from `CONVEX_SITE_URL`, or derives it from a `.convex.cloud`
 `CONVEX_URL`. It also answers 503 after saving the signup when the confirmation email
 cannot be sent, which includes whenever `RESEND_API_KEY` or `RESEND_FEEDBACK_FROM_EMAIL` is
 unset on the Convex deployment. Without the
