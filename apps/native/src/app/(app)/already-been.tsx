@@ -100,6 +100,11 @@ export default function AlreadyBeenScreen() {
   );
   const live = new Set(places.data?.map(pickId));
   const picked = new Map([...chosen].filter(([id]) => live.has(id)));
+  const [seen, setSeen] = useState(places.data);
+  if (seen !== places.data) {
+    setSeen(places.data);
+    if (picked.size !== chosen.size) setPicked(picked);
+  }
   const [busy, setBusy] = useState(false);
   const close = useCallback(() => backOrHome(router), [router]);
 

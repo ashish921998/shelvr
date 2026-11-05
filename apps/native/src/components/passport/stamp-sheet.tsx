@@ -96,6 +96,7 @@ export function StampSheet({
                 onPress={() => {
                   sharing.current = stamp.city;
                   onClose();
+                  if (process.env.EXPO_OS !== "ios") flush();
                 }}
               />
               <Pressable
