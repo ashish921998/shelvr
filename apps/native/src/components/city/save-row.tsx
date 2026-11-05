@@ -1,11 +1,18 @@
 import { AppSymbolIcon } from "@/components/symbol";
 import { saveSource } from "@/lib/city-pins";
+import { formatRecentDate } from "@/lib/date";
 import { t } from "@/lib/i18n";
 import type { Id } from "@convex/_generated/dataModel";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+
+function wentLabel(at: number | null) {
+  return at === null
+    ? t("passport.wentNoDate")
+    : t("passport.went", { date: formatRecentDate(at) });
+}
 
 type SaveRowItem = {
   _id: Id<"items">;
@@ -29,6 +36,8 @@ type Props = {
   onPlaceDetails?: () => void;
   onRemove?: () => void;
   removing?: boolean;
+  went?: { at: number | null } | null;
+  onWent?: () => void;
 };
 
 export function SaveRow({
@@ -40,6 +49,8 @@ export function SaveRow({
   onPlaceDetails,
   onRemove,
   removing,
+  went,
+  onWent,
 }: Props) {
   const router = useRouter();
   const { theme } = useUnistyles();
@@ -88,6 +99,27 @@ export function SaveRow({
           ) : null}
         </View>
       </Pressable>
+      {onWent ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={
+            went
+              ? `${title}, ${wentLabel(went.at)}`
+              : t("passport.markLabel", { name: title })
+          }
+          onPress={onWent}
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.went,
+            went && styles.wentDone,
+            pressed && styles.pressed,
+          ]}
+        >
+          <Text style={[styles.wentText, went && styles.wentDoneText]}>
+            {went ? wentLabel(went.at) : t("passport.iWent")}
+          </Text>
+        </Pressable>
+      ) : null}
       {selected && onRemove ? (
         <Pressable
           accessibilityRole="button"
@@ -145,6 +177,25 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
   },
   selected: { backgroundColor: theme.colors.primarySoft },
+  went: {
+    minHeight: 32,
+    justifyContent: "center",
+    paddingHorizontal: theme.gap(1.5),
+    marginRight: theme.gap(0.75),
+    borderRadius: 999,
+    borderWidth: 1.5,
+    borderColor: theme.colors.primary,
+  },
+  wentDone: {
+    borderColor: theme.colors.foreground,
+    backgroundColor: theme.colors.foreground,
+  },
+  wentText: { ...theme.type.captionStrong, color: theme.colors.primaryText },
+  wentDoneText: {
+    color: theme.colors.background,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+  },
   pressed: { opacity: theme.opacity.pressed },
   bubble: {
     width: 40,

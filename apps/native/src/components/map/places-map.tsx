@@ -1,6 +1,7 @@
 import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
 import { appleZoom } from "@/lib/city-pins";
+import { t } from "@/lib/i18n";
 import { moveCamera } from "@/lib/map-camera";
 import { hasPlaceNear } from "@/lib/map-filters";
 import { fitCamera } from "@/lib/trip";
@@ -21,6 +22,7 @@ export type MapPin = {
   lng: number;
   /** iOS: the emoji inside the pin, saying what the place is. */
   emoji?: string;
+  went?: boolean;
 };
 
 /** A place the camera flies to; a new key moves it again even to the same spot. */
@@ -208,7 +210,11 @@ export function PlacesMap({
           coordinates: { latitude: pin.lat, longitude: pin.lng },
           title: pin.name,
           monogram: pin.emoji,
-          tintColor: theme.colors.primary,
+          tintColor: !pin.went
+            ? theme.colors.primary
+            : isDarkThemeName(rt.themeName)
+              ? theme.colors.primarySoft
+              : theme.colors.primaryText,
         }))}
         onMarkerClick={(marker) => select(marker.id)}
         onCameraMove={trackCamera}
@@ -224,6 +230,7 @@ export function PlacesMap({
         id: pin.id,
         coordinates: { latitude: pin.lat, longitude: pin.lng },
         title: pin.name,
+        snippet: pin.went ? t("passport.wentNoDate") : undefined,
       }))}
       onMarkerClick={(marker) => select(marker.id)}
       onCameraMove={trackCamera}

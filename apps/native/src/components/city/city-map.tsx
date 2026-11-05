@@ -6,6 +6,7 @@ import {
   framedPins,
   type CityPin,
 } from "@/lib/city-pins";
+import { t } from "@/lib/i18n";
 import { moveCamera, sameCamera } from "@/lib/map-camera";
 import { fitCamera } from "@/lib/trip";
 import { useImage } from "expo-image";
@@ -23,6 +24,7 @@ type Props = {
   coveredBottom: number;
   onSelect: (id: string) => void;
   visible?: number;
+  went?: (name: string) => boolean;
 };
 
 export function CityMap({
@@ -32,6 +34,7 @@ export function CityMap({
   coveredBottom,
   onSelect,
   visible = Infinity,
+  went,
 }: Props) {
   const { theme, rt } = useUnistyles();
   const ref = useRef<AppleMaps.MapView>(null);
@@ -149,6 +152,7 @@ export function CityMap({
         id: pin.id,
         coordinates: pin.coordinates,
         title: `${pin.text} ${pin.title}`,
+        snippet: went?.(pin.title) ? t("passport.wentNoDate") : undefined,
       }))}
       onMarkerClick={(marker) => select(marker.id)}
     />

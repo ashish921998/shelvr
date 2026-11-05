@@ -1,5 +1,6 @@
 import { CityCover, type CoverLayout } from "@/components/city/city-cover";
 import { PlanCitySheet } from "@/components/home/plan-city-sheet";
+import { PassportRow } from "@/components/passport/passport-row";
 import { AppSymbolIcon } from "@/components/symbol";
 import { type CityPlanKind, useCityPlan } from "@/lib/city-plan";
 import { canBrowse } from "@/lib/access";
@@ -14,6 +15,7 @@ import {
   visibleCities,
 } from "@/lib/home-places";
 import { t, useAppLocale } from "@/lib/i18n";
+import { usePassport, wentInCity } from "@/lib/passport";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -26,13 +28,15 @@ function CityCard({
   entry,
   layout,
   style,
+  went,
 }: {
   entry: City;
   layout: CoverLayout;
   style?: ViewStyle;
+  went: number;
 }) {
   const router = useRouter();
-  const count = cityCountLine(entry);
+  const count = cityCountLine(entry, went);
   return (
     <Pressable
       accessibilityRole="button"
@@ -42,7 +46,7 @@ function CityCard({
       }
       style={({ pressed }) => [style, pressed && styles.pressed]}
     >
-      <CityCover entry={entry} layout={layout} />
+      <CityCover entry={entry} layout={layout} went={went} />
     </Pressable>
   );
 }
@@ -52,6 +56,7 @@ function CityGrid({ cities }: { cities: City[] }) {
   const [expanded, setExpanded] = useState(false);
   const { shown, hidden } = visibleCities(cities, expanded);
   const only = cities.length === 1;
+  const { stamps } = usePassport();
   return (
     <View style={styles.grid}>
       {cityRows(shown).map((row) =>
@@ -63,6 +68,7 @@ function CityGrid({ cities }: { cities: City[] }) {
                 entry={entry}
                 layout="pair"
                 style={styles.half}
+                went={wentInCity(stamps, entry.city)}
               />
             ))}
           </View>
@@ -71,6 +77,7 @@ function CityGrid({ cities }: { cities: City[] }) {
             key={row.city.city}
             entry={row.city}
             layout={only ? "only" : "wide"}
+            went={wentInCity(stamps, row.city.city)}
           />
         ),
       )}
@@ -302,6 +309,7 @@ export function HomePlaces() {
   if (cities.data.length === 0) {
     return (
       <View style={styles.container}>
+        <PassportRow hideEmpty />
         <HomePlacesEmptyCard />
       </View>
     );
@@ -312,6 +320,7 @@ export function HomePlaces() {
         cities={plannableCities(cities.data)}
         pro={access.kind === "pro"}
       />
+      <PassportRow />
       <CityGrid cities={cities.data} />
     </View>
   );

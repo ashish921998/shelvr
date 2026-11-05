@@ -50,6 +50,9 @@ vi.mock("@/lib/haptics", () => ({
   haptics: { selection: mocks.selection, success: mocks.success },
 }));
 vi.mock("@/lib/screen-dismiss", () => ({ backOrHome: mocks.backOrHome }));
+vi.mock("@/lib/entitlement", () => ({
+  usePaywallGuard: () => ({ guard: vi.fn() }),
+}));
 vi.mock("@/lib/apple-place-card", () => ({
   canOpenPlaceCard: (appleId?: string) =>
     appleId !== undefined && mocks.cardAvailable,
@@ -305,6 +308,9 @@ vi.mock("@/components/ui/button", () => ({
       <button onClick={onPress}>{title}</button>
     ),
   ),
+}));
+vi.mock("@/components/passport/stamp-sheet", () => ({
+  StampSheet: vi.fn(() => null),
 }));
 vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: vi.fn(() => <span>loader</span>),

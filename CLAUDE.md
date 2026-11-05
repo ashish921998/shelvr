@@ -179,6 +179,8 @@ Routes in `(app)`:
 - Tabs: `(home)` (Home: plan tiles, city cards, shared lists, review line), `(map)` (every
   mapped place), `(trips)` (My trips)
 - Places: `city/[name]`, `spots/[id]` (after sharing), `item/[id]`, `edit-save-places`
+- Passport: `passport` (stamps by city, from the Home row), `already-been` (stamp places from
+  before Shelvr), `passport-card` (the 9:16 share card)
 - Plans: `date-plan`, `new-trip`, `trip-plan/[id]`, `add-trip-stop`
 - Shared lists: `shared-list/[id]`, `new-shared-list`, `add-list-place` (the Join screen is the
   root route `list-invite/[token]`)

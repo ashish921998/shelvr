@@ -1155,6 +1155,78 @@
   "sharedLists.startWithHint": "Choisissez au moins une ville. Les lieux que vous y avez déjà enregistrés viennent avec.",
   "sharedLists.cityPlaceholder": "Ou saisissez une ville",
   "sharedLists.typedCity": "Saisie par vous",
+  "passport.iWent": "J'y étais",
+  "passport.went": "Visité · %{date}",
+  "passport.wentNoDate": "Visité",
+  "passport.markLabel": "J'étais à %{name}",
+  "passport.stampedTitle": "Tamponné",
+  "passport.stampedBody": {
+    "one": "%{name} est dans votre passeport. %{formattedCount} lieu pour l'instant.",
+    "many": "%{name} est dans votre passeport. %{formattedCount} lieux pour l'instant.",
+    "other": "%{name} est dans votre passeport. %{formattedCount} lieux pour l'instant."
+  },
+  "passport.stampInk": "%{city} · %{date}",
+  "passport.coverCredit": "Image de la publication enregistrée",
+  "passport.removeStamp": "Retirer le tampon",
+  "passport.wantToGo": "À visiter",
+  "passport.title": "Passeport",
+  "passport.yourPassport": "Votre passeport",
+  "passport.beenTitle": "Déjà visité l'un d'eux ?",
+  "passport.beenBody": "Tamponnez les lieux que vous avez déjà visités",
+  "passport.beenSomewhere": "Déjà visité un lieu ?",
+  "passport.rowCities": "%{places} · %{cities}",
+  "passport.withWent": "%{places} · %{went}",
+  "passport.placesCount": {
+    "one": "%{formattedCount} lieu",
+    "many": "%{formattedCount} lieux",
+    "other": "%{formattedCount} lieux"
+  },
+  "passport.citiesCount": {
+    "one": "%{formattedCount} ville",
+    "many": "%{formattedCount} villes",
+    "other": "%{formattedCount} villes"
+  },
+  "passport.wentCount": {
+    "one": "%{formattedCount} visité",
+    "many": "%{formattedCount} visités",
+    "other": "%{formattedCount} visités"
+  },
+  "passport.places": "Lieux",
+  "passport.cities": "Villes",
+  "passport.countries": "Pays",
+  "passport.elsewhere": "Ailleurs",
+  "passport.coversCredit": "Images des publications enregistrées",
+  "passport.pickBody": "Cochez les lieux que vous avez visités avant de les enregistrer ici.",
+  "passport.nothingToStamp": "Tous vos lieux enregistrés sont déjà dans votre passeport.",
+  "passport.pickNone": "Choisissez les lieux visités",
+  "passport.stampCount": {
+    "one": "Tamponner %{formattedCount} lieu",
+    "many": "Tamponner %{formattedCount} lieux",
+    "other": "Tamponner %{formattedCount} lieux"
+  },
+  "passport.cardKicker": "Sorti du chat de groupe",
+  "passport.cardTitle": {
+    "one": "%{formattedCount} lieu enregistré, enfin visité",
+    "many": "%{formattedCount} lieux enregistrés, enfin visités",
+    "other": "%{formattedCount} lieux enregistrés, enfin visités"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "one": "+%{formattedCount} autre",
+    "many": "+%{formattedCount} autres",
+    "other": "+%{formattedCount} autres"
+  },
+  "passport.cardSavedInstagram": "Enregistré sur Instagram.",
+  "passport.cardSavedTiktok": "Enregistré sur TikTok.",
+  "passport.cardSavedBoth": "Enregistré sur Instagram et TikTok.",
+  "passport.cardSavedElsewhere": "Gardé pour plus tard.",
+  "passport.cardWent": "Visité avec Shelvr.",
+  "passport.shareCity": "Partager %{city}",
+  "cityMap.stampedCount": {
+    "one": "%{formattedCount} tamponné",
+    "many": "%{formattedCount} tamponnés",
+    "other": "%{formattedCount} tamponnés"
+  },
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "one": "Il vous reste %{formattedCount} enregistrement gratuit",

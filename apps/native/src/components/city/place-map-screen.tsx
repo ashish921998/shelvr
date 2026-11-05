@@ -29,8 +29,10 @@ export function PlaceMapScreen<Row extends { id: string }>({
   footer,
   plans,
   children,
+  went,
 }: {
   pins: CityPin[];
+  went?: (name: string) => boolean;
   hasMap: boolean;
   rows: Row[];
   rowGap: number;
@@ -91,6 +93,7 @@ export function PlaceMapScreen<Row extends { id: string }>({
             height={screenHeight}
             coveredBottom={screenHeight - snaps.middle}
             onSelect={select}
+            went={went}
           />
         </View>
       ) : null}

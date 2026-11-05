@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   }[],
   start: vi.fn(),
   busy: null as "date" | "trip" | null,
+  went: (_city: string): number => 0,
   access: { kind: "pro", syncing: false } as Record<string, unknown>,
 }));
 
@@ -23,6 +24,15 @@ vi.mock("@/components/city/city-cover", () => ({
   )),
 }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
+vi.mock("@/components/passport/passport-row", () => ({
+  PassportRow: vi.fn(({ hideEmpty }: { hideEmpty?: boolean }) => (
+    <span>{hideEmpty ? "passport if stamped" : "passport"}</span>
+  )),
+}));
+vi.mock("@/lib/passport", () => ({
+  usePassport: () => ({ stamps: [] }),
+  wentInCity: (_stamps: unknown, city: string) => mocks.went(city),
+}));
 vi.mock("@/components/ui/prompt-sheet", () => ({
   PromptSheet: vi.fn(
     ({
@@ -53,7 +63,7 @@ vi.mock("@/lib/city-plan", () => ({
 }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => ({ entitled: true }),
-  usePaywallGuard: vi.fn(),
+  usePaywallGuard: () => ({ guard: vi.fn() }),
 }));
 vi.mock("@/lib/free-plan", () => ({
   useAccess: () => mocks.access,
@@ -285,6 +295,32 @@ describe("city cards", () => {
     expect(
       screen.getByRole("button", { name: "Tokyo, 3 saves, no place yet" }),
     ).toBeTruthy();
+  });
+
+  it("adds how many places someone went to, for screen readers too", () => {
+    mocks.cities = [
+      { city: "Lisbon", count: 2, placeCount: 3, cover: null },
+      { city: "Rome", count: 1, placeCount: 1, cover: null },
+      { city: "Porto", count: 2, placeCount: 0, cover: null },
+    ];
+    mocks.went = (city) => (city === "Lisbon" ? 2 : city === "Porto" ? 1 : 0);
+    render(<HomePlaces />);
+    expect(
+      screen.getByRole("button", { name: "Lisbon, 3 places · 2 went" }),
+    ).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Rome, 1 place" })).toBeTruthy();
+    expect(
+      screen.getByRole("button", {
+        name: "Porto, 2 saves, no place yet · 1 went",
+      }),
+    ).toBeTruthy();
+    mocks.went = () => 0;
+  });
+
+  it("keeps the passport on Home once the last city is gone", () => {
+    mocks.cities = [];
+    render(<HomePlaces />);
+    expect(screen.getByText("passport if stamped")).toBeTruthy();
   });
 
   it("shows the share tip only for a single city", () => {
