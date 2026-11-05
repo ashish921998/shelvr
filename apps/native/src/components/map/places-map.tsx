@@ -35,9 +35,12 @@ type Props = {
   framed: MapPin[];
   /** iOS: open on the person's location and show it. */
   showsUser: boolean;
-  /** Clears the floating filter row above the map. */
+  /** Clears the floating header above the map. */
   topInset: number;
   focus?: MapFocus;
+  /** A counter: each rise moves the camera to the person. */
+  locate?: number;
+  onCentreChange?: (centre: LatLng) => void;
   onSelect: (id: string) => void;
 };
 
@@ -47,6 +50,8 @@ export function PlacesMap({
   showsUser,
   topInset,
   focus,
+  locate,
+  onCentreChange,
   onSelect,
 }: Props) {
   const { theme, rt } = useUnistyles();
@@ -150,6 +155,15 @@ export function PlacesMap({
     );
   }, [focus]);
 
+  useEffect(() => {
+    if (!locate) return;
+    checkNearby.current = undefined;
+    return moveCamera(
+      () => map()?.setCameraPosition(),
+      (error) => analytics.captureError("places_map_camera_failed", error),
+    );
+  }, [locate]);
+
   // A new filter whose places are all out of reach brings them into view. While the opening move is
   // still deciding where to go, its check frames the new filter instead. Search does not refit:
   // picking a result flies to it. Keyed on the places, so a layout change (the keyboard) never moves
@@ -184,6 +198,7 @@ export function PlacesMap({
       latitude !== undefined && longitude !== undefined
         ? { lat: latitude, lng: longitude }
         : undefined;
+    if (centre.current) onCentreChange?.(centre.current);
     if (checkNearby.current) waitForRest();
   };
 
@@ -201,7 +216,8 @@ export function PlacesMap({
         properties={{ isMyLocationEnabled: showsUser }}
         uiSettings={{
           compassEnabled: false,
-          myLocationButtonEnabled: showsUser,
+          myLocationButtonEnabled: false,
+          togglePitchEnabled: false,
         }}
         markers={pins.map((pin) => ({
           id: pin.id,

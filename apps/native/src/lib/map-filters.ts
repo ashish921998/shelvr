@@ -53,6 +53,24 @@ export function busiestCityPlaces<T extends { city?: string }>(
     : places.filter((place) => cityKey(place.city ?? "") === top);
 }
 
+/** The city of the saved place nearest the centre; places with no city are skipped. */
+export function cityNear(
+  places: readonly (LatLng & { city?: string })[],
+  centre: LatLng,
+): string | undefined {
+  let nearest: string | undefined;
+  let best = Infinity;
+  for (const place of places) {
+    if (!place.city) continue;
+    const gap = (place.lat - centre.lat) ** 2 + (place.lng - centre.lng) ** 2;
+    if (gap < best) {
+      best = gap;
+      nearest = place.city;
+    }
+  }
+  return nearest;
+}
+
 /** Whether opening on the person shows any of their places; if not, the map opens on their busiest city. */
 export function hasPlaceNear(
   centre: LatLng | undefined,
