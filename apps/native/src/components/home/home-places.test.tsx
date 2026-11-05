@@ -3,7 +3,11 @@ import type { ReactNode } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { HomePlaces, UnplacedSaves } from "@/components/home/home-places";
+import {
+  HomePlaces,
+  HomePlacesEmptyCard,
+  UnplacedSaves,
+} from "@/components/home/home-places";
 
 const mocks = vi.hoisted(() => ({
   cities: [] as {
@@ -13,6 +17,11 @@ const mocks = vi.hoisted(() => ({
     cover: string | null;
   }[],
   start: vi.fn(),
+  push: vi.fn(),
+  guard: vi.fn(async (action?: () => void) => {
+    action?.();
+    return true;
+  }),
   busy: null as "date" | "trip" | null,
   access: { kind: "pro", syncing: false } as Record<string, unknown>,
 }));
@@ -75,13 +84,13 @@ vi.mock("@/lib/entitlement", () => ({
 }));
 vi.mock("@/lib/free-plan", () => ({
   useAccess: () => mocks.access,
-  useSaveGuard: () => ({ guard: vi.fn(), loading: false }),
+  useSaveGuard: () => ({ guard: mocks.guard, loading: false }),
 }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: mocks.cities }),
 }));
 vi.mock("@convex-dev/react-query", () => ({ convexQuery: vi.fn() }));
-vi.mock("expo-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("expo-router", () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
   useUnistyles: () => ({ theme: { colors: {} } }),
@@ -316,5 +325,58 @@ describe("city cards", () => {
     ];
     render(<HomePlaces saves={[]} />);
     expect(screen.queryByText(/Share a reel or TikTok to Shelvr/)).toBeNull();
+  });
+});
+
+describe("city grid See all", () => {
+  const many = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      city: `City ${i}`,
+      count: 1,
+      placeCount: 1,
+      cover: null,
+    }));
+
+  it("offers See all only past four cities and reveals the rest on press", () => {
+    mocks.cities = many(4);
+    const { unmount } = render(<HomePlaces saves={[]} />);
+    expect(screen.queryByRole("button", { name: "See all" })).toBeNull();
+    unmount();
+
+    mocks.cities = many(6);
+    render(<HomePlaces saves={[]} />);
+    expect(screen.queryByText("City 4")).toBeNull();
+    expect(screen.queryByText("City 5")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "See all" }));
+    expect(screen.getByText("City 4")).toBeTruthy();
+    expect(screen.getByText("City 5")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "See all" })).toBeNull();
+  });
+});
+
+describe("HomePlacesEmptyCard", () => {
+  beforeEach(() => {
+    mocks.push.mockReset();
+    mocks.guard.mockClear();
+  });
+
+  it("pitches saving places and opens Add through the save guard", () => {
+    render(<HomePlacesEmptyCard />);
+    expect(
+      screen.getByText("Save places from TikTok or Instagram"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText("Share a reel to Shelvr and it lands under its city."),
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Add a spot" }));
+    expect(mocks.guard).toHaveBeenCalledTimes(1);
+    expect(mocks.push).toHaveBeenCalledWith("/add");
+  });
+
+  it("does not open Add when the guard refuses", () => {
+    mocks.guard.mockImplementationOnce(async () => false);
+    render(<HomePlacesEmptyCard />);
+    fireEvent.click(screen.getByRole("button", { name: "Add a spot" }));
+    expect(mocks.push).not.toHaveBeenCalled();
   });
 });

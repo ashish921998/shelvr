@@ -42,8 +42,15 @@ vi.mock("@/components/ui/prompt-sheet", () => ({
       ) : null,
   ),
 }));
+vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
+vi.mock("@/components/ui/themed-text", () => ({
+  ThemedText: vi.fn(({ children }: { children: ReactNode }) => (
+    <span>{children}</span>
+  )),
+}));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}), hairlineWidth: 1 },
+  useUnistyles: () => ({ theme: { colors: {} } }),
 }));
 vi.mock("react-native", () => ({
   View: vi.fn(({ children }: { children: ReactNode }) => (
