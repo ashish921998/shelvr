@@ -43,7 +43,7 @@ export default function PassportCardScreen() {
         UTI: "public.png",
         dialogTitle: t("passport.shareCity", { city }),
       });
-      analytics.capture("passport_card_shared", {
+      analytics.capture("passport_card_share_opened", {
         places: shareCardOf(stamps, city).total,
         surface: surface === "stamp" ? "stamp" : "passport",
       });

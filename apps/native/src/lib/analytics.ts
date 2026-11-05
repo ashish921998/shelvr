@@ -192,7 +192,7 @@ export type AnalyticsEventProperties = {
   place_unstamped: { surface: "city" | "passport" };
   passport_opened: { places: number };
   passport_backfilled: { places: number };
-  passport_card_shared: { places: number; surface: "stamp" | "passport" };
+  passport_card_share_opened: { places: number; surface: "stamp" | "passport" };
   plan_shared: { place_count: number; picked: boolean };
   plan_asked: { place_count: number };
   plan_ask_failed: { reason: "link" | "share" };

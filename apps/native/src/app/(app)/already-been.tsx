@@ -5,11 +5,13 @@ import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
+import { usePaywallGuard } from "@/lib/entitlement";
 import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { unstampedCities, type UnstampedPlace } from "@/lib/passport";
 import { backOrHome } from "@/lib/screen-dismiss";
 import { api } from "@convex/_generated/api";
+import { saveErrorCode } from "@convex/model/saveErrors";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
@@ -111,6 +113,8 @@ export default function AlreadyBeenScreen() {
     });
   };
 
+  const { guard } = usePaywallGuard("passport");
+
   const submit = async () => {
     if (busy || picked.size === 0) return;
     setBusy(true);
@@ -126,7 +130,11 @@ export default function AlreadyBeenScreen() {
       router.dismissTo("/passport");
     } catch (error) {
       analytics.captureError("passport_backfill_failed", error);
-      Alert.alert(t("errors.unexpectedTitle"), t("errors.retrySoon"));
+      const paywalled =
+        saveErrorCode(error) === "pro_required" && !(await guard());
+      if (!paywalled) {
+        Alert.alert(t("errors.unexpectedTitle"), t("errors.retrySoon"));
+      }
     } finally {
       setBusy(false);
     }
