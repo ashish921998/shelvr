@@ -5,6 +5,9 @@ This file provides guidance when working with code in this repository.
 @AGENTS.md carries the "where things live" map for both apps. Check it before searching
 for a module.
 
+To review a change, follow `REVIEW.md` in full, including when a `/code-review` command is
+running: its findings must meet `REVIEW.md`'s proof rule and use its tags and report format.
+
 > Expo docs change quickly. Before writing native app code, read the versioned docs
 > for the SDK pinned in `apps/native/package.json` (currently Expo SDK 58):
 > https://docs.expo.dev/versions/v58.0.0/
