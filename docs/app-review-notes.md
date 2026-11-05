@@ -135,7 +135,7 @@ Shelvr is a private save-it-for-later app for Instagram Reels and TikToks. It us
 Account access:
 
 1. Launch Shelvr and tap "Get started".
-2. Answer "How many places have you saved?", "What would you like to plan?" and "How do you like to plan?" (tap an answer, then "Continue", or "Skip"), tap an answer on the trip question if it appears, then tap a city.
+2. Answer "How many places have you saved?" and "What would you like to plan?" (tap an answer, then "Continue", or "Skip"), tap an answer on the trip question if it appears, then answer "How do you like to plan?". Tap "That’s me 😩" under the chart, tap a city, then "Continue".
 3. On the sample reel, follow the pills: Share, Share to…, More, then Shelvr. This is a demonstration drawn inside the app; the reel becomes a real save after onboarding and sign-in.
 4. After the paywall in the next section, Shelvr asks you to sign in: choose Continue with Apple. App Review may use its own Apple account; no invitation or code is needed.
 
