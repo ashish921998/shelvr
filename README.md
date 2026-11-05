@@ -143,18 +143,11 @@ NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN=<project-token>
 NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
 ```
 
-The Android waitlist route returns 503 when the web deployment lacks `WAITLIST_SHARED_SECRET`
-or a Convex site origin, and 502 when the Convex deployment's `WAITLIST_SHARED_SECRET` is unset
-or different. It takes the origin from `CONVEX_SITE_URL`, or derives it from a `.convex.cloud`
-`CONVEX_URL`. It also answers 503 after saving the signup when the confirmation email
-cannot be sent, which includes whenever `RESEND_API_KEY` or `RESEND_FEEDBACK_FROM_EMAIL` is
-unset on the Convex deployment. Without the
-PostHog public variables, signup and App Store downloads still work and web
-analytics become a no-op. Waitlist rows are stored in Convex. Resend sends the
-confirmation email, so the waitlist needs `RESEND_API_KEY` and `RESEND_FEEDBACK_FROM_EMAIL`
-on the Convex deployment. Confirmed Android signups sync to Resend only once
-`RESEND_ANDROID_SEGMENT_ID` is also set there. Until then their rows stay `unconfigured`,
-and the hourly `retryFailedResendSyncs` cron syncs them once it is set.
+The Android waitlist also needs `RESEND_API_KEY` and `RESEND_FEEDBACK_FROM_EMAIL` on the
+Convex deployment to send its confirmation email, and `RESEND_ANDROID_SEGMENT_ID` there to sync
+signups to Resend. What each error status means is in
+`apps/web/src/app/api/android-waitlist/route.ts`. Without the PostHog variables, web analytics
+are a no-op.
 
 ### 5. Run
 
