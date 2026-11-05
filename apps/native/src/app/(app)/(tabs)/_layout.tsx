@@ -2,9 +2,9 @@ import { TabBar } from "@/components/tab-bar";
 import { t, useAppLocale } from "@/lib/i18n";
 import { Tabs } from "expo-router/js-tabs";
 
-// Without an anchor, Expo Router 58 opens the tab with the shortest name (Map).
+// The anchor is the tab the app opens on; Expo Router 58 would otherwise pick the shortest name.
 // eslint-disable-next-line @typescript-eslint/naming-convention -- Expo Router reads this exact export name.
-export const unstable_settings = { anchor: "(home)" };
+export const unstable_settings = { anchor: "(map)" };
 
 export default function TabsLayout() {
   useAppLocale();

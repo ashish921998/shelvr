@@ -1,7 +1,7 @@
 import { test } from "@e2e-dev/mobile";
 import { expect } from "e2e";
 
-import { startOnSeededHome } from "./seeded-home.ts";
+import { openHome, startOnSeededHome } from "./seeded-home.ts";
 
 startOnSeededHome();
 
@@ -46,6 +46,7 @@ test("removes duplicate places, restores with Undo, and keeps removal after rela
   await expect(screen.getByRole("button", "Austin favorites")).toBeHidden();
 
   await app.open();
+  await openHome(screen);
   await expect(austin).toBeVisible({ timeout: 30_000 });
   await austin.tap();
   await expect(coffee).toBeHidden();
@@ -57,6 +58,7 @@ test("removes duplicate places, restores with Undo, and keeps removal after rela
   await app.screenshot("removal-persists-after-relaunch");
 
   await app.open();
+  await openHome(screen);
   await screen.getByLabel("Search your saves").fill("Austin favorites");
   await screen.getByRole("button", /^Austin favorites/).tap();
   await expect(

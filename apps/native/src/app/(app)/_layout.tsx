@@ -73,7 +73,7 @@ export default function AppLayout() {
     ? "/onboarding"
     : gated
       ? "/plan-gate"
-      : "/(app)/(tabs)/(home)";
+      : "/(app)/(tabs)/(map)";
   const modal = {
     presentation: "modal",
     headerShown: true,
@@ -200,11 +200,11 @@ export default function AppLayout() {
         </Stack.Protected>
         <Stack.Protected
           guard={onboarded && gated}
-          redirectTo="/(app)/(tabs)/(home)"
+          redirectTo="/(app)/(tabs)/(map)"
         >
           <Stack.Screen name="plan-gate" options={{ headerShown: false }} />
         </Stack.Protected>
-        <Stack.Protected guard={!onboarded} redirectTo="/(app)/(tabs)/(home)">
+        <Stack.Protected guard={!onboarded} redirectTo="/(app)/(tabs)/(map)">
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         </Stack.Protected>
         {/* Without a redirectTo, Expo Router falls back to the shortest unguarded route name: `paywall`. */}

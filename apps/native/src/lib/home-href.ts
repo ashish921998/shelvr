@@ -13,12 +13,12 @@ const RETIRED_ROUTE =
  * Since Expo Router 58, "/" matches the index of every tab group and the
  * router picks the shortest group name. Runtime URLs (a notification already
  * scheduled with "/", the Convex Auth sign-in return) go through this so the
- * root, and any retired screen, opens Home.
+ * root opens the Map, and any retired screen opens Home.
  */
 export function resolveRootHref(url: string): string {
   if (RETIRED_ROUTE.test(url)) return HOME;
   if (MAP_ROUTE.test(url)) return url.replace(MAP_ROUTE, MAP);
-  return url.replace(/^\/(?=[?#]|$)/, HOME);
+  return url.replace(/^\/(?=[?#]|$)/, MAP);
 }
 
 /** The in-app route an app-scheme link names, or null for any other URL. */

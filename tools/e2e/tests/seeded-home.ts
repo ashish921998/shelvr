@@ -47,7 +47,7 @@ export function startOnSeededHome(options: { reset?: "settings" } = {}): void {
     const wasSignedIn = await profile.isVisible();
     if (!wasSignedIn) await devLogin.tap({ timeout: 30_000 });
     await expect(profile).toBeVisible({ timeout: 60_000 });
-    if (fromBackend && wasSignedIn) return;
+    if (fromBackend && wasSignedIn) return openHome(screen);
 
     if (fromBackend) await resetFixturesFromBackend();
     else await resetThroughSettings(screen, profile);
@@ -56,7 +56,12 @@ export function startOnSeededHome(options: { reset?: "settings" } = {}): void {
     await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
       timeout: 30_000,
     });
+    await openHome(screen);
   });
+}
+
+export async function openHome(screen: Screen): Promise<void> {
+  await screen.getByRole("button", "Home").tap({ timeout: 30_000 });
 }
 
 // The Convex CLI reads its deployment from .env.local in this directory.
