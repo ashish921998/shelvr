@@ -59,7 +59,9 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Map page** (the public `/m/<token>` page of a person's map): backend
   `convex/publicMaps.ts` with `convex/model/publicMap.ts` and `publicMapLimits.ts`,
   the `GET /map/pages/<token>` route in `convex/http.ts`, fixtures
-  `devFixtures:seedMapPageFixtures`.
+  `devFixtures:seedMapPageFixtures`. The web page is `apps/web/src/app/m/[token]`,
+  with `apps/web/src/lib/publicMap.ts` and `mapSketch.ts`, components in
+  `apps/web/src/components/map` and `apps/web/src/components/MapPageView.tsx`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;
