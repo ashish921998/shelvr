@@ -20,7 +20,7 @@ from those literals later. The title steps (`hero`, `displayTitle`, `largeTitle`
 letter spacing, and Satoshi regular/medium/bold carries body and label steps. The
 display face (`CrimsonProRoman-Regular`, `theme.fonts.display`) stays on the
 wordmark, the launch splash, sign-in, the onboarding opener, legal consent, the
-error screen and the paywall. `ThemedText` takes a
+error screen, the site-panel monogram and the paywall. `ThemedText` takes a
 `variant` prop keyed by ramp name, defaults its color to
 `theme.colors.foreground`, and applies `style` last so callers can override.
 Use variants in new UI; a `fontSize` literal in a new component is a smell.

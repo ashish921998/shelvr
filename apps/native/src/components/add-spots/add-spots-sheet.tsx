@@ -101,7 +101,7 @@ export function AddSpotsSheet() {
     });
   };
   return (
-    <View style={styles.screen}>
+    <View style={styles.screen} accessibilityViewIsModal>
       <Pressable
         accessible={false}
         onPress={() => router.back()}

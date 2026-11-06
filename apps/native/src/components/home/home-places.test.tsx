@@ -38,7 +38,9 @@ vi.mock("@/components/ui/button", () => ({
   ),
 }));
 vi.mock("@/components/home/review-saves", () => ({
-  ReviewSaves: vi.fn(() => <span>Review row</span>),
+  ReviewSaves: vi.fn(({ saves }: { saves: ReviewSave[] }) =>
+    saves.length > 0 ? <span>Review row</span> : null,
+  ),
 }));
 vi.mock("@/components/home/library-rows", () => ({
   LibraryRows: vi.fn(({ cityCount }: { cityCount?: number }) => (

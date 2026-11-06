@@ -1,4 +1,6 @@
+import { EmptyState } from "@/components/empty-state";
 import { ScreenTitle } from "@/components/screen-title";
+import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ThemedText } from "@/components/ui/themed-text";
 import { canBrowse } from "@/lib/access";
 import { useAccess } from "@/lib/free-plan";
@@ -62,14 +64,27 @@ export function Cities() {
     convexQuery(api.items.listCities, browsing ? {} : "skip"),
   );
   const tile = (width - SIDE * 2 - GAP) / 2;
-  return (
-    <View style={styles.screen}>
-      <ScreenTitle title={t("homePlaces.cities")} />
+  let body = <ScreenLoader />;
+  if (cities.isError) {
+    body = (
+      <EmptyState
+        title={t("errors.unexpectedTitle")}
+        message={t("errors.retrySoon")}
+      />
+    );
+  } else if (cities.data !== undefined) {
+    body = (
       <ScrollView contentContainerStyle={styles.grid}>
-        {cities.data?.map((entry) => (
+        {cities.data.map((entry) => (
           <CityTile key={entry.city} entry={entry} width={tile} />
         ))}
       </ScrollView>
+    );
+  }
+  return (
+    <View style={styles.screen}>
+      <ScreenTitle title={t("homePlaces.cities")} />
+      {body}
     </View>
   );
 }

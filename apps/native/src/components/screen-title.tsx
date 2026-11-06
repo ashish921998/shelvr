@@ -14,6 +14,9 @@ export function ScreenTitle({ title }: { title: string }) {
       <ThemedText
         variant="displayTitle"
         accessibilityRole="header"
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.6}
         style={styles.title}
       >
         {title}
@@ -31,5 +34,5 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingTop: rt.insets.top + theme.gap(1.25),
     paddingBottom: theme.gap(2.5),
   },
-  title: { fontSize: 32, lineHeight: 40 },
+  title: { flexShrink: 1, fontSize: 32, lineHeight: 40 },
 }));

@@ -39,7 +39,12 @@ export function usePlanPicker({ onLeave }: { onLeave?: () => void } = {}) {
     void start(kind, city, onLeave);
   };
   const plan = (kind: CityPlanKind, inView?: string) => {
-    if (busy !== null || listed.data === undefined) return;
+    if (busy !== null) return;
+    if (listed.isError) {
+      Alert.alert(t("errors.tryAgain"));
+      return;
+    }
+    if (listed.data === undefined) return;
     const target = planTarget(cities, inView);
     if (target === "pick") setPicking({ kind, open: true });
     else if (target === "none")

@@ -177,7 +177,7 @@ function SearchResults({
 
 const styles = StyleSheet.create((theme) => ({
   field: {
-    height: 38,
+    minHeight: 38,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(1),
@@ -193,7 +193,7 @@ const styles = StyleSheet.create((theme) => ({
     minWidth: 0,
     ...theme.type.body,
     color: theme.colors.foreground,
-    height: 34,
+    minHeight: 34,
     paddingVertical: 0,
   },
   clear: {

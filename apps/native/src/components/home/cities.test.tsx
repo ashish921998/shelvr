@@ -17,8 +17,15 @@ const mocks = vi.hoisted(() => ({
     | undefined,
   access: { kind: "pro" } as Record<string, unknown>,
   queryArgs: [] as unknown[],
+  failed: false,
 }));
 
+vi.mock("@/components/empty-state", () => ({
+  EmptyState: vi.fn(({ title }: { title: string }) => <p>{title}</p>),
+}));
+vi.mock("@/components/ui/screen-loader", () => ({
+  ScreenLoader: vi.fn(() => <p>Loading cities</p>),
+}));
 vi.mock("@/components/screen-title", () => ({
   ScreenTitle: vi.fn(({ title }: { title: string }) => <h1>{title}</h1>),
 }));
@@ -29,7 +36,7 @@ vi.mock("@/components/ui/themed-text", () => ({
 }));
 vi.mock("@/lib/free-plan", () => ({ useAccess: () => mocks.access }));
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: mocks.cities }),
+  useQuery: () => ({ data: mocks.cities, isError: mocks.failed }),
 }));
 vi.mock("@convex-dev/react-query", () => ({
   convexQuery: (_query: unknown, args: unknown) => {
@@ -73,6 +80,7 @@ vi.mock("react-native", () => ({
 beforeEach(() => {
   mocks.push.mockReset();
   mocks.queryArgs = [];
+  mocks.failed = false;
   mocks.access = { kind: "pro" };
   mocks.cities = [
     { city: "Lisbon", count: 3, placeCount: 8, cover: "lisbon.jpg" },
@@ -96,6 +104,27 @@ it("opens a city", () => {
     pathname: "/city/[name]",
     params: { name: "Lisbon" },
   });
+});
+
+it("asks for every city of an account that can browse", () => {
+  render(<Cities />);
+  expect(mocks.queryArgs).toEqual([{}]);
+});
+
+it("shows a loader under the title while the cities load", () => {
+  mocks.cities = undefined;
+  render(<Cities />);
+  expect(screen.getByText("Cities")).toBeTruthy();
+  expect(screen.getByText("Loading cities")).toBeTruthy();
+});
+
+it("says something went wrong instead of an empty grid when the cities fail", () => {
+  mocks.cities = undefined;
+  mocks.failed = true;
+  render(<Cities />);
+  expect(screen.getByText("Cities")).toBeTruthy();
+  expect(screen.getByText("Something went wrong")).toBeTruthy();
+  expect(screen.queryByText("Loading cities")).toBeNull();
 });
 
 it("asks for no cities while the account cannot browse", () => {

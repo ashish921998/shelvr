@@ -33,7 +33,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Core save loop
 
-- **Link:** tap Add, then **Paste a link**, paste an Instagram Reel or TikTok link (any page link is accepted), and save. While Shelvr reads a save, Home lists it under Recents with "Finding places…". Once reading finishes, its places appear on the Map and under their city, which Home's Cities row opens. If a save the user is watching fails or names no place, a banner says "Couldn't find places in that link" with **Retry** (or **View** when a retry can't help). Every failed or placeless save is counted in Home's "Without a place" row, which opens a sheet with **Retry** and **Delete** for each. Notes, photos and the camera are not part of this build.
+- **Link:** tap Add, then **Paste a link**, paste an Instagram Reel or TikTok link (any page link is accepted), and save. While Shelvr reads a save, Home lists it under Recents with "Finding places…". Once reading finishes, its places appear on the Map and under their city, which Home's Cities row opens. If a save the user is watching fails or names no place, a banner says "Couldn't find places in that link" with **Retry** (or **View** when a retry can't help). Home's "Without a place" row counts the failed and placeless saves among those Home has loaded. It opens a sheet with **Delete** for each save, and **Retry** for a save that a retry can help. Notes, photos and the camera are not part of this build.
 - **Free plan:** an account without Pro gets 10 free saves. A save holds a slot while it is being read and keeps it once it finishes with a place in a city; a failed or placeless save gives its slot back, as does deleting a save still being read, but deleting a placed save does not. A shared Google Maps list counts as one save. With 2 or fewer left, Home shows a card with the count and **See plans**. Once all 10 are used, Add, Retry and the share sheet open the paywall; the share sheet can keep the link and save it right after a purchase. Existing saves, city pages and Map stay open.
 - **Share Sheet:** From Safari, Instagram or TikTok, share to Shelvr. While signed in, content saves automatically. While signed out, Shelvr preserves the intent and resumes after sign-in. During onboarding, a shared link is held on the device until sign-in. If the app is relaunched or interrupted mid-save, the pending marker and local session resume the flow on the next launch; successful completion or explicit abandonment clears them. If native payload cleanup fails, the completed session stays available for **Try again** or **Cancel**.
 
@@ -50,7 +50,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Pro / subscriptions (RevenueCat sandbox)
 
-- Shelvr Pro gates saves past the 10 free ones, Plan a date, Plan a trip, editing or removing a save's places, and starting a shared list. For free accounts, Plan a date and Plan a trip open the paywall, from the tab bar, the "Add spots" sheet or a city page.
+- Shelvr Pro gates saves past the 10 free ones, Plan a date, Plan a trip, editing or removing a save's places, and starting a shared list. For free accounts, Plan a date opens the paywall from the tab bar or a city page, and Plan a trip opens it from the "Add spots" sheet or a city page.
 - Plans: **Annual** (labelled Yearly on the paywall; 7-day trial, then the yearly price) and **Weekly** (no trial). Both auto-renew until canceled.
 - Lapsed subscribers are on the free plan: their existing saves stay open, and saves made while they had Pro do not count toward the 10.
 - Present paywall from any gated action or Profile → View Pro plans.
@@ -144,7 +144,7 @@ Subscription testing:
 
 Core review flow:
 
-1. Tap Add, then Paste a link, paste an Instagram Reel or TikTok link, and save. The save first shows processing under Recents on Home, then the places it names appear on the Map and under their city. A link that names no place is counted in Home's "Without a place" row.
+1. Tap Add, then Paste a link, paste an Instagram Reel or TikTok link, and save. The save first shows processing under Recents on Home, then the places it names appear on the Map and under their city. A link that names no place shows in Home's "Without a place" row, whose sheet offers Delete, and Retry when a retry can help.
 2. On Home, tap Cities, then a city to open its page: a map with a pin per place and a list of the places.
 3. On the city page, tap "Plan a date", pick a kind of date, and get an evening of two stops a short walk apart (Apple Maps may suggest one). Tap "Plan a trip" (or open Trips from Home) for a day-by-day trip: saved places first, suggested places from Apple Maps filling the gaps. A trip's menu has Edit trip, Add a place and Delete trip.
 4. The app opens on the Map: every pinned place on one map, with search and filters. Shelvr asks for location only when Map first opens, to center it on you; Map works without it.

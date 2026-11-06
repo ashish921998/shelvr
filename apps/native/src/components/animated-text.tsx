@@ -197,6 +197,8 @@ export function AnimatedText({
     typeof flat.fontSize === "number" ? flat.fontSize : DEFAULT_FONT_SIZE;
   const color =
     typeof flat.color === "string" ? flat.color : theme.colors.foreground;
+  const tracking =
+    typeof flat.letterSpacing === "number" ? flat.letterSpacing : 0;
   const reducedMotion = useReducedMotion();
   const { fontScale } = useWindowDimensions();
   const font = useFont(
@@ -262,6 +264,7 @@ export function AnimatedText({
       baselineY={baselineY}
       blurMax={blurMax}
       truncate={truncate}
+      tracking={tracking}
       animateOnMount={animateOnMount}
       containerStyle={containerStyle}
     />
@@ -279,6 +282,7 @@ function MorphText({
   baselineY,
   blurMax,
   truncate,
+  tracking,
   animateOnMount,
   containerStyle,
 }: {
@@ -292,6 +296,7 @@ function MorphText({
   baselineY: number;
   blurMax: number;
   truncate: boolean;
+  tracking: number;
   animateOnMount: boolean;
   containerStyle?: StyleProp<ViewStyle>;
 }) {
@@ -303,7 +308,14 @@ function MorphText({
     [font],
   );
   const [mount] = useState(() => {
-    const laid = layoutMorphText(text, width, overscan, measure, truncate);
+    const laid = layoutMorphText(
+      text,
+      width,
+      overscan,
+      measure,
+      truncate,
+      tracking,
+    );
     if (!animateOnMount || laid.length === 0) {
       return { cells: laid, deadline: null as number | null };
     }
@@ -332,7 +344,14 @@ function MorphText({
   useEffect(() => {
     let cancelled = false;
     const now = performance.now();
-    const present = layoutMorphText(text, width, overscan, measure, truncate);
+    const present = layoutMorphText(
+      text,
+      width,
+      overscan,
+      measure,
+      truncate,
+      tracking,
+    );
     const { interrupted, next: transition } = advanceMorphTransition(
       lastChange.current,
       text,
@@ -374,7 +393,7 @@ function MorphText({
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [text, width, overscan, measure, truncate]);
+  }, [text, width, overscan, measure, truncate, tracking]);
 
   return (
     <View

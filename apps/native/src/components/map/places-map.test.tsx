@@ -159,4 +159,9 @@ it("flies out to frame every place when asked to zoom out", async () => {
   await act(() => vi.advanceTimersByTimeAsync(200));
   const move = mock.moves.slice(before).find((m) => m !== "person") as Camera;
   expect(move.zoom).toBeLessThan(9);
+  const centre = move.coordinates as { latitude: number; longitude: number };
+  expect(centre.latitude).toBeGreaterThan(30.28);
+  expect(centre.latitude).toBeLessThan(32.78);
+  expect(centre.longitude).toBeGreaterThan(-97.74);
+  expect(centre.longitude).toBeLessThan(-96.8);
 });

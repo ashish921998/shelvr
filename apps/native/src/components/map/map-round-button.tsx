@@ -36,6 +36,7 @@ export function MapAvatarButton({
   label: string;
   onPress: () => void;
 }) {
+  const { theme } = useUnistyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -43,7 +44,11 @@ export function MapAvatarButton({
       onPress={onPress}
       style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}
     >
-      <AppSymbolIcon name="person.fill" size={17} tintColor="#b3a48b" />
+      <AppSymbolIcon
+        name="person.fill"
+        size={17}
+        tintColor={theme.colors.muted}
+      />
     </Pressable>
   );
 }
@@ -66,7 +71,7 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     backgroundColor: theme.colors.surfaceMuted,
     borderWidth: 2.5,
-    borderColor: "#f1d7a6",
+    borderColor: theme.colors.primarySoft,
   },
   pressed: { opacity: theme.opacity.pressed },
 }));

@@ -2,12 +2,13 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { ThemedText } from "@/components/ui/themed-text";
 import type { DetailItem } from "@/components/item-detail";
-import { t } from "@/lib/i18n";
+import { t, useAppLocale } from "@/lib/i18n";
 import { saveDetail, saveEmoji } from "@/lib/save-list";
 import { useSaveActions } from "@/lib/use-save-actions";
 import { displayHost } from "@/lib/url";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
+import { memo } from "react";
 import { Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -34,7 +35,12 @@ function SaveMenu({ save, title }: { save: SaveListItem; title: string }) {
   );
 }
 
-export function SaveListRow({ save }: { save: SaveListItem }) {
+export const SaveListRow = memo(function SaveListRow({
+  save,
+}: {
+  save: SaveListItem;
+}) {
+  useAppLocale();
   const router = useRouter();
   const reading = save.status === "processing";
   const image = reading ? undefined : (save.imageUrl ?? save.heroImageUrl);
@@ -77,7 +83,7 @@ export function SaveListRow({ save }: { save: SaveListItem }) {
       <SaveMenu save={save} title={title} />
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create((theme) => ({
   row: {
