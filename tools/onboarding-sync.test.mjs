@@ -133,7 +133,7 @@ test("the matcher takes a title and its accent, and not a retired title", () => 
     "“where should we eat?”",
     "Save your first post.",
   ]);
-  assert.ok(isShown("No more \"where should we eat?\""));
+  assert.ok(isShown('No more "where should we eat?"'));
   assert.ok(isShown("Save your first post."));
   // PR 438 renamed the share step and left this quote in the notes.
   assert.ok(!isShown("Save this post the way you will in any app."));
@@ -169,5 +169,40 @@ test("the App Review notes quote only text the app shows", () => {
     stale,
     [],
     `These quotes are in neither ${CATALOG} nor the App Intents. If a screen's text changed, quote the new text. If it is not Shelvr's own text, take it out of quotes and bold.`,
+  );
+});
+
+const PASTE_READY = /^## Paste-ready App Review notes\n/m;
+const REVIEW_NOTES_LIMIT = 4000;
+
+function pasteReady(markdown) {
+  const heading = PASTE_READY.exec(markdown);
+  if (!heading) return "";
+  const section = markdown
+    .slice(heading.index + heading[0].length)
+    .split(/^## /m)[0];
+  const intro = /\S[\s\S]*?\n[ \t]*\n/.exec(section);
+  return intro ? section.slice(intro.index + intro[0].length).trim() : "";
+}
+
+test("the paste-ready block starts after its intro and ends at the next section", () => {
+  assert.equal(
+    pasteReady(
+      "## Before\n\nNot pasted.\n\n## Paste-ready App Review notes\n\nThe intro,\nover two lines.\n\nPasted.\n\n1. Also pasted.\n\n## After\n\nNot pasted.\n",
+    ),
+    "Pasted.\n\n1. Also pasted.",
+  );
+});
+
+test("the paste-ready App Review notes fit in App Store Connect", () => {
+  const block = pasteReady(read(NOTES));
+  assert.ok(
+    block,
+    `${NOTES} has no text after the intro of its "## Paste-ready App Review notes" section. If the heading changed, update PASTE_READY in this test.`,
+  );
+  const length = [...block].length;
+  assert.ok(
+    length <= REVIEW_NOTES_LIMIT,
+    `The paste-ready App Review notes in ${NOTES} are ${length} characters, newlines included, and App Store Connect takes ${REVIEW_NOTES_LIMIT}. Cut at least ${length - REVIEW_NOTES_LIMIT}.`,
   );
 });
