@@ -17,7 +17,7 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 import { HeaderScrim } from "@/components/ui/header-scrim";
 import { useCurrentUser } from "@/lib/current-user";
 import { type Entitlement, useEntitlement } from "@/lib/entitlement";
-import { FREE_SAVES_NUDGE_AT } from "@/lib/access";
+import { type Access, FREE_SAVES_NUDGE_AT, saveWaiting } from "@/lib/access";
 import { useAccess } from "@/lib/free-plan";
 import { useHomeFeed } from "@/lib/home-feed";
 import { unplacedSaves } from "@/lib/home-places";
@@ -46,6 +46,18 @@ const AUTO_LOAD_UNPLACED = 5;
 
 function trialEnd(entitlement: Entitlement): number | undefined {
   return entitlement.status === "trialing" ? entitlement.expiresAt : undefined;
+}
+
+function nameAskWaits(
+  entitlement: Entitlement,
+  access: Access,
+  letterPending: boolean,
+): boolean {
+  return (
+    entitlement.loading ||
+    saveWaiting(access) ||
+    (letterPending && entitlement.entitled)
+  );
 }
 
 export default function HomeScreen() {
@@ -82,8 +94,7 @@ export default function HomeScreen() {
     user?._id,
     items !== undefined &&
       !cancelSurvey.visible &&
-      !entitlement.loading &&
-      !(welcomePending && entitlement.entitled),
+      !nameAskWaits(entitlement, access, welcomePending),
   );
   const deferPrompts =
     cancelSurvey.visible ||
