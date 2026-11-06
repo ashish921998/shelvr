@@ -51,23 +51,17 @@ export async function walkToSampleReel(
   const next = screen.getByRole("button", "Continue");
   await expect(next).toBeEnabled({ timeout: 10_000 });
   await next.tap();
-  if (options.goal === "travel") {
-    await expect(screen.getByText("Are you planning a trip soon?")).toBeVisible(
-      { timeout: 30_000 },
-    );
-    await screen.getByRole("radio", "Not yet").tap();
-  }
-  await expect(screen.getByText("How do you like to plan?")).toBeVisible({
-    timeout: 30_000,
-  });
-  await skip.tap();
   await expect(screen.getByText("Let’s put your saves to use.")).toBeVisible({
     timeout: 30_000,
   });
   await screen.getByTestId("onboarding-chart-continue").tap();
-  await expect(screen.getByText("Where do you go out?")).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect(
+    screen.getByText(
+      options.goal === "travel"
+        ? "Where’s your next trip?"
+        : "Where do you go out?",
+    ),
+  ).toBeVisible({ timeout: 30_000 });
   if (options.city) {
     await screen.getByPlaceholder("Search cities").fill(options.city);
     await screen.getByRole("radio", options.city).tap();

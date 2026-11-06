@@ -44,8 +44,6 @@ const mocks = vi.hoisted(() => ({
     travelCity: null as string | null,
     goals: [] as string[],
     savedCount: null as string | null,
-    planner: null as string | null,
-    tripSoon: null as string | null,
     skippedShare: false,
     viewed: [] as string[],
   },
@@ -113,12 +111,6 @@ vi.mock("@/components/onboarding/questions", () => ({
       </div>
     ),
   ),
-  TripSoonStep: vi.fn(({ onPick }: { onPick: (answer: string) => void }) => (
-    <div>
-      {button("trip:soon", () => onPick("soon"))}
-      {button("trip:notYet", () => onPick("notYet"))}
-    </div>
-  )),
   GoalStep: vi.fn(
     ({
       picked,
@@ -133,20 +125,6 @@ vi.mock("@/components/onboarding/questions", () => ({
         {button("goal:food", () => onChange([...picked, "food"]))}
         {button("goal:travel", () => onChange([...picked, "travel"]))}
         {button("goal:continue", onContinue)}
-      </div>
-    ),
-  ),
-  PlannerStep: vi.fn(
-    ({
-      onPick,
-      onContinue,
-    }: {
-      onPick: (planner: string) => void;
-      onContinue: () => void;
-    }) => (
-      <div>
-        {button("planner:explorer", () => onPick("explorer"))}
-        {button("planner:continue", onContinue)}
       </div>
     ),
   ),
@@ -275,15 +253,13 @@ beforeEach(() => {
     travelCity: null,
     goals: [],
     savedCount: null,
-    planner: null,
-    tripSoon: null,
     skippedShare: false,
     viewed: [],
   };
 });
 afterEach(cleanup);
 
-it("walks the questions, the trip question, the chart and the city echo into a sample for the goal that leads, and keeps every answer", () => {
+it("walks the questions, the chart and the city echo into a sample for the goal that leads, and keeps every answer", () => {
   render(<OnboardingScreen />);
   tap("opener:start");
   tap("count:hundreds");
@@ -291,17 +267,12 @@ it("walks the questions, the trip question, the chart and the city echo into a s
   tap("goal:food");
   tap("goal:travel");
   tap("goal:continue");
-  tap("trip:soon");
-  tap("planner:explorer");
-  tap("planner:continue");
   tap("chart:trip");
   tap("city:trip:trip:lisbon");
   expect(saved()).toMatchObject({
     goals: ["food", "travel"],
     spaces: ["Travel", "Restaurants to try"],
     savedCount: "hundreds",
-    planner: "explorer",
-    tripSoon: "soon",
     travelCity: "lisbon",
     step: ONBOARDING_STEPS.indexOf("cityEcho"),
   });
@@ -332,68 +303,30 @@ it("plays the first-save moment between sharing and the spots", () => {
   expect(screen.getByRole("button", { name: "aha:spots" })).toBeTruthy();
 });
 
-it("asks about a trip when the goal question is skipped, and plans for every goal", () => {
-  startAt("goal");
-  render(<OnboardingScreen />);
-  tap("onboardingQ.skip");
-  expect(saved()?.goals).toEqual(["date", "travel", "food"]);
-  expect(screen.getByRole("button", { name: "trip:soon" })).toBeTruthy();
-});
-
-it("asks about a trip when the goal question is skipped after picking a goal without travel", () => {
+it("plans for every goal when the goal question is skipped", () => {
   startAt("goal");
   render(<OnboardingScreen />);
   tap("goal:food");
   tap("onboardingQ.skip");
   expect(saved()?.goals).toEqual(["date", "travel", "food"]);
-  expect(screen.getByRole("button", { name: "trip:soon" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "chart:date" })).toBeTruthy();
 });
 
-it("skips the trip question when the goals carry no travel", () => {
-  startAt("goal");
-  render(<OnboardingScreen />);
-  tap("goal:food");
-  tap("goal:continue");
-  expect(screen.getByRole("button", { name: "planner:continue" })).toBeTruthy();
-  expect(screen.queryByRole("button", { name: "trip:soon" })).toBeNull();
-});
-
-it("moves on from the trip question on one tap and asks for a dream city after a no", () => {
+it("asks where a person goes out when a date leads the goals", () => {
   mocks.progress = { ...mocks.progress, goals: ["date", "travel", "food"] };
-  startAt("tripSoon");
+  startAt("chart");
   render(<OnboardingScreen />);
-  tap("trip:notYet");
-  expect(saved()).toMatchObject({ tripSoon: "notYet" });
-  tap("planner:continue");
-  tap("chart:date");
-  expect(
-    screen.getByRole("button", { name: "city:date:dream:lisbon" }),
-  ).toBeTruthy();
-});
-
-it("asks where a person goes out when no trip is planned", () => {
-  mocks.progress = { ...mocks.progress, goals: ["date"], tripSoon: "soon" };
-  startAt("planner");
-  render(<OnboardingScreen />);
-  tap("planner:continue");
   tap("chart:date");
   expect(
     screen.getByRole("button", { name: "city:date:out:lisbon" }),
   ).toBeTruthy();
 });
 
-it("goes back from a question, over a skipped trip question, and from the sample", () => {
-  mocks.progress = { ...mocks.progress, goals: ["date"] };
-  startAt("planner");
+it("goes back from the chart to the goals, and from the sample", () => {
+  startAt("chart");
   render(<OnboardingScreen />);
   tap("common.back");
   expect(screen.getByRole("button", { name: "goal:continue" })).toBeTruthy();
-  cleanup();
-  mocks.progress = { ...mocks.progress, goals: ["travel"] };
-  startAt("planner");
-  render(<OnboardingScreen />);
-  tap("common.back");
-  expect(screen.getByRole("button", { name: "trip:soon" })).toBeTruthy();
   cleanup();
   startAt("ahaSpots");
   render(<OnboardingScreen />);
@@ -422,18 +355,6 @@ it("sends a step's view once, even after going back and closing the app", () => 
   relaunch();
   tap("aha:spots");
   expect(viewsOf("carousel")).toHaveLength(1);
-});
-
-it("still sends the trip question's first view after going back to add Trips and closing the app", () => {
-  mocks.progress = { ...mocks.progress, goals: ["date"] };
-  startAt("goal");
-  render(<OnboardingScreen />);
-  tap("goal:continue");
-  tap("common.back");
-  tap("goal:travel");
-  relaunch();
-  tap("goal:continue");
-  expect(viewsOf("trip_soon")).toHaveLength(1);
 });
 
 it("reuses the sample for the carousel after the spots, before the paywall", async () => {
@@ -532,7 +453,6 @@ it("hands the goals' spaces to the replay and reports the answers when onboardin
     step: ONBOARDING_STEPS.indexOf("ahaSpots"),
     goals: ["date"],
     savedCount: "few",
-    planner: "planner",
     travelCity: "paris",
   };
   render(<OnboardingScreen />);
@@ -548,8 +468,6 @@ it("hands the goals' spaces to the replay and reports the answers when onboardin
       goal: "date",
       goals: ["date"],
       saved_count: "few",
-      planner: "planner",
-      trip_soon: null,
       sample_city: "paris",
     }),
   );
@@ -587,7 +505,7 @@ it("queues the default reel before leaving onboarding when the city question was
 });
 
 it.each([
-  ["tripSoon", "planner:continue"],
+  ["goal", "chart:date"],
   ["chart", "city:date:out:lisbon"],
   ["cityEcho", "aha:share"],
   ["firstSave", "aha:spots"],
@@ -598,14 +516,6 @@ it.each([
   render(<OnboardingScreen />);
   tap("onboardingQ.skip");
   expect(screen.getByRole("button", { name: next })).toBeTruthy();
-});
-
-it("leaves the trip answer empty when the trip question is skipped", () => {
-  mocks.progress = { ...mocks.progress, goals: ["travel"] };
-  startAt("tripSoon");
-  render(<OnboardingScreen />);
-  tap("onboardingQ.skip");
-  expect(saved()).toMatchObject({ tripSoon: null });
 });
 
 it("offers no Skip on the opener", () => {

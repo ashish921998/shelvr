@@ -680,9 +680,6 @@ export type MessageParams = {
   "onboardingQ.goalFood": undefined;
   "onboardingQ.goalFoodBody": undefined;
   "onboardingQ.goalEverything": undefined;
-  "onboardingQ.plannerTitle": undefined;
-  "onboardingQ.planner": undefined;
-  "onboardingQ.plannerBody": undefined;
   "onboardingQ.flexible": undefined;
   "onboardingQ.flexibleBody": undefined;
   "onboardingQ.spontaneous": undefined;
@@ -1021,12 +1018,8 @@ export type MessageParams = {
   "freePlan.photosNeedPro": undefined;
   "freePlan.photosBody": undefined;
   "freePlan.discardPhoto": undefined;
-  "onboardingQ.tripSoonTitle": undefined;
-  "onboardingQ.tripSoonYes": undefined;
-  "onboardingQ.tripSoonNo": undefined;
   "onboardingQ.cityTitleTrip": undefined;
   "onboardingQ.cityTitleOut": undefined;
-  "onboardingQ.cityTitleDream": undefined;
   "onboardingChart.title": undefined;
   "onboardingChart.lost": undefined;
   "onboardingChart.goalDate": undefined;
