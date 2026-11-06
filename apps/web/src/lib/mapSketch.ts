@@ -8,6 +8,8 @@ const FRAME_MIN_KM = 10;
 const FRAME_SPREAD = 3;
 const MIN_SPAN_DEGREES = 0.009;
 const EARTH_RADIUS_KM = 6371;
+const SPREAD_RINGS = 5;
+const RING_STEPS = 6;
 
 function radians(degrees: number): number {
   return (degrees * Math.PI) / 180;
@@ -43,6 +45,63 @@ function clamp(value: number, low: number, high: number): number {
   return Math.min(high, Math.max(low, value));
 }
 
+function insideBox(point: SketchPoint, box: SketchBox): SketchPoint {
+  return {
+    x: clamp(point.x, box.padding, box.width - box.padding),
+    y: clamp(point.y, box.padding, box.height - box.padding),
+  };
+}
+
+function isClear(
+  point: SketchPoint,
+  placed: readonly SketchPoint[],
+  spacing: number,
+): boolean {
+  return placed.every(
+    (other) => Math.hypot(other.x - point.x, other.y - point.y) >= spacing,
+  );
+}
+
+function clearSpot(
+  point: SketchPoint,
+  placed: readonly SketchPoint[],
+  box: SketchBox,
+  spacing: number,
+): SketchPoint {
+  for (let ring = 1; ring <= SPREAD_RINGS; ring += 1) {
+    const radius = (ring * spacing) / 2;
+    const steps = ring * RING_STEPS;
+    for (let step = 0; step < steps; step += 1) {
+      const angle = (2 * Math.PI * step) / steps;
+      const spot = insideBox(
+        {
+          x: point.x + radius * Math.cos(angle),
+          y: point.y + radius * Math.sin(angle),
+        },
+        box,
+      );
+      if (isClear(spot, placed, spacing)) return spot;
+    }
+  }
+  return point;
+}
+
+export function spreadPoints(
+  points: readonly SketchPoint[],
+  box: SketchBox,
+  spacing: number,
+): SketchPoint[] {
+  const placed: SketchPoint[] = [];
+  for (const point of points) {
+    placed.push(
+      isClear(point, placed, spacing)
+        ? point
+        : clearSpot(point, placed, box, spacing),
+    );
+  }
+  return placed;
+}
+
 export function sketchPoints(
   places: readonly LatLng[],
   box: SketchBox,
@@ -66,16 +125,13 @@ export function sketchPoints(
     (box.width - 2 * box.padding) / spanX,
     (box.height - 2 * box.padding) / spanY,
   );
-  return places.map((place) => ({
-    x: clamp(
-      box.width / 2 + (place.lng - lng0) * squeeze * scale,
-      box.padding,
-      box.width - box.padding,
+  return places.map((place) =>
+    insideBox(
+      {
+        x: box.width / 2 + (place.lng - lng0) * squeeze * scale,
+        y: box.height / 2 - (place.lat - lat0) * scale,
+      },
+      box,
     ),
-    y: clamp(
-      box.height / 2 - (place.lat - lat0) * scale,
-      box.padding,
-      box.height - box.padding,
-    ),
-  }));
+  );
 }

@@ -1,12 +1,14 @@
 import { useId } from "react";
 
-import { sketchPoints } from "@/lib/mapSketch";
+import { sketchPoints, spreadPoints } from "@/lib/mapSketch";
 import { countLabel, type PublicMapPlace } from "@/lib/publicMap";
 
 const WIDTH = 360;
 const HEIGHT = 240;
 const PADDING = 22;
 const GRID_STEP = 20;
+const MARKER_SPACING = 28;
+const BOX = { width: WIDTH, height: HEIGHT, padding: PADDING };
 
 const GRID = Array.from(
   { length: HEIGHT / GRID_STEP - 1 },
@@ -66,11 +68,7 @@ export default function MapSketch({
   places: PublicMapPlace[];
 }) {
   const titleId = useId();
-  const points = sketchPoints(places, {
-    width: WIDTH,
-    height: HEIGHT,
-    padding: PADDING,
-  });
+  const points = spreadPoints(sketchPoints(places, BOX), BOX, MARKER_SPACING);
   const markers = places.map((place, index) => ({
     place,
     point: points[index],

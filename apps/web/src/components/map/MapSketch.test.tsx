@@ -27,6 +27,13 @@ const orinoco: PublicMapPlace = {
   lng: -99.164,
   went: false,
 };
+const avellaneda: PublicMapPlace = {
+  name: "Café Avellaneda",
+  lat: 19.348,
+  lng: -99.162,
+  emoji: "☕",
+  went: false,
+};
 
 let container: HTMLDivElement;
 let root: Root;
@@ -54,6 +61,17 @@ function markerTitles(svg: SVGSVGElement) {
   return Array.from(svg.querySelectorAll("g > title"), (title) =>
     title.textContent?.trim(),
   );
+}
+
+function markerCentres(svg: SVGSVGElement) {
+  return Array.from(svg.querySelectorAll(":scope > g"), (group) => {
+    const [x, y] = (group.getAttribute("transform") ?? "")
+      .replace(/[^\d.\s-]/g, " ")
+      .trim()
+      .split(/\s+/)
+      .map(Number);
+    return { x, y };
+  });
 }
 
 describe("MapSketch", () => {
@@ -89,6 +107,17 @@ describe("MapSketch", () => {
     expect(svg.querySelector(":scope > title")?.textContent).toBe(
       "Sketch of 2 places in Mexico City",
     );
+  });
+
+  it("keeps close places from covering each other when a far one widens the sketch", () => {
+    const centres = markerCentres(
+      render([contramar, avellaneda, rosetta, orinoco]),
+    );
+    expect(centres).toHaveLength(4);
+    const gaps = centres.flatMap((a, index) =>
+      centres.slice(index + 1).map((b) => Math.hypot(a.x - b.x, a.y - b.y)),
+    );
+    expect(Math.min(...gaps)).toBeGreaterThanOrEqual(24);
   });
 
   it("says one place in the singular", () => {
