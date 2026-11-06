@@ -344,6 +344,10 @@ describe("PlanVote name", () => {
     expect(container.textContent).toContain(
       "Shown to Ashish next to your votes.",
     );
+    const help = input().getAttribute("aria-describedby");
+    expect(help && document.getElementById(help)?.textContent).toBe(
+      "Shown to Ashish next to your votes.",
+    );
 
     act(() => root.render(<PlanVote token="tok" places={places} />));
     expect(container.textContent).toContain(

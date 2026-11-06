@@ -285,6 +285,7 @@ export default function PlanVote({
         </label>
         <input
           id="plan-voter-name"
+          aria-describedby="plan-voter-name-help"
           value={typed ?? remembered ?? ""}
           onChange={(event) => onName(event.target.value)}
           onBlur={flushName}
@@ -294,7 +295,7 @@ export default function PlanVote({
           maxLength={40}
           className="mt-1.5 h-11 w-full rounded-[11px] border border-line-strong bg-cream px-3.5 text-base font-medium text-ink outline-none placeholder:text-muted-soft focus:border-ember"
         />
-        <p className="mt-1 text-xs text-muted">
+        <p id="plan-voter-name-help" className="mt-1 text-xs text-muted">
           Shown to {senderName ?? "them"} next to your votes.
         </p>
       </div>
