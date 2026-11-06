@@ -33,6 +33,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { sidePadding } from "@/lib/side-insets";
 
 /** Room left at the right of the filter row for MapKit's my-location button. */
 const LOCATE_BUTTON_CLEARANCE = 64;
@@ -115,10 +116,12 @@ export default function MapScreen() {
 
   if (places.isError) {
     return (
-      <EmptyState
-        title={t("errors.unexpectedTitle")}
-        message={t("errors.retrySoon")}
-      />
+      <View style={styles.empty}>
+        <EmptyState
+          title={t("errors.unexpectedTitle")}
+          message={t("errors.retrySoon")}
+        />
+      </View>
     );
   }
   if (all === undefined || location === "asking") return <ScreenLoader />;
@@ -232,8 +235,12 @@ export default function MapScreen() {
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  empty: { flex: 1, backgroundColor: theme.colors.background },
+  empty: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+    ...sidePadding(rt.insets),
+  },
   overlay: { position: "absolute", gap: theme.gap(1) },
 }));

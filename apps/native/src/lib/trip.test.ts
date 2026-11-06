@@ -34,7 +34,7 @@ describe("fitCamera", () => {
       height: 678,
       top: 60,
       bottom: 40,
-      right: 62,
+      right: 84,
       worldWidth: 951,
       centerY: 678 / 2,
     };
@@ -44,6 +44,9 @@ describe("fitCamera", () => {
       { latitude: 30.2849, longitude: -97.7341 },
     ];
     const camera = fitCamera(points, duo)!;
+    expect(camera.zoom).toBeLessThan(
+      fitCamera(points, { ...duo, right: 0 })!.zoom,
+    );
     const lngPerPoint = 360 / (duo.worldWidth * 2 ** camera.zoom);
     const xs = points.map(
       (point) =>

@@ -27,6 +27,7 @@ import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Platform, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { sidePadding } from "@/lib/side-insets";
 
 function TripHeader({
   overMap,
@@ -159,13 +160,13 @@ export default function TripPlanScreen() {
   );
   if (trip.isError) {
     return (
-      <>
+      <View style={styles.screen}>
         {backTitle}
         <EmptyState
           title={t("errors.unexpectedTitle")}
           message={t("errors.retrySoon")}
         />
-      </>
+      </View>
     );
   }
   if (data === undefined) {
@@ -239,6 +240,10 @@ export default function TripPlanScreen() {
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
-  screen: { flex: 1, backgroundColor: theme.colors.background },
+const styles = StyleSheet.create((theme, rt) => ({
+  screen: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+    ...sidePadding(rt.insets),
+  },
 }));
