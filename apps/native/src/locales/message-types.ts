@@ -680,12 +680,6 @@ export type MessageParams = {
   "onboardingQ.goalFood": undefined;
   "onboardingQ.goalFoodBody": undefined;
   "onboardingQ.goalEverything": undefined;
-  "onboardingQ.flexible": undefined;
-  "onboardingQ.flexibleBody": undefined;
-  "onboardingQ.spontaneous": undefined;
-  "onboardingQ.spontaneousBody": undefined;
-  "onboardingQ.explorer": undefined;
-  "onboardingQ.explorerBody": undefined;
   "onboardingQ.cityBody": undefined;
   "onboardingNotify.title": undefined;
   "onboardingNotify.sub": undefined;
