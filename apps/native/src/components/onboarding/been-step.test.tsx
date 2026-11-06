@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -7,6 +13,7 @@ import type { SampleCityId } from "@/lib/sample-cities";
 import { BeenStep } from "./been-step";
 
 const mocks = vi.hoisted(() => ({
+  fontScale: 1,
   dismiss: vi.fn(),
   onContinue: vi.fn(),
 }));
@@ -17,6 +24,7 @@ vi.mock("expo-localization", () => ({
 }));
 vi.mock("react-native", () => ({
   Keyboard: { dismiss: mocks.dismiss },
+  useWindowDimensions: () => ({ fontScale: mocks.fontScale }),
   View: vi.fn(({ children }: { children?: ReactNode }) => (
     <div>{children}</div>
   )),
@@ -24,7 +32,7 @@ vi.mock("react-native", () => ({
     <span>{children}</span>
   )),
   ScrollView: vi.fn(({ children }: { children?: ReactNode }) => (
-    <div>{children}</div>
+    <div data-testid="scroll">{children}</div>
   )),
   TextInput: vi.fn(
     ({
@@ -127,6 +135,7 @@ const proceed = () =>
 const tile = (name: string) => screen.getByRole("checkbox", { name });
 
 beforeEach(() => {
+  mocks.fontScale = 1;
   mocks.dismiss.mockClear();
   mocks.onContinue.mockClear();
 });
@@ -162,6 +171,19 @@ describe("BeenStep", () => {
     });
     fireEvent.click(tile("Lisbon"));
     expect(mocks.dismiss).toHaveBeenCalledOnce();
+    expect(proceed().disabled).toBe(false);
+  });
+
+  it("lets the question scroll with the cities at the largest text sizes", () => {
+    const view = render(<Step />);
+    const title = () =>
+      within(screen.getByTestId("scroll")).queryByText("Where have you been?");
+    expect(title()).toBeNull();
+    view.unmount();
+    mocks.fontScale = 3;
+    render(<Step />);
+    expect(title()).toBeTruthy();
+    fireEvent.click(tile("Lisbon"));
     expect(proceed().disabled).toBe(false);
   });
 });

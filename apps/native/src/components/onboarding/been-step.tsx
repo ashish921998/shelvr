@@ -17,8 +17,8 @@ export function BeenStep({
   useAppLocale();
   return (
     <View style={styles.wrap}>
-      <QuestionTitle title={t("been.title")} body={t("been.body")} />
       <BeenCityGrid
+        header={<QuestionTitle title={t("been.title")} body={t("been.body")} />}
         picked={picked}
         onToggle={(city) =>
           onChange(
