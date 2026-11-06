@@ -32,6 +32,7 @@ import {
   tripStayValidator,
   tripStopSourceValidator,
 } from "./model/tripPlan";
+import { visitSpotValidator } from "./model/placeVisits";
 
 export default defineSchema({
   ...authTables,
@@ -320,6 +321,7 @@ export default defineSchema({
     name: v.string(),
     itemId: v.id("items"),
     visitedAt: v.number(),
+    spots: v.optional(v.array(visitSpotValidator)),
   })
     .index("by_user_and_key", ["userId", "key"])
     .index("by_user_and_visited", ["userId", "visitedAt"]),

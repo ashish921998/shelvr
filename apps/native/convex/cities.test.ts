@@ -13,7 +13,13 @@ type Save = {
   cities?: string[];
   status?: "ready" | "processing" | "failed";
   heroImageUrl?: string;
-  placePins?: { name: string; lat: number; lng: number; city?: string }[];
+  placePins?: {
+    name: string;
+    lat: number;
+    lng: number;
+    city?: string;
+    appleId?: string;
+  }[];
 };
 
 async function setup(options: { pro?: boolean } = {}) {
@@ -104,6 +110,102 @@ describe("listCities", () => {
     expect(await t.query(api.items.listCities, {})).toEqual([
       { city: "Paris", count: 1, placeCount: 3, visitedCount: 2, cover: null },
       { city: "Porto", count: 1, placeCount: 1, cover: null },
+    ]);
+  });
+
+  it("counts a mark only in the city where it was made", async () => {
+    const { t, save, userId } = await setup();
+    const parisId = await save(userId, {
+      title: "Paris burgers",
+      cities: ["Paris"],
+      placePins: [
+        { name: "Shake Shack", lat: 48.8738, lng: 2.295, appleId: "P-1" },
+      ],
+    });
+    await save(userId, {
+      title: "London eats",
+      cities: ["London"],
+      placePins: [
+        { name: "Shake Shack", lat: 51.5117, lng: -0.1233, appleId: "L-1" },
+        { name: "Dishoom", lat: 51.5124, lng: -0.1269 },
+      ],
+    });
+
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId: parisId,
+      name: "Shake Shack",
+      visited: true,
+      spot: { lat: 48.8738, lng: 2.295, appleId: "P-1" },
+    });
+
+    expect(await t.query(api.items.listCities, {})).toEqual([
+      { city: "London", count: 1, placeCount: 2, cover: null },
+      { city: "Paris", count: 1, placeCount: 1, visitedCount: 1, cover: null },
+    ]);
+  });
+
+  it("counts one branch of a chain, not its namesake across town", async () => {
+    const { t, save, userId } = await setup();
+    const itemId = await save(userId, {
+      title: "Tokyo coffee",
+      cities: ["Tokyo"],
+      placePins: [
+        { name: "Blue Bottle Coffee", lat: 35.6467, lng: 139.71, appleId: "A" },
+        { name: "Blue Bottle Coffee", lat: 35.6737, lng: 139.71, appleId: "B" },
+      ],
+    });
+
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Blue Bottle Coffee",
+      visited: true,
+      spot: { lat: 35.6467, lng: 139.71, appleId: "A" },
+    });
+
+    expect(await t.query(api.items.listCities, {})).toEqual([
+      { city: "Tokyo", count: 1, placeCount: 2, visitedCount: 1, cover: null },
+    ]);
+  });
+
+  it("keeps a venue visited when a newer save names it differently, and takes it back from there", async () => {
+    const { t, save, userId } = await setup();
+    const olderId = await save(userId, {
+      title: "Austin BBQ",
+      cities: ["Austin"],
+      placePins: [
+        { name: "Franklin BBQ", lat: 30.2701, lng: -97.7313, appleId: "X" },
+      ],
+    });
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId: olderId,
+      name: "Franklin BBQ",
+      visited: true,
+      spot: { lat: 30.2701, lng: -97.7313, appleId: "X" },
+    });
+    const newerId = await save(userId, {
+      title: "Austin brisket",
+      cities: ["Austin"],
+      placePins: [
+        {
+          name: "Franklin Barbecue",
+          lat: 30.2702,
+          lng: -97.7312,
+          appleId: "X",
+        },
+      ],
+    });
+    expect(await t.query(api.items.listCities, {})).toEqual([
+      { city: "Austin", count: 2, placeCount: 1, visitedCount: 1, cover: null },
+    ]);
+
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId: newerId,
+      name: "Franklin Barbecue",
+      visited: false,
+      spot: { lat: 30.2702, lng: -97.7312, appleId: "X" },
+    });
+    expect(await t.query(api.items.listCities, {})).toEqual([
+      { city: "Austin", count: 2, placeCount: 1, cover: null },
     ]);
   });
 
