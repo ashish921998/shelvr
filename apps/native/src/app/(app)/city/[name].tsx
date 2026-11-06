@@ -1,6 +1,7 @@
 import { PlaceMapScreen } from "@/components/city/place-map-screen";
 import { MapFilterChips } from "@/components/map/map-filter-chips";
 import { InviteButton, PlanButton } from "@/components/city/plan-button";
+import { CityVotes } from "@/components/city/plan-votes-row";
 import { SaveRow } from "@/components/city/save-row";
 import { PlaceRemovalUndo } from "@/components/city/place-removal";
 import { EmptyState } from "@/components/empty-state";
@@ -14,6 +15,7 @@ import { filterPlaces, mapFilters } from "@/lib/map-filters";
 import type { PlaceKind } from "@convex/model/placeKinds";
 import { t, useAppLocale } from "@/lib/i18n";
 import { usePlaceRemoval } from "@/lib/place-removal";
+import { tallyFor, useVoteLink } from "@/lib/plan-votes";
 import { usePlaceCardFocus } from "@/lib/use-place-opener";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
@@ -32,6 +34,7 @@ export default function CityScreen() {
   const removal = usePlaceRemoval();
   const items = useQuery(convexQuery(api.items.listCityItems, { city }));
   const { busy, start } = useCityPlan();
+  const link = useVoteLink(city);
   const [selected, setSelected] = useState<string | null>(null);
   const loaded = items.data !== undefined;
   const count = items.data?.length ?? 0;
@@ -103,6 +106,9 @@ export default function CityScreen() {
               {t("cityMap.placesFromSaves", { count: allPins.length })}
             </Text>
           ) : null}
+          {allPins.length > 0 ? (
+            <CityVotes city={city} pins={allPins} filtered={pins} link={link} />
+          ) : null}
           {filters.length > 0 ? (
             <View style={styles.chips}>
               <MapFilterChips
@@ -135,6 +141,11 @@ export default function CityScreen() {
             emoji={row.kind === "place" ? (row.pin.emoji ?? "📍") : undefined}
             selected={selected === row.id}
             removing={removal.busy}
+            tally={
+              row.kind === "place"
+                ? tallyFor(link, row.pin, allPins)
+                : undefined
+            }
             onRemove={
               row.kind === "place"
                 ? () => {

@@ -352,6 +352,14 @@ export default defineSchema({
     passes: v.array(v.string()),
     revision: v.optional(v.number()),
     updatedAt: v.number(),
+    name: v.optional(v.string()),
+    last: v.optional(
+      v.object({
+        key: v.string(),
+        choice: v.union(v.literal("pick"), v.literal("pass")),
+        at: v.number(),
+      }),
+    ),
   }).index("by_share_and_voter", ["shareId", "voterId"]),
 
   trips: defineTable({

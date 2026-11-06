@@ -62,14 +62,14 @@ read [localization](docs/architecture/localization.md); before simulator QA read
 ## What grep won't tell you
 
 - **Old-build code looks dead but is a live contract.** `trips.ts`, `tripData.ts`, `plans.ts`,
-  the space CRUD and suggestion functions in `spaces.ts`, `ensureCitySpace`,
+  the space CRUD and suggestion functions in `spaces.ts`,
   `aiRecommendForSpace.ts`, the no-op `aiEmbeddingSweep.ts` and the old sweep exports in `ai.ts`
   have no caller in the current app. Installed builds and queued jobs still call them: do not
   delete or narrow them (see the contract rule under Working conventions).
 - **Declared because rows carry them.** Keep these in the schema through any rollback:
   `users.deleting`, `items.embedding` / `embeddingVersion` /
-  `embeddingAttempts`, `items.placeLocations`, `tripPlans.listId`, and the `placeRemovals` and
-  `tripEveReminders` tables.
+  `embeddingAttempts`, `items.placeLocations`, `tripPlans.listId`, `planVotes.name` and
+  `planVotes.last`, and the `placeRemovals` and `tripEveReminders` tables.
 - **Run-by-hand backfills** after deploying the change that needs them, from `apps/native`:
   `pnpm exec convex run --prod <fn> '{"cursor":null}'` with `items:backfillPlaceSearch`
   (finish it before releasing the search UI), `items:clearEmbeddings` or
@@ -80,7 +80,8 @@ read [localization](docs/architecture/localization.md); before simulator QA read
   its `itemId` goes only to the person who added it; an Apple refresh token is never returned,
   logged or passed as a scheduled job argument (`detachedAppleTokens` holds it instead); public
   item reads strip `places` and `placeLocations`; a vote page shows a saved link's cover image
-  but never a photo save.
+  but never a photo save; a voter's first name goes only to the link's owner, never to the vote
+  page.
 - **An AI check cannot recall a request.** `aiAllowed` runs before a request goes out; a decline
   that lands mid-run is handled at settlement, which ignores the classification.
 - **Rows outlive saves.** Deleting a save keeps its `tripStops` and `sharedListPlaces` rows.

@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import PlanVote from "./PlanVote";
 
+const capture = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/analytics", () => ({ captureWebAnalyticsEvent: capture }));
+
 const places = [
   { key: "p0", name: "Bastian", why: "Seafood" },
   { key: "p1", name: "Masque", why: "Tasting menu" },
@@ -21,6 +24,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.stubGlobal("fetch", fetchMock);
   fetchMock.mockReset();
+  capture.mockReset();
   window.localStorage.clear();
   container = document.createElement("div");
   document.body.appendChild(container);
@@ -32,6 +36,7 @@ afterEach(() => {
   container.remove();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 function render() {
@@ -284,5 +289,207 @@ describe("PlanVote", () => {
 
     expect(container.textContent).toContain("This shortlist has closed.");
     expect(window.localStorage.getItem("shelvr.planVote.tok")).toBeNull();
+  });
+});
+
+describe("PlanVote name", () => {
+  const nameKey = "shelvr.planVoterName.tok";
+
+  function input() {
+    return container.querySelector<HTMLInputElement>("#plan-voter-name")!;
+  }
+
+  function type(value: string) {
+    const field = input();
+    const setValue = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value",
+    )!.set!;
+    act(() => {
+      field.focus();
+      setValue.call(field, value);
+      field.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+  }
+
+  async function blur() {
+    await act(async () => {
+      input().blur();
+      await vi.advanceTimersByTimeAsync(0);
+    });
+  }
+
+  async function wait(ms: number) {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  }
+
+  const body = (call: number) =>
+    JSON.parse(fetchMock.mock.calls[call][1].body) as Record<string, unknown>;
+
+  beforeEach(() => {
+    fetchMock.mockResolvedValue(new Response("{}", { status: 200 }));
+  });
+
+  it("asks for an optional first name and says who sees it", () => {
+    render();
+    const label = container.querySelector("label")!;
+    expect(label.textContent).toBe("Your first name (optional)");
+    expect(label.htmlFor).toBe("plan-voter-name");
+    expect(input().value).toBe("");
+    expect(input().placeholder).toBe("First name");
+    expect(input().autocomplete).toBe("given-name");
+    expect(input().maxLength).toBe(40);
+    expect(container.textContent).toContain(
+      "Shown to Ashish next to your votes.",
+    );
+    const help = input().getAttribute("aria-describedby");
+    expect(help && document.getElementById(help)?.textContent).toBe(
+      "Shown to Ashish next to your votes.",
+    );
+
+    act(() => root.render(<PlanVote token="tok" places={places} />));
+    expect(container.textContent).toContain(
+      "Shown to them next to your votes.",
+    );
+  });
+
+  it("fills in the name kept for this link", () => {
+    window.localStorage.setItem(nameKey, JSON.stringify("Maya"));
+    render();
+    expect(input().value).toBe("Maya");
+  });
+
+  it("starts empty on another link and sends no name with the first tap", async () => {
+    window.localStorage.setItem(
+      "shelvr.planVoterName.other",
+      JSON.stringify("Maya"),
+    );
+    render();
+    expect(input().value).toBe("");
+    tap("Yes to Bastian");
+    await settle();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(body(0)).not.toHaveProperty("name");
+  });
+
+  it("sends nothing for a name typed before any vote, then sends it with the first tap", async () => {
+    render();
+    type("Maya");
+    await wait(2000);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(JSON.parse(window.localStorage.getItem(nameKey)!)).toBe("Maya");
+
+    tap("Yes to Bastian");
+    await settle();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(body(0)).toMatchObject({ name: "Maya", picks: ["p0"] });
+  });
+
+  it("resends the same choices with a higher revision once a new name settles, and at once on blur", async () => {
+    render();
+    tap("Yes to Bastian");
+    await settle();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    type("Maya");
+    await wait(700);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(container.textContent).not.toContain("Saved.");
+    await wait(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(body(1)).toMatchObject({ name: "Maya", picks: ["p0"], passes: [] });
+    expect(body(1).revision as number).toBeGreaterThan(
+      body(0).revision as number,
+    );
+    expect(container.textContent).toContain("Saved. Ashish will see");
+
+    type("Maya Lopez ");
+    await blur();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(body(2)).toMatchObject({ name: "Maya Lopez", picks: ["p0"] });
+    expect(body(2).revision as number).toBeGreaterThan(
+      body(1).revision as number,
+    );
+    await settle();
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("sends a cleared name as empty, and keeps it cleared", async () => {
+    window.localStorage.setItem(nameKey, JSON.stringify("Maya"));
+    render();
+    tap("Yes to Bastian");
+    await settle();
+    expect(body(0)).toMatchObject({ name: "Maya" });
+
+    type("");
+    await settle();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(body(1)).toMatchObject({ name: "", picks: ["p0"] });
+    expect(JSON.parse(window.localStorage.getItem(nameKey)!)).toBe("");
+  });
+
+  it("sends one ballot with the name when the page closes before it settles", async () => {
+    render();
+    tap("Yes to Bastian");
+    await settle();
+    type("Mia");
+    act(() => {
+      window.dispatchEvent(new Event("pagehide"));
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(body(1)).toMatchObject({ name: "Mia", picks: ["p0"] });
+    await wait(2000);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("resends a ballot left by the last visit with this link's name", async () => {
+    window.localStorage.setItem(nameKey, JSON.stringify("Maya"));
+    window.localStorage.setItem(
+      "shelvr.planVotePending.tok",
+      JSON.stringify({ choices: { p0: "pick" }, revision: 7 }),
+    );
+    render();
+    await settle();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(body(0)).toMatchObject({ name: "Maya", revision: 7 });
+  });
+
+  it("reports the first name once, saying whether a vote came first", async () => {
+    render();
+    type(" ");
+    expect(capture).not.toHaveBeenCalled();
+    type("M");
+    type("Ma");
+    expect(capture.mock.calls).toEqual([
+      ["plan_vote_named", { with_votes: false }],
+    ]);
+
+    act(() => root.unmount());
+    root = createRoot(container);
+    capture.mockReset();
+    render();
+    tap("Yes to Bastian");
+    type("Sam");
+    expect(capture.mock.calls).toEqual([
+      ["plan_vote_named", { with_votes: true }],
+    ]);
+  });
+
+  it("still sends the name when the browser refuses storage", async () => {
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("blocked");
+    });
+    expect(() => window.localStorage.getItem(nameKey)).toThrow("blocked");
+    render();
+    type("Maya");
+    tap("Yes to Bastian");
+    await settle();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(body(0)).toMatchObject({ name: "Maya", picks: ["p0"] });
   });
 });

@@ -304,6 +304,23 @@
     "other": "残り%{formattedCount}日。"
   },
   "plan.tally": "行きたい%{picks}、パス%{passes}",
+  "plan.wouldGo": "%{name}さんは%{place}に行きたいそうです。",
+  "plan.wouldPass": "%{name}さんは%{place}をパスしました。",
+  "plan.someoneWouldGo": "誰かが%{place}に行きたいそうです。",
+  "plan.someoneWouldPass": "誰かが%{place}をパスしました。",
+  "plan.askHint": "リンクを送ると、相手が行きたい場所を選びます。",
+  "plan.askBody": "最大%{limit}か所まで選んでください。相手が行きたい場所に✓を付けると、ここに投票が表示されます。",
+  "plan.askSend": "投票リンクを送る",
+  "plan.newLinkHint": "場所を変えると新しいリンクになります。前のリンクの投票はここに表示されなくなります。",
+  "plan.shareLink": "投票リンクを共有",
+  "plan.noVotesYet": "まだ投票はありません",
+  "plan.votedPick": "%{name}さんが%{place}に✓を付けました",
+  "plan.votedPass": "%{name}さんが%{place}に✕を付けました",
+  "plan.someoneVotedPick": "誰かが%{place}に✓を付けました",
+  "plan.someoneVotedPass": "誰かが%{place}に✕を付けました",
+  "plan.votingClosed": {
+    "other": "投票は終了しました。%{formattedCount}人が投票しました。"
+  },
   "trip.make": "旅行を計画",
   "trip.pickTitle": "旅行",
   "trip.pickBody": "保存した場所を日ごとのプランに",
@@ -1107,5 +1124,5 @@
   "onboardingCarousel.eat": "「どこで食べる？」は\nもう終わり。",
   "onboardingCarousel.map": "保存した場所すべてを、\nひとつの地図に。",
   "onboardingCarousel.next": "次のスライド",
-  "sharedLists.nameBodyWelcome": "共有リストの相手に表示されます。あなたが共有した項目のリンクや、あなたが所有するリストのリンクを持つ人にも表示されます。"
+  "sharedLists.nameBodyWelcome": "共有リストの相手に表示されます。あなたが共有した項目のリンク、あなたが所有するリストのリンク、あなたが送った候補リストのリンクを持つ人にも表示されます。"
 }

@@ -6,6 +6,7 @@ import {
   internalMutation,
   query,
   type MutationCtx,
+  type QueryCtx,
 } from "./_generated/server";
 import {
   isDevelopmentAnonymousUser,
@@ -14,11 +15,30 @@ import {
 } from "./model/auth";
 import { fakeAiLocks } from "./model/fakeAi";
 import { insertMembership } from "./model/memberships";
+import { inviteToken } from "./model/sharedLists";
 import { buildTrip, type TripCandidate } from "./model/trip";
 import { safeDeleteStorage } from "./model/storage";
+import { deletePlanSharesForUser } from "./planShares";
 import { deleteTripsForSpace } from "./tripData";
 
 const RESET_LIMIT = 200;
+const MINUTE_MS = 60 * 1000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+const FIXTURE_CITY = "Austin";
+
+const COFFEE_PIN = {
+  name: "Jo's Coffee",
+  lat: 30.2502,
+  lng: -97.7496,
+  city: FIXTURE_CITY,
+};
+const BAKERY_PIN = {
+  name: "Houndstooth Coffee",
+  lat: 30.2684,
+  lng: -97.7432,
+  city: FIXTURE_CITY,
+};
 
 const resetResultValidator = v.object({
   items: v.number(),
@@ -145,6 +165,7 @@ async function seedFixtures(
       "Development fixture reset refused: duplicate subscription rows",
     );
   }
+  await clearFixtureLinks(ctx, userId);
 
   const storageIds = new Set<Id<"_storage">>();
   for (const item of items) {
@@ -233,21 +254,9 @@ async function seedFixtures(
       "the value of craft durable objects thoughtful design reading example journal",
   });
 
-  const coffeePin = {
-    name: "Jo's Coffee",
-    lat: 30.2502,
-    lng: -97.7496,
-    city: "Austin",
-  };
-  const bakeryPin = {
-    name: "Houndstooth Coffee",
-    lat: 30.2684,
-    lng: -97.7432,
-    city: "Austin",
-  };
   for (const [fixtureKey, title, placePins] of [
-    ["austin-coffee", "Austin coffee stops", [coffeePin, bakeryPin]],
-    ["austin-favorites", "Austin favorites", [coffeePin]],
+    ["austin-coffee", "Austin coffee stops", [COFFEE_PIN, BAKERY_PIN]],
+    ["austin-favorites", "Austin favorites", [COFFEE_PIN]],
   ] as const) {
     await ctx.db.insert("items", {
       userId,
@@ -310,6 +319,7 @@ async function seedFixtures(
     itemId: craftId,
     status: "suggested",
   });
+  await seedFixtureLink(ctx, userId, tripsId);
   await ctx.db.insert("subscriptions", {
     userId,
     status: "lifetime",
@@ -319,6 +329,72 @@ async function seedFixtures(
   });
 
   return { items: 6, spaces: 3, memberships: 4 };
+}
+
+async function fixtureItem(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  fixtureKey: string,
+): Promise<Id<"items">> {
+  const items = await ctx.db
+    .query("items")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .take(RESET_LIMIT);
+  const item = items.find((row) => row.fixtureKey === fixtureKey);
+  if (item === undefined) {
+    throw new Error(`Development fixture item missing: ${fixtureKey}`);
+  }
+  return item._id;
+}
+
+async function clearFixtureLinks(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+): Promise<void> {
+  if (!(await deletePlanSharesForUser(ctx, userId))) {
+    throw new Error(
+      "Development fixture reset refused: plan shares reach 50 rows",
+    );
+  }
+}
+
+async function seedFixtureLink(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  spaceId: Id<"spaces">,
+): Promise<void> {
+  const now = Date.now();
+  const itemId = await fixtureItem(ctx, userId, "austin-coffee");
+  const shareId = await ctx.db.insert("planShares", {
+    token: inviteToken(),
+    userId,
+    spaceId,
+    city: FIXTURE_CITY,
+    places: [COFFEE_PIN, BAKERY_PIN].map((pin, index) => ({
+      key: `p${index}`,
+      name: pin.name,
+      why: "",
+      itemId,
+    })),
+    expiresAt: now + 5 * DAY_MS,
+  });
+  await ctx.db.insert("planVotes", {
+    shareId,
+    voterId: "fixture-sam",
+    name: "Sam",
+    picks: ["p0"],
+    passes: ["p1"],
+    last: { key: "p0", choice: "pick", at: now - 10 * MINUTE_MS },
+    updatedAt: now - 10 * MINUTE_MS,
+  });
+  await ctx.db.insert("planVotes", {
+    shareId,
+    voterId: "fixture-guest",
+    picks: ["p1"],
+    passes: [],
+    last: { key: "p1", choice: "pick", at: now - 30 * MINUTE_MS },
+    updatedAt: now - 30 * MINUTE_MS,
+  });
 }
 
 export const locateTripStops = internalMutation({
