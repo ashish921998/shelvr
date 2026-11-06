@@ -36,8 +36,7 @@ export function usePlanPicker({ onLeave }: { onLeave?: () => void } = {}) {
     { kind: "date", open: false },
   );
   const go = (kind: CityPlanKind, city: string) => {
-    onLeave?.();
-    void start(kind, city);
+    void start(kind, city, onLeave);
   };
   const plan = (kind: CityPlanKind, inView?: string) => {
     if (busy !== null || listed.data === undefined) return;

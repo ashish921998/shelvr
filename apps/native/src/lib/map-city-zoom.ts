@@ -13,11 +13,10 @@ export function canShowAllCities(
   city: string | undefined,
   places: readonly { city?: string }[],
 ): boolean {
-  if (city === undefined) return false;
-  const cities = new Set<string>();
-  for (const place of places) {
+  const here = cityKey(city ?? "");
+  if (here === "") return false;
+  return places.some((place) => {
     const key = cityKey(place.city ?? "");
-    if (key !== "") cities.add(key);
-  }
-  return cities.size >= 2;
+    return key !== "" && key !== here;
+  });
 }
