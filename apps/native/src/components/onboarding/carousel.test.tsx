@@ -70,6 +70,8 @@ it("offers to send a date night's spots to the date", () => {
   expect(screen.getByText("datePlan.send")).toBeTruthy();
   expect(screen.queryByText("homePlaces.planTrip")).toBeNull();
   expect(screen.queryByText("common.share")).toBeNull();
+  expect(screen.getAllByText("Eberly")).toHaveLength(2);
+  expect(screen.getAllByText("Jupiter Supper Club")).toHaveLength(1);
 });
 
 it("plans a weekend like a date and shares it", () => {
@@ -83,4 +85,6 @@ it("plans a weekend like a date and shares it", () => {
   expect(screen.getAllByText("homePlaces.planDate")).toHaveLength(2);
   expect(screen.getByText("common.share")).toBeTruthy();
   expect(screen.queryByText("datePlan.send")).toBeNull();
+  expect(screen.getAllByText("Hula Hut")).toHaveLength(2);
+  expect(screen.getAllByText("Quince Lakehouse")).toHaveLength(1);
 });
