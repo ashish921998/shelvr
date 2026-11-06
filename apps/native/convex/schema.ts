@@ -280,6 +280,7 @@ export default defineSchema({
     locale: v.optional(v.string()),
     token: v.string(),
     platform: v.union(v.literal("ios"), v.literal("android")),
+    installSecretHash: v.optional(v.string()),
     enabled: v.boolean(),
     lastSeenAt: v.number(),
   })

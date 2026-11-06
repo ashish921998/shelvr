@@ -48,6 +48,15 @@ function setup(
 }
 
 describe("notification device session", () => {
+  it("saves the token again when a switch is turned on, even if already registered", async () => {
+    const { session, deps } = setup();
+    expect(await session.register()).toBe(true);
+    expect(await session.setWeeklyShelf(true)).toBe(true);
+    expect(await session.setSaveReminders(true)).toBe(true);
+    expect(deps.saveToken).toHaveBeenCalledTimes(3);
+    expect(await session.register()).toBe(true);
+    expect(deps.saveToken).toHaveBeenCalledTimes(3);
+  });
   it("blocks foreground retries for ownership rejection until a new session or token succeeds", async () => {
     const { session, deps } = setup();
     const conflict = new ConvexError({

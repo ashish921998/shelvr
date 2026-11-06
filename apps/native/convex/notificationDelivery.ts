@@ -404,6 +404,7 @@ async function post(path: string, body: unknown): Promise<unknown> {
 
 async function exchange(
   initial: Recipient[],
+  collapseId: string,
   message: (recipient: Recipient) => Record<string, unknown>,
 ): Promise<Recipient[]> {
   let recipients = initial;
@@ -453,6 +454,8 @@ async function exchange(
           "send",
           pending.map((recipient) => ({
             to: recipient.token,
+            collapseId,
+            tag: collapseId,
             ...message(recipient),
           })),
         ),
@@ -495,21 +498,25 @@ export const send = internalAction({
       { digestId },
     );
     if (!delivery) return null;
-    const recipients = await exchange(delivery.recipients, (recipient) => ({
-      ...digestCopy(
-        recipient.locale,
-        delivery.itemCount,
-        delivery.featuredTitle,
-        { olderIncluded: delivery.olderIncluded },
-      ),
-      data: {
-        url: `/digest/${digestId}`,
-        kind: NOTIFICATION_KIND,
-        notificationId: digestId,
-      },
-      sound: "default",
-      channelId: "weekly-shelf",
-    }));
+    const recipients = await exchange(
+      delivery.recipients,
+      digestId,
+      (recipient) => ({
+        ...digestCopy(
+          recipient.locale,
+          delivery.itemCount,
+          delivery.featuredTitle,
+          { olderIncluded: delivery.olderIncluded },
+        ),
+        data: {
+          url: `/digest/${digestId}`,
+          kind: NOTIFICATION_KIND,
+          notificationId: digestId,
+        },
+        sound: "default",
+        channelId: "weekly-shelf",
+      }),
+    );
     await ctx.runMutation(internal.notificationDelivery.finish, {
       digestId,
       attempt: delivery.attempt,
@@ -688,16 +695,20 @@ export const sendReminder = internalAction({
       { reminderId },
     );
     if (!delivery) return null;
-    const recipients = await exchange(delivery.recipients, (recipient) => ({
-      ...reminderCopy(recipient.locale, delivery.kind, delivery.subject),
-      data: {
-        url: `/item/${delivery.itemId}`,
-        kind: reminderNotificationKind(delivery.kind),
-        notificationId: reminderId,
-      },
-      sound: "default",
-      channelId: "save-reminders",
-    }));
+    const recipients = await exchange(
+      delivery.recipients,
+      reminderId,
+      (recipient) => ({
+        ...reminderCopy(recipient.locale, delivery.kind, delivery.subject),
+        data: {
+          url: `/item/${delivery.itemId}`,
+          kind: reminderNotificationKind(delivery.kind),
+          notificationId: reminderId,
+        },
+        sound: "default",
+        channelId: "save-reminders",
+      }),
+    );
     await ctx.runMutation(internal.notificationDelivery.finishReminder, {
       reminderId,
       attempt: delivery.attempt,
@@ -849,16 +860,20 @@ export const sendTripEve = internalAction({
       { reminderId },
     );
     if (!delivery) return null;
-    const recipients = await exchange(delivery.recipients, (recipient) => ({
-      ...tripEveCopy(recipient.locale, delivery.city, delivery.count),
-      data: {
-        url: `/trip-plan/${delivery.tripId}`,
-        kind: TRIP_EVE_KIND,
-        notificationId: reminderId,
-      },
-      sound: "default",
-      channelId: "save-reminders",
-    }));
+    const recipients = await exchange(
+      delivery.recipients,
+      reminderId,
+      (recipient) => ({
+        ...tripEveCopy(recipient.locale, delivery.city, delivery.count),
+        data: {
+          url: `/trip-plan/${delivery.tripId}`,
+          kind: TRIP_EVE_KIND,
+          notificationId: reminderId,
+        },
+        sound: "default",
+        channelId: "save-reminders",
+      }),
+    );
     await ctx.runMutation(internal.notificationDelivery.finishTripEve, {
       reminderId,
       attempt: delivery.attempt,

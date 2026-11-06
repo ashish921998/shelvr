@@ -77,9 +77,14 @@ vi.mock("@convex-dev/auth/react", () => ({
   useAuthActions: () => ({ signOut: mock.signOut }),
 }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: mock.push }) }));
+vi.mock("expo-crypto", () => ({ randomUUID: () => "install-secret-1" }));
 vi.mock("expo-secure-store", () => ({
-  getItemAsync: async () => "[]",
-  setItemAsync: vi.fn(),
+  getItemAsync: async (key: string) =>
+    mock.secure.get(key) ??
+    (key.startsWith("notification-tokens") ? "[]" : null),
+  setItemAsync: async (key: string, value: string) => {
+    mock.secure.set(key, value);
+  },
   getItem: (key: string) => mock.secure.get(key) ?? null,
   setItem: (key: string, value: string) => mock.secure.set(key, value),
 }));
@@ -240,6 +245,16 @@ describe("notification session lifecycle", () => {
     });
     expect(mock.clearWidget).toHaveBeenCalledOnce();
     expect(mock.signOut).toHaveBeenCalledOnce();
+  });
+  it("sends the same install secret on every registration", async () => {
+    renderSession();
+    await waitFor(() => expect(mock.register).toHaveBeenCalledTimes(1));
+    expect(mock.register.mock.calls[0]?.[0]).toMatchObject({
+      installSecret: "install-secret-1",
+    });
+    expect(mock.secure.get("notification-install-secret")).toBe(
+      "install-secret-1",
+    );
   });
   it("does not repeat token requests or server mutations on foreground after ownership rejection", async () => {
     mock.register.mockRejectedValueOnce(

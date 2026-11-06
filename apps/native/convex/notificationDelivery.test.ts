@@ -96,6 +96,23 @@ describe("durable digest delivery", () => {
     });
   });
 
+  it("resends with the same collapse id so a second copy replaces the first", async () => {
+    const { t, digestId, advance } = await seed();
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error("The operation timed out"))
+      .mockResolvedValueOnce(json([{ status: "ok", id: "ticket-retry" }]));
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.send, { digestId });
+    await advance();
+    await t.action(internal.notificationDelivery.send, { digestId });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [first] = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const [second] = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(first).toMatchObject({ collapseId: digestId, tag: digestId });
+    expect(second).toMatchObject({ collapseId: digestId, tag: digestId });
+  });
+
   it("keeps Japanese copy on a resend after a nonterminal receipt error", async () => {
     const { t, digestId, advance, digest } = await seed();
     await t.run(async (ctx) => {
