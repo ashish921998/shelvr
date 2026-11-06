@@ -5,7 +5,7 @@ const MAX_KEY_CHARS = 8;
 const MAX_TOKEN_CHARS = 64;
 const MAX_VOTER_ID_CHARS = 64;
 const MAX_VOTER_NAME_CHARS = 64;
-const VOTER_NAME = /^[\p{L}\p{M}'’-]+$/u;
+const VOTER_NAME = /^(?=.*\p{L})[\p{L}\p{M}'’-]+$/u;
 
 export type PlanVoteBody = {
   token: string;

@@ -35,11 +35,17 @@ describe("planVoterName", () => {
     ["José", "José"],
     ["Anne-Marie", "Anne-Marie"],
     ["O’Brien", "O’Brien"],
+    ["Zoe\u0308", "Zoe\u0308"],
     ["evil.com", undefined],
     ["a@b", undefined],
     ["👋", undefined],
     ["", undefined],
     ["   ", undefined],
+    ["-", undefined],
+    ["'", undefined],
+    ["’’", undefined],
+    ["--", undefined],
+    ["\u0301", undefined],
   ])("%j gives %j", (raw, name) => {
     expect(planVoterName(raw)).toBe(name);
   });
