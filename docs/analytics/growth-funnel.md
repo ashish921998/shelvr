@@ -23,7 +23,7 @@ Without it, links stay plain and nothing is attributed.
   its own link, for example `https://shelvr-web.vercel.app/?ct=tiktok_jane`.
 - A visitor with no campaign gets `web_<button>` (`web_hero`, `web_header`,
   `web_footer`, `web_footer-nav`, `web_oracle`). The share preview page uses
-  `share`.
+  `share`, and a map page uses `map`.
 - Campaigns are lowercased and reduced to `a-z 0-9 _ -`, at most 40 characters.
 
 **Installs, first opens and paying users per campaign** are in App Store
@@ -139,13 +139,16 @@ than saves and flatter the product; saves are the behavior Pro pays for.
 
 A branded share link (`/i/<token>`) never reaches analytics as its token,
 because the token opens the item's preview. The app and the website report
-`share_ref` instead: the first 16 hex characters of the token's SHA-256.
+`share_ref` instead: the first 16 hex characters of the token's SHA-256. A map
+page link (`/m/<token>`) is reported the same way, from its own token.
 
 | Event               | Where                          | `share_ref`                               |
 | ------------------- | ------------------------------ | ----------------------------------------- |
 | `item_shared`       | App, item detail or feed share | Set when a branded link went out          |
 | `share_page_viewed` | Website, share preview page    | Always; see `outcome` below               |
 | `app_store_clicked` | Website, share page's Download | Set; `source = share`, `campaign = share` |
+| `map_page_viewed`   | Website, map page              | Always; see `outcome` below               |
+| `app_store_clicked` | Website, map page's Download   | Set; `source = map`, `campaign = map`     |
 
 `item_shared` also carries `surface` (`item_detail` or `feed`). Before this
 release the feed did not send `item_shared` at all, so counts step up at that
@@ -156,6 +159,9 @@ release. Sharing an image or a source URL sends no `share_ref`.
 - `found`: the preview rendered.
 - `missing`: a dead link, meaning an unknown or revoked token.
 - `unavailable`: the backend could not be reached. Count it as an outage, not a dead link.
+
+`map_page_viewed` carries the same `outcome` values, plus `cities`, `places`
+and `been`: the counts the page showed (zeros unless it was found).
 
 `item_shared` comes from the app, so filter it to production. Development and
 preview builds stamp another environment. Web events carry none, so the
@@ -197,6 +203,7 @@ ORDER BY page_views DESC
 ```
 
 Installs from shares are App Store Connect's `share` campaign (section 1).
+Installs from map pages are its `map` campaign.
 Link previews fetched by chat apps do not run the page's script, so they are
 not counted as views.
 
