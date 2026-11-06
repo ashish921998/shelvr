@@ -43,6 +43,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Platform, ScrollView, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { sidePadding } from "@/lib/side-insets";
 
 function useSeenOnLeave(listId: Id<"sharedLists">, loaded: boolean) {
   const markSeen = useMutation(api.sharedLists.markSharedListSeen);
@@ -341,7 +342,7 @@ function SharedList({ detail }: { detail: SharedListDetail }) {
 const styles = StyleSheet.create((theme, rt) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
   gone: {
-    paddingHorizontal: theme.gap(3),
+    ...sidePadding(rt.insets, theme.gap(3)),
     paddingBottom: rt.insets.bottom + theme.gap(3),
   },
   header: {

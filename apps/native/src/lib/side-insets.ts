@@ -13,3 +13,8 @@ export function sidePadding(insets: SideInsets, base = 0) {
 export function sideOffsets(insets: SideInsets, base = 0) {
   return { left: base + insets.left, right: base + insets.right };
 }
+
+/** The width left for content between the side insets, for layouts sized from the window. */
+export function contentWidth(width: number, insets: SideInsets) {
+  return Math.max(width - insets.left - insets.right, 0);
+}

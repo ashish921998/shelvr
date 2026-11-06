@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { sideOffsets, sidePadding } from "./side-insets";
+import { contentWidth, sideOffsets, sidePadding } from "./side-insets";
 
 describe("sidePadding", () => {
   it("adds nothing on a portrait iPhone", () => {
@@ -28,5 +28,19 @@ describe("sideOffsets", () => {
       left: 16,
       right: 74,
     });
+  });
+});
+
+describe("contentWidth", () => {
+  it("is the window width on a portrait iPhone", () => {
+    expect(contentWidth(402, { left: 0, right: 0 })).toBe(402);
+  });
+
+  it("leaves out the Duo's right-edge strip", () => {
+    expect(contentWidth(951, { left: 0, right: 62 })).toBe(889);
+  });
+
+  it("never goes below zero", () => {
+    expect(contentWidth(40, { left: 30, right: 30 })).toBe(0);
   });
 });

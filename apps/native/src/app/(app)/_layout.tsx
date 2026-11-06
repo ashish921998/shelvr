@@ -75,8 +75,8 @@ export default function AppLayout() {
     : gated
       ? "/plan-gate"
       : "/(app)/(tabs)/(home)";
-  // Full screens stop at the side safe areas (the Duo's right-edge strip); map screens and
-  // sheets lay out their own sides.
+  // Full screens stop at the side safe areas (the Duo's right-edge strip). Map screens, sheets,
+  // the item pager and screens wrapped in a SafeAreaView (plan-gate) lay out their own sides.
   const inset = {
     contentStyle: {
       backgroundColor: theme.colors.background,
@@ -214,10 +214,7 @@ export default function AppLayout() {
           guard={onboarded && gated}
           redirectTo="/(app)/(tabs)/(home)"
         >
-          <Stack.Screen
-            name="plan-gate"
-            options={{ ...inset, headerShown: false }}
-          />
+          <Stack.Screen name="plan-gate" options={{ headerShown: false }} />
         </Stack.Protected>
         <Stack.Protected guard={!onboarded} redirectTo="/(app)/(tabs)/(home)">
           <Stack.Screen
