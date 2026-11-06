@@ -187,8 +187,11 @@ export type AnalyticsEventProperties = {
   plan_place_opened: { rank: number };
   plan_place_visited: { visited: boolean };
   plan_shared: { place_count: number; picked: boolean };
-  plan_asked: { place_count: number };
+  plan_asked: { place_count: number; reused: boolean };
   plan_ask_failed: { reason: "link" | "share" };
+  plan_votes_seen: { voters: number; open: boolean };
+  plan_ask_opened: { has_link: boolean };
+  plan_link_reshared: { shared: boolean };
   trip_made: {
     considered: number;
     days: number;

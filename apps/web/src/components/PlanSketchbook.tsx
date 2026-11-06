@@ -242,9 +242,11 @@ function Spread({ place }: { place: PlanSharePlace }) {
             {place.name}
           </h2>
           <InkUnderline />
-          <p className="text-[clamp(12px,3.4vw,14px)] leading-snug text-ink-soft">
-            {place.why}
-          </p>
+          {place.why ? (
+            <p className="text-[clamp(12px,3.4vw,14px)] leading-snug text-ink-soft">
+              {place.why}
+            </p>
+          ) : null}
           {place.area ? (
             <p className="mt-1 flex items-center gap-1 text-[clamp(11px,3vw,13px)] text-muted">
               <Pin />

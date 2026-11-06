@@ -305,6 +305,24 @@
     "other": "Noch %{formattedCount} Tage."
   },
   "plan.tally": "%{picks} dafür, %{passes} dagegen",
+  "plan.wouldGo": "%{name} wäre bei %{place} dabei.",
+  "plan.wouldPass": "%{name} würde %{place} auslassen.",
+  "plan.someoneWouldGo": "Jemand wäre bei %{place} dabei.",
+  "plan.someoneWouldPass": "Jemand würde %{place} auslassen.",
+  "plan.askHint": "Schick einen Link. Sie wählen die Orte, zu denen sie gehen würden.",
+  "plan.askBody": "Wähle bis zu %{limit} Orte aus. Sie tippen ✓ bei denen, zu denen sie gehen würden, und die Stimmen erscheinen hier.",
+  "plan.askSend": "Abstimmungslink senden",
+  "plan.newLinkHint": "Wenn du die Orte änderst, entsteht ein neuer Link. Stimmen zum alten werden hier nicht mehr angezeigt.",
+  "plan.shareLink": "Abstimmungslink teilen",
+  "plan.noVotesYet": "Noch keine Stimmen",
+  "plan.votedPick": "%{name} hat bei %{place} ✓ getippt",
+  "plan.votedPass": "%{name} hat bei %{place} ✕ getippt",
+  "plan.someoneVotedPick": "Jemand hat bei %{place} ✓ getippt",
+  "plan.someoneVotedPass": "Jemand hat bei %{place} ✕ getippt",
+  "plan.votingClosed": {
+    "one": "Abstimmung beendet. %{formattedCount} Person hat abgestimmt.",
+    "other": "Abstimmung beendet. %{formattedCount} Personen haben abgestimmt."
+  },
   "trip.make": "Meine Reise planen",
   "trip.pickTitle": "Eine Reise",
   "trip.pickBody": "Mach aus deinen gespeicherten Orten Tage",
@@ -1139,5 +1157,5 @@
   "onboardingCarousel.eat": "Nie wieder „Wo\nsollen wir essen?“",
   "onboardingCarousel.map": "Jeder gespeicherte Ort,\nauf einer Karte.",
   "onboardingCarousel.next": "Nächste Folie",
-  "sharedLists.nameBodyWelcome": "Leute auf deinen geteilten Listen sehen ihn, ebenso alle mit einem Link zu einem Inhalt, den du teilst, oder zu einer Liste, die dir gehört."
+  "sharedLists.nameBodyWelcome": "Leute auf deinen geteilten Listen sehen ihn, ebenso alle mit einem Link zu einem Inhalt, den du teilst, zu einer Liste, die dir gehört, oder zu einer Auswahl, die du verschickst."
 }

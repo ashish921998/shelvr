@@ -5,6 +5,8 @@ import { useEffect, useImperativeHandle } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import CityScreen from "@/app/(app)/city/[name]";
 import SharedListScreen from "@/app/(app)/shared-list/[id]";
+import { CityVotes } from "@/components/city/plan-votes-row";
+import { SaveRow } from "@/components/city/save-row";
 
 type Snaps = { expanded: number; middle: number; collapsed: number };
 
@@ -209,6 +211,9 @@ vi.mock("@/components/map/map-filter-chips", () => ({
 vi.mock("@/components/city/place-removal", () => ({
   PlaceRemovalUndo: vi.fn(() => <span>undo bar</span>),
 }));
+vi.mock("@/components/city/plan-votes-row", () => ({
+  CityVotes: vi.fn(() => <span>city votes</span>),
+}));
 function rowFake({
   name,
   number,
@@ -387,6 +392,7 @@ vi.mock("react-native", () => ({
 }));
 
 const CITY_ITEMS = "items:listCityItems";
+const VOTES = "planShares:cityPlanVotes";
 const LIST = "sharedLists:getSharedList";
 
 const taco = {
@@ -651,6 +657,88 @@ describe("city page", () => {
     expect(mocks.remove).toHaveBeenCalledWith(
       "item-1",
       expect.objectContaining({ name: "Taco Spot" }),
+    );
+  });
+
+  it("shows the votes row only with pins, with every pin, the shown pins and the link", () => {
+    const link = { token: "tok", expiresAt: 1, voters: 0, places: [] };
+    mocks.queries[VOTES] = link;
+    mocks.queries[CITY_ITEMS] = [unplaced];
+    const { rerender } = render(<CityScreen />);
+    expect(screen.queryByText("city votes")).toBeNull();
+    expect(CityVotes).not.toHaveBeenCalled();
+
+    const cafe = (name: string, lat: number) => ({
+      name,
+      lat,
+      lng: -97.5,
+      city: "Austin",
+      category: "Cafe",
+    });
+    const cafes = [
+      cafe("Bean One", 30.3),
+      cafe("Bean Two", 30.4),
+      cafe("Bean Three", 30.5),
+    ];
+    mocks.queries[CITY_ITEMS] = [{ ...save, placePins: [taco, bbq, ...cafes] }];
+    rerender(<CityScreen />);
+    expect(screen.getByText("city votes")).toBeTruthy();
+    fireEvent.click(screen.getByText("chip coffee"));
+    const props = vi.mocked(CityVotes).mock.calls.at(-1)?.[0];
+    expect(props?.city).toBe("Austin");
+    expect(props?.link).toBe(link);
+    expect(props?.pins.map((pin) => pin.name)).toEqual([
+      "Taco Spot",
+      "BBQ Pit",
+      "Bean One",
+      "Bean Two",
+      "Bean Three",
+    ]);
+    expect(props?.filtered.map((pin) => pin.name)).toEqual([
+      "Bean One",
+      "Bean Two",
+      "Bean Three",
+    ]);
+  });
+
+  it("gives a place row its tally only while its link has votes", () => {
+    const link = {
+      token: "tok",
+      expiresAt: Date.now() + 60_000,
+      voters: 2,
+      places: [
+        { key: "p0", name: "Taco Spot", itemId: "item-1", picks: 1, passes: 1 },
+      ],
+    };
+    mocks.queries[VOTES] = link;
+    mocks.queries[CITY_ITEMS] = [save, unplaced];
+    const { rerender } = render(<CityScreen />);
+    const tallies = () =>
+      new Map(
+        vi
+          .mocked(SaveRow)
+          .mock.calls.map(([props]) => [
+            props.placeName ?? props.item.title,
+            props.tally,
+          ]),
+      );
+    expect(tallies()).toEqual(
+      new Map([
+        ["Taco Spot", { picks: 1, passes: 1 }],
+        ["BBQ Pit", undefined],
+        ["No places", undefined],
+      ]),
+    );
+
+    vi.mocked(SaveRow).mockClear();
+    mocks.queries[VOTES] = { ...link, voters: 0 };
+    rerender(<CityScreen />);
+    expect(tallies()).toEqual(
+      new Map([
+        ["Taco Spot", undefined],
+        ["BBQ Pit", undefined],
+        ["No places", undefined],
+      ]),
     );
   });
 

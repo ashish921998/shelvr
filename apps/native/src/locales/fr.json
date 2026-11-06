@@ -308,6 +308,25 @@
     "other": "Il reste %{formattedCount} jours."
   },
   "plan.tally": "%{picks} pour, %{passes} contre",
+  "plan.wouldGo": "%{name} irait à %{place}.",
+  "plan.wouldPass": "%{name} n’irait pas à %{place}.",
+  "plan.someoneWouldGo": "Quelqu’un irait à %{place}.",
+  "plan.someoneWouldPass": "Quelqu’un n’irait pas à %{place}.",
+  "plan.askHint": "Envoyez un lien. Ils choisissent les lieux où ils iraient.",
+  "plan.askBody": "Choisissez jusqu’à %{limit} lieux. Ils touchent ✓ sur ceux où ils iraient, et les votes s’affichent ici.",
+  "plan.askSend": "Envoyer le lien de vote",
+  "plan.newLinkHint": "Changer les lieux crée un nouveau lien. Les votes sur l’ancien ne s’affichent plus ici.",
+  "plan.shareLink": "Partager le lien de vote",
+  "plan.noVotesYet": "Pas encore de vote",
+  "plan.votedPick": "%{name} a mis ✓ à %{place}",
+  "plan.votedPass": "%{name} a mis ✕ à %{place}",
+  "plan.someoneVotedPick": "Quelqu’un a mis ✓ à %{place}",
+  "plan.someoneVotedPass": "Quelqu’un a mis ✕ à %{place}",
+  "plan.votingClosed": {
+    "one": "Vote terminé. %{formattedCount} personne a voté.",
+    "many": "Vote terminé. %{formattedCount} personnes ont voté.",
+    "other": "Vote terminé. %{formattedCount} personnes ont voté."
+  },
   "trip.make": "Planifier mon voyage",
   "trip.pickTitle": "Un voyage",
   "trip.pickBody": "Transformez vos lieux enregistrés en journées",
@@ -1171,5 +1190,5 @@
   "onboardingCarousel.eat": "Fini le « on mange\noù ? »",
   "onboardingCarousel.map": "Chaque lieu enregistré,\nsur une seule carte.",
   "onboardingCarousel.next": "Diapositive suivante",
-  "sharedLists.nameBodyWelcome": "Les personnes de vos listes partagées le voient, ainsi que toute personne ayant un lien vers un contenu que vous partagez ou vers une liste qui vous appartient."
+  "sharedLists.nameBodyWelcome": "Les personnes de vos listes partagées le voient, ainsi que toute personne ayant un lien vers un contenu que vous partagez, vers une liste qui vous appartient ou vers une sélection que vous envoyez."
 }

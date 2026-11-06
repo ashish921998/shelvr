@@ -51,9 +51,17 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 - The owner can "Remove" a member. That member loses the list, the old invite link stops working, and the places they added stay. Anyone can "Leave list". When the owner leaves, the oldest member whose account isn't being deleted becomes the owner. When no such member is left, the list is deleted.
 - There is no report or block control. A list name is free text, and anyone holding a live link can join until the list is full. Removing a member is the only control, and it also replaces the link.
 
+## Vote links
+
+- A city page with places shows "Ask someone" under the place count. Making a vote link needs Pro, and without Pro the row opens the paywall.
+- The sheet lists the city's places, and up to 5 can be picked. "Send vote link" opens the share sheet with a link to `https://shelvr-web.vercel.app/p/<token>`.
+- Voters need no app or account. They tap ✓ or ✕ on each place and may type a first name. The page shows the sender's first name, the city and the places, with a saved link's cover image but never a photo save.
+- Votes appear on the city page as they land, with the newest vote, how many people voted, the days left, and a tally on each place. While the link is open, "Share" sends it again.
+- A link closes after 7 days and is deleted a week later with its votes and names.
+
 ## Pro / subscriptions (RevenueCat sandbox)
 
-- Shelvr Pro gates saves past the 10 free ones, Plan a date, Plan a trip, editing or removing a save's places, and starting a shared list. On Home the Plan a date and Plan a trip tiles carry a Pro tag for free accounts, and tapping one opens the paywall.
+- Shelvr Pro gates saves past the 10 free ones, Plan a date, Plan a trip, editing or removing a save's places, starting a shared list, and making a vote link. On Home the Plan a date and Plan a trip tiles carry a Pro tag for free accounts, and tapping one opens the paywall.
 - Plans: **Annual** (labelled Yearly on the paywall; 7-day trial, then the yearly price) and **Weekly** (no trial). Both auto-renew until canceled.
 - Lapsed subscribers are on the free plan: their existing saves stay open, and saves made while they had Pro do not count toward the 10.
 - Present paywall from any gated action or Profile → View Pro plans.
@@ -98,6 +106,7 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 - Saved URLs, extracted page content and spoken words, and the places Gemini finds in them (AI runs automatically unless the account has a previously recorded opt-out).
 - Place names sent to Apple Maps to pin a trip's stops (no live location tracking).
 - Shared list members see the list's places and each other's first names.
+- Voters on a vote link: their choices and an optional first name, seen only by the person who sent the link and deleted with the link.
 - RevenueCat subscription status.
 - PostHog product analytics (not ads).
 

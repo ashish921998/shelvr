@@ -305,6 +305,24 @@
     "other": "%{formattedCount} days left."
   },
   "plan.tally": "%{picks} would go, %{passes} would pass",
+  "plan.wouldGo": "%{name} would go to %{place}.",
+  "plan.wouldPass": "%{name} would pass on %{place}.",
+  "plan.someoneWouldGo": "Someone would go to %{place}.",
+  "plan.someoneWouldPass": "Someone would pass on %{place}.",
+  "plan.askHint": "Send a link. They pick the places they'd go to.",
+  "plan.askBody": "Pick up to %{limit} places. They tap ✓ on the ones they'd go to, and the votes show up here.",
+  "plan.askSend": "Send vote link",
+  "plan.newLinkHint": "Changing the places makes a new link. Votes on the old one stop showing here.",
+  "plan.shareLink": "Share vote link",
+  "plan.noVotesYet": "No votes yet",
+  "plan.votedPick": "%{name} voted ✓ on %{place}",
+  "plan.votedPass": "%{name} voted ✕ on %{place}",
+  "plan.someoneVotedPick": "Someone voted ✓ on %{place}",
+  "plan.someoneVotedPass": "Someone voted ✕ on %{place}",
+  "plan.votingClosed": {
+    "one": "Voting closed. %{formattedCount} person voted.",
+    "other": "Voting closed. %{formattedCount} people voted."
+  },
   "trip.make": "Plan my trip",
   "trip.pickTitle": "A trip",
   "trip.pickBody": "Turn your saved places into days",
@@ -1139,5 +1157,5 @@
   "onboardingCarousel.eat": "No more “where\nshould we eat?”",
   "onboardingCarousel.map": "Every place you saved,\non one map.",
   "onboardingCarousel.next": "Next slide",
-  "sharedLists.nameBodyWelcome": "People on your shared lists see it, and so does anyone with a link to a save you share or a list you own."
+  "sharedLists.nameBodyWelcome": "People on your shared lists see it, and so does anyone with a link to a save you share, a list you own or a shortlist you send."
 }

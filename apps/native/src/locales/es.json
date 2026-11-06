@@ -308,6 +308,25 @@
     "other": "Quedan %{formattedCount} días."
   },
   "plan.tally": "%{picks} irían, %{passes} pasan",
+  "plan.wouldGo": "%{name} iría a %{place}.",
+  "plan.wouldPass": "%{name} no iría a %{place}.",
+  "plan.someoneWouldGo": "Alguien iría a %{place}.",
+  "plan.someoneWouldPass": "Alguien no iría a %{place}.",
+  "plan.askHint": "Envía un enlace. Eligen los sitios a los que irían.",
+  "plan.askBody": "Elige hasta %{limit} sitios. Tocan ✓ en los que irían y los votos aparecen aquí.",
+  "plan.askSend": "Enviar enlace de votación",
+  "plan.newLinkHint": "Cambiar los sitios crea un enlace nuevo. Los votos del anterior dejan de mostrarse aquí.",
+  "plan.shareLink": "Compartir enlace de votación",
+  "plan.noVotesYet": "Aún no hay votos",
+  "plan.votedPick": "%{name} votó ✓ en %{place}",
+  "plan.votedPass": "%{name} votó ✕ en %{place}",
+  "plan.someoneVotedPick": "Alguien votó ✓ en %{place}",
+  "plan.someoneVotedPass": "Alguien votó ✕ en %{place}",
+  "plan.votingClosed": {
+    "one": "Votación cerrada. Votó %{formattedCount} persona.",
+    "many": "Votación cerrada. Votaron %{formattedCount} personas.",
+    "other": "Votación cerrada. Votaron %{formattedCount} personas."
+  },
   "trip.make": "Planear mi viaje",
   "trip.pickTitle": "Un viaje",
   "trip.pickBody": "Convierte tus lugares guardados en días",
@@ -1171,5 +1190,5 @@
   "onboardingCarousel.eat": "Se acabó el «¿dónde\ncomemos?»",
   "onboardingCarousel.map": "Cada lugar que guardaste,\nen un solo mapa.",
   "onboardingCarousel.next": "Siguiente diapositiva",
-  "sharedLists.nameBodyWelcome": "Las personas de tus listas compartidas lo ven, y también cualquiera con un enlace a un contenido que compartas o a una lista que te pertenezca."
+  "sharedLists.nameBodyWelcome": "Las personas de tus listas compartidas lo ven, y también cualquiera con un enlace a un contenido que compartas, a una lista que te pertenezca o a una selección que envíes."
 }
