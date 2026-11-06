@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { sameTripPlace } from "./placeIdentity";
+import { sameMapPlace, sameTripPlace, type Placed } from "./placeIdentity";
+import { uniquePlacePins } from "./trip";
 
 const LISBON = { lat: 38.71, lng: -9.14 };
 const NEXT_DOOR = { lat: 38.7101, lng: -9.14 };
@@ -68,5 +69,50 @@ describe("sameTripPlace", () => {
         { name: "Kafeine", ...NEXT_DOOR },
       ),
     ).toBe(false);
+  });
+});
+
+describe("sameMapPlace", () => {
+  it("matches two pins exactly when the map draws them as one", () => {
+    const pairs: [Placed, Placed, boolean][] = [
+      [
+        { name: "Starbucks", appleId: "A-1", ...LISBON },
+        { name: "Starbucks Chiado", appleId: "A-1", ...ACROSS_TOWN },
+        true,
+      ],
+      [
+        { name: "Starbucks", appleId: "A-1", ...LISBON },
+        { name: "Starbucks", appleId: "A-2", ...NEXT_DOOR },
+        false,
+      ],
+      [
+        { name: "Santa Joana", appleId: "A-1", ...LISBON },
+        { name: " santa joana ", ...NEXT_DOOR },
+        true,
+      ],
+      [
+        { name: "Santa Joana", ...LISBON },
+        { name: "Santa Joana", ...ACROSS_TOWN },
+        false,
+      ],
+      [
+        { name: "Santa Joana", ...LISBON },
+        { name: "Locke de Santa Joana", ...NEXT_DOOR },
+        false,
+      ],
+    ];
+    for (const [a, b, same] of pairs) {
+      expect(sameMapPlace(a, b)).toBe(same);
+      expect(sameMapPlace(b, a)).toBe(same);
+      expect(uniquePlacePins([a, b]).length === 1).toBe(same);
+      expect(uniquePlacePins([b, a]).length === 1).toBe(same);
+    }
+  });
+
+  it("keeps apart a name inside a nearby place's, which sameTripPlace merges", () => {
+    const rosetta = { name: "Rosetta", ...LISBON };
+    const bakery = { name: "Panadería Rosetta", appleId: "A-1", ...NEXT_DOOR };
+    expect(sameTripPlace(rosetta, bakery)).toBe(true);
+    expect(sameMapPlace(rosetta, bakery)).toBe(false);
   });
 });

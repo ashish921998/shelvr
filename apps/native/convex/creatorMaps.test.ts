@@ -23,6 +23,8 @@ import type { TestBackend } from "./test.setup";
 
 const LIST_NAME = "Maya’s Mexico City";
 const UNKNOWN_TOKEN = "0".repeat(32);
+const ROSETTA_POST =
+  "https://www.tiktok.com/@shelvr.fixtures/video/7300000000000000002";
 
 afterEach(() => {
   vi.useRealTimers();
@@ -59,6 +61,25 @@ async function savedListId(
 async function placeNames(person: Caller, listId: Id<"sharedLists">) {
   const list = await person.t.query(api.sharedLists.getSharedList, { listId });
   return list?.places.map((place) => place.name);
+}
+
+function saveRosetta(backend: TestBackend, creatorId: Id<"users">) {
+  return insertSave(backend, creatorId, {
+    url: ROSETTA_POST,
+    placePins: [{ name: "Rosetta", lat: 19.4199, lng: -99.1611 }],
+  });
+}
+
+async function placePosts(person: Caller, listId: Id<"sharedLists">) {
+  const list = await person.t.query(api.sharedLists.getSharedList, { listId });
+  return list?.places.map((place) => [place.name, place.postUrl]);
+}
+
+function withPosts(names: string[]) {
+  return names.map((name) => [
+    name,
+    name === "Rosetta" ? ROSETTA_POST : POSTS[name],
+  ]);
 }
 
 async function refusal(promise: Promise<unknown>): Promise<unknown> {
@@ -269,12 +290,7 @@ describe("saveCreatorMap", () => {
 
   it("copies every place the preview names, even one whose name sits inside a nearby place's", async () => {
     const { backend, creator, token } = await creatorWithPage();
-    const tikTok =
-      "https://www.tiktok.com/@shelvr.fixtures/video/7300000000000000002";
-    await insertSave(backend, creator.userId, {
-      url: tikTok,
-      placePins: [{ name: "Rosetta", lat: 19.4199, lng: -99.1611 }],
-    });
+    await saveRosetta(backend, creator.userId);
     const shown = ["Contramar", "Rosetta", ...PAGE_ORDER.slice(1)];
     await expect(preview(backend, token)).resolves.toMatchObject({
       placeCount: 5,
@@ -283,11 +299,50 @@ describe("saveCreatorMap", () => {
 
     const bo = await follower(backend);
     const listId = await savedListId(bo, token);
-    const list = await bo.t.query(api.sharedLists.getSharedList, { listId });
-    expect(list?.places.map((place) => [place.name, place.postUrl])).toEqual(
-      shown.map((name) => [name, name === "Rosetta" ? tikTok : POSTS[name]]),
+    expect(await placePosts(bo, listId)).toEqual(withPosts(shown));
+    await expect(save(bo, token)).resolves.toMatchObject({ added: 0 });
+  });
+
+  it("adds a place the creator saved since whose name sits inside a nearby place on the list", async () => {
+    const { backend, creator, token } = await creatorWithPage();
+    const bo = await follower(backend);
+    const listId = await savedListId(bo, token);
+    await saveRosetta(backend, creator.userId);
+    await expect(preview(backend, token)).resolves.toMatchObject({
+      placeCount: 5,
+    });
+
+    await expect(save(bo, token)).resolves.toEqual({
+      status: "saved",
+      listId,
+      added: 1,
+      created: false,
+    });
+    expect(await placePosts(bo, listId)).toEqual(
+      withPosts(["Rosetta", ...PAGE_ORDER]),
     );
     await expect(save(bo, token)).resolves.toMatchObject({ added: 0 });
+  });
+
+  it("adds back a removed place whose name sits inside a nearby place the list kept", async () => {
+    const { backend, creator, token } = await creatorWithPage();
+    await saveRosetta(backend, creator.userId);
+    const bo = await follower(backend);
+    const listId = await savedListId(bo, token);
+    const { places } = await listRows(backend, listId);
+    const rosetta = places.find((place) => place.name === "Rosetta");
+    await bo.t.mutation(api.sharedLists.removeSharedListPlace, {
+      placeId: rosetta!._id,
+    });
+
+    await expect(save(bo, token)).resolves.toMatchObject({
+      listId,
+      added: 1,
+      created: false,
+    });
+    expect(await placePosts(bo, listId)).toEqual(
+      withPosts(["Rosetta", ...PAGE_ORDER]),
+    );
   });
 
   it("puts a place the creator saved since at the top", async () => {

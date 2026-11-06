@@ -1,5 +1,5 @@
 import { placeKey } from "./plan";
-import { distanceKm, SAME_PLACE_KM, type LatLng } from "./trip";
+import { distanceKm, otherVenue, SAME_PLACE_KM, type LatLng } from "./trip";
 
 // When two pins are one place. Pure and free of server-only packages, so the
 // app's Add a place uses the same rule as the server.
@@ -46,6 +46,15 @@ function nearNamesake(a: Placed, b: Placed): boolean {
 export function samePlace(a: Placed, b: Placed): boolean {
   if (a.appleId !== undefined && a.appleId === b.appleId) return true;
   return nearNamesake(a, b);
+}
+
+export function sameMapPlace(a: Placed, b: Placed): boolean {
+  if (a.appleId !== undefined && a.appleId === b.appleId) return true;
+  return (
+    !otherVenue(a, b) &&
+    placeKey(a.name) === placeKey(b.name) &&
+    distanceKm(a, b) <= SAME_PLACE_KM
+  );
 }
 
 /**

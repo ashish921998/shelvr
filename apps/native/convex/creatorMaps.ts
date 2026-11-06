@@ -5,6 +5,7 @@ import { readySavesNewestFirst } from "./items";
 import { authedMutation, liveOwner } from "./model/auth";
 import { firstNameOf } from "./model/firstName";
 import { logEvent } from "./model/log";
+import { sameMapPlace } from "./model/placeIdentity";
 import { visitedPlaceKeys } from "./model/placeVisits";
 import { creatorMapPlaces } from "./model/publicMap";
 import { rateLimiter } from "./model/rateLimiter";
@@ -16,7 +17,7 @@ import { servablePage } from "./publicMaps";
 import { insertListPlaces } from "./sharedLists";
 
 const CREATOR_MAP_PREVIEW_NAMES = 3;
-const PAGE_PLACES = { step: 1, alreadyUnique: true };
+const PAGE_PLACES = { step: 1, same: sameMapPlace };
 
 type CreatorCity = {
   page: Doc<"publicMaps">;

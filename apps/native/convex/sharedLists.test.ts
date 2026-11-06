@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { sameMapPlace } from "./model/placeIdentity";
 import { MAX_LIST_CITIES } from "./model/sharedListLimits";
 import { MAX_LIST_MEMBERS } from "./model/sharedLists";
 import { insertListPlaces } from "./sharedLists";
@@ -483,21 +484,20 @@ describe("insertListPlaces", () => {
     expect(list?.placeCount).toBe(5);
   });
 
-  it("keeps a batch's near namesakes apart only when the batch is already unique", async () => {
+  it("keeps near namesakes apart, in the batch and against the list, only under the map's rule", async () => {
     const batch = [
       { name: "Rossio", ...near(10), city: "Lisbon" },
       { name: "Café Rossio", ...near(10.5), city: "Lisbon" },
+      { name: "Manteigaria Chiado", ...near(2.5), city: "Lisbon" },
       { name: "Time Out Market", ...near(0.2), city: "Lisbon" },
     ];
-    for (const [alreadyUnique, added] of [
-      [false, ["Rossio"]],
-      [true, ["Rossio", "Café Rossio"]],
+    for (const [rule, added] of [
+      [{}, ["Rossio"]],
+      [{ same: sameMapPlace }, ["Rossio", "Café Rossio", "Manteigaria Chiado"]],
     ] as const) {
       const { base, owner, listId } = await listWithOwner();
       await base.run((ctx) =>
-        insertListPlaces(ctx, listId, owner.userId, batch, Date.now(), {
-          alreadyUnique,
-        }),
+        insertListPlaces(ctx, listId, owner.userId, batch, Date.now(), rule),
       );
       const names = (await rowsOf(base, listId)).map((row) => row.name);
       expect(names.sort()).toEqual(
