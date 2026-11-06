@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMetadata(
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="November 3, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="November 6, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
@@ -48,6 +48,12 @@ export default function PrivacyPage() {
             the video itself. If you share a photo or text to Shelvr, including
             through Siri or Shortcuts, we store that too. Photos and notes stay
             in your account until you delete them.
+          </li>
+          <li>
+            <strong>Cities you’ve been to.</strong> If you pick cities you have
+            visited, we store which of our listed cities you picked so they show
+            on your map. We do not use your location for this. You can change
+            them in the app, and deleting your account deletes them.
           </li>
           <li>
             <strong>Photo metadata.</strong> When you send a photo to Shelvr
