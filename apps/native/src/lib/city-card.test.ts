@@ -54,4 +54,28 @@ describe("cardPoints", () => {
       ...pins.slice(0, CARD_MAX_PINS - 3),
     ]);
   });
+
+  it("draws a visited place out of town, and still frames the rest", () => {
+    const town = [
+      { lat: 41.8826, lng: -87.6226, visited: false },
+      { lat: 41.8827, lng: -87.6233, visited: false },
+      { lat: 41.8837, lng: -87.6251, visited: false },
+      { lat: 41.8947, lng: -87.6244, visited: false },
+      { lat: 41.8917, lng: -87.6086, visited: false },
+    ];
+    const dayTrip = { lat: 41.6, lng: -87.6, visited: true };
+    const stray = { lat: 41.6, lng: -87.9, visited: false };
+    const points = cardPoints(
+      [...town, dayTrip, stray],
+      box,
+      (pin) => pin.visited,
+    );
+    expect(points.map((point) => point.pin)).toEqual([dayTrip, ...town]);
+    for (const { x, y } of points) {
+      expect(x).toBeGreaterThanOrEqual(box.pad);
+      expect(x).toBeLessThanOrEqual(box.width - box.pad);
+      expect(y).toBeGreaterThanOrEqual(box.pad);
+      expect(y).toBeLessThanOrEqual(box.height - box.pad);
+    }
+  });
 });

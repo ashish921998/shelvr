@@ -9,10 +9,9 @@ export function cardPoints<T extends { lat: number; lng: number }>(
   box: { width: number; height: number; pad: number },
   visited: (pin: T) => boolean = () => false,
 ): CardPoint<T>[] {
-  const framed = framedPins([...pins]);
   const shown = [
-    ...framed.filter((pin) => visited(pin)),
-    ...framed.filter((pin) => !visited(pin)),
+    ...pins.filter((pin) => visited(pin)),
+    ...framedPins([...pins]).filter((pin) => !visited(pin)),
   ].slice(0, CARD_MAX_PINS);
   if (shown.length === 0) return [];
   const midLat = shown.reduce((sum, pin) => sum + pin.lat, 0) / shown.length;
