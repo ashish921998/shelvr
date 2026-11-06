@@ -194,8 +194,13 @@ export default function MapScreen() {
       <View
         style={[
           styles.overlay,
-          // Kept clear of MapKit's my-location button in the top right corner, which it would cover.
-          { top, right: located ? LOCATE_BUTTON_CLEARANCE : 0 },
+          // Kept clear of MapKit's my-location button in the top right corner, which it would cover,
+          // and of the Duo's right-edge strip.
+          {
+            top,
+            left: rt.insets.left,
+            right: rt.insets.right + (located ? LOCATE_BUTTON_CLEARANCE : 0),
+          },
         ]}
       >
         <MapSearch
@@ -231,5 +236,5 @@ export default function MapScreen() {
 const styles = StyleSheet.create((theme) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
   empty: { flex: 1, backgroundColor: theme.colors.background },
-  overlay: { position: "absolute", left: 0, gap: theme.gap(1) },
+  overlay: { position: "absolute", gap: theme.gap(1) },
 }));

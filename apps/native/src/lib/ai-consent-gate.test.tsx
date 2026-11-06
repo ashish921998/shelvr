@@ -116,7 +116,10 @@ vi.mock("@/lib/widget-sync", () => ({ RecentSavesWidgetSync: nothing }));
 vi.mock("react-native-reanimated", () => ({ useReducedMotion: () => false }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}), absoluteFillObject: {} },
-  useUnistyles: () => ({ theme: { colors: {} } }),
+  useUnistyles: () => ({
+    theme: { colors: {} },
+    rt: { insets: { top: 0, bottom: 0, left: 0, right: 0 } },
+  }),
 }));
 vi.mock("react-native", () => ({
   Platform: { OS: "ios" },

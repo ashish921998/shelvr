@@ -49,11 +49,22 @@ export function CityMap({
           height,
           top: rt.insets.top + theme.gap(6),
           bottom: coveredBottom + theme.gap(3),
+          left: rt.insets.left,
+          right: rt.insets.right,
           worldWidth: 256,
           centerY: height / 2,
         },
       ),
-    [pins, width, height, coveredBottom, rt.insets.top, theme],
+    [
+      pins,
+      width,
+      height,
+      coveredBottom,
+      rt.insets.top,
+      rt.insets.left,
+      rt.insets.right,
+      theme,
+    ],
   );
   const focus = useMemo(() => {
     const pin = pins.find((place) => cityPinId(place) === selected);
@@ -63,14 +74,26 @@ export function CityMap({
     const shownMiddle = (top + height - coveredBottom) / 2;
     const cos = Math.cos((pin.lat * Math.PI) / 180);
     const latPerPoint = (360 * cos) / (256 * 2 ** SELECTED_ZOOM);
+    // Likewise between the side insets, clear of the Duo's right-edge strip.
+    const lngPerPoint = 360 / (256 * 2 ** SELECTED_ZOOM);
     return {
       coordinates: {
         latitude: pin.lat - (height / 2 - shownMiddle) * latPerPoint,
-        longitude: pin.lng,
+        longitude:
+          pin.lng + ((rt.insets.right - rt.insets.left) / 2) * lngPerPoint,
       },
       zoom: SELECTED_ZOOM,
     };
-  }, [pins, selected, height, coveredBottom, rt.insets.top, theme]);
+  }, [
+    pins,
+    selected,
+    height,
+    coveredBottom,
+    rt.insets.top,
+    rt.insets.left,
+    rt.insets.right,
+    theme,
+  ]);
   const standard = focus ?? fit;
   const camera = useMemo(
     () =>

@@ -64,6 +64,8 @@ export function PlacesMap({
         height,
         top: topInset,
         bottom: rt.insets.bottom + theme.gap(10),
+        left: rt.insets.left,
+        right: rt.insets.right,
         worldWidth: 256,
         centerY: height / 2,
       },
@@ -79,7 +81,16 @@ export function PlacesMap({
           ),
         }
       : camera;
-  }, [framed, width, height, topInset, rt.insets.bottom, theme]);
+  }, [
+    framed,
+    width,
+    height,
+    topInset,
+    rt.insets.bottom,
+    rt.insets.left,
+    rt.insets.right,
+    theme,
+  ]);
 
   // expo-maps applies a cameraPosition prop without animation, so it only ever holds the first camera.
   const [firstCamera] = useState(showsUser ? undefined : fit);

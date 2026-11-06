@@ -27,6 +27,7 @@ import { usePlaceOpener } from "@/lib/use-place-opener";
 import { useCallback, useMemo } from "react";
 import { Linking, Pressable, ScrollView, Share, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { sidePadding } from "@/lib/side-insets";
 
 const MAP_SHARE = 0.38;
 
@@ -197,7 +198,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   scrollContent: { paddingBottom: rt.insets.bottom + theme.gap(4) },
   content: {
     gap: theme.gap(1.5),
-    paddingHorizontal: theme.gap(2),
+    ...sidePadding(rt.insets, theme.gap(2)),
     paddingTop: theme.gap(2),
   },
   heading: { gap: theme.gap(0.5), paddingBottom: theme.gap(1) },
