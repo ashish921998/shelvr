@@ -1,11 +1,8 @@
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
-import {
-  useEntitlement,
-  waitForSheetTransition,
-  whenSheetSettled,
-} from "@/lib/entitlement";
+import { useEntitlement, waitForSheetTransition } from "@/lib/entitlement";
 import { t } from "@/lib/i18n";
+import { takeSheetTurn } from "@/lib/one-time-sheets";
 import { createSheetRequestStore } from "@/lib/sheet-request-store";
 import type { TextMessageKey } from "@/locales/message-types";
 import { api } from "@convex/_generated/api";
@@ -64,6 +61,19 @@ function serial<T>(work: () => Promise<T>): Promise<T> {
 }
 
 const askedKey = (userId: string) => `shelvr.trialReminderAsked.${userId}`;
+const OWED = "owed";
+const ASKED = "1";
+
+function spendOwedPrimer(userId: string): boolean {
+  try {
+    if (SecureStore.getItem(askedKey(userId)) !== OWED) return false;
+    SecureStore.setItem(askedKey(userId), ASKED);
+    return true;
+  } catch (error) {
+    analytics.captureError("trial_reminder_flag_failed", error);
+    return false;
+  }
+}
 
 export function trialLastDayAt(expiresAt: number, now: number): number | null {
   const at = new Date(expiresAt - RENEWAL_WINDOW_MS);
@@ -231,42 +241,6 @@ export const trialReminderPrimer = {
   dismiss: () => primer.resolve(null),
 };
 
-let primerHolds = 0;
-let primerShown = false;
-let primerClosing: Promise<void> | null = null;
-const primerDoneWaiters = new Set<(done: Promise<void>) => void>();
-
-function holdPrimer(): (shown: boolean) => void {
-  primerHolds += 1;
-  let released = false;
-  return (shown) => {
-    if (released) return;
-    released = true;
-    primerHolds -= 1;
-    primerShown ||= shown;
-    if (primerHolds > 0) return;
-    let done: Promise<void> = Promise.resolve();
-    if (primerShown) {
-      const closing = waitForSheetTransition().then(() => {
-        if (primerClosing === closing) primerClosing = null;
-      });
-      primerClosing = closing;
-      done = closing;
-    }
-    primerShown = false;
-    const waiters = [...primerDoneWaiters];
-    primerDoneWaiters.clear();
-    for (const waiter of waiters) waiter(done);
-  };
-}
-
-export function whenTrialPrimerDone(): Promise<void> {
-  if (primerHolds === 0) return primerClosing ?? Promise.resolve();
-  return new Promise<Promise<void>>((resolve) =>
-    primerDoneWaiters.add(resolve),
-  ).then((done) => done);
-}
-
 export function useTrialReminderPrimerOpen(): boolean {
   return useSyncExternalStore(
     trialReminderPrimer.subscribe,
@@ -350,8 +324,10 @@ export function useTrialReminder(): void {
     const justStarted = before !== null && before !== "trialing";
     let mayAsk = false;
     try {
-      mayAsk = justStarted && SecureStore.getItem(askedKey(userId)) !== "1";
-      if (mayAsk) SecureStore.setItem(askedKey(userId), "1");
+      const asked = SecureStore.getItem(askedKey(userId));
+      mayAsk =
+        asked !== ASKED && (justStarted || (asked === OWED && before === null));
+      if (mayAsk) SecureStore.setItem(askedKey(userId), OWED);
     } catch (error) {
       mayAsk = false;
       analytics.captureError("trial_reminder_flag_failed", error);
@@ -364,21 +340,24 @@ export function useTrialReminder(): void {
     let decision: Promise<boolean> = Promise.resolve(false);
     let pending: typeof primerDecision.current = null;
     if (mayAsk) {
-      const releasePrimer = holdPrimer();
+      const turn = takeSheetTurn("primer");
       const entry = { expiresAt, ask: decision };
       const live = () => primerDecision.current === entry;
       entry.ask = (async () => {
-        let primed = false;
         try {
-          await whenSheetSettled();
-          if (!live()) return false;
+          await turn.granted;
+          if (!live() || !spendOwedPrimer(userId)) return false;
+          if (
+            trialReminderAt(expiresAt, Date.now(), trialReminderLeadDays()) ===
+            null
+          )
+            return false;
           const confirmed = await confirmTrialReminderAsk(live);
-          primed = confirmed.primed;
           if (!confirmed.ask || !live()) return false;
-          if (primed) await waitForSheetTransition();
+          await waitForSheetTransition();
           return live();
         } finally {
-          releasePrimer(primed);
+          turn.end();
         }
       })();
       primerDecision.current = entry;

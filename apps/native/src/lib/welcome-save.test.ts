@@ -48,22 +48,17 @@ vi.mock("@/lib/entitlement", () => ({
       mock.settle.push(resolve);
     }),
 }));
-vi.mock("@/lib/trial-reminder", () => ({
-  whenTrialPrimerDone: () => Promise.resolve(),
-}));
 vi.mock("expo-router", async () => {
-  const { useEffect, useSyncExternalStore } = await import("react");
+  const { useSyncExternalStore } = await import("react");
   return {
-    useFocusEffect: (callback: () => void | (() => void)) => {
-      const focused = useSyncExternalStore(
+    useIsFocused: () =>
+      useSyncExternalStore(
         (listener) => {
           mock.focusListeners.add(listener);
           return () => mock.focusListeners.delete(listener);
         },
         () => mock.focused,
-      );
-      useEffect(() => (focused ? callback() : undefined), [focused, callback]);
-    },
+      ),
   };
 });
 
@@ -150,7 +145,7 @@ describe("useWelcomeSaveTracker", () => {
 describe("useWelcomeSheetVisible", () => {
   beforeEach(() => {
     mock.store.clear();
-    mock.settle.length = 0;
+    for (const resolve of mock.settle.splice(0)) resolve();
     mock.focused = true;
   });
 
@@ -164,7 +159,7 @@ describe("useWelcomeSheetVisible", () => {
     expect(result.current).toBe(true);
   });
 
-  it("waits while Home is not ready", async () => {
+  it("waits while Home is not ready, then for other sheets to settle", async () => {
     welcomeSave.mark("user_a");
     const { result, rerender } = renderHook(
       ({ ready }) => useWelcomeSheetVisible("user_a", ready),
@@ -173,6 +168,8 @@ describe("useWelcomeSheetVisible", () => {
     await settleSheets();
     expect(result.current).toBe(false);
     rerender({ ready: true });
+    expect(result.current).toBe(false);
+    await settleSheets();
     expect(result.current).toBe(true);
   });
 
