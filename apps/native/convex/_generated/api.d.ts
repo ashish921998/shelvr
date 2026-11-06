@@ -19,6 +19,7 @@ import type * as appleProfile from "../appleProfile.js";
 import type * as appleRevoke from "../appleRevoke.js";
 import type * as auth from "../auth.js";
 import type * as cancelSurvey from "../cancelSurvey.js";
+import type * as creatorMaps from "../creatorMaps.js";
 import type * as crons from "../crons.js";
 import type * as datePlanData from "../datePlanData.js";
 import type * as datePlans from "../datePlans.js";
@@ -159,6 +160,7 @@ declare const fullApi: ApiFromModules<{
   appleRevoke: typeof appleRevoke;
   auth: typeof auth;
   cancelSurvey: typeof cancelSurvey;
+  creatorMaps: typeof creatorMaps;
   crons: typeof crons;
   datePlanData: typeof datePlanData;
   datePlans: typeof datePlans;

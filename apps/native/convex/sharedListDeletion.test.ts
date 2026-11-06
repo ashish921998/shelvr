@@ -4,6 +4,13 @@ import { describe, expect, it } from "vitest";
 
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import {
+  CITY,
+  creatorWithPage,
+  follower,
+  PAGE_ORDER,
+  POSTS,
+} from "./creatorMaps.test.helpers";
 import { LIST_DRAIN_BATCH, MAX_LISTS_PER_USER } from "./model/sharedLists";
 import { joiner, listWithOwner, seedSave } from "./sharedLists.test.helpers";
 import { seedNotes, signedInUser, type TestBackend } from "./test.setup";
@@ -190,6 +197,60 @@ describe("deleting an account with shared lists", () => {
     await drain(base, owner.userId);
     expect(
       await base.run((ctx) => ctx.db.query("sharedListMembers").collect()),
+    ).toEqual([]);
+  });
+
+  it("drains a follower's Save all list with the follower", async () => {
+    const { backend, token } = await creatorWithPage();
+    const bo = await follower(backend);
+    const saved = await bo.t.mutation(api.creatorMaps.saveCreatorMap, {
+      token,
+      city: CITY,
+      name: "Maya’s Mexico City",
+    });
+    if (saved.status !== "saved") throw new Error(saved.status);
+    expect((await remains(backend, saved.listId)).places).toHaveLength(4);
+    await bo.t.mutation(api.users.deleteCurrentUserAccount, {});
+    await drain(backend, bo.userId);
+    expect(await remains(backend, saved.listId)).toEqual({
+      list: null,
+      places: [],
+      members: [],
+    });
+  });
+
+  it("keeps a follower's Save all list when the creator deletes their account, and stops new saves at once", async () => {
+    const { backend, creator, token } = await creatorWithPage();
+    const bo = await follower(backend);
+    const args = { token, city: CITY, name: "Maya’s Mexico City" };
+    const saved = await bo.t.mutation(api.creatorMaps.saveCreatorMap, args);
+    if (saved.status !== "saved") throw new Error(saved.status);
+    const before = await remains(backend, saved.listId);
+
+    await creator.t.mutation(api.users.deleteCurrentUserAccount, {});
+    await expect(
+      backend.query(api.creatorMaps.creatorMapPreview, { token, city: CITY }),
+    ).resolves.toBeNull();
+    await expect(
+      bo.t.mutation(api.creatorMaps.saveCreatorMap, args),
+    ).resolves.toEqual({ status: "gone" });
+    await drain(backend, creator.userId);
+
+    expect(await remains(backend, saved.listId)).toEqual(before);
+    const seen = await bo.t.query(api.sharedLists.getSharedList, {
+      listId: saved.listId,
+    });
+    expect(seen?.places.map((place) => place.name)).toEqual(PAGE_ORDER);
+    expect(
+      seen?.places.flatMap((place) => (place.postUrl ? [place.postUrl] : [])),
+    ).toEqual(PAGE_ORDER.flatMap((name) => POSTS[name] ?? []));
+    expect(
+      await backend.run((ctx) =>
+        ctx.db
+          .query("publicMaps")
+          .withIndex("by_user", (q) => q.eq("userId", creator.userId))
+          .collect(),
+      ),
     ).toEqual([]);
   });
 

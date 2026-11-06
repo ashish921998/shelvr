@@ -12,6 +12,8 @@
 export const PUBLIC_ON_PURPOSE: Readonly<Record<string, string>> = {
   "auth:isAuthenticated":
     "Convex Auth's own query answers false to a signed-out caller, which is how the client learns it is signed out.",
+  "creatorMaps:creatorMapPreview":
+    "The Save all screen opens from a map page link before sign-in, so it answers a signed-out caller; the random page token is the capability, the city must be one of the page's stored spellings exactly, and a page that is blocked, has Save all off, lacks the city, or whose owner is gone or deleting answers null.",
   "devFixtures:canResetCurrentUser":
     "Answers false, not an error, to a signed-out caller or a non-development account, so the dev-only reset button can hide.",
   "freeSaves:freePlanOpen":

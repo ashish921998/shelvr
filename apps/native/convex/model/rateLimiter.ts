@@ -94,6 +94,19 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 600,
     shards: 4,
   },
+  creatorMapSave: {
+    kind: "token bucket",
+    rate: 30,
+    period: HOUR,
+    capacity: 12,
+  },
+  creatorMapSavePage: {
+    kind: "token bucket",
+    rate: 3000,
+    period: HOUR,
+    capacity: 600,
+    shards: 4,
+  },
   planVoteIp: { kind: "token bucket", rate: 120, period: HOUR, capacity: 60 },
   planVoterSlot: { kind: "token bucket", rate: 8, period: DAY, capacity: 8 },
   planVoteGlobal: {
