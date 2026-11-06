@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { placeEmoji } from "./map-pin-emoji";
+import { placeEmoji } from "./placeEmoji";
 
 describe("placeEmoji", () => {
   it("draws Apple's category when the pin has one", () => {
@@ -9,7 +9,6 @@ describe("placeEmoji", () => {
     expect(placeEmoji({ category: "Museum", kinds: ["activities"] })).toBe(
       "🏛️",
     );
-    // Two "things to do" places still look different.
     expect(placeEmoji({ category: "Park", kinds: ["activities"] })).toBe("🌳");
     expect(placeEmoji({ category: "FitnessCenter", kinds: [] })).toBe("🏋️");
   });

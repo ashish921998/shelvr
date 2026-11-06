@@ -54,8 +54,12 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `list-gate.ts`; backend `convex/sharedLists.ts` and `convex/model/sharedLists.ts`.
 - **Map tab:** route `src/app/(app)/(tabs)/(map)/index.tsx`, map, search and filter chips in
   `src/components/map`, filter rules in `src/lib/map-filters.ts` and
-  `convex/model/placeKinds.ts`, each pin's emoji in `src/lib/map-pin-emoji.ts`, data from
-  `convex/mapPlaces.ts`.
+  `convex/model/placeKinds.ts`, each pin's emoji in `convex/model/placeEmoji.ts`
+  (re-exported by `src/lib/map-pin-emoji.ts`), data from `convex/mapPlaces.ts`.
+- **Map page** (the public `/m/<token>` page of a person's map): backend
+  `convex/publicMaps.ts` with `convex/model/publicMap.ts` and `publicMapLimits.ts`,
+  the `GET /map/pages/<token>` route in `convex/http.ts`, fixtures
+  `devFixtures:seedMapPageFixtures`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;

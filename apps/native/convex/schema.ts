@@ -459,6 +459,15 @@ export default defineSchema({
     .index("by_item", ["itemId"])
     .index("by_user", ["userId"]),
 
+  publicMaps: defineTable({
+    userId: v.id("users"),
+    token: v.string(),
+    cities: v.array(v.string()),
+    blockedAt: v.optional(v.number()),
+  })
+    .index("by_token", ["token"])
+    .index("by_user", ["userId"]),
+
   weeklyDigests: defineTable({
     userId: v.string(),
     weekStart: v.number(),

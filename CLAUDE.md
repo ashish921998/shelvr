@@ -74,12 +74,19 @@ read [localization](docs/architecture/localization.md); before simulator QA read
   `pnpm exec convex run --prod <fn> '{"cursor":null}'` with `items:backfillPlaceSearch`
   (finish it before releasing the search UI), `items:clearEmbeddings` or
   `placePins:backfillPage`. Each schedules its remaining pages and is safe to restart.
+- **Blocking a reported map page** is by hand, from `apps/native`:
+  `pnpm exec convex run --prod publicMaps:setPublicMapBlocked '{"token":"<token>","blocked":true}'`
+  (`false` unblocks). The token is the last path segment in the report email's subject. The
+  owner cannot undo a block.
 - **Privacy rules the code enforces on purpose:** a shared list's place search sends Apple only
   the city name, never a member's pin; a plan from a shared list needs every contributor's AI
   permission, former members included; `sharedListPlaces` copies no save title or text, and
   its `itemId` goes only to the person who added it; an Apple refresh token is never returned,
   logged or passed as a scheduled job argument (`detachedAppleTokens` holds it instead); public
-  item reads strip `places` and `placeLocations`.
+  item reads strip `places` and `placeLocations`; a public map page returns only the owner's
+  first name, its cities and, for each place from a link save, the name, a rounded point, an
+  emoji, Been there and a post link rebuilt from the post's id; never a save's title, text, raw
+  URL or id, and nothing once the owner is deleting or the page is blocked.
 - **An AI check cannot recall a request.** `aiAllowed` runs before a request goes out; a decline
   that lands mid-run is handled at settlement, which ignores the classification.
 - **Rows outlive saves.** Deleting a save keeps its `tripStops` and `sharedListPlaces` rows.
