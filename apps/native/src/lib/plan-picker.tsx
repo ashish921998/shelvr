@@ -1,5 +1,6 @@
 import { PlanCitySheet } from "@/components/home/plan-city-sheet";
 import { canBrowse } from "@/lib/access";
+import { analytics } from "@/lib/analytics";
 import { type CityPlanKind, useCityPlan } from "@/lib/city-plan";
 import { useAccess } from "@/lib/free-plan";
 import { type City, plannableCities } from "@/lib/home-places";
@@ -40,11 +41,13 @@ export function usePlanPicker({ onLeave }: { onLeave?: () => void } = {}) {
   };
   const plan = (kind: CityPlanKind, inView?: string) => {
     if (busy !== null) return;
-    if (listed.isError) {
-      Alert.alert(t("errors.tryAgain"));
+    if (listed.data === undefined) {
+      if (listed.isError) {
+        analytics.captureError("plan_cities_load_failed", listed.error);
+        Alert.alert(t("errors.tryAgain"));
+      }
       return;
     }
-    if (listed.data === undefined) return;
     const target = planTarget(cities, inView);
     if (target === "pick") setPicking({ kind, open: true });
     else if (target === "none")

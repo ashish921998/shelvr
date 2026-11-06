@@ -18,6 +18,12 @@ const mocks = vi.hoisted(() => ({
   access: { kind: "pro" } as Record<string, unknown>,
   queryArgs: [] as unknown[],
   failed: false,
+  failure: new Error("listCities failed"),
+  captureError: vi.fn(),
+}));
+
+vi.mock("@/lib/analytics", () => ({
+  analytics: { captureError: mocks.captureError },
 }));
 
 vi.mock("@/components/empty-state", () => ({
@@ -36,7 +42,11 @@ vi.mock("@/components/ui/themed-text", () => ({
 }));
 vi.mock("@/lib/free-plan", () => ({ useAccess: () => mocks.access }));
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: mocks.cities, isError: mocks.failed }),
+  useQuery: () => ({
+    data: mocks.cities,
+    isError: mocks.failed,
+    error: mocks.failed ? mocks.failure : null,
+  }),
 }));
 vi.mock("@convex-dev/react-query", () => ({
   convexQuery: (_query: unknown, args: unknown) => {
@@ -81,6 +91,7 @@ beforeEach(() => {
   mocks.push.mockReset();
   mocks.queryArgs = [];
   mocks.failed = false;
+  mocks.captureError.mockReset();
   mocks.access = { kind: "pro" };
   mocks.cities = [
     { city: "Lisbon", count: 3, placeCount: 8, cover: "lisbon.jpg" },
@@ -125,6 +136,17 @@ it("says something went wrong instead of an empty grid when the cities fail", ()
   expect(screen.getByText("Cities")).toBeTruthy();
   expect(screen.getByText("Something went wrong")).toBeTruthy();
   expect(screen.queryByText("Loading cities")).toBeNull();
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "cities_load_failed",
+    mocks.failure,
+  );
+});
+
+it("keeps the cities it has when a later refresh fails", () => {
+  mocks.failed = true;
+  render(<Cities />);
+  expect(screen.getByText("Lisbon")).toBeTruthy();
+  expect(screen.queryByText("Something went wrong")).toBeNull();
 });
 
 it("asks for no cities while the account cannot browse", () => {

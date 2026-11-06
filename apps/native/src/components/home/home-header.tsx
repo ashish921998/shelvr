@@ -33,7 +33,7 @@ export function HomeHeader({ children }: { children?: ReactNode }) {
 
 const styles = StyleSheet.create((theme) => ({
   row: {
-    height: 46,
+    minHeight: 46,
     flexDirection: "row",
     alignItems: "center",
     gap: 13,

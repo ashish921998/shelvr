@@ -1,4 +1,5 @@
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
+import { withAlpha } from "@/lib/color";
 import { Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -71,7 +72,7 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     backgroundColor: theme.colors.surfaceMuted,
     borderWidth: 2.5,
-    borderColor: theme.colors.primarySoft,
+    borderColor: withAlpha(theme.colors.primary, 0.45),
   },
   pressed: { opacity: theme.opacity.pressed },
 }));

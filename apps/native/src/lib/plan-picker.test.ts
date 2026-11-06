@@ -6,9 +6,16 @@ const mocks = vi.hoisted(() => ({
   listed: { data: undefined, isError: false } as {
     data?: { city: string; count: number; cover: null }[];
     isError: boolean;
+    error?: Error;
   },
+  failure: new Error("listCities failed"),
   start: vi.fn(),
   alert: vi.fn(),
+  captureError: vi.fn(),
+}));
+
+vi.mock("@/lib/analytics", () => ({
+  analytics: { captureError: mocks.captureError },
 }));
 
 vi.mock("@/components/home/plan-city-sheet", () => ({
@@ -53,14 +60,31 @@ describe("usePlanPicker", () => {
   beforeEach(() => {
     mocks.start.mockReset();
     mocks.alert.mockReset();
+    mocks.captureError.mockReset();
   });
 
   it("says the cities failed to load instead of dropping the tap", () => {
-    mocks.listed = { data: undefined, isError: true };
+    mocks.listed = { data: undefined, isError: true, error: mocks.failure };
     const { result } = renderHook(() => usePlanPicker());
     result.current.plan("date", "Lisbon");
     expect(mocks.alert).toHaveBeenCalledTimes(1);
+    expect(mocks.captureError).toHaveBeenCalledWith(
+      "plan_cities_load_failed",
+      mocks.failure,
+    );
     expect(mocks.start).not.toHaveBeenCalled();
+  });
+
+  it("plans with the cities it has when a later refresh fails", () => {
+    mocks.listed = {
+      data: [city("Lisbon")],
+      isError: true,
+      error: mocks.failure,
+    };
+    const { result } = renderHook(() => usePlanPicker());
+    result.current.plan("trip");
+    expect(mocks.start).toHaveBeenCalledWith("trip", "Lisbon", undefined);
+    expect(mocks.alert).not.toHaveBeenCalled();
   });
 
   it("plans for the city on screen once the cities are loaded", () => {
