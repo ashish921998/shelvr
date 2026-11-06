@@ -3,10 +3,12 @@ import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 
 const NODE_SCRIPT =
-  /\bnode\s+(?:-\S+\s+)*["']?(?:(?:\.{1,2}|\$\{?\w+\}?)\/)*tools\/([\w.-]+\.[cm]?js)\b/g;
+  /\bnode\s+(?:-\S+\s+)*["']?(?:(?:\.{1,2}|\$\{?\w+\}?)\/)*tools\/([\w./-]+\.[cm]?js)\b/g;
 
 const scriptsRunByNode = (source) =>
-  [...source.matchAll(NODE_SCRIPT)].map(([, name]) => `tools/${name}`);
+  [...source.replaceAll("\\\n", " ").matchAll(NODE_SCRIPT)].map(
+    ([, name]) => `tools/${name}`,
+  );
 
 test("finds the tools scripts a step runs with node", () => {
   assert.deepEqual(
@@ -15,6 +17,9 @@ test("finds the tools scripts a step runs with node", () => {
       run: node ../../tools/relative.mjs "$ota_env"
         "node ../../tools/folded.mjs
       run: node "$GITHUB_ACTION_PATH/../../../tools/action.mjs" "$REVIEW_PROVIDER"
+      run: node tools/review-eval/nested.mjs
+      run: node \\
+        tools/continued.mjs --warn-only
       url=$(node --input-type=module -e '
       ' "$GITHUB_WORKSPACE/tools/e2e/tests/launch.ts")
       uses: actions/setup-node@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -24,6 +29,8 @@ test("finds the tools scripts a step runs with node", () => {
       "tools/relative.mjs",
       "tools/folded.mjs",
       "tools/action.mjs",
+      "tools/review-eval/nested.mjs",
+      "tools/continued.mjs",
     ],
   );
 });
