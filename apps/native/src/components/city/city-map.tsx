@@ -74,7 +74,6 @@ export function CityMap({
     const shownMiddle = (top + height - coveredBottom) / 2;
     const cos = Math.cos((pin.lat * Math.PI) / 180);
     const latPerPoint = (360 * cos) / (256 * 2 ** SELECTED_ZOOM);
-    // Likewise between the side insets, clear of the Duo's right-edge strip.
     const lngPerPoint = 360 / (256 * 2 ** SELECTED_ZOOM);
     return {
       coordinates: {

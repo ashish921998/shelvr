@@ -160,7 +160,6 @@ export function CitySheet({ snaps, top, header, list, onHeaderHeight }: Props) {
 }
 
 const styles = StyleSheet.create((theme, rt) => ({
-  // The map runs under the Duo's right-edge strip; the sheet stops at it.
   sheet: {
     position: "absolute",
     ...sideOffsets(rt.insets),

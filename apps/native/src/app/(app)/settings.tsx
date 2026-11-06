@@ -20,6 +20,8 @@ import {
 import { useNotificationSession } from "@/lib/notifications";
 import { useNotificationPermission } from "@/lib/use-notification-permission";
 import { useRestorePurchases } from "@/lib/use-restore-purchases";
+import { useSheetInsets } from "@/lib/use-sheet-insets";
+import { sidePadding, type SideInsets } from "@/lib/side-insets";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -50,6 +52,7 @@ export default function SettingsScreen() {
     getState: () => { routes: { name: string }[] };
   };
   const { theme } = useUnistyles();
+  const sheet = useSheetInsets();
   const { data: notificationPreferences } = useQuery(
     convexQuery(api.notifications.getPreferences, {}),
   );
@@ -200,12 +203,13 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView
+      onLayout={sheet.onLayout}
       contentInsetAdjustmentBehavior="automatic"
       showsVerticalScrollIndicator={false}
       // Lets the Android form sheet hand drags to this list once it is full
       // height, instead of only dragging the sheet.
       nestedScrollEnabled
-      contentContainerStyle={styles.content}
+      contentContainerStyle={styles.content(sheet.insets)}
     >
       <View style={styles.sheetHeader}>
         <Text accessibilityRole="header" style={styles.title}>
@@ -345,12 +349,12 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create((theme, rt) => ({
-  content: {
-    padding: theme.gap(3),
+  content: (insets: SideInsets) => ({
     paddingTop: theme.gap(4),
     paddingBottom: rt.insets.bottom + theme.gap(4),
+    ...sidePadding(insets, theme.gap(3)),
     gap: theme.gap(1.5),
-  },
+  }),
   sheetHeader: {
     minHeight: 40,
     flexDirection: "row",

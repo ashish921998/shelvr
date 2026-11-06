@@ -107,7 +107,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     position: "absolute",
     // Above the floating tab bar, clear of the header's Profile and Add buttons.
     bottom: rt.insets.bottom + theme.gap(8),
-    // Clear of the Duo's right-edge strip too.
     ...sideOffsets(rt.insets, theme.gap(2)),
   },
   toast: {

@@ -33,8 +33,6 @@ export function useTabStackChrome({
     headerShadowVisible: false,
     headerTitleAlign: "center" as const,
     scrollEdgeEffects: softScrollEdge ? SOFT_SCROLL_EDGE : undefined,
-    // Content stops at the side safe areas, such as the strip an unfolded iPhone Duo keeps down
-    // its right edge for the status bar, header buttons and tab bar.
     contentStyle: {
       backgroundColor: theme.colors.background,
       ...sidePadding(rt.insets),

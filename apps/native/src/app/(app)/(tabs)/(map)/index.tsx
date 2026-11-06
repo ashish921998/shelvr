@@ -194,8 +194,7 @@ export default function MapScreen() {
       <View
         style={[
           styles.overlay,
-          // Kept clear of MapKit's my-location button in the top right corner, which it would cover,
-          // and of the Duo's right-edge strip.
+          // Kept clear of MapKit's my-location button in the top right corner, which it would cover.
           {
             top,
             left: rt.insets.left,

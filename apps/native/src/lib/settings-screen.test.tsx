@@ -104,8 +104,11 @@ vi.mock("@/components/ui/themed-text", () => ({
   )),
 }));
 vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}), hairlineWidth: 1 },
+  StyleSheet: { create: () => ({ content: () => ({}) }), hairlineWidth: 1 },
   useUnistyles: () => ({ theme: { colors: {} } }),
+}));
+vi.mock("@/lib/use-sheet-insets", () => ({
+  useSheetInsets: () => ({ insets: { left: 0, right: 0 }, onLayout: vi.fn() }),
 }));
 vi.mock("react-native", () => ({
   Alert: { alert: mocks.alert },

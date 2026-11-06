@@ -75,8 +75,6 @@ export default function AppLayout() {
     : gated
       ? "/plan-gate"
       : "/(app)/(tabs)/(home)";
-  // Full screens stop at the side safe areas (the Duo's right-edge strip). Map screens, sheets,
-  // the item pager and screens wrapped in a SafeAreaView (plan-gate) lay out their own sides.
   const inset = {
     contentStyle: {
       backgroundColor: theme.colors.background,

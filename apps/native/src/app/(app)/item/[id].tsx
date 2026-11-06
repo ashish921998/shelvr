@@ -263,7 +263,6 @@ function ItemScreenContent() {
   const router = useRouter();
   const { theme, rt } = useUnistyles();
   const { width: windowWidth, height } = useWindowDimensions();
-  // Pages stop at the side safe areas (the Duo's right-edge strip), like the screen content.
   const width = contentWidth(windowWidth, rt.insets);
   const deleteItem = useMutation(api.items.deleteItem);
   const markItemOpened = useMutation(api.notifications.markItemOpened);

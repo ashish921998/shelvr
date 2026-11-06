@@ -28,7 +28,9 @@ import {
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
+import { sidePadding, type SideInsets } from "@/lib/side-insets";
 import { typedLink } from "@/lib/url";
+import { useSheetInsets } from "@/lib/use-sheet-insets";
 
 const PAYWALL_PLACEMENT = "add";
 
@@ -79,6 +81,7 @@ function AndroidAddHeader({
 function AddContent({ close }: { close: () => void }) {
   useAppLocale();
   const { theme } = useUnistyles();
+  const sheet = useSheetInsets();
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [value, setValue] = useState("");
@@ -145,7 +148,7 @@ function AddContent({ close }: { close: () => void }) {
   };
 
   return (
-    <View style={styles.content}>
+    <View onLayout={sheet.onLayout} style={styles.content(sheet.insets)}>
       <Stack.Screen
         options={{
           headerShown: Platform.OS !== "android",
@@ -239,11 +242,12 @@ export default function AddScreen() {
 }
 
 const styles = StyleSheet.create((theme) => ({
-  content: {
-    padding: theme.gap(2.5),
+  content: (insets: SideInsets) => ({
     paddingTop: theme.gap(2),
+    paddingBottom: theme.gap(2.5),
+    ...sidePadding(insets, theme.gap(2.5)),
     gap: theme.gap(1.5),
-  },
+  }),
   heading: {
     fontFamily: theme.fonts.display,
     fontSize: 24,

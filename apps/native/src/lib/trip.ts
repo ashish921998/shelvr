@@ -35,7 +35,6 @@ type MapView = {
   height: number;
   top: number;
   bottom: number;
-  /** Points covered at each side (the Duo's right-edge strip); the pins center in the rest. */
   left?: number;
   right?: number;
   worldWidth: number;
@@ -72,14 +71,13 @@ export function fitCamera(
   );
   const zoom = Math.min(16, Math.max(3, Math.min(byWidth, byHeight)));
   const latPerPoint = (360 * cos) / (view.worldWidth * 2 ** zoom);
+  const lngPerPoint = 360 / (view.worldWidth * 2 ** zoom);
+  const sideShift = ((right - left) / 2) * lngPerPoint;
   const visibleMiddle = view.top + visible / 2;
   return {
     coordinates: {
       latitude: midLat - (view.centerY - visibleMiddle) * latPerPoint,
-      // The camera centers on the whole view; shift it so the pins center between the covered sides.
-      longitude:
-        (minLng + maxLng) / 2 -
-        ((left - right) / 2) * (360 / (view.worldWidth * 2 ** zoom)),
+      longitude: (minLng + maxLng) / 2 + sideShift,
     },
     zoom,
   };

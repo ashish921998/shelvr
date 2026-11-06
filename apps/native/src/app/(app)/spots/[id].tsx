@@ -250,7 +250,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   sheet: {
     flex: 1,
     marginTop: -theme.gap(3),
-    // The map above runs under the Duo's right-edge strip; the sheet stops at it.
     marginLeft: rt.insets.left,
     marginRight: rt.insets.right,
     paddingHorizontal: theme.gap(3),

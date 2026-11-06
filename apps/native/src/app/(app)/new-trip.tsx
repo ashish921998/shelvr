@@ -14,6 +14,8 @@ import { ThemedText } from "@/components/ui/themed-text";
 import { useCreateTripPlan } from "@/lib/create-trip-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
+import { sidePadding, type SideInsets } from "@/lib/side-insets";
+import { useSheetInsets } from "@/lib/use-sheet-insets";
 import {
   cityChoices,
   clampDays,
@@ -39,6 +41,7 @@ export default function NewTripScreen() {
   const locale = useAppLocale();
   const router = useRouter();
   const { theme } = useUnistyles();
+  const sheet = useSheetInsets();
   const { city: cityParam, listId } = useLocalSearchParams<{
     city?: string;
     listId?: string;
@@ -114,7 +117,11 @@ export default function NewTripScreen() {
   // The sheet is modal to VoiceOver too, so a swipe never leaves it for the Trips list behind.
   if (state.status !== "idle") {
     return (
-      <View style={styles.screen} accessibilityViewIsModal>
+      <View
+        onLayout={sheet.onLayout}
+        style={styles.screen(sheet.insets)}
+        accessibilityViewIsModal
+      >
         {header}
         <TripPlannerReveal city={state.city} ready={ready} onDone={open} />
       </View>
@@ -122,7 +129,11 @@ export default function NewTripScreen() {
   }
 
   return (
-    <View style={styles.screen} accessibilityViewIsModal>
+    <View
+      onLayout={sheet.onLayout}
+      style={styles.screen(sheet.insets)}
+      accessibilityViewIsModal
+    >
       {header}
       <ScrollView
         contentInsetAdjustmentBehavior="automatic"
@@ -204,7 +215,11 @@ export default function NewTripScreen() {
 }
 
 const styles = StyleSheet.create((theme, rt) => ({
-  screen: { flex: 1, backgroundColor: theme.colors.background },
+  screen: (insets: SideInsets) => ({
+    flex: 1,
+    backgroundColor: theme.colors.background,
+    ...sidePadding(insets),
+  }),
   content: {
     gap: theme.gap(3),
     paddingHorizontal: theme.gap(2.5),
