@@ -223,6 +223,16 @@ export default function PrivacyPage() {
           stops the old one, turning the page off deletes it, and deleting your
           account removes it. If a page is reported, Shelvr may turn it off.
         </p>
+        <p className="mt-2">
+          If a map page’s owner turns on Save all, anyone with the link can copy
+          the places of a city on it into a list in their own Shelvr account:
+          each place’s name, its exact location and Apple Maps match, its kind,
+          and the link to the post it came from. The list is named with the
+          owner’s first name, if we have one. Nothing else from the owner’s
+          saves is copied. Copies belong to the person who saved them and stay
+          in their account if the owner turns Save all off, changes or turns off
+          the page, or deletes their account.
+        </p>
       </section>
 
       <section>
