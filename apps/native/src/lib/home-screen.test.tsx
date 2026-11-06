@@ -1,9 +1,23 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+} from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import HomeScreen from "@/app/(app)/(tabs)/(home)/index";
 import type { Access } from "@/lib/access";
+import { analytics } from "@/lib/analytics";
+import { useFeedbackInvitation } from "@/lib/feedback-invitation";
+import { useReviewPrompt } from "@/lib/review-prompt";
+import {
+  trialReminderPrimer,
+  useTrialReminder,
+  useTrialReminderPrimerOpen,
+} from "@/lib/trial-reminder";
 import { welcomeName, welcomeSave } from "@/lib/welcome-save";
 
 const USER = "user_a";
@@ -15,11 +29,19 @@ const FREE: Access = {
   pending: 0,
   open: true,
 };
+const GRANTED = { granted: true, canAskAgain: true, ios: { status: 2 } };
+const UNDETERMINED = { granted: false, canAskAgain: true, ios: { status: 0 } };
 
 const mocks = vi.hoisted(() => ({
   store: new Map<string, string>(),
   entitlement: {} as Record<string, unknown>,
   access: { kind: "loading" } as Access,
+  permission: {} as Record<string, unknown>,
+  firstName: {} as {
+    firstName: string | null | undefined;
+    failed: boolean;
+    error?: unknown;
+  },
 }));
 
 vi.mock("@/lib/i18n", () => ({
@@ -35,6 +57,17 @@ vi.mock("expo-secure-store", () => ({
     mocks.store.set(key, value);
   },
 }));
+vi.mock("expo-notifications", () => ({
+  AndroidImportance: { DEFAULT: 3 },
+  IosAuthorizationStatus: { AUTHORIZED: 2, PROVISIONAL: 3, EPHEMERAL: 4 },
+  SchedulableTriggerInputTypes: { DATE: "date" },
+  setNotificationChannelAsync: vi.fn(),
+  getPermissionsAsync: () => Promise.resolve(mocks.permission),
+  requestPermissionsAsync: () => Promise.resolve(mocks.permission),
+  scheduleNotificationAsync: vi.fn(),
+  cancelScheduledNotificationAsync: vi.fn(),
+  dismissNotificationAsync: vi.fn(),
+}));
 vi.mock("expo-router", async () => {
   const { useEffect } = await import("react");
   return {
@@ -45,7 +78,7 @@ vi.mock("expo-router", async () => {
   };
 });
 vi.mock("@tanstack/react-query", () => ({
-  useQuery: () => ({ data: undefined, isError: false }),
+  useQuery: () => ({ data: { remindersEnabled: false }, isError: false }),
 }));
 vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
 vi.mock("@/lib/current-user", () => ({
@@ -53,14 +86,12 @@ vi.mock("@/lib/current-user", () => ({
 }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => mocks.entitlement,
+  waitForSheetTransition: () => Promise.resolve(),
   whenSheetSettled: () => Promise.resolve(),
 }));
 vi.mock("@/lib/free-plan", () => ({ useAccess: () => mocks.access }));
-vi.mock("@/lib/trial-reminder", () => ({
-  whenTrialPrimerDone: () => Promise.resolve(),
-}));
 vi.mock("@/lib/shared-lists", () => ({
-  useMyFirstName: () => ({ firstName: null, loading: false, failed: false }),
+  useMyFirstName: () => mocks.firstName,
 }));
 vi.mock("@/lib/home-feed", () => ({
   useHomeFeed: () => ({
@@ -73,13 +104,13 @@ vi.mock("@/lib/home-feed", () => ({
 vi.mock("@/lib/home-places", () => ({ unplacedSaves: () => [] }));
 vi.mock("@/lib/feedback-invitation", () => ({
   useBusySaving: () => false,
-  useFeedbackInvitation: () => ({
+  useFeedbackInvitation: vi.fn(() => ({
     invitationVisible: false,
     modalOpen: false,
     openFeedbackFromInvitation: vi.fn(),
     dismissInvitation: vi.fn(),
     closeFeedback: vi.fn(),
-  }),
+  })),
 }));
 vi.mock("@/lib/use-cancel-survey", () => ({
   useCancelSurvey: () => ({
@@ -95,8 +126,18 @@ const fakes = vi.hoisted(() => ({
   passThrough: ({ children }: { children?: ReactNode }) => (
     <div>{children}</div>
   ),
-  nameSheet: ({ visible }: { visible: boolean }) =>
-    visible ? <div>name sheet</div> : null,
+  nameSheet: ({
+    visible,
+    onCancel,
+  }: {
+    visible: boolean;
+    onCancel: () => void;
+  }) =>
+    visible ? (
+      <button type="button" onClick={onCancel}>
+        name sheet
+      </button>
+    ) : null,
 }));
 vi.mock("@/components/home/pro-card", () => ({
   FreeSavesCard: fakes.nothing,
@@ -148,6 +189,7 @@ vi.mock("@/components/home/welcome-save-sheet", async () => {
   return { WelcomeSaveSheet };
 });
 vi.mock("react-native", () => ({
+  Platform: { OS: "ios" },
   ScrollView: fakes.passThrough,
   View: fakes.passThrough,
 }));
@@ -160,62 +202,158 @@ const trialing = {
   entitled: true,
   loading: false,
   status: "trialing",
-  expiresAt: 7 * 86_400_000,
+  expiresAt: Date.now() + 7 * 86_400_000,
 };
 
+function App() {
+  useTrialReminder();
+  const primerOpen = useTrialReminderPrimerOpen();
+  return (
+    <>
+      <HomeScreen />
+      {primerOpen ? <div>trial primer</div> : null}
+    </>
+  );
+}
+
 async function settle() {
-  await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  for (let round = 0; round < 5; round += 1) {
+    await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+  }
 }
 
 function sheets() {
   return {
     letter: screen.queryByText("welcome letter") !== null,
     name: screen.queryByText("name sheet") !== null,
+    primer: screen.queryByText("trial primer") !== null,
+  };
+}
+
+function deferred() {
+  return {
+    feedback: vi.mocked(useFeedbackInvitation).mock.lastCall?.[1]?.defer,
+    review: vi.mocked(useReviewPrompt).mock.lastCall?.[1]?.defer,
   };
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   mocks.store.clear();
   mocks.entitlement = notEntitled;
   mocks.access = { kind: "loading" };
+  mocks.permission = GRANTED;
+  mocks.firstName = { firstName: null, failed: false };
   welcomeSave.mark(USER);
   welcomeName.mark(USER);
 });
 
-afterEach(cleanup);
+afterEach(async () => {
+  cleanup();
+  trialReminderPrimer.dismiss();
+  await settle();
+});
 
 it("waits for a purchase made before sign-in, then shows the letter before asking for a name", async () => {
   mocks.access = { kind: "pro", syncing: true };
-  const { rerender } = render(<HomeScreen />);
+  const { rerender } = render(<App />);
   await settle();
-  expect(sheets()).toEqual({ letter: false, name: false });
+  expect(sheets()).toEqual({ letter: false, name: false, primer: false });
 
   mocks.entitlement = trialing;
   mocks.access = { kind: "pro", syncing: false };
-  rerender(<HomeScreen />);
+  rerender(<App />);
   await settle();
-  expect(sheets()).toEqual({ letter: true, name: false });
+  expect(sheets()).toEqual({ letter: true, name: false, primer: false });
 
   act(() => welcomeSave.finish(USER));
   await settle();
-  expect(sheets()).toEqual({ letter: false, name: true });
+  expect(sheets()).toEqual({ letter: false, name: true, primer: false });
 });
 
 it("asks a free account for a name", async () => {
   mocks.access = FREE;
-  render(<HomeScreen />);
+  render(<App />);
   await settle();
-  expect(sheets()).toEqual({ letter: false, name: true });
+  expect(sheets()).toEqual({ letter: false, name: true, primer: false });
 });
 
 it("asks for a name once the purchase window passes with no purchase", async () => {
   mocks.access = { kind: "pro", syncing: true };
-  const { rerender } = render(<HomeScreen />);
+  const { rerender } = render(<App />);
   await settle();
   expect(sheets().name).toBe(false);
 
   mocks.access = FREE;
-  rerender(<HomeScreen />);
+  rerender(<App />);
   await settle();
-  expect(sheets()).toEqual({ letter: false, name: true });
+  expect(sheets()).toEqual({ letter: false, name: true, primer: false });
+});
+
+it("keeps a purchase that lands while the name sheet is up waiting until it closes, then shows the primer and the letter one at a time", async () => {
+  mocks.permission = UNDETERMINED;
+  mocks.access = FREE;
+  const { rerender } = render(<App />);
+  await settle();
+  expect(sheets()).toEqual({ letter: false, name: true, primer: false });
+
+  mocks.entitlement = trialing;
+  mocks.access = { kind: "pro", syncing: false };
+  rerender(<App />);
+  await settle();
+  expect(sheets()).toEqual({ letter: false, name: true, primer: false });
+
+  fireEvent.click(screen.getByText("name sheet"));
+  await settle();
+  expect(sheets()).toEqual({ letter: false, name: false, primer: true });
+
+  act(() => trialReminderPrimer.answer(false));
+  await settle();
+  expect(sheets()).toEqual({ letter: true, name: false, primer: false });
+});
+
+it("lets the feedback invitation and the review prompt run while a free account's letter waits for Pro", async () => {
+  welcomeName.finish(USER);
+  mocks.access = FREE;
+  render(<App />);
+  await settle();
+  expect(sheets()).toEqual({ letter: false, name: false, primer: false });
+  expect(welcomeSave.isPending(USER)).toBe(true);
+  expect(deferred()).toEqual({ feedback: false, review: false });
+});
+
+it("reports a failed name lookup when it spends the ask", async () => {
+  const lookup = new Error("offline");
+  mocks.firstName = { firstName: undefined, failed: true, error: lookup };
+  mocks.access = FREE;
+  render(<App />);
+  await settle();
+  expect(sheets().name).toBe(false);
+  expect(welcomeName.isPending(USER)).toBe(false);
+  expect(analytics.captureError).toHaveBeenCalledWith(
+    "welcome_name_lookup_failed",
+    lookup,
+  );
+});
+
+it("shows the trial primer, the letter and the name sheet one at a time when a purchase lands after Home has opened", async () => {
+  mocks.permission = UNDETERMINED;
+  mocks.access = { kind: "pro", syncing: true };
+  const { rerender } = render(<App />);
+  await settle();
+  expect(sheets()).toEqual({ letter: false, name: false, primer: false });
+
+  mocks.entitlement = trialing;
+  mocks.access = { kind: "pro", syncing: false };
+  rerender(<App />);
+  await settle();
+  expect(sheets()).toEqual({ letter: false, name: false, primer: true });
+
+  act(() => trialReminderPrimer.answer(false));
+  await settle();
+  expect(sheets()).toEqual({ letter: true, name: false, primer: false });
+
+  act(() => welcomeSave.finish(USER));
+  await settle();
+  expect(sheets()).toEqual({ letter: false, name: true, primer: false });
 });
