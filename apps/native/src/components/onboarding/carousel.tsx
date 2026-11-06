@@ -109,8 +109,8 @@ function MapCard() {
         </View>
       ))}
       <View style={styles.mapChips}>
-        <Chip label={t("map.filterAll")} strong />
-        <Chip label={t("map.kindFood")} />
+        <Chip label={t("map.kindFood")} strong />
+        <Chip label={t("map.kindCoffee")} />
       </View>
     </View>
   );

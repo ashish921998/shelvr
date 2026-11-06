@@ -120,15 +120,17 @@ vi.mock("@/components/feedback/feedback-modal", () => ({
 vi.mock("@/components/home/home-places", () => ({
   HomePlaces: fakes.nothing,
   HomePlacesEmptyCard: fakes.nothing,
-  UnplacedSaves: fakes.nothing,
 }));
-vi.mock("@/components/home/review-saves", () => ({
-  ReviewSaves: fakes.nothing,
+vi.mock("@/components/home/home-header", () => ({
+  HomeHeader: fakes.nothing,
+}));
+vi.mock("@/components/home/recent-saves", () => ({
+  RecentSaves: fakes.nothing,
 }));
 vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: fakes.nothing,
 }));
-vi.mock("@/components/ui/header-scrim", () => ({ HeaderScrim: fakes.nothing }));
+vi.mock("expo-router/js-tabs", () => ({ useBottomTabBarHeight: () => 0 }));
 vi.mock("@/components/shared-list/name-sheet", () => ({
   NameSheet: fakes.nameSheet,
 }));
@@ -153,6 +155,7 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
+  useUnistyles: () => ({ theme: { gap: (n: number) => n * 8 } }),
 }));
 
 const notEntitled = { entitled: false, loading: false, status: "none" };
