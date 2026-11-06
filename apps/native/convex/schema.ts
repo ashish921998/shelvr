@@ -8,6 +8,7 @@ import {
   failureReasonValidator,
   intentValidator,
   placePinsValidator,
+  placeCuisinesValidator,
   placeLocationsValidator,
   postMediaValidator,
   recipeValidator,
@@ -132,6 +133,7 @@ export default defineSchema({
     cities: v.optional(v.array(v.string())),
     places: v.optional(v.array(v.string())),
     placeLocations: v.optional(placeLocationsValidator),
+    placeCuisines: v.optional(placeCuisinesValidator),
     /** True once a run has read the video's speech for places; a rerun then reads it no more. */
     placesHeard: v.optional(v.boolean()),
     products: v.optional(

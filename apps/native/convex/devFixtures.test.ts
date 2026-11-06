@@ -177,10 +177,10 @@ describe("resetCurrentUser", () => {
 
     await expect(
       client.mutation(api.devFixtures.resetCurrentUser, {}),
-    ).resolves.toEqual({ items: 6, spaces: 3, memberships: 4 });
+    ).resolves.toEqual({ items: 7, spaces: 3, memberships: 4 });
     await expect(
       client.mutation(api.devFixtures.resetCurrentUser, {}),
-    ).resolves.toEqual({ items: 6, spaces: 3, memberships: 4 });
+    ).resolves.toEqual({ items: 7, spaces: 3, memberships: 4 });
 
     await backend.run(async (ctx) => {
       const items = await ctx.db
@@ -192,6 +192,7 @@ describe("resetCurrentUser", () => {
         "Austin coffee stops",
         "Austin favorites",
         "Belém Tower",
+        "Houston eats",
         "The Value of Craft",
         "Weeknight Miso Ramen",
       ]);
@@ -242,7 +243,7 @@ describe("resetCurrentUser", () => {
 
     await expect(
       client.mutation(api.devFixtures.resetCurrentUser, {}),
-    ).resolves.toEqual({ items: 6, spaces: 3, memberships: 4 });
+    ).resolves.toEqual({ items: 7, spaces: 3, memberships: 4 });
   });
 });
 
@@ -381,7 +382,7 @@ describe("resetAnonymousUsersForE2e", () => {
         oauth: await itemsOf(oauthId),
       };
     });
-    expect(counts).toEqual({ anonymous: 6, deleting: 0, oauth: 0 });
+    expect(counts).toEqual({ anonymous: 7, deleting: 0, oauth: 0 });
   });
 
   it("seeds each of several anonymous accounts", async () => {
@@ -413,7 +414,7 @@ describe("resetAnonymousUsersForE2e", () => {
         ),
       ),
     );
-    expect(counts).toEqual([6, 6]);
+    expect(counts).toEqual([7, 7]);
   });
 
   it("refuses more than 25 anonymous accounts without seeding any", async () => {
