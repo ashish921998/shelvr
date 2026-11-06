@@ -15,7 +15,8 @@ type AppStoreLinkSource =
   | "plan"
   | "bio"
   | "place_tool"
-  | "place_banner";
+  | "place_banner"
+  | "map";
 
 export function useArrivalCampaign(fallback: string) {
   return useBrowserValue(
@@ -29,7 +30,7 @@ export function useAppStoreLink(
   shareToken?: string,
 ) {
   const campaign = useArrivalCampaign(
-    source === "share" ? "share" : `web_${source}`,
+    source === "share" || source === "map" ? source : `web_${source}`,
   );
 
   const onClick = () => {

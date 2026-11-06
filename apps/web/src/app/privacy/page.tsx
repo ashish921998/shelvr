@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMetadata(
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="November 3, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="November 6, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
@@ -184,8 +184,8 @@ export default function PrivacyPage() {
           you give it, such as titles or a screenshot, to Gemini for a reading.
           We do not store what you submit or the results. We do keep a rate
           limit record keyed to your IP address, to limit how often these tools
-          can be used. The waitlist and plan vote pages use the same kind of
-          rate limit.
+          can be used. The waitlist, plan vote and map pages use the same kind
+          of rate limit.
         </p>
         <p className="mt-2">
           Transient AI failures do not delete content you already captured.
@@ -209,6 +209,19 @@ export default function PrivacyPage() {
           with the link can vote, up to 20 people at a time, and we store each
           voter’s choices with a random browser identifier. The link closes
           after a week, and we delete it and its votes about a week after that.
+        </p>
+        <p className="mt-2">
+          If you turn on a map page, Shelvr makes an unlisted web page at a
+          random link. It shows your first name, if we have one, the cities you
+          pick, and, for each place you saved there from a link, its name, its
+          approximate location, an icon for its kind, whether you marked it
+          visited, and a link to the Instagram, TikTok or YouTube post it came
+          from. Places from your notes and photos never appear, and neither do
+          your saves’ titles, captions, notes, photos or other links. Places you
+          save later in those cities appear too. Anyone with the link can open
+          it, and search engines are asked not to index it. Making a new link
+          stops the old one, turning the page off deletes it, and deleting your
+          account removes it. If a page is reported, Shelvr may turn it off.
         </p>
       </section>
 
@@ -236,9 +249,9 @@ export default function PrivacyPage() {
         <p className="mt-2">
           We do not sell your data. We share it only with the providers needed
           to run Shelvr, with the sites we request when reading your saved
-          links, with the people you choose through share links and shared
-          lists, and where the law requires it. These providers are required to
-          protect data to the same standard we hold ourselves to.
+          links, with the people you choose through share links, map pages and
+          shared lists, and where the law requires it. These providers are
+          required to protect data to the same standard we hold ourselves to.
         </p>
         <ul className="mt-2 list-disc pl-5 space-y-2">
           <li>

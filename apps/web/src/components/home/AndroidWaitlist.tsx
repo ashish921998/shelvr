@@ -26,7 +26,7 @@ const tones = {
 };
 
 type AndroidWaitlistProps = {
-  source?: "footer" | "plan" | "bio";
+  source?: "footer" | "plan" | "bio" | "map";
   tone?: keyof typeof tones;
 };
 
