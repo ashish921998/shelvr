@@ -322,6 +322,23 @@ it("lets the feedback invitation and the review prompt run while a free account'
   expect(deferred()).toEqual({ feedback: false, review: false });
 });
 
+it("holds the feedback invitation and the review prompt while a new account's name ask waits for the purchase window", async () => {
+  mocks.access = { kind: "pro", syncing: true };
+  const { rerender } = render(<App />);
+  await settle();
+  expect(sheets()).toEqual({ letter: false, name: false, primer: false });
+  expect(deferred()).toEqual({ feedback: true, review: true });
+
+  mocks.access = FREE;
+  rerender(<App />);
+  await settle();
+  expect(sheets().name).toBe(true);
+
+  fireEvent.click(screen.getByText("name sheet"));
+  await settle();
+  expect(deferred()).toEqual({ feedback: false, review: false });
+});
+
 it("reports a failed name lookup when it spends the ask", async () => {
   const lookup = new Error("offline");
   mocks.firstName = { firstName: undefined, failed: true, error: lookup };

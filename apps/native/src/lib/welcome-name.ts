@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 export function useWelcomeName(
   userId: string | undefined,
   ready: boolean,
-): { open: boolean; close: () => void } {
+): { open: boolean; pending: boolean; close: () => void } {
   const pending = welcomeName.usePending(userId);
   const { firstName, failed, error } = useMyFirstName();
   const focused = useIsFocused();
@@ -37,6 +37,7 @@ export function useWelcomeName(
   }, [open, userId]);
   return {
     open,
+    pending,
     close: () => setAsked((current) => current && { ...current, open: false }),
   };
 }

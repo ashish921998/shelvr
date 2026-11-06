@@ -86,7 +86,11 @@ export default function HomeScreen() {
   );
   const sheetsBusy = useSheetTurnsBusy();
   const deferPrompts =
-    cancelSurvey.visible || entitlement.loading || locked || sheetsBusy;
+    cancelSurvey.visible ||
+    entitlement.loading ||
+    locked ||
+    sheetsBusy ||
+    welcomeName.pending;
   const feedback = useFeedbackInvitation(items, { defer: deferPrompts });
   useHoldSheetTurns(feedback.modalOpen);
   useReviewPrompt(items, {
