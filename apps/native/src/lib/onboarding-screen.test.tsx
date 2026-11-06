@@ -681,3 +681,13 @@ it("opens the paywall and reports a skip when the notifications step is skipped"
     granted: false,
   });
 });
+
+it("sends the first-save view when someone skipped sharing, closed the app, then shared after all", () => {
+  startAt("ahaShare");
+  render(<OnboardingScreen />);
+  tap("onboardingQ.skip");
+  relaunch();
+  tap("common.back");
+  tap("aha:share");
+  expect(viewsOf("first_save")).toHaveLength(1);
+});

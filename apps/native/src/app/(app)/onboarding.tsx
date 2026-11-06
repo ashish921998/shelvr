@@ -180,7 +180,9 @@ export default function OnboardingScreen() {
   const [viewedSteps] = useState(
     () =>
       new Set([
-        ...viewedBeforeResume(initial.step, initial.goals),
+        ...viewedBeforeResume(initial.step, initial.goals).filter(
+          (passed) => !(initial.skippedShare && passed === "firstSave"),
+        ),
         ...initial.viewed,
       ]),
   );

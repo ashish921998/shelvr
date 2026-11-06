@@ -21,7 +21,8 @@ account stays signed out through the paywall and signs in after it.
   button and "Skip" in the header; a skipped goal question plans for every
   goal, so the trip question follows. Skip on "Try saving this reel." goes
   to the spots without "Your first save!", and no reel is saved after
-  sign-in. Skip on the carousel acts as its Continue, and on the
+  sign-in. Skip on any carousel slide leaves it as the last slide's
+  Continue does, and on the
   notifications step as "Not now"; it hides while iOS is asking.
 - The city question reads "Where are you going?" after `Yes, I’m planning
 one`, "Where’s your dream city?" when no goal or every goal is picked,
