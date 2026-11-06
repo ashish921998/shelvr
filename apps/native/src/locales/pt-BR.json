@@ -186,6 +186,7 @@
   "notifications.remindersHelp": "Um lugar salvo, um artigo não lido ou uma receita para testar, no máximo uma vez por dia",
   "notifications.remindersToggle": "Notificações de lembretes dos salvos",
   "notifications.remindersChannel": "Lembretes dos salvos",
+  "notifications.planVotesChannel": "Votos em planos",
   "notifications.remindersDisabledBody": "Permita notificações do Shelvr nas configurações do dispositivo para receber lembretes dos seus salvos.",
   "feedback.open": "Enviar comentários",
   "support.contact": "Contatar suporte",

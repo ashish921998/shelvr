@@ -395,6 +395,20 @@ describe("notification opens", () => {
     expect(mock.push).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
   });
 
+  it("opens the city page from the first vote on a link", () => {
+    mock.lastResponse = opened({
+      url: "/city/Austin",
+      kind: "plan_vote",
+      notificationId: "notice-1",
+    });
+    renderHook(() => useNotificationObserver());
+    expect(mock.capture).toHaveBeenCalledWith("notification_opened", {
+      notification_kind: "plan_vote",
+      notification_id: "notice-1",
+    });
+    expect(mock.push).toHaveBeenCalledWith("/city/Austin");
+  });
+
   it("holds a tap while the plan loads, in the queue deep links share", () => {
     releaseSheetLink(true);
     mock.lastResponse = opened({ url: "/item/a", kind: "save_reminder" });

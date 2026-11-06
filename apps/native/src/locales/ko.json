@@ -184,6 +184,7 @@
   "notifications.remindersHelp": "저장한 장소, 읽지 않은 글, 해 볼 만한 레시피를 하루 최대 한 번",
   "notifications.remindersToggle": "저장 항목 리마인더 알림",
   "notifications.remindersChannel": "저장 항목 리마인더",
+  "notifications.planVotesChannel": "플랜 투표",
   "notifications.remindersDisabledBody": "저장 항목 리마인더를 받으려면 기기 설정에서 Shelvr 알림을 허용하세요.",
   "feedback.open": "의견 보내기",
   "support.contact": "고객 지원 문의",

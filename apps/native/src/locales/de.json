@@ -185,6 +185,7 @@
   "notifications.remindersHelp": "Ein gespeicherter Ort, ein ungelesener Artikel oder ein Rezept zum Ausprobieren – höchstens einmal am Tag",
   "notifications.remindersToggle": "Mitteilungen für Erinnerungen an Gespeichertes",
   "notifications.remindersChannel": "Erinnerungen an Gespeichertes",
+  "notifications.planVotesChannel": "Abstimmungen zu Plänen",
   "notifications.remindersDisabledBody": "Erlaube Shelvr-Mitteilungen in den Geräteeinstellungen, um Erinnerungen an deine gespeicherten Inhalte zu erhalten.",
   "feedback.open": "Feedback senden",
   "support.contact": "Support kontaktieren",

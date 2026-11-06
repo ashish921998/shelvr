@@ -186,6 +186,7 @@
   "notifications.remindersHelp": "Un lieu enregistré, un article non lu ou une recette à essayer, au plus une fois par jour",
   "notifications.remindersToggle": "Notifications des rappels de contenus",
   "notifications.remindersChannel": "Rappels de contenus",
+  "notifications.planVotesChannel": "Votes sur les plans",
   "notifications.remindersDisabledBody": "Autorisez les notifications de Shelvr dans les réglages de votre appareil pour recevoir des rappels sur vos contenus enregistrés.",
   "feedback.open": "Envoyer un avis",
   "support.contact": "Contacter l'assistance",

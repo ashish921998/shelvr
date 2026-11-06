@@ -183,6 +183,7 @@ export type MessageParams = {
   "notifications.remindersHelp": undefined;
   "notifications.remindersToggle": undefined;
   "notifications.remindersChannel": undefined;
+  "notifications.planVotesChannel": undefined;
   "notifications.remindersDisabledBody": undefined;
   "feedback.open": undefined;
   "support.contact": undefined;

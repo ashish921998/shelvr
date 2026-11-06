@@ -11,16 +11,19 @@ record.
 ## What ships
 
 Every notification about saves names one of them, or it is not sent. The trip
-eve push is about a trip, so it names the trip and counts its saved places.
+eve push is about a trip, so it names the trip and counts its saved places. The
+first-vote push is about a vote link, so it names the city and a place someone
+voted on.
 
-| Kind             | Example                                                    | When                                                             | Switch         |
-| ---------------- | ---------------------------------------------------------- | ---------------------------------------------------------------- | -------------- |
-| `weekly_shelf`   | _"The 12-hour short rib" and 2 more you saved this week_   | Sunday 09:00 local, with 3 unopened saves, this week's and older | Weekly shelf   |
-| `read_reminder`  | _"Why bread rises" is ready when you are._                 | An article unopened for a day or more (up to 90 days)            | Save reminders |
-| `cook_reminder`  | _Want to make "Lasagna" today?_                            | A recipe saved 3+ days ago, not opened in the past week          | Save reminders |
-| `visit_reminder` | _Still want to go to "As Bifanas do Afonso"?_              | A save naming a place not marked "We went", saved 3+ days ago    | Save reminders |
-| `trip_eve`       | _Your Lisbon trip is tomorrow / You saved 6 places to go._ | 18:00 local the evening before a dated trip with saved stops     | Save reminders |
-| trial reminder   | _Your free trial ends in 2 days_                           | Local notification, 2 days before a trial renews (on `main`)     | OS permission  |
+| Kind             | Example                                                               | When                                                             | Switch                                       |
+| ---------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------------------------------------- |
+| `weekly_shelf`   | _"The 12-hour short rib" and 2 more you saved this week_              | Sunday 09:00 local, with 3 unopened saves, this week's and older | Weekly shelf                                 |
+| `read_reminder`  | _"Why bread rises" is ready when you are._                            | An article unopened for a day or more (up to 90 days)            | Save reminders                               |
+| `cook_reminder`  | _Want to make "Lasagna" today?_                                       | A recipe saved 3+ days ago, not opened in the past week          | Save reminders                               |
+| `visit_reminder` | _Still want to go to "As Bifanas do Afonso"?_                         | A save naming a place not marked "We went", saved 3+ days ago    | Save reminders                               |
+| `trip_eve`       | _Your Lisbon trip is tomorrow / You saved 6 places to go._            | 18:00 local the evening before a dated trip with saved stops     | Save reminders                               |
+| `plan_vote`      | _First vote on your Austin shortlist / Maya would go to Jo's Coffee._ | Two minutes after the first vote on a vote link, once per link   | Save reminders (Android: Plan votes channel) |
+| trial reminder   | _Your free trial ends in 2 days_                                      | Local notification, 2 days before a trial renews (on `main`)     | OS permission                                |
 
 ### Weekly shelf
 
@@ -114,6 +117,39 @@ and recover machine as save reminders. The rules are pure functions in
   once rows exist; a row outlives a deleted trip, so reverting the schema fails
   the deploy.
 
+### Plan votes
+
+`recordPlanVote` (`convex/planShares.ts`) writes one `planVoteNotices` row when
+the first ballot with a pick or a pass lands on a vote link that has a city,
+and `sendPlanVote` in `convex/notificationDelivery.ts` delivers it through the
+same claim, finish and recover machine. The rules are pure functions in
+`convex/model/planVote.ts`.
+
+- **Who.** A live owner with an enabled device, Save reminders on (no
+  preferences row counts as on), and the server switch on.
+- **When.** Two minutes after the first non-empty ballot, so the first voter's
+  whole ballot is in. The notice expires six hours after it is made, or when
+  the link closes. A link gets one at most, even if its first voter clears
+  their vote and someone else votes later.
+- **What.** The title names the city, and the body names one voter and one
+  place: the voter who queued the notice, then the others, newest first. A
+  pick comes before a pass, and within a voter their newest choice of that
+  kind, else their first in shortlist order. A voter with no name is
+  "Someone".
+- **Budget.** Exempt from the 20-hour gap, and it does not count toward it: it
+  answers something the person just did, at most once per link.
+- **Where a tap goes.** `/city/<city>`, `kind: "plan_vote"`.
+- **Silent conditions**, checked in this order, each closing the notice with
+  no push: the link is gone (`link_gone`); the owner's account is deleting or
+  gone (`owner_unavailable`); the server switch is off (`pushes_paused`); Save
+  reminders are off (`notifications_disabled`); eight attempts were used
+  (`retry_limit_reached`); the link closed or six hours passed (`expired`); the
+  owner made a newer link for the same city (`superseded`); every vote was
+  cleared, or every voted place's save was deleted (`no_items`); there is no
+  enabled device (`no_devices`).
+- **Rollback.** Keep `planVoteNotices` and its indexes declared once rows
+  exist.
+
 ### Events
 
 `notification_permission_result` (only when the user was actually prompted),
@@ -165,6 +201,10 @@ When it turns on, anyone whose pass is more than two hours overdue
 (`MAX_LATE_MS`) is booked for their next slot instead of being sent a
 reminder at whatever hour the switch flipped.
 
+The first-vote push has its own switch, `PLAN_VOTE_PUSH_ENABLED`. While it is
+unset, a vote queues nothing; turned off, a notice already queued closes as
+`pushes_paused`.
+
 ### Launch order
 
 1. Merge. CI deploys Convex. Reminders stay off.
@@ -184,6 +224,22 @@ Older clients handle reminders without the update:
 - A tap routes through the existing `url` handling.
 - On Android, reminders fall back to the app's default channel.
 - Their Profile screen simply has no reminders switch.
+
+The first-vote push launches the same way, with no store build:
+
+1. Merge. CI deploys Convex. Pushes stay off, because `PLAN_VOTE_PUSH_ENABLED`
+   is unset and a vote queues nothing.
+2. `release.yml` in `ota` mode publishes the client, which creates the Android
+   `plan-votes` channel.
+3. Before turning pushes on, check the oldest build in use (PostHog app
+   version) for the `city/[name]` route. Installed builds that still make deck
+   links with a city get the push too, and its tap opens `/city/<city>`.
+4. Once the OTA is live: `npx convex env set PLAN_VOTE_PUSH_ENABLED true --prod`.
+   To stop: `npx convex env set PLAN_VOTE_PUSH_ENABLED false --prod`; a notice
+   already queued then closes as `pushes_paused`.
+
+Without the OTA, a tap still routes through the `url` handling, and Android
+files the push under the app's default channel.
 
 ## Evidence status
 
@@ -258,7 +314,7 @@ Verified against the repository.
 | `model/notificationFields.ts` | `digestCopy` plus nine locale catalogs                                                 |
 | `itemReads`                   | Per-user read state; already the digest's unread filter                                |
 | Deep links                    | `data.url` routed by `useNotificationObserver`                                         |
-| Android channel               | `weekly-shelf`, created in `notification-token.ts`                                     |
+| Android channel               | `weekly-shelf`, `save-reminders` and `plan-votes`, created in `notification-token.ts`  |
 | Opt-in prompt                 | `WeeklyNudgeSheet`, once, after the first share-sheet save                             |
 
 The delivery machine is the strongest part of this system. The design below

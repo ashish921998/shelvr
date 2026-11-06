@@ -184,6 +184,7 @@
   "notifications.remindersHelp": "保存した場所、未読の記事、試したいレシピを、1日1回まで",
   "notifications.remindersToggle": "保存アイテムのリマインダー通知",
   "notifications.remindersChannel": "保存アイテムのリマインダー",
+  "notifications.planVotesChannel": "プランへの投票",
   "notifications.remindersDisabledBody": "保存アイテムのリマインダーを受け取るには、端末の設定でShelvrの通知を許可してください。",
   "feedback.open": "フィードバックを送る",
   "support.contact": "サポートに問い合わせる",

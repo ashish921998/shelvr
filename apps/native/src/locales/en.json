@@ -185,6 +185,7 @@
   "notifications.remindersHelp": "A place you saved, an article you haven’t read or a recipe to try, never more than once a day",
   "notifications.remindersToggle": "Save reminder notifications",
   "notifications.remindersChannel": "Save reminders",
+  "notifications.planVotesChannel": "Plan votes",
   "notifications.remindersDisabledBody": "Allow notifications for Shelvr in your device settings to get reminders about your saves.",
   "feedback.open": "Send feedback",
   "support.contact": "Contact Support",
