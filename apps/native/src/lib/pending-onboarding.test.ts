@@ -58,6 +58,7 @@ describe("onboarding recovery", () => {
       goals: [],
       savedCount: null,
       planner: null,
+      tripSoon: null,
     });
   });
 });
@@ -70,12 +71,14 @@ describe("the survey answers", () => {
       goals: ["date", "food"],
       savedCount: "hundreds",
       planner: "explorer",
+      tripSoon: "notYet",
     });
     setPendingSpaces(["Date nights"]);
     expect(getOnboardingProgress()).toMatchObject({
       goals: ["date", "food"],
       savedCount: "hundreds",
       planner: "explorer",
+      tripSoon: "notYet",
     });
   });
 
@@ -89,13 +92,25 @@ describe("the survey answers", () => {
         goals: ["shopping", "travel"],
         savedCount: "millions",
         planner: "chaotic",
+        tripSoon: "maybe",
       }),
     );
     expect(getOnboardingProgress()).toMatchObject({
       goals: ["travel"],
       savedCount: null,
       planner: null,
+      tripSoon: null,
     });
+  });
+
+  it("drop the step of an earlier flow, whose indexes mean other screens", () => {
+    setOnboardingProgress({ spaces: [], step: 9, goals: ["travel"] });
+    const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({ ...stored, progressVersion: 11 }),
+    );
+    expect(getOnboardingProgress()).toMatchObject({ step: null, goals: [] });
   });
 });
 
@@ -161,6 +176,7 @@ describe("progress written by an older onboarding flow", () => {
     goals: [],
     savedCount: null,
     planner: null,
+    tripSoon: null,
   };
 
   it.each([0, 1, 2, 3, 4, 5, 6, 7])(
@@ -194,6 +210,7 @@ describe("progress written by an older onboarding flow", () => {
     ["the flow that asked one goal", { progressVersion: 8 }],
     ["the flow without the chart step", { progressVersion: 9 }],
     ["the flow that had the sample plan step", { progressVersion: 10 }],
+    ["the flow with the chart and commitment", { progressVersion: 11 }],
     ["a non-numeric version", { progressVersion: "2" }],
   ])("restarts a record with %s", (_name, version) => {
     storage.set(
@@ -217,7 +234,7 @@ describe("progress written by an older onboarding flow", () => {
         operationId: "op",
         spaces: ["Travel"],
         demoUrl: null,
-        progressVersion: 11,
+        progressVersion: 12,
         step: 2,
         spaceNames: {},
       }),
@@ -229,6 +246,7 @@ describe("progress written by an older onboarding flow", () => {
       goals: [],
       savedCount: null,
       planner: null,
+      tripSoon: null,
     });
   });
 
@@ -251,6 +269,7 @@ describe("progress written by an older onboarding flow", () => {
       goals: [],
       savedCount: null,
       planner: null,
+      tripSoon: null,
     });
     expect(getPendingDemoUrl()).toBe("https://example.com/queued");
     expect(getOrCreatePendingOperationId()).toBe("legacy-operation");

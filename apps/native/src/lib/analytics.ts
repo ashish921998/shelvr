@@ -6,9 +6,13 @@ import {
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import type { SaveSource } from "@convex/model/saveSource";
 import type { SaveFailureStage } from "@convex/model/saveErrors";
-import type { Goal, Planner, SavedCount } from "@/lib/onboarding-goals";
+import type {
+  Goal,
+  Planner,
+  SavedCount,
+  TripSoon,
+} from "@/lib/onboarding-goals";
 import type { SampleCityId } from "@/lib/sample-cities";
-import type { PlanKind } from "@/lib/sample-plans";
 import Constants from "expo-constants";
 
 export type AnalyticsItem = {
@@ -81,12 +85,6 @@ export type AnalyticsEventProperties = {
     duration_ms: number;
   };
   onboarding_opener_page_viewed: { page_index: number };
-  onboarding_commitment: {
-    action: "confirmed" | "skipped";
-    plan_kind: PlanKind;
-    sample_city: SampleCityId;
-    flow_version: number;
-  };
   onboarding_notifications: { action: "allow" | "skip"; granted: boolean };
   auth_started: {
     provider: string;
@@ -263,6 +261,7 @@ export type AnalyticsEventProperties = {
     goals: Goal[];
     saved_count: SavedCount | null;
     planner: Planner | null;
+    trip_soon: TripSoon | null;
     space_count: number;
     space_names: string[];
     custom_space_count: number;
@@ -298,7 +297,7 @@ export type AnalyticsEventProperties = {
   shared_list_join_tapped: { signed_in: boolean };
   shared_list_joined: { joined: boolean; onboarded_before: boolean };
   shared_list_name_prompt: {
-    kind: "join" | "create" | "joined";
+    kind: "join" | "create" | "joined" | "welcome";
     outcome: "named" | "skipped";
   };
   shared_list_opened: { places: number; members: number; fresh: number };

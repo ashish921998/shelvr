@@ -4,6 +4,7 @@ import {
   type Goal,
   type Planner,
   type SavedCount,
+  type TripSoon,
 } from "@/lib/onboarding-goals";
 import { isInterest } from "@/lib/onboarding-interests";
 import type { SampleCityId } from "@/lib/sample-cities";
@@ -15,6 +16,7 @@ type Answers = {
   goals?: readonly Goal[];
   savedCount?: SavedCount | null;
   planner?: Planner | null;
+  tripSoon?: TripSoon | null;
 };
 
 /** Topics and travel vibes count as spaces; only preset identities are named, typed names are user content, and the sample city is one of a fixed list. */
@@ -32,6 +34,7 @@ export function onboardingCompletedProperties(
     goals,
     saved_count: answers.savedCount ?? null,
     planner: answers.planner ?? null,
+    trip_soon: answers.tripSoon ?? null,
     space_count: spaces.length,
     space_names: spaces.filter(isPresetSpace),
     custom_space_count: spaces.filter((name) => !isPresetSpace(name)).length,
