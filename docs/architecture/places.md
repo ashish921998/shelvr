@@ -16,8 +16,9 @@ That needs one fact per place: what kind of food or drink it serves.
 ## Design
 
 Keep everything about places where it is: pins on the save, visits in `placeVisits`, removals in
-`placeRemovals`, copies in `sharedListPlaces` and `tripStops`. Add the per-place kind to the save,
-next to the pins it describes.
+`placeRemovals`, copies in `sharedListPlaces` (creator-map copies too: rows with `postUrl`, written
+by `saveCreatorMap`) and `tripStops`. Add the per-place kind to the save, next to the pins it
+describes.
 
 ### 1. The model names each place's kind
 

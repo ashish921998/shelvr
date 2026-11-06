@@ -78,6 +78,10 @@ read [localization](docs/architecture/localization.md); before simulator QA read
   `pnpm exec convex run --prod publicMaps:setPublicMapBlocked '{"token":"<token>","blocked":true}'`
   (`false` unblocks). The token is the last path segment in the report email's subject. The
   owner cannot undo a block.
+- **Save all lists skip `createSharedList`'s Pro check on purpose:** `saveCreatorMap`
+  (`convex/creatorMaps.ts`) makes a follower's list without Pro. It and `creatorMapPreview`
+  accept a city only in the page's exact stored spelling, so spelling variants cannot add cached
+  scans of a creator's saves.
 - **Privacy rules the code enforces on purpose:** a shared list's place search sends Apple only
   the city name, never a member's pin; a plan from a shared list needs every contributor's AI
   permission, former members included; `sharedListPlaces` copies no save title or text, and
@@ -86,7 +90,11 @@ read [localization](docs/architecture/localization.md); before simulator QA read
   item reads strip `places` and `placeLocations`; a public map page returns only the owner's
   first name, its cities and, for each place from a link save, the name, a rounded point, an
   emoji, Been there and a post link rebuilt from the post's id; never a save's title, text, raw
-  URL or id, and nothing once the owner is deleting or the page is blocked.
+  URL or id, and nothing once the owner is deleting or the page is blocked; a creator map's Save
+  all copies into the saver's own list only a place's name, exact point, city, category, Apple id
+  and rebuilt post link, never the creator's save title, text, raw URL, item id or tags; the list
+  is named with the creator's first name; the copy is the saver's, so plans from it check the
+  saver's AI permission, and it stays when the creator leaves.
 - **An AI check cannot recall a request.** `aiAllowed` runs before a request goes out; a decline
   that lands mid-run is handled at settlement, which ignores the classification.
 - **Rows outlive saves.** Deleting a save keeps its `tripStops` and `sharedListPlaces` rows.
