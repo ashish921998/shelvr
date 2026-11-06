@@ -112,9 +112,9 @@ describe("ReelPlaceFinder results", () => {
     const body = paragraph(container, "Get Shelvr")?.textContent ?? "";
     expect(body).toContain("share a reel to it");
     expect(body).not.toContain("this reel");
-    expect(section.querySelector("a[aria-label]")?.textContent).toBe(
-      "Save these to Shelvr",
-    );
+    expect(
+      section.querySelector("a[aria-label]")?.getAttribute("aria-label"),
+    ).toBe("Save these to Shelvr, on the App Store");
   });
 
   it("sketches ten of thirteen places and counts the rest", async () => {
