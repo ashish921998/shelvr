@@ -26,6 +26,21 @@ it.each(SIRI_SHORTCUTS)(
   },
 );
 
+const NOT_SAVES = ["SearchShelvrIntent"];
+
+it("lists every Swift intent with a phrase you can say as is, except search, which is not a save", () => {
+  const sayable = [...swift.matchAll(/intent: (\w+)\(\),[\s\S]*?shortTitle:/g)]
+    .filter(([block]) =>
+      [...block.matchAll(/"([^"]+)"/g)].some(
+        ([, phrase]) => !phrase.includes("\\(\\.$"),
+      ),
+    )
+    .map(([, intent]) => intent);
+  expect(new Set(sayable)).toEqual(
+    new Set([...SIRI_SHORTCUTS.map(({ intent }) => intent), ...NOT_SAVES]),
+  );
+});
+
 const english = [{ languageCode: "en" }];
 const intents = (version: string) =>
   siriShortcuts("ios", version, english).map((shortcut) => shortcut.intent);
