@@ -2,7 +2,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
-import { GoalStep, SavedCountStep } from "./questions";
+import { GoalStep, SavedCountStep, TripSoonStep } from "./questions";
 
 type Children = { children?: ReactNode };
 
@@ -103,4 +103,13 @@ it("marks the one saved-count answer and moves on only after one", () => {
   expect(onPick).toHaveBeenCalledWith("few");
   fireEvent.click(screen.getByRole("button", { name: "common.continue" }));
   expect(onContinue).toHaveBeenCalled();
+});
+
+it("asks about a trip and answers on one tap, with no Continue", () => {
+  const onPick = vi.fn();
+  render(<TripSoonStep picked="notYet" onPick={onPick} />);
+  expect(screen.queryByRole("button")).toBeNull();
+  expect(option("onboardingQ.tripSoonNo").ariaChecked).toBe("true");
+  fireEvent.click(option("onboardingQ.tripSoonYes"));
+  expect(onPick).toHaveBeenCalledWith("soon");
 });
