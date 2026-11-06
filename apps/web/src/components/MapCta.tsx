@@ -10,7 +10,7 @@ const BIG =
 
 const LOOKS = {
   header:
-    "h-11 gap-1.5 rounded-full px-4 text-sm bg-ink text-paper hover:bg-ember-deep focus-visible:outline-ember-deep",
+    "h-11 gap-1.5 rounded-full px-3 min-[360px]:px-4 text-sm bg-ink text-paper hover:bg-ember-deep focus-visible:outline-ember-deep",
   hero: BIG,
   footer: BIG,
   place_tool:
