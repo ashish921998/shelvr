@@ -98,6 +98,7 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 - Saved URLs, extracted page content and spoken words, and the places Gemini finds in them (AI runs automatically unless the account has a previously recorded opt-out).
 - Place names sent to Apple Maps to pin a trip's stops (no live location tracking).
 - Shared list members see the list's places and each other's first names.
+- Cities the user marks as visited, from a fixed list of 25; stored with the account and shown only to that user.
 - RevenueCat subscription status.
 - PostHog product analytics (not ads).
 

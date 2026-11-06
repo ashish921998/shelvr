@@ -13,6 +13,7 @@ Trips, item pages, sharing, settings, notifications. Map them when a change touc
 | [Paywall](paywall.md)         | Home > Add or "View Pro plans", without Pro | `tests/paywall.e2e.ts`                                     | tested                                     |
 | [Onboarding](onboarding.md)   | Fresh install > Get started                 | `tests/onboarding.e2e.ts`                                  | tested                                     |
 | [Plan a date](plan-a-date.md) | Home > a city > Plan a date                 | `tests/plan-city-date.e2e.ts`                              | tested (CI fake model only)                |
+| [Been cities](been-cities.md) | Home > Profile > Cities you’ve been to      | `tests/been-cities.e2e.ts`                                 | tested (by hand; not in a CI shard yet)    |
 
 `tests/home-cities.e2e.ts` is the Doctor, not a feature: it checks Home lists
 a Lisbon city card. The `e2e ios` workflow

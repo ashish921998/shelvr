@@ -825,3 +825,18 @@ export function isSampleCity(value: unknown): value is SampleCityId {
     Object.prototype.hasOwnProperty.call(SAMPLE_CITIES, value)
   );
 }
+
+const fold = (text: string) =>
+  text
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase();
+
+export function cityMatches(
+  id: SampleCityId,
+  name: string,
+  query: string,
+): boolean {
+  const needle = fold(query.trim());
+  return fold(name).includes(needle) || id.replace(/-/g, " ").includes(needle);
+}

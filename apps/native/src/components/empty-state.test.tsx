@@ -12,6 +12,9 @@ vi.mock("react-native", () => ({
   Text: vi.fn(({ children }: { children: ReactNode }) => (
     <span>{children}</span>
   )),
+  View: vi.fn(({ children }: { children: ReactNode }) => (
+    <section>{children}</section>
+  )),
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
@@ -47,5 +50,27 @@ describe("EmptyState", () => {
       />,
     );
     expect(mocks.entering).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("renders its children under the message", () => {
+    render(
+      <EmptyState title="Nothing yet" message="Save something">
+        <button>Add one</button>
+      </EmptyState>,
+    );
+    const message = screen.getByText("Save something");
+    const action = screen.getByRole("button", { name: "Add one" });
+    expect(action.parentElement?.tagName).toBe("SECTION");
+    expect(
+      message.compareDocumentPosition(action) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("adds no wrapper without children", () => {
+    const { container } = render(
+      <EmptyState title="Nothing yet" message="Save something" />,
+    );
+    expect(container.querySelector("section")).toBeNull();
   });
 });

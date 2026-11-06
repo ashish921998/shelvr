@@ -1107,5 +1107,18 @@
   "onboardingCarousel.eat": "‘어디서 먹지?’\n이제 그만.",
   "onboardingCarousel.map": "저장한 모든 장소를\n지도 하나에.",
   "onboardingCarousel.next": "다음 슬라이드",
-  "sharedLists.nameBodyWelcome": "공유 목록에 있는 사람들에게 보이고, 내가 공유한 항목이나 내가 소유한 목록의 링크가 있는 사람에게도 보여요."
+  "sharedLists.nameBodyWelcome": "공유 목록에 있는 사람들에게 보이고, 내가 공유한 항목이나 내가 소유한 목록의 링크가 있는 사람에게도 보여요.",
+  "been.noMatch": "아직 없는 도시예요.",
+  "been.citiesTitle": "가 본 도시",
+  "been.editorBody": "가 본 도시를 탭하면 지도에 추가돼요. 다시 탭하면 빠져요.",
+  "been.cityCount": {
+    "other": "%{formattedCount}개 도시"
+  },
+  "been.none": "아직 없어요",
+  "been.mapTitle": {
+    "other": "%{formattedCount}개 도시에 가 봤어요"
+  },
+  "been.edit": "편집",
+  "been.addFromMap": "가 본 도시 추가하기",
+  "been.saveFailed": "도시를 업데이트하지 못했어요"
 }

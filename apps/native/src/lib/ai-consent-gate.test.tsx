@@ -159,6 +159,7 @@ describe("plan gate", () => {
     expect(shows("screen:(tabs)")).toBe(false);
     expect(shows("screen:add")).toBe(false);
     expect(shows("screen:item/[id]")).toBe(false);
+    expect(shows("screen:been-cities")).toBe(false);
     expect(shows("screen:profile")).toBe(true);
     expect(shows("screen:settings")).toBe(true);
     expect(shows("screen:paywall")).toBe(true);
@@ -170,6 +171,7 @@ describe("plan gate", () => {
     const view = render(<AppLayout />);
     expect(shows("screen:(tabs)")).toBe(true);
     expect(shows("screen:add")).toBe(true);
+    expect(shows("screen:been-cities")).toBe(true);
     expect(shows("screen:plan-gate")).toBe(false);
     expect(mocks.resumeShare).toHaveBeenLastCalledWith(false);
 
@@ -195,6 +197,7 @@ describe("plan gate", () => {
     expect(shows("plan-loading-cover")).toBe(true);
     expect(shows("screen:camera")).toBe(false);
     expect(shows("screen:add")).toBe(false);
+    expect(shows("screen:been-cities")).toBe(false);
   });
 
   it("lifts the cover once the plan is known", () => {

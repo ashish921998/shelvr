@@ -1,4 +1,5 @@
 import { t, useAppLocale } from "@/lib/i18n";
+import { BeenCitiesRow } from "@/components/been/been-cities-row";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { SettingsGroup, SettingsRow } from "@/components/ui/settings-list";
@@ -150,6 +151,7 @@ export default function ProfileScreen() {
             value={t(APPEARANCE_LABELS[appearanceMode])}
           />
         </ActionMenu>
+        <BeenCitiesRow />
         <SettingsRow
           label={t("feedback.open")}
           icon="arrow.up.right"
