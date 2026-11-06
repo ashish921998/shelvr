@@ -185,6 +185,7 @@
   "notifications.remindersHelp": "Ein gespeicherter Ort, ein ungelesener Artikel oder ein Rezept zum Ausprobieren – höchstens einmal am Tag",
   "notifications.remindersToggle": "Mitteilungen für Erinnerungen an Gespeichertes",
   "notifications.remindersChannel": "Erinnerungen an Gespeichertes",
+  "notifications.planVotesChannel": "Abstimmungen zu Plänen",
   "notifications.remindersDisabledBody": "Erlaube Shelvr-Mitteilungen in den Geräteeinstellungen, um Erinnerungen an deine gespeicherten Inhalte zu erhalten.",
   "feedback.open": "Feedback senden",
   "support.contact": "Support kontaktieren",
@@ -305,6 +306,7 @@
     "other": "Noch %{formattedCount} Tage."
   },
   "plan.tally": "%{picks} dafür, %{passes} dagegen",
+  "plan.votePushTitle": "Erste Stimme zu deiner Auswahl für %{city}",
   "plan.wouldGo": "%{name} wäre bei %{place} dabei.",
   "plan.wouldPass": "%{name} würde %{place} auslassen.",
   "plan.someoneWouldGo": "Jemand wäre bei %{place} dabei.",

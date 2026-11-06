@@ -184,6 +184,7 @@
   "notifications.remindersHelp": "저장한 장소, 읽지 않은 글, 해 볼 만한 레시피를 하루 최대 한 번",
   "notifications.remindersToggle": "저장 항목 리마인더 알림",
   "notifications.remindersChannel": "저장 항목 리마인더",
+  "notifications.planVotesChannel": "플랜 투표",
   "notifications.remindersDisabledBody": "저장 항목 리마인더를 받으려면 기기 설정에서 Shelvr 알림을 허용하세요.",
   "feedback.open": "의견 보내기",
   "support.contact": "고객 지원 문의",
@@ -304,6 +305,7 @@
     "other": "%{formattedCount}일 남았어요."
   },
   "plan.tally": "가고 싶음 %{picks}, 패스 %{passes}",
+  "plan.votePushTitle": "%{city} 추천 목록에 첫 투표가 들어왔어요",
   "plan.wouldGo": "%{name}님은 %{place}에 가고 싶어 해요.",
   "plan.wouldPass": "%{name}님은 %{place}에는 안 간대요.",
   "plan.someoneWouldGo": "누군가 %{place}에 가고 싶어 해요.",

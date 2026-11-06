@@ -362,6 +362,28 @@ export default defineSchema({
     ),
   }).index("by_share_and_voter", ["shareId", "voterId"]),
 
+  planVoteNotices: defineTable({
+    shareId: v.id("planShares"),
+    voterId: v.string(),
+    createdAt: v.number(),
+    deliveredAt: v.optional(v.number()),
+    deliveryStatus: v.union(
+      v.literal("pending"),
+      v.literal("complete"),
+      v.literal("failed"),
+    ),
+    deliveryNextAttemptAt: v.optional(v.number()),
+    deliveryAttempts: v.optional(v.number()),
+    deliveryRecipients: v.optional(v.array(recipientValidator)),
+    deliveryError: v.optional(v.string()),
+    deliverySentAt: v.optional(v.number()),
+  })
+    .index("by_share", ["shareId"])
+    .index("by_delivery_status_and_attempt", [
+      "deliveryStatus",
+      "deliveryNextAttemptAt",
+    ]),
+
   trips: defineTable({
     userId: v.string(),
     spaceId: v.id("spaces"),

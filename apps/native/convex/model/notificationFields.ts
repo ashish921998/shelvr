@@ -84,6 +84,11 @@ const catalogs: Record<
     namedShelfSingle: string;
     reminder: Record<ReminderKind, { title: string; body: string }>;
     tripEve: { title: string; body: Record<string, string> };
+    planVote: {
+      title: string;
+      pick: { named: string; someone: string };
+      pass: { named: string; someone: string };
+    };
   }
 > = translations;
 
@@ -160,5 +165,22 @@ export function tripEveCopy(
       "%{formattedCount}",
       new Intl.NumberFormat(selected).format(count),
     ),
+  };
+}
+
+export function planVoteCopy(
+  locale: string | undefined,
+  city: string,
+  subject: { name?: string; place: string; choice: "pick" | "pass" },
+) {
+  const copy = catalogs[notificationLocale(locale) ?? "en"].planVote;
+  const { named, someone } = copy[subject.choice];
+  const name = subject.name;
+  const place = truncateTitle(subject.place) ?? subject.place;
+  const body =
+    name === undefined ? someone : named.replace("%{name}", () => name);
+  return {
+    title: copy.title.replace("%{city}", () => truncateTitle(city) ?? city),
+    body: body.replace("%{place}", () => place),
   };
 }

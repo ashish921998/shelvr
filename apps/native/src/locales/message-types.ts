@@ -183,6 +183,7 @@ export type MessageParams = {
   "notifications.remindersHelp": undefined;
   "notifications.remindersToggle": undefined;
   "notifications.remindersChannel": undefined;
+  "notifications.planVotesChannel": undefined;
   "notifications.remindersDisabledBody": undefined;
   "feedback.open": undefined;
   "support.contact": undefined;
@@ -297,6 +298,7 @@ export type MessageParams = {
   "plan.voterCount": { count: number };
   "plan.daysLeft": { count: number };
   "plan.tally": { picks: string; passes: string };
+  "plan.votePushTitle": { city: string };
   "plan.wouldGo": { name: string; place: string };
   "plan.wouldPass": { name: string; place: string };
   "plan.someoneWouldGo": { place: string };

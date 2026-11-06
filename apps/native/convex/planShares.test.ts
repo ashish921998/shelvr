@@ -691,6 +691,109 @@ describe("cityPlanVotes", () => {
   });
 });
 
+describe("queueing the first-vote push", () => {
+  async function link(city?: string) {
+    const fixture = await setup();
+    const token = await fixture.t.mutation(api.planShares.createPlanShare, {
+      spaceId: fixture.spaceId,
+      ...(city === undefined ? {} : { city }),
+      places: fixture.places,
+    });
+    const notices = () =>
+      fixture.backend.run((ctx) => ctx.db.query("planVoteNotices").collect());
+    const sendJobs = async () =>
+      (
+        await fixture.backend.run((ctx) =>
+          ctx.db.system.query("_scheduled_functions").collect(),
+        )
+      ).filter((job) => job.name === "notificationDelivery:sendPlanVote");
+    return { ...fixture, token, notices, sendJobs };
+  }
+
+  it("queues nothing while the server switch is off", async () => {
+    const { backend, token, notices } = await link("Austin");
+    await vote(backend, token, "a", ["p0"]);
+    expect(await notices()).toEqual([]);
+  });
+
+  it("queues one push, two minutes after the first vote with a choice", async () => {
+    vi.stubEnv("PLAN_VOTE_PUSH_ENABLED", "true");
+    vi.useFakeTimers();
+    const { backend, token, notices, sendJobs } = await link("Austin");
+    await vote(backend, token, "empty", []);
+    expect(await notices()).toEqual([]);
+
+    const now = Date.now();
+    await vote(backend, token, "a", ["p0"]);
+    await vote(backend, token, "b", ["p1"]);
+    await vote(backend, token, "a", [], ["p0"]);
+
+    expect(await notices()).toEqual([
+      expect.objectContaining({
+        voterId: "a",
+        createdAt: now,
+        deliveryStatus: "pending",
+        deliveryNextAttemptAt: now + 2 * 60 * 1000,
+      }),
+    ]);
+    expect(await sendJobs()).toHaveLength(1);
+  });
+
+  it("queues nothing for a link without a city", async () => {
+    vi.stubEnv("PLAN_VOTE_PUSH_ENABLED", "true");
+    const { backend, token, notices, sendJobs } = await link();
+    await vote(backend, token, "a", ["p0"]);
+    expect(await notices()).toEqual([]);
+    expect(await sendJobs()).toEqual([]);
+  });
+
+  it("queues nothing for a link whose first vote came while the switch was off", async () => {
+    const { backend, token, notices, sendJobs } = await link("Austin");
+    await vote(backend, token, "maya", ["p0"]);
+    vi.stubEnv("PLAN_VOTE_PUSH_ENABLED", "true");
+
+    await vote(backend, token, "maya", ["p0", "p1"]);
+    expect(await notices()).toEqual([]);
+    await vote(backend, token, "sam", ["p1"]);
+    expect(await notices()).toEqual([]);
+    expect(await sendJobs()).toEqual([]);
+  });
+
+  it("queues when a voter's first choice follows an empty ballot", async () => {
+    vi.stubEnv("PLAN_VOTE_PUSH_ENABLED", "true");
+    const { backend, token, notices } = await link("Austin");
+    const ballot = (picks: string[], revision: number) =>
+      backend.mutation(internal.planShares.recordPlanVote, {
+        token,
+        voterId: "late",
+        picks,
+        passes: [],
+        revision,
+        ip: "203.0.113.7",
+      });
+    await ballot([], 1);
+    expect(await notices()).toEqual([]);
+    await ballot(["p1"], 2);
+    expect(await notices()).toMatchObject([{ voterId: "late" }]);
+  });
+
+  it("deletes the queued push with its link", async () => {
+    vi.stubEnv("PLAN_VOTE_PUSH_ENABLED", "true");
+    vi.useFakeTimers();
+    const fixture = await link("Austin");
+    await vote(fixture.backend, fixture.token, "a", ["p0"]);
+    expect(await fixture.notices()).toHaveLength(1);
+    await fixture.t.mutation(api.spaces.deleteSpace, { id: fixture.spaceId });
+    expect(await fixture.notices()).toEqual([]);
+
+    const old = await link("Austin");
+    await vote(old.backend, old.token, "a", ["p0"]);
+    vi.advanceTimersByTime(2 * PLAN_SHARE_TTL_MS + 1);
+    await old.backend.mutation(internal.planShares.purgeExpiredPlanShares, {});
+    expect(await old.notices()).toEqual([]);
+  });
+});
+
 describe("deletion", () => {
   async function countRows(backend: ReturnType<typeof newConvexTest>) {
     return backend.run(async (ctx) => ({

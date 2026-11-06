@@ -35,6 +35,11 @@ const notificationPlaceholders = {
   "reminder.cookBody": "%{title}",
   "reminder.tripEveTitle": "%{city}",
   "reminder.tripEveBody": "%{formattedCount}",
+  "plan.votePushTitle": "%{city}",
+  "plan.wouldGo": "%{name}|%{place}",
+  "plan.wouldPass": "%{name}|%{place}",
+  "plan.someoneWouldGo": "%{place}",
+  "plan.someoneWouldPass": "%{place}",
 };
 
 const catalogs = locales.map((locale) => {
@@ -148,6 +153,17 @@ const notificationCopy = Object.fromEntries(
       tripEve: {
         title: messages["reminder.tripEveTitle"],
         body: messages["reminder.tripEveBody"],
+      },
+      planVote: {
+        title: messages["plan.votePushTitle"],
+        pick: {
+          named: messages["plan.wouldGo"],
+          someone: messages["plan.someoneWouldGo"],
+        },
+        pass: {
+          named: messages["plan.wouldPass"],
+          someone: messages["plan.someoneWouldPass"],
+        },
       },
     },
   ]),

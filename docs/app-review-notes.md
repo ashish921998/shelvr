@@ -58,6 +58,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 - Voters need no app or account. They tap ✓ or ✕ on each place and may type a first name. The page shows the sender's first name, the city and the places, with a saved link's cover image but never a photo save.
 - Votes appear on the city page as they land, with the newest vote, how many people voted, the days left, and a tally on each place. While the link is open, "Share" sends it again.
 - A link closes after 7 days and is deleted a week later with its votes and names.
+- The first vote on a link sends the sender one notification, at most once per link. Android files it under "Plan votes", and turning off "Save reminder notifications" in Profile → Settings stops it too.
 
 ## Pro / subscriptions (RevenueCat sandbox)
 
@@ -92,11 +93,11 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Permissions
 
-| Permission    | When requested                                                 | Why                                               |
-| ------------- | -------------------------------------------------------------- | ------------------------------------------------- |
-| Calendar      | User adds an event from an item intent                         | Create calendar event from saved content          |
-| Location      | The Map tab opens for the first time                           | Center the map on the user; Map works without it  |
-| Notifications | "Turn on reminders" in onboarding, or the trial reminder sheet | Reminders about saved places, trips and the trial |
+| Permission    | When requested                                                 | Why                                                                                  |
+| ------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Calendar      | User adds an event from an item intent                         | Create calendar event from saved content                                             |
+| Location      | The Map tab opens for the first time                           | Center the map on the user; Map works without it                                     |
+| Notifications | "Turn on reminders" in onboarding, or the trial reminder sheet | Reminders about saved places, trips and the trial, and the first vote on a vote link |
 
 Shelvr does **not** record microphone audio and does not request microphone access in production.
 

@@ -294,6 +294,33 @@ describe("the vote link fixture", () => {
     ]);
   });
 
+  it("has already pushed, so a vote on it pushes nothing", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    vi.stubEnv("PLAN_VOTE_PUSH_ENABLED", "true");
+    const { backend, userId, client } = await anonymousFixtureUser();
+    await client.mutation(api.devFixtures.resetCurrentUser, {});
+    const [share] = (await linkRows(backend, userId)).shares;
+
+    await backend.mutation(internal.planShares.recordPlanVote, {
+      token: share.token,
+      voterId: "qa-voter",
+      picks: ["p1"],
+      passes: [],
+      ip: "203.0.113.7",
+    });
+
+    const notices = await backend.run((ctx) =>
+      ctx.db.query("planVoteNotices").collect(),
+    );
+    expect(notices).toEqual([
+      expect.objectContaining({
+        shareId: share._id,
+        voterId: "fixture-guest",
+        deliveryStatus: "complete",
+      }),
+    ]);
+  });
+
   it("refuses an account with 50 links without deleting anything", async () => {
     vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
     const { backend, userId, client } = await anonymousFixtureUser();

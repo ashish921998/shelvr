@@ -185,6 +185,7 @@
   "notifications.remindersHelp": "A place you saved, an article you haven’t read or a recipe to try, never more than once a day",
   "notifications.remindersToggle": "Save reminder notifications",
   "notifications.remindersChannel": "Save reminders",
+  "notifications.planVotesChannel": "Plan votes",
   "notifications.remindersDisabledBody": "Allow notifications for Shelvr in your device settings to get reminders about your saves.",
   "feedback.open": "Send feedback",
   "support.contact": "Contact Support",
@@ -305,6 +306,7 @@
     "other": "%{formattedCount} days left."
   },
   "plan.tally": "%{picks} would go, %{passes} would pass",
+  "plan.votePushTitle": "First vote on your %{city} shortlist",
   "plan.wouldGo": "%{name} would go to %{place}.",
   "plan.wouldPass": "%{name} would pass on %{place}.",
   "plan.someoneWouldGo": "Someone would go to %{place}.",

@@ -209,9 +209,9 @@ export default function PrivacyPage() {
           cover image of a saved link but never a photo you saved. Anyone with
           the link can vote, up to 20 people at a time. We store each voter’s
           choices with a random browser identifier and, if they type one on the
-          vote page, their first name. Only you see that name, in the app. The
-          link closes after a week, and we delete it, its votes and those names
-          about a week after that.
+          vote page, their first name. Only you see that name, in the app and in
+          one notification about the first vote. The link closes after a week,
+          and we delete it, its votes and those names about a week after that.
         </p>
       </section>
 
