@@ -2,7 +2,7 @@
 
 A new account answers a few short questions, picks a city, saves a sample
 reel through a drawn share sheet, sees its spots on a map and three slides,
-is asked about reminders, then meets the paywall. This is flow 24:
+is asked about reminders, then meets the paywall. This is flow 25:
 `ONBOARDING_FLOW_VERSION` and the step order (`ONBOARDING_STEPS`) are in
 `src/lib/onboarding-steps.ts`. The opener is three pages that swipe (on
 their own until a swipe, never with Reduce Motion), each with "Get started"
@@ -15,11 +15,18 @@ account stays signed out through the paywall and signs in after it.
   you like to plan?" (checkboxes `Date nights`, `Trips`, `Places to eat`,
   `A bit of everything`). Goals that include `Trips` add "Are you planning
   a trip soon?", which moves on at one tap (`Yes, I’m planning one`,
-  `Not yet`). Then "How do you like to plan?" and a chart, "Let’s put your
-  saves to use." The count, goal and planner questions have Continue
-  (disabled until an answer) and "Skip" in the header; a skipped goal
-  question plans for every goal, so the trip question follows. Every step
-  after the opener has a back button.
+  `Not yet`). Then "How do you like to plan?", "Where have you been?" and a
+  chart, "Let’s put your saves to use." The count, goal, planner and Been
+  questions have Continue (disabled until an answer) and "Skip" in the
+  header; a skipped goal question plans for every goal, so the trip
+  question follows. Every step after the opener has a back button.
+- "Where have you been?" shows the 25 sample cities as checkbox tiles named
+  by city (`been-city-<id>`), with a "Search cities" field; a tile tap
+  closes the keyboard, and a second tap takes the tick off. Its Continue
+  (`onboarding-been-continue`) stays disabled until a city is ticked, and
+  "Skip" moves on with none. The picks stay on the device until sign-in,
+  then go to the account and show on the Map tab (see
+  [Been cities](been-cities.md)).
 - The city question reads "Where are you going?" after `Yes, I’m planning
 one`, "Where’s your dream city?" when no goal or every goal is picked,
   and "Where do you go out?" otherwise. A tap on a city moves on; "Skip"
@@ -66,15 +73,16 @@ person as not Pro (`src/lib/e2e-hide-pro.ts`).
   walks the slides, opens and closes the paywall twice, then relaunches
   cold.
 - "uses a real Austin trip reel for a city without one": `Trips`,
-  `Not yet`, Lisbon. Checks Austin's three trip spots, and that the last
-  slide opens nothing on its own.
+  `Not yet`, Tokyo as a Been city, Lisbon. Checks Austin's three trip
+  spots, and that the last slide opens nothing on its own.
 - "turns one sample reel into a date night's spots, then asks for the
   paywall": date nights, city skipped. Checks Austin's three date spots,
   then opens and closes the paywall.
 
 Helpers in `tests/fresh-onboarding.ts`: `startFreshOnboarding` relaunches
-with `-E2EFreshInstall YES`; `walkToSampleReel(screen, { goal, city })`
-walks to the reel's `Share` button (date nights and no city by default);
+with `-E2EFreshInstall YES`; `walkToSampleReel(screen, { goal, city, been })`
+walks to the reel's `Share` button (date nights, no Been city and no city
+by default; `been` names cities to search for and tick);
 `shareTheSampleReel` saves it through the share sheet and "Your first
 save!", then waits for "· 3 places"; `walkToCarouselEnd` returns the last
 slide's Continue; `relaunchWith` reopens the app until a step shows. In

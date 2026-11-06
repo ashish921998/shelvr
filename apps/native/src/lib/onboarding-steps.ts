@@ -6,6 +6,7 @@ export const ONBOARDING_STEPS = [
   "goal",
   "tripSoon",
   "planner",
+  "been",
   "chart",
   "city",
   "cityEcho",
@@ -15,7 +16,7 @@ export const ONBOARDING_STEPS = [
   "carousel",
   "notifications",
 ] as const;
-export const ONBOARDING_FLOW_VERSION = 24;
+export const ONBOARDING_FLOW_VERSION = 25;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -25,6 +26,7 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   goal: "goal",
   tripSoon: "trip_soon",
   planner: "planner",
+  been: "been_cities",
   chart: "progress_chart",
   city: "city",
   cityEcho: "city_echo",

@@ -1054,6 +1054,8 @@ export type MessageParams = {
   "been.edit": undefined;
   "been.addFromMap": undefined;
   "been.saveFailed": undefined;
+  "been.title": undefined;
+  "been.body": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

@@ -40,10 +40,12 @@ import {
   setOnboardingProgress,
   setPendingSpaces,
 } from "@/lib/pending-onboarding";
+import { queueBeenCities } from "@/lib/pending-been-cities";
 import { holdIncomingShare } from "@/lib/onboarding-exit";
 import { SignInView } from "@/components/sign-in-view";
 import { AhaShareStep } from "@/components/onboarding/aha-share";
 import { AhaSpotsStep } from "@/components/onboarding/aha-spots";
+import { BeenStep } from "@/components/onboarding/been-step";
 import { CityStep } from "@/components/onboarding/city-step";
 import { CarouselStep } from "@/components/onboarding/carousel";
 import { FirstSaveStep } from "@/components/onboarding/first-save";
@@ -72,6 +74,7 @@ const SKIPPABLE: ReadonlySet<OnboardingStep> = new Set([
   "savedCount",
   "goal",
   "planner",
+  "been",
   "city",
 ]);
 
@@ -181,6 +184,9 @@ export default function OnboardingScreen() {
   const [travelCity, setTravelCity] = useState<SampleCityId | null>(
     initial.travelCity,
   );
+  const [beenCities, setBeenCities] = useState<SampleCityId[]>(
+    initial.beenCities,
+  );
   const [showSignIn, setShowSignIn] = useState(false);
   const [viewedOpenerPages] = useState(() => new Set<number>());
   const [viewedSteps] = useState(
@@ -213,6 +219,7 @@ export default function OnboardingScreen() {
       savedCount,
       planner,
       tripSoon,
+      beenCities,
       step: stepIndex,
       viewed: [...viewedSteps],
     });
@@ -222,6 +229,7 @@ export default function OnboardingScreen() {
     savedCount,
     planner,
     tripSoon,
+    beenCities,
     stepIndex,
     viewedSteps,
   ]);
@@ -249,6 +257,7 @@ export default function OnboardingScreen() {
       "onboarding_completed",
       onboardingCompletedProperties(spaces, {
         travelCity,
+        beenCities,
         goals,
         savedCount,
         planner,
@@ -260,6 +269,7 @@ export default function OnboardingScreen() {
     setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
     // The reel they shared in the demo becomes their first real save once they can save.
     queueDemoUrl(sample.firstSaveUrl);
+    queueBeenCities(beenCities);
     noteOnboardingFinished();
     completeOnboarding();
   };
@@ -302,6 +312,7 @@ export default function OnboardingScreen() {
   const previous = previousOnboardingStep(step, goals);
   const skip = () => {
     if (step === "city") setTravelCity(null);
+    if (step === "been") setBeenCities([]);
     if (step !== "goal") return advance();
     const all = [...GOALS];
     setGoals(all);
@@ -323,6 +334,14 @@ export default function OnboardingScreen() {
           <SavedCountStep
             picked={savedCount}
             onPick={setSavedCount}
+            onContinue={advance}
+          />
+        );
+      case "been":
+        return (
+          <BeenStep
+            picked={beenCities}
+            onChange={setBeenCities}
             onContinue={advance}
           />
         );

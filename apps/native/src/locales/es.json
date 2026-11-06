@@ -1188,5 +1188,7 @@
   },
   "been.edit": "Editar",
   "been.addFromMap": "Añadir ciudades visitadas",
-  "been.saveFailed": "No se pudieron actualizar tus ciudades"
+  "been.saveFailed": "No se pudieron actualizar tus ciudades",
+  "been.title": "¿Dónde has estado?",
+  "been.body": "Toca las ciudades que has visitado. Las pondremos en tu mapa."
 }

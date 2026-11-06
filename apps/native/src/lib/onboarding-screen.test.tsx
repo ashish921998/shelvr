@@ -19,7 +19,9 @@ const mocks = vi.hoisted(() => ({
   setOnboardingProgress: vi.fn(),
   setPendingSpaces: vi.fn(),
   queueDemoUrl: vi.fn(),
+  queueBeenCities: vi.fn(),
   completeOnboarding: vi.fn(),
+  authenticated: false,
   capture: vi.fn(),
   captureError: vi.fn(),
   ask: vi.fn(),
@@ -42,6 +44,7 @@ const mocks = vi.hoisted(() => ({
     spaces: [] as string[],
     step: 0,
     travelCity: null as string | null,
+    beenCities: [] as string[],
     goals: [] as string[],
     savedCount: null as string | null,
     planner: null as string | null,
@@ -84,17 +87,29 @@ vi.mock("@/lib/pending-onboarding", () => ({
   setOnboardingProgress: mocks.setOnboardingProgress,
   setPendingSpaces: mocks.setPendingSpaces,
 }));
+vi.mock("@/lib/pending-been-cities", () => ({
+  queueBeenCities: mocks.queueBeenCities,
+}));
 vi.mock("@/lib/share/pending-share-store", () => ({
   markPendingShareOnDevice: vi.fn(),
 }));
-vi.mock("@/components/sign-in-view", () => ({ SignInView: vi.fn(() => null) }));
+vi.mock("@/components/sign-in-view", () => ({
+  SignInView: vi.fn(({ onCompleted }: { onCompleted: () => void }) =>
+    button("signIn:done", onCompleted),
+  ),
+}));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 vi.mock("@/components/onboarding/parts", () => ({
   ScalePressable: mocks.pressable,
 }));
 vi.mock("@/components/onboarding/opener", () => ({
-  OpenerStep: vi.fn(({ onStart }: { onStart: () => void }) =>
-    button("opener:start", onStart),
+  OpenerStep: vi.fn(
+    ({ onStart, onSignIn }: { onStart: () => void; onSignIn: () => void }) => (
+      <div>
+        {button("opener:start", onStart)}
+        {button("opener:signIn", onSignIn)}
+      </div>
+    ),
   ),
 }));
 vi.mock("@/components/onboarding/questions", () => ({
@@ -146,6 +161,25 @@ vi.mock("@/components/onboarding/questions", () => ({
       <div>
         {button("planner:explorer", () => onPick("explorer"))}
         {button("planner:continue", onContinue)}
+      </div>
+    ),
+  ),
+}));
+vi.mock("@/components/onboarding/been-step", () => ({
+  BeenStep: vi.fn(
+    ({
+      picked,
+      onChange,
+      onContinue,
+    }: {
+      picked: string[];
+      onChange: (picked: string[]) => void;
+      onContinue: () => void;
+    }) => (
+      <div>
+        <p>{`been:picked:${picked.join(",")}`}</p>
+        {button("been:lisbon", () => onChange([...picked, "lisbon"]))}
+        {button("been:continue", onContinue)}
       </div>
     ),
   ),
@@ -218,7 +252,7 @@ vi.mock("@/lib/notification-token", () => ({
   notificationPermissionState: mocks.permission,
 }));
 vi.mock("convex/react", () => ({
-  useConvexAuth: () => ({ isAuthenticated: false }),
+  useConvexAuth: () => ({ isAuthenticated: mocks.authenticated }),
 }));
 vi.mock("expo-sharing", () => ({ getSharedPayloads: () => [] }));
 vi.mock("react-native-safe-area-context", () => ({
@@ -259,10 +293,12 @@ const viewsOf = (stepId: string) =>
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.permission.mockReset().mockResolvedValue("ask");
+  mocks.authenticated = false;
   mocks.progress = {
     spaces: [],
     step: 0,
     travelCity: null,
+    beenCities: [],
     goals: [],
     savedCount: null,
     planner: null,
@@ -283,6 +319,8 @@ it("walks the questions, the trip question, the chart and the city echo into a s
   tap("trip:soon");
   tap("planner:explorer");
   tap("planner:continue");
+  tap("been:lisbon");
+  tap("been:continue");
   tap("chart:trip");
   tap("city:trip:trip:lisbon");
   expect(saved()).toMatchObject({
@@ -291,6 +329,7 @@ it("walks the questions, the trip question, the chart and the city echo into a s
     savedCount: "hundreds",
     planner: "explorer",
     tripSoon: "soon",
+    beenCities: ["lisbon"],
     travelCity: "lisbon",
     step: ONBOARDING_STEPS.indexOf("cityEcho"),
   });
@@ -354,6 +393,7 @@ it("moves on from the trip question on one tap and asks for a dream city after a
   tap("trip:notYet");
   expect(saved()).toMatchObject({ tripSoon: "notYet" });
   tap("planner:continue");
+  tap("been:continue");
   tap("chart:date");
   expect(
     screen.getByRole("button", { name: "city:date:dream:lisbon" }),
@@ -365,6 +405,7 @@ it("asks where a person goes out when no trip is planned", () => {
   startAt("planner");
   render(<OnboardingScreen />);
   tap("planner:continue");
+  tap("been:continue");
   tap("chart:date");
   expect(
     screen.getByRole("button", { name: "city:date:out:lisbon" }),
@@ -390,6 +431,58 @@ it("goes back from a question, over a skipped trip question, and from the sample
   expect(
     screen.getByRole("button", { name: "firstSave:continue" }),
   ).toBeTruthy();
+});
+
+it("asks where they have been after the planner, and keeps the picks with the progress", () => {
+  mocks.progress = { ...mocks.progress, goals: ["date"] };
+  startAt("planner");
+  render(<OnboardingScreen />);
+  tap("planner:continue");
+  tap("been:lisbon");
+  expect(saved()).toMatchObject({
+    beenCities: ["lisbon"],
+    step: ONBOARDING_STEPS.indexOf("been"),
+    viewed: expect.arrayContaining(["planner", "been"]),
+  });
+});
+
+it("skips the been step with no cities and opens the chart", () => {
+  mocks.progress = {
+    ...mocks.progress,
+    goals: ["date"],
+    beenCities: ["lisbon"],
+  };
+  startAt("been");
+  render(<OnboardingScreen />);
+  tap("onboardingQ.skip");
+  expect(saved()?.beenCities).toEqual([]);
+  expect(screen.getByRole("button", { name: "chart:date" })).toBeTruthy();
+});
+
+it("goes back from the chart to the been step with its picks, also after a relaunch", () => {
+  mocks.progress = { ...mocks.progress, goals: ["date"] };
+  startAt("been");
+  render(<OnboardingScreen />);
+  tap("been:lisbon");
+  tap("been:continue");
+  tap("common.back");
+  expect(screen.getByText("been:picked:lisbon")).toBeTruthy();
+  tap("been:continue");
+  relaunch();
+  expect(screen.getByRole("button", { name: "chart:date" })).toBeTruthy();
+  tap("common.back");
+  expect(screen.getByText("been:picked:lisbon")).toBeTruthy();
+});
+
+it("sends the been step's view once, even after going back and closing the app", () => {
+  mocks.progress = { ...mocks.progress, goals: ["date"] };
+  startAt("planner");
+  render(<OnboardingScreen />);
+  tap("planner:continue");
+  tap("common.back");
+  relaunch();
+  tap("planner:continue");
+  expect(viewsOf("been_cities")).toHaveLength(1);
 });
 
 it("moves one step on a double tap", () => {
@@ -542,6 +635,35 @@ it("hands the goals' spaces to the replay and reports the answers when onboardin
       sample_city: "paris",
     }),
   );
+});
+
+it("queues the cities they have been to before leaving onboarding, and counts them", () => {
+  mocks.progress = {
+    ...mocks.progress,
+    step: ONBOARDING_STEPS.indexOf("ahaSpots"),
+    goals: ["date"],
+    beenCities: ["lisbon", "madrid"],
+  };
+  render(<OnboardingScreen />);
+  act(() => mocks.paywall.onPro());
+  expect(mocks.queueBeenCities).toHaveBeenCalledWith(["lisbon", "madrid"]);
+  expect(mocks.queueBeenCities.mock.invocationCallOrder[0]).toBeLessThan(
+    mocks.completeOnboarding.mock.invocationCallOrder[0],
+  );
+  expect(mocks.capture).toHaveBeenCalledWith(
+    "onboarding_completed",
+    expect.objectContaining({ been_count: 2 }),
+  );
+});
+
+it("queues no cities for someone who signs in from the opener", () => {
+  mocks.authenticated = true;
+  mocks.progress = { ...mocks.progress, beenCities: ["lisbon"] };
+  render(<OnboardingScreen />);
+  tap("opener:signIn");
+  tap("signIn:done");
+  expect(mocks.completeOnboarding).toHaveBeenCalled();
+  expect(mocks.queueBeenCities).not.toHaveBeenCalled();
 });
 
 it("queues the real reel it played as the first save when onboarding ends", () => {

@@ -1154,5 +1154,7 @@
   },
   "been.edit": "Edit",
   "been.addFromMap": "Add cities you’ve been to",
-  "been.saveFailed": "Couldn’t update your cities"
+  "been.saveFailed": "Couldn’t update your cities",
+  "been.title": "Where have you been?",
+  "been.body": "Tap the cities you’ve visited. We’ll put them on your map."
 }

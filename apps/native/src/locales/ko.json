@@ -1120,5 +1120,7 @@
   },
   "been.edit": "편집",
   "been.addFromMap": "가 본 도시 추가하기",
-  "been.saveFailed": "도시를 업데이트하지 못했어요"
+  "been.saveFailed": "도시를 업데이트하지 못했어요",
+  "been.title": "어디에 가 봤나요?",
+  "been.body": "가 본 도시를 탭하세요. 지도에 표시해 드릴게요."
 }
