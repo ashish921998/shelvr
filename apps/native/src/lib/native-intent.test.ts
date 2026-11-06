@@ -31,6 +31,8 @@ vi.mock("expo-linking", () => ({
   createURL: () => "shelvr:///",
 }));
 
+const CREATOR_MAP_TOKEN = "0123456789abcdef0123456789abcdef";
+
 describe("redirectSystemPath", () => {
   beforeEach(() => {
     markPendingShareOnDevice.mockClear();
@@ -73,6 +75,34 @@ describe("redirectSystemPath", () => {
   it("leaves unrelated deep links untouched", () => {
     const path = "shelvr:///add";
     expect(redirectSystemPath({ path, initial: false })).toBe(path);
+  });
+
+  it.each([
+    `shelvr:///?creatorMap=${CREATOR_MAP_TOKEN}&city=Mexico%20City`,
+    `shelvr-dev://?creatorMap=${CREATOR_MAP_TOKEN}&city=Mexico%20City`,
+  ])("opens the Save all screen for %s", (path) => {
+    expect(redirectSystemPath({ path, initial: true })).toBe(
+      `/creator-map/${CREATOR_MAP_TOKEN}?city=Mexico%20City`,
+    );
+    expect(markPendingShareOnDevice).not.toHaveBeenCalled();
+  });
+
+  it("opens Home for a creator-map link with a bad token, as older builds do", () => {
+    expect(
+      redirectSystemPath({
+        path: "shelvr:///?creatorMap=nothex&city=Mexico%20City",
+        initial: false,
+      }),
+    ).toBe("/(app)/(tabs)/(home)?creatorMap=nothex&city=Mexico%20City");
+  });
+
+  it("keeps routing invite links to the join screen", () => {
+    expect(
+      redirectSystemPath({
+        path: "https://shelvr.app/l/abc123",
+        initial: false,
+      }),
+    ).toBe("/list-invite/abc123");
   });
 });
 

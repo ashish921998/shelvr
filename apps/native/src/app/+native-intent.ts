@@ -1,3 +1,4 @@
+import { creatorMapRoute } from "@/lib/creator-map-link";
 import { rememberSheetLink } from "@/lib/deferred-sheet-link";
 import { appSchemeRoute, resolveRootHref } from "@/lib/home-href";
 import { readOnboardedFlag } from "@/lib/onboarding";
@@ -41,6 +42,9 @@ export function redirectSystemPath({
       markPendingShareQuietly();
       return "/share";
     }
+
+    const creatorMap = creatorMapRoute(path);
+    if (creatorMap !== null) return creatorMap;
 
     const route = appSchemeRoute(path);
     if (route !== null && route !== "/") {

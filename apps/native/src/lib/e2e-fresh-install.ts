@@ -3,6 +3,7 @@ import { Platform, Settings } from "react-native";
 import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { forgetStoredSession } from "@/lib/auth-storage";
 import { forgetOnboarded } from "@/lib/onboarding";
+import { clearPendingCreatorMap } from "@/lib/pending-creator-map";
 import { clearPending } from "@/lib/pending-onboarding";
 import { clearPurchaseBeforeSignIn } from "@/lib/purchase-before-sign-in";
 import { clearQueued } from "@/lib/queued-first-save";
@@ -40,6 +41,7 @@ export function startFreshForE2E(): void {
   clearPending();
   clearQueued();
   clearPurchaseBeforeSignIn();
+  clearPendingCreatorMap();
   clearPendingShareOnDevice();
   clearShareDiscardedOnDevice();
   clearSharedPayloads();

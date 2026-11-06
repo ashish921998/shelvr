@@ -11,6 +11,7 @@ const mock = vi.hoisted(() => ({
     forgetOnboarded: vi.fn(),
     clearPending: vi.fn(),
     clearPurchaseBeforeSignIn: vi.fn(),
+    clearPendingCreatorMap: vi.fn(),
     clearQueued: vi.fn(),
     clearPendingShareOnDevice: vi.fn(),
     clearShareDiscardedOnDevice: vi.fn(),
@@ -42,6 +43,9 @@ vi.mock("@/lib/onboarding", () => ({
 }));
 vi.mock("@/lib/pending-onboarding", () => ({
   clearPending: mock.resets.clearPending,
+}));
+vi.mock("@/lib/pending-creator-map", () => ({
+  clearPendingCreatorMap: mock.resets.clearPendingCreatorMap,
 }));
 vi.mock("@/lib/purchase-before-sign-in", () => ({
   clearPurchaseBeforeSignIn: mock.resets.clearPurchaseBeforeSignIn,

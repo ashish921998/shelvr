@@ -211,6 +211,21 @@ export type AnalyticsEventProperties = {
   public_map_shared: { shared: boolean; share_ref?: string };
   public_map_link_rotated: Record<string, never>;
   public_map_turned_off: Record<string, never>;
+  creator_map_save_all_switched: { on: boolean };
+  creator_map_opened: {
+    signed_in: boolean;
+    outcome: "found" | "empty" | "gone" | "error";
+    places: number;
+    share_ref?: string;
+  };
+  creator_map_save_tapped: { signed_in: boolean; places: number };
+  creator_map_saved: {
+    status: "saved" | "gone" | "empty" | "tooManyLists";
+    added: number;
+    created: boolean;
+    onboarded_before: boolean;
+    share_ref?: string;
+  };
   city_plan_started: { kind: "date" | "trip" };
   trip_stop_opened: { day: number; stop: number };
   trip_directions_opened: { located: boolean };
@@ -309,7 +324,7 @@ export type AnalyticsEventProperties = {
     outcome: "named" | "skipped";
   };
   shared_list_opened: { places: number; members: number; fresh: number };
-  shared_list_place_opened: { action: "save" | "card" | "maps" };
+  shared_list_place_opened: { action: "save" | "card" | "maps" | "post" };
   shared_list_place_added: { from: "save" | "search" | "spots" };
   shared_list_left: { owner: boolean };
   // Android replays a share on task restore; counts the replays the share screen skipped.

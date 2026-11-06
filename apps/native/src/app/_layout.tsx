@@ -26,6 +26,7 @@ import { useSignOutWhenAccountGone } from "@/lib/account-gone";
 import { posthog } from "@/lib/posthog";
 import { resolveRootHref } from "@/lib/home-href";
 import { useInviteJoinCoordinator } from "@/lib/invite-join";
+import { useCreatorMapSaveCoordinator } from "@/lib/creator-map-save";
 
 export { RootErrorBoundary as ErrorBoundary } from "@/components/root-error-boundary";
 
@@ -67,6 +68,11 @@ function InviteJoinCoordinator() {
   return null;
 }
 
+function CreatorMapSaveCoordinator() {
+  useCreatorMapSaveCoordinator();
+  return null;
+}
+
 function EntitlementSync() {
   useEntitlementSync();
   return null;
@@ -81,6 +87,7 @@ export default function RootLayout() {
     <OnboardingProvider>
       <EntitlementSync />
       <InviteJoinCoordinator />
+      <CreatorMapSaveCoordinator />
       <NavThemeProvider>
         <SplashGate active={showSplash} onFinish={finishSplash}>
           <Slot />
