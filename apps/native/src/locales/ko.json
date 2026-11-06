@@ -996,8 +996,14 @@
   "sharedLists.with": "%{names}와 함께",
   "sharedLists.onlyYou": "아직 나만",
   "sharedLists.someone": "누군가",
-  "sharedLists.newCount": {
-    "other": "새 장소 %{formattedCount}곳"
+  "sharedLists.activityOne": {
+    "other": "%{name}이(가) 장소 %{formattedCount}곳을 추가했어요"
+  },
+  "sharedLists.activitySomeone": {
+    "other": "누군가 장소 %{formattedCount}곳을 추가했어요"
+  },
+  "sharedLists.activityMany": {
+    "other": "%{names}의 새 장소 %{formattedCount}곳"
   },
   "sharedLists.alsoAddTo": "여기에도 추가",
   "sharedLists.willSee": {

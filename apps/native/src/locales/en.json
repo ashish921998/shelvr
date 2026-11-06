@@ -1024,9 +1024,17 @@
   "sharedLists.with": "With %{names}",
   "sharedLists.onlyYou": "Only you so far",
   "sharedLists.someone": "Someone",
-  "sharedLists.newCount": {
-    "one": "%{formattedCount} new",
-    "other": "%{formattedCount} new"
+  "sharedLists.activityOne": {
+    "one": "%{name} added %{formattedCount} place",
+    "other": "%{name} added %{formattedCount} places"
+  },
+  "sharedLists.activitySomeone": {
+    "one": "Someone added %{formattedCount} place",
+    "other": "Someone added %{formattedCount} places"
+  },
+  "sharedLists.activityMany": {
+    "one": "%{formattedCount} new place from %{names}",
+    "other": "%{formattedCount} new places from %{names}"
   },
   "sharedLists.alsoAddTo": "Also add to",
   "sharedLists.willSee": {

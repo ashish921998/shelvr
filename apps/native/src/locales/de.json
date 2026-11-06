@@ -1024,9 +1024,17 @@
   "sharedLists.with": "Mit %{names}",
   "sharedLists.onlyYou": "Bisher nur du",
   "sharedLists.someone": "Jemand",
-  "sharedLists.newCount": {
-    "one": "%{formattedCount} neu",
-    "other": "%{formattedCount} neu"
+  "sharedLists.activityOne": {
+    "one": "%{name} hat %{formattedCount} Ort hinzugefügt",
+    "other": "%{name} hat %{formattedCount} Orte hinzugefügt"
+  },
+  "sharedLists.activitySomeone": {
+    "one": "Jemand hat %{formattedCount} Ort hinzugefügt",
+    "other": "Jemand hat %{formattedCount} Orte hinzugefügt"
+  },
+  "sharedLists.activityMany": {
+    "one": "%{formattedCount} neuer Ort von %{names}",
+    "other": "%{formattedCount} neue Orte von %{names}"
   },
   "sharedLists.alsoAddTo": "Auch hinzufügen zu",
   "sharedLists.willSee": {
