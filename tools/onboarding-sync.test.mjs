@@ -173,6 +173,8 @@ test("the App Review notes quote only text the app shows", () => {
 });
 
 const PASTE_READY = /^## Paste-ready App Review notes\n/m;
+const PASTE_INTRO =
+  /^\s*Paste everything after this paragraph\b[\s\S]*?\n[ \t]*\n/;
 const REVIEW_NOTES_LIMIT = 4000;
 
 function pasteReady(markdown) {
@@ -181,16 +183,25 @@ function pasteReady(markdown) {
   const section = markdown
     .slice(heading.index + heading[0].length)
     .split(/^## /m)[0];
-  const intro = /\S[\s\S]*?\n[ \t]*\n/.exec(section);
-  return intro ? section.slice(intro.index + intro[0].length).trim() : "";
+  const intro = PASTE_INTRO.exec(section);
+  return intro ? section.slice(intro[0].length).trim() : "";
 }
 
 test("the paste-ready block starts after its intro and ends at the next section", () => {
   assert.equal(
     pasteReady(
-      "## Before\n\nNot pasted.\n\n## Paste-ready App Review notes\n\nThe intro,\nover two lines.\n\nPasted.\n\n1. Also pasted.\n\n## After\n\nNot pasted.\n",
+      "## Before\n\nNot pasted.\n\n## Paste-ready App Review notes\n\nPaste everything after this paragraph,\nwhich runs over two lines.\n\nPasted.\n\n1. Also pasted.\n\n## After\n\nNot pasted.\n",
     ),
     "Pasted.\n\n1. Also pasted.",
+  );
+});
+
+test("a paste-ready section without its intro has no block to measure", () => {
+  assert.equal(
+    pasteReady(
+      "## Paste-ready App Review notes\n\nPasted.\n\n1. Also pasted.\n",
+    ),
+    "",
   );
 });
 
@@ -198,7 +209,7 @@ test("the paste-ready App Review notes fit in App Store Connect", () => {
   const block = pasteReady(read(NOTES));
   assert.ok(
     block,
-    `${NOTES} has no text after the intro of its "## Paste-ready App Review notes" section. If the heading changed, update PASTE_READY in this test.`,
+    `${NOTES} has no paste-ready text to measure. Its "## Paste-ready App Review notes" section must open with a paragraph that starts "Paste everything after this paragraph", followed by the notes. If the heading or that opening changed, update PASTE_READY or PASTE_INTRO in this test.`,
   );
   const length = [...block].length;
   assert.ok(
