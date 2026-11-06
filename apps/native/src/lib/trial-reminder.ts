@@ -61,6 +61,19 @@ function serial<T>(work: () => Promise<T>): Promise<T> {
 }
 
 const askedKey = (userId: string) => `shelvr.trialReminderAsked.${userId}`;
+const OWED = "owed";
+const ASKED = "1";
+
+function spendOwedPrimer(userId: string): boolean {
+  try {
+    if (SecureStore.getItem(askedKey(userId)) !== OWED) return false;
+    SecureStore.setItem(askedKey(userId), ASKED);
+    return true;
+  } catch (error) {
+    analytics.captureError("trial_reminder_flag_failed", error);
+    return false;
+  }
+}
 
 export function trialLastDayAt(expiresAt: number, now: number): number | null {
   const at = new Date(expiresAt - RENEWAL_WINDOW_MS);
@@ -311,8 +324,10 @@ export function useTrialReminder(): void {
     const justStarted = before !== null && before !== "trialing";
     let mayAsk = false;
     try {
-      mayAsk = justStarted && SecureStore.getItem(askedKey(userId)) !== "1";
-      if (mayAsk) SecureStore.setItem(askedKey(userId), "1");
+      const asked = SecureStore.getItem(askedKey(userId));
+      mayAsk =
+        asked !== ASKED && (justStarted || (asked === OWED && before === null));
+      if (mayAsk) SecureStore.setItem(askedKey(userId), OWED);
     } catch (error) {
       mayAsk = false;
       analytics.captureError("trial_reminder_flag_failed", error);
@@ -331,7 +346,7 @@ export function useTrialReminder(): void {
       entry.ask = (async () => {
         try {
           await turn.granted;
-          if (!live()) return false;
+          if (!live() || !spendOwedPrimer(userId)) return false;
           const confirmed = await confirmTrialReminderAsk(live);
           if (!confirmed.ask || !live()) return false;
           await waitForSheetTransition();
