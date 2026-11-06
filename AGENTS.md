@@ -70,7 +70,11 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `convex/creatorMaps.ts`, copies written through `insertListPlaces` in
   `convex/sharedLists.ts`. Its web panel is `SaveAllPanel.tsx` and
   `SaveAllLink.tsx` in `apps/web/src/components/map`, with helpers in
-  `apps/web/src/lib/creatorMap.ts`.
+  `apps/web/src/lib/creatorMap.ts`. In the app, the Save all switch is
+  `src/components/map/map-page-save-all.tsx` with `src/lib/creator-map.ts`; the
+  Save all screen is `src/app/creator-map/[token].tsx`, with its links in
+  `src/lib/creator-map-link.ts`, the pending slot `src/lib/pending-creator-map.ts`
+  and its coordinator `src/lib/creator-map-save.ts`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;

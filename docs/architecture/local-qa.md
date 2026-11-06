@@ -105,6 +105,14 @@ changes.
   there; Map tab → Share your map. To open the page in a local web server, set
   `WAITLIST_SHARED_SECRET` on the local deployment (`npx convex env set`) and
   put the same value, with `CONVEX_SITE_URL`, in `apps/web/.env.local`.
+- **A creator map.** Make a map page, then turn on Let visitors save all in
+  Your map page (or run
+  `pnpm exec convex run publicMaps:setPublicMapSaveAll '{"on":true}' --identity …`
+  from `apps/native`). Set `APP_LINK_SCHEME=shelvr-dev` in `apps/web/.env.local`
+  so the page's Save all link opens the dev client. Keep the app running before
+  tapping it: a cold dev client's launcher can swallow the link. To save as a
+  follower without Pro, also launch with `-E2EHidePro YES` (The paywall, above):
+  the list opens, and leaving it shows the plan gate with the list's card.
 - **Reduced motion.**
   `xcrun simctl spawn <udid> defaults write com.apple.Accessibility ReduceMotionEnabled -bool true`,
   then relaunch the app. Set it back to `false` when done.

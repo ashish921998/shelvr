@@ -214,6 +214,77 @@ Installs from map pages are its `map` campaign.
 Link previews fetched by chat apps do not run the page's script, so they are
 not counted as views.
 
+**Creator maps.** A map page with Save all on lets a visitor copy a city's
+places into a list of their own. Besides the website's
+`creator_map_save_clicked`, the app sends:
+
+| Event                           | Where                           | Properties                                                                                 |
+| ------------------------------- | ------------------------------- | ------------------------------------------------------------------------------------------ |
+| `creator_map_save_all_switched` | App, map page sheet's Save all  | `on`                                                                                       |
+| `creator_map_opened`            | App, Save all screen            | `outcome` (`found`, `empty`, `gone` or `error`), `places`, `share_ref`                     |
+| `creator_map_save_tapped`       | App, Save all screen's Save all | `signed_in`, `places`                                                                      |
+| `creator_map_saved`             | App, once the save finishes     | `status`, `added`, `created`, `onboarded_before` (`false` means a new person), `share_ref` |
+
+**Creator map totals, last 30 days**:
+
+```sql
+SELECT
+  countIf(event = 'map_page_viewed' AND properties.save_all = true) AS views,
+  countIf(event = 'creator_map_save_clicked') AS save_clicks,
+  countIf(event = 'app_store_clicked' AND properties.source = 'creator_map') AS store_clicks,
+  countIf(event = 'creator_map_opened' AND properties.outcome = 'found') AS app_opens,
+  countIf(event = 'creator_map_saved' AND properties.status = 'saved') AS saves,
+  countIf(event = 'creator_map_saved' AND properties.status = 'saved'
+    AND properties.onboarded_before = false) AS new_people
+FROM events
+WHERE event IN ('map_page_viewed', 'creator_map_save_clicked', 'app_store_clicked',
+    'creator_map_opened', 'creator_map_saved')
+  AND timestamp > now() - INTERVAL 30 DAY
+  AND (event NOT IN ('creator_map_opened', 'creator_map_saved')
+    OR properties.environment = 'production')
+```
+
+New people who arrive through Save all skip onboarding and its paywall step, as
+invited members do. For those whose first creator-map save was 7 to 37 days
+ago, this counts how many saw a paywall and how many started a trial after it.
+
+```sql
+WITH followers AS (
+  SELECT distinct_id, min(timestamp) AS saved_at
+  FROM events
+  WHERE event = 'creator_map_saved'
+    AND properties.status = 'saved'
+    AND properties.onboarded_before = false
+    AND properties.environment = 'production'
+    AND timestamp > now() - INTERVAL 37 DAY
+    AND timestamp <= now() - INTERVAL 7 DAY
+  GROUP BY distinct_id
+),
+paywalls AS (
+  SELECT distinct_id, max(timestamp) AS last_paywall
+  FROM events
+  WHERE event = 'paywall_shown'
+    AND properties.environment = 'production'
+    AND timestamp > now() - INTERVAL 37 DAY
+  GROUP BY distinct_id
+),
+trials AS (
+  SELECT distinct_id, max(timestamp) AS last_trial
+  FROM events
+  WHERE event = 'trial_started'
+    AND properties.environment = 'production'
+    AND timestamp > now() - INTERVAL 37 DAY
+  GROUP BY distinct_id
+)
+SELECT
+  count() AS new_followers,
+  countIf(last_paywall >= saved_at) AS saw_paywall,
+  countIf(last_trial >= saved_at) AS started_trial
+FROM followers
+LEFT JOIN paywalls USING distinct_id
+LEFT JOIN trials USING distinct_id
+```
+
 ## 5. The oracle: does a free verdict earn an install
 
 `/oracle` gives a no-login visitor a verdict about their saving habits, then

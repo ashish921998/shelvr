@@ -58,10 +58,11 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 - The web page shows the owner's first name, the picked cities and, for each place, its name, an icon, a position on a small sketch, whether the owner has been there, and a link to the Instagram, TikTok or YouTube post it came from (or to Apple Maps). Titles, captions, notes and photos never show. Search engines are asked not to index it.
 - Changing cities, "New link" (the old link stops working) and "Turn off" need no Pro. A lapsed subscriber's page keeps working until they turn it off.
 - Every page has a Report this page link that emails support, and support can switch a reported page off.
+- With a page on, the sheet has a "Let visitors save all" switch (Pro). It adds a Save all button to the web page. Tapping it opens Shelvr, where "Save all" copies that city's places, with their exact locations and links to their posts, into a list the visitor owns, free. The list is named with the page owner's first name, and the visitor keeps it if the owner turns the switch off or deletes their account. Showing the visitor's side needs a second account; the switch works with one.
 
 ## Pro / subscriptions (RevenueCat sandbox)
 
-- Shelvr Pro gates saves past the 10 free ones, Plan a date, Plan a trip, editing or removing a save's places, starting a shared list, and turning on a map page. On Home the Plan a date and Plan a trip tiles carry a Pro tag for free accounts, and tapping one opens the paywall.
+- Shelvr Pro gates saves past the 10 free ones, Plan a date, Plan a trip, editing or removing a save's places, starting a shared list, and turning on a map page or its Save all. On Home the Plan a date and Plan a trip tiles carry a Pro tag for free accounts, and tapping one opens the paywall.
 - Plans: **Annual** (labelled Yearly on the paywall; 7-day trial, then the yearly price) and **Weekly** (no trial). Both auto-renew until canceled.
 - Lapsed subscribers are on the free plan: their existing saves stay open, and saves made while they had Pro do not count toward the 10.
 - Present paywall from any gated action or Profile → View Pro plans.
@@ -108,6 +109,7 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 - Place names sent to Apple Maps to pin a trip's stops (no live location tracking).
 - Shared list members see the list's places and each other's first names.
 - A map page, once its owner turns it on, shows anyone with the link the owner's first name, the places saved from links in the chosen cities, and any Been there marks.
+- With Save all on, anyone with a map page link can copy its places (names, exact locations, kinds and post links) into a list in their own account. The list is named with the owner's first name and stays after the owner deletes their account.
 - RevenueCat subscription status.
 - PostHog product analytics (not ads).
 

@@ -102,6 +102,8 @@ read [localization](docs/architecture/localization.md); before simulator QA read
   (`model/readers/googleMaps.ts`). A format change fails quietly to a plain page read.
 - **Retired screens' links** open Home through `src/lib/home-href.ts` and
   `src/app/+native-intent.ts`, so an old link or notification never lands on a missing screen.
+- **Save all links** are `shelvr:///?creatorMap=<token>&city=<city>` so that old bundles open
+  Home; `src/app/+native-intent.ts` routes them through `src/lib/creator-map-link.ts`.
 
 ## Environment variables
 
