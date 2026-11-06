@@ -67,10 +67,13 @@ installed apps ignore. This counts as a public return change: the commit needs t
 Steps 1, 3, 4 and 5 ship in PR 0, on the phone with no deploy, and work for old saves too.
 For the filter chips, `placeKinds(category, tags)` in `convex/model/placeKinds.ts` gains a
 `cuisine` argument that maps it to a kind (coffee to `coffee`, cocktails to `drinks`) and decides the
-food or drink kind ahead of the category and the save's tags. Both callers pass `pin.cuisine`:
-`cityPins` in `src/lib/city-pins.ts` (the city page) and `listMapPlaces` in `convex/mapPlaces.ts`
-(the Map tab). Without that threading the chips stay per-save while the emoji is per-place.
-Both dedupe a venue across saves with `mergeVenueKinds` (`convex/model/placeKinds.ts`), which PR 2
+food or drink kind ahead of the category and the save's tags. All three callers pass `pin.cuisine`:
+`cityPins` in `src/lib/city-pins.ts` (the city page), `listMapPlaces` in `convex/mapPlaces.ts`
+(the Map tab) and `savePins` in `convex/model/publicMap.ts` (the public map page). `publicPlace`
+there builds `placeEmoji`'s argument field by field, so `PublicPin` must carry `cuisine` to it too.
+Without that threading the chips stay per-save while the emoji is per-place, and the public map page
+shows a plainer emoji than the app for the same place.
+All three dedupe a venue across saves with `mergeVenueKinds` (`convex/model/placeKinds.ts`), which PR 2
 extends with the same rule it has for `category`: the kept pin's `cuisine` wins, and a later duplicate's `cuisine` fills it only when the kept one has none. PR 2 tests both duplicate orders.
 
 ### Old saves
