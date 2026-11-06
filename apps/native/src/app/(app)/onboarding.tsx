@@ -75,15 +75,8 @@ const SKIPPABLE: ReadonlySet<OnboardingStep> = new Set([
   "city",
 ]);
 
-function useStepAnalytics(
-  step: OnboardingStep,
-  resumedAt: number | null,
-  resumedGoals: readonly Goal[],
-) {
+function useStepAnalytics(step: OnboardingStep, viewed: Set<OnboardingStep>) {
   const tracked = useRef(new Set<OnboardingStep>());
-  const viewed = useRef(
-    new Set<OnboardingStep>(viewedBeforeResume(resumedAt, resumedGoals)),
-  );
   const enteredAt = useRef(0);
   const current = useRef<OnboardingStep | null>(null);
   const index = ONBOARDING_STEPS.indexOf(step);
@@ -92,14 +85,14 @@ function useStepAnalytics(
     if (current.current === step) return;
     current.current = step;
     enteredAt.current = Date.now();
-    if (viewed.current.has(step)) return;
-    viewed.current.add(step);
+    if (viewed.has(step)) return;
+    viewed.add(step);
     analytics.capture("onboarding_step_viewed", {
       step_id: ONBOARDING_STEP_IDS[step],
       step_index: index,
       flow_version: ONBOARDING_FLOW_VERSION,
     });
-  }, [step, index]);
+  }, [step, index, viewed]);
 
   return useCallback(() => {
     if (tracked.current.has(step)) return;
@@ -190,8 +183,15 @@ export default function OnboardingScreen() {
   );
   const [showSignIn, setShowSignIn] = useState(false);
   const [viewedOpenerPages] = useState(() => new Set<number>());
+  const [viewedSteps] = useState(
+    () =>
+      new Set([
+        ...viewedBeforeResume(initial.step, initial.goals),
+        ...initial.viewed,
+      ]),
+  );
   const [signedIn, setSignedIn] = useState(false);
-  const recordCurrentStep = useStepAnalytics(step, initial.step, initial.goals);
+  const recordCurrentStep = useStepAnalytics(step, viewedSteps);
   const kind = planKindFor(goals);
   const tripAnswer = asksTripSoon(goals) ? tripSoon : null;
   const spaces = goalSpaces(goals);
@@ -214,8 +214,17 @@ export default function OnboardingScreen() {
       planner,
       tripSoon,
       step: stepIndex,
+      viewed: [...viewedSteps],
     });
-  }, [travelCity, goals, savedCount, planner, tripSoon, stepIndex]);
+  }, [
+    travelCity,
+    goals,
+    savedCount,
+    planner,
+    tripSoon,
+    stepIndex,
+    viewedSteps,
+  ]);
 
   const [backward, setBackward] = useState(false);
   const advanceWith = (nextGoals: readonly Goal[]) => {
