@@ -1,10 +1,28 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readdirSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { captureWebAnalyticsEvent, captureWebException } from "./analytics";
+import { pageViewProperties } from "./pageView";
+import { maskTokenPath } from "./tokenPath";
 
 const fetchMock = vi.fn();
+
+const APP = join(dirname(fileURLToPath(import.meta.url)), "../app");
+
+function tokenRoutes(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .flatMap((entry) =>
+      entry.name === "[token]"
+        ? [relative(APP, dir)]
+        : tokenRoutes(join(dir, entry.name)),
+    );
+}
 
 describe("web analytics", () => {
   beforeEach(() => {
@@ -72,6 +90,44 @@ describe("web analytics", () => {
     captureWebAnalyticsEvent("page_viewed");
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  describe("pages with a token in the path", () => {
+    const routes = tokenRoutes(APP);
+    const token = "route-secret-4821";
+
+    afterEach(() => {
+      window.history.replaceState({}, "", "/");
+    });
+
+    it("finds the site's [token] pages", () => {
+      expect(routes.length).toBeGreaterThan(0);
+    });
+
+    it.each(routes)(
+      "keeps a /%s/[token] page's token out of page views and events",
+      (route) => {
+        window.history.replaceState({}, "", `/${route}/${token}`);
+
+        expect(pageViewProperties(window.location, "")).toMatchObject({
+          $current_url: `${window.location.origin}/${route}/[token]`,
+          $pathname: `/${route}/[token]`,
+        });
+
+        captureWebAnalyticsEvent("app_store_clicked", { source: "share" });
+        const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        expect(JSON.parse(String(init.body)).properties.$current_url).toBe(
+          `${window.location.origin}/${route}/[token]`,
+        );
+        expect(String(init.body)).not.toContain(token);
+      },
+    );
+
+    it("masks the whole path under a token route and nothing else", () => {
+      expect(maskTokenPath(`/l/${token}/more`)).toBe("/l/[token]");
+      expect(maskTokenPath(`/lists/${token}`)).toBe(`/lists/${token}`);
+      expect(maskTokenPath("/privacy")).toBe("/privacy");
+    });
   });
 });
 

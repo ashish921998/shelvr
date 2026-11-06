@@ -1,14 +1,7 @@
 import { arrivalCampaign } from "@/lib/appStore";
+import { maskTokenPath } from "@/lib/tokenPath";
 
 type PageLocation = Pick<Location, "origin" | "pathname" | "search">;
-
-function pageViewPath(pathname: string): string {
-  if (pathname.startsWith("/i/")) return "/i/[token]";
-  if (pathname.startsWith("/p/")) return "/p/[token]";
-  if (pathname.startsWith("/l/")) return "/l/[token]";
-  if (pathname.startsWith("/m/")) return "/m/[token]";
-  return pathname;
-}
 
 export function referringDomain(referrer: string, origin: string): string {
   try {
@@ -21,7 +14,7 @@ export function referringDomain(referrer: string, origin: string): string {
 }
 
 export function pageViewProperties(location: PageLocation, referrer: string) {
-  const path = pageViewPath(location.pathname);
+  const path = maskTokenPath(location.pathname);
   const campaign = arrivalCampaign(location.search);
   return {
     $current_url: `${location.origin}${path}`,
