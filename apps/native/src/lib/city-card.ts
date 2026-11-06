@@ -7,8 +7,13 @@ type CardPoint<T> = { pin: T; x: number; y: number };
 export function cardPoints<T extends { lat: number; lng: number }>(
   pins: readonly T[],
   box: { width: number; height: number; pad: number },
+  visited: (pin: T) => boolean = () => false,
 ): CardPoint<T>[] {
-  const shown = framedPins([...pins]).slice(0, CARD_MAX_PINS);
+  const framed = framedPins([...pins]);
+  const shown = [
+    ...framed.filter((pin) => visited(pin)),
+    ...framed.filter((pin) => !visited(pin)),
+  ].slice(0, CARD_MAX_PINS);
   if (shown.length === 0) return [];
   const midLat = shown.reduce((sum, pin) => sum + pin.lat, 0) / shown.length;
   const cos = Math.cos((midLat * Math.PI) / 180);

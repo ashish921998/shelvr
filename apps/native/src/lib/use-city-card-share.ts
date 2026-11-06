@@ -45,7 +45,7 @@ export function useCityCardShare(
         UTI: "public.png",
         dialogTitle: t("cityCard.share"),
       });
-      analytics.capture("city_card_shared", counts);
+      analytics.capture("city_card_share_sheet_opened", counts);
     } catch (error) {
       analytics.captureError("city_card_share_failed", error);
       Alert.alert(t("errors.unexpectedTitle"), t("errors.tryAgain"));

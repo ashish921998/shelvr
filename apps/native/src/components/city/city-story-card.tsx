@@ -37,16 +37,12 @@ function CardMap({
     () => streets(size.width, size.height),
     [size.width, size.height],
   );
-  const points = useMemo(
-    () =>
-      cardPoints(pins, { ...size, pad: BUBBLE })
-        .map((point) => ({
-          ...point,
-          went: visited.has(cityPinId(point.pin)),
-        }))
-        .sort((a, b) => Number(a.went) - Number(b.went)),
-    [pins, size, visited],
-  );
+  const points = useMemo(() => {
+    const went = (pin: CityPin) => visited.has(cityPinId(pin));
+    return cardPoints(pins, { ...size, pad: BUBBLE }, went)
+      .map((point) => ({ ...point, went: went(point.pin) }))
+      .sort((a, b) => Number(a.went) - Number(b.went));
+  }, [pins, size, visited]);
   return (
     <View
       style={styles.map}

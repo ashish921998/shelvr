@@ -39,4 +39,19 @@ describe("cardPoints", () => {
     }));
     expect(cardPoints(pins, box)).toHaveLength(CARD_MAX_PINS);
   });
+
+  it("keeps the visited places when it cuts the oldest saves", () => {
+    const pins = Array.from({ length: CARD_MAX_PINS + 5 }, (_, i) => ({
+      lat: 30 + i / 1000,
+      lng: -97.7,
+      visited: i >= CARD_MAX_PINS + 2,
+    }));
+    const points = cardPoints(pins, box, (pin) => pin.visited);
+    expect(points).toHaveLength(CARD_MAX_PINS);
+    expect(points.filter((point) => point.pin.visited)).toHaveLength(3);
+    expect(points.map((point) => point.pin)).toEqual([
+      ...pins.slice(CARD_MAX_PINS + 2),
+      ...pins.slice(0, CARD_MAX_PINS - 3),
+    ]);
+  });
 });
