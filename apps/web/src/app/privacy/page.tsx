@@ -184,8 +184,8 @@ export default function PrivacyPage() {
           you give it, such as titles or a screenshot, to Gemini for a reading.
           We do not store what you submit or the results. We do keep a rate
           limit record keyed to your IP address, to limit how often these tools
-          can be used. The waitlist and plan vote pages use the same kind of
-          rate limit.
+          can be used. The waitlist, plan vote and map pages use the same kind
+          of rate limit.
         </p>
         <p className="mt-2">
           Transient AI failures do not delete content you already captured.
