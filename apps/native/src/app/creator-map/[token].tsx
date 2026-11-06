@@ -81,7 +81,7 @@ export default function CreatorMapScreen() {
     getPendingCreatorMap,
     getPendingCreatorMap,
   );
-  const saving = pendingCreatorMapToken(raw) === token;
+  const saving = isAuthenticated && pendingCreatorMapToken(raw) === token;
   const [signingIn, setSigningIn] = useState(false);
   useOpenedOnce(
     token,

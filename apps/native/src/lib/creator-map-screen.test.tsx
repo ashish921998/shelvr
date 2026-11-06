@@ -358,6 +358,21 @@ describe("creator map screen actions", () => {
       "false",
     );
   });
+
+  it("lets a signed-out person whose earlier tap is still in the slot tap Save all and sign in", async () => {
+    mocks.auth = { isLoading: false, isAuthenticated: false };
+    mocks.raw = slot();
+    await show(MAYA);
+    const save = screen.getByTestId("creator-map-save");
+    expect(save.dataset.loading).toBe("false");
+    fireEvent.click(save);
+    expect(mocks.setPending).toHaveBeenCalledWith({
+      token: TOKEN,
+      city: "Mexico City",
+      name: "Maya’s Mexico City",
+    });
+    expect(screen.getByText("sign-in-back")).toBeTruthy();
+  });
 });
 
 describe("creator_map_opened", () => {
