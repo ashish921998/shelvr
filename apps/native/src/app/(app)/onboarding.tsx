@@ -75,9 +75,15 @@ const SKIPPABLE: ReadonlySet<OnboardingStep> = new Set([
   "city",
 ]);
 
-function useStepAnalytics(step: OnboardingStep, resumedAt: number | null) {
+function useStepAnalytics(
+  step: OnboardingStep,
+  resumedAt: number | null,
+  resumedGoals: readonly Goal[],
+) {
   const tracked = useRef(new Set<OnboardingStep>());
-  const viewed = useRef(new Set<OnboardingStep>(viewedBeforeResume(resumedAt)));
+  const viewed = useRef(
+    new Set<OnboardingStep>(viewedBeforeResume(resumedAt, resumedGoals)),
+  );
   const enteredAt = useRef(0);
   const current = useRef<OnboardingStep | null>(null);
   const index = ONBOARDING_STEPS.indexOf(step);
@@ -185,7 +191,7 @@ export default function OnboardingScreen() {
   const [showSignIn, setShowSignIn] = useState(false);
   const [viewedOpenerPages] = useState(() => new Set<number>());
   const [signedIn, setSignedIn] = useState(false);
-  const recordCurrentStep = useStepAnalytics(step, initial.step);
+  const recordCurrentStep = useStepAnalytics(step, initial.step, initial.goals);
   const kind = planKindFor(goals);
   const tripAnswer = asksTripSoon(goals) ? tripSoon : null;
   const spaces = goalSpaces(goals);

@@ -108,13 +108,19 @@ describe("onboardingProgress", () => {
 
 describe("viewedBeforeResume", () => {
   it("is empty for a fresh start", () => {
-    expect(viewedBeforeResume(null)).toEqual([]);
+    expect(viewedBeforeResume(null, [])).toEqual([]);
   });
   it("counts the resumed step and every step before it as viewed", () => {
-    expect(viewedBeforeResume(2)).toEqual(["opener", "savedCount", "goal"]);
+    expect(viewedBeforeResume(2, [])).toEqual(["opener", "savedCount", "goal"]);
   });
   it("treats an unknown index as a fresh start", () => {
-    expect(viewedBeforeResume(99)).toEqual([]);
-    expect(viewedBeforeResume(1.5)).toEqual([]);
+    expect(viewedBeforeResume(99, [])).toEqual([]);
+    expect(viewedBeforeResume(1.5, [])).toEqual([]);
+  });
+  it("leaves out the trip question when the goals skipped it", () => {
+    const city = ONBOARDING_STEPS.indexOf("city");
+    expect(viewedBeforeResume(city, ["date"])).not.toContain("tripSoon");
+    expect(viewedBeforeResume(city, ["date"])).toContain("planner");
+    expect(viewedBeforeResume(city, ["travel"])).toContain("tripSoon");
   });
 });

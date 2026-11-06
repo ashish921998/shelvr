@@ -80,8 +80,12 @@ export function restoreOnboardingStep(
     : nextOnboardingStep(ONBOARDING_STEPS[step - 1] ?? "opener", goals);
 }
 
-export function viewedBeforeResume(step: number | null): OnboardingStep[] {
+export function viewedBeforeResume(
+  step: number | null,
+  goals: readonly Goal[],
+): OnboardingStep[] {
   if (step === null || !Number.isInteger(step) || !ONBOARDING_STEPS[step])
     return [];
-  return ONBOARDING_STEPS.slice(0, step + 1);
+  const walked = walkedSteps(goals);
+  return ONBOARDING_STEPS.slice(0, step + 1).filter((s) => walked.includes(s));
 }
