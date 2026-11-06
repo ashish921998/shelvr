@@ -174,6 +174,13 @@ describe("resetCurrentUser", () => {
         searchText: "keep me",
       });
     });
+    await backend.run(async (ctx) => {
+      await ctx.db.insert("beenCities", { userId, cityId: "paris" });
+      await ctx.db.insert("beenCities", {
+        userId: otherUserId,
+        cityId: "tokyo",
+      });
+    });
 
     await expect(
       client.mutation(api.devFixtures.resetCurrentUser, {}),
@@ -181,8 +188,20 @@ describe("resetCurrentUser", () => {
     await expect(
       client.mutation(api.devFixtures.resetCurrentUser, {}),
     ).resolves.toEqual({ items: 6, spaces: 3, memberships: 4 });
+    await expect(
+      client.query(api.beenCities.listBeenCities, {}),
+    ).resolves.toEqual(["austin", "lisbon", "madrid"]);
 
     await backend.run(async (ctx) => {
+      const beenOf = async (id: typeof userId) =>
+        (
+          await ctx.db
+            .query("beenCities")
+            .withIndex("by_user_and_city", (q) => q.eq("userId", id))
+            .collect()
+        ).map((row) => row.cityId);
+      expect(await beenOf(userId)).toEqual(["austin", "lisbon", "madrid"]);
+      expect(await beenOf(otherUserId)).toEqual(["tokyo"]);
       const items = await ctx.db
         .query("items")
         .withIndex("by_user", (q) => q.eq("userId", userId))
