@@ -107,7 +107,7 @@ function FoundMap({ map, android }: { map: PublicMap; android: boolean }) {
   const counts = mapCounts(map);
   return (
     <>
-      <h1 className="mt-10 font-display text-[32px] leading-tight text-ink sm:text-4xl">
+      <h1 className="mt-10 font-display text-[32px] leading-tight text-ink [overflow-wrap:anywhere] sm:text-4xl">
         {mapTitle(map)}
       </h1>
       {counts.places > 0 ? (

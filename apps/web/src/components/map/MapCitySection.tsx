@@ -19,7 +19,7 @@ export default function MapCitySection({
     <section aria-labelledby={headingId} className="mt-12">
       <h2
         id={headingId}
-        className="font-display text-[26px] leading-tight text-ink"
+        className="font-display text-[26px] leading-tight text-ink [overflow-wrap:anywhere]"
       >
         {city}
       </h2>

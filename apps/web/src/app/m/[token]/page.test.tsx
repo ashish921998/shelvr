@@ -129,6 +129,26 @@ describe("map page", () => {
     expect(page).toContain("Report this page");
   });
 
+  it("lets a long owner or city name wrap instead of widening the page", async () => {
+    const owner = "Maximilianbartholomewalexandersson";
+    const city = "Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch";
+    mocks.result = {
+      outcome: "found",
+      map: { ownerName: owner, cities: [{ ...austin, city }] },
+    };
+    const html = await render();
+    expect(html).toMatch(
+      new RegExp(
+        `<h1 class="[^"]*\\[overflow-wrap:anywhere\\][^"]*">${owner}’s map</h1>`,
+      ),
+    );
+    expect(html).toMatch(
+      new RegExp(
+        `<h2 [^>]*class="[^"]*\\[overflow-wrap:anywhere\\][^"]*">${city}</h2>`,
+      ),
+    );
+  });
+
   it("tells a dead link from one that did not load", async () => {
     mocks.result = { outcome: "missing" };
     let page = text(await render());
