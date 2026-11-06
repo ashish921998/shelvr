@@ -25,6 +25,7 @@ import {
   onboardingProgress,
   previousOnboardingStep,
   restoreOnboardingStep,
+  viewedBeforeResume,
   type OnboardingStep,
 } from "@/lib/onboarding-steps";
 import {
@@ -67,9 +68,9 @@ const SKIPPABLE: ReadonlySet<OnboardingStep> = new Set([
   "city",
 ]);
 
-function useStepAnalytics(step: OnboardingStep) {
+function useStepAnalytics(step: OnboardingStep, resumedAt: number | null) {
   const tracked = useRef(new Set<OnboardingStep>());
-  const viewed = useRef(new Set<OnboardingStep>());
+  const viewed = useRef(new Set<OnboardingStep>(viewedBeforeResume(resumedAt)));
   const enteredAt = useRef(0);
   const current = useRef<OnboardingStep | null>(null);
   const index = ONBOARDING_STEPS.indexOf(step);
@@ -174,7 +175,7 @@ export default function OnboardingScreen() {
   const [showSignIn, setShowSignIn] = useState(false);
   const [viewedOpenerPages] = useState(() => new Set<number>());
   const [signedIn, setSignedIn] = useState(false);
-  const recordCurrentStep = useStepAnalytics(step);
+  const recordCurrentStep = useStepAnalytics(step, initial.step);
   const kind = planKindFor(goals);
   const spaces = goalSpaces(goals);
   const sample = ahaSample(kind, travelCity);

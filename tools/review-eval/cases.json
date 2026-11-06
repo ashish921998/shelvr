@@ -268,19 +268,40 @@
     },
     {
       "id": "pr135",
-      "kind": "clean",
+      "kind": "bug",
       "pr": 135,
       "commit": "2f362ca42e19281ae2dc63b9089d022c2b8a8450",
       "area": "convex feedback",
-      "note": "In-app feedback through Convex and the support inbox; only a dead-code cleanup touched its lines later."
+      "fixedBy": [318],
+      "fixCommits": ["691ae7b420accea7e6e7b5b788648e85904f3afc"],
+      "bugs": [
+        {
+          "id": "pr135a",
+          "visible": "diff",
+          "text": "submitFeedback inserts a row for a caller whose account is already deleted (requireUserId only checks the token), so feedback with their content lands after the deletion drain finished and is never cleaned up."
+        },
+        {
+          "id": "pr135b",
+          "visible": "diff",
+          "text": "claimDelivery never checks whether the owner is deleting, so pending feedback, with the account email, is still sent to the support inbox during a multi-pass account deletion. Still open on main as of 6f149de1."
+        }
+      ]
     },
     {
       "id": "pr203",
-      "kind": "clean",
+      "kind": "bug",
       "pr": 203,
       "commit": "d0963c4bf5f4c06c575b25c8730a664aac19e965",
       "area": "native analytics",
-      "note": "Funnel telemetry for saves, paywall and notifications; later changes to its lines were features, not fixes."
+      "fixedBy": [709],
+      "fixCommits": ["85b6cd1d919afd17615d32e84fd2d6c420e37b4d"],
+      "bugs": [
+        {
+          "id": "pr203",
+          "visible": "diff",
+          "text": "When the stale-processing sweep fails a save and its queued run later fails too, failItem still owns the run and sends a second item_processed failure event, so failures are double counted."
+        }
+      ]
     }
   ]
 }

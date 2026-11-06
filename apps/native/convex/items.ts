@@ -2491,6 +2491,7 @@ async function writeFailure(
       keepPins: true,
     });
   }
+  if (item.status === "failed") return;
   await scheduleProcessedTelemetry(ctx, item, {
     status: "failed",
     failureReason: reason,

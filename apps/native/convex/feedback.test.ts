@@ -59,7 +59,7 @@ async function insertSubmission(
 ): Promise<Id<"feedbackSubmissions">> {
   return await t.run(async (ctx) =>
     ctx.db.insert("feedbackSubmissions", {
-      userId: fields.userId ?? "user-seed",
+      userId: fields.userId ?? (await ctx.db.insert("users", {})),
       message: fields.message ?? "seeded",
       surface: fields.surface ?? "home",
       status: fields.status ?? "pending",
@@ -328,6 +328,68 @@ describe("delivery retries", () => {
       attempts: 1,
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("account deletion", () => {
+  it("never sends feedback once its owner has started deleting the account", async () => {
+    const t = setup();
+    const fetchMock = okFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const userId = await t.run(async (ctx) =>
+      ctx.db.insert("users", { email: "gone@example.com", deleting: true }),
+    );
+    const id = await insertSubmission(t, { userId, status: "failed" });
+
+    await t.action(internal.feedback.deliver, { submissionId: id });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await getSubmission(t, id)).toBeNull();
+  });
+
+  it("never sends feedback whose owner row is already gone", async () => {
+    const t = setup();
+    const fetchMock = okFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const userId = await t.run(async (ctx) => {
+      const id = await ctx.db.insert("users", {});
+      await ctx.db.delete(id);
+      return id;
+    });
+    const id = await insertSubmission(t, { userId, status: "pending" });
+
+    await t.action(internal.feedback.deliver, { submissionId: id });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await getSubmission(t, id)).toBeNull();
+  });
+
+  it("keeps retrying a live owner's feedback behind many from deleting accounts", async () => {
+    const t = setup();
+    vi.useFakeTimers();
+    const fetchMock = okFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    await t.run(async (ctx) => {
+      for (let i = 0; i < 101; i++) {
+        const owner = await ctx.db.insert("users", { deleting: true });
+        await ctx.db.insert("feedbackSubmissions", {
+          userId: owner,
+          message: "from a deleting account",
+          surface: "home",
+          status: "failed",
+          attempts: 0,
+        });
+      }
+    });
+    const live = await insertSubmission(t, { status: "failed", attempts: 1 });
+
+    await t.action(internal.feedback.retryFailedDeliveries, {});
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.action(internal.feedback.retryFailedDeliveries, {});
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(await getSubmission(t, live)).toMatchObject({ status: "delivered" });
   });
 });
 
