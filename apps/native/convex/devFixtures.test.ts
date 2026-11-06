@@ -506,6 +506,7 @@ describe("seedMapPageFixtures", () => {
           ],
         },
       ],
+      saveAll: false,
     });
   });
 

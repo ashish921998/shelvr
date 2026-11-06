@@ -178,11 +178,170 @@ describe("getMyPublicMap", () => {
       token,
       cities: ["Mexico City"],
       blocked: false,
+      saveAll: false,
+    });
+    await t.mutation(api.publicMaps.setPublicMapSaveAll, { on: true });
+    await expect(t.query(api.publicMaps.getMyPublicMap, {})).resolves.toEqual({
+      token,
+      cities: ["Mexico City"],
+      blocked: false,
+      saveAll: true,
     });
     await block(backend, token);
     await expect(
       t.query(api.publicMaps.getMyPublicMap, {}),
     ).resolves.toMatchObject({ token, blocked: true });
+  });
+});
+
+describe("setPublicMapSaveAll", () => {
+  async function ownerWithPage(options: { pro?: boolean } = {}) {
+    const found = await owner(newConvexTest(), options);
+    const { token } = await found.t.mutation(
+      api.publicMaps.setPublicMapCities,
+      { cities: ["Mexico City"] },
+    );
+    return { ...found, token };
+  }
+
+  function removeSubscription(backend: TestBackend, userId: Id<"users">) {
+    return backend.run(async (ctx) => {
+      const sub = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .unique();
+      await ctx.db.delete(sub!._id);
+    });
+  }
+
+  it("turns Save all on, and off by leaving the field out", async () => {
+    const { backend, t, userId } = await ownerWithPage();
+    await expect(
+      t.mutation(api.publicMaps.setPublicMapSaveAll, { on: true }),
+    ).resolves.toBe(true);
+    expect((await pagesOf(backend, userId))[0].saveAll).toBe(true);
+    await expect(
+      t.mutation(api.publicMaps.setPublicMapSaveAll, { on: false }),
+    ).resolves.toBe(false);
+    const [row] = await pagesOf(backend, userId);
+    expect(row).not.toHaveProperty("saveAll");
+    await expect(
+      t.query(api.publicMaps.getMyPublicMap, {}),
+    ).resolves.toMatchObject({ saveAll: false });
+  });
+
+  it("needs a page", async () => {
+    const { t } = await owner();
+    for (const on of [true, false]) {
+      await expect(
+        t.mutation(api.publicMaps.setPublicMapSaveAll, { on }),
+      ).rejects.toThrow("Map page required");
+    }
+  });
+
+  it("needs Pro to turn on, but not to turn off, and a lapse leaves it on", async () => {
+    const { backend, t, userId } = await ownerWithPage();
+    await t.mutation(api.publicMaps.setPublicMapSaveAll, { on: true });
+    await removeSubscription(backend, userId);
+    await expect(
+      t.query(api.publicMaps.getMyPublicMap, {}),
+    ).resolves.toMatchObject({ saveAll: true });
+    await expect(
+      t.mutation(api.publicMaps.setPublicMapSaveAll, { on: true }),
+    ).rejects.toMatchObject({ data: { code: "pro_required" } });
+    await expect(
+      t.mutation(api.publicMaps.setPublicMapSaveAll, { on: false }),
+    ).resolves.toBe(false);
+    await expect(
+      t.mutation(api.publicMaps.setPublicMapSaveAll, { on: true }),
+    ).rejects.toMatchObject({ data: { code: "pro_required" } });
+    expect((await pagesOf(backend, userId))[0]).not.toHaveProperty("saveAll");
+  });
+
+  it("refuses a blocked page either way", async () => {
+    const { backend, t, userId, token } = await ownerWithPage();
+    await t.mutation(api.publicMaps.setPublicMapSaveAll, { on: true });
+    await block(backend, token);
+    for (const on of [true, false]) {
+      await expect(
+        t.mutation(api.publicMaps.setPublicMapSaveAll, { on }),
+      ).rejects.toThrow("Map page blocked");
+    }
+    expect((await pagesOf(backend, userId))[0].saveAll).toBe(true);
+  });
+
+  it(
+    "draws on the bucket the page's other edits share",
+    { timeout: 60_000 },
+    async () => {
+      vi.useFakeTimers();
+      const { t } = await ownerWithPage();
+      let refusedAt: number | undefined;
+      for (let i = 1; i <= 25 && refusedAt === undefined; i++) {
+        const error = await refusal(
+          t.mutation(api.publicMaps.setPublicMapSaveAll, { on: i % 2 === 1 }),
+        );
+        if (error !== undefined) {
+          expect(isRateLimitError(error)).toBe(true);
+          refusedAt = i;
+        }
+      }
+      expect(refusedAt).toBe(20);
+      const edit = await refusal(
+        t.mutation(api.publicMaps.setPublicMapCities, { cities: ["Austin"] }),
+      );
+      expect(isRateLimitError(edit)).toBe(true);
+    },
+  );
+
+  it("survives a new link and a change of cities", async () => {
+    const { t, token } = await ownerWithPage();
+    await t.mutation(api.publicMaps.setPublicMapSaveAll, { on: true });
+    const rotated = await t.mutation(api.publicMaps.rotatePublicMapLink, {});
+    expect(rotated).not.toBe(token);
+    await t.mutation(api.publicMaps.setPublicMapCities, {
+      cities: ["Mexico City", "Austin"],
+    });
+    await expect(t.query(api.publicMaps.getMyPublicMap, {})).resolves.toEqual({
+      token: rotated,
+      cities: ["Mexico City", "Austin"],
+      blocked: false,
+      saveAll: true,
+    });
+  });
+
+  it("starts off again on a page turned off and made again", async () => {
+    const { backend, t, userId } = await ownerWithPage();
+    await t.mutation(api.publicMaps.setPublicMapSaveAll, { on: true });
+    const [before] = await pagesOf(backend, userId);
+    await t.mutation(api.publicMaps.turnOffPublicMap, {});
+    await t.mutation(api.publicMaps.setPublicMapCities, {
+      cities: ["Mexico City"],
+    });
+    await expect(
+      t.query(api.publicMaps.getMyPublicMap, {}),
+    ).resolves.toMatchObject({ saveAll: false });
+    const [after] = await pagesOf(backend, userId);
+    expect(after._id).not.toBe(before._id);
+    expect(after).not.toHaveProperty("saveAll");
+  });
+
+  it("shows on the page's read and its HTTP body", async () => {
+    vi.stubEnv("WAITLIST_SHARED_SECRET", SECRET);
+    const { backend, t, token } = await ownerWithPage();
+    await expect(
+      backend.query(internal.publicMaps.getPublicMap, { token }),
+    ).resolves.toMatchObject({ saveAll: false });
+    expect(await (await readPage(backend, token)).json()).toMatchObject({
+      saveAll: false,
+    });
+    await t.mutation(api.publicMaps.setPublicMapSaveAll, { on: true });
+    await expect(
+      backend.query(internal.publicMaps.getPublicMap, { token }),
+    ).resolves.toMatchObject({ saveAll: true });
+    expect(await (await readPage(backend, token)).json()).toMatchObject({
+      saveAll: true,
+    });
   });
 });
 
@@ -426,6 +585,7 @@ describe("getPublicMap", () => {
           ],
         },
       ],
+      saveAll: false,
     });
 
     const json = JSON.stringify(map);
@@ -458,7 +618,7 @@ describe("getPublicMap", () => {
     });
     await expect(
       backend.query(internal.publicMaps.getPublicMap, { token }),
-    ).resolves.toEqual({ cities: [] });
+    ).resolves.toEqual({ cities: [], saveAll: false });
   });
 
   it("serves nothing for an unknown, malformed or blocked link, or a deleting owner", async () => {
@@ -639,6 +799,7 @@ describe("GET /map/pages/<token>", () => {
           ],
         },
       ],
+      saveAll: false,
     });
 
     const unknown = await readPage(backend, UNKNOWN_TOKEN);

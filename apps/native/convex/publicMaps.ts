@@ -64,7 +64,7 @@ async function ownPages(
     .take(OWNER_ROWS);
 }
 
-async function servablePage(
+export async function servablePage(
   ctx: QueryCtx,
   token: string,
 ): Promise<Doc<"publicMaps"> | null> {
@@ -84,6 +84,7 @@ export const getMyPublicMap = authedQuery({
       token: v.string(),
       cities: v.array(v.string()),
       blocked: v.boolean(),
+      saveAll: v.boolean(),
     }),
   ),
   handler: async (ctx) => {
@@ -94,6 +95,7 @@ export const getMyPublicMap = authedQuery({
           token: row.token,
           cities: row.cities,
           blocked: row.blockedAt !== undefined,
+          saveAll: row.saveAll === true,
         };
   },
 });
@@ -154,6 +156,23 @@ export const rotatePublicMapLink = authedMutation({
   },
 });
 
+export const setPublicMapSaveAll = authedMutation({
+  args: { on: v.boolean() },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    await rateLimiter.limit(ctx, "publicMapEdit", {
+      key: ctx.userId,
+      throws: true,
+    });
+    const row = await ownPage(ctx, ctx.userId);
+    if (row === null) throw new Error("Map page required");
+    if (row.blockedAt !== undefined) throw new Error("Map page blocked");
+    if (args.on) await requireProEntitlement(ctx, ctx.userId);
+    await ctx.db.patch(row._id, { saveAll: args.on ? true : undefined });
+    return args.on;
+  },
+});
+
 export const turnOffPublicMap = authedMutation({
   args: {},
   returns: v.null(),
@@ -174,6 +193,7 @@ export const getPublicMap = internalQuery({
       cities: v.array(
         v.object({ city: v.string(), places: v.array(publicPlaceValidator) }),
       ),
+      saveAll: v.boolean(),
     }),
   ),
   handler: async (ctx, args) => {
@@ -187,6 +207,7 @@ export const getPublicMap = internalQuery({
     return {
       ...(ownerName !== undefined ? { ownerName } : {}),
       cities: publicMapCities(saves, row.cities, visited),
+      saveAll: row.saveAll === true,
     };
   },
 });

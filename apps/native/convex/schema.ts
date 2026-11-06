@@ -468,6 +468,7 @@ export default defineSchema({
     token: v.string(),
     cities: v.array(v.string()),
     blockedAt: v.optional(v.number()),
+    saveAll: v.optional(v.boolean()),
   })
     .index("by_token", ["token"])
     .index("by_user", ["userId"]),
