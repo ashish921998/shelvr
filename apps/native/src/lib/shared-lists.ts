@@ -1,5 +1,5 @@
 import { analytics } from "@/lib/analytics";
-import { type CityPin, cityPinId } from "@/lib/city-pins";
+import { type CityPin, cityPinId, saveSource } from "@/lib/city-pins";
 import type { CityPlanKind } from "@/lib/city-plan";
 import { t } from "@/lib/i18n";
 import { shareUrl } from "@/lib/share-link";
@@ -259,6 +259,11 @@ export function listSectionRows(
 }
 
 export function savedByLine(place: SharedListPlace): string {
+  if (place.postUrl) {
+    return t("creatorMaps.fromSite", {
+      site: saveSource({ url: place.postUrl }) ?? "",
+    });
+  }
   if (place.addedByYou) return t("sharedLists.youSaved");
   if (place.addedByPastMember === true) {
     return t("sharedLists.pastMemberSaved");

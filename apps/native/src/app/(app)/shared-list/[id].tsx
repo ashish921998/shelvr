@@ -14,6 +14,7 @@ import { analytics } from "@/lib/analytics";
 import { canOpenPlaceCard } from "@/lib/apple-place-card";
 import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
+import { openLink } from "@/lib/open-link";
 import { backOrHome } from "@/lib/screen-dismiss";
 import { stopAction } from "@/lib/trip-planner";
 import {
@@ -76,6 +77,18 @@ function usePlaceEdits() {
     remove: (placeId: Id<"sharedListPlaces">) =>
       remove({ placeId }).catch(report),
   };
+}
+
+function openPost(url: string) {
+  analytics.capture("shared_list_place_opened", { action: "post" });
+  openLink(url).catch((error: unknown) =>
+    analytics.captureError("shared_list_post_failed", error),
+  );
+}
+
+function postOpener(place: SharedListPlace): (() => void) | undefined {
+  const url = place.postUrl;
+  return url ? () => openPost(url) : undefined;
 }
 
 export default function SharedListScreen() {
@@ -290,6 +303,7 @@ function SharedList({ detail }: { detail: SharedListDetail }) {
                   ? () => open(item.row)
                   : undefined
               }
+              onOpenPost={postOpener(item.row.place)}
               onVisited={(visited) =>
                 void edits.visited(item.row.place._id, visited)
               }

@@ -165,6 +165,20 @@ describe("savedByLine", () => {
       "sharedLists.youSaved",
     );
   });
+
+  it.each([
+    ["https://www.instagram.com/reel/C0abc123/", "Instagram"],
+    ["https://www.tiktok.com/@maya/video/7300000000000000000", "TikTok"],
+    ["https://youtu.be/dQw4w9WgXcQ", "YouTube"],
+  ])(
+    "names the post's site for a creator map copy from %s",
+    (postUrl, site) => {
+      const line = `creatorMaps.fromSite:${JSON.stringify({ site })}`;
+      expect(savedByLine(place({ postUrl }))).toBe(line);
+      expect(savedByLine(place({ postUrl, addedByYou: true }))).toBe(line);
+      expect(savedByLine(place({ postUrl, addedByName: "Maya" }))).toBe(line);
+    },
+  );
 });
 
 describe("withLine and inviteUrl", () => {

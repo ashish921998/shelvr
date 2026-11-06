@@ -1,11 +1,16 @@
 import { hasLiquidGlass } from "@/components/glass";
 import { MemberAvatars } from "@/components/shared-list/member-avatars";
+import { NameSheet } from "@/components/shared-list/name-sheet";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
 import { t } from "@/lib/i18n";
-import { shareInvite, type SharedListDetail } from "@/lib/shared-lists";
+import {
+  shareInvite,
+  useNameGate,
+  type SharedListDetail,
+} from "@/lib/shared-lists";
 import { api } from "@convex/_generated/api";
 import { useMutation } from "convex/react";
 import { Stack, useRouter } from "expo-router";
@@ -16,6 +21,7 @@ export function ListHeaderRight({ detail }: { detail: SharedListDetail }) {
   const router = useRouter();
   const { theme } = useUnistyles();
   const leave = useMutation(api.sharedLists.leaveSharedList);
+  const nameGate = useNameGate();
   const confirmLeave = () =>
     Alert.alert(
       t("sharedLists.leaveTitle", { name: detail.name }),
@@ -42,48 +48,60 @@ export function ListHeaderRight({ detail }: { detail: SharedListDetail }) {
       ],
     );
   return (
-    <Stack.Screen
-      options={{
-        headerRight: () => (
-          <View style={styles.right}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t("sharedLists.invite")}
-              onPress={() => void shareInvite(detail.inviteToken, "list")}
-              style={({ pressed }) => [
-                styles.invite,
-                pressed && styles.pressed,
-              ]}
-            >
-              <MemberAvatars members={detail.members} size={26} />
-              <ThemedText variant="captionStrong">
-                {t("sharedLists.invite")}
-              </ThemedText>
-            </Pressable>
-            <ActionMenu
-              label={t("sharedLists.listActions")}
-              title={detail.name}
-              actions={[
-                {
-                  id: "leave",
-                  label: t("sharedLists.leave"),
-                  destructive: true,
-                  onPress: confirmLeave,
-                },
-              ]}
-              style={styles.menu}
-            >
-              <AppSymbolIcon
-                name="ellipsis"
-                size={18}
-                weight="semibold"
-                tintColor={theme.colors.foreground}
-              />
-            </ActionMenu>
-          </View>
-        ),
-      }}
-    />
+    <>
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <View style={styles.right}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t("sharedLists.invite")}
+                onPress={() =>
+                  nameGate.gate(
+                    () => void shareInvite(detail.inviteToken, "list"),
+                  )
+                }
+                style={({ pressed }) => [
+                  styles.invite,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <MemberAvatars members={detail.members} size={26} />
+                <ThemedText variant="captionStrong">
+                  {t("sharedLists.invite")}
+                </ThemedText>
+              </Pressable>
+              <ActionMenu
+                label={t("sharedLists.listActions")}
+                title={detail.name}
+                actions={[
+                  {
+                    id: "leave",
+                    label: t("sharedLists.leave"),
+                    destructive: true,
+                    onPress: confirmLeave,
+                  },
+                ]}
+                style={styles.menu}
+              >
+                <AppSymbolIcon
+                  name="ellipsis"
+                  size={18}
+                  weight="semibold"
+                  tintColor={theme.colors.foreground}
+                />
+              </ActionMenu>
+            </View>
+          ),
+        }}
+      />
+      <NameSheet
+        visible={nameGate.asking}
+        kind="create"
+        onDone={nameGate.finish}
+        onCancel={nameGate.cancel}
+      />
+    </>
   );
 }
 

@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   openPlaceDetails: vi.fn(),
   cancelPlaceDetails: vi.fn(),
   openUrl: vi.fn(),
+  openLink: vi.fn(),
   alert: vi.fn(),
   backOrHome: vi.fn(),
   start: vi.fn(),
@@ -50,6 +51,7 @@ vi.mock("@/lib/haptics", () => ({
   haptics: { selection: mocks.selection, success: mocks.success },
 }));
 vi.mock("@/lib/screen-dismiss", () => ({ backOrHome: mocks.backOrHome }));
+vi.mock("@/lib/open-link", () => ({ openLink: mocks.openLink }));
 vi.mock("@/lib/apple-place-card", () => ({
   canOpenPlaceCard: (appleId?: string) =>
     appleId !== undefined && mocks.cardAvailable,
@@ -215,6 +217,7 @@ function rowFake({
   selected,
   onPress,
   onPlaceDetails,
+  onOpenPost,
   onRemove,
   onVisited,
 }: {
@@ -223,6 +226,7 @@ function rowFake({
   selected?: boolean;
   onPress: () => void;
   onPlaceDetails?: () => void;
+  onOpenPost?: () => void;
   onRemove?: () => void;
   onVisited?: (visited: boolean) => void;
 }) {
@@ -233,6 +237,9 @@ function rowFake({
       </button>
       {onPlaceDetails ? (
         <button onClick={onPlaceDetails}>{`info ${name}`}</button>
+      ) : null}
+      {onOpenPost ? (
+        <button onClick={onOpenPost}>{`post ${name}`}</button>
       ) : null}
       {onRemove ? <button onClick={onRemove}>{`remove ${name}`}</button> : null}
       {onVisited ? (
@@ -405,6 +412,8 @@ const save = {
 };
 const unplaced = { _id: "item-2", title: "No places", cities: ["Austin"] };
 
+const POST_URL = "https://www.instagram.com/reel/C0abc123/";
+
 function listPlace(overrides: object) {
   return {
     _id: "p1",
@@ -452,6 +461,7 @@ beforeEach(() => {
   mocks.setVisited.mockResolvedValue(null);
   mocks.removeListPlace.mockResolvedValue(null);
   mocks.openUrl.mockResolvedValue(true);
+  mocks.openLink.mockResolvedValue(true);
 });
 
 describe("city page", () => {
@@ -852,6 +862,51 @@ describe("list page", () => {
     (mocks.openPlaceDetails.mock.calls[0]?.[1] as () => void)();
     expect(mocks.openUrl).toHaveBeenCalledWith(
       expect.stringContaining("maps.apple.com"),
+    );
+  });
+
+  it("offers the post only for a place copied with one", () => {
+    mocks.queries[LIST] = listDetail({
+      places: [
+        listPlace({ name: "Contramar", postUrl: POST_URL }),
+        listPlace({ _id: "p2", name: "BBQ Pit", lat: 30.2, lng: -97.2 }),
+      ],
+    });
+    render(<SharedListScreen />);
+    expect(screen.getByText("post Contramar")).toBeTruthy();
+    expect(screen.queryByText("post BBQ Pit")).toBeNull();
+  });
+
+  it("opens the post and counts it", async () => {
+    mocks.queries[LIST] = listDetail({
+      places: [listPlace({ name: "Contramar", postUrl: POST_URL })],
+      placeCount: 1,
+    });
+    render(<SharedListScreen />);
+    await act(async () => {
+      fireEvent.click(screen.getByText("post Contramar"));
+    });
+    expect(mocks.capture).toHaveBeenCalledWith("shared_list_place_opened", {
+      action: "post",
+    });
+    expect(mocks.openLink).toHaveBeenCalledWith(POST_URL);
+    expect(mocks.captureError).not.toHaveBeenCalled();
+  });
+
+  it("reports a post that will not open", async () => {
+    const failure = new Error("no app");
+    mocks.openLink.mockRejectedValue(failure);
+    mocks.queries[LIST] = listDetail({
+      places: [listPlace({ name: "Contramar", postUrl: POST_URL })],
+      placeCount: 1,
+    });
+    render(<SharedListScreen />);
+    await act(async () => {
+      fireEvent.click(screen.getByText("post Contramar"));
+    });
+    expect(mocks.captureError).toHaveBeenCalledWith(
+      "shared_list_post_failed",
+      failure,
     );
   });
 

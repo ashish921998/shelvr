@@ -1,5 +1,5 @@
 import { AppSymbolIcon } from "@/components/symbol";
-import { ActionMenu } from "@/components/ui/action-menu";
+import { ActionMenu, type ActionMenuItem } from "@/components/ui/action-menu";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t } from "@/lib/i18n";
 import { savedByLine, type SharedListPlace } from "@/lib/shared-lists";
@@ -12,6 +12,7 @@ type Props = {
   selected: boolean;
   onPress: () => void;
   onPlaceDetails?: () => void;
+  onOpenPost?: () => void;
   onVisited: (visited: boolean) => void;
   onRemove: () => void;
 };
@@ -22,12 +23,29 @@ export function ListPlaceRow({
   selected,
   onPress,
   onPlaceDetails,
+  onOpenPost,
   onVisited,
   onRemove,
 }: Props) {
   const { theme } = useUnistyles();
   const by = savedByLine(place);
   const went = place.visitedAt !== undefined;
+  const actions: ActionMenuItem[] = [
+    {
+      id: "visited",
+      label: went ? t("sharedLists.notYet") : t("plan.weWent"),
+      onPress: () => onVisited(!went),
+    },
+    ...(onOpenPost
+      ? [{ id: "post", label: t("creatorMaps.openPost"), onPress: onOpenPost }]
+      : []),
+    {
+      id: "remove",
+      label: t("sharedLists.removeFromList"),
+      destructive: true,
+      onPress: onRemove,
+    },
+  ];
   return (
     <View
       style={[
@@ -64,6 +82,23 @@ export function ListPlaceRow({
           </View>
         ) : null}
       </Pressable>
+      {selected && onOpenPost ? (
+        <Pressable
+          testID="list-place-post"
+          accessibilityRole="button"
+          accessibilityLabel={t("creatorMaps.openPostFor", {
+            name: place.name,
+          })}
+          onPress={onOpenPost}
+          style={({ pressed }) => [styles.action, pressed && styles.pressed]}
+        >
+          <AppSymbolIcon
+            name="play.rectangle"
+            size={22}
+            tintColor={theme.colors.foreground}
+          />
+        </Pressable>
+      ) : null}
       {selected && onPlaceDetails ? (
         <Pressable
           accessibilityRole="button"
@@ -81,19 +116,7 @@ export function ListPlaceRow({
       <ActionMenu
         label={t("sharedLists.placeActions")}
         title={place.name}
-        actions={[
-          {
-            id: "visited",
-            label: went ? t("sharedLists.notYet") : t("plan.weWent"),
-            onPress: () => onVisited(!went),
-          },
-          {
-            id: "remove",
-            label: t("sharedLists.removeFromList"),
-            destructive: true,
-            onPress: onRemove,
-          },
-        ]}
+        actions={actions}
         style={styles.action}
       >
         <AppSymbolIcon

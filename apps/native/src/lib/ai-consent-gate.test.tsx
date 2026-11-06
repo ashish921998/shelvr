@@ -20,6 +20,7 @@ const mocks = vi.hoisted(() => ({
     open: boolean;
   },
   push: vi.fn(),
+  lists: undefined as unknown,
 }));
 const nothing = vi.hoisted(() => () => null);
 
@@ -85,7 +86,7 @@ vi.mock("expo-router", () => {
 });
 vi.mock("@/lib/app-intents", () => ({ AppIntentsBridge: nothing }));
 vi.mock("@/lib/shared-lists", () => ({
-  useSharedLists: () => ({ data: undefined }),
+  useSharedLists: () => ({ data: mocks.lists }),
 }));
 vi.mock("@/lib/forget-exit-offer", () => ({ useForgetExitOffer: vi.fn() }));
 vi.mock("@/lib/i18n", () => ({
@@ -132,6 +133,7 @@ beforeEach(() => {
   mocks.entitlement = { entitled: true, loading: false };
   mocks.freeSaves = null;
   mocks.authLoading = false;
+  mocks.lists = undefined;
 });
 
 it.each(["unset", "loading", "granted", "declined"])(
@@ -162,6 +164,19 @@ describe("plan gate", () => {
     expect(shows("screen:profile")).toBe(true);
     expect(shows("screen:settings")).toBe(true);
     expect(shows("screen:paywall")).toBe(true);
+  });
+
+  it("opens a saved list to a gated person, and nothing else", () => {
+    mocks.entitlement = { entitled: false, loading: false };
+    mocks.freeSaves = null;
+    mocks.lists = [];
+    const view = render(<AppLayout />);
+    expect(shows("screen:plan-gate")).toBe(true);
+    expect(shows("screen:shared-list/[id]")).toBe(false);
+    mocks.lists = [{ _id: "list1" }];
+    view.rerender(<AppLayout />);
+    expect(shows("screen:shared-list/[id]")).toBe(true);
+    expect(shows("screen:(tabs)")).toBe(false);
   });
 
   it("opens the app to a free account, and holds shares only once its saves run out", () => {
