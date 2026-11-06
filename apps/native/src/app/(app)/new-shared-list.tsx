@@ -1,5 +1,5 @@
+import { CityCheckRow } from "@/components/city/city-check-row";
 import { NameSheet } from "@/components/shared-list/name-sheet";
-import { AppSymbolIcon } from "@/components/symbol";
 import { Chip } from "@/components/trip-planner/chip";
 import { FormSection } from "@/components/trip-planner/trip-planner-form";
 import { Button } from "@/components/ui/button";
@@ -23,14 +23,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useState } from "react";
-import {
-  Alert,
-  Platform,
-  Pressable,
-  ScrollView,
-  TextInput,
-  View,
-} from "react-native";
+import { Alert, Platform, ScrollView, TextInput, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const NAME_SUGGESTIONS: TextMessageKey[] = [
@@ -38,55 +31,6 @@ const NAME_SUGGESTIONS: TextMessageKey[] = [
   "sharedLists.suggestWeekend",
   "sharedLists.suggestEat",
 ];
-
-function CityRow({
-  title,
-  detail,
-  selected,
-  disabled = false,
-  onPress,
-}: {
-  title: string;
-  detail: string;
-  selected: boolean;
-  disabled?: boolean;
-  onPress: () => void;
-}) {
-  const { theme } = useUnistyles();
-  return (
-    <Pressable
-      accessibilityRole="checkbox"
-      accessibilityLabel={`${title}, ${detail}`}
-      accessibilityState={{ checked: selected, disabled }}
-      disabled={disabled}
-      onPress={() => {
-        void haptics.selection();
-        onPress();
-      }}
-      style={({ pressed }) => [
-        styles.cityRow,
-        (pressed || disabled) && styles.pressed,
-      ]}
-    >
-      <View style={styles.cityText}>
-        <ThemedText variant="subheadStrong">{title}</ThemedText>
-        <ThemedText variant="footnote" style={styles.muted}>
-          {detail}
-        </ThemedText>
-      </View>
-      <View style={[styles.check, selected && styles.checkOn]}>
-        {selected ? (
-          <AppSymbolIcon
-            name="checkmark"
-            size={14}
-            weight="bold"
-            tintColor={theme.colors.surface}
-          />
-        ) : null}
-      </View>
-    </Pressable>
-  );
-}
 
 export default function NewSharedListScreen() {
   useAppLocale();
@@ -221,7 +165,7 @@ export default function NewSharedListScreen() {
           hint={t("sharedLists.startWithHint")}
         >
           {known.map((choice) => (
-            <CityRow
+            <CityCheckRow
               key={choice.city}
               title={choice.city}
               detail={t("homePlaces.spotCount", {
@@ -236,7 +180,7 @@ export default function NewSharedListScreen() {
             />
           ))}
           {custom.map((city) => (
-            <CityRow
+            <CityCheckRow
               key={city}
               title={city}
               detail={t("sharedLists.typedCity")}
@@ -304,29 +248,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.foreground,
   },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: theme.gap(1) },
-  cityRow: {
-    minHeight: theme.control.minHeight,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.5),
-    paddingVertical: theme.gap(1),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.border,
-  },
-  cityText: { flex: 1, gap: theme.gap(0.25) },
-  check: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  checkOn: {
-    borderColor: theme.colors.foreground,
-    backgroundColor: theme.colors.foreground,
-  },
   muted: { color: theme.colors.muted },
   hint: { textAlign: "center" },
   footer: {
@@ -338,5 +259,4 @@ const styles = StyleSheet.create((theme, rt) => ({
     borderTopColor: theme.colors.border,
     backgroundColor: theme.colors.background,
   },
-  pressed: { opacity: theme.opacity.pressed },
 }));

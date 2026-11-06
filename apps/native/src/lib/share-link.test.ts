@@ -24,8 +24,17 @@ describe("shareRefOf", () => {
     );
   });
 
+  it("hashes a map page link's token the same way", async () => {
+    expect(await shareRefOf("https://shelvr-web.vercel.app/m/abc")).toBe(
+      "ba7816bf8f01cfea",
+    );
+  });
+
   it("is undefined for a source URL or no link", async () => {
     expect(await shareRefOf("https://example.com/article")).toBeUndefined();
+    expect(
+      await shareRefOf("https://shelvr-web.vercel.app/l/abc"),
+    ).toBeUndefined();
     expect(await shareRefOf(undefined)).toBeUndefined();
   });
 });

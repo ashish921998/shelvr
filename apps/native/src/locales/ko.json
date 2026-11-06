@@ -1107,5 +1107,41 @@
   "onboardingCarousel.eat": "‘어디서 먹지?’\n이제 그만.",
   "onboardingCarousel.map": "저장한 모든 장소를\n지도 하나에.",
   "onboardingCarousel.next": "다음 슬라이드",
-  "sharedLists.nameBodyWelcome": "공유 목록에 있는 사람들에게 보이고, 내가 공유한 항목이나 내가 소유한 목록의 링크가 있는 사람에게도 보여요."
+  "sharedLists.nameBodyWelcome": "공유 목록에 있는 사람들에게 보이고, 내가 공유한 항목이나 내가 소유한 목록의 링크가 있는 사람에게도 보여요.",
+  "publicMap.open": "내 지도 공유",
+  "publicMap.title": "내 지도 페이지",
+  "publicMap.body": "링크가 있는 사람은 누구나 이 도시들에 저장한 장소를 볼 수 있어요. 나중에 그곳에 저장하는 장소도 표시돼요.",
+  "publicMap.bodyBeen": "링크가 있는 사람은 누구나 이 도시들에 저장한 장소와 그중 다녀온 곳을 볼 수 있어요. 나중에 그곳에 저장하는 장소도 표시돼요.",
+  "publicMap.privacy": "페이지에는 이름이 표시되고, 각 장소는 저장한 원래 게시물로 연결돼요. 저장한 항목의 제목, 메모, 사진은 비공개로 유지돼요.",
+  "publicMap.citiesLabel": "도시",
+  "publicMap.citiesHint": {
+    "other": "최대 %{formattedCount}개 도시까지 고를 수 있어요."
+  },
+  "publicMap.leftOut": "메모와 사진에서 나온 장소, 주소처럼 보이는 이름은 제외돼요.",
+  "publicMap.placeBeen": "%{name} (다녀옴)",
+  "publicMap.noPlaces": "지금은 장소가 없어요",
+  "publicMap.linkLabel": "내 링크",
+  "publicMap.preview": "내 페이지 보기",
+  "publicMap.create": "링크 만들기",
+  "publicMap.share": "링크 공유",
+  "publicMap.save": "변경 사항 저장",
+  "publicMap.newLink": "새 링크",
+  "publicMap.newLinkTitle": "새 링크를 만들까요?",
+  "publicMap.newLinkBody": "이전 링크는 더 이상 작동하지 않아요. 링크를 받은 사람에게는 새 링크가 필요해요.",
+  "publicMap.turnOff": "끄기",
+  "publicMap.turnOffTitle": "지도 페이지를 끌까요?",
+  "publicMap.turnOffBody": "링크가 바로 작동하지 않게 돼요. 페이지를 다시 켜면 새 링크가 만들어져요.",
+  "publicMap.turnOffBodyNoPro": "링크가 바로 작동하지 않게 돼요. 페이지를 다시 켜려면 Shelvr Pro가 필요해요.",
+  "publicMap.failed": "지도 페이지를 업데이트하지 못했어요. 다시 시도해 주세요.",
+  "publicMap.emptyTitle": "아직 공유할 장소가 없어요",
+  "publicMap.emptyBody": "장소가 나오는 릴스나 TikTok을 공유하면 그 도시가 여기에 표시돼요.",
+  "publicMap.blockedTitle": "지도 페이지가 꺼져 있어요",
+  "publicMap.blockedBody": "신고가 접수되어 Shelvr가 페이지를 껐어요. 문의하려면 설정에서 고객 지원 문의를 이용해 주세요.",
+  "publicMap.settingTitle": "지도 페이지",
+  "publicMap.settingOff": "고른 도시에 저장한 장소를 보여 주는 공개 페이지예요.",
+  "publicMap.settingOn": {
+    "other": "도시 %{formattedCount}곳에 공개 중이에요. 링크가 있는 사람은 누구나 볼 수 있어요."
+  },
+  "publicMap.setUp": "설정",
+  "publicMap.manage": "관리"
 }

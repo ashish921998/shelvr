@@ -6,6 +6,7 @@ import {
   type MapPin,
   PlacesMap,
 } from "@/components/map/places-map";
+import { ShareMapButton } from "@/components/map/share-map-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
 import { withAlpha } from "@/lib/color";
@@ -198,24 +199,35 @@ export default function MapScreen() {
           { top, right: located ? LOCATE_BUTTON_CLEARANCE : 0 },
         ]}
       >
-        <MapSearch
-          text={searchText}
-          onChangeText={(text) => {
-            setSearchText(text);
-            setListOpen(true);
-          }}
-          total={matches.length}
-          results={
-            searching && listOpen
-              ? topSearchResults(matches).map((place) => ({
-                  id: placeId(place),
-                  name: place.name,
-                  city: place.city,
-                }))
-              : undefined
-          }
-          onSelect={pickResult}
-        />
+        <View style={styles.searchRow}>
+          <View style={styles.search}>
+            <MapSearch
+              text={searchText}
+              onChangeText={(text) => {
+                setSearchText(text);
+                setListOpen(true);
+              }}
+              total={matches.length}
+              results={
+                searching && listOpen
+                  ? topSearchResults(matches).map((place) => ({
+                      id: placeId(place),
+                      name: place.name,
+                      city: place.city,
+                    }))
+                  : undefined
+              }
+              onSelect={pickResult}
+            />
+          </View>
+          {searching ? null : (
+            <ShareMapButton
+              onPress={() =>
+                router.push({ pathname: "/map-page", params: { from: "map" } })
+              }
+            />
+          )}
+        </View>
         {filters.length > 0 && !searching ? (
           <MapFilterChips
             kinds={filters.map((filter) => filter.kind)}
@@ -232,4 +244,6 @@ const styles = StyleSheet.create((theme) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
   empty: { flex: 1, backgroundColor: theme.colors.background },
   overlay: { position: "absolute", left: 0, gap: theme.gap(1) },
+  searchRow: { flexDirection: "row", alignItems: "flex-start" },
+  search: { flex: 1 },
 }));

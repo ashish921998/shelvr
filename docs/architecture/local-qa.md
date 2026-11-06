@@ -98,6 +98,13 @@ changes.
   Pro, as the paywall flow in `tools/e2e/tests/paywall.e2e.ts` does. The
   server still treats them as Pro. The app then opens on the plan gate
   instead of Home, and its See plans button opens the paywall.
+- **A map page.** Reset flow fixtures, then
+  `pnpm exec convex run devFixtures:seedMapPageFixtures '{"userId":"<id>"}'`
+  from `apps/native` (the id is the `userId` of the newest `items` row right
+  after the reset) adds Mexico City saves of every link kind and one Been
+  there; Map tab → Share your map. To open the page in a local web server, set
+  `WAITLIST_SHARED_SECRET` on the local deployment (`npx convex env set`) and
+  put the same value, with `CONVEX_SITE_URL`, in `apps/web/.env.local`.
 - **Reduced motion.**
   `xcrun simctl spawn <udid> defaults write com.apple.Accessibility ReduceMotionEnabled -bool true`,
   then relaunch the app. Set it back to `false` when done.

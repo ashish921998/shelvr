@@ -51,9 +51,17 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 - The owner can "Remove" a member. That member loses the list, the old invite link stops working, and the places they added stay. Anyone can "Leave list". When the owner leaves, the oldest member whose account isn't being deleted becomes the owner. When no such member is left, the list is deleted.
 - There is no report or block control. A list name is free text, and anyone holding a live link can join until the list is full. Removing a member is the only control, and it also replaces the link.
 
+## Map page
+
+- The Map tab has a round "Share your map" button beside its search field, and Profile → Settings has a "Map page" card. Both open "Your map page".
+- The sheet lists the cities that have places saved from links and, under each picked city, the names of the places the page will show. "Create link" needs Pro; it turns the page on and shows the link. "Share link" opens the share sheet with `https://shelvr-web.vercel.app/m/<token>`, and "See your page" opens it in Safari.
+- The web page shows the owner's first name, the picked cities and, for each place, its name, an icon, a position on a small sketch, whether the owner has been there, and a link to the Instagram, TikTok or YouTube post it came from (or to Apple Maps). Titles, captions, notes and photos never show. Search engines are asked not to index it.
+- Changing cities, "New link" (the old link stops working) and "Turn off" need no Pro. A lapsed subscriber's page keeps working until they turn it off.
+- Every page has a Report this page link that emails support, and support can switch a reported page off.
+
 ## Pro / subscriptions (RevenueCat sandbox)
 
-- Shelvr Pro gates saves past the 10 free ones, Plan a date, Plan a trip, editing or removing a save's places, and starting a shared list. On Home the Plan a date and Plan a trip tiles carry a Pro tag for free accounts, and tapping one opens the paywall.
+- Shelvr Pro gates saves past the 10 free ones, Plan a date, Plan a trip, editing or removing a save's places, starting a shared list, and turning on a map page. On Home the Plan a date and Plan a trip tiles carry a Pro tag for free accounts, and tapping one opens the paywall.
 - Plans: **Annual** (labelled Yearly on the paywall; 7-day trial, then the yearly price) and **Weekly** (no trial). Both auto-renew until canceled.
 - Lapsed subscribers are on the free plan: their existing saves stay open, and saves made while they had Pro do not count toward the 10.
 - Present paywall from any gated action or Profile → View Pro plans.
@@ -74,6 +82,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 - Deleting an account that used Sign in with Apple also revokes its Apple token, when Shelvr holds one. Shelvr started keeping that token with this release, so an account that last signed in before it has none: its deletion still removes everything, the revocation is skipped, and signing in again once stores a token.
 - Confirmation explains what is deleted (saves, places, identity) and that **App Store subscriptions are not cancelled** by account deletion. A user with an active subscription or trial also gets a **Manage subscription** button on that confirmation.
 - Deletion also removes the places the user added to shared lists and takes them off every list, as if they had left it.
+- Deletion also stops the account's map page at once and deletes it.
 - After success the user is signed out.
 
 ## Legal and support
@@ -98,6 +107,7 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 - Saved URLs, extracted page content and spoken words, and the places Gemini finds in them (AI runs automatically unless the account has a previously recorded opt-out).
 - Place names sent to Apple Maps to pin a trip's stops (no live location tracking).
 - Shared list members see the list's places and each other's first names.
+- A map page, once its owner turns it on, shows anyone with the link the owner's first name, the places saved from links in the chosen cities, and any Been there marks.
 - RevenueCat subscription status.
 - PostHog product analytics (not ads).
 
@@ -126,11 +136,11 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 
 ## Paste-ready App Review notes
 
-This is the text submitted with 1.0.13 (build 53), except that its first core review step named a Home heading that does not exist, and that it now describes the free plan (10 free saves, a closable onboarding paywall) shipped after that build. App Store Connect allows 4,000 characters, and it is about 4,000, so cut a line for each line you add.
+This is the text submitted with 1.0.13 (build 53), except that its first core review step named a Home heading that does not exist, and that it now describes the free plan (10 free saves, a closable onboarding paywall) and the map page, both shipped after that build. App Store Connect allows 4,000 characters, and it is about 4,000, so cut a line for each line you add.
 
 New in 1.0.13: shared lists, and a Trips tab that plans and edits a day-by-day trip for a city.
 
-Shelvr is a private save-it-for-later app for Instagram Reels and TikToks. It uses AI to find the places a post names and file them under a city. It has no feed, no messaging and no public profiles. A user can share one save through an unlisted link, or invite people to a shared list.
+Shelvr is a private save-it-for-later app for Instagram Reels and TikToks. It uses AI to find the places a post names and file them under a city. It has no feed, no messaging and no public profiles. A user can share one save or a map of chosen cities through an unlisted link, or invite people to a shared list.
 
 Account access:
 
@@ -149,12 +159,12 @@ Core review flow:
 
 1. From Home, tap Add, paste an Instagram Reel or TikTok link, and save. The save first shows processing, then the places it names appear under their city on Home. A link that names no place is counted in one line under the cities, with Review.
 2. Tap a city to open its page: a map with a pin per place and a list of the places.
-3. On the city page, tap "Plan a date", pick a kind of date, and get an evening of two stops a short walk apart (Apple Maps may suggest one). Tap "Plan a trip" (or use the Trips tab) for a day-by-day trip: saved places first, suggested places from Apple Maps filling the gaps. A trip's menu has Edit trip, Add a place and Delete trip.
+3. On the city page, tap "Plan a date", pick a kind of date, and get an evening of two stops a short walk apart (Apple Maps may suggest one). Tap "Plan a trip" (or use the Trips tab) for a day-by-day trip: saved places first, suggested places from Apple Maps filling the gaps.
 4. Tap Map for every pinned place on one map, with search and filters. Shelvr asks for location only when Map first opens, to center it on you; Map works without it.
 
 Shared lists:
 
-A list holds places kept by people its owner invites, at most 8. Open a city from Home, tap "Invite", enter a name, then "Send invite" to get a link in the share sheet. Anyone with the link can join; joining needs a second account, the list works with one. Members see the list's name, its places and each other's first names. The owner can "Remove" a member, which also stops the old link. Anyone can "Leave list".
+A list holds places kept by people its owner invites, at most 8. Open a city from Home, tap "Invite", enter a name, then "Send invite" to get a link in the share sheet. Anyone with the link can join; joining needs a second account. Members see the list's name, its places and each other's first names. The owner can "Remove" a member, which also stops the old link. Anyone can "Leave list".
 
 Share extension, Siri and widget:
 
@@ -168,5 +178,5 @@ To find the places in a saved reel or TikTok, Shelvr sends its caption and spoke
 
 Account and support controls:
 
-- Profile contains subscription management and Sign out. Profile > Settings contains Contact Support, Restore Purchases, Terms of Service, Privacy Policy, and Delete account.
+- Profile contains subscription management and Sign out. Profile > Settings contains Map page, Contact Support, Restore Purchases, Terms of Service, Privacy Policy, and Delete account.
 - Delete account permanently removes the user's saves, places (shared list additions too), subscription record, and authentication identity. It does not cancel an App Store subscription, which remains managed by Apple.

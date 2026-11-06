@@ -94,6 +94,9 @@ vi.mock("@/components/legal-consent", () => ({
 vi.mock("@/components/update-setting", () => ({
   UpdateSetting: vi.fn(() => null),
 }));
+vi.mock("@/components/map/map-page-setting", () => ({
+  MapPageSetting: vi.fn(() => <span>map-page-setting</span>),
+}));
 vi.mock("@/components/ui/header-icon-button", () => ({
   HeaderIconButton: vi.fn(() => null),
 }));
@@ -384,4 +387,9 @@ it("shows a free account its count and closes Settings before the paywall", asyn
 it("shows no free count to a Pro account", () => {
   render(<SettingsScreen />);
   expect(screen.queryByText(/^free:/)).toBeNull();
+});
+
+it("shows the map page card", () => {
+  render(<SettingsScreen />);
+  expect(screen.getByText("map-page-setting")).toBeTruthy();
 });
