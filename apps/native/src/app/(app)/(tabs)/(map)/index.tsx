@@ -1,4 +1,5 @@
 import { EmptyState } from "@/components/empty-state";
+import { BeenMapCard } from "@/components/map/been-map-card";
 import { MapFilterChips } from "@/components/map/map-filter-chips";
 import { MapSearch } from "@/components/map/map-search";
 import {
@@ -6,6 +7,7 @@ import {
   type MapPin,
   PlacesMap,
 } from "@/components/map/places-map";
+import { Button } from "@/components/ui/button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
 import { withAlpha } from "@/lib/color";
@@ -14,6 +16,7 @@ import {
   cancelPlaceDetails,
   openPlaceDetails,
 } from "@/lib/apple-place-card";
+import { useMapBeen, useOpenBeenEditor } from "@/lib/been-cities";
 import { framedPins } from "@/lib/city-pins";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
@@ -25,13 +28,14 @@ import {
 } from "@/lib/map-filters";
 import { useMapLocation } from "@/lib/map-location";
 import { placeEmoji } from "@/lib/map-pin-emoji";
+import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { api } from "@convex/_generated/api";
 import type { PlaceKind } from "@convex/model/placeKinds";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Keyboard, View } from "react-native";
+import { Keyboard, useWindowDimensions, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 /** Room left at the right of the filter row for MapKit's my-location button. */
@@ -101,17 +105,24 @@ export default function MapScreen() {
       })),
     [shown],
   );
+  const onlyBeen = all !== undefined && all.length === 0;
+  const been = useMapBeen(all, onlyBeen || (active === null && !searching));
+  const mapPins = useMemo(() => [...pins, ...been.pins], [pins, been.pins]);
+  const openEditor = useOpenBeenEditor();
+  const { fontScale } = useWindowDimensions();
+  const [cardHeight, setCardHeight] = useState<number | null>(null);
 
   const reported = useRef(false);
   useEffect(() => {
     if (!opened || all === undefined || location === "asking") return;
-    if (reported.current) return;
+    if (been.ids === undefined || reported.current) return;
     reported.current = true;
     analytics.capture("map_opened", {
       count: all.length,
       located: location === "granted",
+      been: been.ids.length,
     });
-  }, [opened, all, location]);
+  }, [opened, all, been.ids, location]);
 
   if (places.isError) {
     return (
@@ -121,11 +132,19 @@ export default function MapScreen() {
       />
     );
   }
-  if (all === undefined || location === "asking") return <ScreenLoader />;
-  if (all.length === 0) {
+  if (all === undefined || been.ids === undefined || location === "asking") {
+    return <ScreenLoader />;
+  }
+  if (all.length === 0 && been.ids.length === 0) {
     return (
       <View style={styles.empty}>
-        <EmptyState title={t("map.emptyTitle")} message={t("map.emptyBody")} />
+        <EmptyState title={t("map.emptyTitle")} message={t("map.emptyBody")}>
+          <Button
+            title={t("been.addFromMap")}
+            testID="map-add-been"
+            onPress={() => openEditor("map", 0)}
+          />
+        </EmptyState>
       </View>
     );
   }
@@ -136,6 +155,13 @@ export default function MapScreen() {
   const overlayHeight =
     theme.control.minHeight +
     (filters.length > 0 ? theme.gap(1) + theme.control.minHeight : 0);
+  const cardRoom =
+    cardHeight ??
+    Math.ceil(
+      theme.control.minHeight * 2.5 * Math.min(fontScale, HEADLINE_MAX_SCALE),
+    );
+  const overlayTop = onlyBeen ? cardRoom : overlayHeight;
+  const beenCount = been.ids.length;
   const select = (id: string) => {
     const place = shown.find((candidate) => placeId(candidate) === id);
     if (!place || !focused.current) return;
@@ -172,10 +198,10 @@ export default function MapScreen() {
   return (
     <View style={styles.container}>
       <PlacesMap
-        pins={pins}
-        framed={framed}
+        pins={mapPins}
+        framed={onlyBeen ? been.framed : framed}
         showsUser={located}
-        topInset={top + overlayHeight}
+        topInset={top + overlayTop}
         focus={focus}
         onSelect={select}
       />
@@ -186,7 +212,7 @@ export default function MapScreen() {
           top: 0,
           left: 0,
           right: 0,
-          height: top + overlayHeight + theme.gap(2),
+          height: top + overlayTop + theme.gap(2),
           // Built in render: Unistyles drops a stylesheet's backgroundImage on theme change.
           experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0.92)} 0%, ${withAlpha(theme.colors.background, 0.6)} 60%, ${withAlpha(theme.colors.background, 0)} 100%)`,
         }}
@@ -198,31 +224,43 @@ export default function MapScreen() {
           { top, right: located ? LOCATE_BUTTON_CLEARANCE : 0 },
         ]}
       >
-        <MapSearch
-          text={searchText}
-          onChangeText={(text) => {
-            setSearchText(text);
-            setListOpen(true);
-          }}
-          total={matches.length}
-          results={
-            searching && listOpen
-              ? topSearchResults(matches).map((place) => ({
-                  id: placeId(place),
-                  name: place.name,
-                  city: place.city,
-                }))
-              : undefined
-          }
-          onSelect={pickResult}
-        />
-        {filters.length > 0 && !searching ? (
-          <MapFilterChips
-            kinds={filters.map((filter) => filter.kind)}
-            selected={active}
-            onSelect={choose}
+        {onlyBeen ? (
+          <BeenMapCard
+            count={beenCount}
+            onEdit={() => openEditor("map", beenCount)}
+            onLayout={(event) =>
+              setCardHeight(Math.ceil(event.nativeEvent.layout.height))
+            }
           />
-        ) : null}
+        ) : (
+          <>
+            <MapSearch
+              text={searchText}
+              onChangeText={(text) => {
+                setSearchText(text);
+                setListOpen(true);
+              }}
+              total={matches.length}
+              results={
+                searching && listOpen
+                  ? topSearchResults(matches).map((place) => ({
+                      id: placeId(place),
+                      name: place.name,
+                      city: place.city,
+                    }))
+                  : undefined
+              }
+              onSelect={pickResult}
+            />
+            {filters.length > 0 && !searching ? (
+              <MapFilterChips
+                kinds={filters.map((filter) => filter.kind)}
+                selected={active}
+                onSelect={choose}
+              />
+            ) : null}
+          </>
+        )}
       </View>
     </View>
   );

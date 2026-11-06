@@ -1107,5 +1107,18 @@
   "onboardingCarousel.eat": "「どこで食べる？」は\nもう終わり。",
   "onboardingCarousel.map": "保存した場所すべてを、\nひとつの地図に。",
   "onboardingCarousel.next": "次のスライド",
-  "sharedLists.nameBodyWelcome": "共有リストの相手に表示されます。あなたが共有した項目のリンクや、あなたが所有するリストのリンクを持つ人にも表示されます。"
+  "sharedLists.nameBodyWelcome": "共有リストの相手に表示されます。あなたが共有した項目のリンクや、あなたが所有するリストのリンクを持つ人にも表示されます。",
+  "been.noMatch": "その都市はまだありません。",
+  "been.citiesTitle": "行ったことのある都市",
+  "been.editorBody": "行ったことのある都市をタップするとマップに追加されます。もう一度タップすると外れます。",
+  "been.cityCount": {
+    "other": "%{formattedCount}都市"
+  },
+  "been.none": "まだありません",
+  "been.mapTitle": {
+    "other": "%{formattedCount}都市に行きました"
+  },
+  "been.edit": "編集",
+  "been.addFromMap": "行ったことのある都市を追加",
+  "been.saveFailed": "都市を更新できませんでした"
 }

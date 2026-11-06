@@ -1171,5 +1171,22 @@
   "onboardingCarousel.eat": "Se acabó el «¿dónde\ncomemos?»",
   "onboardingCarousel.map": "Cada lugar que guardaste,\nen un solo mapa.",
   "onboardingCarousel.next": "Siguiente diapositiva",
-  "sharedLists.nameBodyWelcome": "Las personas de tus listas compartidas lo ven, y también cualquiera con un enlace a un contenido que compartas o a una lista que te pertenezca."
+  "sharedLists.nameBodyWelcome": "Las personas de tus listas compartidas lo ven, y también cualquiera con un enlace a un contenido que compartas o a una lista que te pertenezca.",
+  "been.noMatch": "Todavía no tenemos esa ciudad.",
+  "been.citiesTitle": "Ciudades que has visitado",
+  "been.editorBody": "Toca una ciudad que hayas visitado para ponerla en tu mapa. Tócala otra vez para quitarla.",
+  "been.cityCount": {
+    "one": "%{formattedCount} ciudad",
+    "many": "%{formattedCount} ciudades",
+    "other": "%{formattedCount} ciudades"
+  },
+  "been.none": "Ninguna todavía",
+  "been.mapTitle": {
+    "one": "Has estado en %{formattedCount} ciudad",
+    "many": "Has estado en %{formattedCount} ciudades",
+    "other": "Has estado en %{formattedCount} ciudades"
+  },
+  "been.edit": "Editar",
+  "been.addFromMap": "Añadir ciudades visitadas",
+  "been.saveFailed": "No se pudieron actualizar tus ciudades"
 }

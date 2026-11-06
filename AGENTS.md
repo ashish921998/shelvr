@@ -56,8 +56,10 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `src/components/map`, filter rules in `src/lib/map-filters.ts` and
   `convex/model/placeKinds.ts`, each pin's emoji in `src/lib/map-pin-emoji.ts`, data from
   `convex/mapPlaces.ts`.
-- **Been cities:** backend `convex/beenCities.ts`, with the city list and centres in
-  `convex/model/beenCities.ts`.
+- **Been cities:** the grid and Profile row in `src/components/been`; the editor route
+  `src/app/(app)/been-cities.tsx`; the Map card `src/components/map/been-map-card.tsx`;
+  hooks, markers and framing in `src/lib/been-cities.ts`; backend `convex/beenCities.ts`,
+  with the city list and centres in `convex/model/beenCities.ts`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;

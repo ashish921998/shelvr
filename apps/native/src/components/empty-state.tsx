@@ -1,4 +1,5 @@
-import { Text } from "react-native";
+import type { ReactNode } from "react";
+import { Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 import { fadeIn } from "@/lib/motion";
@@ -7,9 +8,15 @@ type Props = {
   title: string;
   message: string;
   animateEntrance?: boolean;
+  children?: ReactNode;
 };
 
-export function EmptyState({ title, message, animateEntrance = true }: Props) {
+export function EmptyState({
+  title,
+  message,
+  animateEntrance = true,
+  children,
+}: Props) {
   return (
     <Animated.View
       entering={animateEntrance ? fadeIn : undefined}
@@ -17,6 +24,7 @@ export function EmptyState({ title, message, animateEntrance = true }: Props) {
     >
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.message}>{message}</Text>
+      {children ? <View style={styles.action}>{children}</View> : null}
     </Animated.View>
   );
 }
@@ -41,5 +49,8 @@ const styles = StyleSheet.create((theme, rt) => ({
     color: theme.colors.muted,
     textAlign: "center",
     lineHeight: 21,
+  },
+  action: {
+    marginTop: theme.gap(1),
   },
 }));

@@ -1171,5 +1171,22 @@
   "onboardingCarousel.eat": "Fini le « on mange\noù ? »",
   "onboardingCarousel.map": "Chaque lieu enregistré,\nsur une seule carte.",
   "onboardingCarousel.next": "Diapositive suivante",
-  "sharedLists.nameBodyWelcome": "Les personnes de vos listes partagées le voient, ainsi que toute personne ayant un lien vers un contenu que vous partagez ou vers une liste qui vous appartient."
+  "sharedLists.nameBodyWelcome": "Les personnes de vos listes partagées le voient, ainsi que toute personne ayant un lien vers un contenu que vous partagez ou vers une liste qui vous appartient.",
+  "been.noMatch": "Nous n’avons pas encore cette ville.",
+  "been.citiesTitle": "Villes visitées",
+  "been.editorBody": "Touchez une ville que vous avez visitée pour l’ajouter à votre carte. Touchez-la à nouveau pour la retirer.",
+  "been.cityCount": {
+    "one": "%{formattedCount} ville",
+    "many": "%{formattedCount} villes",
+    "other": "%{formattedCount} villes"
+  },
+  "been.none": "Aucune pour l’instant",
+  "been.mapTitle": {
+    "one": "%{formattedCount} ville visitée",
+    "many": "%{formattedCount} villes visitées",
+    "other": "%{formattedCount} villes visitées"
+  },
+  "been.edit": "Modifier",
+  "been.addFromMap": "Ajouter des villes visitées",
+  "been.saveFailed": "Impossible de mettre à jour vos villes"
 }

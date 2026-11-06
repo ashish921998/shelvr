@@ -1139,5 +1139,20 @@
   "onboardingCarousel.eat": "No more “where\nshould we eat?”",
   "onboardingCarousel.map": "Every place you saved,\non one map.",
   "onboardingCarousel.next": "Next slide",
-  "sharedLists.nameBodyWelcome": "People on your shared lists see it, and so does anyone with a link to a save you share or a list you own."
+  "sharedLists.nameBodyWelcome": "People on your shared lists see it, and so does anyone with a link to a save you share or a list you own.",
+  "been.noMatch": "We don’t have that city yet.",
+  "been.citiesTitle": "Cities you’ve been to",
+  "been.editorBody": "Tap a city you’ve visited to put it on your map. Tap it again to take it off.",
+  "been.cityCount": {
+    "one": "%{formattedCount} city",
+    "other": "%{formattedCount} cities"
+  },
+  "been.none": "None yet",
+  "been.mapTitle": {
+    "one": "Been to %{formattedCount} city",
+    "other": "Been to %{formattedCount} cities"
+  },
+  "been.edit": "Edit",
+  "been.addFromMap": "Add cities you’ve been to",
+  "been.saveFailed": "Couldn’t update your cities"
 }

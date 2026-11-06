@@ -21,7 +21,10 @@ export type MapPin = {
   lng: number;
   /** iOS: the emoji inside the pin, saying what the place is. */
   emoji?: string;
+  been?: boolean;
 };
+
+const savedPins = (pins: readonly MapPin[]) => pins.filter((pin) => !pin.been);
 
 /** A place the camera flies to; a new key moves it again even to the same spot. */
 export type MapFocus = LatLng & { key: number };
@@ -32,7 +35,7 @@ const FOCUS_ZOOM = 15;
 type Props = {
   pins: MapPin[];
   /** The places the first camera frames when it cannot open on the person. */
-  framed: MapPin[];
+  framed: LatLng[];
   /** iOS: open on the person's location and show it. */
   showsUser: boolean;
   /** Clears the floating filter row above the map. */
@@ -112,7 +115,8 @@ export function PlacesMap({
     };
     checkNearby.current = () => {
       checkNearby.current = undefined;
-      if (!hasPlaceNear(centre.current, latest.current.pins)) showCity();
+      if (!hasPlaceNear(centre.current, savedPins(latest.current.pins)))
+        showCity();
     };
     // No position means the person's own location. A map mounted moments ago can refuse its first
     // move, so it is retried; if every try fails, the map shows the busiest city instead.
@@ -162,7 +166,7 @@ export function PlacesMap({
       !fit ||
       pins.length === 0 ||
       checkNearby.current ||
-      hasPlaceNear(centre.current, pins)
+      hasPlaceNear(centre.current, savedPins(pins))
     )
       return;
     map()
@@ -203,13 +207,23 @@ export function PlacesMap({
           compassEnabled: false,
           myLocationButtonEnabled: showsUser,
         }}
-        markers={pins.map((pin) => ({
-          id: pin.id,
-          coordinates: { latitude: pin.lat, longitude: pin.lng },
-          title: pin.name,
-          monogram: pin.emoji,
-          tintColor: theme.colors.primary,
-        }))}
+        markers={pins.map((pin) =>
+          pin.been
+            ? {
+                id: pin.id,
+                coordinates: { latitude: pin.lat, longitude: pin.lng },
+                title: pin.name,
+                systemImage: "checkmark",
+                tintColor: theme.colors.keep,
+              }
+            : {
+                id: pin.id,
+                coordinates: { latitude: pin.lat, longitude: pin.lng },
+                title: pin.name,
+                monogram: pin.emoji,
+                tintColor: theme.colors.primary,
+              },
+        )}
         onMarkerClick={(marker) => select(marker.id)}
         onCameraMove={trackCamera}
       />

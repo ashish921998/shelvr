@@ -1045,6 +1045,15 @@ export type MessageParams = {
   "onboardingCarousel.map": undefined;
   "onboardingCarousel.next": undefined;
   "sharedLists.nameBodyWelcome": undefined;
+  "been.noMatch": undefined;
+  "been.citiesTitle": undefined;
+  "been.editorBody": undefined;
+  "been.cityCount": { count: number };
+  "been.none": undefined;
+  "been.mapTitle": { count: number };
+  "been.edit": undefined;
+  "been.addFromMap": undefined;
+  "been.saveFailed": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {
