@@ -41,12 +41,14 @@ export function LibraryRows({ cityCount }: { cityCount?: number }) {
           onPress={() => router.push("/cities")}
         />
       ) : null}
-      <HomeRow
-        icon="bookmark.fill"
-        name={allSaves}
-        count={saveCount}
-        onPress={() => router.push("/saves")}
-      />
+      {items?.length ? (
+        <HomeRow
+          icon="bookmark.fill"
+          name={allSaves}
+          count={saveCount}
+          onPress={() => router.push("/saves")}
+        />
+      ) : null}
     </>
   );
 }

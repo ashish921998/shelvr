@@ -104,6 +104,16 @@ it("opens Cities, All saves and the Trips tab", () => {
   expect(mocks.navigate).toHaveBeenCalledWith("/(app)/(tabs)/(trips)");
 });
 
+it("keeps Trips and leaves out All saves when there are no saves", () => {
+  mocks.feed = { items: [], canLoadMore: false, loadingMore: false };
+  render(<LibraryRows />);
+  expect(screen.getAllByRole("button").map((row) => row.textContent)).toEqual([
+    "Trips, 3",
+  ]);
+  fireEvent.click(screen.getByText("Trips, 3"));
+  expect(mocks.navigate).toHaveBeenCalledWith("/(app)/(tabs)/(trips)");
+});
+
 it("asks for no trips while signed out", () => {
   mocks.signedIn = false;
   render(<LibraryRows />);

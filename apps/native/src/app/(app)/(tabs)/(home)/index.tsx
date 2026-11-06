@@ -10,6 +10,7 @@ import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card"
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
 import { HomePlaces, HomePlacesEmptyCard } from "@/components/home/home-places";
+import { LibraryRows } from "@/components/home/library-rows";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { useCurrentUser } from "@/lib/current-user";
 import { type Entitlement, useEntitlement } from "@/lib/entitlement";
@@ -164,6 +165,9 @@ export default function HomeScreen() {
               </>
             ) : (
               <>
+                <View style={styles.rows}>
+                  <LibraryRows />
+                </View>
                 <View style={styles.empty}>
                   <HomePlacesEmptyCard />
                 </View>
@@ -202,8 +206,9 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingHorizontal: theme.gap(2),
     paddingBottom: theme.gap(1.5),
   },
+  rows: { paddingHorizontal: theme.gap(2.5) },
   empty: {
     paddingHorizontal: theme.gap(2),
-    paddingTop: theme.gap(1),
+    paddingTop: theme.gap(3),
   },
 }));

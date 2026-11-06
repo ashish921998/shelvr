@@ -97,6 +97,7 @@ const fakes = vi.hoisted(() => ({
   ),
   nameSheet: ({ visible }: { visible: boolean }) =>
     visible ? <div>name sheet</div> : null,
+  libraryRows: () => <div>library rows</div>,
 }));
 vi.mock("@/components/home/pro-card", () => ({
   FreeSavesCard: fakes.nothing,
@@ -120,6 +121,9 @@ vi.mock("@/components/feedback/feedback-modal", () => ({
 vi.mock("@/components/home/home-places", () => ({
   HomePlaces: fakes.nothing,
   HomePlacesEmptyCard: fakes.nothing,
+}));
+vi.mock("@/components/home/library-rows", () => ({
+  LibraryRows: fakes.libraryRows,
 }));
 vi.mock("@/components/home/home-header", () => ({
   HomeHeader: fakes.nothing,
@@ -221,4 +225,11 @@ it("asks for a name once the purchase window passes with no purchase", async () 
   rerender(<HomeScreen />);
   await settle();
   expect(sheets()).toEqual({ letter: false, name: true });
+});
+
+it("shows the library rows on a Home with no saves", async () => {
+  mocks.access = FREE;
+  render(<HomeScreen />);
+  await settle();
+  expect(screen.getByText("library rows")).toBeTruthy();
 });
