@@ -395,6 +395,12 @@ async function seedFixtureLink(
     last: { key: "p1", choice: "pick", at: now - 30 * MINUTE_MS },
     updatedAt: now - 30 * MINUTE_MS,
   });
+  await ctx.db.insert("planVoteNotices", {
+    shareId,
+    voterId: "fixture-guest",
+    createdAt: now - 30 * MINUTE_MS,
+    deliveryStatus: "complete",
+  });
 }
 
 export const locateTripStops = internalMutation({

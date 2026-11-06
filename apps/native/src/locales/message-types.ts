@@ -297,6 +297,7 @@ export type MessageParams = {
   "plan.voterCount": { count: number };
   "plan.daysLeft": { count: number };
   "plan.tally": { picks: string; passes: string };
+  "plan.votePushTitle": { city: string };
   "plan.wouldGo": { name: string; place: string };
   "plan.wouldPass": { name: string; place: string };
   "plan.someoneWouldGo": { place: string };

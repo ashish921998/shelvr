@@ -305,6 +305,7 @@
     "other": "%{formattedCount} days left."
   },
   "plan.tally": "%{picks} would go, %{passes} would pass",
+  "plan.votePushTitle": "First vote on your %{city} shortlist",
   "plan.wouldGo": "%{name} would go to %{place}.",
   "plan.wouldPass": "%{name} would pass on %{place}.",
   "plan.someoneWouldGo": "Someone would go to %{place}.",

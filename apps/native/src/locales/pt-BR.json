@@ -308,6 +308,7 @@
     "other": "Faltam %{formattedCount} dias."
   },
   "plan.tally": "%{picks} iriam, %{passes} passam",
+  "plan.votePushTitle": "Primeiro voto na sua seleção de %{city}",
   "plan.wouldGo": "%{name} toparia ir a %{place}.",
   "plan.wouldPass": "%{name} não toparia ir a %{place}.",
   "plan.someoneWouldGo": "Alguém toparia ir a %{place}.",

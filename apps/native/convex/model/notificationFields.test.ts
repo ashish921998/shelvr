@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import translations from "./notificationTranslations.json";
-import { digestCopy, reminderCopy, truncateTitle } from "./notificationFields";
+import {
+  digestCopy,
+  planVoteCopy,
+  reminderCopy,
+  truncateTitle,
+} from "./notificationFields";
 
 describe("digest copy", () => {
   it("names a save and counts only the others", () => {
@@ -131,5 +136,68 @@ describe("reminder copy", () => {
     );
     const long = reminderCopy("en", "read", "word ".repeat(30)).body;
     expect(long).toContain("…”");
+  });
+});
+
+describe("plan vote copy", () => {
+  it.each([
+    [
+      { name: "Maya", place: "Jo's Coffee", choice: "pick" as const },
+      "Maya would go to Jo's Coffee.",
+    ],
+    [
+      { name: "Maya", place: "Jo's Coffee", choice: "pass" as const },
+      "Maya would pass on Jo's Coffee.",
+    ],
+    [
+      { place: "Jo's Coffee", choice: "pick" as const },
+      "Someone would go to Jo's Coffee.",
+    ],
+    [
+      { place: "Jo's Coffee", choice: "pass" as const },
+      "Someone would pass on Jo's Coffee.",
+    ],
+  ])("names the city and the place (%j)", (subject, body) => {
+    expect(planVoteCopy("en", "Austin", subject)).toEqual({
+      title: "First vote on your Austin shortlist",
+      body,
+    });
+  });
+
+  it("cuts a long city or place with an ellipsis", () => {
+    const long =
+      "Barton Springs Pool and the long walk along the river trail north side";
+    expect(long).toHaveLength(70);
+    expect(planVoteCopy("en", long, { place: long, choice: "pick" })).toEqual({
+      title:
+        "First vote on your Barton Springs Pool and the long walk along the river trail\u2026 shortlist",
+      body: "Someone would go to Barton Springs Pool and the long walk along the river trail\u2026.",
+    });
+  });
+
+  it("falls back to English for an unknown locale and keeps a $ in a place", () => {
+    expect(
+      planVoteCopy("xx", "Austin", {
+        name: "Maya",
+        place: "Cafe $& Bar",
+        choice: "pick",
+      }),
+    ).toEqual({
+      title: "First vote on your Austin shortlist",
+      body: "Maya would go to Cafe $& Bar.",
+    });
+  });
+
+  it("speaks a supported language", () => {
+    expect(
+      planVoteCopy("de", "Austin", {
+        name: "Maya",
+        place: "Jo's Coffee",
+        choice: "pass",
+      }),
+    ).toEqual({
+      title: "Erste Stimme zu deiner Auswahl für Austin",
+      body: "Maya würde Jo's Coffee auslassen.",
+    });
   });
 });

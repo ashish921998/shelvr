@@ -304,6 +304,7 @@
     "other": "%{formattedCount}일 남았어요."
   },
   "plan.tally": "가고 싶음 %{picks}, 패스 %{passes}",
+  "plan.votePushTitle": "%{city} 추천 목록에 첫 투표가 들어왔어요",
   "plan.wouldGo": "%{name}님은 %{place}에 가고 싶어 해요.",
   "plan.wouldPass": "%{name}님은 %{place}에는 안 간대요.",
   "plan.someoneWouldGo": "누군가 %{place}에 가고 싶어 해요.",

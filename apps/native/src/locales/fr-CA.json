@@ -308,6 +308,7 @@
     "other": "Il reste %{formattedCount} jours."
   },
   "plan.tally": "%{picks} pour, %{passes} contre",
+  "plan.votePushTitle": "Premier vote sur votre sélection pour %{city}",
   "plan.wouldGo": "%{name} irait à %{place}.",
   "plan.wouldPass": "%{name} n’irait pas à %{place}.",
   "plan.someoneWouldGo": "Quelqu’un irait à %{place}.",

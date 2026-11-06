@@ -304,6 +304,7 @@
     "other": "残り%{formattedCount}日。"
   },
   "plan.tally": "行きたい%{picks}、パス%{passes}",
+  "plan.votePushTitle": "%{city}の候補リストに最初の投票が届きました",
   "plan.wouldGo": "%{name}さんは%{place}に行きたいそうです。",
   "plan.wouldPass": "%{name}さんは%{place}をパスしました。",
   "plan.someoneWouldGo": "誰かが%{place}に行きたいそうです。",

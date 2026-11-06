@@ -569,3 +569,389 @@ describe("durable digest delivery", () => {
     expect(await sendJobs(t)).toBe(0);
   });
 });
+
+describe("first-vote push", () => {
+  const HOUR = 60 * 60 * 1000;
+
+  beforeEach(() => {
+    vi.setSystemTime(new Date("2026-11-06T18:00:00Z"));
+    vi.stubEnv("PLAN_VOTE_PUSH_ENABLED", "true");
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  async function voteLink(
+    options: { city?: string; locale?: string; device?: boolean } = {},
+  ) {
+    const t = newConvexTest();
+    const now = Date.now();
+    const { userId, spaceId, shareId, itemIds } = await t.run(async (ctx) => {
+      const userId = await ctx.db.insert("users", { name: "Ashish" });
+      if (options.device !== false)
+        await ctx.db.insert("notificationDevices", {
+          userId,
+          token: "token-a",
+          enabled: true,
+          platform: "ios",
+          lastSeenAt: now,
+          ...(options.locale !== undefined ? { locale: options.locale } : {}),
+        });
+      const spaceId = await ctx.db.insert("spaces", { userId, name: "City" });
+      const itemIds = [];
+      for (const title of ["Jo's Coffee", "Houndstooth Coffee"])
+        itemIds.push(
+          await ctx.db.insert("items", {
+            userId,
+            type: "link",
+            status: "ready",
+            title,
+            tags: [],
+            searchText: title,
+          }),
+        );
+      const shareId = await ctx.db.insert("planShares", {
+        token: "vote-link",
+        userId,
+        spaceId,
+        city: options.city ?? "Austin",
+        places: [
+          { key: "p0", name: "Jo's Coffee", why: "", itemId: itemIds[0] },
+          {
+            key: "p1",
+            name: "Houndstooth Coffee",
+            why: "",
+            itemId: itemIds[1],
+          },
+        ],
+        expiresAt: now + 7 * 24 * HOUR,
+      });
+      return { userId, spaceId, shareId, itemIds };
+    });
+    const vote = (
+      voterId: string,
+      picks: string[],
+      passes: string[] = [],
+      name?: string,
+    ) =>
+      t.mutation(internal.planShares.recordPlanVote, {
+        token: "vote-link",
+        voterId,
+        picks,
+        passes,
+        ...(name !== undefined ? { name } : {}),
+        ip: "203.0.113.7",
+      });
+    const notice = async () => {
+      const [row] = await t.run((ctx) =>
+        ctx.db.query("planVoteNotices").collect(),
+      );
+      return row;
+    };
+    const send = async () => {
+      const row = await notice();
+      if (Date.now() < row.deliveryNextAttemptAt!)
+        vi.setSystemTime(row.deliveryNextAttemptAt!);
+      await t.action(internal.notificationDelivery.sendPlanVote, {
+        noticeId: row._id,
+      });
+    };
+    const telemetry = async () =>
+      (
+        await t.run((ctx) =>
+          ctx.db.system.query("_scheduled_functions").collect(),
+        )
+      ).filter((job) => job.name.includes("captureNotification"));
+    return {
+      t,
+      userId,
+      spaceId,
+      shareId,
+      itemIds,
+      vote,
+      notice,
+      send,
+      telemetry,
+    };
+  }
+
+  type Link = Awaited<ReturnType<typeof voteLink>>;
+
+  const sent = (fetchMock: ReturnType<typeof vi.fn>) =>
+    JSON.parse(fetchMock.mock.calls[0][1].body);
+
+  function stubExpo() {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(json([{ status: "ok", id: "ticket-a" }]));
+    vi.stubGlobal("fetch", fetchMock);
+    return fetchMock;
+  }
+
+  it("names the first voter and the place, and opens the city", async () => {
+    const link = await voteLink();
+    await link.vote("maya", ["p0"], ["p1"], "Maya Lopez");
+    await link.vote("sam", ["p1"], [], "Sam");
+    const fetchMock = stubExpo();
+
+    await link.send();
+
+    const { _id } = await link.notice();
+    expect(sent(fetchMock)).toEqual([
+      {
+        to: "token-a",
+        collapseId: _id,
+        tag: _id,
+        title: "First vote on your Austin shortlist",
+        body: "Maya would go to Jo's Coffee.",
+        data: { url: "/city/Austin", kind: "plan_vote", notificationId: _id },
+        sound: "default",
+        channelId: "plan-votes",
+      },
+    ]);
+  });
+
+  it.each([
+    [
+      "a pass-only vote",
+      (link: Link) => link.vote("maya", [], ["p0"], "Maya"),
+      "Maya would pass on Jo's Coffee.",
+    ],
+    [
+      "a voter with no name",
+      (link: Link) => link.vote("guest", ["p0"]),
+      "Someone would go to Jo's Coffee.",
+    ],
+  ])("still names a place for %s", async (_, cast, body) => {
+    const link = await voteLink();
+    await cast(link);
+    const fetchMock = stubExpo();
+
+    await link.send();
+
+    expect(sent(fetchMock)[0]).toMatchObject({ body });
+  });
+
+  it("speaks the device's language and keeps a city with a space in the link", async () => {
+    const link = await voteLink({ city: "New York", locale: "fr" });
+    await link.vote("maya", ["p0"], [], "Maya");
+    const fetchMock = stubExpo();
+
+    await link.send();
+
+    expect(sent(fetchMock)[0]).toMatchObject({
+      title: "Premier vote sur votre sélection pour New York",
+      body: "Maya irait à Jo's Coffee.",
+      data: { url: "/city/New%20York" },
+    });
+  });
+
+  it.each<[string, (link: Link) => Promise<unknown>]>([
+    ["link_gone", (link) => link.t.run((ctx) => ctx.db.delete(link.shareId))],
+    [
+      "owner_unavailable",
+      (link) =>
+        link.t.run((ctx) => ctx.db.patch(link.userId, { deleting: true })),
+    ],
+    [
+      "pushes_paused",
+      async () => vi.stubEnv("PLAN_VOTE_PUSH_ENABLED", "false"),
+    ],
+    [
+      "notifications_disabled",
+      (link) =>
+        link.t.run((ctx) =>
+          ctx.db.insert("notificationPreferences", {
+            userId: link.userId,
+            weeklyShelfEnabled: true,
+            nextDigestAt: Date.now(),
+            remindersEnabled: false,
+            updatedAt: Date.now(),
+          }),
+        ),
+    ],
+    [
+      "retry_limit_reached",
+      async (link) => {
+        const { _id } = await link.notice();
+        await link.t.run((ctx) => ctx.db.patch(_id, { deliveryAttempts: 8 }));
+      },
+    ],
+    [
+      "expired",
+      async (link) => {
+        vi.setSystemTime((await link.notice()).createdAt + 6 * HOUR);
+      },
+    ],
+    [
+      "expired",
+      (link) =>
+        link.t.run((ctx) =>
+          ctx.db.patch(link.shareId, { expiresAt: Date.now() }),
+        ),
+    ],
+    [
+      "superseded",
+      async (link) => {
+        vi.setSystemTime(Date.now() + 1000);
+        await link.t.run((ctx) =>
+          ctx.db.insert("planShares", {
+            token: "newer-link",
+            userId: link.userId,
+            spaceId: link.spaceId,
+            city: "AUSTIN",
+            places: [
+              {
+                key: "p0",
+                name: "Jo's Coffee",
+                why: "",
+                itemId: link.itemIds[0],
+              },
+            ],
+            expiresAt: Date.now() + 7 * 24 * HOUR,
+          }),
+        );
+      },
+    ],
+    ["no_items", (link) => link.vote("maya", [])],
+    ["no_items", (link) => link.t.run((ctx) => ctx.db.delete(link.itemIds[0]))],
+    [
+      "no_devices",
+      async (link) => {
+        await link.t.run(async (ctx) => {
+          for (const device of await ctx.db
+            .query("notificationDevices")
+            .collect())
+            await ctx.db.patch(device._id, { enabled: false });
+        });
+      },
+    ],
+  ])("closes silently as %s", async (error, arrange) => {
+    const link = await voteLink();
+    await link.vote("maya", ["p0"], [], "Maya");
+    await arrange(link);
+    const fetchMock = stubExpo();
+
+    await link.send();
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await link.notice()).toMatchObject({
+      deliveryStatus: "failed",
+      deliveryError: error,
+    });
+    expect(await link.telemetry()).toEqual([]);
+  });
+
+  it("closes a push already sent once when its owner is gone, with no send event", async () => {
+    const link = await voteLink();
+    await link.vote("maya", ["p0"], [], "Maya");
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          json([
+            { status: "error", message: "busy", details: { error: "busy" } },
+          ]),
+        ),
+    );
+    await link.send();
+    expect((await link.notice()).deliveryRecipients).toHaveLength(1);
+
+    await link.t.run((ctx) => ctx.db.delete(link.userId));
+    await link.send();
+
+    expect(await link.notice()).toMatchObject({
+      deliveryStatus: "failed",
+      deliveryError: "owner_unavailable",
+    });
+    expect(await link.telemetry()).toEqual([]);
+  });
+
+  it("sends when the owner has no preferences row", async () => {
+    const link = await voteLink();
+    await link.vote("maya", ["p0"], [], "Maya");
+    const fetchMock = stubExpo();
+
+    await link.send();
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(await link.notice()).toMatchObject({ deliveryStatus: "pending" });
+  });
+
+  it("reports a close that follows an attempt", async () => {
+    const link = await voteLink();
+    await link.vote("maya", ["p0"], [], "Maya");
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValue(
+          json([
+            { status: "error", message: "busy", details: { error: "busy" } },
+          ]),
+        ),
+    );
+    await link.send();
+    expect(await link.notice()).toMatchObject({ deliveryStatus: "pending" });
+
+    vi.stubEnv("PLAN_VOTE_PUSH_ENABLED", "false");
+    await link.send();
+
+    expect(await link.notice()).toMatchObject({
+      deliveryStatus: "failed",
+      deliveryError: "pushes_paused",
+    });
+    const jobs = await link.telemetry();
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].args[0]).toMatchObject({
+      kind: "plan_vote",
+      delivered: false,
+    });
+  });
+
+  it("settles and records one send event with the voter count", async () => {
+    const link = await voteLink();
+    await link.vote("maya", ["p0"], [], "Maya");
+    await link.vote("sam", ["p1"], [], "Sam");
+    vi.stubGlobal(
+      "fetch",
+      vi
+        .fn()
+        .mockResolvedValueOnce(json([{ status: "ok", id: "ticket-a" }]))
+        .mockResolvedValue(json({ "ticket-a": { status: "ok" } })),
+    );
+
+    await link.send();
+    expect(await link.telemetry()).toEqual([]);
+    await link.send();
+
+    expect(await link.notice()).toMatchObject({ deliveryStatus: "complete" });
+    const jobs = await link.telemetry();
+    expect(jobs).toHaveLength(1);
+    expect(jobs[0].args[0]).toMatchObject({
+      userId: link.userId,
+      notificationId: (await link.notice())._id,
+      kind: "plan_vote",
+      itemCount: 2,
+      delivered: true,
+    });
+  });
+
+  it("is picked up by recovery once due, and not before", async () => {
+    const link = await voteLink();
+    await link.vote("maya", ["p0"], [], "Maya");
+    const sends = async () =>
+      (
+        await link.t.run((ctx) =>
+          ctx.db.system.query("_scheduled_functions").collect(),
+        )
+      ).filter((job) => job.name.includes("sendPlanVote")).length;
+    expect(await sends()).toBe(1);
+
+    await link.t.mutation(internal.notificationDelivery.recover, {});
+    expect(await sends()).toBe(1);
+
+    vi.setSystemTime((await link.notice()).deliveryNextAttemptAt!);
+    await link.t.mutation(internal.notificationDelivery.recover, {});
+    expect(await sends()).toBe(2);
+  });
+});
