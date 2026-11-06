@@ -347,6 +347,11 @@ export function useTrialReminder(): void {
         try {
           await turn.granted;
           if (!live() || !spendOwedPrimer(userId)) return false;
+          if (
+            trialReminderAt(expiresAt, Date.now(), trialReminderLeadDays()) ===
+            null
+          )
+            return false;
           const confirmed = await confirmTrialReminderAsk(live);
           if (!confirmed.ask || !live()) return false;
           await waitForSheetTransition();
