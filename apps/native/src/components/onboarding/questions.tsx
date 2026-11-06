@@ -9,6 +9,7 @@ import {
   type Goal,
   type Planner,
   type SavedCount,
+  type TripSoon,
 } from "@/lib/onboarding-goals";
 import type { TextMessageKey } from "@/locales/message-types";
 import type { ReactNode } from "react";
@@ -72,6 +73,11 @@ const PLANNER_CHOICES: readonly Choice<Planner>[] = [
     emoji: "💎",
     title: "onboardingQ.explorer",
   },
+];
+
+const TRIP_SOON_CHOICES: readonly Choice<TripSoon>[] = [
+  { id: "soon", emoji: "✈️", title: "onboardingQ.tripSoonYes" },
+  { id: "notYet", emoji: "🏠", title: "onboardingQ.tripSoonNo" },
 ];
 
 function QuestionScreen({
@@ -175,6 +181,32 @@ export function PlannerStep({
       onPick={onPick}
       onContinue={onContinue}
     />
+  );
+}
+
+export function TripSoonStep({
+  picked,
+  onPick,
+}: {
+  picked: TripSoon | null;
+  onPick: (answer: TripSoon) => void;
+}) {
+  useAppLocale();
+  return (
+    <View style={styles.body}>
+      <QuestionTitle title={t("onboardingQ.tripSoonTitle")} />
+      <View style={styles.list}>
+        {TRIP_SOON_CHOICES.map((choice) => (
+          <OptionCard
+            key={choice.id}
+            emoji={choice.emoji}
+            title={t(choice.title)}
+            selected={picked === choice.id}
+            onPress={() => onPick(choice.id)}
+          />
+        ))}
+      </View>
+    </View>
   );
 }
 
