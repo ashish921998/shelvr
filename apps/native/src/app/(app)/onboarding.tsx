@@ -67,14 +67,6 @@ import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/** The question screens a person may skip; skipping the goal plans for all of them, and the city uses the sample's own. */
-const SKIPPABLE: ReadonlySet<OnboardingStep> = new Set([
-  "savedCount",
-  "goal",
-  "planner",
-  "city",
-]);
-
 function useStepAnalytics(step: OnboardingStep, viewed: Set<OnboardingStep>) {
   const tracked = useRef(new Set<OnboardingStep>());
   const enteredAt = useRef(0);
@@ -301,11 +293,30 @@ export default function OnboardingScreen() {
 
   const previous = previousOnboardingStep(step, goals);
   const skip = () => {
-    if (step === "city") setTravelCity(null);
-    if (step !== "goal") return advance();
-    const all = [...GOALS];
-    setGoals(all);
-    advanceWith(all);
+    switch (step) {
+      case "goal": {
+        const all = [...GOALS];
+        setGoals(all);
+        return advanceWith(all);
+      }
+      case "city":
+        setTravelCity(null);
+        return advance();
+      case "ahaShare":
+        recordCurrentStep();
+        setBackward(false);
+        return setStep((current) => (current === step ? "ahaSpots" : current));
+      case "carousel":
+        return leaveCarousel();
+      case "notifications":
+        analytics.capture("onboarding_notifications", {
+          action: "skip",
+          granted: false,
+        });
+        return askForPlan();
+      default:
+        return advance();
+    }
   };
 
   const body = (() => {
@@ -406,7 +417,7 @@ export default function OnboardingScreen() {
                 setStep(previous);
               }
         }
-        onSkip={SKIPPABLE.has(step) ? skip : null}
+        onSkip={paywall.asked ? null : skip}
       />
       <View style={styles.content}>
         {/* Keyed by step, so a new step springs in while the old one leaves; neither blocks a tap. */}

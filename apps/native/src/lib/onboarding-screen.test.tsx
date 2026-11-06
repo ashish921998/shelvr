@@ -574,3 +574,66 @@ it("queues the default reel before leaving onboarding when the city question was
     mocks.completeOnboarding.mock.invocationCallOrder[0],
   );
 });
+
+it.each([
+  ["tripSoon", "planner:continue"],
+  ["chart", "city:date:out:lisbon"],
+  ["cityEcho", "aha:share"],
+  ["firstSave", "aha:spots"],
+  ["ahaSpots", "carousel:continue"],
+] as const)("moves on from %s when it is skipped", (step, next) => {
+  mocks.progress = { ...mocks.progress, goals: ["date", "travel"] };
+  startAt(step);
+  render(<OnboardingScreen />);
+  tap("onboardingQ.skip");
+  expect(screen.getByRole("button", { name: next })).toBeTruthy();
+});
+
+it("leaves the trip answer empty when the trip question is skipped", () => {
+  mocks.progress = { ...mocks.progress, goals: ["travel"] };
+  startAt("tripSoon");
+  render(<OnboardingScreen />);
+  tap("onboardingQ.skip");
+  expect(saved()).toMatchObject({ tripSoon: null });
+});
+
+it("offers no Skip on the opener", () => {
+  render(<OnboardingScreen />);
+  expect(screen.queryByRole("button", { name: "onboardingQ.skip" })).toBeNull();
+});
+
+it("goes past the first-save moment to the spots when sharing is skipped", () => {
+  startAt("ahaShare");
+  render(<OnboardingScreen />);
+  tap("onboardingQ.skip");
+  expect(screen.getByRole("button", { name: "aha:spots" })).toBeTruthy();
+  expect(saved()?.step).toBe(ONBOARDING_STEPS.indexOf("ahaSpots"));
+  expect(
+    mocks.capture.mock.calls.filter(
+      ([event, properties]) =>
+        event === "onboarding_step_completed" &&
+        properties.step_id === "aha_share",
+    ),
+  ).toHaveLength(1);
+});
+
+it("leaves the carousel the way Continue does when it is skipped", async () => {
+  startAt("carousel");
+  render(<OnboardingScreen />);
+  await act(async () => tap("onboardingQ.skip"));
+  expect(mocks.ask).not.toHaveBeenCalled();
+  expect(
+    screen.getByRole("button", { name: "notifications:continue" }),
+  ).toBeTruthy();
+});
+
+it("opens the paywall and reports a skip when the notifications step is skipped", () => {
+  startAt("notifications");
+  render(<OnboardingScreen />);
+  tap("onboardingQ.skip");
+  expect(mocks.ask).toHaveBeenCalledTimes(1);
+  expect(mocks.capture).toHaveBeenCalledWith("onboarding_notifications", {
+    action: "skip",
+    granted: false,
+  });
+});
