@@ -55,20 +55,29 @@ describe("saveAllLabel", () => {
 
 describe("saveAllHint", () => {
   it("sends in-app browser visitors to their real browser first", () => {
-    expect(saveAllHint("instagram")).toBe(
+    expect(saveAllHint("instagram", 1)).toBe(
       "In Instagram, tap ••• up top, then Open in browser, and tap Save all there.",
     );
-    expect(saveAllHint("tiktok")).toBe(
+    expect(saveAllHint("tiktok", 1)).toBe(
       "In TikTok, tap ••• up top, then Open in browser, and tap Save all there.",
     );
-    expect(saveAllHint("facebook")).toBe(
+    expect(saveAllHint("facebook", 1)).toBe(
       "In Facebook, tap ••• up top, then Open in browser, and tap Save all there.",
     );
   });
 
   it("tells everyone else to install, come back, or update", () => {
-    expect(saveAllHint(undefined)).toBe(
+    expect(saveAllHint(undefined, 1)).toBe(
       "New to Shelvr? Install it, then come back to this page and tap Save all. If Shelvr opens on Home instead, update it from the App Store.",
+    );
+  });
+
+  it("names the city buttons, not Save all, when each city has its own", () => {
+    expect(saveAllHint(undefined, 2)).toBe(
+      "New to Shelvr? Install it, then come back to this page and tap your city’s button. If Shelvr opens on Home instead, update it from the App Store.",
+    );
+    expect(saveAllHint("instagram", 2)).toBe(
+      "In Instagram, tap ••• up top, then Open in browser, and tap your city’s button there.",
     );
   });
 });

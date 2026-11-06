@@ -186,6 +186,8 @@ describe("map page", () => {
 const IPHONE =
   "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1";
 const INSTALL_HINT =
+  "New to Shelvr? Install it, then come back to this page and tap your city’s button. If Shelvr opens on Home instead, update it from the App Store.";
+const ONE_CITY_INSTALL_HINT =
   "New to Shelvr? Install it, then come back to this page and tap Save all. If Shelvr opens on Home instead, update it from the App Store.";
 const DESKTOP_LINE =
   "Open this page on your iPhone to save these places to Shelvr.";
@@ -220,6 +222,7 @@ describe("map page with Save all", () => {
       page.indexOf("Save Austin to Shelvr"),
     );
     expect(page).toContain(INSTALL_HINT);
+    expect(page).not.toContain("tap Save all");
     expect(page).not.toContain(DESKTOP_LINE);
     expect(html.match(/Download Shelvr on the App Store/g)).toHaveLength(2);
   });
@@ -235,6 +238,7 @@ describe("map page with Save all", () => {
     );
     expect(page).toContain("Save all to Shelvr");
     expect(page).not.toContain("Save Mexico City to Shelvr");
+    expect(page).toContain(ONE_CITY_INSTALL_HINT);
   });
 
   it("links to the development app when the scheme says so", async () => {
@@ -250,7 +254,7 @@ describe("map page with Save all", () => {
     mocks.userAgent = `${IPHONE} Instagram 350.0.0.0.0`;
     const page = text(await render());
     expect(page).toContain(
-      "In Instagram, tap ••• up top, then Open in browser, and tap Save all there.",
+      "In Instagram, tap ••• up top, then Open in browser, and tap your city’s button there.",
     );
     expect(page).not.toContain(INSTALL_HINT);
   });

@@ -33,11 +33,15 @@ export function saveAllLabel(city: string, cityCount: number): string {
   return cityCount === 1 ? "Save all to Shelvr" : `Save ${city} to Shelvr`;
 }
 
-export function saveAllHint(inApp: InAppBrowser | undefined): string {
+export function saveAllHint(
+  inApp: InAppBrowser | undefined,
+  cityCount: number,
+): string {
+  const tap = cityCount === 1 ? "tap Save all" : "tap your city’s button";
   if (inApp) {
-    return `In ${IN_APP_NAMES[inApp]}, tap ••• up top, then Open in browser, and tap Save all there.`;
+    return `In ${IN_APP_NAMES[inApp]}, tap ••• up top, then Open in browser, and ${tap} there.`;
   }
-  return "New to Shelvr? Install it, then come back to this page and tap Save all. If Shelvr opens on Home instead, update it from the App Store.";
+  return `New to Shelvr? Install it, then come back to this page and ${tap}. If Shelvr opens on Home instead, update it from the App Store.`;
 }
 
 export function saveAllMode(userAgent: string): SaveAllMode {

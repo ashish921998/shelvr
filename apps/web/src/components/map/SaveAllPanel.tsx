@@ -50,7 +50,9 @@ export default function SaveAllPanel({
               />
             ))}
           </div>
-          <p className="mt-3 text-xs text-muted">{saveAllHint(inApp)}</p>
+          <p className="mt-3 text-xs text-muted">
+            {saveAllHint(inApp, cities.length)}
+          </p>
           <div className="mt-3">
             <AppStoreButton source="creator_map" shareToken={token} compact />
           </div>
