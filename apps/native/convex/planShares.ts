@@ -387,9 +387,9 @@ export const recordPlanVote = internalMutation({
       ) {
         return "recorded";
       }
+      const firstChoice = !empty && !hasVote(existing);
       if (
-        !empty &&
-        !hasVote(existing) &&
+        firstChoice &&
         (await shareVotes(ctx, share._id)).length >= MAX_PLAN_VOTERS
       ) {
         return "full";
@@ -402,7 +402,7 @@ export const recordPlanVote = internalMutation({
         name: fields.name,
         last: fields.last,
       });
-      await queueVoteNotice(ctx, share, voterId, empty);
+      await queueVoteNotice(ctx, share, voterId, firstChoice);
       return "recorded";
     }
     if (empty && args.revision === undefined) return "recorded";
@@ -428,7 +428,7 @@ export const recordPlanVote = internalMutation({
       name: fields.name,
       last: fields.last,
     });
-    await queueVoteNotice(ctx, share, voterId, empty);
+    await queueVoteNotice(ctx, share, voterId, !empty);
     return "recorded";
   },
 });
@@ -437,14 +437,16 @@ async function queueVoteNotice(
   ctx: MutationCtx,
   share: Doc<"planShares">,
   voterId: string,
-  empty: boolean,
+  firstChoice: boolean,
 ) {
-  if (empty || share.city === undefined || !planVotePushLive()) return;
+  if (!firstChoice || share.city === undefined || !planVotePushLive()) return;
   const queued = await ctx.db
     .query("planVoteNotices")
     .withIndex("by_share", (q) => q.eq("shareId", share._id))
     .first();
   if (queued !== null) return;
+  const votes = await shareVotes(ctx, share._id);
+  if (votes.some((vote) => vote.voterId !== voterId)) return;
   const now = Date.now();
   const noticeId = await ctx.db.insert("planVoteNotices", {
     shareId: share._id,

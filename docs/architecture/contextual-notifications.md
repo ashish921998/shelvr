@@ -203,7 +203,8 @@ reminder at whatever hour the switch flipped.
 
 The first-vote push has its own switch, `PLAN_VOTE_PUSH_ENABLED`. While it is
 unset, a vote queues nothing; turned off, a notice already queued closes as
-`pushes_paused`.
+`pushes_paused`. A ballot on a link that already holds a vote queues nothing,
+so turning the switch on announces no vote cast while it was off.
 
 ### Launch order
 

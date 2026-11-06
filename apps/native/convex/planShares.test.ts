@@ -747,6 +747,18 @@ describe("queueing the first-vote push", () => {
     expect(await sendJobs()).toEqual([]);
   });
 
+  it("queues nothing for a link whose first vote came while the switch was off", async () => {
+    const { backend, token, notices, sendJobs } = await link("Austin");
+    await vote(backend, token, "maya", ["p0"]);
+    vi.stubEnv("PLAN_VOTE_PUSH_ENABLED", "true");
+
+    await vote(backend, token, "maya", ["p0", "p1"]);
+    expect(await notices()).toEqual([]);
+    await vote(backend, token, "sam", ["p1"]);
+    expect(await notices()).toEqual([]);
+    expect(await sendJobs()).toEqual([]);
+  });
+
   it("queues when a voter's first choice follows an empty ballot", async () => {
     vi.stubEnv("PLAN_VOTE_PUSH_ENABLED", "true");
     const { backend, token, notices } = await link("Austin");
