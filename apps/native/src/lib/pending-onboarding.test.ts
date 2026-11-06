@@ -60,6 +60,7 @@ describe("onboarding recovery", () => {
       savedCount: null,
       planner: null,
       tripSoon: null,
+      skippedShare: false,
     });
   });
 });
@@ -103,6 +104,7 @@ describe("the survey answers", () => {
       savedCount: "hundreds",
       planner: "explorer",
       tripSoon: "notYet",
+      skippedShare: true,
     });
     setPendingSpaces(["Date nights"]);
     expect(getOnboardingProgress()).toMatchObject({
@@ -110,6 +112,7 @@ describe("the survey answers", () => {
       savedCount: "hundreds",
       planner: "explorer",
       tripSoon: "notYet",
+      skippedShare: true,
     });
   });
 
@@ -124,6 +127,7 @@ describe("the survey answers", () => {
         savedCount: "millions",
         planner: "chaotic",
         tripSoon: "maybe",
+        skippedShare: "yes",
       }),
     );
     expect(getOnboardingProgress()).toMatchObject({
@@ -131,6 +135,7 @@ describe("the survey answers", () => {
       savedCount: null,
       planner: null,
       tripSoon: null,
+      skippedShare: false,
     });
   });
 
@@ -209,6 +214,7 @@ describe("progress written by an older onboarding flow", () => {
     savedCount: null,
     planner: null,
     tripSoon: null,
+    skippedShare: false,
   };
 
   it.each([0, 1, 2, 3, 4, 5, 6, 7])(
@@ -281,6 +287,7 @@ describe("progress written by an older onboarding flow", () => {
       savedCount: null,
       planner: null,
       tripSoon: null,
+      skippedShare: false,
     });
   });
 
@@ -305,6 +312,7 @@ describe("progress written by an older onboarding flow", () => {
       savedCount: null,
       planner: null,
       tripSoon: null,
+      skippedShare: false,
     });
     expect(getPendingDemoUrl()).toBe("https://example.com/queued");
     expect(getOrCreatePendingOperationId()).toBe("legacy-operation");

@@ -17,9 +17,12 @@ account stays signed out through the paywall and signs in after it.
   a trip soon?", which moves on at one tap (`Yes, I’m planning one`,
   `Not yet`). Then "How do you like to plan?" and a chart, "Let’s put your
   saves to use." The count, goal and planner questions have Continue
-  (disabled until an answer) and "Skip" in the header; a skipped goal
-  question plans for every goal, so the trip question follows. Every step
-  after the opener has a back button.
+  (disabled until an answer). Every step after the opener has a back
+  button and "Skip" in the header; a skipped goal question plans for every
+  goal, so the trip question follows. Skip on "Try saving this reel." goes
+  to the spots without "Your first save!", and no reel is saved after
+  sign-in. Skip on the carousel acts as its Continue, and on the
+  notifications step as "Not now"; it hides while iOS is asking.
 - The city question reads "Where are you going?" after `Yes, I’m planning
 one`, "Where’s your dream city?" when no goal or every goal is picked,
   and "Where do you go out?" otherwise. A tap on a city moves on; "Skip"

@@ -46,6 +46,7 @@ const mocks = vi.hoisted(() => ({
     savedCount: null as string | null,
     planner: null as string | null,
     tripSoon: null as string | null,
+    skippedShare: false,
     viewed: [] as string[],
   },
   paywall: {} as { onPro: () => void },
@@ -208,9 +209,18 @@ vi.mock("@/components/onboarding/carousel", () => ({
 }));
 vi.mock("@/components/onboarding/notifications", () => ({
   NotificationsStep: vi.fn(
-    (props: { sample: Sample; onContinue: () => void }) => {
+    (props: {
+      sample: Sample;
+      onAsking: (asking: boolean) => void;
+      onContinue: () => void;
+    }) => {
       mocks.notifications(props);
-      return button("notifications:continue", props.onContinue);
+      return (
+        <div>
+          {button("notifications:continue", props.onContinue)}
+          {button("notifications:asking", () => props.onAsking(true))}
+        </div>
+      );
     },
   ),
 }));
@@ -267,6 +277,7 @@ beforeEach(() => {
     savedCount: null,
     planner: null,
     tripSoon: null,
+    skippedShare: false,
     viewed: [],
   };
 });
@@ -602,12 +613,15 @@ it("offers no Skip on the opener", () => {
   expect(screen.queryByRole("button", { name: "onboardingQ.skip" })).toBeNull();
 });
 
-it("goes past the first-save moment to the spots when sharing is skipped", () => {
+it("goes past the first-save moment to the spots when sharing is skipped, and back to the share", () => {
   startAt("ahaShare");
   render(<OnboardingScreen />);
   tap("onboardingQ.skip");
   expect(screen.getByRole("button", { name: "aha:spots" })).toBeTruthy();
-  expect(saved()?.step).toBe(ONBOARDING_STEPS.indexOf("ahaSpots"));
+  expect(saved()).toMatchObject({
+    step: ONBOARDING_STEPS.indexOf("ahaSpots"),
+    skippedShare: true,
+  });
   expect(
     mocks.capture.mock.calls.filter(
       ([event, properties]) =>
@@ -615,6 +629,36 @@ it("goes past the first-save moment to the spots when sharing is skipped", () =>
         properties.step_id === "aha_share",
     ),
   ).toHaveLength(1);
+  relaunch();
+  tap("common.back");
+  expect(screen.getByRole("button", { name: "aha:share" })).toBeTruthy();
+});
+
+it("saves no reel for someone who skipped sharing, and saves it once they share after all", () => {
+  mocks.progress = { ...mocks.progress, goals: ["date"] };
+  startAt("ahaShare");
+  render(<OnboardingScreen />);
+  tap("onboardingQ.skip");
+  act(() => mocks.paywall.onPro());
+  expect(mocks.queueDemoUrl).not.toHaveBeenCalled();
+  expect(mocks.completeOnboarding).toHaveBeenCalled();
+  cleanup();
+  render(<OnboardingScreen />);
+  tap("onboardingQ.skip");
+  tap("common.back");
+  tap("aha:share");
+  expect(saved()?.skippedShare).toBe(false);
+  act(() => mocks.paywall.onPro());
+  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
+    ahaReelUrl(ahaReel("date", "austin")!),
+  );
+});
+
+it("hides Skip on the notifications step while iOS is asking", () => {
+  startAt("notifications");
+  render(<OnboardingScreen />);
+  tap("notifications:asking");
+  expect(screen.queryByRole("button", { name: "onboardingQ.skip" })).toBeNull();
 });
 
 it("leaves the carousel the way Continue does when it is skipped", async () => {

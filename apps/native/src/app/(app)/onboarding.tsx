@@ -170,6 +170,8 @@ export default function OnboardingScreen() {
   );
   const [planner, setPlanner] = useState<Planner | null>(initial.planner);
   const [tripSoon, setTripSoon] = useState<TripSoon | null>(initial.tripSoon);
+  const [skippedShare, setSkippedShare] = useState(initial.skippedShare);
+  const [askingNotifications, setAskingNotifications] = useState(false);
   const [travelCity, setTravelCity] = useState<SampleCityId | null>(
     initial.travelCity,
   );
@@ -205,6 +207,7 @@ export default function OnboardingScreen() {
       savedCount,
       planner,
       tripSoon,
+      skippedShare,
       step: stepIndex,
       viewed: [...viewedSteps],
     });
@@ -214,6 +217,7 @@ export default function OnboardingScreen() {
     savedCount,
     planner,
     tripSoon,
+    skippedShare,
     stepIndex,
     viewedSteps,
   ]);
@@ -251,7 +255,7 @@ export default function OnboardingScreen() {
     holdIncomingShare();
     setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
     // The reel they shared in the demo becomes their first real save once they can save.
-    queueDemoUrl(sample.firstSaveUrl);
+    if (!skippedShare) queueDemoUrl(sample.firstSaveUrl);
     noteOnboardingFinished();
     completeOnboarding();
   };
@@ -291,7 +295,10 @@ export default function OnboardingScreen() {
     );
   }
 
-  const previous = previousOnboardingStep(step, goals);
+  const previous =
+    step === "ahaSpots" && skippedShare
+      ? "ahaShare"
+      : previousOnboardingStep(step, goals);
   const skip = () => {
     switch (step) {
       case "goal": {
@@ -303,6 +310,7 @@ export default function OnboardingScreen() {
         setTravelCity(null);
         return advance();
       case "ahaShare":
+        setSkippedShare(true);
         recordCurrentStep();
         setBackward(false);
         return setStep((current) => (current === step ? "ahaSpots" : current));
@@ -381,7 +389,15 @@ export default function OnboardingScreen() {
           />
         );
       case "ahaShare":
-        return <AhaShareStep sample={sample} onShared={advance} />;
+        return (
+          <AhaShareStep
+            sample={sample}
+            onShared={() => {
+              setSkippedShare(false);
+              advance();
+            }}
+          />
+        );
       case "firstSave":
         return <FirstSaveStep onContinue={advance} />;
       case "ahaSpots":
@@ -393,6 +409,7 @@ export default function OnboardingScreen() {
           <NotificationsStep
             sample={sample}
             leaving={paywall.asked}
+            onAsking={setAskingNotifications}
             onContinue={askForPlan}
           />
         );
@@ -417,7 +434,7 @@ export default function OnboardingScreen() {
                 setStep(previous);
               }
         }
-        onSkip={paywall.asked ? null : skip}
+        onSkip={paywall.asked || askingNotifications ? null : skip}
       />
       <View style={styles.content}>
         {/* Keyed by step, so a new step springs in while the old one leaves; neither blocks a tap. */}
