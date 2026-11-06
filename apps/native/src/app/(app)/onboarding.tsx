@@ -67,14 +67,6 @@ import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/** The question screens a person may skip; skipping the goal plans for all of them, and the city uses the sample's own. */
-const SKIPPABLE: ReadonlySet<OnboardingStep> = new Set([
-  "savedCount",
-  "goal",
-  "planner",
-  "city",
-]);
-
 function useStepAnalytics(step: OnboardingStep, viewed: Set<OnboardingStep>) {
   const tracked = useRef(new Set<OnboardingStep>());
   const enteredAt = useRef(0);
@@ -178,6 +170,8 @@ export default function OnboardingScreen() {
   );
   const [planner, setPlanner] = useState<Planner | null>(initial.planner);
   const [tripSoon, setTripSoon] = useState<TripSoon | null>(initial.tripSoon);
+  const [skippedShare, setSkippedShare] = useState(initial.skippedShare);
+  const [askingNotifications, setAskingNotifications] = useState(false);
   const [travelCity, setTravelCity] = useState<SampleCityId | null>(
     initial.travelCity,
   );
@@ -186,7 +180,9 @@ export default function OnboardingScreen() {
   const [viewedSteps] = useState(
     () =>
       new Set([
-        ...viewedBeforeResume(initial.step, initial.goals),
+        ...viewedBeforeResume(initial.step, initial.goals).filter(
+          (passed) => !(initial.skippedShare && passed === "firstSave"),
+        ),
         ...initial.viewed,
       ]),
   );
@@ -213,6 +209,7 @@ export default function OnboardingScreen() {
       savedCount,
       planner,
       tripSoon,
+      skippedShare,
       step: stepIndex,
       viewed: [...viewedSteps],
     });
@@ -222,6 +219,7 @@ export default function OnboardingScreen() {
     savedCount,
     planner,
     tripSoon,
+    skippedShare,
     stepIndex,
     viewedSteps,
   ]);
@@ -259,7 +257,7 @@ export default function OnboardingScreen() {
     holdIncomingShare();
     setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
     // The reel they shared in the demo becomes their first real save once they can save.
-    queueDemoUrl(sample.firstSaveUrl);
+    if (!skippedShare) queueDemoUrl(sample.firstSaveUrl);
     noteOnboardingFinished();
     completeOnboarding();
   };
@@ -299,13 +297,36 @@ export default function OnboardingScreen() {
     );
   }
 
-  const previous = previousOnboardingStep(step, goals);
+  const previous =
+    step === "ahaSpots" && skippedShare
+      ? "ahaShare"
+      : previousOnboardingStep(step, goals);
   const skip = () => {
-    if (step === "city") setTravelCity(null);
-    if (step !== "goal") return advance();
-    const all = [...GOALS];
-    setGoals(all);
-    advanceWith(all);
+    switch (step) {
+      case "goal": {
+        const all = [...GOALS];
+        setGoals(all);
+        return advanceWith(all);
+      }
+      case "city":
+        setTravelCity(null);
+        return advance();
+      case "ahaShare":
+        setSkippedShare(true);
+        recordCurrentStep();
+        setBackward(false);
+        return setStep((current) => (current === step ? "ahaSpots" : current));
+      case "carousel":
+        return leaveCarousel();
+      case "notifications":
+        analytics.capture("onboarding_notifications", {
+          action: "skip",
+          granted: false,
+        });
+        return askForPlan();
+      default:
+        return advance();
+    }
   };
 
   const body = (() => {
@@ -370,7 +391,15 @@ export default function OnboardingScreen() {
           />
         );
       case "ahaShare":
-        return <AhaShareStep sample={sample} onShared={advance} />;
+        return (
+          <AhaShareStep
+            sample={sample}
+            onShared={() => {
+              setSkippedShare(false);
+              advance();
+            }}
+          />
+        );
       case "firstSave":
         return <FirstSaveStep onContinue={advance} />;
       case "ahaSpots":
@@ -382,6 +411,7 @@ export default function OnboardingScreen() {
           <NotificationsStep
             sample={sample}
             leaving={paywall.asked}
+            onAsking={setAskingNotifications}
             onContinue={askForPlan}
           />
         );
@@ -406,7 +436,7 @@ export default function OnboardingScreen() {
                 setStep(previous);
               }
         }
-        onSkip={SKIPPABLE.has(step) ? skip : null}
+        onSkip={paywall.asked || askingNotifications ? null : skip}
       />
       <View style={styles.content}>
         {/* Keyed by step, so a new step springs in while the old one leaves; neither blocks a tap. */}
