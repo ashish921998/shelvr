@@ -1,15 +1,24 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import type { ReactNode } from "react";
+import {
+  useEffect,
+  useImperativeHandle,
+  type ReactNode,
+  type Ref,
+} from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HEADLINE_MAX_SCALE, LARGE_TEXT_SCALE } from "@/lib/use-large-text";
 import { BeenCityGrid } from "./been-city-grid";
 
+type LayoutEvent = { nativeEvent: { layout: { y: number } } };
+
 const mocks = vi.hoisted(() => ({
   tag: "en-US",
   fontScale: 1,
+  searchY: 412,
   dismiss: vi.fn(),
   selection: vi.fn(async () => {}),
+  scrollTo: vi.fn(),
 }));
 
 vi.mock("expo-localization", () => ({
@@ -19,9 +28,26 @@ vi.mock("expo-localization", () => ({
 vi.mock("react-native", () => ({
   Keyboard: { dismiss: mocks.dismiss },
   useWindowDimensions: () => ({ fontScale: mocks.fontScale }),
-  View: vi.fn(({ children }: { children?: ReactNode }) => (
-    <div>{children}</div>
-  )),
+  View: vi.fn(
+    ({
+      children,
+      style,
+      onLayout,
+    }: {
+      children?: ReactNode;
+      style?: { name?: string };
+      onLayout?: (event: LayoutEvent) => void;
+    }) => {
+      useEffect(() => {
+        onLayout?.({
+          nativeEvent: {
+            layout: { y: style?.name === "search" ? mocks.searchY : 0 },
+          },
+        });
+      }, [onLayout, style]);
+      return <div>{children}</div>;
+    },
+  ),
   Text: vi.fn(
     ({
       children,
@@ -33,30 +59,37 @@ vi.mock("react-native", () => ({
   ),
   ScrollView: vi.fn(
     ({
+      ref,
       children,
       automaticallyAdjustKeyboardInsets,
     }: {
+      ref?: Ref<unknown>;
       children?: ReactNode;
       automaticallyAdjustKeyboardInsets?: boolean;
-    }) => (
-      <div
-        data-testid="scroll"
-        data-keyboard-insets={automaticallyAdjustKeyboardInsets}
-      >
-        {children}
-      </div>
-    ),
+    }) => {
+      useImperativeHandle(ref, () => ({ scrollTo: mocks.scrollTo }));
+      return (
+        <div
+          data-testid="scroll"
+          data-keyboard-insets={automaticallyAdjustKeyboardInsets}
+        >
+          {children}
+        </div>
+      );
+    },
   ),
   TextInput: vi.fn(
     ({
       value,
       placeholder,
       onChangeText,
+      onFocus,
       maxFontSizeMultiplier,
     }: {
       value: string;
       placeholder: string;
       onChangeText: (text: string) => void;
+      onFocus?: () => void;
       maxFontSizeMultiplier?: number;
     }) => (
       <input
@@ -64,6 +97,7 @@ vi.mock("react-native", () => ({
         placeholder={placeholder}
         data-max-scale={maxFontSizeMultiplier}
         onChange={(event) => onChangeText(event.target.value)}
+        onFocus={onFocus}
       />
     ),
   ),
@@ -137,6 +171,7 @@ beforeEach(() => {
   mocks.fontScale = 1;
   mocks.dismiss.mockClear();
   mocks.selection.mockClear();
+  mocks.scrollTo.mockClear();
 });
 
 describe("BeenCityGrid", () => {
@@ -202,6 +237,23 @@ describe("BeenCityGrid", () => {
     expect(
       screen.getByTestId("scroll").getAttribute("data-keyboard-insets"),
     ).toBe("true");
+  });
+
+  it("brings the search field to the top of the grid when it is focused at the largest text sizes, so the matches show above the keyboard", () => {
+    mocks.fontScale = 3;
+    grid();
+    fireEvent.focus(screen.getByPlaceholderText("Search cities"));
+    expect(mocks.scrollTo).toHaveBeenCalledTimes(1);
+    expect(mocks.scrollTo).toHaveBeenCalledWith({
+      y: mocks.searchY,
+      animated: false,
+    });
+  });
+
+  it("leaves the grid where it is when the search field above it is focused", () => {
+    grid();
+    fireEvent.focus(screen.getByPlaceholderText("Search cities"));
+    expect(mocks.scrollTo).not.toHaveBeenCalled();
   });
 
   it("stops the names and the search text growing past what a tile and the field hold", () => {

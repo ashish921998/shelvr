@@ -15,8 +15,15 @@ import {
   useLargeText,
 } from "@/lib/use-large-text";
 import { Image } from "expo-image";
-import { type ReactNode, useState } from "react";
-import { Keyboard, ScrollView, Text, TextInput, View } from "react-native";
+import { type ReactNode, useRef, useState } from "react";
+import {
+  Keyboard,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  type ScrollViewInstance,
+} from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const TILE_SCRIM = {
@@ -91,6 +98,8 @@ export function BeenCityGrid({
   const { theme } = useUnistyles();
   const largeText = useLargeText();
   const [query, setQuery] = useState("");
+  const scroll = useRef<ScrollViewInstance>(null);
+  const searchY = useRef(0);
   const cities = SAMPLE_CITY_IDS.map((id) => ({
     id,
     name: t(SAMPLE_CITIES[id].name),
@@ -100,7 +109,12 @@ export function BeenCityGrid({
   const top = (
     <View style={styles.top}>
       {header}
-      <View style={styles.search}>
+      <View
+        style={styles.search}
+        onLayout={(event) => {
+          searchY.current = event.nativeEvent.layout.y;
+        }}
+      >
         <AppSymbolIcon
           name="magnifyingglass"
           size={16}
@@ -112,6 +126,11 @@ export function BeenCityGrid({
           placeholderTextColor={theme.colors.faint}
           value={query}
           onChangeText={setQuery}
+          onFocus={() => {
+            if (largeText) {
+              scroll.current?.scrollTo({ y: searchY.current, animated: false });
+            }
+          }}
           autoCorrect={false}
           returnKeyType="search"
           clearButtonMode="while-editing"
@@ -124,6 +143,7 @@ export function BeenCityGrid({
     <View style={styles.wrap}>
       {largeText ? null : top}
       <ScrollView
+        ref={scroll}
         style={styles.scroll}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
