@@ -9,8 +9,13 @@ import {
   cityMatches,
   type SampleCityId,
 } from "@/lib/sample-cities";
+import {
+  HEADLINE_MAX_SCALE,
+  LARGE_TEXT_SCALE,
+  useLargeText,
+} from "@/lib/use-large-text";
 import { Image } from "expo-image";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { Keyboard, ScrollView, Text, TextInput, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -23,11 +28,13 @@ function BeenTile({
   id,
   name,
   checked,
+  wide,
   onPress,
 }: {
   id: SampleCityId;
   name: string;
   checked: boolean;
+  wide: boolean;
   onPress: () => void;
 }) {
   const { theme } = useUnistyles();
@@ -38,7 +45,11 @@ function BeenTile({
       accessibilityLabel={name}
       testID={`been-city-${id}`}
       onPress={onPress}
-      style={[styles.tile, checked && styles.tileChecked]}
+      style={[
+        styles.tile,
+        wide && styles.tileWide,
+        checked && styles.tileChecked,
+      ]}
     >
       <Image
         source={CITY_PICTURES[id].view}
@@ -46,7 +57,11 @@ function BeenTile({
         style={StyleSheet.absoluteFill}
       />
       <View style={[styles.tileScrim, TILE_SCRIM]} />
-      <Text style={styles.tileName} numberOfLines={2}>
+      <Text
+        style={styles.tileName}
+        numberOfLines={2}
+        maxFontSizeMultiplier={LARGE_TEXT_SCALE}
+      >
         {name}
       </Text>
       {checked ? (
@@ -64,14 +79,17 @@ function BeenTile({
 }
 
 export function BeenCityGrid({
+  header,
   picked,
   onToggle,
 }: {
+  header: ReactNode;
   picked: readonly SampleCityId[];
   onToggle: (city: SampleCityId) => void;
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
+  const largeText = useLargeText();
   const [query, setQuery] = useState("");
   const cities = SAMPLE_CITY_IDS.map((id) => ({
     id,
@@ -79,8 +97,9 @@ export function BeenCityGrid({
   }))
     .sort((a, b) => a.name.localeCompare(b.name))
     .filter(({ id, name }) => cityMatches(id, name, query));
-  return (
-    <View style={styles.wrap}>
+  const top = (
+    <View style={styles.top}>
+      {header}
       <View style={styles.search}>
         <AppSymbolIcon
           name="magnifyingglass"
@@ -96,31 +115,41 @@ export function BeenCityGrid({
           autoCorrect={false}
           returnKeyType="search"
           clearButtonMode="while-editing"
+          maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
         />
       </View>
+    </View>
+  );
+  return (
+    <View style={styles.wrap}>
+      {largeText ? null : top}
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.grid}
+        contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
         showsVerticalScrollIndicator={false}
       >
-        {cities.map(({ id, name }) => (
-          <BeenTile
-            key={id}
-            id={id}
-            name={name}
-            checked={picked.includes(id)}
-            onPress={() => {
-              Keyboard.dismiss();
-              void haptics.selection();
-              onToggle(id);
-            }}
-          />
-        ))}
-        {cities.length === 0 ? (
-          <Text style={styles.noMatch}>{t("been.noMatch")}</Text>
-        ) : null}
+        {largeText ? top : null}
+        <View style={styles.grid}>
+          {cities.map(({ id, name }) => (
+            <BeenTile
+              key={id}
+              id={id}
+              name={name}
+              checked={picked.includes(id)}
+              wide={largeText}
+              onPress={() => {
+                Keyboard.dismiss();
+                void haptics.selection();
+                onToggle(id);
+              }}
+            />
+          ))}
+          {cities.length === 0 ? (
+            <Text style={styles.noMatch}>{t("been.noMatch")}</Text>
+          ) : null}
+        </View>
       </ScrollView>
     </View>
   );
@@ -131,8 +160,15 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     gap: theme.gap(2),
   },
+  top: {
+    gap: theme.gap(2),
+  },
   scroll: {
     flex: 1,
+  },
+  content: {
+    gap: theme.gap(2),
+    paddingBottom: theme.gap(3),
   },
   grid: {
     flexDirection: "row",
@@ -140,7 +176,6 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "flex-start",
     columnGap: theme.gap(1),
     rowGap: theme.gap(1),
-    paddingBottom: theme.gap(3),
   },
   tile: {
     width: "31.5%",
@@ -153,6 +188,9 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: 2,
     borderColor: "transparent",
     backgroundColor: theme.colors.surfaceMuted,
+  },
+  tileWide: {
+    width: "48.5%",
   },
   tileChecked: {
     borderColor: theme.colors.primary,

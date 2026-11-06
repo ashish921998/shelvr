@@ -10,6 +10,7 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import MapScreen from "@/app/(app)/(tabs)/(map)/index";
+import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { BEEN_CITY_POINTS } from "@convex/model/beenCities";
 
 type Pin = { id: string; lat: number; lng: number; been?: boolean };
@@ -171,9 +172,15 @@ vi.mock("react-native", () => ({
   Alert: { alert: vi.fn() },
   Keyboard: { dismiss: vi.fn() },
   useWindowDimensions: () => ({ fontScale: mocks.fontScale }),
-  Text: vi.fn(({ children }: { children?: ReactNode }) => (
-    <span>{children}</span>
-  )),
+  Text: vi.fn(
+    ({
+      children,
+      maxFontSizeMultiplier,
+    }: {
+      children?: ReactNode;
+      maxFontSizeMultiplier?: number;
+    }) => <span data-max-scale={maxFontSizeMultiplier}>{children}</span>,
+  ),
   Pressable: vi.fn(
     ({
       children,
@@ -316,6 +323,23 @@ describe("the Map tab with no places", () => {
     act(() => mocks.layout?.({ nativeEvent: { layout: { height: 131.2 } } }));
     expect(mocks.map?.topInset).toBe(TOP + 132);
     expect(gradient()).toBe(TOP + 132 + 16);
+  });
+
+  it("stops the card growing at twice the default text size, and the room kept for it", () => {
+    given([], ["lisbon"]);
+    mocks.fontScale = 3.5;
+    render(<MapScreen />);
+    expect(mocks.map?.topInset).toBe(TOP + 240);
+    expect(gradient()).toBe(TOP + 240 + 16);
+    for (const text of [
+      'been.mapTitle {"count":1}',
+      "been.edit",
+      "map.emptyBody",
+    ]) {
+      expect(screen.getByText(text).getAttribute("data-max-scale")).toBe(
+        String(HEADLINE_MAX_SCALE),
+      );
+    }
   });
 
   it("shows the Been cities even when search text was left from before", () => {

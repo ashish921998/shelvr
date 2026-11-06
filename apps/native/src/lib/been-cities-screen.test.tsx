@@ -108,13 +108,16 @@ vi.mock("expo-router", () => ({
 vi.mock("@/components/been/been-city-grid", () => ({
   BeenCityGrid: vi.fn(
     ({
+      header,
       picked,
       onToggle,
     }: {
+      header: ReactNode;
       picked: string[];
       onToggle: (city: string) => void;
     }) => (
       <div>
+        {header}
         {["lisbon", "madrid"].map((id) => (
           <button
             key={id}

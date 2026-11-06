@@ -15,8 +15,8 @@ function BeenCitiesEditor({ ids }: { ids: SampleCityId[] }) {
   const toggle = useBeenCityToggle();
   return (
     <View style={styles.content}>
-      <Text style={styles.body}>{t("been.editorBody")}</Text>
       <BeenCityGrid
+        header={<Text style={styles.body}>{t("been.editorBody")}</Text>}
         picked={ids}
         onToggle={(city) => {
           const been = !ids.includes(city);

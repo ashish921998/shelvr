@@ -1,4 +1,5 @@
 import { t, useAppLocale } from "@/lib/i18n";
+import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { type LayoutChangeEvent, Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -16,7 +17,9 @@ export function BeenMapCard({
   return (
     <View style={styles.card} onLayout={onLayout}>
       <View style={styles.row}>
-        <Text style={styles.title}>{t("been.mapTitle", { count })}</Text>
+        <Text style={styles.title} maxFontSizeMultiplier={HEADLINE_MAX_SCALE}>
+          {t("been.mapTitle", { count })}
+        </Text>
         <Pressable
           accessibilityRole="button"
           hitSlop={theme.gap(1.5)}
@@ -24,10 +27,14 @@ export function BeenMapCard({
           onPress={onEdit}
           style={({ pressed }) => pressed && styles.pressed}
         >
-          <Text style={styles.edit}>{t("been.edit")}</Text>
+          <Text style={styles.edit} maxFontSizeMultiplier={HEADLINE_MAX_SCALE}>
+            {t("been.edit")}
+          </Text>
         </Pressable>
       </View>
-      <Text style={styles.body}>{t("map.emptyBody")}</Text>
+      <Text style={styles.body} maxFontSizeMultiplier={HEADLINE_MAX_SCALE}>
+        {t("map.emptyBody")}
+      </Text>
     </View>
   );
 }

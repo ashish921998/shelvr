@@ -28,6 +28,7 @@ import {
 } from "@/lib/map-filters";
 import { useMapLocation } from "@/lib/map-location";
 import { placeEmoji } from "@/lib/map-pin-emoji";
+import { HEADLINE_MAX_SCALE } from "@/lib/use-large-text";
 import { api } from "@convex/_generated/api";
 import type { PlaceKind } from "@convex/model/placeKinds";
 import { convexQuery } from "@convex-dev/react-query";
@@ -155,7 +156,10 @@ export default function MapScreen() {
     theme.control.minHeight +
     (filters.length > 0 ? theme.gap(1) + theme.control.minHeight : 0);
   const cardRoom =
-    cardHeight ?? Math.ceil(theme.control.minHeight * 2.5 * fontScale);
+    cardHeight ??
+    Math.ceil(
+      theme.control.minHeight * 2.5 * Math.min(fontScale, HEADLINE_MAX_SCALE),
+    );
   const overlayTop = onlyBeen ? cardRoom : overlayHeight;
   const beenCount = been.ids.length;
   const select = (id: string) => {
