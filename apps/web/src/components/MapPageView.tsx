@@ -11,10 +11,12 @@ export default function MapPageView({
   token,
   outcome,
   counts,
+  saveAll,
 }: {
   token: string;
   outcome: PublicMapOutcome;
   counts: PublicMapCounts;
+  saveAll: boolean;
 }) {
   const { cities, places, been } = counts;
   useEffect(() => {
@@ -25,9 +27,10 @@ export default function MapPageView({
         cities,
         places,
         been,
+        save_all: saveAll,
         ...(ref ? { share_ref: ref } : {}),
       }),
     );
-  }, [token, outcome, cities, places, been]);
+  }, [token, outcome, cities, places, been, saveAll]);
   return null;
 }

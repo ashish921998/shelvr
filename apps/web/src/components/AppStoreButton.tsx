@@ -3,7 +3,15 @@
 import { useAppStoreLink } from "@/lib/appStoreLink";
 
 type AppStoreButtonProps = {
-  source: "header" | "hero" | "footer" | "share" | "plan" | "bio" | "map";
+  source:
+    | "header"
+    | "hero"
+    | "footer"
+    | "share"
+    | "plan"
+    | "bio"
+    | "map"
+    | "creator_map";
   compact?: boolean;
   shareToken?: string;
 };

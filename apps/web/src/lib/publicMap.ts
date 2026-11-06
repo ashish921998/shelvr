@@ -24,6 +24,7 @@ export type PublicMapPlace = {
 export type PublicMap = {
   ownerName?: string;
   cities: { city: string; places: PublicMapPlace[] }[];
+  saveAll: boolean;
 };
 
 export type PublicMapOutcome = "found" | "missing" | "unavailable";
@@ -123,13 +124,21 @@ function parseCity(value: unknown): PublicMap["cities"][number] | undefined {
 
 export function parsePublicMap(body: unknown): PublicMap | undefined {
   if (typeof body !== "object" || body === null) return undefined;
-  const raw = body as { ownerName?: unknown; cities?: unknown };
+  const raw = body as {
+    ownerName?: unknown;
+    cities?: unknown;
+    saveAll?: unknown;
+  };
   if (!Array.isArray(raw.cities)) return undefined;
   const cities = raw.cities
     .slice(0, MAX_CITIES)
     .flatMap((city) => parseCity(city) ?? []);
   const ownerName = cleanText(raw.ownerName, MAX_OWNER_CHARS);
-  return { ...(ownerName ? { ownerName } : {}), cities };
+  return {
+    ...(ownerName ? { ownerName } : {}),
+    cities,
+    saveAll: raw.saveAll === true,
+  };
 }
 
 export async function fetchPublicMap(
@@ -218,7 +227,10 @@ export function mapDescription(map?: PublicMap): string {
   const places = countLabel(counts.places, "place", "places");
   const been = counts.been > 0 ? `, ${counts.been} been there` : "";
   const cities = cityList(map.cities.map((city) => city.city));
-  return `${cities}: ${places}${been}. Made with Shelvr.`;
+  const closing = map.saveAll
+    ? "Save them all to Shelvr."
+    : "Made with Shelvr.";
+  return `${cities}: ${places}${been}. ${closing}`;
 }
 
 export function placeLink(

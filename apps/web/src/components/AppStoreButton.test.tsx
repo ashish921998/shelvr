@@ -27,7 +27,7 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-function campaignOf(source: "map" | "hero"): string | null {
+function campaignOf(source: "map" | "creator_map" | "hero"): string | null {
   act(() =>
     root.render(
       <AppStoreButton
@@ -56,6 +56,16 @@ describe("AppStoreButton campaign", () => {
   it("keeps the campaign a visitor arrived with", () => {
     window.history.replaceState({}, "", "/m/x?ct=tiktok_jane");
     expect(campaignOf("map")).toBe("tiktok_jane");
+  });
+
+  it("tags the Save all panel's Download as the map campaign, whatever ran first", () => {
+    expect(campaignOf("creator_map")).toBe("map");
+    window.history.replaceState({}, "", "/m/x?ct=map");
+    expect(campaignOf("creator_map")).toBe("map");
+    window.history.replaceState({}, "", "/m/x");
+    expect(campaignOf("creator_map")).toBe("map");
+    window.history.replaceState({}, "", "/m/x?ct=tiktok_maya");
+    expect(campaignOf("creator_map")).toBe("tiktok_maya");
   });
 
   it("still tags other buttons with their web_ campaign", () => {

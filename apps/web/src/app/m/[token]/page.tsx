@@ -6,6 +6,14 @@ import MapPageView from "@/components/MapPageView";
 import Logo from "@/components/common/Logo";
 import AndroidWaitlist from "@/components/home/AndroidWaitlist";
 import MapCitySection from "@/components/map/MapCitySection";
+import SaveAllPanel from "@/components/map/SaveAllPanel";
+import { inAppBrowser, type InAppBrowser } from "@/lib/bioLink";
+import {
+  appLinkScheme,
+  saveAllMode,
+  type AppLinkScheme,
+  type SaveAllMode,
+} from "@/lib/creatorMap";
 import {
   loadPublicMap,
   mapCounts,
@@ -103,7 +111,21 @@ function Legend() {
   );
 }
 
-function FoundMap({ map, android }: { map: PublicMap; android: boolean }) {
+function FoundMap({
+  map,
+  android,
+  token,
+  mode,
+  inApp,
+  scheme,
+}: {
+  map: PublicMap;
+  android: boolean;
+  token: string;
+  mode: SaveAllMode;
+  inApp: InAppBrowser | undefined;
+  scheme: AppLinkScheme;
+}) {
   const counts = mapCounts(map);
   return (
     <>
@@ -114,6 +136,18 @@ function FoundMap({ map, android }: { map: PublicMap; android: boolean }) {
         <>
           <Counters counts={counts} />
           {counts.been > 0 ? <Legend /> : null}
+          {map.saveAll && mode !== "none" ? (
+            <SaveAllPanel
+              token={token}
+              mode={mode}
+              inApp={inApp}
+              scheme={scheme}
+              cities={map.cities.map(({ city, places }) => ({
+                city,
+                places: places.length,
+              }))}
+            />
+          ) : null}
           {map.cities.map(({ city, places }) => (
             <MapCitySection
               key={city}
@@ -191,15 +225,28 @@ function ReportLine({ token }: { token: string }) {
 export default async function PublicMapPage({ params }: PageProps) {
   const { token } = await params;
   const { outcome, map } = await loadPublicMap(token);
-  const android = /android/i.test((await headers()).get("user-agent") ?? "");
+  const userAgent = (await headers()).get("user-agent") ?? "";
+  const android = /android/i.test(userAgent);
 
   return (
     <main className="min-h-screen bg-paper">
-      <MapPageView token={token} outcome={outcome} counts={mapCounts(map)} />
+      <MapPageView
+        token={token}
+        outcome={outcome}
+        counts={mapCounts(map)}
+        saveAll={map?.saveAll === true}
+      />
       <div className="container max-w-xl py-10 sm:py-16">
         <Logo />
         {map ? (
-          <FoundMap map={map} android={android} />
+          <FoundMap
+            map={map}
+            android={android}
+            token={token}
+            mode={saveAllMode(userAgent)}
+            inApp={inAppBrowser(userAgent)}
+            scheme={appLinkScheme()}
+          />
         ) : (
           <NoMap outcome={outcome} />
         )}

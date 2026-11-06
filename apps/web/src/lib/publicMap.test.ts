@@ -65,6 +65,7 @@ const map: PublicMap = {
       ],
     },
   ],
+  saveAll: false,
 };
 
 beforeEach(() => {
@@ -247,7 +248,17 @@ describe("parsePublicMap", () => {
           ],
         },
       ],
+      saveAll: false,
     });
+  });
+
+  it("turns Save all on only for a literal true", () => {
+    const body = { cities: map.cities };
+    expect(parsePublicMap({ ...body, saveAll: true })?.saveAll).toBe(true);
+    for (const saveAll of ["true", 1, null, {}]) {
+      expect(parsePublicMap({ ...body, saveAll })?.saveAll).toBe(false);
+    }
+    expect(parsePublicMap(body)?.saveAll).toBe(false);
   });
 
   it("drops a post link that is not the site's own post URL, keeping the place", () => {
@@ -299,7 +310,9 @@ describe("parsePublicMap", () => {
 describe("page copy", () => {
   it("titles the map with the owner's first name when there is one", () => {
     expect(mapTitle(map)).toBe("Ashish’s map");
-    expect(mapTitle({ cities: map.cities })).toBe("A Shelvr map");
+    expect(mapTitle({ cities: map.cities, saveAll: false })).toBe(
+      "A Shelvr map",
+    );
     expect(mapTitle(undefined)).toBe("A Shelvr map");
   });
 
@@ -329,13 +342,22 @@ describe("page copy", () => {
     expect(mapDescription(map)).toBe(
       "Mexico City and Austin: 6 places, 1 been there. Made with Shelvr.",
     );
-    expect(mapDescription({ cities: [map.cities[1]] })).toBe(
+    expect(mapDescription({ cities: [map.cities[1]], saveAll: false })).toBe(
       "Austin: 2 places. Made with Shelvr.",
     );
-    expect(mapDescription({ ownerName: "Ashish", cities: [] })).toBe(
-      "A map made with Shelvr.",
-    );
+    expect(
+      mapDescription({ ownerName: "Ashish", cities: [], saveAll: false }),
+    ).toBe("A map made with Shelvr.");
     expect(mapDescription(undefined)).toBe("Places saved with Shelvr.");
+  });
+
+  it("asks people to save the places when Save all is on and there are some", () => {
+    expect(mapDescription({ ...map, saveAll: true })).toBe(
+      "Mexico City and Austin: 6 places, 1 been there. Save them all to Shelvr.",
+    );
+    expect(
+      mapDescription({ ownerName: "Ashish", cities: [], saveAll: true }),
+    ).toBe("A map made with Shelvr.");
   });
 });
 
