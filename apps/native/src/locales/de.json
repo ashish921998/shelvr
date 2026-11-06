@@ -1154,5 +1154,7 @@
   },
   "been.edit": "Bearbeiten",
   "been.addFromMap": "Städte hinzufügen, in denen du warst",
-  "been.saveFailed": "Deine Städte konnten nicht aktualisiert werden"
+  "been.saveFailed": "Deine Städte konnten nicht aktualisiert werden",
+  "been.title": "Wo warst du schon?",
+  "been.body": "Tippe auf die Städte, in denen du warst. Wir zeigen sie auf deiner Karte."
 }

@@ -826,6 +826,11 @@ export function isSampleCity(value: unknown): value is SampleCityId {
   );
 }
 
+export function readSampleCities(value: unknown): SampleCityId[] {
+  if (!Array.isArray(value)) return [];
+  return SAMPLE_CITY_IDS.filter((id) => value.includes(id));
+}
+
 const fold = (text: string) =>
   text
     .normalize("NFD")

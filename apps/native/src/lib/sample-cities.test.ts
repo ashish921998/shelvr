@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { t } from "@/lib/i18n";
-import { SAMPLE_CITIES, SAMPLE_CITY_IDS, cityMatches } from "./sample-cities";
+import {
+  SAMPLE_CITIES,
+  SAMPLE_CITY_IDS,
+  cityMatches,
+  readSampleCities,
+} from "./sample-cities";
 
 describe("cityMatches", () => {
   it("folds accents and case", () => {
@@ -31,5 +36,19 @@ describe("cityMatches", () => {
         cityMatches(id, t(SAMPLE_CITIES[id].name), "zzz"),
       ),
     ).toEqual([]);
+  });
+});
+
+describe("readSampleCities", () => {
+  it("keeps known cities once each, in the list's order", () => {
+    expect(
+      readSampleCities(["madrid", "lisbon", "atlantis", "lisbon"]),
+    ).toEqual(["lisbon", "madrid"]);
+  });
+
+  it("reads anything but a list as none", () => {
+    expect(readSampleCities("lisbon")).toEqual([]);
+    expect(readSampleCities(undefined)).toEqual([]);
+    expect(readSampleCities({ 0: "lisbon" })).toEqual([]);
   });
 });

@@ -1188,5 +1188,7 @@
   },
   "been.edit": "Modifier",
   "been.addFromMap": "Ajouter des villes visitées",
-  "been.saveFailed": "Impossible de mettre à jour vos villes"
+  "been.saveFailed": "Impossible de mettre à jour vos villes",
+  "been.title": "Quelles villes avez-vous visitées ?",
+  "been.body": "Touchez les villes que vous avez visitées. Nous les ajouterons à votre carte."
 }

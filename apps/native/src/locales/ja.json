@@ -1120,5 +1120,7 @@
   },
   "been.edit": "編集",
   "been.addFromMap": "行ったことのある都市を追加",
-  "been.saveFailed": "都市を更新できませんでした"
+  "been.saveFailed": "都市を更新できませんでした",
+  "been.title": "行ったことのある都市は？",
+  "been.body": "行ったことのある都市をタップしてください。マップに表示します。"
 }

@@ -203,6 +203,7 @@ export type AnalyticsEventProperties = {
   map_search_result_opened: Record<string, never>;
   been_cities_editor_opened: { surface: "profile" | "map"; count: number };
   been_city_changed: { been: boolean; count: number };
+  been_cities_synced: { count: number };
   city_plan_started: { kind: "date" | "trip" };
   trip_stop_opened: { day: number; stop: number };
   trip_directions_opened: { located: boolean };
@@ -262,6 +263,7 @@ export type AnalyticsEventProperties = {
     saved_count: SavedCount | null;
     planner: Planner | null;
     trip_soon: TripSoon | null;
+    been_count: number;
     space_count: number;
     space_names: string[];
     custom_space_count: number;

@@ -12,6 +12,7 @@ const mock = vi.hoisted(() => ({
     clearPending: vi.fn(),
     clearPurchaseBeforeSignIn: vi.fn(),
     clearQueued: vi.fn(),
+    clearQueuedBeenCities: vi.fn(),
     clearPendingShareOnDevice: vi.fn(),
     clearShareDiscardedOnDevice: vi.fn(),
     clearSharedPayloads: vi.fn(),
@@ -49,6 +50,9 @@ vi.mock("@/lib/purchase-before-sign-in", () => ({
 vi.mock("@/lib/queued-first-save", () => ({
   clearQueued: mock.resets.clearQueued,
 }));
+vi.mock("@/lib/pending-been-cities", () => ({
+  clearQueuedBeenCities: mock.resets.clearQueuedBeenCities,
+}));
 vi.mock("@/lib/share/pending-share-store", () => ({
   clearPendingShareOnDevice: mock.resets.clearPendingShareOnDevice,
   clearShareDiscardedOnDevice: mock.resets.clearShareDiscardedOnDevice,
@@ -69,6 +73,11 @@ describe("startFreshForE2E", () => {
   it("runs every reset on a development build launched with the argument", () => {
     startFreshForE2E();
     expect(called()).toBe(Object.keys(mock.resets).length);
+  });
+
+  it("clears the cities picked as visited", () => {
+    startFreshForE2E();
+    expect(mock.resets.clearQueuedBeenCities).toHaveBeenCalledOnce();
   });
 
   it("does nothing without the argument", () => {

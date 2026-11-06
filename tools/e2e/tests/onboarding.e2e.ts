@@ -76,7 +76,11 @@ test(
   { retries: 0, timeout: 600_000 },
   async ({ device, screen, app }) => {
     await startFreshOnboarding({ device, screen });
-    await walkToSampleReel(screen, { goal: "travel", city: "Lisbon" });
+    await walkToSampleReel(screen, {
+      goal: "travel",
+      city: "Lisbon",
+      been: ["Tokyo"],
+    });
     await expect(screen.getByRole("image", /^Sample/)).toBeVisible();
     await app.screenshot("austin-fallback-reel");
     await shareTheSampleReel(screen);

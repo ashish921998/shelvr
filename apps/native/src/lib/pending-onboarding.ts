@@ -12,11 +12,15 @@ import {
   type TripSoon,
 } from "@/lib/onboarding-goals";
 import { ONBOARDING_STEPS, type OnboardingStep } from "@/lib/onboarding-steps";
-import { isSampleCity, type SampleCityId } from "@/lib/sample-cities";
+import {
+  isSampleCity,
+  readSampleCities,
+  type SampleCityId,
+} from "@/lib/sample-cities";
 
 const PENDING_KEY = "shelvr.pending.onboarding";
 
-const PROGRESS_VERSION = 12;
+const PROGRESS_VERSION = 13;
 
 export type PendingDemo = {
   url: string;
@@ -35,6 +39,7 @@ type PendingRecord = {
   viewed: OnboardingStep[];
   spaceNames: Record<string, string>;
   travelCity?: SampleCityId | null;
+  beenCities?: SampleCityId[];
   goals?: Goal[];
   savedCount?: SavedCount | null;
   planner?: Planner | null;
@@ -43,6 +48,7 @@ type PendingRecord = {
 
 type OnboardingAnswers = {
   travelCity: SampleCityId | null;
+  beenCities: SampleCityId[];
   goals: Goal[];
   savedCount: SavedCount | null;
   planner: Planner | null;
@@ -57,6 +63,7 @@ type OnboardingProgress = OnboardingAnswers & {
 
 const NO_ANSWERS: OnboardingAnswers = {
   travelCity: null,
+  beenCities: [],
   goals: [],
   savedCount: null,
   planner: null,
@@ -66,6 +73,7 @@ const NO_ANSWERS: OnboardingAnswers = {
 function answersOf(record: Partial<OnboardingAnswers>): OnboardingAnswers {
   return {
     travelCity: isSampleCity(record.travelCity) ? record.travelCity : null,
+    beenCities: readSampleCities(record.beenCities),
     goals: readGoals(record.goals),
     savedCount: isSavedCount(record.savedCount) ? record.savedCount : null,
     planner: isPlanner(record.planner) ? record.planner : null,

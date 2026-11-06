@@ -38,7 +38,8 @@ describe("previousOnboardingStep", () => {
     ["goal", "savedCount"],
     ["tripSoon", "goal"],
     ["planner", "tripSoon"],
-    ["chart", "planner"],
+    ["been", "planner"],
+    ["chart", "been"],
     ["city", "chart"],
     ["cityEcho", "city"],
     ["ahaShare", "cityEcho"],
@@ -85,6 +86,10 @@ describe("ONBOARDING_STEP_IDS", () => {
   it("names every step once, so funnels can split on it", () => {
     const ids = ONBOARDING_STEPS.map((step) => ONBOARDING_STEP_IDS[step]);
     expect(new Set(ids).size).toBe(ONBOARDING_STEPS.length);
+  });
+
+  it("names the been step been_cities", () => {
+    expect(ONBOARDING_STEP_IDS.been).toBe("been_cities");
   });
 });
 

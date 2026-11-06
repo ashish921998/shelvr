@@ -13,6 +13,7 @@ import { isTravelVibe } from "@/lib/travel-vibes";
 
 type Answers = {
   travelCity?: SampleCityId | null;
+  beenCities?: readonly SampleCityId[];
   goals?: readonly Goal[];
   savedCount?: SavedCount | null;
   planner?: Planner | null;
@@ -35,6 +36,7 @@ export function onboardingCompletedProperties(
     saved_count: answers.savedCount ?? null,
     planner: answers.planner ?? null,
     trip_soon: answers.tripSoon ?? null,
+    been_count: answers.beenCities?.length ?? 0,
     space_count: spaces.length,
     space_names: spaces.filter(isPresetSpace),
     custom_space_count: spaces.filter((name) => !isPresetSpace(name)).length,

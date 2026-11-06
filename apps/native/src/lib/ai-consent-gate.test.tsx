@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   entitlement: { entitled: true, loading: false },
   replay: vi.fn(),
   resumeShare: vi.fn(),
+  syncBeenCities: vi.fn(),
   awaitingPurchase: false,
   authLoading: false,
   freeSaves: null as null | {
@@ -32,6 +33,9 @@ vi.mock("@/lib/replay-onboarding", () => ({
 }));
 vi.mock("@/lib/queued-first-save", () => ({
   useQueuedFirstSave: vi.fn(),
+}));
+vi.mock("@/lib/pending-been-cities", () => ({
+  useSyncPendingBeenCities: mocks.syncBeenCities,
 }));
 vi.mock("@/lib/share/use-resume-pending-share", () => ({
   useResumePendingShare: mocks.resumeShare,
@@ -144,6 +148,7 @@ it.each(["unset", "loading", "granted", "declined"])(
     expect(shows("consent-card")).toBe(false);
     expect(mocks.replay).toHaveBeenCalled();
     expect(mocks.resumeShare).toHaveBeenCalled();
+    expect(mocks.syncBeenCities).toHaveBeenCalled();
   },
 );
 
