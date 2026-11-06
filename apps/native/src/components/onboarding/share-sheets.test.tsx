@@ -171,3 +171,29 @@ it("reaches the map callback after only Share, Share to…, More and Shelvr", ()
     vi.useRealTimers();
   }
 });
+
+it("keeps the reading timer when the parent passes a new callback", () => {
+  vi.useFakeTimers();
+  try {
+    const first = vi.fn();
+    const second = vi.fn();
+    const sample = ahaSample("trip", "lisbon");
+    const { rerender } = render(
+      <AhaShareStep sample={sample} onShared={first} />,
+    );
+    for (const label of [
+      "common.share",
+      "aha.sheetShareTo",
+      "aha.sheetMore",
+      "Shelvr",
+    ])
+      fireEvent.click(screen.getByRole("button", { name: label }));
+    act(() => vi.advanceTimersByTime(800));
+    rerender(<AhaShareStep sample={sample} onShared={second} />);
+    act(() => vi.advanceTimersByTime(400));
+    expect(second).toHaveBeenCalledOnce();
+    expect(first).not.toHaveBeenCalled();
+  } finally {
+    vi.useRealTimers();
+  }
+});

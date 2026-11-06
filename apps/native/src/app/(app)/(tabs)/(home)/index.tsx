@@ -13,7 +13,7 @@ import { HomePlaces, HomePlacesEmptyCard } from "@/components/home/home-places";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { useCurrentUser } from "@/lib/current-user";
 import { type Entitlement, useEntitlement } from "@/lib/entitlement";
-import { FREE_SAVES_NUDGE_AT } from "@/lib/access";
+import { type Access, FREE_SAVES_NUDGE_AT, saveWaiting } from "@/lib/access";
 import { useAccess } from "@/lib/free-plan";
 import { useHomeFeed } from "@/lib/home-feed";
 import { unplacedSaves } from "@/lib/home-places";
@@ -23,6 +23,8 @@ import {
 } from "@/lib/feedback-invitation";
 import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
+import { NameSheet } from "@/components/shared-list/name-sheet";
+import { useWelcomeName } from "@/lib/welcome-name";
 import { welcomeSave } from "@/lib/welcome-save";
 import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import {
@@ -41,6 +43,18 @@ const AUTO_LOAD_UNPLACED = 5;
 
 function trialEnd(entitlement: Entitlement): number | undefined {
   return entitlement.status === "trialing" ? entitlement.expiresAt : undefined;
+}
+
+function nameAskWaits(
+  entitlement: Entitlement,
+  access: Access,
+  letterPending: boolean,
+): boolean {
+  return (
+    entitlement.loading ||
+    saveWaiting(access) ||
+    (letterPending && entitlement.entitled)
+  );
 }
 
 export default function HomeScreen() {
@@ -75,8 +89,18 @@ export default function HomeScreen() {
     access.kind === "free" && access.left <= FREE_SAVES_NUDGE_AT;
   const { data: user } = useCurrentUser();
   const welcomePending = welcomeSave.usePending(user?._id);
+  const welcomeName = useWelcomeName(
+    user?._id,
+    items !== undefined &&
+      !cancelSurvey.visible &&
+      !nameAskWaits(entitlement, access, welcomePending),
+  );
   const deferPrompts =
-    cancelSurvey.visible || entitlement.loading || locked || welcomePending;
+    cancelSurvey.visible ||
+    entitlement.loading ||
+    locked ||
+    welcomePending ||
+    welcomeName.holding;
   const feedback = useFeedbackInvitation(items, { defer: deferPrompts });
   useReviewPrompt(items, {
     defer: deferPrompts || feedback.invitationVisible || feedback.modalOpen,
@@ -156,6 +180,12 @@ export default function HomeScreen() {
           trialEndsAt={trialEnd(entitlement)}
         />
       ) : null}
+      <NameSheet
+        visible={welcomeName.open}
+        kind="welcome"
+        onDone={welcomeName.close}
+        onCancel={welcomeName.close}
+      />
       {feedback.modalOpen ? (
         <FeedbackModal surface="home" onClose={feedback.closeFeedback} />
       ) : null}

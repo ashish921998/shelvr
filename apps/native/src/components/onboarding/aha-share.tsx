@@ -69,6 +69,10 @@ export function AhaShareStep({
   useAppLocale();
   const [reading, setReading] = useState(false);
   const sharedRef = useRef(false);
+  const onSharedRef = useRef(onShared);
+  useEffect(() => {
+    onSharedRef.current = onShared;
+  }, [onShared]);
   const pick = () => {
     void haptics.impact("medium");
     setReading(true);
@@ -79,10 +83,10 @@ export function AhaShareStep({
     const timer = setTimeout(() => {
       if (sharedRef.current) return;
       sharedRef.current = true;
-      onShared();
+      onSharedRef.current();
     }, READING_MS);
     return () => clearTimeout(timer);
-  }, [reading, onShared]);
+  }, [reading]);
 
   return (
     <View style={styles.wrap}>
