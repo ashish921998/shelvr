@@ -376,7 +376,13 @@ export default function OnboardingScreen() {
       case "ahaSpots":
         return <AhaSpotsStep sample={sample} onContinue={advance} />;
       case "carousel":
-        return <CarouselStep sample={sample} onContinue={leaveCarousel} />;
+        return (
+          <CarouselStep
+            sample={sample}
+            leaving={paywall.asked}
+            onContinue={leaveCarousel}
+          />
+        );
       case "notifications":
         return (
           <NotificationsStep

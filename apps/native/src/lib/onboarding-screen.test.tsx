@@ -70,12 +70,22 @@ vi.mock("@/lib/onboarding", () => ({
 }));
 vi.mock("@/lib/welcome-save", () => ({ noteOnboardingFinished: vi.fn() }));
 vi.mock("@/lib/free-plan", () => ({ useFreePlanOpen: () => false }));
-vi.mock("@/lib/onboarding-paywall", () => ({
-  useOnboardingPaywall: (options: { onPro: () => void }) => {
-    mocks.paywall = options;
-    return { asked: false, ask: mocks.ask };
-  },
-}));
+vi.mock("@/lib/onboarding-paywall", async () => {
+  const { useState } = await import("react");
+  return {
+    useOnboardingPaywall: (options: { onPro: () => void }) => {
+      mocks.paywall = options;
+      const [asked, setAsked] = useState(false);
+      return {
+        asked,
+        ask: () => {
+          mocks.ask();
+          setAsked(true);
+        },
+      };
+    },
+  };
+});
 vi.mock("@/lib/pending-onboarding", () => ({
   clearPending: vi.fn(),
   getOnboardingProgress: () => mocks.progress,
@@ -201,10 +211,12 @@ vi.mock("@/components/onboarding/aha-spots", () => ({
   ),
 }));
 vi.mock("@/components/onboarding/carousel", () => ({
-  CarouselStep: vi.fn((props: { sample: Sample; onContinue: () => void }) => {
-    mocks.carousel(props);
-    return button("carousel:continue", props.onContinue);
-  }),
+  CarouselStep: vi.fn(
+    (props: { sample: Sample; leaving: boolean; onContinue: () => void }) => {
+      mocks.carousel(props);
+      return button("carousel:continue", props.onContinue);
+    },
+  ),
 }));
 vi.mock("@/components/onboarding/notifications", () => ({
   NotificationsStep: vi.fn(
@@ -461,6 +473,16 @@ it.each(["granted", "blocked"] as const)(
     expect(mocks.notifications).not.toHaveBeenCalled();
   },
 );
+
+it("shows the carousel as leaving once its Continue asks for the paywall", async () => {
+  mocks.permission.mockResolvedValue("blocked");
+  startAt("carousel");
+  render(<OnboardingScreen />);
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(false);
+  await act(async () => tap("carousel:continue"));
+  expect(mocks.ask).toHaveBeenCalledTimes(1);
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(true);
+});
 
 it("opens the paywall when the permission cannot be read", async () => {
   mocks.permission.mockRejectedValue(new Error("no"));
