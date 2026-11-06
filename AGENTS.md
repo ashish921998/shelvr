@@ -37,29 +37,43 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   Around it: `trial-reminder.ts`, `paywall-funnel.ts`,
   `paywall-telemetry.ts` and `revenuecat-*.ts`.
   The server side is `convex/subscriptions.ts`.
-- **Home:** `src/lib/home-feed.tsx` (`HomeFeedProvider`, `useHomeFeed`); the
-  cities list and processing section are in `src/components/home`
-  (`home-places.tsx`); failed and placeless saves are in `review-saves.tsx` and
-  `unplaced-toast.tsx`. The city page is `src/app/(app)/city/[name].tsx`, with its
+- **Home:** the Library tab, `src/lib/home-feed.tsx` (`HomeFeedProvider`,
+  `useHomeFeed`); its rows and sections are in `src/components/home`
+  (`home-places.tsx`, Recents in `recent-saves.tsx`); failed and placeless saves
+  are in `review-saves.tsx` and `unplaced-toast.tsx`. The Trips, Cities and All
+  saves rows are `library-rows.tsx`; the Cities screen is
+  `src/app/(app)/cities.tsx` (`cities.tsx`) and the All saves screen is
+  `src/app/(app)/saves.tsx` (`all-saves.tsx`), and saves are grouped by day in
+  `src/lib/save-list.ts`. The tab bar is `src/components/tab-bar.tsx`: Library
+  or Map, the + that opens the Add spots sheet (`src/app/(app)/add-spots.tsx`,
+  `src/components/add-spots`, whose How to share and Save with Siri tiles open
+  `src/app/(app)/how-to-share.tsx` and `src/app/(app)/save-with-siri.tsx`; the Siri phrases in
+  `src/lib/siri-phrases.ts` must match `apps/native/app-intents/ShelvrShortcuts.swift`, which
+  `siri-phrases.test.ts` checks), and Plan a date, which picks a city through
+  `src/lib/plan-picker.tsx`. The city page is `src/app/(app)/city/[name].tsx`, with its
   map in `src/components/city` and Plan a date / Plan a trip in `src/lib/city-plan.ts`.
   Plan a date is the `src/app/(app)/date-plan.tsx` route, with its screens in
   `src/components/date-plan`, state in `src/lib/date-plan.ts` and backend in
   `convex/datePlans.ts` (rules in `convex/model/dateRank.ts`).
   Retired routes redirect to Home through `src/lib/home-href.ts`.
 - **Shared lists:** route `src/app/(app)/shared-list/[id].tsx`, the form
-  `new-shared-list.tsx`, `add-list-place.tsx`, the root Join screen
+  `new-shared-list.tsx`, `add-list-place.tsx`, the See all grid
+  `src/app/(app)/shared-lists.tsx` (`src/components/home/all-shared-lists.tsx`), the root Join screen
   `src/app/list-invite/[token].tsx`; rows and cards in `src/components/shared-list`;
   hooks and helpers in `src/lib/shared-lists.ts`, the join coordinator in
   `src/lib/invite-join.ts` with its SecureStore slot `pending-invite.ts`, gating in
   `list-gate.ts`; backend `convex/sharedLists.ts` and `convex/model/sharedLists.ts`.
 - **Map tab:** route `src/app/(app)/(tabs)/(map)/index.tsx`, map, search and filter chips in
-  `src/components/map`, filter rules in `src/lib/map-filters.ts` and
+  `src/components/map` (`map-header.tsx` is the city title, search field and Cancel, with
+  `map-round-button.tsx` behind the search, profile and locate buttons; `map-empty.tsx` is the
+  no-places card; the title's city comes from `src/lib/use-map-city.ts`), filter rules in `src/lib/map-filters.ts` and
   `convex/model/placeKinds.ts`, each pin's emoji in `src/lib/map-pin-emoji.ts`, data from
   `convex/mapPlaces.ts`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;
-  the Add sheet (`src/app/(app)/add.tsx`) takes a pasted link only.
+  the Add sheet (`src/app/(app)/add.tsx`), opened from Add spots' Paste a link,
+  takes a pasted link only.
 - **Onboarding:** screen `src/app/(app)/onboarding.tsx`, steps in
   `src/components/onboarding`, state in `src/lib/onboarding.tsx`,
   `onboarding-steps.ts` and `pending-onboarding.ts`.
@@ -263,6 +277,7 @@ cannot happen.
 | `tools/*.test.mjs` that run git use `createRepo()`                                                           | `tools/temp-repo.test.mjs`                                                                                       | `check:code`                         |
 | App Review notes quote only text in `en.json`, the App Intents or the paywall list                           | `tools/onboarding-sync.test.mjs` (bold is read only under Onboarding)                                            | `check:code`                         |
 | Notes and e2e helpers are walked when the onboarding flow version moves                                      | The same test checks their numbers in `tools/onboarding-walks.json`, not the walk                                | `check:code`, number only            |
+| The paste-ready App Review notes fit App Store Connect's 4,000 characters                                    | `tools/onboarding-sync.test.mjs` counts the block after the intro, newlines included                             | `check:code`                         |
 | e2e helpers use the app's current labels                                                                     | `e2e ios` workflow, on the `run-e2e` label, not required                                                         | nowhere blocking                     |
 | Public Convex `args` and `returns` stay compatible                                                           | `tools/verify-convex-api.mjs` from the fork point; one trailer acknowledges the whole range                      | CI `convex api contract`             |
 | No new code comments: run `/pstack:no-comments`. A comment on a rule we cannot change takes `Comments: kept` | `tools/verify-comments.mjs` fails a file whose comment count rises from the fork point                           | CI `convex api contract`             |

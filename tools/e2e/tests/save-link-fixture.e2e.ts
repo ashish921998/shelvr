@@ -9,7 +9,7 @@ const FIXTURE_URL = "https://fixtures.e2e.invalid/quince-paste";
 const TITLE = "Quince paste for beginners";
 
 test(
-  "saves a link that names no place and offers it for review under the cities",
+  "saves a link that names no place and offers it under Without a place",
   {
     skip:
       process.env.E2E_FAKE_AI !== "local-v1" &&
@@ -21,10 +21,7 @@ test(
     await screen.getByRole("button", "Save").tap();
     await expect(input).toBeHidden({ timeout: 30_000 });
 
-    const review = screen.getByRole(
-      "button",
-      /saves? without a place, Review$/,
-    );
+    const review = screen.getByRole("button", /^Without a place(?:,|$)/);
     await expect(review).toBeVisible({ timeout: 60_000 });
     await review.tap();
 

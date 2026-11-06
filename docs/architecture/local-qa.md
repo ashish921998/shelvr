@@ -97,21 +97,19 @@ changes.
   (`src/lib/e2e-hide-pro.ts`), which makes the client show that user as not
   Pro, as the paywall flow in `tools/e2e/tests/paywall.e2e.ts` does. The
   server still treats them as Pro. The app then opens on the plan gate
-  instead of Home, and its See plans button opens the paywall.
+  instead of the Map, and its See plans button opens the paywall.
 - **Reduced motion.**
   `xcrun simctl spawn <udid> defaults write com.apple.Accessibility ReduceMotionEnabled -bool true`,
   then relaunch the app. Set it back to `false` when done.
 
 ## Reading the screen
 
-- The accessibility tree does not list Home cards; the React component tree
-  does.
 - While a Reanimated `entering` animation runs, the accessibility tree shows
   the node twice. Wait for the screen to settle before calling a duplicate a
   defect.
-- The floating dev-tools button sits over the Home header's Add button, and the
-  tree carries no z-order, so a tap aimed at Add can open the dev menu. Go
-  through "Paste a link" or dismiss the dev button first.
+- The floating dev-tools button can cover another control, and the tree carries
+  no z-order, so a tap aimed at that control can open the dev menu. Dismiss the
+  dev button first.
 
 ## Tests and the router tree
 

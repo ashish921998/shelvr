@@ -1,4 +1,5 @@
 import type { Id } from "@convex/_generated/dataModel";
+import { HomeRow } from "@/components/home/home-row";
 import { PromptSheet } from "@/components/ui/prompt-sheet";
 import { PillButton } from "@/components/onboarding/parts";
 import { useFixSave } from "@/lib/fix-save";
@@ -83,7 +84,6 @@ function ReviewRow({ save, onOpen }: { save: ReviewSave; onOpen: () => void }) {
   );
 }
 
-/** One quiet line under the cities for saves Home couldn't place, opening a sheet to fix them. */
 export function ReviewSaves({ saves }: { saves: ReviewSave[] }) {
   useAppLocale();
   const router = useRouter();
@@ -94,19 +94,14 @@ export function ReviewSaves({ saves }: { saves: ReviewSave[] }) {
     if (open) setOpen(false);
     return null;
   }
-  const count = t("homePlaces.reviewCount", { count: toReview.length });
   return (
     <>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`${count}, ${t("homePlaces.review")}`}
+      <HomeRow
+        icon="rectangle.stack.fill"
+        name={t("homePlaces.withoutPlace")}
+        count={toReview.length}
         onPress={() => setOpen(true)}
-        style={({ pressed }) => [styles.line, pressed && styles.pressed]}
-      >
-        <Text style={styles.muted}>{count}</Text>
-        <Text style={styles.muted}>·</Text>
-        <Text style={styles.lineAction}>{t("homePlaces.review")}</Text>
-      </Pressable>
+      />
       <PromptSheet
         testID="review-saves-sheet"
         visible={open}
@@ -138,16 +133,6 @@ export function ReviewSaves({ saves }: { saves: ReviewSave[] }) {
 }
 
 const styles = StyleSheet.create((theme) => ({
-  line: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: theme.gap(0.75),
-    paddingHorizontal: theme.gap(2),
-    paddingTop: theme.gap(3),
-    paddingBottom: theme.gap(1),
-  },
-  lineAction: { ...theme.type.footnote, color: theme.colors.primaryText },
   muted: { ...theme.type.footnote, color: theme.colors.muted },
   pressed: { opacity: theme.opacity.pressed },
   list: { maxHeight: 360 },

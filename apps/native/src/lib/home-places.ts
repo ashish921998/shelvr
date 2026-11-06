@@ -1,8 +1,7 @@
 import { t } from "@/lib/i18n";
 import { isTerminalFailure } from "@convex/model/itemFields";
 import { displayHost } from "@/lib/url";
-
-const VISIBLE_CITIES = 4;
+import { cityKey } from "@convex/model/trip";
 
 export type City = {
   city: string;
@@ -10,20 +9,6 @@ export type City = {
   placeCount?: number;
   cover: string | null;
 };
-
-/** The cities to draw now, and how many the "+ n more" tile stands for. */
-export function visibleCities(
-  cities: City[],
-  expanded: boolean,
-): { shown: City[]; hidden: number } {
-  if (expanded || cities.length <= VISIBLE_CITIES) {
-    return { shown: cities, hidden: 0 };
-  }
-  return {
-    shown: cities.slice(0, VISIBLE_CITIES),
-    hidden: cities.length - VISIBLE_CITIES,
-  };
-}
 
 type PlaceableSave = {
   _id: string;
@@ -79,20 +64,6 @@ export function plannableCities(cities: City[]): City[] {
   return cities.filter((entry) => entry.placeCount !== 0);
 }
 
-type CityRow =
-  | { kind: "pair"; cities: [City, City] }
-  | { kind: "wide"; city: City };
-
-export function cityRows(cities: City[]): CityRow[] {
-  const rows: CityRow[] = [];
-  for (let index = 0; index < cities.length; index += 2) {
-    const [first, second] = cities.slice(index, index + 2);
-    if (first && second) rows.push({ kind: "pair", cities: [first, second] });
-    else if (first) rows.push({ kind: "wide", city: first });
-  }
-  return rows;
-}
-
 export function cityCountLine(entry: City): string | null {
   if (entry.placeCount === 0) {
     return t("homePlaces.noPlaceYet", { count: entry.count });
@@ -100,4 +71,17 @@ export function cityCountLine(entry: City): string | null {
   return entry.placeCount
     ? t("homePlaces.spotCount", { count: entry.placeCount })
     : null;
+}
+
+export function sharedListCover(
+  listCities: readonly string[],
+  mine: readonly City[] | undefined,
+): string | null {
+  for (const name of listCities) {
+    const cover = mine?.find(
+      (entry) => cityKey(entry.city) === cityKey(name),
+    )?.cover;
+    if (cover) return cover;
+  }
+  return null;
 }

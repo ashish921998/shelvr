@@ -6,107 +6,115 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type Result = { id: string; name: string; city?: string };
 
-/** The search field over the map; while it holds text, the matches list under it. */
-export function MapSearch({
+export function MapSearchField({
   text,
   onChangeText,
+}: {
+  text: string;
+  onChangeText: (text: string) => void;
+}) {
+  const { theme } = useUnistyles();
+  return (
+    <View style={styles.field}>
+      <AppSymbolIcon
+        name="magnifyingglass"
+        size={20}
+        tintColor={theme.colors.muted}
+      />
+      <TextInput
+        testID="map-search-input"
+        accessibilityLabel={t("map.searchPlaceholder")}
+        placeholder={t("map.searchPlaceholder")}
+        placeholderTextColor={theme.colors.muted}
+        value={text}
+        onChangeText={onChangeText}
+        autoFocus
+        autoCapitalize="none"
+        autoCorrect={false}
+        returnKeyType="search"
+        maxLength={200}
+        style={styles.input}
+      />
+      {text.length > 0 ? (
+        <HeaderIconButton
+          icon="xmark"
+          label={t("search.clear")}
+          onPress={() => onChangeText("")}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+export function MapSearchResults({
+  text,
   results,
   total,
   onSelect,
 }: {
   text: string;
-  onChangeText: (text: string) => void;
-  /** Undefined while the field is empty. */
-  results: Result[] | undefined;
+  results: Result[];
   /** How many places match, when more than the list shows. */
   total: number;
   onSelect: (id: string) => void;
 }) {
-  const { theme } = useUnistyles();
+  if (text.trim() === "") return null;
   return (
-    <View style={styles.container}>
-      <View style={styles.field}>
-        <AppSymbolIcon
-          name="magnifyingglass"
-          size={20}
-          tintColor={theme.colors.muted}
-        />
-        <TextInput
-          testID="map-search-input"
-          accessibilityLabel={t("map.searchPlaceholder")}
-          placeholder={t("map.searchPlaceholder")}
-          placeholderTextColor={theme.colors.muted}
-          value={text}
-          onChangeText={onChangeText}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          maxLength={200}
-          style={styles.input}
-        />
-        {text.length > 0 ? (
-          <HeaderIconButton
-            icon="xmark"
-            label={t("search.clear")}
-            onPress={() => onChangeText("")}
-          />
-        ) : null}
-      </View>
-      {results ? (
-        <View style={styles.results}>
-          {results.length === 0 ? (
-            <Text accessibilityLiveRegion="polite" style={styles.empty}>
-              {t("map.searchNoResults", { query: text.trim() })}
+    <View style={styles.results}>
+      {results.length === 0 ? (
+        <Text accessibilityLiveRegion="polite" style={styles.empty}>
+          {t("map.searchNoResults", { query: text.trim() })}
+        </Text>
+      ) : (
+        results.map((result) => (
+          <Pressable
+            key={result.id}
+            accessibilityRole="button"
+            onPress={() => onSelect(result.id)}
+            style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+          >
+            <Text style={styles.title} numberOfLines={1}>
+              {result.name}
             </Text>
-          ) : (
-            results.map((result) => (
-              <Pressable
-                key={result.id}
-                accessibilityRole="button"
-                onPress={() => onSelect(result.id)}
-                style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-              >
-                <Text style={styles.title} numberOfLines={1}>
-                  {result.name}
-                </Text>
-                {result.city ? (
-                  <Text style={styles.subtitle} numberOfLines={1}>
-                    {result.city}
-                  </Text>
-                ) : null}
-              </Pressable>
-            ))
-          )}
-          {results.length > 0 && total > results.length ? (
-            <Text accessibilityLiveRegion="polite" style={styles.more}>
-              {t("map.searchMore", { count: results.length, total })}
-            </Text>
-          ) : null}
-        </View>
+            {result.city ? (
+              <Text style={styles.subtitle} numberOfLines={1}>
+                {result.city}
+              </Text>
+            ) : null}
+          </Pressable>
+        ))
+      )}
+      {results.length > 0 && total > results.length ? (
+        <Text accessibilityLiveRegion="polite" style={styles.more}>
+          {t("map.searchMore", { count: results.length, total })}
+        </Text>
       ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  container: { paddingHorizontal: theme.gap(2), gap: theme.gap(1) },
   field: {
+    flex: 1,
+    minWidth: 0,
     paddingLeft: theme.gap(1.5),
     paddingRight: theme.gap(0.5),
-    minHeight: theme.control.minHeight,
+    minHeight: 48,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(1),
-    borderRadius: theme.radius.lg,
+    borderRadius: 24,
     borderCurve: "continuous",
     backgroundColor: theme.colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
     boxShadow: "0 2px 8px rgba(0, 0, 0, 0.16)",
   },
   input: {
     flex: 1,
     ...theme.type.body,
     color: theme.colors.foreground,
-    minHeight: theme.control.minHeight,
+    minHeight: 48,
   },
   results: {
     borderRadius: theme.radius.lg,

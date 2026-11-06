@@ -73,7 +73,7 @@ export default function AppLayout() {
     ? "/onboarding"
     : gated
       ? "/plan-gate"
-      : "/(app)/(tabs)/(home)";
+      : "/(app)/(tabs)/(map)";
   const modal = {
     presentation: "modal",
     headerShown: true,
@@ -113,6 +113,13 @@ export default function AppLayout() {
             name="city/[name]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
+          <Stack.Screen name="saves" options={{ headerShown: false }} />
+          <Stack.Screen name="cities" options={{ headerShown: false }} />
+          <Stack.Screen name="how-to-share" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="save-with-siri"
+            options={{ headerShown: false }}
+          />
           <Stack.Screen
             name="spots/[id]"
             options={{ headerShown: false, gestureEnabled: false }}
@@ -134,6 +141,7 @@ export default function AppLayout() {
             name="shared-list/[id]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
+          <Stack.Screen name="shared-lists" options={{ headerShown: false }} />
         </Stack.Protected>
         {/* Native sheets and modals present above the loading cover, so they wait for the plan. */}
         <Stack.Protected
@@ -172,6 +180,15 @@ export default function AppLayout() {
           />
           <Stack.Screen name="new-shared-list" options={modal} />
           <Stack.Screen
+            name="add-spots"
+            options={{
+              presentation: "transparentModal",
+              animation: "fade",
+              headerShown: false,
+              contentStyle: { backgroundColor: "transparent" },
+            }}
+          />
+          <Stack.Screen
             name="edit-save-places"
             options={{ headerShown: true, headerTransparent: false }}
           />
@@ -200,11 +217,11 @@ export default function AppLayout() {
         </Stack.Protected>
         <Stack.Protected
           guard={onboarded && gated}
-          redirectTo="/(app)/(tabs)/(home)"
+          redirectTo="/(app)/(tabs)/(map)"
         >
           <Stack.Screen name="plan-gate" options={{ headerShown: false }} />
         </Stack.Protected>
-        <Stack.Protected guard={!onboarded} redirectTo="/(app)/(tabs)/(home)">
+        <Stack.Protected guard={!onboarded} redirectTo="/(app)/(tabs)/(map)">
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
         </Stack.Protected>
         {/* Without a redirectTo, Expo Router falls back to the shortest unguarded route name: `paywall`. */}

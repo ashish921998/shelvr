@@ -1,7 +1,12 @@
 import { test } from "@e2e-dev/mobile";
 import { expect } from "e2e";
 
-import { fillField, openAddSheet, startOnSeededHome } from "./seeded-home.ts";
+import {
+  fillField,
+  openAddSheet,
+  openCities,
+  startOnSeededHome,
+} from "./seeded-home.ts";
 
 startOnSeededHome();
 
@@ -21,6 +26,7 @@ test(
     await screen.getByRole("button", "Save").tap();
     await expect(input).toBeHidden({ timeout: 30_000 });
 
+    await openCities(screen);
     await screen.getByRole("button", /^Lisbon(?:,|$)/).tap();
     await expect(screen.getByText(TITLE)).toBeVisible({ timeout: 60_000 });
 

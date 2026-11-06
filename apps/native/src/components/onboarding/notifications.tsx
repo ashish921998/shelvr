@@ -109,7 +109,12 @@ const styles = StyleSheet.create((theme) => ({
   scroll: { flex: 1 },
   body: { gap: theme.gap(3), paddingBottom: theme.gap(1) },
   head: { gap: theme.gap(1) },
-  title: { ...theme.type.displayTitle, color: theme.colors.foreground },
+  title: {
+    ...theme.type.displayTitle,
+    fontSize: 30,
+    lineHeight: 34,
+    color: theme.colors.foreground,
+  },
   sub: { ...theme.type.body, color: theme.colors.muted },
   previews: { gap: theme.gap(1) },
   actions: { alignItems: "center", gap: theme.gap(1) },

@@ -218,6 +218,7 @@ export const listSharedLists = authedQuery({
         name: list.name,
         placeCount: list.placeCount,
         newCount: await newPlaceCount(ctx, membership),
+        cities: list.cities,
         isOwner: list.ownerId === userId,
         members: members.map((member) => {
           const firstName = names.get(member.userId);

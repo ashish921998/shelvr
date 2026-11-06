@@ -38,6 +38,7 @@ const SF_TO_MATERIAL = {
   safari: "language",
   map: "map",
   airplane: "flight",
+  "suitcase.fill": "luggage",
   "arrow.triangle.turn.up.right.diamond.fill": "directions",
   "arrow.left.arrow.right": "swap_horiz",
   minus: "remove",
@@ -69,6 +70,7 @@ const SF_TO_MATERIAL = {
   "doc.text": "description",
   "fork.knife": "restaurant",
   mappin: "location_on",
+  location: "my_location",
   lock: "lock",
   "arrow.triangle.2.circlepath.camera": "cameraswitch",
   "heart.fill": "favorite",
@@ -83,6 +85,8 @@ const SF_TO_MATERIAL = {
   "minus.circle.fill": "remove_circle",
   "plus.circle.fill": "add_circle",
   pencil: "edit",
+  "map.fill": "map",
+  "bookmark.fill": "bookmark",
 } as const satisfies Partial<Record<SFSymbol, AndroidSymbol>>;
 
 export type AppSymbolName = keyof typeof SF_TO_MATERIAL;
