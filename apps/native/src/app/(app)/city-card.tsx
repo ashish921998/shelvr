@@ -4,11 +4,11 @@ import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { Button } from "@/components/ui/button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { cityPins } from "@/lib/city-pins";
-import { cityProgress } from "@/lib/city-progress";
+import { cityProgress, visitedPinIds } from "@/lib/city-progress";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
 import { useCityCardShare } from "@/lib/use-city-card-share";
-import { useVisitedKeysState } from "@/lib/use-place-visit";
+import { usePlaceVisits } from "@/lib/use-place-visit";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -25,9 +25,12 @@ export default function CityCardScreen() {
   const { theme, rt } = useUnistyles();
   const { city = "" } = useLocalSearchParams<{ city: string }>();
   const items = useQuery(convexQuery(api.items.listCityItems, { city }));
-  const visits = useVisitedKeysState();
-  const visited = visits.keys;
+  const visits = usePlaceVisits();
   const pins = useMemo(() => cityPins(items.data ?? []), [items.data]);
+  const visited = useMemo(
+    () => visitedPinIds(pins, visits.visits),
+    [pins, visits.visits],
+  );
   const progress = cityProgress(pins, visited);
   const card = useRef<ComponentRef<typeof View>>(null);
   const { sharing, share } = useCityCardShare(card, city, {

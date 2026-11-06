@@ -4,31 +4,29 @@ import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import type { Placed } from "@convex/model/placeIdentity";
+import type { VisitMark } from "@convex/model/placeVisits";
 import { saveErrorCode } from "@convex/model/saveErrors";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { useRouter } from "expo-router";
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Alert } from "react-native";
 
-const EMPTY: ReadonlySet<string> = new Set();
+const NO_VISITS: readonly VisitMark[] = [];
 
-export function useVisitedKeys(): ReadonlySet<string> {
-  return useVisitedKeysState().keys;
-}
-
-export function useVisitedKeysState(): {
-  keys: ReadonlySet<string>;
+export function usePlaceVisits(): {
+  visits: readonly VisitMark[];
   loaded: boolean;
   isError: boolean;
 } {
-  const query = useQuery(convexQuery(api.placeVisits.visitedKeys, {}));
-  const keys = useMemo(
-    () => (query.data ? new Set(query.data) : EMPTY),
-    [query.data],
-  );
-  return { keys, loaded: query.data !== undefined, isError: query.isError };
+  const query = useQuery(convexQuery(api.placeVisits.listVisits, {}));
+  return {
+    visits: query.data ?? NO_VISITS,
+    loaded: query.data !== undefined,
+    isError: query.isError,
+  };
 }
 
 export function usePlaceVisit() {
@@ -36,16 +34,21 @@ export function usePlaceVisit() {
   const setVisited = useMutation(api.placeVisits.setVisited);
   const working = useRef(false);
   const [busy, setBusy] = useState(false);
-  const toggle = async (
-    itemId: Id<"items">,
-    name: string,
-    visited: boolean,
-  ) => {
+  const toggle = async (itemId: Id<"items">, pin: Placed, visited: boolean) => {
     if (working.current) return;
     working.current = true;
     setBusy(true);
     try {
-      await setVisited({ itemId, name, visited });
+      await setVisited({
+        itemId,
+        name: pin.name,
+        visited,
+        spot: {
+          lat: pin.lat,
+          lng: pin.lng,
+          ...(pin.appleId === undefined ? {} : { appleId: pin.appleId }),
+        },
+      });
       void (visited ? haptics.success() : haptics.selection());
       analytics.capture("city_place_visited", { visited });
     } catch (error) {

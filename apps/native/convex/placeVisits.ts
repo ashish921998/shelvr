@@ -8,7 +8,6 @@ import {
   MAX_VISIT_SPOTS,
   spotMarks,
   userVisits,
-  visitedPlaceKeys,
   visitMarkValidator,
   type VisitSpot,
   visitSpotValidator,
@@ -145,12 +144,6 @@ export const setVisited = authedMutation({
     await markVisit(ctx, { userId, key, existing, visit, spot });
     return null;
   },
-});
-
-export const visitedKeys = authedQuery({
-  args: {},
-  returns: v.array(v.string()),
-  handler: async (ctx) => [...(await visitedPlaceKeys(ctx, ctx.userId))],
 });
 
 export const listVisits = authedQuery({

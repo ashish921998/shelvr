@@ -14,14 +14,14 @@ import { analytics } from "@/lib/analytics";
 import { canOpenPlaceCard, openPlaceDetails } from "@/lib/apple-place-card";
 import { cityPins, cityRows } from "@/lib/city-pins";
 import { useCityPlan } from "@/lib/city-plan";
-import { cityProgress, isVisited, progressLine } from "@/lib/city-progress";
+import { cityProgress, progressLine, visitedPinIds } from "@/lib/city-progress";
 import { haptics } from "@/lib/haptics";
 import { filterPlaces, mapFilters } from "@/lib/map-filters";
 import type { PlaceKind } from "@convex/model/placeKinds";
 import { t, useAppLocale } from "@/lib/i18n";
 import { usePlaceRemoval } from "@/lib/place-removal";
 import { usePlaceCardFocus } from "@/lib/use-place-opener";
-import { usePlaceVisit, useVisitedKeys } from "@/lib/use-place-visit";
+import { usePlaceVisit, usePlaceVisits } from "@/lib/use-place-visit";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -37,7 +37,7 @@ export default function CityScreen() {
   const focused = usePlaceCardFocus();
   const city = name ?? "";
   const removal = usePlaceRemoval();
-  const visitedKeys = useVisitedKeys();
+  const { visits } = usePlaceVisits();
   const visit = usePlaceVisit();
   const items = useQuery(convexQuery(api.items.listCityItems, { city }));
   const { busy, start } = useCityPlan();
@@ -58,9 +58,13 @@ export default function CityScreen() {
   const filters = useMemo(() => mapFilters(allPins), [allPins]);
   const active = filters.some((filter) => filter.kind === kind) ? kind : null;
   const pins = useMemo(() => filterPlaces(allPins, active), [allPins, active]);
+  const visited = useMemo(
+    () => visitedPinIds(allPins, visits),
+    [allPins, visits],
+  );
   const progress = useMemo(
-    () => cityProgress(allPins, visitedKeys),
-    [allPins, visitedKeys],
+    () => cityProgress(allPins, visited),
+    [allPins, visited],
   );
   const progressText = progressLine(progress);
   const [hadPins, setHadPins] = useState(false);
@@ -90,7 +94,7 @@ export default function CityScreen() {
       rows={rows}
       rowGap={1.5}
       selected={selected}
-      visited={visitedKeys}
+      visited={visited}
       onSelect={(id) => {
         if (id !== selected) void haptics.selection();
         setSelected(id);
@@ -150,7 +154,7 @@ export default function CityScreen() {
       renderRow={(row, select) => {
         const { item } = row;
         const appleId = row.kind === "place" ? row.pin.appleId : undefined;
-        const went = row.kind === "place" && isVisited(row.name, visitedKeys);
+        const went = row.kind === "place" && visited.has(row.id);
         const openSave = () => {
           if (!focused.current) return;
           router.push({
@@ -169,7 +173,7 @@ export default function CityScreen() {
             visiting={visit.busy}
             onToggleVisited={
               row.kind === "place"
-                ? () => void visit.toggle(item._id, row.name, !went)
+                ? () => void visit.toggle(item._id, row.pin, !went)
                 : undefined
             }
             onRemove={

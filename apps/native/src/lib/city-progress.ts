@@ -1,16 +1,21 @@
+import { cityPinId, type CityPin } from "@/lib/city-pins";
 import { t } from "@/lib/i18n";
-import { placeKey } from "@convex/model/plan";
+import { type VisitMark, visitMatcher } from "@convex/model/placeVisits";
 
-export function isVisited(name: string, visited: ReadonlySet<string>): boolean {
-  return visited.has(placeKey(name));
+export function visitedPinIds(
+  pins: readonly CityPin[],
+  visits: readonly VisitMark[],
+): ReadonlySet<string> {
+  const visited = visitMatcher(visits);
+  return new Set(pins.filter((pin) => visited(pin)).map(cityPinId));
 }
 
 export function cityProgress(
-  pins: readonly { name: string }[],
+  pins: readonly CityPin[],
   visited: ReadonlySet<string>,
 ): { visited: number; total: number } {
   return {
-    visited: pins.filter((pin) => isVisited(pin.name, visited)).length,
+    visited: pins.filter((pin) => visited.has(cityPinId(pin))).length,
     total: pins.length,
   };
 }

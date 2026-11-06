@@ -6,7 +6,6 @@ import {
   framedPins,
   type CityPin,
 } from "@/lib/city-pins";
-import { isVisited } from "@/lib/city-progress";
 import { moveCamera, sameCamera } from "@/lib/map-camera";
 import { fitCamera } from "@/lib/trip";
 import { useImage } from "expo-image";
@@ -115,7 +114,7 @@ export function CityMap({
   const annotations = pins.slice(0, visible).map((pin) => {
     const id = cityPinId(pin);
     const isSelected = id === selected;
-    const went = visited !== undefined && isVisited(pin.name, visited);
+    const went = visited?.has(id) ?? false;
     return {
       id,
       coordinates: { latitude: pin.lat, longitude: pin.lng },

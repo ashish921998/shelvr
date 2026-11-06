@@ -1,7 +1,7 @@
 import { ProgressBar } from "@/components/city/progress-bar";
 import { cardPoints } from "@/lib/city-card";
-import type { CityPin } from "@/lib/city-pins";
-import { cityProgress, isVisited, progressLine } from "@/lib/city-progress";
+import { cityPinId, type CityPin } from "@/lib/city-pins";
+import { cityProgress, progressLine } from "@/lib/city-progress";
 import { t, useAppLocale } from "@/lib/i18n";
 import { Canvas, Path } from "@shopify/react-native-skia";
 import { type ComponentRef, type Ref, useMemo, useState } from "react";
@@ -42,7 +42,7 @@ function CardMap({
       cardPoints(pins, { ...size, pad: BUBBLE })
         .map((point) => ({
           ...point,
-          went: isVisited(point.pin.name, visited),
+          went: visited.has(cityPinId(point.pin)),
         }))
         .sort((a, b) => Number(a.went) - Number(b.went)),
     [pins, size, visited],
