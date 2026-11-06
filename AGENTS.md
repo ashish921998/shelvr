@@ -68,7 +68,9 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `apps/web/src/components/MapPageView.tsx`. Save all (creator maps): the switch
   `setPublicMapSaveAll` in `convex/publicMaps.ts`, preview and save in
   `convex/creatorMaps.ts`, copies written through `insertListPlaces` in
-  `convex/sharedLists.ts`.
+  `convex/sharedLists.ts`. Its web panel is `SaveAllPanel.tsx` and
+  `SaveAllLink.tsx` in `apps/web/src/components/map`, with helpers in
+  `apps/web/src/lib/creatorMap.ts`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;

@@ -142,14 +142,16 @@ because the token opens the item's preview. The app and the website report
 `share_ref` instead: the first 16 hex characters of the token's SHA-256. A map
 page link (`/m/<token>`) is reported the same way, from its own token.
 
-| Event               | Where                            | `share_ref`                               |
-| ------------------- | -------------------------------- | ----------------------------------------- |
-| `item_shared`       | App, item detail or feed share   | Set when a branded link went out          |
-| `share_page_viewed` | Website, share preview page      | Always; see `outcome` below               |
-| `app_store_clicked` | Website, share page's Download   | Set; `source = share`, `campaign = share` |
-| `public_map_shared` | App, map page sheet's Share link | Set; `shared` is whether it went out      |
-| `map_page_viewed`   | Website, map page                | Always; see `outcome` below               |
-| `app_store_clicked` | Website, map page's Download     | Set; `source = map`, `campaign = map`     |
+| Event                      | Where                               | `share_ref`                                   |
+| -------------------------- | ----------------------------------- | --------------------------------------------- |
+| `item_shared`              | App, item detail or feed share      | Set when a branded link went out              |
+| `share_page_viewed`        | Website, share preview page         | Always; see `outcome` below                   |
+| `app_store_clicked`        | Website, share page's Download      | Set; `source = share`, `campaign = share`     |
+| `public_map_shared`        | App, map page sheet's Share link    | Set; `shared` is whether it went out          |
+| `map_page_viewed`          | Website, map page                   | Always; see `outcome` below                   |
+| `app_store_clicked`        | Website, map page's Download        | Set; `source = map`, `campaign = map`         |
+| `creator_map_save_clicked` | Website, map page's Save all button | Set; also `places`, `cities`, `in_app`        |
+| `app_store_clicked`        | Website, Save all panel's Download  | Set; `source = creator_map`, `campaign = map` |
 
 `item_shared` also carries `surface` (`item_detail` or `feed`). Before this
 release the feed did not send `item_shared` at all, so counts step up at that
@@ -163,6 +165,10 @@ release. Sharing an image or a source URL sends no `share_ref`.
 
 `map_page_viewed` carries the same `outcome` values, plus `cities`, `places`
 and `been`: the counts the page showed (zeros unless it was found).
+`map_page_viewed` also carries `save_all`: whether the page had Save all on.
+`creator_map_save_clicked` carries `places` (the tapped city's place count),
+`cities` (how many Save all buttons the page showed) and `in_app` (the in-app
+browser's name, absent in a real browser).
 
 `item_shared` comes from the app, so filter it to production. Development and
 preview builds stamp another environment. Web events carry none, so the
