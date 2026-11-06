@@ -70,6 +70,10 @@ read [localization](docs/architecture/localization.md); before simulator QA read
   `users.deleting`, `items.embedding` / `embeddingVersion` /
   `embeddingAttempts`, `items.placeLocations`, `tripPlans.listId`, and the `placeRemovals` and
   `tripEveReminders` tables.
+- **Been city ids travel as plain strings.** `convex/model/beenCities.ts` owns the list; the server
+  drops ids it does not know and an older app drops ids it has no tile for, so adding a city needs
+  no contract or schema change. Do not tighten `beenCities.cityId` or the function validators to
+  literals.
 - **Run-by-hand backfills** after deploying the change that needs them, from `apps/native`:
   `pnpm exec convex run --prod <fn> '{"cursor":null}'` with `items:backfillPlaceSearch`
   (finish it before releasing the search UI), `items:clearEmbeddings` or
