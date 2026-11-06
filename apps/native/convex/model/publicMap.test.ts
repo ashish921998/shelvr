@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Doc, Id } from "../_generated/dataModel";
 import { placeKey } from "./plan";
 import {
+  creatorMapPlaces,
   isPublicMapToken,
   publicCityPlaces,
   publicCityPreviews,
@@ -376,6 +377,182 @@ describe("publicCityPlaces", () => {
         NONE,
       ),
     ).toEqual([{ name: "Orinoco", lat: 19.418, lng: -99.164, went: false }]);
+  });
+});
+
+describe("creatorMapPlaces", () => {
+  const COPY_KEYS = [
+    "name",
+    "lat",
+    "lng",
+    "city",
+    "appleId",
+    "category",
+    "postUrl",
+  ];
+
+  function pageSaves() {
+    return [
+      cdmx([pin("Café Avellaneda", 19.348, -99.162)], {
+        url: "https://vm.tiktok.com/ZMfixture1/",
+      }),
+      cdmx(
+        [
+          pin("Contramar", 19.41937, -99.16681, {
+            appleId: "apple-contramar",
+            category: "Restaurant",
+          }),
+          pin("Calle Durango 200", 19.4205, -99.168),
+          pin("Coffee Shop", 19.4207, -99.1682),
+        ],
+        {
+          title: "Contramar tuna tostadas",
+          tags: ["food"],
+          url: "https://www.instagram.com/someone/reel/DFixtureMx1/?igsh=c2hlbHZy",
+        },
+      ),
+      cdmx(
+        [
+          pin("Contramar Roma", 19.4199, -99.1669, {
+            appleId: "apple-contramar",
+          }),
+          pin("Panadería Rosetta", 19.41961, -99.16062, { category: "Bakery" }),
+        ],
+        {
+          url: "https://www.youtube.com/watch?v=fixtureMx01&si=shelvrfixture",
+        },
+      ),
+      cdmx([pin("Taquería Orinoco", 19.418, -99.164)], {
+        url: "https://www.tiktok.com/@shelvr.fixtures/video/7300000000000000001?is_from_webapp=1",
+      }),
+      cdmx([pin("Museo Frida Kahlo", 19.3551, -99.1624)], {
+        type: "note",
+        note: "Frida museum: book tickets ahead.",
+      }),
+      cdmx([pin("Casa Azul Photo", 19.3552, -99.1625)], { type: "image" }),
+    ];
+  }
+
+  it("copies the places the page shows, in the page's order", () => {
+    const saves = pageSaves();
+    const visited = been("Panadería Rosetta");
+    const copies = creatorMapPlaces(saves, "Mexico City", visited);
+    expect(names(copies)).toEqual([
+      "Panadería Rosetta",
+      "Café Avellaneda",
+      "Contramar",
+      "Taquería Orinoco",
+    ]);
+    expect(names(copies)).toEqual(
+      names(publicCityPlaces(saves, "Mexico City", visited)),
+    );
+    expect(names(creatorMapPlaces(saves, "Mexico City", NONE))).toEqual(
+      names(publicCityPlaces(saves, "Mexico City", NONE)),
+    );
+    expect(creatorMapPlaces(saves, "Austin", NONE)).toEqual([]);
+    expect(creatorMapPlaces(saves, "   ", NONE)).toEqual([]);
+  });
+
+  it(`stops at ${MAX_PUBLIC_MAP_PLACES_PER_CITY} places, as the page does`, () => {
+    const pins = Array.from({ length: 150 }, (_, i) =>
+      pin(`Venue ${String.fromCharCode(65 + (i % 26))}${i}`, 19 + i / 100, -99),
+    );
+    const saves = [cdmx(pins)];
+    const visited = been(pins[120].name);
+    const copies = creatorMapPlaces(saves, "Mexico City", visited);
+    expect(copies).toHaveLength(MAX_PUBLIC_MAP_PLACES_PER_CITY);
+    expect(copies[0].name).toBe(pins[120].name);
+    expect(names(copies)).toEqual(
+      names(publicCityPlaces(saves, "Mexico City", visited)),
+    );
+  });
+
+  it("keeps each pin's exact point, kind, Apple id and the city as asked", () => {
+    const copies = creatorMapPlaces(pageSaves(), "mexico city", NONE);
+    expect(copies).toEqual([
+      {
+        name: "Café Avellaneda",
+        lat: 19.348,
+        lng: -99.162,
+        city: "mexico city",
+      },
+      {
+        name: "Contramar",
+        lat: 19.41937,
+        lng: -99.16681,
+        city: "mexico city",
+        appleId: "apple-contramar",
+        category: "Restaurant",
+        postUrl: "https://www.instagram.com/reel/DFixtureMx1/",
+      },
+      {
+        name: "Panadería Rosetta",
+        lat: 19.41961,
+        lng: -99.16062,
+        city: "mexico city",
+        category: "Bakery",
+        postUrl: "https://youtu.be/fixtureMx01",
+      },
+      {
+        name: "Taquería Orinoco",
+        lat: 19.418,
+        lng: -99.164,
+        city: "mexico city",
+        postUrl:
+          "https://www.tiktok.com/@shelvr.fixtures/video/7300000000000000001",
+      },
+    ]);
+  });
+
+  it("carries only the copy's fields, never the page's marks or the save's", () => {
+    const copies = creatorMapPlaces(
+      pageSaves(),
+      "Mexico City",
+      been("Contramar"),
+    );
+    expect(copies.length).toBeGreaterThan(0);
+    for (const copy of copies) {
+      const keys = Object.keys(copy);
+      expect(keys).toEqual(
+        expect.arrayContaining(["name", "lat", "lng", "city"]),
+      );
+      expect(keys.filter((key) => !COPY_KEYS.includes(key))).toEqual([]);
+      for (const hidden of ["went", "emoji", "tags", "itemId", "post"]) {
+        expect(copy).not.toHaveProperty(hidden);
+      }
+    }
+    const json = JSON.stringify(copies);
+    for (const hidden of [
+      "igsh",
+      "si=",
+      "is_from_webapp",
+      "vm.tiktok",
+      "someone",
+      "tuna tostadas",
+      "Frida",
+      "item-",
+    ]) {
+      expect(json).not.toContain(hidden);
+    }
+  });
+
+  it("links a place to the post the page rebuilds, and leaves short links out", () => {
+    const saves = pageSaves();
+    const byName = new Map(
+      creatorMapPlaces(saves, "Mexico City", NONE).map((copy) => [
+        copy.name,
+        copy,
+      ]),
+    );
+    expect(byName.get("Contramar")?.postUrl).toBe(publicPost(saves[1])?.url);
+    expect(byName.get("Panadería Rosetta")?.postUrl).toBe(
+      publicPost(saves[2])?.url,
+    );
+    expect(byName.get("Taquería Orinoco")?.postUrl).toBe(
+      publicPost(saves[3])?.url,
+    );
+    expect(publicPost(saves[0])).toBeUndefined();
+    expect(byName.get("Café Avellaneda")).not.toHaveProperty("postUrl");
   });
 });
 

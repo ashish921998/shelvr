@@ -42,6 +42,16 @@ type PublicPin = {
   post?: PublicPost;
 };
 
+type CreatorMapPlace = {
+  name: string;
+  lat: number;
+  lng: number;
+  city: string;
+  appleId?: string;
+  category?: string;
+  postUrl?: string;
+};
+
 const PUBLIC_MAP_TOKEN = /^[0-9a-f]{32}$/;
 const TIKTOK_HOSTS = new Set(["tiktok.com", "www.tiktok.com", "m.tiktok.com"]);
 const TIKTOK_POST_PATH = /^\/@([A-Za-z0-9._]+)\/video\/(\d+)\/?$/;
@@ -135,11 +145,11 @@ function publicPlace(pin: PublicPin): PublicPlace {
   };
 }
 
-export function publicCityPlaces(
+function publicCityPins(
   saves: readonly Doc<"items">[],
   city: string,
   visited: ReadonlySet<string>,
-): PublicPlace[] {
+): PublicPin[] {
   const wanted = cityKey(city);
   if (wanted === "") return [];
   const pins = saves
@@ -150,11 +160,35 @@ export function publicCityPlaces(
     )
     .slice(0, MAX_PUBLIC_MAP_SAVES_PER_CITY)
     .flatMap((item) => savePins(item, city, visited));
-  const places = uniquePlacePins(pins, mergePins).map(publicPlace);
+  const unique = uniquePlacePins(pins, mergePins);
   return [
-    ...places.filter((place) => place.went),
-    ...places.filter((place) => !place.went),
+    ...unique.filter((pin) => pin.went),
+    ...unique.filter((pin) => !pin.went),
   ].slice(0, MAX_PUBLIC_MAP_PLACES_PER_CITY);
+}
+
+export function publicCityPlaces(
+  saves: readonly Doc<"items">[],
+  city: string,
+  visited: ReadonlySet<string>,
+): PublicPlace[] {
+  return publicCityPins(saves, city, visited).map(publicPlace);
+}
+
+export function creatorMapPlaces(
+  saves: readonly Doc<"items">[],
+  city: string,
+  visited: ReadonlySet<string>,
+): CreatorMapPlace[] {
+  return publicCityPins(saves, city, visited).map((pin) => ({
+    name: pin.name,
+    lat: pin.lat,
+    lng: pin.lng,
+    city,
+    ...(pin.appleId !== undefined ? { appleId: pin.appleId } : {}),
+    ...(pin.category !== undefined ? { category: pin.category } : {}),
+    ...(pin.post !== undefined ? { postUrl: pin.post.url } : {}),
+  }));
 }
 
 function byPlaceCount<T extends { city: string; places: unknown[] }>(
