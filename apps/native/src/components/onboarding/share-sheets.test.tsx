@@ -9,7 +9,7 @@ import {
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { AppsSheet } from "./share-sheets";
-import { AhaShareStep } from "./aha-share";
+import { AhaSharePractice, AhaShareStep } from "./aha-share";
 import { AhaReel } from "./aha-reel";
 import { ahaSample } from "@/lib/aha-sample";
 import { haptics } from "@/lib/haptics";
@@ -125,6 +125,24 @@ it("gives the Shelvr pick the medium impact, the only one in the practice share"
   fireEvent.click(screen.getByRole("button", { name: "Shelvr" }));
   expect(impact.mock.calls).toEqual([["medium"]]);
   impact.mockRestore();
+});
+
+it("hands the Shelvr pick to the practice's caller, with no reading stage or title", () => {
+  const onPick = vi.fn();
+  render(
+    <AhaSharePractice sample={ahaSample("trip", "lisbon")} onPick={onPick} />,
+  );
+  for (const label of [
+    "common.share",
+    "aha.sheetShareTo",
+    "aha.sheetMore",
+    "Shelvr",
+  ]) {
+    fireEvent.click(screen.getByRole("button", { name: label }));
+  }
+  expect(onPick).toHaveBeenCalledOnce();
+  expect(screen.queryByText("aha.reading")).toBeNull();
+  expect(screen.queryByText("aha.shareTitle")).toBeNull();
 });
 
 it("reaches the map callback after only Share, Share to…, More and Shelvr", () => {

@@ -115,6 +115,11 @@ export default function AppLayout() {
           />
           <Stack.Screen name="saves" options={{ headerShown: false }} />
           <Stack.Screen name="cities" options={{ headerShown: false }} />
+          <Stack.Screen name="how-to-share" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="save-with-siri"
+            options={{ headerShown: false }}
+          />
           <Stack.Screen
             name="spots/[id]"
             options={{ headerShown: false, gestureEnabled: false }}
@@ -136,6 +141,7 @@ export default function AppLayout() {
             name="shared-list/[id]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
+          <Stack.Screen name="shared-lists" options={{ headerShown: false }} />
         </Stack.Protected>
         {/* Native sheets and modals present above the loading cover, so they wait for the plan. */}
         <Stack.Protected

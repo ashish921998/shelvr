@@ -69,6 +69,7 @@ export type MessageParams = {
   "errors.batchSaveTitle": undefined;
   "capture.retryFailed": undefined;
   "common.done": undefined;
+  "common.seeAll": undefined;
   "errors.batchUpload": undefined;
   "capture.articleTitle": undefined;
   "common.back": undefined;
@@ -229,6 +230,11 @@ export type MessageParams = {
   "addSheet.googleMapsList": undefined;
   "addSheet.saveWithSiri": undefined;
   "addSheet.organize": undefined;
+  "siri.lead": undefined;
+  "siri.saveLinkTitle": undefined;
+  "siri.saveLinkBody": undefined;
+  "siri.saveNoteTitle": undefined;
+  "siri.saveNoteBody": undefined;
   "legal.continueFragment": undefined;
   "legal.privacyFragment": undefined;
   "feedback.invitationTitle": undefined;

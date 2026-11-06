@@ -130,3 +130,18 @@ it("still offers Start while lists load", () => {
   render(<SharedListsSection />);
   expect(screen.getByRole("button", { name: "New shared list" })).toBeTruthy();
 });
+
+it("opens every shared list from See all", () => {
+  mocks.lists = { data: [list("l1", "Trip", 3, 0)] };
+  render(<SharedListsSection />);
+  fireEvent.click(screen.getByRole("button", { name: "See all" }));
+  expect(mocks.push).toHaveBeenCalledWith("/shared-lists");
+});
+
+it("offers See all only once there is a list", () => {
+  render(<SharedListsSection />);
+  expect(screen.queryByRole("button", { name: "See all" })).toBeNull();
+  mocks.lists = { data: undefined };
+  render(<SharedListsSection />);
+  expect(screen.queryByRole("button", { name: "See all" })).toBeNull();
+});

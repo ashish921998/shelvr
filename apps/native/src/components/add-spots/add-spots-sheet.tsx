@@ -6,6 +6,7 @@ import { useSaveGuard } from "@/lib/free-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { sheetIn } from "@/lib/motion";
 import { usePlanPicker } from "@/lib/plan-picker";
+import { useSiriShortcuts } from "@/lib/siri-phrases";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
@@ -32,13 +33,12 @@ function Tile({
 }: {
   emoji: string;
   label: string;
-  onPress?: () => void;
+  onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
-      disabled={onPress === undefined}
       onPress={onPress}
       style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
     >
@@ -92,6 +92,7 @@ export function AddSpotsSheet() {
   const reduced = useReducedMotion();
   const { guard, loading } = useSaveGuard("tab_bar");
   const planner = usePlanPicker({ onLeave: () => router.back() });
+  const siri = useSiriShortcuts();
   const closeBottom = addButtonBottom(rt.insets.bottom);
   const addLink = () => {
     if (loading) return;
@@ -141,13 +142,29 @@ export function AddSpotsSheet() {
           <Chevron />
         </Pressable>
         <View style={styles.tiles}>
-          <Tile emoji="🎬" label={t("addSheet.howToShare")} />
+          <Tile
+            emoji="🎬"
+            label={t("addSheet.howToShare")}
+            onPress={() => {
+              router.back();
+              router.push("/how-to-share");
+            }}
+          />
           <Tile
             emoji="📁"
             label={t("addSheet.googleMapsList")}
             onPress={addLink}
           />
-          <Tile emoji="🎙️" label={t("addSheet.saveWithSiri")} />
+          {siri.length > 0 ? (
+            <Tile
+              emoji="🎙️"
+              label={t("addSheet.saveWithSiri")}
+              onPress={() => {
+                router.back();
+                router.push("/save-with-siri");
+              }}
+            />
+          ) : null}
         </View>
         <Text style={styles.section}>{t("addSheet.organize")}</Text>
         <View style={styles.rows}>

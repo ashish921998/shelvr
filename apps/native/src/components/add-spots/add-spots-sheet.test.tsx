@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   calls: [] as string[],
   plan: vi.fn(),
   loading: false,
+  siri: [] as unknown[],
   guard: vi.fn(async (action?: () => void) => {
     action?.();
     return true;
@@ -26,6 +27,9 @@ vi.mock("@/lib/free-plan", () => ({
 }));
 vi.mock("@/lib/plan-picker", () => ({
   usePlanPicker: () => ({ plan: mocks.plan, sheet: null }),
+}));
+vi.mock("@/lib/siri-phrases", () => ({
+  useSiriShortcuts: () => mocks.siri,
 }));
 vi.mock("@/lib/map-city-in-view", () => ({
   useMapCityInView: () => undefined,
@@ -95,6 +99,7 @@ beforeEach(() => {
   mocks.plan.mockReset();
   mocks.guard.mockClear();
   mocks.loading = false;
+  mocks.siri = [];
 });
 
 function press(name: string | RegExp) {
@@ -145,11 +150,19 @@ it("closes from the X", () => {
   expect(mocks.calls).toEqual(["back"]);
 });
 
-it("keeps How to share and Save with Siri unwired until their screens exist", () => {
+it("opens How to share after closing the sheet", () => {
+  press("How to share");
+  expect(mocks.calls).toEqual(["back", "/how-to-share"]);
+});
+
+it("opens Save with Siri where Siri has phrases for Shelvr", () => {
+  mocks.siri = [{ intent: "SaveLinkIntent" }];
+  press("Save with Siri");
+  expect(mocks.calls).toEqual(["back", "/save-with-siri"]);
+});
+
+it("leaves Save with Siri out where Siri has no phrases for Shelvr", () => {
   render(<AddSpotsSheet />);
-  for (const name of ["How to share", "Save with Siri"]) {
-    expect(screen.getByRole("button", { name }).hasAttribute("disabled")).toBe(
-      true,
-    );
-  }
+  expect(screen.queryByRole("button", { name: "Save with Siri" })).toBeNull();
+  expect(screen.getByRole("button", { name: "How to share" })).toBeTruthy();
 });

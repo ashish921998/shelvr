@@ -19,7 +19,44 @@ import { StyleSheet } from "react-native-unistyles";
 const READING_MS = 1200;
 
 /** A practice share, one tap per screen, without changing system settings. */
-type Stage = "post" | "panel" | "sheet" | "apps" | "reading";
+type Stage = "post" | "panel" | "sheet" | "apps";
+
+export function AhaSharePractice({
+  sample,
+  onPick,
+  reading = false,
+}: {
+  sample: AhaSample;
+  onPick: () => void;
+  reading?: boolean;
+}) {
+  useAppLocale();
+  const [stage, setStage] = useState<Stage>("post");
+  const go = (next: Stage) => () => {
+    tick();
+    setStage(next);
+  };
+  return (
+    <View style={styles.stage}>
+      <AhaReel
+        sample={sample}
+        onShare={stage === "post" ? go("panel") : undefined}
+        dimmed={stage !== "post"}
+      />
+      {stage === "panel" ? <AppPanel onShare={go("sheet")} /> : null}
+      {stage === "sheet" ? (
+        <IosSheet title={sample.creator} onMore={go("apps")} />
+      ) : null}
+      {stage === "apps" && !reading ? <AppsSheet onPick={onPick} /> : null}
+      {reading ? (
+        <Animated.View entering={fadeIn} style={styles.reading}>
+          <ActivityIndicator color="#FFFFFF" />
+          <Text style={styles.readingText}>{t("aha.reading")}</Text>
+        </Animated.View>
+      ) : null}
+    </View>
+  );
+}
 
 /** The sample reel: Share, Share to…, More, Shelvr, then its spots on the map. */
 export function AhaShareStep({
@@ -30,48 +67,27 @@ export function AhaShareStep({
   onShared: () => void;
 }) {
   useAppLocale();
-  const [stage, setStage] = useState<Stage>("post");
+  const [reading, setReading] = useState(false);
   const sharedRef = useRef(false);
-  const go = (next: Stage) => () => {
-    tick();
-    setStage(next);
-  };
   const pick = () => {
     void haptics.impact("medium");
-    setStage("reading");
+    setReading(true);
   };
 
   useEffect(() => {
-    if (stage !== "reading") return;
+    if (!reading) return;
     const timer = setTimeout(() => {
       if (sharedRef.current) return;
       sharedRef.current = true;
       onShared();
     }, READING_MS);
     return () => clearTimeout(timer);
-  }, [stage, onShared]);
+  }, [reading, onShared]);
 
   return (
     <View style={styles.wrap}>
       <QuestionTitle title={t("aha.shareTitle")} />
-      <View style={styles.stage}>
-        <AhaReel
-          sample={sample}
-          onShare={stage === "post" ? go("panel") : undefined}
-          dimmed={stage !== "post"}
-        />
-        {stage === "panel" ? <AppPanel onShare={go("sheet")} /> : null}
-        {stage === "sheet" ? (
-          <IosSheet title={sample.creator} onMore={go("apps")} />
-        ) : null}
-        {stage === "apps" ? <AppsSheet onPick={pick} /> : null}
-        {stage === "reading" ? (
-          <Animated.View entering={fadeIn} style={styles.reading}>
-            <ActivityIndicator color="#FFFFFF" />
-            <Text style={styles.readingText}>{t("aha.reading")}</Text>
-          </Animated.View>
-        ) : null}
-      </View>
+      <AhaSharePractice sample={sample} onPick={pick} reading={reading} />
     </View>
   );
 }

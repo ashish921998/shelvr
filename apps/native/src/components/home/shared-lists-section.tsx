@@ -14,7 +14,9 @@ import { useRouter } from "expo-router";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-function ListTile({
+export const TILE = 104;
+
+export function ListTile({
   list,
   cover,
 }: {
@@ -69,32 +71,50 @@ function ListTile({
   );
 }
 
+export function NewListTile() {
+  const router = useRouter();
+  const { theme } = useUnistyles();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t("sharedLists.newList")}
+      onPress={() => router.push("/new-shared-list")}
+      style={({ pressed }) => [styles.startTile, pressed && styles.pressed]}
+    >
+      <AppSymbolIcon name="plus" size={22} tintColor={theme.colors.muted} />
+      <ThemedText style={styles.startLabel}>
+        {t("sharedLists.newList")}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
 export function SharedListsSection({ cities }: { cities?: City[] }) {
   useAppLocale();
   const router = useRouter();
-  const { theme } = useUnistyles();
   const lists = useSharedLists();
   return (
     <View style={styles.container}>
       <View style={styles.heading}>
         <SectionHeading>{t("sharedLists.title")}</SectionHeading>
+        {lists.data?.length ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("common.seeAll")}
+            hitSlop={12}
+            onPress={() => router.push("/shared-lists")}
+            style={({ pressed }) => pressed && styles.pressed}
+          >
+            <ThemedText style={styles.seeAll}>{t("common.seeAll")}</ThemedText>
+          </Pressable>
+        ) : null}
       </View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.rail}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("sharedLists.newList")}
-          onPress={() => router.push("/new-shared-list")}
-          style={({ pressed }) => [styles.startTile, pressed && styles.pressed]}
-        >
-          <AppSymbolIcon name="plus" size={22} tintColor={theme.colors.muted} />
-          <ThemedText style={styles.startLabel}>
-            {t("sharedLists.newList")}
-          </ThemedText>
-        </Pressable>
+        <NewListTile />
         {lists.data?.map((list) => (
           <ListTile
             key={list._id}
@@ -107,11 +127,21 @@ export function SharedListsSection({ cities }: { cities?: City[] }) {
   );
 }
 
-const TILE = 104;
-
 const styles = StyleSheet.create((theme) => ({
   container: { gap: 17, paddingTop: theme.gap(4) },
-  heading: { paddingHorizontal: theme.gap(2.5) },
+  heading: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+    gap: theme.gap(1),
+    paddingHorizontal: theme.gap(2.5),
+  },
+  seeAll: {
+    fontFamily: theme.fonts.medium,
+    fontSize: 16,
+    lineHeight: 21,
+    color: theme.colors.primaryText,
+  },
   rail: {
     gap: 12,
     paddingHorizontal: theme.gap(2.5),
