@@ -1,0 +1,3 @@
+export const MAX_PUBLIC_MAP_CITIES = 12;
+export const MAX_PUBLIC_MAP_PLACES_PER_CITY = 100;
+export const MAX_PUBLIC_MAP_SAVES_PER_CITY = 200;

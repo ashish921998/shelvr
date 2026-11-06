@@ -513,6 +513,45 @@ http.route({
 });
 
 http.route({
+  pathPrefix: "/map/pages/",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const secret = env.WAITLIST_SHARED_SECRET;
+    if (!secret) {
+      return json({ message: "Map page secret not configured." }, 500);
+    }
+    const provided = req.headers.get(WAITLIST_SECRET_HEADER) ?? "";
+    if (!(await secureCompare(secret, provided))) {
+      return json({ message: "Unauthorized." }, 401);
+    }
+    const token = new URL(req.url).pathname.split("/").pop() ?? "";
+    try {
+      const servable = await ctx.runMutation(
+        internal.publicMaps.claimPublicMapView,
+        {
+          token,
+          ip: req.headers.get(WAITLIST_CLIENT_IP_HEADER) ?? undefined,
+        },
+      );
+      if (!servable) return json({ message: "Not found." }, 404);
+      const map = await ctx.runQuery(internal.publicMaps.getPublicMap, {
+        token,
+      });
+      if (map === null) return json({ message: "Not found." }, 404);
+      return json(map, 200);
+    } catch (error) {
+      if (isRateLimitError(error)) {
+        return json({ message: "Too many attempts." }, 429);
+      }
+      logEvent("error", "public_map_read_failed", {
+        error_name: errorName(error),
+      });
+      return json({ message: "Could not load this map." }, 500);
+    }
+  }),
+});
+
+http.route({
   path: "/plan/votes",
   method: "POST",
   handler: httpAction(async (ctx, req) => {

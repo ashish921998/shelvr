@@ -27,6 +27,7 @@ import {
 import { takeWithinBytes } from "./model/readBudget";
 import { logEvent } from "./model/log";
 import { deletePlanSharesForUser } from "./planShares";
+import { deletePublicMapsForUser } from "./publicMaps";
 import { deleteSharedListsBatch } from "./sharedLists";
 
 /** Null when unauthenticated or the account is being deleted. */
@@ -392,6 +393,7 @@ async function deleteSharingAndPlansBatch(
   userId: Id<"users">,
 ): Promise<boolean> {
   return (
+    (await deletePublicMapsForUser(ctx, userId)) &&
     (await deleteShareLinksBatch(ctx, userId)) &&
     (await deletePlaceVisitsBatch(ctx, userId)) &&
     (await deletePlaceRemovalsBatch(ctx, userId)) &&
