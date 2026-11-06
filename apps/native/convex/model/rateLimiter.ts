@@ -78,6 +78,18 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 200,
   },
   placeVisit: { kind: "token bucket", rate: 60, period: HOUR, capacity: 20 },
+  placeVisitBatch: {
+    kind: "token bucket",
+    rate: 120,
+    period: HOUR,
+    capacity: 60,
+  },
+  visitCountryGlobal: {
+    kind: "token bucket",
+    rate: 400,
+    period: HOUR,
+    capacity: 100,
+  },
   purchaseSync: { kind: "token bucket", rate: 10, period: HOUR, capacity: 5 },
   planShare: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
   planVoteIp: { kind: "token bucket", rate: 120, period: HOUR, capacity: 60 },

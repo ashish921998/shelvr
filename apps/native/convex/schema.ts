@@ -320,6 +320,11 @@ export default defineSchema({
     name: v.string(),
     itemId: v.id("items"),
     visitedAt: v.number(),
+    lat: v.optional(v.number()),
+    lng: v.optional(v.number()),
+    city: v.optional(v.string()),
+    countryCode: v.optional(v.string()),
+    backfilled: v.optional(v.boolean()),
   })
     .index("by_user_and_key", ["userId", "key"])
     .index("by_user_and_visited", ["userId", "visitedAt"]),
