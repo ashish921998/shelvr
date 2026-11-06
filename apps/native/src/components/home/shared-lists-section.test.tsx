@@ -8,7 +8,13 @@ import type { useSharedLists } from "@/lib/shared-lists";
 
 type Lists = Pick<
   ReturnType<typeof useSharedLists>,
-  "status" | "error" | "isError" | "isSuccess" | "refetch"
+  | "status"
+  | "error"
+  | "errorUpdateCount"
+  | "isError"
+  | "isFetching"
+  | "isSuccess"
+  | "refetch"
 > & { data: unknown[] | undefined };
 
 const mocks = vi.hoisted(() => ({
@@ -27,13 +33,16 @@ const state = (
   status,
   data,
   error,
+  errorUpdateCount: error ? 1 : 0,
   isError: status === "error",
+  isFetching: status === "pending",
   isSuccess: status === "success",
   refetch: mocks.refetch,
 });
 const loaded = (data: unknown[]) => state("success", data, null);
 const loading = () => state("pending", undefined, null);
 const failed = (error: Error, data?: unknown[]) => state("error", data, error);
+const retrying = (): Lists => ({ ...loading(), errorUpdateCount: 1 });
 
 vi.mock("@/lib/analytics", () => ({
   analytics: { captureError: mocks.captureError },
@@ -69,6 +78,11 @@ vi.mock("react-native", () => ({
   Text: vi.fn(({ children }: { children: ReactNode }) => (
     <span>{children}</span>
   )),
+  ActivityIndicator: vi.fn(
+    ({ accessibilityLabel }: { accessibilityLabel: string }) => (
+      <span>{accessibilityLabel}</span>
+    ),
+  ),
   Pressable: vi.fn(
     ({
       children,
@@ -188,7 +202,7 @@ it("reports a failure once while the lists stay failed, through a Retry", () => 
   const { rerender } = render(<SharedListsSection />);
   mocks.lists = failed(new Error("listSharedLists failed on a later read"));
   rerender(<SharedListsSection />);
-  mocks.lists = loading();
+  mocks.lists = retrying();
   rerender(<SharedListsSection />);
   mocks.lists = failed(new Error("listSharedLists failed on Retry"));
   rerender(<SharedListsSection />);
@@ -197,6 +211,24 @@ it("reports a failure once while the lists stay failed, through a Retry", () => 
     "home_shared_lists_load_failed",
     mocks.failure,
   );
+});
+
+it("keeps the failure up with progress while Retry runs, then shows the lists", () => {
+  mocks.lists = failed(mocks.failure);
+  const { rerender } = render(<SharedListsSection />);
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  expect(mocks.refetch).toHaveBeenCalledTimes(1);
+  mocks.lists = retrying();
+  rerender(<SharedListsSection />);
+  expect(screen.getByText("Something went wrong")).toBeTruthy();
+  expect(screen.getByText("Loading")).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  mocks.lists = loaded([list("l1", "Trip", 3, 0)]);
+  rerender(<SharedListsSection />);
+  expect(screen.getByText("Trip")).toBeTruthy();
+  expect(screen.queryByText("Something went wrong")).toBeNull();
+  expect(screen.queryByText("Loading")).toBeNull();
+  expect(mocks.captureError).toHaveBeenCalledTimes(1);
 });
 
 it("reports a new failure after the lists recover", () => {

@@ -12,7 +12,13 @@ import {
 import { useReportLoadFailure } from "@/lib/use-report-load-failure";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 export const TILE = 104;
@@ -117,7 +123,7 @@ export function SharedListsSection({ cities }: { cities?: City[] }) {
         contentContainerStyle={styles.rail}
       >
         <NewListTile />
-        {lists.data === undefined && lists.isError ? (
+        {lists.data === undefined && lists.errorUpdateCount > 0 ? (
           <View style={styles.failed}>
             <ThemedText style={styles.failedTitle}>
               {t("errors.unexpectedTitle")}
@@ -125,15 +131,25 @@ export function SharedListsSection({ cities }: { cities?: City[] }) {
             <ThemedText style={styles.failedText}>
               {t("errors.retrySoon")}
             </ThemedText>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => void lists.refetch()}
-              style={({ pressed }) => [styles.retry, pressed && styles.pressed]}
-            >
-              <ThemedText variant="subheadStrong" style={styles.retryLabel}>
-                {t("common.retry")}
-              </ThemedText>
-            </Pressable>
+            {lists.isFetching ? (
+              <ActivityIndicator
+                accessibilityLabel={t("common.loading")}
+                style={[styles.retry, styles.retrying]}
+              />
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void lists.refetch()}
+                style={({ pressed }) => [
+                  styles.retry,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <ThemedText variant="subheadStrong" style={styles.retryLabel}>
+                  {t("common.retry")}
+                </ThemedText>
+              </Pressable>
+            )}
           </View>
         ) : null}
         {lists.data?.map((list) => (
@@ -224,6 +240,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   failedText: { fontSize: 14.6, lineHeight: 18, color: theme.colors.muted },
   retry: { minHeight: theme.control.minHeight, justifyContent: "center" },
+  retrying: { alignSelf: "flex-start" },
   retryLabel: { color: theme.colors.primaryText },
   pressed: { opacity: theme.opacity.pressed },
 }));
