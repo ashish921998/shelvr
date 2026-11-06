@@ -1,6 +1,7 @@
 import { v, type Infer } from "convex/values";
 import translations from "./notificationTranslations.json";
 import { pluralRules } from "./localization";
+import type { ReminderKind } from "./saveReminders";
 
 const fields = {
   token: v.string(),
@@ -81,7 +82,8 @@ const catalogs: Record<
     namedSingle: string;
     namedShelf: Record<string, string>;
     namedShelfSingle: string;
-    reminder: Record<"read" | "cook", { title: string; body: string }>;
+    reminder: Record<ReminderKind, { title: string; body: string }>;
+    tripEve: { title: string; body: Record<string, string> };
   }
 > = translations;
 
@@ -134,7 +136,7 @@ export function digestCopy(
 
 export function reminderCopy(
   locale: string | undefined,
-  kind: "read" | "cook",
+  kind: ReminderKind,
   subject: string,
 ) {
   const title = truncateTitle(subject) ?? subject;
@@ -142,5 +144,21 @@ export function reminderCopy(
   return {
     title: copy.title,
     body: copy.body.replace("%{title}", () => title),
+  };
+}
+
+export function tripEveCopy(
+  locale: string | undefined,
+  city: string,
+  count: number,
+) {
+  const selected = notificationLocale(locale) ?? "en";
+  const copy = catalogs[selected].tripEve;
+  return {
+    title: copy.title.replace("%{city}", () => truncateTitle(city) ?? city),
+    body: copy.body[pluralRules[selected](count)].replace(
+      "%{formattedCount}",
+      new Intl.NumberFormat(selected).format(count),
+    ),
   };
 }

@@ -1,4 +1,4 @@
-const PURCHASE_LANDING_MS = 10_000;
+const PURCHASE_LANDING_MS = 40_000;
 
 let landingUntil = 0;
 let session = 0;

@@ -14,6 +14,8 @@ import en from "@/locales/en.json";
 import { ONBOARDING_FLOW_VERSION } from "@/lib/onboarding-steps";
 import { CommitmentStep } from "./commitment";
 
+vi.mock("@/lib/haptics", () => ({ haptics: { success: mocks.haptic } }));
+
 type Children = { children?: ReactNode };
 const mocks = vi.hoisted(() => ({
   map: vi.fn(),
@@ -114,10 +116,6 @@ vi.mock("@shopify/react-native-skia", () => ({
       Make: vi.fn(() => ({ addCircle: vi.fn(() => ({ detach: vi.fn() })) })),
     },
   },
-}));
-vi.mock("expo-haptics", () => ({
-  notificationAsync: mocks.haptic,
-  NotificationFeedbackType: { Success: "success" },
 }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 vi.mock("@/components/onboarding/sample-apple-map", () => ({
@@ -348,7 +346,7 @@ it("supports TalkBack activation without holding, and ignores unrelated actions"
   );
   expect(screen.getByText("You’re in.")).toBeTruthy();
   expect(mocks.capture).toHaveBeenCalledTimes(1);
-  expect(mocks.haptic).not.toHaveBeenCalled();
+  expect(mocks.haptic).toHaveBeenCalledOnce();
   expect(onContinue).not.toHaveBeenCalled();
 });
 

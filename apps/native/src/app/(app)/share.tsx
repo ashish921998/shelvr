@@ -1,4 +1,5 @@
 import { shareBatchAllowed } from "@/lib/share/storage";
+import { haptics } from "@/lib/haptics";
 import { t, useAppLocale, localizeError } from "@/lib/i18n";
 import { recordShareSaved } from "@/lib/first-share";
 import {
@@ -39,8 +40,9 @@ import { useSaveImages } from "@/lib/use-save-image";
 import { analytics } from "@/lib/analytics";
 import { bestEffort } from "@/lib/best-effort";
 import { saveFailureStage } from "@convex/model/saveErrors";
-import { openPaywall, useEntitlement } from "@/lib/entitlement";
-import { useAwaitingOnboardingPurchase } from "@/lib/replay-onboarding";
+import { openPaywall } from "@/lib/entitlement";
+import { canSave, saveWaiting } from "@/lib/access";
+import { useAccess } from "@/lib/free-plan";
 import { useCurrentUser } from "@/lib/current-user";
 import { api } from "@convex/_generated/api";
 import { useMutation } from "convex/react";
@@ -111,10 +113,10 @@ export default function ShareScreen() {
   const router = useRouter();
   const { theme } = useUnistyles();
   const { data: user } = useCurrentUser();
-  const entitlement = useEntitlement();
-  const { entitled } = entitlement;
-  const awaitingPurchase = useAwaitingOnboardingPurchase(entitled);
-  const entitlementLoading = entitlement.loading || awaitingPurchase;
+  const access = useAccess();
+  const saveAllowed = canSave(access);
+  const entitlementLoading = saveWaiting(access);
+  const photosAllowed = access.kind === "pro";
   const {
     sharedPayloads,
     resolvedSharedPayloads,
@@ -182,7 +184,8 @@ export default function ShareScreen() {
     function dispatch(event: ShareEvent): void {
       const next = stepIncomingShare(owner.current, event, {
         userId: user?._id ?? null,
-        entitled,
+        canSave: saveAllowed,
+        photosAllowed,
         entitlementLoading,
         rawPayloads,
         resolved: processorPayloads,
@@ -196,7 +199,8 @@ export default function ShareScreen() {
     },
     [
       user,
-      entitled,
+      saveAllowed,
+      photosAllowed,
       entitlementLoading,
       rawPayloads,
       processorPayloads,
@@ -229,7 +233,10 @@ export default function ShareScreen() {
   const nothingResolved =
     !isResolving && rawPayloads.length === 0 && phase.kind === "idle";
 
-  if (entitlementLoading && phase.kind === "idle") {
+  if (
+    entitlementLoading &&
+    (phase.kind === "idle" || phase.kind === "locked")
+  ) {
     return (
       <Centered
         phaseKey="checking-entitlement"
@@ -240,19 +247,74 @@ export default function ShareScreen() {
     );
   }
 
-  if (phase.kind === "locked") {
+  if (phase.kind === "locked" && phase.reason === "photos") {
     return (
-      <PhaseSurface key="locked" phaseKey="locked">
-        <Text style={styles.title(theme)}>{t("pro.unlockShelvr")}</Text>
-        <Text style={styles.subtitle(theme)}>{t("share.proHelp")}</Text>
+      <PhaseSurface key="locked-photos" phaseKey="locked-photos">
+        <Text style={styles.title(theme)}>{t("freePlan.photosNeedPro")}</Text>
+        <Text style={styles.subtitle(theme)}>{t("freePlan.photosBody")}</Text>
         <View style={styles.actions}>
           <Button
-            label={t("common.cancel")}
+            label={t("freePlan.discardPhoto")}
             theme={theme}
             onPress={() => dispatch({ type: "cancel" })}
           />
           <Button
-            label={t("pro.unlock")}
+            label={t("freePlan.seePlans")}
+            theme={theme}
+            primary
+            onPress={() => dispatch({ type: "unlock" })}
+          />
+        </View>
+      </PhaseSurface>
+    );
+  }
+
+  if (phase.kind === "locked") {
+    const reading = access.kind === "free" && access.pending > 0;
+    if (reading) {
+      return (
+        <PhaseSurface key="locked-reading" phaseKey="locked-reading">
+          <Text style={styles.title(theme)}>{t("freePlan.readingTitle")}</Text>
+          <Text style={styles.subtitle(theme)}>
+            {t("freePlan.readingBody")}
+          </Text>
+          <View style={styles.actions}>
+            <Button
+              label={t("freePlan.seePlans")}
+              theme={theme}
+              onPress={() => dispatch({ type: "unlock" })}
+            />
+            <Button
+              label={t("freePlan.ok")}
+              theme={theme}
+              primary
+              onPress={() => dispatch({ type: "keep" })}
+            />
+          </View>
+        </PhaseSurface>
+      );
+    }
+    return (
+      <PhaseSurface key="locked" phaseKey="locked">
+        <Text style={styles.title(theme)}>
+          {access.kind === "free" && access.open
+            ? t("freePlan.usedTitle", { limit: access.limit })
+            : t("pro.unlockShelvr")}
+        </Text>
+        <Text style={styles.subtitle(theme)}>{t("freePlan.outBody")}</Text>
+        <View style={styles.actions}>
+          <Button
+            label={t("freePlan.discardLink")}
+            theme={theme}
+            onPress={() => dispatch({ type: "cancel" })}
+          />
+          <Button
+            label={t("freePlan.keepLink")}
+            theme={theme}
+            onPress={() => dispatch({ type: "keep" })}
+          />
+          <Button
+            label={t("freePlan.seePlans")}
             theme={theme}
             primary
             onPress={() => dispatch({ type: "unlock" })}
@@ -446,6 +508,7 @@ function runEffect(
       analytics.capture(effect.event);
       return;
     case "sharedContentSaved":
+      void haptics.success();
       analytics.capture("shared_content_saved", {
         item_count: effect.itemCount,
       });
@@ -455,6 +518,12 @@ function runEffect(
       return;
     case "navigateHome":
       deps.router.replace("/(app)/(tabs)/(home)");
+      return;
+    case "revealSpots":
+      deps.router.replace({
+        pathname: "/spots/[id]",
+        params: { id: effect.itemId },
+      });
       return;
   }
 }

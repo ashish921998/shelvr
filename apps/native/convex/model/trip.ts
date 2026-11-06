@@ -59,7 +59,10 @@ export function uniquePlacePins<
 }
 
 /** Apple tells two nearby branches of one name apart; trust it over distance. */
-function otherVenue(a: { appleId?: string }, b: { appleId?: string }): boolean {
+export function otherVenue(
+  a: { appleId?: string },
+  b: { appleId?: string },
+): boolean {
   return (
     a.appleId !== undefined &&
     b.appleId !== undefined &&
@@ -96,6 +99,8 @@ export const STOPS_PER_DAY: Record<TripPace, number> = {
 export function tripPlaceCap(days: number): number {
   return STOPS_PER_DAY.packed * Math.max(days, 5);
 }
+
+export const MAX_CITY_CHARS = 80;
 
 export function tidyCity(city: string): string {
   return city.replace(/\s+/g, " ").trim();

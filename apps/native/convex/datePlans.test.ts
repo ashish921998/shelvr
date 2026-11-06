@@ -440,3 +440,43 @@ describe("makeDatePlan", () => {
     expect(result.status).toBe("no_anchor");
   });
 });
+
+describe("a personal date plan", () => {
+  it("ignores the caller's shared lists when no list is named", async () => {
+    const { base, t, userId } = await setup([DINNER, BAR]);
+    await base.run(async (ctx) => {
+      const listId = await ctx.db.insert("sharedLists", {
+        ownerId: userId,
+        name: "Ours",
+        cities: ["Lisbon"],
+        inviteToken: "t",
+        placeCount: 1,
+        createdAt: 1,
+      });
+      await ctx.db.insert("sharedListMembers", {
+        listId,
+        userId,
+        joinedAt: 1,
+        seenAt: 1,
+      });
+      await ctx.db.insert("sharedListPlaces", {
+        listId,
+        addedBy: userId,
+        name: "List Only Bar",
+        ...near(3),
+        city: "Lisbon",
+        category: "Nightlife",
+        addedAt: 1,
+      });
+    });
+    const result = await t.action(api.datePlans.makeDatePlan, {
+      city: "Lisbon",
+      kind: "classic",
+    });
+    expect(result.status).toBe("ready");
+    expect(result.stops.map((stop) => stop.name)).not.toContain(
+      "List Only Bar",
+    );
+    expect(result.stops.every((stop) => stop.itemId !== undefined)).toBe(true);
+  });
+});

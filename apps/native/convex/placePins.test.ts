@@ -88,6 +88,200 @@ async function setup(
 }
 
 describe("placePins", () => {
+  it("finds a kept place on an edited save by its branch and leaves the owner's pin alone", async () => {
+    const { queries } = await withMaps();
+    const { t, itemId, pins } = await setup([], { read: ["Chosen", "Bakery"] });
+    const chosen = { name: "Chosen", city: "Lisbon", lat: 7, lng: 8 };
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        placesEdited: true,
+        placePins: [chosen],
+        placeLocations: [{ name: "Bakery", location: "Bairro Alto" }],
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId, refresh: true });
+    expect(queries()).toEqual(["Bakery, Bairro Alto, Lisbon"]);
+    const q = "Bakery, Bairro Alto, Lisbon".length;
+    expect(await pins()).toEqual([
+      chosen,
+      { name: "Bakery", city: "Lisbon", lat: q, lng: -q },
+    ]);
+  });
+  it("looks up the source's branch while keeping its display name and public contract", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup(["Carette"], { read: ["Carette"] });
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        cities: ["Paris"],
+        placeLocations: [{ name: "Carette", location: "Place du Trocadéro" }],
+      }),
+    );
+    const queries: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
+        const q = url.searchParams.get("q") ?? "";
+        queries.push(q);
+        const trocadero = q.includes("Trocadéro");
+        return Response.json({
+          results: [
+            {
+              name: "Carette",
+              id: trocadero ? "trocadero" : "vosges",
+              coordinate: {
+                latitude: 48.862,
+                longitude: trocadero ? 2.287 : 2.365,
+              },
+            },
+          ],
+        });
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(queries).toEqual(["Carette, Place du Trocadéro, Paris"]);
+    expect(await pins()).toEqual([
+      {
+        name: "Carette",
+        city: "Paris",
+        lat: 48.862,
+        lng: 2.287,
+        appleId: "trocadero",
+      },
+    ]);
+    const item = await t.run((ctx) => ctx.db.get(itemId));
+    if (!item) throw new Error("Missing test save");
+    const client = t.withIdentity({ subject: item.userId });
+    expect(
+      await client.query(api.items.getItem, { id: itemId }),
+    ).not.toHaveProperty("placeLocations");
+  });
+
+  it.each([
+    ["after", true],
+    ["before", false],
+  ])(
+    "drops a pin an older lookup found once a reread names another branch (new lookup lands %s it)",
+    async (_order, newFirst) => {
+      vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+      vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+      vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: string) => {
+          const url = new URL(input);
+          if (url.pathname === "/v1/token")
+            return Response.json({
+              accessToken: "maps",
+              expiresInSeconds: 1800,
+            });
+          const trocadero = (url.searchParams.get("q") ?? "").includes(
+            "Trocadéro",
+          );
+          return Response.json({
+            results: [
+              {
+                name: "Carette",
+                id: trocadero ? "trocadero" : "vosges",
+                coordinate: {
+                  latitude: 48.862,
+                  longitude: trocadero ? 2.287 : 2.365,
+                },
+              },
+            ],
+          });
+        }),
+      );
+      const { t, itemId, pins } = await setup([], { read: ["Carette"] });
+      await t.run((ctx) => ctx.db.patch(itemId, { cities: ["Paris"] }));
+      const old = await t.query(internal.placePins.toLocate, { itemId });
+      if (old === null) throw new Error("Expected a lookup");
+      expect(old.locations).toEqual([]);
+      await t.run((ctx) => ctx.db.patch(itemId, { status: "processing" }));
+      expect(
+        await t.mutation(internal.items.finalizeItem, {
+          itemId,
+          reading: {},
+          classification: {
+            title: "Lisbon eats",
+            description: "",
+            tags: [],
+            cities: ["Paris"],
+            places: ["Carette"],
+            placeLocations: [
+              { name: "Carette", location: "Place du Trocadéro" },
+            ],
+          },
+        }),
+      ).toBe("applied");
+      const oldStores = () =>
+        t.mutation(internal.placePins.storePins, {
+          itemId,
+          found: [
+            { name: "Carette", lat: 48.862, lng: 2.365, appleId: "vosges" },
+          ],
+          cluesSearched: old.locations,
+        });
+      if (!newFirst) await oldStores();
+      await t.action(internal.placePins.locateItem, { itemId });
+      if (newFirst) await oldStores();
+      expect((await pins())?.map((pin) => pin.appleId)).toEqual(["trocadero"]);
+    },
+  );
+
+  it("pins the new branch when a reread respells the place and changes its branch", async () => {
+    vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+    vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+    vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
+        const neuve = (url.searchParams.get("q") ?? "").includes("Rue Neuve");
+        return Response.json({
+          results: [
+            {
+              name: "Cafe Joe",
+              id: neuve ? "neuve" : "vieille",
+              coordinate: { latitude: 48.86, longitude: neuve ? 2.29 : 2.36 },
+            },
+          ],
+        });
+      }),
+    );
+    const { t, itemId, pins } = await setup([], { read: ["Cafe Joe"] });
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        status: "processing",
+        cities: ["Paris"],
+        placeLocations: [{ name: "Cafe Joe", location: "Rue Vieille" }],
+        placePins: [{ name: "Cafe Joe", lat: 48.86, lng: 2.36, city: "Paris" }],
+      }),
+    );
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      reading: {},
+      classification: {
+        title: "Lisbon eats",
+        description: "",
+        tags: [],
+        cities: ["Paris"],
+        places: ["Café Joe", "Cafe Joe"],
+        placeLocations: [
+          { name: "Café Joe", location: "Rue Neuve" },
+          { name: "Cafe Joe", location: "Rue Vieille" },
+        ],
+      },
+    });
+    expect(await pins()).toEqual([]);
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect((await pins())?.map((pin) => pin.appleId)).toEqual(["neuve"]);
+  });
+
   it("repairs suffixed places and pins without a new lookup, including legacy Maps intents", async () => {
     const { t, itemId, pins } = await setup(["Guest House, Austin"], {
       read: ["Guest House, Austin", "Guest House", "Eberly, Austin"],
@@ -352,6 +546,7 @@ describe("placePins", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("pins every place a save names, searched near its city", async () => {
@@ -786,6 +981,63 @@ describe("placePins", () => {
     expect(await pins()).toEqual([]);
   });
 
+  it("adds a restored save's missing pin and keeps a pin it no longer names", async () => {
+    const { queries } = await withMaps();
+    const { t, itemId, pins } = await setup([], { read: ["Luna Tacos"] });
+    const stray = { name: "Time Out Market", lat: 17, lng: -17 };
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        status: "processing",
+        enrichment: "partial",
+        processingRunId: "run-1",
+        placePins: [stray],
+      }),
+    );
+    vi.useFakeTimers();
+    try {
+      await t.mutation(internal.items.failItem, {
+        itemId,
+        reason: "error",
+        runId: "run-1",
+      });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(queries()).toEqual(["Luna Tacos, Lisbon"]);
+    expect((await pins())?.map((pin) => pin.name)).toEqual([
+      "Time Out Market",
+      "Luna Tacos",
+    ]);
+  });
+
+  it("makes no Apple call for a restored save with nothing to look up", async () => {
+    const { queries } = await withMaps();
+    const { t, itemId, pins } = await setup([]);
+    const stray = { name: "Time Out Market", lat: 17, lng: -17 };
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        status: "processing",
+        enrichment: "partial",
+        processingRunId: "run-1",
+        placePins: [stray],
+      }),
+    );
+    vi.useFakeTimers();
+    try {
+      await t.mutation(internal.items.failItem, {
+        itemId,
+        reason: "not_found",
+        runId: "run-1",
+      });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(queries()).toEqual([]);
+    expect(await pins()).toEqual([stray]);
+  });
+
   it("backfill queues only ready saves that name a place and have no pins", async () => {
     await withMaps();
     const { t, itemId } = await setup(["Pink Street"]);
@@ -830,6 +1082,119 @@ describe("placePins", () => {
       vi.useRealTimers();
     }
     expect((await pins())?.[0].category).toBe("Cafe");
+  });
+
+  function appleAnswers(status: number) {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) =>
+        new URL(input).pathname === "/v1/token"
+          ? Response.json({ accessToken: "maps", expiresInSeconds: 1800 })
+          : status === 200
+            ? Response.json({ results: [] })
+            : new Response("", { status }),
+      ),
+    );
+  }
+
+  async function lookupJobs(t: ReturnType<typeof newConvexTest>) {
+    const jobs = await t.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    return jobs
+      .filter((job) => job.name === "placePins:locateItem")
+      .map((job) => job.args[0] as Record<string, unknown>);
+  }
+
+  it("retries a lookup Apple could not answer, keeping the owner's pins", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup(
+      ["Pink Street", "Time Out Market"],
+      {
+        pins: true,
+      },
+    );
+    appleAnswers(429);
+    vi.useFakeTimers();
+    try {
+      await t.action(internal.placePins.locateItem, { itemId, keepPins: true });
+      expect(await pins()).toEqual([{ name: "Pink Street", lat: 1, lng: 2 }]);
+      expect(await lookupJobs(t)).toEqual([
+        { itemId, keepPins: true, attempt: 2 },
+      ]);
+      await withMaps();
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+    } finally {
+      vi.useRealTimers();
+    }
+    const q = "Time Out Market, Lisbon".length;
+    expect(await pins()).toEqual([
+      { name: "Pink Street", lat: 1, lng: 2 },
+      { name: "Time Out Market", city: "Lisbon", lat: q, lng: -q },
+    ]);
+  });
+
+  it("retries a refresh Apple could not answer as a refresh", async () => {
+    await withMaps(true);
+    const { t, itemId, pins } = await setup(["Micho"]);
+    await t.run(async (ctx) =>
+      ctx.db.patch(itemId, {
+        placePins: [{ name: "Micho", lat: 13, lng: -13, city: "Lisbon" }],
+      }),
+    );
+    appleAnswers(503);
+    vi.useFakeTimers();
+    try {
+      await t.action(internal.placePins.locateItem, { itemId, refresh: true });
+      expect(await lookupJobs(t)).toEqual([
+        { itemId, refresh: true, attempt: 2 },
+      ]);
+      await withMaps(true);
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect((await pins())?.[0].category).toBe("Cafe");
+  });
+
+  it("stops retrying after the last attempt and never retries a place Apple does not know", async () => {
+    await withMaps();
+    const { t, itemId } = await setup(["Pink Street"]);
+    appleAnswers(503);
+    await t.action(internal.placePins.locateItem, { itemId, attempt: 3 });
+    appleAnswers(200);
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(await lookupJobs(t)).toEqual([]);
+  });
+
+  it("backfill queues a save with a place still unpinned, not one fully pinned", async () => {
+    await withMaps(true);
+    const { t, itemId } = await setup(["Pink Street", "Time Out Market"]);
+    const pinned = (name: string) => ({
+      name,
+      lat: 1,
+      lng: 2,
+      city: "Lisbon",
+      category: "Cafe",
+    });
+    await t.run(async (ctx) => {
+      await ctx.db.patch(itemId, { placePins: [pinned("Pink Street")] });
+      const item = (await ctx.db.get(itemId))!;
+      await ctx.db.insert("items", {
+        userId: item.userId,
+        type: "link",
+        status: "ready",
+        tags: [],
+        searchText: "",
+        cities: ["Lisbon"],
+        intents: item.intents,
+        placePins: [pinned("Pink Street"), pinned("Time Out Market")],
+      });
+    });
+    await t.mutation(internal.placePins.backfillPage, { cursor: null });
+    expect(await lookupJobs(t)).toEqual([{ itemId }]);
   });
 });
 

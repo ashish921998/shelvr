@@ -1,3 +1,10 @@
+import {
+  visibleSave,
+  visibleCitySave,
+  visibleItemPlaces,
+  userRemovals,
+  type Removal,
+} from "./model/placeRemovals";
 import { ConvexError, v, type Infer } from "convex/values";
 import {
   paginationOptsValidator,
@@ -19,6 +26,14 @@ import {
   hasProEntitlementStatus,
   requireProEntitlement,
 } from "./subscriptions";
+import {
+  claimSave,
+  coversListParts,
+  isFreeSave,
+  reclaimFreeSave,
+  recordFreeSave,
+  settleFreeSave,
+} from "./freeSaves";
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
 import { takeWithinBytes } from "./model/readBudget";
@@ -50,6 +65,7 @@ import {
   MAX_NOTE_TEXT_CHARS,
   normalizeCities,
   normalizePlaces,
+  placeLocationsValidator,
   placePinsValidator,
   postMediaValidator,
   PROCESSING_STALE_MS,
@@ -73,7 +89,12 @@ import {
   rankSimilar,
   similarSearchTerms,
 } from "./model/similarity";
-import { completionPatch, failurePatch, runFields } from "./model/settlement";
+import {
+  completionPatch,
+  failurePatch,
+  type ItemPatch,
+  runFields,
+} from "./model/settlement";
 import { safeDeleteStorage } from "./model/storage";
 
 export { intentKindValidator, intentValidator, PROCESSING_STALE_MS };
@@ -154,6 +175,7 @@ const itemFields = {
   productsStatus: v.optional(productsStatusValidator),
   failureReason: v.optional(failureReasonValidator),
   enrichment: v.optional(enrichmentValidator),
+  stepFailed: v.optional(v.boolean()),
   processingRunId: v.optional(v.string()),
   processingStartedAt: v.optional(v.number()),
   searchText: v.string(),
@@ -221,10 +243,14 @@ function stripEmbedding(
   | "productsSearchStartedAt"
   | "places"
   | "placesHeard"
+  | "placeLocations"
+  | "placesEdited"
 > {
   const {
+    placesEdited: _placesEdited,
     places: _places,
     placesHeard: _placesHeard,
+    placeLocations: _placeLocations,
     embedding: _embedding,
     embeddingVersion: _version,
     embeddingAttempts: _attempts,
@@ -234,12 +260,16 @@ function stripEmbedding(
   return rest;
 }
 
-export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
+export async function enrichItem(
+  ctx: QueryCtx,
+  item: Doc<"items">,
+  removals?: readonly Removal[],
+) {
   const imageUrl = item.storageId
     ? await ctx.storage.getUrl(item.storageId)
     : null;
   return {
-    ...stripEmbedding(item),
+    ...stripEmbedding(await visibleSave(ctx, item, removals)),
     imageUrl,
     heroImageUrl: item.type === "link" ? (imageUrl ?? undefined) : undefined,
   };
@@ -248,6 +278,7 @@ export async function enrichItem(ctx: QueryCtx, item: Doc<"items">) {
 export async function toItemCard(
   ctx: QueryCtx,
   item: Doc<"items">,
+  removals?: readonly Removal[],
 ): Promise<ItemCard> {
   const {
     userId: _userId,
@@ -258,11 +289,25 @@ export async function toItemCard(
     products: _products,
     productsStatus: _productsStatus,
     ...card
-  } = await enrichItem(ctx, item);
+  } = await enrichItem(ctx, item, removals);
   return recipe ? { ...card, hasRecipe: true } : card;
 }
 
-export async function readySavesNewestFirst(
+export async function enrichItems(ctx: QueryCtx, items: Doc<"items">[]) {
+  const removals = items.length ? await userRemovals(ctx, items[0].userId) : [];
+  return await Promise.all(
+    items.map((item) => enrichItem(ctx, item, removals)),
+  );
+}
+
+export async function toItemCards(ctx: QueryCtx, items: Doc<"items">[]) {
+  const removals = items.length ? await userRemovals(ctx, items[0].userId) : [];
+  return await Promise.all(
+    items.map((item) => toItemCard(ctx, item, removals)),
+  );
+}
+
+export async function rawReadySavesNewestFirst(
   ctx: QueryCtx,
   userId: string,
 ): Promise<Doc<"items">[]> {
@@ -285,16 +330,28 @@ export async function readySavesNewestFirst(
   return rows;
 }
 
+export async function readySavesNewestFirst(
+  ctx: QueryCtx,
+  userId: string,
+  removals?: readonly Removal[],
+): Promise<Doc<"items">[]> {
+  const decisions = removals ?? (await userRemovals(ctx, userId));
+  return (await rawReadySavesNewestFirst(ctx, userId)).map((item) =>
+    visibleCitySave(item, decisions),
+  );
+}
+
 /** The user's ready saves in one city, newest first, capped at `limit`. */
 export async function readyCitySaves(
   ctx: QueryCtx,
   userId: string,
   city: string,
   limit = CITY_ITEMS_MAX,
+  removals?: readonly Removal[],
 ): Promise<Doc<"items">[]> {
   const wanted = cityKey(city);
   if (wanted === "") return [];
-  return (await readySavesNewestFirst(ctx, userId))
+  return (await readySavesNewestFirst(ctx, userId, removals))
     .filter((item) => (item.cities ?? []).some((c) => cityKey(c) === wanted))
     .slice(0, limit);
 }
@@ -404,7 +461,11 @@ export const listCityItems = authedQuery({
     const items = await readyCitySaves(ctx, ctx.userId, args.city);
     return await Promise.all(
       items.map((item) =>
-        enrichItem(ctx, { ...item, placePins: pinsForCity(item, args.city) }),
+        enrichItem(
+          ctx,
+          { ...item, placePins: pinsForCity(item, args.city) },
+          [],
+        ),
       ),
     );
   },
@@ -420,7 +481,7 @@ export const listItems = authedQuery({
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
       .take(LIST_CAP);
-    return await Promise.all(items.map((item) => enrichItem(ctx, item)));
+    return await enrichItems(ctx, items);
   },
 });
 
@@ -474,7 +535,7 @@ export const listItemsPage = authedQuery({
       });
     return {
       ...result,
-      page: await Promise.all(result.page.map((item) => toItemCard(ctx, item))),
+      page: await toItemCards(ctx, result.page),
     };
   },
 });
@@ -500,7 +561,7 @@ export const listRecentItems = authedQuery({
       )
       .order("desc")
       .take(limit);
-    return await Promise.all(ready.map((item) => toItemCard(ctx, item)));
+    return await toItemCards(ctx, ready);
   },
 });
 
@@ -647,11 +708,12 @@ export const searchItems = authedQuery({
         q.search("searchText", query).eq("userId", userId),
       )
       .take(50);
+    const removals = await userRemovals(ctx, userId);
     return await Promise.all(
-      items.map(async (item) => ({
-        ...(await enrichItem(ctx, item)),
-        places: item.places,
-      })),
+      items.map(async (raw) => {
+        const item = visibleItemPlaces(raw, removals);
+        return { ...(await enrichItem(ctx, item, [])), places: item.places };
+      }),
     );
   },
 });
@@ -780,11 +842,7 @@ export const similarItems = authedQuery({
       candidates.set(candidate._id, candidate);
     }
 
-    return await Promise.all(
-      rankSimilar(item, candidates.values()).map((match) =>
-        toItemCard(ctx, match),
-      ),
-    );
+    return await toItemCards(ctx, rankSimilar(item, candidates.values()));
   },
 });
 
@@ -1389,7 +1447,7 @@ export const cleanupOrphanStorage = internalMutation({
 
 export async function createItemWithOperation(
   ctx: MutationCtx,
-  userId: string,
+  userId: Id<"users">,
   kind: Extract<OperationKind, "link" | "note">,
   payload: { url: string } | { note: string },
   options: {
@@ -1466,7 +1524,7 @@ function validateLinkOrNotePayload(
 
 async function createLinkOrNote(
   ctx: MutationCtx,
-  userId: string,
+  userId: Id<"users">,
   kind: Extract<OperationKind, "link" | "note">,
   payload: { url: string } | { note: string },
   options: {
@@ -1477,6 +1535,7 @@ async function createLinkOrNote(
     captureContext?: string;
   },
 ): Promise<Id<"items">> {
+  const free = await claimSave(ctx, userId);
   const run = beginProcessingRun();
   const itemId = await ctx.db.insert("items", {
     userId,
@@ -1490,6 +1549,7 @@ async function createLinkOrNote(
         ? buildSearchText({ tags: [], note: payload.note })
         : "",
   });
+  if (free) await recordFreeSave(ctx, userId, itemId);
   if (options.spaceId !== undefined) {
     await saveIntoSpace(ctx, userId, itemId, options.spaceId);
   }
@@ -1570,7 +1630,6 @@ export const createLinkItem = authedMutation({
   returns: v.id("items"),
   handler: async (ctx, args) => {
     const { userId } = ctx;
-    await requireProEntitlement(ctx, userId);
     const url = normalizeExternalUrl(args.url);
     return await createItemWithOperation(
       ctx,
@@ -1598,7 +1657,6 @@ export const createNoteItem = authedMutation({
   returns: v.id("items"),
   handler: async (ctx, args) => {
     const { userId } = ctx;
-    await requireProEntitlement(ctx, userId);
     return await createItemWithOperation(
       ctx,
       userId,
@@ -1898,7 +1956,10 @@ export const reprocessItem = authedMutation({
   handler: async (ctx, args) => {
     const { userId } = ctx;
     const freeDemo = await freeDemoRetry(ctx, userId, args.id);
-    if (freeDemo === null) await requireProEntitlement(ctx, userId);
+    const freeSave = freeDemo === null && (await isFreeSave(ctx, args.id));
+    if (freeDemo === null && !freeSave) {
+      await requireProEntitlement(ctx, userId);
+    }
     const item = await ctx.db.get(args.id);
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");
@@ -1910,6 +1971,7 @@ export const reprocessItem = authedMutation({
     if (!retryable) {
       return false;
     }
+    if (freeSave) await reclaimFreeSave(ctx, userId, args.id);
     if (freeDemo !== null) {
       await rateLimiter.limit(ctx, "demoRetry", { key: userId, throws: true });
       await ctx.db.patch(freeDemo._id, {
@@ -1925,7 +1987,6 @@ export const reprocessItem = authedMutation({
     await ctx.db.patch(args.id, {
       ...run,
       failureReason: undefined,
-      enrichment: undefined,
     });
     await ctx.scheduler.runAfter(0, internal.ai.processItem, {
       itemId: args.id,
@@ -1970,6 +2031,7 @@ export const deleteItem = authedMutation({
       await safeDeleteStorage(ctx, item.storageId);
     }
     await ctx.db.delete(item._id);
+    await settleFreeSave(ctx, item._id);
     return null;
   },
 });
@@ -2059,17 +2121,19 @@ export const getItemInternal = internalQuery({
       ...itemFields,
       places: v.optional(v.array(v.string())),
       placesHeard: v.optional(v.boolean()),
+      placeLocations: v.optional(placeLocationsValidator),
     }),
     v.null(),
   ),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     if (item === null) return null;
-    const { places, placesHeard } = item;
+    const { places, placesHeard, placeLocations } = item;
     return {
       ...stripEmbedding(item),
       ...(places ? { places } : {}),
       ...(placesHeard !== undefined ? { placesHeard } : {}),
+      ...(placeLocations !== undefined ? { placeLocations } : {}),
     };
   },
 });
@@ -2169,6 +2233,7 @@ export const finalizeItem = internalMutation({
     }
     const patch = completionPatch(item, args, allowed);
     await ctx.db.patch(args.itemId, patch);
+    await settleFreeSave(ctx, args.itemId);
     if (
       allowed &&
       ((patch.places?.length ?? 0) > 0 ||
@@ -2227,6 +2292,7 @@ export const pinListPlaces = internalMutation({
     if (
       item === null ||
       !ownsRun(item, args.runId) ||
+      item.placesEdited ||
       (await liveOwner(ctx, item.userId)) === null ||
       !(await aiAllowed(ctx, item.userId))
     ) {
@@ -2273,7 +2339,6 @@ export const addPlaceListParts = internalMutation({
       });
     }
     // The other parts are new saves, so they need Pro now, not just when the list was saved.
-    if (!(await hasProEntitlement(ctx, owner._id))) return 0;
     const url = item.url;
     const saved = await ctx.db
       .query("items")
@@ -2282,10 +2347,24 @@ export const addPlaceListParts = internalMutation({
       )
       .take(MAX_LIST_PARTS * 2);
     const titles = new Set(saved.map((row) => row.title));
-    let added = 0;
-    for (const part of args.parts.slice(0, MAX_LIST_PARTS)) {
-      if (titles.has(part.title)) continue;
+    const fresh = args.parts.slice(0, MAX_LIST_PARTS).filter((part) => {
+      if (titles.has(part.title)) return false;
       titles.add(part.title);
+      return true;
+    });
+    if (
+      !(await hasProEntitlement(ctx, owner._id)) &&
+      !(await coversListParts(
+        ctx,
+        owner._id,
+        item._id,
+        fresh.some((part) => normalizeCities(part.cities).length > 0),
+      ))
+    ) {
+      return 0;
+    }
+    let added = 0;
+    for (const part of fresh) {
       const cities = normalizeCities(part.cities);
       const places = normalizePlaces(part.places, cities);
       const placePins = withListPins([], part.pins, cities);
@@ -2387,6 +2466,27 @@ export const setProductsInternal = internalMutation({
   },
 });
 
+async function writeFailure(
+  ctx: MutationCtx,
+  item: Doc<"items">,
+  patch: ItemPatch,
+  reason: Infer<typeof failureReasonValidator>,
+): Promise<void> {
+  await ctx.db.patch(item._id, patch);
+  await settleFreeSave(ctx, item._id);
+  if (patch.status === "ready") {
+    await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
+      itemId: item._id,
+      keepPins: true,
+    });
+  }
+  if (item.status === "failed") return;
+  await scheduleProcessedTelemetry(ctx, item, {
+    status: "failed",
+    failureReason: reason,
+  });
+}
+
 export const failItem = internalMutation({
   args: {
     itemId: v.id("items"),
@@ -2406,11 +2506,7 @@ export const failItem = internalMutation({
     if (patch === null) {
       return "settled";
     }
-    await ctx.db.patch(args.itemId, patch);
-    await scheduleProcessedTelemetry(ctx, item, {
-      status: "failed",
-      failureReason: args.reason,
-    });
+    await writeFailure(ctx, item, patch, args.reason);
     return "applied";
   },
 });
@@ -2435,11 +2531,7 @@ export const failStaleProcessingItems = internalMutation({
       if (!isStaleProcessing(item, now) || patch === null) {
         continue;
       }
-      await ctx.db.patch(item._id, patch);
-      await scheduleProcessedTelemetry(ctx, item, {
-        status: "failed",
-        failureReason: "error",
-      });
+      await writeFailure(ctx, item, patch, "error");
       failed++;
     }
     if (candidates.length === STALE_PROCESSING_PAGE_SIZE && failed > 0) {

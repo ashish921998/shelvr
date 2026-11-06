@@ -139,6 +139,9 @@ const noteSchema = z.object({
   intents: z.array(z.object({ kind: z.string() })),
   cities: z.array(z.string()),
   places: z.array(z.string()),
+  placeLocations: z
+    .array(z.object({ name: z.string(), location: z.string() }))
+    .optional(),
 });
 
 describe("FAKE_MODEL", () => {

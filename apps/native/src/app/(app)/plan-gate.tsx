@@ -1,3 +1,4 @@
+import { SharedListCard } from "@/components/shared-list/list-card";
 import { Button } from "@/components/ui/button";
 import { ThemedText } from "@/components/ui/themed-text";
 import { Wordmark } from "@/components/wordmark";
@@ -6,6 +7,7 @@ import { openPaywall } from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useNotificationSession } from "@/lib/notifications";
+import { useSharedLists } from "@/lib/shared-lists";
 import { useRestorePurchases } from "@/lib/use-restore-purchases";
 import { useRouter } from "expo-router";
 import { Alert, Linking, Pressable, ScrollView, View } from "react-native";
@@ -17,6 +19,7 @@ export default function PlanGateScreen() {
   const router = useRouter();
   const { session, operation } = useNotificationSession();
   const { restoring, restore } = useRestorePurchases();
+  const lists = useSharedLists().data ?? [];
 
   const signOut = async () => {
     try {
@@ -39,6 +42,16 @@ export default function PlanGateScreen() {
             {t("planGate.body")}
           </ThemedText>
         </View>
+        {lists.length > 0 ? (
+          <View style={styles.lists}>
+            <ThemedText variant="footnote" style={styles.body}>
+              {t("sharedLists.gateHint")}
+            </ThemedText>
+            {lists.map((list) => (
+              <SharedListCard key={list._id} list={list} />
+            ))}
+          </View>
+        ) : null}
         <Button
           title={t("planGate.seePlans")}
           onPress={() => void openPaywall(router, "plan_gate")}
@@ -115,6 +128,11 @@ const styles = StyleSheet.create((theme) => ({
   },
   title: { textAlign: "center" },
   body: { textAlign: "center", color: theme.colors.muted },
+  lists: {
+    alignSelf: "stretch",
+    gap: theme.gap(1.5),
+    paddingBottom: theme.gap(3),
+  },
   button: { alignSelf: "stretch" },
   restore: { paddingVertical: theme.gap(1.5) },
   link: { color: theme.colors.primaryText },

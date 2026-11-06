@@ -1,4 +1,3 @@
-import * as Haptics from "expo-haptics";
 import { type Href, useRouter } from "expo-router";
 import { PlatformColor } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
@@ -20,14 +19,7 @@ export function useTabStackChrome({
   const { theme } = useUnistyles();
   const labelColor = isIos ? PlatformColor("label") : theme.colors.foreground;
 
-  const haptic = () => {
-    if (isIos) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-  };
-
   const tap = (href: Href) => () => {
-    haptic();
     router.push(href);
   };
 
@@ -42,5 +34,5 @@ export function useTabStackChrome({
     scrollEdgeEffects: softScrollEdge ? SOFT_SCROLL_EDGE : undefined,
   };
 
-  return { haptic, labelColor, screenOptions, tap };
+  return { labelColor, screenOptions, tap };
 }

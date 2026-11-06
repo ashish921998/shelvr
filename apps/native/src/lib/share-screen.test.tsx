@@ -28,9 +28,14 @@ import { hasResumableSharedPayloads } from "@/lib/share/resumable-payloads";
 
 type RawPayload = { value: string; shareType: string; mimeType?: string };
 
+const SPOTS = { pathname: "/spots/[id]", params: { id: "item-1" } };
+
 const mock = vi.hoisted(() => ({
   entitled: false,
   entitlementLoading: false,
+  syncing: false,
+  pending: 0,
+  left: 0,
   user: { _id: "user-1" },
   sharedPayloads: [] as RawPayload[],
   resolvedSharedPayloads: [] as unknown[],
@@ -78,6 +83,23 @@ vi.mock("@/lib/entitlement", () => ({
     entitled: mock.entitled,
     loading: mock.entitlementLoading,
   }),
+}));
+vi.mock("@/lib/free-plan", () => ({
+  useAccess: () =>
+    mock.entitlementLoading
+      ? { kind: "loading" }
+      : mock.syncing
+        ? { kind: "pro", syncing: true }
+        : mock.entitled
+          ? { kind: "pro", syncing: false }
+          : {
+              kind: "free",
+              limit: 10,
+              used: 10 - mock.left,
+              left: mock.left,
+              pending: mock.pending,
+              open: true,
+            },
 }));
 vi.mock("@/lib/current-user", () => ({
   useCurrentUser: () => ({ data: mock.user }),
@@ -198,6 +220,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   mock.entitled = false;
   mock.entitlementLoading = false;
+  mock.syncing = false;
+  mock.pending = 0;
+  mock.left = 0;
   mock.sharedPayloads = [link];
   mock.resolvedSharedPayloads = [];
   mock.isResolving = false;
@@ -210,16 +235,18 @@ beforeEach(() => {
   mock.createLinkItem.mockResolvedValue("item-1");
 });
 
-it("presents one paywall per session across effect re-runs and saves once entitled", async () => {
+it("holds the link while no free save is left, then saves once one is", async () => {
   const view = render(<ShareScreen />);
-  await waitFor(() => expect(mock.openPaywall).toHaveBeenCalledTimes(1));
+  await waitFor(() =>
+    expect(screen.getByText("freePlan.usedTitle")).toBeDefined(),
+  );
+  expect(mock.openPaywall).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByText("freePlan.seePlans"));
   expect(mock.openPaywall).toHaveBeenCalledWith(mock.router, "share");
-  expect(screen.getByText("pro.unlockShelvr")).toBeDefined();
 
   mock.resolvedSharedPayloads = [resolvedLink];
   view.rerender(<ShareScreen />);
   await settle();
-  expect(mock.openPaywall).toHaveBeenCalledTimes(1);
   expect(mock.createLinkItem).not.toHaveBeenCalled();
 
   mock.entitled = true;
@@ -228,10 +255,73 @@ it("presents one paywall per session across effect re-runs and saves once entitl
   expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
     url: link.value,
   });
-  await waitFor(() =>
-    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
-  );
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith(SPOTS));
   expect(mock.openPaywall).toHaveBeenCalledTimes(1);
+});
+
+it("keeps a held link on the device for later", async () => {
+  render(<ShareScreen />);
+  await waitFor(() =>
+    expect(screen.getByText("freePlan.keepLink")).toBeDefined(),
+  );
+  fireEvent.click(screen.getByText("freePlan.keepLink"));
+  expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
+  expect(mock.clearSharedPayloads).not.toHaveBeenCalled();
+  expect(hasResumableSharedPayloads()).toBe(true);
+});
+
+it("says the last free save is still being read while it is", async () => {
+  mock.pending = 1;
+  render(<ShareScreen />);
+  await waitFor(() =>
+    expect(screen.getByText("freePlan.readingTitle")).toBeDefined(),
+  );
+  fireEvent.click(screen.getByText("freePlan.ok"));
+  expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
+  expect(mock.createLinkItem).not.toHaveBeenCalled();
+});
+
+it("saves a held link with the free slot a pending save gives back", async () => {
+  mock.pending = 1;
+  mock.resolvedSharedPayloads = [resolvedLink];
+  const view = render(<ShareScreen />);
+  await waitFor(() =>
+    expect(screen.getByText("freePlan.readingTitle")).toBeDefined(),
+  );
+  expect(mock.createLinkItem).not.toHaveBeenCalled();
+
+  mock.pending = 0;
+  mock.left = 1;
+  view.rerender(<ShareScreen />);
+  await waitFor(() => expect(mock.createLinkItem).toHaveBeenCalledTimes(1));
+  expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
+    url: link.value,
+  });
+  expect(mock.openPaywall).not.toHaveBeenCalled();
+});
+
+it("shows the check instead of the limit while a purchase lands on a held link", async () => {
+  const view = render(<ShareScreen />);
+  await waitFor(() =>
+    expect(screen.getByText("freePlan.usedTitle")).toBeDefined(),
+  );
+  mock.syncing = true;
+  view.rerender(<ShareScreen />);
+  expect(screen.getByText("pro.checking")).toBeDefined();
+  expect(screen.queryByText("freePlan.usedTitle")).toBeNull();
+});
+
+it("waits for a purchase that is still landing before saving", async () => {
+  mock.syncing = true;
+  mock.resolvedSharedPayloads = [resolvedLink];
+  const view = render(<ShareScreen />);
+  await settle();
+  expect(mock.createLinkItem).not.toHaveBeenCalled();
+
+  mock.syncing = false;
+  mock.entitled = true;
+  view.rerender(<ShareScreen />);
+  await waitFor(() => expect(mock.createLinkItem).toHaveBeenCalledTimes(1));
 });
 
 it("waits for the first resolution before saving a shared image", async () => {
@@ -268,10 +358,45 @@ it("waits for the first resolution before saving a shared image", async () => {
   );
 });
 
-it("gates a retry again when the entitlement lapses after a locked session ran", async () => {
+it("asks a free account to go Pro for a shared photo instead of saving it", async () => {
+  mock.left = 5;
+  const image: RawPayload = {
+    value: "content://media/1",
+    shareType: "image",
+    mimeType: "image/jpeg",
+  };
+  mock.sharedPayloads = [image];
+  let settleResolution: (payloads: unknown[]) => void = () => {};
+  mock.resolution = new Promise((resolve) => {
+    settleResolution = resolve;
+  });
+  render(<ShareScreen />);
+  await settle();
+  await act(async () => {
+    settleResolution([
+      {
+        contentType: "image",
+        value: image.value,
+        contentUri: "file:///cache/1.jpg",
+        contentMimeType: image.mimeType,
+      },
+    ]);
+  });
+  await waitFor(() =>
+    expect(screen.getByText("freePlan.photosNeedPro")).toBeDefined(),
+  );
+  expect(screen.queryByText("freePlan.keepLink")).toBeNull();
+  fireEvent.click(screen.getByText("freePlan.seePlans"));
+  expect(mock.openPaywall).toHaveBeenCalledWith(mock.router, "share");
+  expect(mock.saveImages).not.toHaveBeenCalled();
+});
+
+it("holds a retry again when the saves run out after a held session ran", async () => {
   mock.createLinkItem.mockRejectedValue(new Error("save failed"));
   const view = render(<ShareScreen />);
-  await waitFor(() => expect(mock.openPaywall).toHaveBeenCalledTimes(1));
+  await waitFor(() =>
+    expect(screen.getByText("freePlan.usedTitle")).toBeDefined(),
+  );
 
   mock.entitled = true;
   view.rerender(<ShareScreen />);
@@ -283,7 +408,9 @@ it("gates a retry again when the entitlement lapses after a locked session ran",
   view.rerender(<ShareScreen />);
   await settle();
   fireEvent.click(screen.getByText("capture.retryFailed"));
-  await waitFor(() => expect(mock.openPaywall).toHaveBeenCalledTimes(2));
+  await waitFor(() =>
+    expect(screen.getByText("freePlan.usedTitle")).toBeDefined(),
+  );
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
 });
 
@@ -350,9 +477,7 @@ it("never records a tombstone on iOS, which does not replay shares", async () =>
   mock.platform = "ios";
   mock.entitled = true;
   render(<ShareScreen />);
-  await waitFor(() =>
-    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
-  );
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith(SPOTS));
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
   expect(mock.store.has(LAST_COMPLETED_SHARE_KEY)).toBe(false);
 });
@@ -364,9 +489,9 @@ it("records the discard when Cancel's native clear throws, so the leftover is no
   });
   render(<ShareScreen />);
   await waitFor(() =>
-    expect(screen.getByText("pro.unlockShelvr")).toBeDefined(),
+    expect(screen.getByText("freePlan.usedTitle")).toBeDefined(),
   );
-  fireEvent.click(screen.getByText("common.cancel"));
+  fireEvent.click(screen.getByText("freePlan.discardLink"));
   await waitFor(() =>
     expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
   );
@@ -385,9 +510,7 @@ it("clears the pending flag and the discard record once a share completes", asyn
     fingerprintSharePayloads([{ value: "https://old.test", shareType: "url" }]),
   );
   render(<ShareScreen />);
-  await waitFor(() =>
-    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
-  );
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith(SPOTS));
 
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
   expect(mock.secure.get(PENDING_SHARE_KEY)).toBe("");
@@ -401,9 +524,9 @@ it("still resumes and saves a different batch after a discard", async () => {
   });
   const first = render(<ShareScreen />);
   await waitFor(() =>
-    expect(screen.getByText("pro.unlockShelvr")).toBeDefined(),
+    expect(screen.getByText("freePlan.usedTitle")).toBeDefined(),
   );
-  fireEvent.click(screen.getByText("common.cancel"));
+  fireEvent.click(screen.getByText("freePlan.discardLink"));
   await waitFor(() =>
     expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
   );
@@ -421,9 +544,7 @@ it("still resumes and saves a different batch after a discard", async () => {
   mock.entitled = true;
   mock.router.replace.mockClear();
   render(<ShareScreen />);
-  await waitFor(() =>
-    expect(mock.router.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)"),
-  );
+  await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith(SPOTS));
   expect(mock.createLinkItem).toHaveBeenCalledTimes(1);
   expect(mock.createLinkItem.mock.calls[0][0]).toMatchObject({
     url: other.value,

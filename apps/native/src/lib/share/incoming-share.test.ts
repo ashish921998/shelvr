@@ -22,7 +22,8 @@ const raw: RawSharePayload[] = [
 
 const ctx = (over: Partial<ShareContext> = {}): ShareContext => ({
   userId: "user-1",
-  entitled: true,
+  canSave: true,
+  photosAllowed: true,
   entitlementLoading: false,
   rawPayloads: raw,
   resolved: [
@@ -165,6 +166,46 @@ describe("incoming share owner", () => {
     expect(state.phase.kind).toBe("complete");
   });
 
+  it("opens the spots reveal for the first saved link, and Home for a photo", () => {
+    const finish = (saved: ShareSession) => {
+      const { effects } = run(
+        [
+          { type: "reconciled", result: { kind: "new", session: saved } },
+          { type: "saveSettled", session: saved },
+          {
+            type: "nativeClearSettled",
+            ok: true,
+            for: { kind: "complete", session: saved },
+          },
+        ],
+        ctx(),
+        initialIncomingShare(false),
+      );
+      return effects[2].at(-1);
+    };
+    const one = session("s1", "saved");
+    one.entries[0].itemId = "item-1";
+    expect(finish(one)).toEqual({ type: "revealSpots", itemId: "item-1" });
+
+    const two = session("s2", "saved");
+    two.entries = [
+      { ...two.entries[0], itemId: "item-1" },
+      { ...two.entries[0], index: 1, itemId: "item-2" },
+    ];
+    expect(finish(two)).toEqual({ type: "revealSpots", itemId: "item-1" });
+
+    const mixed = session("s4", "saved");
+    mixed.entries = [
+      { ...mixed.entries[0], itemId: "item-1" },
+      { ...mixed.entries[0], index: 1, kind: "image", itemId: "item-2" },
+    ];
+    expect(finish(mixed)).toEqual({ type: "navigateHome" });
+
+    const image = session("s3", "saved");
+    image.entries[0] = { ...image.entries[0], kind: "image", itemId: "i" };
+    expect(finish(image)).toEqual({ type: "navigateHome" });
+  });
+
   it("never tombstones on iOS", () => {
     const { effects } = run(
       [
@@ -224,9 +265,9 @@ describe("incoming share owner", () => {
     expect(state.running).toBeNull();
   });
 
-  it("presents one paywall per locked session, then saves once entitled", () => {
+  it("holds a session while no save is left, then saves once one is", () => {
     const s1 = session("s1");
-    const locked = ctx({ entitled: false });
+    const locked = ctx({ canSave: false });
     let state: IncomingShareState = initialIncomingShare(true);
     const step = (event: ShareEvent, context: ShareContext) => {
       const next = stepIncomingShare(state, event, context);
@@ -238,7 +279,7 @@ describe("incoming share owner", () => {
         { type: "reconciled", result: { kind: "new", session: s1 } },
         locked,
       ),
-    ).toEqual([{ type: "openPaywall" }]);
+    ).toEqual([]);
     expect(state.phase.kind).toBe("locked");
     expect(
       step(
@@ -262,6 +303,69 @@ describe("incoming share owner", () => {
     ).toEqual(["save"]);
     expect(state.locked).toBeNull();
     expect(state.phase.kind).toBe("saving");
+  });
+
+  it("saves a partly saved share once access returns after Retry hit the limit", () => {
+    const s1 = session("s1", "failed");
+    let state: IncomingShareState = initialIncomingShare(true);
+    const step = (event: ShareEvent, context: ShareContext) => {
+      const next = stepIncomingShare(state, event, context);
+      state = next.state;
+      return next.effects;
+    };
+    step({ type: "saveSettled", session: s1 }, ctx());
+    expect(state.phase.kind).toBe("partial");
+    step({ type: "retry", live: s1 }, ctx({ canSave: false }));
+    expect(state.phase.kind).toBe("locked");
+    expect(
+      types(
+        step(
+          { type: "reconciled", result: { kind: "resume", session: s1 } },
+          ctx(),
+        ),
+      ),
+    ).toEqual(["save"]);
+  });
+
+  it("stops a photo share on Photos need Pro without trying to save it", () => {
+    const photo = {
+      contentType: "image" as const,
+      value: "photo",
+      contentUri: "file://photo.jpg",
+      contentMimeType: "image/jpeg",
+    };
+    const { state, effects } = run(
+      [{ type: "reconciled", result: { kind: "new", session: session("s1") } }],
+      ctx({ photosAllowed: false, resolved: [photo] }),
+    );
+    expect(effects).toEqual([[]]);
+    expect(state.phase).toEqual({ kind: "locked", reason: "photos" });
+  });
+
+  it("stops Retry of a failed photo on Photos need Pro", () => {
+    const failed = session("s1", "failed");
+    const photo: ShareSession = {
+      ...failed,
+      entries: [{ ...failed.entries[0], kind: "image" }],
+    };
+    const { state, effects } = run(
+      [{ type: "retry", live: photo }],
+      ctx({ photosAllowed: false }),
+    );
+    expect(effects).toEqual([[]]);
+    expect(state.phase).toEqual({ kind: "locked", reason: "photos" });
+  });
+
+  it("keeps a held link for later without dropping it", () => {
+    const held = stepIncomingShare(
+      initialIncomingShare(false),
+      { type: "reconciled", result: { kind: "new", session: session("s1") } },
+      ctx({ canSave: false }),
+    );
+    expect(
+      stepIncomingShare(held.state, { type: "keep" }, ctx({ canSave: false }))
+        .effects,
+    ).toEqual([{ type: "navigateHome" }]);
   });
 
   it("classifies a fresh session and persists its terminal entries first", () => {

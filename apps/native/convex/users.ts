@@ -9,7 +9,14 @@ import {
 import type { MutationCtx } from "./_generated/server";
 import type { Id } from "./_generated/dataModel";
 import { internal } from "./_generated/api";
-import { liveOwner } from "./model/auth";
+import {
+  authedMutation,
+  authedQuery,
+  liveOwner,
+  senderFirstName,
+} from "./model/auth";
+import { firstNameOf } from "./model/firstName";
+import { rateLimiter } from "./model/rateLimiter";
 import { safeDeleteStorage } from "./model/storage";
 import { revoke } from "./legalConsent";
 import {
@@ -20,6 +27,7 @@ import {
 import { takeWithinBytes } from "./model/readBudget";
 import { logEvent } from "./model/log";
 import { deletePlanSharesForUser } from "./planShares";
+import { deleteSharedListsBatch } from "./sharedLists";
 
 /** Null when unauthenticated or the account is being deleted. */
 export const getCurrentUser = query({
@@ -37,6 +45,32 @@ export const getCurrentUser = query({
     const user = await liveOwner(ctx, userId);
     if (user === null) return null;
     return { _id: user._id, email: user.email };
+  },
+});
+
+const MAX_TYPED_NAME_CHARS = 80;
+
+export const getMyFirstName = authedQuery({
+  args: {},
+  returns: v.union(v.null(), v.string()),
+  handler: async (ctx) => (await senderFirstName(ctx, ctx.userId)) ?? null,
+});
+
+export const setMyName = authedMutation({
+  args: { name: v.string() },
+  returns: v.string(),
+  handler: async (ctx, args) => {
+    const name = args.name.replace(/\s+/g, " ").trim();
+    const first = firstNameOf(name);
+    if (first === undefined || name.length > MAX_TYPED_NAME_CHARS) {
+      throw new Error("Invalid name");
+    }
+    await rateLimiter.limit(ctx, "sharedListEdit", {
+      key: ctx.userId,
+      throws: true,
+    });
+    await ctx.db.patch(ctx.userId, { name });
+    return first;
   },
 });
 
@@ -227,6 +261,8 @@ async function deleteUserOwnedDataBatch(
   }
   if (demos.length === DELETE_BATCH) return false;
 
+  if (!(await deleteFreeSavesBatch(ctx, userId))) return false;
+
   const reads = await ctx.db
     .query("itemReads")
     .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -312,7 +348,15 @@ async function deleteSentNotificationsBatch(
   for (const reminder of reminders) {
     await ctx.db.delete(reminder._id);
   }
-  return reminders.length !== DELETE_BATCH;
+  if (reminders.length === DELETE_BATCH) return false;
+  const tripEves = await ctx.db
+    .query("tripEveReminders")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .take(DELETE_BATCH);
+  for (const tripEve of tripEves) {
+    await ctx.db.delete(tripEve._id);
+  }
+  return tripEves.length !== DELETE_BATCH;
 }
 
 async function deleteFeedbackBatch(
@@ -345,14 +389,16 @@ async function deleteCaptureTokensBatch(
 
 async function deleteSharingAndPlansBatch(
   ctx: MutationCtx,
-  userId: string,
+  userId: Id<"users">,
 ): Promise<boolean> {
   return (
     (await deleteShareLinksBatch(ctx, userId)) &&
     (await deletePlaceVisitsBatch(ctx, userId)) &&
+    (await deletePlaceRemovalsBatch(ctx, userId)) &&
     (await deleteTripsBatch(ctx, userId)) &&
     (await deleteTripPlansBatch(ctx, userId)) &&
-    (await deletePlanSharesForUser(ctx, userId))
+    (await deletePlanSharesForUser(ctx, userId)) &&
+    (await deleteSharedListsBatch(ctx, userId))
   );
 }
 
@@ -368,6 +414,35 @@ async function deleteShareLinksBatch(
     await ctx.db.delete(link._id);
   }
   return links.length !== DELETE_BATCH;
+}
+
+async function deleteFreeSavesBatch(
+  ctx: MutationCtx,
+  userId: string,
+): Promise<boolean> {
+  for (const status of ["pending", "placed", "released"] as const) {
+    const rows = await ctx.db
+      .query("freeSaves")
+      .withIndex("by_user_and_status", (q) =>
+        q.eq("userId", userId).eq("status", status),
+      )
+      .take(DELETE_BATCH);
+    for (const row of rows) await ctx.db.delete(row._id);
+    if (rows.length === DELETE_BATCH) return false;
+  }
+  return true;
+}
+
+async function deletePlaceRemovalsBatch(
+  ctx: MutationCtx,
+  userId: string,
+): Promise<boolean> {
+  const rows = await ctx.db
+    .query("placeRemovals")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .take(DELETE_BATCH);
+  for (const row of rows) await ctx.db.delete(row._id);
+  return rows.length !== DELETE_BATCH;
 }
 
 async function deletePlaceVisitsBatch(

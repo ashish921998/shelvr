@@ -8,8 +8,9 @@ export const ONBOARDING_STEPS = [
   "ahaShare",
   "ahaSpots",
   "commitment",
+  "notifications",
 ] as const;
-export const ONBOARDING_FLOW_VERSION = 22;
+export const ONBOARDING_FLOW_VERSION = 23;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -23,6 +24,7 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   ahaShare: "aha_share",
   ahaSpots: "aha_spots",
   commitment: "commitment",
+  notifications: "notification_ask",
 };
 
 /** How far along the header's bar is on `step`, from its place in the flow; the opener has no bar. */
@@ -46,4 +48,10 @@ export function nextOnboardingStep(step: OnboardingStep): OnboardingStep {
 export function restoreOnboardingStep(step: number | null): OnboardingStep {
   if (step === null || !Number.isInteger(step)) return "opener";
   return ONBOARDING_STEPS[step] ?? "opener";
+}
+
+export function viewedBeforeResume(step: number | null): OnboardingStep[] {
+  if (step === null || !Number.isInteger(step) || !ONBOARDING_STEPS[step])
+    return [];
+  return ONBOARDING_STEPS.slice(0, step + 1);
 }

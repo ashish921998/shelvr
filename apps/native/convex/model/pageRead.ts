@@ -17,7 +17,7 @@ import {
   withLinkedRecipe,
   type PageData,
 } from "./pageReadCore";
-import { fetchTikTokOEmbed } from "./readers/tiktok";
+import { fetchTikTok } from "./readers/tiktok";
 import { fetchYouTube } from "./readers/youtube";
 import { fetchXPost } from "./readers/x";
 import { fetchInstagram } from "./readers/instagram";
@@ -119,11 +119,12 @@ async function asInstagramCaption(read: Promise<PageData>): Promise<PageData> {
 type ReadOptions = {
   /** Skip the linked-recipe fetches a caption may trigger, for callers that only want the caption. */
   captionOnly?: boolean;
+  claimPaidRead?: () => Promise<boolean>;
 };
 
 const SOURCE_READERS = {
-  tiktok: async (url, { captionOnly }) => {
-    const page = await asCaption(fetchTikTokOEmbed(url));
+  tiktok: async (url, { captionOnly, claimPaidRead }) => {
+    const page = await asCaption(fetchTikTok(url, claimPaidRead));
     return captionOnly ? page : withLinkedRecipe(page);
   },
   x: async (url) => withLinkedRecipe(await asCaption(fetchXPost(url))),
@@ -145,15 +146,38 @@ async function readUnsourced(url: string): Promise<PageData> {
   return list ?? (await fetchPage(url));
 }
 
+const MAX_PAGE_FIELD_CHARS = {
+  title: 300,
+  description: 2000,
+  siteName: 200,
+  author: 200,
+} as const;
+
+function boundedPage(page: PageData): PageData {
+  const bounded = { ...page };
+  for (const field of Object.keys(
+    MAX_PAGE_FIELD_CHARS,
+  ) as (keyof typeof MAX_PAGE_FIELD_CHARS)[]) {
+    const value = page[field];
+    const max = MAX_PAGE_FIELD_CHARS[field];
+    if (value !== undefined && value.length > max) {
+      bounded[field] = value.slice(0, max).replace(/[\uD800-\uDBFF]$/, "");
+    }
+  }
+  return bounded;
+}
+
 export async function readPage(
   url: string,
   options: ReadOptions = {},
 ): Promise<PageRead> {
   try {
     const source = linkSource(url);
-    const page = source
-      ? await SOURCE_READERS[source](url, options)
-      : await readUnsourced(url);
+    const page = boundedPage(
+      source
+        ? await SOURCE_READERS[source](url, options)
+        : await readUnsourced(url),
+    );
     const urlShortForm = shortFormSource(url);
     const shortForm = urlShortForm && {
       ...urlShortForm,

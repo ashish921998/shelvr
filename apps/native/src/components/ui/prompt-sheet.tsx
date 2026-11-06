@@ -1,6 +1,13 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import type { ReactNode } from "react";
-import { Modal, Pressable, Text, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  Text,
+  View,
+} from "react-native";
 import { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -12,6 +19,7 @@ export function PromptSheet({
   children,
   actions,
   testID,
+  onDismiss,
 }: {
   visible: boolean;
   onClose: () => void;
@@ -20,6 +28,7 @@ export function PromptSheet({
   children?: ReactNode;
   actions: ReactNode;
   testID?: string;
+  onDismiss?: () => void;
 }) {
   useAppLocale();
   const reducedMotion = useReducedMotion();
@@ -29,8 +38,12 @@ export function PromptSheet({
       transparent
       animationType={reducedMotion ? "fade" : "slide"}
       onRequestClose={onClose}
+      onDismiss={onDismiss}
     >
-      <View style={styles.backdrop}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.backdrop}
+      >
         <Pressable
           style={styles.scrim}
           onPress={onClose}
@@ -44,7 +57,7 @@ export function PromptSheet({
           {children}
           <View style={styles.actions}>{actions}</View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

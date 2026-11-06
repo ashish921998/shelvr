@@ -1,9 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   appleMapsAccessToken,
   appleMapsConfig,
+  appleMapsFind,
   appleMapsLookup,
+  UNAVAILABLE,
   appleMapsSearchPlaces,
   firstPlace,
   placesOf,
@@ -265,6 +267,66 @@ describe("appleMapsLookup", () => {
         down as unknown as typeof fetch,
       ),
     ).toBeNull();
+  });
+});
+
+describe("appleMapsFind", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const find = (fetchImpl: () => Promise<Response>) =>
+    appleMapsFind(
+      "tok",
+      "search",
+      "Secret Bar, Lisbon",
+      undefined,
+      fetchImpl as unknown as typeof fetch,
+    );
+
+  it.each([
+    ["rate_limited", 429, async () => new Response("", { status: 429 })],
+    ["server_error", 503, async () => new Response("", { status: 503 })],
+    [
+      "network",
+      null,
+      async () => {
+        throw new TypeError("fetch failed");
+      },
+    ],
+    [
+      "timeout",
+      null,
+      async () => {
+        throw new DOMException("slow", "TimeoutError");
+      },
+    ],
+  ])(
+    "tells a %s failure apart from no match and logs it without the query",
+    async (category, status, answer) => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const fetchImpl = vi.fn(answer);
+      expect(await find(fetchImpl)).toBe(UNAVAILABLE);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledTimes(1);
+      const line = String(warn.mock.calls[0][0]);
+      expect(JSON.parse(line)).toMatchObject({
+        event: "apple_maps_unavailable",
+        path: "search",
+        category,
+        status,
+      });
+      expect(line).not.toContain("Secret");
+    },
+  );
+
+  it("is no match, without a log line, when Apple refuses the request or finds nothing", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(await find(async () => new Response("", { status: 404 }))).toBe(
+      null,
+    );
+    expect(await find(async () => Response.json({ results: [] }))).toBe(null);
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 

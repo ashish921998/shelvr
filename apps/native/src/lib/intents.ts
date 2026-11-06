@@ -2,7 +2,7 @@
 // the working "present the system Add-Event sheet" helper lives in /legacy.
 import { createEventInCalendarAsync } from "expo-calendar/legacy";
 import * as Clipboard from "expo-clipboard";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import * as Linking from "expo-linking";
 import { Platform } from "react-native";
 import { openLink } from "@/lib/open-link";
@@ -20,7 +20,7 @@ export async function runIntent(
       break;
     case "copy":
       await Clipboard.setStringAsync(value);
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      await haptics.success();
       break;
     case "web_search":
       await openLink(

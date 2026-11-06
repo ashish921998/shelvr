@@ -23,8 +23,9 @@ export function TripStopRow({
   dayColor,
   onPress,
 }: Props) {
-  const badge = t(stopBadge(stop.source));
-  const yours = stop.source === "save";
+  const badgeKey = stopBadge(stop);
+  const badge = t(badgeKey);
+  const yours = badgeKey === "tripPlanner.badgeYours";
   const why = stopWhyLine(stop, fromSave === true);
   return (
     <Pressable

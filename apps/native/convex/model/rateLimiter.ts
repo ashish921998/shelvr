@@ -40,11 +40,36 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: HOUR,
     capacity: 30,
   },
+  sharedListCreate: {
+    kind: "token bucket",
+    rate: 10,
+    period: HOUR,
+    capacity: 5,
+  },
+  sharedListJoin: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
+  sharedListEdit: {
+    kind: "token bucket",
+    rate: 600,
+    period: HOUR,
+    capacity: 120,
+  },
+  sharedListSearch: {
+    kind: "token bucket",
+    rate: 120,
+    period: HOUR,
+    capacity: 30,
+  },
   videoTranscript: {
     kind: "token bucket",
     rate: 20,
     period: DAY,
     capacity: 10,
+  },
+  tikTokCaption: {
+    kind: "token bucket",
+    rate: 50,
+    period: DAY,
+    capacity: 25,
   },
   videoTranscriptGlobal: {
     kind: "token bucket",
@@ -64,7 +89,7 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 200,
   },
   demoRetry: { kind: "token bucket", rate: 4, period: HOUR, capacity: 3 },
-  waitlistJoin: { kind: "token bucket", rate: 5, period: HOUR, capacity: 3 },
+  waitlistJoin: { kind: "token bucket", rate: 2, period: DAY, capacity: 2 },
   waitlistJoinIp: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
   waitlistJoinGlobal: {
     kind: "token bucket",
@@ -80,6 +105,12 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     rate: 60,
     period: MINUTE,
     capacity: 30,
+  },
+  reelPlacesCaption: {
+    kind: "token bucket",
+    rate: 200,
+    period: DAY,
+    capacity: 50,
   },
   oracleGlobal: {
     kind: "token bucket",

@@ -167,10 +167,11 @@ export function getOrCreatePendingOperationId(): string {
   return operationId;
 }
 
-function writePendingSpaces(spaces: string[], refreshOperationId: boolean) {
+/** Onboarding finished: hands the spaces to the replay hook. */
+export function setPendingSpaces(spaces: string[]) {
   const existing = readPendingRecord();
   const operationId =
-    spaces.length > 0 && refreshOperationId && !existing?.demoUrl
+    spaces.length > 0 && !existing?.demoUrl
       ? createOperationId()
       : (existing?.operationId ?? createOperationId());
   writePendingRecord({
@@ -185,15 +186,6 @@ function writePendingSpaces(spaces: string[], refreshOperationId: boolean) {
     ...answersOf(existing ?? {}),
   });
   notifyChanged();
-}
-
-/** Onboarding finished: hands the spaces to the replay hook. */
-export function setPendingSpaces(spaces: string[]) {
-  writePendingSpaces(spaces, true);
-}
-
-export function updatePendingSpaces(spaces: string[]) {
-  writePendingSpaces(spaces, false);
 }
 
 export function getPendingSpaces(): string[] {

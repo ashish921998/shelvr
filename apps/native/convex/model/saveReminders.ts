@@ -1,8 +1,14 @@
 import type { Doc } from "../_generated/dataModel";
 import { env } from "../_generated/server";
 import { linkSource } from "./externalUrl";
+import {
+  isGenericPlaceName,
+  isStreetAddress,
+  placeKey,
+  splitSavedPlace,
+} from "./plan";
 
-type ReminderKind = "read" | "cook";
+export type ReminderKind = "read" | "cook" | "visit";
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -11,6 +17,8 @@ export const READ_MIN_AGE_MS = DAY_MS;
 export const READ_MAX_AGE_MS = 90 * DAY_MS;
 export const COOK_MIN_AGE_MS = 3 * DAY_MS;
 const COOK_RECENTLY_OPENED_MS = 7 * DAY_MS;
+export const VISIT_MIN_AGE_MS = 3 * DAY_MS;
+export const VISIT_REPEAT_AFTER_MS = 90 * DAY_MS;
 
 export const MIN_GAP_MS = 20 * HOUR_MS;
 export const WEEKLY_LIMIT = 4;
@@ -37,7 +45,9 @@ const LATEST_HOUR = 19;
 const MIN_HOUR_SAMPLES = 5;
 export const HOUR_SAMPLE_WINDOW_MS = 30 * DAY_MS;
 
-export function reminderKind(item: Doc<"items">): ReminderKind | undefined {
+export function reminderKind(
+  item: Doc<"items">,
+): Exclude<ReminderKind, "visit"> | undefined {
   if (item.status !== "ready") return undefined;
   if (
     item.recipe !== undefined &&
@@ -55,9 +65,29 @@ export function reminderKind(item: Doc<"items">): ReminderKind | undefined {
   return undefined;
 }
 
+export function placeToVisit(
+  item: Doc<"items">,
+  visited: ReadonlySet<string>,
+): string | undefined {
+  if (item.status !== "ready" || reminderKind(item) === "cook")
+    return undefined;
+  for (const label of item.places ?? []) {
+    const { name } = splitSavedPlace(label);
+    if (
+      !isGenericPlaceName(name) &&
+      !isStreetAddress(name) &&
+      !isStreetAddress(label) &&
+      !visited.has(placeKey(name)) &&
+      !visited.has(placeKey(label))
+    )
+      return name;
+  }
+  return undefined;
+}
+
 export function reminderSubject(
   item: Doc<"items">,
-  kind: ReminderKind,
+  kind: Exclude<ReminderKind, "visit">,
 ): string | undefined {
   const subject =
     (kind === "cook" ? item.recipe?.name?.trim() : undefined) ||
@@ -71,31 +101,46 @@ type ReminderCandidate = {
   subject: string;
 };
 
+const KIND_ORDER: readonly ReminderKind[] = ["visit", "read", "cook"];
+
 export function reminderCandidates(
   newestFirst: readonly Doc<"items">[],
   now: number,
   previousKind: ReminderKind | undefined,
   tripStops: ReadonlySet<string>,
+  visited: ReadonlySet<string> = new Set(),
 ): ReminderCandidate[] {
-  const read: ReminderCandidate[] = [];
-  const cook: ReminderCandidate[] = [];
+  const byKind: Record<ReminderKind, ReminderCandidate[]> = {
+    visit: [],
+    read: [],
+    cook: [],
+  };
   for (const item of newestFirst) {
+    const age = now - item._creationTime;
+    const place = placeToVisit(item, visited);
+    if (place !== undefined) {
+      if (age >= VISIT_MIN_AGE_MS && !tripStops.has(item._id))
+        byKind.visit.push({ item, kind: "visit", subject: place });
+      continue;
+    }
     const kind = reminderKind(item);
     if (kind === undefined) continue;
     const subject = reminderSubject(item, kind);
     if (subject === undefined) continue;
-    const age = now - item._creationTime;
     if (
       kind === "read" &&
       age >= READ_MIN_AGE_MS &&
       age <= READ_MAX_AGE_MS &&
       !tripStops.has(item._id)
     )
-      read.push({ item, kind, subject });
+      byKind.read.push({ item, kind, subject });
     if (kind === "cook" && age >= COOK_MIN_AGE_MS)
-      cook.push({ item, kind, subject });
+      byKind.cook.push({ item, kind, subject });
   }
-  return previousKind === "read" ? [...cook, ...read] : [...read, ...cook];
+  return [
+    ...KIND_ORDER.filter((kind) => kind !== previousKind),
+    ...KIND_ORDER.filter((kind) => kind === previousKind),
+  ].flatMap((kind) => byKind[kind]);
 }
 
 export function openedTooRecently(
@@ -114,10 +159,12 @@ export function reminderBlocked(
   sentAt: readonly number[],
   recentReminders: readonly { createdAt: number; opened: boolean }[],
   shelf?: { nextAt: number; sentThisWeek: boolean },
+  tripEveAt?: number,
 ): BudgetBlock | undefined {
   if (
     sentAt.some((at) => now - at < MIN_GAP_MS) ||
-    (shelf !== undefined && shelf.nextAt - now < MIN_GAP_MS)
+    (shelf !== undefined && shelf.nextAt - now < MIN_GAP_MS) ||
+    (tripEveAt !== undefined && tripEveAt - now < MIN_GAP_MS)
   )
     return "too_soon";
   const kept = shelf !== undefined && !shelf.sentThisWeek ? 1 : 0;

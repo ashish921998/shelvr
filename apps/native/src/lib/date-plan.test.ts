@@ -122,14 +122,25 @@ describe("dateShareText", () => {
 });
 
 describe("emptyMessage", () => {
+  it("talks about the list when planning from one", () => {
+    expect(emptyMessage(result({ status: "no_pair" }), true).message).toContain(
+      "this list",
+    );
+    expect(
+      emptyMessage(result({ status: "no_anchor", kind: "lowkey" }), true)
+        .message,
+    ).toContain("this list");
+  });
+
   it("says what to save for the kind asked, or that the saves are far apart", () => {
     expect(
-      emptyMessage(result({ status: "no_anchor", kind: "lowkey" })).message,
+      emptyMessage(result({ status: "no_anchor", kind: "lowkey" }), false)
+        .message,
     ).toBe("Save a café or a park in Lisbon, then plan again.");
-    expect(emptyMessage(result({ status: "no_anchor" })).message).toBe(
+    expect(emptyMessage(result({ status: "no_anchor" }), false).message).toBe(
       "Save a restaurant or a bar in Lisbon, then plan again.",
     );
-    expect(emptyMessage(result({ status: "no_pair" })).title).toBe(
+    expect(emptyMessage(result({ status: "no_pair" }), false).title).toBe(
       "Your spots are far apart",
     );
   });

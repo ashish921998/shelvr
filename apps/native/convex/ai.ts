@@ -24,6 +24,7 @@ import {
   MAX_ITEM_PLACES,
   normalizeCities,
   normalizePlaces,
+  normalizePlaceLocations,
 } from "./model/itemFields";
 import { logEvent } from "./model/log";
 import {
@@ -60,6 +61,7 @@ import {
 } from "./model/videoTranscript";
 
 const CLASSIFY_TIMEOUT_MS = 60_000;
+const LINK_PROMPT_CONTENT_CHARS = 30_000;
 const SMALL_TIMEOUT_MS = 30_000;
 
 type CategorizationOutcome =
@@ -173,6 +175,7 @@ const intentsPromptBlock = (maxIntents: number): string =>
   ].join("\n");
 
 const MAX_CONTENT_CHARS = 8000;
+const LIST_PINS_TAKE_NO_CLUES: { name: string; location: string }[] = [];
 
 async function scheduleSteeringFor(
   ctx: ActionCtx,
@@ -261,6 +264,21 @@ const itemAnalysisSchema = z.object({
       PLACES_DESCRIPTION +
         " Read the whole text: a list of places often runs past the first lines.",
     ),
+  placeLocations: z
+    .array(
+      z.object({
+        name: z.string().describe("The exact corresponding name from places"),
+        location: z
+          .string()
+          .describe(
+            "The address, branch or neighbourhood explicitly stated for this place, copied from the source, at most 120 characters. Preserve the specific street or square rather than only the city. Never substitute a nearby attraction for the stated location or guess a branch.",
+          ),
+      }),
+    )
+    .optional()
+    .describe(
+      "Location clues that distinguish branches of the named places. Preserve every explicit branch, street address or neighbourhood; omit entries without such evidence. These are lookup context, not display names.",
+    ),
 });
 
 const recipeSchema = z
@@ -310,6 +328,7 @@ const speechRecipeSchema = z.object({ recipe: recipeSchema });
 
 const speechPlacesSchema = z.object({
   places: z.array(z.string()).describe(PLACES_DESCRIPTION),
+  placeLocations: itemAnalysisSchema.shape.placeLocations,
   cities: itemAnalysisSchema.shape.cities,
 });
 
@@ -387,6 +406,7 @@ type Analysis = {
   listPart?: PlaceListPart;
   /** The rest of a shared list, each part a save of its own city. */
   listParts?: PlaceListPart[];
+  stepFailed?: boolean;
 };
 
 type AnalysisOutcome = Analysis | { terminal: true };
@@ -420,6 +440,7 @@ function readingOf(
   item: Doc<"items">,
   { page, linkRead }: Analysis,
   posterStorageId: Id<"_storage"> | undefined,
+  stepFailed: boolean,
 ): Reading {
   return {
     title: item.type === "note" ? firstLine(item.note ?? "") : page?.title,
@@ -433,7 +454,8 @@ function readingOf(
     storageId: posterStorageId,
     aspectRatio:
       item.type === "link" ? page?.heroAspectRatio : item.aspectRatio,
-    enrichment: linkEnrichment(linkRead),
+    enrichment: stepFailed ? "partial" : linkEnrichment(linkRead),
+    ...(stepFailed ? { stepFailed: true } : {}),
   };
 }
 
@@ -445,6 +467,15 @@ function classificationOf(model: ModelResult): Classification {
     intents: sanitizeIntents(model.intents),
     cities: normalizeCities(model.cities),
     places: normalizePlaces(model.places),
+    ...(model.placeLocations !== undefined
+      ? {
+          placeLocations: normalizePlaceLocations(
+            model.placeLocations,
+            model.places,
+            model.cities,
+          ),
+        }
+      : {}),
     ...(model.placesHeard !== undefined
       ? { placesHeard: model.placesHeard }
       : {}),
@@ -485,7 +516,7 @@ function linkAnalysisPrompt(
       ? `Links to: ${page.linkedTitle} (${page.linkedUrl})`
       : "",
     page?.content
-      ? `${captionIntro(linkRead?.status === "ok" ? linkRead.shortForm : undefined)}\n${page.content.slice(0, PROMPT_CONTENT_CHARS)}`
+      ? `${captionIntro(linkRead?.status === "ok" ? linkRead.shortForm : undefined)}\n${page.content.slice(0, LINK_PROMPT_CONTENT_CHARS)}`
       : "No page content could be extracted.",
     linkRead?.status === "unreadable"
       ? "The page could not be read, so you have ONLY the URL. Base the title, description, and tags strictly on what the URL itself reveals (site, section, slug). Do NOT invent specifics — no facts, quotes, prices, names, or claims that are not literally present in the URL. Prefer a plain descriptive title over a confident-sounding one."
@@ -494,6 +525,27 @@ function linkAnalysisPrompt(
   ]
     .filter((line) => line !== "")
     .join("\n\n");
+}
+
+function retryReadNothingNew(item: Doc<"items">, read: LinkRead): boolean {
+  if (item.enrichment !== "partial") return false;
+  if (read.status === "unreadable") return true;
+  if (item.stepFailed) return false;
+  const {
+    content,
+    recipe,
+    placeList,
+    description,
+    title,
+    heroImageUrl,
+    media,
+  } = read.page;
+  if (content || recipe || placeList) return false;
+  if (item.content || item.recipe) return true;
+  if (description || media?.length) return false;
+  if (heroImageUrl && (title || !item.heroImageUrl)) return false;
+  if (read.shortForm?.video && item.placesHeard !== true) return false;
+  return Boolean(item.description || item.places?.length);
 }
 
 async function analyzeLinkItem(
@@ -507,7 +559,13 @@ async function analyzeLinkItem(
   if (!item.url) {
     throw new Error("Link item has no url");
   }
-  const read = fixtureRead(item.url) ?? (await readPage(item.url));
+  const read =
+    fixtureRead(item.url) ??
+    (await readPage(item.url, {
+      claimPaidRead: async () =>
+        (await stillAllowed(ctx, aiAllowed, item)) &&
+        (await claimVideoRead(ctx, "tikTokCaption", item.userId)),
+    }));
   if (read.status === "gone") {
     logEvent("error", "process_item_gone", {
       item_id: args.itemId,
@@ -527,6 +585,15 @@ async function analyzeLinkItem(
       error_category: summarizeError(read.error),
     });
   }
+  if (retryReadNothingNew(item, read)) {
+    await failItemAndRecordOutcome(
+      ctx,
+      args,
+      { itemType: item.type, startedAt },
+      { reason: "error", telemetry: "failed" },
+    );
+    return { terminal: true };
+  }
   const page = read.status === "unreadable" ? undefined : read.page;
   if (!(await stillAllowed(ctx, aiAllowed, item))) {
     return { page, linkRead: read };
@@ -542,12 +609,24 @@ async function analyzeLinkItem(
     askForRecipe,
     read.status === "ok" && read.shortForm?.video === true,
   );
-  const spoken = await fromSpeech(ctx, item, read, result, aiAllowed);
+  const { spoken, failed } = await fromSpeech(
+    ctx,
+    item,
+    read,
+    result,
+    aiAllowed,
+  );
   const parts = page?.placeList
     ? await placeListParts(ctx, item, page, aiAllowed)
     : undefined;
-  if (page === undefined || parts === undefined || parts.length === 0) {
-    return { result: { ...result, ...spoken }, page, linkRead: read };
+  const stepFailed = failed || parts === "failed";
+  if (page === undefined || !Array.isArray(parts) || parts.length === 0) {
+    return {
+      result: { ...result, ...spoken },
+      page,
+      linkRead: read,
+      stepFailed,
+    };
   }
   const index = partIndexFor(parts, item.title);
   const part = parts[index];
@@ -558,12 +637,14 @@ async function analyzeLinkItem(
       intents: intentsForPart(result.intents, part),
       places: part.places,
       cities: part.cities,
+      placeLocations: LIST_PINS_TAKE_NO_CLUES,
       ...(parts.length > 1 ? { title: part.title } : {}),
     },
     page: { ...page, content: part.content },
     linkRead: read,
     listPart: part,
     listParts: parts.filter((_, i) => i !== index),
+    stepFailed,
   };
 }
 
@@ -582,13 +663,13 @@ async function pinListPart(
   });
 }
 
-/** A shared list's places, one part per city; undefined when the model could not name their cities. */
+/** A shared list's places, one part per city; "failed" when the model could not name their cities. */
 async function placeListParts(
   ctx: ActionCtx,
   item: Doc<"items">,
   page: PageData,
   aiAllowed: boolean,
-): Promise<PlaceListPart[] | undefined> {
+): Promise<PlaceListPart[] | "failed" | undefined> {
   const places = page.placeList ?? [];
   if (places.length === 0 || !(await stillAllowed(ctx, aiAllowed, item))) {
     return undefined;
@@ -617,7 +698,7 @@ async function placeListParts(
       item_id: item._id,
       error_category: modelFailure(error),
     });
-    return undefined;
+    return "failed";
   }
 }
 
@@ -684,13 +765,12 @@ function speechWants(
   };
 }
 
-async function claimTranscript(
+async function claimVideoRead(
   ctx: ActionCtx,
+  limit: "videoTranscript" | "tikTokCaption",
   userId: Doc<"items">["userId"],
 ): Promise<boolean> {
-  const perUser = await rateLimiter.limit(ctx, "videoTranscript", {
-    key: userId,
-  });
+  const perUser = await rateLimiter.limit(ctx, limit, { key: userId });
   return (
     perUser.ok && (await rateLimiter.limit(ctx, "videoTranscriptGlobal")).ok
   );
@@ -717,7 +797,10 @@ function speechPlacesPrompt(page: PageData, transcript: string): string {
 }
 
 type Spoken = Partial<
-  Pick<LinkAnalysis, "recipe" | "places" | "cities" | "placesHeard">
+  Pick<
+    LinkAnalysis,
+    "recipe" | "places" | "cities" | "placesHeard" | "placeLocations"
+  >
 >;
 
 type SpeechEvent = "speech_recipe" | "speech_places";
@@ -732,19 +815,51 @@ async function fromSpeech(
   read: LinkRead,
   result: LinkAnalysis,
   aiAllowed: boolean,
-): Promise<Spoken> {
-  const spoken = await readSpeech(ctx, item, read, result, aiAllowed);
+): Promise<{ spoken: Spoken; failed: boolean }> {
+  const { spoken, failed } = await readSpeech(
+    ctx,
+    item,
+    read,
+    result,
+    aiAllowed,
+  );
+  const named = spoken.cities ?? result.cities;
+  const cities =
+    normalizeCities(named).length === 0 && item.cities?.length
+      ? item.cities
+      : named;
   if (!item.places?.length) {
-    return spoken;
+    return { spoken: { ...spoken, cities }, failed };
   }
   return {
-    ...spoken,
-    places: normalizePlaces([
-      ...(spoken.places ?? result.places ?? []),
-      ...item.places,
-    ]),
-    placesHeard: spoken.placesHeard ?? item.placesHeard,
+    failed,
+    spoken: {
+      ...spoken,
+      cities,
+      places: normalizePlaces([
+        ...(spoken.places ?? result.places ?? []),
+        ...item.places,
+      ]),
+      placesHeard: spoken.placesHeard ?? item.placesHeard,
+      placeLocations: normalizePlaceLocations(
+        [
+          ...(spoken.placeLocations ?? result.placeLocations ?? []),
+          ...(item.placeLocations ?? []),
+        ],
+        [...(spoken.places ?? result.places ?? []), ...item.places],
+        cities,
+      ),
+    },
   };
+}
+
+function speechStepFailed(outcome: string): boolean {
+  return (
+    outcome === "failed" ||
+    outcome === "model_timeout" ||
+    outcome === "rate_limited" ||
+    outcome.startsWith("transcript_")
+  );
 }
 
 async function readSpeech(
@@ -753,7 +868,7 @@ async function readSpeech(
   read: LinkRead,
   result: LinkAnalysis,
   aiAllowed: boolean,
-): Promise<Spoken> {
+): Promise<{ spoken: Spoken; failed: boolean }> {
   const wants = speechWants(item, read, result);
   const token = transcriptToken();
   const site = read.status === "ok" ? read.shortForm?.site : undefined;
@@ -766,10 +881,13 @@ async function readSpeech(
     !url ||
     read.status !== "ok"
   ) {
-    return {};
+    return { spoken: {}, failed: false };
   }
-  const log = (event: SpeechEvent, outcome: string) =>
+  let failed = false;
+  const log = (event: SpeechEvent, outcome: string) => {
+    failed ||= speechStepFailed(outcome);
     logEvent("info", event, { item_id: item._id, site, outcome });
+  };
   const logWanted = (outcome: string) => {
     if (wants.recipe) log("speech_recipe", outcome);
     if (wants.places) log("speech_places", outcome);
@@ -784,10 +902,10 @@ async function readSpeech(
     });
   } catch {
     logWanted("failed");
-    return {};
+    return { spoken: {}, failed: true };
   }
   if (transcript === undefined) {
-    return {};
+    return { spoken: {}, failed };
   }
   const [recipe, places] = await Promise.all([
     wants.recipe
@@ -801,7 +919,7 @@ async function readSpeech(
         )
       : undefined,
   ]);
-  return { ...(recipe ? { recipe } : {}), ...places };
+  return { spoken: { ...(recipe ? { recipe } : {}), ...places }, failed };
 }
 
 async function readTranscript(
@@ -818,7 +936,7 @@ async function readTranscript(
   if (!(await stillAllowed(ctx, aiAllowed, item))) {
     return undefined;
   }
-  if (!(await claimTranscript(ctx, item.userId))) {
+  if (!(await claimVideoRead(ctx, "videoTranscript", item.userId))) {
     video.log("rate_limited");
     return undefined;
   }
@@ -872,7 +990,8 @@ async function speechPlaces(
   result: LinkAnalysis,
   log: (outcome: string) => void,
 ): Promise<
-  Pick<LinkAnalysis, "places" | "cities" | "placesHeard"> | undefined
+  | Pick<LinkAnalysis, "places" | "cities" | "placesHeard" | "placeLocations">
+  | undefined
 > {
   try {
     const { object } = await generateObject({
@@ -893,6 +1012,11 @@ async function speechPlaces(
     );
     return {
       places,
+      placeLocations: normalizePlaceLocations(
+        [...(result.placeLocations ?? []), ...(object.placeLocations ?? [])],
+        places,
+        result.cities,
+      ),
       placesHeard: true,
       cities:
         normalizeCities(result.cities).length > 0
@@ -1155,7 +1279,7 @@ export const processItem = internalAction({
       if ("terminal" in outcome) {
         return null;
       }
-      const { page, linkRead } = outcome;
+      const { page } = outcome;
 
       posterStorageId = page?.heroImageUrl
         ? await storePoster(ctx, page.heroImageUrl)
@@ -1165,7 +1289,12 @@ export const processItem = internalAction({
         ? outcome.result
         : undefined;
       const keepTitle = args.refresh === true;
-      const reading = readingOf(item, outcome, posterStorageId);
+      const reading = readingOf(
+        item,
+        outcome,
+        posterStorageId,
+        model !== undefined && outcome.stepFailed === true,
+      );
       const classification = model && classificationOf(model);
 
       if (model) await pinListPart(ctx, args, outcome.listPart);
@@ -1211,8 +1340,7 @@ export const processItem = internalAction({
       );
       await scheduleSteeringFor(ctx, args.itemId, savedSpaceIds);
       await captureCategorizationTelemetry(ctx, {
-        outcome:
-          linkEnrichment(linkRead) === "partial" ? "partial" : "succeeded",
+        outcome: reading.enrichment === "partial" ? "partial" : "succeeded",
         itemType: item.type,
         durationMs: Date.now() - startedAt,
       });

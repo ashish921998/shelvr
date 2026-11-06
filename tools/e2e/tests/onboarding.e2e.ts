@@ -12,6 +12,7 @@ import {
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import {
   closePaywallTo,
+  continueToPaywall,
   expectPaywall,
   paywallTitle,
 } from "./paywall-sheet.ts";
@@ -45,10 +46,11 @@ test(
 
     await shareTheSampleReel(screen);
     await walkToCommitment(screen);
-    // Skipping the optional promise opens the paywall; closing returns to this screen.
-    const commit = screen.getByRole("button", "Maybe later");
-    await commit.tap({ timeout: 30_000 });
-    await expectPaywall(screen);
+    // Skipping the optional promise moves on to the paywall; closing returns to the screen before it.
+    const commit = await continueToPaywall(
+      screen,
+      screen.getByRole("button", "Maybe later"),
+    );
 
     await closeToCommitment(screen, commit);
     await expect(commit).toBeVisible({ timeout: 30_000 });
@@ -140,9 +142,10 @@ test(
     await expect(screen.getByText("You’re in.")).toBeVisible();
     await expect(paywallTitle(screen)).toBeHidden();
     await app.screenshot("commitment-confirmed");
-    const commit = screen.getByRole("button", "Continue");
-    await commit.tap();
-    await expectPaywall(screen);
+    const commit = await continueToPaywall(
+      screen,
+      screen.getByRole("button", "Continue"),
+    );
     await closeToCommitment(screen, commit);
     await expect(commit).toBeVisible({ timeout: 30_000 });
     await expect(screen.getByTestId("dev-login-button")).toBeHidden();

@@ -2494,7 +2494,7 @@ describe("failed saves and retry", () => {
     await t.mutation(api.items.reprocessItem, { id: itemId });
     const item = await t.run(async (ctx) => await ctx.db.get(itemId));
     expect(item?.status).toBe("processing");
-    expect(item?.enrichment).toBeUndefined();
+    expect(item?.enrichment).toBe("partial");
   });
 
   it("does not retry a no-article link (the URL itself is the save)", async () => {

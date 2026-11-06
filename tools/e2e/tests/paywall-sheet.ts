@@ -33,6 +33,23 @@ export async function expectPaywall(screen: Screen): Promise<void> {
   await expect(screen.getByRole("button", "Continue").last()).toBeVisible();
 }
 
+export async function continueToPaywall(
+  screen: Screen,
+  from: Locator,
+): Promise<Locator> {
+  await from.tap({ timeout: 30_000 });
+  const notNow = screen.getByRole("button", "Not now");
+  await pollUntil(
+    async () =>
+      (await notNow.isVisible()) || (await paywallTitle(screen).isVisible()),
+    { timeout: 60_000 },
+  );
+  const asked = await notNow.isVisible();
+  if (asked) await notNow.tap();
+  await expectPaywall(screen);
+  return asked ? notNow : from;
+}
+
 export async function openPaywallPlans(screen: Screen): Promise<void> {
   await screen.getByRole("button", "Continue").last().tap();
   await expect(screen.getByText("How your trial works")).toBeVisible();

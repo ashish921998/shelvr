@@ -1,3 +1,4 @@
+import { userRemovals } from "./model/placeRemovals";
 import { ConvexError, v } from "convex/values";
 import { internalQuery, internalMutation } from "./_generated/server";
 import { internal } from "./_generated/api";
@@ -27,10 +28,10 @@ import {
 } from "./model/memberships";
 import {
   enrichItem,
+  toItemCards,
   enrichedItemValidator,
   intentValidator,
   itemCardValidator,
-  toItemCard,
   CITY_SCAN_ROWS,
   readyCitySaves,
 } from "./items";
@@ -223,6 +224,7 @@ export const getSpace = authedQuery({
       return null;
     }
     const { saved, suggested } = await splitJoins(ctx, space._id);
+    const removals = await userRemovals(ctx, userId);
     const intentsByItem = new Map(
       saved.map((join) => [join.itemId, join.intents]),
     );
@@ -230,13 +232,13 @@ export const getSpace = authedQuery({
       loadItems(ctx, saved).then((rows) =>
         Promise.all(
           rows.map(async (item) => ({
-            ...(await enrichItem(ctx, item)),
+            ...(await enrichItem(ctx, item, removals)),
             spaceIntents: intentsByItem.get(item._id),
           })),
         ),
       ),
       loadItems(ctx, suggested).then((rows) =>
-        Promise.all(rows.map((item) => enrichItem(ctx, item))),
+        Promise.all(rows.map((item) => enrichItem(ctx, item, removals))),
       ),
     ]);
     return { ...space, items, suggestions };
@@ -261,7 +263,7 @@ export const getSpaceCards = authedQuery({
     }
     const { saved } = await splitJoins(ctx, space._id);
     const rows = await loadItems(ctx, saved);
-    const items = await Promise.all(rows.map((item) => toItemCard(ctx, item)));
+    const items = await toItemCards(ctx, rows);
     return { ...space, items };
   },
 });
@@ -799,7 +801,7 @@ export const claimPlanInternal = internalMutation({
   handler: async (ctx, args) => {
     const { userId, space } = await claimSpaceForPlanning(ctx, args.spaceId);
     const sources = (await planSaves(ctx, args.spaceId, userId, args.city)).map(
-      ({ item, join }) => toPlanSource(item, join, args.city),
+      ({ item }) => toPlanSource(item, args.city),
     );
     if (sources.length === 0) {
       return { spaceName: space.name, sources, been: [] };

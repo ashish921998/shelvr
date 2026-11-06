@@ -11,6 +11,9 @@ import {
   failureReasonValidator,
   intentValidator,
   normalizePlaces,
+  savedPlaceKey,
+  normalizePlaceLocations,
+  placeLocationsValidator,
   postMediaValidator,
   recipeValidator,
   type Recipe,
@@ -30,6 +33,7 @@ const readingValidator = v.object({
   storageId: v.optional(v.id("_storage")),
   aspectRatio: v.optional(v.number()),
   enrichment: v.optional(enrichmentValidator),
+  stepFailed: v.optional(v.boolean()),
 });
 
 const classificationValidator = v.object({
@@ -39,6 +43,7 @@ const classificationValidator = v.object({
   intents: v.optional(v.array(intentValidator)),
   cities: v.optional(v.array(v.string())),
   places: v.optional(v.array(v.string())),
+  placeLocations: v.optional(placeLocationsValidator),
   placesHeard: v.optional(v.boolean()),
   recipe: v.optional(recipeValidator),
   embedding: v.optional(
@@ -66,6 +71,7 @@ type Words = {
   intents: Doc<"items">["intents"];
   cities: string[] | undefined;
   places: string[] | undefined;
+  placeLocations: Doc<"items">["placeLocations"];
   placesHeard: boolean | undefined;
   recipe: Recipe | undefined;
 };
@@ -83,6 +89,7 @@ function readingWords(item: Doc<"items">, reading: Reading): Words {
     intents: item.intents ?? [],
     cities: item.cities,
     places: item.places,
+    placeLocations: item.placeLocations,
     placesHeard: item.placesHeard,
     recipe: reading.recipe ?? item.recipe,
   };
@@ -103,6 +110,14 @@ function classifiedWords(
         ? undefined
         : normalizePlaces(classification.places, classification.cities),
     placesHeard: classification.placesHeard,
+    placeLocations:
+      classification.placeLocations === undefined
+        ? undefined
+        : normalizePlaceLocations(
+            classification.placeLocations,
+            classification.places,
+            classification.cities,
+          ),
     recipe: reading.recipe ?? classification.recipe,
   };
 }
@@ -170,30 +185,47 @@ export function completionPatch(
 ): ItemPatch {
   const { reading } = run;
   const words = settledWords(item, run, aiAllowed);
+  if (item.placesEdited) {
+    words.cities = item.cities ?? [];
+    words.places = item.places ?? [];
+    words.placeLocations = item.placeLocations;
+    words.intents = words.intents?.filter(
+      (intent) => intent.kind !== "open_maps",
+    );
+  }
   const title = settledTitle(item, run.keepTitle, words);
+  const earlier = item.enrichment === "partial" ? item : undefined;
+  const content = reading.content || earlier?.content;
   return {
     title,
     description: words.description,
     tags: words.tags,
-    content: reading.content,
-    recipe: words.recipe,
+    content,
+    recipe: words.recipe ?? earlier?.recipe,
     siteName: reading.siteName,
-    author: reading.author,
-    heroImageUrl: reading.heroImageUrl,
-    media: reading.media,
+    author: reading.author ?? earlier?.author,
+    heroImageUrl: reading.heroImageUrl ?? earlier?.heroImageUrl,
+    media: reading.media ?? earlier?.media,
     articleMedia: reading.articleMedia,
     ...(reading.storageId !== undefined
       ? { storageId: reading.storageId }
       : {}),
-    aspectRatio: reading.aspectRatio,
+    aspectRatio:
+      reading.aspectRatio ??
+      (reading.heroImageUrl ? undefined : earlier?.aspectRatio),
     intents: words.intents,
     ...(words.cities !== undefined ? { cities: words.cities } : {}),
     ...(words.places !== undefined ? { places: words.places } : {}),
+    ...replaceCluesAndDropTheirPins(item, words),
     ...(words.placesHeard !== undefined
       ? { placesHeard: words.placesHeard }
       : {}),
     status: "ready",
-    enrichment: reading.enrichment,
+    enrichment:
+      earlier && !reading.content && reading.enrichment === "no_article"
+        ? "partial"
+        : reading.enrichment,
+    stepFailed: reading.stepFailed,
     failureReason: undefined,
     searchText: buildSearchText({
       title,
@@ -204,9 +236,40 @@ export function completionPatch(
       tags: words.tags,
       siteName: reading.siteName,
       note: item.note,
-      content: reading.content,
+      content,
     }),
     ...embeddingPatch(item, run, aiAllowed),
+  };
+}
+
+function replaceCluesAndDropTheirPins(
+  item: Doc<"items">,
+  words: Words,
+): ItemPatch {
+  if (item.placesEdited || words.placeLocations === undefined) return {};
+  const cities = words.cities ?? item.cities;
+  const key = (name: string) => savedPlaceKey(name, cities);
+  const changed = new Set(
+    words.placeLocations
+      .filter(
+        (hint) =>
+          !item.placeLocations?.some(
+            (old) =>
+              key(old.name) === key(hint.name) &&
+              old.location === hint.location,
+          ),
+      )
+      .map((hint) => key(hint.name)),
+  );
+  const changedPin = (pin: NonNullable<Doc<"items">["placePins"]>[number]) =>
+    changed.has(key(pin.name));
+  return {
+    placeLocations: words.placeLocations,
+    ...(item.placePins?.some(changedPin)
+      ? {
+          placePins: item.placePins.filter((pin) => !changedPin(pin)),
+        }
+      : {}),
   };
 }
 
@@ -218,7 +281,7 @@ export function failurePatch(
   item: Doc<"items">,
   reason: Infer<typeof failureReasonValidator>,
 ): ItemPatch | null {
-  return item.status === "ready"
-    ? null
-    : { status: "failed", failureReason: reason };
+  if (item.status === "ready") return null;
+  if (item.enrichment === "partial") return { status: "ready" };
+  return { status: "failed", failureReason: reason };
 }

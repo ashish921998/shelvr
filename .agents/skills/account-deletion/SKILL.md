@@ -19,7 +19,7 @@ cd apps/native && pnpm exec vitest run convex/accountDeletion.test.ts convex/not
 
 `notificationDelivery.test.ts` and `saveReminders.test.ts` hold the unit tests the claim checks below name; `notifications.test.ts` exercises `prepareWeeklyDigest` with a live owner. `accountDeletion.test.ts` runs in the Node environment, not `edge-runtime` like most Convex tests, because it reads source files. It never needs a simulator, a deployment or a secret.
 
-Run it after any change under `apps/native/convex/`. CI runs it too, but CI cannot tell whether the reasons recorded in the policy tables still describe the code: `UNOWNED_TABLES`, `RETAINED_ROWS` and `ONE_ROW_PER_ACCOUNT` at the top of the test file, `RECIPES` further down. When a change touches the deletion drain (`users.ts`, `planShares.ts`), `schema.ts`, `model/auth.ts`, the notification writers and claims, or the Apple token and refund-consent retention, reread them.
+Run it after any change under `apps/native/convex/`. CI runs it too, but CI cannot tell whether the reasons recorded in the policy tables still describe the code: `UNOWNED_TABLES`, `RETAINED_ROWS`, `ONE_ROW_PER_ACCOUNT` and `FEW_ROWS_PER_ACCOUNT` at the top of the test file, `RECIPES` further down. When a change touches the deletion drain (`users.ts`, `planShares.ts`), `schema.ts`, `model/auth.ts`, the notification writers and claims, or the Apple token and refund-consent retention, reread them.
 
 ## Reading a failure
 
@@ -56,6 +56,7 @@ A failure is a finding about the code until you can show the test's model is wro
 - A refused claim closes its row only when a claim reaches it: a row the drain deletes first never needs it, and a row leased to an in-flight send is skipped until the lease ends (the due check runs before the owner check).
 - `finish` and `finishReminder` still schedule the PostHog `notification_sent` event when a delivery claimed before deletion began finishes while its row exists. It carries the user id (person profile off), the notification id, its kind and counts, no content.
 - The writer scan reads source with the `typescript` compiler API (a dependency of `apps/native`, also used by `tools/verify-convex-api.mjs`). `the writers › finds the writers (the scan is not empty)` fails if the scan finds too few writers (the threshold is in the test).
+- `sharedLists` and `sharedListMembers` are left out of `drains <table> across batches` (`FEW_ROWS_PER_ACCOUNT`): a person holds at most 20 and the drain takes one a pass. `sharedListDeletion.test.ts` drains a person at that cap.
 - A table is "owned" if it has `userId` or an `id("users")` field. A table keyed another way (an email, an `ownerId` string) lands in the unexplained list on purpose.
 - The Convex Auth library tables `authVerifiers` and `authRateLimits` are listed as unowned and not audited.
 - Retained rows: only that their removal job is scheduled. Removal itself is covered by `appleRevoke.test.ts` ("keeps the retained token readable for the revoke job after the owner is gone, then forgets it") and `legalConsent.test.ts` ("revokes after account deletion and removes the consent record only after delivery").
@@ -66,7 +67,7 @@ A failure is a finding about the code until you can show the test's model is wro
 ## When a change is intended
 
 1. Make the code change. Run the check.
-2. New table with personal data: add its drain step to `deleteUserOwnedDataBatch`, and mention the table and its step in the `CLAUDE.md` schema list as `tools/verify-agent-docs.mjs` requires. If the step uses `.unique()`, add the table to `ONE_ROW_PER_ACCOUNT`. If it must outlive deletion, add it to `RETAINED_ROWS` with the job that removes it, and schedule that job in the deletion transaction.
+2. New table with personal data: add its drain step to `deleteUserOwnedDataBatch`. If the step uses `.unique()`, add the table to `ONE_ROW_PER_ACCOUNT`. If it must outlive deletion, add it to `RETAINED_ROWS` with the job that removes it, and schedule that job in the deletion transaction.
 3. New table without personal data: `UNOWNED_TABLES`, with the reason.
 4. New function that inserts into an owned table: give it an owner check. If a cron, webhook or scheduled job reaches it with a raw `userId`, also add a recipe to `RECIPES`: a `fence` sentence saying what refuses a draining account, the `table` it writes, a `seed` that makes a live account write, a `call`, and the `padding` (saves) and `fillers` (rows per table) that keep the account draining across several passes while the writer's own inputs still exist. If it prepares something for delivery, add a `claim` that hands it out, and the claim tests pick it up.
 5. Re-run. Then prove the edited check can still fail (next section).

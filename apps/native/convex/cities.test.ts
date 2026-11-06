@@ -1,3 +1,4 @@
+import { visibleSave } from "./model/placeRemovals";
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
@@ -232,7 +233,7 @@ describe("listCities", () => {
       const source = await base.run(async (ctx) => {
         const item = await ctx.db.get(id);
         if (!item) throw new Error("Missing fixture");
-        return toPlanSource(item, undefined, city);
+        return toPlanSource(await visibleSave(ctx, item), city);
       });
       expect(source.pins).toEqual([
         { name: pin.name, lat: pin.lat, lng: pin.lng },

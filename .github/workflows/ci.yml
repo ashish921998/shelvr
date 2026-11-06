@@ -109,6 +109,12 @@ jobs:
           BASE_REF: ${{ github.base_ref }}
         run: node tools/verify-convex-api.mjs "origin/$BASE_REF" HEAD
 
+      - name: Comment ratchet
+        if: ${{ !cancelled() }}
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: node tools/verify-comments.mjs "origin/$BASE_REF" HEAD
+
   # An OTA update only reaches installs whose store build shares the native
   # fingerprint. This job reports a pull request that moves it and never fails,
   # because merging a native change harms nobody; the OTA workflow's own gate

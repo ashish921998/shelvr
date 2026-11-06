@@ -304,6 +304,7 @@ describe("claimTripPlanInternal", () => {
       been: ["Elsewhere"],
       aiAllowed: true,
     });
+    if (claim.from !== "saves") throw new Error("expected a saves claim");
     expect(claim.startDate).toBeUndefined();
     expect(claim.sources).toHaveLength(3);
     expect(claim.pins.map((pin) => pin.appleId).sort()).toEqual([
@@ -479,6 +480,82 @@ describe("createTripPlan without Apple Maps", () => {
 });
 
 describe("createTripPlan with Apple Maps", () => {
+  it("keeps a removed place out when Apple finds it again from a surviving label", async () => {
+    await stubMaps();
+    vi.stubGlobal("fetch", fakeApple());
+    const pin = { name: "Tigre", lat: 38.715, lng: -9.13 };
+    const { t, itemIds } = await setup([
+      { title: "Tigre", places: ["Tigre"], pins: [pin] },
+      { title: "Same place, another label", places: ["Tigre, Alfama"] },
+      {
+        title: "Another place",
+        places: ["Sol"],
+        pins: [{ ...pin, name: "Sol" }],
+      },
+    ]);
+    await t.mutation(api.placeRemovals.removePlace, {
+      itemId: itemIds[0],
+      ...pin,
+    });
+    const { tripId } = await t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 1,
+      pace: "balanced",
+      interests: [],
+      locale: "en-GB",
+    });
+    const trip = await t.query(api.tripPlannerData.getTripPlan, {
+      tripId: tripId!,
+    });
+    expect(
+      [...trip!.days.flat(), ...trip!.unplanned].map((s) => s.name),
+    ).toEqual(["Sol"]);
+  });
+
+  it("keeps a place the user saved again after removing it, when only Apple can pin it", async () => {
+    await stubMaps();
+    vi.stubGlobal("fetch", fakeApple());
+    const pin = { name: "Tigre", lat: 38.715, lng: -9.13 };
+    const { base, t, userId, itemIds } = await setup([
+      { title: "Tigre", places: ["Tigre"], pins: [pin] },
+      {
+        title: "Another place",
+        places: ["Sol"],
+        pins: [{ ...pin, name: "Sol" }],
+      },
+    ]);
+    await t.mutation(api.placeRemovals.removePlace, {
+      itemId: itemIds[0],
+      ...pin,
+    });
+    await base.run(async (ctx) => {
+      await ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Tigre again",
+        cities: ["Lisbon"],
+        places: ["Tigre"],
+        url: "https://www.tiktok.com/@someone/video/2",
+        tags: [],
+        searchText: "Tigre again",
+      });
+    });
+    const { tripId } = await t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 1,
+      pace: "balanced",
+      interests: [],
+      locale: "en-GB",
+    });
+    const trip = await t.query(api.tripPlannerData.getTripPlan, {
+      tripId: tripId!,
+    });
+    expect(
+      [...trip!.days.flat(), ...trip!.unplanned].map((s) => s.name).sort(),
+    ).toEqual(["Sol", "Tigre"]);
+  });
+
   it("adds suggestions from the saves' taste, balanced across interests, without chains or far results", async () => {
     await stubMaps();
     const fetchMock = fakeApple();
@@ -836,5 +913,52 @@ describe("trip ownership", () => {
       "Somewhere",
     ]);
     expect(trip!.days[0][0].itemId).toBeUndefined();
+  });
+});
+
+describe("a personal trip", () => {
+  it("ignores the caller's shared lists when no list is named", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const { base, t, userId } = await setup();
+    await base.run(async (ctx) => {
+      const listId = await ctx.db.insert("sharedLists", {
+        ownerId: userId,
+        name: "Ours",
+        cities: ["Lisbon"],
+        inviteToken: "t",
+        placeCount: 1,
+        createdAt: 1,
+      });
+      await ctx.db.insert("sharedListMembers", {
+        listId,
+        userId,
+        joinedAt: 1,
+        seenAt: 1,
+      });
+      await ctx.db.insert("sharedListPlaces", {
+        listId,
+        addedBy: userId,
+        name: "List Only Spot",
+        lat: 38.715,
+        lng: -9.14,
+        city: "Lisbon",
+        addedAt: 1,
+      });
+    });
+    const result = await t.action(api.tripPlanner.createTripPlan, {
+      city: "Lisbon",
+      days: 1,
+      pace: "easy",
+      interests: [],
+    });
+    const trip = await t.query(api.tripPlannerData.getTripPlan, {
+      tripId: result.tripId!,
+    });
+    const names = [
+      ...(trip?.days.flat() ?? []),
+      ...(trip?.unplanned ?? []),
+    ].map((stop) => stop.name);
+    expect(names).not.toContain("List Only Spot");
+    expect(trip?.listId).toBeUndefined();
   });
 });

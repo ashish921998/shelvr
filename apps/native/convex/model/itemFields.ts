@@ -1,5 +1,7 @@
 import { type Infer, v } from "convex/values";
 
+import { placeKey } from "./plan";
+
 export const INTENT_KINDS = [
   "open_url",
   "copy",
@@ -34,6 +36,39 @@ export const placePinsValidator = v.array(
     category: v.optional(v.string()),
   }),
 );
+
+export const placeLocationsValidator = v.array(
+  v.object({ name: v.string(), location: v.string() }),
+);
+
+export function savedPlaceKey(
+  name: string,
+  cities?: readonly string[],
+): string {
+  return placeKey(normalizePlaceName(name, cities));
+}
+
+export function normalizePlaceLocations(
+  cluesBestFirst: Infer<typeof placeLocationsValidator> | undefined,
+  places: readonly string[] | undefined,
+  cities: readonly string[] = [],
+): Infer<typeof placeLocationsValidator> {
+  const names = new Map<string, string>();
+  for (const name of normalizePlaces(places, cities)) {
+    const key = placeKey(name);
+    if (key !== "" && !names.has(key)) names.set(key, name);
+  }
+  const locations = new Map<string, { name: string; location: string }>();
+  for (const entry of cluesBestFirst ?? []) {
+    const key = savedPlaceKey(entry.name, cities);
+    const name = names.get(key);
+    const location = entry.location.replace(/\s+/g, " ").trim();
+    if (name && location && location.length <= 120 && !locations.has(key)) {
+      locations.set(key, { name, location });
+    }
+  }
+  return [...locations.values()];
+}
 
 export const postMediaValidator = v.object({
   kind: v.union(v.literal("photo"), v.literal("video"), v.literal("gif")),

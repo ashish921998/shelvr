@@ -12,7 +12,7 @@ import { ONBOARDING_FLOW_VERSION } from "@/lib/onboarding-steps";
 import { SAMPLE_CITIES } from "@/lib/sample-cities";
 import { SAMPLE_CROPS } from "@/lib/sample-trip";
 import { Canvas, Circle, Group, Path, Skia } from "@shopify/react-native-skia";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Pressable, ScrollView, Text, View } from "react-native";
 import {
@@ -62,9 +62,7 @@ function useCommitmentHold(sample: AhaSample) {
     progress.set(1);
     setConfirmed(true);
     recordCommitment(sample, "confirmed");
-    if (process.env.EXPO_OS === "ios") {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
+    void haptics.success();
   }, [cancel, progress, sample]);
 
   const skip = () => {

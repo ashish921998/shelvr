@@ -15,7 +15,7 @@ Trips, item pages, sharing, settings, notifications. Map them when a change touc
 | [Plan a date](plan-a-date.md) | Home > a city > Plan a date                 | `tests/plan-city-date.e2e.ts`                              | tested (CI fake model only)                |
 
 `tests/home-cities.e2e.ts` is the Doctor, not a feature: it checks Home lists
-"Your cities" with a Lisbon card. The `e2e ios` workflow
+a Lisbon city card. The `e2e ios` workflow
 (`.github/workflows/e2e-ios.yml`) runs home-cities and onboarding (shard a),
 the paywall, plan-city-date and save-link-fixture (shard b) on main and on pull requests
 that touch the app and carry the `run-e2e` label, against a local Convex backend that runs the fake model

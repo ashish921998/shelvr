@@ -28,7 +28,12 @@ import {
 } from "./model/trip";
 import { requireProEntitlement } from "./subscriptions";
 import { effectiveStatus, getMembership } from "./model/memberships";
-import { readyCitySaves } from "./items";
+import { rawReadySavesNewestFirst } from "./items";
+import {
+  visibleItemPlaces,
+  userRemovals,
+  type Removal,
+} from "./model/placeRemovals";
 
 const MAX_CITY_CHARS = 80;
 
@@ -36,7 +41,9 @@ export async function loadReadySaves(
   ctx: QueryCtx,
   spaceId: Id<"spaces">,
   userId: string,
+  removals?: readonly Removal[],
 ): Promise<{ item: Doc<"items">; join: Doc<"spaceItems"> }[]> {
+  const decisions = removals ?? (await userRemovals(ctx, userId));
   const [saved, legacy] = await Promise.all(
     (["saved", undefined] as const).map((status) =>
       ctx.db
@@ -56,7 +63,16 @@ export async function loadReadySaves(
     const item = await ctx.db.get(join.itemId);
     if (item === null || item.userId !== userId) continue;
     if (item.status !== "ready") continue;
-    saves.push({ item, join });
+    saves.push({
+      item: visibleItemPlaces(
+        {
+          ...item,
+          intents: [...(item.intents ?? []), ...(join.intents ?? [])],
+        },
+        decisions,
+      ),
+      join,
+    });
   }
   return saves;
 }
@@ -73,12 +89,26 @@ export async function planSaves(
   if (city === undefined || cityKey(city) === "") {
     return await loadReadySaves(ctx, spaceId, userId);
   }
-  const items = await readyCitySaves(ctx, userId, city, MAX_PLAN_ITEMS);
+  const decisions = await userRemovals(ctx, userId);
+  const items = (await rawReadySavesNewestFirst(ctx, userId))
+    .filter((item) =>
+      (item.cities ?? []).some((value) => cityKey(value) === cityKey(city)),
+    )
+    .slice(0, MAX_PLAN_ITEMS);
   const saves: PlanSave[] = [];
   for (const item of items) {
     const join = await getMembership(ctx, item._id, spaceId);
     if (join !== null && effectiveStatus(join) !== "saved") continue;
-    saves.push({ item, ...(join === null ? {} : { join }) });
+    saves.push({
+      item: visibleItemPlaces(
+        {
+          ...item,
+          intents: [...(item.intents ?? []), ...(join?.intents ?? [])],
+        },
+        decisions,
+      ),
+      ...(join === null ? {} : { join }),
+    });
   }
   return saves;
 }
@@ -117,13 +147,10 @@ export async function beenPlaces(
   return [...visited];
 }
 
-export function toPlanSource(
-  item: Doc<"items">,
-  join?: Doc<"spaceItems">,
-  city?: string,
-): PlanSource {
+export function toPlanSource(item: Doc<"items">, city?: string): PlanSource {
   return {
     itemId: item._id,
+    savedAt: item._creationTime,
     title: item.title,
     description: item.description,
     content:
@@ -138,7 +165,7 @@ export function toPlanSource(
       ({ name, lat, lng }) => ({ name, lat, lng }),
     ),
     places: [
-      ...[...(item.intents ?? []), ...(join?.intents ?? [])]
+      ...(item.intents ?? [])
         .filter((intent) => intent.kind === "open_maps")
         .map((intent) => intent.value),
       ...(item.places ?? []),
@@ -191,9 +218,7 @@ export const claimTripInternal = internalMutation({
           (item.cities ?? []).some((value) => cityKey(value) === cityKey(city)),
         )
       : initial;
-    const sources = saves.map(({ item, join }) =>
-      toPlanSource(item, join, city),
-    );
+    const sources = saves.map(({ item }) => toPlanSource(item, city));
     if (sources.length === 0) {
       return { spaceName: space.name, city, sources, been: [], pins: [] };
     }
@@ -250,6 +275,7 @@ export async function deleteTripsForSpace(
 
 // ponytail: the newest 10 trips, up to 105 day stops and one membership read each; older trips' stops stay on the shelf.
 const TRIP_STOP_SCAN = 10;
+const PLANNED_STOP_SCAN = 300;
 
 /** Saves the trip page shows on a day of one of the user's trips. A place that didn't fit (`wishlist`) is not planned. */
 export async function tripStopItemIds(
@@ -266,7 +292,16 @@ export async function tripStopItemIds(
       day.stops.map((stop) => ({ itemId: stop.itemId, spaceId: trip.spaceId })),
     ),
   );
-  const planned = new Set<string>();
+  const plannedStops = await ctx.db
+    .query("tripStops")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .order("desc")
+    .take(PLANNED_STOP_SCAN);
+  const planned = new Set<string>(
+    plannedStops.flatMap((stop) =>
+      stop.day > 0 && stop.itemId !== undefined ? [stop.itemId] : [],
+    ),
+  );
   for (const { itemId, spaceId } of stops) {
     if (planned.has(itemId)) continue;
     const membership = await getMembership(ctx, itemId, spaceId);
@@ -320,11 +355,8 @@ export const swapTripStop = authedMutation({
     }
     const live: TripStop[] = [];
     for (const stop of trip.wishlist) {
-      if (
-        (await liveSave(ctx, stop, userId, trip.spaceId, trip.city)) &&
-        !(await findVisit(ctx, userId, stop.name))
-      )
-        live.push(stop);
+      const item = await liveSave(ctx, stop, userId, trip.spaceId, trip.city);
+      if (item && !(await findVisit(ctx, userId, stop.name))) live.push(stop);
     }
     const swapped = swapStop(
       { days: trip.days, wishlist: live },

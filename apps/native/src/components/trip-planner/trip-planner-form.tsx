@@ -14,13 +14,13 @@ import {
   TRIP_PACES,
 } from "@/lib/trip-planner";
 import { TRIP_INTERESTS, type TripInterest } from "@convex/model/tripPlan";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import type { ReactNode } from "react";
 import { Pressable, ScrollView, TextInput, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 function tick() {
-  if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
+  void haptics.selection();
 }
 
 export function FormSection({

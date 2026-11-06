@@ -6,11 +6,11 @@ after changing how reviews work, and compare.
 
 `cases.json` holds 19 cases:
 
-- **12 `bug` cases.** Each is a merged PR that shipped at least one bug a later PR fixed.
+- **14 `bug` cases.** Each is a merged PR that shipped at least one bug a later PR fixed.
   `commit` is the merge of the PR under review and `fixedBy` / `fixCommits` the fix. `bugs`
   lists each failure as its own target, so a PR that shipped three bugs is scored three
   times. Each target is tagged:
-  - `diff` (12 targets): a careful reader of the diff could have flagged it.
+  - `diff` (15 targets): a careful reader of the diff could have flagged it.
   - `runtime` (5): it only showed when the code ran against a real service or device, such
     as a live Pinterest read or RevenueCat's fallback screen.
   - `product` (1, `pr139`): the code did what it meant to; the product call was wrong.
@@ -19,11 +19,11 @@ after changing how reviews work, and compare.
   The tags are a judgment made when the cases were picked. A judge who disagrees with one
   should note it.
 
-- **7 `clean` cases.** Merged PRs that no later fix was traced to. `pr135` and `pr203` are
-  about the size of a typical bug case (around 1,000 changed lines); the other five are
-  small, so compare false alarms on the two groups separately. "No fix traced" is weaker
-  than "no bug", so treat a confirmed finding on a clean case as a reviewer win and move
-  the case.
+- **5 `clean` cases.** Merged PRs that no later fix was traced to. All five are small, so
+  they test false alarms on small changes only. "No fix traced" is weaker than "no bug", so
+  treat a confirmed finding on a clean case as a reviewer win and move the case. `pr135`
+  and `pr203` started as clean cases and were moved to `bug` on 2026-11-05, when a blind
+  review found a real bug in each (`pr135b` is still open on `main`).
 
 Cases were chosen by tracing fix commits on `main` back to the commit that introduced the
 lines they changed (`git blame` on each fix's parent), keeping only fixes whose bug sits
@@ -51,7 +51,7 @@ file.
 
 Per reviewer setup, record:
 
-- **Diff catch rate:** `diff` targets caught, out of 12. This is the number to compare.
+- **Diff catch rate:** `diff` targets caught, out of 15. This is the number to compare.
   Report `runtime` targets caught separately; missing them from a diff is expected, and they
   are what running the code would catch.
 - **False alarms:** findings rejected when checked by hand, on any case. A confirmed
@@ -59,7 +59,7 @@ Per reviewer setup, record:
 - **Cost and time:** tokens or dollars, and wall time per case.
 - **Triage time:** how long a person needs to read the findings and decide.
 
-With 12 scored targets, one target moves the catch rate by about 8 points. Run each setup
+With 15 scored targets, one target moves the catch rate by about 7 points. Run each setup
 at least twice and treat a gap smaller than two targets as noise.
 
 ## Caveats

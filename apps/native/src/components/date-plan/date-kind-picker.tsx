@@ -2,7 +2,7 @@ import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { DATE_OPTIONS, type DateOption } from "@/lib/date-plan";
 import { t } from "@/lib/i18n";
-import * as Haptics from "expo-haptics";
+import { haptics } from "@/lib/haptics";
 import { Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -14,20 +14,25 @@ const ICONS: Record<DateOption["ask"], AppSymbolName> = {
 
 function OptionRow({
   option,
+  onList,
   onPress,
 }: {
   option: DateOption;
+  onList: boolean;
   onPress: () => void;
 }) {
   const { theme } = useUnistyles();
   const label = t(option.label);
-  const hint = t(option.hint);
+  const hint =
+    onList && option.ask === "surprise"
+      ? t("sharedLists.dateSurpriseHint")
+      : t(option.hint);
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${label}, ${hint}`}
       onPress={() => {
-        if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
+        void haptics.selection();
         onPress();
       }}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
@@ -57,10 +62,12 @@ function OptionRow({
 /** "What kind of date?": the kinds the planner makes. */
 export function DateKindPicker({
   city,
+  onList,
   problem,
   onPick,
 }: {
   city: string;
+  onList: boolean;
   problem: string | null;
   onPick: (ask: DateOption["ask"]) => void;
 }) {
@@ -88,6 +95,7 @@ export function DateKindPicker({
           <OptionRow
             key={option.ask}
             option={option}
+            onList={onList}
             onPress={() => onPick(option.ask)}
           />
         ))}

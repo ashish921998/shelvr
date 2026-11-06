@@ -1,4 +1,5 @@
 import { analytics } from "@/lib/analytics";
+import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
 import { tripDayLabel } from "@/lib/trip-planner";
 import { api } from "@convex/_generated/api";
@@ -12,7 +13,7 @@ import {
   UNPLANNED_DAY,
 } from "@convex/model/tripPlan";
 import type { OptimisticLocalStore } from "convex/browser";
-import type { FunctionArgs } from "convex/server";
+import type { FunctionArgs, FunctionReturnType } from "convex/server";
 import { useAction, useMutation } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert } from "react-native";
@@ -234,8 +235,10 @@ export function useTripEditor(trip: TripPlanDetail) {
       const name = stopName(stopId);
       const edit = ++latest.current;
       offerUndo(null);
+      if (method === "drag") void haptics.landing();
       try {
         const before = await optimistic.move({ stopId, ...to });
+        if (method === "menu") void haptics.selection();
         analytics.capture("trip_plan_stop_moved", {
           across_days: from.day !== to.day,
           method,
@@ -266,6 +269,7 @@ export function useTripEditor(trip: TripPlanDetail) {
       offerUndo(null);
       try {
         const before = await optimistic.remove({ stopId: stop._id });
+        void haptics.selection();
         analytics.capture("trip_plan_stop_removed", { source: stop.source });
         if (edit !== latest.current) return;
         offerUndo({
@@ -287,6 +291,7 @@ export function useTripEditor(trip: TripPlanDetail) {
     offerUndo(null);
     try {
       await optimistic.move({ stopId: undo.stopId, ...undo.before });
+      void haptics.selection();
       analytics.capture("trip_plan_edit_undone", { action: undo.kind });
     } catch (error) {
       showEditFailed(error);
@@ -348,6 +353,21 @@ export function useTripPlaceSearch(
   locale: string,
 ): PlaceSearch {
   const search = useAction(api.tripPlanner.searchTripPlaces);
+  const run = useCallback(
+    (text: string) => search({ tripId, query: text, locale }),
+    [search, tripId, locale],
+  );
+  return usePlaceSearch(run, query);
+}
+
+type SearchTripPlacesResult = FunctionReturnType<
+  typeof api.tripPlanner.searchTripPlaces
+>;
+
+export function usePlaceSearch(
+  run: (text: string) => Promise<SearchTripPlacesResult>,
+  query: string,
+): PlaceSearch {
   // The answer and the text it answers; any other text is still being searched.
   const [answer, setAnswer] = useState<{
     text: string;
@@ -360,7 +380,7 @@ export function useTripPlaceSearch(
     const ask = ++latest.current;
     if (short) return;
     const timer = setTimeout(() => {
-      search({ tripId, query: text, locale })
+      run(text)
         .then((result) => {
           if (ask !== latest.current) return;
           analytics.capture("trip_plan_place_searched", {
@@ -381,7 +401,7 @@ export function useTripPlaceSearch(
         });
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [locale, search, short, text, tripId]);
+  }, [run, short, text]);
   if (short) return { status: "idle" };
   return answer?.text === text ? answer.result : { status: "searching" };
 }

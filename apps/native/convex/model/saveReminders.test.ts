@@ -6,14 +6,17 @@ import {
   MIN_GAP_MS,
   READ_MAX_AGE_MS,
   READ_MIN_AGE_MS,
+  VISIT_MIN_AGE_MS,
   WEEK_MS,
   openedTooRecently,
+  placeToVisit,
   preferredReminderHour,
   reminderBlocked,
   reminderCandidates,
   reminderKind,
   reminderSubject,
 } from "./saveReminders";
+import { placeKey } from "./plan";
 
 const DAY = 24 * 60 * 60 * 1000;
 const NOW = Date.parse("2026-09-25T18:00:00Z");
@@ -43,6 +46,116 @@ const recipe = (fields: Partial<Doc<"items">> = {}) =>
     recipe: { name: "Lasagna", ingredients: ["pasta"], steps: ["bake"] },
     ...fields,
   });
+
+const been = (...names: string[]) => new Set(names.map(placeKey));
+const spot = (fields: Partial<Doc<"items">> = {}) =>
+  item({
+    _creationTime: NOW - 5 * DAY,
+    url: "https://www.instagram.com/reel/Cabc123/",
+    places: ["As Bifanas do Afonso", "Castelo de São Jorge"],
+    ...fields,
+  });
+
+describe("asking about a saved place", () => {
+  it("names the first place the owner has not been to", () => {
+    expect(placeToVisit(spot(), new Set())).toBe("As Bifanas do Afonso");
+    expect(placeToVisit(spot(), been("As Bifanas do Afonso"))).toBe(
+      "Castelo de São Jorge",
+    );
+  });
+
+  it("asks about the venue, not its area or a street address", () => {
+    const places = ["12 Main Street", "Time Out Market, Cais do Sodré, Lisbon"];
+    expect(placeToVisit(spot({ places }), new Set())).toBe("Time Out Market");
+    expect(
+      placeToVisit(spot({ places }), been("Time Out Market")),
+    ).toBeUndefined();
+    expect(placeToVisit(spot({ places }), been(places[1]))).toBeUndefined();
+  });
+
+  it("never asks about a label that names no venue", () => {
+    for (const label of [
+      "12, rue de la Paix, Paris",
+      "123, rue de Rivoli, Paris",
+      "12 bis, rue de la Paix",
+      "Restaurant",
+      "the bar",
+    ])
+      expect(
+        placeToVisit(spot({ places: [label] }), new Set()),
+      ).toBeUndefined();
+  });
+
+  it("asks about a short venue name", () => {
+    for (const name of ["XO", "Ko", "Bar 44", "Room 39", "鮨", "Nobu"])
+      expect(placeToVisit(spot({ places: [name] }), new Set())).toBe(name);
+  });
+
+  it("has nothing to ask once every place is visited, or none is named", () => {
+    expect(
+      placeToVisit(
+        spot(),
+        been("As Bifanas do Afonso", "Castelo de São Jorge"),
+      ),
+    ).toBeUndefined();
+    expect(placeToVisit(spot({ places: [" "] }), new Set())).toBeUndefined();
+    expect(
+      placeToVisit(spot({ places: undefined }), new Set()),
+    ).toBeUndefined();
+    expect(
+      placeToVisit(spot({ status: "processing" }), new Set()),
+    ).toBeUndefined();
+  });
+
+  it("keeps a recipe that names its restaurant a recipe", () => {
+    expect(placeToVisit(recipe({ places: ["Nonna's"] }), new Set())).toBe(
+      undefined,
+    );
+  });
+
+  it("gives a place a few days, then asks before the article it came in", () => {
+    const fresh = spot({ _creationTime: NOW - VISIT_MIN_AGE_MS + 1 });
+    const guide = article({ places: ["Time Out Market"] });
+    const due = spot();
+    const candidates = reminderCandidates(
+      [fresh, guide, due, article()],
+      NOW,
+      undefined,
+      new Set(),
+    );
+    expect(candidates.map((c) => [c.item._id, c.kind, c.subject])).toEqual([
+      [due._id, "visit", "As Bifanas do Afonso"],
+      [candidates[1].item._id, "read", candidates[1].subject],
+    ]);
+    expect(candidates[1].item._id).not.toBe(guide._id);
+  });
+
+  it("leaves a place on a trip to the trip, and an article falls back to reading", () => {
+    const stop = spot();
+    const visitedGuide = article({ places: ["Time Out Market"] });
+    const candidates = reminderCandidates(
+      [stop, visitedGuide],
+      NOW,
+      undefined,
+      new Set([stop._id]),
+      been("Time Out Market"),
+    );
+    expect(candidates.map((c) => [c.item._id, c.kind])).toEqual([
+      [visitedGuide._id, "read"],
+    ]);
+  });
+
+  it("sends the place kind to the back after a place reminder", () => {
+    const [place, read, cook] = [spot(), article(), recipe()];
+    const kinds = (previous?: "visit" | "read" | "cook") =>
+      reminderCandidates([place, read, cook], NOW, previous, new Set()).map(
+        (c) => c.kind,
+      );
+    expect(kinds()).toEqual(["visit", "read", "cook"]);
+    expect(kinds("visit")).toEqual(["read", "cook", "visit"]);
+    expect(kinds("cook")).toEqual(["visit", "read", "cook"]);
+  });
+});
 
 describe("which saves get a reminder", () => {
   it("reads an article with a body", () => {

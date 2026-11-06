@@ -8,6 +8,7 @@ import {
 } from "@/lib/city-pins";
 import { moveCamera, sameCamera } from "@/lib/map-camera";
 import { fitCamera } from "@/lib/trip";
+import { useImage } from "expo-image";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -21,6 +22,7 @@ type Props = {
   /** How much of the map's bottom the places sheet covers when the page opens. */
   coveredBottom: number;
   onSelect: (id: string) => void;
+  visible?: number;
 };
 
 export function CityMap({
@@ -29,6 +31,7 @@ export function CityMap({
   height,
   coveredBottom,
   onSelect,
+  visible = Infinity,
 }: Props) {
   const { theme, rt } = useUnistyles();
   const ref = useRef<AppleMaps.MapView>(null);
@@ -87,7 +90,7 @@ export function CityMap({
 
   // A recomputed camera with the same values is not a move.
   const [steady, setSteady] = useState(camera);
-  if (!sameCamera(steady, camera)) setSteady(camera);
+  if (camera && !sameCamera(steady, camera)) setSteady(camera);
   // expo-maps applies every cameraPosition prop change without animation, so the prop holds only the first camera.
   const [firstCamera, setFirstCamera] = useState(steady);
   if (firstCamera === undefined && steady !== undefined) setFirstCamera(steady);
@@ -99,18 +102,22 @@ export function CityMap({
     );
   }, [steady, firstCamera]);
 
-  const annotations = pins.map((pin) => {
+  const bubble = useImage(require("../../../assets/map/place-bubble.png"));
+  const selectedBubble = useImage(
+    require("../../../assets/map/place-bubble-selected.png"),
+  );
+  const annotations = pins.slice(0, visible).map((pin) => {
     const id = cityPinId(pin);
     const isSelected = id === selected;
     return {
       id,
       coordinates: { latitude: pin.lat, longitude: pin.lng },
       title: pin.name,
-      text: String(pin.number),
-      backgroundColor: isSelected
-        ? theme.colors.foreground
-        : theme.colors.primary,
-      textColor: isSelected ? theme.colors.primary : theme.colors.onTint,
+      text: pin.emoji ?? "📍",
+      icon: (isSelected ? selectedBubble : bubble) ?? undefined,
+      anchor: { x: 0.5, y: 0.5 },
+      backgroundColor: theme.colors.surface,
+      textColor: theme.colors.foreground,
     };
   });
   const select = (id: string | undefined) => {
@@ -141,7 +148,7 @@ export function CityMap({
       markers={annotations.map((pin) => ({
         id: pin.id,
         coordinates: pin.coordinates,
-        title: `${pin.text}. ${pin.title}`,
+        title: `${pin.text} ${pin.title}`,
       }))}
       onMarkerClick={(marker) => select(marker.id)}
     />

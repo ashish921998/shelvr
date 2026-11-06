@@ -606,3 +606,30 @@ describe("account deletion fence", () => {
     ).rejects.toThrow(/Not authenticated/);
   });
 });
+
+describe("setMyName", () => {
+  it("names a nameless account for lists and invites, and keeps the full name", async () => {
+    const backend = newConvexTest();
+    const { t, userId } = await as(backend);
+    expect(await t.query(api.users.getMyFirstName, {})).toBeNull();
+
+    expect(
+      await t.mutation(api.users.setMyName, { name: "  Maya   Lee " }),
+    ).toBe("Maya");
+
+    expect(await t.query(api.users.getMyFirstName, {})).toBe("Maya");
+    const user = await t.run(async (ctx) => await ctx.db.get(userId));
+    expect(user?.name).toBe("Maya Lee");
+  });
+
+  it("refuses a name nobody could be shown as", async () => {
+    const backend = newConvexTest();
+    const { t } = await as(backend);
+    for (const name of ["   ", "maya@example.com", "x".repeat(41)]) {
+      await expect(t.mutation(api.users.setMyName, { name })).rejects.toThrow(
+        "Invalid name",
+      );
+    }
+    expect(await t.query(api.users.getMyFirstName, {})).toBeNull();
+  });
+});

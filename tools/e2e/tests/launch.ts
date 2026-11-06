@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
 
-// Config and workers must load local settings before capturing launch values.
 const localEnvironment = new URL("../.env.local", import.meta.url);
 const ci = process.env.CI?.trim().toLowerCase() ?? "";
 if (["", "0", "false"].includes(ci) && existsSync(localEnvironment)) {

@@ -4,7 +4,9 @@ import { ahaSample } from "@/lib/aha-sample";
 import { stepTransition } from "@/lib/motion";
 import { useOnboarding } from "@/lib/onboarding";
 import { noteOnboardingFinished } from "@/lib/welcome-save";
+import { notificationPermissionState } from "@/lib/notification-token";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
+import { useFreePlanOpen } from "@/lib/free-plan";
 import type { SampleCityId } from "@/lib/sample-cities";
 import {
   GOALS,
@@ -23,6 +25,7 @@ import {
   onboardingProgress,
   previousOnboardingStep,
   restoreOnboardingStep,
+  viewedBeforeResume,
   type OnboardingStep,
 } from "@/lib/onboarding-steps";
 import {
@@ -33,12 +36,13 @@ import {
   setOnboardingProgress,
   setPendingSpaces,
 } from "@/lib/pending-onboarding";
-import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
+import { holdIncomingShare } from "@/lib/onboarding-exit";
 import { SignInView } from "@/components/sign-in-view";
 import { AhaShareStep } from "@/components/onboarding/aha-share";
 import { AhaSpotsStep } from "@/components/onboarding/aha-spots";
 import { CityStep } from "@/components/onboarding/city-step";
 import { CommitmentStep } from "@/components/onboarding/commitment";
+import { NotificationsStep } from "@/components/onboarding/notifications";
 import { OpenerStep } from "@/components/onboarding/opener";
 import { ProgressChartStep } from "@/components/onboarding/progress-chart";
 import { ScalePressable } from "@/components/onboarding/parts";
@@ -49,8 +53,7 @@ import {
 } from "@/components/onboarding/questions";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useConvexAuth } from "convex/react";
-import * as Haptics from "expo-haptics";
-import { getSharedPayloads } from "expo-sharing";
+import { haptics } from "@/lib/haptics";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
@@ -65,17 +68,9 @@ const SKIPPABLE: ReadonlySet<OnboardingStep> = new Set([
   "city",
 ]);
 
-function holdIncomingShare() {
-  try {
-    if (getSharedPayloads().length > 0) markPendingShareOnDevice();
-  } catch (err) {
-    analytics.captureError("onboarding_hold_share_failed", err);
-  }
-}
-
-function useStepAnalytics(step: OnboardingStep) {
+function useStepAnalytics(step: OnboardingStep, resumedAt: number | null) {
   const tracked = useRef(new Set<OnboardingStep>());
-  const viewed = useRef(new Set<OnboardingStep>());
+  const viewed = useRef(new Set<OnboardingStep>(viewedBeforeResume(resumedAt)));
   const enteredAt = useRef(0);
   const current = useRef<OnboardingStep | null>(null);
   const index = ONBOARDING_STEPS.indexOf(step);
@@ -180,11 +175,16 @@ export default function OnboardingScreen() {
   const [showSignIn, setShowSignIn] = useState(false);
   const [viewedOpenerPages] = useState(() => new Set<number>());
   const [signedIn, setSignedIn] = useState(false);
-  const recordCurrentStep = useStepAnalytics(step);
+  const recordCurrentStep = useStepAnalytics(step, initial.step);
   const kind = planKindFor(goals);
   const spaces = goalSpaces(goals);
   const sample = ahaSample(kind, travelCity);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
+  const currentStep = useRef(step);
+
+  useEffect(() => {
+    currentStep.current = step;
+  }, [step]);
 
   useEffect(() => {
     setOnboardingProgress({
@@ -214,9 +214,7 @@ export default function OnboardingScreen() {
   }, [signedIn, isAuthenticated, completeOnboarding]);
 
   const finish = () => {
-    if (process.env.EXPO_OS === "ios") {
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
+    void haptics.success();
     analytics.capture(
       "onboarding_completed",
       onboardingCompletedProperties(spaces, {
@@ -229,20 +227,35 @@ export default function OnboardingScreen() {
     recordCurrentStep();
     holdIncomingShare();
     setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
-    // The reel they shared in the demo becomes their first real save once they have Pro.
+    // The reel they shared in the demo becomes their first real save once they can save.
     queueDemoUrl(sample.firstSaveUrl);
     noteOnboardingFinished();
     completeOnboarding();
   };
 
+  const freePlanOpen = useFreePlanOpen();
   const paywall = useOnboardingPaywall({
     onPro: finish,
     onUnavailable: finish,
+    onClosed: freePlanOpen === false ? undefined : finish,
   });
 
-  const askAfterCommitment = () => {
+  const askForPlan = () => {
     recordCurrentStep();
     paywall.ask();
+  };
+
+  const leaveCommitment = () => {
+    void notificationPermissionState()
+      .catch((error: unknown) => {
+        analytics.captureError("onboarding_notifications_check_failed", error);
+        return "blocked" as const;
+      })
+      .then((state) => {
+        if (currentStep.current !== "commitment") return;
+        if (state === "ask") advance();
+        else askForPlan();
+      });
   };
 
   if (showSignIn) {
@@ -313,7 +326,15 @@ export default function OnboardingScreen() {
           <CommitmentStep
             sample={sample}
             leaving={paywall.asked}
-            onContinue={askAfterCommitment}
+            onContinue={leaveCommitment}
+          />
+        );
+      case "notifications":
+        return (
+          <NotificationsStep
+            sample={sample}
+            leaving={paywall.asked}
+            onContinue={askForPlan}
           />
         );
     }

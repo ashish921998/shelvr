@@ -390,6 +390,7 @@ describe("saveWhy", () => {
   };
   const source = (fields: Partial<PlanSource>): PlanSource => ({
     itemId,
+    savedAt: 0,
     description: "A curated list of top-rated Lisbon eateries",
     places: ["Santa Joana"],
     ...fields,

@@ -3,9 +3,8 @@
 ## Start here
 
 Read `CLAUDE.md` before changing code. It is the detailed source of truth for
-the product model, architecture, environment variables, commands, and
-conventions. Keep this file short and use it as the routing layer rather than
-duplicating that reference.
+the product model, architecture, commands, and conventions. Keep this file
+short and use it as the routing layer rather than duplicating that reference.
 
 Before editing native app code, consult the Expo SDK 58 documentation linked in
 `CLAUDE.md`. Before editing `apps/native/convex/**`, read
@@ -30,7 +29,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   (`useTrialReminder` in `trial-reminder.ts`, `useHomeFeed` in `home-feed.tsx`),
   so search for the hook name, not the filename. Subfolders exist only for
   `src/lib/share` and `src/lib/splash`.
-- **Design tokens:** `src/unistyles.ts`. Motion: `src/lib/motion.ts`. Shared
+- **Design tokens:** `src/unistyles.ts`. Motion: `src/lib/motion.ts`. Haptics:
+  `src/lib/haptics.ts`. Shared
   primitives: `src/components/ui` (`themed-text.tsx`, `button.tsx`). See `docs/architecture/design-system.md`.
 - **Paywall and entitlement:** `src/lib/entitlement.ts` owns `useEntitlement`,
   `openPaywall`, `openPaywallOutcome`, `usePaywallGuard` and `restorePurchases`.
@@ -46,6 +46,12 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `src/components/date-plan`, state in `src/lib/date-plan.ts` and backend in
   `convex/datePlans.ts` (rules in `convex/model/dateRank.ts`).
   Retired routes redirect to Home through `src/lib/home-href.ts`.
+- **Shared lists:** route `src/app/(app)/shared-list/[id].tsx`, the form
+  `new-shared-list.tsx`, `add-list-place.tsx`, the root Join screen
+  `src/app/list-invite/[token].tsx`; rows and cards in `src/components/shared-list`;
+  hooks and helpers in `src/lib/shared-lists.ts`, the join coordinator in
+  `src/lib/invite-join.ts` with its SecureStore slot `pending-invite.ts`, gating in
+  `list-gate.ts`; backend `convex/sharedLists.ts` and `convex/model/sharedLists.ts`.
 - **Map tab:** route `src/app/(app)/(tabs)/(map)/index.tsx`, map, search and filter chips in
   `src/components/map`, filter rules in `src/lib/map-filters.ts` and
   `convex/model/placeKinds.ts`, each pin's emoji in `src/lib/map-pin-emoji.ts`, data from
@@ -82,7 +88,7 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `convex/failItem.test.ts` tests it through `failItem` and the stale cron.
   Re-record only for a change you intend, with the command in the test header,
   and review the row diff.
-- **Large files:** `convex/items.ts` (about 2,500 lines), `convex/ai.ts` (about 1,400)
+- **Large files:** `convex/items.ts` (about 2,600 lines), `convex/ai.ts` (about 1,650)
   and `convex/model/pageReadCore.ts` (about 500). Embedding and recommendation actions
   live in `convex/aiEmbeddingSweep.ts` and `convex/aiRecommendForSpace.ts`.
   Search for the export name first and read that range, not the whole file.
@@ -115,8 +121,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   (`tools/formal/image-import`). Use it before changing those functions, the
   storage cleanup crons, or any code that deletes a `_storage` blob.
 - **Pull requests:** fill in `.github/pull_request_template.md`.
-- **Reviewing a pull request:** read `REVIEW.md` first. It is the checklist
-  every reviewer (CI Claude, Codex, any agent) works from.
+- **Reviewing a pull request:** follow `REVIEW.md`. It is the whole
+  procedure, so any agent can review without a review bot.
 - **Measuring a reviewer:** `tools/review-eval` holds past PRs that shipped a
   bug, plus clean ones, to score catch rate and false alarms.
 
@@ -153,7 +159,7 @@ use `expo lint`, which silently skips the `convex/` backend.
 4. Run the narrowest relevant check, then run `pnpm run check` before finishing.
 5. Report the files changed, checks run, warnings, and anything intentionally skipped.
 
-`pnpm run check` is `check:code` (lint, typecheck, codegen and agent-docs drift,
+`pnpm run check` is `check:code` (lint, typecheck, codegen drift,
 tooling tests, coverage thresholds, Knip, Syncpack) followed by the dependency
 audit (`pnpm run audit`, blocks on high/critical). CI and the pre-push hook
 both run `check:code`, the hook before a push leaves the machine. The app-level
@@ -217,13 +223,9 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   The verifier also requires readable `GOOGLE_MAPS_API_KEY`,
   `POSTHOG_PROJECT_TOKEN`, and `POSTHOG_HOST` to keep fingerprint inputs
   consistent. Validation and publication both pin `APP_VARIANT=production`.
-- OTA updates reach installs by EAS fingerprint. A change to a native module, a
-  config plugin, `app.json` or `app.config.js` may move the fingerprint, and a
-  moved fingerprint makes new updates invisible to binaries built from the old
-  one: cut a fresh store build before resuming OTA publishes. Do not predict a
-  move; run `pnpm run verify:fingerprint origin/main HEAD`. What the
-  fingerprint hashes, and what it cannot see, is in
-  `docs/architecture/push-notifications.md#what-the-fingerprint-hashes`.
+- OTA updates reach installs only by matching native fingerprint. The rule, the
+  `Native-Fingerprint: changed` trailer and the check commands are under Working
+  conventions in `CLAUDE.md`.
 - Web deploys via the Vercel Git integration on `main`; no workflow needed.
 - Backend-first ordering: deploy compatible Convex changes before the client
   that needs them. Breaking changes go out as expand/contract, so an installed
@@ -235,13 +237,15 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   `userId` in a public Convex function.
 - Use indexes or search indexes for growing Convex tables. Keep every Convex
   function's `args` and `returns` validators accurate.
-- Gate saves and Pro features with `requireProEntitlement`.
+- Gate Pro features with `requireProEntitlement`, and link and note saves with `claimSave`.
 - AI passes may change only `suggested` memberships, except that the classifier
   inserts new matches as `saved` into a space the user set to auto-file.
   User-owned `saved` and `dismissed` decisions stay intact.
 - Keep secrets and user content out of source, logs, tests, and reports.
-- Do not reintroduce the retired notes-app domain or edit generated Convex files
-  unless the Convex workflow explicitly requires regeneration.
+- Do not reintroduce the retired notes-app domain (`notes` table, OpenAI summary
+  action, `/notes` routes).
+- Do not edit generated Convex files unless the Convex workflow explicitly
+  requires regeneration.
 
 ## Rules and what enforces them
 
@@ -252,35 +256,38 @@ CI check whose message names the fix, then a test. Docs come last. A row that
 fails "nowhere" is a repeat waiting to happen. Drop a row once its mistake
 cannot happen.
 
-| Rule                                                                               | Enforced by                                                                                                      | Fails in                             |
-| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| File and identifier naming                                                         | ESLint `check-file`, `naming-convention`                                                                         | `lint`                               |
-| Complexity limits, zero lint warnings                                              | ESLint `complexity`, `max-*`, `--max-warnings 0`                                                                 | `lint`                               |
-| No `console.*` in app code outside the loggers                                     | ESLint `no-console` (native `src/` allows `warn`)                                                                | `lint`                               |
-| `check:code` is the one gate                                                       | Wiring only: `.husky/pre-push` and the CI `Gate` step call it                                                    | nowhere if they stop                 |
-| Local E2E settings precede launch values; overrides and CI semantics hold          | `tools/e2e-config.test.mjs` imports config and launch settings in isolated processes                             | `check:code`                         |
-| The pre-push hook gates a push of branch commits, not deletes or tags              | `tools/pre-push.test.mjs` pushes through the real hook                                                           | `check:code`                         |
-| Convex modules the app imports pull in no server-only package (zod, ai, linkedom)  | `src/lib/client-bundle-imports.test.ts` walks their imports                                                      | `check:code`                         |
-| `_generated/api.d.ts` lists every Convex module                                    | `tools/verify-convex-codegen.mjs`                                                                                | `check:code`                         |
-| Copy lives in `en.json`; generated catalogs untouched                              | `localization-source.test.ts`, `localization-catalogs.test.ts`                                                   | `check:code`                         |
-| `CLAUDE.md` names every table, module and route                                    | `tools/verify-agent-docs.mjs`                                                                                    | `check:code`                         |
-| No dead code; one version per dependency                                           | Knip, Syncpack                                                                                                   | `check:code`                         |
-| `tools/*.test.mjs` that run git use `createRepo()`                                 | `tools/temp-repo.test.mjs`                                                                                       | `check:code`                         |
-| App Review notes quote only text in `en.json`, the App Intents or the paywall list | `tools/onboarding-sync.test.mjs` (bold is read only under Onboarding)                                            | `check:code`                         |
-| Notes and e2e helpers are walked when the onboarding flow version moves            | The same test checks their numbers in `tools/onboarding-walks.json`, not the walk                                | `check:code`, number only            |
-| e2e helpers use the app's current labels                                           | `e2e ios` workflow, on the `run-e2e` label, not required                                                         | nowhere blocking                     |
-| Public Convex `args` and `returns` stay compatible                                 | `tools/verify-convex-api.mjs` from the fork point; one trailer acknowledges the whole range                      | CI `convex api contract`             |
-| OTA reaches only builds with the same native fingerprint                           | `tools/verify-ota-compatibility.mjs` blocks the publish; `tools/verify-native-fingerprint.mjs` only warns on PRs | OTA `before_update`; CI warns        |
-| A PR shows how it was verified; UI shows a screenshot                              | `tools/verify-pr-evidence.mjs`                                                                                   | CI `PR evidence`                     |
-| No high or critical advisories                                                     | `pnpm run audit`                                                                                                 | `check`, CI on dependency PRs, daily |
-| Public queries and mutations use the auth builders or are in `PUBLIC_ON_PURPOSE`   | `convex/model/publicFunctions.test.ts`; public actions stay review-only                                          | `check:code`                         |
-| A built function refuses a signed-out and a deleting caller before its handler     | The same test calls each one with a ctx stub                                                                     | `check:code`                         |
-| A `PUBLIC_ON_PURPOSE` reason matches its handler                                   | Review against `REVIEW.md`; CODEOWNERS only labels the file                                                      | nowhere                              |
-| No client `userId`; `liveOwner` before acting for an account                       | Review against `REVIEW.md`                                                                                       | nowhere                              |
-| `requireProEntitlement`; `aiAllowed` before content leaves                         | Review against `REVIEW.md`                                                                                       | nowhere                              |
-| AI passes touch only `suggested` memberships                                       | Review against `REVIEW.md`                                                                                       | nowhere                              |
-| No database `.filter((q) => ...)` in `convex/` outside tests                       | ESLint `no-restricted-syntax` (name an index instead)                                                            | `lint`                               |
-| `logEvent` scalars; `safeFetch`                                                    | Review against `REVIEW.md`                                                                                       | nowhere                              |
-| Convex test harnesses come from `newConvexTest()`                                  | ESLint `no-restricted-imports` on `convexTest` outside `convex/test.setup.ts`                                    | `lint`                               |
-| No test file under `src/app`                                                       | ESLint `no-restricted-syntax` on `src/app/**/*.{test,spec}.*`                                                    | `lint`                               |
-| `captureError`                                                                     | Review against `REVIEW.md`                                                                                       | nowhere                              |
+| Rule                                                                                                         | Enforced by                                                                                                      | Fails in                             |
+| ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| File and identifier naming                                                                                   | ESLint `check-file`, `naming-convention`                                                                         | `lint`                               |
+| Complexity limits, zero lint warnings                                                                        | ESLint `complexity`, `max-*`, `--max-warnings 0`                                                                 | `lint`                               |
+| No `console.*` in app code outside the loggers                                                               | ESLint `no-console` (native `src/` allows `warn`)                                                                | `lint`                               |
+| `check:code` is the one gate                                                                                 | Wiring only: `.husky/pre-push` and the CI `Gate` step call it                                                    | nowhere if they stop                 |
+| Local E2E settings precede launch values; overrides and CI semantics hold                                    | `tools/e2e-config.test.mjs` imports config and launch settings in isolated processes                             | `check:code`                         |
+| The pre-push hook gates a push of branch commits, not deletes or tags                                        | `tools/pre-push.test.mjs` pushes through the real hook                                                           | `check:code`                         |
+| Convex modules the app imports pull in no server-only package (zod, ai, linkedom)                            | `src/lib/client-bundle-imports.test.ts` walks their imports                                                      | `check:code`                         |
+| `_generated/api.d.ts` lists every Convex module                                                              | `tools/verify-convex-codegen.mjs`                                                                                | `check:code`                         |
+| Copy lives in `en.json`; generated catalogs untouched                                                        | `localization-source.test.ts`, `localization-catalogs.test.ts`                                                   | `check:code`                         |
+| French app copy says vous; German says Inhalte, not Saves                                                    | `src/lib/localization-register.test.ts` (exceptions keyed by message, with a reason)                             | `check:code`                         |
+| No dead code; one version per dependency                                                                     | Knip, Syncpack                                                                                                   | `check:code`                         |
+| `tools/*.test.mjs` that run git use `createRepo()`                                                           | `tools/temp-repo.test.mjs`                                                                                       | `check:code`                         |
+| App Review notes quote only text in `en.json`, the App Intents or the paywall list                           | `tools/onboarding-sync.test.mjs` (bold is read only under Onboarding)                                            | `check:code`                         |
+| Notes and e2e helpers are walked when the onboarding flow version moves                                      | The same test checks their numbers in `tools/onboarding-walks.json`, not the walk                                | `check:code`, number only            |
+| e2e helpers use the app's current labels                                                                     | `e2e ios` workflow, on the `run-e2e` label, not required                                                         | nowhere blocking                     |
+| Public Convex `args` and `returns` stay compatible                                                           | `tools/verify-convex-api.mjs` from the fork point; one trailer acknowledges the whole range                      | CI `convex api contract`             |
+| No new code comments: run `/pstack:no-comments`. A comment on a rule we cannot change takes `Comments: kept` | `tools/verify-comments.mjs` fails a file whose comment count rises from the fork point                           | CI `convex api contract`             |
+| OTA reaches only builds with the same native fingerprint                                                     | `tools/verify-ota-compatibility.mjs` blocks the publish; `tools/verify-native-fingerprint.mjs` only warns on PRs | OTA `before_update`; CI warns        |
+| A PR shows how it was verified; UI shows a screenshot                                                        | `tools/verify-pr-evidence.mjs`                                                                                   | CI `PR evidence`                     |
+| A PR records a REVIEW.md review; owner paths wait for Ashish's `/approve <commit>` naming the head           | `tools/verify-pr-evidence.mjs` (`OWNER_PATTERNS`, `ownerApproved`); `owner-approve.yml` re-runs the check        | CI `PR evidence`                     |
+| No high or critical advisories                                                                               | `pnpm run audit`                                                                                                 | `check`, CI on dependency PRs, daily |
+| Public queries and mutations use the auth builders or are in `PUBLIC_ON_PURPOSE`                             | `convex/model/publicFunctions.test.ts`; public actions stay review-only                                          | `check:code`                         |
+| A built function refuses a signed-out and a deleting caller before its handler                               | The same test calls each one with a ctx stub and fails if a builder calls the handler first                      | `check:code`                         |
+| A `PUBLIC_ON_PURPOSE` reason matches its handler                                                             | Review against `REVIEW.md`; CODEOWNERS only labels the file                                                      | nowhere                              |
+| No client `userId`; `liveOwner` before acting for an account                                                 | Review against `REVIEW.md`                                                                                       | nowhere                              |
+| `requireProEntitlement`; `aiAllowed` before content leaves                                                   | Review against `REVIEW.md`                                                                                       | nowhere                              |
+| AI passes touch only `suggested` memberships                                                                 | Review against `REVIEW.md`                                                                                       | nowhere                              |
+| No database `.filter((q) => ...)` in `convex/` outside tests                                                 | ESLint `no-restricted-syntax` (name an index instead)                                                            | `lint`                               |
+| `logEvent` scalars; `safeFetch`                                                                              | Review against `REVIEW.md`                                                                                       | nowhere                              |
+| Convex test harnesses come from `newConvexTest()`                                                            | ESLint `no-restricted-imports` on `convexTest` outside `convex/test.setup.ts`                                    | `lint`                               |
+| No test file under `src/app`                                                                                 | ESLint `no-restricted-syntax` on `src/app/**/*.{test,spec}.*`                                                    | `lint`                               |
+| Haptics go through `@/lib/haptics`                                                                           | ESLint `no-restricted-imports` on `expo-haptics` outside the helper and its test                                 | `lint`                               |
+| `captureError`                                                                                               | Review against `REVIEW.md`                                                                                       | nowhere                              |

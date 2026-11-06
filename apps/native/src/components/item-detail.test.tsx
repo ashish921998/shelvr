@@ -48,9 +48,15 @@ vi.mock("expo-image", () => ({
   Image: vi.fn(() => <img data-testid="hero" alt="" />),
 }));
 vi.mock("expo-router", () => ({
-  Link: {
-    AppleZoomTarget: vi.fn(({ children }: { children: ReactNode }) => children),
-  },
+  Link: Object.assign(
+    vi.fn(({ children }: { children: ReactNode }) => children),
+    {
+      AppleZoomTarget: vi.fn(
+        ({ children }: { children: ReactNode }) => children,
+      ),
+    },
+  ),
+  useRouter: () => ({ push: retry.push }),
 }));
 vi.mock("@convex/_generated/api", () => ({
   api: {
@@ -68,7 +74,11 @@ const fullRow = vi.hoisted(() => ({ loading: false }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: undefined, isError: !fullRow.loading }),
 }));
-const retry = vi.hoisted(() => ({ reprocess: vi.fn(), guard: vi.fn() }));
+const retry = vi.hoisted(() => ({
+  reprocess: vi.fn(),
+  guard: vi.fn(),
+  push: vi.fn(),
+}));
 vi.mock("convex/react", () => ({ useMutation: () => retry.reprocess }));
 vi.mock("@/lib/entitlement", () => ({
   usePaywallGuard: () => ({ guard: retry.guard, loading: false }),
@@ -285,6 +295,13 @@ describe("a plain link's page", () => {
     expect(screen.getByText("item.partial")).toBeTruthy();
     expect(screen.getByText("common.tryAgain")).toBeTruthy();
   });
+
+  it("says some details missed when a later step of the read failed", () => {
+    renderPage({ ...product, enrichment: "partial", stepFailed: true });
+    expect(screen.getByText("item.detailsMissing")).toBeTruthy();
+    expect(screen.queryByText("item.partial")).toBeNull();
+    expect(screen.getByText("common.tryAgain")).toBeTruthy();
+  });
 });
 
 it("keeps a post's source line instead of the site button", () => {
@@ -306,4 +323,28 @@ it("shows a note's own text, read-only", () => {
     note: "Lamp, shelves, linen.",
   } as DetailItem);
   expect(screen.getByText("Lamp, shelves, linen.")).toBeTruthy();
+});
+
+it("offers place correction on a ready save", () => {
+  retry.guard.mockReset().mockImplementation(async (action?: () => void) => {
+    action?.();
+    return true;
+  });
+  retry.push.mockReset();
+  render(
+    <ItemDetail
+      item={product}
+      isZoomTarget={false}
+      pageHeight={844}
+      reserveFooter={false}
+    />,
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "placeCorrection.title" }),
+  );
+  expect(retry.guard).toHaveBeenCalledOnce();
+  expect(retry.push).toHaveBeenCalledWith({
+    pathname: "/edit-save-places",
+    params: { itemId: product._id },
+  });
 });

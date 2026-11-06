@@ -4,11 +4,7 @@ import { TripPlannerMap } from "@/components/trip-planner/trip-planner-map";
 import { Button } from "@/components/ui/button";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
-import {
-  canOpenPlaceCard,
-  cancelPlaceDetails,
-  openPlaceDetails,
-} from "@/lib/apple-place-card";
+import { canOpenPlaceCard } from "@/lib/apple-place-card";
 import {
   dateShareText,
   directionsUrl,
@@ -18,7 +14,7 @@ import {
   walkMinutes,
 } from "@/lib/date-plan";
 import { t } from "@/lib/i18n";
-import { dayColor, type StopAction } from "@/lib/trip-planner";
+import { dayColor } from "@/lib/trip-planner";
 import {
   type DateEvening as Evening,
   type DatePlanResult,
@@ -26,9 +22,9 @@ import {
   type DateStop,
   swapStop,
 } from "@convex/model/datePlan";
-import * as Haptics from "expo-haptics";
-import { useFocusEffect, useRouter } from "expo-router";
-import { useCallback, useMemo, useRef } from "react";
+import { haptics } from "@/lib/haptics";
+import { usePlaceOpener } from "@/lib/use-place-opener";
+import { useCallback, useMemo } from "react";
 import { Linking, Pressable, ScrollView, Share, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -36,48 +32,21 @@ const MAP_SHARE = 0.38;
 
 /** Opens a stop's place card, its save or Maps, never after the person has left the screen. */
 function useInfoOpener() {
-  const router = useRouter();
-  const focused = useRef(false);
-  useFocusEffect(
-    useCallback(() => {
-      focused.current = true;
-      return () => {
-        focused.current = false;
-        cancelPlaceDetails();
-      };
-    }, []),
+  const { open } = usePlaceOpener<DateStop>(
+    infoAction,
+    "date_plan_maps_failed",
   );
   return useCallback(
     (stop: DateStop) => {
-      const go = (action: StopAction): void => {
-        if (!focused.current) return;
-        switch (action.kind) {
-          case "save":
-            router.push({
-              pathname: "/item/[id]",
-              params: { id: action.itemId },
-            });
-            return;
-          case "card":
-            void openPlaceDetails(action.appleId, () =>
-              go(infoAction(stop, false)),
-            );
-            return;
-          case "maps":
-            Linking.openURL(action.url).catch((error: unknown) =>
-              analytics.captureError("date_plan_maps_failed", error),
-            );
-        }
-      };
-      if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
+      void haptics.selection();
       const action = infoAction(stop, canOpenPlaceCard(stop.appleId));
       analytics.capture("date_plan_stop_opened", {
         source: stop.source,
         action: action.kind,
       });
-      go(action);
+      open(stop, action);
     },
-    [router],
+    [open],
   );
 }
 
@@ -104,7 +73,7 @@ export function DateEvening({
   const change = (slot: DateSlot) =>
     swapStop(result.stops, evening, slot) !== null
       ? () => {
-          if (process.env.EXPO_OS === "ios") void Haptics.selectionAsync();
+          void haptics.selection();
           onSwap(slot);
         }
       : undefined;

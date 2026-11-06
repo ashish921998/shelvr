@@ -111,6 +111,19 @@ export function nextLocalHourAt(
   throw new Error("Could not calculate daily notification time");
 }
 
+export function localHourOnDayAt(
+  date: string,
+  dayOffset: number,
+  hour: number,
+  timezone: string | undefined,
+): number {
+  const [year, month, day] = date.split("-").map(Number);
+  return instantAt(
+    wallClockFormatter(timezone),
+    Date.UTC(year, month - 1, day + dayOffset, hour),
+  );
+}
+
 export function rebookedSchedule(
   existing: { timezone?: string },
   timezone: string,
