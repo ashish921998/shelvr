@@ -47,7 +47,7 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `src/lib/save-list.ts`. The tab bar is `src/components/tab-bar.tsx`: Library
   or Map, the + that opens the Add spots sheet (`src/app/(app)/add-spots.tsx`,
   `src/components/add-spots`, whose How to share and Save with Siri tiles open
-  `how-to-share.tsx` and `save-with-siri.tsx`; the Siri phrases in
+  `src/app/(app)/how-to-share.tsx` and `src/app/(app)/save-with-siri.tsx`; the Siri phrases in
   `src/lib/siri-phrases.ts` must match `apps/native/app-intents/ShelvrShortcuts.swift`, which
   `siri-phrases.test.ts` checks), and Plan a date, which picks a city through
   `src/lib/plan-picker.tsx`. The city page is `src/app/(app)/city/[name].tsx`, with its
@@ -57,8 +57,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `convex/datePlans.ts` (rules in `convex/model/dateRank.ts`).
   Retired routes redirect to Home through `src/lib/home-href.ts`.
 - **Shared lists:** route `src/app/(app)/shared-list/[id].tsx`, the form
-  `new-shared-list.tsx`, `add-list-place.tsx`, the See all grid `shared-lists.tsx`
-  (`src/components/home/all-shared-lists.tsx`), the root Join screen
+  `new-shared-list.tsx`, `add-list-place.tsx`, the See all grid
+  `src/app/(app)/shared-lists.tsx` (`src/components/home/all-shared-lists.tsx`), the root Join screen
   `src/app/list-invite/[token].tsx`; rows and cards in `src/components/shared-list`;
   hooks and helpers in `src/lib/shared-lists.ts`, the join coordinator in
   `src/lib/invite-join.ts` with its SecureStore slot `pending-invite.ts`, gating in

@@ -1,6 +1,7 @@
 import { SectionHeading } from "@/components/home/section-heading";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ThemedText } from "@/components/ui/themed-text";
+import { analytics } from "@/lib/analytics";
 import { withAlpha } from "@/lib/color";
 import { type City, sharedListCover } from "@/lib/home-places";
 import { t, useAppLocale } from "@/lib/i18n";
@@ -11,6 +12,7 @@ import {
 } from "@/lib/shared-lists";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
+import { useEffect } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -93,6 +95,10 @@ export function SharedListsSection({ cities }: { cities?: City[] }) {
   useAppLocale();
   const router = useRouter();
   const lists = useSharedLists();
+  useEffect(() => {
+    if (lists.error)
+      analytics.captureError("home_shared_lists_load_failed", lists.error);
+  }, [lists.error]);
   return (
     <View style={styles.container}>
       <View style={styles.heading}>
@@ -115,6 +121,16 @@ export function SharedListsSection({ cities }: { cities?: City[] }) {
         contentContainerStyle={styles.rail}
       >
         <NewListTile />
+        {lists.data === undefined && lists.isError ? (
+          <View style={styles.failed}>
+            <ThemedText style={styles.failedTitle}>
+              {t("errors.unexpectedTitle")}
+            </ThemedText>
+            <ThemedText style={styles.failedText}>
+              {t("errors.retrySoon")}
+            </ThemedText>
+          </View>
+        ) : null}
         {lists.data?.map((list) => (
           <ListTile
             key={list._id}
@@ -190,5 +206,17 @@ const styles = StyleSheet.create((theme) => ({
     textAlign: "center",
     color: theme.colors.muted,
   },
+  failed: {
+    width: TILE * 2,
+    minHeight: TILE,
+    justifyContent: "center",
+    gap: 2,
+  },
+  failedTitle: {
+    fontFamily: theme.fonts.medium,
+    fontSize: 14.6,
+    lineHeight: 18,
+  },
+  failedText: { fontSize: 14.6, lineHeight: 18, color: theme.colors.muted },
   pressed: { opacity: theme.opacity.pressed },
 }));

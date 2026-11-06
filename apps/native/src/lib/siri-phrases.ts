@@ -1,6 +1,6 @@
 import type { AppSymbolName } from "@/components/symbol";
-import { useAppLocale } from "@/lib/i18n";
 import type { TextMessageKey } from "@/locales/message-types";
+import { useLocales } from "expo-localization";
 import { Platform } from "react-native";
 
 export type SiriShortcut = {
@@ -34,14 +34,13 @@ export const SIRI_SHORTCUTS: readonly SiriShortcut[] = [
 export function siriShortcuts(
   os: string,
   version: string | number,
-  locale: string,
+  phoneLanguages: readonly { languageCode: string | null }[],
 ): readonly SiriShortcut[] {
-  if (os !== "ios" || locale !== "en") return [];
+  if (os !== "ios" || phoneLanguages[0]?.languageCode !== "en") return [];
   const major = Number(String(version).split(".")[0]);
   return SIRI_SHORTCUTS.filter((shortcut) => major >= shortcut.minIos);
 }
 
 export function useSiriShortcuts(): readonly SiriShortcut[] {
-  const locale = useAppLocale();
-  return siriShortcuts(Platform.OS, Platform.Version, locale);
+  return siriShortcuts(Platform.OS, Platform.Version, useLocales());
 }

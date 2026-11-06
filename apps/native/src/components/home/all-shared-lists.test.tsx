@@ -141,3 +141,11 @@ it("asks for no city covers while the account cannot browse", () => {
   expect(mocks.queryArgs).toEqual(["skip"]);
   expect(screen.getByText("Date spots: no cover")).toBeTruthy();
 });
+
+it("leaves out the New tile when the account cannot make a list", () => {
+  mocks.access = { kind: "locked" };
+  render(<AllSharedLists />);
+  expect(screen.getAllByRole("button").map((tile) => tile.textContent)).toEqual(
+    ["Date spots: no cover", "Weekend trip: no cover"],
+  );
+});

@@ -7,7 +7,17 @@ import { SharedListsSection } from "@/components/home/shared-lists-section";
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
-  lists: { data: [] as unknown[] | undefined },
+  captureError: vi.fn(),
+  failure: new Error("listSharedLists failed"),
+  lists: { data: [] } as {
+    data: unknown[] | undefined;
+    isError?: boolean;
+    error?: Error;
+  },
+}));
+
+vi.mock("@/lib/analytics", () => ({
+  analytics: { captureError: mocks.captureError },
 }));
 
 vi.mock("expo-image", () => ({
@@ -74,6 +84,7 @@ const list = (
 
 beforeEach(() => {
   mocks.push.mockReset();
+  mocks.captureError.mockReset();
   mocks.lists = { data: [] };
 });
 
@@ -129,6 +140,34 @@ it("still offers Start while lists load", () => {
   mocks.lists = { data: undefined };
   render(<SharedListsSection />);
   expect(screen.getByRole("button", { name: "New shared list" })).toBeTruthy();
+  expect(screen.queryByText("Something went wrong")).toBeNull();
+});
+
+it("says beside the New tile when the lists fail to load, and reports it", () => {
+  mocks.lists = { data: undefined, isError: true, error: mocks.failure };
+  render(<SharedListsSection />);
+  expect(screen.getByRole("button", { name: "New shared list" })).toBeTruthy();
+  expect(screen.getByText("Something went wrong")).toBeTruthy();
+  expect(screen.getByText("Please try again in a moment.")).toBeTruthy();
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "home_shared_lists_load_failed",
+    mocks.failure,
+  );
+});
+
+it("keeps the lists it has when a later refresh fails", () => {
+  mocks.lists = {
+    data: [list("l1", "Trip", 3, 0)],
+    isError: true,
+    error: mocks.failure,
+  };
+  render(<SharedListsSection />);
+  expect(screen.getByText("Trip")).toBeTruthy();
+  expect(screen.queryByText("Something went wrong")).toBeNull();
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "home_shared_lists_load_failed",
+    mocks.failure,
+  );
 });
 
 it("opens every shared list from See all", () => {

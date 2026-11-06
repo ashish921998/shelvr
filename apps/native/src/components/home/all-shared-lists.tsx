@@ -43,7 +43,7 @@ export function AllSharedLists() {
   if (lists.data !== undefined) {
     body = (
       <ScrollView contentContainerStyle={[styles.grid, { columnGap }]}>
-        <NewListTile />
+        {browsing ? <NewListTile /> : null}
         {lists.data.map((list) => (
           <ListTile
             key={list._id}
