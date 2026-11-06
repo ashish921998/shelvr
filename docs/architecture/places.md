@@ -7,7 +7,7 @@ design, and why not now".
 ## Goal
 
 The city map and the Map tab show each place as an emoji, with filter chips by kind. Today the emoji
-comes from Apple's category, then the save's tags (`src/lib/map-pin-emoji.ts`). In Austin nearly
+comes from Apple's category, then the save's tags (`convex/model/placeEmoji.ts`). In Austin nearly
 every pin is 🍽️, because Apple calls them all `Restaurant` and a save's tags describe the whole reel,
 not each place. A burger bar should be 🍔, a taco truck 🌮, a coffee shop ☕.
 
@@ -24,7 +24,7 @@ next to the pins it describes.
 The extraction schema in `ai.ts` already returns `places` (names) and `placeLocations` (name and
 location clue). Add an optional `placeKinds` list of `{ name, cuisine? }`, one per place, in the same
 call. `cuisine` is one value of a closed enum that PR 1 defines in `convex/model/placeKinds.ts`, with
-one entry for each emoji `NAME_WORDS` in `src/lib/map-pin-emoji.ts` can give (burger, pizza, tacos,
+one entry for each emoji `NAME_WORDS` in `convex/model/placeEmoji.ts` can give (burger, pizza, tacos,
 sushi, noodles, dumplings, bbq, steak, seafood, curry, pasta, donuts, ice cream, bakery, bagels,
 dessert, coffee, tea, beer, wine, cocktails, brunch, sandwiches, salad, chicken). The model never
 writes an emoji; code derives it from `cuisine`, and nothing stores one.
@@ -55,7 +55,7 @@ installed apps ignore. This counts as a public return change: the commit needs t
 
 ### 4. The phone picks the emoji
 
-`placeEmoji` in `src/lib/map-pin-emoji.ts` tries, in order:
+`placeEmoji` in `convex/model/placeEmoji.ts` tries, in order:
 
 1. Apple's category, when it is a specific one (Museum, Park, Brewery).
 2. The pin's `cuisine` (after PR 2).
