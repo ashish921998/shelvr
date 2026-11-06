@@ -121,9 +121,14 @@ function applySaveOutcome(
   if (outcome.href !== null) replace(outcome.href);
 }
 
-function failSave(error: unknown): void {
-  clearPendingCreatorMap();
+function stillPending(raw: string): boolean {
+  return getPendingCreatorMap() === raw;
+}
+
+function failSave(error: unknown, pending: boolean): void {
   analytics.captureError("creator_map_save_failed", error);
+  if (!pending) return;
+  clearPendingCreatorMap();
   Alert.alert(t(creatorMapFailureAlert(error)));
 }
 
@@ -159,13 +164,14 @@ export function useCreatorMapSaveCoordinator(): void {
       .then((result) => {
         const onboardedBefore = onboardedRef.current;
         void reportSaved(result, token, onboardedBefore);
+        if (!stillPending(step.raw)) return;
         applySaveOutcome(
           creatorMapSaveOutcome(result, step.pending, onboardedBefore),
           completeOnboarding,
           (href) => router.replace(href as never),
         );
       })
-      .catch(failSave)
+      .catch((error: unknown) => failSave(error, stillPending(step.raw)))
       .finally(() => {
         inFlight.current = null;
       });

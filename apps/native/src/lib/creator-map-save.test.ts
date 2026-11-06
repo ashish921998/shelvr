@@ -309,4 +309,88 @@ describe("useCreatorMapSaveCoordinator", () => {
     expect(mocks.clearPendingCreatorMap).toHaveBeenCalled();
     expect(mocks.save).not.toHaveBeenCalled();
   });
+
+  describe("after the slot changed while the save was out", () => {
+    type Settle = {
+      resolve: (value: unknown) => void;
+      reject: (error: unknown) => void;
+    };
+
+    function hold(): Settle {
+      const settle: Settle = { resolve: () => {}, reject: () => {} };
+      mocks.save.mockReturnValueOnce(
+        new Promise((resolve, reject) => {
+          settle.resolve = resolve;
+          settle.reject = reject;
+        }),
+      );
+      return settle;
+    }
+
+    async function slotChangesTo(next: string | null) {
+      const hook = renderHook(() => useCreatorMapSaveCoordinator());
+      await act(async () => {});
+      mocks.raw = next;
+      hook.rerender();
+      await act(async () => {});
+    }
+
+    it("leaves a person who tapped Not now where they are when the save lands", async () => {
+      mocks.onboarded = false;
+      const first = hold();
+      await slotChangesTo(null);
+      await act(async () =>
+        first.resolve({ status: "saved", listId, added: 4, created: true }),
+      );
+      expect(mocks.router.replace).not.toHaveBeenCalled();
+      expect(mocks.completeOnboarding).not.toHaveBeenCalled();
+      expect(mocks.holdIncomingShare).not.toHaveBeenCalled();
+      expect(mocks.success).not.toHaveBeenCalled();
+      expect(mocks.clearPendingCreatorMap).not.toHaveBeenCalled();
+      expect(mocks.capture).toHaveBeenCalledWith(
+        "creator_map_saved",
+        expect.objectContaining({ status: "saved", onboarded_before: false }),
+      );
+    });
+
+    it("reports a failure after Not now without an alert", async () => {
+      const first = hold();
+      await slotChangesTo(null);
+      const error = new Error("Server Error");
+      await act(async () => first.reject(error));
+      expect(mocks.captureError).toHaveBeenCalledWith(
+        "creator_map_save_failed",
+        error,
+      );
+      expect(mocks.alert).not.toHaveBeenCalled();
+      expect(mocks.clearPendingCreatorMap).not.toHaveBeenCalled();
+    });
+
+    it("keeps a newer tap's slot and opens only its list", async () => {
+      const first = hold();
+      const second = hold();
+      const newer = JSON.stringify({
+        ...pending,
+        token: "fedcba9876543210fedcba9876543210",
+      });
+      await slotChangesTo(newer);
+      expect(mocks.save).toHaveBeenCalledTimes(2);
+      await act(async () =>
+        first.resolve({ status: "saved", listId, added: 4, created: true }),
+      );
+      expect(mocks.clearPendingCreatorMap).not.toHaveBeenCalled();
+      expect(mocks.router.replace).not.toHaveBeenCalled();
+      await act(async () =>
+        second.resolve({
+          status: "saved",
+          listId: "list2" as Id<"sharedLists">,
+          added: 2,
+          created: true,
+        }),
+      );
+      expect(mocks.clearPendingCreatorMap).toHaveBeenCalledTimes(1);
+      expect(mocks.router.replace).toHaveBeenCalledTimes(1);
+      expect(mocks.router.replace).toHaveBeenCalledWith("/shared-list/list2");
+    });
+  });
 });
