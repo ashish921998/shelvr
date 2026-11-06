@@ -4,17 +4,36 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 
 import { SharedListsSection } from "@/components/home/shared-lists-section";
+import type { useSharedLists } from "@/lib/shared-lists";
+
+type Lists = Pick<
+  ReturnType<typeof useSharedLists>,
+  "status" | "error" | "isError" | "isSuccess" | "refetch"
+> & { data: unknown[] | undefined };
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   captureError: vi.fn(),
+  refetch: vi.fn(),
   failure: new Error("listSharedLists failed"),
-  lists: { data: [] } as {
-    data: unknown[] | undefined;
-    isError?: boolean;
-    error?: Error;
-  },
+  lists: null as Lists | null,
 }));
+
+const state = (
+  status: Lists["status"],
+  data: unknown[] | undefined,
+  error: Error | null,
+): Lists => ({
+  status,
+  data,
+  error,
+  isError: status === "error",
+  isSuccess: status === "success",
+  refetch: mocks.refetch,
+});
+const loaded = (data: unknown[]) => state("success", data, null);
+const loading = () => state("pending", undefined, null);
+const failed = (error: Error, data?: unknown[]) => state("error", data, error);
 
 vi.mock("@/lib/analytics", () => ({
   analytics: { captureError: mocks.captureError },
@@ -85,7 +104,8 @@ const list = (
 beforeEach(() => {
   mocks.push.mockReset();
   mocks.captureError.mockReset();
-  mocks.lists = { data: [] };
+  mocks.refetch.mockReset();
+  mocks.lists = loaded([]);
 });
 
 it("starts a new shared list", () => {
@@ -96,7 +116,7 @@ it("starts a new shared list", () => {
 });
 
 it("shows a list's name and new badge, and opens it", () => {
-  mocks.lists = { data: [list("l1", "Date nights", 3, 2)] };
+  mocks.lists = loaded([list("l1", "Date nights", 3, 2)]);
   render(<SharedListsSection />);
   expect(screen.getByText("Date nights")).toBeTruthy();
   expect(screen.getByText("2 new")).toBeTruthy();
@@ -112,7 +132,7 @@ it("shows a list's name and new badge, and opens it", () => {
 });
 
 it("omits the new badge when nothing is new", () => {
-  mocks.lists = { data: [list("l2", "Trips", 1, 0)] };
+  mocks.lists = loaded([list("l2", "Trips", 1, 0)]);
   render(<SharedListsSection />);
   expect(screen.queryByText(/new$/)).toBeNull();
 });
@@ -123,28 +143,28 @@ const mine = [
 ];
 
 it("uses the viewer's own cover for the list's city, matched ignoring case", () => {
-  mocks.lists = { data: [list("l1", "Trip", 3, 0, ["paris"])] };
+  mocks.lists = loaded([list("l1", "Trip", 3, 0, ["paris"])]);
   const { container } = render(<SharedListsSection cities={mine} />);
   expect(container.querySelector("img")?.getAttribute("src")).toBe("paris.jpg");
   expect(screen.queryByText("📍")).toBeNull();
 });
 
 it("falls back to a pin when the viewer has saved none of the list's cities", () => {
-  mocks.lists = { data: [list("l1", "Trip", 3, 0, ["Oslo"])] };
+  mocks.lists = loaded([list("l1", "Trip", 3, 0, ["Oslo"])]);
   const { container } = render(<SharedListsSection cities={mine} />);
   expect(container.querySelector("img")).toBeNull();
   expect(screen.getByText("📍")).toBeTruthy();
 });
 
 it("still offers Start while lists load", () => {
-  mocks.lists = { data: undefined };
+  mocks.lists = loading();
   render(<SharedListsSection />);
   expect(screen.getByRole("button", { name: "New shared list" })).toBeTruthy();
   expect(screen.queryByText("Something went wrong")).toBeNull();
 });
 
 it("says beside the New tile when the lists fail to load, and reports it", () => {
-  mocks.lists = { data: undefined, isError: true, error: mocks.failure };
+  mocks.lists = failed(mocks.failure);
   render(<SharedListsSection />);
   expect(screen.getByRole("button", { name: "New shared list" })).toBeTruthy();
   expect(screen.getByText("Something went wrong")).toBeTruthy();
@@ -155,15 +175,51 @@ it("says beside the New tile when the lists fail to load, and reports it", () =>
   );
 });
 
+it("loads the lists again when Retry is pressed after a failure", () => {
+  mocks.lists = failed(mocks.failure);
+  render(<SharedListsSection />);
+  expect(mocks.refetch).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+  expect(mocks.refetch).toHaveBeenCalledTimes(1);
+});
+
+it("reports a failure once while the lists stay failed, through a Retry", () => {
+  mocks.lists = failed(mocks.failure);
+  const { rerender } = render(<SharedListsSection />);
+  mocks.lists = failed(new Error("listSharedLists failed on a later read"));
+  rerender(<SharedListsSection />);
+  mocks.lists = loading();
+  rerender(<SharedListsSection />);
+  mocks.lists = failed(new Error("listSharedLists failed on Retry"));
+  rerender(<SharedListsSection />);
+  expect(mocks.captureError).toHaveBeenCalledTimes(1);
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "home_shared_lists_load_failed",
+    mocks.failure,
+  );
+});
+
+it("reports a new failure after the lists recover", () => {
+  mocks.lists = failed(mocks.failure);
+  const { rerender } = render(<SharedListsSection />);
+  mocks.lists = loaded([list("l1", "Trip", 3, 0)]);
+  rerender(<SharedListsSection />);
+  const later = new Error("listSharedLists failed after recovering");
+  mocks.lists = failed(later, [list("l1", "Trip", 3, 0)]);
+  rerender(<SharedListsSection />);
+  expect(mocks.captureError).toHaveBeenCalledTimes(2);
+  expect(mocks.captureError).toHaveBeenLastCalledWith(
+    "home_shared_lists_load_failed",
+    later,
+  );
+});
+
 it("keeps the lists it has when a later refresh fails", () => {
-  mocks.lists = {
-    data: [list("l1", "Trip", 3, 0)],
-    isError: true,
-    error: mocks.failure,
-  };
+  mocks.lists = failed(mocks.failure, [list("l1", "Trip", 3, 0)]);
   render(<SharedListsSection />);
   expect(screen.getByText("Trip")).toBeTruthy();
   expect(screen.queryByText("Something went wrong")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
   expect(mocks.captureError).toHaveBeenCalledWith(
     "home_shared_lists_load_failed",
     mocks.failure,
@@ -171,7 +227,7 @@ it("keeps the lists it has when a later refresh fails", () => {
 });
 
 it("opens every shared list from See all", () => {
-  mocks.lists = { data: [list("l1", "Trip", 3, 0)] };
+  mocks.lists = loaded([list("l1", "Trip", 3, 0)]);
   render(<SharedListsSection />);
   fireEvent.click(screen.getByRole("button", { name: "See all" }));
   expect(mocks.push).toHaveBeenCalledWith("/shared-lists");
@@ -180,7 +236,7 @@ it("opens every shared list from See all", () => {
 it("offers See all only once there is a list", () => {
   render(<SharedListsSection />);
   expect(screen.queryByRole("button", { name: "See all" })).toBeNull();
-  mocks.lists = { data: undefined };
+  mocks.lists = loading();
   render(<SharedListsSection />);
   expect(screen.queryByRole("button", { name: "See all" })).toBeNull();
 });

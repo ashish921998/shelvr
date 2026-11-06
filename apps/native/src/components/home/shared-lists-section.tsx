@@ -1,7 +1,6 @@
 import { SectionHeading } from "@/components/home/section-heading";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ThemedText } from "@/components/ui/themed-text";
-import { analytics } from "@/lib/analytics";
 import { withAlpha } from "@/lib/color";
 import { type City, sharedListCover } from "@/lib/home-places";
 import { t, useAppLocale } from "@/lib/i18n";
@@ -10,9 +9,9 @@ import {
   useSharedLists,
   withLine,
 } from "@/lib/shared-lists";
+import { useReportLoadFailure } from "@/lib/use-report-load-failure";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useEffect } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -95,10 +94,7 @@ export function SharedListsSection({ cities }: { cities?: City[] }) {
   useAppLocale();
   const router = useRouter();
   const lists = useSharedLists();
-  useEffect(() => {
-    if (lists.error)
-      analytics.captureError("home_shared_lists_load_failed", lists.error);
-  }, [lists.error]);
+  useReportLoadFailure("home_shared_lists_load_failed", lists);
   return (
     <View style={styles.container}>
       <View style={styles.heading}>
@@ -129,6 +125,15 @@ export function SharedListsSection({ cities }: { cities?: City[] }) {
             <ThemedText style={styles.failedText}>
               {t("errors.retrySoon")}
             </ThemedText>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => void lists.refetch()}
+              style={({ pressed }) => [styles.retry, pressed && styles.pressed]}
+            >
+              <ThemedText variant="subheadStrong" style={styles.retryLabel}>
+                {t("common.retry")}
+              </ThemedText>
+            </Pressable>
           </View>
         ) : null}
         {lists.data?.map((list) => (
@@ -218,5 +223,7 @@ const styles = StyleSheet.create((theme) => ({
     lineHeight: 18,
   },
   failedText: { fontSize: 14.6, lineHeight: 18, color: theme.colors.muted },
+  retry: { minHeight: theme.control.minHeight, justifyContent: "center" },
+  retryLabel: { color: theme.colors.primaryText },
   pressed: { opacity: theme.opacity.pressed },
 }));

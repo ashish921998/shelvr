@@ -7,15 +7,14 @@ import {
 import { ScreenTitle } from "@/components/screen-title";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { canBrowse } from "@/lib/access";
-import { analytics } from "@/lib/analytics";
 import { useAccess } from "@/lib/free-plan";
 import { sharedListCover } from "@/lib/home-places";
 import { t, useAppLocale } from "@/lib/i18n";
 import { useSharedLists } from "@/lib/shared-lists";
+import { useReportLoadFailure } from "@/lib/use-report-load-failure";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
 import { ScrollView, View, useWindowDimensions } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -31,10 +30,7 @@ export function AllSharedLists() {
     convexQuery(api.items.listCities, browsing ? {} : "skip"),
   );
   const mine = browsing ? cities.data : undefined;
-  useEffect(() => {
-    if (lists.error)
-      analytics.captureError("shared_lists_load_failed", lists.error);
-  }, [lists.error]);
+  useReportLoadFailure("shared_lists_load_failed", lists);
   const columnGap = Math.max(
     8,
     Math.floor((width - SIDE * 2 - TILE * COLUMNS) / (COLUMNS - 1)),

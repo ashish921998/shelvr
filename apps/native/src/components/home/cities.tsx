@@ -3,16 +3,15 @@ import { ScreenTitle } from "@/components/screen-title";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ThemedText } from "@/components/ui/themed-text";
 import { canBrowse } from "@/lib/access";
-import { analytics } from "@/lib/analytics";
 import { useAccess } from "@/lib/free-plan";
 import { type City, cityCountLine } from "@/lib/home-places";
 import { t, useAppLocale } from "@/lib/i18n";
+import { useReportLoadFailure } from "@/lib/use-report-load-failure";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { useEffect } from "react";
 import { Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -65,10 +64,7 @@ export function Cities() {
   const cities = useQuery(
     convexQuery(api.items.listCities, browsing ? {} : "skip"),
   );
-  useEffect(() => {
-    if (cities.error)
-      analytics.captureError("cities_load_failed", cities.error);
-  }, [cities.error]);
+  useReportLoadFailure("cities_load_failed", cities);
   const tile = (width - SIDE * 2 - GAP) / 2;
   let body = <ScreenLoader />;
   if (cities.data !== undefined) {
