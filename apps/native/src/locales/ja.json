@@ -1143,5 +1143,24 @@
     "other": "%{formattedCount}都市で公開中です。リンクを知っている人は誰でも見られます。"
   },
   "publicMap.setUp": "設定する",
-  "publicMap.manage": "管理"
+  "publicMap.manage": "管理",
+  "creatorMaps.switchTitle": "訪問者にすべて保存を許可",
+  "creatorMaps.switchBody": "ページに、すべての場所を保存できるボタンを追加します。リンクを知っている人は誰でも、各場所の正確な位置と元の投稿付きで、都市の場所を自分のShelvrにコピーできます。そのリストにはあなたの下の名前が付き、この設定をオフにしたりアカウントを削除したりしても、相手の手元に残ります。",
+  "creatorMaps.switchFailed": "設定を変更できませんでした。もう一度お試しください。",
+  "creatorMaps.title": "%{name}の%{city}を保存",
+  "creatorMaps.titleNoName": "この%{city}の地図を保存",
+  "creatorMaps.body": "%{city}にある%{name}の場所が、元の投稿へのリンク付きで、あなたのShelvrのリストに入ります。",
+  "creatorMaps.bodyNoName": "この%{city}の地図の場所が、元の投稿へのリンク付きで、あなたのShelvrのリストに入ります。",
+  "creatorMaps.free": "保存は無料です。Proは必要ありません。",
+  "creatorMaps.save": "すべて保存",
+  "creatorMaps.deadTitle": "この地図はもう共有されていません",
+  "creatorMaps.emptyTitle": "この地図にはまだ場所がありません",
+  "creatorMaps.tooManyLists": "参加しているリストが多すぎます。1つ抜けてから、もう一度お試しください。",
+  "creatorMaps.failed": "これらの場所を保存できませんでした。もう一度お試しください。",
+  "creatorMaps.rateLimited": "短時間に保存しすぎました。数分後にもう一度お試しください。",
+  "creatorMaps.listName": "%{name}の%{city}",
+  "creatorMaps.listNameNoName": "%{city}の地図",
+  "creatorMaps.fromSite": "%{site}から",
+  "creatorMaps.openPost": "投稿を開く",
+  "creatorMaps.openPostFor": "%{name}の投稿を開く"
 }

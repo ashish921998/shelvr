@@ -1211,5 +1211,24 @@
     "other": "Activée pour %{formattedCount} villes. Toute personne ayant le lien peut la voir."
   },
   "publicMap.setUp": "Configurer",
-  "publicMap.manage": "Gérer"
+  "publicMap.manage": "Gérer",
+  "creatorMaps.switchTitle": "Permettre aux visiteurs de tout enregistrer",
+  "creatorMaps.switchBody": "Cette option ajoute à votre page un bouton pour tout enregistrer. Toute personne ayant le lien peut copier les lieux d’une ville dans son propre Shelvr, avec l’emplacement exact de chaque lieu et la publication d’où il vient. Sa liste porte votre prénom, et elle la garde si vous désactivez cette option ou supprimez votre compte.",
+  "creatorMaps.switchFailed": "Impossible de modifier ce réglage. Réessayez.",
+  "creatorMaps.title": "Enregistrer %{city} par %{name}",
+  "creatorMaps.titleNoName": "Enregistrer cette carte de %{city}",
+  "creatorMaps.body": "Les lieux de %{name} à %{city} vont dans une liste de votre Shelvr, avec des liens vers les publications d’où ils viennent.",
+  "creatorMaps.bodyNoName": "Les lieux de cette carte de %{city} vont dans une liste de votre Shelvr, avec des liens vers les publications d’où ils viennent.",
+  "creatorMaps.free": "Enregistrer est gratuit. Pas besoin de Pro.",
+  "creatorMaps.save": "Tout enregistrer",
+  "creatorMaps.deadTitle": "Cette carte n’est plus partagée",
+  "creatorMaps.emptyTitle": "Aucun lieu sur cette carte pour l’instant",
+  "creatorMaps.tooManyLists": "Vous êtes dans trop de listes. Quittez-en une, puis réessayez.",
+  "creatorMaps.failed": "Impossible d’enregistrer ces lieux. Réessayez.",
+  "creatorMaps.rateLimited": "Trop d’enregistrements à l’instant. Réessayez dans quelques minutes.",
+  "creatorMaps.listName": "%{city} par %{name}",
+  "creatorMaps.listNameNoName": "Carte de %{city}",
+  "creatorMaps.fromSite": "Depuis %{site}",
+  "creatorMaps.openPost": "Ouvrir la publication",
+  "creatorMaps.openPostFor": "Ouvrir la publication sur %{name}"
 }

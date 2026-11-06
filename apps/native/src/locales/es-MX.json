@@ -1211,5 +1211,24 @@
     "other": "Activa para %{formattedCount} ciudades. Cualquiera con el enlace puede verla."
   },
   "publicMap.setUp": "Configurar",
-  "publicMap.manage": "Administrar"
+  "publicMap.manage": "Administrar",
+  "creatorMaps.switchTitle": "Permitir que los visitantes guarden todo",
+  "creatorMaps.switchBody": "Agrega a tu página un botón para guardarlo todo. Cualquiera con el enlace puede copiar los lugares de una ciudad en su propio Shelvr, con la ubicación exacta de cada lugar y la publicación de la que salió. Su lista lleva tu nombre, y la conservan si desactivas esto o eliminas tu cuenta.",
+  "creatorMaps.switchFailed": "No se pudo cambiar este ajuste. Inténtalo de nuevo.",
+  "creatorMaps.title": "Guardar %{city} según %{name}",
+  "creatorMaps.titleNoName": "Guardar este mapa de %{city}",
+  "creatorMaps.body": "Los lugares de %{name} en %{city} van a una lista en tu Shelvr, con enlaces a las publicaciones de las que salieron.",
+  "creatorMaps.bodyNoName": "Los lugares de este mapa de %{city} van a una lista en tu Shelvr, con enlaces a las publicaciones de las que salieron.",
+  "creatorMaps.free": "Guardar es gratis. No necesitas Pro.",
+  "creatorMaps.save": "Guardar todo",
+  "creatorMaps.deadTitle": "Este mapa ya no se comparte",
+  "creatorMaps.emptyTitle": "Aún no hay lugares en este mapa",
+  "creatorMaps.tooManyLists": "Estás en demasiadas listas. Sal de una y vuelve a intentarlo.",
+  "creatorMaps.failed": "No se pudieron guardar estos lugares. Inténtalo de nuevo.",
+  "creatorMaps.rateLimited": "Demasiados guardados ahora mismo. Inténtalo de nuevo en unos minutos.",
+  "creatorMaps.listName": "%{city} según %{name}",
+  "creatorMaps.listNameNoName": "Mapa de %{city}",
+  "creatorMaps.fromSite": "De %{site}",
+  "creatorMaps.openPost": "Abrir la publicación",
+  "creatorMaps.openPostFor": "Abrir la publicación de %{name}"
 }

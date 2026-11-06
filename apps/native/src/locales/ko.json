@@ -1143,5 +1143,24 @@
     "other": "도시 %{formattedCount}곳에 공개 중이에요. 링크가 있는 사람은 누구나 볼 수 있어요."
   },
   "publicMap.setUp": "설정",
-  "publicMap.manage": "관리"
+  "publicMap.manage": "관리",
+  "creatorMaps.switchTitle": "방문자가 모두 저장하도록 허용",
+  "creatorMaps.switchBody": "페이지에 모든 장소를 저장하는 버튼을 추가해요. 링크가 있는 사람은 누구나 한 도시의 장소를 각 장소의 정확한 위치와 원래 게시물과 함께 자신의 Shelvr로 복사할 수 있어요. 그 목록에는 내 이름이 붙고, 이 설정을 끄거나 계정을 삭제해도 상대에게 남아 있어요.",
+  "creatorMaps.switchFailed": "설정을 바꾸지 못했어요. 다시 시도해 주세요.",
+  "creatorMaps.title": "%{name}의 %{city} 저장하기",
+  "creatorMaps.titleNoName": "이 %{city} 지도 저장하기",
+  "creatorMaps.body": "%{city}에 있는 %{name}의 장소가 원래 게시물 링크와 함께 내 Shelvr의 목록에 들어가요.",
+  "creatorMaps.bodyNoName": "이 %{city} 지도의 장소가 원래 게시물 링크와 함께 내 Shelvr의 목록에 들어가요.",
+  "creatorMaps.free": "저장은 무료예요. Pro가 필요하지 않아요.",
+  "creatorMaps.save": "모두 저장",
+  "creatorMaps.deadTitle": "이 지도는 더 이상 공유되지 않아요",
+  "creatorMaps.emptyTitle": "아직 이 지도에 장소가 없어요",
+  "creatorMaps.tooManyLists": "참여한 목록이 너무 많아요. 하나에서 나간 다음 다시 시도해 주세요.",
+  "creatorMaps.failed": "이 장소들을 저장하지 못했어요. 다시 시도해 주세요.",
+  "creatorMaps.rateLimited": "방금 너무 많이 저장했어요. 몇 분 후에 다시 시도해 주세요.",
+  "creatorMaps.listName": "%{name}의 %{city}",
+  "creatorMaps.listNameNoName": "%{city} 지도",
+  "creatorMaps.fromSite": "%{site}에서",
+  "creatorMaps.openPost": "게시물 열기",
+  "creatorMaps.openPostFor": "%{name} 게시물 열기"
 }

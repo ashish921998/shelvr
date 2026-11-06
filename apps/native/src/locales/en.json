@@ -1177,5 +1177,24 @@
     "other": "On for %{formattedCount} cities. Anyone with the link can see it."
   },
   "publicMap.setUp": "Set up",
-  "publicMap.manage": "Manage"
+  "publicMap.manage": "Manage",
+  "creatorMaps.switchTitle": "Let visitors save all",
+  "creatorMaps.switchBody": "Adds a Save all button to your page. Anyone with the link can copy a city’s places into their own Shelvr, with each place’s exact location and the post it came from. Their list is named with your first name, and they keep it if you turn this off or delete your account.",
+  "creatorMaps.switchFailed": "Couldn’t change Save all. Try again.",
+  "creatorMaps.title": "Save %{name}’s %{city}",
+  "creatorMaps.titleNoName": "Save this %{city} map",
+  "creatorMaps.body": "%{name}’s places in %{city} go into a list in your Shelvr, with links to the posts they came from.",
+  "creatorMaps.bodyNoName": "The places on this %{city} map go into a list in your Shelvr, with links to the posts they came from.",
+  "creatorMaps.free": "Free to save. You don’t need Pro.",
+  "creatorMaps.save": "Save all",
+  "creatorMaps.deadTitle": "This map isn’t shared anymore",
+  "creatorMaps.emptyTitle": "No places on this map yet",
+  "creatorMaps.tooManyLists": "You’re on too many lists. Leave one, then try again.",
+  "creatorMaps.failed": "Couldn’t save these places. Try again.",
+  "creatorMaps.rateLimited": "Too many saves just now. Try again in a few minutes.",
+  "creatorMaps.listName": "%{name}’s %{city}",
+  "creatorMaps.listNameNoName": "%{city} map",
+  "creatorMaps.fromSite": "From %{site}",
+  "creatorMaps.openPost": "Open the post",
+  "creatorMaps.openPostFor": "Open the post for %{name}"
 }

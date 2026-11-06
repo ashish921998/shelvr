@@ -1211,5 +1211,24 @@
     "other": "Ativa para %{formattedCount} cidades. Qualquer pessoa com o link pode ver."
   },
   "publicMap.setUp": "Configurar",
-  "publicMap.manage": "Gerenciar"
+  "publicMap.manage": "Gerenciar",
+  "creatorMaps.switchTitle": "Deixar visitantes salvarem tudo",
+  "creatorMaps.switchBody": "Adiciona à sua página um botão para salvar tudo. Qualquer pessoa com o link pode copiar os lugares de uma cidade para o próprio Shelvr, com a localização exata de cada lugar e o post de onde ele veio. A lista dela leva seu primeiro nome, e ela continua com a lista se você desativar isto ou excluir sua conta.",
+  "creatorMaps.switchFailed": "Não foi possível mudar esta opção. Tente de novo.",
+  "creatorMaps.title": "Salvar %{city} por %{name}",
+  "creatorMaps.titleNoName": "Salvar este mapa de %{city}",
+  "creatorMaps.body": "Os lugares de %{name} em %{city} vão para uma lista no seu Shelvr, com links para os posts de onde vieram.",
+  "creatorMaps.bodyNoName": "Os lugares deste mapa de %{city} vão para uma lista no seu Shelvr, com links para os posts de onde vieram.",
+  "creatorMaps.free": "Salvar é grátis. Você não precisa do Pro.",
+  "creatorMaps.save": "Salvar tudo",
+  "creatorMaps.deadTitle": "Este mapa não está mais compartilhado",
+  "creatorMaps.emptyTitle": "Ainda não há lugares neste mapa",
+  "creatorMaps.tooManyLists": "Você está em listas demais. Saia de uma e tente de novo.",
+  "creatorMaps.failed": "Não foi possível salvar estes lugares. Tente de novo.",
+  "creatorMaps.rateLimited": "Muitos salvamentos agora. Tente de novo em alguns minutos.",
+  "creatorMaps.listName": "%{city} por %{name}",
+  "creatorMaps.listNameNoName": "Mapa de %{city}",
+  "creatorMaps.fromSite": "Do %{site}",
+  "creatorMaps.openPost": "Abrir o post",
+  "creatorMaps.openPostFor": "Abrir o post de %{name}"
 }

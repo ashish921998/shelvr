@@ -1177,5 +1177,24 @@
     "other": "Aktiv für %{formattedCount} Städte. Alle mit dem Link können sie sehen."
   },
   "publicMap.setUp": "Einrichten",
-  "publicMap.manage": "Verwalten"
+  "publicMap.manage": "Verwalten",
+  "creatorMaps.switchTitle": "Besucher alle Orte speichern lassen",
+  "creatorMaps.switchBody": "Fügt deiner Seite eine Schaltfläche hinzu, mit der man alle Orte speichern kann. Alle mit dem Link können die Orte einer Stadt in ihr eigenes Shelvr kopieren, mit dem genauen Standort jedes Orts und dem Beitrag, aus dem er stammt. Ihre Liste trägt deinen Vornamen, und sie behalten sie, wenn du das hier ausschaltest oder dein Konto löschst.",
+  "creatorMaps.switchFailed": "Die Einstellung konnte nicht geändert werden. Versuch es noch einmal.",
+  "creatorMaps.title": "%{city} von %{name} speichern",
+  "creatorMaps.titleNoName": "Diese Karte von %{city} speichern",
+  "creatorMaps.body": "Die Orte von %{name} in %{city} kommen in eine Liste in deinem Shelvr, mit Links zu den Beiträgen, aus denen sie stammen.",
+  "creatorMaps.bodyNoName": "Die Orte auf dieser Karte von %{city} kommen in eine Liste in deinem Shelvr, mit Links zu den Beiträgen, aus denen sie stammen.",
+  "creatorMaps.free": "Kostenlos speichern. Du brauchst kein Pro.",
+  "creatorMaps.save": "Alle speichern",
+  "creatorMaps.deadTitle": "Diese Karte wird nicht mehr geteilt",
+  "creatorMaps.emptyTitle": "Noch keine Orte auf dieser Karte",
+  "creatorMaps.tooManyLists": "Du bist in zu vielen Listen. Verlass eine und versuch es dann noch einmal.",
+  "creatorMaps.failed": "Diese Orte konnten nicht gespeichert werden. Versuch es noch einmal.",
+  "creatorMaps.rateLimited": "Du hast gerade sehr oft gespeichert. Versuch es in ein paar Minuten noch einmal.",
+  "creatorMaps.listName": "%{city} von %{name}",
+  "creatorMaps.listNameNoName": "Karte von %{city}",
+  "creatorMaps.fromSite": "Von %{site}",
+  "creatorMaps.openPost": "Beitrag öffnen",
+  "creatorMaps.openPostFor": "Beitrag zu %{name} öffnen"
 }

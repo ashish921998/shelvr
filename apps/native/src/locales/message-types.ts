@@ -1077,6 +1077,25 @@ export type MessageParams = {
   "publicMap.settingOn": { count: number };
   "publicMap.setUp": undefined;
   "publicMap.manage": undefined;
+  "creatorMaps.switchTitle": undefined;
+  "creatorMaps.switchBody": undefined;
+  "creatorMaps.switchFailed": undefined;
+  "creatorMaps.title": { name: string; city: string };
+  "creatorMaps.titleNoName": { city: string };
+  "creatorMaps.body": { name: string; city: string };
+  "creatorMaps.bodyNoName": { city: string };
+  "creatorMaps.free": undefined;
+  "creatorMaps.save": undefined;
+  "creatorMaps.deadTitle": undefined;
+  "creatorMaps.emptyTitle": undefined;
+  "creatorMaps.tooManyLists": undefined;
+  "creatorMaps.failed": undefined;
+  "creatorMaps.rateLimited": undefined;
+  "creatorMaps.listName": { name: string; city: string };
+  "creatorMaps.listNameNoName": { city: string };
+  "creatorMaps.fromSite": { site: string };
+  "creatorMaps.openPost": undefined;
+  "creatorMaps.openPostFor": { name: string };
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {
