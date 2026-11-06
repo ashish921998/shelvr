@@ -667,6 +667,7 @@ export type MessageParams = {
   "cityProgress.visited": { visited: string; count: number };
   "cityProgress.markVisited": { name: string };
   "cityProgress.unmarkVisited": { name: string };
+  "cityProgress.rateLimited": undefined;
   "cityCard.share": undefined;
   "cityCard.title": { city: string };
   "cityCard.footer": undefined;

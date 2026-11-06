@@ -4,6 +4,7 @@ import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { isRateLimitedError } from "@convex/model/demoErrors";
 import type { Placed } from "@convex/model/placeIdentity";
 import type { VisitMark } from "@convex/model/placeVisits";
 import { saveErrorCode } from "@convex/model/saveErrors";
@@ -54,6 +55,10 @@ export function usePlaceVisit() {
     } catch (error) {
       if (saveErrorCode(error) === "pro_required") {
         await openPaywall(router, "mark_visited");
+        return;
+      }
+      if (isRateLimitedError(error)) {
+        Alert.alert(t("cityProgress.rateLimited"));
         return;
       }
       analytics.captureError("place_visit_failed", error);

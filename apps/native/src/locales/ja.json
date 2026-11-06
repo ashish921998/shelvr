@@ -718,6 +718,7 @@
   },
   "cityProgress.markVisited": "%{name}を行ったことにする",
   "cityProgress.unmarkVisited": "%{name}の「行った」を取り消す",
+  "cityProgress.rateLimited": "短時間にたくさんの場所を「行った」にしました。数分後にもう一度お試しください。",
   "cityCard.share": "マップを共有",
   "cityCard.title": "%{city}のリスト",
   "cityCard.footer": "Shelvrで保存",

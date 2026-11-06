@@ -744,6 +744,7 @@
   },
   "cityProgress.markVisited": "%{name} als besucht markieren",
   "cityProgress.unmarkVisited": "Besucht-Markierung für %{name} entfernen",
+  "cityProgress.rateLimited": "Du hast gerade viele Orte markiert. Versuch es in ein paar Minuten noch einmal.",
   "cityCard.share": "Karte teilen",
   "cityCard.title": "Meine Liste für %{city}",
   "cityCard.footer": "Gespeichert mit Shelvr",

@@ -121,18 +121,18 @@ export const setVisited = authedMutation({
     if (item === null || item.userId !== userId) {
       throw new Error("Item not found");
     }
-    await requireProEntitlement(ctx, userId);
     const key = placeKey(args.name);
     if (key === "") {
       throw new Error("Place name is empty");
     }
-    await rateLimiter.limit(ctx, "placeVisit", { key: userId, throws: true });
     const spot = args.spot === undefined ? undefined : tidySpot(args.spot);
     const existing = await findVisit(ctx, userId, args.name);
     if (!args.visited) {
       await clearVisit(ctx, { userId, key, existing, spot });
       return null;
     }
+    await requireProEntitlement(ctx, userId);
+    await rateLimiter.limit(ctx, "placeVisit", { key: userId, throws: true });
     const visit = {
       name: args.name
         .replace(/\s+/g, " ")

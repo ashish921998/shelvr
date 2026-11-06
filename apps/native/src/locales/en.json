@@ -744,6 +744,7 @@
   },
   "cityProgress.markVisited": "Mark %{name} as visited",
   "cityProgress.unmarkVisited": "Unmark %{name} as visited",
+  "cityProgress.rateLimited": "You've marked a lot of places just now. Try again in a few minutes.",
   "cityCard.share": "Share map",
   "cityCard.title": "My %{city} list",
   "cityCard.footer": "Saved with Shelvr",

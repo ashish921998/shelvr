@@ -6,6 +6,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import { newConvexTest, signedInUser } from "./test.setup";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { rateLimiter } from "./model/rateLimiter";
 
 const PARIS = { lat: 48.8566, lng: 2.3522 };
 const NEXT_DOOR = { lat: 48.8576, lng: 2.3522 };
@@ -102,8 +103,53 @@ describe("setVisited", () => {
         name: "Tigre",
         visited: true,
       }),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ data: { code: "pro_required" } });
     expect(await visits()).toHaveLength(0);
+  });
+
+  it("lets someone whose Pro ended take a mark back, but not make one", async () => {
+    const { t, userId, visits, mark } = await setup();
+    await mark("Tigre", true, PARIS);
+    await mark("Blend", true);
+    await t.run(async (ctx) => {
+      const subscription = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .unique();
+      await ctx.db.delete(subscription!._id);
+    });
+
+    await mark("Tigre", false, PARIS);
+    await mark("Blend", false);
+    expect(await visits()).toEqual([]);
+    await expect(mark("Tigre", true, PARIS)).rejects.toMatchObject({
+      data: { code: "pro_required" },
+    });
+  });
+
+  it("lets a person mark 25 places of one city in one sitting", async () => {
+    const { visits, mark } = await setup();
+    for (let index = 0; index < 25; index += 1) {
+      await mark(`Place ${index}`, true, {
+        lat: 30.26 + index / 1000,
+        lng: -97.74,
+      });
+    }
+    expect(await visits()).toHaveLength(25);
+  });
+
+  it("takes a mark back once the hour's marks are spent", async () => {
+    const { t, userId, visits, mark } = await setup();
+    await mark("Tigre", true, PARIS);
+    await t.run((ctx) =>
+      rateLimiter.limit(ctx, "placeVisit", { key: userId, count: 199 }),
+    );
+
+    await expect(mark("Blend", true, PARIS)).rejects.toMatchObject({
+      data: { kind: "RateLimited", name: "placeVisit" },
+    });
+    await mark("Tigre", false, PARIS);
+    expect(await visits()).toEqual([]);
   });
 
   it("refuses another user's save and a name with no letters", async () => {
