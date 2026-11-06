@@ -204,8 +204,8 @@ const styles = StyleSheet.create((theme) => ({
   page: { gap: theme.gap(3) },
   title: {
     ...theme.type.displayTitle,
-    fontSize: 38,
-    lineHeight: 42,
+    fontSize: 30,
+    lineHeight: 34,
     color: theme.colors.foreground,
   },
   card: {

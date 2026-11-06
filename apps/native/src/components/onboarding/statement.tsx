@@ -44,7 +44,8 @@ const styles = StyleSheet.create((theme) => ({
   middle: { flexGrow: 1, justifyContent: "center" },
   text: {
     ...theme.type.hero,
-    lineHeight: 54,
+    fontSize: 39,
+    lineHeight: 44,
     letterSpacing: -0.5,
     color: theme.colors.foreground,
   },
