@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import PageShell from "@/components/PageShell";
 import { APP_STORE_ID } from "@/lib/appStore";
+import { CTA_VARIANT_SCRIPT } from "@/lib/ctaVariant";
 import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/siteMetadata";
 import "./globals.css";
 
@@ -28,7 +29,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: CTA_VARIANT_SCRIPT }} />
+      </head>
       <body>
         <PageShell>{children}</PageShell>
       </body>
