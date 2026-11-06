@@ -92,9 +92,9 @@ read [localization](docs/architecture/localization.md); before simulator QA read
   emoji, Been there and a post link rebuilt from the post's id; never a save's title, text, raw
   URL or id, and nothing once the owner is deleting or the page is blocked; a creator map's Save
   all copies into the saver's own list only a place's name, exact point, city, category, Apple id
-  and rebuilt post link, never the creator's save title, text, raw URL, item id or tags; the copy
-  is the saver's, so plans from it check the saver's AI permission, and it stays when the creator
-  leaves.
+  and rebuilt post link, never the creator's save title, text, raw URL, item id or tags; the list
+  is named with the creator's first name; the copy is the saver's, so plans from it check the
+  saver's AI permission, and it stays when the creator leaves.
 - **An AI check cannot recall a request.** `aiAllowed` runs before a request goes out; a decline
   that lands mid-run is handled at settlement, which ignores the classification.
 - **Rows outlive saves.** Deleting a save keeps its `tripStops` and `sharedListPlaces` rows.
