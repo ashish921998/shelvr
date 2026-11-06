@@ -31,9 +31,22 @@ vi.mock("react-native", () => ({
       maxFontSizeMultiplier?: number;
     }) => <span data-max-scale={maxFontSizeMultiplier}>{children}</span>,
   ),
-  ScrollView: vi.fn(({ children }: { children?: ReactNode }) => (
-    <div data-testid="scroll">{children}</div>
-  )),
+  ScrollView: vi.fn(
+    ({
+      children,
+      automaticallyAdjustKeyboardInsets,
+    }: {
+      children?: ReactNode;
+      automaticallyAdjustKeyboardInsets?: boolean;
+    }) => (
+      <div
+        data-testid="scroll"
+        data-keyboard-insets={automaticallyAdjustKeyboardInsets}
+      >
+        {children}
+      </div>
+    ),
+  ),
   TextInput: vi.fn(
     ({
       value,
@@ -186,6 +199,9 @@ describe("BeenCityGrid", () => {
     expect(scroll().getByText("Where have you been?")).toBeTruthy();
     expect(scroll().getByPlaceholderText("Search cities")).toBeTruthy();
     expect(wide("lisbon")).toBe(true);
+    expect(
+      screen.getByTestId("scroll").getAttribute("data-keyboard-insets"),
+    ).toBe("true");
   });
 
   it("stops the names and the search text growing past what a tile and the field hold", () => {
