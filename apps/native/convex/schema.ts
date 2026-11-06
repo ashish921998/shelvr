@@ -409,6 +409,9 @@ export default defineSchema({
     inviteToken: v.string(),
     placeCount: v.number(),
     createdAt: v.number(),
+    fromMap: v.optional(
+      v.object({ mapId: v.id("publicMaps"), city: v.string() }),
+    ),
   })
     .index("by_owner", ["ownerId"])
     .index("by_invite_token", ["inviteToken"]),
@@ -433,6 +436,7 @@ export default defineSchema({
     appleId: v.optional(v.string()),
     category: v.optional(v.string()),
     tags: v.optional(v.array(v.string())),
+    postUrl: v.optional(v.string()),
     addedAt: v.number(),
     visitedAt: v.optional(v.number()),
   })

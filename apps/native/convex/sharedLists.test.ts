@@ -3,15 +3,29 @@
 import { describe, expect, it } from "vitest";
 
 import { api, internal } from "./_generated/api";
+import type { Id } from "./_generated/dataModel";
 import { MAX_LIST_CITIES } from "./model/sharedListLimits";
 import { MAX_LIST_MEMBERS } from "./model/sharedLists";
+import { insertListPlaces } from "./sharedLists";
 import {
   joiner,
   LISBON,
   listWithOwner,
+  near,
   seedSave,
 } from "./sharedLists.test.helpers";
-import { newConvexTest, signedInUser } from "./test.setup";
+import { newConvexTest, signedInUser, type TestBackend } from "./test.setup";
+
+const POST = "https://www.instagram.com/reel/DFixtureMx1/";
+
+async function rowsOf(base: TestBackend, listId: Id<"sharedLists">) {
+  return await base.run((ctx) =>
+    ctx.db
+      .query("sharedListPlaces")
+      .withIndex("by_list_and_added", (q) => q.eq("listId", listId))
+      .collect(),
+  );
+}
 
 describe("createSharedList", () => {
   it("needs Pro", async () => {
@@ -397,6 +411,76 @@ describe("getSharedList's save links", () => {
       undefined,
       undefined,
     ]);
+  });
+});
+
+describe("getSharedList's post links", () => {
+  it("returns a place's post link and leaves the key out when it has none", async () => {
+    const { base, owner, listId } = await listWithOwner();
+    await base.run((ctx) =>
+      insertListPlaces(
+        ctx,
+        listId,
+        owner.userId,
+        [
+          { name: "Rossio", ...near(10), city: "Lisbon", postUrl: POST },
+          { name: "Ramiro", ...near(20), city: "Lisbon" },
+        ],
+        Date.now(),
+      ),
+    );
+    const list = await owner.t.query(api.sharedLists.getSharedList, { listId });
+    const byName = new Map(list?.places.map((place) => [place.name, place]));
+    expect([...byName.keys()].sort()).toEqual([
+      "Manteigaria",
+      "Ramiro",
+      "Rossio",
+      "Time Out Market",
+    ]);
+    expect(byName.get("Rossio")?.postUrl).toBe(POST);
+    for (const name of ["Ramiro", "Time Out Market", "Manteigaria"]) {
+      expect(byName.get(name)).not.toHaveProperty("postUrl");
+    }
+  });
+});
+
+describe("insertListPlaces", () => {
+  it("gives a new list's places one time, as before", async () => {
+    const { base, listId } = await listWithOwner();
+    const rows = await rowsOf(base, listId);
+    expect(rows).toHaveLength(2);
+    expect(new Set(rows.map((row) => row.addedAt)).size).toBe(1);
+  });
+
+  it("with a step, spaces the times so the list reads in the order given", async () => {
+    const { base, owner, listId } = await listWithOwner();
+    const now = Date.now() + 60_000;
+    const ids = await base.run((ctx) =>
+      insertListPlaces(
+        ctx,
+        listId,
+        owner.userId,
+        [
+          { name: "Rossio", ...near(10), city: "Lisbon" },
+          { name: "Ramiro", ...near(20), city: "Lisbon" },
+          { name: "Manteigaria", ...near(2), city: "Lisbon" },
+          { name: "Cervejaria Trindade", ...near(30), city: "Lisbon" },
+        ],
+        now,
+        1,
+      ),
+    );
+    expect(ids).toHaveLength(3);
+    const list = await owner.t.query(api.sharedLists.getSharedList, { listId });
+    expect(
+      list?.places.slice(0, 3).map((place) => [place.name, place.addedAt]),
+    ).toEqual([
+      ["Rossio", now],
+      ["Ramiro", now - 1],
+      ["Cervejaria Trindade", now - 2],
+    ]);
+    expect(list?.places).toHaveLength(5);
+    expect(list?.placeCount).toBe(5);
   });
 });
 

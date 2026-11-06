@@ -51,6 +51,7 @@ export const sharedListPlaceValidator = v.object({
   addedAt: v.number(),
   isNew: v.boolean(),
   visitedAt: v.optional(v.number()),
+  postUrl: v.optional(v.string()),
 });
 
 export const sharedListSummaryValidator = v.object({

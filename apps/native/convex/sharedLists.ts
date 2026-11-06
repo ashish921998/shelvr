@@ -95,12 +95,13 @@ async function liveList(
   return (await liveOwner(ctx, list.ownerId)) === null ? null : list;
 }
 
-async function insertListPlaces(
+export async function insertListPlaces(
   ctx: MutationCtx,
   listId: Id<"sharedLists">,
   userId: Id<"users">,
   places: NewListPlace[],
   now: number,
+  step = 0,
 ): Promise<Id<"sharedListPlaces">[]> {
   const existing = await listPlaces(ctx, listId);
   const kept: NewListPlace[] = [];
@@ -111,13 +112,13 @@ async function insertListPlaces(
     kept.push(place);
   }
   const ids: Id<"sharedListPlaces">[] = [];
-  for (const place of kept) {
+  for (const [index, place] of kept.entries()) {
     ids.push(
       await ctx.db.insert("sharedListPlaces", {
         ...place,
         listId,
         addedBy: userId,
-        addedAt: now,
+        addedAt: now - index * step,
       }),
     );
   }
@@ -293,6 +294,7 @@ export const getSharedList = authedQuery({
             ...(place.visitedAt !== undefined
               ? { visitedAt: place.visitedAt }
               : {}),
+            ...(place.postUrl !== undefined ? { postUrl: place.postUrl } : {}),
           };
         }),
       ),
