@@ -2,6 +2,7 @@ import { type Infer, v } from "convex/values";
 
 export const MAX_PLAN_ITEMS = 60;
 export const MAX_PLAN_PLACES = 5;
+export const PLAN_SHARE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const PLAN_CONTENT_CHARS = 600;
 const MAX_NAME_CHARS = 80;
 export const MAX_AREA_CHARS = 60;
