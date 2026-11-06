@@ -1,6 +1,6 @@
 import { AppSymbolIcon } from "@/components/symbol";
 import { t } from "@/lib/i18n";
-import { Pressable } from "react-native";
+import { Keyboard, Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 export function ShareMapButton({ onPress }: { onPress: () => void }) {
@@ -12,7 +12,10 @@ export function ShareMapButton({ onPress }: { onPress: () => void }) {
       accessibilityLabel={t("publicMap.open")}
       hitSlop={8}
       pressRetentionOffset={theme.control.pressRetentionOffset}
-      onPress={onPress}
+      onPress={() => {
+        Keyboard.dismiss();
+        onPress();
+      }}
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}
     >
       <AppSymbolIcon

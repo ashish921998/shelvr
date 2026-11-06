@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { expect, it, vi } from "vitest";
 import { ShareMapButton } from "./share-map-button";
 
+const { dismissKeyboard } = vi.hoisted(() => ({ dismissKeyboard: vi.fn() }));
+
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 vi.mock("react-native-unistyles", () => ({
@@ -16,6 +18,7 @@ vi.mock("react-native-unistyles", () => ({
   }),
 }));
 vi.mock("react-native", () => ({
+  Keyboard: { dismiss: dismissKeyboard },
   Pressable: vi.fn(
     ({
       children,
@@ -47,4 +50,15 @@ it("names the map share action and hands the tap back", () => {
   expect(button.dataset.testid).toBe("map-share-button");
   fireEvent.click(button);
   expect(onPress).toHaveBeenCalledTimes(1);
+});
+
+it("lets go of the search field's keyboard before the map page opens", () => {
+  dismissKeyboard.mockClear();
+  const onPress = vi.fn();
+  render(<ShareMapButton onPress={onPress} />);
+  fireEvent.click(screen.getByRole("button", { name: "publicMap.open" }));
+  expect(dismissKeyboard).toHaveBeenCalledTimes(1);
+  expect(dismissKeyboard.mock.invocationCallOrder[0]).toBeLessThan(
+    onPress.mock.invocationCallOrder[0],
+  );
 });
