@@ -3,6 +3,7 @@ import { isDarkThemeName } from "@/lib/appearance";
 import { appleZoom } from "@/lib/city-pins";
 import { moveCamera } from "@/lib/map-camera";
 import { hasPlaceNear } from "@/lib/map-filters";
+import { useMarkerBubbles } from "@/lib/use-marker-bubbles";
 import { fitCamera } from "@/lib/trip";
 import type { LatLng } from "@convex/model/trip";
 import { AppleMaps, GoogleMaps } from "expo-maps";
@@ -19,7 +20,7 @@ export type MapPin = {
   name: string;
   lat: number;
   lng: number;
-  /** iOS: the emoji inside the pin, saying what the place is. */
+  /** The emoji inside the pin, saying what the place is. */
   emoji?: string;
 };
 
@@ -173,6 +174,13 @@ export function PlacesMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new framing moves the camera; search narrowing pins must not
   }, [framed]);
 
+  const bubbles = useMarkerBubbles(
+    process.env.EXPO_OS === "android"
+      ? pins.flatMap((pin) =>
+          pin.emoji ? [{ emoji: pin.emoji, selected: false }] : [],
+        )
+      : [],
+  );
   const select = (id: string | undefined) => {
     if (id) onSelect(id);
   };
@@ -220,11 +228,17 @@ export function PlacesMap({
       ref={googleRef}
       style={styles.map}
       cameraPosition={firstCamera}
-      markers={pins.map((pin) => ({
-        id: pin.id,
-        coordinates: { latitude: pin.lat, longitude: pin.lng },
-        title: pin.name,
-      }))}
+      markers={pins.map((pin) => {
+        const icon = pin.emoji
+          ? bubbles({ emoji: pin.emoji, selected: false })
+          : undefined;
+        return {
+          id: pin.id,
+          coordinates: { latitude: pin.lat, longitude: pin.lng },
+          title: pin.name,
+          ...(icon && { icon, anchor: { x: 0.5, y: 0.5 } }),
+        };
+      })}
       onMarkerClick={(marker) => select(marker.id)}
       onCameraMove={trackCamera}
     />

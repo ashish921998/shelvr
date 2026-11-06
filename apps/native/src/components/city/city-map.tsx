@@ -7,6 +7,7 @@ import {
   type CityPin,
 } from "@/lib/city-pins";
 import { moveCamera, sameCamera } from "@/lib/map-camera";
+import { useMarkerBubbles } from "@/lib/use-marker-bubbles";
 import { fitCamera } from "@/lib/trip";
 import { useImage } from "expo-image";
 import { AppleMaps, GoogleMaps } from "expo-maps";
@@ -120,6 +121,14 @@ export function CityMap({
       textColor: theme.colors.foreground,
     };
   });
+  const bubbles = useMarkerBubbles(
+    process.env.EXPO_OS === "android"
+      ? annotations.map((pin) => ({
+          emoji: pin.text,
+          selected: pin.id === selected,
+        }))
+      : [],
+  );
   const select = (id: string | undefined) => {
     if (id) onSelect(id);
   };
@@ -145,11 +154,18 @@ export function CityMap({
     <GoogleMaps.View
       style={styles.map}
       cameraPosition={steady}
-      markers={annotations.map((pin) => ({
-        id: pin.id,
-        coordinates: pin.coordinates,
-        title: `${pin.text} ${pin.title}`,
-      }))}
+      markers={annotations.map((pin) => {
+        const icon = bubbles({
+          emoji: pin.text,
+          selected: pin.id === selected,
+        });
+        return {
+          id: pin.id,
+          coordinates: pin.coordinates,
+          title: `${pin.text} ${pin.title}`,
+          ...(icon && { icon, anchor: pin.anchor }),
+        };
+      })}
       onMarkerClick={(marker) => select(marker.id)}
     />
   );
