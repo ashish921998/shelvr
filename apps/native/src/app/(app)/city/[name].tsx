@@ -1,6 +1,11 @@
 import { PlaceMapScreen } from "@/components/city/place-map-screen";
 import { MapFilterChips } from "@/components/map/map-filter-chips";
-import { InviteButton, PlanButton } from "@/components/city/plan-button";
+import {
+  InviteButton,
+  PlanButton,
+  ShareMapButton,
+} from "@/components/city/plan-button";
+import { ProgressBar } from "@/components/city/progress-bar";
 import { SaveRow } from "@/components/city/save-row";
 import { PlaceRemovalUndo } from "@/components/city/place-removal";
 import { EmptyState } from "@/components/empty-state";
@@ -9,12 +14,14 @@ import { analytics } from "@/lib/analytics";
 import { canOpenPlaceCard, openPlaceDetails } from "@/lib/apple-place-card";
 import { cityPins, cityRows } from "@/lib/city-pins";
 import { useCityPlan } from "@/lib/city-plan";
+import { cityProgress, progressLine, visitedPinIds } from "@/lib/city-progress";
 import { haptics } from "@/lib/haptics";
 import { filterPlaces, mapFilters } from "@/lib/map-filters";
 import type { PlaceKind } from "@convex/model/placeKinds";
 import { t, useAppLocale } from "@/lib/i18n";
 import { usePlaceRemoval } from "@/lib/place-removal";
 import { usePlaceCardFocus } from "@/lib/use-place-opener";
+import { usePlaceVisit, usePlaceVisits } from "@/lib/use-place-visit";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -30,6 +37,8 @@ export default function CityScreen() {
   const focused = usePlaceCardFocus();
   const city = name ?? "";
   const removal = usePlaceRemoval();
+  const { visits } = usePlaceVisits();
+  const visit = usePlaceVisit();
   const items = useQuery(convexQuery(api.items.listCityItems, { city }));
   const { busy, start } = useCityPlan();
   const [selected, setSelected] = useState<string | null>(null);
@@ -49,6 +58,15 @@ export default function CityScreen() {
   const filters = useMemo(() => mapFilters(allPins), [allPins]);
   const active = filters.some((filter) => filter.kind === kind) ? kind : null;
   const pins = useMemo(() => filterPlaces(allPins, active), [allPins, active]);
+  const visited = useMemo(
+    () => visitedPinIds(allPins, visits),
+    [allPins, visits],
+  );
+  const progress = useMemo(
+    () => cityProgress(allPins, visited),
+    [allPins, visited],
+  );
+  const progressText = progressLine(progress);
   const [hadPins, setHadPins] = useState(false);
   if (pins.length > 0 && !hadPins) setHadPins(true);
   const rows = useMemo(
@@ -76,6 +94,7 @@ export default function CityScreen() {
       rows={rows}
       rowGap={1.5}
       selected={selected}
+      visited={visited}
       onSelect={(id) => {
         if (id !== selected) void haptics.selection();
         setSelected(id);
@@ -86,6 +105,14 @@ export default function CityScreen() {
             <Text style={styles.name} numberOfLines={2}>
               {city}
             </Text>
+            {allPins.length > 0 ? (
+              <ShareMapButton
+                disabled={busy !== null}
+                onPress={() =>
+                  router.push({ pathname: "/city-card", params: { city } })
+                }
+              />
+            ) : null}
             {count > 0 ? (
               <InviteButton
                 disabled={busy !== null}
@@ -100,8 +127,14 @@ export default function CityScreen() {
           </View>
           {pins.length > 0 ? (
             <Text style={styles.count}>
-              {t("cityMap.placesFromSaves", { count: allPins.length })}
+              {progressText ??
+                t("cityMap.placesFromSaves", { count: allPins.length })}
             </Text>
+          ) : null}
+          {pins.length > 0 && progressText !== null ? (
+            <View style={styles.progress}>
+              <ProgressBar value={progress.visited / progress.total} />
+            </View>
           ) : null}
           {filters.length > 0 ? (
             <View style={styles.chips}>
@@ -121,6 +154,7 @@ export default function CityScreen() {
       renderRow={(row, select) => {
         const { item } = row;
         const appleId = row.kind === "place" ? row.pin.appleId : undefined;
+        const went = row.kind === "place" && visited.has(row.id);
         const openSave = () => {
           if (!focused.current) return;
           router.push({
@@ -135,6 +169,13 @@ export default function CityScreen() {
             emoji={row.kind === "place" ? (row.pin.emoji ?? "📍") : undefined}
             selected={selected === row.id}
             removing={removal.busy}
+            visited={went}
+            visiting={visit.busy}
+            onToggleVisited={
+              row.kind === "place"
+                ? () => void visit.toggle(item._id, row.pin, !went)
+                : undefined
+            }
             onRemove={
               row.kind === "place"
                 ? () => {
@@ -200,6 +241,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   name: { ...theme.type.largeTitle, color: theme.colors.foreground, flex: 1 },
   count: { ...theme.type.footnote, color: theme.colors.muted },
+  progress: { marginTop: theme.gap(0.75) },
   chips: { marginTop: theme.gap(1), marginHorizontal: -theme.gap(0.5) },
   empty: { gap: theme.gap(0.5), paddingTop: theme.gap(0.5) },
   emptyTitle: { ...theme.type.headline, color: theme.colors.foreground },

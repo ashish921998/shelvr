@@ -1,11 +1,16 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
-import type { FunctionReference } from "convex/server";
+import type { FunctionArgs, FunctionReference } from "convex/server";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { newConvexTest, signedInUser } from "./test.setup";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { rateLimiter } from "./model/rateLimiter";
+
+const PARIS = { lat: 48.8566, lng: 2.3522 };
+const NEXT_DOOR = { lat: 48.8576, lng: 2.3522 };
+const LONDON = { lat: 51.5074, lng: -0.1278 };
 
 async function setup(options: { pro?: boolean } = {}) {
   const backend = newConvexTest();
@@ -29,16 +34,37 @@ async function setup(options: { pro?: boolean } = {}) {
         .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
         .collect(),
     );
-  return { backend, t, userId, itemId, visits };
+  const mark = (
+    name: string,
+    visited: boolean,
+    spot?: { lat: number; lng: number; appleId?: string },
+  ) =>
+    t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name,
+      visited,
+      ...(spot ? { spot } : {}),
+    });
+  return { backend, t, userId, itemId, visits, mark };
 }
 
 describe("setVisited", () => {
-  it("keeps the api reference installed apps compiled against", () => {
+  it("still takes what installed apps send, and an optional spot", () => {
+    expectTypeOf<{
+      itemId: Id<"items">;
+      name: string;
+      visited: boolean;
+    }>().toExtend<FunctionArgs<typeof api.placeVisits.setVisited>>();
     expectTypeOf(api.placeVisits.setVisited).toEqualTypeOf<
       FunctionReference<
         "mutation",
         "public",
-        { itemId: Id<"items">; name: string; visited: boolean },
+        {
+          itemId: Id<"items">;
+          name: string;
+          visited: boolean;
+          spot?: { lat: number; lng: number; appleId?: string };
+        },
         null
       >
     >();
@@ -77,8 +103,53 @@ describe("setVisited", () => {
         name: "Tigre",
         visited: true,
       }),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ data: { code: "pro_required" } });
     expect(await visits()).toHaveLength(0);
+  });
+
+  it("lets someone whose Pro ended take a mark back, but not make one", async () => {
+    const { t, userId, visits, mark } = await setup();
+    await mark("Tigre", true, PARIS);
+    await mark("Blend", true);
+    await t.run(async (ctx) => {
+      const subscription = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .unique();
+      await ctx.db.delete(subscription!._id);
+    });
+
+    await mark("Tigre", false, PARIS);
+    await mark("Blend", false);
+    expect(await visits()).toEqual([]);
+    await expect(mark("Tigre", true, PARIS)).rejects.toMatchObject({
+      data: { code: "pro_required" },
+    });
+  });
+
+  it("lets a person mark 25 places of one city in one sitting", async () => {
+    const { visits, mark } = await setup();
+    for (let index = 0; index < 25; index += 1) {
+      await mark(`Place ${index}`, true, {
+        lat: 30.26 + index / 1000,
+        lng: -97.74,
+      });
+    }
+    expect(await visits()).toHaveLength(25);
+  });
+
+  it("takes a mark back once the hour's marks are spent", async () => {
+    const { t, userId, visits, mark } = await setup();
+    await mark("Tigre", true, PARIS);
+    await t.run((ctx) =>
+      rateLimiter.limit(ctx, "placeVisit", { key: userId, count: 199 }),
+    );
+
+    await expect(mark("Blend", true, PARIS)).rejects.toMatchObject({
+      data: { kind: "RateLimited", name: "placeVisit" },
+    });
+    await mark("Tigre", false, PARIS);
+    expect(await visits()).toEqual([]);
   });
 
   it("refuses another user's save and a name with no letters", async () => {
@@ -99,5 +170,136 @@ describe("setVisited", () => {
         visited: true,
       }),
     ).rejects.toThrow("Place name is empty");
+  });
+
+  it("records where a place was marked, once per spot, and a second city under its name", async () => {
+    const { visits, mark } = await setup();
+
+    await mark("Shake Shack", true, { ...PARIS, appleId: "P-1" });
+    await mark("Shake Shack", true, { ...NEXT_DOOR, appleId: "P-1" });
+    await mark("shake shack", true, { ...LONDON, appleId: " L-1 " });
+
+    expect(await visits()).toMatchObject([
+      {
+        key: "shakeshack",
+        name: "shake shack",
+        spots: [
+          { ...PARIS, appleId: "P-1" },
+          { ...LONDON, appleId: "L-1" },
+        ],
+      },
+    ]);
+  });
+
+  it("takes back one city's mark and keeps the other's", async () => {
+    const { visits, mark } = await setup();
+    await mark("Shake Shack", true, { ...PARIS, appleId: "P-1" });
+    await mark("Shake Shack", true, { ...LONDON, appleId: "L-1" });
+
+    await mark("Shake Shack", false, { ...PARIS, appleId: "P-1" });
+    expect(await visits()).toMatchObject([
+      { key: "shakeshack", spots: [{ ...LONDON, appleId: "L-1" }] },
+    ]);
+
+    await mark("Shake Shack", false, { ...LONDON, appleId: "L-1" });
+    expect(await visits()).toEqual([]);
+  });
+
+  it("takes back a mark made without an Apple id from a few doors away", async () => {
+    const { visits, mark } = await setup();
+    await mark("Blend", true, PARIS);
+    await mark("Blend", false, NEXT_DOOR);
+    expect(await visits()).toEqual([]);
+  });
+
+  it("leaves another branch's mark when one branch is taken back", async () => {
+    const { visits, mark } = await setup();
+    await mark("Blue Bottle Coffee", true, { ...PARIS, appleId: "A" });
+    await mark("Blue Bottle Coffee", true, { ...NEXT_DOOR, appleId: "B" });
+    expect((await visits())[0]?.spots).toHaveLength(2);
+
+    await mark("Blue Bottle Coffee", false, { ...NEXT_DOOR, appleId: "B" });
+    expect(await visits()).toMatchObject([
+      { spots: [{ ...PARIS, appleId: "A" }] },
+    ]);
+  });
+
+  it("keeps a mark made by name alone, and deletes it when the place is taken back", async () => {
+    const { visits, mark } = await setup();
+    await mark("Tigre", true);
+    const [legacy] = await visits();
+    expect(legacy).not.toHaveProperty("spots");
+
+    await mark("Tigre", true, PARIS);
+    const [refreshed] = await visits();
+    expect(refreshed).not.toHaveProperty("spots");
+    expect(refreshed?.visitedAt).toBeGreaterThanOrEqual(legacy!.visitedAt);
+
+    await mark("Tigre", false, LONDON);
+    expect(await visits()).toEqual([]);
+  });
+
+  it("takes back a venue marked under another name, by its Apple id", async () => {
+    const { visits, mark } = await setup();
+    await mark("Franklin BBQ", true, { ...PARIS, appleId: "X" });
+    await mark("Micho", true, { ...PARIS, appleId: "M" });
+
+    await mark("Franklin Barbecue", false, { ...NEXT_DOOR, appleId: "X" });
+    expect((await visits()).map((visit) => visit.key)).toEqual(["micho"]);
+  });
+
+  it("takes back a whole name when an installed app sends no spot", async () => {
+    const { visits, mark } = await setup();
+    await mark("Shake Shack", true, PARIS);
+    await mark("Shake Shack", true, LONDON);
+    await mark("Shake Shack", false);
+    expect(await visits()).toEqual([]);
+  });
+
+  it("keeps the newest spots of a name", async () => {
+    const { t, userId, itemId, visits, mark } = await setup();
+    const spots = Array.from({ length: 20 }, (_, i) => ({
+      lat: 10 + i,
+      lng: 20,
+    }));
+    await t.run((ctx) =>
+      ctx.db.insert("placeVisits", {
+        userId,
+        key: "starbucks",
+        name: "Starbucks",
+        itemId,
+        visitedAt: 1,
+        spots,
+      }),
+    );
+
+    await mark("Starbucks", true, LONDON);
+    expect((await visits())[0]?.spots).toEqual([...spots.slice(1), LONDON]);
+  });
+
+  it("refuses a spot off the map", async () => {
+    const { visits, mark } = await setup();
+    await expect(mark("Tigre", true, { lat: 91, lng: 0 })).rejects.toThrow(
+      "Place position is invalid",
+    );
+    await expect(
+      mark("Tigre", true, { lat: 0, lng: Number.NaN }),
+    ).rejects.toThrow("Place position is invalid");
+    expect(await visits()).toEqual([]);
+  });
+});
+
+describe("listVisits", () => {
+  it("lists only the caller's marks, with where each was made", async () => {
+    const { backend, t, mark } = await setup();
+    await mark("Caffé Dante", true);
+    await mark("Shake Shack", true, { ...PARIS, appleId: "P-1" });
+    const other = await signedInUser(backend, { pro: true });
+
+    expect(await t.query(api.placeVisits.listVisits, {})).toEqual([
+      { key: "caffedante" },
+      { key: "shakeshack", spots: [{ ...PARIS, appleId: "P-1" }] },
+    ]);
+    expect(await other.t.query(api.placeVisits.listVisits, {})).toEqual([]);
   });
 });

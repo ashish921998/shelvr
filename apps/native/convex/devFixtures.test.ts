@@ -155,7 +155,7 @@ describe("resetCurrentUser", () => {
         days: [],
         wishlist: [],
       });
-      await ctx.db.insert("items", {
+      const oldItemId = await ctx.db.insert("items", {
         userId,
         type: "image",
         status: "ready",
@@ -164,7 +164,15 @@ describe("resetCurrentUser", () => {
         tags: [],
         searchText: "old item",
       });
-      return await ctx.db.insert("items", {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "joscoffee",
+        name: "Jo's Coffee",
+        itemId: oldItemId,
+        visitedAt: 1,
+        spots: [{ lat: 30.2502, lng: -97.7496 }],
+      });
+      const keepId = await ctx.db.insert("items", {
         userId: otherUserId,
         type: "note",
         status: "ready",
@@ -173,6 +181,14 @@ describe("resetCurrentUser", () => {
         tags: [],
         searchText: "keep me",
       });
+      await ctx.db.insert("placeVisits", {
+        userId: otherUserId,
+        key: "joscoffee",
+        name: "Jo's Coffee",
+        itemId: keepId,
+        visitedAt: 1,
+      });
+      return keepId;
     });
 
     await expect(
@@ -221,6 +237,84 @@ describe("resetCurrentUser", () => {
       ).toEqual([]);
       expect(await ctx.db.system.get("_storage", storageId)).toBeNull();
       expect(await ctx.db.get(otherItemId)).not.toBeNull();
+      expect(
+        await ctx.db
+          .query("placeVisits")
+          .withIndex("by_user_and_key", (q) => q.eq("userId", userId))
+          .collect(),
+      ).toEqual([]);
+      expect(
+        await ctx.db
+          .query("placeVisits")
+          .withIndex("by_user_and_key", (q) => q.eq("userId", otherUserId))
+          .collect(),
+      ).toMatchObject([{ key: "joscoffee", itemId: otherItemId }]);
+    });
+  });
+
+  it("puts Austin back to its seeded, unvisited state after a place was marked", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { client } = await anonymousFixtureUser();
+    await client.mutation(api.devFixtures.resetCurrentUser, {});
+    const austin = async () =>
+      (await client.query(api.items.listCities, {})).find(
+        (entry) => entry.city === "Austin",
+      );
+    const [favorite] = await client.query(api.items.listCityItems, {
+      city: "Austin",
+    });
+    await client.mutation(api.placeVisits.setVisited, {
+      itemId: favorite!._id,
+      name: "Jo's Coffee",
+      visited: true,
+      spot: { lat: 30.2502, lng: -97.7496 },
+    });
+    expect(await austin()).toMatchObject({ placeCount: 2, visitedCount: 1 });
+
+    await client.mutation(api.devFixtures.resetCurrentUser, {});
+
+    expect(await austin()).toEqual({
+      city: "Austin",
+      count: 2,
+      placeCount: 2,
+      cover: null,
+    });
+    expect(await client.query(api.placeVisits.listVisits, {})).toEqual([]);
+  });
+
+  it("refuses an account with too many marked places without deleting anything", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { backend, userId, client } = await anonymousFixtureUser();
+    await backend.run(async (ctx) => {
+      const itemId = await ctx.db.insert("items", {
+        userId,
+        type: "note",
+        status: "ready",
+        note: "Places",
+        tags: [],
+        searchText: "places",
+      });
+      for (let index = 0; index < 201; index += 1) {
+        await ctx.db.insert("placeVisits", {
+          userId,
+          key: `place${index}`,
+          name: `Place ${index}`,
+          itemId,
+          visitedAt: index,
+        });
+      }
+    });
+
+    await expect(
+      client.mutation(api.devFixtures.resetCurrentUser, {}),
+    ).rejects.toThrow(/visits exceeds 200 rows/);
+    await backend.run(async (ctx) => {
+      expect(
+        await ctx.db
+          .query("placeVisits")
+          .withIndex("by_user_and_key", (q) => q.eq("userId", userId))
+          .collect(),
+      ).toHaveLength(201);
     });
   });
 

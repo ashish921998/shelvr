@@ -664,6 +664,16 @@ export type MessageParams = {
   "cityMap.removedPlace": { name: string };
   "cityMap.noPlacesLeft": undefined;
   "cityMap.noPlacesLeftBody": { city: string };
+  "cityProgress.visited": { visited: string; count: number };
+  "cityProgress.markVisited": { name: string };
+  "cityProgress.unmarkVisited": { name: string };
+  "cityProgress.rateLimited": undefined;
+  "cityCard.share": undefined;
+  "cityCard.title": { city: string };
+  "cityCard.footer": undefined;
+  "cityCard.legendSaved": undefined;
+  "cityCard.legendVisited": undefined;
+  "cityCard.mapLabel": { city: string };
   "opener.tagline": undefined;
   "onboardingQ.skip": undefined;
   "onboardingQ.savedTitle": undefined;
