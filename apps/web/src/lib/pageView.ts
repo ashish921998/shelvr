@@ -5,6 +5,8 @@ type PageLocation = Pick<Location, "origin" | "pathname" | "search">;
 function pageViewPath(pathname: string): string {
   if (pathname.startsWith("/i/")) return "/i/[token]";
   if (pathname.startsWith("/p/")) return "/p/[token]";
+  if (pathname.startsWith("/l/")) return "/l/[token]";
+  if (pathname.startsWith("/m/")) return "/m/[token]";
   return pathname;
 }
 

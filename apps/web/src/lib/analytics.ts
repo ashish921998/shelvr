@@ -55,7 +55,7 @@ export function captureWebAnalyticsEvent(
         properties: {
           distinct_id: distinctId,
           ...properties,
-          $current_url: `${window.location.origin}${window.location.pathname.replace(/^\/(i|p)\/[^/]+/, "/$1/[token]")}`,
+          $current_url: `${window.location.origin}${window.location.pathname.replace(/^\/(i|p|l|m)\/[^/]+/, "/$1/[token]")}`,
         },
       }),
       keepalive: true,

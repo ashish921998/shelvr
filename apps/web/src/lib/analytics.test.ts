@@ -104,3 +104,23 @@ it("redacts plan vote links too", () => {
   );
   window.history.replaceState({}, "", "/");
 });
+
+it.each(["l", "m"])(
+  "redacts /%s/ list invite and map page links too",
+  (prefix) => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN", "test-token");
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://example.com");
+    window.history.replaceState({}, "", `/${prefix}/private-capability123`);
+    const spy = vi.fn().mockResolvedValue(new Response());
+    vi.stubGlobal("fetch", spy);
+    captureWebAnalyticsEvent("map_page_viewed", {
+      $current_url: `https://example.com/${prefix}/private-capability123`,
+    });
+    const body = JSON.parse(spy.mock.calls[0][1].body);
+    expect(body.properties.$current_url).toBe(
+      `${window.location.origin}/${prefix}/[token]`,
+    );
+    expect(spy.mock.calls[0][1].body).not.toContain("private-capability123");
+    window.history.replaceState({}, "", "/");
+  },
+);
