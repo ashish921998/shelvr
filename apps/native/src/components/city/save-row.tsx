@@ -48,7 +48,7 @@ export function SaveRow({
   visiting,
 }: Props) {
   const router = useRouter();
-  const { theme } = useUnistyles();
+  const { foreground, keep, onKeep } = useUnistyles().theme.colors;
   const image = item.imageUrl ?? item.heroImageUrl;
   const source = placeName
     ? (item.title ?? saveSource(item))
@@ -72,11 +72,7 @@ export function SaveRow({
             <Text style={styles.bubbleText}>{emoji}</Text>
             {visited ? (
               <View style={styles.visitedBadge}>
-                <AppSymbolIcon
-                  name="checkmark"
-                  size={10}
-                  tintColor={theme.colors.onKeep}
-                />
+                <AppSymbolIcon name="checkmark" size={10} tintColor={onKeep} />
               </View>
             ) : null}
           </View>
@@ -118,7 +114,7 @@ export function SaveRow({
           <AppSymbolIcon
             name={visited ? "checkmark.circle.fill" : "checkmark"}
             size={22}
-            tintColor={visited ? theme.colors.keep : theme.colors.foreground}
+            tintColor={visited ? keep : foreground}
           />
         </Pressable>
       ) : null}
@@ -130,11 +126,7 @@ export function SaveRow({
           onPress={onRemove}
           style={styles.details}
         >
-          <AppSymbolIcon
-            name="minus"
-            size={22}
-            tintColor={theme.colors.foreground}
-          />
+          <AppSymbolIcon name="minus" size={22} tintColor={foreground} />
         </Pressable>
       ) : null}
       {selected && onPlaceDetails ? (
@@ -144,11 +136,7 @@ export function SaveRow({
           onPress={onPlaceDetails}
           style={({ pressed }) => [styles.details, pressed && styles.pressed]}
         >
-          <AppSymbolIcon
-            name="info.circle"
-            size={22}
-            tintColor={theme.colors.foreground}
-          />
+          <AppSymbolIcon name="info.circle" size={22} tintColor={foreground} />
         </Pressable>
       ) : null}
     </View>
