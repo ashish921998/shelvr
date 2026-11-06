@@ -1,4 +1,5 @@
 import { LegalConsentPreference } from "@/components/legal-consent";
+import { MapPageSetting } from "@/components/map/map-page-setting";
 import { UpdateSetting } from "@/components/update-setting";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { SettingCard } from "@/components/ui/setting-card";
@@ -263,6 +264,8 @@ export default function SettingsScreen() {
           />
         }
       />
+
+      <MapPageSetting />
 
       <UpdateSetting />
 

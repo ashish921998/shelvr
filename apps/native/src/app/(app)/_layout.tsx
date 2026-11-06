@@ -197,6 +197,7 @@ export default function AppLayout() {
               contentStyle: { backgroundColor: theme.colors.background },
             }}
           />
+          <Stack.Screen name="map-page" options={modal} />
         </Stack.Protected>
         <Stack.Protected
           guard={onboarded && gated}

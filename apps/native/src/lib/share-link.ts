@@ -13,7 +13,7 @@ function shareLinkUrl(token: string): string {
 export async function shareRefOf(
   url: string | undefined,
 ): Promise<string | undefined> {
-  const token = url?.match(/\/i\/([^/?#]+)$/)?.[1];
+  const token = url?.match(/\/(?:i|m)\/([^/?#]+)$/)?.[1];
   if (!token) return undefined;
   try {
     const digest = await digestStringAsync(CryptoDigestAlgorithm.SHA256, token);

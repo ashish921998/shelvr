@@ -1107,5 +1107,41 @@
   "onboardingCarousel.eat": "「どこで食べる？」は\nもう終わり。",
   "onboardingCarousel.map": "保存した場所すべてを、\nひとつの地図に。",
   "onboardingCarousel.next": "次のスライド",
-  "sharedLists.nameBodyWelcome": "共有リストの相手に表示されます。あなたが共有した項目のリンクや、あなたが所有するリストのリンクを持つ人にも表示されます。"
+  "sharedLists.nameBodyWelcome": "共有リストの相手に表示されます。あなたが共有した項目、あなたが所有するリスト、あなたの地図ページのリンクを持つ人にも表示されます。",
+  "publicMap.open": "地図を共有",
+  "publicMap.title": "あなたの地図ページ",
+  "publicMap.body": "リンクを知っている人は誰でも、これらの都市に保存した場所を見られます。あとからその都市に保存した場所も表示されます。",
+  "publicMap.bodyBeen": "リンクを知っている人は誰でも、これらの都市に保存した場所と、そのうち行ったことのある場所を見られます。あとからその都市に保存した場所も表示されます。",
+  "publicMap.privacy": "ページにはあなたの下の名前が表示され、各場所は保存元の投稿にリンクされます。保存した項目のタイトル、メモ、写真は公開されません。",
+  "publicMap.citiesLabel": "都市",
+  "publicMap.citiesHint": {
+    "other": "最大%{formattedCount}都市まで選べます。"
+  },
+  "publicMap.leftOut": "メモや写真から保存した場所と、住所のような名前は含まれません。",
+  "publicMap.placeBeen": "%{name}（行った）",
+  "publicMap.noPlaces": "現在、場所はありません",
+  "publicMap.linkLabel": "あなたのリンク",
+  "publicMap.preview": "ページを見る",
+  "publicMap.create": "リンクを作成",
+  "publicMap.share": "リンクを共有",
+  "publicMap.save": "変更を保存",
+  "publicMap.newLink": "新しいリンク",
+  "publicMap.newLinkTitle": "新しいリンクを作成しますか？",
+  "publicMap.newLinkBody": "古いリンクは使えなくなります。送った相手には新しいリンクが必要です。",
+  "publicMap.turnOff": "オフにする",
+  "publicMap.turnOffTitle": "地図ページをオフにしますか？",
+  "publicMap.turnOffBody": "リンクはすぐに使えなくなります。もう一度オンにすると、新しいリンクが作成されます。",
+  "publicMap.turnOffBodyNoPro": "リンクはすぐに使えなくなります。もう一度オンにするにはShelvr Proが必要です。",
+  "publicMap.failed": "地図ページを更新できませんでした。もう一度お試しください。",
+  "publicMap.emptyTitle": "共有できる場所がまだありません",
+  "publicMap.emptyBody": "場所が紹介されているリールやTikTokを共有すると、その都市がここに表示されます。",
+  "publicMap.blockedTitle": "地図ページはオフになっています",
+  "publicMap.blockedBody": "報告を受けて、Shelvrがこのページをオフにしました。お問い合わせは、設定の「サポートに問い合わせる」からどうぞ。",
+  "publicMap.settingTitle": "地図ページ",
+  "publicMap.settingOff": "選んだ都市に保存した場所を載せる公開ページです。",
+  "publicMap.settingOn": {
+    "other": "%{formattedCount}都市で公開中です。リンクを知っている人は誰でも見られます。"
+  },
+  "publicMap.setUp": "設定する",
+  "publicMap.manage": "管理"
 }

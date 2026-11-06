@@ -201,6 +201,16 @@ export type AnalyticsEventProperties = {
   map_filter_selected: { kind: string };
   map_place_opened: { card: boolean };
   map_search_result_opened: Record<string, never>;
+  public_map_opened: {
+    on: boolean;
+    cities: number;
+    surface: "map" | "settings";
+  };
+  public_map_created: { cities: number };
+  public_map_cities_saved: { cities: number };
+  public_map_shared: { shared: boolean; share_ref?: string };
+  public_map_link_rotated: Record<string, never>;
+  public_map_turned_off: Record<string, never>;
   city_plan_started: { kind: "date" | "trip" };
   trip_stop_opened: { day: number; stop: number };
   trip_directions_opened: { located: boolean };

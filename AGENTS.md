@@ -56,12 +56,16 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `src/components/map`, filter rules in `src/lib/map-filters.ts` and
   `convex/model/placeKinds.ts`, each pin's emoji in `convex/model/placeEmoji.ts`
   (re-exported by `src/lib/map-pin-emoji.ts`), data from `convex/mapPlaces.ts`.
-- **Map page** (the public `/m/<token>` page of a person's map): backend
-  `convex/publicMaps.ts` with `convex/model/publicMap.ts` and `publicMapLimits.ts`,
-  the `GET /map/pages/<token>` route in `convex/http.ts`, fixtures
-  `devFixtures:seedMapPageFixtures`. The web page is `apps/web/src/app/m/[token]`,
-  with `apps/web/src/lib/publicMap.ts` and `mapSketch.ts`, components in
-  `apps/web/src/components/map` and `apps/web/src/components/MapPageView.tsx`.
+- **Map page** (the public `/m/<token>` page of a person's map): the sheet
+  `src/app/(app)/map-page.tsx`, its hook `useMapPage` and helpers in
+  `src/lib/public-map.ts`; the Map tab's share button, the sheet's parts and the
+  Settings card in `src/components/map`; the city row
+  `src/components/city/city-check-row.tsx`. Backend `convex/publicMaps.ts` with
+  `convex/model/publicMap.ts` and `publicMapLimits.ts`, the `GET /map/pages/<token>`
+  route in `convex/http.ts`, fixtures `devFixtures:seedMapPageFixtures`. The web
+  page is `apps/web/src/app/m/[token]`, with `apps/web/src/lib/publicMap.ts` and
+  `mapSketch.ts`, components in `apps/web/src/components/map` and
+  `apps/web/src/components/MapPageView.tsx`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;
