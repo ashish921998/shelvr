@@ -42,6 +42,7 @@ export function NameSheet({
   placeName,
   onDone,
   onCancel,
+  onDismiss,
 }: {
   visible: boolean;
   kind: NameSheetKind;
@@ -49,6 +50,7 @@ export function NameSheet({
   placeName?: string;
   onDone: () => void;
   onCancel: () => void;
+  onDismiss?: () => void;
 }) {
   const { theme } = useUnistyles();
   const save = useMutation(api.users.setMyName);
@@ -80,6 +82,7 @@ export function NameSheet({
     <PromptSheet
       visible={visible}
       onClose={kind === "joined" || kind === "welcome" ? skip : onCancel}
+      onDismiss={onDismiss}
       title={t("sharedLists.nameTitle")}
       body={bodyFor(kind, partner)}
       testID="list-name-sheet"

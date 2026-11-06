@@ -57,10 +57,12 @@ export function useNameGate() {
   const { firstName, loading } = useMyFirstName();
   const [pending, setPending] = useState<(() => void) | null>(null);
   const waiting = useRef<(() => void) | null>(null);
+  const hiding = useRef<(() => void) | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(
     () => () => {
       waiting.current = null;
+      hiding.current = null;
       clearTimeout(timer.current);
     },
     [],
@@ -103,11 +105,19 @@ export function useNameGate() {
     gate,
     asking: pending !== null,
     finish: () => {
+      if (pending === null) return;
       setPending(null);
-      pending?.();
+      if (process.env.EXPO_OS === "ios") hiding.current = pending;
+      else pending();
+    },
+    dismissed: () => {
+      const action = hiding.current;
+      hiding.current = null;
+      action?.();
     },
     cancel: () => {
       waiting.current = null;
+      hiding.current = null;
       clearTimeout(timer.current);
       setPending(null);
     },

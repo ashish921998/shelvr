@@ -17,6 +17,7 @@ type NameSheetProps = {
   kind: string;
   onDone: () => void;
   onCancel: () => void;
+  onDismiss?: () => void;
 };
 
 const mocks = vi.hoisted(() => ({
@@ -26,6 +27,7 @@ const mocks = vi.hoisted(() => ({
     asking: false,
     finish: vi.fn(),
     cancel: vi.fn(),
+    dismissed: vi.fn(),
   },
 }));
 
@@ -44,18 +46,25 @@ vi.mock("@/lib/shared-lists", () => ({
   useNameGate: () => mocks.nameGate,
 }));
 vi.mock("@/components/shared-list/name-sheet", () => ({
-  NameSheet: vi.fn(({ visible, kind, onDone, onCancel }: NameSheetProps) =>
-    visible ? (
+  NameSheet: vi.fn(
+    ({ visible, kind, onDone, onCancel, onDismiss }: NameSheetProps) => (
       <div>
-        <span>{`name-sheet:${kind}`}</span>
-        <button type="button" onClick={onDone}>
-          done
-        </button>
-        <button type="button" onClick={onCancel}>
-          cancel
+        {visible ? (
+          <div>
+            <span>{`name-sheet:${kind}`}</span>
+            <button type="button" onClick={onDone}>
+              done
+            </button>
+            <button type="button" onClick={onCancel}>
+              cancel
+            </button>
+          </div>
+        ) : null}
+        <button type="button" onClick={onDismiss}>
+          sheet hidden
         </button>
       </div>
-    ) : null,
+    ),
   ),
 }));
 vi.mock("@/components/shared-list/member-avatars", () => ({
@@ -135,5 +144,13 @@ describe("ListHeaderRight invite", () => {
   it("shows no sheet when nothing is being asked", () => {
     render(<ListHeaderRight detail={DETAIL} />);
     expect(screen.queryByText(/^name-sheet:/)).toBeNull();
+  });
+
+  it("tells the name gate when the sheet has finished hiding", () => {
+    render(<ListHeaderRight detail={DETAIL} />);
+    expect(mocks.nameGate.dismissed).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByText("sheet hidden"));
+    expect(mocks.nameGate.dismissed).toHaveBeenCalledTimes(1);
+    expect(mocks.shareInvite).not.toHaveBeenCalled();
   });
 });

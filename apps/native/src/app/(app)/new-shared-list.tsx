@@ -223,6 +223,7 @@ export default function NewSharedListScreen() {
         kind="create"
         onDone={nameGate.finish}
         onCancel={nameGate.cancel}
+        onDismiss={nameGate.dismissed}
       />
     </View>
   );

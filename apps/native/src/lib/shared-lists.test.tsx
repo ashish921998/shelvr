@@ -58,6 +58,7 @@ vi.mock("react-native", () => ({
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   mocks.add.mockReset();
   mocks.remove.mockReset();
   mocks.capture.mockReset();
@@ -339,5 +340,72 @@ describe("useNameGate", () => {
     act(() => result.current.gate(action));
     expect(action).toHaveBeenCalledTimes(2);
     expect(result.current.asking).toBe(false);
+  });
+});
+
+async function freshNameGate() {
+  vi.resetModules();
+  return (await import("./shared-lists")).useNameGate;
+}
+
+describe("useNameGate and the name sheet hiding", () => {
+  it("on iOS, carries on only once the name sheet has finished hiding", async () => {
+    vi.stubEnv("EXPO_OS", "ios");
+    mocks.query.mockReturnValue({ data: null });
+    const useFreshNameGate = await freshNameGate();
+    const action = vi.fn();
+    const { result } = renderHook(() => useFreshNameGate());
+    act(() => result.current.gate(action));
+    expect(result.current.asking).toBe(true);
+
+    act(() => result.current.finish());
+    expect(result.current.asking).toBe(false);
+    expect(action).not.toHaveBeenCalled();
+
+    act(() => result.current.dismissed());
+    expect(action).toHaveBeenCalledTimes(1);
+    act(() => result.current.dismissed());
+    expect(action).toHaveBeenCalledTimes(1);
+  });
+
+  it("on iOS, starts nothing when a closed sheet finishes hiding", async () => {
+    vi.stubEnv("EXPO_OS", "ios");
+    mocks.query.mockReturnValue({ data: null });
+    const useFreshNameGate = await freshNameGate();
+    const action = vi.fn();
+    const { result } = renderHook(() => useFreshNameGate());
+    act(() => result.current.gate(action));
+    act(() => result.current.cancel());
+    expect(result.current.asking).toBe(false);
+    act(() => result.current.dismissed());
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("on iOS, drops the answer when the screen goes away before the sheet hides", async () => {
+    vi.stubEnv("EXPO_OS", "ios");
+    mocks.query.mockReturnValue({ data: null });
+    const useFreshNameGate = await freshNameGate();
+    const action = vi.fn();
+    const { result, unmount } = renderHook(() => useFreshNameGate());
+    act(() => result.current.gate(action));
+    act(() => result.current.finish());
+    const { dismissed } = result.current;
+    unmount();
+    dismissed();
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("on Android, carries on as soon as the person answers", async () => {
+    vi.stubEnv("EXPO_OS", "android");
+    mocks.query.mockReturnValue({ data: null });
+    const useFreshNameGate = await freshNameGate();
+    const action = vi.fn();
+    const { result } = renderHook(() => useFreshNameGate());
+    act(() => result.current.gate(action));
+    act(() => result.current.finish());
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(result.current.asking).toBe(false);
+    act(() => result.current.dismissed());
+    expect(action).toHaveBeenCalledTimes(1);
   });
 });

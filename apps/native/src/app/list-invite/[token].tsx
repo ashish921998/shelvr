@@ -144,6 +144,7 @@ export default function ListInviteScreen() {
         {...(placeNames[0] !== undefined ? { placeName: placeNames[0] } : {})}
         onDone={nameGate.finish}
         onCancel={nameGate.cancel}
+        onDismiss={nameGate.dismissed}
       />
     </SafeAreaView>
   );

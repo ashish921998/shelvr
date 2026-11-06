@@ -100,6 +100,7 @@ export function ListHeaderRight({ detail }: { detail: SharedListDetail }) {
         kind="create"
         onDone={nameGate.finish}
         onCancel={nameGate.cancel}
+        onDismiss={nameGate.dismissed}
       />
     </>
   );
