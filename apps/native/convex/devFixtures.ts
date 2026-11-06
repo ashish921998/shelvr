@@ -14,11 +14,94 @@ import {
 } from "./model/auth";
 import { fakeAiLocks } from "./model/fakeAi";
 import { insertMembership } from "./model/memberships";
+import { placeKey } from "./model/plan";
 import { buildTrip, type TripCandidate } from "./model/trip";
 import { safeDeleteStorage } from "./model/storage";
 import { deleteTripsForSpace } from "./tripData";
 
 const RESET_LIMIT = 200;
+const PUBLIC_MAP_ROWS = 10;
+const MAP_PAGE_CITY = "Mexico City";
+const MAP_PAGE_VISIT = "Contramar";
+
+type MapPageSave = {
+  fixtureKey: string;
+  type: "link" | "note";
+  url?: string;
+  note?: string;
+  title: string;
+  tags: string[];
+  pins: { name: string; lat: number; lng: number; category?: string }[];
+};
+
+const MAP_PAGE_SAVES: MapPageSave[] = [
+  {
+    fixtureKey: "cdmx-contramar",
+    type: "link",
+    url: "https://www.instagram.com/reel/DFixtureMx1/?igsh=c2hlbHZyZml4dHVyZQ==",
+    title: "Contramar tuna tostadas",
+    tags: ["travel", "food"],
+    pins: [
+      {
+        name: "Contramar",
+        lat: 19.4192,
+        lng: -99.1663,
+        category: "Restaurant",
+      },
+    ],
+  },
+  {
+    fixtureKey: "cdmx-tacos",
+    type: "link",
+    url: "https://www.tiktok.com/@shelvr.fixtures/video/7300000000000000001?is_from_webapp=1",
+    title: "Best tacos in Roma Norte",
+    tags: ["travel", "food"],
+    pins: [
+      { name: "Taquería Orinoco", lat: 19.418, lng: -99.164 },
+      { name: "Calle Durango 200", lat: 19.4205, lng: -99.168 },
+    ],
+  },
+  {
+    fixtureKey: "cdmx-bakery",
+    type: "link",
+    url: "https://www.youtube.com/watch?v=fixtureMx01&si=shelvrfixture",
+    title: "A morning in Roma",
+    tags: ["travel", "food"],
+    pins: [
+      {
+        name: "Panadería Rosetta",
+        lat: 19.4196,
+        lng: -99.1606,
+        category: "Bakery",
+      },
+    ],
+  },
+  {
+    fixtureKey: "cdmx-short-link",
+    type: "link",
+    url: "https://vm.tiktok.com/ZMfixture1/",
+    title: "Coffee in Coyoacán",
+    tags: ["travel", "food"],
+    pins: [
+      { name: "Café Avellaneda", lat: 19.348, lng: -99.162, category: "Cafe" },
+    ],
+  },
+  {
+    fixtureKey: "cdmx-note",
+    type: "note",
+    note: "Frida museum: book tickets ahead.",
+    title: "Mexico City museums",
+    tags: ["travel", "museums"],
+    pins: [
+      {
+        name: "Museo Frida Kahlo",
+        lat: 19.3551,
+        lng: -99.1624,
+        category: "Museum",
+      },
+    ],
+  },
+];
 
 const resetResultValidator = v.object({
   items: v.number(),
@@ -99,33 +182,49 @@ async function seedFixtures(
   ctx: MutationCtx,
   userId: Id<"users">,
 ): Promise<{ items: number; spaces: number; memberships: number }> {
-  const [memberships, operations, items, spaces, subscriptions, removals] =
-    await Promise.all([
-      ctx.db
-        .query("spaceItems")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .take(RESET_LIMIT + 1),
-      ctx.db
-        .query("itemOperations")
-        .withIndex("by_user_operation", (q) => q.eq("userId", userId))
-        .take(RESET_LIMIT + 1),
-      ctx.db
-        .query("items")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .take(RESET_LIMIT + 1),
-      ctx.db
-        .query("spaces")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .take(RESET_LIMIT + 1),
-      ctx.db
-        .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .take(2),
-      ctx.db
-        .query("placeRemovals")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .take(RESET_LIMIT + 1),
-    ]);
+  const [
+    memberships,
+    operations,
+    items,
+    spaces,
+    subscriptions,
+    removals,
+    visits,
+    pages,
+  ] = await Promise.all([
+    ctx.db
+      .query("spaceItems")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
+      .query("itemOperations")
+      .withIndex("by_user_operation", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
+      .query("items")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
+      .query("spaces")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(2),
+    ctx.db
+      .query("placeRemovals")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
+      .query("placeVisits")
+      .withIndex("by_user_and_key", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
+      .query("publicMaps")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(PUBLIC_MAP_ROWS),
+  ]);
 
   for (const [name, count] of [
     ["memberships", memberships.length],
@@ -133,6 +232,7 @@ async function seedFixtures(
     ["items", items.length],
     ["spaces", spaces.length],
     ["removals", removals.length],
+    ["visits", visits.length],
   ] as const) {
     if (count > RESET_LIMIT) {
       throw new Error(
@@ -155,6 +255,8 @@ async function seedFixtures(
   }
 
   for (const row of removals) await ctx.db.delete(row._id);
+  for (const row of visits) await ctx.db.delete(row._id);
+  for (const row of pages) await ctx.db.delete(row._id);
   for (const row of memberships) await ctx.db.delete(row._id);
   for (const row of operations) await ctx.db.delete(row._id);
   for (const row of items) await ctx.db.delete(row._id);
@@ -320,6 +422,67 @@ async function seedFixtures(
 
   return { items: 6, spaces: 3, memberships: 4 };
 }
+
+async function insertMapPageSave(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  { pins, ...save }: MapPageSave,
+): Promise<Id<"items">> {
+  const names = pins.map((pin) => pin.name);
+  return await ctx.db.insert("items", {
+    userId,
+    ...save,
+    status: "ready",
+    cities: [MAP_PAGE_CITY],
+    places: names,
+    placePins: pins.map((pin) => ({ ...pin, city: MAP_PAGE_CITY })),
+    searchText: [save.title, MAP_PAGE_CITY, ...names].join(" ").toLowerCase(),
+  });
+}
+
+export const seedMapPageFixtures = internalMutation({
+  args: { userId: v.id("users") },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const { userId } = args;
+    if ((await liveOwner(ctx, userId)) === null) {
+      throw new Error("Development fixtures require a live account");
+    }
+    await requireDevelopmentAnonymousUser(ctx, userId);
+    const items = await ctx.db
+      .query("items")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1);
+    if (items.length > RESET_LIMIT) {
+      throw new Error(
+        `Development fixture reset refused: items exceeds ${RESET_LIMIT} rows`,
+      );
+    }
+    for (const item of items) {
+      if (item.fixtureKey?.startsWith("cdmx-")) await ctx.db.delete(item._id);
+    }
+    const key = placeKey(MAP_PAGE_VISIT);
+    const visits = await ctx.db
+      .query("placeVisits")
+      .withIndex("by_user_and_key", (q) =>
+        q.eq("userId", userId).eq("key", key),
+      )
+      .take(PUBLIC_MAP_ROWS);
+    for (const visit of visits) await ctx.db.delete(visit._id);
+    const saved: Id<"items">[] = [];
+    for (const save of MAP_PAGE_SAVES) {
+      saved.push(await insertMapPageSave(ctx, userId, save));
+    }
+    await ctx.db.insert("placeVisits", {
+      userId,
+      key,
+      name: MAP_PAGE_VISIT,
+      itemId: saved[0],
+      visitedAt: Date.now(),
+    });
+    return MAP_PAGE_SAVES.length;
+  },
+});
 
 export const locateTripStops = internalMutation({
   args: {

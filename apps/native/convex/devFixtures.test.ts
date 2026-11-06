@@ -3,7 +3,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, internal } from "./_generated/api";
-import { newConvexTest } from "./test.setup";
+import type { Id } from "./_generated/dataModel";
+import { placeKey } from "./model/plan";
+import { newConvexTest, type TestBackend } from "./test.setup";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -243,6 +245,330 @@ describe("resetCurrentUser", () => {
     await expect(
       client.mutation(api.devFixtures.resetCurrentUser, {}),
     ).resolves.toEqual({ items: 6, spaces: 3, memberships: 4 });
+  });
+
+  it("clears the caller's place visits and map pages, a blocked page too", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { backend, userId, client } = await anonymousFixtureUser();
+    const otherUserId = await backend.run(
+      async (ctx) =>
+        await ctx.db.insert("users", { email: "other@example.com" }),
+    );
+    await backend.run(async (ctx) => {
+      for (const owner of [userId, otherUserId]) {
+        const itemId = await ctx.db.insert("items", {
+          userId: owner,
+          type: "link",
+          status: "ready",
+          tags: [],
+          searchText: "contramar",
+        });
+        await ctx.db.insert("placeVisits", {
+          userId: owner,
+          key: placeKey("Contramar"),
+          name: "Contramar",
+          itemId,
+          visitedAt: 1,
+        });
+      }
+      await ctx.db.insert("publicMaps", {
+        userId,
+        token: "a".repeat(32),
+        cities: ["Austin"],
+      });
+      await ctx.db.insert("publicMaps", {
+        userId,
+        token: "b".repeat(32),
+        cities: ["Lisbon"],
+        blockedAt: 1,
+      });
+      await ctx.db.insert("publicMaps", {
+        userId: otherUserId,
+        token: "c".repeat(32),
+        cities: ["Austin"],
+      });
+    });
+
+    await client.mutation(api.devFixtures.resetCurrentUser, {});
+
+    await backend.run(async (ctx) => {
+      const visitsOf = (id: Id<"users">) =>
+        ctx.db
+          .query("placeVisits")
+          .withIndex("by_user_and_key", (q) => q.eq("userId", id))
+          .collect();
+      const pagesOf = (id: Id<"users">) =>
+        ctx.db
+          .query("publicMaps")
+          .withIndex("by_user", (q) => q.eq("userId", id))
+          .collect();
+      expect(await visitsOf(userId)).toEqual([]);
+      expect(await pagesOf(userId)).toEqual([]);
+      expect(await visitsOf(otherUserId)).toHaveLength(1);
+      expect(await pagesOf(otherUserId)).toHaveLength(1);
+    });
+  });
+
+  it("refuses an account with too many place visits without deleting anything", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { backend, userId, client } = await anonymousFixtureUser();
+    await backend.run(async (ctx) => {
+      const itemId = await ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        tags: [],
+        searchText: "places",
+      });
+      for (let index = 0; index < 201; index += 1) {
+        await ctx.db.insert("placeVisits", {
+          userId,
+          key: `place ${index}`,
+          name: `Place ${index}`,
+          itemId,
+          visitedAt: index,
+        });
+      }
+    });
+
+    await expect(
+      client.mutation(api.devFixtures.resetCurrentUser, {}),
+    ).rejects.toThrow(/visits exceeds 200 rows/);
+    await backend.run(async (ctx) => {
+      expect(
+        await ctx.db
+          .query("placeVisits")
+          .withIndex("by_user_and_key", (q) => q.eq("userId", userId))
+          .collect(),
+      ).toHaveLength(201);
+      expect(
+        await ctx.db
+          .query("items")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
+          .collect(),
+      ).toHaveLength(1);
+    });
+  });
+});
+
+describe("seedMapPageFixtures", () => {
+  async function mapPageAccount() {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const fixture = await anonymousFixtureUser();
+    await fixture.client.mutation(api.devFixtures.resetCurrentUser, {});
+    return fixture;
+  }
+
+  function seedMapPage(backend: TestBackend, userId: Id<"users">) {
+    return backend.mutation(internal.devFixtures.seedMapPageFixtures, {
+      userId,
+    });
+  }
+
+  async function accountRows(backend: TestBackend, userId: Id<"users">) {
+    return await backend.run(async (ctx) => ({
+      items: await ctx.db
+        .query("items")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect(),
+      visits: await ctx.db
+        .query("placeVisits")
+        .withIndex("by_user_and_key", (q) => q.eq("userId", userId))
+        .collect(),
+    }));
+  }
+
+  it("adds the Mexico City saves and one visit, and a second run leaves one set", async () => {
+    const { backend, userId } = await mapPageAccount();
+    await expect(seedMapPage(backend, userId)).resolves.toBe(5);
+    await expect(seedMapPage(backend, userId)).resolves.toBe(5);
+
+    const { items, visits } = await accountRows(backend, userId);
+    const saves = items.filter((item) => item.fixtureKey?.startsWith("cdmx-"));
+    expect(items).toHaveLength(11);
+    expect(saves.map((save) => [save.fixtureKey, save.type])).toEqual([
+      ["cdmx-contramar", "link"],
+      ["cdmx-tacos", "link"],
+      ["cdmx-bakery", "link"],
+      ["cdmx-short-link", "link"],
+      ["cdmx-note", "note"],
+    ]);
+    for (const save of saves) {
+      expect(save).toMatchObject({ status: "ready", cities: ["Mexico City"] });
+      expect(save.places).toEqual(save.placePins?.map((pin) => pin.name));
+      expect(save.placePins?.map((pin) => pin.city)).toEqual(
+        save.places?.map(() => "Mexico City"),
+      );
+      expect(save.searchText).toBe(
+        [save.title, "Mexico City", ...save.places!].join(" ").toLowerCase(),
+      );
+    }
+    expect(visits).toEqual([
+      expect.objectContaining({
+        key: placeKey("Contramar"),
+        name: "Contramar",
+        itemId: saves[0]._id,
+      }),
+    ]);
+  });
+
+  it("gives the map page the places the QA plan expects", async () => {
+    const { backend, userId, client } = await mapPageAccount();
+    await seedMapPage(backend, userId);
+
+    await expect(
+      client.query(api.publicMaps.listPublicMapCities, {}),
+    ).resolves.toEqual([
+      {
+        city: "Mexico City",
+        places: [
+          { name: "Contramar", went: true },
+          { name: "Café Avellaneda", went: false },
+          { name: "Panadería Rosetta", went: false },
+          { name: "Taquería Orinoco", went: false },
+        ],
+      },
+      {
+        city: "Austin",
+        places: [
+          { name: "Jo's Coffee", went: false },
+          { name: "Houndstooth Coffee", went: false },
+        ],
+      },
+    ]);
+
+    const { token } = await client.mutation(api.publicMaps.setPublicMapCities, {
+      cities: ["Mexico City", "Austin", "Lisbon"],
+    });
+    await expect(
+      backend.query(internal.publicMaps.getPublicMap, { token }),
+    ).resolves.toEqual({
+      cities: [
+        {
+          city: "Mexico City",
+          places: [
+            {
+              name: "Contramar",
+              lat: 19.419,
+              lng: -99.166,
+              emoji: "🍽️",
+              went: true,
+              post: {
+                site: "instagram",
+                url: "https://www.instagram.com/reel/DFixtureMx1/",
+              },
+            },
+            {
+              name: "Café Avellaneda",
+              lat: 19.348,
+              lng: -99.162,
+              emoji: "☕",
+              went: false,
+            },
+            {
+              name: "Panadería Rosetta",
+              lat: 19.42,
+              lng: -99.161,
+              emoji: "🥐",
+              went: false,
+              post: { site: "youtube", url: "https://youtu.be/fixtureMx01" },
+            },
+            {
+              name: "Taquería Orinoco",
+              lat: 19.418,
+              lng: -99.164,
+              emoji: "🌮",
+              went: false,
+              post: {
+                site: "tiktok",
+                url: "https://www.tiktok.com/@shelvr.fixtures/video/7300000000000000001",
+              },
+            },
+          ],
+        },
+        {
+          city: "Austin",
+          places: [
+            {
+              name: "Jo's Coffee",
+              lat: 30.25,
+              lng: -97.75,
+              emoji: "☕",
+              went: false,
+            },
+            {
+              name: "Houndstooth Coffee",
+              lat: 30.268,
+              lng: -97.743,
+              emoji: "☕",
+              went: false,
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  it("refuses an account over the reset limit without adding anything", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { backend, userId } = await anonymousFixtureUser();
+    await backend.run(async (ctx) => {
+      for (let index = 0; index < 201; index += 1) {
+        await ctx.db.insert("items", {
+          userId,
+          type: "note",
+          status: "ready",
+          note: `Note ${index}`,
+          tags: [],
+          searchText: `note ${index}`,
+        });
+      }
+    });
+
+    await expect(seedMapPage(backend, userId)).rejects.toThrow(
+      /items exceeds 200 rows/,
+    );
+    const { items, visits } = await accountRows(backend, userId);
+    expect(items).toHaveLength(201);
+    expect(visits).toEqual([]);
+  });
+
+  it("refuses a non-anonymous account", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const backend = newConvexTest();
+    const userId = await backend.run(
+      async (ctx) =>
+        await ctx.db.insert("users", { email: "oauth@example.com" }),
+    );
+
+    await expect(seedMapPage(backend, userId)).rejects.toThrow(
+      /require an anonymous account/,
+    );
+    expect((await accountRows(backend, userId)).items).toEqual([]);
+  });
+
+  it("refuses a deleting account", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { backend, userId } = await anonymousFixtureUser();
+    await backend.run((ctx) => ctx.db.patch(userId, { deleting: true }));
+
+    await expect(seedMapPage(backend, userId)).rejects.toThrow(
+      /require a live account/,
+    );
+    expect((await accountRows(backend, userId)).items).toEqual([]);
+  });
+
+  it.each([
+    ["unset", undefined],
+    ["false", "false"],
+  ])("is unavailable when anonymous sign-in is %s", async (_label, value) => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", value);
+    const { backend, userId } = await anonymousFixtureUser();
+
+    await expect(seedMapPage(backend, userId)).rejects.toThrow(
+      /fixtures are disabled/,
+    );
+    expect((await accountRows(backend, userId)).items).toEqual([]);
   });
 });
 
