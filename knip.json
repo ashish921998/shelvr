@@ -48,7 +48,8 @@
         "tools/verify-native-fingerprint.test.mjs",
         "tools/verify-ota-compatibility.mjs",
         "tools/verify-ota-compatibility.test.mjs",
-        "tools/verify-ota-env.mjs"
+        "tools/verify-ota-env.mjs",
+        "tools/verify-pr-evidence.mjs"
       ],
       "project": ["tools/**/*.{mjs,cjs}"],
       "ignoreDependencies": ["expo-updates"]
