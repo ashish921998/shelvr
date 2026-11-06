@@ -2,7 +2,9 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t } from "@/lib/i18n";
+import { sidePadding, type SideInsets } from "@/lib/side-insets";
 import type { PlaceSearch } from "@/lib/trip-edit";
+import { useSheetInsets } from "@/lib/use-sheet-insets";
 import type { TripPlace } from "@convex/model/tripPlan";
 import { Stack } from "expo-router";
 import type { ReactNode } from "react";
@@ -104,8 +106,13 @@ export function AddPlaceSheet({
   children?: ReactNode;
 }) {
   const { theme } = useUnistyles();
+  const sheet = useSheetInsets();
   return (
-    <View style={styles.screen} accessibilityViewIsModal>
+    <View
+      onLayout={sheet.onLayout}
+      style={styles.screen(sheet.insets)}
+      accessibilityViewIsModal
+    >
       <Stack.Screen
         options={{
           title: t("tripPlanner.addPlace"),
@@ -249,7 +256,11 @@ export function AddPlaceSearch({
 }
 
 const styles = StyleSheet.create((theme) => ({
-  screen: { flex: 1, backgroundColor: theme.colors.background },
+  screen: (insets: SideInsets) => ({
+    flex: 1,
+    backgroundColor: theme.colors.background,
+    ...sidePadding(insets),
+  }),
   content: {
     gap: theme.gap(3),
     paddingHorizontal: theme.gap(2.5),

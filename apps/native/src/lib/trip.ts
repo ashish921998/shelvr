@@ -35,6 +35,8 @@ type MapView = {
   height: number;
   top: number;
   bottom: number;
+  left?: number;
+  right?: number;
   worldWidth: number;
   centerY: number;
 };
@@ -57,8 +59,10 @@ export function fitCamera(
   // In Mercator a degree of latitude is 1 / cos(latitude) times taller than a degree of longitude is wide.
   const cos = Math.cos((midLat * Math.PI) / 180);
   const visible = Math.max(view.height - view.top - view.bottom, 1);
+  const left = view.left ?? 0;
+  const right = view.right ?? 0;
   const byWidth = Math.log2(
-    (360 * FIT_FILL * view.width) /
+    (360 * FIT_FILL * Math.max(view.width - left - right, 1)) /
       (view.worldWidth * Math.max(maxLng - minLng, MIN_SPAN)),
   );
   const byHeight = Math.log2(
@@ -67,11 +71,13 @@ export function fitCamera(
   );
   const zoom = Math.min(16, Math.max(3, Math.min(byWidth, byHeight)));
   const latPerPoint = (360 * cos) / (view.worldWidth * 2 ** zoom);
+  const lngPerPoint = 360 / (view.worldWidth * 2 ** zoom);
+  const sideShift = ((right - left) / 2) * lngPerPoint;
   const visibleMiddle = view.top + visible / 2;
   return {
     coordinates: {
       latitude: midLat - (view.centerY - visibleMiddle) * latPerPoint,
-      longitude: (minLng + maxLng) / 2,
+      longitude: (minLng + maxLng) / 2 + sideShift,
     },
     zoom,
   };

@@ -11,6 +11,8 @@ import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
 import { shareInvite, useNameGate, useTypedCity } from "@/lib/shared-lists";
+import { sidePadding, type SideInsets } from "@/lib/side-insets";
+import { useSheetInsets } from "@/lib/use-sheet-insets";
 import type { TextMessageKey } from "@/locales/message-types";
 import { api } from "@convex/_generated/api";
 import {
@@ -92,6 +94,7 @@ export default function NewSharedListScreen() {
   useAppLocale();
   const router = useRouter();
   const { theme } = useUnistyles();
+  const sheet = useSheetInsets();
   const cities = useQuery(convexQuery(api.items.listCities, {}));
   const create = useMutation(api.sharedLists.createSharedList);
   const { guard, loading } = usePaywallGuard("shared_list");
@@ -150,7 +153,11 @@ export default function NewSharedListScreen() {
   };
 
   return (
-    <View style={styles.screen} accessibilityViewIsModal>
+    <View
+      onLayout={sheet.onLayout}
+      style={styles.screen(sheet.insets)}
+      accessibilityViewIsModal
+    >
       <Stack.Screen
         options={{
           title: t("sharedLists.newTitle"),
@@ -285,7 +292,11 @@ export default function NewSharedListScreen() {
 }
 
 const styles = StyleSheet.create((theme, rt) => ({
-  screen: { flex: 1, backgroundColor: theme.colors.background },
+  screen: (insets: SideInsets) => ({
+    flex: 1,
+    backgroundColor: theme.colors.background,
+    ...sidePadding(insets),
+  }),
   content: {
     gap: theme.gap(3),
     paddingHorizontal: theme.gap(2.5),

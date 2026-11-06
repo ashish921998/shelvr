@@ -28,6 +28,51 @@ describe("fitCamera", () => {
     expect(fitCamera([], view)).toBeUndefined();
   });
 
+  it("keeps the pins clear of the Duo's right-edge strip", () => {
+    const duo = {
+      width: 951,
+      height: 678,
+      top: 60,
+      bottom: 40,
+      right: 84,
+      worldWidth: 951,
+      centerY: 678 / 2,
+    };
+    const points = [
+      { latitude: 30.2701, longitude: -97.7312 },
+      { latitude: 30.2638, longitude: -97.7713 },
+      { latitude: 30.2849, longitude: -97.7341 },
+    ];
+    const camera = fitCamera(points, duo)!;
+    expect(camera.zoom).toBeLessThan(
+      fitCamera(points, { ...duo, right: 0 })!.zoom,
+    );
+    const lngPerPoint = 360 / (duo.worldWidth * 2 ** camera.zoom);
+    const xs = points.map(
+      (point) =>
+        duo.width / 2 +
+        (point.longitude - camera.coordinates.longitude) / lngPerPoint,
+    );
+    for (const x of xs) {
+      expect(x).toBeGreaterThan(0);
+      expect(x).toBeLessThan(duo.width - duo.right);
+    }
+    expect((Math.min(...xs) + Math.max(...xs)) / 2).toBeCloseTo(
+      (duo.width - duo.right) / 2,
+      0,
+    );
+  });
+
+  it("centers on the whole view when no side is covered", () => {
+    const points = [
+      { latitude: 30.2701, longitude: -97.7312 },
+      { latitude: 30.2638, longitude: -97.7713 },
+    ];
+    expect(fitCamera(points, { ...view, left: 0, right: 0 })).toEqual(
+      fitCamera(points, view),
+    );
+  });
+
   it("zooms out further for a wider day", () => {
     const tight = fitCamera(
       [

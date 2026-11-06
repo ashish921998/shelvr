@@ -22,6 +22,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { sidePadding } from "@/lib/side-insets";
 
 export default function CityScreen() {
   useAppLocale();
@@ -61,10 +62,12 @@ export default function CityScreen() {
 
   if (items.isError) {
     return (
-      <EmptyState
-        title={t("errors.unexpectedTitle")}
-        message={t("errors.retrySoon")}
-      />
+      <View style={styles.failed}>
+        <EmptyState
+          title={t("errors.unexpectedTitle")}
+          message={t("errors.retrySoon")}
+        />
+      </View>
     );
   }
   if (items.data === undefined) return <ScreenLoader />;
@@ -187,7 +190,12 @@ export default function CityScreen() {
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
+  failed: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+    ...sidePadding(rt.insets),
+  },
   header: {
     gap: theme.gap(0.25),
     paddingTop: theme.gap(1),

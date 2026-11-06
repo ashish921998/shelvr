@@ -1,4 +1,5 @@
 import { t, useAppLocale } from "@/lib/i18n";
+import { sidePadding } from "@/lib/side-insets";
 import type { ReactNode } from "react";
 import {
   KeyboardAvoidingView,
@@ -73,7 +74,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   sheet: {
     gap: theme.gap(1.5),
-    paddingHorizontal: theme.gap(3),
+    ...sidePadding(rt.insets, theme.gap(3)),
     paddingTop: theme.gap(1.5),
     paddingBottom: rt.insets.bottom + theme.gap(2),
     borderTopLeftRadius: theme.radius.xl,

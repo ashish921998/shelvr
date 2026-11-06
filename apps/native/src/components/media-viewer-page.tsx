@@ -39,6 +39,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { contentWidth } from "@/lib/side-insets";
 
 const CAPTION_SCRIM = `linear-gradient(180deg, ${[
   "rgba(0, 0, 0, 0) 0%",
@@ -84,8 +85,9 @@ export function MediaViewerPage({
 }: Props) {
   useAppLocale();
   const reducedMotion = useReducedMotion();
-  const { theme } = useUnistyles();
-  const { width } = useWindowDimensions();
+  const { theme, rt } = useUnistyles();
+  const { width: windowWidth } = useWindowDimensions();
+  const width = contentWidth(windowWidth, rt.insets);
   const insets = useSafeAreaInsets();
 
   const [stored, setCaption] = useState(() => captionFor(null, item._id));

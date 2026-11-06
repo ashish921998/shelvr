@@ -4,6 +4,7 @@ import { isDarkThemeName } from "@/lib/appearance";
 import { withAlpha } from "@/lib/color";
 import { moveCamera } from "@/lib/map-camera";
 import { t } from "@/lib/i18n";
+import { sidePadding } from "@/lib/side-insets";
 import { fitCamera, type LatLng } from "@/lib/trip";
 import { dayColor, planPins } from "@/lib/trip-planner";
 import type { TripPlanDetail, TripPlanStop } from "@convex/model/tripPlan";
@@ -122,6 +123,8 @@ export function TripPlannerMap({
       height,
       top,
       bottom,
+      left: rt.insets.left,
+      right: rt.insets.right,
       ...(process.env.EXPO_OS === "ios"
         ? {
             worldWidth: width,
@@ -129,7 +132,17 @@ export function TripPlannerMap({
           }
         : { worldWidth: 256, centerY: height / 2 }),
     });
-  }, [pins, stayPoint, width, height, top, bottom, rt.insets.top]);
+  }, [
+    pins,
+    stayPoint,
+    width,
+    height,
+    top,
+    bottom,
+    rt.insets.top,
+    rt.insets.left,
+    rt.insets.right,
+  ]);
 
   // expo-maps applies every cameraPosition change without animation, so the prop holds the first camera only.
   const [firstCamera, setFirstCamera] = useState(camera);
@@ -254,7 +267,7 @@ export function TripPlannerMap({
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   header: { width: "100%", backgroundColor: theme.colors.background },
   map: {
     width: "100%",
@@ -268,7 +281,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   chipRow: {
     gap: theme.gap(1),
-    paddingHorizontal: theme.gap(2),
+    ...sidePadding(rt.insets, theme.gap(2)),
     paddingVertical: theme.gap(1),
   },
 }));
