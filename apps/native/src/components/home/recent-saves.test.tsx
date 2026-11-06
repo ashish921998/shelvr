@@ -1,36 +1,27 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { RecentSaves } from "@/components/home/recent-saves";
 
-const mocks = vi.hoisted(() => ({ push: vi.fn() }));
-
-vi.mock("@/components/city/save-row", () => ({
-  SaveRow: vi.fn(
-    ({
-      item,
-      detail,
-      onPress,
-    }: {
-      item: { title?: string };
-      detail?: string;
-      onPress: () => void;
-    }) => (
-      <>
-        <button onClick={onPress}>{item.title}</button>
-        <small>{detail}</small>
-      </>
+vi.mock("@/components/home/save-list-row", () => ({
+  SaveListRow: vi.fn(
+    ({ save }: { save: { title?: string; status: string } }) => (
+      <button>{save.title ?? save.status}</button>
     ),
   ),
+}));
+vi.mock("@/components/home/section-heading", () => ({
+  SectionHeading: vi.fn(({ children }: { children: ReactNode }) => (
+    <h2>{children}</h2>
+  )),
 }));
 vi.mock("@/components/ui/themed-text", () => ({
   ThemedText: vi.fn(({ children }: { children: ReactNode }) => (
     <h2>{children}</h2>
   )),
 }));
-vi.mock("expo-router", () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
 }));
@@ -43,40 +34,55 @@ vi.mock("react-native", () => ({
 type Props = Parameters<typeof RecentSaves>[0];
 const save = (
   id: string,
-  overrides: Partial<Props["saves"][number]> = {},
-): Props["saves"][number] => ({
-  _id: id as Props["saves"][number]["_id"],
-  _creationTime: new Date(2026, 10, 6, 9).getTime(),
-  status: "ready",
-  cities: ["Lisbon"],
-  tags: [],
-  title: `Save ${id}`,
-  imageUrl: null,
-  ...overrides,
-});
+  overrides: Record<string, unknown> = {},
+): Props["saves"][number] =>
+  ({
+    _id: id as Props["saves"][number]["_id"],
+    _creationTime: new Date(2026, 10, 6, 9).getTime(),
+    status: "ready",
+    cities: ["Lisbon"],
+    tags: [],
+    title: `Save ${id}`,
+    imageUrl: null,
+    ...overrides,
+  }) as unknown as Props["saves"][number];
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 10, 6, 15));
-  mocks.push.mockReset();
 });
 afterEach(() => vi.useRealTimers());
 
-it("lists only ready saves that have a city", () => {
+it("lists ready saves with a city and saves still being read", () => {
   render(
     <RecentSaves
       saves={[
         save("ok"),
-        save("reading", { status: "processing" }),
+        save("reading", { status: "processing", cities: undefined }),
         save("failed", { status: "failed" }),
         save("nocity", { cities: [] }),
         save("undefined", { cities: undefined }),
       ]}
     />,
   );
-  expect(screen.getByText("Recent saves")).toBeTruthy();
-  expect(screen.getByText("Save ok")).toBeTruthy();
-  expect(screen.getAllByRole("button")).toHaveLength(1);
+  expect(screen.getByText("Recents")).toBeTruthy();
+  expect(
+    screen.getAllByRole("button").map((button) => button.textContent),
+  ).toEqual(["Save reading", "Save ok"]);
+});
+
+it("puts saves still being read first under Today", () => {
+  render(
+    <RecentSaves
+      saves={[
+        save("ready"),
+        save("reading", { status: "processing", cities: undefined }),
+      ]}
+    />,
+  );
+  expect(
+    screen.getAllByRole("button").map((button) => button.textContent),
+  ).toEqual(["Save reading", "Save ready"]);
 });
 
 it("shows at most eight, keeping the first eight in order", () => {
@@ -97,20 +103,11 @@ it("renders nothing when no save qualifies", () => {
   expect(container.textContent).toBe("");
 });
 
-it("opens a save from Home", () => {
-  render(<RecentSaves saves={[save("abc")]} />);
-  fireEvent.click(screen.getByText("Save abc"));
-  expect(mocks.push).toHaveBeenCalledWith({
-    pathname: "/item/[id]",
-    params: { id: "abc", from: "home" },
-  });
-});
-
-it("puts each save under the day it was saved, with its kind and city", () => {
+it("puts each save under the day it was saved", () => {
   render(
     <RecentSaves
       saves={[
-        save("today", { tags: ["coffee"] }),
+        save("today"),
         save("yesterday", {
           _creationTime: new Date(2026, 10, 5, 22).getTime(),
         }),
@@ -119,7 +116,5 @@ it("puts each save under the day it was saved, with its kind and city", () => {
   );
   expect(
     screen.getAllByRole("heading").map((title) => title.textContent),
-  ).toEqual(["Recent saves", "Today", "Yesterday"]);
-  expect(screen.getByText("Coffee · Lisbon")).toBeTruthy();
-  expect(screen.getByText("Lisbon")).toBeTruthy();
+  ).toEqual(["Recents", "Today", "Yesterday"]);
 });

@@ -1,5 +1,8 @@
-import { AppSymbolIcon } from "@/components/symbol";
-import { MapRoundButton } from "@/components/map/map-round-button";
+import { BackCircle } from "@/components/back-circle";
+import {
+  MapAvatarButton,
+  MapRoundButton,
+} from "@/components/map/map-round-button";
 import { MapSearchField } from "@/components/map/map-search";
 import { ThemedText } from "@/components/ui/themed-text";
 import { Wordmark } from "@/components/wordmark";
@@ -8,11 +11,10 @@ import { useRouter } from "expo-router";
 import { Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-export const MAP_HEADER_HEIGHT = 58;
+export const MAP_HEADER_HEIGHT = 50;
 
 function CityTitle({ city }: { city: string }) {
   const router = useRouter();
-  const { theme } = useUnistyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -23,7 +25,7 @@ function CityTitle({ city }: { city: string }) {
       style={({ pressed }) => [styles.title, pressed && styles.pressed]}
     >
       <ThemedText
-        variant="hero"
+        variant="displayTitle"
         numberOfLines={1}
         adjustsFontSizeToFit
         minimumFontScale={0.6}
@@ -31,12 +33,6 @@ function CityTitle({ city }: { city: string }) {
       >
         {city}
       </ThemedText>
-      <AppSymbolIcon
-        name="chevron.right"
-        size={20}
-        weight="semibold"
-        tintColor={theme.colors.foreground}
-      />
     </Pressable>
   );
 }
@@ -49,6 +45,7 @@ export function MapHeader({
   onChangeText,
   onOpenSearch,
   onCancel,
+  onShowAllCities,
 }: {
   city?: string;
   canSearch: boolean;
@@ -57,6 +54,7 @@ export function MapHeader({
   onChangeText: (text: string) => void;
   onOpenSearch: () => void;
   onCancel: () => void;
+  onShowAllCities?: () => void;
 }) {
   const router = useRouter();
   const { rt } = useUnistyles();
@@ -70,6 +68,10 @@ export function MapHeader({
   } else if (city) {
     left = <CityTitle city={city} />;
   }
+  const back =
+    city && !searchOpen && onShowAllCities ? (
+      <BackCircle label={t("map.showAllCities")} onPress={onShowAllCities} />
+    ) : null;
   let right = null;
   if (searchOpen) {
     right = (
@@ -93,13 +95,15 @@ export function MapHeader({
   }
   return (
     <View style={[styles.row, { top: rt.insets.top }]}>
+      {back}
       {left}
-      {right}
-      <MapRoundButton
-        icon="person.fill"
-        label={t("navigation.profile")}
-        onPress={() => router.push("/profile")}
-      />
+      <View style={styles.actions}>
+        {right}
+        <MapAvatarButton
+          label={t("navigation.profile")}
+          onPress={() => router.push("/profile")}
+        />
+      </View>
     </View>
   );
 }
@@ -110,23 +114,24 @@ const styles = StyleSheet.create((theme) => ({
     left: 0,
     right: 0,
     minHeight: MAP_HEADER_HEIGHT,
-    paddingHorizontal: theme.gap(2),
+    paddingHorizontal: theme.gap(2.5),
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.gap(1),
+    gap: 7,
   },
+  actions: { flexDirection: "row", alignItems: "center", gap: 14 },
   title: {
     flex: 1,
     minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.gap(0.5),
   },
   city: {
     flexShrink: 1,
-    lineHeight: 58,
-    textShadowColor: theme.colors.background,
-    textShadowRadius: 8,
+    fontSize: 32,
+    lineHeight: 44,
+    textShadowColor: theme.colors.frame,
+    textShadowRadius: 5,
     textShadowOffset: { width: 0, height: 0 },
   },
   cancel: {

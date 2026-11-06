@@ -8,6 +8,13 @@ const push = vi.fn();
 
 vi.mock("expo-router", () => ({ useRouter: () => ({ push }) }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
+vi.mock("@/components/back-circle", () => ({
+  BackCircle: vi.fn(
+    ({ label, onPress }: { label: string; onPress: () => void }) => (
+      <button aria-label={label} onClick={onPress} />
+    ),
+  ),
+}));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 vi.mock("@/components/wordmark", () => ({
   Wordmark: vi.fn(() => <span>wordmark</span>),
@@ -68,9 +75,11 @@ vi.mock("react-native", () => ({
 function Harness({
   city,
   canSearch = true,
+  onShowAllCities,
 }: {
   city?: string;
   canSearch?: boolean;
+  onShowAllCities?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
@@ -78,6 +87,7 @@ function Harness({
     <MapHeader
       city={city}
       canSearch={canSearch}
+      onShowAllCities={onShowAllCities}
       searchOpen={open}
       text={text}
       onChangeText={setText}
@@ -124,4 +134,18 @@ it("hides Search when there are no places but keeps Profile", () => {
   expect(screen.queryByLabelText("map.searchPlaceholder")).toBeNull();
   fireEvent.click(screen.getByLabelText("navigation.profile"));
   expect(push).toHaveBeenCalledWith("/profile");
+});
+
+it("offers the way back to every city only beside a city title, and not while searching", () => {
+  const showAll = vi.fn();
+  const { rerender } = render(<Harness onShowAllCities={showAll} />);
+  expect(screen.queryByLabelText("map.showAllCities")).toBeNull();
+  rerender(<Harness city="Lisbon" onShowAllCities={showAll} />);
+  fireEvent.click(screen.getByLabelText("map.showAllCities"));
+  expect(showAll).toHaveBeenCalledTimes(1);
+  rerender(<Harness city="Lisbon" />);
+  expect(screen.queryByLabelText("map.showAllCities")).toBeNull();
+  rerender(<Harness city="Lisbon" onShowAllCities={showAll} />);
+  fireEvent.click(screen.getByLabelText("map.searchPlaceholder"));
+  expect(screen.queryByLabelText("map.showAllCities")).toBeNull();
 });

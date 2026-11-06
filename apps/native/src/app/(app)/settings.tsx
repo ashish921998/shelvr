@@ -358,8 +358,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     justifyContent: "space-between",
   },
   title: {
-    fontFamily: theme.fonts.display,
-    fontSize: 24,
+    ...theme.type.sheetTitle,
     color: theme.colors.foreground,
   },
   fixtureReset: {

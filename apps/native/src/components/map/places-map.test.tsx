@@ -7,12 +7,23 @@ import { type MapFocus, PlacesMap } from "./places-map";
 
 type Camera = { coordinates: object; zoom: number };
 
-const mock = vi.hoisted(() => ({ moves: [] as (Camera | "person")[] }));
+const mock = vi.hoisted(() => ({
+  moves: [] as (Camera | "person")[],
+  props: {} as Record<string, any>,
+}));
 
 vi.mock("expo-maps", () => ({
   AppleMaps: {
     MapColorScheme: { DARK: "dark", LIGHT: "light" },
-    View: forwardRef(function MapView(_props: object, ref) {
+    PointOfInterestCategory: {
+      LANDMARK: "LANDMARK",
+      MUSEUM: "MUSEUM",
+      CASTLE: "CASTLE",
+      FORTRESS: "FORTRESS",
+      PARK: "PARK",
+    },
+    View: forwardRef(function MapView(props: Record<string, any>, ref) {
+      mock.props = props;
       useImperativeHandle(ref, () => ({
         setCameraPosition: (camera?: Camera) => {
           mock.moves.push(camera ?? "person");
@@ -100,3 +111,52 @@ it.each([
     expect(new Set(mock.moves.slice(before))).toEqual(new Set([request]));
   },
 );
+
+it("draws each place as an emoji tile titled with its name, and tapping one selects it", () => {
+  const onSelect = vi.fn();
+  render(
+    <PlacesMap
+      pins={[{ ...AUSTIN[0]!, emoji: "🍜" }, AUSTIN[1]!]}
+      framed={AUSTIN}
+      showsUser={false}
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={onSelect}
+    />,
+  );
+  expect(mock.props.annotations[0]).toMatchObject({
+    id: "a",
+    title: "Ramen",
+    text: "🍜",
+    backgroundColor: "#ffffff",
+  });
+  expect(mock.props.properties.emphasis).toBe("MUTED");
+  act(() => mock.props.onAnnotationClick({ id: "a" }));
+  expect(onSelect).toHaveBeenCalledWith("a");
+  expect(mock.props.annotations[0].backgroundColor).toBe("#amber");
+  expect(mock.props.annotations[1].backgroundColor).toBe("#ffffff");
+});
+
+it("flies out to frame every place when asked to zoom out", async () => {
+  const far = [...AUSTIN, { id: "c", name: "Bar", lat: 32.78, lng: -96.8 }];
+  const { rerender } = render(map());
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  const before = mock.moves.length;
+  rerender(
+    <PlacesMap
+      pins={AUSTIN}
+      framed={AUSTIN}
+      overview={far}
+      zoomOut={1}
+      showsUser
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={vi.fn()}
+    />,
+  );
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  const move = mock.moves.slice(before).find((m) => m !== "person") as Camera;
+  expect(move.zoom).toBeLessThan(9);
+});

@@ -9,11 +9,7 @@ import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
 import { FeedbackModal } from "@/components/feedback/feedback-modal";
-import {
-  HomePlaces,
-  HomePlacesEmptyCard,
-  UnplacedSaves,
-} from "@/components/home/home-places";
+import { HomePlaces, HomePlacesEmptyCard } from "@/components/home/home-places";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { useCurrentUser } from "@/lib/current-user";
 import { type Entitlement, useEntitlement } from "@/lib/entitlement";
@@ -140,7 +136,6 @@ export default function HomeScreen() {
             {items.length > 0 ? (
               <>
                 <HomePlaces saves={items} />
-                <UnplacedSaves saves={items} />
                 <RecentSaves saves={items} />
               </>
             ) : (

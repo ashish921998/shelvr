@@ -13,7 +13,7 @@ export default function TabsLayout() {
       screenOptions={{ headerShown: false }}
       tabBar={(props) => <TabBar {...props} />}
     >
-      <Tabs.Screen name="(home)" options={{ title: t("navigation.home") }} />
+      <Tabs.Screen name="(home)" options={{ title: t("navigation.library") }} />
       <Tabs.Screen name="(map)" options={{ title: t("navigation.map") }} />
       <Tabs.Screen name="(trips)" options={{ title: t("navigation.trips") }} />
     </Tabs>

@@ -9,8 +9,8 @@ test("saves a link and shows it on Home", async ({ agent, screen }) => {
   await fillField(input, "https://en.wikipedia.org/wiki/Sourdough");
   await screen.getByRole("button", "Save").tap();
 
-  await agent.waitFor(
-    "Home says a save has no place, with a Review link above the cities",
-    { timeout: 120_000, vision: "only" },
-  );
+  await agent.waitFor("Home shows a Without a place row under All saves", {
+    timeout: 120_000,
+    vision: "only",
+  });
 });

@@ -1,7 +1,7 @@
 import { test } from "@e2e-dev/mobile";
 import { expect } from "e2e";
 
-import { startOnSeededHome } from "./seeded-home.ts";
+import { openCities, startOnSeededHome } from "./seeded-home.ts";
 
 startOnSeededHome();
 
@@ -13,6 +13,7 @@ test(
       "needs a development backend with Apple Maps configured",
   },
   async ({ screen, app }) => {
+    await openCities(screen);
     await screen.getByRole("button", /^Lisbon(?:,|$)/).tap();
     await screen.getByRole("button", "Plan a trip").tap();
     await screen.getByTestId("new-trip-submit").tap();

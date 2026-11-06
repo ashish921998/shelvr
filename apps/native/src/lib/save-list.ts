@@ -2,6 +2,7 @@ import { placeKinds } from "@convex/model/placeKinds";
 import { canRetrySave } from "@/lib/home-places";
 import { formattingLocale, t } from "@/lib/i18n";
 import { KIND_LABELS } from "@/lib/map-filters";
+import { KIND_EMOJI } from "@/lib/map-pin-emoji";
 
 type SaveDay<T> = { key: string; title: string; saves: T[] };
 
@@ -43,6 +44,26 @@ export function saveDays<T extends { _creationTime: number }>(
     else days.push({ key, title: title(start), saves: [save] });
   }
   return days;
+}
+
+export function readingFirstDays<
+  T extends { _creationTime: number; status: string },
+>(saves: readonly T[], now = Date.now()): SaveDay<T>[] {
+  return saveDays(saves, now).map((day) => ({
+    ...day,
+    saves: [
+      ...day.saves.filter((save) => save.status === "processing"),
+      ...day.saves.filter((save) => save.status !== "processing"),
+    ],
+  }));
+}
+
+export function saveEmoji(
+  save: Parameters<typeof canRetrySave>[0] & { tags: readonly string[] },
+): string | undefined {
+  if (save.status !== "ready" || !save.cities?.[0]) return undefined;
+  const [kind] = placeKinds(undefined, save.tags);
+  return kind ? KIND_EMOJI[kind] : undefined;
 }
 
 export function saveDetail(

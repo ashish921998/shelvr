@@ -1,56 +1,44 @@
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { ThemedText } from "@/components/ui/themed-text";
-import { Pressable, View } from "react-native";
+import { withAlpha } from "@/lib/color";
+import { t } from "@/lib/i18n";
+import { countLabel } from "@/lib/save-list";
+import { Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 export function HomeRow({
   icon,
-  title,
-  value,
-  tag,
-  label,
-  disabled,
+  name,
+  count,
   onPress,
 }: {
   icon: AppSymbolName;
-  title: string;
-  value?: string;
-  tag?: string;
-  label: string;
-  disabled?: boolean;
+  name: string;
+  count?: string | number;
   onPress: () => void;
 }) {
   const { theme } = useUnistyles();
+  const shown = typeof count === "number" ? countLabel(count, false) : count;
+  const title =
+    shown === undefined
+      ? name
+      : t("homePlaces.rowCount", { title: name, n: shown });
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={label}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
+      accessibilityLabel={shown === undefined ? name : `${name}, ${shown}`}
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.row,
-        (pressed || disabled) && styles.pressed,
-      ]}
+      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
-      <AppSymbolIcon name={icon} size={22} tintColor={theme.colors.primary} />
+      <AppSymbolIcon name={icon} size={20} tintColor={theme.colors.primary} />
       <ThemedText style={styles.title} numberOfLines={1}>
         {title}
       </ThemedText>
-      {tag ? (
-        <View style={styles.tag}>
-          <ThemedText variant="captionStrong" style={styles.tagText}>
-            {tag}
-          </ThemedText>
-        </View>
-      ) : null}
-      <ThemedText variant="footnote" style={styles.value} numberOfLines={1}>
-        {value}
-      </ThemedText>
       <AppSymbolIcon
         name="chevron.right"
-        size={14}
-        tintColor={theme.colors.faint}
+        size={13}
+        weight="semibold"
+        tintColor={withAlpha(theme.colors.muted, 0.25)}
       />
     </Pressable>
   );
@@ -58,22 +46,14 @@ export function HomeRow({
 
 const styles = StyleSheet.create((theme) => ({
   row: {
-    minHeight: theme.control.minHeight + theme.gap(0.5),
+    height: 47,
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.gap(1.5),
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: theme.gap(2),
+    paddingRight: 6,
+    borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
   pressed: { opacity: theme.opacity.pressed },
-  title: { flexShrink: 1 },
-  tag: {
-    paddingHorizontal: theme.gap(0.75),
-    paddingVertical: theme.gap(0.25),
-    borderRadius: theme.radius.sm,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.primarySoft,
-  },
-  tagText: { color: theme.colors.primaryText },
-  value: { flex: 1, textAlign: "right", color: theme.colors.muted },
+  title: { flex: 1, minWidth: 0, fontSize: 16.5, lineHeight: 21 },
 }));

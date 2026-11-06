@@ -37,12 +37,17 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   Around it: `trial-reminder.ts`, `paywall-funnel.ts`,
   `paywall-telemetry.ts` and `revenuecat-*.ts`.
   The server side is `convex/subscriptions.ts`.
-- **Home:** `src/lib/home-feed.tsx` (`HomeFeedProvider`, `useHomeFeed`); the
-  cities list and processing section are in `src/components/home`
-  (`home-places.tsx`); failed and placeless saves are in `review-saves.tsx` and
-  `unplaced-toast.tsx`. The All saves and Trips rows are `library-rows.tsx`; the
-  All saves screen is `src/app/(app)/saves.tsx` (`all-saves.tsx`), and saves are
-  grouped by day in `src/lib/save-list.ts`. The city page is `src/app/(app)/city/[name].tsx`, with its
+- **Home:** the Library tab, `src/lib/home-feed.tsx` (`HomeFeedProvider`,
+  `useHomeFeed`); its rows and sections are in `src/components/home`
+  (`home-places.tsx`, Recents in `recent-saves.tsx`); failed and placeless saves
+  are in `review-saves.tsx` and `unplaced-toast.tsx`. The Trips, Cities and All
+  saves rows are `library-rows.tsx`; the Cities screen is
+  `src/app/(app)/cities.tsx` (`cities.tsx`) and the All saves screen is
+  `src/app/(app)/saves.tsx` (`all-saves.tsx`), and saves are grouped by day in
+  `src/lib/save-list.ts`. The tab bar is `src/components/tab-bar.tsx`: Library
+  or Map, the + that opens the Add spots sheet (`src/app/(app)/add-spots.tsx`,
+  `src/components/add-spots`), and Plan a date, which picks a city through
+  `src/lib/plan-picker.tsx`. The city page is `src/app/(app)/city/[name].tsx`, with its
   map in `src/components/city` and Plan a date / Plan a trip in `src/lib/city-plan.ts`.
   Plan a date is the `src/app/(app)/date-plan.tsx` route, with its screens in
   `src/components/date-plan`, state in `src/lib/date-plan.ts` and backend in
@@ -63,7 +68,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;
-  the Add sheet (`src/app/(app)/add.tsx`) takes a pasted link only.
+  the Add sheet (`src/app/(app)/add.tsx`), opened from Add spots' Paste a link,
+  takes a pasted link only.
 - **Onboarding:** screen `src/app/(app)/onboarding.tsx`, steps in
   `src/components/onboarding`, state in `src/lib/onboarding.tsx`,
   `onboarding-steps.ts` and `pending-onboarding.ts`.

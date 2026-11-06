@@ -11,7 +11,6 @@ import {
 } from "@/components/map/places-map";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
-import { withAlpha } from "@/lib/color";
 import {
   canOpenPlaceCard,
   cancelPlaceDetails,
@@ -26,6 +25,8 @@ import {
   searchPlaces,
   topSearchResults,
 } from "@/lib/map-filters";
+import { setMapCityInView } from "@/lib/map-city-in-view";
+import { canShowAllCities } from "@/lib/map-city-zoom";
 import { useMapLocation } from "@/lib/map-location";
 import { useMapCity } from "@/lib/use-map-city";
 import { placeEmoji } from "@/lib/map-pin-emoji";
@@ -76,6 +77,7 @@ export default function MapScreen() {
   const [focus, setFocus] = useState<MapFocus | undefined>(undefined);
   const [searchOpen, setSearchOpen] = useState(false);
   const [locate, setLocate] = useState(0);
+  const [zoomOut, setZoomOut] = useState(0);
   const [mapHeight, setMapHeight] = useState(0);
   const [stripHeight, setStripHeight] = useState(0);
   const barHeight = useBottomTabBarHeight();
@@ -101,6 +103,13 @@ export default function MapScreen() {
       })),
     [matches],
   );
+  const overview = useMemo(
+    () => shown.map((place) => ({ ...place, id: placeId(place) })),
+    [shown],
+  );
+  useEffect(() => {
+    setMapCityInView(city);
+  }, [city]);
   const framed = useMemo(
     () =>
       // As on the city page, a pin far out of town stays on the map but does not set the zoom.
@@ -191,22 +200,12 @@ export default function MapScreen() {
           }
           focus={focus}
           locate={locate}
+          overview={overview}
+          zoomOut={zoomOut}
           onCentreChange={onCentreChange}
           onSelect={select}
         />
       ) : null}
-      <View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: headerBottom + theme.gap(2),
-          // Built in render: Unistyles drops a stylesheet's backgroundImage on theme change.
-          experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0.92)} 0%, ${withAlpha(theme.colors.background, 0.6)} 60%, ${withAlpha(theme.colors.background, 0)} 100%)`,
-        }}
-      />
       <MapHeader
         city={city}
         canSearch={all.length > 0}
@@ -218,6 +217,11 @@ export default function MapScreen() {
         }}
         onOpenSearch={() => setSearchOpen(true)}
         onCancel={cancelSearch}
+        onShowAllCities={
+          canShowAllCities(city, shown)
+            ? () => setZoomOut((n) => n + 1)
+            : undefined
+        }
       />
       {searchOpen && listOpen ? (
         <View style={[styles.results, { top: headerBottom }]}>
@@ -277,8 +281,8 @@ const styles = StyleSheet.create((theme) => ({
   aboveBar: { ...StyleSheet.absoluteFillObject, justifyContent: "flex-end" },
   locate: {
     alignSelf: "flex-end",
-    marginRight: theme.gap(2),
-    marginBottom: theme.gap(1),
+    marginRight: theme.gap(2.5),
+    marginBottom: 10,
   },
-  strip: { paddingVertical: theme.gap(1) },
+  strip: { paddingTop: theme.gap(1), paddingBottom: 13 },
 }));

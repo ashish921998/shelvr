@@ -61,7 +61,11 @@ export function startOnSeededHome(options: { reset?: "settings" } = {}): void {
 }
 
 export async function openHome(screen: Screen): Promise<void> {
-  await screen.getByRole("button", "Home").tap({ timeout: 30_000 });
+  await screen.getByRole("button", "Library").tap({ timeout: 30_000 });
+}
+
+export async function openCities(screen: Screen): Promise<void> {
+  await screen.getByRole("button", /^Cities(?:,|$)/).tap({ timeout: 30_000 });
 }
 
 // The Convex CLI reads its deployment from .env.local in this directory.
@@ -166,12 +170,14 @@ export async function tapUntilVisible(
   );
 }
 
-/** Opens the + sheet, which takes a link and nothing else. */
 export async function openAddSheet(screen: Screen): Promise<Locator> {
   const input = screen.getByTestId("add-article-input");
-  await tapUntilVisible(screen.getByRole("button", "Add"), input, {
+  const pasteLink = screen.getByRole("button", /^Paste a link,/);
+  await tapUntilVisible(screen.getByRole("button", "Add"), pasteLink, {
     waitMs: ADD_SHEET_WAIT_MS,
     timeout: 60_000,
   });
+  await pasteLink.tap();
+  await expect(input).toBeVisible({ timeout: 30_000 });
   return input;
 }

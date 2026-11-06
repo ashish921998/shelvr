@@ -8,7 +8,7 @@ import { useRouter } from "expo-router";
 
 const TRIPS_COUNTED = 50;
 
-export function LibraryRows() {
+export function LibraryRows({ cityCount }: { cityCount?: number }) {
   const router = useRouter();
   const { isAuthenticated } = useConvexAuth();
   const { items, canLoadMore, loadingMore } = useHomeFeed();
@@ -17,30 +17,35 @@ export function LibraryRows() {
     isAuthenticated ? {} : "skip",
     { initialNumItems: TRIPS_COUNTED },
   );
-  const allSaves = t("homePlaces.allSaves");
-  const saveCount = countLabel(items?.length ?? 0, canLoadMore || loadingMore);
   const tripsTitle = t("navigation.trips");
   const tripCount =
     trips.status === "LoadingFirstPage"
       ? undefined
       : countLabel(trips.results.length, trips.status !== "Exhausted");
+  const citiesTitle = t("homePlaces.cities");
+  const allSaves = t("homePlaces.allSaves");
+  const saveCount = countLabel(items?.length ?? 0, canLoadMore || loadingMore);
   return (
     <>
       <HomeRow
-        icon="square.grid.2x2.fill"
-        title={allSaves}
-        value={saveCount}
-        label={`${allSaves}, ${saveCount}`}
-        onPress={() => router.push("/saves")}
-      />
-      <HomeRow
-        icon="suitcase.fill"
-        title={tripsTitle}
-        value={tripCount}
-        label={
-          tripCount === undefined ? tripsTitle : `${tripsTitle}, ${tripCount}`
-        }
+        icon="airplane"
+        name={tripsTitle}
+        count={tripCount}
         onPress={() => router.navigate("/(app)/(tabs)/(trips)")}
+      />
+      {cityCount ? (
+        <HomeRow
+          icon="map.fill"
+          name={citiesTitle}
+          count={cityCount}
+          onPress={() => router.push("/cities")}
+        />
+      ) : null}
+      <HomeRow
+        icon="bookmark.fill"
+        name={allSaves}
+        count={saveCount}
+        onPress={() => router.push("/saves")}
       />
     </>
   );

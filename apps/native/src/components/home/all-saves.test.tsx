@@ -16,27 +16,17 @@ type Save = {
 };
 
 const mocks = vi.hoisted(() => ({
-  push: vi.fn(),
   loadMore: vi.fn(),
   items: undefined as Save[] | undefined,
 }));
 
-vi.mock("@/components/city/save-row", () => ({
-  SaveRow: vi.fn(
-    ({
-      item,
-      detail,
-      onPress,
-    }: {
-      item: { title?: string };
-      detail?: string;
-      onPress: () => void;
-    }) => (
-      <button onClick={onPress}>
-        {item.title} / {detail}
-      </button>
-    ),
-  ),
+vi.mock("@/components/home/save-list-row", () => ({
+  SaveListRow: vi.fn(({ save }: { save: Save }) => (
+    <button>{save.title}</button>
+  )),
+}));
+vi.mock("@/components/screen-title", () => ({
+  ScreenTitle: vi.fn(({ title }: { title: string }) => <h1>{title}</h1>),
 }));
 vi.mock("@/components/home/home-places", () => ({
   HomePlacesEmptyCard: vi.fn(() => <p>Add your first spot</p>),
@@ -52,7 +42,6 @@ vi.mock("@/components/ui/themed-text", () => ({
 vi.mock("@/lib/home-feed", () => ({
   useHomeFeed: () => ({ items: mocks.items, loadMore: mocks.loadMore }),
 }));
-vi.mock("expo-router", () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
 }));
@@ -111,7 +100,6 @@ const save = (id: string, overrides: Partial<Save> = {}): Save => ({
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 10, 6, 15));
-  mocks.push.mockReset();
   mocks.loadMore.mockReset();
   mocks.items = undefined;
 });
@@ -138,22 +126,12 @@ it("lists every save under the day it was saved, placeless ones too", () => {
     screen.getAllByRole("heading").map((title) => title.textContent),
   ).toEqual(["All saves", "Today", "Yesterday", "Mon, Nov 2"]);
   expect(screen.getAllByRole("button").map((row) => row.textContent)).toEqual([
-    "Save coffee / Coffee · Lisbon",
-    "Save reading / Finding places…",
-    "Save failed / Couldn't read this link",
-    "Save noplace / No place in this one",
+    "Save reading",
+    "Save coffee",
+    "Save failed",
+    "Save noplace",
     "end of list",
   ]);
-});
-
-it("opens a save so it pages through the Home feed", () => {
-  mocks.items = [save("abc")];
-  render(<AllSaves />);
-  fireEvent.click(screen.getByText("Save abc / Lisbon"));
-  expect(mocks.push).toHaveBeenCalledWith({
-    pathname: "/item/[id]",
-    params: { id: "abc", from: "home" },
-  });
 });
 
 it("loads the next page at the end of the list", () => {

@@ -85,6 +85,8 @@ const SF_TO_MATERIAL = {
   "minus.circle.fill": "remove_circle",
   "plus.circle.fill": "add_circle",
   pencil: "edit",
+  "map.fill": "map",
+  "bookmark.fill": "bookmark",
 } as const satisfies Partial<Record<SFSymbol, AndroidSymbol>>;
 
 export type AppSymbolName = keyof typeof SF_TO_MATERIAL;

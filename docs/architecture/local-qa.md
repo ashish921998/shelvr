@@ -104,14 +104,12 @@ changes.
 
 ## Reading the screen
 
-- The accessibility tree does not list Home cards; the React component tree
-  does.
 - While a Reanimated `entering` animation runs, the accessibility tree shows
   the node twice. Wait for the screen to settle before calling a duplicate a
   defect.
-- The floating dev-tools button sits over the Home header's Add button, and the
-  tree carries no z-order, so a tap aimed at Add can open the dev menu. Go
-  through "Paste a link" or dismiss the dev button first.
+- The floating dev-tools button can cover another control, and the tree carries
+  no z-order, so a tap aimed at that control can open the dev menu. Dismiss the
+  dev button first.
 
 ## Tests and the router tree
 

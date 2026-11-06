@@ -94,14 +94,12 @@ export function ReviewSaves({ saves }: { saves: ReviewSave[] }) {
     if (open) setOpen(false);
     return null;
   }
-  const count = t("homePlaces.reviewCount", { count: toReview.length });
   return (
     <>
       <HomeRow
         icon="rectangle.stack.fill"
-        title={count}
-        value={t("homePlaces.review")}
-        label={`${count}, ${t("homePlaces.review")}`}
+        name={t("homePlaces.withoutPlace")}
+        count={toReview.length}
         onPress={() => setOpen(true)}
       />
       <PromptSheet

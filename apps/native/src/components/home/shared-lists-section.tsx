@@ -1,18 +1,26 @@
-import { MemberAvatars } from "@/components/shared-list/member-avatars";
+import { SectionHeading } from "@/components/home/section-heading";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { withAlpha } from "@/lib/color";
+import { type City, sharedListCover } from "@/lib/home-places";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
   type SharedListSummary,
   useSharedLists,
   withLine,
 } from "@/lib/shared-lists";
+import { Image } from "expo-image";
 import { useRouter } from "expo-router";
-import { Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-function ListTile({ list }: { list: SharedListSummary }) {
+function ListTile({
+  list,
+  cover,
+}: {
+  list: SharedListSummary;
+  cover: string | null;
+}) {
   const router = useRouter();
   const places = t("homePlaces.spotCount", { count: list.placeCount });
   const fresh =
@@ -32,14 +40,20 @@ function ListTile({ list }: { list: SharedListSummary }) {
       onPress={() =>
         router.push({ pathname: "/shared-list/[id]", params: { id: list._id } })
       }
-      style={({ pressed }) => [
-        styles.tile,
-        styles.listTile,
-        pressed && styles.pressed,
-      ]}
+      style={({ pressed }) => [styles.listTile, pressed && styles.pressed]}
     >
-      <View style={styles.tileTop}>
-        <MemberAvatars members={list.members} size={28} />
+      <View style={styles.photoBox}>
+        {cover ? (
+          <Image
+            source={{ uri: cover }}
+            style={styles.photo}
+            contentFit="cover"
+          />
+        ) : (
+          <View style={[styles.photo, styles.soft]}>
+            <Text style={styles.pin}>📍</Text>
+          </View>
+        )}
         {fresh ? (
           <View style={styles.badge}>
             <ThemedText variant="captionStrong" style={styles.badgeText}>
@@ -48,32 +62,23 @@ function ListTile({ list }: { list: SharedListSummary }) {
           </View>
         ) : null}
       </View>
-      <View>
-        <ThemedText variant="header" numberOfLines={2}>
-          {list.name}
-        </ThemedText>
-        <ThemedText variant="caption" style={styles.muted} numberOfLines={1}>
-          {places}
-        </ThemedText>
-      </View>
+      <ThemedText style={styles.name} numberOfLines={1}>
+        {list.name}
+      </ThemedText>
     </Pressable>
   );
 }
 
-export function SharedListsSection() {
+export function SharedListsSection({ cities }: { cities?: City[] }) {
   useAppLocale();
   const router = useRouter();
   const { theme } = useUnistyles();
   const lists = useSharedLists();
   return (
     <View style={styles.container}>
-      <ThemedText
-        variant="title"
-        accessibilityRole="header"
-        style={styles.heading}
-      >
-        {t("sharedLists.title")}
-      </ThemedText>
+      <View style={styles.heading}>
+        <SectionHeading>{t("sharedLists.title")}</SectionHeading>
+      </View>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -81,71 +86,79 @@ export function SharedListsSection() {
       >
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t("sharedLists.start")}
+          accessibilityLabel={t("sharedLists.newList")}
           onPress={() => router.push("/new-shared-list")}
-          style={({ pressed }) => [
-            styles.tile,
-            styles.startTile,
-            pressed && styles.pressed,
-          ]}
+          style={({ pressed }) => [styles.startTile, pressed && styles.pressed]}
         >
-          <AppSymbolIcon
-            name="plus"
-            size={24}
-            tintColor={theme.colors.foreground}
-          />
-          <ThemedText variant="subheadLabel" style={styles.startLabel}>
-            {t("sharedLists.start")}
+          <AppSymbolIcon name="plus" size={22} tintColor={theme.colors.muted} />
+          <ThemedText style={styles.startLabel}>
+            {t("sharedLists.newList")}
           </ThemedText>
         </Pressable>
         {lists.data?.map((list) => (
-          <ListTile key={list._id} list={list} />
+          <ListTile
+            key={list._id}
+            list={list}
+            cover={sharedListCover(list.cities, cities)}
+          />
         ))}
       </ScrollView>
     </View>
   );
 }
 
+const TILE = 104;
+
 const styles = StyleSheet.create((theme) => ({
-  container: { gap: theme.gap(1.5), paddingTop: theme.gap(3) },
-  heading: { paddingHorizontal: theme.gap(2) },
-  rail: { gap: theme.gap(1.5), paddingHorizontal: theme.gap(2) },
-  tile: {
-    width: 148,
-    height: 132,
-    padding: theme.gap(1.5),
-    borderRadius: theme.radius.lg,
+  container: { gap: 17, paddingTop: theme.gap(4) },
+  heading: { paddingHorizontal: theme.gap(2.5) },
+  rail: {
+    gap: 12,
+    paddingHorizontal: theme.gap(2.5),
+    alignItems: "flex-start",
   },
-  listTile: {
-    justifyContent: "space-between",
+  listTile: { width: TILE, gap: 7 },
+  photoBox: { width: TILE, height: TILE },
+  photo: {
+    width: TILE,
+    height: TILE,
+    borderRadius: 10,
     borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  startTile: {
-    alignItems: "center",
-    justifyContent: "center",
-    gap: theme.gap(1),
-    borderWidth: 1.5,
-    borderStyle: "dashed",
-    borderColor: withAlpha(theme.colors.muted, 0.5),
     backgroundColor: theme.colors.surfaceMuted,
   },
-  startLabel: { textAlign: "center" },
-  tileTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
+  soft: { alignItems: "center", justifyContent: "center" },
+  pin: { fontSize: 32 },
+  name: { fontSize: 14.6, lineHeight: 18 },
   badge: {
-    paddingVertical: theme.gap(0.25),
-    paddingHorizontal: theme.gap(0.75),
-    borderRadius: theme.radius.sm,
+    position: "absolute",
+    top: 6,
+    right: 6,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 8,
     borderCurve: "continuous",
     backgroundColor: theme.colors.primarySoft,
   },
-  badgeText: { color: theme.colors.primaryText },
-  muted: { color: theme.colors.muted },
+  badgeText: { fontSize: 11, lineHeight: 15, color: theme.colors.primaryText },
+  startTile: {
+    width: TILE,
+    height: TILE,
+    padding: theme.gap(1),
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    borderRadius: 10,
+    borderCurve: "continuous",
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: withAlpha(theme.colors.muted, 0.42),
+    backgroundColor: theme.colors.surfaceMuted,
+  },
+  startLabel: {
+    fontSize: 14.6,
+    lineHeight: 18,
+    textAlign: "center",
+    color: theme.colors.muted,
+  },
   pressed: { opacity: theme.opacity.pressed },
 }));

@@ -15,8 +15,18 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/components/home/home-row", () => ({
   HomeRow: vi.fn(
-    ({ label, onPress }: { label: string; onPress: () => void }) => (
-      <button onClick={onPress}>{label}</button>
+    ({
+      name,
+      count,
+      onPress,
+    }: {
+      name: string;
+      count?: string | number;
+      onPress: () => void;
+    }) => (
+      <button onClick={onPress}>
+        {count === undefined ? name : `${name}, ${count}`}
+      </button>
     ),
   ),
 }));
@@ -46,8 +56,8 @@ beforeEach(() => {
 it("counts every save and trip once all of them are loaded", () => {
   render(<LibraryRows />);
   expect(screen.getAllByRole("button").map((row) => row.textContent)).toEqual([
-    "All saves, 23",
     "Trips, 3",
+    "All saves, 23",
   ]);
 });
 
@@ -72,8 +82,22 @@ it("shows no trips count before the first page arrives", () => {
   expect(screen.getByText("Trips")).toBeTruthy();
 });
 
-it("opens All saves and the Trips tab", () => {
-  render(<LibraryRows />);
+it("puts Cities between Trips and All saves, and hides it without cities", () => {
+  const { unmount } = render(<LibraryRows cityCount={4} />);
+  expect(screen.getAllByRole("button").map((row) => row.textContent)).toEqual([
+    "Trips, 3",
+    "Cities, 4",
+    "All saves, 23",
+  ]);
+  unmount();
+  render(<LibraryRows cityCount={0} />);
+  expect(screen.queryByText(/Cities/)).toBeNull();
+});
+
+it("opens Cities, All saves and the Trips tab", () => {
+  render(<LibraryRows cityCount={4} />);
+  fireEvent.click(screen.getByText("Cities, 4"));
+  expect(mocks.push).toHaveBeenCalledWith("/cities");
   fireEvent.click(screen.getByText("All saves, 23"));
   expect(mocks.push).toHaveBeenCalledWith("/saves");
   fireEvent.click(screen.getByText("Trips, 3"));

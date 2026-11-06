@@ -117,9 +117,8 @@ describe("ReviewSaves", () => {
   it("collapses failed and placeless saves into one line that opens a sheet", () => {
     render(<ReviewSaves saves={[timeout, recipe, placed, reading]} />);
     expect(screen.queryByRole("dialog")).toBeNull();
-    fireEvent.click(
-      screen.getByRole("button", { name: "2 saves without a place, Review" }),
-    );
+    expect(screen.getByText("Without a place (2)")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Without a place, 2" }));
     expect(screen.getByRole("dialog", { name: "Saves without a place" }));
     expect(screen.queryByText("Alfama")).toBeNull();
     expect(screen.queryByText("New reel")).toBeNull();
@@ -127,17 +126,23 @@ describe("ReviewSaves", () => {
 
   it("doesn't reopen on its own after the last save in it goes away", () => {
     const view = render(<ReviewSaves saves={[recipe, placed]} />);
-    fireEvent.click(screen.getByText("Review"));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Without a place, \d+$/ }),
+    );
     expect(screen.getByRole("dialog")).toBeTruthy();
     view.rerender(<ReviewSaves saves={[placed]} />);
     view.rerender(<ReviewSaves saves={[timeout, placed]} />);
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByText("Review")).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /^Without a place, \d+$/ }),
+    ).toBeTruthy();
   });
 
   it("names a save by its site, never its raw URL", () => {
     render(<ReviewSaves saves={[timeout, recipe]} />);
-    fireEvent.click(screen.getByText("Review"));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Without a place, \d+$/ }),
+    );
     expect(screen.getByText("timeout.com")).toBeTruthy();
     expect(screen.queryByText(/https:/)).toBeNull();
     expect(screen.getByText("Couldn't read this link")).toBeTruthy();
@@ -146,7 +151,9 @@ describe("ReviewSaves", () => {
 
   it("offers Retry only where the server would rerun the save, and Delete on every row", () => {
     render(<ReviewSaves saves={[timeout, recipe]} />);
-    fireEvent.click(screen.getByText("Review"));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Without a place, \d+$/ }),
+    );
     expect(
       screen.queryByRole("button", { name: "Retry, Sourdough starter" }),
     ).toBeNull();
@@ -168,7 +175,9 @@ describe("ReviewSaves", () => {
       url: "https://qa-broken-link.invalid/coffee",
     });
     render(<ReviewSaves saves={[partial]} />);
-    fireEvent.click(screen.getByText("Review"));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Without a place, \d+$/ }),
+    );
     expect(
       screen.getByText("qa-broken-link.invalid · Couldn't read this link"),
     ).toBeTruthy();
@@ -179,7 +188,9 @@ describe("ReviewSaves", () => {
 
   it("opens a save from its row and closes the sheet", () => {
     render(<ReviewSaves saves={[recipe]} />);
-    fireEvent.click(screen.getByText("Review"));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Without a place, \d+$/ }),
+    );
     fireEvent.click(
       screen.getByRole("button", {
         name: "Sourdough starter, Wikipedia · No place in this one",

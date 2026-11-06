@@ -56,10 +56,9 @@ export default function TripsStackLayout() {
 }
 
 const styles = StyleSheet.create((theme) => ({
-  // The size of Home's wordmark, so the two tab headers match.
   title: {
-    fontFamily: theme.fonts.display,
-    fontSize: 31,
+    ...theme.type.displayTitle,
+    fontSize: 32,
     color: theme.colors.foreground,
   },
 }));

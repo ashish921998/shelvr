@@ -1,7 +1,7 @@
 import { test } from "@e2e-dev/mobile";
 import { expect } from "e2e";
 
-import { openHome, startOnSeededHome } from "./seeded-home.ts";
+import { openCities, openHome, startOnSeededHome } from "./seeded-home.ts";
 
 startOnSeededHome();
 
@@ -10,6 +10,7 @@ test("removes duplicate places, restores with Undo, and keeps removal after rela
   screen,
 }) => {
   const austin = screen.getByRole("button", /^Austin(?:,|$)/);
+  await openCities(screen);
   await expect(austin).toBeVisible();
   await austin.tap();
   const coffee = screen.getByRole("button", "Jo's Coffee");
@@ -47,6 +48,7 @@ test("removes duplicate places, restores with Undo, and keeps removal after rela
 
   await app.open();
   await openHome(screen);
+  await openCities(screen);
   await expect(austin).toBeVisible({ timeout: 30_000 });
   await austin.tap();
   await expect(coffee).toBeHidden();
@@ -72,6 +74,7 @@ test("keeps both consecutive removals recoverable with queued Undo", async ({
   app,
   screen,
 }) => {
+  await openCities(screen);
   await screen.getByRole("button", /^Austin(?:,|$)/).tap();
   const coffee = screen.getByRole("button", "Jo's Coffee");
   const other = screen.getByRole("button", "Houndstooth Coffee");
@@ -99,11 +102,12 @@ test("keeps both consecutive removals recoverable with queued Undo", async ({
   await app.screenshot("both-places-restored");
 });
 
-test("takes an emptied city off Home once the person goes back", async ({
+test("takes an emptied city off Cities once the person goes back", async ({
   app,
   screen,
 }) => {
   const austin = screen.getByRole("button", /^Austin(?:,|$)/);
+  await openCities(screen);
   await austin.tap();
   const coffee = screen.getByRole("button", "Jo's Coffee");
   const other = screen.getByRole("button", "Houndstooth Coffee");
@@ -114,7 +118,7 @@ test("takes an emptied city off Home once the person goes back", async ({
   await screen.getByRole("button", "Remove Houndstooth Coffee").tap();
   await expect(screen.getByText("No places left")).toBeVisible();
   await screen.getByTestId("BackButton").tap();
-  await expect(screen.getByTestId("home-search-input")).toBeVisible();
+  await expect(screen.getByRole("button", /^Lisbon(?:,|$)/)).toBeVisible();
   await expect(austin).toBeHidden();
-  await app.screenshot("emptied-city-off-home");
+  await app.screenshot("emptied-city-off-cities");
 });

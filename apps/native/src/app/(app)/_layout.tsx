@@ -113,10 +113,8 @@ export default function AppLayout() {
             name="city/[name]"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
-          <Stack.Screen
-            name="saves"
-            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
-          />
+          <Stack.Screen name="saves" options={{ headerShown: false }} />
+          <Stack.Screen name="cities" options={{ headerShown: false }} />
           <Stack.Screen
             name="spots/[id]"
             options={{ headerShown: false, gestureEnabled: false }}
@@ -175,6 +173,15 @@ export default function AppLayout() {
             }
           />
           <Stack.Screen name="new-shared-list" options={modal} />
+          <Stack.Screen
+            name="add-spots"
+            options={{
+              presentation: "transparentModal",
+              animation: "fade",
+              headerShown: false,
+              contentStyle: { backgroundColor: "transparent" },
+            }}
+          />
           <Stack.Screen
             name="edit-save-places"
             options={{ headerShown: true, headerTransparent: false }}

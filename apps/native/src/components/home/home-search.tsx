@@ -39,7 +39,7 @@ export function HomeSearch({
         <View style={styles.field}>
           <AppSymbolIcon
             name="magnifyingglass"
-            size={18}
+            size={17}
             tintColor={theme.colors.muted}
           />
           <TextInput
@@ -177,24 +177,23 @@ function SearchResults({
 
 const styles = StyleSheet.create((theme) => ({
   field: {
-    minHeight: 44,
+    height: 38,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(1),
-    paddingLeft: theme.gap(1.5),
-    paddingRight: theme.gap(1),
-    borderRadius: 22,
+    paddingHorizontal: theme.gap(1.5),
+    borderRadius: 19,
     borderCurve: "continuous",
     borderWidth: 1,
     borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
+    backgroundColor: theme.colors.background,
   },
   input: {
     flex: 1,
     minWidth: 0,
     ...theme.type.body,
     color: theme.colors.foreground,
-    minHeight: 44,
+    height: 34,
     paddingVertical: 0,
   },
   clear: {

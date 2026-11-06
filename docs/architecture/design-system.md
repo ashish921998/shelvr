@@ -15,9 +15,12 @@ Each one names a family/size pair the app already renders as a literal, so the
 ramp is a census of the type in use rather than a wish list. Read it that way
 before pruning it: a step no component passes to `variant` yet still describes
 sizes written by hand across `src/`, and deleting it only means re-deriving it
-from those literals later. The display face (`CrimsonProRoman-Regular`) carries titles
-(`hero`, `displayTitle`, `largeTitle`, `sheetTitle`, `title`, `header`, `displaySmall`);
-Satoshi regular/medium/bold carries body and label steps. `ThemedText` takes a
+from those literals later. The title steps (`hero`, `displayTitle`, `largeTitle`,
+`sheetTitle`, `title`, `header`, `displaySmall`) are Satoshi bold with negative
+letter spacing, and Satoshi regular/medium/bold carries body and label steps. The
+display face (`CrimsonProRoman-Regular`, `theme.fonts.display`) stays on the
+wordmark, the launch splash, sign-in, the onboarding opener, legal consent, the
+error screen and the paywall. `ThemedText` takes a
 `variant` prop keyed by ramp name, defaults its color to
 `theme.colors.foreground`, and applies `style` last so callers can override.
 Use variants in new UI; a `fontSize` literal in a new component is a smell.

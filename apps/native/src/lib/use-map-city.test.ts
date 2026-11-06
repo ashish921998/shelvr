@@ -21,6 +21,14 @@ describe("useMapCity", () => {
     expect(result.current.city).toBe("Porto");
   });
 
+  it("names no city once the map is zoomed out past a single city", () => {
+    const { result } = renderHook(() => useMapCity(places));
+    act(() => result.current.onCentreChange({ lat: 38.72, lng: -9.14 }, 5));
+    expect(result.current.city).toBeUndefined();
+    act(() => result.current.onCentreChange({ lat: 38.72, lng: -9.14 }, 12));
+    expect(result.current.city).toBe("Lisbon");
+  });
+
   it("names no city once the map is far from every saved place", () => {
     const { result } = renderHook(() => useMapCity(places));
     act(() => result.current.onCentreChange({ lat: 40.42, lng: -3.7 }));

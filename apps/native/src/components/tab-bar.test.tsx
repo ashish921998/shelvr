@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import {
   BottomTabBarHeightCallbackContext,
   type BottomTabBarProps,
@@ -11,23 +11,18 @@ import { TabBar } from "@/components/tab-bar";
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
-  guard: vi.fn(async (action?: () => void) => {
-    action?.();
-    return true;
-  }),
-  loading: false,
+  plan: vi.fn(),
+  cityInView: undefined as string | undefined,
   keyboard: false,
   os: "ios",
 }));
 
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
-vi.mock("@/components/ui/themed-text", () => ({
-  ThemedText: vi.fn(({ children }: { children: ReactNode }) => (
-    <span>{children}</span>
-  )),
+vi.mock("@/lib/plan-picker", () => ({
+  usePlanPicker: () => ({ plan: mocks.plan, sheet: null }),
 }));
-vi.mock("@/lib/free-plan", () => ({
-  useSaveGuard: () => ({ guard: mocks.guard, loading: mocks.loading }),
+vi.mock("@/lib/map-city-in-view", () => ({
+  useMapCityInView: () => mocks.cityInView,
 }));
 vi.mock("@/lib/use-keyboard-visible", () => ({
   useKeyboardVisible: () => mocks.keyboard,
@@ -43,7 +38,7 @@ vi.mock("expo-router/js-tabs", async () => {
 });
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { colors: {} } }),
+  useUnistyles: () => ({ theme: { colors: { background: "#faf6ee" } } }),
 }));
 vi.mock("react-native", async () => {
   const { useEffect } = await import("react");
@@ -93,7 +88,7 @@ const routes = [
   { key: "trips-key", name: "(trips)" },
 ];
 const titles: Record<string, string> = {
-  "home-key": "Home",
+  "home-key": "Library",
   "map-key": "Map",
   "trips-key": "My trips",
 };
@@ -123,30 +118,41 @@ function bar(
 
 beforeEach(() => {
   mocks.push.mockReset();
-  mocks.guard.mockClear();
-  mocks.loading = false;
+  mocks.plan.mockReset();
+  mocks.cityInView = undefined;
   mocks.keyboard = false;
   mocks.os = "ios";
 });
 
+function labels() {
+  return screen
+    .getAllByRole("button")
+    .map((button) => button.getAttribute("aria-label"));
+}
+
 describe("tabs", () => {
-  it("shows the two tabs you are not on, in route order", () => {
+  it("offers the Map from the Library", () => {
+    bar(0);
+    expect(labels()).toEqual(["Map", "Add", "Plan a date"]);
+  });
+
+  it("offers the Library from the Map and from Trips", () => {
     bar(1);
-    const labels = screen
-      .getAllByRole("button")
-      .map((b) => b.getAttribute("aria-label"));
-    expect(labels).toEqual(["Home", "Add", "My trips"]);
+    expect(labels()).toEqual(["Library", "Add", "Plan a date"]);
+    cleanup();
+    bar(2);
+    expect(labels()).toEqual(["Library", "Add", "Plan a date"]);
   });
 
   it("emits tabPress and navigates", () => {
-    const { emit, navigateToTab } = bar(0);
-    fireEvent.click(screen.getByRole("button", { name: "My trips" }));
+    const { emit, navigateToTab } = bar(1);
+    fireEvent.click(screen.getByRole("button", { name: "Library" }));
     expect(emit).toHaveBeenCalledWith({
       type: "tabPress",
-      target: "trips-key",
+      target: "home-key",
       canPreventDefault: true,
     });
-    expect(navigateToTab).toHaveBeenCalledWith("trips-key");
+    expect(navigateToTab).toHaveBeenCalledWith("home-key");
   });
 
   it("does not navigate when the press is default-prevented", () => {
@@ -158,19 +164,26 @@ describe("tabs", () => {
 });
 
 describe("add button", () => {
-  it("runs the save guard, then opens Add", () => {
+  it("opens the Add spots sheet", () => {
     bar(0);
     fireEvent.click(screen.getByRole("button", { name: "Add" }));
-    expect(mocks.guard).toHaveBeenCalledTimes(1);
-    expect(mocks.push).toHaveBeenCalledWith("/add");
+    expect(mocks.push).toHaveBeenCalledWith("/add-spots");
+  });
+});
+
+describe("plan a date", () => {
+  it("plans for the city the map shows", () => {
+    mocks.cityInView = "Lisbon";
+    bar(1);
+    fireEvent.click(screen.getByRole("button", { name: "Plan a date" }));
+    expect(mocks.plan).toHaveBeenCalledWith("date", "Lisbon");
   });
 
-  it("does nothing while the guard is loading", () => {
-    mocks.loading = true;
+  it("asks for a city from the Library, whatever the map last showed", () => {
+    mocks.cityInView = "Lisbon";
     bar(0);
-    fireEvent.click(screen.getByRole("button", { name: "Add" }));
-    expect(mocks.guard).not.toHaveBeenCalled();
-    expect(mocks.push).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Plan a date" }));
+    expect(mocks.plan).toHaveBeenCalledWith("date", undefined);
   });
 });
 

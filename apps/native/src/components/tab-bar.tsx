@@ -1,8 +1,8 @@
 import { AppSymbolIcon } from "@/components/symbol";
-import { ThemedText } from "@/components/ui/themed-text";
 import { withAlpha } from "@/lib/color";
-import { useSaveGuard } from "@/lib/free-plan";
 import { t, useAppLocale } from "@/lib/i18n";
+import { useMapCityInView } from "@/lib/map-city-in-view";
+import { usePlanPicker } from "@/lib/plan-picker";
 import { useKeyboardVisible } from "@/lib/use-keyboard-visible";
 import { useRouter } from "expo-router";
 import {
@@ -15,35 +15,65 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type TabRoute = BottomTabBarProps["state"]["routes"][number];
 
-const TAB_EMOJI: Record<string, string> = {
-  "(home)": "🏠",
-  "(map)": "🗺️",
-  "(trips)": "🧳",
-};
+const LIBRARY = "(home)";
+const MAP = "(map)";
+const TAB_EMOJI: Record<string, string> = { [LIBRARY]: "📘", [MAP]: "🗺️" };
+const ADD_SIZE = 64;
+const ADD_LIFT = 8;
 
-function TabButton({
-  route,
+export function addButtonBottom(insetBottom: number): number {
+  return Math.max(insetBottom, 12) + ADD_LIFT;
+}
+
+export function AddButton({
   label,
+  icon,
   onPress,
 }: {
-  route: TabRoute | undefined;
   label: string;
+  icon: "plus" | "xmark";
   onPress: () => void;
 }) {
-  if (!route) return <View style={styles.side} />;
+  const { theme } = useUnistyles();
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
-      style={({ pressed }) => [styles.side, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.add, pressed && styles.pressed]}
+    >
+      <AppSymbolIcon
+        name={icon}
+        size={icon === "plus" ? 27 : 22}
+        weight="bold"
+        tintColor={theme.colors.foreground}
+      />
+    </Pressable>
+  );
+}
+
+function TabItem({
+  emoji,
+  label,
+  onPress,
+}: {
+  emoji: string;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+      style={({ pressed }) => [styles.item, pressed && styles.pressed]}
     >
       <Text style={styles.emoji} allowFontScaling={false}>
-        {TAB_EMOJI[route.name]}
+        {emoji}
       </Text>
-      <ThemedText variant="caption" numberOfLines={1} style={styles.label}>
+      <Text style={styles.label} numberOfLines={1}>
         {label}
-      </ThemedText>
+      </Text>
     </Pressable>
   );
 }
@@ -57,22 +87,21 @@ export function TabBar({
   useAppLocale();
   const router = useRouter();
   const { theme } = useUnistyles();
-  const { guard, loading } = useSaveGuard("tab_bar");
   const keyboardVisible = useKeyboardVisible();
   const onHeightChange = useContext(BottomTabBarHeightCallbackContext);
+  const cityInView = useMapCityInView();
+  const planner = usePlanPicker();
   const hidden = Platform.OS === "android" && keyboardVisible;
   useEffect(() => {
     if (hidden) onHeightChange?.(0);
   }, [hidden, onHeightChange]);
   if (hidden) return null;
   const current = state.routes[state.index];
-  const [left, right] = state.routes.filter(
-    (route) => route.key !== current?.key,
+  const onMap = current?.name === MAP;
+  const other = state.routes.find(
+    (route) => route.name === (current?.name === LIBRARY ? MAP : LIBRARY),
   );
-  const label = (route: TabRoute | undefined) =>
-    route ? (descriptors[route.key]?.options.title ?? route.name) : "";
-  const open = (route: TabRoute | undefined) => () => {
-    if (!route) return;
+  const open = (route: TabRoute) => () => {
     const event = emitter.emit({
       type: "tabPress",
       target: route.key,
@@ -80,33 +109,40 @@ export function TabBar({
     });
     if (!event.defaultPrevented) navigateToTab(route.key);
   };
+  const background = theme.colors.background;
+  const strength = onMap ? 0.96 : 1;
   return (
     <View
       onLayout={(event) => onHeightChange?.(event.nativeEvent.layout.height)}
       style={[
         styles.bar,
         {
-          experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0)} 0%, ${withAlpha(theme.colors.background, 0.85)} 35%, ${theme.colors.background} 60%)`,
+          experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(background, 0)} 0%, ${withAlpha(background, 0.85 * strength)} 35%, ${withAlpha(background, 0.97 * strength)} 55%, ${withAlpha(background, strength)} 75%)`,
         },
       ]}
     >
-      <TabButton route={left} label={label(left)} onPress={open(left)} />
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("common.add")}
-        onPress={() => {
-          if (!loading) void guard(() => router.push("/add"));
-        }}
-        style={({ pressed }) => [styles.add, pressed && styles.pressed]}
-      >
-        <AppSymbolIcon
-          name="plus"
-          size={28}
-          weight="semibold"
-          tintColor={theme.colors.tabTint}
+      {other ? (
+        <TabItem
+          emoji={TAB_EMOJI[other.name] ?? ""}
+          label={descriptors[other.key]?.options.title ?? other.name}
+          onPress={open(other)}
         />
-      </Pressable>
-      <TabButton route={right} label={label(right)} onPress={open(right)} />
+      ) : (
+        <View style={styles.item} />
+      )}
+      <View style={styles.lift}>
+        <AddButton
+          label={t("common.add")}
+          icon="plus"
+          onPress={() => router.push("/add-spots")}
+        />
+      </View>
+      <TabItem
+        emoji="🎲"
+        label={t("homePlaces.planDate")}
+        onPress={() => planner.plan("date", onMap ? cityInView : undefined)}
+      />
+      {planner.sheet}
     </View>
   );
 }
@@ -119,29 +155,33 @@ const styles = StyleSheet.create((theme, rt) => ({
     bottom: 0,
     flexDirection: "row",
     justifyContent: "center",
-    alignItems: "flex-start",
-    gap: theme.gap(1.5),
-    paddingTop: theme.gap(1),
-    paddingBottom: Math.max(rt.insets.bottom, theme.gap(1.5)),
+    alignItems: "flex-end",
+    paddingTop: theme.gap(2),
+    paddingBottom: Math.max(rt.insets.bottom, 12),
   },
-  side: {
-    width: 96,
+  item: {
+    width: 100,
     alignItems: "center",
-    gap: theme.gap(0.25),
-    paddingTop: theme.gap(1.25),
+    gap: 5,
   },
-  emoji: { fontSize: 34, lineHeight: 42 },
-  label: { color: theme.colors.muted },
+  emoji: { fontSize: 38, lineHeight: 44 },
+  label: {
+    fontFamily: theme.fonts.regular,
+    fontSize: 10.5,
+    lineHeight: 13,
+    color: theme.colors.muted,
+  },
+  lift: { marginBottom: ADD_LIFT },
   add: {
-    width: 64,
-    height: 64,
+    width: ADD_SIZE,
+    height: ADD_SIZE,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 32,
-    borderWidth: 1,
+    borderRadius: ADD_SIZE / 2,
+    borderWidth: 0.5,
     borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    boxShadow: "0 4px 14px rgba(0, 0, 0, 0.12)",
+    backgroundColor: theme.colors.frame,
+    boxShadow: "0 4px 14px rgba(43, 36, 24, 0.18)",
   },
   pressed: { opacity: theme.opacity.pressed },
 }));

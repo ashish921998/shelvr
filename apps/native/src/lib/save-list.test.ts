@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { countLabel, saveDays, saveDetail } from "./save-list";
+import {
+  countLabel,
+  readingFirstDays,
+  saveDays,
+  saveDetail,
+  saveEmoji,
+} from "./save-list";
 
 const NOW = new Date(2026, 10, 6, 15).getTime();
 const savedAt = (year: number, month: number, day: number, hour: number) => ({
@@ -69,5 +75,39 @@ describe("countLabel", () => {
     [40, true, "40+"],
   ])("shows %i with more to load %s as %s", (count, more, label) => {
     expect(countLabel(count, more)).toBe(label);
+  });
+});
+
+describe("readingFirstDays", () => {
+  it("moves saves still being read to the front of their day only", () => {
+    const save = (name: string, status: string, day: number, hour: number) => ({
+      name,
+      status,
+      _creationTime: new Date(2026, 10, day, hour).getTime(),
+    });
+    const days = readingFirstDays(
+      [
+        save("ready today", "ready", 6, 9),
+        save("reading today", "processing", 6, 8),
+        save("reading yesterday", "processing", 5, 20),
+        save("ready yesterday", "ready", 5, 9),
+      ],
+      NOW,
+    );
+    expect(days.map((day) => day.saves.map((s) => s.name))).toEqual([
+      ["reading today", "ready today"],
+      ["reading yesterday", "ready yesterday"],
+    ]);
+  });
+});
+
+describe("saveEmoji", () => {
+  it("is the kind's emoji for a placed save, and nothing otherwise", () => {
+    const base = { _id: "a", tags: ["dessert"] };
+    expect(saveEmoji({ ...base, status: "ready", cities: ["Lisbon"] })).toBe(
+      "🍰",
+    );
+    expect(saveEmoji({ ...base, status: "ready", cities: [] })).toBeUndefined();
+    expect(saveEmoji({ ...base, status: "processing" })).toBeUndefined();
   });
 });
