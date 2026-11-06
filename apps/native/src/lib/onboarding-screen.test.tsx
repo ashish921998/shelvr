@@ -535,12 +535,31 @@ it("ignores an answer from an earlier carousel visit", async () => {
   tap("carousel:continue");
   tap("common.back");
   tap("aha:spots");
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(false);
   await act(async () => answer("granted"));
   expect(mocks.ask).not.toHaveBeenCalled();
   expect(
     screen.getByRole("button", { name: "carousel:continue" }),
   ).toBeTruthy();
   expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(false);
+});
+
+it("keeps a later visit's Continue busy when an earlier visit's answer lands", async () => {
+  const answers: ((value: "blocked") => void)[] = [];
+  mocks.permission.mockImplementation(
+    () => new Promise((resolve) => answers.push(resolve)),
+  );
+  startAt("carousel");
+  render(<OnboardingScreen />);
+  tap("carousel:continue");
+  tap("common.back");
+  tap("aha:spots");
+  tap("carousel:continue");
+  await act(async () => answers[0]?.("blocked"));
+  expect(mocks.ask).not.toHaveBeenCalled();
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(true);
+  await act(async () => answers[1]?.("blocked"));
+  expect(mocks.ask).toHaveBeenCalledTimes(1);
 });
 
 it("returns from the notifications step to the same carousel without opening the paywall", () => {

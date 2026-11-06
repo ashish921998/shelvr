@@ -286,8 +286,8 @@ export default function OnboardingScreen() {
         return "blocked" as const;
       })
       .then((state) => {
-        setCheckingNotifications(false);
         if (stepVisit.current !== visit) return;
+        setCheckingNotifications(false);
         if (state === "ask") advance();
         else askForPlan();
       });
@@ -412,6 +412,7 @@ export default function OnboardingScreen() {
             ? null
             : () => {
                 setBackward(true);
+                setCheckingNotifications(false);
                 setStep(previous);
               }
         }

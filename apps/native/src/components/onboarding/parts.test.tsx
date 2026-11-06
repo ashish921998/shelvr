@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, expect, it, vi } from "vitest";
 import { PillButton } from "./parts";
@@ -11,14 +11,20 @@ const mock = vi.hoisted(() => ({
     children,
     accessibilityLabel,
     accessibilityState,
+    disabled,
+    onPress,
   }: Children & {
     accessibilityLabel?: string;
     accessibilityState?: { busy?: boolean };
+    disabled?: boolean;
+    onPress?: () => void;
   }) => (
     <button
       type="button"
       aria-label={accessibilityLabel}
       aria-busy={accessibilityState?.busy ? "true" : "false"}
+      disabled={disabled}
+      onClick={onPress}
     >
       {children}
     </button>
@@ -60,4 +66,12 @@ it("keeps its label as its name while the stitches replace the text", () => {
   const pill = screen.getByRole("button", { name: "Continue" });
   expect(pill.getAttribute("aria-busy")).toBe("true");
   expect(screen.queryByText("Continue")).toBeNull();
+});
+
+it("ignores a press while busy", () => {
+  const onPress = vi.fn();
+  render(<PillButton label="Continue" busy onPress={onPress} />);
+
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  expect(onPress).not.toHaveBeenCalled();
 });
