@@ -484,6 +484,21 @@ it("shows the carousel as leaving once its Continue asks for the paywall", async
   expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(true);
 });
 
+it("shows the carousel as leaving while it reads the notifications answer", async () => {
+  let answer: (value: "blocked") => void = () => undefined;
+  mocks.permission.mockImplementation(
+    () => new Promise((resolve) => (answer = resolve)),
+  );
+  startAt("carousel");
+  render(<OnboardingScreen />);
+  tap("carousel:continue");
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(true);
+  expect(mocks.ask).not.toHaveBeenCalled();
+  await act(async () => answer("blocked"));
+  expect(mocks.ask).toHaveBeenCalledTimes(1);
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(true);
+});
+
 it("opens the paywall when the permission cannot be read", async () => {
   mocks.permission.mockRejectedValue(new Error("no"));
   startAt("carousel");
@@ -525,6 +540,7 @@ it("ignores an answer from an earlier carousel visit", async () => {
   expect(
     screen.getByRole("button", { name: "carousel:continue" }),
   ).toBeTruthy();
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(false);
 });
 
 it("returns from the notifications step to the same carousel without opening the paywall", () => {

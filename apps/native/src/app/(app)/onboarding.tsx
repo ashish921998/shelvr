@@ -270,6 +270,7 @@ export default function OnboardingScreen() {
     onUnavailable: finish,
     onClosed: freePlanOpen === false ? undefined : finish,
   });
+  const [checkingNotifications, setCheckingNotifications] = useState(false);
 
   const askForPlan = () => {
     recordCurrentStep();
@@ -278,12 +279,14 @@ export default function OnboardingScreen() {
 
   const leaveCarousel = () => {
     const visit = stepVisit.current;
+    setCheckingNotifications(true);
     void notificationPermissionState()
       .catch((error: unknown) => {
         analytics.captureError("onboarding_notifications_check_failed", error);
         return "blocked" as const;
       })
       .then((state) => {
+        setCheckingNotifications(false);
         if (stepVisit.current !== visit) return;
         if (state === "ask") advance();
         else askForPlan();
@@ -379,7 +382,7 @@ export default function OnboardingScreen() {
         return (
           <CarouselStep
             sample={sample}
-            leaving={paywall.asked}
+            leaving={checkingNotifications || paywall.asked}
             onContinue={leaveCarousel}
           />
         );
