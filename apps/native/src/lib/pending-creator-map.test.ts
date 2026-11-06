@@ -4,6 +4,7 @@ import {
   clearPendingCreatorMap,
   getPendingCreatorMap,
   parsePendingCreatorMap,
+  pendingCreatorMapToken,
   setPendingCreatorMap,
   subscribePendingCreatorMap,
 } from "./pending-creator-map";
@@ -127,5 +128,18 @@ describe("parsePendingCreatorMap", () => {
       parsePendingCreatorMap(slot({ name: "n".repeat(61) }), NOW)?.name,
     ).toHaveLength(61);
     expect(parsePendingCreatorMap(slot({ name: "" }), NOW)?.name).toBe("");
+  });
+});
+
+describe("pendingCreatorMapToken", () => {
+  it("names the map a slot holds, whatever its age", () => {
+    expect(pendingCreatorMapToken(slot())).toBe(TOKEN);
+    expect(pendingCreatorMapToken(slot({ at: NOW - 48 * HOUR }))).toBe(TOKEN);
+  });
+
+  it("names none for an empty or unreadable slot", () => {
+    expect(pendingCreatorMapToken(null)).toBeNull();
+    expect(pendingCreatorMapToken("{token")).toBeNull();
+    expect(pendingCreatorMapToken(slot({ name: 7 }))).toBeNull();
   });
 });

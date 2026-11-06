@@ -86,6 +86,9 @@ vi.mock("@/components/empty-state", () => ({
     ),
   ),
 }));
+vi.mock("@/components/map/map-page-save-all", () => ({
+  MapPageSaveAll: vi.fn(() => <div data-testid="map-page-save-all-card" />),
+}));
 vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: vi.fn(() => <div>loading-screen</div>),
 }));
@@ -357,6 +360,36 @@ describe("map page sheet states", () => {
     expect(current.rotate).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByTestId("map-page-turn-off"));
     expect(current.turnOff).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers Save all under the cities only when the page is on", () => {
+    show({
+      status: "on",
+      url: PAGE_URL,
+      cities: cities(["Mexico City"]),
+      pickedCount: 1,
+      canSubmit: true,
+    });
+    const card = screen.getByTestId("map-page-save-all-card");
+    const lastCity = screen.getByText("Lisbon");
+    expect(
+      lastCity.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      card.compareDocumentPosition(screen.getByTestId("map-page-submit")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    for (const status of [
+      "off",
+      "loading",
+      "error",
+      "blocked",
+      "empty",
+    ] as const) {
+      cleanup();
+      show({ status, cities: cities(["Mexico City"]), canSubmit: true });
+      expect(screen.queryByTestId("map-page-save-all-card")).toBeNull();
+    }
   });
 
   it("saves edited cities instead of sharing", () => {

@@ -62,6 +62,10 @@ function slotFields(raw: string): PendingCreatorMap | null {
   return { token, city, name, at };
 }
 
+export function pendingCreatorMapToken(raw: string | null): string | null {
+  return raw === null ? null : (slotFields(raw)?.token ?? null);
+}
+
 export function parsePendingCreatorMap(
   raw: string | null,
   now: number,

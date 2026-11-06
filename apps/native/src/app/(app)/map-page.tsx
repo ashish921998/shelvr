@@ -2,6 +2,7 @@ import { EmptyState } from "@/components/empty-state";
 import { MapPageActions } from "@/components/map/map-page-actions";
 import { MapPageCities } from "@/components/map/map-page-cities";
 import { MapPageLink } from "@/components/map/map-page-link";
+import { MapPageSaveAll } from "@/components/map/map-page-save-all";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ThemedText } from "@/components/ui/themed-text";
@@ -57,6 +58,7 @@ function MapPageBody({ page }: { page: MapPage }) {
               disabled={page.busy}
               onToggle={page.toggle}
             />
+            {page.status === "on" ? <MapPageSaveAll /> : null}
           </ScrollView>
           <MapPageActions page={page} />
         </>
