@@ -267,6 +267,29 @@ describe("saveCreatorMap", () => {
     expect((await listRows(backend, listId)).places).toHaveLength(4);
   });
 
+  it("copies every place the preview names, even one whose name sits inside a nearby place's", async () => {
+    const { backend, creator, token } = await creatorWithPage();
+    const tikTok =
+      "https://www.tiktok.com/@shelvr.fixtures/video/7300000000000000002";
+    await insertSave(backend, creator.userId, {
+      url: tikTok,
+      placePins: [{ name: "Rosetta", lat: 19.4199, lng: -99.1611 }],
+    });
+    const shown = ["Contramar", "Rosetta", ...PAGE_ORDER.slice(1)];
+    await expect(preview(backend, token)).resolves.toMatchObject({
+      placeCount: 5,
+      placeNames: shown.slice(0, 3),
+    });
+
+    const bo = await follower(backend);
+    const listId = await savedListId(bo, token);
+    const list = await bo.t.query(api.sharedLists.getSharedList, { listId });
+    expect(list?.places.map((place) => [place.name, place.postUrl])).toEqual(
+      shown.map((name) => [name, name === "Rosetta" ? tikTok : POSTS[name]]),
+    );
+    await expect(save(bo, token)).resolves.toMatchObject({ added: 0 });
+  });
+
   it("puts a place the creator saved since at the top", async () => {
     const { backend, creator, token } = await creatorWithPage();
     const bo = await follower(backend);

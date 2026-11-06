@@ -467,7 +467,7 @@ describe("insertListPlaces", () => {
           { name: "Cervejaria Trindade", ...near(30), city: "Lisbon" },
         ],
         now,
-        1,
+        { step: 1 },
       ),
     );
     expect(ids).toHaveLength(3);
@@ -481,6 +481,29 @@ describe("insertListPlaces", () => {
     ]);
     expect(list?.places).toHaveLength(5);
     expect(list?.placeCount).toBe(5);
+  });
+
+  it("keeps a batch's near namesakes apart only when the batch is already unique", async () => {
+    const batch = [
+      { name: "Rossio", ...near(10), city: "Lisbon" },
+      { name: "Café Rossio", ...near(10.5), city: "Lisbon" },
+      { name: "Time Out Market", ...near(0.2), city: "Lisbon" },
+    ];
+    for (const [alreadyUnique, added] of [
+      [false, ["Rossio"]],
+      [true, ["Rossio", "Café Rossio"]],
+    ] as const) {
+      const { base, owner, listId } = await listWithOwner();
+      await base.run((ctx) =>
+        insertListPlaces(ctx, listId, owner.userId, batch, Date.now(), {
+          alreadyUnique,
+        }),
+      );
+      const names = (await rowsOf(base, listId)).map((row) => row.name);
+      expect(names.sort()).toEqual(
+        [...added, "Manteigaria", "Time Out Market"].sort(),
+      );
+    }
   });
 });
 

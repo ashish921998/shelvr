@@ -95,19 +95,23 @@ async function liveList(
   return (await liveOwner(ctx, list.ownerId)) === null ? null : list;
 }
 
+type PlaceBatch = { step?: number; alreadyUnique?: boolean };
+
 export async function insertListPlaces(
   ctx: MutationCtx,
   listId: Id<"sharedLists">,
   userId: Id<"users">,
   places: NewListPlace[],
   now: number,
-  step = 0,
+  { step = 0, alreadyUnique = false }: PlaceBatch = {},
 ): Promise<Id<"sharedListPlaces">[]> {
   const existing = await listPlaces(ctx, listId);
   const kept: NewListPlace[] = [];
   for (const place of places) {
     if (existing.some((row) => sameTripPlace(row, place))) continue;
-    if (kept.some((row) => sameTripPlace(row, place))) continue;
+    if (!alreadyUnique && kept.some((row) => sameTripPlace(row, place))) {
+      continue;
+    }
     if (existing.length + kept.length >= MAX_LIST_PLACES) break;
     kept.push(place);
   }

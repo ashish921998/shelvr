@@ -16,6 +16,7 @@ import { servablePage } from "./publicMaps";
 import { insertListPlaces } from "./sharedLists";
 
 const CREATOR_MAP_PREVIEW_NAMES = 3;
+const PAGE_PLACES = { step: 1, alreadyUnique: true };
 
 type CreatorCity = {
   page: Doc<"publicMaps">;
@@ -183,12 +184,26 @@ export const saveCreatorMap = authedMutation({
       found.city,
     );
     if (list !== null) {
-      const ids = await insertListPlaces(ctx, list._id, userId, places, now, 1);
+      const ids = await insertListPlaces(
+        ctx,
+        list._id,
+        userId,
+        places,
+        now,
+        PAGE_PLACES,
+      );
       return listSaved(list._id, ids.length, false);
     }
     if (memberships >= MAX_LISTS_PER_USER) return refused("tooManyLists");
     const listId = await newCreatorList(ctx, userId, found, args.name, now);
-    const ids = await insertListPlaces(ctx, listId, userId, places, now, 1);
+    const ids = await insertListPlaces(
+      ctx,
+      listId,
+      userId,
+      places,
+      now,
+      PAGE_PLACES,
+    );
     return listSaved(listId, ids.length, true);
   },
 });
