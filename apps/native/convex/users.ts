@@ -394,6 +394,7 @@ async function deleteSharingAndPlansBatch(
   return (
     (await deleteShareLinksBatch(ctx, userId)) &&
     (await deletePlaceVisitsBatch(ctx, userId)) &&
+    (await deleteBeenCitiesBatch(ctx, userId)) &&
     (await deletePlaceRemovalsBatch(ctx, userId)) &&
     (await deleteTripsBatch(ctx, userId)) &&
     (await deleteTripPlansBatch(ctx, userId)) &&
@@ -457,6 +458,18 @@ async function deletePlaceVisitsBatch(
     await ctx.db.delete(visit._id);
   }
   return visits.length !== DELETE_BATCH;
+}
+
+async function deleteBeenCitiesBatch(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+): Promise<boolean> {
+  const rows = await ctx.db
+    .query("beenCities")
+    .withIndex("by_user_and_city", (q) => q.eq("userId", userId))
+    .take(DELETE_BATCH);
+  for (const row of rows) await ctx.db.delete(row._id);
+  return rows.length !== DELETE_BATCH;
 }
 
 async function deleteTripsBatch(

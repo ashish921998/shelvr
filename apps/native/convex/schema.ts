@@ -324,6 +324,11 @@ export default defineSchema({
     .index("by_user_and_key", ["userId", "key"])
     .index("by_user_and_visited", ["userId", "visitedAt"]),
 
+  beenCities: defineTable({
+    userId: v.id("users"),
+    cityId: v.string(),
+  }).index("by_user_and_city", ["userId", "cityId"]),
+
   planShares: defineTable({
     token: v.string(),
     userId: v.string(),
