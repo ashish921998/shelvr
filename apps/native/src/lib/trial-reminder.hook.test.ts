@@ -4,11 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
 import { useCurrentUser } from "@/lib/current-user";
 import { useEntitlement } from "@/lib/entitlement";
-import {
-  trialReminderPrimer,
-  useTrialReminder,
-  whenTrialPrimerDone,
-} from "./trial-reminder";
+import { takeSheetTurn } from "./one-time-sheets";
+import { trialReminderPrimer, useTrialReminder } from "./trial-reminder";
 
 const mock = vi.hoisted(() => ({
   permission: vi.fn(),
@@ -17,6 +14,7 @@ const mock = vi.hoisted(() => ({
   cancel: vi.fn(),
   remindersEnabled: true,
   transition: vi.fn(() => Promise.resolve()),
+  settled: vi.fn(() => Promise.resolve()),
 }));
 vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
@@ -37,7 +35,7 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: vi.fn(),
   waitForSheetTransition: () => mock.transition(),
-  whenSheetSettled: () => Promise.resolve(),
+  whenSheetSettled: () => mock.settled(),
 }));
 vi.mock("expo-secure-store", () => ({ getItem: () => null, setItem: vi.fn() }));
 vi.mock("expo-notifications", () => ({
@@ -116,16 +114,18 @@ describe("useTrialReminder primer", () => {
     expect(mock.request).toHaveBeenCalledTimes(1);
   });
 
-  it("holds the welcome sheet until the primer is answered", async () => {
+  it("holds the next sheet's turn until the primer is answered", async () => {
     startTrial();
+    const letter = takeSheetTurn("letter");
     let done = false;
-    void whenTrialPrimerDone().then(() => {
+    void letter.granted.then(() => {
       done = true;
     });
     await vi.waitFor(() => expect(trialReminderPrimer.isOpen()).toBe(true));
     expect(done).toBe(false);
     act(() => trialReminderPrimer.answer(false));
     await vi.waitFor(() => expect(done).toBe(true));
+    letter.end();
   });
 
   it("never opens the primer when the trial ends while permission is read", async () => {
@@ -146,24 +146,26 @@ describe("useTrialReminder primer", () => {
   });
 
   it("holds a late caller until the declined primer has slid away", async () => {
+    startTrial();
+    await vi.waitFor(() => expect(trialReminderPrimer.isOpen()).toBe(true));
+    const letter = takeSheetTurn("letter");
+    let done = false;
+    void letter.granted.then(() => {
+      done = true;
+    });
     let slid: () => void = () => {};
-    mock.transition.mockReturnValueOnce(
+    mock.settled.mockReturnValueOnce(
       new Promise<void>((resolve) => {
         slid = resolve;
       }),
     );
-    startTrial();
-    await vi.waitFor(() => expect(trialReminderPrimer.isOpen()).toBe(true));
     act(() => trialReminderPrimer.answer(false));
-    await vi.waitFor(() => expect(mock.transition).toHaveBeenCalled());
-    let done = false;
-    void whenTrialPrimerDone().then(() => {
-      done = true;
-    });
+    await vi.waitFor(() => expect(mock.settled).toHaveBeenCalledTimes(2));
     await Promise.resolve();
     expect(done).toBe(false);
     await act(async () => slid());
     await vi.waitFor(() => expect(done).toBe(true));
+    letter.end();
   });
 
   it("closes the primer without prompting when the trial ends", async () => {

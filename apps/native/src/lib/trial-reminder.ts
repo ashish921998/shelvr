@@ -1,11 +1,8 @@
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
-import {
-  useEntitlement,
-  waitForSheetTransition,
-  whenSheetSettled,
-} from "@/lib/entitlement";
+import { useEntitlement, waitForSheetTransition } from "@/lib/entitlement";
 import { t } from "@/lib/i18n";
+import { takeSheetTurn } from "@/lib/one-time-sheets";
 import { createSheetRequestStore } from "@/lib/sheet-request-store";
 import type { TextMessageKey } from "@/locales/message-types";
 import { api } from "@convex/_generated/api";
@@ -231,42 +228,6 @@ export const trialReminderPrimer = {
   dismiss: () => primer.resolve(null),
 };
 
-let primerHolds = 0;
-let primerShown = false;
-let primerClosing: Promise<void> | null = null;
-const primerDoneWaiters = new Set<(done: Promise<void>) => void>();
-
-function holdPrimer(): (shown: boolean) => void {
-  primerHolds += 1;
-  let released = false;
-  return (shown) => {
-    if (released) return;
-    released = true;
-    primerHolds -= 1;
-    primerShown ||= shown;
-    if (primerHolds > 0) return;
-    let done: Promise<void> = Promise.resolve();
-    if (primerShown) {
-      const closing = waitForSheetTransition().then(() => {
-        if (primerClosing === closing) primerClosing = null;
-      });
-      primerClosing = closing;
-      done = closing;
-    }
-    primerShown = false;
-    const waiters = [...primerDoneWaiters];
-    primerDoneWaiters.clear();
-    for (const waiter of waiters) waiter(done);
-  };
-}
-
-export function whenTrialPrimerDone(): Promise<void> {
-  if (primerHolds === 0) return primerClosing ?? Promise.resolve();
-  return new Promise<Promise<void>>((resolve) =>
-    primerDoneWaiters.add(resolve),
-  ).then((done) => done);
-}
-
 export function useTrialReminderPrimerOpen(): boolean {
   return useSyncExternalStore(
     trialReminderPrimer.subscribe,
@@ -364,21 +325,19 @@ export function useTrialReminder(): void {
     let decision: Promise<boolean> = Promise.resolve(false);
     let pending: typeof primerDecision.current = null;
     if (mayAsk) {
-      const releasePrimer = holdPrimer();
+      const turn = takeSheetTurn("primer");
       const entry = { expiresAt, ask: decision };
       const live = () => primerDecision.current === entry;
       entry.ask = (async () => {
-        let primed = false;
         try {
-          await whenSheetSettled();
+          await turn.granted;
           if (!live()) return false;
           const confirmed = await confirmTrialReminderAsk(live);
-          primed = confirmed.primed;
           if (!confirmed.ask || !live()) return false;
-          if (primed) await waitForSheetTransition();
+          await waitForSheetTransition();
           return live();
         } finally {
-          releasePrimer(primed);
+          turn.end();
         }
       })();
       primerDecision.current = entry;
