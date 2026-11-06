@@ -22,17 +22,21 @@ account stays signed out through the paywall and signs in after it.
   after the opener has a back button.
 - The city question reads "Where are you going?" after `Yes, I’m planning
 one`, "Where’s your dream city?" when no goal or every goal is picked,
-  and "Where do you go out?" otherwise. A tap on a city moves on; "Skip",
-  "Somewhere else" or (for a trip) "Not sure yet" keep no city. A statement
-  repeats the pick before the reel.
-- The sample is always a real reel (`src/lib/aha-sample.ts`). No city, or a
-  city with no reel for the goal, gets Austin's: Eberly, The Guest House and
-  Jupiter Supper Club for date nights; Austin Motel, Heritage Boot Co. and
-  Jo's Coffee for a trip.
+  and "Where do you go out?" otherwise. A tap on a city moves on; "Skip"
+  and "Somewhere else" keep no city, and so does "Not sure yet", which
+  replaces "Somewhere else" when Trips is picked without Date nights. A
+  statement with Continue follows every city answer: it repeats the pick,
+  if there is one, and names the city the sample comes from.
+- The sample is always a real reel (`src/lib/aha-sample.ts`), chosen by the
+  leading goal: Date nights, then Trips, then Places to eat. No city, or a
+  city with no reel for that goal, gets Austin's: Eberly, The Guest House
+  and Jupiter Supper Club for date nights; Austin Motel, Heritage Boot Co.
+  and Jo's Coffee when Trips is picked without Date nights; Hula Hut, Ski
+  Shores Cafe and Quince Lakehouse when only Places to eat is picked.
 - "Try saving this reel." has a drawn share sheet: `Share` on the reel,
   then "Share to…", "More" and `Shelvr`. "Your first save!" follows, then
-  the spots screen, "Austin · 3 places" under a map, whose Continue enables
-  once the pins land.
+  the spots screen, "<city> · 3 places" (Austin in the tests) under a map,
+  whose Continue enables once the pins land.
 - Three slides follow: "Plan it together with your people.", "No more
   “where should we eat?”" and "Every place you saved, on one map."
   Continue, a swipe or a tap on the card moves to the next slide; on the
@@ -85,7 +89,8 @@ so the next test starts signed out at the opener. It does not use
 The sample's spots show by name on "Austin · 3 places". After each paywall
 close the step that opened it (the last slide, or the notifications step's
 "Not now") is back, and `dev-login-button` and `Add` stay hidden; a cold
-relaunch returns to that step with the splash gone. No purchase is made.
+relaunch returns to that step with the splash gone, and the carousel
+reopens on its first slide. No purchase is made.
 
 ## Charters
 
@@ -99,7 +104,8 @@ onboarding-sample|ios|skeptic|From a fresh install, plan Trips in Lisbon, save t
 - Each test can take several minutes (timeout 600 s): cold launches
   through the dev client.
 - Answer cards read their short titles ("Date nights", "Trips", "Places to
-  eat"). Text styled in capitals reads in capitals (the reel's "SAMPLE").
+  eat"). The reel reads as one image, "Sample", or "Sample reel by
+  @handle" once its video plays; its SAMPLE badge is hidden.
 - The notifications step shows only while iOS has no answer for the app,
   so whether "Not now" appears depends on the simulator.
   `continueToPaywall` handles both.
