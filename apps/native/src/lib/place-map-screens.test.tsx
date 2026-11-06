@@ -2,9 +2,11 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode, Ref } from "react";
 import { useEffect, useImperativeHandle } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import CityScreen from "@/app/(app)/city/[name]";
 import SharedListScreen from "@/app/(app)/shared-list/[id]";
+import { CityMap } from "@/components/city/city-map";
+import { ListActivity } from "@/components/shared-list/list-activity";
 
 type Snaps = { expanded: number; middle: number; collapsed: number };
 
@@ -36,6 +38,7 @@ const mocks = vi.hoisted(() => ({
   markSeen: vi.fn(),
   setVisited: vi.fn(),
   removeListPlace: vi.fn(),
+  reduced: false,
 }));
 
 vi.mock("@/lib/i18n", () => ({
@@ -48,6 +51,10 @@ vi.mock("@/lib/analytics", () => ({
 }));
 vi.mock("@/lib/haptics", () => ({
   haptics: { selection: mocks.selection, success: mocks.success },
+}));
+vi.mock("@/lib/motion", () => ({
+  motion: { duration: { stagger: 300 } },
+  fadeIn: undefined,
 }));
 vi.mock("@/lib/screen-dismiss", () => ({ backOrHome: mocks.backOrHome }));
 vi.mock("@/lib/apple-place-card", () => ({
@@ -276,6 +283,9 @@ vi.mock("@/components/shared-list/list-place-row", () => ({
 vi.mock("@/components/shared-list/name-sheet", () => ({
   NameSheet: vi.fn(() => null),
 }));
+vi.mock("@/components/shared-list/list-activity", () => ({
+  ListActivity: vi.fn(() => null),
+}));
 vi.mock("@/components/shared-list/list-footer", () => ({
   ListFooter: vi.fn(({ city }: { city: string }) => (
     <span>{`footer ${city}`}</span>
@@ -356,6 +366,7 @@ vi.mock("react-native-reanimated", () => ({
     get: () => mocks.sheetTop || initial,
     set: mocks.sheetSet,
   }),
+  useReducedMotion: () => mocks.reduced,
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: {
@@ -434,6 +445,7 @@ function listDetail(overrides: object = {}) {
       { firstName: "Sam", isYou: false },
     ],
     covered: true,
+    newFrom: [],
     ...overrides,
   };
 }
@@ -448,6 +460,7 @@ beforeEach(() => {
   mocks.sheetTop = 0;
   mocks.snaps = undefined;
   mocks.cardAvailable = true;
+  mocks.reduced = false;
   mocks.markSeen.mockResolvedValue(null);
   mocks.setVisited.mockResolvedValue(null);
   mocks.removeListPlace.mockResolvedValue(null);
@@ -915,6 +928,134 @@ describe("list page", () => {
     });
     expect(mocks.removeListPlace).toHaveBeenCalledWith({ placeId: "p1" });
     expect(screen.getByTestId("map").dataset.selected).toBe("");
+  });
+
+  describe("with places new since the last visit", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    const fresh = [
+      listPlace({
+        _id: "p3",
+        name: "Uchi",
+        lat: 30.25,
+        lng: -97.76,
+        addedByName: "Priya",
+        addedAt: 30,
+        isNew: true,
+      }),
+      listPlace({
+        _id: "p4",
+        name: "Franklin Barbecue",
+        lat: 30.27,
+        lng: -97.73,
+        addedByName: "Sam",
+        addedAt: 10,
+        isNew: true,
+      }),
+      listPlace({
+        _id: "p5",
+        name: "Barton Springs Pool",
+        lat: 30.26,
+        lng: -97.77,
+        addedByName: "Priya",
+        addedAt: 20,
+        isNew: true,
+      }),
+    ];
+    const newFrom = [
+      { firstName: "Priya", count: 2 },
+      { firstName: "Sam", count: 1 },
+    ];
+    const lastMap = () =>
+      vi.mocked(CityMap).mock.calls.at(-1)?.[0] as {
+        pins: { name: string }[];
+        visible?: number;
+      };
+
+    it("says who added them and heads them with their names", () => {
+      mocks.queries[LIST] = listDetail({
+        places: [...listDetail().places, ...fresh],
+        placeCount: 5,
+        newFrom,
+      });
+      render(<SharedListScreen />);
+      expect(vi.mocked(ListActivity).mock.calls.at(-1)?.[0]).toEqual({
+        newFrom,
+      });
+      expect(
+        screen.getByText('sharedLists.newFrom {"name":"Priya, Sam"}'),
+      ).toBeTruthy();
+      expect(screen.getByText("sharedLists.everythingElse")).toBeTruthy();
+    });
+
+    it("shows the old pins at once and drops the new ones a beat apart, oldest first", () => {
+      vi.useFakeTimers();
+      mocks.queries[LIST] = listDetail({
+        places: [...listDetail().places, ...fresh],
+        placeCount: 5,
+        newFrom,
+      });
+      render(<SharedListScreen />);
+      expect(lastMap().visible).toBe(2);
+      expect(lastMap().pins.map((pin) => pin.name)).toEqual([
+        "Taco Spot",
+        "BBQ Pit",
+        "Franklin Barbecue",
+        "Barton Springs Pool",
+        "Uchi",
+      ]);
+      const beat = () =>
+        act(() => {
+          vi.advanceTimersByTime(300);
+        });
+      beat();
+      expect(lastMap().visible).toBe(3);
+      beat();
+      expect(lastMap().visible).toBe(4);
+      beat();
+      expect(lastMap().visible).toBe(5);
+      expect(mocks.selection).not.toHaveBeenCalled();
+      expect(mocks.success).not.toHaveBeenCalled();
+    });
+
+    it("shows every pin at once under Reduce Motion", () => {
+      vi.useFakeTimers();
+      mocks.reduced = true;
+      mocks.queries[LIST] = listDetail({
+        places: [...listDetail().places, ...fresh],
+        placeCount: 5,
+        newFrom,
+      });
+      render(<SharedListScreen />);
+      expect(lastMap().visible).toBe(5);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it("opens on the first city with something new", () => {
+      mocks.queries[LIST] = listDetail({
+        cities: ["Austin", "Dallas"],
+        places: [
+          listPlace({}),
+          listPlace({
+            _id: "p2",
+            name: "Dallas Deli",
+            city: "Dallas",
+            lat: 32.7,
+            lng: -96.8,
+            isNew: true,
+          }),
+        ],
+        newFrom: [{ firstName: "Sam", count: 1 }],
+      });
+      render(<SharedListScreen />);
+      expect(screen.getByText("🥪 Dallas Deli")).toBeTruthy();
+      expect(screen.queryByText("🌮 Taco Spot")).toBeNull();
+      expect(screen.getByText("footer Dallas")).toBeTruthy();
+      fireEvent.click(screen.getByText("chip Austin"));
+      expect(screen.getByText("🌮 Taco Spot")).toBeTruthy();
+    });
   });
 
   it("alerts when an edit fails", async () => {

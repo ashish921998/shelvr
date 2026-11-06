@@ -941,7 +941,9 @@ export type MessageParams = {
   "sharedLists.with": { names: string };
   "sharedLists.onlyYou": undefined;
   "sharedLists.someone": undefined;
-  "sharedLists.newCount": { count: number };
+  "sharedLists.activityOne": { name: string; count: number };
+  "sharedLists.activitySomeone": { count: number };
+  "sharedLists.activityMany": { count: number; names: string };
   "sharedLists.alsoAddTo": undefined;
   "sharedLists.willSee": { name: string; count: number };
   "sharedLists.invite": undefined;

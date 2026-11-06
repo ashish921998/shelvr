@@ -74,6 +74,16 @@ changes.
   deployment must set `AUTH_ENABLE_ANONYMOUS=true`.
 - **Fixtures:** `devFixtures.resetCurrentUser` seeds items, spaces and a Pro
   subscription. Home cards carry `fixture-item-*` test ids.
+- **Fixture shared list:** the reset also makes "Date night spots" with a
+  partner, Priya, whose three places are new to the account. It leaves any real
+  shared list the account is on, the way Leave list does, so Home after a reset
+  shows only the fixture list.
+- **A place arriving live:** with the list open,
+  `npx convex run devFixtures:simulateSharedListActivity '{"listId":"<id>"}'`
+  adds Priya's next place: Veracruz All Natural, then Zilker Park, then
+  Torchy's Tacos, then `null`. `npx convex data sharedLists` gives the id. Open
+  the list with `shelvr-dev://shared-list/<id>`, because Home cards are not in
+  the accessibility tree.
 - **Saved flows:** `apps/native/.argent/flows`.
 
 ## Getting into a specific state
