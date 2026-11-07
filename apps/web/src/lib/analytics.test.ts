@@ -66,6 +66,45 @@ describe("web analytics", () => {
     );
   });
 
+  it("sends one UUIDv7 session id across events in a session", () => {
+    captureWebAnalyticsEvent("$pageview");
+    captureWebAnalyticsEvent("$pageleave");
+
+    const [first, second] = fetchMock.mock.calls.map(
+      ([, init]) => JSON.parse(String((init as RequestInit).body)).properties,
+    );
+    expect(first.$session_id).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+    );
+    expect(second.$session_id).toBe(first.$session_id);
+  });
+
+  it("starts a new session after 30 idle minutes", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    const start = Date.UTC(2026, 10, 3, 12);
+    const sessionAt = (minutes: number) => {
+      vi.setSystemTime(start + minutes * 60 * 1000);
+      captureWebAnalyticsEvent("$pageview");
+      const [, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+      return JSON.parse(String(init.body)).properties.$session_id;
+    };
+
+    const first = sessionAt(0);
+    expect(sessionAt(29)).toBe(first);
+    expect(sessionAt(58)).toBe(first);
+    expect(sessionAt(89)).not.toBe(first);
+    vi.useRealTimers();
+  });
+
+  it("redacts a page the caller names", () => {
+    captureWebAnalyticsEvent("$pageleave", {}, { pathname: "/p/private" });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).properties.$current_url).toBe(
+      `${window.location.origin}/p/[token]`,
+    );
+  });
+
   it("does nothing when analytics is not configured", () => {
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN", "");
 

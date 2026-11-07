@@ -2,7 +2,12 @@
 
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { pageViewProperties, referringDomain } from "./pageView";
+import {
+  pageLeaveProperties,
+  pageViewProperties,
+  referringDomain,
+  webVitalProperties,
+} from "./pageView";
 
 const origin = "https://shelvr-web.vercel.app";
 
@@ -67,5 +72,28 @@ describe("page view properties", () => {
   it("reads an unusable referrer as direct", () => {
     expect(referringDomain("", origin)).toBe("$direct");
     expect(referringDomain("not a url", origin)).toBe("$direct");
+  });
+});
+
+describe("page leave properties", () => {
+  it("names the redacted page and how long it was open", () => {
+    expect(pageLeaveProperties("/i/secret", 1_000, 13_500)).toEqual({
+      $pathname: "/i/[token]",
+      $prev_pageview_pathname: "/i/[token]",
+      $prev_pageview_duration: 12.5,
+    });
+  });
+});
+
+describe("web vital properties", () => {
+  it("uses PostHog's property name for the metric", () => {
+    expect(webVitalProperties({ name: "LCP", value: 1234 }, "/p/x")).toEqual({
+      $pathname: "/p/[token]",
+      $web_vitals_LCP_value: 1234,
+    });
+  });
+
+  it("skips metrics PostHog does not chart", () => {
+    expect(webVitalProperties({ name: "TTFB", value: 80 }, "/")).toBeNull();
   });
 });

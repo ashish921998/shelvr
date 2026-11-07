@@ -1,7 +1,43 @@
+import { pageViewPath } from "@/lib/pageView";
+
 type AnalyticsProperties = Record<
   string,
   boolean | number | string | unknown[]
 >;
+
+const SESSION_KEY = "shelvr_web_session";
+const SESSION_IDLE_MS = 30 * 60 * 1000;
+
+function uuidV7(now: number): string {
+  const time = now.toString(16).padStart(12, "0");
+  return `${time.slice(0, 8)}-${time.slice(8)}-7${window.crypto.randomUUID().slice(15)}`;
+}
+
+function storedSession(): { id: string; lastActivity: number } | null {
+  try {
+    const session = JSON.parse(window.localStorage.getItem(SESSION_KEY) ?? "");
+    return typeof session?.id === "string" &&
+      typeof session?.lastActivity === "number"
+      ? session
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function webSessionId(): string {
+  const now = Date.now();
+  const session = storedSession();
+  const id =
+    session && now - session.lastActivity < SESSION_IDLE_MS
+      ? session.id
+      : uuidV7(now);
+  window.localStorage.setItem(
+    SESSION_KEY,
+    JSON.stringify({ id, lastActivity: now }),
+  );
+  return id;
+}
 
 function safeExceptionValue(message: string): string {
   return message
@@ -33,6 +69,7 @@ export function captureWebException(
 export function captureWebAnalyticsEvent(
   event: string,
   properties: AnalyticsProperties = {},
+  { pathname }: { pathname?: string } = {},
 ) {
   try {
     const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
@@ -55,7 +92,8 @@ export function captureWebAnalyticsEvent(
         properties: {
           distinct_id: distinctId,
           ...properties,
-          $current_url: `${window.location.origin}${window.location.pathname.replace(/^\/(i|p)\/[^/]+/, "/$1/[token]")}`,
+          $session_id: webSessionId(),
+          $current_url: `${window.location.origin}${pageViewPath(pathname ?? window.location.pathname)}`,
         },
       }),
       keepalive: true,
