@@ -21,16 +21,25 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, Text, View, type ViewStyle } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import Animated, {
+  FadeIn,
+  ReduceMotion,
+  useReducedMotion,
+} from "react-native-reanimated";
+import { motion } from "@/lib/motion";
 
 function CityCard({
   entry,
   layout,
   style,
+  reveal = false,
 }: {
   entry: City;
   layout: CoverLayout;
   style?: ViewStyle;
+  reveal?: boolean;
 }) {
+  const reduced = useReducedMotion();
   const router = useRouter();
   const count = cityCountLine(entry);
   return (
@@ -42,7 +51,19 @@ function CityCard({
       }
       style={({ pressed }) => [style, pressed && styles.pressed]}
     >
-      <CityCover entry={entry} layout={layout} />
+      <Animated.View
+        entering={
+          reveal
+            ? FadeIn.duration(
+                reduced ? motion.duration.feedback : motion.duration.state,
+              )
+                .easing(motion.easing.out)
+                .reduceMotion(ReduceMotion.Never)
+            : undefined
+        }
+      >
+        <CityCover entry={entry} layout={layout} />
+      </Animated.View>
     </Pressable>
   );
 }
@@ -51,6 +72,7 @@ function CityGrid({ cities }: { cities: City[] }) {
   const { theme } = useUnistyles();
   const [expanded, setExpanded] = useState(false);
   const { shown, hidden } = visibleCities(cities, expanded);
+  const collapsed = visibleCities(cities, false).shown;
   const only = cities.length === 1;
   return (
     <View style={styles.grid}>
@@ -63,6 +85,10 @@ function CityGrid({ cities }: { cities: City[] }) {
                 entry={entry}
                 layout="pair"
                 style={styles.half}
+                reveal={
+                  expanded &&
+                  !collapsed.some((city) => city.city === entry.city)
+                }
               />
             ))}
           </View>
@@ -71,6 +97,9 @@ function CityGrid({ cities }: { cities: City[] }) {
             key={row.city.city}
             entry={row.city}
             layout={only ? "only" : "wide"}
+            reveal={
+              expanded && !collapsed.some((city) => city.city === row.city.city)
+            }
           />
         ),
       )}
