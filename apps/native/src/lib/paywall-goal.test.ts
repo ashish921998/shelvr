@@ -11,7 +11,7 @@ import ptBR from "@/locales/pt-BR.json";
 import { GOALS, type Goal } from "@/lib/onboarding-goals";
 import { goalPaywallVariables } from "@/lib/paywall-goal";
 import { paywallVariables } from "@/lib/paywall-funnel";
-import { planCities } from "@/lib/sample-plans";
+import { SAMPLE_CITY_IDS } from "@/lib/sample-cities";
 
 vi.mock("expo-localization", () => ({
   getLocales: () => [{ languageTag: "en-US" }],
@@ -109,10 +109,10 @@ describe("goalPaywallVariables", () => {
     }
   });
 
-  it("offers only trip cities the goal paywall has a photo for", () => {
+  it("offers only cities the goal paywall has a travel photo for", () => {
     expect(
-      planCities("trip"),
-      "A new trip city needs its own 'Goal photo travel <City>' layer in the RevenueCat goal paywall's Travel photos group, or travel users who pick it see Prague",
+      [...SAMPLE_CITY_IDS].sort(),
+      "A new city needs its own 'Goal photo travel <City>' layer in the RevenueCat goal paywall's Travel photos group, or travel users who pick it see Prague",
     ).toEqual([
       "amsterdam",
       "austin",
@@ -134,6 +134,7 @@ describe("goalPaywallVariables", () => {
       "prague",
       "rome",
       "san-francisco",
+      "seattle",
       "seoul",
       "tokyo",
       "toronto",
