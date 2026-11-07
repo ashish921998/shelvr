@@ -28,12 +28,9 @@ account stays signed out through the paywall and signs in after it.
   without Date nights. A
   statement with Continue follows every city answer: it repeats the pick,
   if there is one, and names the city the sample comes from.
-- The sample is always a real reel (`src/lib/aha-sample.ts`), chosen by the
-  leading goal: Date nights, then Trips, then Places to eat. No city, or a
-  city with no reel for that goal, gets Austin's: Eberly, The Guest House
-  and Jupiter Supper Club for date nights; Austin Motel, Heritage Boot Co.
-  and Jo's Coffee when Trips is picked without Date nights; Hula Hut, Ski
-  Shores Cafe and Quince Lakehouse when only Places to eat is picked.
+- The sample is always a real reel about the picked city's hidden gems
+  (`src/lib/aha-reels.ts`), one per city for every goal. No city gets
+  Austin's: Lima Criolla, Uncle Nicky's and Vic & Al's.
 - "Try saving this reel." has a drawn share sheet: `Share` on the reel,
   then "Share to…", "More" and `Shelvr`. "Your first save!" follows, then
   the spots screen, "<city> · 3 places" (Austin in the tests) under a map,
@@ -66,11 +63,10 @@ person as not Pro (`src/lib/e2e-hide-pro.ts`).
   there": date nights, city skipped. Relaunches at the reel, saves it,
   walks the slides, opens and closes the paywall twice, then relaunches
   cold.
-- "uses a real Austin trip reel for a city without one": `Trips`,
-  `Not yet`, Lisbon. Checks Austin's three trip spots, and that the last
-  slide opens nothing on its own.
+- "plays the picked city's own reel": `Trips`, Lisbon. Checks Lisbon's
+  three spots, and that the last slide opens nothing on its own.
 - "turns one sample reel into a date night's spots, then asks for the
-  paywall": date nights, city skipped. Checks Austin's three date spots,
+  paywall": date nights, city skipped. Checks Austin's three spots,
   then opens and closes the paywall.
 
 Helpers in `tests/fresh-onboarding.ts`: `startFreshOnboarding` relaunches

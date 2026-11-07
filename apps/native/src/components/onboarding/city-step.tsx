@@ -2,9 +2,13 @@ import { CITY_PICTURES } from "@/components/onboarding/city-pictures";
 import { QuestionTitle, ScalePressable } from "@/components/onboarding/parts";
 import { AppSymbolIcon } from "@/components/symbol";
 import { t, useAppLocale } from "@/lib/i18n";
-import { SAMPLE_CITIES, type SampleCityId } from "@/lib/sample-cities";
+import {
+  SAMPLE_CITIES,
+  SAMPLE_CITY_IDS,
+  type SampleCityId,
+} from "@/lib/sample-cities";
 import type { CityQuestion } from "@/lib/onboarding-goals";
-import { planCities, type PlanKind } from "@/lib/sample-plans";
+import type { PlanKind } from "@/lib/sample-plans";
 import type { TextMessageKey } from "@/locales/message-types";
 import { Image } from "expo-image";
 import { useState } from "react";
@@ -72,9 +76,10 @@ export function CityStep({
   const { theme } = useUnistyles();
   const [query, setQuery] = useState("");
   const needle = fold(query.trim());
-  const all = planCities(kind)
-    .map((id) => ({ id, name: t(SAMPLE_CITIES[id].name) }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const all = SAMPLE_CITY_IDS.map((id) => ({
+    id,
+    name: t(SAMPLE_CITIES[id].name),
+  })).sort((a, b) => a.name.localeCompare(b.name));
   const cities = all.filter(
     ({ id, name }) =>
       fold(name).includes(needle) || id.replace(/-/g, " ").includes(needle),

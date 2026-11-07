@@ -72,21 +72,21 @@ test(
 );
 
 test(
-  "uses a real Austin trip reel for a city without one",
+  "plays the picked city's own reel",
   { retries: 0, timeout: 600_000 },
   async ({ device, screen, app }) => {
     await startFreshOnboarding({ device, screen });
     await walkToSampleReel(screen, { goal: "travel", city: "Lisbon" });
     await expect(screen.getByRole("image", /^Sample/)).toBeVisible();
-    await app.screenshot("austin-fallback-reel");
+    await app.screenshot("lisbon-reel");
     await shareTheSampleReel(screen);
-    await expect(screen.getByText("Austin · 3 places")).toBeVisible();
-    for (const place of ["Austin Motel", "Heritage Boot Co.", "Jo's Coffee"]) {
+    await expect(screen.getByText("Lisbon · 3 places")).toBeVisible();
+    for (const place of ["Ler Devagar", "Casa do Alentejo", "Mini Bar"]) {
       await expect(screen.getByText(place).first()).toBeVisible();
     }
     await walkToCarouselEnd(screen);
     await expect(paywallTitle(screen)).toBeHidden();
-    await app.screenshot("austin-carousel");
+    await app.screenshot("lisbon-carousel");
   },
 );
 
@@ -101,11 +101,11 @@ test(
     await app.screenshot("austin-date-reel");
 
     await shareTheSampleReel(screen);
-    // The skipped city uses a real Austin reel. Each name is both a map pin's title and a row.
+    // The skipped city uses Austin's reel. Each name is both a map pin's title and a row.
     await expect(screen.getByText("Austin · 3 places")).toBeVisible({
       timeout: 30_000,
     });
-    for (const place of ["Eberly", "The Guest House", "Jupiter Supper Club"]) {
+    for (const place of ["Lima Criolla", "Uncle Nicky's", "Vic & Al's"]) {
       await expect(screen.getByText(place).first()).toBeVisible({
         timeout: 10_000,
       });

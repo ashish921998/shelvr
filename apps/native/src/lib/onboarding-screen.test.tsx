@@ -276,15 +276,15 @@ it("walks the questions, the chart and the city echo into a sample for the goal 
     travelCity: "lisbon",
     step: ONBOARDING_STEPS.indexOf("cityEcho"),
   });
-  expect(screen.getByText("onboardingStatement.cityFirst")).toBeTruthy();
+  expect(screen.getByText("onboardingStatement.cityPicked")).toBeTruthy();
   tap("statement");
   expect(mocks.share.mock.lastCall?.[0].sample).toMatchObject({
     kind: "trip",
-    city: "austin",
+    city: "lisbon",
   });
 });
 
-it("praises the city only when the demo plays that city's reel", () => {
+it("praises the city the user picked", () => {
   mocks.progress = {
     ...mocks.progress,
     goals: ["travel"],
@@ -369,13 +369,13 @@ it("reuses the sample for the carousel after the spots, before the paywall", asy
   expect(mocks.ask).not.toHaveBeenCalled();
   expect(mocks.carousel.mock.lastCall?.[0].sample).toMatchObject({
     kind: "trip",
-    city: "austin",
+    city: "lisbon",
   });
   await act(async () => tap("carousel:continue"));
   expect(mocks.ask).not.toHaveBeenCalled();
   expect(mocks.notifications.mock.lastCall?.[0].sample).toMatchObject({
     kind: "trip",
-    city: "austin",
+    city: "lisbon",
   });
   expect(saved()?.step).toBe(ONBOARDING_STEPS.indexOf("notifications"));
   await act(async () => tap("notifications:continue"));
@@ -458,9 +458,7 @@ it("hands the goals' spaces to the replay and reports the answers when onboardin
   render(<OnboardingScreen />);
   act(() => mocks.paywall.onPro());
   expect(mocks.setPendingSpaces).toHaveBeenCalledWith(["Date nights"]);
-  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
-    ahaReelUrl(ahaReel("date", "austin")!),
-  );
+  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(ahaReelUrl(ahaReel("paris")));
   expect(mocks.completeOnboarding).toHaveBeenCalled();
   expect(mocks.capture).toHaveBeenCalledWith(
     "onboarding_completed",
@@ -483,7 +481,7 @@ it("queues the real reel it played as the first save when onboarding ends", () =
   render(<OnboardingScreen />);
   act(() => mocks.paywall.onPro());
   expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
-    ahaReelUrl(ahaReel("date", "austin")!),
+    ahaReelUrl(ahaReel("austin")),
   );
 });
 
@@ -497,7 +495,7 @@ it("queues the default reel before leaving onboarding when the city question was
   render(<OnboardingScreen />);
   act(() => mocks.paywall.onPro());
   expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
-    ahaReelUrl(ahaReel("trip", "austin")!),
+    ahaReelUrl(ahaReel("austin")),
   );
   expect(mocks.queueDemoUrl.mock.invocationCallOrder[0]).toBeLessThan(
     mocks.completeOnboarding.mock.invocationCallOrder[0],
@@ -560,7 +558,7 @@ it("saves no reel for someone who skipped sharing, and saves it once they share 
   expect(saved()?.skippedShare).toBe(false);
   act(() => mocks.paywall.onPro());
   expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
-    ahaReelUrl(ahaReel("date", "austin")!),
+    ahaReelUrl(ahaReel("austin")),
   );
 });
 
