@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { fetchSharePreview, loadSharePreview } from "./sharePreview";
+import {
+  fetchSharePreview,
+  loadSharePreview,
+  missingNote,
+} from "./sharePreview";
 
 const originalEnv = { ...process.env };
 
@@ -81,5 +85,13 @@ describe("loadSharePreview", () => {
     delete process.env.CONVEX_SITE_URL;
     delete process.env.CONVEX_URL;
     expect(await loadSharePreview("abc")).toEqual({ outcome: "unavailable" });
+  });
+});
+
+describe("missingNote", () => {
+  it("tells a backend that didn't answer apart from a closed link", () => {
+    expect(missingNote("unavailable")).toContain("didn’t load");
+    expect(missingNote("missing")).toContain("no longer shared");
+    expect(missingNote("found")).toBeUndefined();
   });
 });
