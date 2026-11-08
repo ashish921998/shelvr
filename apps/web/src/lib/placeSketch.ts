@@ -1,3 +1,5 @@
+import { splitGraphemes } from "unicode-segmenter/grapheme";
+
 export const SKETCH_WIDTH = 320;
 
 const MAX_PINS = 10;
@@ -15,7 +17,7 @@ const WIDE =
 type SketchPin = { n: number; x: number; y: number; label: string };
 
 function graphemes(text: string): string[] {
-  if (typeof Intl.Segmenter !== "function") return Array.from(text);
+  if (typeof Intl.Segmenter !== "function") return [...splitGraphemes(text)];
   const segmenter = new Intl.Segmenter("und", { granularity: "grapheme" });
   return Array.from(segmenter.segment(text), (part) => part.segment);
 }

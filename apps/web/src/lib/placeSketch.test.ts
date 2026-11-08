@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { placeSketch } from "./placeSketch";
 
@@ -20,6 +20,10 @@ const LABELS: [string, string][] = [
   ["🇵🇹 Casa Portuguesa do Pastel", "🇵🇹 Casa…"],
   ["\u{1F469}‍\u{1F373} Chef Maria's Kitchen", "\u{1F469}‍\u{1F373} Chef…"],
   ["Pastéis de Belém".normalize("NFD"), "Pastéis de…".normalize("NFD")],
+  ["PizzaRoma🇮🇹", "PizzaRoma🇮🇹"],
+  ["PizzaRoma🇮🇹 Bistro", "PizzaRoma🇮🇹…"],
+  ["PizzaRoma👩🏽‍🍳 Bistro", "PizzaRoma👩🏽‍🍳…"],
+  ["PizzeriaCafé".normalize("NFD"), "PizzeriaCafé".normalize("NFD")],
 ];
 
 const labelOf = (name: string) => placeSketch([name]).pins[0].label;
@@ -98,7 +102,15 @@ describe("placeSketch layout", () => {
   });
 });
 
-describe("placeSketch labels", () => {
+describe.each(["native", "fallback"])("placeSketch labels (%s)", (mode) => {
+  beforeEach(() => {
+    if (mode === "fallback") vi.stubGlobal("Intl", { Segmenter: undefined });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it.each(LABELS)("labels %s as %s", (name, label) => {
     expect(labelOf(name)).toBe(label);
   });
