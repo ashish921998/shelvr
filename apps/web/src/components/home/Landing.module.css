@@ -87,11 +87,41 @@
   box-shadow: 0 30px 60px -20px rgba(43, 36, 24, 0.35);
 }
 
-.phone img {
+.phone svg {
   display: block;
   width: 100%;
   height: auto;
   border-radius: 37px;
+}
+
+.mapPin {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: pin-drop 420ms var(--ease) both;
+}
+
+@keyframes pin-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.6);
+  }
+}
+
+.mapPulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: map-pulse 1.8s ease-out 1.8s 3 both;
+}
+
+@keyframes map-pulse {
+  from {
+    opacity: 0.9;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.2);
+  }
 }
 
 .reel {
@@ -132,6 +162,200 @@
     opacity: 0;
     transform: translateY(16px) rotate(var(--r));
   }
+}
+
+.proof {
+  padding: 40px 0 120px;
+}
+
+.proof h2 {
+  font-size: clamp(38px, 4.4vw, 58px);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.proofSteps {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 56px;
+  margin-top: 48px;
+  padding: 0;
+  list-style: none;
+}
+
+.proofStep {
+  position: relative;
+  container-type: inline-size;
+}
+
+.proofStep > h3 {
+  margin-top: 22px;
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1.15;
+}
+
+.proofBody {
+  margin-top: 8px;
+  max-width: 30ch;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.proofArrow {
+  position: absolute;
+  top: calc(37.5cqi - 14px);
+  left: calc(100% + 14px);
+  width: 28px;
+  height: 28px;
+}
+
+.proofArt {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--color-cream);
+  border: 1px solid var(--color-line);
+  box-shadow: var(--shadow-card);
+}
+
+.proofReel {
+  position: absolute;
+  width: 30%;
+  aspect-ratio: 9 / 16;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--color-paper-deep);
+  border: 2px solid var(--color-cream);
+  box-shadow: 0 18px 34px -16px rgba(43, 36, 24, 0.4);
+  filter: saturate(0.7);
+  transform: rotate(var(--r));
+}
+
+.proofReel img {
+  object-fit: cover;
+}
+
+.proofChip {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--color-ink);
+  color: var(--color-paper);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.proofChip svg {
+  width: 14px;
+  height: 14px;
+}
+
+.proofMap {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.proofPlan {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 16px 18px;
+}
+
+.proofPlanTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 21px;
+  line-height: 1.1;
+}
+
+.proofPlan ol {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.proofPlan li {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  column-gap: 10px;
+  align-items: center;
+}
+
+.proofPlanNumber {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: var(--color-ember);
+  color: var(--color-ink);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.proofPlanSlot {
+  grid-column: 2;
+  grid-row: 1;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.3;
+  text-transform: uppercase;
+  color: var(--color-ember-deep);
+}
+
+.proofPlanName {
+  grid-column: 2;
+  grid-row: 2;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.proofPlanBadge {
+  grid-column: 3;
+  grid-row: 1 / 3;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-paper-deep);
+  color: var(--color-ink-soft);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.proofPlanWalk {
+  grid-column: 2 / 4;
+  grid-row: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.proofPlanWalk::before {
+  content: "";
+  height: 18px;
+  margin-left: -21px;
+  margin-right: 11px;
+  border-left: 2px dotted var(--color-line-strong);
 }
 
 /* story: saved reels become pins */
@@ -318,6 +542,21 @@
     width: 104px;
   }
 
+  .proof {
+    padding: 64px 0 80px;
+  }
+
+  .proofSteps {
+    grid-template-columns: 1fr;
+    gap: 48px;
+  }
+
+  .proofArrow {
+    top: calc(100% + 10px);
+    left: calc(50% - 14px);
+    transform: rotate(90deg);
+  }
+
   .story {
     height: 300vh;
   }
@@ -357,6 +596,14 @@
   .title,
   .hero .reel {
     animation: none;
+  }
+
+  .mapPin {
+    animation: none;
+  }
+
+  .mapPulse {
+    display: none;
   }
 
   .appMap {
