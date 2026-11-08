@@ -10,7 +10,7 @@ const savedReels = [
   { src: "lisbon-arch", style: { "--r": "-8deg", left: "16%", top: "12%" } },
   { src: "lisbon-tram", style: { "--r": "0deg", left: "35%", top: "6%" } },
   { src: "lisbon-street", style: { "--r": "7deg", left: "54%", top: "14%" } },
-];
+] satisfies { src: string; style: CSSProperties & { "--r": string } }[];
 
 function Arrow() {
   return (
@@ -40,7 +40,7 @@ export default function ProblemProof() {
                 <div
                   key={reel.src}
                   className={styles.proofReel}
-                  style={reel.style as CSSProperties}
+                  style={reel.style}
                 >
                   <Image
                     src={`/images/landing/${reel.src}.jpg`}

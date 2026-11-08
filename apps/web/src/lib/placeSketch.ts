@@ -31,9 +31,10 @@ function label(name: string): string {
   const head: string[] = [];
   let used = 0;
   for (const part of parts) {
-    if (used + units(part) > LABEL_UNITS - 1) break;
+    const width = units(part);
+    if (used + width > LABEL_UNITS - 1) break;
     head.push(part);
-    used += units(part);
+    used += width;
   }
   const space = head.lastIndexOf(" ");
   const cut =
@@ -62,7 +63,7 @@ export function placeSketch(names: readonly string[]): {
     return {
       n: i + 1,
       x: Math.round(x * 10) / 10,
-      y: Math.round(y * 10) / 10,
+      y,
       label: label(name),
     };
   });
