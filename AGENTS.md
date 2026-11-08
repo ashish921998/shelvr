@@ -71,12 +71,6 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Analytics:** `src/lib/analytics.ts` holds the typed client event map
   (`AnalyticsEventProperties`); server capture is `convex/analytics.ts`. Read
   those rather than grepping call sites.
-- **Marketing site buttons and samples:** the App Store buttons in the site
-  header, on the landing page and on the reel place finder's results are
-  `apps/web/src/components/MapCta.tsx`. The hero's Lisbon map and the strip's
-  evening card are drawn from `apps/web/src/lib/sampleCity.ts`, and the
-  finder's sketch from `apps/web/src/lib/placeSketch.ts`. Their click-through
-  queries are in `docs/analytics/growth-funnel.md`.
 - **Link reading:** `convex/model/pageRead.ts` (`readPage`, host dispatcher),
   shared extraction and recipe helpers in `convex/model/pageReadCore.ts`, and
   per-host readers in `convex/model/readers/` (Google Maps lists split by city in
