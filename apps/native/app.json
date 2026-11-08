@@ -198,15 +198,6 @@
         }
       ],
       [
-        "expo-media-library",
-        {
-          "photosPermission": "Shelvr lets you tidy your photo library \u2014 keep, delete, or save photos into your hub.",
-          "savePhotosPermission": false,
-          "isAccessMediaLocationEnabled": true,
-          "granularPermissions": ["photo"]
-        }
-      ],
-      [
         "expo-sharing",
         {
           "ios": {
