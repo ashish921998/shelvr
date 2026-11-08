@@ -9,29 +9,38 @@ const nativeRequire = createRequire(
   new URL("../apps/native/package.json", import.meta.url),
 );
 
-test("Glob finds nested source files and respects ignored directories after the matcher upgrade", async (t) => {
-  const cwd = mkdtempSync(join(tmpdir(), "shelvr-glob-"));
-  t.after(() => rmSync(cwd, { recursive: true, force: true }));
-  for (const path of [
-    "src/index.ts",
-    "src/lib/place.ts",
-    "src/lib/place.test.ts",
-    "src/.hidden.ts",
-    "node_modules/pkg/index.ts",
-  ]) {
-    mkdirSync(dirname(join(cwd, path)), { recursive: true });
-    writeFileSync(join(cwd, path), "");
-  }
-  const { glob, globSync } = nativeRequire("glob");
-  const options = {
-    cwd,
-    dot: true,
-    ignore: ["**/node_modules/**", "**/*.test.ts"],
-  };
-  const expected = ["src/.hidden.ts", "src/index.ts", "src/lib/place.ts"];
-  assert.deepEqual(globSync("**/*.ts", options).sort(), expected);
-  assert.deepEqual((await glob("**/*.ts", options)).sort(), expected);
-});
+for (const consumer of ["@expo/fingerprint", "expo-updates"]) {
+  test(
+    "Glob finds nested source files and respects ignored directories for " +
+      consumer,
+    async (t) => {
+      const cwd = mkdtempSync(join(tmpdir(), "shelvr-glob-"));
+      t.after(() => rmSync(cwd, { recursive: true, force: true }));
+      for (const path of [
+        "src/index.ts",
+        "src/lib/place.ts",
+        "src/lib/place.test.ts",
+        "src/.hidden.ts",
+        "node_modules/pkg/index.ts",
+      ]) {
+        mkdirSync(dirname(join(cwd, path)), { recursive: true });
+        writeFileSync(join(cwd, path), "");
+      }
+      const consumerRequire = createRequire(
+        nativeRequire.resolve(consumer + "/package.json"),
+      );
+      const { glob, globSync } = consumerRequire("glob");
+      const options = {
+        cwd,
+        dot: true,
+        ignore: ["**/node_modules/**", "**/*.test.ts"],
+      };
+      const expected = ["src/.hidden.ts", "src/index.ts", "src/lib/place.ts"];
+      assert.deepEqual(globSync("**/*.ts", options).sort(), expected);
+      assert.deepEqual((await glob("**/*.ts", options)).sort(), expected);
+    },
+  );
+}
 
 test("Expo fingerprint keeps ordered ignore rules and nested native files", () => {
   const { isIgnoredPath } = nativeRequire(

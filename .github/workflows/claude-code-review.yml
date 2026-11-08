@@ -65,7 +65,8 @@ jobs:
         run: |
           for attempt in 1 2 3; do
             if gh release download bun-v1.3.14 --repo oven-sh/bun --pattern bun-linux-x64.zip \
-              --output "$RUNNER_TEMP/review-bun.zip" --clobber && unzip -tq "$RUNNER_TEMP/review-bun.zip"; then
+              --output "$RUNNER_TEMP/review-bun.zip" --clobber &&
+              echo "951ee2aee855f08595aeec6225226a298d3fea83a3dcd6465c09cbccdf7e848f  $RUNNER_TEMP/review-bun.zip" | sha256sum --check --status; then
               break
             fi
             if [ "$attempt" -eq 3 ]; then exit 1; fi
