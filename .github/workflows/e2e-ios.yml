@@ -108,6 +108,18 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Download the local Convex runtime
+        working-directory: apps/native
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cli_version=$(node -p 'require("convex/package.json").version')
+          runtime_version=$(curl --fail --silent --show-error --location --retry 3 --retry-all-errors \
+            -H "Convex-Client: npm-cli-$cli_version" https://version.convex.dev/v1/local_backend_version \
+            | node -p 'JSON.parse(require("fs").readFileSync(0)).version')
+          bash ../../tools/cache-convex-runtime.sh "$runtime_version"
+          echo "CONVEX_LOCAL_BACKEND_VERSION=$runtime_version" >> "$GITHUB_ENV"
+
       # The development build only changes when its native fingerprint does,
       # so the key is that fingerprint plus the Xcode that compiled it, plus
       # how it was signed.
@@ -226,14 +238,14 @@ jobs:
               privateKey: (await exportPKCS8(privateKey)).trimEnd().replace(/\n/g, " "),
               jwks: JSON.stringify({ keys: [{ use: "sig", ...jwk }] }),
             }));')
-          npx convex dev --once --typecheck disable --codegen disable || true
+          npx convex dev --once --local-backend-version "$CONVEX_LOCAL_BACKEND_VERSION" --typecheck disable --codegen disable || true
           test -f .env.local
           npx convex env set GOOGLE_GENERATIVE_AI_API_KEY ci-no-model
           npx convex env set AUTH_ENABLE_ANONYMOUS true
           npx convex env set E2E_FAKE_AI local-v1
           npx convex env set JWT_PRIVATE_KEY -- "$(node -p 'JSON.parse(process.argv[1]).privateKey' "$keys")"
           npx convex env set JWKS -- "$(node -p 'JSON.parse(process.argv[1]).jwks' "$keys")"
-          nohup npx convex dev --typecheck disable --codegen disable --tail-logs always \
+          nohup npx convex dev --local-backend-version "$CONVEX_LOCAL_BACKEND_VERSION" --typecheck disable --codegen disable --tail-logs always \
             > "$RUNNER_TEMP/convex.log" 2>&1 &
           for _ in $(seq 1 120); do
             grep -q "Convex functions ready" "$RUNNER_TEMP/convex.log" && break
