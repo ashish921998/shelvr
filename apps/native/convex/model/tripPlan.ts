@@ -121,6 +121,13 @@ export const searchTripPlacesResultValidator = v.object({
 export const tripSavePlaceValidator = v.object({
   itemId: v.id("items"),
   name: v.string(),
+  location: v.optional(
+    v.object({
+      lat: v.number(),
+      lng: v.number(),
+      appleId: v.optional(v.string()),
+    }),
+  ),
   /** The save's title, so the person knows which save the place came from. */
   title: v.optional(v.string()),
   category: v.optional(v.string()),

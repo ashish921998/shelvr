@@ -1170,5 +1170,14 @@
   "tripSetup.suggestedCountry": "おすすめ",
   "tripSetup.popularCountries": "人気の旅行先",
   "tripSetup.allCountries": "すべての国・地域",
-  "tripSetup.removeCountry": "%{name}を削除"
+  "tripSetup.removeCountry": "%{name}を削除",
+  "tripDay.overview": "概要",
+  "tripDay.progress": "%{total}件中%{current}件目",
+  "tripDay.selectedStops": "追加するスポット",
+  "tripDay.noKept": "選んだスポットはありません",
+  "tripDay.suggestionsChanged": "旅程が変更されました。プレビューを閉じて、もう一度お試しください。",
+  "tripDay.keep": "選ぶ",
+  "tripDay.skip": "スキップ",
+  "tripDay.addSelected": "選んだスポットを追加",
+  "tripDay.addSaveToDay": "%{day}に%{name}を追加"
 }

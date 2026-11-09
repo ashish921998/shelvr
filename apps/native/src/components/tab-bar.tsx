@@ -16,6 +16,7 @@ type TabRoute = BottomTabBarProps["state"]["routes"][number];
 
 const LIBRARY = "(home)";
 const MAP = "(map)";
+const TRIPS = "(trips)";
 const ADD_SIZE = 64;
 const ADD_LIFT = 8;
 const ATTRIBUTION_CLEARANCE = 32;
@@ -95,12 +96,13 @@ export function TabBar({
   const onHeightChange = useContext(BottomTabBarHeightCallbackContext);
   const cityInView = useMapCityInView();
   const planner = usePlanPicker();
-  const hidden = Platform.OS === "android" && keyboardVisible;
+  const current = state.routes[state.index];
+  const hidden =
+    current?.name === TRIPS || (Platform.OS === "android" && keyboardVisible);
   useEffect(() => {
     if (hidden) onHeightChange?.(0);
   }, [hidden, onHeightChange]);
   if (hidden) return null;
-  const current = state.routes[state.index];
   const onMap = current?.name === MAP;
   const other = state.routes.find(
     (route) => route.name === (current?.name === LIBRARY ? MAP : LIBRARY),

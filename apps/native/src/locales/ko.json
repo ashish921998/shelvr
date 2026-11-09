@@ -1170,5 +1170,14 @@
   "tripSetup.suggestedCountry": "추천",
   "tripSetup.popularCountries": "인기 여행지",
   "tripSetup.allCountries": "모든 국가",
-  "tripSetup.removeCountry": "%{name} 삭제"
+  "tripSetup.removeCountry": "%{name} 삭제",
+  "tripDay.overview": "개요",
+  "tripDay.progress": "%{total}개 중 %{current}번째",
+  "tripDay.selectedStops": "추가할 장소",
+  "tripDay.noKept": "선택한 장소 없음",
+  "tripDay.suggestionsChanged": "여행 일정이 변경됐어요. 미리보기를 닫고 다시 시도해 주세요.",
+  "tripDay.keep": "선택",
+  "tripDay.skip": "건너뛰기",
+  "tripDay.addSelected": "선택한 장소 추가",
+  "tripDay.addSaveToDay": "%{day}에 %{name} 추가"
 }

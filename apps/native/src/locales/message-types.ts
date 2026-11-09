@@ -1112,6 +1112,15 @@ export type MessageParams = {
   "tripSetup.popularCountries": undefined;
   "tripSetup.allCountries": undefined;
   "tripSetup.removeCountry": { name: string };
+  "tripDay.overview": undefined;
+  "tripDay.progress": { current: string; total: number };
+  "tripDay.selectedStops": undefined;
+  "tripDay.noKept": undefined;
+  "tripDay.suggestionsChanged": undefined;
+  "tripDay.keep": undefined;
+  "tripDay.skip": undefined;
+  "tripDay.addSelected": undefined;
+  "tripDay.addSaveToDay": { name: string; day: string };
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

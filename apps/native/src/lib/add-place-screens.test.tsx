@@ -101,9 +101,17 @@ vi.mock("expo-router", () => {
       <span>{`redirect ${href}`}</span>
     )),
     useRouter: () => ({}),
+    useNavigation: () => ({ isFocused: () => true }),
     useLocalSearchParams: () => mocks.params,
   };
 });
+vi.mock("@/components/trip-planner/trip-stop-search-map", () => ({
+  TripStopSearchMap: vi.fn(({ places }: { places: { name: string }[] }) => (
+    <div data-testid="trip-stop-search-map">
+      {places.map((place) => place.name).join(", ")}
+    </div>
+  )),
+}));
 vi.mock("@/components/symbol", () => ({
   AppSymbolIcon: vi.fn(({ name }: { name: string }) => <span>{name}</span>),
 }));
@@ -514,6 +522,32 @@ describe("Add a place on a trip", () => {
     expect(screen.getByText("tripPlanner.onTrip")).toBeTruthy();
   });
 
+  it("keeps the map visible and surfaces a venue from saves once when search also finds it", () => {
+    mocks.queries[TRIP] = trip;
+    mocks.queries[TRIP_SAVES] = [
+      {
+        itemId: "i1",
+        name: "Veracruz",
+        title: "Austin reel",
+        location: { lat: found.lat, lng: found.lng },
+      },
+    ];
+    mocks.search = { status: "done", places: [found, already] };
+    render(<AddTripStopScreen />);
+    type("add-trip-stop-search", "taco");
+    expect(screen.getByTestId("trip-stop-search-map").textContent).toBe(
+      "Veracruz, Odd Duck",
+    );
+    expect(
+      screen.getByRole("button", {
+        name: "Veracruz, Austin reel, tripPlanner.fromSaves",
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.queryByRole("button", { name: "Veracruz, East Austin" }),
+    ).toBeNull();
+  });
+
   it("adds a found place to the chosen day and closes", async () => {
     mocks.queries[TRIP] = trip;
     mocks.search = { status: "done", places: [found] };
@@ -540,7 +574,11 @@ describe("Add a place on a trip", () => {
       { itemId: "i1", name: "Franklin", title: "BBQ reel" },
     ];
     render(<AddTripStopScreen />);
-    fireEvent.click(screen.getByRole("button", { name: "Franklin, BBQ reel" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Franklin, BBQ reel, tripPlanner.fromSaves",
+      }),
+    );
     await waitFor(() => expect(mocks.backOrHome).toHaveBeenCalledTimes(1));
     expect(mocks.addStop).toHaveBeenCalledWith(2, {
       kind: "save",
@@ -556,13 +594,17 @@ describe("Add a place on a trip", () => {
       { itemId: "i1", name: "Franklin", title: "BBQ reel" },
     ];
     render(<AddTripStopScreen />);
-    fireEvent.click(screen.getByRole("button", { name: "Franklin, BBQ reel" }));
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Franklin, BBQ reel, tripPlanner.fromSaves",
+      }),
+    );
     await waitFor(() => expect(mocks.addStop).toHaveBeenCalledTimes(1));
     await waitFor(() =>
       expect(
         (
           screen.getByRole("button", {
-            name: "Franklin, BBQ reel",
+            name: "Franklin, BBQ reel, tripPlanner.fromSaves",
           }) as HTMLButtonElement
         ).disabled,
       ).toBe(false),

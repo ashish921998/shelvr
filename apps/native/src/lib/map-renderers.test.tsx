@@ -172,3 +172,45 @@ it("clusters trip stops without changing routes, day colours or stop numbers, an
   fireEvent.click(screen.getByRole("button", { name: "tripPlanner.allDays" }));
   expect(selectDay).toHaveBeenLastCalledWith(null);
 });
+
+it("shows the stay and only the selected day's markers and line, then restores the full trip in Overview", () => {
+  const tripDays = [
+    cityPins,
+    [
+      { name: "Gamma", lat: 31, lng: -98 },
+      { name: "Delta", lat: 31.01, lng: -98.01 },
+    ],
+  ];
+  const map = (activeDay: number | null) => (
+    <TripPlannerMap
+      days={tripDays}
+      stay={{ name: "Hotel", lat: 30.5, lng: -97.9 }}
+      activeDay={activeDay}
+      height={330}
+      onSelectDay={vi.fn()}
+      embedded
+    />
+  );
+  const { rerender } = render(map(1));
+  act(() => mock.props.onCameraMove({ zoom: 16 }));
+  expect(mock.props.cameraPosition.coordinates.latitude).toBeGreaterThan(31);
+  expect(mock.props.cameraPosition.zoom).toBeGreaterThan(10);
+  expect(mock.props.properties).toEqual({
+    pointsOfInterest: { including: [] },
+  });
+  expect(mock.props.markers.map((marker: { id: string }) => marker.id)).toEqual(
+    ["1:0", "1:1", "stay"],
+  );
+  expect(mock.props.polylines.map((line: { id: string }) => line.id)).toEqual([
+    "route-1",
+  ]);
+  rerender(map(null));
+  expect(mock.props.properties).toBeUndefined();
+  expect(mock.props.markers.map((marker: { id: string }) => marker.id)).toEqual(
+    ["0:0", "0:1", "1:0", "1:1", "stay"],
+  );
+  expect(mock.props.polylines.map((line: { id: string }) => line.id)).toEqual([
+    "route-0",
+    "route-1",
+  ]);
+});

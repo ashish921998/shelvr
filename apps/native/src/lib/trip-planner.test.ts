@@ -4,23 +4,15 @@ import type { Id } from "@convex/_generated/dataModel";
 import type { TripPlanStop } from "@convex/model/tripPlan";
 
 import {
-  type DayFocus,
-  type DayFocusEvent,
   cityChoices,
   clampDays,
-  dayAtScroll,
   dayColor,
-  dayScrollOffset,
   DEFAULT_INTERESTS,
-  firstFocusDay,
-  initialDayFocus,
   initialTripForm,
-  nextDayFocus,
   paceHint,
   planPins,
   REVEAL_STEPS,
   revealDelay,
-  scrolledToEnd,
   sharedSaveStops,
   stopAction,
   stopBadge,
@@ -368,49 +360,6 @@ describe("trip page focus", () => {
     ]);
   });
 
-  it("follows the list to the day whose header has reached the pinned map", () => {
-    const tops = [400, 900, 1500];
-    // Map and chips are 360 tall; a header counts once it is 16 under them.
-    expect(dayAtScroll(0, 376, tops, false)).toBe(0);
-    expect(dayAtScroll(523, 376, tops, false)).toBe(0);
-    expect(dayAtScroll(524, 376, tops, false)).toBe(1);
-    expect(dayAtScroll(1200, 376, tops, false)).toBe(2);
-    // Scrolled to the end, the last day wins even if its header never reached the map.
-    expect(dayAtScroll(700, 376, tops, true)).toBe(2);
-  });
-
-  it("follows only the days that have laid out", () => {
-    expect(dayAtScroll(0, 376, [], false)).toBeNull();
-    expect(dayAtScroll(0, 376, [undefined, 900], false)).toBe(1);
-    expect(dayAtScroll(2000, 376, [400, undefined], true)).toBe(0);
-  });
-
-  it("lands a chip's scroll on the day the scroll-follow then reports", () => {
-    const tops = [400, 900, 1500];
-    const offset = dayScrollOffset(900, 360, 8);
-    expect(dayAtScroll(offset, 360 + 16, tops, false)).toBe(1);
-  });
-
-  it("knows when the list is at its end", () => {
-    expect(scrolledToEnd(1200, 800, 2000)).toBe(true);
-    expect(scrolledToEnd(1199.5, 800, 2000)).toBe(true);
-    expect(scrolledToEnd(1000, 800, 2000)).toBe(false);
-    // A list shorter than the screen never scrolls, so it is never "at the end".
-    expect(scrolledToEnd(0, 800, 600)).toBe(false);
-  });
-
-  it("opens on the first day with a stop, or the whole trip when none has one", () => {
-    expect(firstFocusDay([[stop()], [stop()]])).toBe(0);
-    expect(firstFocusDay([[], [stop()]])).toBe(1);
-    expect(firstFocusDay([[], []])).toBeNull();
-    expect(firstFocusDay([])).toBeNull();
-  });
-
-  it("scrolls a day's header to just under the pinned map, never above the top", () => {
-    expect(dayScrollOffset(900, 360, 8)).toBe(532);
-    expect(dayScrollOffset(300, 360, 8)).toBe(0);
-  });
-
   it("marks stops whose why is the title of a save several stops share", () => {
     const itemId = "item1" as Id<"items">;
     const shared = sharedSaveStops([
@@ -425,123 +374,6 @@ describe("trip page focus", () => {
       stop({ _id: "e" as Id<"tripStops">, why: "Best of Lisbon" }),
     ]);
     expect([...shared].sort()).toEqual(["a", "b"]);
-  });
-});
-
-describe("trip page focus state", () => {
-  const run = (start: DayFocus, events: DayFocusEvent[]) =>
-    events.reduce(nextDayFocus, start);
-  const opened: DayFocus = { day: 0, scroll: "idle" };
-
-  it("opens on the first day with a stop, still", () => {
-    expect(initialDayFocus([[], [stop()]])).toEqual({ day: 1, scroll: "idle" });
-    expect(initialDayFocus([[], []])).toEqual({ day: null, scroll: "idle" });
-  });
-
-  it("keeps All days through scroll events nobody dragged for", () => {
-    // The reported race: All days tapped just after opening, then layout scrolls the list.
-    expect(
-      run(opened, [
-        { type: "pick", day: null },
-        { type: "scroll", day: 2 },
-        { type: "momentumEnd", day: 2 },
-        { type: "scroll", day: 2 },
-      ]),
-    ).toEqual({ day: null, scroll: "idle" });
-  });
-
-  it("keeps All days while the person scrolls the list", () => {
-    expect(
-      run(opened, [
-        { type: "pick", day: null },
-        { type: "dragStart" },
-        { type: "scroll", day: 1 },
-        { type: "dragEnd", day: 2 },
-        { type: "momentumStart" },
-        { type: "scroll", day: 2 },
-        { type: "momentumEnd", day: 2 },
-      ]).day,
-    ).toBeNull();
-  });
-
-  it("leaves All days only for a day the person picks", () => {
-    const all = run(opened, [{ type: "pick", day: null }]);
-    expect(run(all, [{ type: "pick", day: 2 }]).day).toBe(2);
-  });
-
-  it("drops a pick's settling scroll even when a flick was still running", () => {
-    // A flick runs, the person taps All days mid-flight; the flick's last events change nothing.
-    expect(
-      run(opened, [
-        { type: "dragStart" },
-        { type: "dragEnd", day: 1 },
-        { type: "momentumStart" },
-        { type: "pick", day: null },
-        { type: "scroll", day: 2 },
-        { type: "momentumEnd", day: 2 },
-      ]),
-    ).toEqual({ day: null, scroll: "idle" });
-  });
-
-  it("follows a focused day through the person's drag and flick", () => {
-    expect(
-      run(opened, [{ type: "dragStart" }, { type: "scroll", day: 1 }]).day,
-    ).toBe(1);
-    expect(
-      run(opened, [
-        { type: "dragStart" },
-        { type: "scroll", day: 1 },
-        { type: "dragEnd", day: 1 },
-        { type: "momentumStart" },
-        { type: "scroll", day: 2 },
-        { type: "momentumEnd", day: 2 },
-      ]),
-    ).toEqual({ day: 2, scroll: "idle" });
-  });
-
-  it("ignores a picked day's own scroll animation and layout scrolls", () => {
-    // Day 3 picked on the map: its scroll passes day 2 on the way and ends with a momentum end.
-    expect(
-      run(opened, [
-        { type: "pick", day: 2 },
-        { type: "scroll", day: 1 },
-        { type: "momentumEnd", day: 1 },
-      ]),
-    ).toEqual({ day: 2, scroll: "idle" });
-    expect(run(opened, [{ type: "scroll", day: 2 }])).toBe(opened);
-  });
-
-  it("hands the focus back to the person who drags during a picked day's scroll", () => {
-    expect(
-      run(opened, [
-        { type: "pick", day: 2 },
-        { type: "dragStart" },
-        { type: "scroll", day: 1 },
-      ]).day,
-    ).toBe(1);
-  });
-
-  it("ignores scroll events after a drag that ended without a flick", () => {
-    expect(
-      run(opened, [
-        { type: "dragStart" },
-        { type: "dragEnd", day: 1 },
-        { type: "scroll", day: 2 },
-      ]),
-    ).toEqual({ day: 1, scroll: "released" });
-  });
-
-  it("keeps the focused day when the list reports no laid-out day", () => {
-    expect(
-      run(opened, [{ type: "dragStart" }, { type: "scroll", day: null }]).day,
-    ).toBe(0);
-  });
-
-  it("returns the same state when nothing changes, so React skips the render", () => {
-    const idle = run(opened, [{ type: "scroll", day: 1 }]);
-    expect(idle).toBe(opened);
-    const dragging = run(opened, [{ type: "dragStart" }]);
-    expect(nextDayFocus(dragging, { type: "scroll", day: 0 })).toBe(dragging);
   });
 });
 

@@ -190,6 +190,79 @@ describe("blank trip setup", () => {
   });
 });
 
+describe("applying day suggestions", () => {
+  it("requires personal access to fill a day from saves on a covered shared trip", async () => {
+    const { base, t, tripId, itemId } = await setup([], { pro: false });
+    const owner = await signedInUser(base, { pro: true });
+    const { listId, inviteToken } = await owner.t.mutation(
+      api.sharedLists.createSharedList,
+      {
+        name: "Lisbon plans",
+        cities: ["Lisbon"],
+      },
+    );
+    await t.mutation(api.sharedLists.joinSharedList, { token: inviteToken });
+    await base.run((ctx) => ctx.db.patch(tripId, { listId }));
+    await expect(
+      t.mutation(api.tripPlannerData.applyTripDaySuggestions, {
+        tripId,
+        day: 1,
+        places: [{ itemId, name: "Time Out Market" }],
+      }),
+    ).rejects.toMatchObject({ data: { code: "pro_required" } });
+    expect(await layout(t, tripId)).toEqual({ days: [[], []], unplanned: [] });
+  });
+
+  it("adds only kept places in review order and leaves an edited day alone", async () => {
+    const { t, tripId, itemId } = await setup([]);
+    const apply = api.tripPlannerData.applyTripDaySuggestions;
+    const market = { itemId, name: "Time Out Market" };
+    const bakery = { itemId, name: "Manteigaria" };
+    expect(
+      await t.mutation(apply, { tripId, day: 1, places: [bakery, market] }),
+    ).toBe(true);
+    expect(await t.mutation(apply, { tripId, day: 1, places: [market] })).toBe(
+      false,
+    );
+    expect(await layout(t, tripId)).toEqual({
+      days: [["Manteigaria", "Time Out Market"], []],
+      unplanned: [],
+    });
+  });
+
+  it("refuses duplicate and stale suggestions without applying any of the picks", async () => {
+    const { base, t, tripId, itemId } = await setup([]);
+    const apply = api.tripPlannerData.applyTripDaySuggestions;
+    const market = { itemId, name: "Time Out Market" };
+    const bakery = { itemId, name: "Manteigaria" };
+    const other = await signedInUser(base, { pro: true });
+    await expect(
+      other.t.mutation(apply, { tripId, day: 1, places: [market] }),
+    ).rejects.toThrow();
+    await expect(
+      t.mutation(apply, {
+        tripId,
+        day: 1,
+        places: [market, { itemId, name: "Unavailable place" }],
+      }),
+    ).rejects.toThrow();
+    expect(
+      await t.mutation(apply, { tripId, day: 1, places: [market, market] }),
+    ).toBe(false);
+    expect(await layout(t, tripId)).toEqual({ days: [[], []], unplanned: [] });
+    expect(await t.mutation(apply, { tripId, day: 2, places: [market] })).toBe(
+      true,
+    );
+    expect(
+      await t.mutation(apply, { tripId, day: 1, places: [bakery, market] }),
+    ).toBe(false);
+    expect(await layout(t, tripId)).toEqual({
+      days: [[], ["Time Out Market"]],
+      unplanned: [],
+    });
+  });
+});
+
 describe("stop details", () => {
   it("persists optional time and note through a move and allows clearing both", async () => {
     const { base, t, tripId, ids } = await setup(TRIP);

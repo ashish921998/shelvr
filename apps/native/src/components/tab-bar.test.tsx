@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import {
   BottomTabBarHeightCallbackContext,
   type BottomTabBarProps,
@@ -136,12 +136,16 @@ describe("tabs", () => {
     expect(labels()).toEqual(["Map", "Add", "Go out"]);
   });
 
-  it("offers the Library from the Map and from Trips", () => {
+  it("offers the Library from the Map", () => {
     bar(1);
     expect(labels()).toEqual(["Library", "Add", "Go out"]);
-    cleanup();
-    bar(2);
-    expect(labels()).toEqual(["Library", "Add", "Go out"]);
+  });
+
+  it("clears the floating controls and their reserved height on Trips", () => {
+    const onHeight = vi.fn();
+    bar(2, false, onHeight);
+    expect(screen.queryAllByRole("button")).toEqual([]);
+    expect(onHeight).toHaveBeenCalledWith(0);
   });
 
   it("emits tabPress and navigates", () => {

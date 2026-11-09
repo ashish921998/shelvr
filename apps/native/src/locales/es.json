@@ -1230,5 +1230,14 @@
   "tripSetup.suggestedCountry": "Sugerencia",
   "tripSetup.popularCountries": "Destinos populares",
   "tripSetup.allCountries": "Todos los países",
-  "tripSetup.removeCountry": "Quitar %{name}"
+  "tripSetup.removeCountry": "Quitar %{name}",
+  "tripDay.overview": "Resumen",
+  "tripDay.progress": "%{current} de %{total}",
+  "tripDay.selectedStops": "Paradas para añadir",
+  "tripDay.noKept": "No se ha elegido ninguna parada",
+  "tripDay.suggestionsChanged": "El viaje ha cambiado. Cierra la vista previa e inténtalo de nuevo.",
+  "tripDay.keep": "Conservar",
+  "tripDay.skip": "Omitir",
+  "tripDay.addSelected": "Añadir las paradas elegidas",
+  "tripDay.addSaveToDay": "Añadir %{name} a %{day}"
 }

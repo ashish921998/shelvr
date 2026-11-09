@@ -20,7 +20,7 @@ import {
   placeKey,
   planSourceValidator,
 } from "./model/plan";
-import { sameTripPlace } from "./model/placeIdentity";
+import { sameTripPlace, type TripPlaceRef } from "./model/placeIdentity";
 import { recentVisits } from "./model/placeVisits";
 import { listPlanClaimValidator } from "./model/sharedLists";
 import { rateLimiter } from "./model/rateLimiter";
@@ -722,6 +722,53 @@ export const fillBlankTripDay = authedMutation({
   },
 });
 
+export const applyTripDaySuggestions = authedMutation({
+  args: {
+    tripId: v.id("tripPlans"),
+    day: v.number(),
+    places: v.array(v.object({ itemId: v.id("items"), name: v.string() })),
+  },
+  returns: v.boolean(),
+  handler: async (ctx, args) => {
+    const plan = await editablePlan(ctx, args.tripId, ctx.userId);
+    await requireProEntitlement(ctx, ctx.userId);
+    const day = checkedDay(plan, args.day);
+    if (
+      day === UNPLANNED_DAY ||
+      args.places.length === 0 ||
+      args.places.length > STOPS_PER_DAY[plan.pace]
+    )
+      return false;
+    const stops = await stopsOf(ctx, plan._id);
+    if (
+      stops.some((stop) => stop.day === day) ||
+      stops.length + args.places.length > MAX_TRIP_STOPS
+    )
+      return false;
+    const picks: NewStop[] = [];
+    for (const { itemId, name } of args.places) {
+      const place = await savedStop(ctx, plan, itemId, name);
+      if (
+        stops.some((stop) => sameTripPlace(stop, place)) ||
+        picks.some((stop) => sameTripPlace(stop, place))
+      )
+        return false;
+      picks.push(place);
+    }
+    for (const [order, place] of picks.entries()) {
+      await ctx.db.insert("tripStops", {
+        ...place,
+        tripId: plan._id,
+        userId: ctx.userId,
+        day,
+        order,
+      });
+    }
+    await recount(ctx, plan);
+    return true;
+  },
+});
+
 /**
  * Adds a place to `day` at `index` (the end when left out): a search result from
  * `searchTripPlaces`, or one of the city's saved places. A place already on the trip moves
@@ -820,24 +867,31 @@ export const tripSavePlaces = authedQuery({
     const plan = await ownedPlan(ctx, args.tripId, ctx.userId);
     if (plan === null) return [];
     const stops = await stopsOf(ctx, plan._id);
-    const listed = new Set<string>();
+    const listed: TripPlaceRef[] = [];
+    const keys = new Set<string>();
     const saves = await readyCitySaves(ctx, ctx.userId, plan.city);
     const places: TripSavePlace[] = [];
     for (const item of saves) {
       for (const pin of pinsForCity(item, plan.city)) {
         if (places.length >= MAX_SAVE_PLACES) return places;
         const key = `${item._id}|${placeKey(pin.name)}`;
-        if (listed.has(key)) continue;
+        const place = { ...pin, itemId: item._id };
         if (
-          stops.some((stop) =>
-            sameTripPlace(stop, { ...pin, itemId: item._id }),
-          )
+          keys.has(key) ||
+          stops.some((stop) => sameTripPlace(stop, place)) ||
+          listed.some((other) => sameTripPlace(other, place))
         )
           continue;
-        listed.add(key);
+        listed.push(place);
+        keys.add(key);
         places.push({
           itemId: item._id,
           name: pin.name,
+          location: {
+            lat: pin.lat,
+            lng: pin.lng,
+            ...(pin.appleId !== undefined ? { appleId: pin.appleId } : {}),
+          },
           ...(item.title !== undefined ? { title: item.title } : {}),
           ...(pin.category !== undefined ? { category: pin.category } : {}),
         });

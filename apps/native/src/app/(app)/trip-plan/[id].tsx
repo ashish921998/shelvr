@@ -1,9 +1,6 @@
 import { EmptyState } from "@/components/empty-state";
 import { Button } from "@/components/ui/button";
-import {
-  hasMapPoints,
-  TripPlanBody,
-} from "@/components/trip-planner/trip-plan-body";
+import { TripPlanBody } from "@/components/trip-planner/trip-plan-body";
 import {
   TripEditHeader,
   TripEditList,
@@ -23,7 +20,8 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { usePlanGate } from "@/lib/plan-gate";
+import { canBrowse } from "@/lib/access";
+import { useAccess } from "@/lib/free-plan";
 import { personalPlanAllowed } from "@/lib/list-gate";
 import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -31,7 +29,6 @@ import { Platform, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 function TripHeader({
-  overMap,
   editing,
   onEdit,
   onDone,
@@ -40,7 +37,6 @@ function TripHeader({
   onShare,
   shareLoading,
 }: {
-  overMap: boolean;
   editing: boolean;
   onEdit: () => void;
   onDone: () => void;
@@ -59,12 +55,8 @@ function TripHeader({
     return (
       <Stack.Screen
         options={{
-          // Over the map the header floats; without one it needs its own background.
-          headerTransparent: overMap && !editing,
-          headerStyle:
-            overMap && !editing
-              ? undefined
-              : { backgroundColor: theme.colors.background },
+          headerTransparent: false,
+          headerStyle: { backgroundColor: theme.colors.background },
           headerRight: () =>
             editing ? (
               <HeaderIconButton
@@ -92,15 +84,11 @@ function TripHeader({
       />
     );
   }
-  // The edit list has no map under the header, so its rows would scroll under the buttons.
-  // Both states set it, since options a screen set stay after it unmounts.
   const iosHeader = (
     <Stack.Screen
       options={{
-        headerTransparent: !editing,
-        headerStyle: editing
-          ? { backgroundColor: theme.colors.background }
-          : undefined,
+        headerTransparent: false,
+        headerStyle: { backgroundColor: theme.colors.background },
       }}
     />
   );
@@ -158,9 +146,11 @@ export default function TripPlanScreen() {
   const deleteTrip = useDeleteTripPlan();
   const [editing, setEditing] = useState(mode === "edit");
   const [name, setName] = useState<string | null>(null);
+  const [day, setDay] = useState<number | null>(null);
   const rename = useRenameTrip(tripId, trip.data?.name);
   const share = useTripShare(tripId);
-  const { gated } = usePlanGate();
+  const access = useAccess();
+  const gated = access.kind === "locked";
 
   const data = trip.data;
   const opened = useRef(false);
@@ -243,7 +233,6 @@ export default function TripPlanScreen() {
     <>
       {backTitle}
       <TripHeader
-        overMap={hasMapPoints(data)}
         editing={editing}
         onEdit={() => {
           analytics.capture("trip_plan_edit_started", {
@@ -256,7 +245,7 @@ export default function TripPlanScreen() {
           if (name !== null) void rename(name);
           setEditing(false);
         }}
-        onAddPlace={() => addPlace(1)}
+        onAddPlace={() => addPlace((day ?? 0) + 1)}
         onDelete={() => deleteTrip(data._id, () => backOrHome(router))}
         onShare={share.open}
         shareLoading={share.loading}
@@ -277,7 +266,14 @@ export default function TripPlanScreen() {
           }
         />
       ) : (
-        <TripPlanBody trip={data} onAddPlace={addPlace} />
+        <TripPlanBody
+          trip={data}
+          canUseSaves={canBrowse(access)}
+          canFillFromSaves={access.kind === "pro" && !access.syncing}
+          day={day}
+          onPickDay={setDay}
+          onAddPlace={addPlace}
+        />
       )}
     </>
   );
