@@ -63,6 +63,8 @@ export const tripPlanSummaryValidator = v.object({
   _id: v.id("tripPlans"),
   /** Set once the person renames the trip; the app shows "<city> trip" until then. */
   name: v.optional(v.string()),
+  countries: v.optional(v.array(v.string())),
+  cover: v.optional(v.string()),
   city: v.string(),
   startDate: v.optional(v.string()),
   dayCount: v.number(),
@@ -77,6 +79,8 @@ export const tripPlanDetailValidator = v.object({
   _id: v.id("tripPlans"),
   listId: v.optional(v.id("sharedLists")),
   name: v.optional(v.string()),
+  countries: v.optional(v.array(v.string())),
+  cover: v.optional(v.string()),
   city: v.string(),
   startDate: v.optional(v.string()),
   dayCount: v.number(),

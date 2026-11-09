@@ -107,6 +107,89 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("blank trip setup", () => {
+  it("persists countries, dates, cover, and empty days, and accepts a saved stop", async () => {
+    const { base, t, itemId } = await setup([]);
+    const cover = "/9j/AAAA";
+    const tripId = await t.mutation(api.tripPlannerData.createBlankTrip, {
+      name: " Iberia ",
+      countries: ["PT", "ES", "PT"],
+      city: "Lisbon",
+      dayCount: 3,
+      startDate: "2027-05-01",
+      cover,
+    });
+    expect(
+      await t.query(api.tripPlannerData.getTripPlan, { tripId }),
+    ).toMatchObject({
+      name: "Iberia",
+      countries: ["PT", "ES"],
+      city: "Lisbon",
+      dayCount: 3,
+      startDate: "2027-05-01",
+      cover,
+      days: [[], [], []],
+    });
+    await t.mutation(api.tripPlannerData.addTripStop, {
+      tripId,
+      day: 2,
+      place: { kind: "save", itemId, name: "Time Out Market" },
+    });
+    expect(await layout(t, tripId)).toEqual({
+      days: [[], ["Time Out Market"], []],
+      unplanned: [],
+    });
+    expect(
+      await t.mutation(api.tripPlannerData.fillBlankTripDay, {
+        tripId,
+        day: 1,
+      }),
+    ).toBe(1);
+    expect(
+      await t.mutation(api.tripPlannerData.fillBlankTripDay, {
+        tripId,
+        day: 1,
+      }),
+    ).toBe(0);
+    expect(await layout(t, tripId)).toEqual({
+      days: [["Manteigaria"], ["Time Out Market"], []],
+      unplanned: [],
+    });
+    const other = await signedInUser(base, { pro: true });
+    expect(
+      await other.t.query(api.tripPlannerData.getTripPlan, { tripId }),
+    ).toBeNull();
+  });
+
+  it("requires Pro and rejects invalid countries and dates", async () => {
+    const args = { name: "Trip", countries: ["PT"], dayCount: 2 };
+    const free = await setup([], { pro: false });
+    await expect(
+      free.t.mutation(api.tripPlannerData.createBlankTrip, args),
+    ).rejects.toThrow();
+    const { t } = await setup([]);
+    await expect(
+      t.mutation(api.tripPlannerData.createBlankTrip, {
+        ...args,
+        countries: ["ZZ"],
+      }),
+    ).rejects.toThrow();
+    await expect(
+      t.mutation(api.tripPlannerData.createBlankTrip, {
+        ...args,
+        startDate: "2027-02-29",
+      }),
+    ).rejects.toThrow();
+    const tripId = await t.mutation(api.tripPlannerData.createBlankTrip, args);
+    expect(
+      await t.query(api.tripPlannerData.getTripPlan, { tripId }),
+    ).toMatchObject({
+      city: "Portugal",
+      days: [[], []],
+    });
+  });
+});
+
 describe("stop details", () => {
   it("persists optional time and note through a move and allows clearing both", async () => {
     const { base, t, tripId, ids } = await setup(TRIP);

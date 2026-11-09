@@ -6,6 +6,9 @@ import { ActionMenu } from "@/components/ui/action-menu";
 import { ThemedText } from "@/components/ui/themed-text";
 import { UndoBar } from "@/components/ui/undo-bar";
 import { analytics } from "@/lib/analytics";
+import { api } from "@convex/_generated/api";
+import type { Id } from "@convex/_generated/dataModel";
+import { useMutation } from "convex/react";
 import { canOpenPlaceCard } from "@/lib/apple-place-card";
 import { t } from "@/lib/i18n";
 import { moveTargets, useTripEditor } from "@/lib/trip-edit";
@@ -22,6 +25,9 @@ import {
   tripLengthLine,
   tripStopsLine,
   tripName,
+  countryFlag,
+  tripCountryLine,
+  tripCoverUri,
 } from "@/lib/trip-planner";
 import {
   type TripPlanDetail,
@@ -30,6 +36,7 @@ import {
 } from "@convex/model/tripPlan";
 import { haptics } from "@/lib/haptics";
 import { usePlaceOpener } from "@/lib/use-place-opener";
+import { Image } from "expo-image";
 import { useCallback, useMemo, useReducer, useRef, useState } from "react";
 import {
   type NativeScrollEvent,
@@ -42,6 +49,59 @@ import {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const MAP_SHARE = 0.42;
+
+function FillTripDay({
+  tripId,
+  day,
+}: {
+  tripId: Id<"tripPlans">;
+  day: number;
+}) {
+  const { theme } = useUnistyles();
+  const fill = useMutation(api.tripPlannerData.fillBlankTripDay);
+  const [status, setStatus] = useState<"idle" | "busy" | "empty" | "failed">(
+    "idle",
+  );
+  const fillDay = async () => {
+    setStatus("busy");
+    try {
+      const count = await fill({ tripId, day });
+      setStatus(count === 0 ? "empty" : "idle");
+    } catch (error) {
+      analytics.captureError("fill_blank_trip_day_failed", error);
+      setStatus("failed");
+    }
+  };
+  return (
+    <View style={styles.dayActions}>
+      <ThemedText variant="footnote" style={styles.muted}>
+        {t(
+          status === "empty"
+            ? "tripPlanner.noSavesLeft"
+            : status === "failed"
+              ? "tripPlanner.editFailed"
+              : "tripSetup.emptyDay",
+        )}
+      </ThemedText>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityState={{ busy: status === "busy" }}
+        disabled={status === "busy"}
+        onPress={() => void fillDay()}
+        style={styles.add}
+      >
+        <AppSymbolIcon
+          name="dice.fill"
+          size={15}
+          tintColor={theme.colors.primaryText}
+        />
+        <ThemedText variant="labelStrong" style={styles.addText}>
+          {t("tripSetup.fillDay")}
+        </ThemedText>
+      </Pressable>
+    </View>
+  );
+}
 
 function DayHeader({
   index,
@@ -58,7 +118,7 @@ function DayHeader({
   /** The day's colour on the map, so the list and its pins and route match up. */
   color: string;
   active: boolean;
-  onPress: () => void;
+  onPress?: () => void;
   onAdd: () => void;
 }) {
   const { theme } = useUnistyles();
@@ -66,11 +126,13 @@ function DayHeader({
   return (
     <View style={styles.dayActions}>
       <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={t("tripPlanner.showDay", {
-          day: String(index + 1),
-        })}
-        accessibilityState={{ selected: active }}
+        accessibilityRole={onPress ? "button" : undefined}
+        accessibilityLabel={
+          onPress
+            ? t("tripPlanner.showDay", { day: String(index + 1) })
+            : undefined
+        }
+        accessibilityState={onPress ? { selected: active } : undefined}
         onPress={onPress}
         style={({ pressed }) => [styles.dayHeader, pressed && styles.pressed]}
       >
@@ -83,11 +145,13 @@ function DayHeader({
             {t("trip.stopCount", { count: stops })}
           </ThemedText>
         </View>
-        <AppSymbolIcon
-          name="map"
-          size={18}
-          tintColor={active ? theme.colors.primaryText : theme.colors.muted}
-        />
+        {onPress ? (
+          <AppSymbolIcon
+            name="map"
+            size={18}
+            tintColor={active ? theme.colors.primaryText : theme.colors.muted}
+          />
+        ) : null}
       </Pressable>
       <Pressable
         accessibilityRole="button"
@@ -323,11 +387,27 @@ export function TripPlanBody({
           }}
         >
           <View style={styles.heading}>
+            {trip.cover ? (
+              <Image
+                source={tripCoverUri(trip.cover)}
+                style={styles.tripCover}
+              />
+            ) : trip.countries?.[0] ? (
+              <View style={styles.tripCover}>
+                <ThemedText variant="largeTitle">
+                  {countryFlag(trip.countries[0])}
+                </ThemedText>
+              </View>
+            ) : null}
             <ThemedText variant="largeTitle" accessibilityRole="header">
               {tripName(trip)}
             </ThemedText>
             <ThemedText variant="subhead" style={styles.muted}>
-              {tripLengthLine(trip)}
+              {trip.countries
+                ? [tripCountryLine(trip.countries), tripLengthLine(trip)].join(
+                    " · ",
+                  )
+                : tripLengthLine(trip)}
             </ThemedText>
             <ThemedText variant="footnote" style={styles.muted}>
               {tripStopsLine({ stopCount, savedCount })}
@@ -353,9 +433,12 @@ export function TripPlanBody({
                 stops={stops.length}
                 color={dayColor(index, theme.colors.tripDays)}
                 active={activeDay === index}
-                onPress={() => pick(index)}
+                onPress={hasMap ? () => pick(index) : undefined}
                 onAdd={() => onAddPlace(index + 1)}
               />
+              {trip.countries && stops.length === 0 ? (
+                <FillTripDay tripId={trip._id} day={index + 1} />
+              ) : null}
               {stops.map((stop, stopIndex) => (
                 <TripStopRow
                   key={stop._id}
@@ -429,6 +512,14 @@ export function TripPlanBody({
 }
 
 const styles = StyleSheet.create((theme, rt) => ({
+  tripCover: {
+    width: 72,
+    height: 72,
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   screen: { flex: 1, backgroundColor: theme.colors.background },
   scrollContent: { paddingBottom: rt.insets.bottom + theme.gap(4) },
   content: {

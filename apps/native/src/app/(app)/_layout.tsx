@@ -153,7 +153,10 @@ export default function AppLayout() {
           guard={listRoutes && !planUnknown}
           redirectTo={waitingRedirect}
         >
-          <Stack.Screen name="new-trip" options={modal} />
+          <Stack.Screen
+            name="new-trip"
+            options={{ ...modal, headerShown: false }}
+          />
           <Stack.Screen name="add-list-place" options={modal} />
           <Stack.Screen name="add-trip-stop" options={modal} />
         </Stack.Protected>

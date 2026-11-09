@@ -29,6 +29,7 @@ import {
   toggleInterest,
   tripDateRange,
   tripCardDate,
+  tripCitySuggestions,
   tripDayLabel,
   tripFormArgs,
   tripFormProblem,
@@ -139,6 +140,34 @@ describe("cityChoices", () => {
       { city: "Lisbon", count: 9 },
       { city: "Braga", count: 2 },
       { city: "Porto", count: 2 },
+    ]);
+  });
+});
+
+describe("trip city suggestions", () => {
+  it("keeps the saved city's identity when displaying a qualified match and leaves a distant namesake separate", () => {
+    const texas = { lat: 30.27, lng: -97.74 };
+    expect(
+      tripCitySuggestions(
+        [{ city: "Austin", count: 5 }],
+        [
+          {
+            label: "Austin, TX, United States",
+            locality: "Austin",
+            location: texas,
+          },
+          {
+            label: "Austin, QC, Canada",
+            locality: "Austin",
+            location: { lat: 45.19, lng: -72.29 },
+          },
+        ],
+        [{ city: "Austin", ...texas }],
+        "Aus",
+      ),
+    ).toEqual([
+      { city: "Austin", label: "Austin, TX, United States", count: 5 },
+      { city: "Austin, QC, Canada", label: "Austin, QC, Canada" },
     ]);
   });
 });

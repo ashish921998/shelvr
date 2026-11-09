@@ -30,10 +30,21 @@ import {
   middleOf,
   MIN_TRIP_DAYS,
   pinsForCity,
+  STOPS_PER_DAY,
   tidyCity,
   tripPaceValidator,
 } from "./model/trip";
-import { tidyPlace, tidyText, tripSummary } from "./model/tripPlace";
+import {
+  tidyPlace,
+  tidyText,
+  tripSummary,
+  validPoint,
+} from "./model/tripPlace";
+import {
+  countryName,
+  MAX_TRIP_COUNTRIES,
+  MAX_TRIP_COVER_CHARS,
+} from "./model/tripCountries";
 import {
   MAX_TRIP_NAME_CHARS,
   MAX_TRIP_STOP_NOTE_CHARS,
@@ -291,6 +302,80 @@ export const saveTripPlanInternal = internalMutation({
   },
 });
 
+export const createBlankTrip = authedMutation({
+  args: {
+    name: v.string(),
+    countries: v.array(v.string()),
+    city: v.optional(v.string()),
+    dayCount: v.number(),
+    startDate: v.optional(v.string()),
+    stay: v.optional(tripStayValidator),
+    cover: v.optional(v.string()),
+  },
+  returns: v.id("tripPlans"),
+  handler: async (ctx, args) => {
+    const name = tidyText(args.name, MAX_TRIP_NAME_CHARS);
+    const countries = [...new Set(args.countries)];
+    const destination = countryName(countries[0] ?? "");
+    if (
+      !name ||
+      !destination ||
+      countries.length > MAX_TRIP_COUNTRIES ||
+      countries.some((code) => !countryName(code))
+    )
+      throw new Error("Invalid trip");
+    if (args.dayCount !== tripDays(args.dayCount))
+      throw new Error("Invalid duration");
+    const startDate = tidyStartDate(args.startDate);
+    if (args.startDate !== undefined && startDate === undefined)
+      throw new Error("Invalid start date");
+    const cover = args.cover;
+    if (
+      cover !== undefined &&
+      (cover.length > MAX_TRIP_COVER_CHARS ||
+        !/^\/9j\/[A-Za-z0-9+/]+={0,2}$/.test(cover))
+    )
+      throw new Error("Invalid cover");
+    const stay = tidyStay(args.stay?.name);
+    const at = args.stay;
+    if (
+      (at?.lat !== undefined || at?.lng !== undefined) &&
+      (at.lat === undefined ||
+        at.lng === undefined ||
+        !validPoint(at.lat, at.lng))
+    )
+      throw new Error("Invalid stay");
+    await requireProEntitlement(ctx, ctx.userId);
+    await rateLimiter.limit(ctx, "createTripPlan", {
+      key: ctx.userId,
+      throws: true,
+    });
+    return await ctx.db.insert("tripPlans", {
+      userId: ctx.userId,
+      name,
+      countries,
+      city: tidyText(args.city, MAX_CITY_CHARS) ?? destination,
+      dayCount: args.dayCount,
+      pace: "balanced",
+      interests: [],
+      stopCount: 0,
+      savedCount: 0,
+      ...(startDate ? { startDate } : {}),
+      ...(cover ? { cover } : {}),
+      ...(stay
+        ? {
+            stay: {
+              name: stay,
+              ...(at?.lat !== undefined && at.lng !== undefined
+                ? { lat: at.lat, lng: at.lng }
+                : {}),
+            },
+          }
+        : {}),
+    });
+  },
+});
+
 export const listTripPlans = authedQuery({
   args: { paginationOpts: paginationOptsValidator },
   returns: paginationResultValidator(tripPlanSummaryValidator),
@@ -393,6 +478,8 @@ export const getTripPlan = authedQuery({
       _id: plan._id,
       ...(plan.listId !== undefined ? { listId: plan.listId } : {}),
       ...(plan.name !== undefined ? { name: plan.name } : {}),
+      ...(plan.countries !== undefined ? { countries: plan.countries } : {}),
+      ...(plan.cover !== undefined ? { cover: plan.cover } : {}),
       city: plan.city,
       ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
       dayCount: plan.dayCount,
@@ -560,6 +647,23 @@ function addedStop(place: TripPlace): NewStop {
   return { source: "added", ...tidyPlace(place) };
 }
 
+function savedStopFromPin(
+  item: Doc<"items">,
+  pin: NonNullable<Doc<"items">["placePins"]>[number],
+): NewStop {
+  const why = tidyText(item.title, MAX_PLACE_NAME_CHARS);
+  return {
+    source: "save",
+    itemId: item._id,
+    name: pin.name,
+    lat: pin.lat,
+    lng: pin.lng,
+    ...(pin.appleId !== undefined ? { appleId: pin.appleId } : {}),
+    ...(pin.category !== undefined ? { category: pin.category } : {}),
+    ...(why !== undefined ? { why } : {}),
+  };
+}
+
 async function savedStop(
   ctx: MutationCtx,
   plan: Doc<"tripPlans">,
@@ -575,18 +679,48 @@ async function savedStop(
     (candidate) => candidate.name === name,
   );
   if (pin === undefined) throw new Error("Place not found");
-  const why = tidyText(item.title, MAX_PLACE_NAME_CHARS);
-  return {
-    source: "save",
-    itemId,
-    name: pin.name,
-    lat: pin.lat,
-    lng: pin.lng,
-    ...(pin.appleId !== undefined ? { appleId: pin.appleId } : {}),
-    ...(pin.category !== undefined ? { category: pin.category } : {}),
-    ...(why !== undefined ? { why } : {}),
-  };
+  return savedStopFromPin(item, pin);
 }
+
+export const fillBlankTripDay = authedMutation({
+  args: { tripId: v.id("tripPlans"), day: v.number() },
+  returns: v.number(),
+  handler: async (ctx, args) => {
+    const plan = await editablePlan(ctx, args.tripId, ctx.userId);
+    const day = checkedDay(plan, args.day);
+    if (!plan.countries?.length || day === UNPLANNED_DAY) return 0;
+    const stops = await stopsOf(ctx, plan._id);
+    if (stops.some((stop) => stop.day === day)) return 0;
+    const limit = Math.min(
+      MAX_TRIP_STOPS - stops.length,
+      STOPS_PER_DAY[plan.pace],
+    );
+    const picks: NewStop[] = [];
+    for (const item of await readyCitySaves(ctx, ctx.userId, plan.city)) {
+      for (const pin of pinsForCity(item, plan.city)) {
+        if (picks.length >= limit) break;
+        const place = savedStopFromPin(item, pin);
+        if (
+          stops.some((stop) => sameTripPlace(stop, place)) ||
+          picks.some((stop) => sameTripPlace(stop, place))
+        )
+          continue;
+        picks.push(place);
+      }
+      if (picks.length >= limit) break;
+    }
+    for (const [order, place] of picks.entries())
+      await ctx.db.insert("tripStops", {
+        ...place,
+        tripId: plan._id,
+        userId: ctx.userId,
+        day,
+        order,
+      });
+    if (picks.length > 0) await recount(ctx, plan);
+    return picks.length;
+  },
+});
 
 /**
  * Adds a place to `day` at `index` (the end when left out): a search result from
@@ -718,6 +852,7 @@ export const claimTripSearchInternal = internalMutation({
   args: { tripId: v.id("tripPlans") },
   returns: v.object({
     city: v.string(),
+    countries: v.optional(v.array(v.string())),
     centre: v.union(v.null(), v.object({ lat: v.number(), lng: v.number() })),
     aiAllowed: v.boolean(),
   }),
@@ -734,11 +869,25 @@ export const claimTripSearchInternal = internalMutation({
     const planned = stops.filter((stop) => stop.day !== UNPLANNED_DAY);
     return {
       city: plan.city,
+      ...(plan.countries !== undefined ? { countries: plan.countries } : {}),
       centre:
         plan.listId !== undefined
           ? null
           : middleOf(planned.length > 0 ? planned : stops),
       aiAllowed: await aiAllowed(ctx, userId),
     };
+  },
+});
+
+export const claimCitySearchInternal = internalMutation({
+  args: {},
+  returns: v.boolean(),
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    if (!(await aiAllowed(ctx, userId))) return false;
+    const result = await rateLimiter.limit(ctx, "tripCitySearch", {
+      key: userId,
+    });
+    return result.ok;
   },
 });

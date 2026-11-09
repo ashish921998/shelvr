@@ -9,10 +9,13 @@ import {
   appleMapsAccessToken,
   appleMapsConfig,
   appleMapsLookup,
+  appleMapsSearchCities,
+  type AppleCity,
   appleMapsSearchPlaces,
   type ApplePoi,
 } from "./model/appleMaps";
 import { logEvent } from "./model/log";
+import { countryName, MAX_TRIP_COUNTRIES } from "./model/tripCountries";
 import { isRemovedSuggestion, removalsSince } from "./model/placeRemovals";
 import {
   placeKey,
@@ -25,6 +28,7 @@ import {
   distanceKm,
   dropStrays,
   lookupQuery,
+  MAX_CITY_CHARS,
   middleOf,
   STOPS_PER_DAY,
   tripPaceValidator,
@@ -411,6 +415,34 @@ export const createTripPlan = action({
 const MIN_SEARCH_CHARS = 2;
 const MAX_SEARCH_CHARS = 100;
 const MAX_SEARCH_RESULTS = 15;
+
+export const searchTripCities = action({
+  args: { query: v.string(), locale: v.optional(v.string()) },
+  returns: v.array(
+    v.object({
+      label: v.string(),
+      locality: v.string(),
+      location: v.optional(v.object({ lat: v.number(), lng: v.number() })),
+    }),
+  ),
+  handler: async (ctx, args): Promise<AppleCity[]> => {
+    const query = args.query.trim();
+    if (query.length < MIN_SEARCH_CHARS || query.length > MAX_CITY_CHARS)
+      return [];
+    if (
+      !(await ctx.runMutation(
+        internal.tripPlannerData.claimCitySearchInternal,
+        {},
+      ))
+    )
+      return [];
+    const maps = await openMaps(appleLang(args.locale));
+    return maps === null
+      ? []
+      : appleMapsSearchCities(maps.token, query, maps.lang);
+  },
+});
+
 /** Add a place looks a little wider than suggestions do: a day trip out of town is fine. */
 const SEARCH_RADIUS_KM = SUGGEST_RADIUS_KM * 2;
 
@@ -418,6 +450,7 @@ type SearchClaim = {
   city: string;
   centre: LatLng | null;
   aiAllowed: boolean;
+  countries?: string[];
 };
 
 type SearchResult = { available: boolean; places: TripPlace[] };
@@ -434,6 +467,14 @@ async function placeSearch(
   // as createTripPlan does.
   const maps = claim.aiAllowed ? await openMaps(appleLang(locale)) : null;
   if (maps === null) return { available: false, places: [] };
+  if (claim.countries?.length) {
+    const places = await appleMapsSearchPlaces(maps.token, query, {
+      countries: claim.countries,
+      ...(claim.centre ? { near: claim.centre } : {}),
+      ...(maps.lang ? { lang: maps.lang } : {}),
+    });
+    return { available: true, places };
+  }
   const centre =
     claim.centre ?? (await appleMapsLookup(maps.token, "geocode", claim.city));
   if (centre === null) {
@@ -468,6 +509,47 @@ export const searchTripPlaces = action({
         tripId: args.tripId,
       }),
     ),
+});
+
+export const searchTripStays = action({
+  args: {
+    query: v.string(),
+    countries: v.array(v.string()),
+    city: v.optional(v.string()),
+    locale: v.optional(v.string()),
+  },
+  returns: searchTripPlacesResultValidator,
+  handler: async (ctx, args): Promise<SearchResult> => {
+    const query = args.query.trim();
+    if (
+      query.length < MIN_SEARCH_CHARS ||
+      query.length > MAX_SEARCH_CHARS ||
+      !args.countries.length ||
+      args.countries.length > MAX_TRIP_COUNTRIES ||
+      args.countries.some((code) => !countryName(code))
+    )
+      return { available: true, places: [] };
+    if (
+      !(await ctx.runMutation(
+        internal.tripPlannerData.claimCitySearchInternal,
+        {},
+      ))
+    )
+      return { available: false, places: [] };
+    const maps = await openMaps(appleLang(args.locale));
+    if (maps === null) return { available: false, places: [] };
+    const city = args.city?.trim().slice(0, MAX_CITY_CHARS);
+    const places = await appleMapsSearchPlaces(
+      maps.token,
+      city ? `${query}, ${city}` : query,
+      {
+        countries: args.countries,
+        categories: ["Hotel"],
+        ...(maps.lang ? { lang: maps.lang } : {}),
+      },
+    );
+    return { available: true, places };
+  },
 });
 
 export const searchListPlaces = action({

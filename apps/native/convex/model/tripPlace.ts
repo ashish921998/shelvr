@@ -53,6 +53,8 @@ export function tripSummary(plan: Doc<"tripPlans">): TripPlanSummary {
   return {
     _id: plan._id,
     ...(plan.name !== undefined ? { name: plan.name } : {}),
+    ...(plan.countries !== undefined ? { countries: plan.countries } : {}),
+    ...(plan.cover !== undefined ? { cover: plan.cover } : {}),
     city: plan.city,
     ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
     dayCount: plan.dayCount,

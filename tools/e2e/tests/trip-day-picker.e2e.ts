@@ -16,6 +16,7 @@ test(
     await openCities(screen);
     await screen.getByRole("button", /^Lisbon(?:,|$)/).tap();
     await screen.getByRole("button", "Plan a trip").tap();
+    await screen.getByRole("button", "Generate an itinerary").tap();
     await screen.getByTestId("new-trip-submit").tap();
     await expect(screen.getByRole("button", "More")).toBeVisible({
       timeout: 60_000,

@@ -1,14 +1,19 @@
 import { formattingLocale, t } from "@/lib/i18n";
 import { formatTripDay, toDateKey, tripDayDate } from "@/lib/trip";
 import type { TextMessageKey } from "@/locales/message-types";
+import type { api } from "@convex/_generated/api";
+import type { FunctionReturnType } from "convex/server";
 import { isRateLimitedError } from "@convex/model/demoErrors";
 import { saveErrorCode } from "@convex/model/saveErrors";
+import { countryName } from "@convex/model/tripCountries";
 import {
   cityKey,
+  distanceKm,
   MAX_TRIP_DAYS,
   MIN_TRIP_DAYS,
   STOPS_PER_DAY,
   tidyCity,
+  type LatLng,
   type TripPace,
 } from "@convex/model/trip";
 import {
@@ -25,6 +30,20 @@ export const TRIP_PACES: TripPace[] = ["easy", "balanced", "packed"];
 export const DEFAULT_INTERESTS: TripInterest[] = ["food", "coffee", "sights"];
 
 const DEFAULT_TRIP_DAYS = 3;
+
+export function countryFlag(code: string) {
+  return String.fromCodePoint(
+    ...Array.from(code, (letter) => letter.charCodeAt(0) + 127397),
+  );
+}
+
+export function tripCountryLine(countries: string[]) {
+  return countries.map((code) => countryName(code) ?? code).join(" · ");
+}
+
+export function tripCoverUri(cover: string) {
+  return `data:image/jpeg;base64,${cover}`;
+}
 
 // Kept short so a typed city or hotel stays one line and one Apple Maps query.
 export const MAX_CITY_LENGTH = 80;
@@ -89,6 +108,51 @@ export function cityChoices(
 
 export function sameCity(a: string, b: string): boolean {
   return cityKey(a) === cityKey(b);
+}
+
+export type TripCityCompletion = FunctionReturnType<
+  typeof api.tripPlanner.searchTripCities
+>[number];
+
+export function tripCitySuggestions(
+  cities: CityChoice[],
+  completions: TripCityCompletion[],
+  pins: readonly (LatLng & { city?: string })[],
+  query: string,
+) {
+  if (!query) return [];
+  const wanted = cityKey(query);
+  const suggestions = new Map<
+    string,
+    { city: string; label: string; count?: number }
+  >();
+  for (const saved of cities) {
+    const key = cityKey(saved.city);
+    if (key.includes(wanted))
+      suggestions.set(key, { ...saved, label: saved.city });
+  }
+  for (const { label, locality, location } of completions) {
+    const saved = cities.find(
+      ({ city }) =>
+        sameCity(city, label) ||
+        (sameCity(city, locality) &&
+          location !== undefined &&
+          pins.some(
+            (pin) =>
+              pin.city !== undefined &&
+              sameCity(pin.city, city) &&
+              distanceKm(pin, location) <= 30,
+          )),
+    );
+    const city = saved?.city ?? label;
+    const key = cityKey(city);
+    if (
+      !suggestions.has(key) ||
+      (saved && suggestions.get(key)?.label === city)
+    )
+      suggestions.set(key, { city, label, count: saved?.count });
+  }
+  return [...suggestions.values()].slice(0, 5);
 }
 
 export type TripForm = {

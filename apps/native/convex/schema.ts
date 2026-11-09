@@ -376,6 +376,8 @@ export default defineSchema({
     shareToken: v.optional(v.string()),
     listId: v.optional(v.id("sharedLists")),
     name: v.optional(v.string()),
+    countries: v.optional(v.array(v.string())),
+    cover: v.optional(v.string()),
     city: v.string(),
     startDate: v.optional(v.string()),
     dayCount: v.number(),

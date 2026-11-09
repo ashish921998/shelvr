@@ -2,7 +2,7 @@ import { z } from "zod";
 import { signEs256Jwt } from "./appleSigning";
 import { logEvent } from "./log";
 import { placeKey } from "./plan";
-import { keepNearby, type LatLng } from "./trip";
+import { keepNearby, MAX_CITY_CHARS, tidyCity, type LatLng } from "./trip";
 
 const API = "https://maps-api.apple.com/v1";
 const TOKEN_TIMEOUT_MS = 8_000;
@@ -15,7 +15,7 @@ function isTemporary(status: number): boolean {
 }
 
 function reportUnavailable(
-  path: "token" | "search" | "geocode",
+  path: "token" | "search" | "geocode" | "searchAutocomplete",
   failure: { status: number } | { error: unknown },
 ): void {
   const name =
@@ -162,7 +162,7 @@ export function firstPlace(
 
 function appleGet(
   accessToken: string,
-  path: "search" | "geocode",
+  path: "search" | "geocode" | "searchAutocomplete",
   params: URLSearchParams,
   fetchImpl: typeof fetch,
 ): Promise<Response> {
@@ -229,6 +229,77 @@ export async function appleMapsLookup(
   return found === UNAVAILABLE ? null : found;
 }
 
+const cityCompletionSchema = z.object({
+  displayLines: z.array(z.string()),
+  structuredAddress: z.object({ locality: z.string().optional() }).optional(),
+  location: z
+    .object({
+      latitude: z.number().min(-90).max(90),
+      longitude: z.number().min(-180).max(180),
+    })
+    .optional(),
+});
+
+export type AppleCity = {
+  label: string;
+  locality: string;
+  location?: LatLng;
+};
+
+export async function appleMapsSearchCities(
+  accessToken: string,
+  query: string,
+  lang?: string,
+): Promise<AppleCity[]> {
+  const path = "searchAutocomplete";
+  const params = new URLSearchParams({
+    q: query,
+    resultTypeFilter: "address",
+    includeAddressCategories: "Locality",
+  });
+  if (lang !== undefined) params.set("lang", lang);
+  try {
+    const response = await appleGet(accessToken, path, params, fetch);
+    if (!response.ok) {
+      if (isTemporary(response.status))
+        reportUnavailable(path, { status: response.status });
+      return [];
+    }
+    const body: unknown = await response.json();
+    const reply = replySchema.safeParse(body);
+    if (!reply.success) return [];
+    const cities = new Map<string, AppleCity>();
+    for (const entry of reply.data.results) {
+      const result = cityCompletionSchema.safeParse(entry);
+      if (!result.success) continue;
+      const { displayLines, structuredAddress, location } = result.data;
+      const label = tidyCity(displayLines.join(", "));
+      const locality = tidyCity(
+        structuredAddress?.locality ?? displayLines[0]?.split(",")[0] ?? "",
+      );
+      if (
+        label &&
+        locality &&
+        label.length <= MAX_CITY_CHARS &&
+        !cities.has(label)
+      ) {
+        cities.set(label, {
+          label,
+          locality,
+          ...(location
+            ? { location: { lat: location.latitude, lng: location.longitude } }
+            : {}),
+        });
+      }
+      if (cities.size === 5) break;
+    }
+    return [...cities.values()];
+  } catch (error) {
+    reportUnavailable(path, { error });
+    return [];
+  }
+}
+
 const poiSchema = placeSchema.extend({
   name: z.string().trim().min(1),
   structuredAddress: z
@@ -283,14 +354,22 @@ export function placesOf(body: unknown): ApplePoi[] {
 export async function appleMapsSearchPlaces(
   accessToken: string,
   query: string,
-  options: { near: LatLng; categories?: readonly string[]; lang?: string },
+  options: {
+    near?: LatLng;
+    categories?: readonly string[];
+    lang?: string;
+    countries?: readonly string[];
+  },
   fetchImpl: typeof fetch = fetch,
 ): Promise<ApplePoi[]> {
   const params = new URLSearchParams({
     q: query.slice(0, 200),
-    searchLocation: `${options.near.lat},${options.near.lng}`,
     resultTypeFilter: "Poi",
   });
+  if (options.near !== undefined)
+    params.set("searchLocation", `${options.near.lat},${options.near.lng}`);
+  if (options.countries?.length)
+    params.set("limitToCountries", options.countries.join(","));
   if (options.categories !== undefined && options.categories.length > 0) {
     params.set("includePoiCategories", options.categories.join(","));
   }
