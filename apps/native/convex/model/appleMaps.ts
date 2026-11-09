@@ -122,6 +122,22 @@ type FoundPlace = LatLng & {
   category?: string;
 };
 
+function matchesLookupName(
+  name: string | undefined,
+  expected: string,
+  thoroughfare: string | undefined,
+): boolean {
+  if (!name) return false;
+  const nameKey = placeKey(name);
+  if (nameKey === placeKey(expected)) return true;
+  const [addressLine] = expected.split(",", 1);
+  return (
+    !!thoroughfare &&
+    /^#?\d/.test(addressLine) &&
+    nameKey === placeKey(addressLine)
+  );
+}
+
 export function firstPlace(
   body: unknown,
   near?: LatLng,
@@ -131,23 +147,13 @@ export function firstPlace(
 ): FoundPlace | null {
   const reply = replySchema.safeParse(body);
   if (!reply.success) return null;
-  const exactKey = exactName === undefined ? null : placeKey(exactName);
-  const [addressLine] = exactName?.split(",", 1) ?? [];
-  const addressKey =
-    addressLine && /^#?\d/.test(addressLine) ? placeKey(addressLine) : null;
   for (const result of reply.data.results) {
     const place = placeSchema.safeParse(result);
     if (place.success) {
       const { name, structuredAddress: address } = place.data;
-      const nameKey = name ? placeKey(name) : null;
       if (
-        exactKey !== null &&
-        nameKey !== exactKey &&
-        !(
-          address?.thoroughfare &&
-          addressKey !== null &&
-          nameKey === addressKey
-        )
+        exactName !== undefined &&
+        !matchesLookupName(name, exactName, address?.thoroughfare)
       )
         continue;
       if (
