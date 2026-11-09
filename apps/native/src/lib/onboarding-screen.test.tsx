@@ -46,6 +46,7 @@ const mocks = vi.hoisted(() => ({
     savedCount: null as string | null,
     planner: null as string | null,
     tripSoon: null as string | null,
+    viewed: [] as string[],
   },
   paywall: {} as { onPro: () => void },
 }));
@@ -244,6 +245,16 @@ const saved = () => mocks.setOnboardingProgress.mock.lastCall?.[0];
 const startAt = (step: (typeof ONBOARDING_STEPS)[number]) => {
   mocks.progress = { ...mocks.progress, step: ONBOARDING_STEPS.indexOf(step) };
 };
+const relaunch = () => {
+  cleanup();
+  mocks.progress = saved();
+  render(<OnboardingScreen />);
+};
+const viewsOf = (stepId: string) =>
+  mocks.capture.mock.calls.filter(
+    ([event, properties]) =>
+      event === "onboarding_step_viewed" && properties.step_id === stepId,
+  );
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -256,6 +267,7 @@ beforeEach(() => {
     savedCount: null,
     planner: null,
     tripSoon: null,
+    viewed: [],
   };
 });
 afterEach(cleanup);
@@ -389,6 +401,28 @@ it("moves one step on a double tap", () => {
   expect(
     screen.getByRole("button", { name: "firstSave:continue" }),
   ).toBeTruthy();
+});
+
+it("sends a step's view once, even after going back and closing the app", () => {
+  startAt("ahaSpots");
+  render(<OnboardingScreen />);
+  tap("aha:spots");
+  tap("common.back");
+  relaunch();
+  tap("aha:spots");
+  expect(viewsOf("carousel")).toHaveLength(1);
+});
+
+it("still sends the trip question's first view after going back to add Trips and closing the app", () => {
+  mocks.progress = { ...mocks.progress, goals: ["date"] };
+  startAt("goal");
+  render(<OnboardingScreen />);
+  tap("goal:continue");
+  tap("common.back");
+  tap("goal:travel");
+  relaunch();
+  tap("goal:continue");
+  expect(viewsOf("trip_soon")).toHaveLength(1);
 });
 
 it("reuses the sample for the carousel after the spots, before the paywall", async () => {
