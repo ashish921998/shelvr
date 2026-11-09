@@ -1,5 +1,4 @@
 import { AppSymbolIcon } from "@/components/symbol";
-import { Wordmark } from "@/components/wordmark";
 import { withAlpha } from "@/lib/color";
 import { t, useAppLocale } from "@/lib/i18n";
 import { useRouter } from "expo-router";
@@ -13,7 +12,6 @@ export function HomeHeader({ children }: { children?: ReactNode }) {
   const { theme } = useUnistyles();
   return (
     <View style={styles.row}>
-      <Wordmark size={30} />
       <View style={styles.middle}>{children}</View>
       <Pressable
         accessibilityRole="button"

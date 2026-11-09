@@ -74,10 +74,10 @@ export function cityCountLine(entry: City): string | null {
 }
 
 export function sharedListCover(
-  listCities: readonly string[],
+  listCities: readonly string[] | undefined,
   mine: readonly City[] | undefined,
 ): string | null {
-  for (const name of listCities) {
+  for (const name of listCities ?? []) {
     const cover = mine?.find(
       (entry) => cityKey(entry.city) === cityKey(name),
     )?.cover;

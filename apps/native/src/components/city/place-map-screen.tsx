@@ -11,7 +11,10 @@ import {
   useState,
 } from "react";
 import { FlatList, View } from "react-native";
-import Animated, { useSharedValue } from "react-native-reanimated";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const MAP_SHARE = 0.4;
@@ -55,11 +58,12 @@ export function PlaceMapScreen<Row extends { id: string }>({
         insetTop: rt.insets.top,
         insetBottom: rt.insets.bottom,
         middle: screenHeight * MAP_SHARE - theme.gap(3),
+        minimumMapHeight: hasMap ? rt.insets.top + theme.gap(13) : 0,
         ...(headerHeight !== null && plansHeight !== null
           ? { collapsedVisible: headerHeight + plansHeight - rt.insets.bottom }
           : {}),
       }),
-    [screenHeight, rt.insets, theme, headerHeight, plansHeight],
+    [screenHeight, rt.insets, theme, headerHeight, plansHeight, hasMap],
   );
   const restingSnaps = useMemo(
     () =>
@@ -69,6 +73,7 @@ export function PlaceMapScreen<Row extends { id: string }>({
     [hasMap, snaps],
   );
   const sheetTop = useSharedValue(restingSnaps.middle);
+  const mapStyle = useAnimatedStyle(() => ({ height: sheetTop.get() }));
   const restingMiddle = restingSnaps.middle;
   useEffect(() => {
     sheetTop.set(restingMiddle);
@@ -84,15 +89,15 @@ export function PlaceMapScreen<Row extends { id: string }>({
   return (
     <View style={styles.container}>
       {hasMap ? (
-        <View style={styles.map}>
+        <Animated.View style={[styles.map, mapStyle]}>
           <CityMap
             pins={pins}
             selected={selected}
-            height={screenHeight}
-            coveredBottom={screenHeight - snaps.middle}
+            height={snaps.middle}
+            coveredBottom={0}
             onSelect={select}
           />
-        </View>
+        </Animated.View>
       ) : null}
       <CitySheet
         snaps={restingSnaps}
@@ -136,7 +141,7 @@ export function PlaceMapScreen<Row extends { id: string }>({
 
 const styles = StyleSheet.create((theme, rt) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  map: { ...StyleSheet.absoluteFillObject },
+  map: { position: "absolute", top: 0, left: 0, right: 0 },
   content: {
     paddingHorizontal: theme.gap(2),
     paddingBottom: rt.insets.bottom + theme.gap(12),

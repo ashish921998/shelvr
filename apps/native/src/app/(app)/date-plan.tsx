@@ -1,5 +1,6 @@
 import { DateEvening } from "@/components/date-plan/date-evening";
 import { DateKindPicker } from "@/components/date-plan/date-kind-picker";
+import { DateFirstSpotSheet } from "@/components/date-plan/date-first-spot-sheet";
 import { EmptyState } from "@/components/empty-state";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import { usePlanGate } from "@/lib/plan-gate";
 import { personalPlanAllowed } from "@/lib/list-gate";
 import type { Id } from "@convex/_generated/dataModel";
 import { Redirect, Stack, useLocalSearchParams } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ScrollView, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -24,6 +25,7 @@ export default function DatePlanScreen() {
   }>();
   const city = tidyCity(cityParam ?? "");
   const { gated } = usePlanGate();
+  const [pickingFirst, setPickingFirst] = useState(false);
   const { state, plan, swap, restart } = useDatePlan(
     city,
     locale,
@@ -62,6 +64,7 @@ export default function DatePlanScreen() {
           <DateEvening
             result={state.result}
             evening={state.evening}
+            firstLocked={state.firstLocked}
             onSwap={swap}
             onRestart={restart}
           />
@@ -75,9 +78,24 @@ export default function DatePlanScreen() {
       return (
         <View style={styles.screen}>
           {backTitle}
-          <EmptyState title={title} message={message} />
+          <EmptyState
+            title={state.firstLocked ? t("datePlan.tryAnotherFirst") : title}
+            message={
+              state.firstLocked ? t("datePlan.firstUnavailable") : message
+            }
+          />
           <View style={styles.footer}>
-            <Button title={t("datePlan.changeKind")} onPress={restart} />
+            <Button
+              title={t(
+                state.firstLocked
+                  ? "datePlan.pickFirst"
+                  : "datePlan.changeKind",
+              )}
+              onPress={() => {
+                restart();
+                if (state.firstLocked) setPickingFirst(true);
+              }}
+            />
           </View>
         </View>
       );
@@ -102,8 +120,16 @@ export default function DatePlanScreen() {
                     : null
               }
               onPick={(ask) => void plan(ask)}
+              onPickFirst={() => setPickingFirst(true)}
             />
           </ScrollView>
+          <DateFirstSpotSheet
+            visible={pickingFirst}
+            city={city}
+            listId={listId as Id<"sharedLists"> | undefined}
+            onClose={() => setPickingFirst(false)}
+            onPick={(firstSpot) => void plan("surprise", firstSpot)}
+          />
         </>
       );
   }

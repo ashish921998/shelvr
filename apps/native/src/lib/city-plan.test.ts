@@ -80,7 +80,7 @@ it("stays put when the paywall stops the plan", async () => {
   expect(mocks.push).not.toHaveBeenCalled();
 });
 
-it("opens one date planner for a double tap on Plan a date", async () => {
+it("opens one picker for a double tap on Go out", async () => {
   const { result } = renderHook(() => useCityPlan());
   await act(async () => {
     await Promise.all([
@@ -90,7 +90,7 @@ it("opens one date planner for a double tap on Plan a date", async () => {
   });
   expect(mocks.push).toHaveBeenCalledTimes(1);
   expect(mocks.push).toHaveBeenCalledWith({
-    pathname: "/date-plan",
+    pathname: "/go-out",
     params: { city: "Lisbon" },
   });
   expect(result.current.busy).toBeNull();

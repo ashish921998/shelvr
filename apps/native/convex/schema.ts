@@ -320,6 +320,11 @@ export default defineSchema({
     name: v.string(),
     itemId: v.id("items"),
     visitedAt: v.number(),
+    city: v.optional(v.string()),
+    countryCode: v.optional(v.string()),
+    lat: v.optional(v.number()),
+    lng: v.optional(v.number()),
+    backfilled: v.optional(v.boolean()),
   })
     .index("by_user_and_key", ["userId", "key"])
     .index("by_user_and_visited", ["userId", "visitedAt"]),
@@ -368,6 +373,7 @@ export default defineSchema({
 
   tripPlans: defineTable({
     userId: v.string(),
+    shareToken: v.optional(v.string()),
     listId: v.optional(v.id("sharedLists")),
     name: v.optional(v.string()),
     city: v.string(),
@@ -381,6 +387,8 @@ export default defineSchema({
   })
     .index("by_user", ["userId"])
     .index("by_user_and_list", ["userId", "listId"])
+    .index("by_share_token", ["shareToken"])
+    .index("by_user_and_share_token", ["userId", "shareToken"])
     .index("by_start_date", ["startDate"]),
 
   tripStops: defineTable({
@@ -398,6 +406,8 @@ export default defineSchema({
     category: v.optional(v.string()),
     why: v.optional(v.string()),
     slot: v.optional(tripSlotValidator),
+    time: v.optional(v.string()),
+    note: v.optional(v.string()),
   })
     .index("by_trip_and_day", ["tripId", "day", "order"])
     .index("by_user", ["userId"]),

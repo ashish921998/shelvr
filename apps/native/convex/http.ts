@@ -37,6 +37,7 @@ import {
   imageSizeErrorCode,
 } from "./model/imagePolicy";
 import { secureCompare } from "./model/secureCompare";
+import { tripSharePage } from "./model/tripSharePage";
 import {
   WaitlistInputError,
   isWaitlistProduct,
@@ -483,6 +484,18 @@ http.route({
     });
     if (!preview) return json({ message: "Not found." }, 404);
     return json(preview, 200);
+  }),
+});
+
+http.route({
+  pathPrefix: "/trip/shared/",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const token = new URL(req.url).pathname.slice("/trip/shared/".length);
+    const trip = await ctx.runQuery(internal.tripShares.getPublicTrip, {
+      token,
+    });
+    return tripSharePage(trip);
   }),
 });
 

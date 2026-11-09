@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   setCity: vi.fn(),
   centre: undefined as ((c: object, zoom: number) => void) | undefined,
   zoomOut: undefined as number | undefined,
+  viewport: undefined as { height: number; bottomInset: number } | undefined,
 }));
 const place = (name: string, city: string, lat: number) => ({
   itemId: name,
@@ -78,9 +79,12 @@ vi.mock("@/components/map/places-map", () => ({
     (props: {
       onCentreChange: (c: object, zoom: number) => void;
       zoomOut: number;
+      height: number;
+      bottomInset: number;
     }) => {
       mocks.centre = props.onCentreChange;
       mocks.zoomOut = props.zoomOut;
+      mocks.viewport = props;
       return null;
     },
   ),
@@ -142,4 +146,10 @@ it("tells the tab bar which city is in view, and clears it when zoomed out to ev
   act(() => mocks.centre?.({ lat: 40, lng: -9 }, 6));
   expect(mocks.setCity).toHaveBeenLastCalledWith(undefined);
   expect(screen.getByText("wordmark")).toBeTruthy();
+});
+
+it("keeps the map behind the floating controls while framing places above them", () => {
+  render(<MapScreen />);
+  expect(mocks.viewport?.height).toBe(800);
+  expect(mocks.viewport?.bottomInset).toBeGreaterThan(80);
 });

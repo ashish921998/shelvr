@@ -10,6 +10,15 @@ type Camera = { coordinates: object; zoom: number };
 const mock = vi.hoisted(() => ({
   moves: [] as (Camera | "person")[],
   props: {} as Record<string, any>,
+  cluster: {} as Record<string, any>,
+  clearSelection: vi.fn(),
+}));
+
+vi.mock("./map-cluster-sheet", () => ({
+  MapClusterSheet: vi.fn((props: Record<string, any>) => {
+    mock.cluster = props;
+    return null;
+  }),
 }));
 
 vi.mock("expo-maps", () => ({
@@ -25,6 +34,7 @@ vi.mock("expo-maps", () => ({
     View: forwardRef(function MapView(props: Record<string, any>, ref) {
       mock.props = props;
       useImperativeHandle(ref, () => ({
+        selectMarker: mock.clearSelection,
         setCameraPosition: (camera?: Camera) => {
           mock.moves.push(camera ?? "person");
           return camera
@@ -40,13 +50,17 @@ vi.mock("expo-maps", () => ({
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}), absoluteFillObject: {} },
   useUnistyles: () => ({
-    theme: { colors: { primary: "#amber" } },
+    theme: { colors: { primary: "#amber", frame: "#ffffff" } },
     rt: { themeName: "light", screen: { width: 390 } },
   }),
 }));
 vi.mock("@/lib/appearance", () => ({ isDarkThemeName: () => false }));
 vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
-vi.mock("@/lib/i18n", () => ({ formattingLocale: () => "en" }));
+vi.mock("@/lib/i18n", () => ({
+  formattingLocale: () => "en",
+  useAppLocale: () => "en",
+  t: (_key: string, { count }: { count: number }) => `${count} places`,
+}));
 
 const AUSTIN = [
   { id: "a", name: "Ramen", lat: 30.26, lng: -97.74 },
@@ -73,6 +87,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.stubEnv("EXPO_OS", "ios");
   mock.moves = [];
+  mock.clearSelection.mockClear();
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -112,7 +127,7 @@ it.each([
   },
 );
 
-it("draws each place as an emoji tile titled with its name, and tapping one selects it", () => {
+it("uses native markers to declutter nearby places, keeping their emoji, title and selection", () => {
   const onSelect = vi.fn();
   render(
     <PlacesMap
@@ -125,17 +140,55 @@ it("draws each place as an emoji tile titled with its name, and tapping one sele
       onSelect={onSelect}
     />,
   );
-  expect(mock.props.annotations[0]).toMatchObject({
+  act(() =>
+    mock.props.onCameraMove({
+      coordinates: { latitude: 30.27, longitude: -97.73 },
+      zoom: 14,
+    }),
+  );
+  expect(mock.props.annotations).toBeUndefined();
+  expect(mock.props.markers[0]).toMatchObject({
     id: "a",
     title: "Ramen",
-    text: "🍜",
-    backgroundColor: "#ffffff",
+    monogram: "🍜",
+    tintColor: "#ffffff",
   });
   expect(mock.props.properties.emphasis).toBe("MUTED");
-  act(() => mock.props.onAnnotationClick({ id: "a" }));
+  act(() => mock.props.onMarkerClick({ id: "a" }));
   expect(onSelect).toHaveBeenCalledWith("a");
-  expect(mock.props.annotations[0].backgroundColor).toBe("#amber");
-  expect(mock.props.annotations[1].backgroundColor).toBe("#ffffff");
+  expect(mock.props.markers[0].tintColor).toBe("#amber");
+  expect(mock.props.markers[1].tintColor).toBe("#ffffff");
+});
+
+it("keeps all nearby places reachable through the count marker's picker", () => {
+  const onSelect = vi.fn();
+  render(
+    <PlacesMap
+      pins={AUSTIN}
+      framed={AUSTIN}
+      showsUser={false}
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={onSelect}
+    />,
+  );
+  expect(mock.props.markers).toHaveLength(1);
+  expect(mock.props.markers[0]).toMatchObject({
+    title: "2 places",
+    monogram: "2",
+  });
+  act(() => mock.props.onMarkerClick({ id: mock.props.markers[0].id }));
+  expect(mock.clearSelection).toHaveBeenCalledWith(undefined);
+  expect(mock.cluster.pins.map((pin: { id: string }) => pin.id)).toEqual([
+    "a",
+    "b",
+  ]);
+  expect(onSelect).not.toHaveBeenCalled();
+  act(() => mock.cluster.onSelect("b"));
+  expect(onSelect).toHaveBeenCalledWith("b");
+  act(() => mock.cluster.onClose());
+  expect(mock.cluster.pins).toEqual([]);
 });
 
 it("flies out to frame every place when asked to zoom out", async () => {

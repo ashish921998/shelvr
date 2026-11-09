@@ -128,12 +128,21 @@ vi.mock("@/components/city/city-map", () => ({
       pins,
       selected,
       onSelect,
+      height,
+      coveredBottom,
     }: {
       pins: { number: number; name: string }[];
       selected: string | null;
       onSelect: (id: string) => void;
+      height: number;
+      coveredBottom: number;
     }) => (
-      <div data-testid="map" data-selected={selected ?? ""}>
+      <div
+        data-testid="map"
+        data-selected={selected ?? ""}
+        data-height={height}
+        data-covered-bottom={coveredBottom}
+      >
         {pins.map((pin, index) => (
           <button
             key={pin.name}
@@ -319,6 +328,11 @@ vi.mock("@/components/ui/themed-text", () => ({
 }));
 vi.mock("react-native-reanimated", () => ({
   default: {
+    View: vi.fn(
+      ({ children, style }: { children: ReactNode; style: object[] }) => (
+        <div style={Object.assign({}, ...style)}>{children}</div>
+      ),
+    ),
     FlatList: vi.fn(
       ({
         ref,
@@ -356,6 +370,7 @@ vi.mock("react-native-reanimated", () => ({
     get: () => mocks.sheetTop || initial,
     set: mocks.sheetSet,
   }),
+  useAnimatedStyle: (style: () => object) => style(),
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: {
@@ -453,6 +468,27 @@ beforeEach(() => {
   mocks.removeListPlace.mockResolvedValue(null);
   mocks.openUrl.mockResolvedValue(true);
 });
+
+it.each(["city", "shared list"])(
+  "keeps native map credits above the %s panel while it moves",
+  (kind) => {
+    mocks.params = { name: "Austin", id: "list-1" };
+    mocks.queries[CITY_ITEMS] = [save];
+    mocks.queries[LIST] = listDetail();
+    const Page = kind === "city" ? CityScreen : SharedListScreen;
+    const { rerender } = render(<Page />);
+    const map = screen.getByTestId("map");
+    expect(map.getAttribute("data-covered-bottom")).toBe("0");
+    expect(Number(map.getAttribute("data-height"))).toBe(mocks.snaps?.middle);
+    expect(map.parentElement?.style.height).toBe(`${mocks.snaps?.middle}px`);
+    mocks.sheetTop = mocks.snaps?.collapsed ?? 0;
+    rerender(<Page />);
+    expect(map.parentElement?.style.height).toBe(`${mocks.snaps?.collapsed}px`);
+    mocks.sheetTop = mocks.snaps?.expanded ?? 0;
+    rerender(<Page />);
+    expect(map.parentElement?.style.height).toBe(`${mocks.snaps?.expanded}px`);
+  },
+);
 
 describe("city page", () => {
   beforeEach(() => {

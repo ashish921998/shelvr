@@ -17,6 +17,7 @@ import {
   senderFirstName,
 } from "./model/auth";
 import { recentVisits } from "./model/placeVisits";
+import { dateStartValidator } from "./model/datePlan";
 import { userRemovals, visibleSave } from "./model/placeRemovals";
 import { placeKey } from "./model/plan";
 import { rateLimiter } from "./model/rateLimiter";
@@ -614,6 +615,39 @@ async function ownSaveId(
   return item !== null && item.userId === userId ? item._id : undefined;
 }
 
+async function listPlanRows(
+  ctx: QueryCtx,
+  listId: Id<"sharedLists">,
+  userId: Id<"users">,
+  city: string,
+) {
+  const wanted = cityKey(city);
+  const inCity = (await listPlaces(ctx, listId)).filter(
+    (row) => cityKey(row.city) === wanted,
+  );
+  const visited = await recentVisits(ctx, userId);
+  const skipped = new Set(visited.map(placeKey));
+  const rows = inCity.filter(
+    (row) => row.visitedAt === undefined && !skipped.has(placeKey(row.name)),
+  );
+  return { inCity, rows, visited };
+}
+
+export const listDateStarts = authedQuery({
+  args: { listId: v.id("sharedLists"), city: v.string() },
+  returns: v.array(dateStartValidator),
+  handler: async (ctx, { listId, city }) => {
+    if (!(await memberList(ctx, listId, ctx.userId))) return [];
+    const { rows } = await listPlanRows(ctx, listId, ctx.userId, city);
+    return rows.map(({ name, lat, lng, appleId }) => ({
+      name,
+      lat,
+      lng,
+      appleId,
+    }));
+  },
+});
+
 export async function claimListPlan(
   ctx: MutationCtx,
   listId: Id<"sharedLists">,
@@ -622,14 +656,11 @@ export async function claimListPlan(
   options: { bucket: "makePlan" | "createTripPlan"; needsPlaces: boolean },
 ): Promise<ListPlanClaim> {
   const list = await requireCoveredList(ctx, listId, userId);
-  const wanted = cityKey(city);
-  const inCity = (await listPlaces(ctx, list._id)).filter(
-    (row) => cityKey(row.city) === wanted,
-  );
-  const visited = await recentVisits(ctx, userId);
-  const skipped = new Set(visited.map(placeKey));
-  const rows = inCity.filter(
-    (row) => row.visitedAt === undefined && !skipped.has(placeKey(row.name)),
+  const { inCity, rows, visited } = await listPlanRows(
+    ctx,
+    list._id,
+    userId,
+    city,
   );
   if (options.needsPlaces && rows.length === 0) {
     throw new Error("No places in this city");

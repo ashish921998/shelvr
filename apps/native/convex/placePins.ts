@@ -30,7 +30,7 @@ import {
 import { logEvent } from "./model/log";
 import { buildSearchText } from "./model/searchText";
 import { effectiveStatus } from "./model/memberships";
-import { placeKey } from "./model/plan";
+import { isStreetAddress, placeKey } from "./model/plan";
 import { SAME_SPOT_KM } from "./model/placeList";
 import {
   cityKey,
@@ -357,14 +357,24 @@ async function lookUp(
   );
   const unavailable = new Set<string>();
   const find = async (name: string, near: LatLng | undefined) => {
-    const at = await appleMapsFind(
-      token,
-      "search",
-      lookupQuery(queries.get(name) ?? name, city),
-      near,
-      undefined,
-      true,
-    );
+    const kind = isStreetAddress(name) ? "search" : "poi";
+    const plain = lookupQuery(name, city);
+    const qualified = lookupQuery(queries.get(name) ?? name, city);
+    let at = await appleMapsFind(token, kind, qualified, near, undefined, true);
+    if (at === null && qualified !== plain) {
+      at = await appleMapsFind(token, kind, plain, near, undefined, true);
+    }
+    if (at === null && kind === "poi") {
+      at = await appleMapsFind(
+        token,
+        "search",
+        plain,
+        near,
+        undefined,
+        true,
+        name,
+      );
+    }
     if (at !== UNAVAILABLE) return at;
     unavailable.add(name);
     return null;

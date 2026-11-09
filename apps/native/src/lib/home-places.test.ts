@@ -113,4 +113,7 @@ describe("sharedListCover", () => {
     expect(sharedListCover(["Oslo"], mine)).toBeNull();
     expect(sharedListCover(["Lisbon"], undefined)).toBeNull();
   });
+  it("keeps lists from an older backend visible before city summaries have deployed", () => {
+    expect(sharedListCover(undefined, mine)).toBeNull();
+  });
 });

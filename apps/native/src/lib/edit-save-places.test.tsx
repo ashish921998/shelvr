@@ -1,6 +1,11 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import type { ReactNode } from "react";
+import {
+  type ReactNode,
+  forwardRef,
+  useImperativeHandle,
+  useEffect,
+} from "react";
 import { beforeEach, expect, it, vi } from "vitest";
 import EditSavePlacesScreen from "@/app/(app)/edit-save-places";
 
@@ -10,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   back: vi.fn(),
   alert: vi.fn(),
   success: vi.fn(),
+  scrollTo: vi.fn(),
   data: {
     places: [{ name: "Old branch", city: "Lisbon", lat: 38.7, lng: -9.1 }],
     version: "original",
@@ -41,9 +47,13 @@ vi.mock("react-native-unistyles", () => ({
 }));
 vi.mock("react-native", () => ({
   View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
-  ScrollView: vi.fn(({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  )),
+  ScrollView: forwardRef(function MockScrollView(
+    { children }: { children: ReactNode },
+    ref,
+  ) {
+    useImperativeHandle(ref, () => ({ scrollTo: mocks.scrollTo }));
+    return <div>{children}</div>;
+  }),
   Pressable: vi.fn(
     ({
       children,
@@ -83,9 +93,20 @@ vi.mock("react-native", () => ({
   Keyboard: { dismiss: vi.fn() },
 }));
 vi.mock("@/components/ui/themed-text", () => ({
-  ThemedText: vi.fn(({ children }: { children: ReactNode }) => (
-    <span>{children}</span>
-  )),
+  ThemedText: vi.fn(
+    ({
+      children,
+      onLayout,
+    }: {
+      children: ReactNode;
+      onLayout?: (event: { nativeEvent: { layout: { y: number } } }) => void;
+    }) => {
+      useEffect(() => {
+        onLayout?.({ nativeEvent: { layout: { y: 1800 } } });
+      }, [onLayout]);
+      return <span>{children}</span>;
+    },
+  ),
 }));
 vi.mock("@/components/ui/button", () => ({
   Button: vi.fn(
@@ -171,4 +192,13 @@ it("keeps the editor open when saving fails", async () => {
   await waitFor(() => expect(mocks.alert).toHaveBeenCalled());
   expect(mocks.back).not.toHaveBeenCalled();
   expect(mocks.success).not.toHaveBeenCalled();
+});
+
+it("brings the prefilled search form into view when replacing a place in a long list", () => {
+  render(<EditSavePlacesScreen />);
+  fireEvent.click(screen.getAllByText("placeCorrection.replace")[0]);
+  expect(
+    screen.getByRole("textbox", { name: "placeCorrection.search" }),
+  ).toHaveProperty("value", "Old branch");
+  expect(mocks.scrollTo).toHaveBeenCalledWith({ y: 1800, animated: true });
 });

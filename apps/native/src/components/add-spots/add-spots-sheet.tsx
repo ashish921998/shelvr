@@ -166,7 +166,6 @@ export function AddSpotsSheet() {
             />
           ) : null}
         </View>
-        <Text style={styles.section}>{t("addSheet.organize")}</Text>
         <View style={styles.rows}>
           <Row
             emoji="👥"
@@ -264,16 +263,8 @@ const styles = StyleSheet.create((theme) => ({
     textAlign: "center",
     color: theme.colors.foreground,
   },
-  section: {
-    marginTop: 21,
-    marginBottom: 7,
-    textAlign: "center",
-    fontFamily: theme.fonts.regular,
-    fontSize: 12.6,
-    lineHeight: 16,
-    color: theme.colors.muted,
-  },
   rows: {
+    marginTop: theme.gap(2),
     borderRadius: 17,
     borderCurve: "continuous",
     overflow: "hidden",

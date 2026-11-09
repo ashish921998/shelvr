@@ -44,6 +44,14 @@ export const dateStopValidator = v.object({
 });
 export type DateStop = Infer<typeof dateStopValidator>;
 
+export const dateStartValidator = dateStopValidator.pick(
+  "name",
+  "lat",
+  "lng",
+  "appleId",
+);
+export type DateStart = Infer<typeof dateStartValidator>;
+
 /** One evening: indexes into the plan's stops. */
 export const dateEveningValidator = v.object({
   first: v.number(),

@@ -3,7 +3,8 @@ import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
 import { withAlpha } from "@/lib/color";
 import { moveCamera } from "@/lib/map-camera";
-import { t } from "@/lib/i18n";
+import { t, useAppLocale } from "@/lib/i18n";
+import { useMapPinClusters } from "@/lib/use-map-pin-clusters";
 import { fitCamera, type LatLng } from "@/lib/trip";
 import { dayColor, planPins } from "@/lib/trip-planner";
 import type { TripPlanDetail, TripPlanStop } from "@convex/model/tripPlan";
@@ -88,8 +89,14 @@ export function TripPlannerMap({
   onSelectDay,
   onLayout,
 }: Props) {
+  useAppLocale();
   const { theme, rt } = useUnistyles();
   const ref = useRef<AppleMaps.MapView>(null);
+  const [focusedPin, setFocusedPin] = useState<{
+    id: string;
+    day: number | null;
+  } | null>(null);
+  if (focusedPin && focusedPin.day !== activeDay) setFocusedPin(null);
   const pins = useMemo(() => planPins(days, activeDay), [days, activeDay]);
   const stayLat = stay?.lat;
   const stayLng = stay?.lng;
@@ -107,10 +114,15 @@ export function TripPlannerMap({
   // Room under the lowest pin for its name label (a focused day's pins carry one).
   const bottom = theme.gap(4);
   const camera = useMemo(() => {
+    const chosen =
+      focusedPin?.id === STAY_ID
+        ? stayPoint
+        : pins.find((pin) => pin.id === focusedPin?.id)?.coordinates;
     const focused = pins.filter((pin) => pin.active).map((p) => p.coordinates);
     const all = pins.map((pin) => pin.coordinates);
-    const points =
-      focused.length > 0
+    const points = chosen
+      ? [chosen]
+      : focused.length > 0
         ? focused
         : all.length > 0
           ? all
@@ -129,7 +141,7 @@ export function TripPlannerMap({
           }
         : { worldWidth: 256, centerY: height / 2 }),
     });
-  }, [pins, stayPoint, width, height, top, bottom, rt.insets.top]);
+  }, [pins, stayPoint, width, height, top, bottom, rt.insets.top, focusedPin]);
 
   // expo-maps applies every cameraPosition change without animation, so the prop holds the first camera only.
   const [firstCamera, setFirstCamera] = useState(camera);
@@ -156,15 +168,61 @@ export function TripPlannerMap({
   const routeColor = (day: number) =>
     colorOf(day, activeDay === null || activeDay === day);
   const select = (id: string | undefined) => {
+    if (id === STAY_ID) {
+      setFocusedPin({ id, day: activeDay });
+      return;
+    }
     const day = pins.find((pin) => pin.id === id)?.day;
-    if (day !== undefined) onSelectDay(day);
+    if (day !== undefined && id) {
+      setFocusedPin({ id, day });
+      onSelectDay(day);
+    }
   };
+
+  const visiblePins =
+    process.env.EXPO_OS === "ios" || activeDay === null
+      ? pins
+      : pins.filter((pin) => pin.active);
+  const clustered = useMapPinClusters(
+    [
+      ...visiblePins.map((pin) => ({
+        id: pin.id,
+        name: `${t("trip.dayTab", { day: String(pin.day + 1) })} · ${Number(pin.id.split(":")[1]) + 1}. ${pin.name}`,
+        title: pin.title,
+        text: pin.text,
+        lat: pin.coordinates.latitude,
+        lng: pin.coordinates.longitude,
+        tintColor: colorOf(pin.day, pin.active),
+      })),
+      ...(stayPoint && stay
+        ? [
+            {
+              id: STAY_ID,
+              name: stay.name,
+              emoji: "🛏️",
+              lat: stayPoint.latitude,
+              lng: stayPoint.longitude,
+              tintColor: theme.colors.foreground,
+            },
+          ]
+        : []),
+    ],
+    (id) => select(id),
+    {
+      selectedId: null,
+      clusterText: (count) => `×${count}`,
+      clearSelection: () => ref.current?.selectMarker(undefined),
+    },
+  );
 
   const chips = showChips ? (
     <DayChips
       dayCount={days.length}
       activeDay={activeDay}
-      onSelectDay={onSelectDay}
+      onSelectDay={(day) => {
+        setFocusedPin(null);
+        onSelectDay(day);
+      }}
     />
   ) : null;
 
@@ -185,38 +243,19 @@ export function TripPlannerMap({
               compassEnabled: false,
               myLocationButtonEnabled: false,
             }}
-            annotations={pins.map((pin) => ({
-              id: pin.id,
-              coordinates: pin.coordinates,
-              // MapKit prints the title under the pin: the name on a focused day, nothing elsewhere.
-              title: pin.title,
-              text: pin.text,
-              backgroundColor: colorOf(pin.day, pin.active),
-              textColor: theme.colors.onTripDay,
-            }))}
-            markers={
-              stayPoint && stay
-                ? [
-                    {
-                      id: STAY_ID,
-                      coordinates: stayPoint,
-                      title: stay.name,
-                      systemImage: "bed.double.fill",
-                      tintColor: theme.colors.foreground,
-                    },
-                  ]
-                : []
-            }
+            markers={clustered.markers}
             polylines={routes.map((route) => ({
               id: `route-${route.day}`,
               coordinates: route.coordinates,
               color: routeColor(route.day),
               width: activeDay === route.day ? 4 : 3,
             }))}
-            onAnnotationClick={(pin) => select(pin.id)}
+            onMarkerClick={(pin) => clustered.select(pin.id)}
+            onCameraMove={({ zoom }) => clustered.trackZoom(zoom)}
           />
         </View>
         {chips}
+        {clustered.sheet}
       </View>
     );
   }
@@ -227,29 +266,18 @@ export function TripPlannerMap({
         <GoogleMaps.View
           style={StyleSheet.absoluteFill}
           cameraPosition={camera}
-          markers={[
-            // Google's markers cannot fade, so a focused day shows only its own.
-            ...pins
-              .filter((pin) => activeDay === null || pin.active)
-              .map((pin) => ({
-                id: pin.id,
-                coordinates: pin.coordinates,
-                // Shown in the callout a tap opens.
-                title: pin.name,
-              })),
-            ...(stayPoint && stay
-              ? [{ id: STAY_ID, coordinates: stayPoint, title: stay.name }]
-              : []),
-          ]}
+          markers={clustered.markers}
           polylines={routes.map((route) => ({
             coordinates: route.coordinates,
             color: routeColor(route.day),
             width: activeDay === route.day ? 10 : 7,
           }))}
-          onMarkerClick={(marker) => select(marker.id)}
+          onMarkerClick={(marker) => clustered.select(marker.id)}
+          onCameraMove={({ zoom }) => clustered.trackZoom(zoom)}
         />
       </View>
       {chips}
+      {clustered.sheet}
     </View>
   );
 }

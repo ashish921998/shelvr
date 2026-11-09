@@ -4,6 +4,8 @@ import { appleZoom } from "@/lib/city-pins";
 import { moveCamera } from "@/lib/map-camera";
 import { CITY_ZOOM } from "@/lib/map-city-zoom";
 import { hasPlaceNear } from "@/lib/map-filters";
+import { type MapPin } from "@/lib/map-pin-clusters";
+import { useMapPinClusters } from "@/lib/use-map-pin-clusters";
 import { fitCamera } from "@/lib/trip";
 import type { LatLng } from "@convex/model/trip";
 import { AppleMaps, GoogleMaps } from "expo-maps";
@@ -23,14 +25,7 @@ const SETTLE_MS = 600;
 /** After this, the opening check is dropped so it never pulls back a camera the person moved. */
 const DISARM_MS = 3000;
 
-export type MapPin = {
-  id: string;
-  name: string;
-  lat: number;
-  lng: number;
-  /** iOS: the emoji inside the pin, saying what the place is. */
-  emoji?: string;
-};
+export type { MapPin } from "@/lib/map-pin-clusters";
 
 /** A place the camera flies to; a new key moves it again even to the same spot. */
 export type MapFocus = LatLng & { key: number };
@@ -69,12 +64,15 @@ export function PlacesMap({
   onCentreChange,
   onSelect,
 }: Props) {
-  const { theme, rt } = useUnistyles();
+  const { rt } = useUnistyles();
   const appleRef = useRef<AppleMaps.MapView>(null);
   const googleRef = useRef<GoogleMaps.MapView>(null);
   // Whichever map this platform rendered.
   const map = () => appleRef.current ?? googleRef.current;
   const { width } = rt.screen;
+  const clustered = useMapPinClusters(pins, onSelect, {
+    clearSelection: () => appleRef.current?.selectMarker(undefined),
+  });
 
   const cameraFor = useCallback(
     (points: MapPin[]) => {
@@ -226,16 +224,11 @@ export function PlacesMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new framing moves the camera; search narrowing pins must not
   }, [framed]);
 
-  const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
-  const select = (id: string | undefined) => {
-    if (!id) return;
-    setSelectedId(id);
-    onSelect(id);
-  };
   const trackCamera = (event: {
     coordinates: { latitude?: number; longitude?: number };
     zoom?: number;
   }) => {
+    clustered.trackZoom(event.zoom);
     const { latitude, longitude } = event.coordinates;
     centre.current =
       latitude !== undefined && longitude !== undefined
@@ -246,8 +239,8 @@ export function PlacesMap({
     if (checkNearby.current) waitForRest();
   };
 
-  if (process.env.EXPO_OS === "ios") {
-    return (
+  const nativeMap =
+    process.env.EXPO_OS === "ios" ? (
       <AppleMaps.View
         ref={appleRef}
         style={styles.map}
@@ -267,32 +260,25 @@ export function PlacesMap({
           myLocationButtonEnabled: false,
           togglePitchEnabled: false,
         }}
-        annotations={pins.map((pin) => ({
-          id: pin.id,
-          coordinates: { latitude: pin.lat, longitude: pin.lng },
-          title: pin.name,
-          text: pin.emoji,
-          backgroundColor:
-            pin.id === selectedId ? theme.colors.primary : "#ffffff",
-        }))}
-        onAnnotationClick={(annotation) => select(annotation.id)}
+        markers={clustered.markers}
+        onMarkerClick={(marker) => clustered.select(marker.id)}
+        onCameraMove={trackCamera}
+      />
+    ) : (
+      <GoogleMaps.View
+        ref={googleRef}
+        style={styles.map}
+        cameraPosition={firstCamera}
+        markers={clustered.markers}
+        onMarkerClick={(marker) => clustered.select(marker.id)}
         onCameraMove={trackCamera}
       />
     );
-  }
   return (
-    <GoogleMaps.View
-      ref={googleRef}
-      style={styles.map}
-      cameraPosition={firstCamera}
-      markers={pins.map((pin) => ({
-        id: pin.id,
-        coordinates: { latitude: pin.lat, longitude: pin.lng },
-        title: pin.name,
-      }))}
-      onMarkerClick={(marker) => select(marker.id)}
-      onCameraMove={trackCamera}
-    />
+    <>
+      {nativeMap}
+      {clustered.sheet}
+    </>
   );
 }
 

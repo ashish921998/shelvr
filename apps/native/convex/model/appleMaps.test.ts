@@ -150,6 +150,27 @@ describe("firstPlace", () => {
 });
 
 describe("appleMapsLookup", () => {
+  it("leaves an unmatched venue unplaced instead of falling back to an address", async () => {
+    const fetchImpl = vi.fn(async (_input: Parameters<typeof fetch>[0]) =>
+      Response.json({ results: [] }),
+    );
+    expect(
+      await appleMapsLookup(
+        "tok",
+        "poi",
+        "Unknown venue, Austin",
+        undefined,
+        fetchImpl,
+      ),
+    ).toBeNull();
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(
+      new URL(String(fetchImpl.mock.calls[0]?.[0] ?? "")).searchParams.get(
+        "resultTypeFilter",
+      ),
+    ).toBe("Poi");
+  });
+
   it("preserves a street address instead of substituting a similarly named business", async () => {
     const fetchImpl = vi.fn(async () =>
       Response.json({

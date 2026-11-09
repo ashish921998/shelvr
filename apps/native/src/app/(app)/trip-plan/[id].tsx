@@ -1,4 +1,5 @@
 import { EmptyState } from "@/components/empty-state";
+import { Button } from "@/components/ui/button";
 import {
   hasMapPoints,
   TripPlanBody,
@@ -17,6 +18,7 @@ import { useDeleteTripPlan } from "@/lib/delete-trip-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
 import { useRenameTrip } from "@/lib/trip-edit";
+import { useTripShare } from "@/lib/trip-share";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
@@ -35,6 +37,8 @@ function TripHeader({
   onDone,
   onAddPlace,
   onDelete,
+  onShare,
+  shareLoading,
 }: {
   overMap: boolean;
   editing: boolean;
@@ -42,6 +46,8 @@ function TripHeader({
   onDone: () => void;
   onAddPlace: () => void;
   onDelete: () => void;
+  onShare: () => void;
+  shareLoading: boolean;
 }) {
   const { theme } = useUnistyles();
   const actions = [
@@ -67,12 +73,20 @@ function TripHeader({
                 onPress={onDone}
               />
             ) : (
-              <HeaderActionMenu
-                icon="ellipsis"
-                label={t("tripPlanner.tripActions")}
-                title={t("tripPlanner.tripActions")}
-                actions={actions}
-              />
+              <View style={styles.headerActions}>
+                <HeaderIconButton
+                  icon="square.and.arrow.up"
+                  label={t("tripShare.title")}
+                  onPress={onShare}
+                  disabled={shareLoading}
+                />
+                <HeaderActionMenu
+                  icon="ellipsis"
+                  label={t("tripPlanner.tripActions")}
+                  title={t("tripPlanner.tripActions")}
+                  actions={actions}
+                />
+              </View>
             ),
         }}
       />
@@ -110,6 +124,13 @@ function TripHeader({
     <>
       {iosHeader}
       <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button
+          icon="square.and.arrow.up"
+          disabled={shareLoading}
+          onPress={onShare}
+        >
+          {t("tripShare.title")}
+        </Stack.Toolbar.Button>
         <Stack.Toolbar.Menu icon="ellipsis" tintColor={theme.colors.foreground}>
           <Stack.Toolbar.MenuAction icon="pencil" onPress={onEdit}>
             {t("tripPlanner.edit")}
@@ -138,6 +159,7 @@ export default function TripPlanScreen() {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState<string | null>(null);
   const rename = useRenameTrip(tripId, trip.data?.name);
+  const share = useTripShare(tripId);
   const { gated } = usePlanGate();
 
   const data = trip.data;
@@ -189,6 +211,23 @@ export default function TripPlanScreen() {
   }
 
   if (!personalPlanAllowed(gated, data.listId)) {
+    if (share.loading) return <ScreenLoader label={t("trip.loading")} />;
+    if (share.revokeActive) {
+      return (
+        <View style={styles.screen}>
+          {backTitle}
+          <EmptyState
+            title={t("tripShare.title")}
+            message={t("tripShare.active")}
+          />
+          <Button
+            title={t("tripShare.revoke")}
+            onPress={share.revokeActive}
+            style={styles.revoke}
+          />
+        </View>
+      );
+    }
     return <Redirect href="/plan-gate" />;
   }
 
@@ -216,6 +255,8 @@ export default function TripPlanScreen() {
         }}
         onAddPlace={() => addPlace(1)}
         onDelete={() => deleteTrip(data._id, () => backOrHome(router))}
+        onShare={share.open}
+        shareLoading={share.loading}
       />
       {editing ? (
         <TripEditList
@@ -233,12 +274,17 @@ export default function TripPlanScreen() {
           }
         />
       ) : (
-        <TripPlanBody trip={data} />
+        <TripPlanBody trip={data} onAddPlace={addPlace} />
       )}
     </>
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   screen: { flex: 1, backgroundColor: theme.colors.background },
+  headerActions: { flexDirection: "row", gap: theme.gap(0.5) },
+  revoke: {
+    marginHorizontal: theme.gap(2),
+    marginBottom: rt.insets.bottom + theme.gap(2),
+  },
 }));

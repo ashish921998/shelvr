@@ -64,6 +64,7 @@ const SF_TO_MATERIAL = {
   speedometer: "speed",
   viewfinder: "center_focus_strong",
   "figure.run": "directions_run",
+  "figure.walk": "directions_walk",
   "hand.tap": "pan_tool",
   "tray.and.arrow.up": "move_up",
   "arrow.up": "arrow_upward",
@@ -87,6 +88,8 @@ const SF_TO_MATERIAL = {
   pencil: "edit",
   "map.fill": "map",
   "bookmark.fill": "bookmark",
+  "books.vertical.fill": "library_books",
+  "dice.fill": "casino",
 } as const satisfies Partial<Record<SFSymbol, AndroidSymbol>>;
 
 export type AppSymbolName = keyof typeof SF_TO_MATERIAL;

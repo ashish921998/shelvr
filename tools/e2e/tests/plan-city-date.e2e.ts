@@ -30,8 +30,9 @@ test(
     await screen.getByRole("button", /^Lisbon(?:,|$)/).tap();
     await expect(screen.getByText(TITLE)).toBeVisible({ timeout: 60_000 });
 
+    await screen.getByRole("button", "Go out").tap();
     await screen.getByRole("button", "Plan a date").tap();
-    await expect(screen.getByText("What kind of date?")).toBeVisible({
+    await expect(screen.getByText("Plan a date in Lisbon")).toBeVisible({
       timeout: 30_000,
     });
     await screen.getByRole("button", /^Classic(?:,|$)/).tap();

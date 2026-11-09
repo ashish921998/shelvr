@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { signEs256Jwt } from "./appleSigning";
 import { logEvent } from "./log";
+import { placeKey } from "./plan";
 import { keepNearby, type LatLng } from "./trip";
 
 const API = "https://maps-api.apple.com/v1";
@@ -126,13 +127,16 @@ export function firstPlace(
   near?: LatLng,
   skipCityOnly = false,
   includeCity = false,
+  exactName?: string,
 ): FoundPlace | null {
   const reply = replySchema.safeParse(body);
   if (!reply.success) return null;
+  const exactKey = exactName === undefined ? null : placeKey(exactName);
   for (const result of reply.data.results) {
     const place = placeSchema.safeParse(result);
     if (place.success) {
       const { name, structuredAddress: address } = place.data;
+      if (exactKey !== null && (!name || placeKey(name) !== exactKey)) continue;
       if (
         skipCityOnly &&
         address?.locality &&
@@ -170,26 +174,32 @@ function appleGet(
 
 export async function appleMapsFind(
   accessToken: string,
-  kind: "search" | "geocode",
+  kind: "search" | "geocode" | "poi",
   query: string,
   near?: LatLng,
   fetchImpl: typeof fetch = fetch,
   includeCity = false,
+  exactName?: string,
 ): Promise<FoundPlace | null | typeof UNAVAILABLE> {
   const params = new URLSearchParams({ q: query.slice(0, 200) });
   if (near !== undefined) {
     params.set("searchLocation", `${near.lat},${near.lng}`);
   }
-  // Preserve exact street addresses. If Apple answers with only a city centre,
-  // retry as a point of interest instead of pretending that centre is the place.
-  for (const filter of kind === "search" ? ["Poi,Address", "Poi"] : [""]) {
+  const path = kind === "poi" ? "search" : kind;
+  const filters =
+    kind === "poi"
+      ? ["Poi"]
+      : kind === "search"
+        ? ["Poi,Address", "Poi"]
+        : [""];
+  for (const filter of filters) {
     if (filter) params.set("resultTypeFilter", filter);
     let body: unknown;
     try {
-      const response = await appleGet(accessToken, kind, params, fetchImpl);
+      const response = await appleGet(accessToken, path, params, fetchImpl);
       if (!response.ok) {
         if (!isTemporary(response.status)) return null;
-        reportUnavailable(kind, { status: response.status });
+        reportUnavailable(path, { status: response.status });
         return UNAVAILABLE;
       }
       body = await response.json().catch((error: unknown) => {
@@ -197,10 +207,16 @@ export async function appleMapsFind(
         throw error;
       });
     } catch (error) {
-      reportUnavailable(kind, { error });
+      reportUnavailable(path, { error });
       return UNAVAILABLE;
     }
-    const found = firstPlace(body, near, kind === "search", includeCity);
+    const found = firstPlace(
+      body,
+      near,
+      path === "search",
+      includeCity,
+      exactName,
+    );
     if (found) return found;
   }
   return null;

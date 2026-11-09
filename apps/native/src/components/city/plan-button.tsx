@@ -13,12 +13,7 @@ export function PlanButton({
   busy: CityPlanKind | null;
   onPress: () => void;
 }) {
-  const label = t(
-    kind === "date" ? "homePlaces.planDate" : "homePlaces.planTrip",
-  );
-  const hint = t(
-    kind === "date" ? "homePlaces.planDateHint" : "homePlaces.planTripHint",
-  );
+  const label = t(kind === "date" ? "plan.goOut" : "homePlaces.planTrip");
   const dark = kind === "date";
   const working = busy === kind;
   return (
@@ -37,10 +32,7 @@ export function PlanButton({
       {working ? (
         <ActivityIndicator />
       ) : (
-        <>
-          <Text style={[styles.planLabel, dark && styles.onDark]}>{label}</Text>
-          <Text style={[styles.planHint, dark && styles.onDark]}>{hint}</Text>
-        </>
+        <Text style={[styles.planLabel, dark && styles.onDark]}>{label}</Text>
       )}
     </Pressable>
   );
@@ -94,7 +86,6 @@ const styles = StyleSheet.create((theme) => ({
   planButton: {
     flex: 1,
     minHeight: theme.control.minHeight,
-    gap: theme.gap(0.25),
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: theme.gap(1.5),
@@ -105,7 +96,6 @@ const styles = StyleSheet.create((theme) => ({
   planDark: { backgroundColor: theme.colors.foreground },
   planMuted: { backgroundColor: theme.colors.surfaceMuted },
   planLabel: { ...theme.type.button, color: theme.colors.foreground },
-  planHint: { ...theme.type.caption, color: theme.colors.muted },
   onDark: { color: theme.colors.surface },
   pressed: { opacity: theme.opacity.pressed },
 }));

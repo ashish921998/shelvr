@@ -107,6 +107,99 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("stop details", () => {
+  it("persists optional time and note through a move and allows clearing both", async () => {
+    const { base, t, tripId, ids } = await setup(TRIP);
+    const update = api.tripPlannerData.updateTripStopDetails;
+    const fields = { stopId: ids.A, time: "18:30", note: " Window seat " };
+    const other = await signedInUser(base, { pro: true });
+    await expect(other.t.mutation(update, fields)).rejects.toThrow();
+    await expect(
+      t.mutation(update, { ...fields, time: "24:00" }),
+    ).rejects.toThrow();
+    await t.mutation(update, fields);
+    await t.mutation(api.tripPlannerData.moveTripStop, {
+      stopId: ids.A,
+      day: 2,
+      index: 0,
+    });
+    const get = () => t.query(api.tripPlannerData.getTripPlan, { tripId });
+    expect((await get())?.days[1][0]).toMatchObject({
+      name: "A",
+      time: "18:30",
+      note: "Window seat",
+    });
+    await t.mutation(update, { stopId: ids.A, time: null, note: null });
+    const stop = (await get())?.days[1][0];
+    expect(stop).not.toHaveProperty("time");
+    expect(stop).not.toHaveProperty("note");
+  });
+});
+
+describe("trip share link", () => {
+  it("lets an owner find and revoke active links after Pro lapses", async () => {
+    const { base, t, tripId, userId } = await setup(TRIP);
+    const paginationOpts = { cursor: null, numItems: 10 };
+    const token = await t.mutation(api.tripShares.createShare, { tripId });
+    await base.run(async (ctx) => {
+      const sub = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .unique();
+      if (!sub) throw new Error("Expected seeded subscription");
+      await ctx.db.patch(sub._id, {
+        status: "lapsed",
+        expiresAt: Date.now() - 1,
+      });
+    });
+    const other = await signedInUser(base);
+    expect(
+      (await other.t.query(api.tripShares.listSharedTrips, { paginationOpts }))
+        .page,
+    ).toEqual([]);
+    expect(
+      (await t.query(api.tripShares.listSharedTrips, { paginationOpts })).page,
+    ).toEqual([{ _id: tripId, city: "Lisbon" }]);
+    await t.mutation(api.tripShares.revokeShare, { tripId, token });
+    expect(
+      (await t.query(api.tripShares.listSharedTrips, { paginationOpts })).page,
+    ).toEqual([]);
+  });
+
+  it("reads the live scheduled itinerary without authentication and invalidates revoked links", async () => {
+    const { base, t, tripId, ids, userId } = await setup(TRIP);
+    const { createShare, revokeShare } = api.tripShares;
+    const other = await signedInUser(base, { pro: true });
+    await expect(other.t.mutation(createShare, { tripId })).rejects.toThrow();
+    const token = await t.mutation(createShare, { tripId });
+    await expect(
+      other.t.mutation(revokeShare, { tripId, token }),
+    ).rejects.toThrow();
+    const path = `/trip/shared/${token}`;
+    await t.mutation(api.tripPlannerData.updateTripStopDetails, {
+      stopId: ids.A,
+      time: "18:30",
+      note: "<script>example</script>",
+    });
+    const response = await base.fetch(path);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    const page = await response.text();
+    expect(page).toContain("18:30");
+    expect(page).toContain("&lt;script&gt;example&lt;/script&gt;");
+    expect(page).not.toContain("<script>");
+    expect(page).not.toContain("Extra");
+    await t.mutation(revokeShare, { tripId, token });
+    expect((await base.fetch(path)).status).toBe(404);
+    const next = await t.mutation(createShare, { tripId });
+    expect(next).not.toBe(token);
+    await t.mutation(revokeShare, { tripId, token });
+    expect((await base.fetch(`/trip/shared/${next}`)).status).toBe(200);
+    await base.run((ctx) => ctx.db.patch(userId, { deleting: true }));
+    expect((await base.fetch(`/trip/shared/${next}`)).status).toBe(404);
+  });
+});
+
 describe("moveTripStop", () => {
   it("reorders within a day and returns where the stop was", async () => {
     const { t, tripId, ids } = await setup(TRIP);

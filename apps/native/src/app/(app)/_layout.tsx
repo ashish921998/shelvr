@@ -130,12 +130,17 @@ export default function AppLayout() {
           redirectTo={onboarded ? "/plan-gate" : "/onboarding"}
         >
           <Stack.Screen
-            name="trip-plan/[id]"
+            name="date-plan"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
           <Stack.Screen
-            name="date-plan"
-            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+            name="go-out"
+            options={{
+              presentation: "transparentModal",
+              animation: "fade",
+              headerShown: false,
+              contentStyle: { backgroundColor: "transparent" },
+            }}
           />
           <Stack.Screen
             name="shared-list/[id]"
@@ -194,6 +199,10 @@ export default function AppLayout() {
           />
         </Stack.Protected>
         <Stack.Protected guard={onboarded} redirectTo="/onboarding">
+          <Stack.Screen
+            name="trip-plan/[id]"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
           <Stack.Screen
             name="profile"
             options={{

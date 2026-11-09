@@ -133,15 +133,15 @@ function labels() {
 describe("tabs", () => {
   it("offers the Map from the Library", () => {
     bar(0);
-    expect(labels()).toEqual(["Map", "Add", "Plan a date"]);
+    expect(labels()).toEqual(["Map", "Add", "Go out"]);
   });
 
   it("offers the Library from the Map and from Trips", () => {
     bar(1);
-    expect(labels()).toEqual(["Library", "Add", "Plan a date"]);
+    expect(labels()).toEqual(["Library", "Add", "Go out"]);
     cleanup();
     bar(2);
-    expect(labels()).toEqual(["Library", "Add", "Plan a date"]);
+    expect(labels()).toEqual(["Library", "Add", "Go out"]);
   });
 
   it("emits tabPress and navigates", () => {
@@ -171,18 +171,18 @@ describe("add button", () => {
   });
 });
 
-describe("plan a date", () => {
+describe("go out", () => {
   it("plans for the city the map shows", () => {
     mocks.cityInView = "Lisbon";
     bar(1);
-    fireEvent.click(screen.getByRole("button", { name: "Plan a date" }));
+    fireEvent.click(screen.getByRole("button", { name: "Go out" }));
     expect(mocks.plan).toHaveBeenCalledWith("date", "Lisbon");
   });
 
   it("asks for a city from the Library, whatever the map last showed", () => {
     mocks.cityInView = "Lisbon";
     bar(0);
-    fireEvent.click(screen.getByRole("button", { name: "Plan a date" }));
+    fireEvent.click(screen.getByRole("button", { name: "Go out" }));
     expect(mocks.plan).toHaveBeenCalledWith("date", undefined);
   });
 });

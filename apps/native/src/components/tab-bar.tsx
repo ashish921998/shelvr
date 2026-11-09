@@ -1,5 +1,4 @@
-import { AppSymbolIcon } from "@/components/symbol";
-import { withAlpha } from "@/lib/color";
+import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { t, useAppLocale } from "@/lib/i18n";
 import { useMapCityInView } from "@/lib/map-city-in-view";
 import { usePlanPicker } from "@/lib/plan-picker";
@@ -17,12 +16,12 @@ type TabRoute = BottomTabBarProps["state"]["routes"][number];
 
 const LIBRARY = "(home)";
 const MAP = "(map)";
-const TAB_EMOJI: Record<string, string> = { [LIBRARY]: "📘", [MAP]: "🗺️" };
 const ADD_SIZE = 64;
 const ADD_LIFT = 8;
+const ATTRIBUTION_CLEARANCE = 32;
 
 export function addButtonBottom(insetBottom: number): number {
-  return Math.max(insetBottom, 12) + ADD_LIFT;
+  return Math.max(insetBottom, 12) + ADD_LIFT + ATTRIBUTION_CLEARANCE;
 }
 
 export function AddButton({
@@ -53,14 +52,15 @@ export function AddButton({
 }
 
 function TabItem({
-  emoji,
+  icon,
   label,
   onPress,
 }: {
-  emoji: string;
+  icon: AppSymbolName;
   label: string;
   onPress: () => void;
 }) {
+  const { theme } = useUnistyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -68,9 +68,14 @@ function TabItem({
       onPress={onPress}
       style={({ pressed }) => [styles.item, pressed && styles.pressed]}
     >
-      <Text style={styles.emoji} allowFontScaling={false}>
-        {emoji}
-      </Text>
+      <View style={styles.destinationIcon}>
+        <AppSymbolIcon
+          name={icon}
+          size={28}
+          weight="medium"
+          tintColor={theme.colors.primaryText}
+        />
+      </View>
       <Text style={styles.label} numberOfLines={1}>
         {label}
       </Text>
@@ -86,7 +91,6 @@ export function TabBar({
 }: BottomTabBarProps) {
   useAppLocale();
   const router = useRouter();
-  const { theme } = useUnistyles();
   const keyboardVisible = useKeyboardVisible();
   const onHeightChange = useContext(BottomTabBarHeightCallbackContext);
   const cityInView = useMapCityInView();
@@ -109,21 +113,15 @@ export function TabBar({
     });
     if (!event.defaultPrevented) navigateToTab(route.key);
   };
-  const background = theme.colors.background;
-  const strength = onMap ? 0.96 : 1;
   return (
     <View
+      pointerEvents="box-none"
       onLayout={(event) => onHeightChange?.(event.nativeEvent.layout.height)}
-      style={[
-        styles.bar,
-        {
-          experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(background, 0)} 0%, ${withAlpha(background, 0.85 * strength)} 35%, ${withAlpha(background, 0.97 * strength)} 55%, ${withAlpha(background, strength)} 75%)`,
-        },
-      ]}
+      style={styles.bar}
     >
       {other ? (
         <TabItem
-          emoji={TAB_EMOJI[other.name] ?? ""}
+          icon={other.name === MAP ? "map.fill" : "books.vertical.fill"}
           label={descriptors[other.key]?.options.title ?? other.name}
           onPress={open(other)}
         />
@@ -138,8 +136,8 @@ export function TabBar({
         />
       </View>
       <TabItem
-        emoji="🎲"
-        label={t("homePlaces.planDate")}
+        icon="figure.walk"
+        label={t("plan.goOut")}
         onPress={() => planner.plan("date", onMap ? cityInView : undefined)}
       />
       {planner.sheet}
@@ -157,14 +155,25 @@ const styles = StyleSheet.create((theme, rt) => ({
     justifyContent: "center",
     alignItems: "flex-end",
     paddingTop: theme.gap(2),
-    paddingBottom: Math.max(rt.insets.bottom, 12),
+    paddingBottom: Math.max(rt.insets.bottom, 12) + ATTRIBUTION_CLEARANCE,
   },
   item: {
     width: 100,
     alignItems: "center",
     gap: 5,
   },
-  emoji: { fontSize: 38, lineHeight: 44 },
+  destinationIcon: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.radius.lg,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.frame,
+    borderWidth: 0.5,
+    borderColor: theme.colors.border,
+    boxShadow: "0 2px 5px rgba(43, 36, 24, 0.10)",
+  },
   label: {
     fontFamily: theme.fonts.regular,
     fontSize: 10.5,

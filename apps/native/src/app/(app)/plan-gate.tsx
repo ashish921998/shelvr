@@ -8,7 +8,10 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useNotificationSession } from "@/lib/notifications";
 import { useSharedLists } from "@/lib/shared-lists";
+import { tripName } from "@/lib/trip-planner";
 import { useRestorePurchases } from "@/lib/use-restore-purchases";
+import { api } from "@convex/_generated/api";
+import { usePaginatedQuery } from "convex/react";
 import { useRouter } from "expo-router";
 import { Alert, Linking, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -20,6 +23,13 @@ export default function PlanGateScreen() {
   const { session, operation } = useNotificationSession();
   const { restoring, restore } = useRestorePurchases();
   const lists = useSharedLists().data ?? [];
+  const sharedTrips = usePaginatedQuery(
+    api.tripShares.listSharedTrips,
+    {},
+    {
+      initialNumItems: 10,
+    },
+  );
 
   const signOut = async () => {
     try {
@@ -50,6 +60,31 @@ export default function PlanGateScreen() {
             {lists.map((list) => (
               <SharedListCard key={list._id} list={list} />
             ))}
+          </View>
+        ) : null}
+        {sharedTrips.results.length > 0 ? (
+          <View style={styles.lists}>
+            <ThemedText variant="footnote" style={styles.body}>
+              {t("tripShare.manage")}
+            </ThemedText>
+            {sharedTrips.results.map((trip) => (
+              <Button
+                key={trip._id}
+                title={tripName(trip)}
+                onPress={() =>
+                  router.push({
+                    pathname: "/trip-plan/[id]",
+                    params: { id: trip._id },
+                  })
+                }
+              />
+            ))}
+            {sharedTrips.status === "CanLoadMore" ? (
+              <Button
+                title={t("tripShare.more")}
+                onPress={() => sharedTrips.loadMore(10)}
+              />
+            ) : null}
           </View>
         ) : null}
         <Button

@@ -53,7 +53,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Pro / subscriptions (RevenueCat sandbox)
 
-- Shelvr Pro gates saves past the 10 free ones, Plan a date, Plan a trip, editing or removing a save's places, and starting a shared list. For free accounts, Plan a date opens the paywall from the tab bar or a city page, and Plan a trip opens it from the "Add spots" sheet or a city page. From the tab bar or the "Add spots" sheet, each needs a saved place pinned in a city first; without one, it shows "No places yet" instead of the paywall.
+- Shelvr Pro gates saves past the 10 free ones, Plan a date, Plan a trip, editing or removing a save's places, and starting a shared list. For free accounts, Go out opens the paywall from the tab bar or a city page, and Plan a trip opens it from the "Add spots" sheet or a city page. From the tab bar or the "Add spots" sheet, each needs a saved place pinned in a city first; without one, it shows "No places yet" instead of the paywall.
 - Plans: **Annual** (labelled Yearly on the paywall; 7-day trial, then the yearly price) and **Weekly** (no trial). Both auto-renew until canceled.
 - Lapsed subscribers are on the free plan: their existing saves stay open, and saves made while they had Pro do not count toward the 10.
 - Present paywall from any gated action or Profile → View Pro plans.
@@ -149,7 +149,7 @@ Core review flow:
 
 1. Tap the + button, then Paste a link, paste an Instagram Reel or TikTok link, and save. It shows as processing under Recents in Library, then its places appear on the Map and under their city. A link that names no place shows in Library's "Without a place" row, whose sheet offers Delete, and Retry when a retry can help.
 2. Tap Library, then Cities and a city to open its page: a map with a pin per place and a list of the places.
-3. On the city page, tap "Plan a date", pick a kind of date, and get an evening of two stops a short walk apart (Apple Maps may suggest one). Tap "Plan a trip" (or Trips in Library) for a day-by-day trip: saved places first, then Apple Maps suggestions in the gaps. A trip's menu has Edit trip, Add a place and Delete trip.
+3. Tap "Go out", then "Plan a date". Pick a kind of date or a saved first spot. The planner pairs two nearby stops. Tap "Plan a trip" in Go out to build a day-by-day trip. In the itinerary, add or move a stop and use "Share trip" to make or revoke a view-only link.
 4. The app opens on the Map: every pinned place, with search and filters. Shelvr asks for location only when Map first opens, to center it on you; Map works without it.
 
 Shared lists:

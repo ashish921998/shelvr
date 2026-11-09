@@ -4,12 +4,14 @@ import type { FunctionReturnType } from "convex/server";
 import { v } from "convex/values";
 import { action, env } from "./_generated/server";
 import { internal } from "./_generated/api";
+import { savedCandidates } from "./datePlanData";
 import {
   appleMapsAccessToken,
   appleMapsConfig,
   appleMapsSearchPlaces,
 } from "./model/appleMaps";
 import {
+  anchoredDateStops,
   fillTargets,
   keepDateSuggestion,
   MIN_SAVED_EVENINGS,
@@ -24,15 +26,15 @@ import {
   DATE_KINDS,
   dateAskValidator,
   datePlanResultValidator,
+  dateStartValidator,
   type DateAsk,
   type DateKind,
   type DatePlanResult,
 } from "./model/datePlan";
 import { logEvent } from "./model/log";
-import { placeKey, suggestSavedPlaces } from "./model/plan";
-import { dropStrays } from "./model/trip";
-import { chainNames, saveWhy } from "./model/tripSuggest";
-import { appleLang, pinFor } from "./tripPlanner";
+import { placeKey } from "./model/plan";
+import { chainNames } from "./model/tripSuggest";
+import { appleLang } from "./tripPlanner";
 
 /** The whole Apple search, token included, gives up after this and the saves plan alone. */
 const FILL_DEADLINE_MS = 10_000;
@@ -42,45 +44,7 @@ const SUGGESTIONS_PER_ANCHOR = 3;
 type Claim = FunctionReturnType<
   typeof internal.datePlanData.claimDatePlanInternal
 >;
-type SavesClaim = Extract<Claim, { from: "saves" }>;
 type ListClaim = Extract<Claim, { from: "list" }>;
-
-/** The city's unvisited saved places that already have a pin; a date never looks one up. */
-function savedCandidates(claim: SavesClaim): DateCandidate[] {
-  const been = new Set(claim.been.map(placeKey));
-  const places = suggestSavedPlaces(
-    claim.sources,
-    been,
-    Number.MAX_SAFE_INTEGER,
-  );
-  const pinned = dropStrays(places.map((place) => pinFor(place, claim.pins)));
-  const sources = new Map(
-    claim.sources.map((source) => [source.itemId, source]),
-  );
-  const saves = new Map(claim.saves.map((save) => [save.itemId, save]));
-  return places.flatMap((place, i) => {
-    const pin = pinned[i];
-    const source = sources.get(place.itemId);
-    const save = saves.get(place.itemId);
-    if (!pin || !source || !save) return [];
-    const why = saveWhy(place, source);
-    return [
-      {
-        itemId: place.itemId,
-        name: place.name,
-        ...(place.area ? { area: place.area } : {}),
-        ...(why ? { why } : {}),
-        lat: pin.lat,
-        lng: pin.lng,
-        ...(pin.appleId !== undefined ? { appleId: pin.appleId } : {}),
-        ...(pin.category !== undefined ? { category: pin.category } : {}),
-        tags: save.tags,
-        ownTags: save.ownTags,
-        savedAt: save.savedAt,
-      },
-    ];
-  });
-}
 
 /** The kind to plan: the one asked for, or for "surprise" one the saves can make an evening of. */
 function chooseKind(
@@ -137,6 +101,7 @@ async function suggestStops(
   lang: string | undefined,
   signal: AbortSignal,
   removed: Claim["removed"],
+  firstLocked: boolean,
 ): Promise<{ stops: ScoredStop[]; searches: number }> {
   const config = appleMapsConfig(env);
   if (config === null) {
@@ -150,7 +115,9 @@ async function suggestStops(
     logEvent("warn", "date_plan_map_token_failed", {});
     return { stops: [], searches: 0 };
   }
-  const targets = fillTargets(scored);
+  const targets = fillTargets(
+    firstLocked ? scored.filter(({ stop }) => stop.slot === "first") : scored,
+  );
   const replies = await Promise.all(
     targets.map(({ anchor, slot }) =>
       appleMapsSearchPlaces(
@@ -207,6 +174,7 @@ export const makeDatePlan = action({
     kind: dateAskValidator,
     locale: v.optional(v.string()),
     listId: v.optional(v.id("sharedLists")),
+    firstSpot: v.optional(dateStartValidator),
   },
   returns: datePlanResultValidator,
   // Annotated: inferring through `internal` is circular for an action.
@@ -221,7 +189,9 @@ export const makeDatePlan = action({
     const now = Date.now();
     const candidates =
       claim.from === "list" ? listCandidates(claim) : savedCandidates(claim);
-    const { kind, scored } = chooseKind(args.kind, candidates, now);
+    const { kind, scored } = args.firstSpot
+      ? anchoredDateStops(args.firstSpot, candidates, now)
+      : chooseKind(args.kind, candidates, now);
     const fields = {
       kind,
       asked: args.kind,
@@ -254,6 +224,7 @@ export const makeDatePlan = action({
             appleLang(args.locale),
             signal,
             claim.removed,
+            args.firstSpot !== undefined,
           ).catch((error: unknown) => {
             logEvent("warn", "date_plan_suggest_failed", {
               error_name: error instanceof Error ? error.name : "unknown",

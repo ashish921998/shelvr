@@ -1,10 +1,14 @@
 import { AppSymbolIcon } from "@/components/symbol";
 import { TripPlannerMap } from "@/components/trip-planner/trip-planner-map";
 import { TripStopRow } from "@/components/trip-planner/trip-stop-row";
+import { TripStopDetailsSheet } from "@/components/trip-planner/trip-stop-details-sheet";
+import { ActionMenu } from "@/components/ui/action-menu";
 import { ThemedText } from "@/components/ui/themed-text";
+import { UndoBar } from "@/components/ui/undo-bar";
 import { analytics } from "@/lib/analytics";
 import { canOpenPlaceCard } from "@/lib/apple-place-card";
 import { t } from "@/lib/i18n";
+import { moveTargets, useTripEditor } from "@/lib/trip-edit";
 import {
   dayAtScroll,
   dayColor,
@@ -19,10 +23,14 @@ import {
   tripStopsLine,
   tripName,
 } from "@/lib/trip-planner";
-import type { TripPlanDetail, TripPlanStop } from "@convex/model/tripPlan";
+import {
+  type TripPlanDetail,
+  type TripPlanStop,
+  UNPLANNED_DAY,
+} from "@convex/model/tripPlan";
 import { haptics } from "@/lib/haptics";
 import { usePlaceOpener } from "@/lib/use-place-opener";
-import { useCallback, useMemo, useReducer, useRef } from "react";
+import { useCallback, useMemo, useReducer, useRef, useState } from "react";
 import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -42,6 +50,7 @@ function DayHeader({
   color,
   active,
   onPress,
+  onAdd,
 }: {
   index: number;
   startDate: string | undefined;
@@ -50,31 +59,122 @@ function DayHeader({
   color: string;
   active: boolean;
   onPress: () => void;
+  onAdd: () => void;
 }) {
   const { theme } = useUnistyles();
+  const day = tripDayLabel(index, startDate);
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={t("tripPlanner.showDay", { day: String(index + 1) })}
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={({ pressed }) => [styles.dayHeader, pressed && styles.pressed]}
+    <View style={styles.dayActions}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("tripPlanner.showDay", {
+          day: String(index + 1),
+        })}
+        accessibilityState={{ selected: active }}
+        onPress={onPress}
+        style={({ pressed }) => [styles.dayHeader, pressed && styles.pressed]}
+      >
+        <View style={[styles.daySwatch, { backgroundColor: color }]} />
+        <View style={styles.dayHeaderText}>
+          <ThemedText variant="header" accessibilityRole="header">
+            {day}
+          </ThemedText>
+          <ThemedText variant="caption" style={styles.muted}>
+            {t("trip.stopCount", { count: stops })}
+          </ThemedText>
+        </View>
+        <AppSymbolIcon
+          name="map"
+          size={18}
+          tintColor={active ? theme.colors.primaryText : theme.colors.muted}
+        />
+      </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("tripPlanner.addPlaceTo", { day })}
+        onPress={onAdd}
+        style={({ pressed }) => [styles.add, pressed && styles.pressed]}
+      >
+        <AppSymbolIcon
+          name="plus"
+          size={15}
+          tintColor={theme.colors.primaryText}
+        />
+        <ThemedText variant="labelStrong" style={styles.addText}>
+          {t("common.add")}
+        </ThemedText>
+      </Pressable>
+    </View>
+  );
+}
+
+function StopActionMenu({
+  trip,
+  stop,
+  day,
+  index,
+  editor,
+  onDetails,
+}: {
+  trip: TripPlanDetail;
+  stop: TripPlanStop;
+  day: number;
+  index: number;
+  editor: ReturnType<typeof useTripEditor>;
+  onDetails: () => void;
+}) {
+  const { theme } = useUnistyles();
+  const label = t("tripPlanner.stopActions", { name: stop.name });
+  const planned = day !== UNPLANNED_DAY;
+  const moveTo = (targetDay: number, targetIndex: number) =>
+    void editor.moveStop(
+      stop._id,
+      { day: targetDay, index: targetIndex },
+      "menu",
+    );
+  const actions = [
+    { label: t("tripPlanner.stopDetails"), onPress: onDetails },
+    ...(planned && index > 0
+      ? [
+          {
+            label: t("tripPlanner.moveUp"),
+            onPress: () => moveTo(day, index - 1),
+          },
+        ]
+      : []),
+    ...(planned && index < (trip.days[day - 1]?.length ?? 0) - 1
+      ? [
+          {
+            label: t("tripPlanner.moveDown"),
+            onPress: () => moveTo(day, index + 1),
+          },
+        ]
+      : []),
+    ...moveTargets(trip, day)
+      .filter((target) => target.day !== UNPLANNED_DAY)
+      .map((target) => ({
+        label: target.label,
+        onPress: () => moveTo(target.day, Number.MAX_SAFE_INTEGER),
+      })),
+    ...(planned
+      ? [
+          {
+            label: t("tripPlanner.removeFromDay"),
+            destructive: true,
+            onPress: () => void editor.removeStop(stop),
+          },
+        ]
+      : []),
+  ];
+  return (
+    <ActionMenu
+      label={label}
+      title={label}
+      style={styles.move}
+      actions={actions}
     >
-      <View style={[styles.daySwatch, { backgroundColor: color }]} />
-      <View style={styles.dayHeaderText}>
-        <ThemedText variant="header" accessibilityRole="header">
-          {tripDayLabel(index, startDate)}
-        </ThemedText>
-        <ThemedText variant="caption" style={styles.muted}>
-          {t("trip.stopCount", { count: stops })}
-        </ThemedText>
-      </View>
-      <AppSymbolIcon
-        name="map"
-        size={18}
-        tintColor={active ? theme.colors.primaryText : theme.colors.muted}
-      />
-    </Pressable>
+      <AppSymbolIcon name="ellipsis" size={19} tintColor={theme.colors.muted} />
+    </ActionMenu>
   );
 }
 
@@ -108,7 +208,13 @@ function useStopOpener() {
  * A planned trip: the map pinned over a scrolling day-by-day list. The focused day lives here;
  * the map only shows it and reports picks.
  */
-export function TripPlanBody({ trip }: { trip: TripPlanDetail }) {
+export function TripPlanBody({
+  trip,
+  onAddPlace,
+}: {
+  trip: TripPlanDetail;
+  onAddPlace: (day: number) => void;
+}) {
   const { rt, theme } = useUnistyles();
   const scroll = useRef<ScrollViewInstance>(null);
   // The trip opens on its first day, so the map starts on a handful of pins, not the whole region.
@@ -125,6 +231,8 @@ export function TripPlanBody({ trip }: { trip: TripPlanDetail }) {
   // The map and its chip row, pinned over the list; the chip row adds to the map's height.
   const headerHeight = useRef(0);
   const openStop = useStopOpener();
+  const editor = useTripEditor(trip);
+  const [details, setDetails] = useState<TripPlanStop | null>(null);
   const hasMap = hasMapPoints(trip);
   const mapHeight = rt.screen.height * MAP_SHARE;
   const stopCount = trip.days.reduce((sum, day) => sum + day.length, 0);
@@ -176,82 +284,79 @@ export function TripPlanBody({ trip }: { trip: TripPlanDetail }) {
   };
 
   return (
-    <ScrollView
-      ref={scroll}
-      style={styles.screen}
-      contentInsetAdjustmentBehavior={hasMap ? "never" : "automatic"}
-      contentContainerStyle={styles.scrollContent}
-      // The map stays pinned while the days scroll under it, so a focused day is always in view.
-      stickyHeaderIndices={hasMap ? [0] : undefined}
-      // The focused day follows the person's own scrolling only; see `nextDayFocus`.
-      onScroll={(event) => dispatch({ type: "scroll", day: dayAt(event) })}
-      scrollEventThrottle={32}
-      onScrollBeginDrag={() => dispatch({ type: "dragStart" })}
-      onScrollEndDrag={(event) =>
-        dispatch({ type: "dragEnd", day: dayAt(event) })
-      }
-      onMomentumScrollBegin={() => dispatch({ type: "momentumStart" })}
-      onMomentumScrollEnd={(event) =>
-        dispatch({ type: "momentumEnd", day: dayAt(event) })
-      }
-    >
-      {hasMap ? (
-        <TripPlannerMap
-          days={trip.days}
-          stay={trip.stay}
-          activeDay={activeDay}
-          height={mapHeight}
-          onSelectDay={pickOnMap}
-          onLayout={({ nativeEvent }) => {
-            headerHeight.current = nativeEvent.layout.height;
-          }}
-        />
-      ) : null}
-      <View
-        style={styles.content}
-        onLayout={({ nativeEvent }) => {
-          contentY.current = nativeEvent.layout.y;
-        }}
+    <View style={styles.screen}>
+      <ScrollView
+        ref={scroll}
+        style={styles.screen}
+        contentInsetAdjustmentBehavior={hasMap ? "never" : "automatic"}
+        contentContainerStyle={styles.scrollContent}
+        // The map stays pinned while the days scroll under it, so a focused day is always in view.
+        stickyHeaderIndices={hasMap ? [0] : undefined}
+        // The focused day follows the person's own scrolling only; see `nextDayFocus`.
+        onScroll={(event) => dispatch({ type: "scroll", day: dayAt(event) })}
+        scrollEventThrottle={32}
+        onScrollBeginDrag={() => dispatch({ type: "dragStart" })}
+        onScrollEndDrag={(event) =>
+          dispatch({ type: "dragEnd", day: dayAt(event) })
+        }
+        onMomentumScrollBegin={() => dispatch({ type: "momentumStart" })}
+        onMomentumScrollEnd={(event) =>
+          dispatch({ type: "momentumEnd", day: dayAt(event) })
+        }
       >
-        <View style={styles.heading}>
-          <ThemedText variant="largeTitle" accessibilityRole="header">
-            {tripName(trip)}
-          </ThemedText>
-          <ThemedText variant="subhead" style={styles.muted}>
-            {tripLengthLine(trip)}
-          </ThemedText>
-          <ThemedText variant="footnote" style={styles.muted}>
-            {tripStopsLine({ stopCount, savedCount })}
-          </ThemedText>
-          {trip.stay ? (
-            <ThemedText variant="footnote" style={styles.muted}>
-              {t("tripPlanner.stayingAt", { name: trip.stay.name })}
-            </ThemedText>
-          ) : null}
-        </View>
-
-        {trip.days.map((stops, index) => (
-          <View
-            key={`day-${index}`}
-            style={styles.day}
+        {hasMap ? (
+          <TripPlannerMap
+            days={trip.days}
+            stay={trip.stay}
+            activeDay={activeDay}
+            height={mapHeight}
+            onSelectDay={pickOnMap}
             onLayout={({ nativeEvent }) => {
-              dayY.current[index] = nativeEvent.layout.y;
+              headerHeight.current = nativeEvent.layout.height;
             }}
-          >
-            <DayHeader
-              index={index}
-              startDate={trip.startDate}
-              stops={stops.length}
-              color={dayColor(index, theme.colors.tripDays)}
-              active={activeDay === index}
-              onPress={() => pick(index)}
-            />
-            {stops.length === 0 ? (
+          />
+        ) : null}
+        <View
+          style={styles.content}
+          onLayout={({ nativeEvent }) => {
+            contentY.current = nativeEvent.layout.y;
+          }}
+        >
+          <View style={styles.heading}>
+            <ThemedText variant="largeTitle" accessibilityRole="header">
+              {tripName(trip)}
+            </ThemedText>
+            <ThemedText variant="subhead" style={styles.muted}>
+              {tripLengthLine(trip)}
+            </ThemedText>
+            <ThemedText variant="footnote" style={styles.muted}>
+              {tripStopsLine({ stopCount, savedCount })}
+            </ThemedText>
+            {trip.stay ? (
               <ThemedText variant="footnote" style={styles.muted}>
-                {t("tripPlanner.emptyDay")}
+                {t("tripPlanner.stayingAt", { name: trip.stay.name })}
               </ThemedText>
-            ) : (
-              stops.map((stop, stopIndex) => (
+            ) : null}
+          </View>
+
+          {trip.days.map((stops, index) => (
+            <View
+              key={`day-${index}`}
+              style={styles.day}
+              onLayout={({ nativeEvent }) => {
+                dayY.current[index] = nativeEvent.layout.y;
+              }}
+            >
+              <DayHeader
+                index={index}
+                startDate={trip.startDate}
+                stops={stops.length}
+                color={dayColor(index, theme.colors.tripDays)}
+                active={activeDay === index}
+                onPress={() => pick(index)}
+                onAdd={() => onAddPlace(index + 1)}
+              />
+              {stops.map((stop, stopIndex) => (
                 <TripStopRow
                   key={stop._id}
                   stop={stop}
@@ -261,39 +366,65 @@ export function TripPlanBody({ trip }: { trip: TripPlanDetail }) {
                     on: theme.colors.onTripDay,
                   }}
                   fromSave={fromSave.has(stop._id)}
+                  action={
+                    <StopActionMenu
+                      trip={trip}
+                      stop={stop}
+                      day={index + 1}
+                      index={stopIndex}
+                      editor={editor}
+                      onDetails={() => setDetails(stop)}
+                    />
+                  }
                   onPress={() => {
                     // The map follows the list: coming back, it shows the day this stop is on.
                     pick(index);
                     openStop(stop);
                   }}
                 />
-              ))
-            )}
-          </View>
-        ))}
+              ))}
+            </View>
+          ))}
 
-        {trip.unplanned.length > 0 ? (
-          <View style={styles.day}>
-            <View style={styles.dayHeaderText}>
+          {trip.unplanned.length > 0 ? (
+            <View style={styles.day}>
               <ThemedText variant="header" accessibilityRole="header">
                 {t("tripPlanner.unplanned")}
               </ThemedText>
-              <ThemedText variant="caption" style={styles.muted}>
-                {t("tripPlanner.unplannedHint")}
-              </ThemedText>
+              {trip.unplanned.map((stop, index) => (
+                <TripStopRow
+                  key={stop._id}
+                  stop={stop}
+                  fromSave={fromSave.has(stop._id)}
+                  action={
+                    <StopActionMenu
+                      trip={trip}
+                      stop={stop}
+                      day={UNPLANNED_DAY}
+                      index={index}
+                      editor={editor}
+                      onDetails={() => setDetails(stop)}
+                    />
+                  }
+                  onPress={() => openStop(stop)}
+                />
+              ))}
             </View>
-            {trip.unplanned.map((stop) => (
-              <TripStopRow
-                key={stop._id}
-                stop={stop}
-                fromSave={fromSave.has(stop._id)}
-                onPress={() => openStop(stop)}
-              />
-            ))}
-          </View>
-        ) : null}
-      </View>
-    </ScrollView>
+          ) : null}
+        </View>
+      </ScrollView>
+      <UndoBar
+        message={editor.undo?.message ?? null}
+        onUndo={() => void editor.undoLast()}
+      />
+      {details ? (
+        <TripStopDetailsSheet
+          key={details._id}
+          stop={details}
+          onClose={() => setDetails(null)}
+        />
+      ) : null}
+    </View>
   );
 }
 
@@ -308,7 +439,9 @@ const styles = StyleSheet.create((theme, rt) => ({
   heading: { gap: theme.gap(0.5) },
   muted: { color: theme.colors.muted },
   day: { gap: theme.gap(0.5) },
+  dayActions: { flexDirection: "row", alignItems: "center", gap: theme.gap(1) },
   dayHeader: {
+    flex: 1,
     minHeight: theme.control.minHeight,
     flexDirection: "row",
     alignItems: "center",
@@ -317,5 +450,21 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   dayHeaderText: { flex: 1, gap: theme.gap(0.25) },
   daySwatch: { width: 12, height: 12, borderRadius: 6 },
+  add: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(0.5),
+    minHeight: theme.control.minHeight,
+    paddingHorizontal: theme.gap(1.5),
+    borderRadius: theme.radius.lg,
+    backgroundColor: theme.colors.primarySoft,
+  },
+  addText: { color: theme.colors.primaryText },
+  move: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   pressed: { opacity: theme.opacity.pressed },
 }));

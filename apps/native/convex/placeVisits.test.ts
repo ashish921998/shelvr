@@ -4,7 +4,7 @@ import type { FunctionReference } from "convex/server";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 import { newConvexTest, signedInUser } from "./test.setup";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
 async function setup(options: { pro?: boolean } = {}) {
@@ -33,6 +33,40 @@ async function setup(options: { pro?: boolean } = {}) {
 }
 
 describe("setVisited", () => {
+  it("preserves stored visit coordinates and removes them with the account", async () => {
+    const { backend, t, userId, itemId, visits } = await setup();
+    const location = {
+      city: "Austin",
+      countryCode: "US",
+      lat: 30.27,
+      lng: -97.75,
+      backfilled: true,
+    };
+    const visitId = await t.run((ctx) =>
+      ctx.db.insert("placeVisits", {
+        userId,
+        itemId,
+        key: "tigre",
+        name: "Tigre",
+        visitedAt: 1,
+        ...location,
+      }),
+    );
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: true,
+    });
+    expect(await visits()).toMatchObject([{ _id: visitId, ...location }]);
+    await t.mutation(api.users.deleteCurrentUserAccount, {});
+    for (let pass = 0; pass < 30; pass++) {
+      if ((await backend.run((ctx) => ctx.db.get(userId))) === null) break;
+      await backend.mutation(internal.users.processAccountDeletion, { userId });
+    }
+    expect(await backend.run((ctx) => ctx.db.get(userId))).toBeNull();
+    expect(await backend.run((ctx) => ctx.db.get(visitId))).toBeNull();
+  });
+
   it("keeps the api reference installed apps compiled against", () => {
     expectTypeOf(api.placeVisits.setVisited).toEqualTypeOf<
       FunctionReference<

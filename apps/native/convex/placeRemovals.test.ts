@@ -412,11 +412,7 @@ describe("place removals", () => {
       [],
     );
     expect(
-      (
-        await t.mutation(internal.datePlanData.claimDatePlanInternal, {
-          city: "Lisboa",
-        })
-      ).pins,
+      await t.query(api.datePlanData.listDateStarts, { city: "Lisboa" }),
     ).toEqual([]);
   });
 

@@ -36,6 +36,9 @@ export const tripStayValidator = v.object({
 /** Day 0 holds the unplanned stops; days 1..dayCount are the itinerary. */
 export const UNPLANNED_DAY = 0;
 
+export const MAX_TRIP_STOP_NOTE_CHARS = 500;
+export const TRIP_STOP_TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
 export const tripPlanStopValidator = v.object({
   _id: v.id("tripStops"),
   source: tripStopSourceValidator,
@@ -48,6 +51,8 @@ export const tripPlanStopValidator = v.object({
   category: v.optional(v.string()),
   why: v.optional(v.string()),
   slot: v.optional(tripSlotValidator),
+  time: v.optional(v.string()),
+  note: v.optional(v.string()),
 });
 export type TripPlanStop = Infer<typeof tripPlanStopValidator>;
 

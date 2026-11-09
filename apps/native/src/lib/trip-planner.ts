@@ -287,7 +287,10 @@ export function stopWhyLine(
  * "Stop 3, Kafeine, Yours, Alfama, From “Best of Lisbon”". Unplanned stops have no number.
  */
 export function stopRowLabel(
-  stop: Pick<TripPlanStop, "name" | "source" | "itemId" | "area" | "why">,
+  stop: Pick<
+    TripPlanStop,
+    "name" | "source" | "itemId" | "area" | "why" | "time" | "note"
+  >,
   { number, fromSave }: { number?: number; fromSave: boolean },
 ): string {
   return [
@@ -295,9 +298,11 @@ export function stopRowLabel(
       ? null
       : t("tripPlanner.stopNumber", { number: String(number) }),
     stop.name,
+    stop.time,
     t(stopBadge(stop)),
     stop.area,
     stopWhyLine(stop, fromSave),
+    stop.note,
   ]
     .filter(Boolean)
     .join(", ");
