@@ -87,6 +87,45 @@ async function setup(
   return { t, itemId, pins };
 }
 
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+});
+
+it("uses a precise address when POI search has no match", async () => {
+  await withMaps();
+  const { t, itemId, pins } = await setup([], {
+    read: ["123 Broadway", "Eberly"],
+  });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname === "/v1/token")
+        return Response.json({ accessToken: "maps" });
+      if (url.searchParams.get("resultTypeFilter") === "Poi")
+        return Response.json({ results: [] });
+      const query = url.searchParams.get("q");
+      return Response.json({
+        results: [
+          {
+            name: query?.startsWith("123 Broadway")
+              ? "123 Broadway"
+              : "Eberly Street",
+            coordinate: { latitude: 38.72, longitude: -9.1 },
+          },
+        ],
+      });
+    }),
+  );
+  await t.action(internal.placePins.locateItem, { itemId });
+  expect(await pins()).toEqual([
+    { name: "123 Broadway", city: "Lisbon", lat: 38.72, lng: -9.1 },
+  ]);
+});
+
 describe("placePins", () => {
   it("finds a kept place on an edited save by its branch and leaves the owner's pin alone", async () => {
     const { queries } = await withMaps();
@@ -200,6 +239,7 @@ describe("placePins", () => {
       if (old === null) throw new Error("Expected a lookup");
       expect(old.locations).toEqual([]);
       await t.run((ctx) => ctx.db.patch(itemId, { status: "processing" }));
+      vi.useFakeTimers();
       expect(
         await t.mutation(internal.items.finalizeItem, {
           itemId,
@@ -225,7 +265,7 @@ describe("placePins", () => {
           cluesSearched: old.locations,
         });
       if (!newFirst) await oldStores();
-      await t.action(internal.placePins.locateItem, { itemId });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
       if (newFirst) await oldStores();
       expect((await pins())?.map((pin) => pin.appleId)).toEqual(["trocadero"]);
     },
@@ -262,6 +302,7 @@ describe("placePins", () => {
         placePins: [{ name: "Cafe Joe", lat: 48.86, lng: 2.36, city: "Paris" }],
       }),
     );
+    vi.useFakeTimers();
     await t.mutation(internal.items.finalizeItem, {
       itemId,
       reading: {},
@@ -278,7 +319,7 @@ describe("placePins", () => {
       },
     });
     expect(await pins()).toEqual([]);
-    await t.action(internal.placePins.locateItem, { itemId });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
     expect((await pins())?.map((pin) => pin.appleId)).toEqual(["neuve"]);
   });
 
@@ -543,10 +584,91 @@ describe("placePins", () => {
       lng: 2.338,
     });
   });
-  afterEach(() => {
-    vi.unstubAllEnvs();
-    vi.unstubAllGlobals();
-    vi.restoreAllMocks();
+  it("retries the venue in its city when the location clue returns no match", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup([], { read: ["Cafe"] });
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        placeLocations: [{ name: "Cafe", location: "City University" }],
+      }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps" });
+        expect(url.searchParams.get("resultTypeFilter")).toBe("Poi");
+        return Response.json({
+          results:
+            url.searchParams.get("q") === "Cafe, Lisbon"
+              ? [
+                  {
+                    id: "cafe",
+                    coordinate: { latitude: 38.72, longitude: -9.1 },
+                  },
+                ]
+              : [],
+        });
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(await pins()).toMatchObject([
+      { name: "Cafe", city: "Lisbon", appleId: "cafe" },
+    ]);
+  });
+
+  it("matches a venue as a point of interest instead of a similarly named street address", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup([], { read: ["Eberly"] });
+    await t.run((ctx) => ctx.db.patch(itemId, { cities: ["Austin"] }));
+    const filters: (string | null)[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps" });
+        const filter = url.searchParams.get("resultTypeFilter");
+        filters.push(filter);
+        return Response.json({
+          results:
+            filter === "Poi"
+              ? [
+                  {
+                    name: "Eberly",
+                    id: "eberly-south-lamar",
+                    poiCategory: "Restaurant",
+                    coordinate: {
+                      latitude: 30.2585588,
+                      longitude: -97.7589059,
+                    },
+                  },
+                ]
+              : [
+                  {
+                    name: "Eberly Street",
+                    coordinate: {
+                      latitude: 30.298424351230945,
+                      longitude: -97.69657681722597,
+                    },
+                  },
+                ],
+        });
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(filters).toEqual(["Poi"]);
+    expect(await pins()).toEqual([
+      {
+        name: "Eberly",
+        city: "Austin",
+        lat: 30.2585588,
+        lng: -97.7589059,
+        appleId: "eberly-south-lamar",
+        category: "Restaurant",
+      },
+    ]);
   });
 
   it("pins every place a save names, searched near its city", async () => {
