@@ -30,7 +30,7 @@ import {
 import { logEvent } from "./model/log";
 import { buildSearchText } from "./model/searchText";
 import { effectiveStatus } from "./model/memberships";
-import { isStreetAddress, placeKey } from "./model/plan";
+import { isStreetAddress, placeKey, splitSavedPlace } from "./model/plan";
 import { SAME_SPOT_KM } from "./model/placeList";
 import {
   cityKey,
@@ -355,15 +355,22 @@ async function lookUp(
   const queries = new Map(
     locations.map(({ name, location }) => [name, `${name}, ${location}`]),
   );
+  const sourceCityKey =
+    city === undefined ? null : placeKey(splitSavedPlace(city).name);
   const unavailable = new Set<string>();
   const find = async (name: string, near: LatLng | undefined) => {
-    const kind = isStreetAddress(name) ? "search" : "poi";
+    const isSourceCity = placeKey(splitSavedPlace(name).name) === sourceCityKey;
+    const kind = isSourceCity
+      ? "address"
+      : isStreetAddress(name)
+        ? "search"
+        : "poi";
     const query = lookupQuery(queries.get(name) ?? name, city);
     let at = await appleMapsFind(token, kind, query, near, undefined, true);
     if (at === null && kind === "poi") {
       at = await appleMapsFind(
         token,
-        "search",
+        "address",
         query,
         near,
         undefined,

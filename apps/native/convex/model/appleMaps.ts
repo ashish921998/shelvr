@@ -193,7 +193,7 @@ function appleGet(
 
 export async function appleMapsFind(
   accessToken: string,
-  kind: "search" | "geocode" | "poi",
+  kind: "search" | "geocode" | "poi" | "address",
   query: string,
   near?: LatLng,
   fetchImpl: typeof fetch = fetch,
@@ -204,13 +204,13 @@ export async function appleMapsFind(
   if (near !== undefined) {
     params.set("searchLocation", `${near.lat},${near.lng}`);
   }
-  const path = kind === "poi" ? "search" : kind;
-  const filters =
-    kind === "poi"
-      ? ["Poi"]
-      : kind === "search"
-        ? ["Poi,Address", "Poi"]
-        : [""];
+  const path = kind === "geocode" ? "geocode" : "search";
+  const filters = {
+    search: ["Poi,Address", "Poi"],
+    geocode: [""],
+    poi: ["Poi"],
+    address: ["Address"],
+  }[kind];
   for (const filter of filters) {
     if (filter) params.set("resultTypeFilter", filter);
     let body: unknown;
