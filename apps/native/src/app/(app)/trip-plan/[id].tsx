@@ -150,13 +150,13 @@ function TripHeader({
 export default function TripPlanScreen() {
   useAppLocale();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, mode } = useLocalSearchParams<{ id: string; mode?: "edit" }>();
   const tripId = id as Id<"tripPlans">;
   const trip = useQuery(
     convexQuery(api.tripPlannerData.getTripPlan, { tripId }),
   );
   const deleteTrip = useDeleteTripPlan();
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(mode === "edit");
   const [name, setName] = useState<string | null>(null);
   const rename = useRenameTrip(tripId, trip.data?.name);
   const share = useTripShare(tripId);
@@ -173,7 +173,10 @@ export default function TripPlanScreen() {
       stops: stops.length,
       saved: stops.filter((stop) => stop.source === "save").length,
     });
-  }, [data]);
+    if (mode === "edit") {
+      analytics.capture("trip_plan_edit_started", { stops: stops.length });
+    }
+  }, [data, mode]);
 
   // Without a title VoiceOver read the tab group's route name, "(tabs)".
   const backTitle = (
@@ -265,7 +268,7 @@ export default function TripPlanScreen() {
           header={
             <TripEditHeader
               city={data.city}
-              name={name ?? ""}
+              name={name ?? data.name ?? ""}
               onChangeName={setName}
               onSubmitName={() => {
                 if (name !== null) void rename(name);

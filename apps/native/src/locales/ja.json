@@ -866,11 +866,11 @@
   "tripPlanner.loading": "旅行を読み込んでいます",
   "tripPlanner.planTrip": "旅行を計画",
   "tripPlanner.emptyTitle": "まだ旅行はありません",
-  "tripPlanner.emptyBody": "都市と日数を選ぶだけ。保存した場所と近くのおすすめを組み合わせて、日ごとにまとめます。",
+  "tripPlanner.emptyBody": "保存した場所から日ごとの旅程を作りましょう。",
   "tripPlanner.tripTitle": "%{city}旅行",
   "tripPlanner.dateRange": "%{start}〜%{end}",
   "tripPlanner.lengthWithDates": "%{days}・%{dates}",
-  "tripPlanner.lengthPlanned": "%{days}・%{date}に作成",
+  "tripPlanner.plannedDate": "%{date}に作成",
   "tripPlanner.stopsFromSaves": {
     "other": "%{stops}・うち保存から%{formattedCount}か所"
   },

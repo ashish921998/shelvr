@@ -825,7 +825,7 @@ export type MessageParams = {
   "tripPlanner.tripTitle": { city: string };
   "tripPlanner.dateRange": { start: string; end: string };
   "tripPlanner.lengthWithDates": { days: string; dates: string };
-  "tripPlanner.lengthPlanned": { days: string; date: string };
+  "tripPlanner.plannedDate": { date: string };
   "tripPlanner.stopsFromSaves": { stops: string; count: number };
   "tripPlanner.dayWithDate": { day: string; date: string };
   "tripPlanner.tripActions": undefined;

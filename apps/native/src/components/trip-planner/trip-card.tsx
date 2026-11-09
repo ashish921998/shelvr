@@ -2,12 +2,7 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t } from "@/lib/i18n";
-import {
-  tripCardLine,
-  tripInterestsLine,
-  tripStopsLine,
-  tripName,
-} from "@/lib/trip-planner";
+import { tripCardDate, tripInterestsLine, tripName } from "@/lib/trip-planner";
 import type { TripPlanSummary } from "@convex/model/tripPlan";
 import { Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -15,16 +10,24 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 type Props = {
   trip: TripPlanSummary;
   onOpen: () => void;
+  onEdit: () => void;
   onDelete: () => void;
 };
 
-export function TripCard({ trip, onOpen, onDelete }: Props) {
+export function TripCard({ trip, onOpen, onEdit, onDelete }: Props) {
   const { theme } = useUnistyles();
   const title = tripName(trip);
-  const length = tripCardLine(trip);
-  const interests = tripInterestsLine(trip);
-  const stops = tripStopsLine(trip);
-  const label = [title, length, interests, stops].filter(Boolean).join(", ");
+  const summary = [
+    trip.name?.trim() ? trip.city : null,
+    t("trip.dayCount", { count: trip.dayCount }),
+    t("trip.stopCount", { count: trip.stopCount }),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const context = [tripCardDate(trip), tripInterestsLine(trip)]
+    .filter(Boolean)
+    .join(" · ");
+  const label = [title, summary, context].join(", ");
   return (
     <View style={styles.card}>
       <Pressable
@@ -33,31 +36,15 @@ export function TripCard({ trip, onOpen, onDelete }: Props) {
         onPress={onOpen}
         style={({ pressed }) => [styles.body, pressed && styles.pressed]}
       >
-        <View style={styles.icon}>
-          <AppSymbolIcon
-            name="airplane"
-            size={18}
-            tintColor={theme.colors.primaryText}
-          />
-        </View>
         <View style={styles.text}>
-          <ThemedText variant="title" numberOfLines={1}>
+          <ThemedText variant="title" numberOfLines={2}>
             {title}
           </ThemedText>
-          <ThemedText variant="subhead" style={styles.muted} numberOfLines={1}>
-            {length}
+          <ThemedText variant="subheadLabel" style={styles.summary}>
+            {summary}
           </ThemedText>
-          {interests === null ? null : (
-            <ThemedText
-              variant="footnote"
-              style={styles.muted}
-              numberOfLines={1}
-            >
-              {interests}
-            </ThemedText>
-          )}
-          <ThemedText variant="footnote" style={styles.muted} numberOfLines={1}>
-            {stops}
+          <ThemedText variant="footnote" style={styles.muted} numberOfLines={2}>
+            {context}
           </ThemedText>
         </View>
       </Pressable>
@@ -65,6 +52,11 @@ export function TripCard({ trip, onOpen, onDelete }: Props) {
         label={t("tripPlanner.tripActions")}
         title={title}
         actions={[
+          {
+            id: "edit",
+            label: t("tripPlanner.edit"),
+            onPress: onEdit,
+          },
           {
             id: "delete",
             label: t("tripPlanner.delete"),
@@ -97,26 +89,17 @@ const styles = StyleSheet.create((theme) => ({
   },
   body: {
     flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.5),
-    padding: theme.gap(2),
+    paddingVertical: theme.gap(1.75),
+    paddingLeft: theme.gap(2),
   },
   pressed: { opacity: theme.opacity.pressed },
-  icon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: theme.colors.primarySoft,
-  },
-  text: { flex: 1, gap: theme.gap(0.25) },
+  text: { gap: theme.gap(0.5) },
+  summary: { color: theme.colors.primaryText },
   muted: { color: theme.colors.muted },
   menu: {
     width: theme.control.minHeight,
     height: theme.control.minHeight,
-    marginRight: theme.gap(0.5),
+    marginHorizontal: theme.gap(0.5),
     alignItems: "center",
     justifyContent: "center",
   },

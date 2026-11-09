@@ -28,7 +28,7 @@ import {
   stopWhyLine,
   toggleInterest,
   tripDateRange,
-  tripCardLine,
+  tripCardDate,
   tripDayLabel,
   tripFormArgs,
   tripFormProblem,
@@ -165,15 +165,13 @@ describe("trip lines", () => {
 
   it("tells same-city trips apart on their cards by when they were planned", () => {
     const createdAt = new Date(2026, 9, 27, 15).getTime();
-    expect(tripCardLine({ dayCount: 3, createdAt })).toBe(
-      "3 days · Planned Oct 27",
-    );
-    expect(tripCardLine({ dayCount: 3, startDate: "soon", createdAt })).toBe(
-      "3 days · Planned Oct 27",
+    expect(tripCardDate({ dayCount: 3, createdAt })).toBe("Planned Oct 27");
+    expect(tripCardDate({ dayCount: 3, startDate: "soon", createdAt })).toBe(
+      "Planned Oct 27",
     );
     expect(
-      tripCardLine({ dayCount: 3, startDate: "2026-11-04", createdAt }),
-    ).toBe("3 days · Nov 4 – Nov 6");
+      tripCardDate({ dayCount: 3, startDate: "2026-11-04", createdAt }),
+    ).toBe("Nov 4 – Nov 6");
   });
 
   it("lists a trip's interests by name so trips to one city read apart", () => {

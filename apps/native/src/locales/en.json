@@ -889,11 +889,11 @@
   "tripPlanner.loading": "Loading your trips",
   "tripPlanner.planTrip": "Plan a trip",
   "tripPlanner.emptyTitle": "No trips yet",
-  "tripPlanner.emptyBody": "Pick a city and a few days. Your trip mixes the places you saved with suggested spots nearby, sorted into days.",
+  "tripPlanner.emptyBody": "Turn saved places into a day-by-day plan.",
   "tripPlanner.tripTitle": "%{city} trip",
   "tripPlanner.dateRange": "%{start} – %{end}",
   "tripPlanner.lengthWithDates": "%{days} · %{dates}",
-  "tripPlanner.lengthPlanned": "%{days} · Planned %{date}",
+  "tripPlanner.plannedDate": "Planned %{date}",
   "tripPlanner.stopsFromSaves": {
     "one": "%{stops} · %{formattedCount} from your saves",
     "other": "%{stops} · %{formattedCount} from your saves"

@@ -889,11 +889,11 @@
   "tripPlanner.loading": "Deine Reisen werden geladen",
   "tripPlanner.planTrip": "Reise planen",
   "tripPlanner.emptyTitle": "Noch keine Reisen",
-  "tripPlanner.emptyBody": "Wähle eine Stadt und ein paar Tage. Deine Reise mischt deine gespeicherten Orte mit Vorschlägen in der Nähe, aufgeteilt auf Tage.",
+  "tripPlanner.emptyBody": "Mach aus gespeicherten Orten einen Reiseplan für jeden Tag.",
   "tripPlanner.tripTitle": "Reise nach %{city}",
   "tripPlanner.dateRange": "%{start} – %{end}",
   "tripPlanner.lengthWithDates": "%{days} · %{dates}",
-  "tripPlanner.lengthPlanned": "%{days} · Geplant am %{date}",
+  "tripPlanner.plannedDate": "Geplant am %{date}",
   "tripPlanner.stopsFromSaves": {
     "one": "%{stops} · %{formattedCount} aus deinen Inhalten",
     "other": "%{stops} · %{formattedCount} aus deinen Inhalten"

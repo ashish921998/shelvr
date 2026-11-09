@@ -866,11 +866,11 @@
   "tripPlanner.loading": "여행을 불러오는 중",
   "tripPlanner.planTrip": "여행 계획하기",
   "tripPlanner.emptyTitle": "아직 여행이 없어요",
-  "tripPlanner.emptyBody": "도시와 기간을 고르세요. 저장한 장소와 근처 추천 장소를 섞어 하루씩 나눠 드려요.",
+  "tripPlanner.emptyBody": "저장한 장소로 하루 단위 여행 일정을 만들어 보세요.",
   "tripPlanner.tripTitle": "%{city} 여행",
   "tripPlanner.dateRange": "%{start}~%{end}",
   "tripPlanner.lengthWithDates": "%{days} · %{dates}",
-  "tripPlanner.lengthPlanned": "%{days} · %{date}에 계획함",
+  "tripPlanner.plannedDate": "%{date}에 계획함",
   "tripPlanner.stopsFromSaves": {
     "other": "%{stops} · 저장한 곳 %{formattedCount}곳"
   },

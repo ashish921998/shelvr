@@ -202,19 +202,21 @@ export function tripLengthLine(
     : t("tripPlanner.lengthWithDates", { days, dates });
 }
 
-/**
- * The length line on a trip's card. Without dates it says when the trip was planned, so two
- * trips to one city still read apart: "3 days · Planned Oct 27".
- */
+export function tripCardDate(
+  trip: Pick<TripPlanSummary, "dayCount" | "startDate" | "createdAt">,
+): string {
+  return (
+    tripDateRange(trip.startDate, trip.dayCount) ??
+    t("tripPlanner.plannedDate", { date: shortDate(new Date(trip.createdAt)) })
+  );
+}
+
 export function tripCardLine(
   trip: Pick<TripPlanSummary, "dayCount" | "startDate" | "createdAt">,
 ): string {
-  if (tripDateRange(trip.startDate, trip.dayCount) !== null) {
-    return tripLengthLine(trip);
-  }
-  return t("tripPlanner.lengthPlanned", {
+  return t("tripPlanner.lengthWithDates", {
     days: t("trip.dayCount", { count: trip.dayCount }),
-    date: shortDate(new Date(trip.createdAt)),
+    dates: tripCardDate(trip),
   });
 }
 

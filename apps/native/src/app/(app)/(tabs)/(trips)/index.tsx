@@ -14,7 +14,7 @@ import { FlatList, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-function NoTrips({ onPlan }: { onPlan: () => void }) {
+function NoTrips() {
   const { theme } = useUnistyles();
   return (
     <Animated.View entering={fadeIn} style={styles.empty}>
@@ -31,12 +31,6 @@ function NoTrips({ onPlan }: { onPlan: () => void }) {
       <ThemedText variant="subhead" style={[styles.center, styles.muted]}>
         {t("tripPlanner.emptyBody")}
       </ThemedText>
-      <Button
-        testID="trips-plan-trip"
-        title={t("tripPlanner.planTrip")}
-        onPress={onPlan}
-        style={styles.emptyButton}
-      />
     </Animated.View>
   );
 }
@@ -63,7 +57,6 @@ function TripsList({ signedIn }: { signedIn: boolean }) {
   );
   const deleteTrip = useDeleteTripPlan();
   const sorted = trips.results;
-  const plan = () => router.push("/new-trip");
   // Under the Plan a trip sheet the list is still on screen; hidden from VoiceOver and TalkBack
   // then, so a swipe cannot leave the sheet for the list behind it.
   const focused = useIsFocused();
@@ -73,54 +66,78 @@ function TripsList({ signedIn }: { signedIn: boolean }) {
   }
 
   return (
-    <FlatList
+    <View
       style={styles.screen}
       accessibilityElementsHidden={!focused}
       importantForAccessibility={focused ? "auto" : "no-hide-descendants"}
-      data={sorted}
-      keyExtractor={(trip) => trip._id}
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={[
-        styles.content,
-        sorted.length === 0 && styles.contentEmpty,
-      ]}
-      renderItem={({ item: trip }) => (
-        <TripCard
-          trip={trip}
-          onOpen={() =>
-            router.push({
-              pathname: "/trip-plan/[id]",
-              params: { id: trip._id },
-            })
-          }
-          onDelete={() => deleteTrip(trip._id)}
+    >
+      <View style={styles.header}>
+        <ThemedText
+          variant="displayTitle"
+          accessibilityRole="header"
+          style={styles.title}
+        >
+          {t("tripPlanner.listTitle")}
+        </ThemedText>
+        <Button
+          testID="trips-plan-trip"
+          title={t("tripPlanner.planTrip")}
+          onPress={() => router.push("/new-trip")}
+          style={styles.planButton}
         />
-      )}
-      onEndReached={() => {
-        if (trips.status === "CanLoadMore") trips.loadMore(PAGE_SIZE);
-      }}
-      onEndReachedThreshold={0.5}
-      ListEmptyComponent={<NoTrips onPlan={plan} />}
-      ListFooterComponent={
-        sorted.length > 0 ? (
-          <Button
-            testID="trips-plan-another"
-            title={t("tripPlanner.planTrip")}
-            onPress={plan}
-            style={styles.footerButton}
+      </View>
+      <FlatList
+        data={sorted}
+        keyExtractor={(trip) => trip._id}
+        contentContainerStyle={[
+          styles.content,
+          sorted.length === 0 && styles.contentEmpty,
+        ]}
+        renderItem={({ item: trip }) => (
+          <TripCard
+            trip={trip}
+            onOpen={() =>
+              router.push({
+                pathname: "/trip-plan/[id]",
+                params: { id: trip._id },
+              })
+            }
+            onDelete={() => deleteTrip(trip._id)}
+            onEdit={() =>
+              router.push({
+                pathname: "/trip-plan/[id]",
+                params: { id: trip._id, mode: "edit" },
+              })
+            }
           />
-        ) : undefined
-      }
-    />
+        )}
+        onEndReached={() => {
+          if (trips.status === "CanLoadMore") trips.loadMore(PAGE_SIZE);
+        }}
+        onEndReachedThreshold={0.5}
+        ListEmptyComponent={NoTrips}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create((theme, rt) => ({
   screen: { flex: 1, backgroundColor: theme.colors.background },
+  header: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.gap(1.5),
+    paddingHorizontal: theme.gap(2.5),
+    paddingTop: rt.insets.top + theme.gap(1.5),
+    paddingBottom: theme.gap(2.5),
+  },
+  title: { flexShrink: 1 },
+  planButton: { flexShrink: 1 },
   content: {
     gap: theme.gap(1.5),
-    paddingHorizontal: theme.gap(2),
-    paddingTop: theme.gap(1),
+    paddingHorizontal: theme.gap(2.5),
     paddingBottom: rt.insets.bottom + theme.gap(12),
   },
   contentEmpty: { flexGrow: 1, justifyContent: "center" },
@@ -140,6 +157,4 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   center: { textAlign: "center" },
   muted: { color: theme.colors.muted },
-  emptyButton: { alignSelf: "stretch", marginTop: theme.gap(1) },
-  footerButton: { marginTop: theme.gap(1.5) },
 }));

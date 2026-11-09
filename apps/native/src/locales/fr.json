@@ -912,11 +912,11 @@
   "tripPlanner.loading": "Chargement de vos voyages",
   "tripPlanner.planTrip": "Planifier un voyage",
   "tripPlanner.emptyTitle": "Pas encore de voyage",
-  "tripPlanner.emptyBody": "Choisissez une ville et quelques jours. Votre voyage mêle vos lieux enregistrés à des suggestions à proximité, répartis par jour.",
+  "tripPlanner.emptyBody": "Créez un itinéraire jour par jour à partir de vos lieux enregistrés.",
   "tripPlanner.tripTitle": "Voyage à %{city}",
   "tripPlanner.dateRange": "%{start} – %{end}",
   "tripPlanner.lengthWithDates": "%{days} · %{dates}",
-  "tripPlanner.lengthPlanned": "%{days} · Planifié le %{date}",
+  "tripPlanner.plannedDate": "Planifié le %{date}",
   "tripPlanner.stopsFromSaves": {
     "one": "%{stops} · %{formattedCount} de vos enregistrements",
     "many": "%{stops} · %{formattedCount} de vos enregistrements",
