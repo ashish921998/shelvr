@@ -358,17 +358,13 @@ async function lookUp(
   const unavailable = new Set<string>();
   const find = async (name: string, near: LatLng | undefined) => {
     const kind = isStreetAddress(name) ? "search" : "poi";
-    const plain = lookupQuery(name, city);
-    const qualified = lookupQuery(queries.get(name) ?? name, city);
-    let at = await appleMapsFind(token, kind, qualified, near, undefined, true);
-    if (at === null && qualified !== plain) {
-      at = await appleMapsFind(token, kind, plain, near, undefined, true);
-    }
+    const query = lookupQuery(queries.get(name) ?? name, city);
+    let at = await appleMapsFind(token, kind, query, near, undefined, true);
     if (at === null && kind === "poi") {
       at = await appleMapsFind(
         token,
         "search",
-        plain,
+        query,
         near,
         undefined,
         true,

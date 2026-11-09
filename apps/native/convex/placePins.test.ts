@@ -97,8 +97,9 @@ afterEach(() => {
 it("uses a precise address when POI search has no match", async () => {
   await withMaps();
   const { t, itemId, pins } = await setup([], {
-    read: ["123 Broadway", "Eberly"],
+    read: ["123 Broadway, New York, NY", "Eberly"],
   });
+  await t.run((ctx) => ctx.db.patch(itemId, { cities: ["New York"] }));
   vi.stubGlobal(
     "fetch",
     vi.fn(async (input: string) => {
@@ -114,7 +115,11 @@ it("uses a precise address when POI search has no match", async () => {
             name: query?.startsWith("123 Broadway")
               ? "123 Broadway"
               : "Eberly Street",
-            coordinate: { latitude: 38.72, longitude: -9.1 },
+            structuredAddress: {
+              locality: "New York",
+              thoroughfare: "Broadway",
+            },
+            coordinate: { latitude: 40.71, longitude: -74.01 },
           },
         ],
       });
@@ -122,7 +127,12 @@ it("uses a precise address when POI search has no match", async () => {
   );
   await t.action(internal.placePins.locateItem, { itemId });
   expect(await pins()).toEqual([
-    { name: "123 Broadway", city: "Lisbon", lat: 38.72, lng: -9.1 },
+    {
+      name: "123 Broadway, New York, NY",
+      city: "New York",
+      lat: 40.71,
+      lng: -74.01,
+    },
   ]);
 });
 
@@ -584,28 +594,32 @@ describe("placePins", () => {
       lng: 2.338,
     });
   });
-  it("retries the venue in its city when the location clue returns no match", async () => {
+  it("keeps the branch clue on fallback instead of pinning another branch", async () => {
     await withMaps();
-    const { t, itemId, pins } = await setup([], { read: ["Cafe"] });
+    const { t, itemId, pins } = await setup([], { read: ["Carette"] });
     await t.run((ctx) =>
       ctx.db.patch(itemId, {
-        placeLocations: [{ name: "Cafe", location: "City University" }],
+        cities: ["Paris"],
+        placeLocations: [{ name: "Carette", location: "Place du Trocadéro" }],
       }),
     );
+    const queries: (string | null)[] = [];
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: string) => {
         const url = new URL(input);
         if (url.pathname === "/v1/token")
           return Response.json({ accessToken: "maps" });
-        expect(url.searchParams.get("resultTypeFilter")).toBe("Poi");
+        const query = url.searchParams.get("q");
+        queries.push(query);
         return Response.json({
           results:
-            url.searchParams.get("q") === "Cafe, Lisbon"
+            query === "Carette, Paris"
               ? [
                   {
-                    id: "cafe",
-                    coordinate: { latitude: 38.72, longitude: -9.1 },
+                    name: "Carette",
+                    id: "vosges",
+                    coordinate: { latitude: 48.855, longitude: 2.365 },
                   },
                 ]
               : [],
@@ -613,9 +627,10 @@ describe("placePins", () => {
       }),
     );
     await t.action(internal.placePins.locateItem, { itemId });
-    expect(await pins()).toMatchObject([
-      { name: "Cafe", city: "Lisbon", appleId: "cafe" },
-    ]);
+    expect(queries).toEqual(
+      Array(3).fill("Carette, Place du Trocadéro, Paris"),
+    );
+    expect(await pins()).toBeUndefined();
   });
 
   it("matches a venue as a point of interest instead of a similarly named street address", async () => {

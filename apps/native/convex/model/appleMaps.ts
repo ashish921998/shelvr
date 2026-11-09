@@ -132,11 +132,24 @@ export function firstPlace(
   const reply = replySchema.safeParse(body);
   if (!reply.success) return null;
   const exactKey = exactName === undefined ? null : placeKey(exactName);
+  const [addressLine] = exactName?.split(",", 1) ?? [];
+  const addressKey =
+    addressLine && /^#?\d/.test(addressLine) ? placeKey(addressLine) : null;
   for (const result of reply.data.results) {
     const place = placeSchema.safeParse(result);
     if (place.success) {
       const { name, structuredAddress: address } = place.data;
-      if (exactKey !== null && (!name || placeKey(name) !== exactKey)) continue;
+      const nameKey = name ? placeKey(name) : null;
+      if (
+        exactKey !== null &&
+        nameKey !== exactKey &&
+        !(
+          address?.thoroughfare &&
+          addressKey !== null &&
+          nameKey === addressKey
+        )
+      )
+        continue;
       if (
         skipCityOnly &&
         address?.locality &&
