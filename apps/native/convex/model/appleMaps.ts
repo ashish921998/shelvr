@@ -211,6 +211,7 @@ export async function appleMapsFind(
     poi: ["Poi"],
     address: ["Address"],
   }[kind];
+  const allowLocality = kind === "address" && exactName === undefined;
   for (const filter of filters) {
     if (filter) params.set("resultTypeFilter", filter);
     let body: unknown;
@@ -232,7 +233,7 @@ export async function appleMapsFind(
     const found = firstPlace(
       body,
       near,
-      path === "search",
+      path === "search" && !allowLocality,
       includeCity,
       exactName,
     );

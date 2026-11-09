@@ -304,6 +304,34 @@ describe("saved venue lookup", () => {
       },
     ]);
   });
+
+  it("accepts an exact locality when the saved place is the source city", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup([], { read: ["Paris"] });
+    await t.run((ctx) => ctx.db.patch(itemId, { cities: ["Paris"] }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps" });
+        expect(url.searchParams.get("resultTypeFilter")).toBe("Address");
+        return Response.json({
+          results: [
+            {
+              name: "Paris",
+              structuredAddress: { locality: "Paris" },
+              coordinate: { latitude: 48.8566, longitude: 2.3522 },
+            },
+          ],
+        });
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(await pins()).toEqual([
+      { name: "Paris", city: "Paris", lat: 48.8566, lng: 2.3522 },
+    ]);
+  });
 });
 
 describe("placePins", () => {
