@@ -50,6 +50,7 @@ type TripDraft = {
   name: string;
   countries: string[];
   city: string;
+  cityLocation?: LatLng;
   cover?: string;
   dated: boolean;
   start: Date;
@@ -353,7 +354,7 @@ function StayStep({
         <CityPicker
           cities={choices}
           value={draft.city}
-          onChange={(city) => update({ city })}
+          onChange={(city, cityLocation) => update({ city, cityLocation })}
         />
       </FormSection>
       <Button
@@ -538,8 +539,10 @@ export function TripSetup({
         (pins.data ?? []).filter(
           (pin) => pin.city && sameCity(pin.city, draft.city),
         ),
-      ),
-    [pins.data, draft.city],
+      ) ??
+      draft.cityLocation ??
+      null,
+    [pins.data, draft.city, draft.cityLocation],
   );
   const update = (patch: Partial<TripDraft>) =>
     setDraft((current) => ({ ...current, ...patch }));

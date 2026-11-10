@@ -15,6 +15,7 @@ import {
   type TripCityCompletion,
   TRIP_PACES,
 } from "@/lib/trip-planner";
+import type { LatLng } from "@convex/model/trip";
 import { TRIP_INTERESTS, type TripInterest } from "@convex/model/tripPlan";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
@@ -101,7 +102,7 @@ export function CityPicker({
 }: {
   cities: CityChoice[];
   value: string;
-  onChange: (city: string) => void;
+  onChange: (city: string, location?: LatLng) => void;
 }) {
   const locale = useAppLocale();
   const { theme } = useUnistyles();
@@ -122,9 +123,9 @@ export function CityPicker({
     query,
   );
   const searching = query.length >= 2 && remoteCities === null;
-  const select = (city: string) => {
+  const select = (city: string, location?: LatLng) => {
     tick();
-    onChange(city);
+    onChange(city, location);
     setFocused(false);
     Keyboard.dismiss();
   };
@@ -171,11 +172,11 @@ export function CityPicker({
       />
       {suggestions.length > 0 || searching ? (
         <View style={styles.citySuggestions}>
-          {suggestions.map(({ city, label, count }) => (
+          {suggestions.map(({ city, label, count, location }) => (
             <Pressable
               key={city}
               accessibilityRole="button"
-              onPress={() => select(city)}
+              onPress={() => select(city, location)}
               style={({ pressed }) => [
                 styles.citySuggestion,
                 pressed && styles.pressed,

@@ -124,7 +124,7 @@ export function tripCitySuggestions(
   const wanted = cityKey(query);
   const suggestions = new Map<
     string,
-    { city: string; label: string; count?: number }
+    { city: string; label: string; count?: number; location?: LatLng }
   >();
   for (const saved of cities) {
     const key = cityKey(saved.city);
@@ -150,7 +150,12 @@ export function tripCitySuggestions(
       !suggestions.has(key) ||
       (saved && suggestions.get(key)?.label === city)
     )
-      suggestions.set(key, { city, label, count: saved?.count });
+      suggestions.set(key, {
+        city,
+        label,
+        count: saved?.count,
+        ...(location ? { location } : {}),
+      });
   }
   return [...suggestions.values()].slice(0, 5);
 }

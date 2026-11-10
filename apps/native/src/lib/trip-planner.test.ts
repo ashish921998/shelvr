@@ -158,8 +158,17 @@ describe("trip city suggestions", () => {
         "Aus",
       ),
     ).toEqual([
-      { city: "Austin", label: "Austin, TX, United States", count: 5 },
-      { city: "Austin, QC, Canada", label: "Austin, QC, Canada" },
+      {
+        city: "Austin",
+        label: "Austin, TX, United States",
+        count: 5,
+        location: texas,
+      },
+      {
+        city: "Austin, QC, Canada",
+        label: "Austin, QC, Canada",
+        location: { lat: 45.19, lng: -72.29 },
+      },
     ]);
   });
 
