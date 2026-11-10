@@ -104,6 +104,7 @@ const placeSchema = z.object({
   structuredAddress: z
     .object({
       locality: z.string().optional(),
+      subLocality: z.string().optional(),
       thoroughfare: z.string().optional(),
     })
     .optional(),
@@ -122,19 +123,69 @@ type FoundPlace = LatLng & {
   category?: string;
 };
 
-function matchesLookupName(
-  name: string | undefined,
-  expected: string,
-  thoroughfare: string | undefined,
+type SavedLookup = {
+  target: "place" | "address" | "locality";
+  name: string;
+};
+
+const ADDRESS_ABBREVIATIONS = new Map([
+  ["n", "north"],
+  ["s", "south"],
+  ["e", "east"],
+  ["w", "west"],
+  ["ave", "avenue"],
+  ["blvd", "boulevard"],
+  ["dr", "drive"],
+  ["ln", "lane"],
+  ["rd", "road"],
+  ["st", "street"],
+]);
+
+function streetKey(value: string): string {
+  return placeKey(
+    value
+      .toLowerCase()
+      .replace(
+        /\b\p{L}+\b/gu,
+        (word) => ADDRESS_ABBREVIATIONS.get(word) ?? word,
+      ),
+  );
+}
+
+function matchesSavedPlace(
+  place: z.infer<typeof placeSchema>,
+  lookup: SavedLookup,
+  filter: string,
 ): boolean {
-  if (!name) return false;
-  const nameKey = placeKey(name);
-  if (nameKey === placeKey(expected)) return true;
-  const [addressLine] = expected.split(",", 1);
+  const { name, structuredAddress: address, poiCategory } = place;
+  const expected = placeKey(lookup.name);
+  const labelMatches = !!name && placeKey(name) === expected;
+  if (filter === "Poi") return labelMatches;
+  if (filter === "Address" && poiCategory) return false;
+  if (filter === "Poi,Address" && !name && !address) return true;
+  if (lookup.target === "address") {
+    const [street] = lookup.name.split(",", 1);
+    return (
+      labelMatches ||
+      (!!address?.thoroughfare &&
+        !!name &&
+        streetKey(name) === streetKey(street))
+    );
+  }
   return (
-    !!thoroughfare &&
-    /^#?\d/.test(addressLine) &&
-    nameKey === placeKey(addressLine)
+    labelMatches ||
+    (!poiCategory &&
+      !address?.thoroughfare &&
+      [address?.subLocality, address?.locality].some(
+        (area) => area && placeKey(area) === expected,
+      ))
+  );
+}
+
+function isRankedPoi(place: z.infer<typeof placeSchema>): boolean {
+  return (
+    !!place.poiCategory ||
+    (!!place.id && !place.structuredAddress?.thoroughfare)
   );
 }
 
@@ -143,7 +194,7 @@ export function firstPlace(
   near?: LatLng,
   skipCityOnly = false,
   includeCity = false,
-  exactName?: string,
+  accepts?: (place: z.infer<typeof placeSchema>) => boolean,
 ): FoundPlace | null {
   const reply = replySchema.safeParse(body);
   if (!reply.success) return null;
@@ -151,11 +202,7 @@ export function firstPlace(
     const place = placeSchema.safeParse(result);
     if (place.success) {
       const { name, structuredAddress: address } = place.data;
-      if (
-        exactName !== undefined &&
-        !matchesLookupName(name, exactName, address?.thoroughfare)
-      )
-        continue;
+      if (accepts && !accepts(place.data)) continue;
       if (
         skipCityOnly &&
         address?.locality &&
@@ -193,32 +240,35 @@ function appleGet(
 
 export async function appleMapsFind(
   accessToken: string,
-  kind: "search" | "geocode" | "poi" | "address",
+  kind: "search" | "geocode" | SavedLookup,
   query: string,
   near?: LatLng,
   fetchImpl: typeof fetch = fetch,
   includeCity = false,
-  exactName?: string,
 ): Promise<FoundPlace | null | typeof UNAVAILABLE> {
   const params = new URLSearchParams({ q: query.slice(0, 200) });
   if (near !== undefined) {
     params.set("searchLocation", `${near.lat},${near.lng}`);
   }
   const path = kind === "geocode" ? "geocode" : "search";
-  const filters = {
-    search: ["Poi,Address", "Poi"],
-    geocode: [""],
-    poi: ["Poi"],
-    address: ["Address"],
-  }[kind];
-  const allowLocality = kind === "address" && exactName === undefined;
+  const saved = typeof kind === "object" ? kind : null;
+  const filters = saved
+    ? {
+        place: ["Poi,Address", "Poi"],
+        address: ["Address", "Poi"],
+        locality: ["Address"],
+      }[saved.target]
+    : path === "search"
+      ? ["Poi,Address", "Poi"]
+      : [""];
+  let ranked: FoundPlace | null = null;
   for (const filter of filters) {
     if (filter) params.set("resultTypeFilter", filter);
     let body: unknown;
     try {
       const response = await appleGet(accessToken, path, params, fetchImpl);
       if (!response.ok) {
-        if (!isTemporary(response.status)) return null;
+        if (!isTemporary(response.status)) return ranked;
         reportUnavailable(path, { status: response.status });
         return UNAVAILABLE;
       }
@@ -233,13 +283,16 @@ export async function appleMapsFind(
     const found = firstPlace(
       body,
       near,
-      path === "search" && !allowLocality,
+      path === "search" && saved === null,
       includeCity,
-      exactName,
+      saved ? (place) => matchesSavedPlace(place, saved, filter) : undefined,
     );
     if (found) return found;
+    if (saved?.target === "place" && filter === "Poi,Address") {
+      ranked = firstPlace(body, near, true, includeCity, isRankedPoi);
+    }
   }
-  return null;
+  return ranked;
 }
 
 export async function appleMapsLookup(

@@ -94,7 +94,7 @@ afterEach(() => {
 });
 
 describe("saved venue lookup", () => {
-  it("uses a precise address when POI search has no match", async () => {
+  it("looks up a numbered address before a store and rejects an unrelated street for a venue", async () => {
     await withMaps();
     const { t, itemId, pins } = await setup([], {
       read: ["123 Broadway, New York, NY", "Eberly"],
@@ -110,7 +110,16 @@ describe("saved venue lookup", () => {
         const query = url.searchParams.get("q") ?? "";
         const filter = url.searchParams.get("resultTypeFilter");
         filters.set(query, [...(filters.get(query) ?? []), filter]);
-        if (filter === "Poi") return Response.json({ results: [] });
+        if (filter === "Poi")
+          return Response.json({
+            results: [
+              {
+                name: "Broadway Store",
+                poiCategory: "Store",
+                coordinate: { latitude: 40.7628, longitude: -73.9829 },
+              },
+            ],
+          });
         return Response.json({
           results: [
             {
@@ -128,11 +137,8 @@ describe("saved venue lookup", () => {
       }),
     );
     await t.action(internal.placePins.locateItem, { itemId });
-    expect(filters.get("123 Broadway, New York, NY")).toEqual([
-      "Poi",
-      "Address",
-    ]);
-    expect(filters.get("Eberly, New York")).toEqual(["Poi", "Address"]);
+    expect(filters.get("123 Broadway, New York, NY")).toEqual(["Address"]);
+    expect(filters.get("Eberly, New York")).toEqual(["Poi,Address", "Poi"]);
     expect(await pins()).toEqual([
       {
         name: "123 Broadway, New York, NY",
@@ -221,7 +227,7 @@ describe("saved venue lookup", () => {
       }),
     );
     await t.action(internal.placePins.locateItem, { itemId });
-    expect(filters).toEqual(["Poi"]);
+    expect(filters).toEqual(["Poi,Address", "Poi"]);
     expect(await pins()).toEqual([
       {
         name: "Eberly",
@@ -231,6 +237,34 @@ describe("saved venue lookup", () => {
         appleId: "eberly-south-lamar",
         category: "Restaurant",
       },
+    ]);
+  });
+
+  it("prefers an exact venue over a different business ranked by the mixed search", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup([], { read: ["Eberly"] });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps" });
+        const poi = url.searchParams.get("resultTypeFilter") === "Poi";
+        return Response.json({
+          results: [
+            {
+              name: poi ? "Eberly" : "Eberly Bar",
+              id: poi ? "restaurant" : "bar",
+              poiCategory: poi ? "Restaurant" : "Bar",
+              coordinate: { latitude: 30.2586, longitude: -97.7589 },
+            },
+          ],
+        });
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(await pins()).toMatchObject([
+      { name: "Eberly", appleId: "restaurant" },
     ]);
   });
 
@@ -244,7 +278,8 @@ describe("saved venue lookup", () => {
         const url = new URL(input);
         if (url.pathname === "/v1/token")
           return Response.json({ accessToken: "maps" });
-        expect(url.searchParams.get("resultTypeFilter")).toBe("Poi");
+        if (url.searchParams.get("resultTypeFilter") === "Poi")
+          return Response.json({ results: [] });
         return Response.json({
           results: [
             {
@@ -266,7 +301,9 @@ describe("saved venue lookup", () => {
   it("keeps a saved city on the city result instead of a similarly named hotel", async () => {
     await withMaps();
     const { t, itemId, pins } = await setup([], { read: ["Positano, Italy"] });
-    await t.run((ctx) => ctx.db.patch(itemId, { cities: ["Positano"] }));
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, { cities: ["Positano", "Amalfi"] }),
+    );
     vi.stubGlobal(
       "fetch",
       vi.fn(async (input: string) => {
@@ -331,6 +368,90 @@ describe("saved venue lookup", () => {
     expect(await pins()).toEqual([
       { name: "Paris", city: "Paris", lat: 48.8566, lng: 2.3522 },
     ]);
+  });
+
+  it("keeps the city qualifier in the request and matches the neighborhood label", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup([], { read: ["Alfama, Lisbon"] });
+    await t.run((ctx) => ctx.db.patch(itemId, { cities: ["Lisbon", "Porto"] }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps" });
+        expect(url.searchParams.get("q")).toBe("Alfama, Lisbon");
+        return Response.json({
+          results: [
+            {
+              name: "Alfama Hotel",
+              poiCategory: "Hotel",
+              coordinate: { latitude: 38.7102, longitude: -9.1305 },
+            },
+            {
+              name: "Alfama",
+              structuredAddress: { locality: "Lisboa" },
+              coordinate: { latitude: 38.7108, longitude: -9.1299 },
+            },
+          ],
+        });
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(await pins()).toEqual([
+      { name: "Alfama, Lisbon", city: "Lisbon", lat: 38.7108, lng: -9.1299 },
+    ]);
+  });
+
+  it("accepts an expanded street abbreviation for the same house number", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup([], { read: ["123 W Broadway"] });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps" });
+        expect(url.searchParams.get("resultTypeFilter")).toBe("Address");
+        return Response.json({
+          results: [
+            {
+              name: "124 West Broadway",
+              structuredAddress: { thoroughfare: "West Broadway" },
+              coordinate: { latitude: 40.71, longitude: -74.02 },
+            },
+            {
+              name: "123 West Broadway",
+              structuredAddress: { thoroughfare: "West Broadway" },
+              coordinate: { latitude: 40.71, longitude: -74.01 },
+            },
+          ],
+        });
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(await pins()).toMatchObject([
+      { name: "123 W Broadway", lat: 40.71, lng: -74.01 },
+    ]);
+  });
+
+  it("ends a saved-place search on HTTP 401 without trying a fallback", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup([], { read: ["Eberly"] });
+    const filters: (string | null)[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps" });
+        filters.push(url.searchParams.get("resultTypeFilter"));
+        return new Response(null, { status: 401 });
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(filters).toEqual(["Poi,Address"]);
+    expect(await pins()).toBeUndefined();
   });
 });
 
@@ -608,6 +729,7 @@ describe("placePins", () => {
           results: [
             {
               structuredAddress: { locality: porto ? "Porto" : "Lisbon" },
+              name: porto ? "Tower" : "Cafe",
               coordinate: { latitude: porto ? 41.15 : 38.72, longitude: -9.1 },
             },
           ],
@@ -645,6 +767,7 @@ describe("placePins", () => {
                     : "Los Angeles",
                 thoroughfare: "Street",
               },
+              name: q.split(",")[0],
               coordinate: {
                 latitude: wrong ? 43.7858 : pier ? 34.01 : 34.05,
                 longitude: wrong ? -85.5028 : pier ? -118.49 : -118.25,
@@ -1004,6 +1127,7 @@ describe("placePins", () => {
                 locality: wrong ? "Michigan" : "Paris",
                 thoroughfare: "Street",
               },
+              name: (url.searchParams.get("q") ?? "").split(",")[0],
               coordinate: {
                 latitude: wrong ? 43.7858 : 48.8685,
                 longitude: wrong ? -85.5028 : 2.3256,
@@ -1312,7 +1436,7 @@ describe("placePins", () => {
     const { t, itemId, pins } = await setup(["Micho"]);
     await t.run(async (ctx) =>
       ctx.db.patch(itemId, {
-        placePins: [{ name: "Micho", lat: 13, lng: -13, city: "Lisbon" }],
+        placePins: [{ name: "Micho", lat: 13.0001, lng: -13, city: "Lisbon" }],
       }),
     );
     vi.useFakeTimers();
@@ -1322,7 +1446,58 @@ describe("placePins", () => {
     } finally {
       vi.useRealTimers();
     }
-    expect((await pins())?.[0].category).toBe("Cafe");
+    expect(await pins()).toMatchObject([
+      { lat: 13.0001, lng: -13, category: "Cafe" },
+    ]);
+  });
+
+  it("backfill leaves a located pin alone when a new match is elsewhere", async () => {
+    await withMaps(true);
+    const { t, itemId, pins } = await setup(["Micho"]);
+    const stored = { name: "Micho", lat: 12, lng: -12, city: "Lisbon" };
+    await t.run((ctx) => ctx.db.patch(itemId, { placePins: [stored] }));
+    vi.useFakeTimers();
+    try {
+      await t.mutation(internal.placePins.backfillPage, { cursor: null });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(await pins()).toEqual([stored]);
+  });
+
+  it("keeps the existing pin when new backfill results form a distant cluster", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup(["Existing", "Cafe", "Bakery"]);
+    const stored = { name: "Existing", lat: 38.72, lng: -9.14, city: "Lisbon" };
+    await t.run((ctx) => ctx.db.patch(itemId, { placePins: [stored] }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps" });
+        const [name] = (url.searchParams.get("q") ?? "").split(",");
+        const results =
+          name === "Existing"
+            ? []
+            : [
+                {
+                  name,
+                  coordinate: { latitude: 44.22, longitude: -71.9 },
+                },
+              ];
+        return Response.json({ results });
+      }),
+    );
+    vi.useFakeTimers();
+    try {
+      await t.mutation(internal.placePins.backfillPage, { cursor: null });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(await pins()).toEqual([stored]);
   });
 
   function appleAnswers(status: number) {
