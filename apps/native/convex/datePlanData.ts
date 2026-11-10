@@ -121,12 +121,9 @@ export const listDateStarts = authedQuery({
       ctx.userId,
       tidyCity(city).slice(0, MAX_CITY_CHARS),
     );
-    return savedCandidates(claim).map(({ name, lat, lng, appleId }) => ({
-      name,
-      lat,
-      lng,
-      appleId,
-    }));
+    return savedCandidates(claim)
+      .map(({ name, lat, lng, appleId }) => ({ name, lat, lng, appleId }))
+      .sort((a, b) => a.name.localeCompare(b.name));
   },
 });
 

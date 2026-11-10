@@ -31,20 +31,24 @@ export function AllSharedLists() {
   );
   const mine = browsing ? cities.data : undefined;
   useReportLoadFailure("shared_lists_load_failed", lists);
-  const columnGap = Math.max(
-    8,
-    Math.floor((width - SIDE * 2 - TILE * COLUMNS) / (COLUMNS - 1)),
+  const tile = Math.min(
+    TILE,
+    Math.floor((width - SIDE * 2 - 8 * (COLUMNS - 1)) / COLUMNS),
+  );
+  const columnGap = Math.floor(
+    (width - SIDE * 2 - tile * COLUMNS) / (COLUMNS - 1),
   );
   let body = <ScreenLoader />;
   if (lists.data !== undefined) {
     body = (
       <ScrollView contentContainerStyle={[styles.grid, { columnGap }]}>
-        {browsing ? <NewListTile /> : null}
+        {browsing ? <NewListTile size={tile} /> : null}
         {lists.data.map((list) => (
           <ListTile
             key={list._id}
             list={list}
             cover={sharedListCover(list.cities, mine)}
+            size={tile}
           />
         ))}
       </ScrollView>

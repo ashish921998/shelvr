@@ -5,6 +5,7 @@ import { useAppLocale } from "@/lib/i18n";
 import { personalPlanAllowed } from "@/lib/list-gate";
 import { usePlanGate } from "@/lib/plan-gate";
 import { sameCity } from "@/lib/trip-planner";
+import { useReportLoadFailure } from "@/lib/use-report-load-failure";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { tidyCity } from "@convex/model/trip";
@@ -34,6 +35,7 @@ export default function GoOutScreen() {
     ),
   );
   const query = listId ? shared : personal;
+  useReportLoadFailure("go_out_places_load_failed", query);
   const places = useMemo(
     () =>
       goOutPlaces(

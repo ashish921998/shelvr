@@ -12,7 +12,7 @@ import { internalMutation } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { aiAllowed } from "./aiConsent";
-import { readyCitySaves } from "./items";
+import { readyCitySaves, readySavesNewestFirst } from "./items";
 import { authedMutation, authedQuery, requireUserId } from "./model/auth";
 import {
   MAX_PLACE_NAME_CHARS,
@@ -25,6 +25,8 @@ import { recentVisits } from "./model/placeVisits";
 import { listPlanClaimValidator } from "./model/sharedLists";
 import { rateLimiter } from "./model/rateLimiter";
 import {
+  cityKey,
+  distanceKm,
   MAX_CITY_CHARS,
   MAX_TRIP_DAYS,
   middleOf,
@@ -33,7 +35,9 @@ import {
   STOPS_PER_DAY,
   tidyCity,
   tripPaceValidator,
+  type LatLng,
 } from "./model/trip";
+import { SEARCH_RADIUS_KM } from "./model/tripSuggest";
 import {
   tidyPlace,
   tidyText,
@@ -409,6 +413,50 @@ async function stopsOf(
     .take(MAX_TRIP_STOPS);
 }
 
+function tripCentre(
+  plan: Doc<"tripPlans">,
+  stops: Doc<"tripStops">[],
+): LatLng | null {
+  const planned = stops.filter((stop) => stop.day !== UNPLANNED_DAY);
+  const lat = plan.stay?.lat;
+  const lng = plan.stay?.lng;
+  return (
+    middleOf(planned.length > 0 ? planned : stops) ??
+    (lat !== undefined && lng !== undefined ? { lat, lng } : null)
+  );
+}
+
+function hasBaseCity(plan: Doc<"tripPlans">): boolean {
+  return !plan.countries?.some(
+    (code) => cityKey(countryName(code) ?? "") === cityKey(plan.city),
+  );
+}
+
+function tripPins<T extends LatLng & { name: string; city?: string }>(
+  item: { cities?: string[]; placePins?: T[] },
+  plan: Doc<"tripPlans">,
+  centre: LatLng | null,
+): T[] {
+  const named = pinsForCity(item, plan.city);
+  if (hasBaseCity(plan) || centre === null) return named;
+  return (item.placePins ?? []).filter(
+    (pin) => named.includes(pin) || distanceKm(pin, centre) <= SEARCH_RADIUS_KM,
+  );
+}
+
+async function tripSaves(
+  ctx: QueryCtx,
+  plan: Doc<"tripPlans">,
+  userId: string,
+  centre: LatLng | null,
+): Promise<Doc<"items">[]> {
+  if (hasBaseCity(plan) || centre === null)
+    return await readyCitySaves(ctx, userId, plan.city);
+  return (await readySavesNewestFirst(ctx, userId)).filter(
+    (item) => tripPins(item, plan, centre).length > 0,
+  );
+}
+
 function stopView(
   stop: Doc<"tripStops">,
   live: ReadonlySet<Id<"items">>,
@@ -675,7 +723,8 @@ async function savedStop(
     throw new Error("Save not found");
   }
   // Only a pin the save already has in the trip's city, so a stop never lands somewhere made up.
-  const pin = pinsForCity(await visibleSave(ctx, item), plan.city).find(
+  const centre = tripCentre(plan, await stopsOf(ctx, plan._id));
+  const pin = tripPins(await visibleSave(ctx, item), plan, centre).find(
     (candidate) => candidate.name === name,
   );
   if (pin === undefined) throw new Error("Place not found");
@@ -696,8 +745,9 @@ export const fillBlankTripDay = authedMutation({
       STOPS_PER_DAY[plan.pace],
     );
     const picks: NewStop[] = [];
-    for (const item of await readyCitySaves(ctx, ctx.userId, plan.city)) {
-      for (const pin of pinsForCity(item, plan.city)) {
+    const centre = tripCentre(plan, stops);
+    for (const item of await tripSaves(ctx, plan, ctx.userId, centre)) {
+      for (const pin of tripPins(item, plan, centre)) {
         if (picks.length >= limit) break;
         const place = savedStopFromPin(item, pin);
         if (
@@ -869,10 +919,11 @@ export const tripSavePlaces = authedQuery({
     const stops = await stopsOf(ctx, plan._id);
     const listed: TripPlaceRef[] = [];
     const keys = new Set<string>();
-    const saves = await readyCitySaves(ctx, ctx.userId, plan.city);
+    const centre = tripCentre(plan, stops);
+    const saves = await tripSaves(ctx, plan, ctx.userId, centre);
     const places: TripSavePlace[] = [];
     for (const item of saves) {
-      for (const pin of pinsForCity(item, plan.city)) {
+      for (const pin of tripPins(item, plan, centre)) {
         if (places.length >= MAX_SAVE_PLACES) return places;
         const key = `${item._id}|${placeKey(pin.name)}`;
         const place = { ...pin, itemId: item._id };
@@ -919,15 +970,13 @@ export const claimTripSearchInternal = internalMutation({
       key: userId,
       throws: true,
     });
-    const stops = await stopsOf(ctx, plan._id);
-    const planned = stops.filter((stop) => stop.day !== UNPLANNED_DAY);
     return {
       city: plan.city,
       ...(plan.countries !== undefined ? { countries: plan.countries } : {}),
       centre:
         plan.listId !== undefined
           ? null
-          : middleOf(planned.length > 0 ? planned : stops),
+          : tripCentre(plan, await stopsOf(ctx, plan._id)),
       aiAllowed: await aiAllowed(ctx, userId),
     };
   },

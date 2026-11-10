@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   alert: vi.fn(),
   forget: vi.fn(),
   deleted: vi.fn(),
+  captureError: vi.fn(),
 }));
 
 vi.mock("@/lib/use-item-share", () => ({ useItemShare: () => mocks.share }));
@@ -37,6 +38,7 @@ vi.mock("@/lib/analytics", () => ({
     capture: vi.fn(),
     itemAction: vi.fn(),
     itemDeleted: mocks.deleted,
+    captureError: mocks.captureError,
   },
 }));
 
@@ -87,13 +89,18 @@ it("asks before deleting, then deletes and reports the surface", async () => {
   expect(onRemoved).toHaveBeenCalled();
 });
 
-it("alerts and skips the follow-up when the delete fails", async () => {
-  mocks.deleteItem.mockRejectedValueOnce(new Error("no"));
+it("reports and alerts, then skips the follow-up when the delete fails", async () => {
+  const failure = new Error("no");
+  mocks.deleteItem.mockRejectedValueOnce(failure);
   const onRemoved = vi.fn();
   const { result } = renderHook(() =>
     useSaveActions(item(), "feed", { onRemoved }),
   );
   await act(async () => result.current.remove());
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "item_delete_failed",
+    failure,
+  );
   expect(mocks.alert).toHaveBeenCalled();
   expect(onRemoved).not.toHaveBeenCalled();
 });

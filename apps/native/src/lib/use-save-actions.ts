@@ -40,7 +40,8 @@ export function useSaveActions(
         forgetDeletedSharedItem(item._id);
         analytics.itemDeleted(item, surface);
         onRemoved?.();
-      } catch {
+      } catch (error) {
+        analytics.captureError("item_delete_failed", error);
         Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
       }
     });

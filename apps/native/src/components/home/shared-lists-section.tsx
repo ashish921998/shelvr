@@ -26,10 +26,13 @@ export const TILE = 104;
 export function ListTile({
   list,
   cover,
+  size = TILE,
 }: {
   list: SharedListSummary;
   cover: string | null;
+  size?: number;
 }) {
+  const box = { width: size, height: size };
   const router = useRouter();
   const places = t("homePlaces.spotCount", { count: list.placeCount });
   const fresh =
@@ -49,17 +52,21 @@ export function ListTile({
       onPress={() =>
         router.push({ pathname: "/shared-list/[id]", params: { id: list._id } })
       }
-      style={({ pressed }) => [styles.listTile, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.listTile,
+        { width: size },
+        pressed && styles.pressed,
+      ]}
     >
-      <View style={styles.photoBox}>
+      <View style={box}>
         {cover ? (
           <Image
             source={{ uri: cover }}
-            style={styles.photo}
+            style={[styles.photo, box]}
             contentFit="cover"
           />
         ) : (
-          <View style={[styles.photo, styles.soft]}>
+          <View style={[styles.photo, box, styles.soft]}>
             <Text style={styles.pin}>📍</Text>
           </View>
         )}
@@ -78,7 +85,7 @@ export function ListTile({
   );
 }
 
-export function NewListTile() {
+export function NewListTile({ size = TILE }: { size?: number }) {
   const router = useRouter();
   const { theme } = useUnistyles();
   return (
@@ -86,7 +93,11 @@ export function NewListTile() {
       accessibilityRole="button"
       accessibilityLabel={t("sharedLists.newList")}
       onPress={() => router.push("/new-shared-list")}
-      style={({ pressed }) => [styles.startTile, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.startTile,
+        { width: size, height: size },
+        pressed && styles.pressed,
+      ]}
     >
       <AppSymbolIcon name="plus" size={22} tintColor={theme.colors.muted} />
       <ThemedText style={styles.startLabel}>
@@ -185,7 +196,6 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "flex-start",
   },
   listTile: { width: TILE, gap: 7 },
-  photoBox: { width: TILE, height: TILE },
   photo: {
     width: TILE,
     height: TILE,

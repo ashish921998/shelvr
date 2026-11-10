@@ -224,6 +224,7 @@ export default function TripPlanScreen() {
     return <Redirect href="/plan-gate" />;
   }
 
+  const pro = access.kind === "pro" && !access.syncing;
   const addPlace = (day: number) =>
     router.push({
       pathname: "/add-trip-stop",
@@ -268,8 +269,8 @@ export default function TripPlanScreen() {
       ) : (
         <TripPlanBody
           trip={data}
-          canUseSaves={canBrowse(access)}
-          canFillFromSaves={access.kind === "pro" && !access.syncing}
+          canUseSaves={data.listId === undefined ? pro : canBrowse(access)}
+          canFillFromSaves={pro}
           day={day}
           onPickDay={setDay}
           onAddPlace={addPlace}

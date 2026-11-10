@@ -21,6 +21,13 @@ const FOCUSED_MAP_STYLE = {
   ]),
 };
 
+const pinKey = ({
+  day,
+  name,
+  coordinates,
+}: ReturnType<typeof planPins>[number]) =>
+  JSON.stringify([day, name, coordinates.latitude, coordinates.longitude]);
+
 type Props = {
   /** Only each stop's name and point are drawn, so a date's evening can use the map too. */
   days: readonly Pick<TripPlanStop, "name" | "lat" | "lng">[][];
@@ -100,7 +107,7 @@ export function TripPlannerMap({
   const { theme, rt } = useUnistyles();
   const ref = useRef<AppleMaps.MapView>(null);
   const [focusedPin, setFocusedPin] = useState<{
-    id: string;
+    key: string;
     day: number | null;
   } | null>(null);
   if (focusedPin && focusedPin.day !== activeDay) setFocusedPin(null);
@@ -127,9 +134,9 @@ export function TripPlannerMap({
   const bottom = theme.gap(4);
   const camera = useMemo(() => {
     const chosen =
-      focusedPin?.id === STAY_ID
+      focusedPin?.key === STAY_ID
         ? stayPoint
-        : pins.find((pin) => pin.id === focusedPin?.id)?.coordinates;
+        : pins.find((pin) => pinKey(pin) === focusedPin?.key)?.coordinates;
     const nearbyStay =
       stayPoint &&
       (activeDay === null ||
@@ -195,13 +202,13 @@ export function TripPlannerMap({
   const colorOf = (day: number) => dayColor(day, theme.colors.tripDays);
   const select = (id: string | undefined) => {
     if (id === STAY_ID) {
-      setFocusedPin({ id, day: activeDay });
+      setFocusedPin({ key: id, day: activeDay });
       return;
     }
-    const day = pins.find((pin) => pin.id === id)?.day;
-    if (day !== undefined && id) {
-      setFocusedPin({ id, day });
-      onSelectDay(day);
+    const pin = pins.find((candidate) => candidate.id === id);
+    if (pin) {
+      setFocusedPin({ key: pinKey(pin), day: pin.day });
+      onSelectDay(pin.day);
     }
   };
 

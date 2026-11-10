@@ -807,3 +807,162 @@ describe("searchTripPlaces", () => {
     ).rejects.toMatchObject({ data: { code: "pro_required" } });
   });
 });
+
+const PARIS_STAY = { name: "Hotel du Louvre", lat: 48.8625, lng: 2.3355 };
+
+async function countryTrip(stay?: typeof PARIS_STAY) {
+  const base = newConvexTest();
+  const user = await signedInUser(base, { pro: true });
+  const itemId = await base.run((ctx) =>
+    ctx.db.insert("items", {
+      userId: user.userId,
+      type: "link",
+      status: "ready",
+      title: "France food",
+      cities: ["Paris", "Lyon"],
+      places: ["Du Pain et des Idées", "Paul Bocuse"],
+      placePins: [
+        {
+          name: "Du Pain et des Idées",
+          lat: 48.8717,
+          lng: 2.3632,
+          city: "Paris",
+        },
+        { name: "Paul Bocuse", lat: 45.8164, lng: 4.8495, city: "Lyon" },
+      ],
+      url: "https://www.tiktok.com/@someone/video/9",
+      tags: ["food"],
+      searchText: "France food",
+    }),
+  );
+  const tripId = await user.t.mutation(api.tripPlannerData.createBlankTrip, {
+    name: "France",
+    countries: ["FR"],
+    city: "",
+    dayCount: 2,
+    ...(stay ? { stay } : {}),
+  });
+  return { base, ...user, itemId, tripId };
+}
+
+describe("a trip with no base city", () => {
+  it("finds saves near the stay for Fill my day, From your saves and adding a stop", async () => {
+    const { t, itemId, tripId } = await countryTrip(PARIS_STAY);
+    expect(
+      (await t.query(api.tripPlannerData.tripSavePlaces, { tripId })).map(
+        (place) => place.name,
+      ),
+    ).toEqual(["Du Pain et des Idées"]);
+    expect(
+      await t.mutation(api.tripPlannerData.fillBlankTripDay, {
+        tripId,
+        day: 1,
+      }),
+    ).toBe(1);
+    await expect(
+      t.mutation(api.tripPlannerData.addTripStop, {
+        tripId,
+        day: 2,
+        place: { kind: "save", itemId, name: "Paul Bocuse" },
+      }),
+    ).rejects.toThrow("Place not found");
+    expect(await layout(t, tripId)).toEqual({
+      days: [["Du Pain et des Idées"], []],
+      unplanned: [],
+    });
+  });
+
+  it("accepts a nearby saved place picked before any fill", async () => {
+    const { t, itemId, tripId } = await countryTrip(PARIS_STAY);
+    expect(
+      await t.mutation(api.tripPlannerData.applyTripDaySuggestions, {
+        tripId,
+        day: 2,
+        places: [{ itemId, name: "Du Pain et des Idées" }],
+      }),
+    ).toBe(true);
+    expect(await layout(t, tripId)).toEqual({
+      days: [[], ["Du Pain et des Idées"]],
+      unplanned: [],
+    });
+  });
+
+  it("offers no saves while the trip has no stay or stops to anchor it", async () => {
+    const { t, tripId } = await countryTrip();
+    expect(
+      await t.query(api.tripPlannerData.tripSavePlaces, { tripId }),
+    ).toEqual([]);
+    expect(
+      await t.mutation(api.tripPlannerData.fillBlankTripDay, {
+        tripId,
+        day: 1,
+      }),
+    ).toBe(0);
+  });
+});
+
+describe("searching a new blank trip", () => {
+  function searched(fetchMock: ReturnType<typeof fakeApple>) {
+    const urls = fetchMock.mock.calls.map(([input]) => new URL(input));
+    const search = urls.find((url) => url.pathname === "/v1/search");
+    return {
+      geocoded: urls.some((url) => url.pathname === "/v1/geocode"),
+      near: search?.searchParams.get("searchLocation") ?? null,
+      countries: search?.searchParams.get("limitToCountries") ?? null,
+    };
+  }
+
+  it("searches near the stay before the first stop", async () => {
+    await stubMaps();
+    const fetchMock = fakeApple();
+    vi.stubGlobal("fetch", fetchMock);
+    const { t, tripId } = await countryTrip(PARIS_STAY);
+    await t.action(api.tripPlanner.searchTripPlaces, {
+      tripId,
+      query: "croissant",
+    });
+    expect(searched(fetchMock)).toEqual({
+      geocoded: false,
+      near: `${PARIS_STAY.lat},${PARIS_STAY.lng}`,
+      countries: "FR",
+    });
+  });
+
+  it("searches near the base city when there is no stay yet", async () => {
+    await stubMaps();
+    const fetchMock = fakeApple();
+    vi.stubGlobal("fetch", fetchMock);
+    const { t } = await setup([]);
+    const tripId = await t.mutation(api.tripPlannerData.createBlankTrip, {
+      name: "Portugal",
+      countries: ["PT"],
+      city: "Lisbon",
+      dayCount: 2,
+    });
+    await t.action(api.tripPlanner.searchTripPlaces, {
+      tripId,
+      query: "pastel de nata",
+    });
+    expect(searched(fetchMock)).toEqual({
+      geocoded: true,
+      near: "38.72,-9.14",
+      countries: "PT",
+    });
+  });
+
+  it("searches the whole country when no city or stay was chosen", async () => {
+    await stubMaps();
+    const fetchMock = fakeApple();
+    vi.stubGlobal("fetch", fetchMock);
+    const { t, tripId } = await countryTrip();
+    await t.action(api.tripPlanner.searchTripPlaces, {
+      tripId,
+      query: "croissant",
+    });
+    expect(searched(fetchMock)).toEqual({
+      geocoded: false,
+      near: null,
+      countries: "FR",
+    });
+  });
+});

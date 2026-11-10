@@ -214,3 +214,38 @@ it("shows the stay and only the selected day's markers and line, then restores t
     "route-1",
   ]);
 });
+
+it("keeps a chosen trip stop in focus after its day's stops are reordered", async () => {
+  const map = (stops: typeof cityPins) => (
+    <TripPlannerMap
+      days={[stops]}
+      stay={undefined}
+      activeDay={0}
+      height={330}
+      onSelectDay={vi.fn()}
+    />
+  );
+  const { rerender } = render(map(cityPins));
+  act(() => mock.props.onCameraMove({ zoom: 16 }));
+  act(() => mock.props.onMarkerClick({ id: "0:1" }));
+  await waitFor(() =>
+    expect(mock.move).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        coordinates: expect.objectContaining({ longitude: -97.739 }),
+      }),
+    ),
+  );
+  rerender(map([...cityPins].reverse()));
+  await waitFor(() =>
+    expect(mock.move).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        coordinates: expect.objectContaining({ longitude: -97.739 }),
+      }),
+    ),
+  );
+  expect(mock.move).not.toHaveBeenLastCalledWith(
+    expect.objectContaining({
+      coordinates: expect.objectContaining({ longitude: -97.74 }),
+    }),
+  );
+});

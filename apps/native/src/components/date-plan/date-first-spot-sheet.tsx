@@ -3,13 +3,14 @@ import { ThemedText } from "@/components/ui/themed-text";
 import { goOutPlaces } from "@/lib/go-out";
 import { t } from "@/lib/i18n";
 import { searchPlaces } from "@/lib/map-filters";
+import { useReportLoadFailure } from "@/lib/use-report-load-failure";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import type { DateStart } from "@convex/model/datePlan";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useRef, useState } from "react";
-import { FlatList, Pressable, TextInput } from "react-native";
+import { FlatList, Pressable, TextInput, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 export function DateFirstSpotSheet({
@@ -41,6 +42,7 @@ export function DateFirstSpotSheet({
     ),
   );
   const query = listId ? shared : personal;
+  useReportLoadFailure("date_first_spot_load_failed", query);
   const inCity = goOutPlaces(query.data ?? []);
   const matches = search.trim() ? searchPlaces(inCity, search) : inCity;
   const close = () => {
@@ -77,15 +79,28 @@ export function DateFirstSpotSheet({
         }
         keyboardShouldPersistTaps="handled"
         ListEmptyComponent={
-          <ThemedText variant="footnote">
-            {query.isPending
-              ? t("common.loading")
-              : query.isError
-                ? t("errors.tryAgain")
+          query.isError ? (
+            <View>
+              <ThemedText variant="footnote">{t("errors.tryAgain")}</ThemedText>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => void query.refetch()}
+                style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+              >
+                <ThemedText variant="subheadStrong">
+                  {t("common.retry")}
+                </ThemedText>
+              </Pressable>
+            </View>
+          ) : (
+            <ThemedText variant="footnote">
+              {query.isPending
+                ? t("common.loading")
                 : search.trim()
                   ? t("map.searchNoResults", { query: search })
                   : t("plan.emptyTitle")}
-          </ThemedText>
+            </ThemedText>
+          )
         }
         renderItem={({ item: { name, lat, lng, appleId } }) => (
           <Pressable

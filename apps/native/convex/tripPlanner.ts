@@ -25,6 +25,7 @@ import {
   type PlanPlace,
 } from "./model/plan";
 import {
+  cityKey,
   distanceKm,
   dropStrays,
   lookupQuery,
@@ -52,8 +53,8 @@ import {
   mergeSavedNamesakes,
   nextBatch,
   saveWhy,
+  SEARCH_RADIUS_KM,
   searchQueues,
-  SUGGEST_RADIUS_KM,
   tasteQueries,
   type PlannedStop,
   type Suggestion,
@@ -443,9 +444,6 @@ export const searchTripCities = action({
   },
 });
 
-/** Add a place looks a little wider than suggestions do: a day trip out of town is fine. */
-const SEARCH_RADIUS_KM = SUGGEST_RADIUS_KM * 2;
-
 type SearchClaim = {
   city: string;
   centre: LatLng | null;
@@ -468,9 +466,16 @@ async function placeSearch(
   const maps = claim.aiAllowed ? await openMaps(appleLang(locale)) : null;
   if (maps === null) return { available: false, places: [] };
   if (claim.countries?.length) {
+    const near =
+      claim.centre ??
+      (claim.countries.some(
+        (code) => cityKey(countryName(code) ?? "") === cityKey(claim.city),
+      )
+        ? null
+        : await appleMapsLookup(maps.token, "geocode", claim.city));
     const places = await appleMapsSearchPlaces(maps.token, query, {
       countries: claim.countries,
-      ...(claim.centre ? { near: claim.centre } : {}),
+      ...(near ? { near } : {}),
       ...(maps.lang ? { lang: maps.lang } : {}),
     });
     return { available: true, places };

@@ -35,10 +35,20 @@ vi.mock("@/components/screen-title", () => ({
 }));
 vi.mock("@/components/home/shared-lists-section", () => ({
   TILE: 104,
-  NewListTile: vi.fn(() => <button>New shared list</button>),
+  NewListTile: vi.fn(({ size }: { size: number }) => (
+    <button data-size={size}>New shared list</button>
+  )),
   ListTile: vi.fn(
-    ({ list, cover }: { list: Summary; cover: string | null }) => (
-      <button>{`${list.name}: ${cover ?? "no cover"}`}</button>
+    ({
+      list,
+      cover,
+      size,
+    }: {
+      list: Summary;
+      cover: string | null;
+      size: number;
+    }) => (
+      <button data-size={size}>{`${list.name}: ${cover ?? "no cover"}`}</button>
     ),
   ),
 }));
@@ -108,6 +118,15 @@ it("fits three tiles across the screen", () => {
   mocks.width = 375;
   render(<AllSharedLists />);
   expect(screen.getAllByTestId("grid")[1].dataset.gap).toBe("11");
+});
+
+it("shrinks the tiles to keep three columns on a narrow screen", () => {
+  mocks.width = 320;
+  render(<AllSharedLists />);
+  expect(screen.getByTestId("grid").dataset.gap).toBe("8");
+  expect(
+    screen.getAllByRole("button").map((tile) => tile.dataset.size),
+  ).toEqual(["88", "88", "88"]);
 });
 
 it("shows a loader under the title while the lists load", () => {
