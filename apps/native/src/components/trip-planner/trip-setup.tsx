@@ -539,11 +539,10 @@ export function TripSetup({
         (pins.data ?? []).filter(
           (pin) => pin.city && sameCity(pin.city, draft.city),
         ),
-      ) ??
-      draft.cityLocation ??
-      null,
-    [pins.data, draft.city, draft.cityLocation],
+      ),
+    [pins.data, draft.city],
   );
+  const pinStart = base ?? draft.cityLocation ?? null;
   const update = (patch: Partial<TripDraft>) =>
     setDraft((current) => ({ ...current, ...patch }));
   const go = (next: Stage) => {
@@ -678,7 +677,7 @@ export function TripSetup({
       ) : null}
       {stage === "pin" ? (
         <PinStep
-          base={base}
+          base={pinStart}
           busy={busy}
           failed={failed}
           onPick={(place) => void submit(place)}
