@@ -162,6 +162,22 @@ describe("trip city suggestions", () => {
       { city: "Austin, QC, Canada", label: "Austin, QC, Canada" },
     ]);
   });
+
+  it("keeps a saved city's name when a suggestion cannot be placed yet", () => {
+    const lisbon = { label: "Lisbon, Portugal", locality: "Lisbon" };
+    const expected = [{ city: "Lisbon", label: "Lisbon, Portugal", count: 3 }];
+    expect(
+      tripCitySuggestions([{ city: "Lisbon", count: 3 }], [lisbon], [], "Lisb"),
+    ).toEqual(expected);
+    expect(
+      tripCitySuggestions(
+        [{ city: "Lisbon", count: 3 }],
+        [{ ...lisbon, location: { lat: 38.72, lng: -9.14 } }],
+        [],
+        "Lisb",
+      ),
+    ).toEqual(expected);
+  });
 });
 
 describe("trip lines", () => {

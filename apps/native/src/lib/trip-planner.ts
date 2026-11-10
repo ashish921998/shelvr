@@ -132,18 +132,20 @@ export function tripCitySuggestions(
       suggestions.set(key, { ...saved, label: saved.city });
   }
   for (const { label, locality, location } of completions) {
-    const saved = cities.find(
-      ({ city }) =>
-        sameCity(city, label) ||
-        (sameCity(city, locality) &&
-          location !== undefined &&
-          pins.some(
-            (pin) =>
-              pin.city !== undefined &&
-              sameCity(pin.city, city) &&
-              distanceKm(pin, location) <= 30,
-          )),
-    );
+    const byLocality = cities.find(({ city }) => sameCity(city, locality));
+    const cityPins = byLocality
+      ? pins.filter(
+          (pin) =>
+            pin.city !== undefined && sameCity(pin.city, byLocality.city),
+        )
+      : [];
+    const saved =
+      cities.find(({ city }) => sameCity(city, label)) ??
+      (location === undefined ||
+      cityPins.length === 0 ||
+      cityPins.some((pin) => distanceKm(pin, location) <= 30)
+        ? byLocality
+        : undefined);
     const city = saved?.city ?? label;
     const key = cityKey(city);
     if (
