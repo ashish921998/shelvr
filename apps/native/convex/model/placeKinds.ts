@@ -155,7 +155,7 @@ const DATE_TAGS = [
 ];
 
 /** Categories an Apple pin can carry and still be a dessert or coffee stop the save is about. */
-const FOOD_CATEGORIES = new Set(["Restaurant", "Cafe", "Bakery", "FoodMarket"]);
+const FOOD_CATEGORIES = new Set(["Restaurant", "Cafe", "Bakery"]);
 
 /** Kinds a date night can happen at. */
 const DATE_KINDS = new Set<PlaceKind>([
@@ -221,20 +221,10 @@ const CUISINE_KINDS: Partial<Record<Cuisine, CategoryKind>> = {
   donuts: "dessert",
 };
 
-const CUISINE_CATEGORIES = new Set([
-  "Restaurant",
-  "Cafe",
-  "Bakery",
-  "Nightlife",
-]);
+const BROAD_CATEGORIES = new Set(["Restaurant", "Cafe", "Bakery", "Nightlife"]);
 
-export function refiningCuisine(
-  category: string | undefined,
-  cuisine: Cuisine | undefined,
-): Cuisine | undefined {
-  return category === undefined || CUISINE_CATEGORIES.has(category)
-    ? cuisine
-    : undefined;
+export function refinable(category: string | undefined): boolean {
+  return category === undefined || BROAD_CATEGORIES.has(category);
 }
 
 export function placeKinds(
@@ -245,7 +235,7 @@ export function placeKinds(
   const tags = new Set(saveTags.map((tag) => tag.trim().toLowerCase()));
   const kinds = new Set<PlaceKind>();
   const fromCategory = category ? CATEGORY_KINDS[category] : undefined;
-  const served = refiningCuisine(category, cuisine);
+  const served = refinable(category) ? cuisine : undefined;
   if (served) {
     const fromCuisine = CUISINE_KINDS[served] ?? "food";
     kinds.add(fromCuisine);

@@ -64,18 +64,18 @@ installed apps ignore. This counts as a public return change: the commit needs t
 `placeEmoji` in `src/lib/map-pin-emoji.ts` tries, in order:
 
 1. Apple's category, when it is a specific one (Museum, Park, Brewery).
-2. The pin's `cuisine` (after PR 2), only when the category is missing or one of Restaurant, Cafe,
-   Bakery and Nightlife. A market keeps its cart.
+2. The pin's `cuisine` (after PR 2), only when the category is missing or broad (Restaurant, Cafe,
+   Bakery, Nightlife).
 3. A whole word of the place name that names a dish or a kind of venue ("Burger", "Taquería",
-   "Café"), only when the category is missing or broad (Restaurant, FoodMarket, Cafe, Bakery,
-   Nightlife). A word for a country's cooking ("Thai") or a loose one ("Grill") gives no emoji.
+   "Café"), under the same condition. A word for a country's cooking ("Thai") or a loose one
+   ("Grill") gives no emoji. A market keeps its cart whatever its name or its save says.
 4. A broad category's emoji.
 5. The save's tags.
 
 Steps 1, 3, 4 and 5 ship in PR 0, on the phone with no deploy, and work for old saves too.
 For the filter chips, `placeKinds(category, tags)` in `convex/model/placeKinds.ts` gains a
 `cuisine` argument that maps it to a kind (coffee to `coffee`, cocktails to `drinks`) and decides the
-food or drink kind ahead of the category and the save's tags. `refiningCuisine` is the one rule both
+food or drink kind ahead of the category and the save's tags. `refinable` is the one rule both
 the emoji and the kinds apply: a place Apple gives a specific category (a museum, a shop, a market)
 ignores its cuisine, so its pin and its filter chips cannot disagree. Both callers pass `pin.cuisine`:
 `cityPins` in `src/lib/city-pins.ts` (the city page) and `listMapPlaces` in `convex/mapPlaces.ts`

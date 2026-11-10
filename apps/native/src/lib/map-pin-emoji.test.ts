@@ -108,6 +108,16 @@ describe("placeEmoji", () => {
     ).toBe("🍺");
   });
 
+  it("keeps a market's cart whatever its name says", () => {
+    expect(
+      placeEmoji({
+        name: "Coffee Corner Market",
+        category: "FoodMarket",
+        kinds: ["food"],
+      }),
+    ).toBe("🛒");
+  });
+
   it("keeps a market's cart whatever the save says it serves", () => {
     expect(
       placeEmoji({

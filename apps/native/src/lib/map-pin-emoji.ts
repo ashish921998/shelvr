@@ -1,6 +1,6 @@
 import { nameWords } from "@convex/model/placeIdentity";
 import {
-  refiningCuisine,
+  refinable,
   type Cuisine,
   type PlaceKind,
 } from "@convex/model/placeKinds";
@@ -68,14 +68,6 @@ const PIN_KIND_ORDER: PlaceKind[] = [
   "shopping",
   "activities",
 ];
-
-const BROAD_CATEGORIES = new Set([
-  "Restaurant",
-  "FoodMarket",
-  "Cafe",
-  "Bakery",
-  "Nightlife",
-]);
 
 const CUISINE_EMOJI: Record<Cuisine, string> = {
   burger: "🍔",
@@ -147,7 +139,7 @@ function nameEmoji(name: string): string | undefined {
 
 /**
  * The emoji a pin shows, so a steakhouse, a bar and a museum no longer look alike.
- * Apple's category wins unless it is a broad food or drink one; then the place's cuisine (never for a market), then the name (only with no or a broad category), then the save's tags.
+ * Apple's category wins unless it is a broad food or drink one; then the place's cuisine, then the name (both only with no or a broad category), then the save's tags.
  * Undefined when nothing says what the place is, which leaves the plain pin.
  */
 export function placeEmoji(place: {
@@ -159,10 +151,9 @@ export function placeEmoji(place: {
   const fromCategory = place.category
     ? CATEGORY_EMOJI[place.category]
     : undefined;
-  const nameDecides = !place.category || BROAD_CATEGORIES.has(place.category);
+  const nameDecides = refinable(place.category);
   if (fromCategory && !nameDecides) return fromCategory;
-  const cuisine = refiningCuisine(place.category, place.cuisine);
-  if (cuisine) return CUISINE_EMOJI[cuisine];
+  if (nameDecides && place.cuisine) return CUISINE_EMOJI[place.cuisine];
   const fromName =
     nameDecides && place.name ? nameEmoji(place.name) : undefined;
   if (fromName) return fromName;

@@ -94,6 +94,7 @@ describe("placeKinds", () => {
   it("ignores the cuisine of a place Apple gives a specific category", () => {
     expect(placeKinds("Museum", [], "coffee")).toEqual(["activities"]);
     expect(placeKinds("FoodMarket", [], "coffee")).toEqual(["food"]);
+    expect(placeKinds("FoodMarket", ["coffee"])).toEqual(["food"]);
     expect(placeKinds("Store", ["food"], "burger")).toEqual(["shopping"]);
     expect(placeKinds("Brewery", [], "pizza")).toEqual(["drinks"]);
   });
