@@ -23,7 +23,7 @@ async function testKey(): Promise<string> {
   return btoa(String.fromCharCode(...der));
 }
 
-async function withMaps(ids = false) {
+async function withMaps(ids = false, resultName?: string) {
   vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
   vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
   vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
@@ -36,6 +36,7 @@ async function withMaps(ids = false) {
     return Response.json({
       results: [
         {
+          name: resultName ?? q.split(",")[0],
           ...(ids ? { id: `ID${q.length}`, poiCategory: "Cafe" } : {}),
           coordinate: { latitude: q.length, longitude: -q.length },
         },
@@ -833,7 +834,7 @@ describe("placePins", () => {
   });
 
   it("keeps city context when a comma belongs to the venue name", async () => {
-    const { queries } = await withMaps();
+    const { queries } = await withMaps(false, "Cafe, Downtown");
     const { t, itemId } = await setup(["Cafe, Downtown"]);
     const todo = await t.query(internal.placePins.toLocate, { itemId });
     expect(todo?.city).toBe("Lisbon");

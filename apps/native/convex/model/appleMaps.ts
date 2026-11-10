@@ -162,7 +162,6 @@ function matchesSavedPlace(
   const labelMatches = !!name && placeKey(name) === expected;
   if (filter === "Poi") return labelMatches;
   if (filter === "Address" && poiCategory) return false;
-  if (filter === "Poi,Address" && !name && !address) return true;
   if (lookup.target === "address") {
     const [street] = lookup.name.split(",", 1);
     return (
@@ -185,7 +184,8 @@ function matchesSavedPlace(
 function isRankedPoi(place: z.infer<typeof placeSchema>): boolean {
   return (
     !!place.poiCategory ||
-    (!!place.id && !place.structuredAddress?.thoroughfare)
+    (!!place.id && !place.structuredAddress?.thoroughfare) ||
+    (!place.name && !place.structuredAddress)
   );
 }
 

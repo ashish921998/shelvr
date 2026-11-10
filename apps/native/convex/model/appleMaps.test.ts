@@ -150,6 +150,40 @@ describe("firstPlace", () => {
 });
 
 describe("appleMapsLookup", () => {
+  it.each(["Poi,Address", "Poi"])(
+    "prefers a named match in %s over an anonymous mixed result",
+    async (matchingFilter) => {
+      const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+        const filter = new URL(String(input)).searchParams.get(
+          "resultTypeFilter",
+        );
+        const anonymous = {
+          coordinate: { latitude: 30.29, longitude: -97.69 },
+        };
+        const named = {
+          name: "Eberly",
+          id: "restaurant",
+          coordinate: { latitude: 30.2586, longitude: -97.7589 },
+        };
+        return Response.json({
+          results: [
+            ...(filter === "Poi,Address" ? [anonymous] : []),
+            ...(filter === matchingFilter ? [named] : []),
+          ],
+        });
+      });
+      expect(
+        await appleMapsLookup(
+          "tok",
+          { target: "place", name: "Eberly" },
+          "Eberly, Austin",
+          undefined,
+          fetchImpl,
+        ),
+      ).toMatchObject({ appleId: "restaurant" });
+    },
+  );
+
   it("leaves an unmatched save unplaced after the mixed search and venue fallback", async () => {
     const fetchImpl = vi.fn(async (_input: Parameters<typeof fetch>[0]) =>
       Response.json({ results: [] }),
