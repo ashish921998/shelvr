@@ -27,13 +27,14 @@ account stays signed out through the paywall and signs in after it.
   "Not sure yet", which replaces "Somewhere else" when Trips is picked
   without Date nights. A
   statement with Continue follows every city answer: it repeats the pick,
-  if there is one, and names the city the sample comes from.
+  if there is one.
 - The sample is always a real reel about the picked city's hidden gems
-  (`src/lib/aha-reels.ts`), one per city for every goal. No city gets
-  Austin's: Lima Criolla, Uncle Nicky's and Vic & Al's.
+  (`src/lib/aha-reels.ts`), one per city for every goal. When no city is
+  picked, the sample uses Austin's reel: Lima Criolla, Uncle Nicky's and
+  Vic & Al's.
 - "Try saving this reel." has a drawn share sheet: `Share` on the reel,
   then "Share to…", "More" and `Shelvr`. "Your first save!" follows, then
-  the spots screen, "<city> · 3 places" (Austin in the tests) under a map,
+  the spots screen, "<city> · 3 places" (Lisbon, or Austin with no city, in the tests) under a map,
   whose Continue enables once the pins land.
 - Three slides follow: "Plan it together with your people.", "No more
   “where should we eat?”" and "Every place you saved, on one map."
@@ -83,7 +84,8 @@ so the next test starts signed out at the opener. It does not use
 
 ## Proof
 
-The sample's spots show by name on "Austin · 3 places". After each paywall
+The sample's spots show by name on "<city> · 3 places", the picked city's
+or Austin's with no city. After each paywall
 close the step that opened it (the last slide, or the notifications step's
 "Not now") is back, and `dev-login-button` and `Add` stay hidden; a cold
 relaunch returns to that step with the splash gone, and the carousel
@@ -93,7 +95,7 @@ reopens on its first slide. No purchase is made.
 
 ```
 onboarding-flow|ios|skeptic|From a fresh install, walk Get started through the questions, the city and the sample reel's share sheet to the spots, the slides and the paywall; close the paywall, relaunch, and check the step is kept and nothing signs in
-onboarding-sample|ios|skeptic|From a fresh install, plan Trips in Lisbon, save the sample reel, and check Austin's three trip spots show on the map and the slides before the paywall
+onboarding-sample|ios|skeptic|From a fresh install, plan Trips in Lisbon, save the sample reel, and check Lisbon's three spots show on the map and the slides before the paywall
 ```
 
 ## Gotchas
