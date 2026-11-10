@@ -460,15 +460,16 @@ function savedLookup(
   const { name: label } = splitSavedPlace(name);
   if (cityKeys.has(placeKey(label)))
     return { target: "locality" as const, name: label };
+  const matchName =
+    cities
+      .map((city) => withoutCitySuffix(name, city))
+      .find((value) => value !== null) ?? name;
   if (
     isStreetAddress(label) ||
     /^(?:#?\d+[a-z]?\s)|(?:\s\d+[a-z]?$)/i.test(label)
   )
-    return { target: "address" as const, name };
-  const unqualified = cities
-    .map((city) => withoutCitySuffix(name, city))
-    .find((value) => value !== null);
-  return { target: "place" as const, name: unqualified ?? name };
+    return { target: "address" as const, name: matchName };
+  return { target: "place" as const, name: matchName };
 }
 
 export const locateItem = internalAction({

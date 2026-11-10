@@ -95,6 +95,102 @@ afterEach(() => {
 });
 
 describe("saved venue lookup", () => {
+  it.each([
+    {
+      saved: "5 Napkin Burger",
+      label: "5 Napkin Burger Union Square",
+      cities: ["New York"],
+      query: "5 Napkin Burger, New York",
+    },
+    {
+      saved: "Studio 54, New York",
+      label: "Studio 54",
+      cities: ["New York", "Los Angeles"],
+      query: "Studio 54, New York",
+    },
+  ])(
+    "falls back to the venue for $saved after an address miss",
+    async ({ saved, label, cities, query }) => {
+      await withMaps();
+      const { t, itemId, pins } = await setup([], { read: [saved] });
+      await t.run((ctx) => ctx.db.patch(itemId, { cities }));
+      const filters: (string | null)[] = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: string) => {
+          const url = new URL(input);
+          if (url.pathname === "/v1/token")
+            return Response.json({ accessToken: "maps" });
+          expect(url.searchParams.get("q")).toBe(query);
+          const filter = url.searchParams.get("resultTypeFilter");
+          filters.push(filter);
+          return Response.json({
+            results:
+              filter === "Poi"
+                ? [
+                    {
+                      name: label,
+                      id: "venue",
+                      poiCategory: "Restaurant",
+                      coordinate: { latitude: 40.73, longitude: -73.99 },
+                    },
+                  ]
+                : [],
+          });
+        }),
+      );
+      await t.action(internal.placePins.locateItem, { itemId });
+      expect(await pins()).toMatchObject([{ name: saved, appleId: "venue" }]);
+      expect(filters).toEqual(["Address", "Poi,Address", "Poi"]);
+    },
+  );
+
+  it.each([true, false])(
+    "chooses Broadway the venue over the same-named street when the mixed reply contains the venue: %s",
+    async (venueInMixed) => {
+      await withMaps();
+      const { t, itemId, pins } = await setup([], { read: ["Broadway"] });
+      await t.run((ctx) => ctx.db.patch(itemId, { cities: ["New York"] }));
+      const street = {
+        name: "Broadway",
+        structuredAddress: { thoroughfare: "Broadway" },
+        coordinate: { latitude: 40.75, longitude: -73.99 },
+      };
+      const venue = {
+        name: "Broadway",
+        id: "restaurant",
+        poiCategory: "Restaurant",
+        coordinate: { latitude: 40.76, longitude: -73.98 },
+      };
+      const filters: (string | null)[] = [];
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async (input: string) => {
+          const url = new URL(input);
+          if (url.pathname === "/v1/token")
+            return Response.json({ accessToken: "maps" });
+          const filter = url.searchParams.get("resultTypeFilter");
+          filters.push(filter);
+          return Response.json({
+            results:
+              filter === "Poi"
+                ? [venue]
+                : venueInMixed
+                  ? [street, venue]
+                  : [street],
+          });
+        }),
+      );
+      await t.action(internal.placePins.locateItem, { itemId });
+      expect(await pins()).toMatchObject([
+        { name: "Broadway", appleId: "restaurant" },
+      ]);
+      expect(filters).toEqual(
+        venueInMixed ? ["Poi,Address"] : ["Poi,Address", "Poi"],
+      );
+    },
+  );
+
   it("looks up a numbered address before a store and rejects an unrelated street for a venue", async () => {
     await withMaps();
     const { t, itemId, pins } = await setup([], {
@@ -382,6 +478,8 @@ describe("saved venue lookup", () => {
         if (url.pathname === "/v1/token")
           return Response.json({ accessToken: "maps" });
         expect(url.searchParams.get("q")).toBe("Alfama, Lisbon");
+        if (url.searchParams.get("resultTypeFilter") === "Poi")
+          return Response.json({ results: [] });
         return Response.json({
           results: [
             {
@@ -469,7 +567,10 @@ describe("placePins", () => {
       }),
     );
     await t.action(internal.placePins.locateItem, { itemId, refresh: true });
-    expect(queries()).toEqual(["Bakery, Bairro Alto, Lisbon"]);
+    expect(queries()).toEqual([
+      "Bakery, Bairro Alto, Lisbon",
+      "Bakery, Bairro Alto, Lisbon",
+    ]);
     const q = "Bakery, Bairro Alto, Lisbon".length;
     expect(await pins()).toEqual([
       chosen,
@@ -738,7 +839,12 @@ describe("placePins", () => {
       }),
     );
     await t.action(internal.placePins.locateItem, { itemId });
-    expect(queries).toEqual(["Cafe, Lisbon", "Tower, Porto"]);
+    expect(queries).toEqual([
+      "Cafe, Lisbon",
+      "Tower, Porto",
+      "Cafe, Lisbon",
+      "Tower, Porto",
+    ]);
     expect((await pins())?.map((pin) => pin.city)).toEqual(["Lisbon", "Porto"]);
   });
 
@@ -840,7 +946,10 @@ describe("placePins", () => {
     expect(todo?.city).toBe("Lisbon");
     expect(todo?.singleCity).toBe(true);
     await t.action(internal.placePins.locateItem, { itemId });
-    expect(queries()).toEqual(["Cafe, Downtown, Lisbon"]);
+    expect(queries()).toEqual([
+      "Cafe, Downtown, Lisbon",
+      "Cafe, Downtown, Lisbon",
+    ]);
   });
 
   it("adds a city that contains a comma to the lookup only once", async () => {
@@ -850,7 +959,10 @@ describe("placePins", () => {
       ctx.db.patch(itemId, { cities: ["Washington, D.C"] }),
     );
     await t.action(internal.placePins.locateItem, { itemId });
-    expect(queries()).toEqual(["Founding Farmers, Washington, D.C"]);
+    expect(queries()).toEqual([
+      "Founding Farmers, Washington, D.C",
+      "Founding Farmers, Washington, D.C",
+    ]);
   });
 
   it("keeps retained and new single-city pins assigned to their source city", async () => {
@@ -1060,7 +1172,7 @@ describe("placePins", () => {
       },
     );
     await t.action(internal.placePins.locateItem, { itemId });
-    expect(queries()).toEqual(["Pink Street, Lisbon"]);
+    expect(queries()).toEqual(["Pink Street, Lisbon", "Pink Street, Lisbon"]);
     expect(await pins()).toHaveLength(2);
   });
 
@@ -1275,7 +1387,7 @@ describe("placePins", () => {
       });
     });
     await t.action(internal.placePins.locateItem, { itemId });
-    expect(queries()).toEqual(["Pink Street, Lisbon"]);
+    expect(queries()).toEqual(["Pink Street, Lisbon", "Pink Street, Lisbon"]);
     expect(await pins()).toHaveLength(1);
   });
 
@@ -1370,7 +1482,7 @@ describe("placePins", () => {
     } finally {
       vi.useRealTimers();
     }
-    expect(queries()).toEqual(["Luna Tacos, Lisbon"]);
+    expect(queries()).toEqual(["Luna Tacos, Lisbon", "Luna Tacos, Lisbon"]);
     expect((await pins())?.map((pin) => pin.name)).toEqual([
       "Time Out Market",
       "Luna Tacos",

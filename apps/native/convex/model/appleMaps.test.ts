@@ -150,6 +150,35 @@ describe("firstPlace", () => {
 });
 
 describe("appleMapsLookup", () => {
+  it("leaves an address miss unplaced when the mixed result is an unrelated venue", async () => {
+    const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+      const filter = new URL(String(input)).searchParams.get(
+        "resultTypeFilter",
+      );
+      return Response.json({
+        results:
+          filter === "Poi,Address"
+            ? [
+                {
+                  name: "Broadway Cafe",
+                  poiCategory: "Cafe",
+                  coordinate: { latitude: 40.75, longitude: -73.98 },
+                },
+              ]
+            : [],
+      });
+    });
+    expect(
+      await appleMapsLookup(
+        "tok",
+        { target: "address", name: "123 West Broadway" },
+        "123 West Broadway, New York",
+        undefined,
+        fetchImpl,
+      ),
+    ).toBeNull();
+  });
+
   it.each(["Poi,Address", "Poi"])(
     "prefers a named match in %s over an anonymous mixed result",
     async (matchingFilter) => {
