@@ -71,9 +71,9 @@ it("offers to send a date night's spots to the date", () => {
   expect(screen.getByText("datePlan.send")).toBeTruthy();
   expect(screen.queryByText("homePlaces.planTrip")).toBeNull();
   expect(screen.queryByText("common.share")).toBeNull();
-  expect(screen.getAllByText("Lima Criolla")).toHaveLength(2);
-  expect(screen.getAllByText("Uncle Nicky's")).toHaveLength(2);
-  expect(screen.getAllByText("Vic & Al's")).toHaveLength(1);
+  expect(screen.getAllByText("Austin Motel")).toHaveLength(2);
+  expect(screen.getAllByText("Heritage Boot")).toHaveLength(2);
+  expect(screen.getAllByText("Jo's Coffee")).toHaveLength(1);
 });
 
 it("plans a weekend like a date and shares it", () => {
@@ -87,7 +87,7 @@ it("plans a weekend like a date and shares it", () => {
   expect(screen.getAllByText("homePlaces.planDate")).toHaveLength(2);
   expect(screen.getByText("common.share")).toBeTruthy();
   expect(screen.queryByText("datePlan.send")).toBeNull();
-  expect(screen.getAllByText("Lima Criolla")).toHaveLength(2);
-  expect(screen.getAllByText("Uncle Nicky's")).toHaveLength(2);
-  expect(screen.getAllByText("Vic & Al's")).toHaveLength(1);
+  expect(screen.getAllByText("Austin Motel")).toHaveLength(2);
+  expect(screen.getAllByText("Heritage Boot")).toHaveLength(2);
+  expect(screen.getAllByText("Jo's Coffee")).toHaveLength(1);
 });

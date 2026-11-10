@@ -39,21 +39,21 @@ const AHA_REELS: Record<SampleCityId, AhaReel> = {
     ],
   },
   "los-angeles": {
-    code: "DNI_eJoxciy",
-    handle: "camberplaces",
+    code: "DQZtAA6Ebfr",
+    handle: "beccsvoyage",
     places: [
-      ["drinks", "Zizou", 34.074097, -118.215726],
-      ["dinner", "Rasarumah", 34.071976, -118.282317],
-      ["brunch", "Linden", 34.097958, -118.319243],
+      ["dinner", "Yamashiro", 34.105826, -118.342318],
+      ["dinner", "Alba", 34.082904, -118.375121],
+      ["dinner", "Bavel", 34.041432, -118.232954],
     ],
   },
   "new-york": {
-    code: "DXXpR7DhOm5",
-    handle: "secret_nyc",
+    code: "DLyj62RsbTj",
+    handle: "beli_eats",
     places: [
-      ["lunch", "Footprints Cafe", 40.575747, -73.983238],
-      ["afternoon", "Film Noir Cinema", 40.727314, -73.951608],
-      ["coffee", "Thrift N' Sip", 40.700925, -73.826755],
+      ["dinner", "Chrissy’s Pizza", 40.724637, -73.947671],
+      ["dinner", "Bernie’s", 40.721912, -73.950585],
+      ["lunch", "Taqueria Ramirez", 40.727887, -73.957007],
     ],
   },
   paris: {
@@ -96,9 +96,9 @@ const AHA_REELS: Record<SampleCityId, AhaReel> = {
     code: "DVnzGTnNT15",
     handle: "svadore",
     places: [
-      ["coffee", "Kayaba Coffee", 35.721146, 139.770771],
-      ["afternoon", "Nennekoya", 35.720746, 139.766069],
-      ["lunch", "Kamachiku", 35.718083, 139.766998],
+      ["coffee", "Kayaba Coffee", 35.721152, 139.770735],
+      ["walk", "Yanaka Ginza", 35.724295, 139.767909],
+      ["walk", "Nezu Shrine", 35.719278, 139.764251],
     ],
   },
   toronto: {
@@ -111,17 +111,12 @@ const AHA_REELS: Record<SampleCityId, AhaReel> = {
     ],
   },
   chicago: {
-    code: "DLlHb3RvIjy",
-    handle: "biancaalbamph",
+    code: "DUzIHJpkgO4",
+    handle: "windy_citychicago",
     places: [
-      [
-        "morning",
-        "International Museum of Surgical Science",
-        41.910153,
-        -87.62694,
-      ],
-      ["walk", "The Magic Hedge", 41.962992, -87.63317],
-      ["afternoon", "Merz Apothecary", 41.967071, -87.687687],
+      ["dinner", "Olio e Più", 41.890667, -87.62941],
+      ["dinner", "Mastro’s Steakhouse", 41.891518, -87.62983],
+      ["dinner", "Benihana", 41.899045, -87.623777],
     ],
   },
   seattle: {
@@ -134,12 +129,12 @@ const AHA_REELS: Record<SampleCityId, AhaReel> = {
     ],
   },
   austin: {
-    code: "Com2fwCDNnZ",
-    handle: "512bites",
+    code: "Da1LtsNRybN",
+    handle: "austinites101",
     places: [
-      ["dinner", "Lima Criolla", 30.324796, -97.707735],
-      ["lunch", "Uncle Nicky's", 30.247654, -97.771921],
-      ["dinner", "Vic & Al's", 30.284928, -97.717],
+      ["afternoon", "Austin Motel", 30.251748, -97.749094],
+      ["morning", "Heritage Boot", 30.246645, -97.751175],
+      ["coffee", "Jo's Coffee", 30.251084, -97.749345],
     ],
   },
   dallas: {
@@ -152,12 +147,12 @@ const AHA_REELS: Record<SampleCityId, AhaReel> = {
     ],
   },
   "las-vegas": {
-    code: "DPuKyjqEWCT",
-    handle: "immarcomurillo",
+    code: "DK70lVnh7rV",
+    handle: "jinaham812",
     places: [
-      ["drinks", "The Lock Speakeasy", 36.113482, -115.169055],
-      ["dessert", "The Speakeasy at Caramella", 36.110062, -115.171513],
-      ["dinner", "Caspian's Rock & Roe", 36.116628, -115.176757],
+      ["drinks", "The Barbershop Cuts & Cocktails", 36.109651, -115.174567],
+      ["drinks", "Ghost Donkey", 36.109749, -115.173893],
+      ["dinner", "Secret Pizza", 36.109692, -115.174237],
     ],
   },
   vancouver: {
@@ -179,12 +174,17 @@ const AHA_REELS: Record<SampleCityId, AhaReel> = {
     ],
   },
   madrid: {
-    code: "DcB6IefAcnh",
-    handle: "visita_madrid",
+    code: "CX_4PcDsPGB",
+    handle: "derutapormadrid",
     places: [
-      ["coffee", "La Terraza del Campo del Moro", 40.418981, -3.719612],
-      ["dessert", "Las Carboneras", 40.414693, -3.70995],
-      ["walk", "Travesía del Nuncio", 40.413427, -3.710202],
+      [
+        "morning",
+        "Catedral Ortodoxa de Santa María Magdalena",
+        40.467002,
+        -3.65145,
+      ],
+      ["afternoon", "Palacio de Santoña", 40.414019, -3.700365],
+      ["walk", "Frontón Beti Jai", 40.430983, -3.691138],
     ],
   },
   berlin: {
@@ -206,12 +206,12 @@ const AHA_REELS: Record<SampleCityId, AhaReel> = {
     ],
   },
   amsterdam: {
-    code: "DTQmXZUgPAA",
-    handle: "cosmoiscosmic",
+    code: "Deabvz5GiBz",
+    handle: "vovvarov",
     places: [
-      ["morning", "Kalverstraat carillon", 52.369883, 4.891307],
-      ["coffee", "Het Kleinste Huis", 52.371235, 4.897672],
-      ["walk", "Rokin metro archaeology display", 52.370533, 4.89267],
+      ["coffee", "LOT61 Coffee Roasters", 52.366834, 4.870291],
+      ["afternoon", "Albert Cuyp Markt", 52.355867, 4.895225],
+      ["drinks", "Brouwerij 't IJ", 52.366669, 4.92639],
     ],
   },
   rome: {

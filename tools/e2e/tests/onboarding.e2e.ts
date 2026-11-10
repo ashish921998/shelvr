@@ -76,17 +76,22 @@ test(
   { retries: 0, timeout: 600_000 },
   async ({ device, screen, app }) => {
     await startFreshOnboarding({ device, screen });
-    await walkToSampleReel(screen, { goal: "travel", city: "Lisbon" });
+    await walkToSampleReel(screen, { goal: "date", city: "Las Vegas" });
     await expect(screen.getByRole("image", /^Sample/)).toBeVisible();
-    await app.screenshot("lisbon-reel");
+    await app.screenshot("las-vegas-reel");
     await shareTheSampleReel(screen);
-    await expect(screen.getByText("Lisbon · 3 places")).toBeVisible();
-    for (const place of ["Ler Devagar", "Casa do Alentejo", "Mini Bar"]) {
+    await expect(screen.getByText("Las Vegas · 3 places")).toBeVisible();
+    for (const place of [
+      "The Barbershop Cuts & Cocktails",
+      "Ghost Donkey",
+      "Secret Pizza",
+    ]) {
       await expect(screen.getByText(place).first()).toBeVisible();
     }
+    await app.screenshot("las-vegas-spots");
     await walkToCarouselEnd(screen);
     await expect(paywallTitle(screen)).toBeHidden();
-    await app.screenshot("lisbon-carousel");
+    await app.screenshot("las-vegas-carousel");
   },
 );
 
@@ -105,11 +110,12 @@ test(
     await expect(screen.getByText("Austin · 3 places")).toBeVisible({
       timeout: 30_000,
     });
-    for (const place of ["Lima Criolla", "Uncle Nicky's", "Vic & Al's"]) {
+    for (const place of ["Austin Motel", "Heritage Boot", "Jo's Coffee"]) {
       await expect(screen.getByText(place).first()).toBeVisible({
         timeout: 10_000,
       });
     }
+    await app.screenshot("austin-spots");
     const last = await walkToCarouselEnd(screen);
     await expect(paywallTitle(screen)).toBeHidden();
     await app.screenshot("carousel-before");
