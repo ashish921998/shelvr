@@ -155,7 +155,7 @@ const DATE_TAGS = [
 ];
 
 /** Categories an Apple pin can carry and still be a dessert or coffee stop the save is about. */
-const FOOD_CATEGORIES = new Set(["Restaurant", "Cafe", "Bakery", "FoodMarket"]);
+const FOOD_CATEGORIES = new Set(["Restaurant", "Cafe", "Bakery"]);
 
 /** Kinds a date night can happen at. */
 const DATE_KINDS = new Set<PlaceKind>([
@@ -209,21 +209,40 @@ function tagged(tags: ReadonlySet<string>, words: readonly string[]): boolean {
   );
 }
 
+const CUISINE_KINDS: Partial<Record<Cuisine, CategoryKind>> = {
+  coffee: "coffee",
+  tea: "coffee",
+  bakery: "dessert",
+  cocktails: "drinks",
+  wine: "drinks",
+  beer: "drinks",
+  dessert: "dessert",
+  "ice cream": "dessert",
+  donuts: "dessert",
+};
+
+const BROAD_CATEGORIES = new Set(["Restaurant", "Cafe", "Bakery", "Nightlife"]);
+
+export function refinable(category: string | undefined): boolean {
+  return category === undefined || BROAD_CATEGORIES.has(category);
+}
+
 export function placeKinds(
   category: string | undefined,
   saveTags: readonly string[],
+  cuisine?: Cuisine,
 ): PlaceKind[] {
   const tags = new Set(saveTags.map((tag) => tag.trim().toLowerCase()));
   const kinds = new Set<PlaceKind>();
   const fromCategory = category ? CATEGORY_KINDS[category] : undefined;
-  if (fromCategory) kinds.add(fromCategory);
-  if (category === undefined) {
-    for (const [kind, words] of Object.entries(TAG_KINDS))
-      if (tagged(tags, words)) kinds.add(kind as CategoryKind);
-  } else if (FOOD_CATEGORIES.has(category)) {
-    // Apple files most dessert and coffee shops as restaurants; the save says what they are.
-    if (tagged(tags, TAG_KINDS.dessert)) kinds.add("dessert");
-    if (tagged(tags, TAG_KINDS.coffee)) kinds.add("coffee");
+  const served = refinable(category) ? cuisine : undefined;
+  if (served) {
+    const fromCuisine = CUISINE_KINDS[served] ?? "food";
+    kinds.add(fromCuisine);
+    if (fromCategory && fromCuisine === "food") kinds.add(fromCategory);
+  } else {
+    if (fromCategory) kinds.add(fromCategory);
+    for (const kind of tagKinds(category, tags)) kinds.add(kind);
   }
   const datable =
     category === undefined || [...kinds].some((kind) => DATE_KINDS.has(kind));
@@ -231,12 +250,32 @@ export function placeKinds(
   return PLACE_KINDS.filter((kind) => kinds.has(kind));
 }
 
+function tagKinds(
+  category: string | undefined,
+  tags: ReadonlySet<string>,
+): CategoryKind[] {
+  if (category === undefined)
+    return (Object.entries(TAG_KINDS) as [CategoryKind, readonly string[]][])
+      .filter(([, words]) => tagged(tags, words))
+      .map(([kind]) => kind);
+  if (!FOOD_CATEGORIES.has(category)) return [];
+  // Apple files most dessert and coffee shops as restaurants; the save says what they are.
+  return (["dessert", "coffee"] as const).filter((kind) =>
+    tagged(tags, TAG_KINDS[kind]),
+  );
+}
+
 export function mergeVenueKinds<
-  T extends { category?: string; kinds: readonly PlaceKind[] },
+  T extends {
+    category?: string;
+    cuisine?: Cuisine;
+    kinds: readonly PlaceKind[];
+  },
 >(kept: T, repeat: T): T {
   return {
     ...kept,
     ...(kept.category || !repeat.category ? {} : { category: repeat.category }),
+    ...(kept.cuisine || !repeat.cuisine ? {} : { cuisine: repeat.cuisine }),
     kinds: PLACE_KINDS.filter(
       (kind) => kept.kinds.includes(kind) || repeat.kinds.includes(kind),
     ),

@@ -52,7 +52,10 @@ It is a new optional field, so it stays declared `v.optional` on rollback once r
 already copies `city`, `appleId` and `category`. The match is by name only, since `placeCuisines`
 carries no Apple id or point: both sides go through `placeKey`, and when one save names two places
 with the same key the first `placeCuisines` entry wins. A renamed place matches nothing and keeps no
-cuisine; edits drop `placeCuisines` anyway (section 2). The pin validators gain an optional `cuisine`, which
+cuisine; edits drop `placeCuisines` anyway (section 2). Every pin write sets the cuisine of every pin
+from the save's current `placeCuisines`, kept pins included (`keepPins` and edited saves), and takes it
+off a pin the save no longer gives one; no pin moves. `placePins:backfillPage` repairs pins whose
+cuisines differ from their save's by patching them directly, with no Apple Maps call. The pin validators gain an optional `cuisine`, which
 installed apps ignore. This counts as a public return change: the commit needs the
 `Convex-Api: changed` trailer.
 
@@ -61,16 +64,20 @@ installed apps ignore. This counts as a public return change: the commit needs t
 `placeEmoji` in `src/lib/map-pin-emoji.ts` tries, in order:
 
 1. Apple's category, when it is a specific one (Museum, Park, Brewery).
-2. The pin's `cuisine` (after PR 2).
-3. A whole word of the place name ("Burger", "Taquería", "Café"), only when the category is missing
-   or broad (Restaurant, FoodMarket, Cafe, Bakery, Nightlife).
+2. The pin's `cuisine` (after PR 2), only when the category is missing or broad (Restaurant, Cafe,
+   Bakery, Nightlife).
+3. A whole word of the place name that names a dish or a kind of venue ("Burger", "Taquería",
+   "Café"), under the same condition. A word for a country's cooking ("Thai") or a loose one
+   ("Grill") gives no emoji. A market keeps its cart whatever its name or its save says.
 4. A broad category's emoji.
 5. The save's tags.
 
 Steps 1, 3, 4 and 5 ship in PR 0, on the phone with no deploy, and work for old saves too.
 For the filter chips, `placeKinds(category, tags)` in `convex/model/placeKinds.ts` gains a
 `cuisine` argument that maps it to a kind (coffee to `coffee`, cocktails to `drinks`) and decides the
-food or drink kind ahead of the category and the save's tags. Both callers pass `pin.cuisine`:
+food or drink kind ahead of the category and the save's tags. `refinable` is the one rule both
+the emoji and the kinds apply: a place Apple gives a specific category (a museum, a shop, a market)
+ignores its cuisine, so its pin and its filter chips cannot disagree. Both callers pass `pin.cuisine`:
 `cityPins` in `src/lib/city-pins.ts` (the city page) and `listMapPlaces` in `convex/mapPlaces.ts`
 (the Map tab). Without that threading the chips stay per-save while the emoji is per-place.
 Both dedupe a venue across saves with `mergeVenueKinds` (`convex/model/placeKinds.ts`), which PR 2

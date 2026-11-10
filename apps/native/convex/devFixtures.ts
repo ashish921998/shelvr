@@ -279,8 +279,21 @@ async function seedFixtures(
       { name: "Marlowe's", cuisine: "cocktails" },
     ],
     placePins: [
-      { name: "Lucy's", lat: 29.7499, lng: -95.3584, city: "Houston" },
-      { name: "Marlowe's", lat: 29.7604, lng: -95.3698, city: "Houston" },
+      {
+        name: "Lucy's",
+        lat: 29.7499,
+        lng: -95.3584,
+        city: "Houston",
+        category: "Restaurant",
+        cuisine: "burger",
+      },
+      {
+        name: "Marlowe's",
+        lat: 29.7604,
+        lng: -95.3698,
+        city: "Houston",
+        cuisine: "cocktails",
+      },
     ],
     searchText: "Houston eats Houston Lucy's Marlowe's",
   });

@@ -26,6 +26,10 @@ export const intentValidator = v.object({
   value: v.string(),
 });
 
+export const cuisineValidator = v.union(
+  ...CUISINES.map((cuisine) => v.literal(cuisine)),
+);
+
 export const placePinsValidator = v.array(
   v.object({
     name: v.string(),
@@ -35,15 +39,12 @@ export const placePinsValidator = v.array(
     appleId: v.optional(v.string()),
     /** Apple Maps' point-of-interest category, e.g. "Bakery"; the Map tab's filters read it. */
     category: v.optional(v.string()),
+    cuisine: v.optional(cuisineValidator),
   }),
 );
 
 export const placeLocationsValidator = v.array(
   v.object({ name: v.string(), location: v.string() }),
-);
-
-export const cuisineValidator = v.union(
-  ...CUISINES.map((cuisine) => v.literal(cuisine)),
 );
 
 export const placeCuisinesValidator = v.array(
