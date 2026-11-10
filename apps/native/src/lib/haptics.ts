@@ -1,6 +1,6 @@
 import * as Haptics from "expo-haptics";
 
-type Feedback = "selection" | "impact" | "success";
+type Feedback = "selection" | "impact" | "landing" | "success";
 
 async function playOptionalFeedback(
   kind: Feedback,
@@ -12,12 +12,13 @@ async function playOptionalFeedback(
       const effect = {
         selection: Haptics.AndroidHaptics.Segment_Tick,
         impact: Haptics.AndroidHaptics.Drag_Start,
+        landing: Haptics.AndroidHaptics.Gesture_End,
         success: Haptics.AndroidHaptics.Confirm,
       }[kind];
       await Haptics.performAndroidHapticsAsync(effect);
     } else if (kind === "selection") {
       await Haptics.selectionAsync();
-    } else if (kind === "impact") {
+    } else if (kind === "impact" || kind === "landing") {
       await Haptics.impactAsync(impactStyle);
     } else {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -28,6 +29,8 @@ async function playOptionalFeedback(
 }
 
 export const haptics = {
+  landing: () =>
+    playOptionalFeedback("landing", Haptics.ImpactFeedbackStyle.Soft),
   selection: () => playOptionalFeedback("selection"),
   impact: (strength: "light" | "medium" = "light") =>
     playOptionalFeedback(

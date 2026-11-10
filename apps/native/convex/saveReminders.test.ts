@@ -772,6 +772,8 @@ describe("delivering a save reminder", () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual([
       {
         to: "token-a",
+        collapseId: reminder._id,
+        tag: reminder._id,
         title: "Saved for later",
         body: "“Why bread rises” is ready when you are.",
         data: {

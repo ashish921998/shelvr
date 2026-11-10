@@ -42,7 +42,7 @@ export function planKindFor(goals: readonly Goal[]): PlanKind {
   return goal === null ? "weekend" : GOAL_PLAN[goal];
 }
 
-export const SAVED_COUNTS = [
+const SAVED_COUNTS = [
   "few",
   "tenToFifty",
   "fiftyToTwoHundred",
@@ -54,13 +54,31 @@ export type SavedCount = (typeof SAVED_COUNTS)[number];
 export const isSavedCount = (value: unknown): value is SavedCount =>
   SAVED_COUNTS.some((count) => count === value);
 
-export const PLANNERS = [
-  "planner",
-  "flexible",
-  "spontaneous",
-  "explorer",
-] as const;
+const PLANNERS = ["planner", "flexible", "spontaneous", "explorer"] as const;
 export type Planner = (typeof PLANNERS)[number];
 
 export const isPlanner = (value: unknown): value is Planner =>
   PLANNERS.some((planner) => planner === value);
+
+const TRIP_SOON_ANSWERS = ["soon", "notYet"] as const;
+export type TripSoon = (typeof TRIP_SOON_ANSWERS)[number];
+
+export const isTripSoon = (value: unknown): value is TripSoon =>
+  TRIP_SOON_ANSWERS.some((answer) => answer === value);
+
+export function asksTripSoon(goals: readonly Goal[]): boolean {
+  return goals.length === 0 || readGoals(goals).includes("travel");
+}
+
+export type CityQuestion = "trip" | "out" | "dream";
+
+export function cityQuestion(
+  goals: readonly Goal[],
+  tripSoon: TripSoon | null,
+): CityQuestion {
+  if (asksTripSoon(goals) && tripSoon === "soon") return "trip";
+  const picked = readGoals(goals);
+  return picked.length === 0 || picked.length === GOALS.length
+    ? "dream"
+    : "out";
+}

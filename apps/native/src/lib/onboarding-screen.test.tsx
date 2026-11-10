@@ -35,7 +35,7 @@ const mocks = vi.hoisted(() => ({
     </button>
   ),
   share: vi.fn((_props: { sample: Sample }) => null),
-  commitment: vi.fn(),
+  carousel: vi.fn(),
   notifications: vi.fn(),
   permission: vi.fn<() => Promise<"granted" | "ask" | "blocked">>(),
   progress: {
@@ -45,6 +45,8 @@ const mocks = vi.hoisted(() => ({
     goals: [] as string[],
     savedCount: null as string | null,
     planner: null as string | null,
+    tripSoon: null as string | null,
+    viewed: [] as string[],
   },
   paywall: {} as { onPro: () => void },
 }));
@@ -68,12 +70,22 @@ vi.mock("@/lib/onboarding", () => ({
 }));
 vi.mock("@/lib/welcome-save", () => ({ noteOnboardingFinished: vi.fn() }));
 vi.mock("@/lib/free-plan", () => ({ useFreePlanOpen: () => false }));
-vi.mock("@/lib/onboarding-paywall", () => ({
-  useOnboardingPaywall: (options: { onPro: () => void }) => {
-    mocks.paywall = options;
-    return { asked: false, ask: mocks.ask };
-  },
-}));
+vi.mock("@/lib/onboarding-paywall", async () => {
+  const { useState } = await import("react");
+  return {
+    useOnboardingPaywall: (options: { onPro: () => void }) => {
+      mocks.paywall = options;
+      const [asked, setAsked] = useState(false);
+      return {
+        asked,
+        ask: () => {
+          mocks.ask();
+          setAsked(true);
+        },
+      };
+    },
+  };
+});
 vi.mock("@/lib/pending-onboarding", () => ({
   clearPending: vi.fn(),
   getOnboardingProgress: () => mocks.progress,
@@ -110,6 +122,12 @@ vi.mock("@/components/onboarding/questions", () => ({
       </div>
     ),
   ),
+  TripSoonStep: vi.fn(({ onPick }: { onPick: (answer: string) => void }) => (
+    <div>
+      {button("trip:soon", () => onPick("soon"))}
+      {button("trip:notYet", () => onPick("notYet"))}
+    </div>
+  )),
   GoalStep: vi.fn(
     ({
       picked,
@@ -142,23 +160,40 @@ vi.mock("@/components/onboarding/questions", () => ({
     ),
   ),
 }));
+vi.mock("@/components/onboarding/statement", () => ({
+  StatementStep: vi.fn(
+    ({ text, onContinue }: { text: string; onContinue: () => void }) => (
+      <div>
+        <p>{text}</p>
+        {button("statement", onContinue)}
+      </div>
+    ),
+  ),
+}));
 vi.mock("@/components/onboarding/progress-chart", () => ({
   ProgressChartStep: vi.fn(
     ({ kind, onContinue }: { kind: string; onContinue: () => void }) =>
       button(`chart:${kind}`, onContinue),
   ),
 }));
+vi.mock("@/components/onboarding/first-save", () => ({
+  FirstSaveStep: vi.fn(({ onContinue }: { onContinue: () => void }) =>
+    button("firstSave:continue", onContinue),
+  ),
+}));
 vi.mock("@/components/onboarding/city-step", () => ({
   CityStep: vi.fn(
     ({
       kind,
+      question,
       onPick,
     }: {
       kind: string;
+      question: string;
       onPick: (city: string | null) => void;
     }) => (
       <div>
-        {button(`city:${kind}:lisbon`, () => onPick("lisbon"))}
+        {button(`city:${kind}:${question}:lisbon`, () => onPick("lisbon"))}
         {button("city:none", () => onPick(null))}
       </div>
     ),
@@ -175,11 +210,13 @@ vi.mock("@/components/onboarding/aha-spots", () => ({
     button("aha:spots", onContinue),
   ),
 }));
-vi.mock("@/components/onboarding/commitment", () => ({
-  CommitmentStep: vi.fn((props: { sample: Sample; onContinue: () => void }) => {
-    mocks.commitment(props);
-    return button("commitment:continue", props.onContinue);
-  }),
+vi.mock("@/components/onboarding/carousel", () => ({
+  CarouselStep: vi.fn(
+    (props: { sample: Sample; leaving: boolean; onContinue: () => void }) => {
+      mocks.carousel(props);
+      return button("carousel:continue", props.onContinue);
+    },
+  ),
 }));
 vi.mock("@/components/onboarding/notifications", () => ({
   NotificationsStep: vi.fn(
@@ -220,6 +257,16 @@ const saved = () => mocks.setOnboardingProgress.mock.lastCall?.[0];
 const startAt = (step: (typeof ONBOARDING_STEPS)[number]) => {
   mocks.progress = { ...mocks.progress, step: ONBOARDING_STEPS.indexOf(step) };
 };
+const relaunch = () => {
+  cleanup();
+  mocks.progress = saved();
+  render(<OnboardingScreen />);
+};
+const viewsOf = (stepId: string) =>
+  mocks.capture.mock.calls.filter(
+    ([event, properties]) =>
+      event === "onboarding_step_viewed" && properties.step_id === stepId,
+  );
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -231,11 +278,13 @@ beforeEach(() => {
     goals: [],
     savedCount: null,
     planner: null,
+    tripSoon: null,
+    viewed: [],
   };
 });
 afterEach(cleanup);
 
-it("walks the questions into a sample for the goal that leads, and keeps every answer", () => {
+it("walks the questions, the trip question, the chart and the city echo into a sample for the goal that leads, and keeps every answer", () => {
   render(<OnboardingScreen />);
   tap("opener:start");
   tap("count:hundreds");
@@ -243,42 +292,116 @@ it("walks the questions into a sample for the goal that leads, and keeps every a
   tap("goal:food");
   tap("goal:travel");
   tap("goal:continue");
+  tap("trip:soon");
   tap("planner:explorer");
   tap("planner:continue");
   tap("chart:trip");
-  tap("city:trip:lisbon");
+  tap("city:trip:trip:lisbon");
   expect(saved()).toMatchObject({
     goals: ["food", "travel"],
     spaces: ["Travel", "Restaurants to try"],
     savedCount: "hundreds",
     planner: "explorer",
+    tripSoon: "soon",
     travelCity: "lisbon",
-    step: ONBOARDING_STEPS.indexOf("ahaShare"),
+    step: ONBOARDING_STEPS.indexOf("cityEcho"),
   });
+  expect(screen.getByText("onboardingStatement.cityFirst")).toBeTruthy();
+  tap("statement");
   expect(mocks.share.mock.lastCall?.[0].sample).toMatchObject({
     kind: "trip",
     city: "austin",
   });
 });
 
-it("plans for every goal when the goal question is skipped", () => {
+it("praises the city only when the demo plays that city's reel", () => {
+  mocks.progress = {
+    ...mocks.progress,
+    goals: ["travel"],
+    travelCity: "austin",
+  };
+  startAt("cityEcho");
+  render(<OnboardingScreen />);
+  expect(screen.getByText("onboardingStatement.cityPicked")).toBeTruthy();
+});
+
+it("plays the first-save moment between sharing and the spots", () => {
+  startAt("ahaShare");
+  render(<OnboardingScreen />);
+  tap("aha:share");
+  tap("firstSave:continue");
+  expect(screen.getByRole("button", { name: "aha:spots" })).toBeTruthy();
+});
+
+it("asks about a trip when the goal question is skipped, and plans for every goal", () => {
   startAt("goal");
   render(<OnboardingScreen />);
   tap("onboardingQ.skip");
   expect(saved()?.goals).toEqual(["date", "travel", "food"]);
-  expect(screen.getByRole("button", { name: "planner:continue" })).toBeTruthy();
+  expect(screen.getByRole("button", { name: "trip:soon" })).toBeTruthy();
 });
 
-it("goes back from a question and from the sample", () => {
+it("asks about a trip when the goal question is skipped after picking a goal without travel", () => {
+  startAt("goal");
+  render(<OnboardingScreen />);
+  tap("goal:food");
+  tap("onboardingQ.skip");
+  expect(saved()?.goals).toEqual(["date", "travel", "food"]);
+  expect(screen.getByRole("button", { name: "trip:soon" })).toBeTruthy();
+});
+
+it("skips the trip question when the goals carry no travel", () => {
+  startAt("goal");
+  render(<OnboardingScreen />);
+  tap("goal:food");
+  tap("goal:continue");
+  expect(screen.getByRole("button", { name: "planner:continue" })).toBeTruthy();
+  expect(screen.queryByRole("button", { name: "trip:soon" })).toBeNull();
+});
+
+it("moves on from the trip question on one tap and asks for a dream city after a no", () => {
+  mocks.progress = { ...mocks.progress, goals: ["date", "travel", "food"] };
+  startAt("tripSoon");
+  render(<OnboardingScreen />);
+  tap("trip:notYet");
+  expect(saved()).toMatchObject({ tripSoon: "notYet" });
+  tap("planner:continue");
+  tap("chart:date");
+  expect(
+    screen.getByRole("button", { name: "city:date:dream:lisbon" }),
+  ).toBeTruthy();
+});
+
+it("asks where a person goes out when no trip is planned", () => {
+  mocks.progress = { ...mocks.progress, goals: ["date"], tripSoon: "soon" };
+  startAt("planner");
+  render(<OnboardingScreen />);
+  tap("planner:continue");
+  tap("chart:date");
+  expect(
+    screen.getByRole("button", { name: "city:date:out:lisbon" }),
+  ).toBeTruthy();
+});
+
+it("goes back from a question, over a skipped trip question, and from the sample", () => {
+  mocks.progress = { ...mocks.progress, goals: ["date"] };
   startAt("planner");
   render(<OnboardingScreen />);
   tap("common.back");
   expect(screen.getByRole("button", { name: "goal:continue" })).toBeTruthy();
   cleanup();
+  mocks.progress = { ...mocks.progress, goals: ["travel"] };
+  startAt("planner");
+  render(<OnboardingScreen />);
+  tap("common.back");
+  expect(screen.getByRole("button", { name: "trip:soon" })).toBeTruthy();
+  cleanup();
   startAt("ahaSpots");
   render(<OnboardingScreen />);
   tap("common.back");
-  expect(screen.getByRole("button", { name: "aha:share" })).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "firstSave:continue" }),
+  ).toBeTruthy();
 });
 
 it("moves one step on a double tap", () => {
@@ -287,10 +410,34 @@ it("moves one step on a double tap", () => {
   const share = screen.getByRole("button", { name: "aha:share" });
   fireEvent.click(share);
   fireEvent.click(share);
-  expect(screen.getByRole("button", { name: "aha:spots" })).toBeTruthy();
+  expect(
+    screen.getByRole("button", { name: "firstSave:continue" }),
+  ).toBeTruthy();
 });
 
-it("reuses the sample for the commitment after the spots, before opening the paywall", async () => {
+it("sends a step's view once, even after going back and closing the app", () => {
+  startAt("ahaSpots");
+  render(<OnboardingScreen />);
+  tap("aha:spots");
+  tap("common.back");
+  relaunch();
+  tap("aha:spots");
+  expect(viewsOf("carousel")).toHaveLength(1);
+});
+
+it("still sends the trip question's first view after going back to add Trips and closing the app", () => {
+  mocks.progress = { ...mocks.progress, goals: ["date"] };
+  startAt("goal");
+  render(<OnboardingScreen />);
+  tap("goal:continue");
+  tap("common.back");
+  tap("goal:travel");
+  relaunch();
+  tap("goal:continue");
+  expect(viewsOf("trip_soon")).toHaveLength(1);
+});
+
+it("reuses the sample for the carousel after the spots, before the paywall", async () => {
   mocks.progress = {
     ...mocks.progress,
     goals: ["travel"],
@@ -300,12 +447,11 @@ it("reuses the sample for the commitment after the spots, before opening the pay
   render(<OnboardingScreen />);
   await act(async () => tap("aha:spots"));
   expect(mocks.ask).not.toHaveBeenCalled();
-  expect(mocks.commitment.mock.lastCall?.[0].sample).toMatchObject({
+  expect(mocks.carousel.mock.lastCall?.[0].sample).toMatchObject({
     kind: "trip",
     city: "austin",
   });
-  expect(saved()?.step).toBe(ONBOARDING_STEPS.indexOf("commitment"));
-  await act(async () => tap("commitment:continue"));
+  await act(async () => tap("carousel:continue"));
   expect(mocks.ask).not.toHaveBeenCalled();
   expect(mocks.notifications.mock.lastCall?.[0].sample).toMatchObject({
     kind: "trip",
@@ -320,19 +466,44 @@ it.each(["granted", "blocked"] as const)(
   "skips the notifications step when iOS already says %s",
   async (state) => {
     mocks.permission.mockResolvedValue(state);
-    startAt("commitment");
+    startAt("carousel");
     render(<OnboardingScreen />);
-    await act(async () => tap("commitment:continue"));
+    await act(async () => tap("carousel:continue"));
     expect(mocks.ask).toHaveBeenCalledTimes(1);
     expect(mocks.notifications).not.toHaveBeenCalled();
   },
 );
 
+it("shows the carousel as leaving once its Continue asks for the paywall", async () => {
+  mocks.permission.mockResolvedValue("blocked");
+  startAt("carousel");
+  render(<OnboardingScreen />);
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(false);
+  await act(async () => tap("carousel:continue"));
+  expect(mocks.ask).toHaveBeenCalledTimes(1);
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(true);
+});
+
+it("shows the carousel as leaving while it reads the notifications answer", async () => {
+  let answer: (value: "blocked") => void = () => undefined;
+  mocks.permission.mockImplementation(
+    () => new Promise((resolve) => (answer = resolve)),
+  );
+  startAt("carousel");
+  render(<OnboardingScreen />);
+  tap("carousel:continue");
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(true);
+  expect(mocks.ask).not.toHaveBeenCalled();
+  await act(async () => answer("blocked"));
+  expect(mocks.ask).toHaveBeenCalledTimes(1);
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(true);
+});
+
 it("opens the paywall when the permission cannot be read", async () => {
   mocks.permission.mockRejectedValue(new Error("no"));
-  startAt("commitment");
+  startAt("carousel");
   render(<OnboardingScreen />);
-  await act(async () => tap("commitment:continue"));
+  await act(async () => tap("carousel:continue"));
   expect(mocks.ask).toHaveBeenCalledTimes(1);
   expect(mocks.captureError).toHaveBeenCalledTimes(1);
 });
@@ -344,9 +515,9 @@ it.each(["granted", "blocked"] as const)(
     mocks.permission.mockImplementation(
       () => new Promise((resolve) => (answer = resolve)),
     );
-    startAt("commitment");
+    startAt("carousel");
     render(<OnboardingScreen />);
-    tap("commitment:continue");
+    tap("carousel:continue");
     tap("common.back");
     await act(async () => answer(state));
     expect(mocks.ask).not.toHaveBeenCalled();
@@ -354,20 +525,50 @@ it.each(["granted", "blocked"] as const)(
   },
 );
 
-it("returns from the notifications step to the commitment", () => {
+it("ignores an answer from an earlier carousel visit", async () => {
+  let answer: (value: "granted") => void = () => undefined;
+  mocks.permission.mockImplementation(
+    () => new Promise((resolve) => (answer = resolve)),
+  );
+  startAt("carousel");
+  render(<OnboardingScreen />);
+  tap("carousel:continue");
+  tap("common.back");
+  tap("aha:spots");
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(false);
+  await act(async () => answer("granted"));
+  expect(mocks.ask).not.toHaveBeenCalled();
+  expect(
+    screen.getByRole("button", { name: "carousel:continue" }),
+  ).toBeTruthy();
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(false);
+});
+
+it("keeps a later visit's Continue busy when an earlier visit's answer lands", async () => {
+  const answers: ((value: "blocked") => void)[] = [];
+  mocks.permission.mockImplementation(
+    () => new Promise((resolve) => answers.push(resolve)),
+  );
+  startAt("carousel");
+  render(<OnboardingScreen />);
+  tap("carousel:continue");
+  tap("common.back");
+  tap("aha:spots");
+  tap("carousel:continue");
+  await act(async () => answers[0]?.("blocked"));
+  expect(mocks.ask).not.toHaveBeenCalled();
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(true);
+  await act(async () => answers[1]?.("blocked"));
+  expect(mocks.ask).toHaveBeenCalledTimes(1);
+});
+
+it("returns from the notifications step to the same carousel without opening the paywall", () => {
   startAt("notifications");
   render(<OnboardingScreen />);
   tap("common.back");
   expect(
-    screen.getByRole("button", { name: "commitment:continue" }),
+    screen.getByRole("button", { name: "carousel:continue" }),
   ).toBeTruthy();
-});
-
-it("returns from commitment to the same spots without opening the paywall", () => {
-  startAt("commitment");
-  render(<OnboardingScreen />);
-  tap("common.back");
-  expect(screen.getByRole("button", { name: "aha:spots" })).toBeTruthy();
   expect(mocks.ask).not.toHaveBeenCalled();
 });
 
@@ -394,6 +595,7 @@ it("hands the goals' spaces to the replay and reports the answers when onboardin
       goals: ["date"],
       saved_count: "few",
       planner: "planner",
+      trip_soon: null,
       sample_city: "paris",
     }),
   );
@@ -416,7 +618,7 @@ it("queues the real reel it played as the first save when onboarding ends", () =
 it("queues the default reel before leaving onboarding when the city question was skipped", () => {
   mocks.progress = {
     ...mocks.progress,
-    step: ONBOARDING_STEPS.indexOf("commitment"),
+    step: ONBOARDING_STEPS.indexOf("carousel"),
     goals: ["travel"],
     travelCity: null,
   };
