@@ -2,7 +2,7 @@
 
 A new account answers a few short questions, picks a city, saves a sample
 reel through a drawn share sheet, sees its spots on a map and three slides,
-is asked about reminders, then meets the paywall. This is flow 24:
+is asked about reminders, then meets the paywall. This is flow 25:
 `ONBOARDING_FLOW_VERSION` and the step order (`ONBOARDING_STEPS`) are in
 `src/lib/onboarding-steps.ts`. The opener is three pages that swipe (on
 their own until a swipe, never with Reduce Motion), each with "Get started"

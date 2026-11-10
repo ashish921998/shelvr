@@ -10,7 +10,11 @@ import {
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import OnboardingScreen from "@/app/(app)/onboarding";
 import { ahaReel, ahaReelUrl } from "@/lib/aha-reels";
-import { ONBOARDING_STEPS } from "@/lib/onboarding-steps";
+import {
+  ONBOARDING_FLOW_VERSION,
+  ONBOARDING_STEP_IDS,
+  ONBOARDING_STEPS,
+} from "@/lib/onboarding-steps";
 
 type Children = { children?: ReactNode };
 type Sample = { kind: string; city: string };
@@ -452,6 +456,10 @@ it("reuses the sample for the carousel after the spots, before the paywall", asy
   });
   await act(async () => tap("carousel:continue"));
   expect(mocks.ask).not.toHaveBeenCalled();
+  expect(mocks.capture).toHaveBeenCalledWith(
+    "onboarding_step_completed",
+    expect.objectContaining({ step_id: "carousel", skipped: false }),
+  );
   expect(mocks.notifications.mock.lastCall?.[0].sample).toMatchObject({
     kind: "trip",
     city: "austin",
@@ -598,6 +606,14 @@ it.each([
   render(<OnboardingScreen />);
   tap("onboardingQ.skip");
   expect(screen.getByRole("button", { name: next })).toBeTruthy();
+  expect(mocks.capture).toHaveBeenCalledWith(
+    "onboarding_step_completed",
+    expect.objectContaining({
+      step_id: ONBOARDING_STEP_IDS[step],
+      flow_version: ONBOARDING_FLOW_VERSION,
+      skipped: true,
+    }),
+  );
 });
 
 it("leaves the trip answer empty when the trip question is skipped", () => {
@@ -622,13 +638,14 @@ it("goes past the first-save moment to the spots when sharing is skipped, and ba
     step: ONBOARDING_STEPS.indexOf("ahaSpots"),
     skippedShare: true,
   });
-  expect(
-    mocks.capture.mock.calls.filter(
-      ([event, properties]) =>
-        event === "onboarding_step_completed" &&
-        properties.step_id === "aha_share",
-    ),
-  ).toHaveLength(1);
+  const completions = mocks.capture.mock.calls.filter(
+    ([event, properties]) =>
+      event === "onboarding_step_completed" &&
+      properties.step_id === "aha_share",
+  );
+  expect(completions).toEqual([
+    ["onboarding_step_completed", expect.objectContaining({ skipped: true })],
+  ]);
   relaunch();
   tap("common.back");
   expect(screen.getByRole("button", { name: "aha:share" })).toBeTruthy();
@@ -661,15 +678,25 @@ it("hides Skip on the notifications step while iOS is asking", () => {
   expect(screen.queryByRole("button", { name: "onboardingQ.skip" })).toBeNull();
 });
 
-it("leaves the carousel the way Continue does when it is skipped", async () => {
-  startAt("carousel");
-  render(<OnboardingScreen />);
-  await act(async () => tap("onboardingQ.skip"));
-  expect(mocks.ask).not.toHaveBeenCalled();
-  expect(
-    screen.getByRole("button", { name: "notifications:continue" }),
-  ).toBeTruthy();
-});
+it.each(["ask", "granted"] as const)(
+  "records carousel Skip when notification permission is %s",
+  async (state) => {
+    mocks.permission.mockResolvedValue(state);
+    startAt("carousel");
+    render(<OnboardingScreen />);
+    await act(async () => tap("onboardingQ.skip"));
+    expect(mocks.ask).toHaveBeenCalledTimes(state === "ask" ? 0 : 1);
+    if (state === "ask") {
+      expect(
+        screen.getByRole("button", { name: "notifications:continue" }),
+      ).toBeTruthy();
+    }
+    expect(mocks.capture).toHaveBeenCalledWith(
+      "onboarding_step_completed",
+      expect.objectContaining({ step_id: "carousel", skipped: true }),
+    );
+  },
+);
 
 it("opens the paywall and reports a skip when the notifications step is skipped", () => {
   startAt("notifications");
@@ -680,6 +707,10 @@ it("opens the paywall and reports a skip when the notifications step is skipped"
     action: "skip",
     granted: false,
   });
+  expect(mocks.capture).toHaveBeenCalledWith(
+    "onboarding_step_completed",
+    expect.objectContaining({ step_id: "notification_ask", skipped: true }),
+  );
 });
 
 it("sends the first-save view when someone skipped sharing, closed the app, then shared after all", () => {

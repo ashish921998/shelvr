@@ -86,16 +86,20 @@ function useStepAnalytics(step: OnboardingStep, viewed: Set<OnboardingStep>) {
     });
   }, [step, index, viewed]);
 
-  return useCallback(() => {
-    if (tracked.current.has(step)) return;
-    analytics.capture("onboarding_step_completed", {
-      step_id: ONBOARDING_STEP_IDS[step],
-      step_index: index,
-      flow_version: ONBOARDING_FLOW_VERSION,
-      duration_ms: Math.max(0, Date.now() - enteredAt.current),
-    });
-    tracked.current.add(step);
-  }, [step, index]);
+  return useCallback(
+    (skipped = false) => {
+      if (tracked.current.has(step)) return;
+      analytics.capture("onboarding_step_completed", {
+        step_id: ONBOARDING_STEP_IDS[step],
+        step_index: index,
+        flow_version: ONBOARDING_FLOW_VERSION,
+        duration_ms: Math.max(0, Date.now() - enteredAt.current),
+        skipped,
+      });
+      tracked.current.add(step);
+    },
+    [step, index],
+  );
 }
 
 function Header({
@@ -225,8 +229,8 @@ export default function OnboardingScreen() {
   ]);
 
   const [backward, setBackward] = useState(false);
-  const advanceWith = (nextGoals: readonly Goal[]) => {
-    recordCurrentStep();
+  const advanceWith = (nextGoals: readonly Goal[], skipped = false) => {
+    recordCurrentStep(skipped);
     setBackward(false);
     setStep((current) =>
       current === step ? nextOnboardingStep(current, nextGoals) : current,
@@ -269,12 +273,12 @@ export default function OnboardingScreen() {
     onClosed: freePlanOpen === false ? undefined : finish,
   });
 
-  const askForPlan = () => {
-    recordCurrentStep();
+  const askForPlan = (skipped = false) => {
+    recordCurrentStep(skipped);
     paywall.ask();
   };
 
-  const leaveCarousel = () => {
+  const leaveCarousel = (skipped = false) => {
     const visit = stepVisit.current;
     void notificationPermissionState()
       .catch((error: unknown) => {
@@ -283,8 +287,8 @@ export default function OnboardingScreen() {
       })
       .then((state) => {
         if (stepVisit.current !== visit) return;
-        if (state === "ask") advance();
-        else askForPlan();
+        if (state === "ask") advanceWith(goals, skipped);
+        else askForPlan(skipped);
       });
   };
 
@@ -306,26 +310,26 @@ export default function OnboardingScreen() {
       case "goal": {
         const all = [...GOALS];
         setGoals(all);
-        return advanceWith(all);
+        return advanceWith(all, true);
       }
       case "city":
         setTravelCity(null);
-        return advance();
+        return advanceWith(goals, true);
       case "ahaShare":
         setSkippedShare(true);
-        recordCurrentStep();
+        recordCurrentStep(true);
         setBackward(false);
         return setStep((current) => (current === step ? "ahaSpots" : current));
       case "carousel":
-        return leaveCarousel();
+        return leaveCarousel(true);
       case "notifications":
         analytics.capture("onboarding_notifications", {
           action: "skip",
           granted: false,
         });
-        return askForPlan();
+        return askForPlan(true);
       default:
-        return advance();
+        return advanceWith(goals, true);
     }
   };
 
@@ -405,14 +409,16 @@ export default function OnboardingScreen() {
       case "ahaSpots":
         return <AhaSpotsStep sample={sample} onContinue={advance} />;
       case "carousel":
-        return <CarouselStep sample={sample} onContinue={leaveCarousel} />;
+        return (
+          <CarouselStep sample={sample} onContinue={() => leaveCarousel()} />
+        );
       case "notifications":
         return (
           <NotificationsStep
             sample={sample}
             leaving={paywall.asked}
             onAsking={setAskingNotifications}
-            onContinue={askForPlan}
+            onContinue={() => askForPlan()}
           />
         );
     }
