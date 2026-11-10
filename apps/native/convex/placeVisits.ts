@@ -6,8 +6,11 @@ import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
 import {
   findVisit,
   MAX_VISIT_SPOTS,
+  rowSpots,
   spotMarks,
+  spotsOnItem,
   userVisits,
+  visitRows,
   visitMarkValidator,
   type VisitSpot,
   visitSpotValidator,
@@ -30,6 +33,10 @@ function tidySpot(spot: VisitSpot): VisitSpot {
   };
 }
 
+function oneSpot(spots: VisitSpot[] | undefined): VisitSpot | undefined {
+  return spots?.length === 1 ? spots[0] : undefined;
+}
+
 async function markVisit(
   ctx: MutationCtx,
   mark: {
@@ -50,17 +57,22 @@ async function markVisit(
     });
     return;
   }
-  if (existing.spots === undefined || spot === undefined) {
-    await ctx.db.patch(existing._id, visit);
+  const kept = await rowSpots(ctx, existing);
+  if (spot === undefined || kept === undefined) {
+    await ctx.db.patch(existing._id, {
+      ...visit,
+      ...(spot === undefined ? {} : { spots: [spot] }),
+    });
     return;
   }
-  const known = existing.spots.some((kept) => spotMarks(kept, spot, true));
-  await ctx.db.patch(existing._id, {
-    ...visit,
-    ...(known
-      ? {}
-      : { spots: [...existing.spots, spot].slice(-MAX_VISIT_SPOTS) }),
-  });
+  if (kept.some((spotKept) => spotMarks(spotKept, spot, true))) {
+    await ctx.db.patch(existing._id, { ...visit, spots: kept });
+    return;
+  }
+  if (kept.length >= MAX_VISIT_SPOTS) {
+    throw new Error("Place has too many visited spots");
+  }
+  await ctx.db.patch(existing._id, { ...visit, spots: [...kept, spot] });
 }
 
 async function visitsAt(
@@ -69,12 +81,7 @@ async function visitsAt(
   existing: Doc<"placeVisits"> | null,
   spot: VisitSpot,
 ): Promise<Doc<"placeVisits">[]> {
-  if (spot.appleId !== undefined) {
-    return await ctx.db
-      .query("placeVisits")
-      .withIndex("by_user_and_key", (q) => q.eq("userId", userId))
-      .collect();
-  }
+  if (spot.appleId !== undefined) return await visitRows(ctx, userId);
   return existing === null ? [] : [existing];
 }
 
@@ -94,14 +101,17 @@ async function clearVisit(
   }
   for (const row of await visitsAt(ctx, userId, existing, spot)) {
     const sameName = row.key === key;
-    if (row.spots === undefined) {
+    const kept = await rowSpots(ctx, row);
+    if (kept === undefined) {
       if (sameName) await ctx.db.delete(row._id);
       continue;
     }
-    const spots = row.spots.filter((kept) => !spotMarks(kept, spot, sameName));
+    const spots = kept.filter(
+      (spotKept) => !spotMarks(spotKept, spot, sameName),
+    );
     if (spots.length === 0) {
       await ctx.db.delete(row._id);
-    } else if (spots.length < row.spots.length) {
+    } else if (spots.length < kept.length) {
       await ctx.db.patch(row._id, { spots });
     }
   }
@@ -125,9 +135,16 @@ export const setVisited = authedMutation({
     if (key === "") {
       throw new Error("Place name is empty");
     }
-    const spot = args.spot === undefined ? undefined : tidySpot(args.spot);
+    const spot =
+      args.spot === undefined
+        ? oneSpot(spotsOnItem(item, key))
+        : tidySpot(args.spot);
     const existing = await findVisit(ctx, userId, args.name);
     if (!args.visited) {
+      await rateLimiter.limit(ctx, "placeVisitClear", {
+        key: userId,
+        throws: true,
+      });
       await clearVisit(ctx, { userId, key, existing, spot });
       return null;
     }

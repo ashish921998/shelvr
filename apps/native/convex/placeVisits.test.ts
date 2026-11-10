@@ -150,6 +150,13 @@ describe("setVisited", () => {
     });
     await mark("Tigre", false, PARIS);
     expect(await visits()).toEqual([]);
+
+    await t.run((ctx) =>
+      rateLimiter.limit(ctx, "placeVisitClear", { key: userId, count: 199 }),
+    );
+    await expect(mark("Tigre", false, PARIS)).rejects.toMatchObject({
+      data: { kind: "RateLimited", name: "placeVisitClear" },
+    });
   });
 
   it("refuses another user's save and a name with no letters", async () => {
@@ -224,7 +231,7 @@ describe("setVisited", () => {
     ]);
   });
 
-  it("keeps a mark made by name alone, and deletes it when the place is taken back", async () => {
+  it("narrows a mark made by name alone to the spot it is marked again at", async () => {
     const { visits, mark } = await setup();
     await mark("Tigre", true);
     const [legacy] = await visits();
@@ -232,11 +239,50 @@ describe("setVisited", () => {
 
     await mark("Tigre", true, PARIS);
     const [refreshed] = await visits();
-    expect(refreshed).not.toHaveProperty("spots");
+    expect(refreshed?.spots).toEqual([PARIS]);
     expect(refreshed?.visitedAt).toBeGreaterThanOrEqual(legacy!.visitedAt);
 
-    await mark("Tigre", false, LONDON);
+    await mark("Tigre", false, PARIS);
     expect(await visits()).toEqual([]);
+  });
+
+  it("reads where an installed app's mark was made from the save's pin", async () => {
+    const { t, itemId, visits, mark } = await setup();
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        placePins: [{ name: "Shake Shack", ...PARIS, appleId: "P-1" }],
+      }),
+    );
+    await mark("Shake Shack", true, LONDON);
+
+    await mark("Shake Shack", true);
+    expect((await visits())[0]?.spots).toEqual([
+      LONDON,
+      { ...PARIS, appleId: "P-1" },
+    ]);
+
+    await mark("Shake Shack", false);
+    expect((await visits())[0]?.spots).toEqual([LONDON]);
+  });
+
+  it("lists a mark made by name alone at the places its save carries", async () => {
+    const { t, userId, itemId } = await setup();
+    await t.run(async (ctx) => {
+      await ctx.db.patch(itemId, {
+        placePins: [{ name: "Starbucks", ...PARIS }],
+      });
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "starbucks",
+        name: "Starbucks",
+        itemId,
+        visitedAt: 1,
+      });
+    });
+
+    expect(await t.query(api.placeVisits.listVisits, {})).toEqual([
+      { key: "starbucks", spots: [PARIS] },
+    ]);
   });
 
   it("takes back a venue marked under another name, by its Apple id", async () => {
@@ -256,7 +302,7 @@ describe("setVisited", () => {
     expect(await visits()).toEqual([]);
   });
 
-  it("keeps the newest spots of a name", async () => {
+  it("refuses a spot past the cap and keeps every earlier one", async () => {
     const { t, userId, itemId, visits, mark } = await setup();
     const spots = Array.from({ length: 20 }, (_, i) => ({
       lat: 10 + i,
@@ -273,8 +319,10 @@ describe("setVisited", () => {
       }),
     );
 
-    await mark("Starbucks", true, LONDON);
-    expect((await visits())[0]?.spots).toEqual([...spots.slice(1), LONDON]);
+    await expect(mark("Starbucks", true, LONDON)).rejects.toThrow(
+      "Place has too many visited spots",
+    );
+    expect((await visits())[0]?.spots).toEqual(spots);
   });
 
   it("refuses a spot off the map", async () => {
@@ -297,8 +345,8 @@ describe("listVisits", () => {
     const other = await signedInUser(backend, { pro: true });
 
     expect(await t.query(api.placeVisits.listVisits, {})).toEqual([
-      { key: "caffedante" },
       { key: "shakeshack", spots: [{ ...PARIS, appleId: "P-1" }] },
+      { key: "caffedante" },
     ]);
     expect(await other.t.query(api.placeVisits.listVisits, {})).toEqual([]);
   });

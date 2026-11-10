@@ -71,6 +71,16 @@ describe("useCityCardShare", () => {
     ]);
   });
 
+  it("opens one share sheet for a double tap", async () => {
+    const { result } = renderHook(() =>
+      useCityCardShare({ current: null }, "Austin", counts),
+    );
+    await act(() =>
+      Promise.all([result.current.share(), result.current.share()]),
+    );
+    expect(mocks.shareAsync).toHaveBeenCalledTimes(1);
+  });
+
   it("reports a card it could not draw and records no share sheet", async () => {
     mocks.image = null;
     await share();

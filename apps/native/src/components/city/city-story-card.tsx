@@ -1,7 +1,7 @@
 import { ProgressBar } from "@/components/city/progress-bar";
 import { cardPoints } from "@/lib/city-card";
 import { cityPinId, type CityPin } from "@/lib/city-pins";
-import { cityProgress, progressLine } from "@/lib/city-progress";
+import { progressLine } from "@/lib/city-progress";
 import { t, useAppLocale } from "@/lib/i18n";
 import { Canvas, Path } from "@shopify/react-native-skia";
 import { type ComponentRef, type Ref, useMemo, useState } from "react";
@@ -94,16 +94,17 @@ export function CityStoryCard({
   city,
   pins,
   visited,
+  progress,
   width,
 }: {
   ref?: Ref<ComponentRef<typeof View>>;
   city: string;
   pins: CityPin[];
   visited: ReadonlySet<string>;
+  progress: { visited: number; total: number };
   width: number;
 }) {
   useAppLocale();
-  const progress = cityProgress(pins, visited);
   const line =
     progressLine(progress) ??
     t("homePlaces.spotCount", { count: progress.total });

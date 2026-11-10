@@ -7,6 +7,7 @@ import {
   type Component,
   type ComponentRef,
   type RefObject,
+  useRef,
   useState,
 } from "react";
 import { Alert, type View } from "react-native";
@@ -26,9 +27,11 @@ export function useCityCardShare(
   city: string,
   counts: { place_count: number; visited_count: number },
 ) {
+  const working = useRef(false);
   const [sharing, setSharing] = useState(false);
   const share = async () => {
-    if (sharing) return;
+    if (working.current) return;
+    working.current = true;
     setSharing(true);
     try {
       const image = await makeImageFromView(
@@ -50,6 +53,7 @@ export function useCityCardShare(
       analytics.captureError("city_card_share_failed", error);
       Alert.alert(t("errors.unexpectedTitle"), t("errors.tryAgain"));
     } finally {
+      working.current = false;
       setSharing(false);
     }
   };

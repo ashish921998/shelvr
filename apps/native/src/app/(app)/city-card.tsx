@@ -90,6 +90,7 @@ export default function CityCardScreen() {
             city={city}
             pins={pins}
             visited={visited}
+            progress={progress}
             width={width}
           />
           <View style={{ width }}>
