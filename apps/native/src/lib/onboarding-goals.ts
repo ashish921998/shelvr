@@ -42,7 +42,7 @@ export function planKindFor(goals: readonly Goal[]): PlanKind {
   return goal === null ? "weekend" : GOAL_PLAN[goal];
 }
 
-export const SAVED_COUNTS = [
+const SAVED_COUNTS = [
   "few",
   "tenToFifty",
   "fiftyToTwoHundred",

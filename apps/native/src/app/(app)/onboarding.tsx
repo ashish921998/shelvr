@@ -78,16 +78,20 @@ function useStepAnalytics(step: OnboardingStep, viewed: Set<OnboardingStep>) {
     });
   }, [step, index, viewed]);
 
-  return useCallback(() => {
-    if (tracked.current.has(step)) return;
-    analytics.capture("onboarding_step_completed", {
-      step_id: ONBOARDING_STEP_IDS[step],
-      step_index: index,
-      flow_version: ONBOARDING_FLOW_VERSION,
-      duration_ms: Math.max(0, Date.now() - enteredAt.current),
-    });
-    tracked.current.add(step);
-  }, [step, index]);
+  return useCallback(
+    (skipped = false) => {
+      if (tracked.current.has(step)) return;
+      analytics.capture("onboarding_step_completed", {
+        step_id: ONBOARDING_STEP_IDS[step],
+        step_index: index,
+        flow_version: ONBOARDING_FLOW_VERSION,
+        duration_ms: Math.max(0, Date.now() - enteredAt.current),
+        skipped,
+      });
+      tracked.current.add(step);
+    },
+    [step, index],
+  );
 }
 
 function Header({
@@ -201,13 +205,14 @@ export default function OnboardingScreen() {
   }, [travelCity, goals, savedCount, skippedShare, stepIndex, viewedSteps]);
 
   const [backward, setBackward] = useState(false);
-  const advance = () => {
-    recordCurrentStep();
+  const completeStep = (skipped: boolean) => {
+    recordCurrentStep(skipped);
     setBackward(false);
     setStep((current) =>
       current === step ? nextOnboardingStep(current) : current,
     );
   };
+  const advance = () => completeStep(false);
 
   useEffect(() => {
     if (!signedIn || !isAuthenticated) return;
@@ -241,14 +246,16 @@ export default function OnboardingScreen() {
     onUnavailable: finish,
     onClosed: freePlanOpen === false ? undefined : finish,
   });
+  const [checkingNotifications, setCheckingNotifications] = useState(false);
 
-  const askForPlan = () => {
-    recordCurrentStep();
+  const askForPlan = (skipped = false) => {
+    recordCurrentStep(skipped);
     paywall.ask();
   };
 
-  const leaveCarousel = () => {
+  const leaveCarousel = (skipped = false) => {
     const visit = stepVisit.current;
+    setCheckingNotifications(true);
     void notificationPermissionState()
       .catch((error: unknown) => {
         analytics.captureError("onboarding_notifications_check_failed", error);
@@ -256,8 +263,9 @@ export default function OnboardingScreen() {
       })
       .then((state) => {
         if (stepVisit.current !== visit) return;
-        if (state === "ask") advance();
-        else askForPlan();
+        setCheckingNotifications(false);
+        if (state === "ask") completeStep(skipped);
+        else askForPlan(skipped);
       });
   };
 
@@ -278,25 +286,25 @@ export default function OnboardingScreen() {
     switch (step) {
       case "goal":
         setGoals([...GOALS]);
-        return advance();
+        return completeStep(true);
       case "city":
         setTravelCity(null);
-        return advance();
+        return completeStep(true);
       case "ahaShare":
         setSkippedShare(true);
-        recordCurrentStep();
+        recordCurrentStep(true);
         setBackward(false);
         return setStep((current) => (current === step ? "ahaSpots" : current));
       case "carousel":
-        return leaveCarousel();
+        return leaveCarousel(true);
       case "notifications":
         analytics.capture("onboarding_notifications", {
           action: "skip",
           granted: false,
         });
-        return askForPlan();
+        return askForPlan(true);
       default:
-        return advance();
+        return completeStep(true);
     }
   };
 
@@ -358,14 +366,20 @@ export default function OnboardingScreen() {
       case "ahaSpots":
         return <AhaSpotsStep sample={sample} onContinue={advance} />;
       case "carousel":
-        return <CarouselStep sample={sample} onContinue={leaveCarousel} />;
+        return (
+          <CarouselStep
+            sample={sample}
+            leaving={checkingNotifications || paywall.asked}
+            onContinue={() => leaveCarousel()}
+          />
+        );
       case "notifications":
         return (
           <NotificationsStep
             sample={sample}
             leaving={paywall.asked}
             onAsking={setAskingNotifications}
-            onContinue={askForPlan}
+            onContinue={() => askForPlan()}
           />
         );
     }
@@ -385,6 +399,7 @@ export default function OnboardingScreen() {
             ? null
             : () => {
                 setBackward(true);
+                setCheckingNotifications(false);
                 setStep(previous);
               }
         }

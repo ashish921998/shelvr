@@ -64,7 +64,9 @@ import {
   MAX_ITEM_TITLE_CHARS,
   MAX_NOTE_TEXT_CHARS,
   normalizeCities,
+  normalizePlaceCuisines,
   normalizePlaces,
+  placeCuisinesValidator,
   placeLocationsValidator,
   placePinsValidator,
   postMediaValidator,
@@ -244,6 +246,7 @@ function stripEmbedding(
   | "places"
   | "placesHeard"
   | "placeLocations"
+  | "placeCuisines"
   | "placesEdited"
 > {
   const {
@@ -251,6 +254,7 @@ function stripEmbedding(
     places: _places,
     placesHeard: _placesHeard,
     placeLocations: _placeLocations,
+    placeCuisines: _placeCuisines,
     embedding: _embedding,
     embeddingVersion: _version,
     embeddingAttempts: _attempts,
@@ -2122,18 +2126,20 @@ export const getItemInternal = internalQuery({
       places: v.optional(v.array(v.string())),
       placesHeard: v.optional(v.boolean()),
       placeLocations: v.optional(placeLocationsValidator),
+      placeCuisines: v.optional(placeCuisinesValidator),
     }),
     v.null(),
   ),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     if (item === null) return null;
-    const { places, placesHeard, placeLocations } = item;
+    const { places, placesHeard, placeLocations, placeCuisines } = item;
     return {
       ...stripEmbedding(item),
       ...(places ? { places } : {}),
       ...(placesHeard !== undefined ? { placesHeard } : {}),
       ...(placeLocations !== undefined ? { placeLocations } : {}),
+      ...(placeCuisines !== undefined ? { placeCuisines } : {}),
     };
   },
 });
@@ -2318,6 +2324,7 @@ export const addPlaceListParts = internalMutation({
     itemId: v.id("items"),
     runId: v.optional(v.string()),
     parts: v.array(placeListPartValidator),
+    placeCuisines: v.optional(placeCuisinesValidator),
   },
   returns: v.number(),
   handler: async (ctx, args) => {
@@ -2368,6 +2375,11 @@ export const addPlaceListParts = internalMutation({
       const cities = normalizeCities(part.cities);
       const places = normalizePlaces(part.places, cities);
       const placePins = withListPins([], part.pins, cities);
+      const placeCuisines = normalizePlaceCuisines(
+        args.placeCuisines,
+        places,
+        cities,
+      );
       const partId = await ctx.db.insert("items", {
         userId: item.userId,
         type: "link",
@@ -2384,6 +2396,7 @@ export const addPlaceListParts = internalMutation({
         intents: [],
         cities,
         places,
+        ...(placeCuisines.length > 0 ? { placeCuisines } : {}),
         placePins,
         searchText: buildSearchText({
           title: part.title,
