@@ -263,6 +263,77 @@ describe("the places a run brings", () => {
   });
 });
 
+describe("the cuisines a run brings", () => {
+  const classification = {
+    description: "Where to eat",
+    tags: ["lisbon"],
+    intents: [],
+    places: ["Santelmo", "Intenso"],
+    placeCuisines: [
+      { name: "santelmo", cuisine: "steak" as const },
+      { name: "Santelmo", cuisine: "pizza" as const },
+      { name: "Invented", cuisine: "sushi" as const },
+    ],
+  };
+  const old = [{ name: "Antiga", cuisine: "coffee" as const }];
+
+  it("stores the first cuisine per named place with AI allowed", () => {
+    const patch = completionPatch(
+      savedItem({ places: ["Antiga"], placeCuisines: old }),
+      { reading: {}, classification },
+      true,
+    );
+    expect(patch.placeCuisines).toEqual([
+      { name: "Santelmo", cuisine: "steak" },
+    ]);
+  });
+
+  it("keeps the save's cuisines when AI is declined", () => {
+    const patch = completionPatch(
+      savedItem({ places: ["Antiga"], placeCuisines: old }),
+      { reading: {}, classification },
+      false,
+    );
+    expect(patch.placeCuisines).toEqual(old);
+  });
+
+  it("clears them when a re-read brings places without cuisines", () => {
+    const { placeCuisines: _omitted, ...plain } = classification;
+    const patch = completionPatch(
+      savedItem({ places: ["Antiga"], placeCuisines: old }),
+      { reading: {}, classification: plain },
+      true,
+    );
+    expect("placeCuisines" in patch).toBe(true);
+    expect(patch.placeCuisines).toBeUndefined();
+  });
+
+  it("drops them once the person has edited the places", () => {
+    const patch = completionPatch(
+      savedItem({
+        places: ["Antiga"],
+        placeCuisines: old,
+        placesEdited: true,
+      }),
+      { reading: {}, classification },
+      true,
+    );
+    expect(patch.places).toEqual(["Antiga"]);
+    expect("placeCuisines" in patch).toBe(true);
+    expect(patch.placeCuisines).toBeUndefined();
+  });
+
+  it("writes none when the run brings no places", () => {
+    const { places: _places, ...placeless } = classification;
+    const patch = completionPatch(
+      savedItem({ places: ["Antiga"], placeCuisines: old }),
+      { reading: {}, classification: placeless },
+      true,
+    );
+    expect("placeCuisines" in patch).toBe(false);
+  });
+});
+
 describe("the embedding a run brings", () => {
   const reading = { siteName: "Example", content: "Body text" };
   const classification = {

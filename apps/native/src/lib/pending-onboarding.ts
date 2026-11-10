@@ -39,6 +39,7 @@ type PendingRecord = {
   savedCount?: SavedCount | null;
   planner?: Planner | null;
   tripSoon?: TripSoon | null;
+  skippedShare?: boolean;
 };
 
 type OnboardingAnswers = {
@@ -47,6 +48,7 @@ type OnboardingAnswers = {
   savedCount: SavedCount | null;
   planner: Planner | null;
   tripSoon: TripSoon | null;
+  skippedShare: boolean;
 };
 
 type OnboardingProgress = OnboardingAnswers & {
@@ -61,6 +63,7 @@ const NO_ANSWERS: OnboardingAnswers = {
   savedCount: null,
   planner: null,
   tripSoon: null,
+  skippedShare: false,
 };
 
 function answersOf(record: Partial<OnboardingAnswers>): OnboardingAnswers {
@@ -70,6 +73,7 @@ function answersOf(record: Partial<OnboardingAnswers>): OnboardingAnswers {
     savedCount: isSavedCount(record.savedCount) ? record.savedCount : null,
     planner: isPlanner(record.planner) ? record.planner : null,
     tripSoon: isTripSoon(record.tripSoon) ? record.tripSoon : null,
+    skippedShare: record.skippedShare === true,
   };
 }
 
