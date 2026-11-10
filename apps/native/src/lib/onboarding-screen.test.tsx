@@ -10,7 +10,11 @@ import {
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import OnboardingScreen from "@/app/(app)/onboarding";
 import { ahaReel, ahaReelUrl } from "@/lib/aha-reels";
-import { ONBOARDING_STEPS } from "@/lib/onboarding-steps";
+import {
+  ONBOARDING_FLOW_VERSION,
+  ONBOARDING_STEP_IDS,
+  ONBOARDING_STEPS,
+} from "@/lib/onboarding-steps";
 
 type Children = { children?: ReactNode };
 type Sample = { kind: string; city: string };
@@ -46,6 +50,7 @@ const mocks = vi.hoisted(() => ({
     savedCount: null as string | null,
     planner: null as string | null,
     tripSoon: null as string | null,
+    skippedShare: false,
     viewed: [] as string[],
   },
   paywall: {} as { onPro: () => void },
@@ -220,9 +225,18 @@ vi.mock("@/components/onboarding/carousel", () => ({
 }));
 vi.mock("@/components/onboarding/notifications", () => ({
   NotificationsStep: vi.fn(
-    (props: { sample: Sample; onContinue: () => void }) => {
+    (props: {
+      sample: Sample;
+      onAsking: (asking: boolean) => void;
+      onContinue: () => void;
+    }) => {
       mocks.notifications(props);
-      return button("notifications:continue", props.onContinue);
+      return (
+        <div>
+          {button("notifications:continue", props.onContinue)}
+          {button("notifications:asking", () => props.onAsking(true))}
+        </div>
+      );
     },
   ),
 }));
@@ -279,6 +293,7 @@ beforeEach(() => {
     savedCount: null,
     planner: null,
     tripSoon: null,
+    skippedShare: false,
     viewed: [],
   };
 });
@@ -453,6 +468,10 @@ it("reuses the sample for the carousel after the spots, before the paywall", asy
   });
   await act(async () => tap("carousel:continue"));
   expect(mocks.ask).not.toHaveBeenCalled();
+  expect(mocks.capture).toHaveBeenCalledWith(
+    "onboarding_step_completed",
+    expect.objectContaining({ step_id: "carousel", skipped: false }),
+  );
   expect(mocks.notifications.mock.lastCall?.[0].sample).toMatchObject({
     kind: "trip",
     city: "austin",
@@ -630,4 +649,133 @@ it("queues the default reel before leaving onboarding when the city question was
   expect(mocks.queueDemoUrl.mock.invocationCallOrder[0]).toBeLessThan(
     mocks.completeOnboarding.mock.invocationCallOrder[0],
   );
+});
+
+it.each([
+  ["tripSoon", "planner:continue"],
+  ["chart", "city:date:out:lisbon"],
+  ["cityEcho", "aha:share"],
+  ["firstSave", "aha:spots"],
+  ["ahaSpots", "carousel:continue"],
+] as const)("moves on from %s when it is skipped", (step, next) => {
+  mocks.progress = { ...mocks.progress, goals: ["date", "travel"] };
+  startAt(step);
+  render(<OnboardingScreen />);
+  tap("onboardingQ.skip");
+  expect(screen.getByRole("button", { name: next })).toBeTruthy();
+  expect(mocks.capture).toHaveBeenCalledWith(
+    "onboarding_step_completed",
+    expect.objectContaining({
+      step_id: ONBOARDING_STEP_IDS[step],
+      flow_version: ONBOARDING_FLOW_VERSION,
+      skipped: true,
+    }),
+  );
+});
+
+it("leaves the trip answer empty when the trip question is skipped", () => {
+  mocks.progress = { ...mocks.progress, goals: ["travel"] };
+  startAt("tripSoon");
+  render(<OnboardingScreen />);
+  tap("onboardingQ.skip");
+  expect(saved()).toMatchObject({ tripSoon: null });
+});
+
+it("offers no Skip on the opener", () => {
+  render(<OnboardingScreen />);
+  expect(screen.queryByRole("button", { name: "onboardingQ.skip" })).toBeNull();
+});
+
+it("goes past the first-save moment to the spots when sharing is skipped, and back to the share", () => {
+  startAt("ahaShare");
+  render(<OnboardingScreen />);
+  tap("onboardingQ.skip");
+  expect(screen.getByRole("button", { name: "aha:spots" })).toBeTruthy();
+  expect(saved()).toMatchObject({
+    step: ONBOARDING_STEPS.indexOf("ahaSpots"),
+    skippedShare: true,
+  });
+  const completions = mocks.capture.mock.calls.filter(
+    ([event, properties]) =>
+      event === "onboarding_step_completed" &&
+      properties.step_id === "aha_share",
+  );
+  expect(completions).toEqual([
+    ["onboarding_step_completed", expect.objectContaining({ skipped: true })],
+  ]);
+  relaunch();
+  tap("common.back");
+  expect(screen.getByRole("button", { name: "aha:share" })).toBeTruthy();
+});
+
+it("saves no reel for someone who skipped sharing, and saves it once they share after all", () => {
+  mocks.progress = { ...mocks.progress, goals: ["date"] };
+  startAt("ahaShare");
+  render(<OnboardingScreen />);
+  tap("onboardingQ.skip");
+  act(() => mocks.paywall.onPro());
+  expect(mocks.queueDemoUrl).not.toHaveBeenCalled();
+  expect(mocks.completeOnboarding).toHaveBeenCalled();
+  cleanup();
+  render(<OnboardingScreen />);
+  tap("onboardingQ.skip");
+  tap("common.back");
+  tap("aha:share");
+  expect(saved()?.skippedShare).toBe(false);
+  act(() => mocks.paywall.onPro());
+  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
+    ahaReelUrl(ahaReel("date", "austin")!),
+  );
+});
+
+it("hides Skip on the notifications step while iOS is asking", () => {
+  startAt("notifications");
+  render(<OnboardingScreen />);
+  tap("notifications:asking");
+  expect(screen.queryByRole("button", { name: "onboardingQ.skip" })).toBeNull();
+});
+
+it.each(["ask", "granted"] as const)(
+  "records carousel Skip when notification permission is %s",
+  async (state) => {
+    mocks.permission.mockResolvedValue(state);
+    startAt("carousel");
+    render(<OnboardingScreen />);
+    await act(async () => tap("onboardingQ.skip"));
+    expect(mocks.ask).toHaveBeenCalledTimes(state === "ask" ? 0 : 1);
+    if (state === "ask") {
+      expect(
+        screen.getByRole("button", { name: "notifications:continue" }),
+      ).toBeTruthy();
+    }
+    expect(mocks.capture).toHaveBeenCalledWith(
+      "onboarding_step_completed",
+      expect.objectContaining({ step_id: "carousel", skipped: true }),
+    );
+  },
+);
+
+it("opens the paywall and reports a skip when the notifications step is skipped", () => {
+  startAt("notifications");
+  render(<OnboardingScreen />);
+  tap("onboardingQ.skip");
+  expect(mocks.ask).toHaveBeenCalledTimes(1);
+  expect(mocks.capture).toHaveBeenCalledWith("onboarding_notifications", {
+    action: "skip",
+    granted: false,
+  });
+  expect(mocks.capture).toHaveBeenCalledWith(
+    "onboarding_step_completed",
+    expect.objectContaining({ step_id: "notification_ask", skipped: true }),
+  );
+});
+
+it("sends the first-save view when someone skipped sharing, closed the app, then shared after all", () => {
+  startAt("ahaShare");
+  render(<OnboardingScreen />);
+  tap("onboardingQ.skip");
+  relaunch();
+  tap("common.back");
+  tap("aha:share");
+  expect(viewsOf("first_save")).toHaveLength(1);
 });

@@ -83,6 +83,7 @@ export type AnalyticsEventProperties = {
     step_index: number;
     flow_version: number;
     duration_ms: number;
+    skipped: boolean;
   };
   onboarding_opener_page_viewed: { page_index: number };
   onboarding_notifications: { action: "allow" | "skip"; granted: boolean };
