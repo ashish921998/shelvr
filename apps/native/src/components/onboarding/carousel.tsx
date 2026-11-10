@@ -124,9 +124,11 @@ function Illustration({ id, sample }: { id: Slide["id"]; sample: AhaSample }) {
 
 export function CarouselStep({
   sample,
+  leaving,
   onContinue,
 }: {
   sample: AhaSample;
+  leaving: boolean;
   onContinue: () => void;
 }) {
   useAppLocale();
@@ -192,6 +194,7 @@ export function CarouselStep({
       </View>
       <PillButton
         label={t("common.continue")}
+        busy={leaving}
         onPress={last ? onContinue : next}
       />
     </View>

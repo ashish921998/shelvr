@@ -216,7 +216,7 @@ export const getPublicPlanShare = internalQuery({
       const item = await ctx.db.get(place.itemId);
       if (item === null || item.userId !== share.userId) continue;
       const imageUrl =
-        item.storageId === undefined
+        item.type === "image" || item.storageId === undefined
           ? null
           : await ctx.storage.getUrl(item.storageId);
       places.push({
