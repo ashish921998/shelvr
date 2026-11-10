@@ -1,5 +1,6 @@
 import { type Infer, v } from "convex/values";
 
+import { CUISINES } from "./placeKinds";
 import { placeKey } from "./plan";
 
 export const INTENT_KINDS = [
@@ -41,6 +42,14 @@ export const placeLocationsValidator = v.array(
   v.object({ name: v.string(), location: v.string() }),
 );
 
+export const cuisineValidator = v.union(
+  ...CUISINES.map((cuisine) => v.literal(cuisine)),
+);
+
+export const placeCuisinesValidator = v.array(
+  v.object({ name: v.string(), cuisine: cuisineValidator }),
+);
+
 export function savedPlaceKey(
   name: string,
   cities?: readonly string[],
@@ -48,16 +57,24 @@ export function savedPlaceKey(
   return placeKey(normalizePlaceName(name, cities));
 }
 
-export function normalizePlaceLocations(
-  cluesBestFirst: Infer<typeof placeLocationsValidator> | undefined,
+function placeNamesByKey(
   places: readonly string[] | undefined,
-  cities: readonly string[] = [],
-): Infer<typeof placeLocationsValidator> {
+  cities: readonly string[],
+): Map<string, string> {
   const names = new Map<string, string>();
   for (const name of normalizePlaces(places, cities)) {
     const key = placeKey(name);
     if (key !== "" && !names.has(key)) names.set(key, name);
   }
+  return names;
+}
+
+export function normalizePlaceLocations(
+  cluesBestFirst: Infer<typeof placeLocationsValidator> | undefined,
+  places: readonly string[] | undefined,
+  cities: readonly string[] = [],
+): Infer<typeof placeLocationsValidator> {
+  const names = placeNamesByKey(places, cities);
   const locations = new Map<string, { name: string; location: string }>();
   for (const entry of cluesBestFirst ?? []) {
     const key = savedPlaceKey(entry.name, cities);
@@ -68,6 +85,25 @@ export function normalizePlaceLocations(
     }
   }
   return [...locations.values()];
+}
+
+export function normalizePlaceCuisines(
+  entries: Infer<typeof placeCuisinesValidator> | undefined,
+  places: readonly string[] | undefined,
+  cities: readonly string[] = [],
+): Infer<typeof placeCuisinesValidator> {
+  const names = placeNamesByKey(places, cities);
+  const cuisines = new Map<
+    string,
+    Infer<typeof placeCuisinesValidator>[number]
+  >();
+  for (const entry of entries ?? []) {
+    const key = savedPlaceKey(entry.name, cities);
+    const name = names.get(key);
+    if (name && CUISINES.includes(entry.cuisine) && !cuisines.has(key))
+      cuisines.set(key, { name, cuisine: entry.cuisine });
+  }
+  return [...cuisines.values()];
 }
 
 export const postMediaValidator = v.object({

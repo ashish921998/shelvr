@@ -12,7 +12,9 @@ import {
   intentValidator,
   normalizePlaces,
   savedPlaceKey,
+  normalizePlaceCuisines,
   normalizePlaceLocations,
+  placeCuisinesValidator,
   placeLocationsValidator,
   postMediaValidator,
   recipeValidator,
@@ -44,6 +46,7 @@ const classificationValidator = v.object({
   cities: v.optional(v.array(v.string())),
   places: v.optional(v.array(v.string())),
   placeLocations: v.optional(placeLocationsValidator),
+  placeCuisines: v.optional(placeCuisinesValidator),
   placesHeard: v.optional(v.boolean()),
   recipe: v.optional(recipeValidator),
   embedding: v.optional(
@@ -72,6 +75,7 @@ type Words = {
   cities: string[] | undefined;
   places: string[] | undefined;
   placeLocations: Doc<"items">["placeLocations"];
+  placeCuisines: Doc<"items">["placeCuisines"];
   placesHeard: boolean | undefined;
   recipe: Recipe | undefined;
 };
@@ -90,6 +94,7 @@ function readingWords(item: Doc<"items">, reading: Reading): Words {
     cities: item.cities,
     places: item.places,
     placeLocations: item.placeLocations,
+    placeCuisines: item.placeCuisines,
     placesHeard: item.placesHeard,
     recipe: reading.recipe ?? item.recipe,
   };
@@ -115,6 +120,15 @@ function classifiedWords(
         ? undefined
         : normalizePlaceLocations(
             classification.placeLocations,
+            classification.places,
+            classification.cities,
+          ),
+    placeCuisines:
+      classification.places === undefined ||
+      classification.placeCuisines === undefined
+        ? undefined
+        : normalizePlaceCuisines(
+            classification.placeCuisines,
             classification.places,
             classification.cities,
           ),
@@ -189,6 +203,7 @@ export function completionPatch(
     words.cities = item.cities ?? [];
     words.places = item.places ?? [];
     words.placeLocations = item.placeLocations;
+    words.placeCuisines = undefined;
     words.intents = words.intents?.filter(
       (intent) => intent.kind !== "open_maps",
     );
@@ -215,7 +230,9 @@ export function completionPatch(
       (reading.heroImageUrl ? undefined : earlier?.aspectRatio),
     intents: words.intents,
     ...(words.cities !== undefined ? { cities: words.cities } : {}),
-    ...(words.places !== undefined ? { places: words.places } : {}),
+    ...(words.places !== undefined
+      ? { places: words.places, placeCuisines: words.placeCuisines }
+      : {}),
     ...replaceCluesAndDropTheirPins(item, words),
     ...(words.placesHeard !== undefined
       ? { placesHeard: words.placesHeard }

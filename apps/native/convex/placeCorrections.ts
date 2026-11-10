@@ -152,6 +152,7 @@ export const savePlaces = authedMutation({
         unpinned.map(({ name }) => name),
         cities,
       ),
+      placeCuisines: undefined,
       intents: item.intents?.filter((intent) => intent.kind !== "open_maps"),
     };
     await ctx.db.patch(item._id, {
