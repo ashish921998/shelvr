@@ -284,6 +284,25 @@ describe("framedPins", () => {
 });
 
 describe("cuisine", () => {
+  it("leaves a museum's emoji and kinds alone", () => {
+    const [pin] = cityPins([
+      {
+        _id: "a",
+        tags: ["coffee"],
+        placePins: [
+          {
+            name: "Menil Collection",
+            lat: 29.74,
+            lng: -95.4,
+            category: "Museum",
+            cuisine: "coffee",
+          },
+        ],
+      },
+    ]);
+    expect(pin).toMatchObject({ emoji: "🏛️", kinds: ["activities"] });
+  });
+
   it("picks a city pin's emoji and kind", () => {
     const [pin] = cityPins([
       {

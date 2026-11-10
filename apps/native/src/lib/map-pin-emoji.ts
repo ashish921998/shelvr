@@ -1,5 +1,9 @@
 import { nameWords } from "@convex/model/placeIdentity";
-import type { Cuisine, PlaceKind } from "@convex/model/placeKinds";
+import {
+  refiningCuisine,
+  type Cuisine,
+  type PlaceKind,
+} from "@convex/model/placeKinds";
 
 /** Apple Maps' point-of-interest categories; any other category falls back to the place's kinds. */
 const CATEGORY_EMOJI: Record<string, string> = {
@@ -104,14 +108,14 @@ const CUISINE_EMOJI: Record<Cuisine, string> = {
 const NAME_WORDS: [string[], Cuisine][] = [
   [["burger", "burgers", "smash"], "burger"],
   [["pizza", "pizzas", "pizzeria"], "pizza"],
-  [["taco", "tacos", "taqueria", "cantina", "mexican"], "tacos"],
+  [["taco", "tacos", "taqueria", "cantina"], "tacos"],
   [["sushi", "omakase", "izakaya"], "sushi"],
-  [["ramen", "noodle", "noodles", "pho", "udon", "thai"], "noodles"],
+  [["ramen", "noodle", "noodles", "pho", "udon"], "noodles"],
   [["dumpling", "dumplings", "dim sum", "bao"], "dumplings"],
   [["bbq", "barbecue", "smokehouse"], "bbq"],
-  [["steakhouse", "steak", "grill"], "steak"],
-  [["seafood", "oyster", "oysters", "fish", "crab", "lobster"], "seafood"],
-  [["curry", "indian", "tandoori", "masala"], "curry"],
+  [["steakhouse", "steak"], "steak"],
+  [["seafood", "oyster", "oysters", "crab", "lobster"], "seafood"],
+  [["curry", "tandoori", "masala"], "curry"],
   [["pasta", "trattoria", "osteria"], "pasta"],
   [["donut", "donuts", "doughnut", "doughnuts"], "donuts"],
   [["ice cream", "ice creams", "gelato", "gelateria", "creamery"], "ice cream"],
@@ -122,10 +126,10 @@ const NAME_WORDS: [string[], Cuisine][] = [
   [["tea", "matcha", "boba"], "tea"],
   [["brewery", "brewing", "taproom", "beer", "pub"], "beer"],
   [["wine", "vino", "enoteca"], "wine"],
-  [["cocktail", "cocktails", "speakeasy", "lounge"], "cocktails"],
+  [["cocktail", "cocktails", "speakeasy"], "cocktails"],
   [["brunch", "breakfast", "diner", "pancake", "pancakes"], "brunch"],
   [["sandwich", "sandwiches", "deli"], "sandwiches"],
-  [["salad", "poke", "bowl", "bowls"], "salad"],
+  [["salad", "poke"], "salad"],
   [["chicken", "wings"], "chicken"],
 ];
 
@@ -143,7 +147,7 @@ function nameEmoji(name: string): string | undefined {
 
 /**
  * The emoji a pin shows, so a steakhouse, a bar and a museum no longer look alike.
- * Apple's category wins unless it is a broad food or drink one; then the place's cuisine, then the name (only with no or a broad category), then the save's tags.
+ * Apple's category wins unless it is a broad food or drink one; then the place's cuisine (never for a market), then the name (only with no or a broad category), then the save's tags.
  * Undefined when nothing says what the place is, which leaves the plain pin.
  */
 export function placeEmoji(place: {
@@ -157,7 +161,8 @@ export function placeEmoji(place: {
     : undefined;
   const nameDecides = !place.category || BROAD_CATEGORIES.has(place.category);
   if (fromCategory && !nameDecides) return fromCategory;
-  if (place.cuisine) return CUISINE_EMOJI[place.cuisine];
+  const cuisine = refiningCuisine(place.category, place.cuisine);
+  if (cuisine) return CUISINE_EMOJI[cuisine];
   const fromName =
     nameDecides && place.name ? nameEmoji(place.name) : undefined;
   if (fromName) return fromName;

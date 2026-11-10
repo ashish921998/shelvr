@@ -107,4 +107,34 @@ describe("placeEmoji", () => {
       }),
     ).toBe("🍺");
   });
+
+  it("keeps a market's cart whatever the save says it serves", () => {
+    expect(
+      placeEmoji({
+        name: "Central Market",
+        category: "FoodMarket",
+        cuisine: "coffee",
+        kinds: ["food"],
+      }),
+    ).toBe("🛒");
+  });
+
+  it("leaves a restaurant generic when its name only hints at a cuisine", () => {
+    for (const name of [
+      "Lotus Thai",
+      "Garden Grill",
+      "Blue Fish",
+      "Sky Lounge",
+    ])
+      expect(
+        placeEmoji({ name, category: "Restaurant", kinds: ["food"] }),
+      ).toBe("🍽️");
+    expect(
+      placeEmoji({
+        name: "Gino's Pizzeria",
+        category: "Restaurant",
+        kinds: [],
+      }),
+    ).toBe("🍕");
+  });
 });

@@ -91,11 +91,14 @@ describe("placeKinds", () => {
     expect(placeKinds("Restaurant", [], "burger")).toEqual(["food"]);
   });
 
-  it("keeps a category's other kind and date night beside the cuisine", () => {
-    expect(placeKinds("Museum", [], "coffee")).toEqual([
-      "coffee",
-      "activities",
-    ]);
+  it("ignores the cuisine of a place Apple gives a specific category", () => {
+    expect(placeKinds("Museum", [], "coffee")).toEqual(["activities"]);
+    expect(placeKinds("FoodMarket", [], "coffee")).toEqual(["food"]);
+    expect(placeKinds("Store", ["food"], "burger")).toEqual(["shopping"]);
+    expect(placeKinds("Brewery", [], "pizza")).toEqual(["drinks"]);
+  });
+
+  it("keeps date night beside the cuisine", () => {
     expect(placeKinds("Restaurant", ["date night"], "wine")).toEqual([
       "drinks",
       "dateNight",

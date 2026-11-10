@@ -221,12 +221,21 @@ const CUISINE_KINDS: Partial<Record<Cuisine, CategoryKind>> = {
   donuts: "dessert",
 };
 
-const FOOD_AND_DRINK_KINDS = new Set<PlaceKind>([
-  "food",
-  "coffee",
-  "dessert",
-  "drinks",
+const CUISINE_CATEGORIES = new Set([
+  "Restaurant",
+  "Cafe",
+  "Bakery",
+  "Nightlife",
 ]);
+
+export function refiningCuisine(
+  category: string | undefined,
+  cuisine: Cuisine | undefined,
+): Cuisine | undefined {
+  return category === undefined || CUISINE_CATEGORIES.has(category)
+    ? cuisine
+    : undefined;
+}
 
 export function placeKinds(
   category: string | undefined,
@@ -236,13 +245,11 @@ export function placeKinds(
   const tags = new Set(saveTags.map((tag) => tag.trim().toLowerCase()));
   const kinds = new Set<PlaceKind>();
   const fromCategory = category ? CATEGORY_KINDS[category] : undefined;
-  if (cuisine) {
-    const fromCuisine = CUISINE_KINDS[cuisine] ?? "food";
+  const served = refiningCuisine(category, cuisine);
+  if (served) {
+    const fromCuisine = CUISINE_KINDS[served] ?? "food";
     kinds.add(fromCuisine);
-    const categoryAdds =
-      !FOOD_AND_DRINK_KINDS.has(fromCategory ?? "food") ||
-      (fromCuisine === "food" && fromCategory !== "food");
-    if (fromCategory && categoryAdds) kinds.add(fromCategory);
+    if (fromCategory && fromCuisine === "food") kinds.add(fromCategory);
   } else {
     if (fromCategory) kinds.add(fromCategory);
     for (const kind of tagKinds(category, tags)) kinds.add(kind);
