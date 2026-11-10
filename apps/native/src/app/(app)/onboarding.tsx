@@ -10,14 +10,11 @@ import { useFreePlanOpen } from "@/lib/free-plan";
 import type { SampleCityId } from "@/lib/sample-cities";
 import {
   GOALS,
-  asksTripSoon,
   cityQuestion,
   goalSpaces,
   planKindFor,
   type Goal,
-  type Planner,
   type SavedCount,
-  type TripSoon,
 } from "@/lib/onboarding-goals";
 import { cityEchoText } from "@/lib/onboarding-echo";
 import { onboardingCompletedProperties } from "@/lib/onboarding-completed";
@@ -52,12 +49,7 @@ import { OpenerStep } from "@/components/onboarding/opener";
 import { ScalePressable } from "@/components/onboarding/parts";
 import { StatementStep } from "@/components/onboarding/statement";
 import { ProgressChartStep } from "@/components/onboarding/progress-chart";
-import {
-  GoalStep,
-  PlannerStep,
-  SavedCountStep,
-  TripSoonStep,
-} from "@/components/onboarding/questions";
+import { GoalStep, SavedCountStep } from "@/components/onboarding/questions";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useConvexAuth } from "convex/react";
 import { haptics } from "@/lib/haptics";
@@ -104,17 +96,15 @@ function useStepAnalytics(step: OnboardingStep, viewed: Set<OnboardingStep>) {
 
 function Header({
   step,
-  goals,
   onBack,
   onSkip,
 }: {
   step: OnboardingStep;
-  goals: readonly Goal[];
   onBack: (() => void) | null;
   onSkip: (() => void) | null;
 }) {
   const { theme } = useUnistyles();
-  const progress = onboardingProgress(step, goals);
+  const progress = onboardingProgress(step);
   if (progress === null) return null;
   return (
     <View style={styles.header}>
@@ -166,14 +156,12 @@ export default function OnboardingScreen() {
 
   const [initial] = useState(() => getOnboardingProgress());
   const [step, setStep] = useState<OnboardingStep>(() =>
-    restoreOnboardingStep(initial.step, initial.goals),
+    restoreOnboardingStep(initial.step),
   );
   const [goals, setGoals] = useState<Goal[]>(initial.goals);
   const [savedCount, setSavedCount] = useState<SavedCount | null>(
     initial.savedCount,
   );
-  const [planner, setPlanner] = useState<Planner | null>(initial.planner);
-  const [tripSoon, setTripSoon] = useState<TripSoon | null>(initial.tripSoon);
   const [skippedShare, setSkippedShare] = useState(initial.skippedShare);
   const [askingNotifications, setAskingNotifications] = useState(false);
   const [travelCity, setTravelCity] = useState<SampleCityId | null>(
@@ -184,7 +172,7 @@ export default function OnboardingScreen() {
   const [viewedSteps] = useState(
     () =>
       new Set([
-        ...viewedBeforeResume(initial.step, initial.goals).filter(
+        ...viewedBeforeResume(initial.step).filter(
           (passed) => !(initial.skippedShare && passed === "firstSave"),
         ),
         ...initial.viewed,
@@ -193,7 +181,6 @@ export default function OnboardingScreen() {
   const [signedIn, setSignedIn] = useState(false);
   const recordCurrentStep = useStepAnalytics(step, viewedSteps);
   const kind = planKindFor(goals);
-  const tripAnswer = asksTripSoon(goals) ? tripSoon : null;
   const spaces = goalSpaces(goals);
   const sample = ahaSample(kind, travelCity);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
@@ -211,32 +198,21 @@ export default function OnboardingScreen() {
       travelCity,
       goals,
       savedCount,
-      planner,
-      tripSoon,
       skippedShare,
       step: stepIndex,
       viewed: [...viewedSteps],
     });
-  }, [
-    travelCity,
-    goals,
-    savedCount,
-    planner,
-    tripSoon,
-    skippedShare,
-    stepIndex,
-    viewedSteps,
-  ]);
+  }, [travelCity, goals, savedCount, skippedShare, stepIndex, viewedSteps]);
 
   const [backward, setBackward] = useState(false);
-  const advanceWith = (nextGoals: readonly Goal[], skipped = false) => {
+  const completeStep = (skipped: boolean) => {
     recordCurrentStep(skipped);
     setBackward(false);
     setStep((current) =>
-      current === step ? nextOnboardingStep(current, nextGoals) : current,
+      current === step ? nextOnboardingStep(current) : current,
     );
   };
-  const advance = () => advanceWith(goals);
+  const advance = () => completeStep(false);
 
   useEffect(() => {
     if (!signedIn || !isAuthenticated) return;
@@ -253,8 +229,6 @@ export default function OnboardingScreen() {
         travelCity,
         goals,
         savedCount,
-        planner,
-        tripSoon: tripAnswer,
       }),
     );
     recordCurrentStep();
@@ -290,7 +264,7 @@ export default function OnboardingScreen() {
       .then((state) => {
         if (stepVisit.current !== visit) return;
         setCheckingNotifications(false);
-        if (state === "ask") advanceWith(goals, skipped);
+        if (state === "ask") completeStep(skipped);
         else askForPlan(skipped);
       });
   };
@@ -307,17 +281,15 @@ export default function OnboardingScreen() {
   const previous =
     step === "ahaSpots" && skippedShare
       ? "ahaShare"
-      : previousOnboardingStep(step, goals);
+      : previousOnboardingStep(step);
   const skip = () => {
     switch (step) {
-      case "goal": {
-        const all = [...GOALS];
-        setGoals(all);
-        return advanceWith(all, true);
-      }
+      case "goal":
+        setGoals([...GOALS]);
+        return completeStep(true);
       case "city":
         setTravelCity(null);
-        return advanceWith(goals, true);
+        return completeStep(true);
       case "ahaShare":
         setSkippedShare(true);
         recordCurrentStep(true);
@@ -332,7 +304,7 @@ export default function OnboardingScreen() {
         });
         return askForPlan(true);
       default:
-        return advanceWith(goals, true);
+        return completeStep(true);
     }
   };
 
@@ -360,29 +332,11 @@ export default function OnboardingScreen() {
         return (
           <GoalStep picked={goals} onChange={setGoals} onContinue={advance} />
         );
-      case "tripSoon":
-        return (
-          <TripSoonStep
-            picked={tripSoon}
-            onPick={(answer) => {
-              setTripSoon(answer);
-              advance();
-            }}
-          />
-        );
-      case "planner":
-        return (
-          <PlannerStep
-            picked={planner}
-            onPick={setPlanner}
-            onContinue={advance}
-          />
-        );
       case "city":
         return (
           <CityStep
             kind={kind}
-            question={cityQuestion(goals, tripSoon)}
+            question={cityQuestion(goals)}
             city={travelCity}
             onPick={(city) => {
               setTravelCity(city);
@@ -440,7 +394,6 @@ export default function OnboardingScreen() {
     >
       <Header
         step={step}
-        goals={goals}
         onBack={
           paywall.asked || previous === null
             ? null

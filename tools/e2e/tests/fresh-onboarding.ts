@@ -5,16 +5,16 @@ import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { pollUntil } from "./poll.ts";
 import { tapUntilVisible } from "./seeded-home.ts";
 
-export async function startFreshOnboarding({
-  device,
-  screen,
-}: {
-  device: Device;
-  screen: Screen;
-}): Promise<void> {
+export async function startFreshOnboarding(
+  { device, screen }: { device: Device; screen: Screen },
+  extraLaunchArguments: readonly string[] = [],
+): Promise<void> {
   const start = screen.getByRole("button", "Get started");
-  await relaunchWith(device, screen, FRESH_INSTALL_ARGUMENTS, () =>
-    start.isVisible(),
+  await relaunchWith(
+    device,
+    screen,
+    [...FRESH_INSTALL_ARGUMENTS, ...extraLaunchArguments],
+    () => start.isVisible(),
   );
 }
 
@@ -51,23 +51,17 @@ export async function walkToSampleReel(
   const next = screen.getByRole("button", "Continue");
   await expect(next).toBeEnabled({ timeout: 10_000 });
   await next.tap();
-  if (options.goal === "travel") {
-    await expect(screen.getByText("Are you planning a trip soon?")).toBeVisible(
-      { timeout: 30_000 },
-    );
-    await screen.getByRole("radio", "Not yet").tap();
-  }
-  await expect(screen.getByText("How do you like to plan?")).toBeVisible({
-    timeout: 30_000,
-  });
-  await skip.tap();
   await expect(screen.getByText("Let’s put your saves to use.")).toBeVisible({
     timeout: 30_000,
   });
   await screen.getByTestId("onboarding-chart-continue").tap();
-  await expect(screen.getByText("Where do you go out?")).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect(
+    screen.getByText(
+      options.goal === "travel"
+        ? "Where’s your next trip?"
+        : "Where do you go out?",
+    ),
+  ).toBeVisible({ timeout: 30_000 });
   if (options.city) {
     await screen.getByPlaceholder("Search cities").fill(options.city);
     await screen.getByRole("radio", options.city).tap();
@@ -121,7 +115,7 @@ const STALLED_LAUNCH_MS = 75_000;
 
 const LAUNCHER_GRACE_MS = 15_000;
 
-export async function relaunchWith(
+async function relaunchWith(
   device: Device,
   screen: Screen,
   launchArguments: readonly string[],
@@ -153,4 +147,4 @@ export async function relaunchWith(
 const SHARE_TO_SHELVR = "Shelvr";
 
 // The ringed share button on the sample reel; exact, so it never matches "Share to…".
-export const SHARE_ON_REEL = /^Share$/;
+const SHARE_ON_REEL = /^Share$/;
