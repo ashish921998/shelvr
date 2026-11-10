@@ -394,6 +394,39 @@ describe("appleMapsFind", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it("does not accept a physical feature as an extended branch venue", async () => {
+    const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+      const filter = new URL(String(input)).searchParams.get(
+        "resultTypeFilter",
+      );
+      return Response.json({
+        results:
+          filter === "Poi"
+            ? [
+                {
+                  name: "Cedar Creek",
+                  coordinate: { latitude: 30.25, longitude: -97.72 },
+                },
+              ]
+            : [],
+      });
+    });
+    const lookup = {
+      target: "place" as const,
+      name: "Cedar",
+      hasBranchClue: true,
+    };
+    expect(
+      await appleMapsFind(
+        "t",
+        lookup,
+        "Cedar, Main Street, Austin",
+        undefined,
+        fetchImpl,
+      ),
+    ).toBeNull();
+  });
+
   it("matches an extended venue name across apostrophe variants and only at a word boundary", async () => {
     const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
       const filter = new URL(String(input)).searchParams.get(

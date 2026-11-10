@@ -210,11 +210,12 @@ function preferredSavedPlace(
   filter: string,
 ): boolean {
   const mixed = filter === "Poi,Address";
-  if (mixed && !place.poiCategory && !(place.id && !place.structuredAddress))
-    return false;
+  const venue = !!place.poiCategory || (!!place.id && !place.structuredAddress);
+  if (mixed && !venue) return false;
   return (
     matchesSavedPlace(place, lookup, filter) ||
     (lookup.hasBranchClue === true &&
+      venue &&
       (mixed || filter === "Poi") &&
       hasExtendedVenueName(place.name, lookup.name))
   );
