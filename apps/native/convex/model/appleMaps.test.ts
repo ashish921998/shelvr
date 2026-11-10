@@ -358,6 +358,150 @@ describe("appleMapsFind", () => {
     vi.restoreAllMocks();
   });
 
+  it("keeps Apple's first matching venue when a saved branch clue is present", async () => {
+    const fetchImpl = vi.fn(async () =>
+      Response.json({
+        results: [
+          {
+            name: "Carette Trocadéro",
+            id: "troc",
+            poiCategory: "Bakery",
+            coordinate: { latitude: 48.863, longitude: 2.287 },
+          },
+          {
+            name: "Carette",
+            id: "vosges",
+            poiCategory: "Bakery",
+            coordinate: { latitude: 48.855, longitude: 2.365 },
+          },
+        ],
+      }),
+    );
+    const lookup = {
+      target: "place" as const,
+      name: "Carette",
+      hasBranchClue: true,
+    };
+    expect(
+      await appleMapsFind(
+        "t",
+        lookup,
+        "Carette, Place du Trocadéro, Paris",
+        undefined,
+        fetchImpl,
+      ),
+    ).toMatchObject({ appleId: "troc" });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("matches an extended venue name across apostrophe variants and only at a word boundary", async () => {
+    const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+      const filter = new URL(String(input)).searchParams.get(
+        "resultTypeFilter",
+      );
+      return Response.json({
+        results:
+          filter === "Poi"
+            ? [
+                {
+                  name: "Joe’s 240 Diner",
+                  id: "different-number",
+                  poiCategory: "Restaurant",
+                  coordinate: { latitude: 40.74, longitude: -73.99 },
+                },
+                {
+                  name: "Joe’s 24 Diner",
+                  id: "diner",
+                  poiCategory: "Restaurant",
+                  coordinate: { latitude: 40.73, longitude: -73.99 },
+                },
+              ]
+            : [],
+      });
+    });
+    expect(
+      await appleMapsFind(
+        "t",
+        { target: "address", name: "Joe's 24" },
+        "Joe's 24, New York",
+        undefined,
+        fetchImpl,
+      ),
+    ).toMatchObject({ appleId: "diner" });
+  });
+
+  it.each([
+    ["503", async () => new Response("", { status: 503 })],
+    ["429", async () => new Response("", { status: 429 })],
+    [
+      "timeout",
+      async () => {
+        throw new DOMException("slow", "TimeoutError");
+      },
+    ],
+    [
+      "thrown fetch",
+      async () => {
+        throw new TypeError("fetch failed");
+      },
+    ],
+  ])(
+    "keeps an exact geographic match when the later POI request fails with %s",
+    async (_label, fail) => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) =>
+        new URL(String(input)).searchParams.get("resultTypeFilter") === "Poi"
+          ? fail()
+          : Response.json({
+              results: [
+                {
+                  name: "Pink Street",
+                  structuredAddress: { thoroughfare: "Pink Street" },
+                  coordinate: { latitude: 38.7073, longitude: -9.1439 },
+                },
+              ],
+            }),
+      );
+      expect(
+        await appleMapsFind(
+          "t",
+          { target: "place", name: "Pink Street" },
+          "Pink Street, Lisbon",
+          undefined,
+          fetchImpl,
+        ),
+      ).toEqual({ lat: 38.7073, lng: -9.1439 });
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("still reports unavailable when the failed fallback only has an unchecked venue", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) =>
+      new URL(String(input)).searchParams.get("resultTypeFilter") === "Poi"
+        ? new Response("", { status: 503 })
+        : Response.json({
+            results: [
+              {
+                name: "Different Bar",
+                id: "unchecked",
+                poiCategory: "Bar",
+                coordinate: { latitude: 38.7073, longitude: -9.1439 },
+              },
+            ],
+          }),
+    );
+    expect(
+      await appleMapsFind(
+        "t",
+        { target: "place", name: "Pink Street" },
+        "Pink Street, Lisbon",
+        undefined,
+        fetchImpl,
+      ),
+    ).toBe(UNAVAILABLE);
+  });
+
   const find = (fetchImpl: () => Promise<Response>) =>
     appleMapsFind(
       "tok",

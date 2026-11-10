@@ -126,6 +126,7 @@ type FoundPlace = LatLng & {
 type SavedLookup = {
   target: "place" | "address" | "locality";
   name: string;
+  hasBranchClue?: boolean;
 };
 
 const ADDRESS_ABBREVIATIONS = new Map([
@@ -190,12 +191,32 @@ function isRankedPoi(place: z.infer<typeof placeSchema>): boolean {
 }
 
 function hasExtendedVenueName(
-  place: z.infer<typeof placeSchema>,
+  name: string | undefined,
   savedName: string,
 ): boolean {
-  const prefix = savedName.trim().toLowerCase() + " ";
+  if (!name) return false;
+  const expected = placeKey(savedName);
+  if (expected === "" || placeKey(name) === expected) return false;
+  for (const word of name.matchAll(/[\p{L}\p{M}\p{N}'’]+/gu)) {
+    const end = word.index + word[0].length;
+    if (placeKey(name.slice(0, end)) === expected) return true;
+  }
+  return false;
+}
+
+function preferredSavedPlace(
+  place: z.infer<typeof placeSchema>,
+  lookup: SavedLookup,
+  filter: string,
+): boolean {
+  const mixed = filter === "Poi,Address";
+  if (mixed && !place.poiCategory && !(place.id && !place.structuredAddress))
+    return false;
   return (
-    !!place.poiCategory && !!place.name?.trim().toLowerCase().startsWith(prefix)
+    matchesSavedPlace(place, lookup, filter) ||
+    (lookup.hasBranchClue === true &&
+      (mixed || filter === "Poi") &&
+      hasExtendedVenueName(place.name, lookup.name))
   );
 }
 
@@ -281,7 +302,7 @@ export async function appleMapsFind(
       if (!response.ok) {
         if (!isTemporary(response.status)) return geographic ?? ranked;
         reportUnavailable(path, { status: response.status });
-        return UNAVAILABLE;
+        return geographic ?? UNAVAILABLE;
       }
       body = await response.json().catch((error: unknown) => {
         if (error instanceof SyntaxError) return null;
@@ -289,7 +310,7 @@ export async function appleMapsFind(
       });
     } catch (error) {
       reportUnavailable(path, { error });
-      return UNAVAILABLE;
+      return geographic ?? UNAVAILABLE;
     }
     const mixed = filter === "Poi,Address";
     const matches = saved
@@ -301,11 +322,7 @@ export async function appleMapsFind(
       near,
       path === "search" && saved === null,
       includeCity,
-      matches && mixed
-        ? (place) =>
-            matches(place) &&
-            (!!place.poiCategory || (!!place.id && !place.structuredAddress))
-        : matches,
+      saved ? (place) => preferredSavedPlace(place, saved, filter) : undefined,
     );
     if (found) return found;
     if (saved && mixed) {
@@ -314,8 +331,13 @@ export async function appleMapsFind(
         ranked = firstPlace(body, near, true, includeCity, isRankedPoi);
     }
     if (saved?.target === "address" && filter === "Poi") {
-      const extended = firstPlace(body, near, true, includeCity, (place) =>
-        hasExtendedVenueName(place, saved.name),
+      const extended = firstPlace(
+        body,
+        near,
+        true,
+        includeCity,
+        (place) =>
+          !!place.poiCategory && hasExtendedVenueName(place.name, saved.name),
       );
       return geographic ?? extended;
     }

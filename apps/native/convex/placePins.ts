@@ -406,7 +406,7 @@ async function lookUp(
     const query = lookupQuery(queries.get(name) ?? name, city);
     const at = await appleMapsFind(
       token,
-      savedLookup(name, cities, cityKeys),
+      savedLookup(name, cities, cityKeys, queries.has(name)),
       query,
       near,
       undefined,
@@ -456,6 +456,7 @@ function savedLookup(
   name: string,
   cities: string[],
   cityKeys: ReadonlySet<string>,
+  hasBranchClue: boolean,
 ) {
   const { name: label } = splitSavedPlace(name);
   if (cityKeys.has(placeKey(label)))
@@ -468,8 +469,8 @@ function savedLookup(
     isStreetAddress(label) ||
     /^(?:#?\d+[a-z]?\s)|(?:\s\d+[a-z]?$)/i.test(label)
   )
-    return { target: "address" as const, name: matchName };
-  return { target: "place" as const, name: matchName };
+    return { target: "address" as const, name: matchName, hasBranchClue };
+  return { target: "place" as const, name: matchName, hasBranchClue };
 }
 
 export const locateItem = internalAction({

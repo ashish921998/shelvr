@@ -88,6 +88,15 @@ async function setup(
   return { t, itemId, pins };
 }
 
+async function lookupJobs(t: ReturnType<typeof newConvexTest>) {
+  const jobs = await t.run((ctx) =>
+    ctx.db.system.query("_scheduled_functions").collect(),
+  );
+  return jobs
+    .filter((job) => job.name === "placePins:locateItem")
+    .map((job) => job.args[0] as Record<string, unknown>);
+}
+
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
@@ -282,6 +291,46 @@ describe("saved venue lookup", () => {
       Array(2).fill("Carette, Place du Trocadéro, Paris"),
     );
     expect(await pins()).toBeUndefined();
+  });
+
+  it("pins the first matching venue for an explicit saved branch clue", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup([], { read: ["Carette"] });
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        cities: ["Paris"],
+        placeLocations: [{ name: "Carette", location: "Place du Trocadéro" }],
+      }),
+    );
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps" });
+        expect(url.searchParams.get("q")).toBe(
+          "Carette, Place du Trocadéro, Paris",
+        );
+        return Response.json({
+          results: [
+            {
+              name: "Carette Trocadéro",
+              id: "troc",
+              poiCategory: "Bakery",
+              coordinate: { latitude: 48.863, longitude: 2.287 },
+            },
+            {
+              name: "Carette",
+              id: "vosges",
+              poiCategory: "Bakery",
+              coordinate: { latitude: 48.855, longitude: 2.365 },
+            },
+          ],
+        });
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(await pins()).toMatchObject([{ name: "Carette", appleId: "troc" }]);
   });
 
   it("matches a venue as a point of interest instead of a similarly named street address", async () => {
@@ -1628,14 +1677,35 @@ describe("placePins", () => {
     );
   }
 
-  async function lookupJobs(t: ReturnType<typeof newConvexTest>) {
-    const jobs = await t.run((ctx) =>
-      ctx.db.system.query("_scheduled_functions").collect(),
+  it("stores the matched street without scheduling a retry when only the POI fallback fails", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup([], { read: ["Pink Street"] });
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps" });
+        if (url.searchParams.get("resultTypeFilter") === "Poi")
+          return new Response("", { status: 503 });
+        return Response.json({
+          results: [
+            {
+              name: "Pink Street",
+              structuredAddress: { thoroughfare: "Pink Street" },
+              coordinate: { latitude: 38.7073, longitude: -9.1439 },
+            },
+          ],
+        });
+      }),
     );
-    return jobs
-      .filter((job) => job.name === "placePins:locateItem")
-      .map((job) => job.args[0] as Record<string, unknown>);
-  }
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(await pins()).toEqual([
+      { name: "Pink Street", city: "Lisbon", lat: 38.7073, lng: -9.1439 },
+    ]);
+    expect(await lookupJobs(t)).toEqual([]);
+  });
 
   it("retries a lookup Apple could not answer, keeping the owner's pins", async () => {
     await withMaps();
