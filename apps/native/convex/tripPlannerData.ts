@@ -21,7 +21,7 @@ import {
   planSourceValidator,
 } from "./model/plan";
 import { sameTripPlace } from "./model/placeIdentity";
-import { recentVisits } from "./model/placeVisits";
+import { userVisits, visitedNames } from "./model/placeVisits";
 import { listPlanClaimValidator } from "./model/sharedLists";
 import { rateLimiter } from "./model/rateLimiter";
 import {
@@ -52,7 +52,7 @@ import {
 } from "./model/tripPlan";
 import { claimListPlan, requirePlanAccess } from "./sharedLists";
 import { requireProEntitlement } from "./subscriptions";
-import { beenPlaces, toPlanSource } from "./tripData";
+import { toPlanSource } from "./tripData";
 
 const MAX_STAY_CHARS = 120;
 /** Days of a packed 15-day trip, plus room for unplanned extras. */
@@ -202,12 +202,10 @@ export const claimTripPlanInternal = internalMutation({
       ...asked,
       sources,
       removed,
-      been: [
-        ...new Set([
-          ...(await beenPlaces(ctx, userId, sources)),
-          ...(await recentVisits(ctx, userId)),
-        ]),
-      ],
+      been: visitedNames(
+        await userVisits(ctx, userId, saves),
+        saves.flatMap((item) => pinsForCity(item, city)),
+      ),
       pins: saves.flatMap((item) =>
         pinsForCity(item, city).map((pin) => ({
           itemId: item._id,

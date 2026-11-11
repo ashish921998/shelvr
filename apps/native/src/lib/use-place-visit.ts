@@ -21,12 +21,18 @@ export function usePlaceVisits(): {
   visits: readonly VisitMark[];
   loaded: boolean;
   isError: boolean;
+  offerRetry: () => void;
 } {
   const query = useQuery(convexQuery(api.placeVisits.listVisits, {}));
   return {
     visits: query.data ?? NO_VISITS,
     loaded: query.data !== undefined,
     isError: query.isError,
+    offerRetry: () =>
+      Alert.alert(t("errors.unexpectedTitle"), t("errors.retrySoon"), [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("common.retry"), onPress: () => void query.refetch() },
+      ]),
   };
 }
 

@@ -37,7 +37,8 @@ export default function CityScreen() {
   const focused = usePlaceCardFocus();
   const city = name ?? "";
   const removal = usePlaceRemoval();
-  const { visits } = usePlaceVisits();
+  const placeVisits = usePlaceVisits();
+  const { visits } = placeVisits;
   const visit = usePlaceVisit();
   const items = useQuery(convexQuery(api.items.listCityItems, { city }));
   const { busy, start } = useCityPlan();
@@ -170,11 +171,15 @@ export default function CityScreen() {
             selected={selected === row.id}
             removing={removal.busy}
             visited={went}
-            visiting={visit.busy}
+            visiting={
+              visit.busy || (!placeVisits.loaded && !placeVisits.isError)
+            }
             onToggleVisited={
-              row.kind === "place"
-                ? () => void visit.toggle(item._id, row.pin, !went)
-                : undefined
+              row.kind !== "place"
+                ? undefined
+                : placeVisits.loaded
+                  ? () => void visit.toggle(item._id, row.pin, !went)
+                  : placeVisits.offerRetry
             }
             onRemove={
               row.kind === "place"

@@ -42,6 +42,9 @@ const mocks = vi.hoisted(() => ({
     spots?: { lat: number; lng: number; appleId?: string }[];
   }[],
   toggleVisit: vi.fn(),
+  visitsLoaded: true,
+  visitsError: false,
+  offerRetry: vi.fn(),
 }));
 
 vi.mock("@/lib/i18n", () => ({
@@ -71,8 +74,9 @@ vi.mock("@/lib/place-removal", () => ({
 vi.mock("@/lib/use-place-visit", () => ({
   usePlaceVisits: () => ({
     visits: mocks.visits,
-    loaded: true,
-    isError: false,
+    loaded: mocks.visitsLoaded,
+    isError: mocks.visitsError,
+    offerRetry: mocks.offerRetry,
   }),
   usePlaceVisit: () => ({ busy: false, toggle: mocks.toggleVisit }),
 }));
@@ -274,6 +278,7 @@ vi.mock("@/components/city/save-row", () => ({
       emoji,
       visited,
       onToggleVisited,
+      visiting,
       ...rest
     }: {
       item: { title?: string };
@@ -282,13 +287,14 @@ vi.mock("@/components/city/save-row", () => ({
       visited?: boolean;
       selected?: boolean;
       onToggleVisited?: () => void;
+      visiting?: boolean;
       onPress: () => void;
     }) =>
       rowFake({
         name: `${placeName ?? item.title ?? ""}${visited ? " ✓" : ""}`,
         number: emoji,
         ...rest,
-        ...(onToggleVisited && rest.selected
+        ...(onToggleVisited && rest.selected && !visiting
           ? { onVisited: () => onToggleVisited() }
           : {}),
       }),
@@ -483,6 +489,8 @@ beforeEach(() => {
   mocks.snaps = undefined;
   mocks.cardAvailable = true;
   mocks.visits = [];
+  mocks.visitsLoaded = true;
+  mocks.visitsError = false;
   mocks.markSeen.mockResolvedValue(null);
   mocks.setVisited.mockResolvedValue(null);
   mocks.removeListPlace.mockResolvedValue(null);
@@ -556,6 +564,20 @@ describe("city page", () => {
       expect.objectContaining({ name: "BBQ Pit", lat: 30.2, lng: -97.2 }),
       true,
     );
+  });
+
+  it("holds the visit check until marks load, and offers a retry when they fail", () => {
+    mocks.queries[CITY_ITEMS] = [save];
+    mocks.visitsLoaded = false;
+    const { rerender } = render(<CityScreen />);
+    fireEvent.click(screen.getByText("🍖 BBQ Pit"));
+    expect(screen.queryByText("went BBQ Pit")).toBeNull();
+
+    mocks.visitsError = true;
+    rerender(<CityScreen />);
+    fireEvent.click(screen.getByText("went BBQ Pit"));
+    expect(mocks.offerRetry).toHaveBeenCalled();
+    expect(mocks.toggleVisit).not.toHaveBeenCalled();
   });
 
   it("ticks only the branch a mark was made on, on the rows and the map", () => {

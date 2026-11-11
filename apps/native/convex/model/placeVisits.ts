@@ -5,7 +5,6 @@ import type { Placed } from "./placeIdentity";
 import { placeKey } from "./plan";
 import { distanceKm, otherVenue, SAME_PLACE_KM } from "./trip";
 
-const RECENT_VISITS = 200;
 export const MAX_VISIT_SPOTS = 20;
 export const MAX_VISITS = 1000;
 
@@ -22,7 +21,7 @@ export const visitMarkValidator = v.object({
   spots: v.optional(v.array(visitSpotValidator)),
 });
 
-export type VisitMark = Infer<typeof visitMarkValidator>;
+export type VisitMark = Infer<typeof visitMarkValidator> & { name?: string };
 
 export function spotMarks(
   spot: VisitSpot,
@@ -39,9 +38,54 @@ export function spotMarks(
   );
 }
 
-export function visitMatcher(
+export function sameSpots(
+  kept: readonly VisitSpot[],
+  spot: VisitSpot,
+  sameName: boolean,
+): VisitSpot[] {
+  if (spot.appleId === undefined) {
+    return kept.filter((spotKept) => spotMarks(spotKept, spot, sameName));
+  }
+  const exact = kept.filter((spotKept) => spotKept.appleId === spot.appleId);
+  return exact.length > 0
+    ? exact
+    : kept.filter(
+        (spotKept) =>
+          spotKept.appleId === undefined && spotMarks(spotKept, spot, sameName),
+      );
+}
+
+export function knowsSpot(
+  kept: readonly VisitSpot[],
+  spot: VisitSpot,
+): boolean {
+  return spot.appleId === undefined
+    ? kept.some((spotKept) => spotMarks(spotKept, spot, true))
+    : kept.some((spotKept) => spotKept.appleId === spot.appleId);
+}
+
+function nearestPin<T extends Placed>(
+  spot: VisitSpot,
+  key: string,
+  pins: readonly T[],
+): T | undefined {
+  let nearest: T | undefined;
+  let nearestKm = Infinity;
+  for (const pin of pins) {
+    if (placeKey(pin.name) !== key || !spotMarks(spot, pin, true)) continue;
+    const km = distanceKm(spot, pin);
+    if (km < nearestKm) {
+      nearest = pin;
+      nearestKm = km;
+    }
+  }
+  return nearest;
+}
+
+export function visitMatcher<T extends Placed>(
   visits: readonly VisitMark[],
-): (pin: Placed) => boolean {
+  pins: readonly T[],
+): (pin: T) => boolean {
   const byKey = new Map(visits.map((visit) => [visit.key, visit]));
   const appleIds = new Set(
     visits.flatMap((visit) =>
@@ -50,15 +94,52 @@ export function visitMatcher(
       ),
     ),
   );
+  const byApple = (pin: T) =>
+    pin.appleId !== undefined && appleIds.has(pin.appleId);
+  const open = pins.filter((pin) => !byApple(pin));
+  const claimed = new Set<T>(
+    visits.flatMap((visit) =>
+      (visit.spots ?? []).flatMap((spot) => {
+        if (spot.appleId !== undefined) return [];
+        const pin = nearestPin(spot, visit.key, open);
+        return pin === undefined ? [] : [pin];
+      }),
+    ),
+  );
   return (pin) => {
-    if (pin.appleId !== undefined && appleIds.has(pin.appleId)) return true;
+    if (byApple(pin)) return true;
     const visit = byKey.get(placeKey(pin.name));
     if (visit === undefined) return false;
     return (
       visit.spots === undefined ||
-      visit.spots.some((spot) => spotMarks(spot, pin, true))
+      claimed.has(pin) ||
+      visit.spots.some(
+        (spot) => spot.appleId !== undefined && spotMarks(spot, pin, true),
+      )
     );
   };
+}
+
+export function visitedNames(
+  visits: readonly VisitMark[],
+  pins: readonly Placed[],
+): string[] {
+  const visited = visitMatcher(visits, pins);
+  return [
+    ...new Set([
+      ...visits.flatMap((visit) =>
+        visit.spots === undefined ? [visit.name ?? visit.key] : [],
+      ),
+      ...pins.filter((pin) => visited(pin)).map((pin) => pin.name),
+    ]),
+  ];
+}
+
+export function visitedKeysOnItem(
+  visits: readonly VisitMark[],
+  item: Pick<Doc<"items">, "placePins">,
+): Set<string> {
+  return new Set(visitedNames(visits, item.placePins ?? []).map(placeKey));
 }
 
 export async function findVisit(
@@ -128,29 +209,8 @@ export async function userVisits(
   return rows.map((row) => {
     const spots =
       row.spots ?? spotsOnItem(items.get(row.itemId) ?? null, row.key);
-    return spots === undefined ? { key: row.key } : { key: row.key, spots };
+    return spots === undefined
+      ? { key: row.key, name: row.name }
+      : { key: row.key, name: row.name, spots };
   });
-}
-
-export async function visitedPlaceKeys(
-  ctx: QueryCtx,
-  userId: string,
-): Promise<Set<string>> {
-  const visits = await ctx.db
-    .query("placeVisits")
-    .withIndex("by_user_and_key", (q) => q.eq("userId", userId))
-    .collect();
-  return new Set(visits.map((visit) => visit.key));
-}
-
-export async function recentVisits(
-  ctx: QueryCtx,
-  userId: string,
-): Promise<string[]> {
-  const visits = await ctx.db
-    .query("placeVisits")
-    .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
-    .order("desc")
-    .take(RECENT_VISITS);
-  return visits.map((visit) => visit.name);
 }

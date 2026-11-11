@@ -425,7 +425,7 @@ export const listCities = authedQuery({
   ),
   handler: async (ctx) => {
     const items = await readySavesNewestFirst(ctx, ctx.userId);
-    const visited = visitMatcher(await userVisits(ctx, ctx.userId, items));
+    const visits = await userVisits(ctx, ctx.userId, items);
     const cities = countCities(items)
       .map(({ city, count }) => {
         const pins = uniquePlacePins(
@@ -438,6 +438,7 @@ export const listCities = authedQuery({
             .slice(0, CITY_ITEMS_MAX)
             .flatMap((item) => pinsForCity(item, city)),
         );
+        const visited = visitMatcher(visits, pins);
         const visitedCount = pins.filter((pin) => visited(pin)).length;
         return {
           city,

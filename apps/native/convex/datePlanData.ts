@@ -4,7 +4,7 @@ import { internalMutation } from "./_generated/server";
 import { aiAllowed } from "./aiConsent";
 import { readyCitySaves } from "./items";
 import { requireUserId } from "./model/auth";
-import { recentVisits } from "./model/placeVisits";
+import { userVisits, visitedNames } from "./model/placeVisits";
 import { listPlanClaimValidator } from "./model/sharedLists";
 import { namesOneVenue } from "./model/dateRank";
 import { MAX_PLAN_ITEMS, planSourceValidator } from "./model/plan";
@@ -12,7 +12,7 @@ import { rateLimiter } from "./model/rateLimiter";
 import { MAX_CITY_CHARS, pinsForCity, tidyCity } from "./model/trip";
 import { claimListPlan } from "./sharedLists";
 import { requireProEntitlement } from "./subscriptions";
-import { beenPlaces, toPlanSource } from "./tripData";
+import { toPlanSource } from "./tripData";
 import { savedPinValidator } from "./tripPlannerData";
 
 const TAGS_PER_SAVE = 8;
@@ -77,12 +77,10 @@ export const claimDatePlanInternal = internalMutation({
       city,
       sources,
       removed,
-      been: [
-        ...new Set([
-          ...(await beenPlaces(ctx, userId, sources)),
-          ...(await recentVisits(ctx, userId)),
-        ]),
-      ],
+      been: visitedNames(
+        await userVisits(ctx, userId, items),
+        items.flatMap((item) => pinsForCity(item, city)),
+      ),
       pins: items.flatMap((item) =>
         pinsForCity(item, city).map((pin) => ({
           itemId: item._id,

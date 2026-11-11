@@ -6,7 +6,7 @@ export function visitedPinIds(
   pins: readonly CityPin[],
   visits: readonly VisitMark[],
 ): ReadonlySet<string> {
-  const visited = visitMatcher(visits);
+  const visited = visitMatcher(visits, pins);
   return new Set(pins.filter((pin) => visited(pin)).map(cityPinId));
 }
 

@@ -326,6 +326,25 @@ describe("makeDatePlan", () => {
     expect(result.status).toBe("no_pair");
   });
 
+  it("keeps a place whose mark was made at a same-named place in another city", async () => {
+    const { base, t, userId, itemIds } = await setup([DINNER, BAR]);
+    await base.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "redfrog",
+        name: "Red Frog",
+        itemId: itemIds[1],
+        visitedAt: Date.now(),
+        spots: [{ lat: 30.26, lng: -97.74 }],
+      });
+    });
+    const claim = await t.mutation(
+      internal.datePlanData.claimDatePlanInternal,
+      { city: "Lisbon" },
+    );
+    expect(claim).toMatchObject({ from: "saves", been: [] });
+  });
+
   it("picks a kind the saves can make when asked to surprise", async () => {
     const { t } = await setup([DINNER, BAR, CAFE]);
     for (let i = 0; i < 4; i++) {

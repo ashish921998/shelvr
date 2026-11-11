@@ -294,12 +294,52 @@ describe("setVisited", () => {
     expect((await visits()).map((visit) => visit.key)).toEqual(["micho"]);
   });
 
-  it("takes back a whole name when an installed app sends no spot", async () => {
+  it("keeps marks made at places when an installed app takes back a name its save has no pin for", async () => {
     const { visits, mark } = await setup();
     await mark("Shake Shack", true, PARIS);
     await mark("Shake Shack", true, LONDON);
     await mark("Shake Shack", false);
-    expect(await visits()).toEqual([]);
+    expect((await visits())[0]?.spots).toEqual([PARIS, LONDON]);
+
+    await mark("Tigre", true);
+    await mark("Tigre", false);
+    expect((await visits()).map((visit) => visit.key)).toEqual(["shakeshack"]);
+  });
+
+  it("marks and takes back every pin of the name on an installed app's save", async () => {
+    const { t, itemId, visits, mark } = await setup();
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        placePins: [
+          { name: "Jo's Coffee", ...PARIS },
+          { name: "Jo's Coffee", ...LONDON },
+        ],
+      }),
+    );
+    await mark("Jo's Coffee", true, { lat: 30.26, lng: -97.74 });
+
+    await mark("Jo's Coffee", true);
+    expect((await visits())[0]?.spots).toEqual([
+      { lat: 30.26, lng: -97.74 },
+      PARIS,
+      LONDON,
+    ]);
+
+    await mark("Jo's Coffee", false);
+    expect((await visits())[0]?.spots).toEqual([{ lat: 30.26, lng: -97.74 }]);
+  });
+
+  it("keeps one branch's mark when the branch next door is marked and taken back", async () => {
+    const { visits, mark } = await setup();
+    await mark("Blue Bottle", true, PARIS);
+    await mark("Blue Bottle", true, { ...NEXT_DOOR, appleId: "B" });
+    expect((await visits())[0]?.spots).toEqual([
+      PARIS,
+      { ...NEXT_DOOR, appleId: "B" },
+    ]);
+
+    await mark("Blue Bottle", false, { ...NEXT_DOOR, appleId: "B" });
+    expect((await visits())[0]?.spots).toEqual([PARIS]);
   });
 
   it("refuses a spot past the cap and keeps every earlier one", async () => {
