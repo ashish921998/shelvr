@@ -713,6 +713,18 @@
   "cityMap.removedPlace": "%{name} 삭제됨",
   "cityMap.noPlacesLeft": "남은 장소가 없어요",
   "cityMap.noPlacesLeftBody": "%{city}의 다른 장소를 저장하면 여기에 표시돼요.",
+  "cityProgress.visited": {
+    "other": "%{formattedCount}곳 중 %{visited}곳 방문"
+  },
+  "cityProgress.markVisited": "%{name} 방문함으로 표시",
+  "cityProgress.unmarkVisited": "%{name} 방문 표시 해제",
+  "cityProgress.rateLimited": "방문 상태를 너무 많이 변경했어요. 몇 분 후에 다시 시도해 주세요.",
+  "cityCard.share": "지도 공유",
+  "cityCard.title": "나의 %{city} 리스트",
+  "cityCard.footer": "Shelvr에 저장됨",
+  "cityCard.legendSaved": "가고 싶은 곳",
+  "cityCard.legendVisited": "가본 곳",
+  "cityCard.mapLabel": "%{city} 지도 카드",
   "opener.tagline": "장소를 저장하세요. 데이트도 여행도 계획은 저희가 할게요.",
   "onboardingQ.skip": "건너뛰기",
   "onboardingQ.savedTitle": "장소를 얼마나 저장했나요?",

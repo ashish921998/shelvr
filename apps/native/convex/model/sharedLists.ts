@@ -1,3 +1,4 @@
+import { namedVisitMarkValidator } from "./placeVisits";
 import { type Infer, v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
@@ -104,6 +105,7 @@ const listPlanPlaceValidator = v.object({
 export const listPlanClaimValidator = v.object({
   places: v.array(listPlanPlaceValidator),
   been: v.array(v.string()),
+  visitMarks: v.array(namedVisitMarkValidator),
   removed: v.array(removalValidator),
   aiAllowed: v.boolean(),
 });

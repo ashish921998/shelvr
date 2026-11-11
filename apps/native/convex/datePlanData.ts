@@ -4,7 +4,11 @@ import { internalMutation } from "./_generated/server";
 import { aiAllowed } from "./aiConsent";
 import { readyCitySaves } from "./items";
 import { requireUserId } from "./model/auth";
-import { recentVisits } from "./model/placeVisits";
+import {
+  unscopedVisitNames,
+  userVisits,
+  namedVisitMarkValidator,
+} from "./model/placeVisits";
 import { listPlanClaimValidator } from "./model/sharedLists";
 import { namesOneVenue } from "./model/dateRank";
 import { MAX_PLAN_ITEMS, planSourceValidator } from "./model/plan";
@@ -12,7 +16,7 @@ import { rateLimiter } from "./model/rateLimiter";
 import { MAX_CITY_CHARS, pinsForCity, tidyCity } from "./model/trip";
 import { claimListPlan } from "./sharedLists";
 import { requireProEntitlement } from "./subscriptions";
-import { beenPlaces, toPlanSource } from "./tripData";
+import { toPlanSource } from "./tripData";
 import { savedPinValidator } from "./tripPlannerData";
 
 const TAGS_PER_SAVE = 8;
@@ -29,6 +33,7 @@ export const claimDatePlanInternal = internalMutation({
       city: v.string(),
       sources: v.array(planSourceValidator),
       been: v.array(v.string()),
+      visitMarks: v.array(namedVisitMarkValidator),
       removed: v.array(removalValidator),
       pins: v.array(savedPinValidator),
       saves: v.array(
@@ -72,17 +77,14 @@ export const claimDatePlanInternal = internalMutation({
       removed,
     );
     const sources = items.map((item) => toPlanSource(item, city));
+    const visits = await userVisits(ctx, userId, items);
     return {
       from: "saves" as const,
       city,
       sources,
       removed,
-      been: [
-        ...new Set([
-          ...(await beenPlaces(ctx, userId, sources)),
-          ...(await recentVisits(ctx, userId)),
-        ]),
-      ],
+      been: unscopedVisitNames(visits),
+      visitMarks: visits,
       pins: items.flatMap((item) =>
         pinsForCity(item, city).map((pin) => ({
           itemId: item._id,

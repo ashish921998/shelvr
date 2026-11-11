@@ -28,7 +28,7 @@ import {
 } from "./model/saveReminders";
 import { TRIP_EVE_MAX_AGE_MS, tripSavedStopCount } from "./model/tripEve";
 import { visibleSave } from "./model/placeRemovals";
-import { visitedPlaceKeys } from "./model/placeVisits";
+import { userVisits, visitedKeysOnItem } from "./model/placeVisits";
 
 const NOTIFICATION_KIND = "weekly_shelf";
 const reminderNotificationKind = (kind: ReminderKind) => `${kind}_reminder`;
@@ -597,7 +597,10 @@ export const claimReminder = internalMutation({
         ? reminder.kind === "visit"
           ? placeToVisit(
               await visibleSave(ctx, item),
-              await visitedPlaceKeys(ctx, reminder.userId),
+              visitedKeysOnItem(
+                await userVisits(ctx, reminder.userId, [item]),
+                item,
+              ),
             )
           : reminderSubject(item, reminder.kind)
         : undefined;
