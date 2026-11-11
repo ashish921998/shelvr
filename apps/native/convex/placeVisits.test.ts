@@ -383,27 +383,33 @@ describe("setVisited", () => {
     ]);
   });
 
-  it("narrows an ambiguous legacy visit when one of its pins is explicitly marked", async () => {
-    const { t, userId, itemId, visits, mark } = await setup();
-    const chosen = { ...PARIS, appleId: "A" };
-    await t.run(async (ctx) => {
-      await ctx.db.patch(itemId, {
-        placePins: [
-          { name: "Tigre", ...chosen },
-          { name: "Tigre", ...LONDON },
-        ],
+  it.each(["inferred", "different"] as const)(
+    "handles an explicit %s pin on a save with an ambiguous legacy visit",
+    async (kind) => {
+      const { t, userId, itemId, visits, mark } = await setup();
+      const paris = { ...PARIS, appleId: "A" };
+      const dallas = { lat: 32.7767, lng: -96.797, appleId: "D" };
+      await t.run(async (ctx) => {
+        await ctx.db.patch(itemId, {
+          placePins: [
+            { name: "Tigre", ...paris },
+            { name: "Tigre", ...LONDON },
+          ],
+        });
+        await ctx.db.insert("placeVisits", {
+          userId,
+          key: "tigre",
+          name: "Tigre",
+          itemId,
+          visitedAt: 1,
+        });
       });
-      await ctx.db.insert("placeVisits", {
-        userId,
-        key: "tigre",
-        name: "Tigre",
-        itemId,
-        visitedAt: 1,
-      });
-    });
-    await mark("Tigre", true, chosen);
-    expect((await visits())[0]?.spots).toEqual([chosen]);
-  });
+      await mark("Tigre", true, kind === "inferred" ? paris : dallas);
+      expect((await visits())[0]?.spots).toEqual(
+        kind === "inferred" ? [paris] : [paris, LONDON, dallas],
+      );
+    },
+  );
 
   it("refuses an older app's first mark when it would record more than 20 spots", async () => {
     const { t, itemId, visits, mark } = await setup();

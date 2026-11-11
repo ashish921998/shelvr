@@ -56,8 +56,8 @@ async function markVisit(
     existing?.spots === undefined &&
     oldSpots !== undefined &&
     oldSpots.length > 1 &&
-    (existing?.itemId === visit.itemId ||
-      (spots?.[0] !== undefined && knowsSpot(oldSpots, spots[0])));
+    spots?.[0] !== undefined &&
+    knowsSpot(oldSpots, spots[0]);
   const next = narrowing ? [] : [...(oldSpots ?? [])];
   for (const spot of spots ?? []) {
     if (!knowsSpot(next, spot)) next.push(spot);
