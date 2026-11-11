@@ -552,7 +552,7 @@ describe("city page", () => {
     ];
     render(<CityScreen />);
     expect(
-      screen.getByText('cityProgress.visited {"count":2,"visited":"1"}'),
+      screen.getByText('cityProgress.visited {"count":2,"visited":1}'),
     ).toBeTruthy();
     expect(screen.getByTestId("progress").textContent).toBe("0.5");
     expect(screen.getByText("🌮 Taco Spot ✓")).toBeTruthy();
@@ -588,7 +588,7 @@ describe("city page", () => {
     ];
     render(<CityScreen />);
     expect(
-      screen.getByText('cityProgress.visited {"count":3,"visited":"1"}'),
+      screen.getByText('cityProgress.visited {"count":3,"visited":1}'),
     ).toBeTruthy();
     expect(screen.getAllByText("🌮 Taco Spot ✓")).toHaveLength(1);
     expect(screen.getAllByText("🌮 Taco Spot")).toHaveLength(1);
@@ -603,7 +603,7 @@ describe("city page", () => {
     mocks.visits = [{ key: "tacospot" }];
     render(<CityScreen />);
     expect(
-      screen.getByText('cityProgress.visited {"count":3,"visited":"2"}'),
+      screen.getByText('cityProgress.visited {"count":3,"visited":2}'),
     ).toBeTruthy();
     expect(screen.getAllByText("🌮 Taco Spot ✓")).toHaveLength(2);
   });

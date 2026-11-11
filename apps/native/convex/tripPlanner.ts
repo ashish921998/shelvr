@@ -154,22 +154,22 @@ function saveStop(
   };
 }
 
+function distinctSavedStops(stops: PlannedStop[]): PlannedStop[] {
+  return mergeSavedNamesakes(uniquePlacePins(stops));
+}
+
 function listStops(claim: ListClaim): {
   stops: PlannedStop[];
   centre: LatLng | null;
 } {
-  const stops = mergeSavedNamesakes(
-    uniquePlacePins(
-      shuffled(claim.places)
-        .slice(0, tripPlaceCap(claim.days))
-        .map(
-          ({ addedAt: _addedAt, tags: _tags, ...place }): PlannedStop => ({
-            source: "save",
-            ...place,
-          }),
-        ),
+  const stops = distinctSavedStops(
+    shuffled(claim.places).map(
+      ({ addedAt: _addedAt, tags: _tags, ...place }): PlannedStop => ({
+        source: "save",
+        ...place,
+      }),
     ),
-  );
+  ).slice(0, tripPlaceCap(claim.days));
   return { stops, centre: middleOf(stops) };
 }
 
@@ -186,13 +186,14 @@ async function savedStops(
     claim.sources.map((source) => [source.itemId, source]),
   );
   const why = (place: PlanPlace) => saveWhy(place, sources.get(place.itemId));
-  const stops: PlannedStop[] = [];
+  const mapped: PlannedStop[] = [];
   const unpinned: PlanPlace[] = [];
   candidates.forEach(({ place }, i) => {
     const pin = pinned[i];
-    if (pin && stops.length < cap) stops.push(saveStop(place, pin, why(place)));
-    else if (!pin) unpinned.push(place);
+    if (pin) mapped.push(saveStop(place, pin, why(place)));
+    else unpinned.push(place);
   });
+  const stops = distinctSavedStops(mapped).slice(0, cap);
   let centre = middleOf(stops);
   if (centre === null && spend(maps)) {
     centre = await appleMapsLookup(maps.token, "geocode", claim.city);
@@ -229,7 +230,7 @@ async function savedStops(
         stops.push(saveStop(place, at, why(place)));
     });
   }
-  return { stops: mergeSavedNamesakes(uniquePlacePins(stops)), centre };
+  return { stops: distinctSavedStops(stops), centre };
 }
 
 function suggestedStop(found: Suggestion): PlannedStop {

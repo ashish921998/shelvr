@@ -664,7 +664,7 @@ export type MessageParams = {
   "cityMap.removedPlace": { name: string };
   "cityMap.noPlacesLeft": undefined;
   "cityMap.noPlacesLeftBody": { city: string };
-  "cityProgress.visited": { visited: string; count: number };
+  "cityProgress.visited": { visited: number; count: number };
   "cityProgress.markVisited": { name: string };
   "cityProgress.unmarkVisited": { name: string };
   "cityProgress.rateLimited": undefined;

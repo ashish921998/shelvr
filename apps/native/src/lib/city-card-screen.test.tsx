@@ -180,7 +180,7 @@ describe("city card", () => {
     ];
     render(<CityCardScreen />);
     expect(
-      screen.getByText('cityProgress.visited {"count":3,"visited":"2"}'),
+      screen.getByText('cityProgress.visited {"count":3,"visited":2}'),
     ).toBeTruthy();
     expect(wentBubbles()).toEqual(["📸", "🏛️"].sort());
     expect(mocks.counts.at(-1)).toEqual({ place_count: 3, visited_count: 2 });

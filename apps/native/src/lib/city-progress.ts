@@ -27,6 +27,6 @@ export function progressLine(progress: {
   if (progress.visited === 0 || progress.total === 0) return null;
   return t("cityProgress.visited", {
     count: progress.total,
-    visited: String(Math.min(progress.visited, progress.total)),
+    visited: Math.min(progress.visited, progress.total),
   });
 }

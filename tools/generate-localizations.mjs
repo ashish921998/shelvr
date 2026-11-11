@@ -229,7 +229,7 @@ const parameters = Object.entries(source).map(([key, value]) => {
   ];
   const fields = names.map((name) => {
     const param = name === "formattedCount" ? "count" : name;
-    return `${param}: ${["count", "saved", "total", "limit"].includes(param) ? "number" : "string"}`;
+    return `${param}: ${["count", "saved", "total", "limit", "visited"].includes(param) ? "number" : "string"}`;
   });
   return `  ${JSON.stringify(key)}: ${fields.length ? `{ ${fields.join("; ")} }` : "undefined"};`;
 });

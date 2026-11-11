@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, internal } from "./_generated/api";
 import { placeKey } from "./model/plan";
+import { tripPlaceCap } from "./model/trip";
 import type { Id } from "./_generated/dataModel";
 import {
   insertConsentingUser,
@@ -383,6 +384,44 @@ describe("createTripPlan without Apple Maps", () => {
       expect(stops.map((stop) => stop.itemId)).toEqual([itemIds[1]]);
     },
   );
+
+  it("keeps a distinct venue when repeated saves would fill the trip limit", async () => {
+    const days = 1;
+    const repeated = Array.from(
+      { length: tripPlaceCap(days) },
+      (_, i): Save => ({
+        title: "Red Frog",
+        places: ["Red Frog"],
+        pins: [
+          {
+            name: "Red Frog",
+            lat: 38.72 + i * 0.00001,
+            lng: -9.145,
+            appleId: "same-venue",
+          },
+        ],
+      }),
+    );
+    const { t } = await setup([SAVES[0], ...repeated]);
+    const random = vi.spyOn(Math, "random").mockReturnValue(0.999999);
+    try {
+      const { tripId } = await t.action(api.tripPlanner.createTripPlan, {
+        city: "Lisbon",
+        days,
+        pace: "easy",
+        interests: [],
+      });
+      const trip = await t.query(api.tripPlannerData.getTripPlan, {
+        tripId: tripId!,
+      });
+      const names = [...(trip?.days.flat() ?? []), ...(trip?.unplanned ?? [])]
+        .map((stop) => stop.name)
+        .sort();
+      expect(names).toEqual(["Ramen Shop", "Red Frog"]);
+    } finally {
+      random.mockRestore();
+    }
+  });
 
   it("plans the pinned saves only and stores a new trip every time", async () => {
     const fetchMock = vi.fn();
