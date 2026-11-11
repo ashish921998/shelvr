@@ -24,7 +24,7 @@ import { sameTripPlace } from "./model/placeIdentity";
 import {
   unscopedVisitNames,
   userVisits,
-  visitMarkValidator,
+  namedVisitMarkValidator,
 } from "./model/placeVisits";
 import { listPlanClaimValidator } from "./model/sharedLists";
 import { rateLimiter } from "./model/rateLimiter";
@@ -146,7 +146,7 @@ export const claimTripPlanInternal = internalMutation({
       ...plannedTripFields,
       sources: v.array(planSourceValidator),
       been: v.array(v.string()),
-      visitMarks: v.array(visitMarkValidator),
+      visitMarks: v.array(namedVisitMarkValidator),
       removed: v.array(removalValidator),
       pins: v.array(savedPinValidator),
       aiAllowed: v.boolean(),
@@ -209,7 +209,7 @@ export const claimTripPlanInternal = internalMutation({
       sources,
       removed,
       been: unscopedVisitNames(visits),
-      visitMarks: visits.map(({ name: _name, ...visit }) => visit),
+      visitMarks: visits,
       pins: saves.flatMap((item) =>
         pinsForCity(item, city).map((pin) => ({
           itemId: item._id,

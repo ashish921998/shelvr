@@ -7,7 +7,7 @@ import { requireUserId } from "./model/auth";
 import {
   unscopedVisitNames,
   userVisits,
-  visitMarkValidator,
+  namedVisitMarkValidator,
 } from "./model/placeVisits";
 import { listPlanClaimValidator } from "./model/sharedLists";
 import { namesOneVenue } from "./model/dateRank";
@@ -33,7 +33,7 @@ export const claimDatePlanInternal = internalMutation({
       city: v.string(),
       sources: v.array(planSourceValidator),
       been: v.array(v.string()),
-      visitMarks: v.array(visitMarkValidator),
+      visitMarks: v.array(namedVisitMarkValidator),
       removed: v.array(removalValidator),
       pins: v.array(savedPinValidator),
       saves: v.array(
@@ -84,7 +84,7 @@ export const claimDatePlanInternal = internalMutation({
       sources,
       removed,
       been: unscopedVisitNames(visits),
-      visitMarks: visits.map(({ name: _name, ...visit }) => visit),
+      visitMarks: visits,
       pins: items.flatMap((item) =>
         pinsForCity(item, city).map((pin) => ({
           itemId: item._id,

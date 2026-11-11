@@ -2,7 +2,7 @@ import { type Infer, v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { QueryCtx } from "../_generated/server";
 import type { Placed } from "./placeIdentity";
-import { placeKey } from "./plan";
+import { placeKey, splitSavedPlace } from "./plan";
 import { distanceKm, otherVenue, SAME_PLACE_KM } from "./trip";
 
 export const MAX_VISIT_SPOTS = 20;
@@ -21,7 +21,11 @@ export const visitMarkValidator = v.object({
   spots: v.optional(v.array(visitSpotValidator)),
 });
 
-export type VisitMark = Infer<typeof visitMarkValidator> & { name?: string };
+export const namedVisitMarkValidator = visitMarkValidator.extend({
+  name: v.optional(v.string()),
+});
+
+export type VisitMark = Infer<typeof namedVisitMarkValidator>;
 
 function samePoint(a: VisitSpot, b: VisitSpot): boolean {
   return a.lat === b.lat && a.lng === b.lng;
@@ -111,17 +115,24 @@ export function visitAtPin(
     for (const spot of visit.spots) {
       if (spot.appleId !== undefined) appleIds.add(spot.appleId);
     }
-    const existing = spotsByName.get(visit.key);
-    if (existing) existing.push(...visit.spots);
-    else spotsByName.set(visit.key, [...visit.spots]);
+    const bare =
+      visit.name === undefined ? visit.key : barePlaceKey(visit.name);
+    for (const key of new Set([visit.key, bare])) {
+      if (key === "") continue;
+      const existing = spotsByName.get(key);
+      if (existing) existing.push(...visit.spots);
+      else spotsByName.set(key, [...visit.spots]);
+    }
   }
   return (pin) => {
     if (pin.appleId !== undefined && appleIds.has(pin.appleId)) return true;
     const key = placeKey(pin.name);
     return (
       names.has(key) ||
-      (spotsByName.get(key) ?? []).some(
-        (spot) => !otherVenue(spot, pin) && samePoint(spot, pin),
+      [key, barePlaceKey(pin.name)].some((candidate) =>
+        spotsByName
+          .get(candidate)
+          ?.some((spot) => !otherVenue(spot, pin) && samePoint(spot, pin)),
       )
     );
   };
@@ -170,15 +181,40 @@ export async function visitRows(
     .take(MAX_VISITS);
 }
 
+function barePlaceKey(name: string): string {
+  return placeKey(splitSavedPlace(name).name);
+}
+
+function pinsForVisit(
+  item: Pick<Doc<"items">, "placePins" | "places"> | null,
+  name: string,
+): NonNullable<Doc<"items">["placePins"]> {
+  const pins = item?.placePins ?? [];
+  const key = placeKey(name);
+  const exact = pins.filter((pin) => placeKey(pin.name) === key);
+  if (exact.length > 0) return exact;
+  const bare = barePlaceKey(name);
+  if (bare === "" || bare === key) return [];
+  const qualifiedLabels = new Set(
+    (item?.places ?? [])
+      .filter((label) => barePlaceKey(label) === bare)
+      .map(placeKey)
+      .filter((label) => label !== bare),
+  );
+  if (qualifiedLabels.size !== 1 || !qualifiedLabels.has(key)) return [];
+  const matches = pins.filter((pin) => barePlaceKey(pin.name) === bare);
+  return matches.length === 1 && placeKey(matches[0].name) === bare
+    ? matches
+    : [];
+}
+
 export function spotsOnItem(
-  item: Pick<Doc<"items">, "placePins"> | null,
-  key: string,
+  item: Pick<Doc<"items">, "placePins" | "places"> | null,
+  name: string,
 ): VisitSpot[] | undefined {
-  const spots = (item?.placePins ?? [])
-    .filter((pin) => placeKey(pin.name) === key)
-    .map(({ lat, lng, appleId }) =>
-      appleId === undefined ? { lat, lng } : { lat, lng, appleId },
-    );
+  const spots = pinsForVisit(item, name).map(({ lat, lng, appleId }) =>
+    appleId === undefined ? { lat, lng } : { lat, lng, appleId },
+  );
   return spots.length === 0 ? undefined : spots;
 }
 
@@ -186,7 +222,7 @@ export async function rowSpots(
   ctx: QueryCtx,
   row: Doc<"placeVisits">,
 ): Promise<VisitSpot[] | undefined> {
-  return row.spots ?? spotsOnItem(await ctx.db.get(row.itemId), row.key);
+  return row.spots ?? spotsOnItem(await ctx.db.get(row.itemId), row.name);
 }
 
 export async function userVisits(
@@ -212,7 +248,7 @@ export async function userVisits(
   }
   return rows.map((row) => {
     const spots =
-      row.spots ?? spotsOnItem(items.get(row.itemId) ?? null, row.key);
+      row.spots ?? spotsOnItem(items.get(row.itemId) ?? null, row.name);
     return spots === undefined
       ? { key: row.key, name: row.name }
       : { key: row.key, name: row.name, spots };

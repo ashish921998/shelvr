@@ -661,7 +661,7 @@ export async function claimListPlan(
           .map((row) => row.name),
       ]),
     ],
-    visitMarks: visits.map(({ name: _name, ...visit }) => visit),
+    visitMarks: visits,
     removed: await userRemovals(ctx, userId),
     aiAllowed: await listAiAllowed(ctx, userId, rows),
   };

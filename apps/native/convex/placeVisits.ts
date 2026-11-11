@@ -157,7 +157,9 @@ export const setVisited = authedMutation({
       throw new Error("Place name is empty");
     }
     const spots =
-      args.spot === undefined ? spotsOnItem(item, key) : [tidySpot(args.spot)];
+      args.spot === undefined
+        ? spotsOnItem(item, args.name)
+        : [tidySpot(args.spot)];
     const existing = await findVisit(ctx, userId, args.name);
     if (!args.visited) {
       await rateLimiter.limit(ctx, "placeVisitClear", {

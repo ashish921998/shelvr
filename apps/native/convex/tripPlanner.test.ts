@@ -3,6 +3,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, internal } from "./_generated/api";
+import { placeKey } from "./model/plan";
 import type { Id } from "./_generated/dataModel";
 import {
   insertConsentingUser,
@@ -337,6 +338,52 @@ describe("claimTripPlanInternal", () => {
 });
 
 describe("createTripPlan without Apple Maps", () => {
+  it.each(["pin name", "qualified mark", "legacy qualified mark"] as const)(
+    "excludes the visited branch of an address-qualified save with a %s",
+    async (variant) => {
+      const name = "Red Frog";
+      const label = "Red Frog, 12 Rua do Ouro";
+      const spot = { lat: 38.72, lng: -9.145 };
+      const { base, t, userId, itemIds } = await setup([
+        { title: label, places: [label], pins: [{ name, ...spot }] },
+        {
+          title: name,
+          places: [name],
+          pins: [{ name, lat: 38.721, lng: spot.lng, appleId: "other-branch" }],
+        },
+      ]);
+      if (variant === "legacy qualified mark") {
+        await base.run((ctx) =>
+          ctx.db.insert("placeVisits", {
+            userId,
+            itemId: itemIds[0],
+            name: label,
+            key: placeKey(label),
+            visitedAt: Date.now(),
+          }),
+        );
+      } else {
+        await t.mutation(api.placeVisits.setVisited, {
+          itemId: itemIds[0],
+          name: variant === "pin name" ? name : label,
+          visited: true,
+          spot,
+        });
+      }
+      const result = await t.action(api.tripPlanner.createTripPlan, {
+        city: "Lisbon",
+        days: 2,
+        pace: "easy",
+        interests: [],
+      });
+      const trip = await t.query(api.tripPlannerData.getTripPlan, {
+        tripId: result.tripId!,
+      });
+      const stops = [...(trip?.days.flat() ?? []), ...(trip?.unplanned ?? [])];
+      expect(stops.map((stop) => stop.itemId)).toEqual([itemIds[1]]);
+    },
+  );
+
   it("plans the pinned saves only and stores a new trip every time", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);

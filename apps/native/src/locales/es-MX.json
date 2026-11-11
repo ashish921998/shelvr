@@ -770,7 +770,7 @@
   },
   "cityProgress.markVisited": "Marcar %{name} como visitado",
   "cityProgress.unmarkVisited": "Quitar la marca de visitado de %{name}",
-  "cityProgress.rateLimited": "Acabas de marcar muchos lugares. Inténtalo de nuevo en unos minutos.",
+  "cityProgress.rateLimited": "Hiciste demasiados cambios en tus visitas. Inténtalo de nuevo en unos minutos.",
   "cityCard.share": "Compartir mapa",
   "cityCard.title": "Mi lista de %{city}",
   "cityCard.footer": "Guardado con Shelvr",
