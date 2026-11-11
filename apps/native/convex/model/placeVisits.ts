@@ -16,12 +16,9 @@ export const visitSpotValidator = v.object({
 
 export type VisitSpot = Infer<typeof visitSpotValidator>;
 
-export const visitMarkValidator = v.object({
+export const namedVisitMarkValidator = v.object({
   key: v.string(),
   spots: v.optional(v.array(visitSpotValidator)),
-});
-
-export const namedVisitMarkValidator = visitMarkValidator.extend({
   name: v.optional(v.string()),
 });
 
@@ -31,33 +28,32 @@ function samePoint(a: VisitSpot, b: VisitSpot): boolean {
   return a.lat === b.lat && a.lng === b.lng;
 }
 
-export function spotsToClear(
+export function matchesVisitSpot(
+  a: VisitSpot,
+  b: VisitSpot,
+  sameName: boolean,
+): boolean {
+  return a.appleId !== undefined && b.appleId !== undefined
+    ? a.appleId === b.appleId
+    : sameName && samePoint(a, b);
+}
+
+export function closestUnidentifiedSpot(
   kept: readonly VisitSpot[],
   spot: VisitSpot,
-  sameName: boolean,
-): VisitSpot[] {
-  const exact = kept.filter((other) =>
-    spot.appleId !== undefined && other.appleId !== undefined
-      ? spot.appleId === other.appleId
-      : sameName && samePoint(other, spot),
-  );
-  if (exact.length > 0 || !sameName) return exact;
+): VisitSpot | undefined {
   const nearby = kept
     .filter((other) => other.appleId === undefined)
     .map((other) => ({ other, km: distanceKm(other, spot) }))
     .sort((a, b) => a.km - b.km)[0];
-  return nearby && nearby.km <= SAME_PLACE_KM ? [nearby.other] : [];
+  return nearby && nearby.km <= SAME_PLACE_KM ? nearby.other : undefined;
 }
 
 export function knowsSpot(
   kept: readonly VisitSpot[],
   spot: VisitSpot,
 ): boolean {
-  return kept.some((other) =>
-    spot.appleId !== undefined && other.appleId !== undefined
-      ? spot.appleId === other.appleId
-      : samePoint(other, spot),
-  );
+  return kept.some((other) => matchesVisitSpot(other, spot, true));
 }
 
 function nearestPin<T extends Placed>(
@@ -181,7 +177,24 @@ export async function visitRows(
     .take(MAX_VISITS);
 }
 
-function barePlaceKey(name: string): string {
+export async function visitRowsWithNamePrefix(
+  ctx: QueryCtx,
+  userId: string,
+  prefix: string,
+): Promise<Doc<"placeVisits">[]> {
+  if (prefix === "") return [];
+  return await ctx.db
+    .query("placeVisits")
+    .withIndex("by_user_and_key", (q) =>
+      q
+        .eq("userId", userId)
+        .gte("key", prefix)
+        .lt("key", `${prefix}\u{10FFFF}`),
+    )
+    .take(MAX_VISITS);
+}
+
+export function barePlaceKey(name: string): string {
   return placeKey(splitSavedPlace(name).name);
 }
 

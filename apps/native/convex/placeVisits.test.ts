@@ -6,6 +6,7 @@ import { describe, expect, expectTypeOf, it } from "vitest";
 import { newConvexTest, signedInUser } from "./test.setup";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
+import { visitMatcher } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 
 const PARIS = { lat: 48.8566, lng: 2.3522 };
@@ -281,7 +282,7 @@ describe("setVisited", () => {
     });
 
     expect(await t.query(api.placeVisits.listVisits, {})).toEqual([
-      { key: "starbucks", spots: [PARIS] },
+      { key: "starbucks", name: "Starbucks", spots: [PARIS] },
     ]);
   });
 
@@ -378,7 +379,7 @@ describe("setVisited", () => {
     await mark("Tigre", true);
     await mark("Tigre", false);
     expect(await t.query(api.placeVisits.listVisits, {})).toEqual([
-      { key: "tigre", spots: [spot] },
+      { key: "tigre", name: "Tigre", spots: [spot] },
     ]);
   });
 
@@ -422,6 +423,20 @@ describe("setVisited", () => {
     expect(await visits()).toEqual([]);
   });
 
+  it.each([
+    ["Tigre", "Tigre, Alfama"],
+    ["Tigre, Alfama", "Tigre"],
+  ])(
+    "clears a spot marked as %s when undoing it as %s",
+    async (marked, pin) => {
+      const { mark, visits } = await setup();
+      await mark(pin, true, NEXT_DOOR);
+      await mark(marked, true, PARIS);
+      await mark(pin, false, PARIS);
+      expect(await visits()).toMatchObject([{ name: pin, spots: [NEXT_DOOR] }]);
+    },
+  );
+
   it("refuses a spot past the cap and keeps every earlier one", async () => {
     const { t, userId, itemId, visits, mark } = await setup();
     const spots = Array.from({ length: 20 }, (_, i) => ({
@@ -458,6 +473,32 @@ describe("setVisited", () => {
 });
 
 describe("listVisits", () => {
+  it("agrees with Home for an address-qualified legacy mark on a bare pin", async () => {
+    const { t, userId, itemId } = await setup();
+    const pin = { name: "Tigre", ...PARIS };
+    const name = "Tigre, Alfama";
+    await t.run(async (ctx) => {
+      await ctx.db.patch(itemId, {
+        cities: ["Lisbon"],
+        places: [name],
+        placePins: [pin],
+      });
+      await ctx.db.insert("placeVisits", {
+        userId,
+        itemId,
+        name,
+        key: "tigrealfama",
+        visitedAt: 1,
+      });
+    });
+
+    const visits = await t.query(api.placeVisits.listVisits, {});
+    expect(await t.query(api.items.listCities, {})).toMatchObject([
+      { city: "Lisbon", placeCount: 1, visitedCount: 1 },
+    ]);
+    expect(visitMatcher(visits, [pin])(pin)).toBe(true);
+  });
+
   it("lists only the caller's marks, with where each was made", async () => {
     const { backend, t, mark } = await setup();
     await mark("Caffé Dante", true);
@@ -465,8 +506,12 @@ describe("listVisits", () => {
     const other = await signedInUser(backend, { pro: true });
 
     expect(await t.query(api.placeVisits.listVisits, {})).toEqual([
-      { key: "shakeshack", spots: [{ ...PARIS, appleId: "P-1" }] },
-      { key: "caffedante" },
+      {
+        key: "shakeshack",
+        name: "Shake Shack",
+        spots: [{ ...PARIS, appleId: "P-1" }],
+      },
+      { key: "caffedante", name: "Caffé Dante" },
     ]);
     expect(await other.t.query(api.placeVisits.listVisits, {})).toEqual([]);
   });

@@ -4,15 +4,18 @@ import type { MutationCtx } from "./_generated/server";
 import { authedMutation, authedQuery } from "./model/auth";
 import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
 import {
+  barePlaceKey,
+  closestUnidentifiedSpot,
   findVisit,
   MAX_VISIT_SPOTS,
   knowsSpot,
+  matchesVisitSpot,
+  namedVisitMarkValidator,
   rowSpots,
-  spotsToClear,
   spotsOnItem,
   userVisits,
   visitRows,
-  visitMarkValidator,
+  visitRowsWithNamePrefix,
   type VisitSpot,
   visitSpotValidator,
 } from "./model/placeVisits";
@@ -81,41 +84,30 @@ async function markVisit(
   await ctx.db.patch(existing._id, { ...visit, spots: next });
 }
 
-async function visitsAt(
-  ctx: MutationCtx,
-  userId: Id<"users">,
-  existing: Doc<"placeVisits"> | null,
-  spot: VisitSpot,
-): Promise<Doc<"placeVisits">[]> {
-  if (spot.appleId !== undefined) return await visitRows(ctx, userId);
-  const row = existing === null ? null : await ctx.db.get(existing._id);
-  return row === null ? [] : [row];
-}
+type ClearRow = {
+  row: Doc<"placeVisits">;
+  sameName: boolean;
+  relatedName: boolean;
+  original: VisitSpot[] | undefined;
+  remaining: VisitSpot[] | undefined;
+};
 
-async function clearSpot(
-  ctx: MutationCtx,
-  clear: {
-    userId: Id<"users">;
-    key: string;
-    existing: Doc<"placeVisits"> | null;
-    spot: VisitSpot;
-  },
-): Promise<void> {
-  const { userId, key, existing, spot } = clear;
-  for (const row of await visitsAt(ctx, userId, existing, spot)) {
-    const sameName = row.key === key;
-    const kept = await rowSpots(ctx, row);
-    if (kept === undefined) {
-      if (sameName) await ctx.db.delete(row._id);
-      continue;
+function clearSpot(rows: ClearRow[], spot: VisitSpot): void {
+  let matched = false;
+  for (const entry of rows) {
+    const matches = (kept: VisitSpot) =>
+      matchesVisitSpot(kept, spot, entry.relatedName);
+    if (entry.original?.some(matches)) {
+      entry.remaining = entry.remaining?.filter((kept) => !matches(kept));
+      matched = true;
     }
-    const gone = spotsToClear(kept, spot, sameName);
-    const spots = kept.filter((spotKept) => !gone.includes(spotKept));
-    if (spots.length === 0) {
-      await ctx.db.delete(row._id);
-    } else if (gone.length > 0) {
-      await ctx.db.patch(row._id, { spots });
-    }
+  }
+  if (matched) return;
+  const named = rows.find((entry) => entry.sameName);
+  if (named?.remaining === undefined) return;
+  const nearest = closestUnidentifiedSpot(named.remaining, spot);
+  if (nearest !== undefined) {
+    named.remaining = named.remaining.filter((kept) => kept !== nearest);
   }
 }
 
@@ -123,19 +115,48 @@ async function clearVisit(
   ctx: MutationCtx,
   clear: {
     userId: Id<"users">;
+    name: string;
     key: string;
     existing: Doc<"placeVisits"> | null;
     spots: VisitSpot[] | undefined;
   },
 ): Promise<void> {
-  const { existing, spots } = clear;
+  const { userId, name, key, existing, spots } = clear;
   if (spots === undefined) {
     if (existing !== null && (await rowSpots(ctx, existing)) === undefined) {
       await ctx.db.delete(existing._id);
     }
     return;
   }
-  for (const spot of spots) await clearSpot(ctx, { ...clear, spot });
+  const bare = barePlaceKey(name);
+  const byId = spots.some((spot) => spot.appleId !== undefined);
+  const candidates = byId
+    ? await visitRows(ctx, userId)
+    : await visitRowsWithNamePrefix(ctx, userId, bare);
+  if (
+    existing !== null &&
+    !candidates.some((row) => row._id === existing._id)
+  ) {
+    candidates.push(existing);
+  }
+  const rows = await Promise.all(
+    candidates.map(async (row): Promise<ClearRow> => {
+      const sameName = row.key === key;
+      const relatedName =
+        sameName || (bare !== "" && barePlaceKey(row.name) === bare);
+      const original =
+        byId || relatedName ? await rowSpots(ctx, row) : undefined;
+      return { row, sameName, relatedName, original, remaining: original };
+    }),
+  );
+  for (const spot of spots) clearSpot(rows, spot);
+  for (const { row, sameName, original, remaining } of rows) {
+    if (remaining?.length === 0 || (original === undefined && sameName)) {
+      await ctx.db.delete(row._id);
+    } else if (remaining !== original) {
+      await ctx.db.patch(row._id, { spots: remaining });
+    }
+  }
 }
 
 export const setVisited = authedMutation({
@@ -166,7 +187,7 @@ export const setVisited = authedMutation({
         key: userId,
         throws: true,
       });
-      await clearVisit(ctx, { userId, key, existing, spots });
+      await clearVisit(ctx, { userId, name: args.name, key, existing, spots });
       return null;
     }
     await requireProEntitlement(ctx, userId);
@@ -193,9 +214,6 @@ export const setVisited = authedMutation({
 
 export const listVisits = authedQuery({
   args: {},
-  returns: v.array(visitMarkValidator),
-  handler: async (ctx) =>
-    (await userVisits(ctx, ctx.userId)).map(({ key, spots }) =>
-      spots === undefined ? { key } : { key, spots },
-    ),
+  returns: v.array(namedVisitMarkValidator),
+  handler: async (ctx) => await userVisits(ctx, ctx.userId),
 });
