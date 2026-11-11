@@ -385,6 +385,39 @@ describe("votes", () => {
     ).toBeNull();
   });
 
+  it("does not mark a second nearby branch visited in the owner's share", async () => {
+    const { t, spaceId, places, itemIds } = await setup();
+    const name = "Thalassa";
+    const visited = { lat: 37.98, lng: 23.73 };
+    const neighbour = { lat: 37.981, lng: 23.73 };
+    await t.run(async (ctx) => {
+      await ctx.db.patch(itemIds[0], {
+        places: [name],
+        placePins: [{ name, ...visited, appleId: "A" }],
+      });
+      await ctx.db.patch(itemIds[1], {
+        places: [name],
+        placePins: [{ name, ...neighbour, appleId: "B" }],
+      });
+    });
+    await t.mutation(api.planShares.createPlanShare, {
+      spaceId,
+      places: places.map((place) => ({ ...place, name })),
+    });
+    await t.mutation(api.placeVisits.setVisited, {
+      name,
+      itemId: itemIds[0],
+      visited: true,
+      spot: visited,
+    });
+
+    const share = await t.query(api.planShares.latestPlanShare, { spaceId });
+    expect(share?.places.map(({ been }) => been === true)).toEqual([
+      true,
+      false,
+    ]);
+  });
+
   it("tells the owner which shared places they marked We went", async () => {
     const { t, spaceId, places } = await setup();
     await t.mutation(api.planShares.createPlanShare, { spaceId, places });

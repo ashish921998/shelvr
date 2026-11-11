@@ -6,7 +6,7 @@ import { placeKey } from "./plan";
 import { distanceKm, otherVenue, SAME_PLACE_KM } from "./trip";
 
 export const MAX_VISIT_SPOTS = 20;
-export const MAX_VISITS = 1000;
+const MAX_VISITS = 1000;
 
 export const visitSpotValidator = v.object({
   lat: v.number(),
@@ -23,58 +23,49 @@ export const visitMarkValidator = v.object({
 
 export type VisitMark = Infer<typeof visitMarkValidator> & { name?: string };
 
-export function spotMarks(
-  spot: VisitSpot,
-  place: VisitSpot,
-  sameName: boolean,
-): boolean {
-  if (spot.appleId !== undefined && spot.appleId === place.appleId) {
-    return true;
-  }
-  return (
-    sameName &&
-    !otherVenue(spot, place) &&
-    distanceKm(spot, place) <= SAME_PLACE_KM
-  );
+function samePoint(a: VisitSpot, b: VisitSpot): boolean {
+  return a.lat === b.lat && a.lng === b.lng;
 }
 
-export function sameSpots(
+export function spotsToClear(
   kept: readonly VisitSpot[],
   spot: VisitSpot,
   sameName: boolean,
 ): VisitSpot[] {
-  if (spot.appleId === undefined) {
-    return kept.filter((spotKept) => spotMarks(spotKept, spot, sameName));
-  }
-  const exact = kept.filter((spotKept) => spotKept.appleId === spot.appleId);
-  return exact.length > 0
-    ? exact
-    : kept.filter(
-        (spotKept) =>
-          spotKept.appleId === undefined && spotMarks(spotKept, spot, sameName),
-      );
+  const exact = kept.filter((other) =>
+    spot.appleId !== undefined && other.appleId !== undefined
+      ? spot.appleId === other.appleId
+      : sameName && samePoint(other, spot),
+  );
+  if (exact.length > 0 || !sameName) return exact;
+  const nearby = kept
+    .filter((other) => other.appleId === undefined)
+    .map((other) => ({ other, km: distanceKm(other, spot) }))
+    .sort((a, b) => a.km - b.km)[0];
+  return nearby && nearby.km <= SAME_PLACE_KM ? [nearby.other] : [];
 }
 
 export function knowsSpot(
   kept: readonly VisitSpot[],
   spot: VisitSpot,
 ): boolean {
-  return spot.appleId === undefined
-    ? kept.some((spotKept) => spotMarks(spotKept, spot, true))
-    : kept.some((spotKept) => spotKept.appleId === spot.appleId);
+  return kept.some((other) =>
+    spot.appleId !== undefined && other.appleId !== undefined
+      ? spot.appleId === other.appleId
+      : samePoint(other, spot),
+  );
 }
 
 function nearestPin<T extends Placed>(
   spot: VisitSpot,
-  key: string,
   pins: readonly T[],
 ): T | undefined {
   let nearest: T | undefined;
   let nearestKm = Infinity;
   for (const pin of pins) {
-    if (placeKey(pin.name) !== key || !spotMarks(spot, pin, true)) continue;
+    if (otherVenue(spot, pin)) continue;
     const km = distanceKm(spot, pin);
-    if (km < nearestKm) {
+    if (km <= SAME_PLACE_KM && km < nearestKm) {
       nearest = pin;
       nearestKm = km;
     }
@@ -86,60 +77,73 @@ export function visitMatcher<T extends Placed>(
   visits: readonly VisitMark[],
   pins: readonly T[],
 ): (pin: T) => boolean {
-  const byKey = new Map(visits.map((visit) => [visit.key, visit]));
-  const appleIds = new Set(
-    visits.flatMap((visit) =>
-      (visit.spots ?? []).flatMap((spot) =>
-        spot.appleId === undefined ? [] : [spot.appleId],
-      ),
-    ),
-  );
-  const byApple = (pin: T) =>
-    pin.appleId !== undefined && appleIds.has(pin.appleId);
-  const open = pins.filter((pin) => !byApple(pin));
-  const claimed = new Set<T>(
-    visits.flatMap((visit) =>
-      (visit.spots ?? []).flatMap((spot) => {
-        if (spot.appleId !== undefined) return [];
-        const pin = nearestPin(spot, visit.key, open);
-        return pin === undefined ? [] : [pin];
-      }),
-    ),
-  );
+  const exact = visitAtPin(visits);
+  const pinsByName = new Map<string, T[]>();
+  for (const pin of pins) {
+    const key = placeKey(pin.name);
+    const group = pinsByName.get(key);
+    if (group) group.push(pin);
+    else pinsByName.set(key, [pin]);
+  }
+  const claimed = new Set<T>();
+  for (const visit of visits) {
+    const group = pinsByName.get(visit.key) ?? [];
+    for (const spot of visit.spots ?? []) {
+      if (spot.appleId !== undefined) continue;
+      const pin = nearestPin(spot, group);
+      if (pin !== undefined) claimed.add(pin);
+    }
+  }
+  return (pin) => exact(pin) || claimed.has(pin);
+}
+
+export function visitAtPin(
+  visits: readonly VisitMark[],
+): (pin: Placed) => boolean {
+  const names = new Set<string>();
+  const appleIds = new Set<string>();
+  const spotsByName = new Map<string, VisitSpot[]>();
+  for (const visit of visits) {
+    if (visit.spots === undefined) {
+      names.add(visit.key);
+      continue;
+    }
+    for (const spot of visit.spots) {
+      if (spot.appleId !== undefined) appleIds.add(spot.appleId);
+    }
+    const existing = spotsByName.get(visit.key);
+    if (existing) existing.push(...visit.spots);
+    else spotsByName.set(visit.key, [...visit.spots]);
+  }
   return (pin) => {
-    if (byApple(pin)) return true;
-    const visit = byKey.get(placeKey(pin.name));
-    if (visit === undefined) return false;
+    if (pin.appleId !== undefined && appleIds.has(pin.appleId)) return true;
+    const key = placeKey(pin.name);
     return (
-      visit.spots === undefined ||
-      claimed.has(pin) ||
-      visit.spots.some(
-        (spot) => spot.appleId !== undefined && spotMarks(spot, pin, true),
+      names.has(key) ||
+      (spotsByName.get(key) ?? []).some(
+        (spot) => !otherVenue(spot, pin) && samePoint(spot, pin),
       )
     );
   };
 }
 
-export function visitedNames(
-  visits: readonly VisitMark[],
-  pins: readonly Placed[],
-): string[] {
-  const visited = visitMatcher(visits, pins);
-  return [
-    ...new Set([
-      ...visits.flatMap((visit) =>
-        visit.spots === undefined ? [visit.name ?? visit.key] : [],
-      ),
-      ...pins.filter((pin) => visited(pin)).map((pin) => pin.name),
-    ]),
-  ];
+export function unscopedVisitNames(visits: readonly VisitMark[]): string[] {
+  return visits.flatMap((visit) =>
+    visit.spots === undefined ? [visit.name ?? visit.key] : [],
+  );
 }
 
 export function visitedKeysOnItem(
   visits: readonly VisitMark[],
   item: Pick<Doc<"items">, "placePins">,
 ): Set<string> {
-  return new Set(visitedNames(visits, item.placePins ?? []).map(placeKey));
+  const visited = visitAtPin(visits);
+  return new Set(
+    [
+      ...unscopedVisitNames(visits),
+      ...(item.placePins ?? []).filter(visited).map((pin) => pin.name),
+    ].map(placeKey),
+  );
 }
 
 export async function findVisit(

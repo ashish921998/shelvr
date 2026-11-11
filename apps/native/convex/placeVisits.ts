@@ -8,7 +8,7 @@ import {
   MAX_VISIT_SPOTS,
   knowsSpot,
   rowSpots,
-  sameSpots,
+  spotsToClear,
   spotsOnItem,
   userVisits,
   visitRows,
@@ -42,28 +42,41 @@ async function markVisit(
     existing: Doc<"placeVisits"> | null;
     visit: Visit;
     spots: VisitSpot[] | undefined;
+    explicit: boolean;
   },
 ): Promise<void> {
-  const { userId, key, existing, visit, spots } = mark;
+  const { userId, key, existing, visit, spots, explicit } = mark;
+  const oldSpots =
+    existing === null ? undefined : await rowSpots(ctx, existing);
+  const narrowing =
+    explicit &&
+    existing?.spots === undefined &&
+    oldSpots !== undefined &&
+    oldSpots.length > 1 &&
+    (existing?.itemId === visit.itemId ||
+      (spots?.[0] !== undefined && knowsSpot(oldSpots, spots[0])));
+  const next = narrowing ? [] : [...(oldSpots ?? [])];
+  for (const spot of spots ?? []) {
+    if (!knowsSpot(next, spot)) next.push(spot);
+  }
+  if (spots !== undefined && next.length > MAX_VISIT_SPOTS) {
+    throw new Error("Place has too many visited spots");
+  }
   if (existing === null) {
     await ctx.db.insert("placeVisits", {
       userId,
       key,
       ...visit,
-      ...(spots === undefined ? {} : { spots }),
+      ...(spots === undefined ? {} : { spots: next }),
     });
     return;
   }
   if (spots === undefined) {
-    await ctx.db.patch(existing._id, visit);
+    await ctx.db.patch(existing._id, {
+      name: visit.name,
+      visitedAt: visit.visitedAt,
+    });
     return;
-  }
-  let next = (await rowSpots(ctx, existing)) ?? [];
-  for (const spot of spots) {
-    if (!knowsSpot(next, spot)) next = [...next, spot];
-  }
-  if (next.length > MAX_VISIT_SPOTS) {
-    throw new Error("Place has too many visited spots");
   }
   await ctx.db.patch(existing._id, { ...visit, spots: next });
 }
@@ -96,7 +109,7 @@ async function clearSpot(
       if (sameName) await ctx.db.delete(row._id);
       continue;
     }
-    const gone = sameSpots(kept, spot, sameName);
+    const gone = spotsToClear(kept, spot, sameName);
     const spots = kept.filter((spotKept) => !gone.includes(spotKept));
     if (spots.length === 0) {
       await ctx.db.delete(row._id);
@@ -164,7 +177,14 @@ export const setVisited = authedMutation({
       itemId: args.itemId,
       visitedAt: Date.now(),
     };
-    await markVisit(ctx, { userId, key, existing, visit, spots });
+    await markVisit(ctx, {
+      userId,
+      key,
+      existing,
+      visit,
+      spots,
+      explicit: args.spot !== undefined,
+    });
     return null;
   },
 });

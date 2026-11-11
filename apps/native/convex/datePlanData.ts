@@ -4,7 +4,11 @@ import { internalMutation } from "./_generated/server";
 import { aiAllowed } from "./aiConsent";
 import { readyCitySaves } from "./items";
 import { requireUserId } from "./model/auth";
-import { userVisits, visitedNames } from "./model/placeVisits";
+import {
+  unscopedVisitNames,
+  userVisits,
+  visitMarkValidator,
+} from "./model/placeVisits";
 import { listPlanClaimValidator } from "./model/sharedLists";
 import { namesOneVenue } from "./model/dateRank";
 import { MAX_PLAN_ITEMS, planSourceValidator } from "./model/plan";
@@ -29,6 +33,7 @@ export const claimDatePlanInternal = internalMutation({
       city: v.string(),
       sources: v.array(planSourceValidator),
       been: v.array(v.string()),
+      visitMarks: v.array(visitMarkValidator),
       removed: v.array(removalValidator),
       pins: v.array(savedPinValidator),
       saves: v.array(
@@ -72,15 +77,14 @@ export const claimDatePlanInternal = internalMutation({
       removed,
     );
     const sources = items.map((item) => toPlanSource(item, city));
+    const visits = await userVisits(ctx, userId, items);
     return {
       from: "saves" as const,
       city,
       sources,
       removed,
-      been: visitedNames(
-        await userVisits(ctx, userId, items),
-        items.flatMap((item) => pinsForCity(item, city)),
-      ),
+      been: unscopedVisitNames(visits),
+      visitMarks: visits.map(({ name: _name, ...visit }) => visit),
       pins: items.flatMap((item) =>
         pinsForCity(item, city).map((pin) => ({
           itemId: item._id,

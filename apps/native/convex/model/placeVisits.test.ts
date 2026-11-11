@@ -91,6 +91,32 @@ describe("visitMatcher", () => {
     ).toEqual(new Set(["joscoffee"]));
   });
 
+  it("does not count a location-only mark on a second nearby save", () => {
+    const name = "Tigre";
+    const visits = [{ key: "tigre", spots: [PARIS] }];
+    expect(
+      visitedKeysOnItem(visits, {
+        placePins: [{ name, ...PARIS, appleId: "A" }],
+      }),
+    ).toEqual(new Set(["tigre"]));
+    expect(
+      visitedKeysOnItem(visits, {
+        placePins: [{ name, ...NEXT_DOOR, appleId: "B" }],
+      }),
+    ).toEqual(new Set());
+  });
+
+  it("does not move a location-only mark to the branch next door when its venue gains a scoped mark", () => {
+    const name = "Tigre";
+    const first = { name, ...PARIS, appleId: "A" };
+    const second = { name, ...NEXT_DOOR };
+    const visited = visitMatcher(
+      [{ key: "tigre", spots: [PARIS, first] }],
+      [first, second],
+    );
+    expect([visited(first), visited(second)]).toEqual([true, false]);
+  });
+
   it("ticks nothing without marks", () => {
     expect(alone([])({ name: "Blend", ...PARIS })).toBe(false);
   });

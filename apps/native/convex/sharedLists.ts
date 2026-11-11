@@ -16,7 +16,11 @@ import {
   requireUserId,
   senderFirstName,
 } from "./model/auth";
-import { userVisits, visitedNames, visitMatcher } from "./model/placeVisits";
+import {
+  unscopedVisitNames,
+  userVisits,
+  visitMatcher,
+} from "./model/placeVisits";
 import { userRemovals, visibleSave } from "./model/placeRemovals";
 import { rateLimiter } from "./model/rateLimiter";
 import {
@@ -651,12 +655,13 @@ export async function claimListPlan(
     places,
     been: [
       ...new Set([
-        ...visitedNames(visits, inCity),
+        ...unscopedVisitNames(visits),
         ...inCity
           .filter((row) => row.visitedAt !== undefined)
           .map((row) => row.name),
       ]),
     ],
+    visitMarks: visits.map(({ name: _name, ...visit }) => visit),
     removed: await userRemovals(ctx, userId),
     aiAllowed: await listAiAllowed(ctx, userId, rows),
   };

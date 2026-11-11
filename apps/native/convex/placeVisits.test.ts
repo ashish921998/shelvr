@@ -342,6 +342,86 @@ describe("setVisited", () => {
     expect((await visits())[0]?.spots).toEqual([PARIS]);
   });
 
+  it("marks and clears an unidentified branch without changing a nearby identified branch", async () => {
+    const { visits, mark } = await setup();
+    const identified = { ...PARIS, appleId: "A" };
+    await mark("Tigre", true, identified);
+    await mark("Tigre", true, NEXT_DOOR);
+    expect((await visits())[0]?.spots).toEqual([identified, NEXT_DOOR]);
+
+    await mark("Tigre", false, NEXT_DOOR);
+    expect((await visits())[0]?.spots).toEqual([identified]);
+  });
+
+  it("preserves the location of a legacy mark when an older app marks a save without pins", async () => {
+    const { t, userId, mark } = await setup();
+    const spot = { ...PARIS, appleId: "A" };
+    await t.run(async (ctx) => {
+      const sourceId = await ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Tigre",
+        tags: [],
+        searchText: "Tigre",
+        placePins: [{ name: "Tigre", ...spot }],
+      });
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId: sourceId,
+        visitedAt: 1,
+      });
+    });
+
+    await mark("Tigre", true);
+    await mark("Tigre", false);
+    expect(await t.query(api.placeVisits.listVisits, {})).toEqual([
+      { key: "tigre", spots: [spot] },
+    ]);
+  });
+
+  it("narrows an ambiguous legacy visit when one of its pins is explicitly marked", async () => {
+    const { t, userId, itemId, visits, mark } = await setup();
+    const chosen = { ...PARIS, appleId: "A" };
+    await t.run(async (ctx) => {
+      await ctx.db.patch(itemId, {
+        placePins: [
+          { name: "Tigre", ...chosen },
+          { name: "Tigre", ...LONDON },
+        ],
+      });
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+      });
+    });
+    await mark("Tigre", true, chosen);
+    expect((await visits())[0]?.spots).toEqual([chosen]);
+  });
+
+  it("refuses an older app's first mark when it would record more than 20 spots", async () => {
+    const { t, itemId, visits, mark } = await setup();
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, {
+        placePins: Array.from({ length: 21 }, (_, i) => ({
+          name: "Tigre",
+          lat: 20 + i * 0.1,
+          lng: 0,
+          appleId: String(i),
+        })),
+      }),
+    );
+    await expect(mark("Tigre", true)).rejects.toThrow(
+      "Place has too many visited spots",
+    );
+    expect(await visits()).toEqual([]);
+  });
+
   it("refuses a spot past the cap and keeps every earlier one", async () => {
     const { t, userId, itemId, visits, mark } = await setup();
     const spots = Array.from({ length: 20 }, (_, i) => ({
