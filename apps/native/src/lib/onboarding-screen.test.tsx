@@ -10,7 +10,11 @@ import {
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import OnboardingScreen from "@/app/(app)/onboarding";
 import { ahaReel, ahaReelUrl } from "@/lib/aha-reels";
-import { ONBOARDING_STEPS } from "@/lib/onboarding-steps";
+import {
+  ONBOARDING_FLOW_VERSION,
+  ONBOARDING_STEP_IDS,
+  ONBOARDING_STEPS,
+} from "@/lib/onboarding-steps";
 
 type Children = { children?: ReactNode };
 type Sample = { kind: string; city: string };
@@ -69,12 +73,22 @@ vi.mock("@/lib/onboarding", () => ({
 }));
 vi.mock("@/lib/welcome-save", () => ({ noteOnboardingFinished: vi.fn() }));
 vi.mock("@/lib/free-plan", () => ({ useFreePlanOpen: () => false }));
-vi.mock("@/lib/onboarding-paywall", () => ({
-  useOnboardingPaywall: (options: { onPro: () => void }) => {
-    mocks.paywall = options;
-    return { asked: false, ask: mocks.ask };
-  },
-}));
+vi.mock("@/lib/onboarding-paywall", async () => {
+  const { useState } = await import("react");
+  return {
+    useOnboardingPaywall: (options: { onPro: () => void }) => {
+      mocks.paywall = options;
+      const [asked, setAsked] = useState(false);
+      return {
+        asked,
+        ask: () => {
+          mocks.ask();
+          setAsked(true);
+        },
+      };
+    },
+  };
+});
 vi.mock("@/lib/pending-onboarding", () => ({
   clearPending: vi.fn(),
   getOnboardingProgress: () => mocks.progress,
@@ -180,10 +194,12 @@ vi.mock("@/components/onboarding/aha-spots", () => ({
   ),
 }));
 vi.mock("@/components/onboarding/carousel", () => ({
-  CarouselStep: vi.fn((props: { sample: Sample; onContinue: () => void }) => {
-    mocks.carousel(props);
-    return button("carousel:continue", props.onContinue);
-  }),
+  CarouselStep: vi.fn(
+    (props: { sample: Sample; leaving: boolean; onContinue: () => void }) => {
+      mocks.carousel(props);
+      return button("carousel:continue", props.onContinue);
+    },
+  ),
 }));
 vi.mock("@/components/onboarding/notifications", () => ({
   NotificationsStep: vi.fn(
@@ -373,6 +389,10 @@ it("reuses the sample for the carousel after the spots, before the paywall", asy
   });
   await act(async () => tap("carousel:continue"));
   expect(mocks.ask).not.toHaveBeenCalled();
+  expect(mocks.capture).toHaveBeenCalledWith(
+    "onboarding_step_completed",
+    expect.objectContaining({ step_id: "carousel", skipped: false }),
+  );
   expect(mocks.notifications.mock.lastCall?.[0].sample).toMatchObject({
     kind: "trip",
     city: "lisbon",
@@ -393,6 +413,31 @@ it.each(["granted", "blocked"] as const)(
     expect(mocks.notifications).not.toHaveBeenCalled();
   },
 );
+
+it("shows the carousel as leaving once its Continue asks for the paywall", async () => {
+  mocks.permission.mockResolvedValue("blocked");
+  startAt("carousel");
+  render(<OnboardingScreen />);
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(false);
+  await act(async () => tap("carousel:continue"));
+  expect(mocks.ask).toHaveBeenCalledTimes(1);
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(true);
+});
+
+it("shows the carousel as leaving while it reads the notifications answer", async () => {
+  let answer: (value: "blocked") => void = () => undefined;
+  mocks.permission.mockImplementation(
+    () => new Promise((resolve) => (answer = resolve)),
+  );
+  startAt("carousel");
+  render(<OnboardingScreen />);
+  tap("carousel:continue");
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(true);
+  expect(mocks.ask).not.toHaveBeenCalled();
+  await act(async () => answer("blocked"));
+  expect(mocks.ask).toHaveBeenCalledTimes(1);
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(true);
+});
 
 it("opens the paywall when the permission cannot be read", async () => {
   mocks.permission.mockRejectedValue(new Error("no"));
@@ -430,11 +475,31 @@ it("ignores an answer from an earlier carousel visit", async () => {
   tap("carousel:continue");
   tap("common.back");
   tap("aha:spots");
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(false);
   await act(async () => answer("granted"));
   expect(mocks.ask).not.toHaveBeenCalled();
   expect(
     screen.getByRole("button", { name: "carousel:continue" }),
   ).toBeTruthy();
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(false);
+});
+
+it("keeps a later visit's Continue busy when an earlier visit's answer lands", async () => {
+  const answers: ((value: "blocked") => void)[] = [];
+  mocks.permission.mockImplementation(
+    () => new Promise((resolve) => answers.push(resolve)),
+  );
+  startAt("carousel");
+  render(<OnboardingScreen />);
+  tap("carousel:continue");
+  tap("common.back");
+  tap("aha:spots");
+  tap("carousel:continue");
+  await act(async () => answers[0]?.("blocked"));
+  expect(mocks.ask).not.toHaveBeenCalled();
+  expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(true);
+  await act(async () => answers[1]?.("blocked"));
+  expect(mocks.ask).toHaveBeenCalledTimes(1);
 });
 
 it("returns from the notifications step to the same carousel without opening the paywall", () => {
@@ -514,6 +579,14 @@ it.each([
   render(<OnboardingScreen />);
   tap("onboardingQ.skip");
   expect(screen.getByRole("button", { name: next })).toBeTruthy();
+  expect(mocks.capture).toHaveBeenCalledWith(
+    "onboarding_step_completed",
+    expect.objectContaining({
+      step_id: ONBOARDING_STEP_IDS[step],
+      flow_version: ONBOARDING_FLOW_VERSION,
+      skipped: true,
+    }),
+  );
 });
 
 it("offers no Skip on the opener", () => {
@@ -530,13 +603,14 @@ it("goes past the first-save moment to the spots when sharing is skipped, and ba
     step: ONBOARDING_STEPS.indexOf("ahaSpots"),
     skippedShare: true,
   });
-  expect(
-    mocks.capture.mock.calls.filter(
-      ([event, properties]) =>
-        event === "onboarding_step_completed" &&
-        properties.step_id === "aha_share",
-    ),
-  ).toHaveLength(1);
+  const completions = mocks.capture.mock.calls.filter(
+    ([event, properties]) =>
+      event === "onboarding_step_completed" &&
+      properties.step_id === "aha_share",
+  );
+  expect(completions).toEqual([
+    ["onboarding_step_completed", expect.objectContaining({ skipped: true })],
+  ]);
   relaunch();
   tap("common.back");
   expect(screen.getByRole("button", { name: "aha:share" })).toBeTruthy();
@@ -569,15 +643,25 @@ it("hides Skip on the notifications step while iOS is asking", () => {
   expect(screen.queryByRole("button", { name: "onboardingQ.skip" })).toBeNull();
 });
 
-it("leaves the carousel the way Continue does when it is skipped", async () => {
-  startAt("carousel");
-  render(<OnboardingScreen />);
-  await act(async () => tap("onboardingQ.skip"));
-  expect(mocks.ask).not.toHaveBeenCalled();
-  expect(
-    screen.getByRole("button", { name: "notifications:continue" }),
-  ).toBeTruthy();
-});
+it.each(["ask", "granted"] as const)(
+  "records carousel Skip when notification permission is %s",
+  async (state) => {
+    mocks.permission.mockResolvedValue(state);
+    startAt("carousel");
+    render(<OnboardingScreen />);
+    await act(async () => tap("onboardingQ.skip"));
+    expect(mocks.ask).toHaveBeenCalledTimes(state === "ask" ? 0 : 1);
+    if (state === "ask") {
+      expect(
+        screen.getByRole("button", { name: "notifications:continue" }),
+      ).toBeTruthy();
+    }
+    expect(mocks.capture).toHaveBeenCalledWith(
+      "onboarding_step_completed",
+      expect.objectContaining({ step_id: "carousel", skipped: true }),
+    );
+  },
+);
 
 it("opens the paywall and reports a skip when the notifications step is skipped", () => {
   startAt("notifications");
@@ -588,6 +672,10 @@ it("opens the paywall and reports a skip when the notifications step is skipped"
     action: "skip",
     granted: false,
   });
+  expect(mocks.capture).toHaveBeenCalledWith(
+    "onboarding_step_completed",
+    expect.objectContaining({ step_id: "notification_ask", skipped: true }),
+  );
 });
 
 it("sends the first-save view when someone skipped sharing, closed the app, then shared after all", () => {

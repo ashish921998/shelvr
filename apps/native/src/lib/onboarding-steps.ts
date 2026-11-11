@@ -11,7 +11,7 @@ export const ONBOARDING_STEPS = [
   "carousel",
   "notifications",
 ] as const;
-export const ONBOARDING_FLOW_VERSION = 25;
+export const ONBOARDING_FLOW_VERSION = 26;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 

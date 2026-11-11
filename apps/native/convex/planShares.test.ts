@@ -133,6 +133,44 @@ describe("createPlanShare", () => {
   });
 });
 
+describe("getPublicPlanShare", () => {
+  it("shows a saved link's cover image but never a photo save", async () => {
+    const { backend, t, userId, spaceId, itemIds, places } = await setup();
+    const photoId = await t.run(async (ctx) => {
+      const cover = await ctx.storage.store(new Blob(["cover image"]));
+      const photo = await ctx.storage.store(new Blob(["private photo"]));
+      await ctx.db.patch(itemIds[0], { storageId: cover });
+      return await ctx.db.insert("items", {
+        userId,
+        type: "image",
+        status: "ready",
+        title: "Beach shack",
+        storageId: photo,
+        tags: [],
+        searchText: "Beach shack",
+      });
+    });
+    const token = await t.mutation(api.planShares.createPlanShare, {
+      spaceId,
+      places: [places[0], { name: "Beach shack", why: "", itemId: photoId }],
+    });
+
+    const share = await backend.query(internal.planShares.getPublicPlanShare, {
+      token,
+    });
+    expect(share?.places).toEqual([
+      {
+        key: "p0",
+        name: "Thalassa",
+        area: "Vagator",
+        why: "Sunset dinner",
+        imageUrl: expect.any(String),
+      },
+      { key: "p1", name: "Beach shack", why: "" },
+    ]);
+  });
+});
+
 describe("votes", () => {
   it("keeps one answer per visitor and tallies them for the owner", async () => {
     const { backend, t, spaceId, places } = await setup();

@@ -2,8 +2,6 @@ import { afterEach, test } from "@e2e-dev/mobile";
 import { expect, type Locator, type Screen } from "e2e";
 
 import {
-  SHARE_ON_REEL,
-  relaunchWith,
   shareTheSampleReel,
   startFreshOnboarding,
   walkToSampleReel,
@@ -33,16 +31,9 @@ test(
   "asks for the paywall at the end of onboarding, and a close keeps it there",
   { retries: 0, timeout: 600_000 },
   async ({ device, screen }) => {
-    await startFreshOnboarding({ device, screen });
+    const hidePro = ["-E2EHidePro", "YES"];
+    await startFreshOnboarding({ device, screen }, hidePro);
     await walkToSampleReel(screen);
-
-    const share = screen.getByRole("button", SHARE_ON_REEL);
-    await relaunchWith(
-      device,
-      screen,
-      [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
-      () => share.isVisible(),
-    );
 
     await shareTheSampleReel(screen);
     // The carousel's last Continue moves on to the paywall; closing returns to that slide.
@@ -61,7 +52,7 @@ test(
 
     await device.openApp(BUNDLE_ID, {
       relaunch: true,
-      launchArguments: [...LAUNCH_ARGUMENTS, "-E2EHidePro", "YES"],
+      launchArguments: [...LAUNCH_ARGUMENTS, ...hidePro],
     });
     await expect(lastSlide).toBeVisible({ timeout: 180_000 });
     await expect(screen.getByTestId("SplashScreenLogo")).toBeHidden({
