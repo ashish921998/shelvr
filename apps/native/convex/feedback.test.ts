@@ -469,23 +469,15 @@ describe("delivery snapshot ownership", () => {
     expect(row?.deliveryRequestBody).toBeUndefined();
     expect(fetch).not.toHaveBeenCalled();
   });
-  it("migrates an earlier request snapshot without rebuilding it", async () => {
+  it("clears the request snapshot once delivered", async () => {
     const t = setup();
     const submissionId = await insertSubmission(t, {});
-    const body = JSON.stringify({
-      from: SENDER,
-      to: INBOX,
-      subject: "old",
-      text: "original",
-    });
-    await t.run((ctx) => ctx.db.patch(submissionId, { deliveryEmail: body }));
     const claimed = await t.mutation(internal.feedback.claimDelivery, {
       submissionId,
     });
-    expect(claimed).toEqual({ attempt: 1, body });
-    const row = await getSubmission(t, submissionId);
-    expect(row?.deliveryRequestBody).toBe(body);
-    expect(row?.deliveryEmail).toBeUndefined();
+    expect((await getSubmission(t, submissionId))?.deliveryRequestBody).toBe(
+      claimed?.body,
+    );
     await t.mutation(internal.feedback.finishDelivery, {
       submissionId,
       attempt: 1,
@@ -493,7 +485,6 @@ describe("delivery snapshot ownership", () => {
     });
     const delivered = await getSubmission(t, submissionId);
     expect(delivered?.deliveryRequestBody).toBeUndefined();
-    expect(delivered?.deliveryEmail).toBeUndefined();
   });
 
   it("clears snapshots when a failed attempt exhausts delivery", async () => {
@@ -509,7 +500,6 @@ describe("delivery snapshot ownership", () => {
       attempts: MAX_DELIVERY_ATTEMPTS,
     });
     expect(row?.deliveryRequestBody).toBeUndefined();
-    expect(row?.deliveryEmail).toBeUndefined();
     expect(
       await t.query(internal.feedback.listSubmissionsNeedingDelivery, {}),
     ).not.toContain(submissionId);

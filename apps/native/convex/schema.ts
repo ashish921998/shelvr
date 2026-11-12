@@ -277,8 +277,6 @@ export default defineSchema({
     deliveryLeaseUntil: v.optional(v.number()),
     deliveryStartedAt: v.optional(v.number()),
     deliveryRequestBody: v.optional(v.string()),
-    // Persisted under the old name; claims migrate it and terminal outcomes clear it.
-    deliveryEmail: v.optional(v.string()),
   })
     .index("by_user", ["userId"])
     .index("by_status_attempts", ["status", "attempts"]),

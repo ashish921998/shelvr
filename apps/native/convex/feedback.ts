@@ -32,7 +32,6 @@ const RETRY_SCAN = 100;
 const MAX_CONTEXT_LENGTH = 64;
 const CLEARED_DELIVERY = {
   deliveryRequestBody: undefined,
-  deliveryEmail: undefined,
   deliveryLeaseUntil: undefined,
 };
 
@@ -171,15 +170,12 @@ export const claimDelivery = internalMutation({
     }
     const attempt = row.attempts + 1;
     const body =
-      row.deliveryRequestBody ??
-      row.deliveryEmail ??
-      feedbackEmailBody(config, row, user.email);
+      row.deliveryRequestBody ?? feedbackEmailBody(config, row, user.email);
     await ctx.db.patch(args.submissionId, {
       attempts: attempt,
       deliveryLeaseUntil: now + DELIVERY_LEASE_MS,
       deliveryStartedAt: row.deliveryStartedAt ?? now,
       deliveryRequestBody: body,
-      deliveryEmail: undefined,
     });
     return { attempt, body };
   },
