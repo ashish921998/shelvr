@@ -165,33 +165,44 @@ async function seedFixtures(
   ctx: MutationCtx,
   userId: Id<"users">,
 ): Promise<{ items: number; spaces: number; memberships: number }> {
-  const [memberships, operations, items, spaces, subscriptions, removals] =
-    await Promise.all([
-      ctx.db
-        .query("spaceItems")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .take(RESET_LIMIT + 1),
-      ctx.db
-        .query("itemOperations")
-        .withIndex("by_user_operation", (q) => q.eq("userId", userId))
-        .take(RESET_LIMIT + 1),
-      ctx.db
-        .query("items")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .take(RESET_LIMIT + 1),
-      ctx.db
-        .query("spaces")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .take(RESET_LIMIT + 1),
-      ctx.db
-        .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .take(2),
-      ctx.db
-        .query("placeRemovals")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .take(RESET_LIMIT + 1),
-    ]);
+  const [
+    memberships,
+    operations,
+    items,
+    spaces,
+    subscriptions,
+    removals,
+    visits,
+  ] = await Promise.all([
+    ctx.db
+      .query("spaceItems")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
+      .query("itemOperations")
+      .withIndex("by_user_operation", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
+      .query("items")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
+      .query("spaces")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(2),
+    ctx.db
+      .query("placeRemovals")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
+      .query("placeVisits")
+      .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+  ]);
 
   for (const [name, count] of [
     ["memberships", memberships.length],
@@ -199,6 +210,7 @@ async function seedFixtures(
     ["items", items.length],
     ["spaces", spaces.length],
     ["removals", removals.length],
+    ["visits", visits.length],
   ] as const) {
     if (count > RESET_LIMIT) {
       throw new Error(
@@ -222,6 +234,7 @@ async function seedFixtures(
   }
 
   for (const row of removals) await ctx.db.delete(row._id);
+  for (const row of visits) await ctx.db.delete(row._id);
   for (const row of memberships) await ctx.db.delete(row._id);
   for (const row of operations) await ctx.db.delete(row._id);
   for (const row of items) await ctx.db.delete(row._id);
@@ -319,6 +332,40 @@ async function seedFixtures(
     });
   }
 
+  await ctx.db.insert("items", {
+    userId,
+    fixtureKey: "houston-eats",
+    title: "Houston eats",
+    type: "link",
+    status: "ready",
+    url: "https://example.com/places/houston-eats",
+    tags: ["food"],
+    cities: ["Houston"],
+    places: ["Lucy's", "Marlowe's"],
+    placeCuisines: [
+      { name: "Lucy's", cuisine: "burger" },
+      { name: "Marlowe's", cuisine: "cocktails" },
+    ],
+    placePins: [
+      {
+        name: "Lucy's",
+        lat: 29.7499,
+        lng: -95.3584,
+        city: "Houston",
+        category: "Restaurant",
+        cuisine: "burger",
+      },
+      {
+        name: "Marlowe's",
+        lat: 29.7604,
+        lng: -95.3698,
+        city: "Houston",
+        cuisine: "cocktails",
+      },
+    ],
+    searchText: "Houston eats Houston Lucy's Marlowe's",
+  });
+
   const recipesId = await ctx.db.insert("spaces", {
     userId,
     fixtureKey: "recipes",
@@ -374,7 +421,7 @@ async function seedFixtures(
     updatedAt: Date.now(),
   });
 
-  return { items: 6, spaces: 3, memberships: 4 };
+  return { items: 7, spaces: 3, memberships: 4 };
 }
 
 async function fixtureItem(

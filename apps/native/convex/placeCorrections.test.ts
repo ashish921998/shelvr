@@ -53,6 +53,26 @@ describe("place corrections", () => {
       t.query(api.items.getItem, { id: itemId }),
     ).resolves.not.toBeNull();
   });
+  it("hides pin cuisines from the editor and drops the save's cuisines on save", async () => {
+    const { base, t, itemId } = await setup();
+    await base.run((ctx) =>
+      ctx.db.patch(itemId, {
+        placeCuisines: [{ name: original.name, cuisine: "burger" }],
+        placePins: [{ ...original, cuisine: "burger" }],
+      }),
+    );
+    const data = await t.query(api.placeCorrections.getPlaces, { itemId });
+    if (!data) throw new Error("Missing save");
+    expect(data.places).toEqual([original]);
+    await t.mutation(api.placeCorrections.savePlaces, {
+      itemId,
+      version: data.version,
+      places: [{ ...original, name: "Renamed" }],
+    });
+    const item = await base.run((ctx) => ctx.db.get(itemId));
+    expect(item?.placeCuisines).toBeUndefined();
+    expect(item?.placePins).toEqual([{ ...original, name: "Renamed" }]);
+  });
   it("keeps removals through a delayed pin lookup and reprocessing", async () => {
     const { base, t, itemId, data } = await setup();
     await t.mutation(api.placeCorrections.savePlaces, {

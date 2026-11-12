@@ -16,9 +16,12 @@ import {
   requireUserId,
   senderFirstName,
 } from "./model/auth";
-import { recentVisits } from "./model/placeVisits";
+import {
+  unscopedVisitNames,
+  userVisits,
+  visitMatcher,
+} from "./model/placeVisits";
 import { userRemovals, visibleSave } from "./model/placeRemovals";
-import { placeKey } from "./model/plan";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   departMember,
@@ -632,10 +635,10 @@ export async function claimListPlan(
   const inCity = (await listPlaces(ctx, list._id)).filter(
     (row) => cityKey(row.city) === wanted,
   );
-  const visited = await recentVisits(ctx, userId);
-  const skipped = new Set(visited.map(placeKey));
+  const visits = await userVisits(ctx, userId);
+  const visited = visitMatcher(visits, inCity);
   const rows = inCity.filter(
-    (row) => row.visitedAt === undefined && !skipped.has(placeKey(row.name)),
+    (row) => row.visitedAt === undefined && !visited(row),
   );
   if (options.needsPlaces && rows.length === 0) {
     throw new Error("No places in this city");
@@ -659,12 +662,13 @@ export async function claimListPlan(
     places,
     been: [
       ...new Set([
-        ...visited,
+        ...unscopedVisitNames(visits),
         ...inCity
           .filter((row) => row.visitedAt !== undefined)
           .map((row) => row.name),
       ]),
     ],
+    visitMarks: visits,
     removed: await userRemovals(ctx, userId),
     aiAllowed: await listAiAllowed(ctx, userId, rows),
   };

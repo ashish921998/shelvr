@@ -30,6 +30,7 @@ export function PlaceMapScreen<Row extends { id: string }>({
   footer,
   plans,
   children,
+  visited,
 }: {
   pins: CityPin[];
   visible?: number;
@@ -44,6 +45,7 @@ export function PlaceMapScreen<Row extends { id: string }>({
   footer?: ReactElement;
   plans: ReactNode;
   children?: ReactNode;
+  visited?: ReadonlySet<string>;
 }) {
   const { theme, rt } = useUnistyles();
   const list = useRef<FlatList<Row>>(null);
@@ -94,6 +96,7 @@ export function PlaceMapScreen<Row extends { id: string }>({
             height={screenHeight}
             coveredBottom={screenHeight - snaps.middle}
             onSelect={select}
+            visited={visited}
           />
         </View>
       ) : null}

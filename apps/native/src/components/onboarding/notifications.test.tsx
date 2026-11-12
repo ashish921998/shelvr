@@ -95,12 +95,15 @@ const sample = {
   spots: [{ name: "Eberly" }, { name: "Jo's" }, { name: "Barton Springs" }],
 } as unknown as AhaSample;
 
+const onAsking = vi.fn();
+
 function renderStep(leaving = false) {
   const onContinue = vi.fn();
   render(
     <NotificationsStep
       sample={sample}
       leaving={leaving}
+      onAsking={onAsking}
       onContinue={onContinue}
     />,
   );
@@ -111,6 +114,7 @@ beforeEach(() => {
   mock.request.mockReset();
   mock.capture.mockReset();
   mock.captureError.mockReset();
+  onAsking.mockReset();
 });
 afterEach(cleanup);
 
@@ -183,6 +187,7 @@ it("drops the answer when Back left the screen while iOS was asking", async () =
     <NotificationsStep
       sample={sample}
       leaving={false}
+      onAsking={onAsking}
       onContinue={onContinue}
     />,
   );
@@ -211,4 +216,17 @@ it("holds both buttons while the paywall opens", () => {
     true,
   );
   expect(screen.getByText("common.notNow")).toHaveProperty("disabled", true);
+});
+
+it("says it is asking while iOS answers, and stops saying so once it moves on", async () => {
+  let answer: (granted: boolean) => void = () => undefined;
+  mock.request.mockImplementation(
+    () => new Promise((resolve) => (answer = resolve)),
+  );
+  const onContinue = renderStep();
+  fireEvent.click(screen.getByText("onboardingNotify.allow"));
+  expect(onAsking).toHaveBeenLastCalledWith(true);
+  await act(async () => answer(true));
+  expect(onContinue).toHaveBeenCalledTimes(1);
+  expect(onAsking).toHaveBeenLastCalledWith(false);
 });

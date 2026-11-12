@@ -6,12 +6,7 @@ import {
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import type { SaveSource } from "@convex/model/saveSource";
 import type { SaveFailureStage } from "@convex/model/saveErrors";
-import type {
-  Goal,
-  Planner,
-  SavedCount,
-  TripSoon,
-} from "@/lib/onboarding-goals";
+import type { Goal, SavedCount } from "@/lib/onboarding-goals";
 import type { SampleCityId } from "@/lib/sample-cities";
 import Constants from "expo-constants";
 
@@ -83,6 +78,7 @@ export type AnalyticsEventProperties = {
     step_index: number;
     flow_version: number;
     duration_ms: number;
+    skipped: boolean;
   };
   onboarding_opener_page_viewed: { page_index: number };
   onboarding_notifications: { action: "allow" | "skip"; granted: boolean };
@@ -197,6 +193,8 @@ export type AnalyticsEventProperties = {
   };
   trip_failed: { reason: "error" };
   city_opened: { count: number };
+  city_place_visited: { visited: boolean };
+  city_card_share_sheet_opened: { place_count: number; visited_count: number };
   map_opened: { count: number; located: boolean };
   map_filter_selected: { kind: string };
   map_place_opened: { card: boolean };
@@ -258,8 +256,6 @@ export type AnalyticsEventProperties = {
     goal: Goal | null;
     goals: Goal[];
     saved_count: SavedCount | null;
-    planner: Planner | null;
-    trip_soon: TripSoon | null;
     space_count: number;
     space_names: string[];
     custom_space_count: number;
