@@ -179,9 +179,11 @@ async function clearVisit(
     if (remaining?.length === 0 || (original === undefined && sameName)) {
       await ctx.db.delete(row._id);
     } else if (remaining !== original) {
-      const kept = stampPlacesFor(row.stampPlaces, remaining ?? []).filter(
-        (place) => place !== undefined,
-      );
+      const assigned = stampPlacesFor(row.stampPlaces, original ?? []);
+      const kept = (original ?? []).flatMap((spot, index) => {
+        const place = assigned[index];
+        return place !== undefined && remaining?.includes(spot) ? [place] : [];
+      });
       await ctx.db.patch(row._id, {
         spots: remaining,
         ...(row.stampPlaces === undefined ? {} : { stampPlaces: kept }),

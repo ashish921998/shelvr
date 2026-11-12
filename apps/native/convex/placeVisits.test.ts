@@ -1142,6 +1142,36 @@ describe("the passport", () => {
     expect(lookups()).toBe(1);
   });
 
+  it("keeps a corrected branch's own country when a nearby branch is cleared", async () => {
+    const { t, userId, itemId, visits } = await passportSetup();
+    const oldBranch = { lat: PIN.lat + 0.0018, lng: PIN.lng };
+    const corrected = { ...PIN, lat: PIN.lat + 0.00045 };
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        stampPlaces: [
+          { lat: PIN.lat, lng: PIN.lng, city: "Lisbon", countryCode: "ES" },
+          { ...oldBranch, city: "Lisbon", countryCode: "FR" },
+        ],
+      });
+      await ctx.db.patch(itemId, { placePins: [PIN, corrected] });
+    });
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+      spot: { lat: PIN.lat, lng: PIN.lng },
+    });
+    const [visit] = await visits();
+    expect(visit?.stampPlaces).toEqual([
+      expect.objectContaining({ countryCode: "FR" }),
+    ]);
+  });
+
   it("stores no country once the account is being deleted", async () => {
     const { t, userId, itemId, visits } = await passportSetup();
     await t.mutation(api.placeVisits.setVisited, {
