@@ -619,6 +619,41 @@ describe("the passport", () => {
     vi.useRealTimers();
   });
 
+  it("still lists every stamp when its saves are too large to read", async () => {
+    const { t, userId, stamps } = await passportSetup();
+    const count = 50;
+    await t.run(async (ctx) => {
+      for (let i = 0; i < count; i++) {
+        const spot = { lat: 38 + i / 100, lng: -9 };
+        const itemId = await ctx.db.insert("items", {
+          userId,
+          type: "link",
+          status: "ready",
+          title: `Place ${i}`,
+          tags: [],
+          searchText: "x".repeat(100_000),
+          cities: ["Lisbon"],
+          heroImageUrl: "https://example.com/cover.jpg",
+          placePins: [{ name: `Place ${i}`, ...spot }],
+        });
+        await ctx.db.insert("placeVisits", {
+          userId,
+          key: placeKey(`Place ${i}`),
+          name: `Place ${i}`,
+          itemId,
+          visitedAt: i + 1,
+          spots: [spot],
+          stampPlaces: [{ ...spot, city: "Lisbon", countryCode: "PT" }],
+        });
+      }
+    });
+    const listed = await stamps();
+    expect(listed).toHaveLength(count);
+    expect(listed.every((stamp) => stamp.countryCode === "PT")).toBe(true);
+    expect(listed[0]?.cover).toBe("https://example.com/cover.jpg");
+    expect(listed.at(-1)?.cover).toBeNull();
+  });
+
   it("backfills the pin and country of a mark made before the Passport", async () => {
     const lookups = await withMaps();
     const { t, userId, itemId, stamps } = await passportSetup();

@@ -18,6 +18,7 @@ import {
 import { authedMutation, authedQuery, liveOwner } from "./model/auth";
 import { linkSource } from "./model/externalUrl";
 import { logEvent } from "./model/log";
+import { approximateDocBytes } from "./model/readBudget";
 import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
 import {
   barePlaceKey,
@@ -240,6 +241,7 @@ export const listVisits = authedQuery({
 
 const MAX_BATCH_PLACES = 60;
 const MAX_PASSPORT_STAMPS = 500;
+const PASSPORT_SAVE_BYTES = 4 * 1024 * 1024;
 const MAX_UNSTAMPED_PLACES = 200;
 const COUNTRY_SPACING_MS = 1_000;
 const COUNTRY_RETRY_MS = 60_000;
@@ -456,15 +458,18 @@ export const getPassport = authedQuery({
       0,
       MAX_PASSPORT_STAMPS,
     );
-    const itemIds = [...new Set(rows.map((row) => row.itemId))];
-    const saves = new Map(
-      await Promise.all(
-        itemIds.map(async (itemId) => {
-          const owned = await ownedSave(ctx, ctx.userId, itemId);
-          return [itemId, { owned, cover: await coverOf(ctx, owned) }] as const;
-        }),
-      ),
-    );
+    const saves = new Map<
+      Id<"items">,
+      { owned: Doc<"items"> | null; cover: string | null }
+    >();
+    let bytes = 0;
+    for (const { itemId } of rows) {
+      if (saves.has(itemId)) continue;
+      if (bytes >= PASSPORT_SAVE_BYTES) break;
+      const owned = await ownedSave(ctx, ctx.userId, itemId);
+      bytes += approximateDocBytes(owned);
+      saves.set(itemId, { owned, cover: await coverOf(ctx, owned) });
+    }
     const stamps: Infer<typeof stampValidator>[] = [];
     for (const row of rows) {
       const { owned, cover } = saves.get(row.itemId) ?? {
