@@ -22,8 +22,10 @@ Without it, links stay plain and nothing is attributed.
   landing URL, kept for the browser session. Give each creator, ad set or post
   its own link, for example `https://shelvr-web.vercel.app/?ct=tiktok_jane`.
 - A visitor with no campaign gets `web_<button>` (`web_hero`, `web_header`,
-  `web_footer`, `web_footer-nav`, `web_oracle`). The share preview page uses
-  `share`.
+  `web_footer`, `web_footer-nav`, `web_oracle`, `web_place_tool` for the reel
+  place finder's results card, `web_place_banner` for the finder's phone
+  banner, `web_bio` for the bio page and `web_plan` for the plan vote page).
+  The share preview page uses `share`.
 - Campaigns are lowercased and reduced to `a-z 0-9 _ -`, at most 40 characters.
 
 **Installs, first opens and paying users per campaign** are in App Store
@@ -243,6 +245,75 @@ ORDER BY started DESC
 ```
 
 Store clicks from the page are `app_store_clicked` with `source = 'oracle'`.
+
+## 6. The landing page and the finder: who clicks through
+
+The landing page's buttons (`source` `header`, `hero` and `footer`) and the
+reel place finder's results card (`source = place_tool`) are read per browser:
+`distinct_id`, the site's `shelvr_web_distinct_id`. Clicks per page view would
+mislead. One view can send several clicks (the header, hero and footer
+buttons, or a second click after a return from the App Store), and the views
+of one browser are not independent trials.
+
+`$pageview` carries `$pathname`, but a click carries only `$current_url`, so
+the root is matched with a regex. Match the URL as well as the source: `/apple`
+also sends `header` and `hero`.
+
+**Landing click-through per browser**: of the browsers with a `$pageview` on
+`/`, the share that clicked a store button there. Replace the two bounds with
+the window's start and end.
+
+```sql
+SELECT count() AS browsers,
+  countIf(clicked) AS clicked_browsers,
+  round(clicked_browsers / browsers, 4) AS click_through
+FROM (
+  SELECT distinct_id,
+    countIf(event = '$pageview') > 0 AS landed,
+    countIf(event = 'app_store_clicked') > 0 AS clicked
+  FROM events
+  WHERE timestamp >= toDateTime('<window start>')
+    AND timestamp < toDateTime('<window end>')
+    AND (
+      (event = '$pageview' AND properties.$pathname = '/')
+      OR (event = 'app_store_clicked'
+        AND properties.source IN ('header', 'hero', 'footer')
+        AND match(properties.$current_url, '^https?://[^/]+/$'))
+    )
+  GROUP BY distinct_id
+)
+WHERE landed
+```
+
+**Finder click-through per browser**: of the browsers that saw a result with
+places (`place_tool_result` with `count > 0`) or the sample
+(`place_tool_sample_opened`), the share that clicked the results card. Same
+bounds.
+
+```sql
+SELECT count() AS browsers,
+  countIf(clicked) AS clicked_browsers,
+  round(clicked_browsers / browsers, 4) AS click_through
+FROM (
+  SELECT distinct_id,
+    countIf(event != 'app_store_clicked') > 0 AS shown,
+    countIf(event = 'app_store_clicked') > 0 AS clicked
+  FROM events
+  WHERE timestamp >= toDateTime('<window start>')
+    AND timestamp < toDateTime('<window end>')
+    AND (
+      (event = 'place_tool_result' AND toFloat(properties.count) > 0)
+      OR event = 'place_tool_sample_opened'
+      OR (event = 'app_store_clicked' AND properties.source = 'place_tool')
+    )
+  GROUP BY distinct_id
+)
+WHERE shown
+```
+
+To read a change to either page, compare whole weeks before and after its
+deploy (four on each side), and report the difference as a direction, not an
+effect: the season and the campaigns move too.
 
 ## Not measured yet
 

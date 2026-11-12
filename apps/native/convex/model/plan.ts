@@ -270,6 +270,7 @@ export function sanitizePicks<T extends RawPlanPlace>(
   sources: PlanSource[],
   been: ReadonlySet<string>,
   limit: number,
+  { distinctSaves = false } = {},
 ): { pick: T; place: PlanPlace }[] {
   const kept: { pick: T; place: PlanPlace }[] = [];
   const seen = new Set<string>();
@@ -280,11 +281,12 @@ export function sanitizePicks<T extends RawPlanPlace>(
     const evidence = evidenceOf(source);
     const name = withoutAddress(clip(pick.name, MAX_NAME_CHARS), evidence);
     const key = squash(name);
-    if (key === "" || seen.has(key)) continue;
+    const seenKey = distinctSaves ? `${source.itemId}:${key}` : key;
+    if (key === "" || seen.has(seenKey)) continue;
     if (!namesPlace(name, evidence)) continue;
     const why = clip(pick.why, MAX_WHY_CHARS);
     if (why === "") continue;
-    seen.add(key);
+    seen.add(seenKey);
     const area = groundedArea(clip(pick.area, MAX_AREA_CHARS), evidence);
     kept.push({
       pick,
@@ -469,6 +471,7 @@ export function suggestSavedPlaces(
   sources: PlanSource[],
   been: ReadonlySet<string>,
   limit: number,
+  { distinctSaves = false } = {},
 ): PlanPlace[] {
   const raw = sources.flatMap((source, index) =>
     source.places
@@ -483,9 +486,9 @@ export function suggestSavedPlaces(
         };
       }),
   );
-  const candidates = sanitizePicks(raw, sources, new Set(), raw.length).map(
-    ({ place }) => place,
-  );
+  const candidates = sanitizePicks(raw, sources, new Set(), raw.length, {
+    distinctSaves,
+  }).map(({ place }) => place);
   return shuffled(uniqueUnvisitedPlaces(candidates, sources, been)).slice(
     0,
     limit,

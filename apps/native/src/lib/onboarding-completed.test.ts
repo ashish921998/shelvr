@@ -29,8 +29,6 @@ describe("onboardingCompletedProperties", () => {
       goal: null,
       goals: [],
       saved_count: null,
-      planner: null,
-      trip_soon: null,
       $set: { save_pileup: [] },
     });
   });
@@ -51,15 +49,11 @@ describe("onboardingCompletedProperties", () => {
         travelCity: "paris",
         goals: ["date", "travel"],
         savedCount: "fiftyToTwoHundred",
-        planner: "spontaneous",
-        tripSoon: "soon",
       }),
     ).toMatchObject({
       goal: "date",
       goals: ["date", "travel"],
       saved_count: "fiftyToTwoHundred",
-      planner: "spontaneous",
-      trip_soon: "soon",
       sample_city: "paris",
     });
   });

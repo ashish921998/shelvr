@@ -8,9 +8,9 @@ describe("sitemap and robots", () => {
     const urls = sitemap().map((entry) => entry.url);
     expect(urls).toContain("https://shelvr-web.vercel.app");
     expect(urls).toContain("https://shelvr-web.vercel.app/privacy");
-    expect(urls.some((url) => /\/(i|p|api|auth|waitlist)\//.test(url))).toBe(
-      false,
-    );
+    expect(
+      urls.some((url) => /\/(i|p|l|m|api|auth|waitlist)\//.test(url)),
+    ).toBe(false);
   });
 
   it("points crawlers at the sitemap and keeps them out of the API", () => {

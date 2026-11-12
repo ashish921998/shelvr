@@ -18,7 +18,7 @@ export type SharePhase =
   | { kind: "clearFailed"; session: ShareSession }
   | { kind: "complete" };
 
-export type LockReason = "saves" | "photos";
+type LockReason = "saves" | "photos";
 
 export type IncomingShareState = {
   phase: SharePhase;
