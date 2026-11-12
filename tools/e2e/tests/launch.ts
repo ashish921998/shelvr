@@ -1,3 +1,11 @@
+import { existsSync } from "node:fs";
+
+const localEnvironment = new URL("../.env.local", import.meta.url);
+const ci = process.env.CI?.trim().toLowerCase() ?? "";
+if (["", "0", "false"].includes(ci) && existsSync(localEnvironment)) {
+  process.loadEnvFile(localEnvironment);
+}
+
 export const METRO_PORT = process.env.E2E_METRO_PORT ?? "8091";
 export const METRO_URL = `http://localhost:${METRO_PORT}`;
 

@@ -19,6 +19,7 @@ import {
   MAX_PLAN_PLACES,
   MAX_WHY_CHARS,
   PLAN_SHARE_TTL_MS,
+  placeKey,
 } from "./model/plan";
 import {
   latestVote,
@@ -26,7 +27,7 @@ import {
   planVotePushLive,
   voterFields,
 } from "./model/planVote";
-import { findVisit } from "./model/placeVisits";
+import { userVisits, visitedKeysOnItem } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import { cityKey } from "./model/trip";
 import { requireProEntitlement } from "./subscriptions";
@@ -217,17 +218,18 @@ export const latestPlanShare = authedQuery({
       .withIndex("by_share_and_voter", (q) => q.eq("shareId", share._id))
       .take(MAX_VOTE_ROWS);
     const places = [];
+    const visits = await userVisits(ctx, userId);
     for (const place of share.places) {
       const item = await ctx.db.get(place.itemId);
       if (item === null || item.userId !== userId) continue;
-      const visit = await findVisit(ctx, userId, place.name);
+      const been = visitedKeysOnItem(visits, item).has(placeKey(place.name));
       places.push({
         key: place.key,
         name: place.name,
         ...(place.area !== undefined ? { area: place.area } : {}),
         why: place.why,
         itemId: place.itemId,
-        ...(visit !== null ? { been: true } : {}),
+        ...(been ? { been: true } : {}),
         picks: votes.filter((vote) => vote.picks.includes(place.key)).length,
         passes: votes.filter((vote) => vote.passes.includes(place.key)).length,
       });

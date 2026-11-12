@@ -1,3 +1,5 @@
+import { maskTokenPath } from "@/lib/tokenPath";
+
 type AnalyticsProperties = Record<
   string,
   boolean | number | string | unknown[]
@@ -55,7 +57,7 @@ export function captureWebAnalyticsEvent(
         properties: {
           distinct_id: distinctId,
           ...properties,
-          $current_url: `${window.location.origin}${window.location.pathname.replace(/^\/(i|p)\/[^/]+/, "/$1/[token]")}`,
+          $current_url: `${window.location.origin}${maskTokenPath(window.location.pathname)}`,
         },
       }),
       keepalive: true,

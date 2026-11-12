@@ -2,6 +2,7 @@ import { linkSource, type LinkSource } from "@convex/model/externalUrl";
 import {
   mergeVenueKinds,
   placeKinds,
+  type Cuisine,
   type PlaceKind,
 } from "@convex/model/placeKinds";
 import { distanceKm, middleOf, uniquePlacePins } from "@convex/model/trip";
@@ -14,6 +15,7 @@ export type CityPin = {
   lng: number;
   appleId?: string;
   category?: string;
+  cuisine?: Cuisine;
   emoji?: string;
   kinds: PlaceKind[];
   number: number;
@@ -36,6 +38,7 @@ export function cityPins(
       lng: number;
       appleId?: string;
       category?: string;
+      cuisine?: Cuisine;
     }[];
   }[],
 ): CityPin[] {
@@ -44,7 +47,7 @@ export function cityPins(
       (save.placePins ?? []).map((pin) => ({
         itemId: save._id,
         ...pin,
-        kinds: placeKinds(pin.category, save.tags ?? []),
+        kinds: placeKinds(pin.category, save.tags ?? [], pin.cuisine),
       })),
     ),
     mergeVenueKinds,
