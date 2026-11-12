@@ -40,7 +40,7 @@ import {
 } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import { MAX_APPLE_ID_CHARS, tidyText, validPoint } from "./model/tripPlace";
-import { uniquePlacePins } from "./model/trip";
+import { distanceKm, SAME_PLACE_KM, uniquePlacePins } from "./model/trip";
 import { requireProEntitlement } from "./subscriptions";
 
 type Visit = { name: string; itemId: Id<"items">; visitedAt: number };
@@ -284,6 +284,25 @@ function placeAt(
   return places?.find((p) => p.lat === point.lat && p.lng === point.lng);
 }
 
+function stampPlaceFor(
+  places: readonly StampPlace[] | undefined,
+  point: Point,
+): StampPlace | undefined {
+  const exact = placeAt(places, point);
+  if (exact !== undefined) return exact;
+  let nearest: StampPlace | undefined;
+  for (const place of places ?? []) {
+    const km = distanceKm(place, point);
+    if (
+      km <= SAME_PLACE_KM &&
+      (nearest === undefined || km < distanceKm(nearest, point))
+    ) {
+      nearest = place;
+    }
+  }
+  return nearest;
+}
+
 function markedSpots(
   row: Doc<"placeVisits">,
   item: Doc<"items"> | null,
@@ -331,14 +350,21 @@ async function syncStampPlaces(
   const spots = stampSpots(row, saved) ?? [];
   const fresh: StampPlace[] = [];
   const places = spots.map((spot): StampPlace => {
-    const known = placeAt(row.stampPlaces, spot);
-    if (known !== undefined) return known;
+    const known = stampPlaceFor(row.stampPlaces, spot);
+    if (known !== undefined) {
+      return known.lat === spot.lat && known.lng === spot.lng
+        ? known
+        : { ...known, lat: spot.lat, lng: spot.lng };
+    }
     const city = cityAt(marked, spot) ?? cityAt(saved, spot);
     const place = { lat: spot.lat, lng: spot.lng, ...(city ? { city } : {}) };
     fresh.push(place);
     return place;
   });
-  if (fresh.length > 0 || places.length !== (row.stampPlaces?.length ?? 0)) {
+  if (
+    places.length !== (row.stampPlaces?.length ?? 0) ||
+    places.some((place) => !row.stampPlaces?.includes(place))
+  ) {
     await ctx.db.patch(row._id, { stampPlaces: places });
   }
   const lookups = options.retryMissing
@@ -500,7 +526,7 @@ export const getPassport = authedQuery({
         continue;
       }
       for (const spot of spots) {
-        const place = placeAt(row.stampPlaces, spot);
+        const place = stampPlaceFor(row.stampPlaces, spot);
         const city = place?.city ?? cityAt(owned, spot);
         stamps.push({
           ...base,

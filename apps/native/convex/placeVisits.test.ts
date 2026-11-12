@@ -1000,6 +1000,35 @@ describe("the passport", () => {
     expect((await stamps())[0]?.countryCode).toBeUndefined();
   });
 
+  it("keeps a stamp's country when its save's pin moves a little", async () => {
+    const lookups = await withMaps();
+    const { t, userId, itemId, stamps } = await passportSetup();
+    const moved = { ...PIN, lat: PIN.lat + 0.0005 };
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        stampPlaces: [
+          { lat: PIN.lat, lng: PIN.lng, city: "Lisbon", countryCode: "PT" },
+        ],
+      });
+      await ctx.db.patch(itemId, { placePins: [moved] });
+    });
+    expect(await stamps()).toMatchObject([
+      { lat: moved.lat, countryCode: "PT" },
+    ]);
+    await settle(t, () =>
+      t.mutation(internal.placeVisits.backfillCountries, { cursor: null }),
+    );
+    expect(await stamps()).toMatchObject([
+      { lat: moved.lat, city: "Lisbon", countryCode: "PT" },
+    ]);
+    expect(lookups()).toBe(0);
+  });
+
   it("stores no country once the account is being deleted", async () => {
     const { t, userId, itemId, visits } = await passportSetup();
     await t.mutation(api.placeVisits.setVisited, {
