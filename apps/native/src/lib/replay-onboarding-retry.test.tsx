@@ -478,6 +478,38 @@ describe("a link handed to the replay while it runs", () => {
     expect(createLinkItem).toHaveBeenCalledWith(
       expect.objectContaining({ url: "https://example.com/late" }),
     );
+    expect(createLinkItem.mock.calls[1][0].operationId).not.toBe(
+      createLinkItem.mock.calls[0][0].operationId,
+    );
+    expect(hasPending()).toBe(false);
+  });
+
+  it("keeps the first link's operation while its space is being created", async () => {
+    let finishSpace: (id: string) => void = () => {};
+    createSpace.mockImplementationOnce(
+      () => new Promise((resolve) => (finishSpace = resolve)),
+    );
+    const saved = new Map<string, string>();
+    createLinkItem.mockImplementation(
+      ({ operationId, url }: { operationId: string; url: string }) => {
+        if (!saved.has(operationId)) saved.set(operationId, url);
+        return Promise.resolve(operationId);
+      },
+    );
+    queueDemoUrl("https://example.com/first", "Recipes");
+    renderHook(() => useReplayOnboarding());
+    await settle();
+
+    await act(async () => {
+      queueDemoUrl("https://example.com/late");
+      finishSpace("space");
+    });
+    await settle();
+
+    expect([...saved.values()]).toEqual([
+      "https://example.com/first",
+      "https://example.com/late",
+    ]);
     expect(hasPending()).toBe(false);
   });
 

@@ -145,6 +145,9 @@ export function useReplayOnboarding(
 
     const legacyDemoUrl = getPendingDemoUrl();
     const legacyDemoSpace = getPendingDemoSpace();
+    const operationId = legacyDemoUrl
+      ? getOrCreatePendingOperationId()
+      : undefined;
 
     runningRef.current = true;
     startedEntitledRef.current = entitled;
@@ -186,11 +189,12 @@ export function useReplayOnboarding(
             await createLinkItem({
               url: legacyDemoUrl,
               spaceId,
-              operationId: getOrCreatePendingOperationId(),
+              operationId,
               analyticsSessionId: analytics.sessionId(),
               saveSource: "onboarding_demo",
             });
-            if (getPendingDemoUrl() === legacyDemoUrl) clearLegacyDemoUrl();
+            if (!sameAccount()) return;
+            if (getPendingOperationId() === operationId) clearLegacyDemoUrl();
             remainderKey = pendingWorkKey();
           } catch (error) {
             analytics.captureError("onboarding_demo_save_failed", error);
