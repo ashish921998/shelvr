@@ -3,8 +3,9 @@
 import { ArrowUpRightIcon, LockClosedIcon } from "@heroicons/react/24/outline";
 import { FormEvent, useState } from "react";
 
+import MapCta from "@/components/MapCta";
+import PlaceSketch from "@/components/tools/PlaceSketch";
 import { captureWebAnalyticsEvent } from "@/lib/analytics";
-import { useAppStoreLink } from "@/lib/appStoreLink";
 import {
   SAMPLE_PLACES,
   appleMapsUrl,
@@ -210,29 +211,29 @@ function Results({ loaded }: { loaded: Loaded }) {
               </li>
             ))}
           </ol>
-          <StoreButton />
+          <PlaceSketch places={found.places} />
+          <SaveCard city={found.city} sample={sample} />
         </>
       )}
     </section>
   );
 }
 
-function StoreButton() {
-  const { href, onClick } = useAppStoreLink("place_tool");
+function SaveCard({ city, sample }: { city?: string; sample: boolean }) {
   return (
-    <div className="mt-8 rounded-3xl bg-ink px-6 py-7 text-center text-white sm:px-8">
+    <div className="mt-4 rounded-3xl bg-ink px-6 py-7 text-center text-white sm:px-8">
       <p className="font-display text-2xl sm:text-3xl">
-        Keep these in a city, ready to plan.
+        {city ? `Put these on your ${city} map.` : "Put these on your map."}
       </p>
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={onClick}
-        className="mt-5 inline-flex min-h-12 items-center justify-center rounded-xl bg-ember px-6 text-base font-bold text-ink transition hover:-translate-y-0.5 hover:bg-ember-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
-      >
-        Get Shelvr on the App Store
-      </a>
+      <p className="mx-auto mt-2 max-w-[34ch] text-[15px] leading-normal text-white/70">
+        {`Get Shelvr, then share ${sample ? "a" : "this"} reel to it. Its places land under their city, ready for a date night or a trip.`}
+      </p>
+      <div className="mt-5">
+        <MapCta source="place_tool" />
+      </div>
+      <p className="mt-3 text-[13px] text-white/60">
+        On the App Store, for iPhone.
+      </p>
     </div>
   );
 }

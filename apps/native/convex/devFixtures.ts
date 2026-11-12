@@ -218,7 +218,7 @@ async function seedFixtures(
       .take(RESET_LIMIT + 1),
     ctx.db
       .query("placeVisits")
-      .withIndex("by_user_and_key", (q) => q.eq("userId", userId))
+      .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
       .take(RESET_LIMIT + 1),
     ctx.db
       .query("publicMaps")
@@ -366,6 +366,40 @@ async function seedFixtures(
     });
   }
 
+  await ctx.db.insert("items", {
+    userId,
+    fixtureKey: "houston-eats",
+    title: "Houston eats",
+    type: "link",
+    status: "ready",
+    url: "https://example.com/places/houston-eats",
+    tags: ["food"],
+    cities: ["Houston"],
+    places: ["Lucy's", "Marlowe's"],
+    placeCuisines: [
+      { name: "Lucy's", cuisine: "burger" },
+      { name: "Marlowe's", cuisine: "cocktails" },
+    ],
+    placePins: [
+      {
+        name: "Lucy's",
+        lat: 29.7499,
+        lng: -95.3584,
+        city: "Houston",
+        category: "Restaurant",
+        cuisine: "burger",
+      },
+      {
+        name: "Marlowe's",
+        lat: 29.7604,
+        lng: -95.3698,
+        city: "Houston",
+        cuisine: "cocktails",
+      },
+    ],
+    searchText: "Houston eats Houston Lucy's Marlowe's",
+  });
+
   const recipesId = await ctx.db.insert("spaces", {
     userId,
     fixtureKey: "recipes",
@@ -420,7 +454,7 @@ async function seedFixtures(
     updatedAt: Date.now(),
   });
 
-  return { items: 6, spaces: 3, memberships: 4 };
+  return { items: 7, spaces: 3, memberships: 4 };
 }
 
 async function insertMapPageSave(

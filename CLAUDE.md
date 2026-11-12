@@ -83,10 +83,11 @@ read [localization](docs/architecture/localization.md); before simulator QA read
   permission, former members included; `sharedListPlaces` copies no save title or text, and
   its `itemId` goes only to the person who added it; an Apple refresh token is never returned,
   logged or passed as a scheduled job argument (`detachedAppleTokens` holds it instead); public
-  item reads strip `places` and `placeLocations`; a public map page returns only the owner's
-  first name, its cities and, for each place from a link save, the name, a rounded point, an
-  emoji, Been there and a post link rebuilt from the post's id; never a save's title, text, raw
-  URL or id, and nothing once the owner is deleting or the page is blocked.
+  item reads strip `places` and `placeLocations`; a vote page shows a saved link's cover image
+  but never a photo save; a public map page returns only the owner's first name, its cities
+  and, for each place from a link save, the name, a rounded point, an emoji, Been there and a
+  post link rebuilt from the post's id; never a save's title, text, raw URL or id, and nothing
+  once the owner is deleting or the page is blocked.
 - **An AI check cannot recall a request.** `aiAllowed` runs before a request goes out; a decline
   that lands mid-run is handled at settlement, which ignores the classification.
 - **Rows outlive saves.** Deleting a save keeps its `tripStops` and `sharedListPlaces` rows.
