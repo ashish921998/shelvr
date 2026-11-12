@@ -286,6 +286,15 @@ function markedSpots(
   return byKey && spotsOnItem(item, byKey.name);
 }
 
+function stampSpots(
+  row: Doc<"placeVisits">,
+  item: Doc<"items"> | null,
+): VisitSpot[] | undefined {
+  const spots = markedSpots(row, item);
+  if (spots !== undefined || !row.stampPlaces?.length) return spots;
+  return row.stampPlaces.map(({ lat, lng }) => ({ lat, lng }));
+}
+
 async function ownedSave(
   ctx: QueryCtx,
   userId: string,
@@ -309,7 +318,7 @@ async function syncStampPlaces(
     marked?._id === row.itemId
       ? marked
       : await ownedSave(ctx, row.userId, row.itemId);
-  const spots = markedSpots(row, saved) ?? [];
+  const spots = stampSpots(row, saved) ?? [];
   const fresh: StampPlace[] = [];
   const places = spots.map((spot): StampPlace => {
     const known = placeAt(row.stampPlaces, spot);
@@ -443,7 +452,10 @@ export const getPassport = authedQuery({
   args: {},
   returns: v.array(stampValidator),
   handler: async (ctx) => {
-    const rows = await visitRows(ctx, ctx.userId);
+    const rows = (await visitRows(ctx, ctx.userId)).slice(
+      0,
+      MAX_PASSPORT_STAMPS,
+    );
     const itemIds = [...new Set(rows.map((row) => row.itemId))];
     const saves = new Map(
       await Promise.all(
@@ -469,7 +481,7 @@ export const getPassport = authedQuery({
         ...(source ? { source } : {}),
         cover,
       };
-      const spots = markedSpots(row, owned);
+      const spots = stampSpots(row, owned);
       if (spots === undefined) {
         stamps.push(base);
         continue;

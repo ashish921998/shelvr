@@ -660,6 +660,33 @@ describe("the passport", () => {
     expect(await stamps()).toMatchObject([{ lat: PIN.lat, countryCode: "PT" }]);
   });
 
+  it("keeps an old mark's city and country after its save is deleted", async () => {
+    await withMaps();
+    const { t, userId, itemId, visits, stamps } = await passportSetup();
+    await t.run((ctx) =>
+      ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+      }),
+    );
+    await settle(t, () =>
+      t.mutation(internal.placeVisits.backfillCountries, { cursor: null }),
+    );
+    await t.run((ctx) => ctx.db.delete(itemId));
+    await settle(t, () =>
+      t.mutation(internal.placeVisits.backfillCountries, { cursor: null }),
+    );
+    expect((await visits())[0].stampPlaces).toMatchObject([
+      { lat: PIN.lat, city: "Lisbon", countryCode: "PT" },
+    ]);
+    expect(await stamps()).toMatchObject([
+      { lat: PIN.lat, city: "Lisbon", countryCode: "PT" },
+    ]);
+  });
+
   it("leaves a deleting account's marks alone in the backfill", async () => {
     const lookups = await withMaps();
     const { t, userId, itemId, visits } = await passportSetup();
