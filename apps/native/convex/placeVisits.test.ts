@@ -657,6 +657,34 @@ describe("the passport", () => {
     ).rejects.toThrow("Item not found");
   });
 
+  it("takes back one branch of an old stamp and keeps the other", async () => {
+    const { t, userId, itemId, visits, stamps } = await passportSetup();
+    const first = { lat: PIN.lat, lng: PIN.lng };
+    const second = { lat: 41.15, lng: -8.61 };
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        stampPlaces: [
+          { ...first, city: "Lisbon", countryCode: "PT" },
+          { ...second, city: "Porto", countryCode: "PT" },
+        ],
+      });
+      await ctx.db.delete(itemId);
+    });
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+      spot: first,
+    });
+    expect(await visits()).toHaveLength(1);
+    expect(await stamps()).toMatchObject([{ ...second, city: "Porto" }]);
+  });
+
   it("still lists every stamp when its saves are too large to read", async () => {
     const { t, userId, stamps } = await passportSetup();
     const count = 50;

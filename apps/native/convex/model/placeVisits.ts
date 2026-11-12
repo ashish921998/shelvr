@@ -235,7 +235,20 @@ export async function rowSpots(
   ctx: QueryCtx,
   row: Doc<"placeVisits">,
 ): Promise<VisitSpot[] | undefined> {
-  return row.spots ?? spotsOnItem(await ctx.db.get(row.itemId), row.name);
+  return spotsOfRow(row, await ctx.db.get(row.itemId));
+}
+
+function spotsOfRow(
+  row: Doc<"placeVisits">,
+  item: Doc<"items"> | null,
+): VisitSpot[] | undefined {
+  return (
+    row.spots ??
+    spotsOnItem(item, row.name) ??
+    (row.stampPlaces?.length
+      ? row.stampPlaces.map(({ lat, lng }) => ({ lat, lng }))
+      : undefined)
+  );
 }
 
 export async function userVisits(
@@ -260,8 +273,7 @@ export async function userVisits(
     items.set(id, item);
   }
   return rows.map((row) => {
-    const spots =
-      row.spots ?? spotsOnItem(items.get(row.itemId) ?? null, row.name);
+    const spots = spotsOfRow(row, items.get(row.itemId) ?? null);
     return spots === undefined
       ? { key: row.key, name: row.name }
       : { key: row.key, name: row.name, spots };
