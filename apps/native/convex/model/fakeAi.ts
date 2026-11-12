@@ -1,4 +1,5 @@
 import type { wrapLanguageModel } from "ai";
+import type { Cuisine } from "./placeKinds";
 
 type AnyLanguageModel = Parameters<typeof wrapLanguageModel>[0]["model"];
 type FakeLanguageModel = Extract<
@@ -52,7 +53,7 @@ function isLoopback(url: string | undefined): boolean {
 }
 
 const ANALYSIS_KEYS =
-  "cities,description,intents,placeLocations,places,spaceNames,tags,title";
+  "cities,description,intents,placeCuisines,placeLocations,places,spaceNames,tags,title";
 const NOTE_TASK = "Analyze this saved note";
 const NOTE_MARKER = "\n\nNote:\n";
 const LINK_TASK = "Analyze this saved web page";
@@ -77,6 +78,7 @@ type Analysis = {
   intents: never[];
   cities: string[];
   places: string[];
+  placeCuisines?: { name: string; cuisine: Cuisine }[];
 };
 
 type PlanAnswer = {
@@ -123,6 +125,7 @@ export function fakeLinkAnalysis(page: PromptPage): Analysis | undefined {
     intents: [],
     cities: fixture?.cities ?? [],
     places: fixture?.places ?? [],
+    ...(fixture?.placeCuisines ? { placeCuisines: fixture.placeCuisines } : {}),
   };
 }
 
@@ -289,6 +292,7 @@ type FixturePage = {
   /** What the fake model reads off the page, as the real one would. */
   cities?: string[];
   places?: string[];
+  placeCuisines?: { name: string; cuisine: Cuisine }[];
 };
 
 const FIXTURE_PAGES = new Map<string, FixturePage>([
@@ -316,6 +320,7 @@ const FIXTURE_PAGES = new Map<string, FixturePage>([
         "Miradouro da Graça",
         "Manteigaria",
       ],
+      placeCuisines: [{ name: "Manteigaria", cuisine: "bakery" }],
     },
   ],
 ]);

@@ -58,8 +58,7 @@ describe("onboarding recovery", () => {
       travelCity: null,
       goals: [],
       savedCount: null,
-      planner: null,
-      tripSoon: null,
+      skippedShare: false,
     });
   });
 });
@@ -101,15 +100,13 @@ describe("the survey answers", () => {
       step: 5,
       goals: ["date", "food"],
       savedCount: "hundreds",
-      planner: "explorer",
-      tripSoon: "notYet",
+      skippedShare: true,
     });
     setPendingSpaces(["Date nights"]);
     expect(getOnboardingProgress()).toMatchObject({
       goals: ["date", "food"],
       savedCount: "hundreds",
-      planner: "explorer",
-      tripSoon: "notYet",
+      skippedShare: true,
     });
   });
 
@@ -122,15 +119,13 @@ describe("the survey answers", () => {
         ...stored,
         goals: ["shopping", "travel"],
         savedCount: "millions",
-        planner: "chaotic",
-        tripSoon: "maybe",
+        skippedShare: "yes",
       }),
     );
     expect(getOnboardingProgress()).toMatchObject({
       goals: ["travel"],
       savedCount: null,
-      planner: null,
-      tripSoon: null,
+      skippedShare: false,
     });
   });
 
@@ -207,8 +202,7 @@ describe("progress written by an older onboarding flow", () => {
     travelCity: null,
     goals: [],
     savedCount: null,
-    planner: null,
-    tripSoon: null,
+    skippedShare: false,
   };
 
   it.each([0, 1, 2, 3, 4, 5, 6, 7])(
@@ -243,6 +237,7 @@ describe("progress written by an older onboarding flow", () => {
     ["the flow without the chart step", { progressVersion: 9 }],
     ["the flow that had the sample plan step", { progressVersion: 10 }],
     ["the flow with the chart and commitment", { progressVersion: 11 }],
+    ["the flow with the trip and planner questions", { progressVersion: 12 }],
     ["a non-numeric version", { progressVersion: "2" }],
   ])("restarts a record with %s", (_name, version) => {
     storage.set(
@@ -267,7 +262,7 @@ describe("progress written by an older onboarding flow", () => {
         operationId: "op",
         spaces: ["Travel"],
         demoUrl: null,
-        progressVersion: 12,
+        progressVersion: 13,
         step: 2,
         spaceNames: {},
       }),
@@ -279,8 +274,7 @@ describe("progress written by an older onboarding flow", () => {
       travelCity: null,
       goals: [],
       savedCount: null,
-      planner: null,
-      tripSoon: null,
+      skippedShare: false,
     });
   });
 
@@ -303,8 +297,7 @@ describe("progress written by an older onboarding flow", () => {
       travelCity: null,
       goals: [],
       savedCount: null,
-      planner: null,
-      tripSoon: null,
+      skippedShare: false,
     });
     expect(getPendingDemoUrl()).toBe("https://example.com/queued");
     expect(getOrCreatePendingOperationId()).toBe("legacy-operation");

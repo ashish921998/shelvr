@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Doc, Id } from "../_generated/dataModel";
+import type { VisitMark } from "./placeVisits";
 import { placeKey } from "./plan";
 import {
   isPublicMapToken,
@@ -44,8 +45,9 @@ function cdmx(pins: Pin[], fields: Partial<Doc<"items">> = {}) {
   return save({ cities: ["Mexico City"], placePins: pins, ...fields });
 }
 
-const NONE = new Set<string>();
-const been = (...names: string[]) => new Set(names.map(placeKey));
+const NONE: VisitMark[] = [];
+const been = (...names: string[]): VisitMark[] =>
+  names.map((name) => ({ key: placeKey(name), name }));
 const names = (places: { name: string }[]) => places.map((p) => p.name);
 
 describe("isPublicMapToken", () => {
@@ -376,6 +378,48 @@ describe("publicCityPlaces", () => {
         NONE,
       ),
     ).toEqual([{ name: "Orinoco", lat: 19.418, lng: -99.164, went: false }]);
+  });
+
+  it("draws the place's cuisine like the app does", () => {
+    expect(
+      publicCityPlaces(
+        [
+          cdmx([
+            pin("Orinoco", 19.418, -99.164, {
+              category: "Restaurant",
+              cuisine: "tacos",
+            }),
+          ]),
+        ],
+        "Mexico City",
+        NONE,
+      ),
+    ).toEqual([
+      { name: "Orinoco", lat: 19.418, lng: -99.164, emoji: "🌮", went: false },
+    ]);
+  });
+
+  it("marks Been there only at the branch the visit was at", () => {
+    const visit: VisitMark = {
+      key: placeKey("Orinoco"),
+      name: "Orinoco",
+      spots: [{ lat: 19.418, lng: -99.164 }],
+    };
+    expect(
+      publicCityPlaces(
+        [
+          cdmx([
+            pin("Orinoco", 19.418, -99.164),
+            pin("Orinoco", 19.36, -99.18),
+          ]),
+        ],
+        "Mexico City",
+        [visit],
+      ).map(({ lat, went }) => ({ lat, went })),
+    ).toEqual([
+      { lat: 19.418, went: true },
+      { lat: 19.36, went: false },
+    ]);
   });
 });
 

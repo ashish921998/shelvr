@@ -1,8 +1,15 @@
 import type { Doc } from "../_generated/dataModel";
 import { instagramMedia, youtubeVideoId } from "./externalUrl";
 import { placeEmoji } from "./placeEmoji";
-import { mergeVenueKinds, placeKinds, type PlaceKind } from "./placeKinds";
-import { isGenericPlaceName, isStreetAddress, placeKey } from "./plan";
+import type { Placed } from "./placeIdentity";
+import {
+  mergeVenueKinds,
+  placeKinds,
+  type Cuisine,
+  type PlaceKind,
+} from "./placeKinds";
+import { visitAtPin, type VisitMark } from "./placeVisits";
+import { isGenericPlaceName, isStreetAddress } from "./plan";
 import {
   MAX_PUBLIC_MAP_CITIES,
   MAX_PUBLIC_MAP_PLACES_PER_CITY,
@@ -37,6 +44,7 @@ type PublicPin = {
   lng: number;
   appleId?: string;
   category?: string;
+  cuisine?: Cuisine;
   kinds: PlaceKind[];
   went: boolean;
   post?: PublicPost;
@@ -91,7 +99,7 @@ function round3(value: number): number {
 function savePins(
   item: Doc<"items">,
   city: string,
-  visited: ReadonlySet<string>,
+  visited: (pin: Placed) => boolean,
 ): PublicPin[] {
   const post = publicPost(item);
   return pinsForCity(item, city)
@@ -104,8 +112,9 @@ function savePins(
       lng: pin.lng,
       ...(pin.appleId !== undefined ? { appleId: pin.appleId } : {}),
       ...(pin.category !== undefined ? { category: pin.category } : {}),
-      kinds: placeKinds(pin.category, item.tags),
-      went: visited.has(placeKey(pin.name)),
+      ...(pin.cuisine !== undefined ? { cuisine: pin.cuisine } : {}),
+      kinds: placeKinds(pin.category, item.tags, pin.cuisine),
+      went: visited(pin),
       ...(post !== undefined ? { post } : {}),
     }));
 }
@@ -123,6 +132,7 @@ function publicPlace(pin: PublicPin): PublicPlace {
   const emoji = placeEmoji({
     name: pin.name,
     category: pin.category,
+    cuisine: pin.cuisine,
     kinds: pin.kinds,
   });
   return {
@@ -138,10 +148,11 @@ function publicPlace(pin: PublicPin): PublicPlace {
 export function publicCityPlaces(
   saves: readonly Doc<"items">[],
   city: string,
-  visited: ReadonlySet<string>,
+  visits: readonly VisitMark[],
 ): PublicPlace[] {
   const wanted = cityKey(city);
   if (wanted === "") return [];
+  const visited = visitAtPin(visits);
   const pins = saves
     .filter(
       (item) =>
@@ -171,24 +182,24 @@ function byPlaceCount<T extends { city: string; places: unknown[] }>(
 export function publicMapCities(
   saves: readonly Doc<"items">[],
   cities: readonly string[],
-  visited: ReadonlySet<string>,
+  visits: readonly VisitMark[],
 ): PublicCity[] {
   return byPlaceCount(
     cities.slice(0, MAX_PUBLIC_MAP_CITIES).map((city) => ({
       city,
-      places: publicCityPlaces(saves, city, visited),
+      places: publicCityPlaces(saves, city, visits),
     })),
   );
 }
 
 export function publicCityPreviews(
   saves: readonly Doc<"items">[],
-  visited: ReadonlySet<string>,
+  visits: readonly VisitMark[],
 ): PublicCityPreview[] {
   return byPlaceCount(
     countCities([...saves]).map(({ city }) => ({
       city,
-      places: publicCityPlaces(saves, city, visited).map(({ name, went }) => ({
+      places: publicCityPlaces(saves, city, visits).map(({ name, went }) => ({
         name,
         went,
       })),

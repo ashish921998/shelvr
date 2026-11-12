@@ -30,7 +30,7 @@ export const removePlace = authedMutation({
     const city =
       selected.city ?? (item.cities?.length === 1 ? item.cities[0] : undefined);
     if (!city) throw new Error("Place city required");
-    await rateLimiter.limit(ctx, "placeVisit", {
+    await rateLimiter.limit(ctx, "placeRemoval", {
       key: ctx.userId,
       throws: true,
     });

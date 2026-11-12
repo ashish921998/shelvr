@@ -11,7 +11,7 @@ import { authedMutation, authedQuery, liveOwner } from "./model/auth";
 import { ipNetwork } from "./model/clientIp";
 import { firstNameOf } from "./model/firstName";
 import { logEvent } from "./model/log";
-import { visitedPlaceKeys } from "./model/placeVisits";
+import { userVisits } from "./model/placeVisits";
 import {
   isPublicMapToken,
   publicCityPreviews,
@@ -106,11 +106,10 @@ export const listPublicMapCities = authedQuery({
       places: v.array(v.object({ name: v.string(), went: v.boolean() })),
     }),
   ),
-  handler: async (ctx) =>
-    publicCityPreviews(
-      await readySavesNewestFirst(ctx, ctx.userId),
-      await visitedPlaceKeys(ctx, ctx.userId),
-    ),
+  handler: async (ctx) => {
+    const saves = await readySavesNewestFirst(ctx, ctx.userId);
+    return publicCityPreviews(saves, await userVisits(ctx, ctx.userId, saves));
+  },
 });
 
 export const setPublicMapCities = authedMutation({
@@ -182,11 +181,11 @@ export const getPublicMap = internalQuery({
     const owner = await liveOwner(ctx, row.userId);
     if (owner === null) return null;
     const saves = await readySavesNewestFirst(ctx, row.userId);
-    const visited = await visitedPlaceKeys(ctx, row.userId);
+    const visits = await userVisits(ctx, row.userId, saves);
     const ownerName = firstNameOf(owner.name);
     return {
       ...(ownerName !== undefined ? { ownerName } : {}),
-      cities: publicMapCities(saves, row.cities, visited),
+      cities: publicMapCities(saves, row.cities, visits),
     };
   },
 });
