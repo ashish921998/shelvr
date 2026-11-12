@@ -619,6 +619,44 @@ describe("the passport", () => {
     vi.useRealTimers();
   });
 
+  it("takes back a stamp after its save is deleted, and only the caller's", async () => {
+    const { backend, t, itemId, visits, stamps } = await passportSetup();
+    const other = await signedInUser(backend, { pro: true });
+    const spot = { lat: PIN.lat, lng: PIN.lng };
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: true,
+      spot,
+    });
+    await t.run((ctx) => ctx.db.delete(itemId));
+    expect(await stamps()).toHaveLength(1);
+
+    await other.t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+      spot,
+    });
+    expect(await visits()).toHaveLength(1);
+
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+      spot,
+    });
+    expect(await visits()).toEqual([]);
+    expect(await stamps()).toEqual([]);
+    await expect(
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    ).rejects.toThrow("Item not found");
+  });
+
   it("still lists every stamp when its saves are too large to read", async () => {
     const { t, userId, stamps } = await passportSetup();
     const count = 50;

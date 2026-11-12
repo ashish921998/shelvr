@@ -188,8 +188,9 @@ export const setVisited = authedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const { userId } = ctx;
-    const item = await ctx.db.get(args.itemId);
-    if (item === null || item.userId !== userId) {
+    const found = await ctx.db.get(args.itemId);
+    const owned = found !== null && found.userId === userId ? found : null;
+    if (owned === null && args.visited) {
       throw new Error("Item not found");
     }
     const key = placeKey(args.name);
@@ -197,11 +198,13 @@ export const setVisited = authedMutation({
       throw new Error("Place name is empty");
     }
     const spots =
-      args.spot === undefined
-        ? spotsOnItem(item, args.name)
-        : [tidySpot(args.spot)];
+      args.spot !== undefined
+        ? [tidySpot(args.spot)]
+        : owned === null
+          ? undefined
+          : spotsOnItem(owned, args.name);
     const existing = await findVisit(ctx, userId, args.name);
-    if (!args.visited) {
+    if (!args.visited || owned === null) {
       await rateLimiter.limit(ctx, "placeVisitClear", {
         key: userId,
         throws: true,
@@ -228,7 +231,7 @@ export const setVisited = authedMutation({
       explicit: args.spot !== undefined,
     });
     const row = await findVisit(ctx, userId, args.name);
-    if (row !== null) await syncStampPlaces(ctx, row, item);
+    if (row !== null) await syncStampPlaces(ctx, row, owned);
     return null;
   },
 });
