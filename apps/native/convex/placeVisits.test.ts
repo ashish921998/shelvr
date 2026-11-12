@@ -1172,6 +1172,36 @@ describe("the passport", () => {
     ]);
   });
 
+  it("lets a surviving branch keep a nearby stamp the cleared branch had taken", async () => {
+    const { t, userId, itemId, visits } = await passportSetup();
+    const second = { lat: PIN.lat + 0.0018, lng: PIN.lng };
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        spots: [{ lat: PIN.lat, lng: PIN.lng }, second],
+        stampPlaces: [
+          { lat: PIN.lat + 0.0009, lng: PIN.lng, countryCode: "FR" },
+          { lat: PIN.lat - 0.0018, lng: PIN.lng, countryCode: "ES" },
+        ],
+      });
+    });
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+      spot: { lat: PIN.lat, lng: PIN.lng },
+    });
+    const [visit] = await visits();
+    expect(visit?.spots).toEqual([second]);
+    expect(visit?.stampPlaces).toEqual([
+      expect.objectContaining({ countryCode: "FR" }),
+    ]);
+  });
+
   it("stores no country once the account is being deleted", async () => {
     const { t, userId, itemId, visits } = await passportSetup();
     await t.mutation(api.placeVisits.setVisited, {

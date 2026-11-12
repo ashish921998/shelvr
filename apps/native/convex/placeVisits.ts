@@ -179,14 +179,17 @@ async function clearVisit(
     if (remaining?.length === 0 || (original === undefined && sameName)) {
       await ctx.db.delete(row._id);
     } else if (remaining !== original) {
-      const assigned = stampPlacesFor(row.stampPlaces, original ?? []);
-      const kept = (original ?? []).flatMap((spot, index) => {
-        const place = assigned[index];
-        return place !== undefined && remaining?.includes(spot) ? [place] : [];
-      });
       await ctx.db.patch(row._id, {
         spots: remaining,
-        ...(row.stampPlaces === undefined ? {} : { stampPlaces: kept }),
+        ...(row.stampPlaces === undefined
+          ? {}
+          : {
+              stampPlaces: keptStampPlaces(
+                row.stampPlaces,
+                original ?? [],
+                remaining ?? [],
+              ),
+            }),
       });
     }
   }
@@ -315,6 +318,19 @@ function stampPlacesFor(
     claimed.add(nearest);
     return nearest;
   });
+}
+
+function keptStampPlaces(
+  places: readonly StampPlace[],
+  original: readonly VisitSpot[],
+  remaining: readonly VisitSpot[],
+): StampPlace[] {
+  const before = stampPlacesFor(places, original);
+  const own = remaining.map((spot) => before[original.indexOf(spot)]);
+  const leftover = places.filter((place) => !own.includes(place));
+  const unplaced = remaining.filter((_, index) => own[index] === undefined);
+  const borrowed = stampPlacesFor(leftover, unplaced);
+  return [...own, ...borrowed].filter((place) => place !== undefined);
 }
 
 function markedSpots(
