@@ -685,6 +685,55 @@ describe("the passport", () => {
     expect(await stamps()).toMatchObject([{ ...second, city: "Porto" }]);
   });
 
+  it("unmarks an old stamp by name after its save is deleted", async () => {
+    const { t, userId, itemId, visits } = await passportSetup();
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        stampPlaces: [{ lat: PIN.lat, lng: PIN.lng, city: "Lisbon" }],
+      });
+      await ctx.db.delete(itemId);
+    });
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+    });
+    expect(await visits()).toEqual([]);
+  });
+
+  it("keeps a stored branch the save no longer pins when another is cleared", async () => {
+    const { t, userId, itemId, visits, stamps } = await passportSetup();
+    const second = { name: "Tigre", lat: 41.15, lng: -8.61 };
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        stampPlaces: [
+          { lat: PIN.lat, lng: PIN.lng, city: "Lisbon" },
+          { lat: second.lat, lng: second.lng, city: "Porto" },
+        ],
+      });
+    });
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+      spot: { lat: PIN.lat, lng: PIN.lng },
+    });
+    expect(await visits()).toHaveLength(1);
+    expect(await stamps()).toMatchObject([
+      { lat: second.lat, lng: second.lng, city: "Porto" },
+    ]);
+  });
+
   it("still lists every stamp when its saves are too large to read", async () => {
     const { t, userId, stamps } = await passportSetup();
     const count = 50;

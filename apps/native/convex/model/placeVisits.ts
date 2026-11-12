@@ -242,13 +242,16 @@ function spotsOfRow(
   row: Doc<"placeVisits">,
   item: Doc<"items"> | null,
 ): VisitSpot[] | undefined {
-  return (
-    row.spots ??
-    spotsOnItem(item, row.name) ??
-    (row.stampPlaces?.length
-      ? row.stampPlaces.map(({ lat, lng }) => ({ lat, lng }))
-      : undefined)
-  );
+  if (row.spots !== undefined) return row.spots;
+  const pinned = spotsOnItem(item, row.name) ?? [];
+  const stamped = (row.stampPlaces ?? [])
+    .filter(
+      (place) =>
+        !pinned.some((pin) => pin.lat === place.lat && pin.lng === place.lng),
+    )
+    .map(({ lat, lng }) => ({ lat, lng }));
+  const spots = [...pinned, ...stamped];
+  return spots.length === 0 ? undefined : spots;
 }
 
 export async function userVisits(

@@ -142,7 +142,12 @@ async function clearVisit(
 ): Promise<void> {
   const { userId, name, key, existing, spots } = clear;
   if (spots === undefined) {
-    if (existing !== null && (await rowSpots(ctx, existing)) === undefined) {
+    if (
+      existing !== null &&
+      existing.spots === undefined &&
+      spotsOnItem(await ctx.db.get(existing.itemId), existing.name) ===
+        undefined
+    ) {
       await ctx.db.delete(existing._id);
     }
     return;
