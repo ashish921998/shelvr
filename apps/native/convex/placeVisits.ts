@@ -284,23 +284,29 @@ function placeAt(
   return places?.find((p) => p.lat === point.lat && p.lng === point.lng);
 }
 
-function stampPlaceFor(
+function stampPlacesFor(
   places: readonly StampPlace[] | undefined,
-  point: Point,
-): StampPlace | undefined {
-  const exact = placeAt(places, point);
-  if (exact !== undefined) return exact;
-  let nearest: StampPlace | undefined;
-  for (const place of places ?? []) {
-    const km = distanceKm(place, point);
-    if (
-      km <= SAME_PLACE_KM &&
-      (nearest === undefined || km < distanceKm(nearest, point))
-    ) {
-      nearest = place;
+  spots: readonly Point[],
+): (StampPlace | undefined)[] {
+  const matched = spots.map((spot) => placeAt(places, spot));
+  const claimed = new Set(matched);
+  return spots.map((spot, index) => {
+    const exact = matched[index];
+    if (exact !== undefined) return exact;
+    let nearest: StampPlace | undefined;
+    for (const place of places ?? []) {
+      const km = distanceKm(place, spot);
+      if (
+        !claimed.has(place) &&
+        km <= SAME_PLACE_KM &&
+        (nearest === undefined || km < distanceKm(nearest, spot))
+      ) {
+        nearest = place;
+      }
     }
-  }
-  return nearest;
+    claimed.add(nearest);
+    return nearest;
+  });
 }
 
 function markedSpots(
@@ -349,8 +355,9 @@ async function syncStampPlaces(
       : await ownedSave(ctx, row.userId, row.itemId);
   const spots = stampSpots(row, saved) ?? [];
   const fresh: StampPlace[] = [];
-  const places = spots.map((spot): StampPlace => {
-    const known = stampPlaceFor(row.stampPlaces, spot);
+  const stored = stampPlacesFor(row.stampPlaces, spots);
+  const places = spots.map((spot, index): StampPlace => {
+    const known = stored[index];
     if (known !== undefined) {
       return known.lat === spot.lat && known.lng === spot.lng
         ? known
@@ -525,8 +532,9 @@ export const getPassport = authedQuery({
         stamps.push(base);
         continue;
       }
-      for (const spot of spots) {
-        const place = stampPlaceFor(row.stampPlaces, spot);
+      const stored = stampPlacesFor(row.stampPlaces, spots);
+      for (const [index, spot] of spots.entries()) {
+        const place = stored[index];
         const city = place?.city ?? cityAt(owned, spot);
         stamps.push({
           ...base,
