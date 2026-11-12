@@ -332,7 +332,13 @@ async function syncStampPlaces(
 
 export const markVisitedBefore = authedMutation({
   args: {
-    places: v.array(v.object({ itemId: v.id("items"), name: v.string() })),
+    places: v.array(
+      v.object({
+        itemId: v.id("items"),
+        name: v.string(),
+        spot: v.optional(visitSpotValidator),
+      }),
+    ),
   },
   returns: v.number(),
   handler: async (ctx, args) => {
@@ -343,12 +349,16 @@ export const markVisitedBefore = authedMutation({
     const places = args.places.filter(({ name }) => placeKey(name) !== "");
     if (places.length === 0) return 0;
     await requireProEntitlement(ctx, userId);
-    const unique = new Map<string, { name: string; item: Doc<"items"> }>();
-    for (const { itemId, name } of places) {
+    const unique = new Map<
+      string,
+      { name: string; item: Doc<"items">; spot?: VisitSpot }
+    >();
+    for (const { itemId, name, spot } of places) {
       const item = await ownedSave(ctx, userId, itemId);
       if (item === null) throw new Error("Item not found");
-      const id = `${itemId}:${placeKey(name)}`;
-      if (!unique.has(id)) unique.set(id, { name, item });
+      const picked = spot && tidySpot(spot);
+      const id = `${itemId}:${placeKey(name)}:${picked ? `${picked.lat},${picked.lng}` : ""}`;
+      if (!unique.has(id)) unique.set(id, { name, item, spot: picked });
     }
     await rateLimiter.limit(ctx, "placeVisitBatch", {
       key: userId,
@@ -356,7 +366,7 @@ export const markVisitedBefore = authedMutation({
       throws: true,
     });
     let queued = 0;
-    for (const { name, item } of unique.values()) {
+    for (const { name, item, spot } of unique.values()) {
       const key = placeKey(name);
       const existing = await findVisit(ctx, userId, name);
       const visit =
@@ -379,8 +389,8 @@ export const markVisitedBefore = authedMutation({
         key,
         existing,
         visit,
-        spots: spotsOnItem(item, name),
-        explicit: false,
+        spots: spot ? [spot] : spotsOnItem(item, name),
+        explicit: spot !== undefined,
       });
       const row = await findVisit(ctx, userId, name);
       if (row === null) continue;
@@ -493,6 +503,7 @@ export const listUnstampedPlaces = authedQuery({
       itemId: v.id("items"),
       name: v.string(),
       city: v.string(),
+      spot: visitSpotValidator,
       title: v.optional(v.string()),
       cover: v.union(v.string(), v.null()),
     }),
@@ -504,7 +515,7 @@ export const listUnstampedPlaces = authedQuery({
     );
     const covers = new Map<Id<"items">, Promise<string | null>>();
     return await Promise.all(
-      places.map(async ({ name, city, item }) => {
+      places.map(async ({ name, city, item, lat, lng, appleId }) => {
         let cover = covers.get(item._id);
         if (cover === undefined) {
           cover = coverOf(ctx, item);
@@ -514,6 +525,7 @@ export const listUnstampedPlaces = authedQuery({
           itemId: item._id,
           name,
           city,
+          spot: { lat, lng, ...(appleId === undefined ? {} : { appleId }) },
           ...(item.title ? { title: item.title } : {}),
           cover: await cover,
         };

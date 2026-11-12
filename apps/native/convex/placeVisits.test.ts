@@ -1043,6 +1043,7 @@ describe("the passport", () => {
         itemId: newer,
         name: "Tigre",
         city: "Lisbon",
+        spot: { lat: PIN.lat, lng: PIN.lng },
         title: "Porto and Lisbon",
         cover: null,
       },
@@ -1076,6 +1077,7 @@ describe("the passport", () => {
         itemId: newer,
         name: "Cafe Uno",
         city: "Lisbon",
+        spot: { lat: 38.7, lng: -8 },
         title: "Lisbon",
         cover: null,
       },
@@ -1083,6 +1085,7 @@ describe("the passport", () => {
         itemId: porto,
         name: "Cafe Uno",
         city: "Porto",
+        spot: { lat: 41.15, lng: -8 },
         title: "Porto",
         cover: null,
       },
@@ -1094,6 +1097,40 @@ describe("the passport", () => {
     expect(await stamps()).toContainEqual(
       expect.objectContaining({ lat: 38.7, city: "Lisbon" }),
     );
+    expect(
+      (await t.query(api.placeVisits.listUnstampedPlaces, {}))
+        .filter((row) => row.name === "Cafe Uno")
+        .map((row) => row.city),
+    ).toEqual(["Porto"]);
+  });
+
+  it("marks only the branch picked when one save has two of the same name", async () => {
+    const { t, userId, stamps } = await passportSetup();
+    const both = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Cafe Uno twice",
+        tags: [],
+        searchText: "Cafe Uno",
+        cities: ["Lisbon", "Porto"],
+        placePins: [
+          { name: "Cafe Uno", lat: 38.7, lng: -9.1, city: "Lisbon" },
+          { name: "Cafe Uno", lat: 41.15, lng: -8.6, city: "Porto" },
+        ],
+      }),
+    );
+    const listed = (
+      await t.query(api.placeVisits.listUnstampedPlaces, {})
+    ).filter((row) => row.name === "Cafe Uno");
+    const lisbon = listed.find((row) => row.city === "Lisbon")!;
+    await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [{ itemId: both, name: lisbon.name, spot: lisbon.spot }],
+    });
+    expect(
+      (await stamps()).filter((stamp) => stamp.name === "Cafe Uno"),
+    ).toMatchObject([{ city: "Lisbon", lat: 38.7 }]);
     expect(
       (await t.query(api.placeVisits.listUnstampedPlaces, {}))
         .filter((row) => row.name === "Cafe Uno")
