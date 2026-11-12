@@ -30,6 +30,7 @@ import {
   namedVisitMarkValidator,
   rowSpots,
   spotsOnItem,
+  withStampedSpots,
   userVisits,
   visitMatcher,
   visitRows,
@@ -301,17 +302,7 @@ function stampSpots(
   item: Doc<"items"> | null,
 ): VisitSpot[] | undefined {
   if (row.spots !== undefined) return row.spots;
-  const marked = markedSpots(row, item) ?? [];
-  const stored = (row.stampPlaces ?? [])
-    .filter(
-      (place) =>
-        !marked.some(
-          (spot) => spot.lat === place.lat && spot.lng === place.lng,
-        ),
-    )
-    .map(({ lat, lng }) => ({ lat, lng }));
-  const spots = [...marked, ...stored];
-  return spots.length === 0 ? undefined : spots;
+  return withStampedSpots(row, markedSpots(row, item) ?? []);
 }
 
 async function ownedSave(
@@ -603,7 +594,11 @@ export const storeCountry = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const visit = await ctx.db.get(args.visitId);
-    if (visit === null || placeAt(visit.stampPlaces, args) === undefined) {
+    if (
+      visit === null ||
+      placeAt(visit.stampPlaces, args) === undefined ||
+      (await liveOwner(ctx, visit.userId)) === null
+    ) {
       return null;
     }
     await ctx.db.patch(visit._id, {

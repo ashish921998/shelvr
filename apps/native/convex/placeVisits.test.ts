@@ -1000,6 +1000,43 @@ describe("the passport", () => {
     expect((await stamps())[0]?.countryCode).toBeUndefined();
   });
 
+  it("stores no country once the account is being deleted", async () => {
+    const { t, userId, itemId, visits } = await passportSetup();
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: true,
+    });
+    const [visit] = await visits();
+    await t.run((ctx) => ctx.db.patch(userId, { deleting: true }));
+    await t.mutation(internal.placeVisits.storeCountry, {
+      visitId: visit!._id,
+      lat: PIN.lat,
+      lng: PIN.lng,
+      countryCode: "PT",
+    });
+    const [after] = await visits();
+    expect(after?.stampPlaces?.[0]?.countryCode).toBeUndefined();
+  });
+
+  it("counts an old stamp once after its save's pin is corrected", async () => {
+    const { t, userId, itemId, stamps } = await passportSetup();
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        stampPlaces: [{ lat: PIN.lat, lng: PIN.lng, city: "Lisbon" }],
+      });
+      await ctx.db.patch(itemId, {
+        placePins: [{ ...PIN, lat: PIN.lat + 0.0005 }],
+      });
+    });
+    expect(await stamps()).toHaveLength(1);
+  });
+
   it("marks places from before Shelvr without a date, in one go, past the single-mark limit", async () => {
     const { t, itemId, visits } = await passportSetup();
     await t.mutation(api.placeVisits.setVisited, {
