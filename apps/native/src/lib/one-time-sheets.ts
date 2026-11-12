@@ -11,6 +11,7 @@ const listeners = new Set<() => void>();
 let current: Turn | null = null;
 let holds = 0;
 let granting = false;
+let settleRound = 0;
 
 function notify(): void {
   for (const listener of listeners) listener();
@@ -26,8 +27,10 @@ function subscribe(listener: () => void): () => void {
 function grantNext(): void {
   if (granting || current !== null || holds > 0 || waiting.size === 0) return;
   granting = true;
+  const round = settleRound;
   void whenSheetSettled().then(() => {
     granting = false;
+    if (round !== settleRound) return grantNext();
     if (current !== null || holds > 0) return;
     const next = [...waiting].sort(
       (a, b) => ORDER.indexOf(a.sheet) - ORDER.indexOf(b.sheet),
@@ -90,6 +93,7 @@ export function useHoldSheetTurns(holding: boolean): void {
   useEffect(() => {
     if (!holding) return;
     holds += 1;
+    settleRound += 1;
     notify();
     return () => {
       holds -= 1;

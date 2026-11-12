@@ -100,6 +100,18 @@ it("lets a sheet that stops waiting leave the line, so it holds nothing back", a
   expect(busy.result.current).toBe(false);
 });
 
+it("waits again after a feedback form that opened and closed during the wait", async () => {
+  const letter = wanting("letter");
+  const form = renderHook(({ open }) => useHoldSheetTurns(open), {
+    initialProps: { open: true },
+  });
+  form.rerender({ open: false });
+  await settleSheets();
+  expect(letter.result.current).toBe(false);
+  await settleSheets();
+  expect(letter.result.current).toBe(true);
+});
+
 it("keeps every sheet waiting while the feedback form is open", async () => {
   const form = renderHook(({ open }) => useHoldSheetTurns(open), {
     initialProps: { open: true },
