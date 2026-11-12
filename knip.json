@@ -1,10 +1,9 @@
 {
-  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignore": [".design-sync/**"],
   "workspaces": {
     "apps/native": {
       "entry": [
-        "index.ts",
         "src/app/**/*.{ts,tsx}",
         "src/**/*.test.{ts,tsx}",
         "src/widgets/recent-saves-widget.tsx",
@@ -12,12 +11,8 @@
         "convex/*.ts",
         "convex/**/*.test.ts",
         "modules/*/index.{ts,tsx}",
-        "babel.config.js",
-        "metro.config.js",
         "generateKeys.mjs",
-        "goldie/goldie.config.ts",
-        "plugins/with-widget-localization.js",
-        "plugins/with-android-share-new-intent.js"
+        "goldie/goldie.config.ts"
       ],
       "project": ["**/*.{js,mjs,ts,tsx}"],
       "ignore": ["convex/_generated/**"]
@@ -33,23 +28,15 @@
     },
     ".": {
       "entry": [
-        "tools/generate-localizations.mjs",
         "tools/git-trailer.test.mjs",
         "tools/main-module.test.mjs",
         "tools/measure-header-morph.mjs",
         "tools/release-guards.test.mjs",
         "tools/verify-ci.cjs",
-        "tools/verify-convex-api.mjs",
         "tools/verify-convex-api.test.mjs",
-        "tools/verify-convex-codegen.mjs",
         "tools/verify-convex-codegen.test.mjs",
-        "tools/verify-ios-submit.mjs",
-        "tools/verify-native-fingerprint.mjs",
         "tools/verify-native-fingerprint.test.mjs",
-        "tools/verify-ota-compatibility.mjs",
-        "tools/verify-ota-compatibility.test.mjs",
-        "tools/verify-ota-env.mjs",
-        "tools/verify-pr-evidence.mjs"
+        "tools/verify-ota-compatibility.test.mjs"
       ],
       "project": ["tools/**/*.{mjs,cjs}"],
       "ignoreDependencies": ["expo-updates"]

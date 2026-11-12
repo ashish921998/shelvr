@@ -55,7 +55,7 @@ import {
   tripSavedStopCount,
 } from "./model/tripEve";
 import { visibleItemPlaces, userRemovals } from "./model/placeRemovals";
-import { visitedPlaceKeys } from "./model/placeVisits";
+import { userVisits, visitedKeysOnItem } from "./model/placeVisits";
 
 const digestResponseValidator = v.object({
   _id: v.id("weeklyDigests"),
@@ -787,12 +787,13 @@ export const prepareSaveReminder = internalMutation({
 
     const checks = { read: 0, cook: 0, visit: 0 };
     const removals = await userRemovals(ctx, userId);
+    const visits = await userVisits(ctx, userId, items);
     for (const candidate of reminderCandidates(
       items.map((item) => visibleItemPlaces(item, removals)),
       now,
       reminders[0]?.kind,
       await tripStopItemIds(ctx, userId),
-      await visitedPlaceKeys(ctx, userId),
+      (item) => visitedKeysOnItem(visits, item),
     )) {
       if (checks[candidate.kind]++ >= REMINDER_CHECKS_PER_KIND) continue;
       const earlier = await ctx.db

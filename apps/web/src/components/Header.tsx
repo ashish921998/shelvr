@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Logo from "./common/Logo";
-import StoreButton from "./home/StoreButton";
+import MapCta from "./MapCta";
 
 export default function Header() {
   const [scrolled, setScrolled] = useState(false);
@@ -21,7 +21,7 @@ export default function Header() {
     >
       <nav className="mx-auto flex max-w-[1200px] items-center justify-between px-5 py-3.5">
         <Logo />
-        <StoreButton source="header" />
+        <MapCta source="header" />
       </nav>
     </header>
   );

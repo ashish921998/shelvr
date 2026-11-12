@@ -4,13 +4,7 @@ import {
   QuestionTitle,
 } from "@/components/onboarding/parts";
 import { t, useAppLocale } from "@/lib/i18n";
-import {
-  GOALS,
-  type Goal,
-  type Planner,
-  type SavedCount,
-  type TripSoon,
-} from "@/lib/onboarding-goals";
+import { GOALS, type Goal, type SavedCount } from "@/lib/onboarding-goals";
 import type { TextMessageKey } from "@/locales/message-types";
 import type { ReactNode } from "react";
 import { ScrollView, View } from "react-native";
@@ -50,34 +44,6 @@ const GOAL_CHOICES: readonly Choice<Goal>[] = [
     emoji: "🍜",
     title: "onboardingQ.goalFood",
   },
-];
-
-const PLANNER_CHOICES: readonly Choice<Planner>[] = [
-  {
-    id: "planner",
-    emoji: "🗓️",
-    title: "onboardingQ.planner",
-  },
-  {
-    id: "flexible",
-    emoji: "🧭",
-    title: "onboardingQ.flexible",
-  },
-  {
-    id: "spontaneous",
-    emoji: "🎲",
-    title: "onboardingQ.spontaneous",
-  },
-  {
-    id: "explorer",
-    emoji: "💎",
-    title: "onboardingQ.explorer",
-  },
-];
-
-const TRIP_SOON_CHOICES: readonly Choice<TripSoon>[] = [
-  { id: "soon", emoji: "✈️", title: "onboardingQ.tripSoonYes" },
-  { id: "notYet", emoji: "🏠", title: "onboardingQ.tripSoonNo" },
 ];
 
 function QuestionScreen({
@@ -160,53 +126,6 @@ export function SavedCountStep({
       onPick={onPick}
       onContinue={onContinue}
     />
-  );
-}
-
-export function PlannerStep({
-  picked,
-  onPick,
-  onContinue,
-}: {
-  picked: Planner | null;
-  onPick: (planner: Planner) => void;
-  onContinue: () => void;
-}) {
-  useAppLocale();
-  return (
-    <SingleChoice
-      title={t("onboardingQ.plannerTitle")}
-      choices={PLANNER_CHOICES}
-      picked={picked}
-      onPick={onPick}
-      onContinue={onContinue}
-    />
-  );
-}
-
-export function TripSoonStep({
-  picked,
-  onPick,
-}: {
-  picked: TripSoon | null;
-  onPick: (answer: TripSoon) => void;
-}) {
-  useAppLocale();
-  return (
-    <View style={styles.body}>
-      <QuestionTitle title={t("onboardingQ.tripSoonTitle")} />
-      <View style={styles.list}>
-        {TRIP_SOON_CHOICES.map((choice) => (
-          <OptionCard
-            key={choice.id}
-            emoji={choice.emoji}
-            title={t(choice.title)}
-            selected={picked === choice.id}
-            onPress={() => onPick(choice.id)}
-          />
-        ))}
-      </View>
-    </View>
   );
 }
 

@@ -133,6 +133,44 @@ describe("createPlanShare", () => {
   });
 });
 
+describe("getPublicPlanShare", () => {
+  it("shows a saved link's cover image but never a photo save", async () => {
+    const { backend, t, userId, spaceId, itemIds, places } = await setup();
+    const photoId = await t.run(async (ctx) => {
+      const cover = await ctx.storage.store(new Blob(["cover image"]));
+      const photo = await ctx.storage.store(new Blob(["private photo"]));
+      await ctx.db.patch(itemIds[0], { storageId: cover });
+      return await ctx.db.insert("items", {
+        userId,
+        type: "image",
+        status: "ready",
+        title: "Beach shack",
+        storageId: photo,
+        tags: [],
+        searchText: "Beach shack",
+      });
+    });
+    const token = await t.mutation(api.planShares.createPlanShare, {
+      spaceId,
+      places: [places[0], { name: "Beach shack", why: "", itemId: photoId }],
+    });
+
+    const share = await backend.query(internal.planShares.getPublicPlanShare, {
+      token,
+    });
+    expect(share?.places).toEqual([
+      {
+        key: "p0",
+        name: "Thalassa",
+        area: "Vagator",
+        why: "Sunset dinner",
+        imageUrl: expect.any(String),
+      },
+      { key: "p1", name: "Beach shack", why: "" },
+    ]);
+  });
+});
+
 describe("votes", () => {
   it("keeps one answer per visitor and tallies them for the owner", async () => {
     const { backend, t, spaceId, places } = await setup();
@@ -383,6 +421,39 @@ describe("votes", () => {
     expect(
       await t.query(api.planShares.latestPlanShare, { spaceId }),
     ).toBeNull();
+  });
+
+  it("does not mark a second nearby branch visited in the owner's share", async () => {
+    const { t, spaceId, places, itemIds } = await setup();
+    const name = "Thalassa";
+    const visited = { lat: 37.98, lng: 23.73 };
+    const neighbour = { lat: 37.981, lng: 23.73 };
+    await t.run(async (ctx) => {
+      await ctx.db.patch(itemIds[0], {
+        places: [name],
+        placePins: [{ name, ...visited, appleId: "A" }],
+      });
+      await ctx.db.patch(itemIds[1], {
+        places: [name],
+        placePins: [{ name, ...neighbour, appleId: "B" }],
+      });
+    });
+    await t.mutation(api.planShares.createPlanShare, {
+      spaceId,
+      places: places.map((place) => ({ ...place, name })),
+    });
+    await t.mutation(api.placeVisits.setVisited, {
+      name,
+      itemId: itemIds[0],
+      visited: true,
+      spot: visited,
+    });
+
+    const share = await t.query(api.planShares.latestPlanShare, { spaceId });
+    expect(share?.places.map(({ been }) => been === true)).toEqual([
+      true,
+      false,
+    ]);
   });
 
   it("tells the owner which shared places they marked We went", async () => {
