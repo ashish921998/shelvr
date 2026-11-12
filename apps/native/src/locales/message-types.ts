@@ -944,6 +944,8 @@ type MessageParams = {
   "sharedLists.someone": undefined;
   "sharedLists.newCount": { count: number };
   "sharedLists.alsoAddTo": undefined;
+  "sharedLists.alsoAddFull": { name: string };
+  "sharedLists.alsoAddAlready": { name: string };
   "sharedLists.willSee": { name: string; count: number };
   "sharedLists.invite": undefined;
   "sharedLists.newFrom": { name: string };

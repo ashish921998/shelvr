@@ -1003,6 +1003,8 @@
     "other": "新着%{formattedCount}件"
   },
   "sharedLists.alsoAddTo": "こちらにも追加",
+  "sharedLists.alsoAddFull": "%{name}はいっぱいです。さらに追加するには、場所を削除してください。",
+  "sharedLists.alsoAddAlready": "これらの場所はすでに%{name}にあります。",
   "sharedLists.willSee": {
     "other": "%{name}にこの%{formattedCount}件が表示されます"
   },

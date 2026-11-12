@@ -1063,6 +1063,8 @@
     "other": "%{formattedCount} novos"
   },
   "sharedLists.alsoAddTo": "Adicionar também a",
+  "sharedLists.alsoAddFull": "%{name} está cheia. Remova um lugar para adicionar mais.",
+  "sharedLists.alsoAddAlready": "Esses lugares já estão em %{name}.",
   "sharedLists.willSee": {
     "one": "%{name} vai ver %{formattedCount} lugar",
     "many": "%{name} vai ver estes %{formattedCount}",
