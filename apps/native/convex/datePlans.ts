@@ -33,6 +33,7 @@ import {
 } from "./model/datePlan";
 import { logEvent } from "./model/log";
 import { placeKey } from "./model/plan";
+import { visitAtPin } from "./model/placeVisits";
 import { chainNames } from "./model/tripSuggest";
 import { appleLang } from "./tripPlanner";
 
@@ -102,6 +103,7 @@ async function suggestStops(
   signal: AbortSignal,
   removed: Claim["removed"],
   firstLocked: boolean,
+  visitMarks: Claim["visitMarks"],
 ): Promise<{ stops: ScoredStop[]; searches: number }> {
   const config = appleMapsConfig(env);
   if (config === null) {
@@ -133,6 +135,7 @@ async function suggestStops(
     ),
   );
   const chains = chainNames(replies.flat());
+  const visited = visitAtPin(visitMarks);
   const taken = scored.map((entry) => entry.stop);
   const stops: ScoredStop[] = [];
   targets.forEach(({ anchor, slot }, i) => {
@@ -140,6 +143,7 @@ async function suggestStops(
     for (const found of replies[i]) {
       if (kept >= SUGGESTIONS_PER_ANCHOR) break;
       if (
+        visited(found) ||
         !keepDateSuggestion(found, {
           kind,
           slot,
@@ -225,6 +229,7 @@ export const makeDatePlan = action({
             signal,
             claim.removed,
             args.firstSpot !== undefined,
+            claim.visitMarks,
           ).catch((error: unknown) => {
             logEvent("warn", "date_plan_suggest_failed", {
               error_name: error instanceof Error ? error.name : "unknown",

@@ -16,10 +16,13 @@ import {
   requireUserId,
   senderFirstName,
 } from "./model/auth";
-import { recentVisits } from "./model/placeVisits";
+import {
+  unscopedVisitNames,
+  userVisits,
+  visitMatcher,
+} from "./model/placeVisits";
 import { dateStartValidator } from "./model/datePlan";
 import { userRemovals, visibleSave } from "./model/placeRemovals";
-import { placeKey } from "./model/plan";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   departMember,
@@ -625,12 +628,12 @@ async function listPlanRows(
   const inCity = (await listPlaces(ctx, listId)).filter(
     (row) => cityKey(row.city) === wanted,
   );
-  const visited = await recentVisits(ctx, userId);
-  const skipped = new Set(visited.map(placeKey));
+  const visits = await userVisits(ctx, userId);
+  const visited = visitMatcher(visits, inCity);
   const rows = inCity.filter(
-    (row) => row.visitedAt === undefined && !skipped.has(placeKey(row.name)),
+    (row) => row.visitedAt === undefined && !visited(row),
   );
-  return { inCity, rows, visited };
+  return { inCity, rows, visits };
 }
 
 export const listDateStarts = authedQuery({
@@ -656,7 +659,7 @@ export async function claimListPlan(
   options: { bucket: "makePlan" | "createTripPlan"; needsPlaces: boolean },
 ): Promise<ListPlanClaim> {
   const list = await requireCoveredList(ctx, listId, userId);
-  const { inCity, rows, visited } = await listPlanRows(
+  const { inCity, rows, visits } = await listPlanRows(
     ctx,
     list._id,
     userId,
@@ -684,12 +687,13 @@ export async function claimListPlan(
     places,
     been: [
       ...new Set([
-        ...visited,
+        ...unscopedVisitNames(visits),
         ...inCity
           .filter((row) => row.visitedAt !== undefined)
           .map((row) => row.name),
       ]),
     ],
+    visitMarks: visits,
     removed: await userRemovals(ctx, userId),
     aiAllowed: await listAiAllowed(ctx, userId, rows),
   };

@@ -187,6 +187,7 @@ export default function AppLayout() {
             }
           />
           <Stack.Screen name="new-shared-list" options={modal} />
+          <Stack.Screen name="city-card" options={modal} />
           <Stack.Screen
             name="add-spots"
             options={{

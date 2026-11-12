@@ -751,6 +751,18 @@
   "cityMap.removedPlace": "%{name}を削除しました",
   "cityMap.noPlacesLeft": "場所がなくなりました",
   "cityMap.noPlacesLeftBody": "%{city}の別の場所を保存すると、ここに表示されます。",
+  "cityProgress.visited": {
+    "other": "%{formattedCount}か所中%{visited}か所に行った"
+  },
+  "cityProgress.markVisited": "%{name}を行ったことにする",
+  "cityProgress.unmarkVisited": "%{name}の「行った」を取り消す",
+  "cityProgress.rateLimited": "訪問状況を短時間に何度も変更しました。数分後にもう一度お試しください。",
+  "cityCard.share": "マップを共有",
+  "cityCard.title": "%{city}のリスト",
+  "cityCard.footer": "Shelvrで保存",
+  "cityCard.legendSaved": "行きたい",
+  "cityCard.legendVisited": "行った",
+  "cityCard.mapLabel": "%{city}のマップカード",
   "opener.tagline": "スポットを保存しよう。デートも旅行もプランはおまかせ。",
   "onboardingQ.skip": "スキップ",
   "onboardingQ.savedTitle": "いくつの場所を保存しましたか？",

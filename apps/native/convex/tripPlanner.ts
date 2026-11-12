@@ -1,5 +1,6 @@
 "use node";
 
+import { visitAtPin, visitMatcher } from "./model/placeVisits";
 import type { FunctionReturnType } from "convex/server";
 import { v } from "convex/values";
 import { action, env } from "./_generated/server";
@@ -112,16 +113,32 @@ function spend(maps: Maps | null, calls = 1): maps is Maps {
 // appleMapsLookup's search retries as a point of interest when the first answer is only a city.
 const SEARCH_LOOKUP_CALLS = 2;
 
-export function pinFor(place: PlanPlace, pins: SavedPin[]): SavedPin | null {
+function pinNamesPlace(pin: SavedPin, place: PlanPlace): boolean {
   const key = placeKey(place.name);
   return (
-    pins.find(
-      (pin) =>
-        pin.itemId === place.itemId &&
-        (placeKey(pin.name) === key ||
-          placeKey(splitSavedPlace(pin.name).name) === key),
-    ) ?? null
+    pin.itemId === place.itemId &&
+    (placeKey(pin.name) === key ||
+      placeKey(splitSavedPlace(pin.name).name) === key)
   );
+}
+
+export function unvisitedSavedPlaces(
+  claim: Pick<SavesClaim, "been" | "sources" | "pins" | "visitMarks">,
+): { place: PlanPlace; pin: SavedPin | null }[] {
+  const visited = visitMatcher(claim.visitMarks, claim.pins);
+  const places = suggestSavedPlaces(
+    claim.sources,
+    new Set(claim.been.map(placeKey)),
+    Number.MAX_SAFE_INTEGER,
+    { distinctSaves: true },
+  );
+  return places.flatMap<{ place: PlanPlace; pin: SavedPin | null }>((place) => {
+    const matching = claim.pins.filter((pin) => pinNamesPlace(pin, place));
+    if (matching.length === 0) return [{ place, pin: null }];
+    return matching
+      .filter((pin) => !visited(pin))
+      .map((pin) => ({ place, pin }));
+  });
 }
 
 function saveStop(
@@ -142,22 +159,22 @@ function saveStop(
   };
 }
 
+function distinctSavedStops(stops: PlannedStop[]): PlannedStop[] {
+  return mergeSavedNamesakes(uniquePlacePins(stops));
+}
+
 function listStops(claim: ListClaim): {
   stops: PlannedStop[];
   centre: LatLng | null;
 } {
-  const stops = mergeSavedNamesakes(
-    uniquePlacePins(
-      shuffled(claim.places)
-        .slice(0, tripPlaceCap(claim.days))
-        .map(
-          ({ addedAt: _addedAt, tags: _tags, ...place }): PlannedStop => ({
-            source: "save",
-            ...place,
-          }),
-        ),
+  const stops = distinctSavedStops(
+    shuffled(claim.places).map(
+      ({ addedAt: _addedAt, tags: _tags, ...place }): PlannedStop => ({
+        source: "save",
+        ...place,
+      }),
     ),
-  );
+  ).slice(0, tripPlaceCap(claim.days));
   return { stops, centre: middleOf(stops) };
 }
 
@@ -166,27 +183,22 @@ async function savedStops(
   claim: SavesClaim,
   maps: Maps | null,
 ): Promise<{ stops: PlannedStop[]; centre: LatLng | null }> {
-  const been = new Set(claim.been.map(placeKey));
   const cap = tripPlaceCap(claim.days);
-  // Every candidate first, so the cap keeps pinned places over ones that would need a lookup.
-  const places = suggestSavedPlaces(
-    claim.sources,
-    been,
-    Number.MAX_SAFE_INTEGER,
-  );
-  // An older pin can be a stray from before storePins dropped them; that place is looked up again.
-  const pinned = dropStrays(places.map((place) => pinFor(place, claim.pins)));
+  const candidates = unvisitedSavedPlaces(claim);
+  const pinned = dropStrays(candidates.map(({ pin }) => pin));
+  const visited = visitAtPin(claim.visitMarks);
   const sources = new Map(
     claim.sources.map((source) => [source.itemId, source]),
   );
   const why = (place: PlanPlace) => saveWhy(place, sources.get(place.itemId));
-  const stops: PlannedStop[] = [];
+  const mapped: PlannedStop[] = [];
   const unpinned: PlanPlace[] = [];
-  places.forEach((place, i) => {
+  candidates.forEach(({ place }, i) => {
     const pin = pinned[i];
-    if (pin && stops.length < cap) stops.push(saveStop(place, pin, why(place)));
-    else if (!pin) unpinned.push(place);
+    if (pin) mapped.push(saveStop(place, pin, why(place)));
+    else unpinned.push(place);
   });
+  const stops = distinctSavedStops(mapped).slice(0, cap);
   let centre = middleOf(stops);
   if (centre === null && spend(maps)) {
     centre = await appleMapsLookup(maps.token, "geocode", claim.city);
@@ -214,6 +226,7 @@ async function savedStops(
       const at = found[i];
       if (
         at &&
+        !visited({ name: place.name, ...at }) &&
         !isRemovedSuggestion(
           removalsSince(claim.removed, sources.get(place.itemId)!.savedAt),
           { name: place.name, ...at },
@@ -222,7 +235,7 @@ async function savedStops(
         stops.push(saveStop(place, at, why(place)));
     });
   }
-  return { stops: mergeSavedNamesakes(uniquePlacePins(stops)), centre };
+  return { stops: distinctSavedStops(stops), centre };
 }
 
 function suggestedStop(found: Suggestion): PlannedStop {
@@ -248,6 +261,7 @@ async function suggestStops(
     interests.map((interest) => [interest, []]),
   );
   const been = new Set(claim.been.map(placeKey));
+  const visited = visitAtPin(claim.visitMarks);
   const seen: ApplePoi[] = [];
   const kept: { name: string; lat: number; lng: number; appleId?: string }[] = [
     ...taken,
@@ -279,6 +293,7 @@ async function suggestStops(
         seen.push(found);
         const suggestion = { ...found, interest: search.interest };
         if (
+          visited(found) ||
           !keepSuggestion(suggestion, {
             centre,
             been,

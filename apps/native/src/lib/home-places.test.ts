@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   canRetrySave,
+  cityCountLine,
   newlyUnplaced,
   plannableCities,
   savesToReview,
@@ -115,5 +116,22 @@ describe("sharedListCover", () => {
   });
   it("keeps lists from an older backend visible before city summaries have deployed", () => {
     expect(sharedListCover(undefined, mine)).toBeNull();
+  });
+});
+
+describe("cityCountLine", () => {
+  it("counts places until one is marked visited", () => {
+    expect(cityCountLine({ ...city("Austin"), placeCount: 23 })).toBe(
+      "23 places",
+    );
+    expect(
+      cityCountLine({ ...city("Austin"), placeCount: 23, visitedCount: 7 }),
+    ).toBe("7 of 23 places visited");
+  });
+
+  it("says a city with saves but no place has none yet", () => {
+    expect(cityCountLine({ ...city("Austin", 2), placeCount: 0 })).toBe(
+      "2 saves, no place yet",
+    );
   });
 });

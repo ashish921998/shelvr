@@ -6,19 +6,18 @@ import type { QueryCtx } from "./_generated/server";
 import { dateStartValidator } from "./model/datePlan";
 import type { DateCandidate } from "./model/dateRank";
 import { saveWhy } from "./model/tripSuggest";
-import { pinFor } from "./tripPlanner";
+import { unvisitedSavedPlaces } from "./tripPlanner";
 import { aiAllowed } from "./aiConsent";
 import { readyCitySaves } from "./items";
 import { authedQuery, requireUserId } from "./model/auth";
-import { recentVisits } from "./model/placeVisits";
+import {
+  unscopedVisitNames,
+  userVisits,
+  namedVisitMarkValidator,
+} from "./model/placeVisits";
 import { listPlanClaimValidator } from "./model/sharedLists";
 import { namesOneVenue } from "./model/dateRank";
-import {
-  MAX_PLAN_ITEMS,
-  placeKey,
-  planSourceValidator,
-  suggestSavedPlaces,
-} from "./model/plan";
+import { MAX_PLAN_ITEMS, planSourceValidator } from "./model/plan";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   dropStrays,
@@ -28,7 +27,7 @@ import {
 } from "./model/trip";
 import { claimListPlan } from "./sharedLists";
 import { requireProEntitlement } from "./subscriptions";
-import { beenPlaces, toPlanSource } from "./tripData";
+import { toPlanSource } from "./tripData";
 import { savedPinValidator } from "./tripPlannerData";
 
 const TAGS_PER_SAVE = 8;
@@ -43,17 +42,14 @@ async function readSavedDate(ctx: QueryCtx, userId: Id<"users">, city: string) {
     removed,
   );
   const sources = items.map((item) => toPlanSource(item, city));
+  const visits = await userVisits(ctx, userId, items);
   return {
     from: "saves" as const,
     city,
     sources,
     removed,
-    been: [
-      ...new Set([
-        ...(await beenPlaces(ctx, userId, sources)),
-        ...(await recentVisits(ctx, userId)),
-      ]),
-    ],
+    been: unscopedVisitNames(visits),
+    visitMarks: visits,
     pins: items.flatMap((item) =>
       pinsForCity(item, city).map((pin) => ({
         itemId: item._id,
@@ -77,18 +73,13 @@ async function readSavedDate(ctx: QueryCtx, userId: Id<"users">, city: string) {
 export function savedCandidates(
   claim: Awaited<ReturnType<typeof readSavedDate>>,
 ): DateCandidate[] {
-  const been = new Set(claim.been.map(placeKey));
-  const places = suggestSavedPlaces(
-    claim.sources,
-    been,
-    Number.MAX_SAFE_INTEGER,
-  );
-  const pinned = dropStrays(places.map((place) => pinFor(place, claim.pins)));
+  const candidates = unvisitedSavedPlaces(claim);
+  const pinned = dropStrays(candidates.map(({ pin }) => pin));
   const sources = new Map(
     claim.sources.map((source) => [source.itemId, source]),
   );
   const saves = new Map(claim.saves.map((save) => [save.itemId, save]));
-  return places.flatMap((place, i) => {
+  return candidates.flatMap(({ place }, i) => {
     const pin = pinned[i];
     const source = sources.get(place.itemId);
     const save = saves.get(place.itemId);
@@ -139,6 +130,7 @@ export const claimDatePlanInternal = internalMutation({
       city: v.string(),
       sources: v.array(planSourceValidator),
       been: v.array(v.string()),
+      visitMarks: v.array(namedVisitMarkValidator),
       removed: v.array(removalValidator),
       pins: v.array(savedPinValidator),
       saves: v.array(

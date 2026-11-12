@@ -23,6 +23,7 @@ type Props = {
   coveredBottom: number;
   onSelect: (id: string) => void;
   visible?: number;
+  visited?: ReadonlySet<string>;
 };
 
 export function CityMap({
@@ -32,13 +33,25 @@ export function CityMap({
   coveredBottom,
   onSelect,
   visible = Infinity,
+  visited,
 }: Props) {
   const { theme, rt } = useUnistyles();
   const ref = useRef<AppleMaps.MapView>(null);
   const { width } = rt.screen;
   const shown = useMemo(
-    () => pins.slice(0, visible).map((pin) => ({ ...pin, id: cityPinId(pin) })),
-    [pins, visible],
+    () =>
+      pins.slice(0, visible).map((pin) => {
+        const id = cityPinId(pin);
+        return visited?.has(id)
+          ? {
+              ...pin,
+              id,
+              title: `✓ ${pin.name}`,
+              tintColor: theme.colors.muted,
+            }
+          : { ...pin, id };
+      }),
+    [pins, visible, visited, theme.colors.muted],
   );
   const clustered = useMapPinClusters(shown, onSelect, {
     selectedId: selected,
