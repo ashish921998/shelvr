@@ -280,9 +280,7 @@ export async function appleMapsCountry(
       fetchImpl,
     );
     if (!response.ok) return null;
-    const reply = countrySchema.safeParse(
-      await response.json().catch(() => null),
-    );
+    const reply = countrySchema.safeParse(await response.json());
     const code = reply.success
       ? reply.data.results.find((place) => place.countryCode)?.countryCode
       : undefined;
