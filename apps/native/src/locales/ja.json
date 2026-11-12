@@ -643,6 +643,7 @@
   "refundConsent.enabled": "返金審査のため、購入・提供状況に関する情報をAppleと共有することを許可しています。",
   "refundConsent.disabled": "返金審査のデータ共有はオフです。",
   "refundConsent.syncPending": "選択を保存しました。RevenueCatを更新中です。完了までは以前の設定が適用される場合があります。",
+  "refundConsent.syncFailed": "選択は保存されましたが、RevenueCatを更新できなかったため、返金審査のデータ共有は有効になっていません。",
   "refundConsent.withdraw": "共有をオフにする",
   "refundConsent.review": "更新された利用規約を確認",
   "aiConsent.findLinksOff": "このアカウントではAIが無効です。設定を変更するにはサポートにお問い合わせください。",

@@ -683,6 +683,7 @@
   "refundConsent.enabled": "Vous autorisez le partage d’informations d’achat et de fourniture avec Apple pour examiner les remboursements.",
   "refundConsent.disabled": "Le partage de données pour les remboursements est désactivé.",
   "refundConsent.syncPending": "Votre choix est enregistré. Mise à jour de RevenueCat ; le réglage précédent peut s’appliquer jusqu’à la fin.",
+  "refundConsent.syncFailed": "Votre choix est enregistré, mais RevenueCat n’a pas pu être mis à jour : le partage de données pour les remboursements n’est donc pas actif.",
   "refundConsent.withdraw": "Désactiver le partage",
   "refundConsent.review": "Consulter les nouvelles conditions",
   "aiConsent.findLinksOff": "L’IA est désactivée pour ce compte. Contactez le soutien pour modifier votre choix.",

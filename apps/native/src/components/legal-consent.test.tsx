@@ -13,7 +13,12 @@ import { LegalConsentPreference } from "./legal-consent";
 import { TERMS_VERSION } from "@convex/model/legalConsent";
 
 type Consent =
-  | { reviewedVersion: string; refundSharing: boolean; syncPending: boolean }
+  | {
+      reviewedVersion: string;
+      refundSharing: boolean;
+      syncPending: boolean;
+      syncFailed?: boolean;
+    }
   | null
   | undefined;
 const mocks = vi.hoisted(() => ({
@@ -117,6 +122,17 @@ it("offers withdrawal and displays pending remote propagation", async () => {
   rerender(<LegalConsentPreference />);
   expect(screen.getByText("refundConsent.disabled")).toBeDefined();
   expect(screen.getByText("refundConsent.syncPending")).toBeDefined();
+});
+it("says sharing is not active once the RevenueCat update has stopped", () => {
+  mocks.consent = {
+    reviewedVersion: TERMS_VERSION,
+    refundSharing: true,
+    syncPending: true,
+    syncFailed: true,
+  };
+  render(<LegalConsentPreference />);
+  expect(screen.getByText("refundConsent.syncFailed")).toBeDefined();
+  expect(screen.queryByText("refundConsent.syncPending")).toBeNull();
 });
 it("allows an existing user to review and opt in later", async () => {
   mocks.consent = {

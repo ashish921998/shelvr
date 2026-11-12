@@ -663,6 +663,7 @@
   "refundConsent.enabled": "Du erlaubst die Weitergabe von Kauf- und Bereitstellungsinformationen an Apple zur Prüfung von Rückerstattungen.",
   "refundConsent.disabled": "Die Datenweitergabe für Rückerstattungen ist aus.",
   "refundConsent.syncPending": "Deine Auswahl ist gespeichert. RevenueCat wird aktualisiert; bis zum Abschluss kann die bisherige Einstellung gelten.",
+  "refundConsent.syncFailed": "Deine Auswahl ist gespeichert, aber RevenueCat konnte nicht aktualisiert werden. Die Datenweitergabe für Rückerstattungen ist daher nicht aktiv.",
   "refundConsent.withdraw": "Weitergabe ausschalten",
   "refundConsent.review": "Aktualisierte Bedingungen ansehen",
   "aiConsent.findLinksOff": "KI ist für dieses Konto deaktiviert. Kontaktiere den Support, um deine Einstellung zu ändern.",

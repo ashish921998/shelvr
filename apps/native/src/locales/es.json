@@ -683,6 +683,7 @@
   "refundConsent.enabled": "Permites compartir información de compra y entrega con Apple para revisar reembolsos.",
   "refundConsent.disabled": "El uso compartido de datos para reembolsos está desactivado.",
   "refundConsent.syncPending": "Tu elección está guardada. Se está actualizando RevenueCat; la configuración anterior puede aplicarse hasta que termine.",
+  "refundConsent.syncFailed": "Tu elección está guardada, pero no se pudo actualizar RevenueCat, así que el uso compartido de datos para reembolsos no está activo.",
   "refundConsent.withdraw": "Dejar de compartir",
   "refundConsent.review": "Revisar condiciones actualizadas",
   "aiConsent.findLinksOff": "La IA está desactivada en esta cuenta. Contacta con soporte para cambiar tu preferencia.",

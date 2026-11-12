@@ -21,6 +21,7 @@ already does not respond to refund requests, so the gate was removed.
 Profile also provides withdrawal. Withdrawing keeps the terms
 acceptance receipt but changes the sharing preference. A pending status makes
 clear that RevenueCat can still use the previous setting until sync completes.
+A grant whose sync stopped as `failed` says instead that sharing is not active.
 
 ## Source of truth and delivery
 

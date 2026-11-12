@@ -604,6 +604,7 @@ type MessageParams = {
   "refundConsent.enabled": undefined;
   "refundConsent.disabled": undefined;
   "refundConsent.syncPending": undefined;
+  "refundConsent.syncFailed": undefined;
   "refundConsent.withdraw": undefined;
   "refundConsent.review": undefined;
   "aiConsent.findLinksOff": undefined;
