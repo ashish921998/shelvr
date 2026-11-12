@@ -235,7 +235,7 @@ export async function rowSpots(
   ctx: QueryCtx,
   row: Doc<"placeVisits">,
 ): Promise<VisitSpot[] | undefined> {
-  return spotsOfRow(row, await ctx.db.get(row.itemId));
+  return row.spots ?? spotsOfRow(row, await ctx.db.get(row.itemId));
 }
 
 function spotsOfRow(
