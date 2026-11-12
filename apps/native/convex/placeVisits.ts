@@ -359,9 +359,10 @@ async function syncStampPlaces(
   const places = spots.map((spot, index): StampPlace => {
     const known = stored[index];
     if (known !== undefined) {
-      return known.lat === spot.lat && known.lng === spot.lng
-        ? known
-        : { ...known, lat: spot.lat, lng: spot.lng };
+      if (known.lat === spot.lat && known.lng === spot.lng) return known;
+      const moved = { ...known, lat: spot.lat, lng: spot.lng };
+      if (moved.countryCode === undefined) fresh.push(moved);
+      return moved;
     }
     const city = cityAt(marked, spot) ?? cityAt(saved, spot);
     const place = { lat: spot.lat, lng: spot.lng, ...(city ? { city } : {}) };
