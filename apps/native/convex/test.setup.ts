@@ -15,9 +15,10 @@ export async function storeCurrentPins(
   const lookup = await t.query(internal.placePins.toLocate, {
     itemId: args.itemId,
   });
+  if (lookup === null) throw new Error("Expected an eligible pin lookup");
   return t.mutation(internal.placePins.storePins, {
     ...args,
-    version: lookup?.version,
+    version: lookup.version,
   });
 }
 

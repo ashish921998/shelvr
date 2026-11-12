@@ -73,6 +73,21 @@ function pendingWorkKey(): string {
   ]);
 }
 
+function pendingDemo(): {
+  url: string;
+  space: string | null;
+  operationId: string;
+} | null {
+  const url = getPendingDemoUrl();
+  return url === null
+    ? null
+    : {
+        url,
+        space: getPendingDemoSpace(),
+        operationId: getOrCreatePendingOperationId(),
+      };
+}
+
 /** Mount once: after onboarding and sign-in, shows the paywall and saves the queued sample reel. */
 export function useReplayOnboarding(
   freeSaves: { left: boolean; loading: boolean } = {
@@ -143,11 +158,7 @@ export function useReplayOnboarding(
     )
       return;
 
-    const legacyDemoUrl = getPendingDemoUrl();
-    const legacyDemoSpace = getPendingDemoSpace();
-    const operationId = legacyDemoUrl
-      ? getOrCreatePendingOperationId()
-      : undefined;
+    const demo = pendingDemo();
 
     runningRef.current = true;
     startedEntitledRef.current = entitled;
@@ -178,23 +189,24 @@ export function useReplayOnboarding(
 
         remainderKey = pendingWorkKey();
 
-        if (legacyDemoUrl) {
+        if (demo) {
           if (!sameAccount()) return;
           try {
             const spaceId =
-              legacyDemoSpace === null
+              demo.space === null
                 ? undefined
-                : await createSpace({ name: legacyDemoSpace, dynamic: true });
+                : await createSpace({ name: demo.space, dynamic: true });
             if (!sameAccount()) return;
             await createLinkItem({
-              url: legacyDemoUrl,
+              url: demo.url,
               spaceId,
-              operationId,
+              operationId: demo.operationId,
               analyticsSessionId: analytics.sessionId(),
               saveSource: "onboarding_demo",
             });
             if (!sameAccount()) return;
-            if (getPendingOperationId() === operationId) clearLegacyDemoUrl();
+            if (getPendingOperationId() === demo.operationId)
+              clearLegacyDemoUrl();
             remainderKey = pendingWorkKey();
           } catch (error) {
             analytics.captureError("onboarding_demo_save_failed", error);

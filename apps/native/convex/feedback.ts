@@ -7,7 +7,7 @@ import {
   internalQuery,
   type ActionCtx,
 } from "./_generated/server";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import { authedMutation, liveOwner } from "./model/auth";
 import {
   feedbackDeliveryStatusValidator,
@@ -30,17 +30,15 @@ const DELIVERY_LEASE_MS = 90_000;
 const DELIVERY_RETRY_WINDOW_MS = 23 * 60 * 60_000;
 const RETRY_SCAN = 100;
 const MAX_CONTEXT_LENGTH = 64;
+const CLEARED_DELIVERY = {
+  deliveryRequestBody: undefined,
+  deliveryEmail: undefined,
+  deliveryLeaseUntil: undefined,
+};
 
 const claimedDeliveryValidator = v.object({
-  email: v.string(),
+  body: v.string(),
   attempt: v.number(),
-  submittedAt: v.number(),
-  message: v.string(),
-  surface: feedbackSurfaceValidator,
-  platform: v.optional(feedbackPlatformValidator),
-  appVersion: v.optional(v.string()),
-  buildVariant: v.optional(v.string()),
-  accountEmail: v.optional(v.string()),
 });
 type ClaimedDelivery = Infer<typeof claimedDeliveryValidator>;
 
@@ -135,8 +133,9 @@ export const claimDelivery = internalMutation({
     if (
       row === null ||
       row.status === "delivered" ||
-      (row.deliveryLeaseUntil ?? 0) > now ||
-      row.attempts >= MAX_DELIVERY_ATTEMPTS
+      row.status === "expired" ||
+      row.status === "exhausted" ||
+      (row.deliveryLeaseUntil ?? 0) > now
     ) {
       return null;
     }
@@ -145,10 +144,16 @@ export const claimDelivery = internalMutation({
       now - row.deliveryStartedAt >= DELIVERY_RETRY_WINDOW_MS
     ) {
       await ctx.db.patch(args.submissionId, {
-        status: "failed",
-        attempts: MAX_DELIVERY_ATTEMPTS,
-        deliveryError: "idempotency_window_expired",
-        deliveryLeaseUntil: undefined,
+        status: "expired",
+        deliveryError: undefined,
+        ...CLEARED_DELIVERY,
+      });
+      return null;
+    }
+    if (row.attempts >= MAX_DELIVERY_ATTEMPTS) {
+      await ctx.db.patch(args.submissionId, {
+        status: "exhausted",
+        ...CLEARED_DELIVERY,
       });
       return null;
     }
@@ -165,28 +170,18 @@ export const claimDelivery = internalMutation({
       return null;
     }
     const attempt = row.attempts + 1;
-    const claimed = {
-      attempt,
-      submittedAt: row._creationTime,
-      message: row.message,
-      surface: row.surface,
-      ...(row.platform !== undefined ? { platform: row.platform } : {}),
-      ...(row.appVersion !== undefined ? { appVersion: row.appVersion } : {}),
-      ...(row.buildVariant !== undefined
-        ? { buildVariant: row.buildVariant }
-        : {}),
-      ...(user.email !== undefined ? { accountEmail: user.email } : {}),
-    };
-    const email =
+    const body =
+      row.deliveryRequestBody ??
       row.deliveryEmail ??
-      feedbackEmailBody(config, args.submissionId, claimed);
+      feedbackEmailBody(config, row, user.email);
     await ctx.db.patch(args.submissionId, {
       attempts: attempt,
       deliveryLeaseUntil: now + DELIVERY_LEASE_MS,
       deliveryStartedAt: row.deliveryStartedAt ?? now,
-      deliveryEmail: email,
+      deliveryRequestBody: body,
+      deliveryEmail: undefined,
     });
-    return { ...claimed, email };
+    return { attempt, body };
   },
 });
 
@@ -200,10 +195,14 @@ export const finishDelivery = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Pre-deploy actions have no attempt identity; discard their completion.
+    if (args.attempt === undefined) return null;
     const row = await ctx.db.get(args.submissionId);
     if (
       row === null ||
       row.status === "delivered" ||
+      row.status === "expired" ||
+      row.status === "exhausted" ||
       args.attempt !== row.attempts
     )
       return null;
@@ -212,13 +211,14 @@ export const finishDelivery = internalMutation({
         status: "delivered",
         deliveredAt: Date.now(),
         deliveryError: undefined,
-        deliveryLeaseUntil: undefined,
+        ...CLEARED_DELIVERY,
       });
       return null;
     }
     await ctx.db.patch(args.submissionId, {
-      status: "failed",
+      status: row.attempts >= MAX_DELIVERY_ATTEMPTS ? "exhausted" : "failed",
       deliveryLeaseUntil: undefined,
+      ...(row.attempts >= MAX_DELIVERY_ATTEMPTS ? CLEARED_DELIVERY : {}),
       deliveryError: formatResendError(
         args.errorCategory ?? "network_error",
         args.errorStatus,
@@ -228,61 +228,47 @@ export const finishDelivery = internalMutation({
   },
 });
 
-function buildFeedbackEmail(
-  submissionId: Id<"feedbackSubmissions">,
-  claimed: Omit<ClaimedDelivery, "email">,
-): { subject: string; text: string; replyTo?: string } {
-  const lines = [
-    `New Shelvr feedback from the ${claimed.surface} form.`,
-    "",
-    claimed.message,
-    "",
-    "—",
-    `Submission ID: ${submissionId}`,
-    `Surface: ${claimed.surface}`,
-    `Platform: ${claimed.platform ?? "unknown"}`,
-    `App version: ${claimed.appVersion ?? "unknown"}`,
-    `Build: ${claimed.buildVariant ?? "unknown"}`,
-    `Account email: ${claimed.accountEmail ?? "not available"}`,
-    `Submitted: ${new Date(claimed.submittedAt).toISOString()}`,
-  ];
-  return {
-    subject: `Shelvr feedback (${claimed.surface})`,
-    text: lines.join("\n"),
-    ...(claimed.accountEmail !== undefined
-      ? { replyTo: claimed.accountEmail }
-      : {}),
-  };
-}
-
 function feedbackEmailBody(
   config: FeedbackInboxConfig,
-  submissionId: Id<"feedbackSubmissions">,
-  claimed: Omit<ClaimedDelivery, "email">,
+  row: Doc<"feedbackSubmissions">,
+  accountEmail: string | undefined,
 ): string {
-  const { subject, text, replyTo } = buildFeedbackEmail(submissionId, claimed);
+  const lines = [
+    `New Shelvr feedback from the ${row.surface} form.`,
+    "",
+    row.message,
+    "",
+    "—",
+    `Submission ID: ${row._id}`,
+    `Surface: ${row.surface}`,
+    `Platform: ${row.platform ?? "unknown"}`,
+    `App version: ${row.appVersion ?? "unknown"}`,
+    `Build: ${row.buildVariant ?? "unknown"}`,
+    `Account email: ${accountEmail ?? "not available"}`,
+    `Submitted: ${new Date(row._creationTime).toISOString()}`,
+  ];
   return JSON.stringify({
     from: config.from,
     to: config.to,
-    subject,
-    text,
-    ...(replyTo === undefined ? {} : { reply_to: replyTo }),
+    subject: `Shelvr feedback (${row.surface})`,
+    text: lines.join("\n"),
+    ...(accountEmail === undefined ? {} : { reply_to: accountEmail }),
   });
 }
 
 async function sendFeedbackEmail(
-  config: FeedbackInboxConfig,
+  apiKey: string,
   submissionId: Id<"feedbackSubmissions">,
-  claimed: ClaimedDelivery,
+  body: string,
 ): Promise<void> {
   const response = await resendRequest(
-    config.apiKey,
+    apiKey,
     "Shelvr-Feedback/1.0",
     "/emails",
     {
       method: "POST",
       headers: { "Idempotency-Key": `feedback/${submissionId}` },
-      body: claimed.email,
+      body,
     },
   );
   if (!response.ok) {
@@ -299,10 +285,10 @@ async function attemptDelivery(
     { submissionId },
   );
   if (claimed === null) return;
-  const config = feedbackInboxConfig();
-  if (config === null) return;
+  const apiKey = env.RESEND_API_KEY;
+  if (!apiKey) return;
   try {
-    await sendFeedbackEmail(config, submissionId, claimed);
+    await sendFeedbackEmail(apiKey, submissionId, claimed.body);
     logEvent("info", "feedback_delivered", {
       submission_id: submissionId,
       attempt: claimed.attempt,
@@ -352,9 +338,7 @@ export const listSubmissionsNeedingDelivery = internalQuery({
     for (const status of statuses) {
       const page = await ctx.db
         .query("feedbackSubmissions")
-        .withIndex("by_status_attempts", (q) =>
-          q.eq("status", status).lt("attempts", MAX_DELIVERY_ATTEMPTS),
-        )
+        .withIndex("by_status_attempts", (q) => q.eq("status", status))
         .take(RETRY_SCAN);
       for (const row of page) out.push(row._id);
     }

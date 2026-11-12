@@ -276,6 +276,8 @@ export default defineSchema({
     deliveredAt: v.optional(v.number()),
     deliveryLeaseUntil: v.optional(v.number()),
     deliveryStartedAt: v.optional(v.number()),
+    deliveryRequestBody: v.optional(v.string()),
+    // Persisted under the old name; claims migrate it and terminal outcomes clear it.
     deliveryEmail: v.optional(v.string()),
   })
     .index("by_user", ["userId"])

@@ -107,6 +107,9 @@ describe("submitFeedback", () => {
     expect(await getSubmission(t, submissionId)).toMatchObject({
       status: "delivered",
     });
+    expect(
+      (await getSubmission(t, submissionId))?.deliveryRequestBody,
+    ).toBeUndefined();
   });
 
   it("retries an uncertain send with the same key and body after account or inbox changes", async () => {
@@ -148,9 +151,12 @@ describe("submitFeedback", () => {
     await t.action(internal.feedback.deliver, { submissionId });
     expect(fetch).not.toHaveBeenCalled();
     expect(await getSubmission(t, submissionId)).toMatchObject({
-      status: "failed",
-      deliveryError: "idempotency_window_expired",
+      status: "expired",
+      attempts: 1,
     });
+    expect(
+      (await getSubmission(t, submissionId))?.deliveryRequestBody,
+    ).toBeUndefined();
     expect(
       await t.query(internal.feedback.listSubmissionsNeedingDelivery, {}),
     ).not.toContain(submissionId);
@@ -352,7 +358,7 @@ describe("delivery retries", () => {
     });
   });
 
-  it("retries pending, failed, and unconfigured rows but never a delivered or capped one", async () => {
+  it("retries active rows and closes capped rows without sending them", async () => {
     const t = setup();
     const fetchMock = okFetch();
     vi.stubGlobal("fetch", fetchMock);
@@ -383,7 +389,7 @@ describe("delivery retries", () => {
     expect(due).toContain(failed);
     expect(due).toContain(unconfigured);
     expect(due).not.toContain(delivered);
-    expect(due).not.toContain(capped);
+    expect(due).toContain(capped);
 
     await t.action(internal.feedback.retryFailedDeliveries, {});
     await t.finishAllScheduledFunctions(vi.runAllTimers);
@@ -393,12 +399,13 @@ describe("delivery retries", () => {
       expect(await getSubmission(t, id)).toMatchObject({ status: "delivered" });
     }
     expect(await getSubmission(t, capped)).toMatchObject({
-      status: "failed",
+      status: "exhausted",
       attempts: MAX_DELIVERY_ATTEMPTS,
     });
   });
 
   it("stops retrying a row once the attempt cap is reached", async () => {
+    vi.useFakeTimers();
     const t = setup();
     const fetchMock = okFetch();
     vi.stubGlobal("fetch", fetchMock);
@@ -408,10 +415,11 @@ describe("delivery retries", () => {
     });
 
     await t.action(internal.feedback.retryFailedDeliveries, {});
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(await getSubmission(t, capped)).toMatchObject({
-      status: "failed",
+      status: "exhausted",
       attempts: MAX_DELIVERY_ATTEMPTS,
     });
   });
@@ -425,12 +433,98 @@ describe("delivery retries", () => {
     const claimed = await t.mutation(internal.feedback.claimDelivery, {
       submissionId: id,
     });
-    expect(claimed).toMatchObject({ attempt: 1, message: "seeded" });
+    expect(claimed).toEqual({ attempt: 1, body: expect.any(String) });
+    expect(JSON.parse(claimed!.body).text).toContain("seeded");
     expect(await getSubmission(t, id)).toMatchObject({
       status: "pending",
       attempts: 1,
     });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("delivery snapshot ownership", () => {
+  it("clears a crashed final attempt after its lease expires", async () => {
+    vi.useFakeTimers();
+    const t = setup();
+    const submissionId = await insertSubmission(t, {
+      attempts: MAX_DELIVERY_ATTEMPTS - 1,
+    });
+    await t.mutation(internal.feedback.claimDelivery, { submissionId });
+    const fetch = okFetch();
+    vi.stubGlobal("fetch", fetch);
+    await t.action(internal.feedback.retryFailedDeliveries, {});
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    expect(
+      (await getSubmission(t, submissionId))?.deliveryRequestBody,
+    ).toBeDefined();
+    vi.setSystemTime(Date.now() + 90_001);
+    await t.action(internal.feedback.retryFailedDeliveries, {});
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    const row = await getSubmission(t, submissionId);
+    expect(row).toMatchObject({
+      status: "exhausted",
+      attempts: MAX_DELIVERY_ATTEMPTS,
+    });
+    expect(row?.deliveryRequestBody).toBeUndefined();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+  it("migrates an earlier request snapshot without rebuilding it", async () => {
+    const t = setup();
+    const submissionId = await insertSubmission(t, {});
+    const body = JSON.stringify({
+      from: SENDER,
+      to: INBOX,
+      subject: "old",
+      text: "original",
+    });
+    await t.run((ctx) => ctx.db.patch(submissionId, { deliveryEmail: body }));
+    const claimed = await t.mutation(internal.feedback.claimDelivery, {
+      submissionId,
+    });
+    expect(claimed).toEqual({ attempt: 1, body });
+    const row = await getSubmission(t, submissionId);
+    expect(row?.deliveryRequestBody).toBe(body);
+    expect(row?.deliveryEmail).toBeUndefined();
+    await t.mutation(internal.feedback.finishDelivery, {
+      submissionId,
+      attempt: 1,
+      status: "delivered",
+    });
+    const delivered = await getSubmission(t, submissionId);
+    expect(delivered?.deliveryRequestBody).toBeUndefined();
+    expect(delivered?.deliveryEmail).toBeUndefined();
+  });
+
+  it("clears snapshots when a failed attempt exhausts delivery", async () => {
+    const t = setup();
+    const submissionId = await insertSubmission(t, {
+      attempts: MAX_DELIVERY_ATTEMPTS - 1,
+    });
+    vi.stubGlobal("fetch", statusFetch(500));
+    await t.action(internal.feedback.deliver, { submissionId });
+    const row = await getSubmission(t, submissionId);
+    expect(row).toMatchObject({
+      status: "exhausted",
+      attempts: MAX_DELIVERY_ATTEMPTS,
+    });
+    expect(row?.deliveryRequestBody).toBeUndefined();
+    expect(row?.deliveryEmail).toBeUndefined();
+    expect(
+      await t.query(internal.feedback.listSubmissionsNeedingDelivery, {}),
+    ).not.toContain(submissionId);
+  });
+
+  it("discards a pre-deploy completion without finishing the current attempt", async () => {
+    const t = setup();
+    const submissionId = await insertSubmission(t, {});
+    await t.mutation(internal.feedback.claimDelivery, { submissionId });
+    const before = await getSubmission(t, submissionId);
+    await t.mutation(internal.feedback.finishDelivery, {
+      submissionId,
+      status: "delivered",
+    });
+    expect(await getSubmission(t, submissionId)).toEqual(before);
   });
 });
 

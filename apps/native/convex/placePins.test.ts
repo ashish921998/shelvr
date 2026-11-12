@@ -106,6 +106,22 @@ afterEach(() => {
 });
 
 describe("saved venue lookup", () => {
+  it("discards an older action's unversioned result without throwing", async () => {
+    const { t, itemId, pins } = await setup(["Cafe"]);
+    await t.mutation(internal.placePins.storePins, {
+      itemId,
+      found: [{ name: "Cafe", lat: 38.7, lng: -9.1 }],
+    });
+    expect(await pins()).toBeUndefined();
+  });
+
+  it("fails the test helper when the lookup is ineligible", async () => {
+    const { t, itemId } = await setup(["Cafe"]);
+    await t.run((ctx) => ctx.db.patch(itemId, { status: "processing" }));
+    await expect(storeCurrentPins(t, { itemId, found: [] })).rejects.toThrow(
+      "Expected an eligible pin lookup",
+    );
+  });
   it("rejects a lookup from before a retry changed the save's city", async () => {
     vi.useFakeTimers();
     const t = newConvexTest();
