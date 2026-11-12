@@ -50,6 +50,7 @@ import {
   type NewListPlace,
 } from "./model/sharedLists";
 import { MAX_LIST_CITIES, MAX_LIST_PLACES } from "./model/sharedListLimits";
+import { MAX_ITEM_PLACES } from "./model/itemFields";
 import { sameTripPlace } from "./model/placeIdentity";
 import { saveError } from "./model/saveErrors";
 import { cityKey, MAX_CITY_CHARS } from "./model/trip";
@@ -502,7 +503,7 @@ export const listsWithSave = authedQuery({
       .withIndex("by_item_and_added_by", (q) =>
         q.eq("itemId", args.itemId).eq("addedBy", userId),
       )
-      .take(MAX_LIST_PLACES);
+      .take(MAX_ITEM_PLACES * MAX_LISTS_PER_USER);
     return [...new Set(places.map((place) => place.listId))];
   },
 });
