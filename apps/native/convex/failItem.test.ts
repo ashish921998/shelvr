@@ -92,9 +92,26 @@ it("writes only how the run ended and keeps what earlier runs gave the save", as
         status: "failed",
         failureReason: reason,
       });
-      expect(await telemetry(t, itemId)).toEqual([`failed:${reason}`]);
+      expect(await telemetry(t, itemId)).toEqual(
+        before === "sweptFirst" ? [] : [`failed:${reason}`],
+      );
     }
   }
+});
+
+it("counts a save the sweep failed once when its run fails late", async () => {
+  const t = newConvexTest();
+  const { itemId } = await seed(t, "retried", STALE);
+  await t.mutation(internal.items.failStaleProcessingItems, {});
+  await t.mutation(internal.items.failItem, {
+    itemId,
+    reason: "not_found",
+    runId: RUN_ID,
+  });
+  expect(await telemetry(t, itemId)).toEqual(["failed:error"]);
+  expect((await t.run((ctx) => ctx.db.get(itemId)))?.failureReason).toBe(
+    "not_found",
+  );
 });
 
 it("puts a retried partial save back as it was when the run fails", async () => {

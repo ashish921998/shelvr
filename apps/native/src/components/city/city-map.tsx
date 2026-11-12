@@ -24,6 +24,7 @@ type Props = {
   coveredBottom: number;
   onSelect: (id: string) => void;
   visible?: number;
+  visited?: ReadonlySet<string>;
 };
 
 export function CityMap({
@@ -33,6 +34,7 @@ export function CityMap({
   coveredBottom,
   onSelect,
   visible = Infinity,
+  visited,
 }: Props) {
   const { theme, rt } = useUnistyles();
   const ref = useRef<AppleMaps.MapView>(null);
@@ -107,15 +109,22 @@ export function CityMap({
   const selectedBubble = useImage(
     require("../../../assets/map/place-bubble-selected.png"),
   );
+  const visitedBubble = useImage(
+    require("../../../assets/map/place-bubble-visited.png"),
+  );
   const annotations = pins.slice(0, visible).map((pin) => {
     const id = cityPinId(pin);
     const isSelected = id === selected;
+    const went = visited?.has(id) ?? false;
     return {
       id,
       coordinates: { latitude: pin.lat, longitude: pin.lng },
       title: pin.name,
       text: pin.emoji ?? "📍",
-      icon: (isSelected ? selectedBubble : bubble) ?? undefined,
+      icon:
+        (isSelected ? selectedBubble : went ? visitedBubble : bubble) ??
+        undefined,
+      went,
       anchor: { x: 0.5, y: 0.5 },
       backgroundColor: theme.colors.surface,
       textColor: theme.colors.foreground,
@@ -162,7 +171,7 @@ export function CityMap({
         return {
           id: pin.id,
           coordinates: pin.coordinates,
-          title: `${pin.text} ${pin.title}`,
+          title: `${pin.went ? "✓ " : ""}${pin.text} ${pin.title}`,
           ...(icon && { icon, anchor: pin.anchor }),
         };
       })}

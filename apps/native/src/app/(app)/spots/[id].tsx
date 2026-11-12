@@ -169,10 +169,14 @@ function Spots({
 }
 
 function useLandingHaptics(dropped: number, total: number) {
+  const focused = useIsFocused();
+  const previous = useRef(0);
   useEffect(() => {
-    if (process.env.EXPO_OS !== "ios" || dropped === 0) return;
-    void (dropped >= total ? haptics.success() : haptics.impact());
-  }, [dropped, total]);
+    const landed = dropped > previous.current;
+    previous.current = dropped;
+    if (!focused || !landed) return;
+    void (dropped >= total ? haptics.success() : haptics.landing());
+  }, [dropped, total, focused]);
 }
 
 function SpotRow({

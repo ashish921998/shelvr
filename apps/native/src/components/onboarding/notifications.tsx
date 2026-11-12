@@ -21,10 +21,12 @@ function tripEveTime(): string {
 export function NotificationsStep({
   sample,
   leaving,
+  onAsking,
   onContinue,
 }: {
   sample: AhaSample;
   leaving: boolean;
+  onAsking: (asking: boolean) => void;
   onContinue: () => void;
 }) {
   useAppLocale();
@@ -38,6 +40,11 @@ export function NotificationsStep({
       mounted.current = false;
     };
   }, []);
+
+  useEffect(() => {
+    onAsking(asking);
+    return () => onAsking(false);
+  }, [asking, onAsking]);
 
   const leave = (action: "allow" | "skip", granted: boolean) => {
     analytics.capture("onboarding_notifications", { action, granted });

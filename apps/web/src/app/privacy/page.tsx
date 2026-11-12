@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMetadata(
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="November 3, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="November 6, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
@@ -205,8 +205,9 @@ export default function PrivacyPage() {
         </p>
         <p className="mt-2">
           A plan can also be shared as an unlisted vote link, which shows your
-          first name, if we have one, and the plan’s city and places. Anyone
-          with the link can vote, up to 20 people at a time, and we store each
+          first name, if we have one, and the plan’s city and places, with the
+          cover image of a saved link but never a photo you saved. Anyone with
+          the link can vote, up to 20 people at a time, and we store each
           voter’s choices with a random browser identifier. The link closes
           after a week, and we delete it and its votes about a week after that.
         </p>
