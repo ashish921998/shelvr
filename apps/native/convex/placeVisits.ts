@@ -300,9 +300,18 @@ function stampSpots(
   row: Doc<"placeVisits">,
   item: Doc<"items"> | null,
 ): VisitSpot[] | undefined {
-  const spots = markedSpots(row, item);
-  if (spots !== undefined || !row.stampPlaces?.length) return spots;
-  return row.stampPlaces.map(({ lat, lng }) => ({ lat, lng }));
+  if (row.spots !== undefined) return row.spots;
+  const marked = markedSpots(row, item) ?? [];
+  const stored = (row.stampPlaces ?? [])
+    .filter(
+      (place) =>
+        !marked.some(
+          (spot) => spot.lat === place.lat && spot.lng === place.lng,
+        ),
+    )
+    .map(({ lat, lng }) => ({ lat, lng }));
+  const spots = [...marked, ...stored];
+  return spots.length === 0 ? undefined : spots;
 }
 
 async function ownedSave(

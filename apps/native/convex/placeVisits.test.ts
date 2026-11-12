@@ -734,6 +734,32 @@ describe("the passport", () => {
     ]);
   });
 
+  it("keeps a stored stamp in the passport after the save drops its pin", async () => {
+    await withMaps();
+    const { t, userId, itemId, stamps } = await passportSetup();
+    const second = { lat: 41.15, lng: -8.61 };
+    await t.run((ctx) =>
+      ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        stampPlaces: [
+          { lat: PIN.lat, lng: PIN.lng, city: "Lisbon", countryCode: "PT" },
+          { ...second, city: "Porto", countryCode: "PT" },
+        ],
+      }),
+    );
+    await settle(t, () =>
+      t.mutation(internal.placeVisits.backfillCountries, { cursor: null }),
+    );
+    expect(await stamps()).toMatchObject([
+      { lat: PIN.lat, lng: PIN.lng, city: "Lisbon" },
+      { ...second, city: "Porto" },
+    ]);
+  });
+
   it("still lists every stamp when its saves are too large to read", async () => {
     const { t, userId, stamps } = await passportSetup();
     const count = 50;
