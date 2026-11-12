@@ -42,7 +42,7 @@ export function planKindFor(goals: readonly Goal[]): PlanKind {
   return goal === null ? "weekend" : GOAL_PLAN[goal];
 }
 
-export const SAVED_COUNTS = [
+const SAVED_COUNTS = [
   "few",
   "tenToFifty",
   "fiftyToTwoHundred",
@@ -54,13 +54,8 @@ export type SavedCount = (typeof SAVED_COUNTS)[number];
 export const isSavedCount = (value: unknown): value is SavedCount =>
   SAVED_COUNTS.some((count) => count === value);
 
-export const PLANNERS = [
-  "planner",
-  "flexible",
-  "spontaneous",
-  "explorer",
-] as const;
-export type Planner = (typeof PLANNERS)[number];
+export type CityQuestion = "trip" | "out";
 
-export const isPlanner = (value: unknown): value is Planner =>
-  PLANNERS.some((planner) => planner === value);
+export function cityQuestion(goals: readonly Goal[]): CityQuestion {
+  return planKindFor(goals) === "trip" ? "trip" : "out";
+}

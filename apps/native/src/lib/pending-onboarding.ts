@@ -2,18 +2,17 @@ import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { onboardingLabel } from "@/lib/onboarding-labels";
 import {
-  isPlanner,
   isSavedCount,
   readGoals,
   type Goal,
-  type Planner,
   type SavedCount,
 } from "@/lib/onboarding-goals";
+import { ONBOARDING_STEPS, type OnboardingStep } from "@/lib/onboarding-steps";
 import { isSampleCity, type SampleCityId } from "@/lib/sample-cities";
 
 const PENDING_KEY = "shelvr.pending.onboarding";
 
-const PROGRESS_VERSION = 11;
+const PROGRESS_VERSION = 13;
 
 export type PendingDemo = {
   url: string;
@@ -29,30 +28,32 @@ type PendingRecord = {
   demoOwner: string | null;
   progressVersion: number | null;
   step: number | null;
+  viewed: OnboardingStep[];
   spaceNames: Record<string, string>;
   travelCity?: SampleCityId | null;
   goals?: Goal[];
   savedCount?: SavedCount | null;
-  planner?: Planner | null;
+  skippedShare?: boolean;
 };
 
 type OnboardingAnswers = {
   travelCity: SampleCityId | null;
   goals: Goal[];
   savedCount: SavedCount | null;
-  planner: Planner | null;
+  skippedShare: boolean;
 };
 
 type OnboardingProgress = OnboardingAnswers & {
   spaces: string[];
   step: number | null;
+  viewed: OnboardingStep[];
 };
 
 const NO_ANSWERS: OnboardingAnswers = {
   travelCity: null,
   goals: [],
   savedCount: null,
-  planner: null,
+  skippedShare: false,
 };
 
 function answersOf(record: Partial<OnboardingAnswers>): OnboardingAnswers {
@@ -60,7 +61,7 @@ function answersOf(record: Partial<OnboardingAnswers>): OnboardingAnswers {
     travelCity: isSampleCity(record.travelCity) ? record.travelCity : null,
     goals: readGoals(record.goals),
     savedCount: isSavedCount(record.savedCount) ? record.savedCount : null,
-    planner: isPlanner(record.planner) ? record.planner : null,
+    skippedShare: record.skippedShare === true,
   };
 }
 
@@ -124,12 +125,19 @@ function readPendingRecord(): PendingRecord | null {
           ? record.progressVersion
           : null,
       step,
+      viewed: readViewed(record.viewed),
       spaceNames: readSpaceNames(record.spaceNames),
       ...answersOf(record),
     };
   } catch {
     return null;
   }
+}
+
+function readViewed(value: unknown): OnboardingStep[] {
+  return Array.isArray(value)
+    ? ONBOARDING_STEPS.filter((step) => value.includes(step))
+    : [];
 }
 
 function readSpaceNames(value: unknown): Record<string, string> {
@@ -162,6 +170,7 @@ export function getOrCreatePendingOperationId(): string {
     demoOwner: null,
     progressVersion: null,
     step: null,
+    viewed: [],
     spaceNames: {},
   });
   return operationId;
@@ -182,6 +191,7 @@ export function setPendingSpaces(spaces: string[]) {
     demoOwner: existing?.demoOwner ?? null,
     progressVersion: existing?.progressVersion ?? null,
     step: existing?.step ?? null,
+    viewed: existing?.viewed ?? [],
     spaceNames: existing?.spaceNames ?? {},
     ...answersOf(existing ?? {}),
   });
@@ -245,13 +255,22 @@ function isCurrentProgress(record: PendingRecord | null): boolean {
 export function getOnboardingProgress(): OnboardingProgress {
   const record = readPendingRecord();
   if (record === null || !isCurrentProgress(record)) {
-    return { ...NO_ANSWERS, spaces: [], step: null };
+    return { ...NO_ANSWERS, spaces: [], step: null, viewed: [] };
   }
-  return { ...answersOf(record), spaces: record.spaces, step: record.step };
+  return {
+    ...answersOf(record),
+    spaces: record.spaces,
+    step: record.step,
+    viewed: record.viewed,
+  };
 }
 
 export function setOnboardingProgress(
-  progress: Partial<OnboardingAnswers> & { spaces: string[]; step: number },
+  progress: Partial<OnboardingAnswers> & {
+    spaces: string[];
+    step: number;
+    viewed?: OnboardingStep[];
+  },
 ) {
   const existing = readPendingRecord();
   const operationId = existing?.operationId ?? createOperationId();
@@ -263,6 +282,7 @@ export function setOnboardingProgress(
     demoOwner: existing?.demoOwner ?? null,
     progressVersion: PROGRESS_VERSION,
     step: progress.step,
+    viewed: progress.viewed ?? [],
     spaceNames: existing?.spaceNames ?? {},
     ...answersOf(progress),
   });

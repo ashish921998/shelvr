@@ -3,9 +3,8 @@
 ## Start here
 
 Read `CLAUDE.md` before changing code. It is the detailed source of truth for
-the product model, architecture, environment variables, commands, and
-conventions. Keep this file short and use it as the routing layer rather than
-duplicating that reference.
+the product model, architecture, commands, and conventions. Keep this file
+short and use it as the routing layer rather than duplicating that reference.
 
 Before editing native app code, consult the Expo SDK 58 documentation linked in
 `CLAUDE.md`. Before editing `apps/native/convex/**`, read
@@ -103,6 +102,14 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Running on a simulator:** `docs/architecture/local-qa.md` covers worktree
   setup, the dev client link, sign-in, fixtures, and forcing onboarding or the
   paywall.
+  For local development and agent testing, use the `E2E_DEVICE` in the
+  gitignored `tools/e2e/.env.local` when present, including when passing
+  `--device` to an Expo build. Final QA uses its `E2E_QA_DEVICE` explicitly;
+  keep that simulator stock and never apply SimSlim to it. An explicit user
+  device request takes precedence. If the configured development device is
+  missing, report it rather than falling back to the final-QA device.
+  New worktrees copy that local file from the main checkout before choosing
+  a development device.
 - **Proving a change on the simulator:** `.agents/skills/verify-shelvr`
   drives the `tools/e2e` suite and maps the core features it covers to their tests.
 - **Proving account deletion:** `.agents/skills/account-deletion` runs
@@ -152,7 +159,7 @@ use `expo lint`, which silently skips the `convex/` backend.
 4. Run the narrowest relevant check, then run `pnpm run check` before finishing.
 5. Report the files changed, checks run, warnings, and anything intentionally skipped.
 
-`pnpm run check` is `check:code` (lint, typecheck, codegen and agent-docs drift,
+`pnpm run check` is `check:code` (lint, typecheck, codegen drift,
 tooling tests, coverage thresholds, Knip, Syncpack) followed by the dependency
 audit (`pnpm run audit`, blocks on high/critical). CI and the pre-push hook
 both run `check:code`, the hook before a push leaves the machine. The app-level
@@ -235,8 +242,10 @@ Vitest with Node by default and jsdom when browser APIs are needed.
   inserts new matches as `saved` into a space the user set to auto-file.
   User-owned `saved` and `dismissed` decisions stay intact.
 - Keep secrets and user content out of source, logs, tests, and reports.
-- Do not reintroduce the retired notes-app domain or edit generated Convex files
-  unless the Convex workflow explicitly requires regeneration.
+- Do not reintroduce the retired notes-app domain (`notes` table, OpenAI summary
+  action, `/notes` routes).
+- Do not edit generated Convex files unless the Convex workflow explicitly
+  requires regeneration.
 
 ## Rules and what enforces them
 
@@ -253,12 +262,12 @@ cannot happen.
 | Complexity limits, zero lint warnings                                                                        | ESLint `complexity`, `max-*`, `--max-warnings 0`                                                                 | `lint`                               |
 | No `console.*` in app code outside the loggers                                                               | ESLint `no-console` (native `src/` allows `warn`)                                                                | `lint`                               |
 | `check:code` is the one gate                                                                                 | Wiring only: `.husky/pre-push` and the CI `Gate` step call it                                                    | nowhere if they stop                 |
+| Local E2E settings precede launch values; overrides and CI semantics hold                                    | `tools/e2e-config.test.mjs` imports config and launch settings in isolated processes                             | `check:code`                         |
 | The pre-push hook gates a push of branch commits, not deletes or tags                                        | `tools/pre-push.test.mjs` pushes through the real hook                                                           | `check:code`                         |
 | Convex modules the app imports pull in no server-only package (zod, ai, linkedom)                            | `src/lib/client-bundle-imports.test.ts` walks their imports                                                      | `check:code`                         |
 | `_generated/api.d.ts` lists every Convex module                                                              | `tools/verify-convex-codegen.mjs`                                                                                | `check:code`                         |
 | Copy lives in `en.json`; generated catalogs untouched                                                        | `localization-source.test.ts`, `localization-catalogs.test.ts`                                                   | `check:code`                         |
 | French app copy says vous; German says Inhalte, not Saves                                                    | `src/lib/localization-register.test.ts` (exceptions keyed by message, with a reason)                             | `check:code`                         |
-| `CLAUDE.md` names every table, module and route                                                              | `tools/verify-agent-docs.mjs`                                                                                    | `check:code`                         |
 | No dead code; one version per dependency                                                                     | Knip, Syncpack                                                                                                   | `check:code`                         |
 | `tools/*.test.mjs` that run git use `createRepo()`                                                           | `tools/temp-repo.test.mjs`                                                                                       | `check:code`                         |
 | App Review notes quote only text in `en.json`, the App Intents or the paywall list                           | `tools/onboarding-sync.test.mjs` (bold is read only under Onboarding)                                            | `check:code`                         |

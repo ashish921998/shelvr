@@ -1,4 +1,4 @@
-import AppStoreButton from "@/components/AppStoreButton";
+import MapCta from "@/components/MapCta";
 import AndroidWaitlist from "./AndroidWaitlist";
 import styles from "./Landing.module.css";
 
@@ -9,7 +9,8 @@ export default function ClosingPanel() {
         the next date is already in your saves.
       </h2>
       <div className={styles.ctaRow}>
-        <AppStoreButton source="footer" />
+        <MapCta source="footer" />
+        <span className={styles.ctaNote}>On the App Store, for iPhone.</span>
       </div>
       <AndroidWaitlist tone="light" />
     </section>

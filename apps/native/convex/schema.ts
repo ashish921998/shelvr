@@ -8,6 +8,7 @@ import {
   failureReasonValidator,
   intentValidator,
   placePinsValidator,
+  placeCuisinesValidator,
   placeLocationsValidator,
   postMediaValidator,
   recipeValidator,
@@ -32,6 +33,7 @@ import {
   tripStayValidator,
   tripStopSourceValidator,
 } from "./model/tripPlan";
+import { visitSpotValidator } from "./model/placeVisits";
 
 export default defineSchema({
   ...authTables,
@@ -132,6 +134,7 @@ export default defineSchema({
     cities: v.optional(v.array(v.string())),
     places: v.optional(v.array(v.string())),
     placeLocations: v.optional(placeLocationsValidator),
+    placeCuisines: v.optional(placeCuisinesValidator),
     /** True once a run has read the video's speech for places; a rerun then reads it no more. */
     placesHeard: v.optional(v.boolean()),
     products: v.optional(
@@ -320,10 +323,17 @@ export default defineSchema({
     name: v.string(),
     itemId: v.id("items"),
     visitedAt: v.number(),
-    lat: v.optional(v.number()),
-    lng: v.optional(v.number()),
-    city: v.optional(v.string()),
-    countryCode: v.optional(v.string()),
+    spots: v.optional(v.array(visitSpotValidator)),
+    stampPlaces: v.optional(
+      v.array(
+        v.object({
+          lat: v.number(),
+          lng: v.number(),
+          city: v.optional(v.string()),
+          countryCode: v.optional(v.string()),
+        }),
+      ),
+    ),
     backfilled: v.optional(v.boolean()),
   })
     .index("by_user_and_key", ["userId", "key"])

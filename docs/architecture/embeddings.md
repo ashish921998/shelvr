@@ -412,7 +412,7 @@ lives on the item row so any future migration is a re-index, not a re-embed.
 
 ## Deploy order
 
-Backend deploys before the client that needs it (CLAUDE.md; `.github/workflows/deploy.yml`).
+Backend deploys before the client that needs it (`AGENTS.md` → Deployment; `.github/workflows/deploy.yml`).
 
 1. Phase 0: backend only.
 2. Phase 1 schema + write path + backfill cron: backend only, old clients unaffected.

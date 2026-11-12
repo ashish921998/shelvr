@@ -1,6 +1,6 @@
-import { v } from "convex/values";
-import { internal } from "./_generated/api";
+import { type Infer, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
+import { internal } from "./_generated/api";
 import {
   env,
   internalAction,
@@ -16,21 +16,238 @@ import {
   appleMapsCountry,
 } from "./model/appleMaps";
 import { authedMutation, authedQuery, liveOwner } from "./model/auth";
-import { logEvent } from "./model/log";
 import { linkSource } from "./model/externalUrl";
+import { logEvent } from "./model/log";
 import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
-import { findVisit } from "./model/placeVisits";
+import {
+  barePlaceKey,
+  closestUnidentifiedSpot,
+  findVisit,
+  MAX_VISIT_SPOTS,
+  knowsSpot,
+  matchesVisitSpot,
+  namedVisitMarkValidator,
+  rowSpots,
+  spotsOnItem,
+  userVisits,
+  visitMatcher,
+  visitRows,
+  visitRowsWithNamePrefix,
+  type VisitSpot,
+  visitSpotValidator,
+} from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
+import { MAX_APPLE_ID_CHARS, tidyText, validPoint } from "./model/tripPlace";
 import { uniquePlacePins } from "./model/trip";
 import { requireProEntitlement } from "./subscriptions";
 
+type Visit = { name: string; itemId: Id<"items">; visitedAt: number };
+
+function tidySpot(spot: VisitSpot): VisitSpot {
+  if (!validPoint(spot.lat, spot.lng)) {
+    throw new Error("Place position is invalid");
+  }
+  const appleId = tidyText(spot.appleId, MAX_APPLE_ID_CHARS);
+  return {
+    lat: spot.lat,
+    lng: spot.lng,
+    ...(appleId === undefined ? {} : { appleId }),
+  };
+}
+
+async function markVisit(
+  ctx: MutationCtx,
+  mark: {
+    userId: Id<"users">;
+    key: string;
+    existing: Doc<"placeVisits"> | null;
+    visit: Visit;
+    spots: VisitSpot[] | undefined;
+    explicit: boolean;
+  },
+): Promise<void> {
+  const { userId, key, existing, visit, spots, explicit } = mark;
+  const oldSpots =
+    existing === null ? undefined : await rowSpots(ctx, existing);
+  const narrowing =
+    explicit &&
+    existing?.spots === undefined &&
+    oldSpots !== undefined &&
+    oldSpots.length > 1 &&
+    spots?.[0] !== undefined &&
+    knowsSpot(oldSpots, spots[0]);
+  const next = narrowing ? [] : [...(oldSpots ?? [])];
+  for (const spot of spots ?? []) {
+    if (!knowsSpot(next, spot)) next.push(spot);
+  }
+  if (spots !== undefined && next.length > MAX_VISIT_SPOTS) {
+    throw new Error("Place has too many visited spots");
+  }
+  if (existing === null) {
+    await ctx.db.insert("placeVisits", {
+      userId,
+      key,
+      ...visit,
+      ...(spots === undefined ? {} : { spots: next }),
+    });
+    return;
+  }
+  if (spots === undefined) {
+    await ctx.db.patch(existing._id, {
+      name: visit.name,
+      visitedAt: visit.visitedAt,
+    });
+    return;
+  }
+  await ctx.db.patch(existing._id, { ...visit, spots: next });
+}
+
+type ClearRow = {
+  row: Doc<"placeVisits">;
+  sameName: boolean;
+  relatedName: boolean;
+  original: VisitSpot[] | undefined;
+  remaining: VisitSpot[] | undefined;
+};
+
+function clearSpot(rows: ClearRow[], spot: VisitSpot): void {
+  let matched = false;
+  for (const entry of rows) {
+    const matches = (kept: VisitSpot) =>
+      matchesVisitSpot(kept, spot, entry.relatedName);
+    if (entry.original?.some(matches)) {
+      entry.remaining = entry.remaining?.filter((kept) => !matches(kept));
+      matched = true;
+    }
+  }
+  if (matched) return;
+  const named = rows.find((entry) => entry.sameName);
+  if (named?.remaining === undefined) return;
+  const nearest = closestUnidentifiedSpot(named.remaining, spot);
+  if (nearest !== undefined) {
+    named.remaining = named.remaining.filter((kept) => kept !== nearest);
+  }
+}
+
+async function clearVisit(
+  ctx: MutationCtx,
+  clear: {
+    userId: Id<"users">;
+    name: string;
+    key: string;
+    existing: Doc<"placeVisits"> | null;
+    spots: VisitSpot[] | undefined;
+  },
+): Promise<void> {
+  const { userId, name, key, existing, spots } = clear;
+  if (spots === undefined) {
+    if (existing !== null && (await rowSpots(ctx, existing)) === undefined) {
+      await ctx.db.delete(existing._id);
+    }
+    return;
+  }
+  const bare = barePlaceKey(name);
+  const byId = spots.some((spot) => spot.appleId !== undefined);
+  const candidates = byId
+    ? await visitRows(ctx, userId)
+    : await visitRowsWithNamePrefix(ctx, userId, bare);
+  if (
+    existing !== null &&
+    !candidates.some((row) => row._id === existing._id)
+  ) {
+    candidates.push(existing);
+  }
+  const rows = await Promise.all(
+    candidates.map(async (row): Promise<ClearRow> => {
+      const sameName = row.key === key;
+      const relatedName =
+        sameName || (bare !== "" && barePlaceKey(row.name) === bare);
+      const original =
+        byId || relatedName ? await rowSpots(ctx, row) : undefined;
+      return { row, sameName, relatedName, original, remaining: original };
+    }),
+  );
+  for (const spot of spots) clearSpot(rows, spot);
+  for (const { row, sameName, original, remaining } of rows) {
+    if (remaining?.length === 0 || (original === undefined && sameName)) {
+      await ctx.db.delete(row._id);
+    } else if (remaining !== original) {
+      await ctx.db.patch(row._id, { spots: remaining });
+    }
+  }
+}
+
+export const setVisited = authedMutation({
+  args: {
+    itemId: v.id("items"),
+    name: v.string(),
+    visited: v.boolean(),
+    spot: v.optional(visitSpotValidator),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { userId } = ctx;
+    const item = await ctx.db.get(args.itemId);
+    if (item === null || item.userId !== userId) {
+      throw new Error("Item not found");
+    }
+    const key = placeKey(args.name);
+    if (key === "") {
+      throw new Error("Place name is empty");
+    }
+    const spots =
+      args.spot === undefined
+        ? spotsOnItem(item, args.name)
+        : [tidySpot(args.spot)];
+    const existing = await findVisit(ctx, userId, args.name);
+    if (!args.visited) {
+      await rateLimiter.limit(ctx, "placeVisitClear", {
+        key: userId,
+        throws: true,
+      });
+      await clearVisit(ctx, { userId, name: args.name, key, existing, spots });
+      return null;
+    }
+    await requireProEntitlement(ctx, userId);
+    await rateLimiter.limit(ctx, "placeVisit", { key: userId, throws: true });
+    const visit = {
+      name: args.name
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, MAX_PLACE_NAME_CHARS),
+      itemId: args.itemId,
+      visitedAt: Date.now(),
+    };
+    await markVisit(ctx, {
+      userId,
+      key,
+      existing,
+      visit,
+      spots,
+      explicit: args.spot !== undefined,
+    });
+    const row = await findVisit(ctx, userId, args.name);
+    if (row !== null) await syncStampPlaces(ctx, row, item);
+    return null;
+  },
+});
+
+export const listVisits = authedQuery({
+  args: {},
+  returns: v.array(namedVisitMarkValidator),
+  handler: async (ctx) => await userVisits(ctx, ctx.userId),
+});
+
 const MAX_BATCH_PLACES = 60;
 const MAX_PASSPORT_STAMPS = 500;
+const MAX_UNSTAMPED_PLACES = 200;
 const COUNTRY_SPACING_MS = 1_000;
 const COUNTRY_RETRY_MS = 60_000;
 const MAX_COUNTRY_ATTEMPTS = 3;
+const BACKFILL_PAGE = 100;
 
-type VisitPin = { lat: number; lng: number; city?: string };
+type StampPlace = NonNullable<Doc<"placeVisits">["stampPlaces"]>[number];
+type Point = { lat: number; lng: number };
 
 function pinCity(
   item: Doc<"items">,
@@ -41,92 +258,77 @@ function pinCity(
   return city || undefined;
 }
 
-function visitPin(item: Doc<"items">, key: string): VisitPin | null {
-  const pins = (item.placePins ?? []).filter((p) => placeKey(p.name) === key);
-  const pin = pins.find((p) => pinCity(item, p) !== undefined) ?? pins[0];
-  if (pin === undefined) return null;
-  const city = pinCity(item, pin);
-  return { lat: pin.lat, lng: pin.lng, ...(city ? { city } : {}) };
+function cityAt(item: Doc<"items"> | null, point: Point): string | undefined {
+  const pin = item?.placePins?.find(
+    (p) => p.lat === point.lat && p.lng === point.lng,
+  );
+  return item && pin ? pinCity(item, pin) : undefined;
 }
 
-async function ownedItem(
+function placeAt(
+  places: readonly StampPlace[] | undefined,
+  point: Point,
+): StampPlace | undefined {
+  return places?.find((p) => p.lat === point.lat && p.lng === point.lng);
+}
+
+function markedSpots(
+  row: Doc<"placeVisits">,
+  item: Doc<"items"> | null,
+): VisitSpot[] | undefined {
+  if (row.spots !== undefined) return row.spots;
+  const byName = spotsOnItem(item, row.name);
+  if (byName !== undefined || item === null) return byName;
+  const byKey = (item.placePins ?? []).find(
+    (pin) => placeKey(pin.name) === row.key,
+  );
+  return byKey && spotsOnItem(item, byKey.name);
+}
+
+async function ownedSave(
   ctx: QueryCtx,
   userId: string,
   itemId: Id<"items">,
-): Promise<Doc<"items">> {
+): Promise<Doc<"items"> | null> {
   const item = await ctx.db.get(itemId);
-  if (item === null || item.userId !== userId) {
-    throw new Error("Item not found");
-  }
-  return item;
+  return item !== null && item.userId === userId ? item : null;
 }
 
-async function markVisit(
+async function syncStampPlaces(
   ctx: MutationCtx,
-  userId: Id<"users">,
-  item: Doc<"items">,
-  name: string,
-  backfilled: boolean,
-  lookupDelayMs = 0,
-): Promise<void> {
-  const key = placeKey(name);
-  const existing = await findVisit(ctx, userId, name);
-  if (backfilled && existing !== null) return;
-  const pin = visitPin(item, key);
-  const samePoint =
-    existing !== null &&
-    pin !== null &&
-    existing.lat === pin.lat &&
-    existing.lng === pin.lng;
-  const countryCode = samePoint ? existing.countryCode : undefined;
-  const location =
-    pin === null
-      ? {}
-      : { lat: pin.lat, lng: pin.lng, city: pin.city, countryCode };
-  const visit = {
-    name: name.replace(/\s+/g, " ").trim().slice(0, MAX_PLACE_NAME_CHARS),
-    itemId: item._id,
-    visitedAt: Date.now(),
-    ...location,
-    backfilled: backfilled ? true : undefined,
-  };
-  let visitId = existing?._id;
-  if (visitId === undefined) {
-    visitId = await ctx.db.insert("placeVisits", { userId, key, ...visit });
-  } else {
-    await ctx.db.patch(visitId, visit);
+  row: Doc<"placeVisits">,
+  marked: Doc<"items"> | null,
+  options: { delayMs?: number; retryMissing?: boolean } = {},
+): Promise<number> {
+  const saved =
+    marked?._id === row.itemId
+      ? marked
+      : await ownedSave(ctx, row.userId, row.itemId);
+  const spots = markedSpots(row, saved) ?? [];
+  const fresh: StampPlace[] = [];
+  const places = spots.map((spot): StampPlace => {
+    const known = placeAt(row.stampPlaces, spot);
+    if (known !== undefined) return known;
+    const city = cityAt(marked, spot) ?? cityAt(saved, spot);
+    const place = { lat: spot.lat, lng: spot.lng, ...(city ? { city } : {}) };
+    fresh.push(place);
+    return place;
+  });
+  if (fresh.length > 0 || places.length !== (row.stampPlaces?.length ?? 0)) {
+    await ctx.db.patch(row._id, { stampPlaces: places });
   }
-  if (pin !== null && countryCode === undefined) {
+  const lookups = options.retryMissing
+    ? places.filter((place) => place.countryCode === undefined)
+    : fresh;
+  for (const [index, { lat, lng }] of lookups.entries()) {
     await ctx.scheduler.runAfter(
-      lookupDelayMs,
+      (options.delayMs ?? 0) + index * COUNTRY_SPACING_MS,
       internal.placeVisits.locateCountry,
-      { visitId },
+      { visitId: row._id, lat, lng },
     );
   }
+  return lookups.length;
 }
-
-export const setVisited = authedMutation({
-  args: { itemId: v.id("items"), name: v.string(), visited: v.boolean() },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const { userId } = ctx;
-    const item = args.visited
-      ? await ownedItem(ctx, userId, args.itemId)
-      : null;
-    await requireProEntitlement(ctx, userId);
-    if (placeKey(args.name) === "") {
-      throw new Error("Place name is empty");
-    }
-    await rateLimiter.limit(ctx, "placeVisit", { key: userId, throws: true });
-    if (item !== null) {
-      await markVisit(ctx, userId, item, args.name, false);
-    } else {
-      const existing = await findVisit(ctx, userId, args.name);
-      if (existing !== null) await ctx.db.delete(existing._id);
-    }
-    return null;
-  },
-});
 
 export const markVisitedBefore = authedMutation({
   args: {
@@ -141,31 +343,51 @@ export const markVisitedBefore = authedMutation({
     const places = args.places.filter(({ name }) => placeKey(name) !== "");
     if (places.length === 0) return 0;
     await requireProEntitlement(ctx, userId);
-    const items = await Promise.all(
-      places.map(({ itemId }) => ownedItem(ctx, userId, itemId)),
-    );
     const unique = new Map<string, { name: string; item: Doc<"items"> }>();
-    places.forEach(({ name }, i) => {
-      if (!unique.has(placeKey(name))) {
-        unique.set(placeKey(name), { name, item: items[i] });
-      }
-    });
+    for (const { itemId, name } of places) {
+      const item = await ownedSave(ctx, userId, itemId);
+      if (item === null) throw new Error("Item not found");
+      const id = `${itemId}:${placeKey(name)}`;
+      if (!unique.has(id)) unique.set(id, { name, item });
+    }
     await rateLimiter.limit(ctx, "placeVisitBatch", {
       key: userId,
       count: unique.size,
       throws: true,
     });
-    let order = 0;
+    let queued = 0;
     for (const { name, item } of unique.values()) {
-      await markVisit(
-        ctx,
+      const key = placeKey(name);
+      const existing = await findVisit(ctx, userId, name);
+      const visit =
+        existing === null
+          ? {
+              name: name
+                .replace(/\s+/g, " ")
+                .trim()
+                .slice(0, MAX_PLACE_NAME_CHARS),
+              itemId: item._id,
+              visitedAt: Date.now(),
+            }
+          : {
+              name: existing.name,
+              itemId: existing.itemId,
+              visitedAt: existing.visitedAt,
+            };
+      await markVisit(ctx, {
         userId,
-        item,
-        name,
-        true,
-        order * COUNTRY_SPACING_MS,
-      );
-      order += 1;
+        key,
+        existing,
+        visit,
+        spots: spotsOnItem(item, name),
+        explicit: false,
+      });
+      const row = await findVisit(ctx, userId, name);
+      if (row === null) continue;
+      if (existing === null) await ctx.db.patch(row._id, { backfilled: true });
+      queued += await syncStampPlaces(ctx, row, item, {
+        delayMs: queued * COUNTRY_SPACING_MS,
+      });
     }
     return unique.size;
   },
@@ -205,68 +427,63 @@ export const getPassport = authedQuery({
   args: {},
   returns: v.array(stampValidator),
   handler: async (ctx) => {
-    const visits = await ctx.db
-      .query("placeVisits")
-      .withIndex("by_user_and_visited", (q) => q.eq("userId", ctx.userId))
-      .order("desc")
-      .take(MAX_PASSPORT_STAMPS);
-    const itemIds = [...new Set(visits.map((visit) => visit.itemId))];
+    const rows = await visitRows(ctx, ctx.userId);
+    const itemIds = [...new Set(rows.map((row) => row.itemId))];
     const saves = new Map(
       await Promise.all(
         itemIds.map(async (itemId) => {
-          const item = await ctx.db.get(itemId);
-          const owned =
-            item !== null && item.userId === ctx.userId ? item : null;
+          const owned = await ownedSave(ctx, ctx.userId, itemId);
           return [itemId, { owned, cover: await coverOf(ctx, owned) }] as const;
         }),
       ),
     );
-    const stamps = [];
-    for (const visit of visits) {
-      const { owned, cover } = saves.get(visit.itemId) ?? {
+    const stamps: Infer<typeof stampValidator>[] = [];
+    for (const row of rows) {
+      const { owned, cover } = saves.get(row.itemId) ?? {
         owned: null,
         cover: null,
       };
-      const pin =
-        visit.lat !== undefined && visit.lng !== undefined
-          ? { lat: visit.lat, lng: visit.lng, city: visit.city }
-          : owned && visitPin(owned, visit.key);
       const source = reelSource(owned);
-      stamps.push({
-        key: visit.key,
-        name: visit.name,
-        itemId: visit.itemId,
-        visitedAt: visit.visitedAt,
-        ...(visit.backfilled ? { backfilled: true } : {}),
-        ...(pin ? { lat: pin.lat, lng: pin.lng } : {}),
-        ...(pin?.city ? { city: pin.city } : {}),
-        ...(visit.countryCode ? { countryCode: visit.countryCode } : {}),
+      const base = {
+        key: row.key,
+        name: row.name,
+        itemId: row.itemId,
+        visitedAt: row.visitedAt,
+        ...(row.backfilled ? { backfilled: true } : {}),
         ...(source ? { source } : {}),
         cover,
-      });
+      };
+      const spots = markedSpots(row, owned);
+      if (spots === undefined) {
+        stamps.push(base);
+        continue;
+      }
+      for (const spot of spots) {
+        const place = placeAt(row.stampPlaces, spot);
+        const city = place?.city ?? cityAt(owned, spot);
+        stamps.push({
+          ...base,
+          lat: spot.lat,
+          lng: spot.lng,
+          ...(city ? { city } : {}),
+          ...(place?.countryCode ? { countryCode: place.countryCode } : {}),
+        });
+      }
     }
-    return stamps;
+    return stamps.slice(0, MAX_PASSPORT_STAMPS);
   },
 });
 
-const MAX_UNSTAMPED_PLACES = 200;
-const MAX_VISIT_CHECKS = 1_000;
-
 async function unstampedPins(ctx: QueryCtx, userId: Id<"users">) {
-  const checked = new Set<string>();
-  const pins = [];
-  for (const item of await readySavesNewestFirst(ctx, userId)) {
-    for (const pin of item.placePins ?? []) {
+  const saves = await readySavesNewestFirst(ctx, userId);
+  const pins = saves.flatMap((item) =>
+    (item.placePins ?? []).flatMap((pin) => {
       const city = pinCity(item, pin);
-      const key = placeKey(pin.name);
-      if (city === undefined || checked.has(key)) continue;
-      if (checked.size >= MAX_VISIT_CHECKS) return pins;
-      checked.add(key);
-      if ((await findVisit(ctx, userId, pin.name)) !== null) continue;
-      pins.push({ ...pin, city, item });
-    }
-  }
-  return pins;
+      return city === undefined ? [] : [{ ...pin, city, item }];
+    }),
+  );
+  const visited = visitMatcher(await userVisits(ctx, userId, saves), pins);
+  return pins.filter((pin) => !visited(pin));
 }
 
 export const listUnstampedPlaces = authedQuery({
@@ -305,56 +522,64 @@ export const listUnstampedPlaces = authedQuery({
   },
 });
 
+const countryLookupArgs = {
+  visitId: v.id("placeVisits"),
+  lat: v.number(),
+  lng: v.number(),
+};
+
 export const claimCountryLookup = internalMutation({
-  args: { visitId: v.id("placeVisits") },
+  args: countryLookupArgs,
   returns: v.union(
     v.null(),
     v.object({ busyMs: v.number() }),
-    v.object({ lat: v.number(), lng: v.number() }),
+    v.object({ ready: v.literal(true) }),
   ),
   handler: async (ctx, args) => {
     const visit = await ctx.db.get(args.visitId);
-    if (visit?.lat === undefined || visit.lng === undefined) return null;
-    if (visit.countryCode !== undefined) return null;
+    const place = placeAt(visit?.stampPlaces, args);
+    if (visit === null || place === undefined) return null;
+    if (place.countryCode !== undefined) return null;
     if (!(await aiAllowed(ctx, visit.userId))) return null;
     const budget = await rateLimiter.limit(ctx, "visitCountryGlobal");
-    if (!budget.ok) return { busyMs: budget.retryAfter };
-    return { lat: visit.lat, lng: visit.lng };
+    return budget.ok ? { ready: true as const } : { busyMs: budget.retryAfter };
   },
 });
 
 export const storeCountry = internalMutation({
-  args: {
-    visitId: v.id("placeVisits"),
-    lat: v.number(),
-    lng: v.number(),
-    countryCode: v.string(),
-  },
+  args: { ...countryLookupArgs, countryCode: v.string() },
   returns: v.null(),
   handler: async (ctx, args) => {
     const visit = await ctx.db.get(args.visitId);
-    if (visit === null || visit.lat !== args.lat || visit.lng !== args.lng) {
+    if (visit === null || placeAt(visit.stampPlaces, args) === undefined) {
       return null;
     }
-    await ctx.db.patch(visit._id, { countryCode: args.countryCode });
+    await ctx.db.patch(visit._id, {
+      stampPlaces: visit.stampPlaces?.map((place) =>
+        place.lat === args.lat && place.lng === args.lng
+          ? { ...place, countryCode: args.countryCode }
+          : place,
+      ),
+    });
     return null;
   },
 });
 
 export const locateCountry = internalAction({
-  args: { visitId: v.id("placeVisits"), attempt: v.optional(v.number()) },
+  args: { ...countryLookupArgs, attempt: v.optional(v.number()) },
   returns: v.null(),
   handler: async (ctx, args) => {
     const config = appleMapsConfig(env);
     if (config === null) return null;
-    const point = await ctx.runMutation(
+    const { attempt: previous, ...point } = args;
+    const claim = await ctx.runMutation(
       internal.placeVisits.claimCountryLookup,
-      { visitId: args.visitId },
+      point,
     );
-    if (point === null) return null;
-    if (point.busyMs !== undefined) {
+    if (claim === null) return null;
+    if (!("ready" in claim)) {
       await ctx.scheduler.runAfter(
-        point.busyMs + Math.random() * COUNTRY_SPACING_MS * 60,
+        claim.busyMs + Math.random() * COUNTRY_SPACING_MS * 60,
         internal.placeVisits.locateCountry,
         args,
       );
@@ -365,14 +590,12 @@ export const locateCountry = internalAction({
       token === null ? null : await appleMapsCountry(token, point);
     if (countryCode !== null) {
       await ctx.runMutation(internal.placeVisits.storeCountry, {
-        visitId: args.visitId,
-        lat: point.lat,
-        lng: point.lng,
+        ...point,
         countryCode,
       });
       return null;
     }
-    const attempt = (args.attempt ?? 0) + 1;
+    const attempt = (previous ?? 0) + 1;
     logEvent("warn", "visit_country_failed", {
       token: token !== null,
       attempt,
@@ -381,14 +604,12 @@ export const locateCountry = internalAction({
       await ctx.scheduler.runAfter(
         COUNTRY_RETRY_MS * attempt,
         internal.placeVisits.locateCountry,
-        { visitId: args.visitId, attempt },
+        { ...point, attempt },
       );
     }
     return null;
   },
 });
-
-const BACKFILL_PAGE = 100;
 
 export const backfillCountries = internalMutation({
   args: { cursor: v.union(v.string(), v.null()) },
@@ -398,23 +619,12 @@ export const backfillCountries = internalMutation({
       .query("placeVisits")
       .paginate({ numItems: BACKFILL_PAGE, cursor: args.cursor });
     let queued = 0;
-    for (const visit of page) {
-      if (visit.countryCode !== undefined) continue;
-      if ((await liveOwner(ctx, visit.userId)) === null) continue;
-      if (visit.lat === undefined) {
-        const item = await ctx.db.get(visit.itemId);
-        const pin =
-          item !== null && item.userId === visit.userId
-            ? visitPin(item, visit.key)
-            : null;
-        if (pin === null) continue;
-        await ctx.db.patch(visit._id, pin);
-      }
-      await ctx.scheduler.runAfter(
-        queued++ * COUNTRY_SPACING_MS,
-        internal.placeVisits.locateCountry,
-        { visitId: visit._id },
-      );
+    for (const row of page) {
+      if ((await liveOwner(ctx, row.userId)) === null) continue;
+      queued += await syncStampPlaces(ctx, row, null, {
+        delayMs: queued * COUNTRY_SPACING_MS,
+        retryMissing: true,
+      });
     }
     if (!isDone) {
       await ctx.scheduler.runAfter(

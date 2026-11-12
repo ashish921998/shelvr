@@ -23,10 +23,14 @@ The target's `app.command` starts its own Metro
 `app.shelvr.save.dev`, opened with `--initialUrl` pointing at that Metro, so
 nothing is started by hand. Before a run:
 
-- **One simulator.** `xcrun simctl list devices booted` first. Reuse a booted
-  simulator that has `app.shelvr.save.dev`; boot one only when none is booted.
-  A simulator or a Metro on 8081 from another project is not yours: leave it.
-  `E2E_DEVICE=<name or udid>` picks the simulator when more than one is booted.
+- **Device policy.** Read `tools/e2e/.env.local` when present. Its `E2E_DEVICE`
+  is the local development and agent-testing default; the config loads it
+  outside CI without overriding an explicit environment variable. Final QA
+  uses `E2E_DEVICE=<E2E_QA_DEVICE from that file>` explicitly and keeps that
+  device stock. Never apply SimSlim to the final-QA device. An explicit user
+  device request wins. Do not silently fall back when the default is missing.
+  List devices through Argent first and use one simulator at a time; leave
+  devices and Metro servers owned by other projects or sessions alone.
 - **Port.** 8091 by default; `E2E_METRO_PORT` moves it. A Metro already on the
   port makes the run fail to start its own.
 - **Env.** `apps/native/.env.local` copied from the main checkout, pointing at
