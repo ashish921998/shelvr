@@ -275,8 +275,9 @@ export default defineSchema({
     deliveryError: v.optional(v.string()),
     deliveredAt: v.optional(v.number()),
     deliveryLeaseUntil: v.optional(v.number()),
-    deliveryStartedAt: v.optional(v.number()),
-    deliveryRequestBody: v.optional(v.string()),
+    deliveryRequest: v.optional(
+      v.object({ key: v.string(), body: v.string(), startedAt: v.number() }),
+    ),
   })
     .index("by_user", ["userId"])
     .index("by_status_attempts", ["status", "attempts"]),

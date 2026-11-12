@@ -31,11 +31,15 @@ const DELIVERY_RETRY_WINDOW_MS = 23 * 60 * 60_000;
 const RETRY_SCAN = 100;
 const MAX_CONTEXT_LENGTH = 64;
 const CLEARED_DELIVERY = {
-  deliveryRequestBody: undefined,
+  deliveryRequest: undefined,
   deliveryLeaseUntil: undefined,
 };
+const REJECTED_CATEGORIES = new Set<Infer<typeof resendErrorCategoryValidator>>(
+  ["invalid_request", "invalid_recipient", "auth_error"],
+);
 
 const claimedDeliveryValidator = v.object({
+  key: v.string(),
   body: v.string(),
   attempt: v.number(),
 });
@@ -139,8 +143,8 @@ export const claimDelivery = internalMutation({
       return null;
     }
     if (
-      row.deliveryStartedAt !== undefined &&
-      now - row.deliveryStartedAt >= DELIVERY_RETRY_WINDOW_MS
+      row.deliveryRequest !== undefined &&
+      now - row.deliveryRequest.startedAt >= DELIVERY_RETRY_WINDOW_MS
     ) {
       await ctx.db.patch(args.submissionId, {
         status: "expired",
@@ -169,15 +173,17 @@ export const claimDelivery = internalMutation({
       return null;
     }
     const attempt = row.attempts + 1;
-    const body =
-      row.deliveryRequestBody ?? feedbackEmailBody(config, row, user.email);
+    const request = row.deliveryRequest ?? {
+      key: `feedback/${row._id}/${attempt}`,
+      body: feedbackEmailBody(config, row, user.email),
+      startedAt: now,
+    };
     await ctx.db.patch(args.submissionId, {
       attempts: attempt,
       deliveryLeaseUntil: now + DELIVERY_LEASE_MS,
-      deliveryStartedAt: row.deliveryStartedAt ?? now,
-      deliveryRequestBody: body,
+      deliveryRequest: request,
     });
-    return { attempt, body };
+    return { attempt, key: request.key, body: request.body };
   },
 });
 
@@ -191,17 +197,20 @@ export const finishDelivery = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // Pre-deploy actions have no attempt identity; discard their completion.
-    if (args.attempt === undefined) return null;
     const row = await ctx.db.get(args.submissionId);
     if (
       row === null ||
       row.status === "delivered" ||
       row.status === "expired" ||
-      row.status === "exhausted" ||
-      args.attempt !== row.attempts
+      row.status === "exhausted"
     )
       return null;
+    // Pre-deploy actions have no attempt; only a success no new claim has taken over still owns the row.
+    const owns =
+      args.attempt === undefined
+        ? args.status === "delivered" && row.deliveryRequest === undefined
+        : args.attempt === row.attempts;
+    if (!owns) return null;
     if (args.status === "delivered") {
       await ctx.db.patch(args.submissionId, {
         status: "delivered",
@@ -211,14 +220,15 @@ export const finishDelivery = internalMutation({
       });
       return null;
     }
+    const category = args.errorCategory ?? "network_error";
+    const exhausted = row.attempts >= MAX_DELIVERY_ATTEMPTS;
     await ctx.db.patch(args.submissionId, {
-      status: row.attempts >= MAX_DELIVERY_ATTEMPTS ? "exhausted" : "failed",
+      status: exhausted ? "exhausted" : "failed",
       deliveryLeaseUntil: undefined,
-      ...(row.attempts >= MAX_DELIVERY_ATTEMPTS ? CLEARED_DELIVERY : {}),
-      deliveryError: formatResendError(
-        args.errorCategory ?? "network_error",
-        args.errorStatus,
-      ),
+      ...(exhausted || REJECTED_CATEGORIES.has(category)
+        ? { deliveryRequest: undefined }
+        : {}),
+      deliveryError: formatResendError(category, args.errorStatus),
     });
     return null;
   },
@@ -254,8 +264,7 @@ function feedbackEmailBody(
 
 async function sendFeedbackEmail(
   apiKey: string,
-  submissionId: Id<"feedbackSubmissions">,
-  body: string,
+  { key, body }: ClaimedDelivery,
 ): Promise<void> {
   const response = await resendRequest(
     apiKey,
@@ -263,7 +272,7 @@ async function sendFeedbackEmail(
     "/emails",
     {
       method: "POST",
-      headers: { "Idempotency-Key": `feedback/${submissionId}` },
+      headers: { "Idempotency-Key": key },
       body,
     },
   );
@@ -284,7 +293,7 @@ async function attemptDelivery(
   const apiKey = env.RESEND_API_KEY;
   if (!apiKey) return;
   try {
-    await sendFeedbackEmail(apiKey, submissionId, claimed.body);
+    await sendFeedbackEmail(apiKey, claimed);
     logEvent("info", "feedback_delivered", {
       submission_id: submissionId,
       attempt: claimed.attempt,
