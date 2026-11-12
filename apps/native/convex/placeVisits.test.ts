@@ -1094,6 +1094,54 @@ describe("the passport", () => {
     expect(lookups()).toBe(1);
   });
 
+  it("gives a branch marked next to a cleared one its own country", async () => {
+    const lookups = await withMaps();
+    const { t, userId, itemId, visits } = await passportSetup();
+    const near = { ...PIN, lat: PIN.lat + 0.001 };
+    const far = { ...PIN, lat: PIN.lat + 0.05 };
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        spots: [
+          { lat: PIN.lat, lng: PIN.lng },
+          { lat: far.lat, lng: far.lng },
+        ],
+        stampPlaces: [
+          { lat: PIN.lat, lng: PIN.lng, city: "Lisbon", countryCode: "ES" },
+          { lat: far.lat, lng: far.lng, city: "Lisbon", countryCode: "ES" },
+        ],
+      });
+      await ctx.db.patch(itemId, { placePins: [PIN, near, far] });
+    });
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+      spot: { lat: PIN.lat, lng: PIN.lng },
+    });
+    await settle(t, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+        spot: { lat: near.lat, lng: near.lng },
+      }),
+    );
+    const [visit] = await visits();
+    expect(visit?.stampPlaces).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ lat: far.lat, countryCode: "ES" }),
+        expect.objectContaining({ lat: near.lat, countryCode: "PT" }),
+      ]),
+    );
+    expect(visit?.stampPlaces).toHaveLength(2);
+    expect(lookups()).toBe(1);
+  });
+
   it("stores no country once the account is being deleted", async () => {
     const { t, userId, itemId, visits } = await passportSetup();
     await t.mutation(api.placeVisits.setVisited, {

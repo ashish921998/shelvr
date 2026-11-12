@@ -179,7 +179,13 @@ async function clearVisit(
     if (remaining?.length === 0 || (original === undefined && sameName)) {
       await ctx.db.delete(row._id);
     } else if (remaining !== original) {
-      await ctx.db.patch(row._id, { spots: remaining });
+      const kept = stampPlacesFor(row.stampPlaces, remaining ?? []).filter(
+        (place) => place !== undefined,
+      );
+      await ctx.db.patch(row._id, {
+        spots: remaining,
+        ...(row.stampPlaces === undefined ? {} : { stampPlaces: kept }),
+      });
     }
   }
 }
