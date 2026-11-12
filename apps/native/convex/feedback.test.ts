@@ -9,7 +9,7 @@ import {
   isFeedbackInboxConfigured,
 } from "./feedback";
 import { classifyResendError, formatResendError } from "./model/resend";
-import { newConvexTest, signedInUser } from "./test.setup";
+import { gate, newConvexTest, signedInUser } from "./test.setup";
 import type { Id } from "./_generated/dataModel";
 
 const INBOX = "support@shelvr.app";
@@ -76,6 +76,109 @@ async function getSubmission(
 }
 
 describe("submitFeedback", () => {
+  it("reclaims expired deliveries without accepting an older attempt's failure", async () => {
+    vi.useFakeTimers();
+    const t = setup();
+    const submissionId = await insertSubmission(t, {});
+    const first = await t.mutation(internal.feedback.claimDelivery, {
+      submissionId,
+    });
+    expect(
+      await t.mutation(internal.feedback.claimDelivery, { submissionId }),
+    ).toBeNull();
+    vi.setSystemTime(Date.now() + 90_001);
+    const second = await t.mutation(internal.feedback.claimDelivery, {
+      submissionId,
+    });
+    expect(second?.attempt).toBe(2);
+    await t.mutation(internal.feedback.finishDelivery, {
+      submissionId,
+      attempt: first?.attempt,
+      status: "failed",
+    });
+    expect(
+      (await getSubmission(t, submissionId))?.deliveryLeaseUntil,
+    ).toBeGreaterThan(Date.now());
+    await t.mutation(internal.feedback.finishDelivery, {
+      submissionId,
+      attempt: second?.attempt,
+      status: "delivered",
+    });
+    expect(await getSubmission(t, submissionId)).toMatchObject({
+      status: "delivered",
+    });
+  });
+
+  it("retries an uncertain send with the same key and body after account or inbox changes", async () => {
+    const t = setup();
+    const { userId } = await signedInWithEmail(t, "before@example.com");
+    const submissionId = await insertSubmission(t, { userId });
+    const fetch = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("connection lost"))
+      .mockResolvedValue(Response.json({ id: "same-email" }));
+    vi.stubGlobal("fetch", fetch);
+    await t.action(internal.feedback.deliver, { submissionId });
+    await t.run((ctx) => ctx.db.patch(userId, { email: "after@example.com" }));
+    vi.stubEnv("RESEND_FEEDBACK_INBOX_EMAIL", "different@example.com");
+    await t.action(internal.feedback.deliver, { submissionId });
+    const first: RequestInit = fetch.mock.calls[0][1];
+    const second: RequestInit = fetch.mock.calls[1][1];
+    expect(new Headers(first.headers).get("Idempotency-Key")).toBe(
+      `feedback/${submissionId}`,
+    );
+    expect(new Headers(second.headers).get("Idempotency-Key")).toBe(
+      new Headers(first.headers).get("Idempotency-Key"),
+    );
+    expect(second.body).toBe(first.body);
+    expect(await getSubmission(t, submissionId)).toMatchObject({
+      status: "delivered",
+      attempts: 2,
+    });
+  });
+
+  it("does not resend an uncertain delivery after the provider's deduplication window", async () => {
+    vi.useFakeTimers();
+    const t = setup();
+    const submissionId = await insertSubmission(t, {});
+    await t.mutation(internal.feedback.claimDelivery, { submissionId });
+    vi.setSystemTime(Date.now() + 24 * 60 * 60_000);
+    const fetch = okFetch();
+    vi.stubGlobal("fetch", fetch);
+    await t.action(internal.feedback.deliver, { submissionId });
+    expect(fetch).not.toHaveBeenCalled();
+    expect(await getSubmission(t, submissionId)).toMatchObject({
+      status: "failed",
+      deliveryError: "idempotency_window_expired",
+    });
+    expect(
+      await t.query(internal.feedback.listSubmissionsNeedingDelivery, {}),
+    ).not.toContain(submissionId);
+  });
+
+  it("sends once when recovery overlaps a delivery already in flight", async () => {
+    const t = setup();
+    const submissionId = await insertSubmission(t, {});
+    const sending = gate();
+    const fetch = vi
+      .fn()
+      .mockImplementationOnce(() =>
+        sending.hold(Response.json({ id: "email" })),
+      )
+      .mockResolvedValue(Response.json({ id: "email" }));
+    vi.stubGlobal("fetch", fetch);
+    const first = t.action(internal.feedback.deliver, { submissionId });
+    await sending.reached;
+    const candidates = await t.query(
+      internal.feedback.listSubmissionsNeedingDelivery,
+      {},
+    );
+    if (candidates.includes(submissionId))
+      await t.action(internal.feedback.deliver, { submissionId });
+    sending.open();
+    await first;
+    expect(fetch).toHaveBeenCalledOnce();
+  });
   it("rejects unauthenticated callers", async () => {
     const t = setup();
     await expect(

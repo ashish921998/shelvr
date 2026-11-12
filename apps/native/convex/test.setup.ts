@@ -5,6 +5,21 @@ import type { MutationCtx } from "./_generated/server";
 import { AI_CONSENT_VERSION } from "./model/aiConsent";
 import schema from "./schema";
 import { vi } from "vitest";
+import type { FunctionArgs } from "convex/server";
+import { internal } from "./_generated/api";
+
+export async function storeCurrentPins(
+  t: ReturnType<typeof newConvexTest>,
+  args: Omit<FunctionArgs<typeof internal.placePins.storePins>, "version">,
+) {
+  const lookup = await t.query(internal.placePins.toLocate, {
+    itemId: args.itemId,
+  });
+  return t.mutation(internal.placePins.storePins, {
+    ...args,
+    version: lookup?.version,
+  });
+}
 
 export function revenuecatSnapshot({
   entitlement = "Shelvr Pro",

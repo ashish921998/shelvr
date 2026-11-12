@@ -90,6 +90,22 @@ describe("ScreenshotInput", () => {
     view.unmount();
   });
 
+  it("does not submit an image after switching away during decoding", async () => {
+    stubEncoder(100);
+    let finish: (image: ImageBitmap) => void = () => {};
+    vi.mocked(createImageBitmap).mockImplementationOnce(
+      () => new Promise((resolve) => (finish = resolve)),
+    );
+    const view = render();
+    view.pick(MB);
+    await view.submit();
+    view.unmount();
+    const close = vi.fn();
+    await act(async () => finish({ width: 100, height: 100, close }));
+    expect(view.onSubmit).not.toHaveBeenCalled();
+    expect(close).toHaveBeenCalledOnce();
+  });
+
   it("says so instead of sending when the shrunk image is still over the oracle's limit", async () => {
     stubEncoder(4 * MB + 1);
     const view = render();
