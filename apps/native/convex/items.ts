@@ -37,6 +37,7 @@ import {
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
 import { takeWithinBytes } from "./model/readBudget";
+import { userVisits, visitMatcher } from "./model/placeVisits";
 import {
   cityKey,
   countCities,
@@ -64,7 +65,9 @@ import {
   MAX_ITEM_TITLE_CHARS,
   MAX_NOTE_TEXT_CHARS,
   normalizeCities,
+  normalizePlaceCuisines,
   normalizePlaces,
+  placeCuisinesValidator,
   placeLocationsValidator,
   placePinsValidator,
   postMediaValidator,
@@ -244,6 +247,7 @@ function stripEmbedding(
   | "places"
   | "placesHeard"
   | "placeLocations"
+  | "placeCuisines"
   | "placesEdited"
 > {
   const {
@@ -251,6 +255,7 @@ function stripEmbedding(
     places: _places,
     placesHeard: _placesHeard,
     placeLocations: _placeLocations,
+    placeCuisines: _placeCuisines,
     embedding: _embedding,
     embeddingVersion: _version,
     embeddingAttempts: _attempts,
@@ -418,17 +423,16 @@ export const listCities = authedQuery({
       city: v.string(),
       count: v.number(),
       placeCount: v.optional(v.number()),
+      visitedCount: v.optional(v.number()),
       cover: v.union(v.string(), v.null()),
     }),
   ),
   handler: async (ctx) => {
     const items = await readySavesNewestFirst(ctx, ctx.userId);
+    const visits = await userVisits(ctx, ctx.userId, items);
     const cities = countCities(items)
-      .map(({ city, count }) => ({
-        city,
-        // Older installed clients use count as the number of saves.
-        count,
-        placeCount: uniquePlacePins(
+      .map(({ city, count }) => {
+        const pins = uniquePlacePins(
           items
             .filter((item) =>
               (item.cities ?? []).some(
@@ -437,8 +441,17 @@ export const listCities = authedQuery({
             )
             .slice(0, CITY_ITEMS_MAX)
             .flatMap((item) => pinsForCity(item, city)),
-        ).length,
-      }))
+        );
+        const visited = visitMatcher(visits, pins);
+        const visitedCount = pins.filter((pin) => visited(pin)).length;
+        return {
+          city,
+          // Older installed clients use count as the number of saves.
+          count,
+          placeCount: pins.length,
+          ...(visitedCount > 0 ? { visitedCount } : {}),
+        };
+      })
       .sort(
         (a, b) => b.placeCount - a.placeCount || (a.city < b.city ? -1 : 1),
       );
@@ -2122,18 +2135,20 @@ export const getItemInternal = internalQuery({
       places: v.optional(v.array(v.string())),
       placesHeard: v.optional(v.boolean()),
       placeLocations: v.optional(placeLocationsValidator),
+      placeCuisines: v.optional(placeCuisinesValidator),
     }),
     v.null(),
   ),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     if (item === null) return null;
-    const { places, placesHeard, placeLocations } = item;
+    const { places, placesHeard, placeLocations, placeCuisines } = item;
     return {
       ...stripEmbedding(item),
       ...(places ? { places } : {}),
       ...(placesHeard !== undefined ? { placesHeard } : {}),
       ...(placeLocations !== undefined ? { placeLocations } : {}),
+      ...(placeCuisines !== undefined ? { placeCuisines } : {}),
     };
   },
 });
@@ -2318,6 +2333,7 @@ export const addPlaceListParts = internalMutation({
     itemId: v.id("items"),
     runId: v.optional(v.string()),
     parts: v.array(placeListPartValidator),
+    placeCuisines: v.optional(placeCuisinesValidator),
   },
   returns: v.number(),
   handler: async (ctx, args) => {
@@ -2368,6 +2384,11 @@ export const addPlaceListParts = internalMutation({
       const cities = normalizeCities(part.cities);
       const places = normalizePlaces(part.places, cities);
       const placePins = withListPins([], part.pins, cities);
+      const placeCuisines = normalizePlaceCuisines(
+        args.placeCuisines,
+        places,
+        cities,
+      );
       const partId = await ctx.db.insert("items", {
         userId: item.userId,
         type: "link",
@@ -2384,6 +2405,7 @@ export const addPlaceListParts = internalMutation({
         intents: [],
         cities,
         places,
+        ...(placeCuisines.length > 0 ? { placeCuisines } : {}),
         placePins,
         searchText: buildSearchText({
           title: part.title,

@@ -2,7 +2,7 @@
 
 A new account answers a few short questions, picks a city, saves a sample
 reel through a drawn share sheet, sees its spots on a map and three slides,
-is asked about reminders, then meets the paywall. This is flow 25:
+is asked about reminders, then meets the paywall. This is flow 27:
 `ONBOARDING_FLOW_VERSION` and the step order (`ONBOARDING_STEPS`) are in
 `src/lib/onboarding-steps.ts`. The opener is three pages that swipe (on
 their own until a swipe, never with Reduce Motion), each with "Get started"
@@ -13,13 +13,14 @@ account stays signed out through the paywall and signs in after it.
 
 - "Get started" opens "How many places have you saved?", then "What would
   you like to plan?" (checkboxes `Date nights`, `Trips`, `Places to eat`,
-  `A bit of everything`). Goals that include `Trips` add "Are you planning
-  a trip soon?", which moves on at one tap (`Yes, I’m planning one`,
-  `Not yet`). Then "How do you like to plan?", "Where have you been?" and a
-  chart, "Let’s put your saves to use." The count, goal, planner and Been
-  questions have Continue (disabled until an answer) and "Skip" in the
-  header; a skipped goal question plans for every goal, so the trip
-  question follows. Every step after the opener has a back button.
+  `A bit of everything`), then "Where have you been?", then a chart, "Let’s
+  put your saves to use." The count and goal questions have Continue
+  (disabled until an answer). Every step after the opener has a back button
+  and "Skip" in the header; a skipped goal question plans for every goal.
+  Skip on "Try saving this reel." goes to the spots without "Your first
+  save!", and no reel is saved after sign-in. Skip on any carousel slide
+  leaves it as the last slide's Continue does, and on the notifications step
+  as "Not now"; it hides while iOS is asking.
 - "Where have you been?" shows the 25 sample cities as checkbox tiles named
   by city (`been-city-<id>`), with a "Search cities" field; a tile tap
   closes the keyboard, and a second tap takes the tick off. Its Continue
@@ -27,11 +28,11 @@ account stays signed out through the paywall and signs in after it.
   "Skip" moves on with none. The picks stay on the device until sign-in,
   then go to the account and show on the Map tab (see
   [Been cities](been-cities.md)).
-- The city question reads "Where are you going?" after `Yes, I’m planning
-one`, "Where’s your dream city?" when no goal or every goal is picked,
-  and "Where do you go out?" otherwise. A tap on a city moves on; "Skip"
-  and "Somewhere else" keep no city, and so does "Not sure yet", which
-  replaces "Somewhere else" when Trips is picked without Date nights. A
+- The city question reads "Where’s your next trip?" when `Trips` is picked
+  without `Date nights`, and "Where do you go out?" otherwise. A tap on a
+  city moves on; "Skip" and "Somewhere else" keep no city, and so does
+  "Not sure yet", which replaces "Somewhere else" when Trips is picked
+  without Date nights. A
   statement with Continue follows every city answer: it repeats the pick,
   if there is one, and names the city the sample comes from.
 - The sample is always a real reel (`src/lib/aha-sample.ts`), chosen by the
@@ -73,7 +74,7 @@ person as not Pro (`src/lib/e2e-hide-pro.ts`).
   walks the slides, opens and closes the paywall twice, then relaunches
   cold.
 - "uses a real Austin trip reel for a city without one": `Trips`,
-  `Not yet`, Tokyo as a Been city, Lisbon. Checks Austin's three trip
+  Tokyo as a Been city, Lisbon. Checks Austin's three trip
   spots, and that the last slide opens nothing on its own.
 - "turns one sample reel into a date night's spots, then asks for the
   paywall": date nights, city skipped. Checks Austin's three date spots,

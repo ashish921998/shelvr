@@ -2,14 +2,10 @@ import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { onboardingLabel } from "@/lib/onboarding-labels";
 import {
-  isPlanner,
   isSavedCount,
-  isTripSoon,
   readGoals,
   type Goal,
-  type Planner,
   type SavedCount,
-  type TripSoon,
 } from "@/lib/onboarding-goals";
 import { ONBOARDING_STEPS, type OnboardingStep } from "@/lib/onboarding-steps";
 import {
@@ -20,7 +16,7 @@ import {
 
 const PENDING_KEY = "shelvr.pending.onboarding";
 
-const PROGRESS_VERSION = 13;
+const PROGRESS_VERSION = 14;
 
 export type PendingDemo = {
   url: string;
@@ -42,8 +38,7 @@ type PendingRecord = {
   beenCities?: SampleCityId[];
   goals?: Goal[];
   savedCount?: SavedCount | null;
-  planner?: Planner | null;
-  tripSoon?: TripSoon | null;
+  skippedShare?: boolean;
 };
 
 type OnboardingAnswers = {
@@ -51,8 +46,7 @@ type OnboardingAnswers = {
   beenCities: SampleCityId[];
   goals: Goal[];
   savedCount: SavedCount | null;
-  planner: Planner | null;
-  tripSoon: TripSoon | null;
+  skippedShare: boolean;
 };
 
 type OnboardingProgress = OnboardingAnswers & {
@@ -66,8 +60,7 @@ const NO_ANSWERS: OnboardingAnswers = {
   beenCities: [],
   goals: [],
   savedCount: null,
-  planner: null,
-  tripSoon: null,
+  skippedShare: false,
 };
 
 function answersOf(record: Partial<OnboardingAnswers>): OnboardingAnswers {
@@ -76,8 +69,7 @@ function answersOf(record: Partial<OnboardingAnswers>): OnboardingAnswers {
     beenCities: readSampleCities(record.beenCities),
     goals: readGoals(record.goals),
     savedCount: isSavedCount(record.savedCount) ? record.savedCount : null,
-    planner: isPlanner(record.planner) ? record.planner : null,
-    tripSoon: isTripSoon(record.tripSoon) ? record.tripSoon : null,
+    skippedShare: record.skippedShare === true,
   };
 }
 
