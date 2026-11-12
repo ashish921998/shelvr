@@ -21,7 +21,6 @@ const SEARCH_FROM = 6;
 const CITY_TITLES: Record<CityQuestion, TextMessageKey> = {
   trip: "onboardingQ.cityTitleTrip",
   out: "onboardingQ.cityTitleOut",
-  dream: "onboardingQ.cityTitleDream",
 };
 
 function CityTile({

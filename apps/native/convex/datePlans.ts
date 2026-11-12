@@ -29,10 +29,11 @@ import {
   type DatePlanResult,
 } from "./model/datePlan";
 import { logEvent } from "./model/log";
-import { placeKey, suggestSavedPlaces } from "./model/plan";
+import { placeKey } from "./model/plan";
+import { visitAtPin } from "./model/placeVisits";
 import { dropStrays } from "./model/trip";
 import { chainNames, saveWhy } from "./model/tripSuggest";
-import { appleLang, pinFor } from "./tripPlanner";
+import { appleLang, unvisitedSavedPlaces } from "./tripPlanner";
 
 /** The whole Apple search, token included, gives up after this and the saves plan alone. */
 const FILL_DEADLINE_MS = 10_000;
@@ -47,18 +48,13 @@ type ListClaim = Extract<Claim, { from: "list" }>;
 
 /** The city's unvisited saved places that already have a pin; a date never looks one up. */
 function savedCandidates(claim: SavesClaim): DateCandidate[] {
-  const been = new Set(claim.been.map(placeKey));
-  const places = suggestSavedPlaces(
-    claim.sources,
-    been,
-    Number.MAX_SAFE_INTEGER,
-  );
-  const pinned = dropStrays(places.map((place) => pinFor(place, claim.pins)));
+  const candidates = unvisitedSavedPlaces(claim);
+  const pinned = dropStrays(candidates.map(({ pin }) => pin));
   const sources = new Map(
     claim.sources.map((source) => [source.itemId, source]),
   );
   const saves = new Map(claim.saves.map((save) => [save.itemId, save]));
-  return places.flatMap((place, i) => {
+  return candidates.flatMap(({ place }, i) => {
     const pin = pinned[i];
     const source = sources.get(place.itemId);
     const save = saves.get(place.itemId);
@@ -137,6 +133,7 @@ async function suggestStops(
   lang: string | undefined,
   signal: AbortSignal,
   removed: Claim["removed"],
+  visitMarks: Claim["visitMarks"],
 ): Promise<{ stops: ScoredStop[]; searches: number }> {
   const config = appleMapsConfig(env);
   if (config === null) {
@@ -166,6 +163,7 @@ async function suggestStops(
     ),
   );
   const chains = chainNames(replies.flat());
+  const visited = visitAtPin(visitMarks);
   const taken = scored.map((entry) => entry.stop);
   const stops: ScoredStop[] = [];
   targets.forEach(({ anchor, slot }, i) => {
@@ -173,6 +171,7 @@ async function suggestStops(
     for (const found of replies[i]) {
       if (kept >= SUGGESTIONS_PER_ANCHOR) break;
       if (
+        visited(found) ||
         !keepDateSuggestion(found, {
           kind,
           slot,
@@ -254,6 +253,7 @@ export const makeDatePlan = action({
             appleLang(args.locale),
             signal,
             claim.removed,
+            claim.visitMarks,
           ).catch((error: unknown) => {
             logEvent("warn", "date_plan_suggest_failed", {
               error_name: error instanceof Error ? error.name : "unknown",

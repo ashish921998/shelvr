@@ -172,6 +172,7 @@ export default function AppLayout() {
           />
           <Stack.Screen name="new-shared-list" options={modal} />
           <Stack.Screen name="been-cities" options={modal} />
+          <Stack.Screen name="city-card" options={modal} />
           <Stack.Screen
             name="edit-save-places"
             options={{ headerShown: true, headerTransparent: false }}
