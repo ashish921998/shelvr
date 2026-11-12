@@ -225,6 +225,23 @@ describe("useTrialReminder primer", () => {
     expect(mock.request).not.toHaveBeenCalled();
   });
 
+  it("drops a new trial's primer whose turn comes too late for its preview", async () => {
+    vi.mocked(useCurrentUser).mockReturnValue({
+      data: { _id: "user-a" as Id<"users">, email: undefined },
+    } as CurrentUser);
+    vi.mocked(useEntitlement).mockReturnValue(entitled("none"));
+    const hook = renderHook(() => useTrialReminder());
+    vi.mocked(useEntitlement).mockReturnValue({
+      ...entitled("trialing"),
+      expiresAt: Date.now() + 5 * DAY,
+    });
+    hook.rerender();
+    await vi.waitFor(() => expect(mock.settled).toHaveBeenCalled());
+    for (let round = 0; round < 5; round += 1) await act(async () => {});
+    expect(trialReminderPrimer.isOpen()).toBe(false);
+    expect(mock.request).not.toHaveBeenCalled();
+  });
+
   it("does not ask again on the next launch once the primer was shown", async () => {
     vi.resetModules();
     const first = await import("./trial-reminder");
