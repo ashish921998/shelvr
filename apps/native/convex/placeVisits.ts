@@ -244,7 +244,8 @@ const MAX_UNSTAMPED_PLACES = 200;
 const COUNTRY_SPACING_MS = 1_000;
 const COUNTRY_RETRY_MS = 60_000;
 const MAX_COUNTRY_ATTEMPTS = 3;
-const BACKFILL_PAGE = 100;
+const BACKFILL_PAGE = 25;
+const BACKFILL_SPACING_MS = 9_000;
 
 type StampPlace = NonNullable<Doc<"placeVisits">["stampPlaces"]>[number];
 type Point = { lat: number; lng: number };
@@ -298,7 +299,11 @@ async function syncStampPlaces(
   ctx: MutationCtx,
   row: Doc<"placeVisits">,
   marked: Doc<"items"> | null,
-  options: { delayMs?: number; retryMissing?: boolean } = {},
+  options: {
+    delayMs?: number;
+    spacingMs?: number;
+    retryMissing?: boolean;
+  } = {},
 ): Promise<number> {
   const saved =
     marked?._id === row.itemId
@@ -322,7 +327,8 @@ async function syncStampPlaces(
     : fresh;
   for (const [index, { lat, lng }] of lookups.entries()) {
     await ctx.scheduler.runAfter(
-      (options.delayMs ?? 0) + index * COUNTRY_SPACING_MS,
+      (options.delayMs ?? 0) +
+        index * (options.spacingMs ?? COUNTRY_SPACING_MS),
       internal.placeVisits.locateCountry,
       { visitId: row._id, lat, lng },
     );
@@ -634,13 +640,14 @@ export const backfillCountries = internalMutation({
     for (const row of page) {
       if ((await liveOwner(ctx, row.userId)) === null) continue;
       queued += await syncStampPlaces(ctx, row, null, {
-        delayMs: queued * COUNTRY_SPACING_MS,
+        delayMs: queued * BACKFILL_SPACING_MS,
+        spacingMs: BACKFILL_SPACING_MS,
         retryMissing: true,
       });
     }
     if (!isDone) {
       await ctx.scheduler.runAfter(
-        queued * COUNTRY_SPACING_MS,
+        queued * BACKFILL_SPACING_MS,
         internal.placeVisits.backfillCountries,
         { cursor: continueCursor },
       );
