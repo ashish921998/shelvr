@@ -25,7 +25,6 @@ export const TRIAL_REMINDER_ID = "shelvr.trial-ending";
 export const TRIAL_LAST_DAY_ID = "shelvr.trial-last-day";
 const CHANNEL_ID = "trial-reminder";
 const TRIAL_MS = 7 * DAY_MS;
-const PRIMER_PREVIEW_MIN_MS = 4 * DAY_MS;
 const NUDGE_EARLIEST_HOUR = 10;
 const NUDGE_LATEST_HOUR = 19;
 
@@ -355,7 +354,7 @@ export function useTrialReminder(): void {
             trialReminderLeadDays(),
           );
           if (remindAt === null) return false;
-          if (remindAt - now < PRIMER_PREVIEW_MIN_MS) return false;
+          if (expiresAt - now < TRIAL_MS - DAY_MS) return false;
           const confirmed = await confirmTrialReminderAsk(live);
           if (!confirmed.ask || !live()) return false;
           await waitForSheetTransition();
