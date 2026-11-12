@@ -327,8 +327,18 @@ export default defineSchema({
     countryCode: v.optional(v.string()),
     lat: v.optional(v.number()),
     lng: v.optional(v.number()),
-    backfilled: v.optional(v.boolean()),
     spots: v.optional(v.array(visitSpotValidator)),
+    stampPlaces: v.optional(
+      v.array(
+        v.object({
+          lat: v.number(),
+          lng: v.number(),
+          city: v.optional(v.string()),
+          countryCode: v.optional(v.string()),
+        }),
+      ),
+    ),
+    backfilled: v.optional(v.boolean()),
   })
     .index("by_user_and_key", ["userId", "key"])
     .index("by_user_and_visited", ["userId", "visitedAt"]),

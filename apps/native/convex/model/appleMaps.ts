@@ -258,9 +258,41 @@ export function firstPlace(
   return null;
 }
 
+const countrySchema = z.object({
+  results: z.array(
+    z
+      .object({ countryCode: z.string().regex(/^[A-Za-z]{2}$/) })
+      .partial()
+      .catch({}),
+  ),
+});
+
+export async function appleMapsCountry(
+  accessToken: string,
+  point: LatLng,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string | null> {
+  try {
+    const response = await appleGet(
+      accessToken,
+      "reverseGeocode",
+      new URLSearchParams({ loc: `${point.lat},${point.lng}` }),
+      fetchImpl,
+    );
+    if (!response.ok) return null;
+    const reply = countrySchema.safeParse(await response.json());
+    const code = reply.success
+      ? reply.data.results.find((place) => place.countryCode)?.countryCode
+      : undefined;
+    return code?.toUpperCase() ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function appleGet(
   accessToken: string,
-  path: "search" | "geocode" | "searchAutocomplete",
+  path: "search" | "geocode" | "searchAutocomplete" | "reverseGeocode",
   params: URLSearchParams,
   fetchImpl: typeof fetch,
 ): Promise<Response> {
