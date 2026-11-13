@@ -673,7 +673,16 @@ async function unstampedRows(ctx: QueryCtx, places: readonly UnstampedPin[]) {
 
 export const listUnstampedPlaces = authedQuery({
   args: {},
-  returns: v.array(unstampedPlaceValidator),
+  returns: v.array(
+    v.object({
+      itemId: v.id("items"),
+      name: v.string(),
+      city: v.string(),
+      spot: visitSpotValidator,
+      title: v.optional(v.string()),
+      cover: v.union(v.string(), v.null()),
+    }),
+  ),
   handler: async (ctx) =>
     await unstampedRows(
       ctx,
