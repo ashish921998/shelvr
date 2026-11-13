@@ -274,6 +274,10 @@ export default defineSchema({
     attempts: v.number(),
     deliveryError: v.optional(v.string()),
     deliveredAt: v.optional(v.number()),
+    deliveryLeaseUntil: v.optional(v.number()),
+    deliveryRequest: v.optional(
+      v.object({ key: v.string(), body: v.string(), startedAt: v.number() }),
+    ),
   })
     .index("by_user", ["userId"])
     .index("by_status_attempts", ["status", "attempts"]),
@@ -324,6 +328,17 @@ export default defineSchema({
     itemId: v.id("items"),
     visitedAt: v.number(),
     spots: v.optional(v.array(visitSpotValidator)),
+    stampPlaces: v.optional(
+      v.array(
+        v.object({
+          lat: v.number(),
+          lng: v.number(),
+          city: v.optional(v.string()),
+          countryCode: v.optional(v.string()),
+        }),
+      ),
+    ),
+    backfilled: v.optional(v.boolean()),
   })
     .index("by_user_and_key", ["userId", "key"])
     .index("by_user_and_visited", ["userId", "visitedAt"]),

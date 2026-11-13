@@ -196,11 +196,16 @@ async function namesToLocate(
   );
 }
 
+function lookupVersion(item: Doc<"items">): string {
+  return JSON.stringify([item.processingRunId ?? null, item.cities ?? []]);
+}
+
 export const toLocate = internalQuery({
   args: { itemId: v.id("items"), refresh: v.optional(v.boolean()) },
   returns: v.union(
     v.null(),
     v.object({
+      version: v.string(),
       names: v.array(v.string()),
       locations: placeLocationsValidator,
       cities: v.array(v.string()),
@@ -218,6 +223,7 @@ export const toLocate = internalQuery({
     const singleCity = city !== undefined;
     const pins = nearEachOther(item.placePins ?? [], city);
     return {
+      version: lookupVersion(item),
       names,
       cities: item.cities ?? [],
       locations: normalizePlaceLocations(
@@ -345,6 +351,7 @@ async function addPinsBesideOwnerPins(
 export const storePins = internalMutation({
   args: {
     itemId: v.id("items"),
+    version: v.optional(v.string()),
     found: placePinsValidator,
     cluesSearched: v.optional(placeLocationsValidator),
     keepPins: v.optional(v.boolean()),
@@ -352,8 +359,16 @@ export const storePins = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    // Discard pre-deploy results without throwing so their action can still schedule its retry.
+    if (args.version === undefined) return null;
     const item = await ctx.db.get(args.itemId);
-    if (item === null || !(await aiAllowed(ctx, item.userId))) return null;
+    if (
+      item === null ||
+      item.status !== "ready" ||
+      args.version !== lookupVersion(item) ||
+      !(await aiAllowed(ctx, item.userId))
+    )
+      return null;
     const wanted = await wantedPlaces(ctx, item);
     const found = dropPinsFoundUnderOldClues(
       args.found,
@@ -537,6 +552,7 @@ export const locateItem = internalAction({
           );
     await ctx.runMutation(internal.placePins.storePins, {
       itemId: args.itemId,
+      version: todo.version,
       found,
       cluesSearched: todo.locations,
       keepPins: args.keepPins,
@@ -568,17 +584,26 @@ export const locateItem = internalAction({
 
 export const toIdentify = internalQuery({
   args: { itemId: v.id("items") },
-  returns: v.array(
-    v.object({ name: v.string(), lat: v.number(), lng: v.number() }),
+  returns: v.union(
+    v.null(),
+    v.object({
+      version: v.string(),
+      pins: v.array(
+        v.object({ name: v.string(), lat: v.number(), lng: v.number() }),
+      ),
+    }),
   ),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     // Before the save settles its places are not set yet, and storePins would drop every pin.
-    if (item === null || item.status !== "ready") return [];
-    if (!(await aiAllowed(ctx, item.userId))) return [];
-    return (item.placePins ?? [])
-      .filter((pin) => pin.appleId === undefined)
-      .map(({ name, lat, lng }) => ({ name, lat, lng }));
+    if (item === null || item.status !== "ready") return null;
+    if (!(await aiAllowed(ctx, item.userId))) return null;
+    return {
+      version: lookupVersion(item),
+      pins: (item.placePins ?? [])
+        .filter((pin) => pin.appleId === undefined)
+        .map(({ name, lat, lng }) => ({ name, lat, lng })),
+    };
   },
 });
 
@@ -590,8 +615,9 @@ export const identifyPins = internalAction({
   args: { itemId: v.id("items") },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const pins = await ctx.runQuery(internal.placePins.toIdentify, args);
-    if (pins.length === 0) return null;
+    const todo = await ctx.runQuery(internal.placePins.toIdentify, args);
+    if (todo === null || todo.pins.length === 0) return null;
+    const { pins, version } = todo;
     const config = appleMapsConfig(env);
     if (config === null) {
       logEvent("info", "place_pins_unconfigured", {});
@@ -624,6 +650,7 @@ export const identifyPins = internalAction({
     await ctx.runMutation(internal.placePins.storePins, {
       itemId: args.itemId,
       found: found.flat(),
+      version,
     });
     return null;
   },

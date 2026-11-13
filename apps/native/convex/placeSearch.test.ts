@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
-import { newConvexTest, signedInUser } from "./test.setup";
+import { newConvexTest, signedInUser, storeCurrentPins } from "./test.setup";
 import { buildSearchText, searchQueryText } from "./model/searchText";
 import { completionPatch } from "./model/settlement";
 
@@ -107,19 +107,19 @@ it("indexes intent-sourced map pins during backfill and keeps pin updates search
   await backend.run((ctx) =>
     ctx.db.patch(itemId, { searchText: "stale", placePins: [] }),
   );
-  await backend.mutation(internal.placePins.storePins, {
+  await storeCurrentPins(backend, {
     itemId,
     found: [pin],
   });
   expect(await found()).toEqual([itemId]);
   await backend.run((ctx) => ctx.db.patch(itemId, { searchText: "stale" }));
-  await backend.mutation(internal.placePins.storePins, {
+  await storeCurrentPins(backend, {
     itemId,
     found: [pin],
   });
   expect(await found()).toEqual([itemId]);
   await backend.run((ctx) => ctx.db.patch(itemId, { intents: [] }));
-  await backend.mutation(internal.placePins.storePins, { itemId, found: [] });
+  await storeCurrentPins(backend, { itemId, found: [] });
   expect(await found()).toEqual([]);
 });
 
