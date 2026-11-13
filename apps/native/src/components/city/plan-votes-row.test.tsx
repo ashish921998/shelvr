@@ -271,6 +271,18 @@ describe("CityVotes", () => {
     expect(mocks.mounts).toBe(2);
   });
 
+  it("keeps a reopened sheet open when the first sheet's request finishes late", async () => {
+    show(null);
+    await tap(screen.getByTestId("plan-votes-row"));
+    const firstClose = sheetProps()!.onClose;
+    fireEvent.click(screen.getByText("close sheet"));
+    await tap(screen.getByTestId("plan-votes-row"));
+    expect(sheetProps()?.visible).toBe(true);
+
+    act(() => firstClose());
+    expect(sheetProps()?.visible).toBe(true);
+  });
+
   it("opens the sheet with no link from the ask row", async () => {
     show(null);
     await tap(screen.getByTestId("plan-votes-row"));

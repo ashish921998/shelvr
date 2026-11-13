@@ -248,9 +248,13 @@ export default function PlanVote({
   };
 
   const onName = (value: string) => {
+    const stored = [
+      storedBallot(savedKey(token)),
+      storedBallot(pendingKey(token)),
+    ];
     const current = newestChoices(
       pending.current ?? { choices, revision: lastRevision.current },
-      [storedBallot(savedKey(token)), storedBallot(pendingKey(token))],
+      stored,
     );
     if (current !== (pending.current?.choices ?? choices)) setChoices(current);
     const withVotes = Object.keys(current).length > 0;
@@ -262,6 +266,10 @@ export default function PlanVote({
       captureWebAnalyticsEvent("plan_vote_named", { with_votes: withVotes });
     }
     if (!withVotes) return;
+    lastRevision.current = Math.max(
+      lastRevision.current,
+      ...stored.map((ballot) => ballot?.revision ?? 0),
+    );
     clearTimeout(timer.current);
     const revision = nextRevision(lastRevision);
     pending.current = { choices: current, revision };
