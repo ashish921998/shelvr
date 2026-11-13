@@ -351,7 +351,7 @@ async function addPinsBesideOwnerPins(
 export const storePins = internalMutation({
   args: {
     itemId: v.id("items"),
-    version: v.optional(v.string()),
+    version: v.string(),
     found: placePinsValidator,
     cluesSearched: v.optional(placeLocationsValidator),
     keepPins: v.optional(v.boolean()),
@@ -359,8 +359,6 @@ export const storePins = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
-    // Discard pre-deploy results without throwing so their action can still schedule its retry.
-    if (args.version === undefined) return null;
     const item = await ctx.db.get(args.itemId);
     if (
       item === null ||

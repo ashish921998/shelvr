@@ -34,9 +34,17 @@ const CLEARED_DELIVERY = {
   deliveryRequest: undefined,
   deliveryLeaseUntil: undefined,
 };
-const REJECTED_CATEGORIES = new Set<Infer<typeof resendErrorCategoryValidator>>(
-  ["invalid_request", "invalid_recipient", "auth_error"],
-);
+const REJECTED_PAYLOADS = new Set<Infer<typeof resendErrorCategoryValidator>>([
+  "invalid_request",
+  "invalid_recipient",
+]);
+
+function deliveryKey(
+  submissionId: Id<"feedbackSubmissions">,
+  attempt: number,
+): string {
+  return `feedback/${submissionId}/${attempt}`;
+}
 
 const claimedDeliveryValidator = v.object({
   key: v.string(),
@@ -160,24 +168,28 @@ export const claimDelivery = internalMutation({
       });
       return null;
     }
-    const config = feedbackInboxConfig();
-    if (config === null) {
-      if (row.status !== "unconfigured") {
-        await ctx.db.patch(args.submissionId, { status: "unconfigured" });
-      }
-      return null;
-    }
     const user = await liveOwner(ctx, row.userId);
     if (user === null) {
       await ctx.db.delete(args.submissionId);
       return null;
     }
     const attempt = row.attempts + 1;
-    const request = row.deliveryRequest ?? {
-      key: `feedback/${row._id}/${attempt}`,
-      body: feedbackEmailBody(config, row, user.email),
-      startedAt: now,
-    };
+    const config = feedbackInboxConfig();
+    const request =
+      row.deliveryRequest ??
+      (config === null
+        ? null
+        : {
+            key: deliveryKey(row._id, attempt),
+            body: feedbackEmailBody(config, row, user.email),
+            startedAt: now,
+          });
+    if (!env.RESEND_API_KEY || request === null) {
+      if (row.status !== "unconfigured") {
+        await ctx.db.patch(args.submissionId, { status: "unconfigured" });
+      }
+      return null;
+    }
     await ctx.db.patch(args.submissionId, {
       attempts: attempt,
       deliveryLeaseUntil: now + DELIVERY_LEASE_MS,
@@ -190,7 +202,7 @@ export const claimDelivery = internalMutation({
 export const finishDelivery = internalMutation({
   args: {
     submissionId: v.id("feedbackSubmissions"),
-    attempt: v.optional(v.number()),
+    attempt: v.number(),
     status: v.union(v.literal("delivered"), v.literal("failed")),
     errorCategory: v.optional(resendErrorCategoryValidator),
     errorStatus: v.optional(v.number()),
@@ -202,15 +214,10 @@ export const finishDelivery = internalMutation({
       row === null ||
       row.status === "delivered" ||
       row.status === "expired" ||
-      row.status === "exhausted"
+      row.status === "exhausted" ||
+      args.attempt !== row.attempts
     )
       return null;
-    // Pre-deploy actions have no attempt; only a success no new claim has taken over still owns the row.
-    const owns =
-      args.attempt === undefined
-        ? args.status === "delivered" && row.deliveryRequest === undefined
-        : args.attempt === row.attempts;
-    if (!owns) return null;
     if (args.status === "delivered") {
       await ctx.db.patch(args.submissionId, {
         status: "delivered",
@@ -225,7 +232,10 @@ export const finishDelivery = internalMutation({
     await ctx.db.patch(args.submissionId, {
       status: exhausted ? "exhausted" : "failed",
       deliveryLeaseUntil: undefined,
-      ...(exhausted || REJECTED_CATEGORIES.has(category)
+      ...(exhausted ||
+      REJECTED_PAYLOADS.has(category) ||
+      (category === "auth_error" &&
+        row.deliveryRequest?.key === deliveryKey(row._id, row.attempts))
         ? { deliveryRequest: undefined }
         : {}),
       deliveryError: formatResendError(category, args.errorStatus),
