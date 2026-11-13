@@ -37,10 +37,10 @@ async function fixture() {
     if (!consent) throw new Error("Missing fixture consent");
     await t.action(internal.legalConsentSync.send, { id: consent._id });
   };
-  const reachRetry = async () => {
+  const reachRetry = async (maxDelay: number) => {
     const consent = await row();
     if (!consent) throw new Error("Missing fixture consent");
-    expect(consent.nextSyncAt - Date.now()).toBeLessThanOrEqual(3_601_000);
+    expect(consent.nextSyncAt - Date.now()).toBeLessThanOrEqual(maxDelay + 50);
     vi.setSystemTime(consent.nextSyncAt);
   };
   return { t, userId, signedIn, row, review, send, reachRetry };
@@ -270,7 +270,7 @@ describe("consent delivery reliability", () => {
       });
       await f.send();
       expect(fetchMock).toHaveBeenCalledOnce();
-      await f.reachRetry();
+      await f.reachRetry(2000);
       fetchMock.mockImplementation(async () => Response.json({}));
       await f.send();
       expect((await f.row())?.syncState).toBe("synced");
@@ -286,7 +286,7 @@ describe("consent delivery reliability", () => {
     await f.send();
     expect(fetchMock).not.toHaveBeenCalled();
     vi.stubEnv("REVENUECAT_API_KEY", "test-api-key");
-    await f.reachRetry();
+    await f.reachRetry(2000);
     await f.send();
     expect((await f.row())?.syncState).toBe("pending");
   });
@@ -297,7 +297,7 @@ describe("consent delivery reliability", () => {
     vi.stubGlobal("fetch", fetchMock);
     await f.review(true);
     for (let attempt = 0; attempt < MAX_SYNC_ATTEMPTS; attempt++) {
-      if (attempt > 0) await f.reachRetry();
+      if (attempt > 0) await f.reachRetry(3_600_000);
       await f.send();
     }
     expect(await f.row()).toMatchObject({
@@ -341,7 +341,7 @@ describe("consent delivery reliability", () => {
       }),
     );
     for (let attempt = 0; attempt <= MAX_SYNC_ATTEMPTS; attempt++) {
-      if (attempt > 0) await f.reachRetry();
+      if (attempt > 0) await f.reachRetry(3_600_000);
       await f.send();
     }
     expect(await f.row()).toMatchObject({
@@ -360,7 +360,7 @@ describe("consent delivery reliability", () => {
     expect(await f.row()).toMatchObject({ syncState: "pending" });
     await f.signedIn.mutation(api.legalConsent.withdraw, {});
     for (let attempt = 0; attempt <= MAX_SYNC_ATTEMPTS; attempt++) {
-      if (attempt > 0) await f.reachRetry();
+      if (attempt > 0) await f.reachRetry(3_600_000);
       await f.send();
     }
     expect(await f.row()).toMatchObject({
