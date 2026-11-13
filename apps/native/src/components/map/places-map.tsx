@@ -21,9 +21,7 @@ export type MapPin = {
   lng: number;
   /** iOS: the emoji inside the pin, saying what the place is. */
   emoji?: string;
-  /** iOS: the pin's colour, when it is not the usual one. */
   tint?: string;
-  /** Android: the line under the pin's name. */
   snippet?: string;
 };
 

@@ -38,7 +38,6 @@ export function filterPlaces<T extends Kinded>(
 
 export type WentFilter = "all" | "want" | "went";
 
-/** The switch shows only once a place on the map was visited; until then every place shows. */
 export function wentView<T>(
   places: readonly T[],
   filter: WentFilter,
