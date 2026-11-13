@@ -41,18 +41,14 @@ export function useFreshPinDrop(
     ReadonlyMap<string, readonly string[]>
   >(() => new Map());
   const shown = shownByCity.get(key) ?? EMPTY;
-  const order = useMemo(() => {
-    const ids = new Set(shown);
-    if (selected !== null) ids.add(selected);
-    return dropOrder(rows, ids);
-  }, [rows, shown, selected]);
-  useEffect(() => {
-    if (selected === null || shown.includes(selected)) return;
-    if (!rows.some((row) => cityPinId(row.pin) === selected)) return;
-    setShownByCity((current) =>
-      new Map(current).set(key, [...(current.get(key) ?? EMPTY), selected]),
-    );
-  }, [selected, shown, rows, key]);
+  if (
+    selected !== null &&
+    !shown.includes(selected) &&
+    rows.some((row) => cityPinId(row.pin) === selected)
+  ) {
+    setShownByCity(new Map(shownByCity).set(key, [...shown, selected]));
+  }
+  const order = useMemo(() => dropOrder(rows, new Set(shown)), [rows, shown]);
   useEffect(() => {
     if (reduced || order.waiting.length === 0) return;
     const batch =
