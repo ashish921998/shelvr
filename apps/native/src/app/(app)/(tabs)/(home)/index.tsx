@@ -28,7 +28,11 @@ import {
 import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
 import { NameSheet } from "@/components/shared-list/name-sheet";
-import { useHoldSheetTurns, useSheetTurnsBusy } from "@/lib/one-time-sheets";
+import {
+  useHoldSheetTurns,
+  useSheetTurnUp,
+  useSheetTurnsBusy,
+} from "@/lib/one-time-sheets";
 import { useWelcomeName } from "@/lib/welcome-name";
 import {
   type NativeScrollEvent,
@@ -85,6 +89,7 @@ export default function HomeScreen() {
       !saveWaiting(access),
   );
   const sheetsBusy = useSheetTurnsBusy();
+  const sheetUp = useSheetTurnUp();
   const deferPrompts =
     cancelSurvey.visible ||
     entitlement.loading ||
@@ -114,7 +119,7 @@ export default function HomeScreen() {
     <ProCard lapsed={entitlement.status === "lapsed"} />
   ) : nearLimit ? (
     <FreeSavesCard left={access.left} limit={access.limit} open={access.open} />
-  ) : feedback.invitationVisible && !busySaving ? (
+  ) : feedback.invitationVisible && !busySaving && !sheetUp ? (
     <FeedbackInvitation
       onSendFeedback={feedback.openFeedbackFromInvitation}
       onDismiss={feedback.dismissInvitation}

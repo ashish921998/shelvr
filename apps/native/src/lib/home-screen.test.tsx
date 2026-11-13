@@ -37,6 +37,7 @@ const mocks = vi.hoisted(() => ({
   entitlement: {} as Record<string, unknown>,
   access: { kind: "loading" } as Access,
   permission: {} as Record<string, unknown>,
+  permissionGate: null as Promise<void> | null,
   firstName: {} as {
     firstName: string | null | undefined;
     failed: boolean;
@@ -62,7 +63,8 @@ vi.mock("expo-notifications", () => ({
   IosAuthorizationStatus: { AUTHORIZED: 2, PROVISIONAL: 3, EPHEMERAL: 4 },
   SchedulableTriggerInputTypes: { DATE: "date" },
   setNotificationChannelAsync: vi.fn(),
-  getPermissionsAsync: () => Promise.resolve(mocks.permission),
+  getPermissionsAsync: () =>
+    (mocks.permissionGate ?? Promise.resolve()).then(() => mocks.permission),
   requestPermissionsAsync: () => Promise.resolve(mocks.permission),
   scheduleNotificationAsync: vi.fn(),
   cancelScheduledNotificationAsync: vi.fn(),
@@ -123,6 +125,11 @@ vi.mock("@/lib/review-prompt", () => ({ useReviewPrompt: vi.fn() }));
 
 const fakes = vi.hoisted(() => ({
   nothing: () => null,
+  invitation: ({ onSendFeedback }: { onSendFeedback: () => void }) => (
+    <button type="button" onClick={onSendFeedback}>
+      feedback invitation
+    </button>
+  ),
   passThrough: ({ children }: { children?: ReactNode }) => (
     <div>{children}</div>
   ),
@@ -153,7 +160,7 @@ vi.mock("@/components/cancel-survey/cancel-survey-card", () => ({
   CancelSurveyCard: fakes.nothing,
 }));
 vi.mock("@/components/feedback/feedback-invitation", () => ({
-  FeedbackInvitation: fakes.nothing,
+  FeedbackInvitation: fakes.invitation,
 }));
 vi.mock("@/components/feedback/feedback-modal", () => ({
   FeedbackModal: fakes.nothing,
@@ -243,6 +250,7 @@ beforeEach(() => {
   mocks.entitlement = notEntitled;
   mocks.access = { kind: "loading" };
   mocks.permission = GRANTED;
+  mocks.permissionGate = null;
   mocks.firstName = { firstName: null, failed: false };
   welcomeSave.mark(USER);
   welcomeName.mark(USER);
@@ -373,4 +381,35 @@ it("shows the trial primer, the letter and the name sheet one at a time when a p
   act(() => welcomeSave.finish(USER));
   await settle();
   expect(sheets()).toEqual({ letter: false, name: true, primer: false });
+});
+
+it("hides the feedback invitation while the trial primer holds its turn but has not opened yet", async () => {
+  welcomeName.finish(USER);
+  let openGate = () => {};
+  mocks.permissionGate = new Promise<void>((resolve) => {
+    openGate = resolve;
+  });
+  mocks.permission = UNDETERMINED;
+  mocks.access = { kind: "pro", syncing: true };
+  vi.mocked(useFeedbackInvitation).mockReturnValue({
+    invitationVisible: true,
+    modalOpen: false,
+    openFeedbackFromInvitation: vi.fn(),
+    dismissInvitation: vi.fn(),
+    closeFeedback: vi.fn(),
+  });
+  const { rerender } = render(<App />);
+  await settle();
+  expect(screen.queryByText("feedback invitation")).not.toBeNull();
+
+  mocks.entitlement = trialing;
+  mocks.access = { kind: "pro", syncing: false };
+  rerender(<App />);
+  await settle();
+  expect(sheets().primer).toBe(false);
+  expect(screen.queryByText("feedback invitation")).toBeNull();
+
+  openGate();
+  await settle();
+  expect(sheets().primer).toBe(true);
 });

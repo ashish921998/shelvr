@@ -103,6 +103,10 @@ export function useHoldSheetTurns(holding: boolean): void {
   }, [holding]);
 }
 
+export function useSheetTurnUp(): boolean {
+  return useSyncExternalStore(subscribe, () => current !== null);
+}
+
 export function useSheetTurnsBusy(): boolean {
   return useSyncExternalStore(
     subscribe,
