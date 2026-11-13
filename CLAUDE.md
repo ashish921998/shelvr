@@ -57,7 +57,7 @@ read [localization](docs/architecture/localization.md); before simulator QA read
 - **External fetches** go through `model/safeFetch.ts`; host knowledge lives in the page readers
   under `model/readers/`, never in `ai.ts`.
 - **Logging** goes through `logEvent` (`model/log.ts`): one JSON line, scalar fields only.
-- For any edit in `convex/`, prefer the `convex-expert` skill.
+- For any edit in `convex/`, prefer the `convex:convex-expert` subagent.
 
 ## What grep won't tell you
 
@@ -145,7 +145,7 @@ than a line:
   `tools/verify-ota-compatibility.mjs` blocks a publish whose fingerprint does not match
   `apps/native/released-builds.json`: for production it runs as the `Verify the update can
 reach the released build` step in `.github/workflows/release.yml`, for other profiles as
-  the `before_update` hook in `native-update.yml`. The fix is a store build, then recording
+  the `before_update` hook in `apps/native/.eas/workflows/native-update.yml`. The fix is a store build, then recording
   the release. The pull-request check covers only the production
   variant and cannot see `eas.json` build fields, `.easignore` edits or pnpm patches.
   Details: [push notification builds and updates](docs/architecture/push-notifications.md#what-the-fingerprint-hashes).
