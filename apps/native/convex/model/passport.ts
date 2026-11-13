@@ -32,24 +32,32 @@ function among(place: PassportPlace, others: readonly PassportPlace[]) {
   return others.some((other) => samePassportPlace(place, other));
 }
 
-function distinct(places: readonly PassportPlace[]): NamedPlace[] {
+function distinct(places: readonly PassportPlace[]): PassportPlace[] {
   const kept: PassportPlace[] = [];
   for (const place of places) if (!among(place, kept)) kept.push(place);
-  return kept.map(({ name, city }) => (city ? { name, city } : { name }));
+  return kept;
 }
 
-export function placesToSave(
-  onlyThem: readonly NamedPlace[],
+function named({ name, city }: PassportPlace): NamedPlace {
+  return city ? { name, city } : { name };
+}
+
+function saveKey({ name, city }: PassportPlace): string | null {
+  return city ? `${cityKey(city)}\0${placeKey(name)}` : null;
+}
+
+function placesToSave(
+  onlyThem: readonly PassportPlace[],
   saved: readonly PassportPlace[],
 ): { name: string; city: string }[] {
-  const known = [...saved];
+  const taken = new Set(saved.map(saveKey));
   const fresh: { name: string; city: string }[] = [];
-  for (const { name, city } of onlyThem) {
-    if (city === undefined) continue;
-    const place = { name, city };
-    if (among(place, known)) continue;
-    known.push(place);
-    fresh.push(place);
+  for (const place of onlyThem) {
+    if (!place.city) continue;
+    const key = saveKey(place);
+    if (taken.has(key) || among(place, saved)) continue;
+    taken.add(key);
+    fresh.push({ name: place.name, city: place.city });
   }
   return fresh;
 }
@@ -61,9 +69,9 @@ export function comparePassports(
 ) {
   const onlyThem = distinct(theirs.filter((place) => !among(place, mine)));
   return {
-    both: distinct(mine.filter((place) => among(place, theirs))),
-    onlyThem,
-    onlyYou: distinct(mine.filter((place) => !among(place, theirs))),
+    both: distinct(mine.filter((place) => among(place, theirs))).map(named),
+    onlyThem: onlyThem.map(named),
+    onlyYou: distinct(mine.filter((place) => !among(place, theirs))).map(named),
     toSave: placesToSave(onlyThem, saved),
   };
 }

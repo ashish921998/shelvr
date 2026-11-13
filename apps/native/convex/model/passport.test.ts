@@ -64,6 +64,17 @@ describe("comparePassports", () => {
     ]);
     expect(result.toSave).toEqual([{ name: "Majestic", city: "Porto" }]);
   });
+
+  it("does not save a place you saved under a longer name at the same spot", () => {
+    const spot = { lat: 38.72, lng: -9.14 };
+    const result = comparePassports(
+      [],
+      [{ name: "Santa Joana", city: "Lisbon", ...spot }],
+      [{ name: "Locke de Santa Joana", city: "Lisbon", ...spot }],
+    );
+    expect(result.onlyThem).toEqual([{ name: "Santa Joana", city: "Lisbon" }]);
+    expect(result.toSave).toEqual([]);
+  });
 });
 
 describe("groupByCity", () => {
