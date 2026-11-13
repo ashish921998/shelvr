@@ -69,6 +69,7 @@ import type * as model_notificationSchedule from "../model/notificationSchedule.
 import type * as model_oracle from "../model/oracle.js";
 import type * as model_pageRead from "../model/pageRead.js";
 import type * as model_pageReadCore from "../model/pageReadCore.js";
+import type * as model_passport from "../model/passport.js";
 import type * as model_paymentTelemetry from "../model/paymentTelemetry.js";
 import type * as model_placeIdentity from "../model/placeIdentity.js";
 import type * as model_placeKinds from "../model/placeKinds.js";
@@ -206,6 +207,7 @@ declare const fullApi: ApiFromModules<{
   "model/oracle": typeof model_oracle;
   "model/pageRead": typeof model_pageRead;
   "model/pageReadCore": typeof model_pageReadCore;
+  "model/passport": typeof model_passport;
   "model/paymentTelemetry": typeof model_paymentTelemetry;
   "model/placeIdentity": typeof model_placeIdentity;
   "model/placeKinds": typeof model_placeKinds;
