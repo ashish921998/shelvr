@@ -81,6 +81,7 @@ export function passportCities(
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const LABEL_GAP = 24;
+const SHARED_DOT_GAP = 96;
 
 export function dotMap(
   stamps: readonly PassportStamp[],
@@ -123,7 +124,20 @@ export function dotMap(
   const offsetX = inset + (innerW - spanX * scale) / 2;
   const offsetY = inset + (innerH - spanY * scale) / 2;
   return groups.map((group, index) => {
-    const x = offsetX + (points[index].x - Math.min(...xs)) * scale;
+    const shared = groups.filter(
+      (other) =>
+        other.dot.lat === group.dot.lat && other.dot.lng === group.dot.lng,
+    );
+    const slot = shared.indexOf(group) - (shared.length - 1) / 2;
+    const x = Math.min(
+      size.width - size.pad,
+      Math.max(
+        size.pad,
+        offsetX +
+          (points[index].x - Math.min(...xs)) * scale +
+          slot * SHARED_DOT_GAP,
+      ),
+    );
     const y = offsetY + (points[index].y - Math.min(...ys)) * scale;
     return {
       city: group.city,

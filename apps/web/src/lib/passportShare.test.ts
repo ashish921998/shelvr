@@ -143,6 +143,9 @@ describe("dotMap", () => {
       box,
     );
     expect(cities.map((city) => city.city)).toEqual(["Lisbon", "Oeiras"]);
+    const [lisbon, oeiras] = cities;
+    expect(oeiras.x - lisbon.x).toBeGreaterThanOrEqual(80);
+    expect(lisbon.y).toBe(oeiras.y);
   });
 
   it("centres a single city and skips places with no dot", () => {
