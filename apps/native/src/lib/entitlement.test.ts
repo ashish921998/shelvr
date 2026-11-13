@@ -238,6 +238,29 @@ describe("selling before sign-in", () => {
     );
   });
 
+  it("tries sign-in again when a paywall opens after its automatic retries ran out", async () => {
+    const offline = new Error("offline");
+    mock.logIn
+      .mockRejectedValueOnce(offline)
+      .mockRejectedValueOnce(offline)
+      .mockRejectedValueOnce(offline);
+    vi.resetModules();
+    const mod = await import("./entitlement");
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      renderHook(() => mod.useEntitlementSync());
+      await vi.advanceTimersByTimeAsync(6000);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(mock.logIn).toHaveBeenCalledTimes(3);
+    mock.presentPaywallIfNeeded.mockResolvedValue("CANCELLED");
+    await mod.openPaywall(router, "share");
+    expect(mock.logIn).toHaveBeenCalledTimes(4);
+    expect(mock.presentPaywallIfNeeded).toHaveBeenCalledOnce();
+    expect(push).not.toHaveBeenCalled();
+  });
+
   it("does not start an anonymous customer while sign-in is still loading", async () => {
     mock.auth = { isAuthenticated: false, isLoading: true };
     await loadReady();

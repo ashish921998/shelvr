@@ -75,6 +75,7 @@ let _rcSyncedUserId: string | null = null;
 let _rcIdentitySync = Promise.resolve();
 let _rcAnonymousReady = false;
 let _rcSignedOut = false;
+let _rcRetryIdentity: (() => void) | null = null;
 const ANONYMOUS_PLACEMENT = "onboarding";
 
 const SYNC_READY_TIMEOUT_MS = 5000;
@@ -111,6 +112,7 @@ function rcReadyFor(anonymous: boolean) {
 async function awaitRcSyncReady(anonymous = false): Promise<boolean> {
   const ready = () => rcReadyFor(anonymous);
   if (ready()) return true;
+  if (!anonymous) _rcRetryIdentity?.();
   return Promise.race([
     _rcIdentitySync.then(ready),
     new Promise<boolean>((r) =>
@@ -213,6 +215,8 @@ export function useEntitlementSync(): void {
       },
       onError: reportRevenueCatIdentityError,
     });
+    const retryIdentity = () => observer.retry();
+    _rcRetryIdentity = retryIdentity;
     const stopLanding = subscribePurchaseLanding(() => {
       if (readPurchaseLanding() > 0) attachPurchase();
     });
@@ -224,6 +228,7 @@ export function useEntitlementSync(): void {
 
     return () => {
       cancelled = true;
+      if (_rcRetryIdentity === retryIdentity) _rcRetryIdentity = null;
       observer.dispose();
       attach?.dispose();
       stopLanding();
