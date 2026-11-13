@@ -9,17 +9,26 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { aiAllowed } from "./aiConsent";
-import { readySavesNewestFirst } from "./items";
+import {
+  CITY_ITEMS_MAX,
+  rawReadySavesNewestFirst,
+  readySavesNewestFirst,
+} from "./items";
 import {
   appleMapsAccessToken,
   appleMapsConfig,
   appleMapsCountry,
 } from "./model/appleMaps";
 import { authedMutation, authedQuery, liveOwner } from "./model/auth";
+import {
+  cityCompletionValidator,
+  completionByCity,
+} from "./model/cityCompletion";
 import { linkSource } from "./model/externalUrl";
 import { logEvent } from "./model/log";
 import { normalizeCities, normalizePlaceName } from "./model/itemFields";
 import { type PassportPlace, soleCity } from "./model/passport";
+import { userRemovals, visibleCitySave } from "./model/placeRemovals";
 import { approximateDocBytes } from "./model/readBudget";
 import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
 import {
@@ -517,22 +526,24 @@ async function coverOf(
 }
 
 type PassportStamp = Infer<typeof stampValidator>;
-type StampRow = Omit<PassportStamp, "cover">;
+type StampRow = Omit<PassportStamp, "cover"> & { appleId?: string };
 
 async function stampRows(
   ctx: QueryCtx,
   userId: string,
+  readSaves: readonly Doc<"items">[] = [],
 ): Promise<{
   stamps: StampRow[];
   saves: Map<Id<"items">, Doc<"items"> | null>;
 }> {
   const rows = (await visitRows(ctx, userId)).slice(0, MAX_PASSPORT_STAMPS);
+  const known = new Map(readSaves.map((save) => [save._id, save]));
   const saves = new Map<Id<"items">, Doc<"items"> | null>();
   let bytes = 0;
   for (const { itemId } of rows) {
     if (saves.has(itemId)) continue;
     if (bytes >= PASSPORT_SAVE_BYTES) break;
-    const owned = await ownedSave(ctx, userId, itemId);
+    const owned = known.get(itemId) ?? (await ownedSave(ctx, userId, itemId));
     bytes += approximateDocBytes(owned);
     saves.set(itemId, owned);
   }
@@ -561,6 +572,7 @@ async function stampRows(
         ...base,
         lat: spot.lat,
         lng: spot.lng,
+        ...(spot.appleId === undefined ? {} : { appleId: spot.appleId }),
         ...(city ? { city } : {}),
         ...(place?.countryCode ? { countryCode: place.countryCode } : {}),
       });
@@ -595,7 +607,7 @@ export const getPassport = authedQuery({
     for (const [itemId, owned] of saves) {
       covers.set(itemId, await coverOf(ctx, owned));
     }
-    return stamps.map((stamp) => ({
+    return stamps.map(({ appleId: _appleId, ...stamp }) => ({
       ...stamp,
       cover: covers.get(stamp.itemId) ?? null,
     }));
@@ -649,6 +661,23 @@ export const listUnstampedPlaces = authedQuery({
         };
       }),
     );
+  },
+});
+
+export const cityCompletion = authedQuery({
+  args: {},
+  returns: v.array(cityCompletionValidator),
+  handler: async (ctx) => {
+    const { userId } = ctx;
+    const saves = await rawReadySavesNewestFirst(ctx, userId);
+    const removals = await userRemovals(ctx, userId);
+    const { stamps } = await stampRows(ctx, userId, saves);
+    return completionByCity({
+      saves: saves.map((item) => visibleCitySave(item, removals)),
+      stamps,
+      visits: await userVisits(ctx, userId, saves),
+      savesPerCity: CITY_ITEMS_MAX,
+    });
   },
 });
 
