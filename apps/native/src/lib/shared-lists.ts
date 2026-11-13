@@ -15,7 +15,8 @@ import { useConvexAuth, useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Share } from "react-native";
+import { Alert, Share } from "react-native";
+import { MAX_LIST_PLACES } from "@convex/model/sharedListLimits";
 
 export type SharedListSummary = FunctionReturnType<
   typeof api.sharedLists.listSharedLists
@@ -292,32 +293,51 @@ export function nextAlsoAddState(
 }
 
 export function useAlsoAddTo(itemId: Id<"items">, city: string) {
+  const { isAuthenticated } = useConvexAuth();
   const add = useMutation(api.sharedLists.addSavePlaces);
   const remove = useMutation(api.sharedLists.removeSavePlaces);
-  const [state, setState] = useState<AlsoAddState>({});
-  const toggle = useCallback(
-    async (listId: Id<"sharedLists">) => {
-      const action = nextAlsoAddState(state[listId]);
-      if (action === null) return;
-      setState((s) => ({
-        ...s,
-        [listId]: action === "add" ? "adding" : "removing",
-      }));
-      try {
-        if (action === "add") {
-          await add({ listId, itemId, city });
+  const { data: savedOn } = useQuery(
+    convexQuery(
+      api.sharedLists.listsWithSave,
+      isAuthenticated ? { itemId } : "skip",
+    ),
+  );
+  const [busy, setBusy] = useState<Record<string, "adding" | "removing">>({});
+  const state: AlsoAddState = {
+    ...Object.fromEntries((savedOn ?? []).map((id) => [id, "on" as const])),
+    ...busy,
+  };
+  const toggle = async (list: SharedListSummary) => {
+    const action = nextAlsoAddState(state[list._id]);
+    if (savedOn === undefined || action === null) return;
+    setBusy((b) => ({
+      ...b,
+      [list._id]: action === "add" ? "adding" : "removing",
+    }));
+    try {
+      if (action === "add") {
+        const added = await add({ listId: list._id, itemId, city });
+        if (added > 0) {
           analytics.capture("shared_list_place_added", { from: "spots" });
         } else {
-          await remove({ listId, itemId });
+          Alert.alert(
+            t(
+              list.placeCount >= MAX_LIST_PLACES
+                ? "sharedLists.alsoAddFull"
+                : "sharedLists.alsoAddAlready",
+              { name: list.name },
+            ),
+          );
         }
-        setState((s) => ({ ...s, [listId]: action === "add" ? "on" : "off" }));
-      } catch (error) {
-        analytics.captureError("shared_list_also_add_failed", error);
-        setState((s) => ({ ...s, [listId]: action === "add" ? "off" : "on" }));
+      } else {
+        await remove({ listId: list._id, itemId });
       }
-    },
-    [state, itemId, city, add, remove],
-  );
+    } catch (error) {
+      analytics.captureError("shared_list_also_add_failed", error);
+    } finally {
+      setBusy(({ [list._id]: _, ...rest }) => rest);
+    }
+  };
   return { state, toggle };
 }
 

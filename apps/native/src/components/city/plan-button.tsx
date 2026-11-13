@@ -79,7 +79,45 @@ export function InviteButton({
   );
 }
 
+export function ShareMapButton({
+  disabled,
+  onPress,
+}: {
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  const { theme } = useUnistyles();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t("cityCard.share")}
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={8}
+      style={({ pressed }) => [
+        styles.shareMap,
+        (pressed || disabled) && styles.pressed,
+      ]}
+    >
+      <AppSymbolIcon
+        name="square.and.arrow.up"
+        size={16}
+        tintColor={theme.colors.foreground}
+      />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create((theme) => ({
+  shareMap: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 18,
+    backgroundColor: theme.colors.surfaceMuted,
+  },
   invite: {
     flexDirection: "row",
     alignItems: "center",

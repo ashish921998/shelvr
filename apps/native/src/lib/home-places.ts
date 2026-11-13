@@ -1,3 +1,4 @@
+import { progressLine } from "@/lib/city-progress";
 import { t } from "@/lib/i18n";
 import { isTerminalFailure } from "@convex/model/itemFields";
 import { displayHost } from "@/lib/url";
@@ -8,6 +9,7 @@ export type City = {
   city: string;
   count: number;
   placeCount?: number;
+  visitedCount?: number;
   cover: string | null;
 };
 
@@ -97,7 +99,11 @@ export function cityCountLine(entry: City): string | null {
   if (entry.placeCount === 0) {
     return t("homePlaces.noPlaceYet", { count: entry.count });
   }
-  return entry.placeCount
-    ? t("homePlaces.spotCount", { count: entry.placeCount })
-    : null;
+  if (!entry.placeCount) return null;
+  return (
+    progressLine({
+      visited: entry.visitedCount ?? 0,
+      total: entry.placeCount,
+    }) ?? t("homePlaces.spotCount", { count: entry.placeCount })
+  );
 }

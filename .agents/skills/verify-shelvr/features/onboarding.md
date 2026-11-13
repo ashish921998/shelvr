@@ -2,7 +2,7 @@
 
 A new account answers a few short questions, picks a city, saves a sample
 reel through a drawn share sheet, sees its spots on a map and three slides,
-is asked about reminders, then meets the paywall. This is flow 24:
+is asked about reminders, then meets the paywall. This is flow 26:
 `ONBOARDING_FLOW_VERSION` and the step order (`ONBOARDING_STEPS`) are in
 `src/lib/onboarding-steps.ts`. The opener is three pages that swipe (on
 their own until a swipe, never with Reduce Motion), each with "Get started"
@@ -13,18 +13,19 @@ account stays signed out through the paywall and signs in after it.
 
 - "Get started" opens "How many places have you saved?", then "What would
   you like to plan?" (checkboxes `Date nights`, `Trips`, `Places to eat`,
-  `A bit of everything`). Goals that include `Trips` add "Are you planning
-  a trip soon?", which moves on at one tap (`Yes, I’m planning one`,
-  `Not yet`). Then "How do you like to plan?" and a chart, "Let’s put your
-  saves to use." The count, goal and planner questions have Continue
-  (disabled until an answer) and "Skip" in the header; a skipped goal
-  question plans for every goal, so the trip question follows. Every step
-  after the opener has a back button.
-- The city question reads "Where are you going?" after `Yes, I’m planning
-one`, "Where’s your dream city?" when no goal or every goal is picked,
-  and "Where do you go out?" otherwise. A tap on a city moves on; "Skip"
-  and "Somewhere else" keep no city, and so does "Not sure yet", which
-  replaces "Somewhere else" when Trips is picked without Date nights. A
+  `A bit of everything`), then a chart, "Let’s put your saves to use." The
+  count and goal questions have Continue (disabled until an answer). Every
+  step after the opener has a back button and "Skip" in the header; a
+  skipped goal question plans for every goal. Skip on "Try saving this
+  reel." goes to the spots without "Your first save!", and no reel is saved
+  after sign-in. Skip on any carousel slide leaves it as the last slide's
+  Continue does, and on the notifications step as "Not now"; it hides
+  while iOS is asking.
+- The city question reads "Where’s your next trip?" when `Trips` is picked
+  without `Date nights`, and "Where do you go out?" otherwise. A tap on a
+  city moves on; "Skip" and "Somewhere else" keep no city, and so does
+  "Not sure yet", which replaces "Somewhere else" when Trips is picked
+  without Date nights. A
   statement with Continue follows every city answer: it repeats the pick,
   if there is one, and names the city the sample comes from.
 - The sample is always a real reel (`src/lib/aha-sample.ts`), chosen by the

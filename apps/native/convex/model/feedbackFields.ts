@@ -15,4 +15,6 @@ export const feedbackDeliveryStatusValidator = v.union(
   v.literal("unconfigured"),
   v.literal("delivered"),
   v.literal("failed"),
+  v.literal("expired"),
+  v.literal("exhausted"),
 );

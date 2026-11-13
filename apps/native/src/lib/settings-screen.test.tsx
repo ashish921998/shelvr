@@ -24,6 +24,8 @@ const mocks = vi.hoisted(() => ({
   dismissAll: vi.fn(),
   replace: vi.fn(),
   openPaywall: vi.fn(),
+  stopSharingPassport: vi.fn(),
+  passportShare: null as string | null,
   access: { kind: "pro", syncing: false } as Record<string, unknown>,
   stackRoot: "(tabs)",
   status: "none",
@@ -50,6 +52,10 @@ vi.mock("@/lib/entitlement", () => ({
   openPaywall: mocks.openPaywall,
   restorePurchases: mocks.restorePurchases,
   useEntitlement: () => ({ status: mocks.status }),
+}));
+vi.mock("@/lib/passport-share", () => ({
+  usePassportShare: () => mocks.passportShare,
+  useStopSharingPassport: () => mocks.stopSharingPassport,
 }));
 vi.mock("@/lib/free-plan", () => ({ useAccess: () => mocks.access }));
 vi.mock("@/lib/free-saves-title", () => ({
@@ -170,6 +176,7 @@ beforeEach(() => {
   mocks.permission = "granted";
   mocks.stackRoot = "(tabs)";
   mocks.access = { kind: "pro", syncing: false };
+  mocks.passportShare = null;
 });
 afterEach(() => {
   cleanup();
@@ -194,6 +201,16 @@ it("deletes the account only after the destructive confirm", async () => {
       ?.onPress?.();
   });
   expect(mocks.deleteAccount).toHaveBeenCalledTimes(1);
+});
+
+it("offers Stop sharing my passport only while a passport link is live", () => {
+  render(<SettingsScreen />);
+  expect(screen.queryByText("passportShare.stopSetting")).toBeNull();
+  cleanup();
+  mocks.passportShare = "tok";
+  render(<SettingsScreen />);
+  fireEvent.click(screen.getByText("passportShare.stopSetting"));
+  expect(mocks.stopSharingPassport).toHaveBeenCalledTimes(1);
 });
 
 it("offers no subscription button to an account with nothing to cancel", () => {

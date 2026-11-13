@@ -141,6 +141,52 @@ export const captureSave = internalAction({
   },
 });
 
+export const capturePassportLinkOpen = internalAction({
+  args: {
+    ownerId: v.id("users"),
+    openedAt: v.number(),
+    attempt: v.optional(v.number()),
+    eventId: v.optional(v.string()),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const eventId = args.eventId ?? newDeliveryId();
+    const delivery = await deliverPostHogEvent({
+      event: "passport_link_opened",
+      distinctId: args.ownerId,
+      deliveryId: eventId,
+      timestamp: args.openedAt,
+      properties: { $process_person_profile: false, analytics_version: 1 },
+    });
+    if (delivery.status !== "retryable") {
+      if (delivery.status === "rejected") {
+        logEvent("warn", "passport_link_open_capture_failed", {
+          status: delivery.status,
+        });
+      }
+      return null;
+    }
+    const attempt = args.attempt ?? 0;
+    const retried = await scheduleCaptureRetry(
+      attempt,
+      MAX_SAVE_ATTEMPTS,
+      (delayMs, nextAttempt) =>
+        ctx.scheduler.runAfter(
+          delayMs,
+          internal.analytics.capturePassportLinkOpen,
+          { ...args, attempt: nextAttempt, eventId },
+        ),
+    );
+    if (!retried) {
+      logEvent("warn", "passport_link_open_capture_failed", {
+        status: delivery.status,
+        attempts: attempt + 1,
+      });
+    }
+    return null;
+  },
+});
+
 export const captureItemProcessed = internalAction({
   args: {
     itemId: v.id("items"),

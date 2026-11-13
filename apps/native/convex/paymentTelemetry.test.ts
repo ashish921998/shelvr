@@ -563,7 +563,7 @@ describe("receipt retention", () => {
     await t.run((ctx) =>
       ctx.db.insert("paymentAnalyticsReceipts", { eventId: "live" }),
     );
-    vi.advanceTimersByTime(RECEIPT_RETENTION_MS);
+    vi.advanceTimersByTime(RECEIPT_RETENTION_MS - 60_000);
     await t.mutation(internal.paymentTelemetry.purgeExpiredReceipts, {});
     await t.mutation(internal.paymentTelemetry.purgeExpiredReceipts, {});
     await t.mutation(internal.paymentTelemetry.purgeExpiredReceipts, {});

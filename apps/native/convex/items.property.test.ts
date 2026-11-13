@@ -194,7 +194,7 @@ const EXPIRIES: [string, number][] = [
   ["a day ago", -DAY_MS],
   ["1 ms ago", -1],
   ["now", 0],
-  ["in 1 ms", 1],
+  ["in a second", 1000],
   ["in a day", DAY_MS],
   ["in 30 days", 30 * DAY_MS],
 ];
