@@ -632,6 +632,22 @@ describe("account deletion", () => {
     expect(await getSubmission(t, id)).toBeNull();
   });
 
+  it("deletes a deleting owner's feedback even while the inbox is unconfigured", async () => {
+    const t = setup();
+    vi.stubEnv("RESEND_API_KEY", "");
+    const fetchMock = okFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const userId = await t.run(async (ctx) =>
+      ctx.db.insert("users", { email: "gone@example.com", deleting: true }),
+    );
+    const id = await insertSubmission(t, { userId });
+
+    await t.action(internal.feedback.deliver, { submissionId: id });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await getSubmission(t, id)).toBeNull();
+  });
+
   it("never sends feedback whose owner row is already gone", async () => {
     const t = setup();
     const fetchMock = okFetch();
