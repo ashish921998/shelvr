@@ -1071,6 +1071,52 @@
   "sharedLists.startWithHint": "都市を1つ以上選んでください。そこに保存済みの場所も一緒に入ります。",
   "sharedLists.cityPlaceholder": "または都市名を入力",
   "sharedLists.typedCity": "入力した都市",
+  "passport.wentNoDate": "行った",
+  "passport.stampedTitle": "スタンプ完了",
+  "passport.stampedBody": {
+    "other": "%{name}をパスポートに追加しました。行った場所は%{formattedCount}か所です。"
+  },
+  "passport.stampInk": "%{city} · %{date}",
+  "passport.coverCredit": "保存した投稿の画像",
+  "passport.removeStamp": "スタンプを削除",
+  "passport.wantToGo": "行きたい",
+  "passport.title": "パスポート",
+  "passport.yourPassport": "あなたのパスポート",
+  "passport.beenTitle": "行ったことのある場所は？",
+  "passport.beenBody": "もう行った場所にスタンプを押しましょう",
+  "passport.beenSomewhere": "もう行った場所がある？",
+  "passport.rowCities": "%{places} · %{cities}",
+  "passport.placesCount": {
+    "other": "%{formattedCount}か所"
+  },
+  "passport.citiesCount": {
+    "other": "%{formattedCount}都市"
+  },
+  "passport.places": "場所",
+  "passport.cities": "都市",
+  "passport.countries": "国",
+  "passport.elsewhere": "その他",
+  "passport.coversCredit": "保存した投稿の画像",
+  "passport.pickBody": "ここに保存する前に行った場所にチェックを入れてください。",
+  "passport.nothingToStamp": "保存した場所はすべてパスポートに入っています。",
+  "passport.pickNone": "行った場所を選んでください",
+  "passport.stampCount": {
+    "other": "%{formattedCount}か所にスタンプ"
+  },
+  "passport.cardKicker": "グループチャットから現実へ",
+  "passport.cardTitle": {
+    "other": "保存して、ついに行けた%{formattedCount}か所"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "other": "ほか%{formattedCount}か所"
+  },
+  "passport.cardSavedInstagram": "Instagramで保存。",
+  "passport.cardSavedTiktok": "TikTokで保存。",
+  "passport.cardSavedBoth": "InstagramとTikTokで保存。",
+  "passport.cardSavedElsewhere": "あとで行く用に保存。",
+  "passport.cardWent": "Shelvrで行った。",
+  "passport.shareCity": "%{city}を共有",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "other": "無料保存は残り%{formattedCount}件"

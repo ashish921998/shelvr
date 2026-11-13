@@ -182,6 +182,10 @@ export type AnalyticsEventProperties = {
   plan_picked: { place_count: number };
   plan_place_opened: { rank: number };
   plan_place_visited: { visited: boolean };
+  place_unstamped: { surface: "passport" };
+  passport_opened: { places: number };
+  passport_backfilled: { places: number };
+  passport_card_share_opened: { places: number; surface: "stamp" | "passport" };
   plan_shared: { place_count: number; picked: boolean };
   plan_asked: { place_count: number };
   plan_ask_failed: { reason: "link" | "share" };
