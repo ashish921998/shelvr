@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   dotMap,
   loadPassport,
+  recordPassportOpen,
   passportSummary,
   passportTitle,
   type SharedPassport,
@@ -38,18 +39,13 @@ const passport: SharedPassport = {
 };
 
 describe("loadPassport", () => {
-  it("fetches the page uncached, and marks a preview so it is not counted as an open", async () => {
+  it("fetches the page uncached", async () => {
     vi.mocked(fetch).mockImplementation(
       async () => new Response(JSON.stringify(passport), { status: 200 }),
     );
     expect(await loadPassport("a/b")).toEqual({ outcome: "found", passport });
     expect(fetch).toHaveBeenLastCalledWith(
       "https://deployment.convex.site/passport/shares/a%2Fb",
-      expect.objectContaining({ cache: "no-store" }),
-    );
-    await loadPassport("tok", "preview");
-    expect(fetch).toHaveBeenLastCalledWith(
-      "https://deployment.convex.site/passport/shares/tok?preview=1",
       expect.objectContaining({ cache: "no-store" }),
     );
   });
@@ -69,6 +65,25 @@ describe("loadPassport", () => {
     vi.stubEnv("CONVEX_URL", "");
     expect(await loadPassport("abc")).toEqual({ outcome: "unavailable" });
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe("recordPassportOpen", () => {
+  it("posts the open, and logs only a real failure", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await recordPassportOpen("a/b");
+    expect(fetch).toHaveBeenLastCalledWith(
+      "https://deployment.convex.site/passport/shares/a%2Fb",
+      { method: "POST" },
+    );
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 404 }));
+    await recordPassportOpen("gone");
+    expect(mocks.serverLog).not.toHaveBeenCalled();
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 500 }));
+    await recordPassportOpen("down");
+    vi.mocked(fetch).mockRejectedValueOnce(new TypeError("offline"));
+    await recordPassportOpen("down");
+    expect(mocks.serverLog).toHaveBeenCalledTimes(2);
   });
 });
 

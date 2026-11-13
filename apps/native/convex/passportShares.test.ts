@@ -179,6 +179,30 @@ describe("the public passport", () => {
     expect(leaks(body)).toEqual([]);
   });
 
+  it("records an open only on a post, never on a read", async () => {
+    const backend = newConvexTest();
+    const maya = await sharedMaya(backend);
+    const opens = async () =>
+      (
+        await backend.run((ctx) =>
+          ctx.db.system.query("_scheduled_functions").collect(),
+        )
+      ).filter((job) => job.name.includes("capturePassportLinkOpen"));
+
+    await backend.fetch(`/passport/shares/${maya.token}`);
+    expect(await opens()).toHaveLength(0);
+    const posted = await backend.fetch(`/passport/shares/${maya.token}`, {
+      method: "POST",
+    });
+    expect(posted.status).toBe(204);
+    expect(await opens()).toHaveLength(1);
+    const unknown = await backend.fetch(`/passport/shares/${"0".repeat(32)}`, {
+      method: "POST",
+    });
+    expect(unknown.status).toBe(404);
+    expect(await opens()).toHaveLength(1);
+  });
+
   it("answers null for an unknown token, an empty one, or an owner who is deleting", async () => {
     const backend = newConvexTest();
     const maya = await sharedMaya(backend);

@@ -15,18 +15,20 @@ export type SharedPassport = {
 
 type PassportOutcome = "found" | "missing" | "unavailable";
 
+function shareUrl(siteUrl: string, token: string): string {
+  return `${siteUrl}/passport/shares/${encodeURIComponent(token)}`;
+}
+
 export async function loadPassport(
   token: string,
-  purpose: "page" | "preview" = "page",
 ): Promise<{ outcome: PassportOutcome; passport?: SharedPassport }> {
   const siteUrl = convexSiteUrl();
   if (!siteUrl) return { outcome: "unavailable" };
 
   try {
-    const response = await fetch(
-      `${siteUrl}/passport/shares/${encodeURIComponent(token)}${purpose === "preview" ? "?preview=1" : ""}`,
-      { cache: "no-store" },
-    );
+    const response = await fetch(shareUrl(siteUrl, token), {
+      cache: "no-store",
+    });
     if (response.status === 404) return { outcome: "missing" };
     if (!response.ok) {
       serverLog("error", "passport_share_failed", { status: response.status });
@@ -41,6 +43,21 @@ export async function loadPassport(
       error_name: error instanceof Error ? error.name : "unknown",
     });
     return { outcome: "unavailable" };
+  }
+}
+
+export async function recordPassportOpen(token: string): Promise<void> {
+  const siteUrl = convexSiteUrl();
+  if (!siteUrl) return;
+  try {
+    const response = await fetch(shareUrl(siteUrl, token), { method: "POST" });
+    if (!response.ok && response.status !== 404) {
+      serverLog("error", "passport_open_failed", { status: response.status });
+    }
+  } catch (error) {
+    serverLog("error", "passport_open_failed", {
+      error_name: error instanceof Error ? error.name : "unknown",
+    });
   }
 }
 

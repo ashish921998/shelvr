@@ -20,7 +20,7 @@ type ImageProps = { params: Promise<{ token: string }> };
 
 export default async function Image({ params }: ImageProps) {
   const { token } = await params;
-  const { passport } = await loadPassport(token, "preview");
+  const { passport } = await loadPassport(token);
   const cities = passport?.byCity ?? [];
   const shown = cities.slice(0, MAX_ROWS);
   const more = cities.length - shown.length;

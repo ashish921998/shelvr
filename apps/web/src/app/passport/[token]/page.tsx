@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { after } from "next/server";
 
 import AppStoreButton from "@/components/AppStoreButton";
 import Logo from "@/components/common/Logo";
@@ -8,6 +9,7 @@ import {
   passportSummary,
   passportTitle,
   type PassportCity,
+  recordPassportOpen,
 } from "@/lib/passportShare";
 import { SUPPORT_EMAIL } from "@/lib/support";
 
@@ -82,6 +84,7 @@ function DotMap({ byCity }: { byCity: PassportCity[] }) {
 export default async function PassportPage({ params }: PageProps) {
   const { token } = await params;
   const { outcome, passport } = await loadPassport(token);
+  if (passport) after(() => recordPassportOpen(token));
 
   return (
     <main className="min-h-screen bg-paper">
