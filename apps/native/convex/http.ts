@@ -504,12 +504,12 @@ http.route({
   method: "GET",
   handler: httpAction(async (ctx, req) => {
     const token = new URL(req.url).pathname.split("/").pop() ?? "";
-    const shared = await ctx.runQuery(
+    const passport = await ctx.runQuery(
       internal.passportShares.getPublicPassport,
       { token },
     );
-    if (!shared) return json({ message: "Not found." }, 404);
-    return json(shared.passport, 200);
+    if (!passport) return json({ message: "Not found." }, 404);
+    return json(passport, 200);
   }),
 });
 
@@ -518,15 +518,14 @@ http.route({
   method: "POST",
   handler: httpAction(async (ctx, req) => {
     const token = new URL(req.url).pathname.split("/").pop() ?? "";
-    const shared = await ctx.runQuery(
-      internal.passportShares.getPublicPassport,
-      { token },
-    );
-    if (!shared) return json({ message: "Not found." }, 404);
+    const ownerId = await ctx.runQuery(internal.passportShares.passportSharer, {
+      token,
+    });
+    if (ownerId === null) return json({ message: "Not found." }, 404);
     await ctx.scheduler.runAfter(
       0,
       internal.analytics.capturePassportLinkOpen,
-      { ownerId: shared.ownerId, openedAt: Date.now() },
+      { ownerId, openedAt: Date.now() },
     );
     return new Response(null, { status: 204 });
   }),

@@ -104,13 +104,10 @@ function publicPassport(
 async function sharedPassport(ctx: QueryCtx, token: string) {
   const owner = await liveSharer(ctx, token);
   if (owner === null) return null;
-  return {
-    ownerId: owner._id,
-    passport: publicPassport(
-      firstNameOf(owner.name),
-      await passportPlaces(ctx, owner._id),
-    ),
-  };
+  return publicPassport(
+    firstNameOf(owner.name),
+    await passportPlaces(ctx, owner._id),
+  );
 }
 
 function placesOnSave(item: Doc<"items">): PassportPlace[] {
@@ -186,17 +183,20 @@ export const stopSharingPassport = authedMutation({
 export const passportPreview = query({
   args: { token: v.string() },
   returns: v.union(v.null(), publicPassportValidator),
-  handler: async (ctx, args) =>
-    (await sharedPassport(ctx, args.token))?.passport ?? null,
+  handler: async (ctx, args) => await sharedPassport(ctx, args.token),
 });
 
 export const getPublicPassport = internalQuery({
   args: { token: v.string() },
-  returns: v.union(
-    v.null(),
-    v.object({ ownerId: v.id("users"), passport: publicPassportValidator }),
-  ),
+  returns: v.union(v.null(), publicPassportValidator),
   handler: async (ctx, args) => await sharedPassport(ctx, args.token),
+});
+
+export const passportSharer = internalQuery({
+  args: { token: v.string() },
+  returns: v.union(v.id("users"), v.null()),
+  handler: async (ctx, args) =>
+    (await liveSharer(ctx, args.token))?._id ?? null,
 });
 
 export const comparePassport = authedQuery({

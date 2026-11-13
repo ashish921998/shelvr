@@ -166,16 +166,20 @@ describe("the public passport", () => {
   it("answers the web route the same, with the owner id kept server-side", async () => {
     const backend = newConvexTest();
     const maya = await sharedMaya(backend);
-    const shared = await backend.query(
+    const passport = await backend.query(
       internal.passportShares.getPublicPassport,
       { token: maya.token },
     );
-    expect(shared?.ownerId).toBe(maya.userId);
-    expect(leaks(shared?.passport)).toEqual([]);
+    expect(
+      await backend.query(internal.passportShares.passportSharer, {
+        token: maya.token,
+      }),
+    ).toBe(maya.userId);
+    expect(leaks(passport)).toEqual([]);
     const response = await backend.fetch(`/passport/shares/${maya.token}`);
     expect(response.status).toBe(200);
     const body: unknown = await response.json();
-    expect(body).toEqual(shared?.passport);
+    expect(body).toEqual(passport);
     expect(leaks(body)).toEqual([]);
   });
 
