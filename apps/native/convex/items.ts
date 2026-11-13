@@ -66,6 +66,7 @@ import {
   MAX_NOTE_TEXT_CHARS,
   normalizeCities,
   normalizePlaceCuisines,
+  normalizePlaceName,
   normalizePlaces,
   placeCuisinesValidator,
   placeLocationsValidator,
@@ -1575,6 +1576,41 @@ async function createLinkOrNote(
     sessionId: options.analyticsSessionId,
     saveSource: options.saveSource,
     operationId: options.operationId,
+  });
+  return itemId;
+}
+
+export async function createReadyPlaceSave(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  place: { name: string; city: string },
+  note: string,
+  locateAfterMs: number,
+): Promise<Id<"items">> {
+  const free = await claimSave(ctx, userId);
+  const cities = normalizeCities([place.city]);
+  const name = normalizePlaceName(place.name, cities);
+  const itemId = await ctx.db.insert("items", {
+    userId,
+    type: "note",
+    status: "ready",
+    title: name,
+    note,
+    tags: [],
+    intents: [],
+    cities,
+    places: [name],
+    placesEdited: true,
+    titleSource: "user",
+    searchText: buildSearchText({ title: name, tags: [], note, cities }),
+  });
+  if (free) {
+    await recordFreeSave(ctx, userId, itemId);
+    await settleFreeSave(ctx, itemId);
+  }
+  await scheduleSaveTelemetry(ctx, itemId);
+  await ctx.scheduler.runAfter(locateAfterMs, internal.placePins.locateItem, {
+    itemId,
   });
   return itemId;
 }

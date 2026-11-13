@@ -1,17 +1,15 @@
 import { v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { internal } from "./_generated/api";
 import {
   internalQuery,
   type MutationCtx,
   query,
   type QueryCtx,
 } from "./_generated/server";
-import { claimSave, recordFreeSave, settleFreeSave } from "./freeSaves";
-import { readySavesNewestFirst } from "./items";
+import { createReadyPlaceSave, readySavesNewestFirst } from "./items";
 import { authedMutation, authedQuery, liveOwner } from "./model/auth";
 import { firstNameOf } from "./model/firstName";
-import { normalizeCities, normalizePlaceName } from "./model/itemFields";
+import { normalizePlaceName } from "./model/itemFields";
 import {
   comparePassports,
   groupByCity,
@@ -19,9 +17,7 @@ import {
   type PassportPlace,
 } from "./model/passport";
 import { rateLimiter } from "./model/rateLimiter";
-import { buildSearchText } from "./model/searchText";
 import { inviteToken } from "./model/sharedLists";
-import { cityKey } from "./model/trip";
 import { passportPlaces } from "./placeVisits";
 
 const DELETE_BATCH = 50;
@@ -156,45 +152,6 @@ async function compareWith(
   );
 }
 
-async function saveFriendPlace(
-  ctx: MutationCtx,
-  userId: Id<"users">,
-  place: { name: string; city: string },
-  note: string,
-): Promise<Id<"items">> {
-  const free = await claimSave(ctx, userId);
-  const cities = normalizeCities([place.city]);
-  const name = normalizePlaceName(place.name, cities);
-  const itemId = await ctx.db.insert("items", {
-    userId,
-    type: "note",
-    status: "ready",
-    title: name,
-    note,
-    tags: [],
-    intents: [],
-    cities,
-    places: [name],
-    placesEdited: true,
-    titleSource: "user",
-    searchText: buildSearchText({ title: name, tags: [], note, cities }),
-  });
-  if (free) {
-    await recordFreeSave(ctx, userId, itemId);
-    await settleFreeSave(ctx, itemId);
-  }
-  const item = await ctx.db.get(itemId);
-  if (item !== null) {
-    await ctx.scheduler.runAfter(0, internal.analytics.captureSave, {
-      itemId,
-      userId,
-      itemType: item.type,
-      savedAt: item._creationTime,
-    });
-  }
-  return itemId;
-}
-
 export const sharePassport = authedMutation({
   args: {},
   returns: v.string(),
@@ -291,11 +248,12 @@ export const saveFriendPlaces = authedMutation({
       .trim()
       .slice(0, MAX_FRIEND_NOTE_CHARS);
     for (const [index, place] of picked.entries()) {
-      const itemId = await saveFriendPlace(ctx, userId, place, note);
-      await ctx.scheduler.runAfter(
+      await createReadyPlaceSave(
+        ctx,
+        userId,
+        place,
+        note,
         index * LOCATE_SPACING_MS,
-        internal.placePins.locateItem,
-        { itemId },
       );
     }
     return { saved: picked.length, remaining };
