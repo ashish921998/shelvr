@@ -67,6 +67,12 @@ type Timer = ReturnType<typeof setTimeout>;
 
 type WaitingBadges = { ids: BadgeId[]; at: number; matched: boolean };
 
+const LANDS_AFTER_STAMP: ReadonlySet<BadgeId> = new Set(
+  BADGES.filter((badge) => badge.measure === "countries").map(
+    (badge) => badge.id,
+  ),
+);
+
 function inTableOrder(ids: readonly BadgeId[]): BadgeId[] {
   return BADGES.map((badge) => badge.id).filter((id) => ids.includes(id));
 }
@@ -142,6 +148,7 @@ function useBadgeQueue(reduced: boolean) {
         at: now,
         matched:
           (live && prior.matched) ||
+          ids.some((id) => LANDS_AFTER_STAMP.has(id)) ||
           (stampAt !== null && now - stampAt <= BADGE_TIMING.window),
       };
       later(flush, BADGE_TIMING.grace);

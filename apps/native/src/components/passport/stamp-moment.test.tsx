@@ -304,6 +304,29 @@ describe("badge unlock moment", () => {
     );
   });
 
+  it("plays Passport holder when the third country lands long after the stamp", () => {
+    mount(bulk, "already_been");
+    stamp();
+    unlock(["firstStamp"]);
+    wait(STAMP_TIMING.shown + BADGE_TIMING.grace);
+    expect(screen.getByText("badges.firstStamp")).toBeTruthy();
+    wait(BADGE_TIMING.shown + BADGE_TIMING.window);
+    expect(badgeShown()).toBe(false);
+    unlock(["passportHolder"]);
+    wait(BADGE_TIMING.grace);
+    expect(screen.getByText("badges.passportHolder")).toBeTruthy();
+  });
+
+  it("holds a late country badge while a stamp moment plays", () => {
+    mount(lisbon, "city");
+    stamp();
+    unlock(["passportHolder"]);
+    wait(BADGE_TIMING.grace);
+    expect(badgeShown()).toBe(false);
+    wait(STAMP_TIMING.shown);
+    expect(screen.getByText("badges.passportHolder")).toBeTruthy();
+  });
+
   it("leads with the first badge in table order and counts the rest", () => {
     mount(bulk, "already_been");
     stamp();
