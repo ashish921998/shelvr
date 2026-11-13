@@ -1135,6 +1135,64 @@
   "sharedLists.startWithHint": "Elige al menos una ciudad. Los lugares que ya guardaste ahí vienen incluidos.",
   "sharedLists.cityPlaceholder": "O escribe una ciudad",
   "sharedLists.typedCity": "Escrita por ti",
+  "passport.wentNoDate": "Fui",
+  "passport.stampedTitle": "Sellado",
+  "passport.stampedBody": {
+    "one": "%{name} ya está en tu pasaporte. Llevas %{formattedCount} lugar.",
+    "many": "%{name} ya está en tu pasaporte. Llevas %{formattedCount} lugares.",
+    "other": "%{name} ya está en tu pasaporte. Llevas %{formattedCount} lugares."
+  },
+  "passport.stampInk": "%{city} · %{date}",
+  "passport.coverCredit": "Imagen de la publicación que guardaste",
+  "passport.removeStamp": "Quitar sello",
+  "passport.wantToGo": "Quiero ir",
+  "passport.title": "Pasaporte",
+  "passport.yourPassport": "Tu pasaporte",
+  "passport.beenTitle": "¿Ya fuiste a alguno?",
+  "passport.beenBody": "Sella los lugares a los que ya fuiste",
+  "passport.beenSomewhere": "¿Ya fuiste a algún lugar?",
+  "passport.rowCities": "%{places} · %{cities}",
+  "passport.placesCount": {
+    "one": "%{formattedCount} lugar",
+    "many": "%{formattedCount} lugares",
+    "other": "%{formattedCount} lugares"
+  },
+  "passport.citiesCount": {
+    "one": "%{formattedCount} ciudad",
+    "many": "%{formattedCount} ciudades",
+    "other": "%{formattedCount} ciudades"
+  },
+  "passport.places": "Lugares",
+  "passport.cities": "Ciudades",
+  "passport.countries": "Países",
+  "passport.elsewhere": "Otros lugares",
+  "passport.coversCredit": "Imágenes de las publicaciones que guardaste",
+  "passport.pickBody": "Marca los lugares a los que fuiste antes de guardarlos aquí.",
+  "passport.nothingToStamp": "Todos los lugares que guardaste ya están en tu pasaporte.",
+  "passport.pickNone": "Elige los lugares a los que fuiste",
+  "passport.stampCount": {
+    "one": "Sellar %{formattedCount} lugar",
+    "many": "Sellar %{formattedCount} lugares",
+    "other": "Sellar %{formattedCount} lugares"
+  },
+  "passport.cardKicker": "Fuera del chat del grupo",
+  "passport.cardTitle": {
+    "one": "%{formattedCount} lugar guardado al que por fin fuimos",
+    "many": "%{formattedCount} lugares guardados a los que por fin fuimos",
+    "other": "%{formattedCount} lugares guardados a los que por fin fuimos"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "one": "+%{formattedCount} más",
+    "many": "+%{formattedCount} más",
+    "other": "+%{formattedCount} más"
+  },
+  "passport.cardSavedInstagram": "Guardado en Instagram.",
+  "passport.cardSavedTiktok": "Guardado en TikTok.",
+  "passport.cardSavedBoth": "Guardado en Instagram y TikTok.",
+  "passport.cardSavedElsewhere": "Guardado para después.",
+  "passport.cardWent": "Fuimos con Shelvr.",
+  "passport.shareCity": "Compartir %{city}",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "one": "Te queda %{formattedCount} guardado gratis",

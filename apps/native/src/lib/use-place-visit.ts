@@ -12,7 +12,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { Alert } from "react-native";
 
 const NO_VISITS: readonly VisitMark[] = [];
@@ -24,15 +24,20 @@ export function usePlaceVisits(): {
   offerRetry: () => void;
 } {
   const query = useQuery(convexQuery(api.placeVisits.listVisits, {}));
+  const { refetch } = query;
+  const offerRetry = useCallback(
+    () =>
+      Alert.alert(t("errors.unexpectedTitle"), t("errors.retrySoon"), [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("common.retry"), onPress: () => void refetch() },
+      ]),
+    [refetch],
+  );
   return {
     visits: query.data ?? NO_VISITS,
     loaded: query.data !== undefined,
     isError: query.isError,
-    offerRetry: () =>
-      Alert.alert(t("errors.unexpectedTitle"), t("errors.retrySoon"), [
-        { text: t("common.cancel"), style: "cancel" },
-        { text: t("common.retry"), onPress: () => void query.refetch() },
-      ]),
+    offerRetry,
   };
 }
 

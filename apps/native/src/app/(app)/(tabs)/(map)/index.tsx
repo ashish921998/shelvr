@@ -1,6 +1,7 @@
 import { EmptyState } from "@/components/empty-state";
 import { MapFilterChips } from "@/components/map/map-filter-chips";
 import { MapSearch } from "@/components/map/map-search";
+import { MapWentSwitch } from "@/components/map/map-went-switch";
 import {
   type MapFocus,
   type MapPin,
@@ -25,6 +26,9 @@ import {
 } from "@/lib/map-filters";
 import { useMapLocation } from "@/lib/map-location";
 import { placeEmoji } from "@/lib/map-pin-emoji";
+import { filterByWent, type WentFilter } from "@/lib/passport";
+import { usePlaceVisits } from "@/lib/use-place-visit";
+import { visitMatcher } from "@convex/model/placeVisits";
 import { api } from "@convex/_generated/api";
 import type { PlaceKind } from "@convex/model/placeKinds";
 import { convexQuery } from "@convex-dev/react-query";
@@ -72,10 +76,26 @@ export default function MapScreen() {
   const [focus, setFocus] = useState<MapFocus | undefined>(undefined);
 
   const all = places.data;
-  const filters = useMemo(() => mapFilters(all ?? []), [all]);
+  const { visits, loaded, isError, offerRetry } = usePlaceVisits();
+  const visitsFailed = isError && !loaded;
+  useEffect(() => {
+    if (visitsFailed && focused.current) offerRetry();
+  }, [visitsFailed, offerRetry]);
+  const visited = useMemo(() => visitMatcher(visits, all ?? []), [visits, all]);
+  const [wentFilter, setWentFilter] = useState<WentFilter>("all");
+  const anyWent = (all ?? []).some(visited);
+  const went = anyWent ? wentFilter : "all";
+  const wentPlaces = useMemo(
+    () => filterByWent(all ?? [], went, visited),
+    [all, went, visited],
+  );
+  const filters = useMemo(() => mapFilters(wentPlaces), [wentPlaces]);
   // A filter that no longer has enough places (a save was deleted) falls back to All.
   const active = filters.some((filter) => filter.kind === kind) ? kind : null;
-  const shown = useMemo(() => filterPlaces(all ?? [], active), [all, active]);
+  const shown = useMemo(
+    () => filterPlaces(wentPlaces, active),
+    [wentPlaces, active],
+  );
   const searching = searchText.trim() !== "";
   // Search narrows whatever the filter shows; every match stays on the map, the first few are listed.
   const matches = useMemo(
@@ -88,8 +108,9 @@ export default function MapScreen() {
         ...place,
         id: placeId(place),
         emoji: placeEmoji(place),
+        went: visited(place),
       })),
-    [matches],
+    [matches, visited],
   );
   const framed = useMemo(
     () =>
@@ -135,6 +156,7 @@ export default function MapScreen() {
   // The search field, then the chips under it.
   const overlayHeight =
     theme.control.minHeight +
+    (anyWent && !searching ? theme.gap(1) + theme.control.minHeight : 0) +
     (filters.length > 0 ? theme.gap(1) + theme.control.minHeight : 0);
   const select = (id: string) => {
     const place = shown.find((candidate) => placeId(candidate) === id);
@@ -216,6 +238,9 @@ export default function MapScreen() {
           }
           onSelect={pickResult}
         />
+        {anyWent && !searching ? (
+          <MapWentSwitch selected={went} onSelect={setWentFilter} />
+        ) : null}
         {filters.length > 0 && !searching ? (
           <MapFilterChips
             kinds={filters.map((filter) => filter.kind)}
