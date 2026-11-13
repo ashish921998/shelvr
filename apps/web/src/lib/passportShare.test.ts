@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   dotMap,
   loadPassport,
-  passportCities,
   passportSummary,
   passportTitle,
   type SharedPassport,
@@ -28,10 +27,13 @@ const passport: SharedPassport = {
   places: 3,
   cities: 2,
   countries: 1,
-  stamps: [
-    { name: "Tigre", city: "Lisbon", dot: { lat: 38.7, lng: -9.1 } },
-    { name: "Bar Alto", city: "Lisbon", dot: { lat: 38.7, lng: -9.1 } },
-    { name: "Majestic", city: "Porto", dot: { lat: 41.1, lng: -8.6 } },
+  byCity: [
+    {
+      city: "Lisbon",
+      dot: { lat: 38.7, lng: -9.1 },
+      names: ["Tigre", "Bar Alto"],
+    },
+    { city: "Porto", dot: { lat: 41.1, lng: -8.6 }, names: ["Majestic"] },
   ],
 };
 
@@ -81,23 +83,13 @@ describe("passport text", () => {
       "1 place · 2 cities",
     );
   });
-
-  it("groups places by city, with places that have none last", () => {
-    expect(passportCities([{ name: "Somewhere" }, ...passport.stamps])).toEqual(
-      [
-        { city: "Lisbon", names: ["Tigre", "Bar Alto"] },
-        { city: "Porto", names: ["Majestic"] },
-        { city: null, names: ["Somewhere"] },
-      ],
-    );
-  });
 });
 
 describe("dotMap", () => {
   const box = { width: 560, height: 300, pad: 48, spread: 7 };
 
   it("draws one dot per place, gathered around its city inside the box", () => {
-    const cities = dotMap(passport.stamps, box);
+    const cities = dotMap(passport.byCity, box);
     expect(cities.map((city) => [city.city, city.dots.length])).toEqual([
       ["Lisbon", 2],
       ["Porto", 1],
@@ -113,15 +105,15 @@ describe("dotMap", () => {
 
   it("keeps a big southern cluster and its label inside the box", () => {
     for (const count of [50, 500]) {
-      const stamps = [
-        { name: "North", city: "Porto", dot: { lat: 41.1, lng: -8.6 } },
-        ...Array.from({ length: count }, (_, index) => ({
-          name: `Spot ${index}`,
+      const byCity = [
+        { city: "Porto", dot: { lat: 41.1, lng: -8.6 }, names: ["North"] },
+        {
           city: "Lisbon",
           dot: { lat: 38.7, lng: -9.1 },
-        })),
+          names: Array.from({ length: count }, (_, index) => `Spot ${index}`),
+        },
       ];
-      for (const city of dotMap(stamps, box)) {
+      for (const city of dotMap(byCity, box)) {
         expect(city.labelY).toBeLessThanOrEqual(box.height - 16);
         for (const dot of city.dots) {
           expect(dot.x).toBeGreaterThanOrEqual(0);
@@ -137,10 +129,9 @@ describe("dotMap", () => {
     const dot = { lat: 38.7, lng: -9.2 };
     const cities = dotMap(
       [
-        { name: "A", city: "Lisbon", dot },
-        { name: "B", city: "Oeiras", dot },
-        { name: "C", city: "lisbon", dot },
-        { name: "D", city: "Setúbal", dot: { lat: 38.5, lng: -8.9 } },
+        { city: "Lisbon", dot, names: ["A", "C"] },
+        { city: "Oeiras", dot, names: ["B"] },
+        { city: "Setúbal", dot: { lat: 38.5, lng: -8.9 }, names: ["D"] },
       ],
       box,
     );
@@ -155,9 +146,9 @@ describe("dotMap", () => {
     const dot = { lat: 34.1, lng: -118.4 };
     const cities = dotMap(
       [
-        { name: "A", city: "West Hollywood", dot },
-        { name: "B", city: "Beverly Hills", dot },
-        { name: "C", city: "Pasadena", dot: { lat: 34.1, lng: -118.1 } },
+        { city: "West Hollywood", dot, names: ["A"] },
+        { city: "Beverly Hills", dot, names: ["B"] },
+        { city: "Pasadena", dot: { lat: 34.1, lng: -118.1 }, names: ["C"] },
         ...[
           "Santa Monica",
           "Culver City",
@@ -166,9 +157,9 @@ describe("dotMap", () => {
           "Playa Vista",
           "El Segundo",
         ].map((city) => ({
-          name: city,
           city,
           dot: { lat: 34.0, lng: -118.4 },
+          names: [city],
         })),
       ],
       box,
@@ -184,11 +175,11 @@ describe("dotMap", () => {
 
   it("centres a single city and skips places with no dot", () => {
     const [only, ...rest] = dotMap(
-      [passport.stamps[0], { name: "Nowhere" }],
+      [passport.byCity[1], { names: ["Nowhere"] }],
       box,
     );
     expect(rest).toEqual([]);
     expect(only).toMatchObject({ x: box.width / 2, y: box.height / 2 });
-    expect(dotMap([{ name: "Nowhere" }], box)).toEqual([]);
+    expect(dotMap([{ names: ["Nowhere"] }], box)).toEqual([]);
   });
 });

@@ -5,10 +5,9 @@ import Logo from "@/components/common/Logo";
 import {
   dotMap,
   loadPassport,
-  passportCities,
   passportSummary,
   passportTitle,
-  type PassportStamp,
+  type PassportCity,
 } from "@/lib/passportShare";
 import { SUPPORT_EMAIL } from "@/lib/support";
 
@@ -42,8 +41,8 @@ export async function generateMetadata({
   };
 }
 
-function DotMap({ stamps }: { stamps: PassportStamp[] }) {
-  const cities = dotMap(stamps, MAP);
+function DotMap({ byCity }: { byCity: PassportCity[] }) {
+  const cities = dotMap(byCity, MAP);
   if (cities.length === 0) return null;
   return (
     <svg
@@ -100,9 +99,9 @@ export default async function PassportPage({ params }: PageProps) {
             <p className="mt-1 text-[15px] text-muted">
               {passportSummary(passport)}
             </p>
-            <DotMap stamps={passport.stamps} />
+            <DotMap byCity={passport.byCity} />
             <div className="mt-6 flex flex-col gap-4">
-              {passportCities(passport.stamps).map((group) => (
+              {passport.byCity.map((group) => (
                 <section
                   key={group.city ?? ""}
                   className="rounded-2xl border border-line bg-card p-5"

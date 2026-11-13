@@ -2,7 +2,6 @@ import { ImageResponse } from "next/og";
 
 import {
   loadPassport,
-  passportCities,
   passportSummary,
   passportTitle,
 } from "@/lib/passportShare";
@@ -22,7 +21,7 @@ type ImageProps = { params: Promise<{ token: string }> };
 export default async function Image({ params }: ImageProps) {
   const { token } = await params;
   const { passport } = await loadPassport(token, "preview");
-  const cities = passport ? passportCities(passport.stamps) : [];
+  const cities = passport?.byCity ?? [];
   const shown = cities.slice(0, MAX_ROWS);
   const more = cities.length - shown.length;
 

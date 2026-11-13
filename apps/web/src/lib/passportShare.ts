@@ -3,14 +3,14 @@ import { serverLog } from "@/lib/serverLog";
 
 type Dot = { lat: number; lng: number };
 
-export type PassportStamp = { name: string; city?: string; dot?: Dot };
+export type PassportCity = { city?: string; dot?: Dot; names: string[] };
 
 export type SharedPassport = {
   ownerName?: string;
   places: number;
   cities: number;
   countries: number | null;
-  stamps: PassportStamp[];
+  byCity: PassportCity[];
 };
 
 type PassportOutcome = "found" | "missing" | "unavailable";
@@ -64,39 +64,24 @@ export function passportSummary(passport: SharedPassport): string {
   ].join(" · ");
 }
 
-export function passportCities(
-  stamps: readonly PassportStamp[],
-): { city: string | null; names: string[] }[] {
-  const groups = new Map<string, { city: string | null; names: string[] }>();
-  for (const stamp of stamps) {
-    const key = stamp.city?.trim().toLowerCase() ?? "";
-    const group = groups.get(key);
-    if (group) group.names.push(stamp.name);
-    else groups.set(key, { city: stamp.city ?? null, names: [stamp.name] });
-  }
-  return [...groups.values()].sort(
-    (a, b) => Number(a.city === null) - Number(b.city === null),
-  );
-}
-
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const LABEL_GAP = 24;
 const LABEL_CHAR_WIDTH = 7.5;
 const LABEL_EDGE = 4;
 
 export function dotMap(
-  stamps: readonly PassportStamp[],
+  byCity: readonly PassportCity[],
   size: { width: number; height: number; pad: number; spread: number },
 ) {
   const cities = new Map<
     string,
     { names: string[]; dot: Dot; count: number }
   >();
-  for (const { city, dot } of stamps) {
+  for (const { city, dot, names } of byCity) {
     if (!dot) continue;
     const key = `${dot.lat},${dot.lng}`;
     const found = cities.get(key) ?? { names: [], dot, count: 0 };
-    found.count += 1;
+    found.count += names.length;
     const name = city?.trim() ?? "";
     const known = found.names.some(
       (other) => other.toLowerCase() === name.toLowerCase(),
