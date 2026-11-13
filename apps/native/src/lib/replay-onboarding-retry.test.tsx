@@ -54,7 +54,11 @@ vi.mock("@/lib/onboarding", () => ({
 }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => ({ ...entitlement }),
-  openPaywall,
+  openPaywallOutcome: async (...args: unknown[]) => {
+    const result: unknown = await openPaywall(...args);
+    if (result === true) return "success";
+    return result === false ? "cancelled" : result;
+  },
   waitForSheetTransition: () => Promise.resolve(),
 }));
 
@@ -81,6 +85,71 @@ beforeEach(() => {
   openPaywall.mockReset().mockResolvedValue(false);
   entitlement.entitled = true;
   account.user = { _id: "user_1" };
+});
+
+describe("a no to the replay's paywall", () => {
+  const reel = ahaSample("trip", null).firstSaveUrl;
+
+  async function coldLaunch() {
+    vi.resetModules();
+    const fresh = await import("./replay-onboarding");
+    const hook = renderHook(() => fresh.useReplayOnboarding());
+    await settle();
+    return hook;
+  }
+
+  it("asks once for the queued work, in the same launch and after a cold launch", async () => {
+    entitlement.entitled = false;
+    queueDemoUrl(reel);
+    const first = renderHook(() => useReplayOnboarding());
+    await settle();
+    expect(openPaywall).toHaveBeenCalledOnce();
+    act(() => queueDemoUrl(reel));
+    await settle();
+    expect(openPaywall).toHaveBeenCalledOnce();
+    first.unmount();
+    await coldLaunch();
+    expect(openPaywall).toHaveBeenCalledOnce();
+    expect(getPendingDemoUrl()).toBe(reel);
+  });
+
+  it("still saves the queued reel once access arrives after a no", async () => {
+    entitlement.entitled = false;
+    queueDemoUrl(reel);
+    createLinkItem.mockResolvedValue("item");
+    const hook = renderHook(() => useReplayOnboarding());
+    await settle();
+    expect(openPaywall).toHaveBeenCalledOnce();
+    entitlement.entitled = true;
+    hook.rerender();
+    await settle();
+    expect(createLinkItem).toHaveBeenCalledOnce();
+    expect(createLinkItem).toHaveBeenCalledWith(
+      expect.objectContaining({ url: reel }),
+    );
+    expect(hasPending()).toBe(false);
+  });
+
+  it("asks again when the paywall could not open, since that is not a no", async () => {
+    entitlement.entitled = false;
+    openPaywall.mockResolvedValueOnce("unavailable");
+    queueDemoUrl(reel);
+    renderHook(() => useReplayOnboarding());
+    await settle();
+    act(() => queueDemoUrl(reel));
+    await settle();
+    expect(openPaywall).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks once about new queued work after a no", async () => {
+    entitlement.entitled = false;
+    queueDemoUrl(reel);
+    renderHook(() => useReplayOnboarding());
+    await settle();
+    act(() => queueDemoUrl("https://www.instagram.com/reel/other/"));
+    await settle();
+    expect(openPaywall).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("useReplayOnboarding and the account", () => {

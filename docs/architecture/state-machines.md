@@ -95,15 +95,22 @@ transition, and a hook that only runs the effects. Do it when a fix would add
 another flag, or when bugs cluster in one machine. Behaviour should not change,
 so the existing tests must pass untouched.
 
+## Decisions
+
+- **The replay asks at most once for each batch of queued onboarding work.** A
+  "no" (a `cancelled` outcome, not a paywall that could not open) is stored in
+  the pending onboarding record as `declinedOperationId`, so it survives a cold
+  launch (`noteReplayDeclined`, `replayDeclined` in
+  `src/lib/pending-onboarding.ts`). The work stays queued and is saved without
+  another ask if access arrives later; new work gets a new operation id and one
+  new ask. Tests: `replay-onboarding-retry.test.tsx`, "a no to the replay's
+  paywall".
+
 ## Open questions
 
-- A decline of the onboarding replay's own paywall is not recorded, so while
-  onboarding work is queued the paywall opens again on the next run, in the
-  same launch or after a cold launch. A decline at the onboarding step is kept
-  only in `onboardingPaywall`, so a cold launch forgets it, and it is recorded
-  only when the person is signed in (`onboarding-paywall.ts`). Whether a
-  decline should stick is a product decision; the test "keeps the paywall open
-  to a later run after a decline in the same launch" pins today's behaviour.
+- A decline at the onboarding step is kept only in `onboardingPaywall`, so a
+  cold launch forgets it, and it is recorded only when the person is signed in
+  (`onboarding-paywall.ts`). The replay then asks once more for that work.
 - A time-zone change between scheduling and relaunch may send the trial-ending
   reminder twice or not at all (`trial-reminder.ts`): it schedules from local
   hours and nothing records a delivered reminder. Not reproduced.

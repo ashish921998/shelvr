@@ -525,25 +525,20 @@ export async function openPaywall(
   router: ReturnType<typeof useRouter>,
   placement = "pro_gate",
 ): Promise<boolean> {
-  const { outcome, owned } = await presentPaywall(placement);
-  if (owned && shouldOpenPaywallFallback(outcome)) {
-    router.push("/(app)/paywall");
-  }
-  recordBlockedAction(placement, outcome === "success");
+  const outcome = await openPaywallOutcome(router, placement, {
+    fallback: true,
+  });
   return outcome === "success";
 }
 
-/** `openPaywall` returning the outcome; the onboarding placement never gets the fallback screen. */
+/** `openPaywall` returning the outcome; by default the onboarding placement never gets the fallback screen. */
 export async function openPaywallOutcome(
   router: ReturnType<typeof useRouter>,
   placement: string,
+  { fallback = placement !== "onboarding" }: { fallback?: boolean } = {},
 ): Promise<PaywallOutcome> {
   const { outcome, owned } = await presentPaywall(placement);
-  if (
-    owned &&
-    shouldOpenPaywallFallback(outcome) &&
-    placement !== "onboarding"
-  ) {
+  if (owned && shouldOpenPaywallFallback(outcome) && fallback) {
     router.push("/(app)/paywall");
   }
   recordBlockedAction(placement, outcome === "success");
