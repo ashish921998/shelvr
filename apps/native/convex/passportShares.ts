@@ -115,12 +115,12 @@ async function compareWith(
   userId: Id<"users">,
   ownerId: Id<"users">,
 ) {
-  const saves = await readySavesNewestFirst(ctx, userId);
-  return comparePassports(
-    await passportPlaces(ctx, userId),
-    await passportPlaces(ctx, ownerId),
-    saves.flatMap(placesOnSave),
-  );
+  const [mine, theirs, saves] = await Promise.all([
+    passportPlaces(ctx, userId),
+    passportPlaces(ctx, ownerId),
+    readySavesNewestFirst(ctx, userId),
+  ]);
+  return comparePassports(mine, theirs, saves.flatMap(placesOnSave));
 }
 
 export const sharePassport = authedMutation({

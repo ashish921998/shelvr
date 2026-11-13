@@ -16,15 +16,15 @@ export type SharedPassport = {
   byCity: PassportCity[];
 };
 
-type PassportOutcome = "found" | "missing" | "unavailable";
+type PassportResult =
+  | { outcome: "found"; passport: SharedPassport }
+  | { outcome: "missing" | "unavailable"; passport?: undefined };
 
 function shareUrl(siteUrl: string, token: string): string {
   return `${siteUrl}/passport/shares/${encodeURIComponent(token)}`;
 }
 
-async function fetchPassport(
-  token: string,
-): Promise<{ outcome: PassportOutcome; passport?: SharedPassport }> {
+async function fetchPassport(token: string): Promise<PassportResult> {
   const siteUrl = convexSiteUrl();
   if (!siteUrl) return { outcome: "unavailable" };
 
