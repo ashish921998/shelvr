@@ -123,7 +123,7 @@ it("offers withdrawal and displays pending remote propagation", async () => {
   expect(screen.getByText("refundConsent.disabled")).toBeDefined();
   expect(screen.getByText("refundConsent.syncPending")).toBeDefined();
 });
-it("says sharing is not active once the RevenueCat update has stopped", () => {
+it("shows the unconfirmed sharing status once automatic updates have stopped", () => {
   mocks.consent = {
     reviewedVersion: TERMS_VERSION,
     refundSharing: true,
