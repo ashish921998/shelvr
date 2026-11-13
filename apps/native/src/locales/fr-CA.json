@@ -1227,6 +1227,119 @@
   "passport.nextEmpty": "Aucun lieu à afficher pour %{city} pour le moment.",
   "passport.stampPlace": "Tamponner",
   "passport.stampPlaceLabel": "Tamponner %{name}",
+  "badges.title": "Badges",
+  "badges.earned": "Badge obtenu",
+  "badges.unlocked": "Badge %{badge} obtenu",
+  "badges.moreEarned": {
+    "one": "Et %{formattedCount} autre badge",
+    "many": "Et %{formattedCount} autres badges",
+    "other": "Et %{formattedCount} autres badges"
+  },
+  "badges.shareMessage": "J’ai obtenu le badge %{badge} dans mon passeport Shelvr.",
+  "badges.shareHint": "Pour partager ce badge",
+  "badges.lockedHint": "Obtenez des badges avec Shelvr Pro",
+  "badges.firstStamp": "Premier tampon",
+  "badges.explorer": "Explorateur",
+  "badges.wanderer": "Baroudeur",
+  "badges.globetrotter": "Globe-trotteur",
+  "badges.cityHopper": "Saute-villes",
+  "badges.passportHolder": "Passeport en poche",
+  "badges.completionist": "Complétiste",
+  "badges.coffeeCrawler": "Tournée des cafés",
+  "badges.foodie": "Gourmet",
+  "badges.sweetTooth": "Bec sucré",
+  "badges.nightOwl": "Oiseau de nuit",
+  "badges.outAndAbout": "Toujours dehors",
+  "badges.goalPlaces": {
+    "one": "%{formattedCount} lieu tamponné",
+    "many": "%{formattedCount} lieux tamponnés",
+    "other": "%{formattedCount} lieux tamponnés"
+  },
+  "badges.goalCities": {
+    "one": "%{formattedCount} ville tamponnée",
+    "many": "%{formattedCount} villes tamponnées",
+    "other": "%{formattedCount} villes tamponnées"
+  },
+  "badges.goalCountries": {
+    "one": "%{formattedCount} pays tamponné",
+    "many": "%{formattedCount} pays tamponnés",
+    "other": "%{formattedCount} pays tamponnés"
+  },
+  "badges.goalCompleteCities": {
+    "one": "%{formattedCount} ville complète",
+    "many": "%{formattedCount} villes complètes",
+    "other": "%{formattedCount} villes complètes"
+  },
+  "badges.goalCoffee": {
+    "one": "%{formattedCount} café tamponné",
+    "many": "%{formattedCount} cafés tamponnés",
+    "other": "%{formattedCount} cafés tamponnés"
+  },
+  "badges.goalFood": {
+    "one": "%{formattedCount} restaurant tamponné",
+    "many": "%{formattedCount} restaurants tamponnés",
+    "other": "%{formattedCount} restaurants tamponnés"
+  },
+  "badges.goalDessert": {
+    "one": "%{formattedCount} adresse sucrée tamponnée",
+    "many": "%{formattedCount} adresses sucrées tamponnées",
+    "other": "%{formattedCount} adresses sucrées tamponnées"
+  },
+  "badges.goalDrinks": {
+    "one": "%{formattedCount} bar tamponné",
+    "many": "%{formattedCount} bars tamponnés",
+    "other": "%{formattedCount} bars tamponnés"
+  },
+  "badges.goalActivities": {
+    "one": "%{formattedCount} activité tamponnée",
+    "many": "%{formattedCount} activités tamponnées",
+    "other": "%{formattedCount} activités tamponnées"
+  },
+  "badges.progressPlaces": {
+    "one": "%{visited} sur %{formattedCount} lieu",
+    "many": "%{visited} sur %{formattedCount} lieux",
+    "other": "%{visited} sur %{formattedCount} lieux"
+  },
+  "badges.progressCities": {
+    "one": "%{visited} sur %{formattedCount} ville",
+    "many": "%{visited} sur %{formattedCount} villes",
+    "other": "%{visited} sur %{formattedCount} villes"
+  },
+  "badges.progressCountries": {
+    "one": "%{visited} sur %{formattedCount} pays",
+    "many": "%{visited} sur %{formattedCount} pays",
+    "other": "%{visited} sur %{formattedCount} pays"
+  },
+  "badges.progressCompleteCities": {
+    "one": "%{visited} sur %{formattedCount} ville complète",
+    "many": "%{visited} sur %{formattedCount} villes complètes",
+    "other": "%{visited} sur %{formattedCount} villes complètes"
+  },
+  "badges.progressCoffee": {
+    "one": "%{visited} sur %{formattedCount} café",
+    "many": "%{visited} sur %{formattedCount} cafés",
+    "other": "%{visited} sur %{formattedCount} cafés"
+  },
+  "badges.progressFood": {
+    "one": "%{visited} sur %{formattedCount} restaurant",
+    "many": "%{visited} sur %{formattedCount} restaurants",
+    "other": "%{visited} sur %{formattedCount} restaurants"
+  },
+  "badges.progressDessert": {
+    "one": "%{visited} sur %{formattedCount} adresse sucrée",
+    "many": "%{visited} sur %{formattedCount} adresses sucrées",
+    "other": "%{visited} sur %{formattedCount} adresses sucrées"
+  },
+  "badges.progressDrinks": {
+    "one": "%{visited} sur %{formattedCount} bar",
+    "many": "%{visited} sur %{formattedCount} bars",
+    "other": "%{visited} sur %{formattedCount} bars"
+  },
+  "badges.progressActivities": {
+    "one": "%{visited} sur %{formattedCount} activité",
+    "many": "%{visited} sur %{formattedCount} activités",
+    "other": "%{visited} sur %{formattedCount} activités"
+  },
   "passportShare.share": "Partager le passeport",
   "passportShare.stopSetting": "Ne plus partager mon passeport",
   "passportShare.stopTitle": "Ne plus partager votre passeport ?",

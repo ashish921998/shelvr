@@ -1185,6 +1185,100 @@
   "passport.nextEmpty": "Für %{city} gibt es gerade keine Orte zum Anzeigen.",
   "passport.stampPlace": "Stempeln",
   "passport.stampPlaceLabel": "%{name} stempeln",
+  "badges.title": "Meilensteine",
+  "badges.earned": "Abzeichen erhalten",
+  "badges.unlocked": "Abzeichen „%{badge}“ erhalten",
+  "badges.moreEarned": {
+    "one": "Und %{formattedCount} weiteres Abzeichen",
+    "other": "Und %{formattedCount} weitere Abzeichen"
+  },
+  "badges.shareMessage": "Ich habe in meinem Shelvr-Pass das Abzeichen „%{badge}“ bekommen.",
+  "badges.shareHint": "Teilt dieses Abzeichen",
+  "badges.lockedHint": "Abzeichen mit Shelvr Pro sammeln",
+  "badges.firstStamp": "Erster Stempel",
+  "badges.explorer": "Entdecker",
+  "badges.wanderer": "Wandervogel",
+  "badges.globetrotter": "Globetrotter",
+  "badges.cityHopper": "Städtehopper",
+  "badges.passportHolder": "Passinhaber",
+  "badges.completionist": "Perfektionist",
+  "badges.coffeeCrawler": "Kaffeetour",
+  "badges.foodie": "Feinschmecker",
+  "badges.sweetTooth": "Naschkatze",
+  "badges.nightOwl": "Nachteule",
+  "badges.outAndAbout": "Immer unterwegs",
+  "badges.goalPlaces": {
+    "one": "%{formattedCount} Ort gestempelt",
+    "other": "%{formattedCount} Orte gestempelt"
+  },
+  "badges.goalCities": {
+    "one": "%{formattedCount} Stadt gestempelt",
+    "other": "%{formattedCount} Städte gestempelt"
+  },
+  "badges.goalCountries": {
+    "one": "%{formattedCount} Land gestempelt",
+    "other": "%{formattedCount} Länder gestempelt"
+  },
+  "badges.goalCompleteCities": {
+    "one": "%{formattedCount} Stadt komplett",
+    "other": "%{formattedCount} Städte komplett"
+  },
+  "badges.goalCoffee": {
+    "one": "%{formattedCount} Café gestempelt",
+    "other": "%{formattedCount} Cafés gestempelt"
+  },
+  "badges.goalFood": {
+    "one": "%{formattedCount} Restaurant gestempelt",
+    "other": "%{formattedCount} Restaurants gestempelt"
+  },
+  "badges.goalDessert": {
+    "one": "%{formattedCount} Dessertladen gestempelt",
+    "other": "%{formattedCount} Dessertläden gestempelt"
+  },
+  "badges.goalDrinks": {
+    "one": "%{formattedCount} Bar gestempelt",
+    "other": "%{formattedCount} Bars gestempelt"
+  },
+  "badges.goalActivities": {
+    "one": "%{formattedCount} Aktivität gestempelt",
+    "other": "%{formattedCount} Aktivitäten gestempelt"
+  },
+  "badges.progressPlaces": {
+    "one": "%{visited} von %{formattedCount} Ort",
+    "other": "%{visited} von %{formattedCount} Orten"
+  },
+  "badges.progressCities": {
+    "one": "%{visited} von %{formattedCount} Stadt",
+    "other": "%{visited} von %{formattedCount} Städten"
+  },
+  "badges.progressCountries": {
+    "one": "%{visited} von %{formattedCount} Land",
+    "other": "%{visited} von %{formattedCount} Ländern"
+  },
+  "badges.progressCompleteCities": {
+    "one": "%{visited} von %{formattedCount} Stadt komplett",
+    "other": "%{visited} von %{formattedCount} Städten komplett"
+  },
+  "badges.progressCoffee": {
+    "one": "%{visited} von %{formattedCount} Café",
+    "other": "%{visited} von %{formattedCount} Cafés"
+  },
+  "badges.progressFood": {
+    "one": "%{visited} von %{formattedCount} Restaurant",
+    "other": "%{visited} von %{formattedCount} Restaurants"
+  },
+  "badges.progressDessert": {
+    "one": "%{visited} von %{formattedCount} Dessertladen",
+    "other": "%{visited} von %{formattedCount} Dessertläden"
+  },
+  "badges.progressDrinks": {
+    "one": "%{visited} von %{formattedCount} Bar",
+    "other": "%{visited} von %{formattedCount} Bars"
+  },
+  "badges.progressActivities": {
+    "one": "%{visited} von %{formattedCount} Aktivität",
+    "other": "%{visited} von %{formattedCount} Aktivitäten"
+  },
   "passportShare.share": "Pass teilen",
   "passportShare.stopSetting": "Meinen Pass nicht mehr teilen",
   "passportShare.stopTitle": "Deinen Pass nicht mehr teilen?",
