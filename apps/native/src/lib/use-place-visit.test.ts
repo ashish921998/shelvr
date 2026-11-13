@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   captureError: vi.fn(),
   play: vi.fn(),
+  queue: vi.fn(),
   success: vi.fn(),
   selection: vi.fn(),
   router: { push: vi.fn() },
@@ -29,7 +30,7 @@ vi.mock("@/lib/haptics", () => ({
 }));
 vi.mock("@/lib/stamp-moment", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/stamp-moment")>()),
-  useStampMoment: () => ({ play: mocks.play, queue: vi.fn() }),
+  useStampMoment: () => ({ play: mocks.play, queue: mocks.queue }),
 }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
 vi.mock("react-native", () => ({ Alert: { alert: mocks.alert } }));
@@ -143,6 +144,7 @@ describe("usePlaceVisit", () => {
           city: "Austin",
           cover: "https://img/taco.jpg",
           firstInCity: true,
+          completedTotal: null,
         },
         "city",
       ],
@@ -153,12 +155,53 @@ describe("usePlaceVisit", () => {
           city: "Austin",
           cover: "https://img/taco.jpg",
           firstInCity: false,
+          completedTotal: null,
         },
         "city",
       ],
     ]);
     expect(mocks.success).not.toHaveBeenCalled();
     expect(mocks.selection).not.toHaveBeenCalled();
+  });
+
+  it("marks the moment as the city's last place when the stamp completes it", async () => {
+    await toggle(taco, { ...austin, cityVisited: 4, cityTotal: 5 });
+    await toggle(taco, { ...austin, cityVisited: 3, cityTotal: 5 });
+    expect(mocks.play.mock.calls.map(([moment]) => moment)).toMatchObject([
+      { firstInCity: false, completedTotal: 5 },
+      { firstInCity: false, completedTotal: null },
+    ]);
+  });
+
+  it("holds the moment from the next-to-stamp sheet until Passport shows", async () => {
+    const { result } = renderHook(() => usePlaceVisit("next_to_stamp"));
+    await act(() =>
+      result.current.toggle(itemId, taco, true, {
+        ...austin,
+        cityVisited: 0,
+        cityTotal: 1,
+      }),
+    );
+    expect(mocks.play).not.toHaveBeenCalled();
+    expect(mocks.queue).toHaveBeenCalledWith(
+      {
+        kind: "place",
+        name: "Taco Spot",
+        city: "Austin",
+        cover: "https://img/taco.jpg",
+        firstInCity: true,
+        completedTotal: 1,
+      },
+      "next_to_stamp",
+    );
+    expect(mocks.capture).not.toHaveBeenCalledWith(
+      "city_place_visited",
+      expect.anything(),
+    );
+    expect(mocks.capture).not.toHaveBeenCalledWith(
+      "place_unstamped",
+      expect.anything(),
+    );
   });
 
   it("still plays the moment for a stamp with no city context", async () => {

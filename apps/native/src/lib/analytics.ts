@@ -186,9 +186,13 @@ export type AnalyticsEventProperties = {
   passport_opened: { places: number };
   passport_backfilled: { places: number };
   passport_stamp_landed: {
-    surface: "city" | "already_been";
+    surface: "city" | "already_been" | "next_to_stamp";
     first_in_city: boolean;
     count: number;
+  };
+  passport_city_completed: {
+    surface: "city" | "already_been" | "next_to_stamp";
+    total: number;
   };
   passport_card_share_opened: { places: number; surface: "stamp" | "passport" };
   passport_shared: { places: number; shared: boolean };

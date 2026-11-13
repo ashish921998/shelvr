@@ -149,6 +149,7 @@ it("shows the stamp and its line over the screen without hiding it", () => {
       city: "Lisbon",
       cover: "https://img/c.jpg",
       firstInCity: true,
+      completedTotal: null,
     },
     "city",
   );

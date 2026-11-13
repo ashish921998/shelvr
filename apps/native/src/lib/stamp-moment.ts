@@ -20,16 +20,20 @@ export type StampMoment =
       city: string;
       cover: string | null;
       firstInCity: boolean;
+      completedTotal: number | null;
     }
   | { kind: "bulk"; count: number; cover: string | null };
 
-export type StampSurface = "city" | "already_been";
+export type StampSurface = "city" | "already_been" | "next_to_stamp";
 
 export type StampPlace = {
   city: string;
   cover: string | null;
   cityVisited: number;
+  cityTotal?: number;
 };
+
+export type CityCount = { stamped: number; total: number };
 
 export type ShownStamp = {
   id: number;
@@ -50,11 +54,38 @@ export const STAMP_TIMING = {
 
 const NO_CITY: StampPlace = { city: "", cover: null, cityVisited: 1 };
 
+export function cityStampPlace(
+  city: string,
+  cover: string | null,
+  count: CityCount | undefined,
+): StampPlace {
+  return count === undefined
+    ? { city, cover, cityVisited: 1 }
+    : { city, cover, cityVisited: count.stamped, cityTotal: count.total };
+}
+
+export function completesCity(before: CityCount, after: CityCount): boolean {
+  return (
+    after.total > 0 &&
+    before.stamped < before.total &&
+    after.stamped >= after.total
+  );
+}
+
 export function placeStampMoment(
   name: string,
-  { city, cover, cityVisited }: StampPlace = NO_CITY,
+  { city, cover, cityVisited, cityTotal }: StampPlace = NO_CITY,
 ): StampMoment {
-  return { kind: "place", name, city, cover, firstInCity: cityVisited === 0 };
+  const before = { stamped: cityVisited, total: cityTotal ?? 0 };
+  const after = { stamped: cityVisited + 1, total: before.total };
+  return {
+    kind: "place",
+    name,
+    city,
+    cover,
+    firstInCity: cityVisited === 0,
+    completedTotal: city && completesCity(before, after) ? after.total : null,
+  };
 }
 
 export function bulkStampMoment(
@@ -69,6 +100,9 @@ export function bulkStampMoment(
 export function stampLine(moment: StampMoment): string {
   if (moment.kind === "bulk") {
     return t("passport.momentBulk", { count: moment.count });
+  }
+  if (moment.completedTotal !== null) {
+    return t("passport.momentCityComplete", { city: moment.city });
   }
   return moment.firstInCity && moment.city
     ? t("passport.momentFirstInCity", { city: moment.city })
@@ -175,6 +209,12 @@ export function useStampMomentPlayer(reduced: boolean): {
         first_in_city: moment.kind === "place" && moment.firstInCity,
         count: moment.kind === "bulk" ? moment.count : 1,
       });
+      if (moment.kind === "place" && moment.completedTotal !== null) {
+        analytics.capture("passport_city_completed", {
+          surface,
+          total: moment.completedTotal,
+        });
+      }
       AccessibilityInfo.announceForAccessibility(line);
       if (reduced) {
         void haptics.impact("medium");
