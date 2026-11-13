@@ -236,13 +236,10 @@ export const itemCardValidator = enrichedItemValidator
 
 export type ItemCard = Infer<typeof itemCardValidator>;
 
-function stripEmbedding(
+function withoutServerFields(
   item: Doc<"items">,
 ): Omit<
   Doc<"items">,
-  | "embedding"
-  | "embeddingVersion"
-  | "embeddingAttempts"
   | "productsSearchStartedAt"
   | "places"
   | "placesHeard"
@@ -256,9 +253,6 @@ function stripEmbedding(
     placesHeard: _placesHeard,
     placeLocations: _placeLocations,
     placeCuisines: _placeCuisines,
-    embedding: _embedding,
-    embeddingVersion: _version,
-    embeddingAttempts: _attempts,
     productsSearchStartedAt: _searchStartedAt,
     ...rest
   } = item;
@@ -274,7 +268,7 @@ export async function enrichItem(
     ? await ctx.storage.getUrl(item.storageId)
     : null;
   return {
-    ...stripEmbedding(await visibleSave(ctx, item, removals)),
+    ...withoutServerFields(await visibleSave(ctx, item, removals)),
     imageUrl,
     heroImageUrl: item.type === "link" ? (imageUrl ?? undefined) : undefined,
   };
@@ -750,49 +744,6 @@ export const backfillPlaceSearch = internalMutation({
     }
     if (!batch.isDone) {
       await ctx.scheduler.runAfter(0, internal.items.backfillPlaceSearch, {
-        cursor: batch.continueCursor,
-      });
-    }
-    return null;
-  },
-});
-
-/**
- * Run once after deploying the end of embeddings, to shrink every save:
- * convex run items:clearEmbeddings '{"cursor":null}'. Safe to restart from a null cursor.
- */
-export const clearEmbeddings = internalMutation({
-  args: { cursor: v.union(v.string(), v.null()) },
-  returns: v.null(),
-  handler: async (ctx, { cursor }) => {
-    const batch = await ctx.db.query("items").paginate({
-      cursor,
-      numItems: 25,
-      maximumBytesRead: 2 * 1024 * 1024,
-    });
-    let cleared = 0;
-    for (const item of batch.page) {
-      if (
-        item.embedding === undefined &&
-        item.embeddingVersion === undefined &&
-        item.embeddingAttempts === undefined
-      ) {
-        continue;
-      }
-      await ctx.db.patch(item._id, {
-        embedding: undefined,
-        embeddingVersion: undefined,
-        embeddingAttempts: undefined,
-      });
-      cleared++;
-    }
-    logEvent("info", "embeddings_cleared", {
-      scanned: batch.page.length,
-      cleared,
-      done: batch.isDone,
-    });
-    if (!batch.isDone) {
-      await ctx.scheduler.runAfter(0, internal.items.clearEmbeddings, {
         cursor: batch.continueCursor,
       });
     }
@@ -1878,8 +1829,6 @@ export const updateNoteItem = authedMutation({
         note: text,
         content: item.content,
       }),
-      embeddingVersion: undefined,
-      embeddingAttempts: undefined,
       ...(refreshRunId !== undefined ? { processingRunId: refreshRunId } : {}),
       ...(refreshRunId !== undefined && item.status === "processing"
         ? { processingStartedAt: Date.now() }
@@ -2144,7 +2093,7 @@ export const getItemInternal = internalQuery({
     if (item === null) return null;
     const { places, placesHeard, placeLocations, placeCuisines } = item;
     return {
-      ...stripEmbedding(item),
+      ...withoutServerFields(item),
       ...(places ? { places } : {}),
       ...(placesHeard !== undefined ? { placesHeard } : {}),
       ...(placeLocations !== undefined ? { placeLocations } : {}),
@@ -2202,7 +2151,7 @@ export const listReadyItemsInternal = internalQuery({
       )
       .order("desc")
       .take(limit);
-    return rows.map(stripEmbedding);
+    return rows.map(withoutServerFields);
   },
 });
 

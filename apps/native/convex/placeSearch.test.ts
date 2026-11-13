@@ -36,7 +36,7 @@ it("finds old saves by city, place, and title beyond the Home page, without retu
     return id;
   });
   await backend.mutation(internal.items.backfillPlaceSearch, { cursor: null });
-  await backend.finishAllScheduledFunctions(vi.runAllTimers);
+  await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
   for (const query of [" lisbon ", "Belém", "weekend", "Lisbon---"]) {
     expect(
       (await t.query(api.items.searchItems, { query })).map((item) => item._id),
@@ -53,7 +53,7 @@ it("finds old saves by city, place, and title beyond the Home page, without retu
     [],
   );
   await backend.mutation(internal.items.backfillPlaceSearch, { cursor: null });
-  await backend.finishAllScheduledFunctions(vi.runAllTimers);
+  await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
   expect(
     (await t.query(api.items.searchItems, { query: "lisbon" })).map(
       (item) => item._id,

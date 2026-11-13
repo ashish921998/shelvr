@@ -663,9 +663,9 @@
   "refundConsent.enabled": "Du erlaubst die Weitergabe von Kauf- und Bereitstellungsinformationen an Apple zur Prüfung von Rückerstattungen.",
   "refundConsent.disabled": "Die Datenweitergabe für Rückerstattungen ist aus.",
   "refundConsent.syncPending": "Deine Auswahl ist gespeichert. RevenueCat wird aktualisiert; bis zum Abschluss kann die bisherige Einstellung gelten.",
+  "refundConsent.syncFailed": "Deine Auswahl ist gespeichert, aber wir konnten nicht bestätigen, ob die Datenweitergabe für Rückerstattungen eingeschaltet ist. Schalte die Weitergabe aus und erlaube sie erneut, um es noch einmal zu versuchen.",
   "refundConsent.withdraw": "Weitergabe ausschalten",
   "refundConsent.review": "Aktualisierte Bedingungen ansehen",
-  "aiConsent.findLinksOff": "KI ist für dieses Konto deaktiviert. Kontaktiere den Support, um deine Einstellung zu ändern.",
   "updates.title": "App-Updates",
   "updates.check": "Nach Updates suchen",
   "updates.checking": "Suche läuft…",
@@ -1033,6 +1033,8 @@
     "other": "%{formattedCount} neu"
   },
   "sharedLists.alsoAddTo": "Auch hinzufügen zu",
+  "sharedLists.alsoAddFull": "%{name} ist voll. Entferne einen Ort, um mehr hinzuzufügen.",
+  "sharedLists.alsoAddAlready": "Diese Orte sind schon auf %{name}.",
   "sharedLists.willSee": {
     "one": "%{name} sieht %{formattedCount} Ort",
     "other": "%{name} sieht diese %{formattedCount}"

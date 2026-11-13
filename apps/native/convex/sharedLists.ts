@@ -36,7 +36,6 @@ import {
   LIST_DRAIN_BATCH,
   LIST_TRIPS_SHOWN,
   MAX_LIST_MEMBERS,
-  MAX_LIST_PLACES,
   MAX_LISTS_PER_USER,
   memberOf,
   newPlaceCount,
@@ -50,7 +49,8 @@ import {
   type ListPlanClaim,
   type NewListPlace,
 } from "./model/sharedLists";
-import { MAX_LIST_CITIES } from "./model/sharedListLimits";
+import { MAX_LIST_CITIES, MAX_LIST_PLACES } from "./model/sharedListLimits";
+import { MAX_ITEM_PLACES } from "./model/itemFields";
 import { sameTripPlace } from "./model/placeIdentity";
 import { saveError } from "./model/saveErrors";
 import { cityKey, MAX_CITY_CHARS } from "./model/trip";
@@ -490,6 +490,21 @@ export const addSavePlaces = authedMutation({
       Date.now(),
     );
     return inserted.length;
+  },
+});
+
+export const listsWithSave = authedQuery({
+  args: { itemId: v.id("items") },
+  returns: v.array(v.id("sharedLists")),
+  handler: async (ctx, args) => {
+    const { userId } = ctx;
+    const places = await ctx.db
+      .query("sharedListPlaces")
+      .withIndex("by_item_and_added_by", (q) =>
+        q.eq("itemId", args.itemId).eq("addedBy", userId),
+      )
+      .take(MAX_ITEM_PLACES * MAX_LISTS_PER_USER);
+    return [...new Set(places.map((place) => place.listId))];
   },
 });
 

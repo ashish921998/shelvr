@@ -683,9 +683,9 @@
   "refundConsent.enabled": "Permites compartir información de compra y entrega con Apple para revisar reembolsos.",
   "refundConsent.disabled": "El uso compartido de datos para reembolsos está desactivado.",
   "refundConsent.syncPending": "Tu elección está guardada. Se está actualizando RevenueCat; la configuración anterior puede aplicarse hasta que termine.",
+  "refundConsent.syncFailed": "Tu elección está guardada, pero no pudimos confirmar si el uso compartido de datos para reembolsos está activado. Desactívalo y vuelve a permitirlo para intentarlo de nuevo.",
   "refundConsent.withdraw": "Dejar de compartir",
   "refundConsent.review": "Revisar condiciones actualizadas",
-  "aiConsent.findLinksOff": "La IA está desactivada en esta cuenta. Contacta a soporte para cambiar tu preferencia.",
   "updates.title": "Actualizaciones de la app",
   "updates.check": "Buscar actualizaciones",
   "updates.checking": "Buscando…",
@@ -1063,6 +1063,8 @@
     "other": "%{formattedCount} nuevos"
   },
   "sharedLists.alsoAddTo": "Agregar también a",
+  "sharedLists.alsoAddFull": "%{name} está llena. Quita un lugar para agregar más.",
+  "sharedLists.alsoAddAlready": "Estos lugares ya están en %{name}.",
   "sharedLists.willSee": {
     "one": "%{name} verá %{formattedCount} lugar",
     "many": "%{name} verá estos %{formattedCount}",
