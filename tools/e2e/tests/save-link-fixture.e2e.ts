@@ -27,7 +27,11 @@ test(
     );
     await expect(review).toBeVisible({ timeout: 60_000 });
     const dismissToast = screen.getByRole("button", "Dismiss");
-    if (await dismissToast.isVisible()) {
+    const toastUp = await expect(dismissToast)
+      .toBeVisible({ timeout: 5000 })
+      .then(() => true)
+      .catch(() => false);
+    if (toastUp) {
       await dismissToast.tap();
       await expect(dismissToast).toBeHidden({ timeout: 10_000 });
     }
