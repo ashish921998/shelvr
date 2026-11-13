@@ -643,9 +643,9 @@
   "refundConsent.enabled": "환불 심사를 위해 구매 및 제공 정보를 Apple과 공유하도록 허용했습니다.",
   "refundConsent.disabled": "환불 데이터 공유가 꺼져 있습니다.",
   "refundConsent.syncPending": "선택이 저장되었습니다. RevenueCat을 업데이트하는 중이며, 완료될 때까지 이전 설정이 적용될 수 있습니다.",
+  "refundConsent.syncFailed": "선택은 저장되었지만 환불 데이터 공유가 켜져 있는지 확인하지 못했습니다. 다시 시도하려면 공유를 끈 다음 다시 허용해 주세요.",
   "refundConsent.withdraw": "공유 끄기",
   "refundConsent.review": "업데이트된 약관 검토",
-  "aiConsent.findLinksOff": "이 계정에서는 AI가 꺼져 있어요. 변경하려면 고객 지원에 문의해 주세요.",
   "updates.title": "앱 업데이트",
   "updates.check": "업데이트 확인",
   "updates.checking": "확인 중…",
@@ -1003,6 +1003,8 @@
     "other": "새 장소 %{formattedCount}곳"
   },
   "sharedLists.alsoAddTo": "여기에도 추가",
+  "sharedLists.alsoAddFull": "%{name} 목록이 가득 찼어요. 더 추가하려면 장소를 하나 삭제하세요.",
+  "sharedLists.alsoAddAlready": "이 장소들은 이미 %{name} 목록에 있어요.",
   "sharedLists.willSee": {
     "other": "%{name}에게 이 %{formattedCount}곳이 보여요"
   },
@@ -1117,6 +1119,35 @@
   "passport.cardSavedElsewhere": "나중을 위해 저장.",
   "passport.cardWent": "Shelvr로 다녀옴.",
   "passport.shareCity": "%{city} 공유",
+  "passportShare.share": "여권 공유",
+  "passportShare.stopSetting": "내 여권 공유 중지",
+  "passportShare.stopTitle": "여권 공유를 중지할까요?",
+  "passportShare.stopBody": "보낸 링크가 모두 더 이상 열리지 않아요. 언제든 다시 공유할 수 있어요.",
+  "passportShare.stop": "공유 중지",
+  "passportShare.title": "%{name}의 여권",
+  "passportShare.titleNoName": "친구의 여권",
+  "passportShare.compare": "내 여권과 비교",
+  "passportShare.deadTitle": "더 이상 공유되지 않는 여권이에요",
+  "passportShare.deadBody": "새 링크를 받거나 Shelvr에서 내 여권을 시작해 보세요.",
+  "passportShare.bothHeader": {
+    "other": "둘 다 가 본 곳 %{formattedCount}곳"
+  },
+  "passportShare.compareSub": "나만: %{onlyYou} · %{name}만: %{onlyThem}",
+  "passportShare.compareSubNoName": "나만: %{onlyYou} · 상대만: %{onlyThem}",
+  "passportShare.compareEmpty": "가 본 곳에 스탬프를 찍으면 여기서 비교할 수 있어요.",
+  "passportShare.both": "둘 다",
+  "passportShare.onlyThem": "%{name}만",
+  "passportShare.onlyThemNoName": "상대만",
+  "passportShare.onlyYou": "나만",
+  "passportShare.save": {
+    "other": "상대의 %{formattedCount}곳 저장"
+  },
+  "passportShare.saved": {
+    "other": "%{formattedCount}곳 저장했어요"
+  },
+  "passportShare.savedNone": "새로 저장할 장소가 없어요",
+  "passportShare.fromFriend": "%{name}의 여권에서",
+  "passportShare.fromFriendNoName": "친구의 여권에서",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "other": "무료 저장 %{formattedCount}개 남음"

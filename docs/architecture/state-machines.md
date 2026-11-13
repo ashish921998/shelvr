@@ -51,10 +51,6 @@ Each is a status field plus helper fields, moved by several functions.
 | `cancelSurveys`                                                          | asked → submitted / dismissed                                                                                                                   | `convex/cancelSurvey.ts`                                                                                                                                                                                                            | `askedAt`, `outcome`, `respondedAt`.                                                                                                                                                                                                                                                                                                                                   |
 | `aiConsents.status`                                                      | granted / declined                                                                                                                              | `convex/aiConsent.ts`                                                                                                                                                                                                               | AI is on by default and the app never asks. The table only keeps legacy opt-outs: `aiAllowed` blocks on declined, and a row with an older `version` reads as unset.                                                                                                                                                                                                    |
 
-`items.embeddingVersion` and `embeddingAttempts` are no longer a machine: the
-sweep that read them is retired (`convex/aiEmbeddingSweep.ts`), so setting or
-clearing them queues nothing.
-
 ## Client flag machines
 
 Module-level variables and refs moved by hand, all in `src/lib` unless noted.

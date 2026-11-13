@@ -1,6 +1,7 @@
 import { AppSymbolIcon } from "@/components/symbol";
 import { t, useAppLocale } from "@/lib/i18n";
-import { passportCounts, stampId, usePassport } from "@/lib/passport";
+import { stampId, usePassport } from "@/lib/passport";
+import { passportCounts } from "@convex/model/passport";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Pressable, Text, View } from "react-native";

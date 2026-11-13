@@ -643,9 +643,9 @@
   "refundConsent.enabled": "返金審査のため、購入・提供状況に関する情報をAppleと共有することを許可しています。",
   "refundConsent.disabled": "返金審査のデータ共有はオフです。",
   "refundConsent.syncPending": "選択を保存しました。RevenueCatを更新中です。完了までは以前の設定が適用される場合があります。",
+  "refundConsent.syncFailed": "選択は保存されましたが、返金審査のデータ共有がオンになっているか確認できませんでした。もう一度試すには、共有をオフにしてから再度許可してください。",
   "refundConsent.withdraw": "共有をオフにする",
   "refundConsent.review": "更新された利用規約を確認",
-  "aiConsent.findLinksOff": "このアカウントではAIが無効です。設定を変更するにはサポートにお問い合わせください。",
   "updates.title": "アプリのアップデート",
   "updates.check": "アップデートを確認",
   "updates.checking": "確認中…",
@@ -1003,6 +1003,8 @@
     "other": "新着%{formattedCount}件"
   },
   "sharedLists.alsoAddTo": "こちらにも追加",
+  "sharedLists.alsoAddFull": "%{name}はいっぱいです。さらに追加するには、場所を削除してください。",
+  "sharedLists.alsoAddAlready": "これらの場所はすでに%{name}にあります。",
   "sharedLists.willSee": {
     "other": "%{name}にこの%{formattedCount}件が表示されます"
   },
@@ -1117,6 +1119,35 @@
   "passport.cardSavedElsewhere": "あとで行く用に保存。",
   "passport.cardWent": "Shelvrで行った。",
   "passport.shareCity": "%{city}を共有",
+  "passportShare.share": "パスポートを共有",
+  "passportShare.stopSetting": "パスポートの共有をやめる",
+  "passportShare.stopTitle": "パスポートの共有をやめますか？",
+  "passportShare.stopBody": "送ったリンクはすべて使えなくなります。いつでもまた共有できます。",
+  "passportShare.stop": "共有をやめる",
+  "passportShare.title": "%{name}のパスポート",
+  "passportShare.titleNoName": "友だちのパスポート",
+  "passportShare.compare": "自分のと比べる",
+  "passportShare.deadTitle": "このパスポートはもう共有されていません",
+  "passportShare.deadBody": "新しいリンクをもらうか、Shelvrで自分のパスポートを始めましょう。",
+  "passportShare.bothHeader": {
+    "other": "2人とも行った場所：%{formattedCount}か所"
+  },
+  "passportShare.compareSub": "あなただけ：%{onlyYou} · %{name}だけ：%{onlyThem}",
+  "passportShare.compareSubNoName": "あなただけ：%{onlyYou} · 相手だけ：%{onlyThem}",
+  "passportShare.compareEmpty": "行った場所にスタンプを押すと、ここで比べられます。",
+  "passportShare.both": "2人とも",
+  "passportShare.onlyThem": "%{name}だけ",
+  "passportShare.onlyThemNoName": "相手だけ",
+  "passportShare.onlyYou": "あなただけ",
+  "passportShare.save": {
+    "other": "相手の%{formattedCount}か所を保存"
+  },
+  "passportShare.saved": {
+    "other": "%{formattedCount}か所を保存しました"
+  },
+  "passportShare.savedNone": "新しく保存する場所はありません",
+  "passportShare.fromFriend": "%{name}のパスポートから",
+  "passportShare.fromFriendNoName": "友だちのパスポートから",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "other": "無料保存は残り%{formattedCount}件"
