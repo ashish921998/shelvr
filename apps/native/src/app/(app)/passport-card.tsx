@@ -11,7 +11,13 @@ import { Skia } from "@shopify/react-native-skia";
 import { File, Paths } from "expo-file-system";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
-import { type ComponentRef, useCallback, useRef, useState } from "react";
+import {
+  type ComponentRef,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   Alert,
   findNodeHandle,
@@ -29,7 +35,10 @@ export default function PassportCardScreen() {
     city: string;
     surface?: string;
   }>();
-  const { stamps, failed } = usePassport();
+  const { stamps, failed, error } = usePassport();
+  useEffect(() => {
+    if (error) analytics.captureError("passport_card_load_failed", error);
+  }, [error]);
   const card = useRef<ComponentRef<typeof View>>(null);
   const [busy, setBusy] = useState(false);
   const close = useCallback(() => backOrHome(router), [router]);

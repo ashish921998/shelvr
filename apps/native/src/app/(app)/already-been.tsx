@@ -107,6 +107,11 @@ export default function AlreadyBeenScreen() {
     if (picked.size !== chosen.size) setPicked(picked);
   }
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (places.error) {
+      analytics.captureError("passport_picker_load_failed", places.error);
+    }
+  }, [places.error]);
   const close = useCallback(() => backOrHome(router), [router]);
 
   const toggle = (place: UnstampedPlace) => {
