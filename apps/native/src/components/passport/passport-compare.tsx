@@ -39,9 +39,7 @@ export function CityNames({
 
 function saveTitle(toSave: number, saved: number | null): string {
   if (toSave > 0) return t("passportShare.save", { count: toSave });
-  if (saved !== null && saved > 0) {
-    return t("passportShare.saved", { count: saved });
-  }
+  if (saved) return t("passportShare.saved", { count: saved });
   return t("passportShare.savedNone");
 }
 

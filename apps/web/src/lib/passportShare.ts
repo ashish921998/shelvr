@@ -108,11 +108,7 @@ export function dotMap(
     const key = `${dot.lat},${dot.lng}`;
     const found = cities.get(key) ?? { names: [], dot, count: 0 };
     found.count += names.length;
-    const name = city?.trim() ?? "";
-    const known = found.names.some(
-      (other) => other.toLowerCase() === name.toLowerCase(),
-    );
-    if (name !== "" && !known) found.names.push(name);
+    if (city) found.names.push(city);
     cities.set(key, found);
   }
   const groups = [...cities.values()];
