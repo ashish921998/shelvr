@@ -7,7 +7,7 @@ export type ReplayState = {
   settledEntitled: boolean;
 };
 
-export type PendingWork = { has: boolean; key: string };
+type PendingWork = { has: boolean; key: string };
 
 export type ReplayInputs = {
   ready: boolean;
