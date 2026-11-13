@@ -194,6 +194,7 @@ export type AnalyticsEventProperties = {
     surface: "city" | "already_been" | "next_to_stamp";
     total: number;
   };
+  passport_paywall_opened: { surface: "ring" };
   passport_card_share_opened: { places: number; surface: "stamp" | "passport" };
   passport_shared: { places: number; shared: boolean };
   passport_sharing_stopped: Record<string, never>;

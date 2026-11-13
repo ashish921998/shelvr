@@ -2,10 +2,13 @@ import { describe, expect, it } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   CARD_PLACES,
+  completionFor,
+  passportSections,
   shareCardOf,
   type Stamp,
   stampDate,
   unstampedCities,
+  unstampedIn,
   wentInCity,
 } from "./passport";
 
@@ -104,5 +107,92 @@ describe("shareCardOf", () => {
     const card = shareCardOf(stamps, "Lisbon");
     expect(card.total).toBe(CARD_PLACES + 3);
     expect(card.places).toHaveLength(CARD_PLACES);
+  });
+});
+
+function row(city: string, stamped: number, total: number) {
+  return { city, stamped, total };
+}
+
+describe("passportSections", () => {
+  it("puts each stamped city's ring on its stamps, matching the city however it is spelled", () => {
+    const { stamped, waiting } = passportSections(
+      [
+        stamp({ city: "lisbon " }),
+        stamp({ key: "majestic", city: "Porto" }),
+        stamp({ key: "dante", city: "Lisbon" }),
+      ],
+      [row("Porto", 1, 4), row("Lisbon", 2, 2)],
+    );
+    expect(
+      stamped.map((section) => [
+        section.city,
+        section.stamps.length,
+        section.completion,
+      ]),
+    ).toEqual([
+      ["Lisbon", 2, row("Lisbon", 2, 2)],
+      ["Porto", 1, row("Porto", 1, 4)],
+    ]);
+    expect(waiting).toEqual([]);
+  });
+
+  it("lists cities with saves and no stamps after the stamped ones, without stamps", () => {
+    const { stamped, waiting } = passportSections(
+      [stamp({ city: "Lisbon" })],
+      [row("Lisbon", 1, 3), row("Tokyo", 0, 12), row("Paris", 0, 2)],
+    );
+    expect(stamped.map((section) => section.city)).toEqual(["Lisbon"]);
+    expect(
+      waiting.map((section) => [section.city, section.stamps, section.key]),
+    ).toEqual([
+      ["Tokyo", [], "tokyo"],
+      ["Paris", [], "paris"],
+    ]);
+  });
+
+  it("keeps stamps with no city last, and a ring whose stamps sit under another spelling before them", () => {
+    const { stamped, waiting } = passportSections(
+      [stamp({ city: "Lisbon" }), stamp({ key: "x", city: undefined })],
+      [row("Lisbon", 1, 1), row("Kyoto", 2, 5)],
+    );
+    expect(
+      stamped.map((section) => [section.city, section.completion?.total]),
+    ).toEqual([
+      ["Lisbon", 1],
+      ["Kyoto", 5],
+      [null, undefined],
+    ]);
+    expect(stamped.at(-1)?.stamps).toHaveLength(1);
+    expect(waiting).toEqual([]);
+  });
+
+  it("shows the stamps alone while the rings have not loaded", () => {
+    const { stamped } = passportSections([stamp({ city: "Lisbon" })], []);
+    expect(stamped).toMatchObject([{ city: "Lisbon", completion: null }]);
+  });
+});
+
+describe("next to stamp", () => {
+  const place = { itemId: ITEM, cover: null, spot: { lat: 1, lng: 2 } };
+  const places = [
+    { ...place, name: "Tigre", city: "Lisbon" },
+    { ...place, name: "Majestic", city: "Porto" },
+    { ...place, name: "Dante", city: "LISBON" },
+  ];
+
+  it("lists only the city's unstamped places, whatever the spelling", () => {
+    expect(unstampedIn(places, "lisbon").map((p) => p.name)).toEqual([
+      "Tigre",
+      "Dante",
+    ]);
+    expect(unstampedIn(places, "Kyoto")).toEqual([]);
+  });
+
+  it("finds the city's ring by name", () => {
+    const rows = [row("Lisbon", 2, 5), row("Porto", 0, 1)];
+    expect(completionFor(rows, "LISBON")).toEqual(row("Lisbon", 2, 5));
+    expect(completionFor(rows, "Kyoto")).toBeUndefined();
+    expect(completionFor(undefined, "Lisbon")).toBeUndefined();
   });
 });
