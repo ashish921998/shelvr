@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  dotMap,
   loadPassport,
   recordPassportOpen,
   passportSummary,
@@ -29,12 +28,8 @@ const passport: SharedPassport = {
   cities: 2,
   countries: 1,
   byCity: [
-    {
-      city: "Lisbon",
-      dot: { lat: 38.7, lng: -9.1 },
-      names: ["Tigre", "Bar Alto"],
-    },
-    { city: "Porto", dot: { lat: 41.1, lng: -8.6 }, names: ["Majestic"] },
+    { city: "Lisbon", names: ["Tigre", "Bar Alto"] },
+    { city: "Porto", names: ["Majestic"] },
   ],
 };
 
@@ -100,104 +95,5 @@ describe("passport text", () => {
     expect(passportSummary({ ...passport, places: 1, countries: null })).toBe(
       "1 place · 2 cities",
     );
-  });
-});
-
-describe("dotMap", () => {
-  const box = { width: 560, height: 300, pad: 48, spread: 7 };
-
-  it("draws one dot per place, gathered around its city inside the box", () => {
-    const cities = dotMap(passport.byCity, box);
-    expect(cities.map((city) => [city.city, city.dots.length])).toEqual([
-      ["Lisbon", 2],
-      ["Porto", 1],
-    ]);
-    for (const city of cities) {
-      expect(city.x).toBeGreaterThan(box.pad - 0.01);
-      expect(city.x).toBeLessThan(box.width - box.pad + 0.01);
-      expect(city.y).toBeGreaterThan(box.pad - 0.01);
-      expect(city.y).toBeLessThan(box.height - box.pad + 0.01);
-    }
-    expect(cities[1].y).toBeLessThan(cities[0].y);
-  });
-
-  it("keeps a big southern cluster and its label inside the box", () => {
-    for (const count of [50, 500]) {
-      const byCity = [
-        { city: "Porto", dot: { lat: 41.1, lng: -8.6 }, names: ["North"] },
-        {
-          city: "Lisbon",
-          dot: { lat: 38.7, lng: -9.1 },
-          names: Array.from({ length: count }, (_, index) => `Spot ${index}`),
-        },
-      ];
-      for (const city of dotMap(byCity, box)) {
-        expect(city.labelY).toBeLessThanOrEqual(box.height - 16);
-        for (const dot of city.dots) {
-          expect(dot.x).toBeGreaterThanOrEqual(0);
-          expect(dot.x).toBeLessThanOrEqual(box.width);
-          expect(dot.y).toBeGreaterThanOrEqual(0);
-          expect(dot.y).toBeLessThanOrEqual(box.height);
-        }
-      }
-    }
-  });
-
-  it("names both cities on a dot they share, without moving either", () => {
-    const dot = { lat: 38.7, lng: -9.2 };
-    const cities = dotMap(
-      [
-        { city: "Lisbon", dot, names: ["A", "C"] },
-        { city: "Oeiras", dot, names: ["B"] },
-        { city: "Setúbal", dot: { lat: 38.5, lng: -8.9 }, names: ["D"] },
-      ],
-      box,
-    );
-    expect(cities.map((city) => city.city)).toEqual([
-      "Lisbon · Oeiras",
-      "Setúbal",
-    ]);
-    expect(cities[0].dots).toHaveLength(3);
-  });
-
-  it("keeps a long joined label inside the map at either edge", () => {
-    const dot = { lat: 34.1, lng: -118.4 };
-    const cities = dotMap(
-      [
-        { city: "West Hollywood", dot, names: ["A"] },
-        { city: "Beverly Hills", dot, names: ["B"] },
-        { city: "Pasadena", dot: { lat: 34.1, lng: -118.1 }, names: ["C"] },
-        ...[
-          "Santa Monica",
-          "Culver City",
-          "Inglewood",
-          "Marina del Rey",
-          "Playa Vista",
-          "El Segundo",
-        ].map((city) => ({
-          city,
-          dot: { lat: 34.0, lng: -118.4 },
-          names: [city],
-        })),
-      ],
-      box,
-    );
-    for (const city of cities) {
-      const half = (city.city.length * 7.5) / 2;
-      expect(city.labelX - half).toBeGreaterThanOrEqual(0);
-      expect(city.labelX + half).toBeLessThanOrEqual(box.width);
-    }
-    expect(cities[0].labelX).toBeGreaterThan(cities[0].x);
-    expect(cities[2].city.endsWith("…")).toBe(true);
-  });
-
-  it("centres a single city and skips places with no dot", () => {
-    const [only, ...rest] = dotMap(
-      [passport.byCity[1], { names: ["Nowhere"] }],
-      box,
-    );
-    expect(rest).toEqual([]);
-    expect(only).toMatchObject({ x: box.width / 2, y: box.height / 2 });
-    expect(dotMap([{ names: ["Nowhere"] }], box)).toEqual([]);
   });
 });

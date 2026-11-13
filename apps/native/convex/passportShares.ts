@@ -6,6 +6,7 @@ import {
   query,
   type QueryCtx,
 } from "./_generated/server";
+import { aiAllowed } from "./aiConsent";
 import { createReadyPlaceSave, readySavesNewestFirst } from "./items";
 import { authedMutation, authedQuery, liveOwner } from "./model/auth";
 import { firstNameOf } from "./model/firstName";
@@ -36,7 +37,6 @@ const publicPassportValidator = v.object({
   byCity: v.array(
     v.object({
       city: v.optional(v.string()),
-      dot: v.optional(dotValidator),
       names: v.array(v.string()),
     }),
   ),
@@ -83,31 +83,32 @@ function cityDot(places: readonly PassportPlace[]) {
   return { lat: mean((spot) => spot.lat), lng: mean((spot) => spot.lng) };
 }
 
-function publicPassport(
-  ownerName: string | undefined,
-  places: readonly PassportPlace[],
-) {
+function mapDots(places: readonly PassportPlace[]) {
+  return groupByCity(places)
+    .filter(({ city }) => city !== null)
+    .sort((a, b) => b.items.length - a.items.length)
+    .flatMap(({ items }) => {
+      const dot = cityDot(items);
+      return dot ? [dot] : [];
+    });
+}
+
+function publicPassport(owner: Doc<"users">, places: readonly PassportPlace[]) {
+  const ownerName = firstNameOf(owner.name);
   return {
     ...(ownerName !== undefined ? { ownerName } : {}),
     ...passportCounts(places),
-    byCity: groupByCity(places).map(({ city, items }) => {
-      const dot = city === null ? undefined : cityDot(items);
-      return {
-        ...(city !== null ? { city } : {}),
-        ...(dot ? { dot } : {}),
-        names: items.map((place) => place.name),
-      };
-    }),
+    byCity: groupByCity(places).map(({ city, items }) => ({
+      ...(city !== null ? { city } : {}),
+      names: items.map((place) => place.name),
+    })),
   };
 }
 
-async function sharedPassport(ctx: QueryCtx, token: string) {
+async function sharedPlaces(ctx: QueryCtx, token: string) {
   const owner = await liveSharer(ctx, token);
   if (owner === null) return null;
-  return publicPassport(
-    firstNameOf(owner.name),
-    await passportPlaces(ctx, owner._id),
-  );
+  return { owner, places: await passportPlaces(ctx, owner._id) };
 }
 
 async function compareWith(
@@ -157,13 +158,30 @@ export const stopSharingPassport = authedMutation({
 export const passportPreview = query({
   args: { token: v.string() },
   returns: v.union(v.null(), publicPassportValidator),
-  handler: async (ctx, args) => await sharedPassport(ctx, args.token),
+  handler: async (ctx, args) => {
+    const shared = await sharedPlaces(ctx, args.token);
+    return shared && publicPassport(shared.owner, shared.places);
+  },
 });
 
 export const getPublicPassport = internalQuery({
   args: { token: v.string() },
-  returns: v.union(v.null(), publicPassportValidator),
-  handler: async (ctx, args) => await sharedPassport(ctx, args.token),
+  returns: v.union(
+    v.null(),
+    v.object({
+      passport: publicPassportValidator,
+      mapDots: v.array(dotValidator),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const shared = await sharedPlaces(ctx, args.token);
+    if (shared === null) return null;
+    const { owner, places } = shared;
+    return {
+      passport: publicPassport(owner, places),
+      mapDots: (await aiAllowed(ctx, owner._id)) ? mapDots(places) : [],
+    };
+  },
 });
 
 export const passportSharer = internalQuery({

@@ -1,21 +1,18 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import { after } from "next/server";
 
 import AppStoreButton from "@/components/AppStoreButton";
 import Logo from "@/components/common/Logo";
 import {
-  dotMap,
   loadPassport,
   passportSummary,
   passportTitle,
-  type PassportCity,
   recordPassportOpen,
 } from "@/lib/passportShare";
 import { SUPPORT_EMAIL } from "@/lib/support";
 
 type PageProps = { params: Promise<{ token: string }> };
-
-const MAP = { width: 560, height: 300, pad: 48, spread: 7 };
 
 export async function generateMetadata({
   params,
@@ -43,44 +40,6 @@ export async function generateMetadata({
   };
 }
 
-function DotMap({ byCity }: { byCity: PassportCity[] }) {
-  const cities = dotMap(byCity, MAP);
-  if (cities.length === 0) return null;
-  return (
-    <svg
-      viewBox={`0 0 ${MAP.width} ${MAP.height}`}
-      role="img"
-      aria-label="A map with one dot per place, placed at city level"
-      className="mt-6 w-full rounded-2xl border border-line bg-paper-deep"
-    >
-      {cities.map((city) => (
-        <g key={`${city.city},${city.x},${city.y}`}>
-          {city.dots.map((dot) => (
-            <circle
-              key={`${dot.x},${dot.y}`}
-              cx={dot.x}
-              cy={dot.y}
-              r={5}
-              className="fill-terracotta stroke-cream"
-              strokeWidth={1.5}
-            />
-          ))}
-          {city.city ? (
-            <text
-              x={city.labelX}
-              y={city.labelY}
-              textAnchor="middle"
-              className="fill-ink-soft text-[13px] font-semibold"
-            >
-              {city.city}
-            </text>
-          ) : null}
-        </g>
-      ))}
-    </svg>
-  );
-}
-
 export default async function PassportPage({ params }: PageProps) {
   const { token } = await params;
   const { outcome, passport } = await loadPassport(token);
@@ -102,7 +61,16 @@ export default async function PassportPage({ params }: PageProps) {
             <p className="mt-1 text-[15px] text-muted">
               {passportSummary(passport)}
             </p>
-            <DotMap byCity={passport.byCity} />
+            {passport.mapUrl ? (
+              <Image
+                src={passport.mapUrl}
+                alt={`A map of the cities in ${passportTitle(passport)}`}
+                width={560}
+                height={300}
+                unoptimized
+                className="mt-6 w-full rounded-2xl border border-line bg-paper-deep"
+              />
+            ) : null}
             <div className="mt-6 flex flex-col gap-4">
               {passport.byCity.map((group) => (
                 <section

@@ -21,6 +21,8 @@ import {
 } from "./model/captureRequest";
 import { isUrlPolicyError, normalizeExternalUrl } from "./model/externalUrl";
 import { errorName, logEvent } from "./model/log";
+import { appleMapsConfig } from "./model/appleMaps";
+import { passportMapUrl } from "./model/passportMap";
 import { parsePlanVote, type PlanVoteBody } from "./model/planVote";
 import { parseOracleInput } from "./model/oracle";
 import { parseReelPlacesBody } from "./model/reelPlaces";
@@ -504,12 +506,14 @@ http.route({
   method: "GET",
   handler: httpAction(async (ctx, req) => {
     const token = new URL(req.url).pathname.split("/").pop() ?? "";
-    const passport = await ctx.runQuery(
+    const shared = await ctx.runQuery(
       internal.passportShares.getPublicPassport,
       { token },
     );
-    if (!passport) return json({ message: "Not found." }, 404);
-    return json(passport, 200);
+    if (!shared) return json({ message: "Not found." }, 404);
+    const config = appleMapsConfig(env);
+    const mapUrl = config && (await passportMapUrl(config, shared.mapDots));
+    return json({ ...shared.passport, ...(mapUrl ? { mapUrl } : {}) }, 200);
   }),
 });
 

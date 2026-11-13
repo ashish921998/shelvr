@@ -1,11 +1,16 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { placeKey } from "./model/plan";
-import { newConvexTest, signedInUser, type TestBackend } from "./test.setup";
+import {
+  newConvexTest,
+  setTestConsent,
+  signedInUser,
+  type TestBackend,
+} from "./test.setup";
 
 const LISBON_CAFE = { lat: 38.71234, lng: -9.13987, appleId: "I1234ABCD" };
 const LISBON_BAR = { lat: 38.72111, lng: -9.14555 };
@@ -13,6 +18,37 @@ const PORTO_BRANCH = { lat: 41.14961, lng: -8.61099 };
 const PORTO_FAR_BRANCH = { lat: 41.16, lng: -8.63 };
 
 type Spot = { lat: number; lng: number; appleId?: string };
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+async function stubMaps() {
+  const pair = await crypto.subtle.generateKey(
+    { name: "ECDSA", namedCurve: "P-256" },
+    true,
+    ["sign", "verify"],
+  );
+  const der = new Uint8Array(
+    await crypto.subtle.exportKey("pkcs8", pair.privateKey),
+  );
+  vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", btoa(String.fromCharCode(...der)));
+  vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+  vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+}
+
+async function webPassport(backend: TestBackend, token: string) {
+  const response = await backend.fetch(`/passport/shares/${token}`);
+  expect(response.status).toBe(200);
+  return (await response.json()) as { mapUrl?: string };
+}
+
+function mapPins(mapUrl: string | undefined): string[] {
+  const annotations = new URL(mapUrl ?? "").searchParams.get("annotations");
+  return (JSON.parse(annotations ?? "[]") as { point: string }[]).map(
+    ({ point }) => point,
+  );
+}
 
 async function person(backend: TestBackend, name: string, pro = true) {
   const { t, userId } = await signedInUser(backend, { pro });
@@ -140,7 +176,7 @@ describe("sharePassport", () => {
 });
 
 describe("the public passport", () => {
-  it("shows first name, counts, place names, cities and city-level dots only", async () => {
+  it("shows first name, counts, place names and cities only", async () => {
     const backend = newConvexTest();
     const maya = await sharedMaya(backend);
     const preview = await backend.query(api.passportShares.passportPreview, {
@@ -154,10 +190,9 @@ describe("the public passport", () => {
       byCity: expect.arrayContaining([
         {
           city: "Lisbon",
-          dot: { lat: 38.7, lng: -9.1 },
           names: expect.arrayContaining(["Café Secreto", "Bar Alto"]),
         },
-        { city: "Porto", dot: { lat: 41.1, lng: -8.6 }, names: ["Majestic"] },
+        { city: "Porto", names: ["Majestic"] },
       ]),
     });
     expect(leaks(preview)).toEqual([]);
@@ -166,7 +201,7 @@ describe("the public passport", () => {
   it("answers the web route the same, with the owner id kept server-side", async () => {
     const backend = newConvexTest();
     const maya = await sharedMaya(backend);
-    const passport = await backend.query(
+    const shared = await backend.query(
       internal.passportShares.getPublicPassport,
       { token: maya.token },
     );
@@ -175,12 +210,39 @@ describe("the public passport", () => {
         token: maya.token,
       }),
     ).toBe(maya.userId);
-    expect(leaks(passport)).toEqual([]);
-    const response = await backend.fetch(`/passport/shares/${maya.token}`);
-    expect(response.status).toBe(200);
-    const body: unknown = await response.json();
-    expect(body).toEqual(passport);
+    expect(leaks(shared)).toEqual([]);
+    const body = await webPassport(backend, maya.token);
+    expect(body).toEqual(shared?.passport);
     expect(leaks(body)).toEqual([]);
+  });
+
+  it("adds a signed Apple map with one city-level pin per city, busiest first", async () => {
+    await stubMaps();
+    const backend = newConvexTest();
+    const maya = await sharedMaya(backend);
+    const { mapUrl } = await webPassport(backend, maya.token);
+    const url = new URL(mapUrl ?? "");
+    expect(url.origin + url.pathname).toBe(
+      "https://snapshot.apple-mapkit.com/api/v1/snapshot",
+    );
+    expect(url.searchParams.get("teamId")).toBe("TEAM1");
+    expect(url.searchParams.get("keyId")).toBe("KEY1");
+    expect(Number(url.searchParams.get("expires"))).toBeGreaterThan(
+      Date.now() / 1000,
+    );
+    expect(url.searchParams.get("signature")).toMatch(/^[\w-]{80,}$/);
+    expect(mapPins(mapUrl)).toEqual(["38.7,-9.1", "41.1,-8.6"]);
+    expect(leaks(mapUrl)).toEqual([]);
+  });
+
+  it("leaves the map out when the owner declined AI", async () => {
+    await stubMaps();
+    const backend = newConvexTest();
+    const maya = await sharedMaya(backend);
+    await backend.run((ctx) => setTestConsent(ctx, maya.userId, "declined"));
+    const body = await webPassport(backend, maya.token);
+    expect(body.mapUrl).toBeUndefined();
+    expect(body).toMatchObject({ ownerName: "Maya", places: 3 });
   });
 
   it("records an open only on a post, never on a read", async () => {
