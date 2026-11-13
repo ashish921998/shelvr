@@ -683,9 +683,9 @@
   "refundConsent.enabled": "Permites compartir información de compra y entrega con Apple para revisar reembolsos.",
   "refundConsent.disabled": "El uso compartido de datos para reembolsos está desactivado.",
   "refundConsent.syncPending": "Tu elección está guardada. Se está actualizando RevenueCat; la configuración anterior puede aplicarse hasta que termine.",
+  "refundConsent.syncFailed": "Tu elección está guardada, pero no pudimos confirmar si el uso compartido de datos para reembolsos está activado. Desactívalo y vuelve a permitirlo para intentarlo de nuevo.",
   "refundConsent.withdraw": "Dejar de compartir",
   "refundConsent.review": "Revisar condiciones actualizadas",
-  "aiConsent.findLinksOff": "La IA está desactivada en esta cuenta. Contacta con soporte para cambiar tu preferencia.",
   "updates.title": "Actualizaciones de la app",
   "updates.check": "Buscar actualizaciones",
   "updates.checking": "Buscando…",
@@ -1137,6 +1137,64 @@
   "sharedLists.startWithHint": "Elige al menos una ciudad. Los lugares que ya guardaste allí vienen incluidos.",
   "sharedLists.cityPlaceholder": "O escribe una ciudad",
   "sharedLists.typedCity": "Escrita por ti",
+  "passport.wentNoDate": "Fui",
+  "passport.stampedTitle": "Sellado",
+  "passport.stampedBody": {
+    "one": "%{name} ya está en tu pasaporte. Llevas %{formattedCount} lugar.",
+    "many": "%{name} ya está en tu pasaporte. Llevas %{formattedCount} lugares.",
+    "other": "%{name} ya está en tu pasaporte. Llevas %{formattedCount} lugares."
+  },
+  "passport.stampInk": "%{city} · %{date}",
+  "passport.coverCredit": "Imagen de la publicación que guardaste",
+  "passport.removeStamp": "Quitar sello",
+  "passport.wantToGo": "Quiero ir",
+  "passport.title": "Pasaporte",
+  "passport.yourPassport": "Tu pasaporte",
+  "passport.beenTitle": "¿Ya fuiste a alguno?",
+  "passport.beenBody": "Sella los lugares a los que ya fuiste",
+  "passport.beenSomewhere": "¿Ya fuiste a algún sitio?",
+  "passport.rowCities": "%{places} · %{cities}",
+  "passport.placesCount": {
+    "one": "%{formattedCount} lugar",
+    "many": "%{formattedCount} lugares",
+    "other": "%{formattedCount} lugares"
+  },
+  "passport.citiesCount": {
+    "one": "%{formattedCount} ciudad",
+    "many": "%{formattedCount} ciudades",
+    "other": "%{formattedCount} ciudades"
+  },
+  "passport.places": "Lugares",
+  "passport.cities": "Ciudades",
+  "passport.countries": "Países",
+  "passport.elsewhere": "Otros lugares",
+  "passport.coversCredit": "Imágenes de las publicaciones que guardaste",
+  "passport.pickBody": "Marca los lugares a los que fuiste antes de guardarlos aquí.",
+  "passport.nothingToStamp": "Todos los lugares que guardaste ya están en tu pasaporte.",
+  "passport.pickNone": "Elige los lugares a los que fuiste",
+  "passport.stampCount": {
+    "one": "Sellar %{formattedCount} lugar",
+    "many": "Sellar %{formattedCount} lugares",
+    "other": "Sellar %{formattedCount} lugares"
+  },
+  "passport.cardKicker": "Fuera del chat del grupo",
+  "passport.cardTitle": {
+    "one": "%{formattedCount} sitio guardado al que por fin fuimos",
+    "many": "%{formattedCount} sitios guardados a los que por fin fuimos",
+    "other": "%{formattedCount} sitios guardados a los que por fin fuimos"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "one": "+%{formattedCount} más",
+    "many": "+%{formattedCount} más",
+    "other": "+%{formattedCount} más"
+  },
+  "passport.cardSavedInstagram": "Guardado en Instagram.",
+  "passport.cardSavedTiktok": "Guardado en TikTok.",
+  "passport.cardSavedBoth": "Guardado en Instagram y TikTok.",
+  "passport.cardSavedElsewhere": "Guardado para luego.",
+  "passport.cardWent": "Fuimos con Shelvr.",
+  "passport.shareCity": "Compartir %{city}",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "one": "Te queda %{formattedCount} guardado gratis",

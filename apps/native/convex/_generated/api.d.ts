@@ -11,7 +11,6 @@
 import type * as accountTelemetry from "../accountTelemetry.js";
 import type * as ai from "../ai.js";
 import type * as aiConsent from "../aiConsent.js";
-import type * as aiEmbeddingSweep from "../aiEmbeddingSweep.js";
 import type * as aiRecommendForSpace from "../aiRecommendForSpace.js";
 import type * as analytics from "../analytics.js";
 import type * as appIntents from "../appIntents.js";
@@ -50,7 +49,6 @@ import type * as model_datePlan from "../model/datePlan.js";
 import type * as model_dateRank from "../model/dateRank.js";
 import type * as model_demoErrors from "../model/demoErrors.js";
 import type * as model_deployment from "../model/deployment.js";
-import type * as model_embedding from "../model/embedding.js";
 import type * as model_entitlement from "../model/entitlement.js";
 import type * as model_externalUrl from "../model/externalUrl.js";
 import type * as model_fakeAi from "../model/fakeAi.js";
@@ -89,6 +87,7 @@ import type * as model_readers_x from "../model/readers/x.js";
 import type * as model_readers_youtube from "../model/readers/youtube.js";
 import type * as model_recallAge from "../model/recallAge.js";
 import type * as model_recipeMarkup from "../model/recipeMarkup.js";
+import type * as model_recommend from "../model/recommend.js";
 import type * as model_reelPlaces from "../model/reelPlaces.js";
 import type * as model_resend from "../model/resend.js";
 import type * as model_retentionMessaging from "../model/retentionMessaging.js";
@@ -147,7 +146,6 @@ declare const fullApi: ApiFromModules<{
   accountTelemetry: typeof accountTelemetry;
   ai: typeof ai;
   aiConsent: typeof aiConsent;
-  aiEmbeddingSweep: typeof aiEmbeddingSweep;
   aiRecommendForSpace: typeof aiRecommendForSpace;
   analytics: typeof analytics;
   appIntents: typeof appIntents;
@@ -186,7 +184,6 @@ declare const fullApi: ApiFromModules<{
   "model/dateRank": typeof model_dateRank;
   "model/demoErrors": typeof model_demoErrors;
   "model/deployment": typeof model_deployment;
-  "model/embedding": typeof model_embedding;
   "model/entitlement": typeof model_entitlement;
   "model/externalUrl": typeof model_externalUrl;
   "model/fakeAi": typeof model_fakeAi;
@@ -225,6 +222,7 @@ declare const fullApi: ApiFromModules<{
   "model/readers/youtube": typeof model_readers_youtube;
   "model/recallAge": typeof model_recallAge;
   "model/recipeMarkup": typeof model_recipeMarkup;
+  "model/recommend": typeof model_recommend;
   "model/reelPlaces": typeof model_reelPlaces;
   "model/resend": typeof model_resend;
   "model/retentionMessaging": typeof model_retentionMessaging;

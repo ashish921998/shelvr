@@ -1,10 +1,9 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
-import { describe, expect, it, vi } from "vitest";
-import { api, internal } from "./_generated/api";
+import { describe, expect, it } from "vitest";
+import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { CITY_SCAN_ROWS } from "./items";
-import { EMBEDDING_DIMENSIONS } from "./model/embedding";
 import { newConvexTest, signedInUser } from "./test.setup";
 
 const CITIES = ["Austin", "Chicago", "Lisbon", "Tokyo", "Paris"];
@@ -13,21 +12,11 @@ const CAPTION =
   "Best tacos in town, go early, order the al pastor and the horchata. ".repeat(
     22,
   );
-// Full-precision components like a real normalized vector's, so the JSON size the
-// read budget counts matches production.
-const VECTOR = Array.from(
-  { length: EMBEDDING_DIMENSIONS },
-  (_, index) => Math.sin(index + 1) / 30,
-);
 
 type Backend = Awaited<ReturnType<typeof signedInUser>>;
 
 /** `count` ready reel saves, oldest first; every third names three mapped places. */
-async function seedShelf(
-  { t, userId }: Backend,
-  count: number,
-  embedded: boolean,
-) {
+async function seedShelf({ t, userId }: Backend, count: number) {
   let pins = 0;
   for (let start = 0; start < count; start += 50) {
     await t.run(async (ctx) => {
@@ -57,7 +46,6 @@ async function seedShelf(
           placePins,
           content: CAPTION,
           searchText: `reel ${i} ${city}`,
-          ...(embedded ? { embedding: VECTOR, embeddingVersion: 1 } : {}),
         });
       }
     });
@@ -71,39 +59,22 @@ async function savesCounted(t: Backend["t"]) {
 }
 
 describe("Home and Map at 1,000 saves", () => {
-  it(
-    "show every city and place once the embeddings are cleared",
-    { timeout: 120_000 },
-    async () => {
-      vi.useFakeTimers();
-      try {
-        const backend = await signedInUser(newConvexTest(), { pro: true });
-        const { t } = backend;
-        const pins = await seedShelf(backend, CITY_SCAN_ROWS, true);
+  it("show every city and place", { timeout: 120_000 }, async () => {
+    const backend = await signedInUser(newConvexTest(), { pro: true });
+    const { t } = backend;
+    const pins = await seedShelf(backend, CITY_SCAN_ROWS);
 
-        // With a vector on every save, the 4 MB read budget runs out long before 1,000.
-        expect(await savesCounted(t)).toBeLessThan(300);
-
-        await t.mutation(internal.items.clearEmbeddings, { cursor: null });
-        await t.finishAllScheduledFunctions(vi.runAllTimers);
-
-        const cities = await t.query(api.items.listCities, {});
-        expect(cities.map(({ city, count }) => [city, count]).sort()).toEqual(
-          CITIES.map((city) => [city, 200]).sort(),
-        );
-        expect(await t.query(api.mapPlaces.listMapPlaces, {})).toHaveLength(
-          pins,
-        );
-        for (const city of CITIES) {
-          expect(await t.query(api.items.listCityItems, { city })).toHaveLength(
-            200,
-          );
-        }
-      } finally {
-        vi.useRealTimers();
-      }
-    },
-  );
+    const cities = await t.query(api.items.listCities, {});
+    expect(cities.map(({ city, count }) => [city, count]).sort()).toEqual(
+      CITIES.map((city) => [city, 200]).sort(),
+    );
+    expect(await t.query(api.mapPlaces.listMapPlaces, {})).toHaveLength(pins);
+    for (const city of CITIES) {
+      expect(await t.query(api.items.listCityItems, { city })).toHaveLength(
+        200,
+      );
+    }
+  });
 
   it(
     "show the newest 1,000 when there are more",
@@ -111,7 +82,7 @@ describe("Home and Map at 1,000 saves", () => {
     async () => {
       const backend = await signedInUser(newConvexTest(), { pro: true });
       const { t, userId } = backend;
-      await seedShelf(backend, CITY_SCAN_ROWS, false);
+      await seedShelf(backend, CITY_SCAN_ROWS);
       await t.run((ctx) =>
         ctx.db.insert("items", {
           userId: userId as Id<"users">,
