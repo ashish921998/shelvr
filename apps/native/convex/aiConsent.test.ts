@@ -6,10 +6,7 @@ import { api, internal } from "./_generated/api";
 import type { TestConvexForDataModel } from "convex-test";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { AI_CONSENT_VERSION, isAiConsentRequired } from "./model/aiConsent";
-import {
-  CURRENT_EMBEDDING_VERSION,
-  EMBEDDING_DIMENSIONS,
-} from "./model/embedding";
+import { EMBEDDING_DIMENSIONS } from "./model/embedding";
 import {
   insertConsentingUser,
   newConvexTest,
@@ -83,7 +80,7 @@ async function processing(
   );
 }
 
-async function ready(t: T, fields: { embedding?: number[] } = {}) {
+async function ready(t: T) {
   return await t.run((ctx) =>
     ctx.db.insert("items", {
       userId: USER,
@@ -94,12 +91,6 @@ async function ready(t: T, fields: { embedding?: number[] } = {}) {
       note: "Lentils, stock, lemon",
       tags: ["food"],
       searchText: "lentil soup",
-      ...(fields.embedding
-        ? {
-            embedding: fields.embedding,
-            embeddingVersion: CURRENT_EMBEDDING_VERSION,
-          }
-        : {}),
     }),
   );
 }
@@ -207,15 +198,14 @@ describe("a user who has not answered", () => {
   });
 });
 
-describe("an unanswered account that then taps Not now", () => {
-  it("has vectors stored before answering removed", async () => {
+describe("an old build that taps Not now", () => {
+  it("leaves the user's saves untouched", async () => {
     const t = await signedIn(newConvexTest(), "unset");
-    const itemId = await ready(t, { embedding: VECTOR });
+    const itemId = await ready(t);
+    const before = await t.run((ctx) => ctx.db.get(itemId));
     await t.mutation(api.aiConsent.setConsent, { granted: false });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
-    expect(
-      (await t.run((ctx) => ctx.db.get(itemId)))?.embedding,
-    ).toBeUndefined();
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toEqual(before);
   });
 });
 
@@ -439,21 +429,6 @@ describe("a user who declined", () => {
     expect((await t.run((ctx) => ctx.db.get(itemId)))?.productsStatus).toBe(
       "failed",
     );
-    await expectNoThirdPartyCall();
-  });
-
-  it("has stored vectors removed", async () => {
-    const t = await signedIn();
-    const embedded = await ready(t, { embedding: VECTOR });
-    const neverEmbedded = await ready(t);
-
-    await t.mutation(api.aiConsent.setConsent, { granted: false });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
-
-    for (const id of [embedded, neverEmbedded]) {
-      const item = await t.run((ctx) => ctx.db.get(id));
-      expect(item?.embedding).toBeUndefined();
-    }
     await expectNoThirdPartyCall();
   });
 });
