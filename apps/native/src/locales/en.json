@@ -1103,6 +1103,58 @@
   "sharedLists.startWithHint": "Pick at least one city. Places you already saved there come along.",
   "sharedLists.cityPlaceholder": "Or type a city",
   "sharedLists.typedCity": "Typed by you",
+  "passport.wentNoDate": "Went",
+  "passport.stampedTitle": "Stamped",
+  "passport.stampedBody": {
+    "one": "%{name} is in your passport. %{formattedCount} place so far.",
+    "other": "%{name} is in your passport. %{formattedCount} places so far."
+  },
+  "passport.stampInk": "%{city} · %{date}",
+  "passport.coverCredit": "Picture from the post you saved",
+  "passport.removeStamp": "Remove stamp",
+  "passport.wantToGo": "Want to go",
+  "passport.title": "Passport",
+  "passport.yourPassport": "Your passport",
+  "passport.beenTitle": "Been to any of these?",
+  "passport.beenBody": "Stamp places you already went",
+  "passport.beenSomewhere": "Already been somewhere?",
+  "passport.rowCities": "%{places} · %{cities}",
+  "passport.placesCount": {
+    "one": "%{formattedCount} place",
+    "other": "%{formattedCount} places"
+  },
+  "passport.citiesCount": {
+    "one": "%{formattedCount} city",
+    "other": "%{formattedCount} cities"
+  },
+  "passport.places": "Places",
+  "passport.cities": "Cities",
+  "passport.countries": "Countries",
+  "passport.elsewhere": "Somewhere else",
+  "passport.coversCredit": "Pictures from the posts you saved",
+  "passport.pickBody": "Tick the places you went before you saved them here.",
+  "passport.nothingToStamp": "Every place you saved is already in your passport.",
+  "passport.pickNone": "Pick the places you went",
+  "passport.stampCount": {
+    "one": "Stamp %{formattedCount} place",
+    "other": "Stamp %{formattedCount} places"
+  },
+  "passport.cardKicker": "Out of the group chat",
+  "passport.cardTitle": {
+    "one": "%{formattedCount} saved spot we finally went to",
+    "other": "%{formattedCount} saved spots we finally went to"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "one": "+%{formattedCount} more",
+    "other": "+%{formattedCount} more"
+  },
+  "passport.cardSavedInstagram": "Saved on Instagram.",
+  "passport.cardSavedTiktok": "Saved on TikTok.",
+  "passport.cardSavedBoth": "Saved on Instagram and TikTok.",
+  "passport.cardSavedElsewhere": "Saved for later.",
+  "passport.cardWent": "Went with Shelvr.",
+  "passport.shareCity": "Share %{city}",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "one": "%{formattedCount} free save left",

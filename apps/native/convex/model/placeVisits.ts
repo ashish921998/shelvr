@@ -6,6 +6,7 @@ import { placeKey, splitSavedPlace } from "./plan";
 import { distanceKm, otherVenue, SAME_PLACE_KM } from "./trip";
 
 export const MAX_VISIT_SPOTS = 20;
+export const MAX_BATCH_PLACES = 60;
 const MAX_VISITS = 1000;
 
 export const visitSpotValidator = v.object({

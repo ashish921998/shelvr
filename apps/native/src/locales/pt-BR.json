@@ -1135,6 +1135,64 @@
   "sharedLists.startWithHint": "Escolha ao menos uma cidade. Os lugares que você já salvou lá vêm junto.",
   "sharedLists.cityPlaceholder": "Ou digite uma cidade",
   "sharedLists.typedCity": "Digitada por você",
+  "passport.wentNoDate": "Fui",
+  "passport.stampedTitle": "Carimbado",
+  "passport.stampedBody": {
+    "one": "%{name} está no seu passaporte. %{formattedCount} lugar até agora.",
+    "many": "%{name} está no seu passaporte. %{formattedCount} lugares até agora.",
+    "other": "%{name} está no seu passaporte. %{formattedCount} lugares até agora."
+  },
+  "passport.stampInk": "%{city} · %{date}",
+  "passport.coverCredit": "Imagem do post que você salvou",
+  "passport.removeStamp": "Remover carimbo",
+  "passport.wantToGo": "Quero ir",
+  "passport.title": "Passaporte",
+  "passport.yourPassport": "Seu passaporte",
+  "passport.beenTitle": "Já foi a algum destes?",
+  "passport.beenBody": "Carimbe os lugares aonde você já foi",
+  "passport.beenSomewhere": "Já foi a algum lugar?",
+  "passport.rowCities": "%{places} · %{cities}",
+  "passport.placesCount": {
+    "one": "%{formattedCount} lugar",
+    "many": "%{formattedCount} lugares",
+    "other": "%{formattedCount} lugares"
+  },
+  "passport.citiesCount": {
+    "one": "%{formattedCount} cidade",
+    "many": "%{formattedCount} cidades",
+    "other": "%{formattedCount} cidades"
+  },
+  "passport.places": "Lugares",
+  "passport.cities": "Cidades",
+  "passport.countries": "Países",
+  "passport.elsewhere": "Outros lugares",
+  "passport.coversCredit": "Imagens dos posts que você salvou",
+  "passport.pickBody": "Marque os lugares aonde você foi antes de salvá-los aqui.",
+  "passport.nothingToStamp": "Todos os lugares que você salvou já estão no seu passaporte.",
+  "passport.pickNone": "Escolha os lugares aonde você foi",
+  "passport.stampCount": {
+    "one": "Carimbar %{formattedCount} lugar",
+    "many": "Carimbar %{formattedCount} lugares",
+    "other": "Carimbar %{formattedCount} lugares"
+  },
+  "passport.cardKicker": "Saiu do grupo",
+  "passport.cardTitle": {
+    "one": "%{formattedCount} lugar salvo onde finalmente fomos",
+    "many": "%{formattedCount} lugares salvos onde finalmente fomos",
+    "other": "%{formattedCount} lugares salvos onde finalmente fomos"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "one": "+%{formattedCount} a mais",
+    "many": "+%{formattedCount} a mais",
+    "other": "+%{formattedCount} a mais"
+  },
+  "passport.cardSavedInstagram": "Salvo no Instagram.",
+  "passport.cardSavedTiktok": "Salvo no TikTok.",
+  "passport.cardSavedBoth": "Salvo no Instagram e no TikTok.",
+  "passport.cardSavedElsewhere": "Salvo para depois.",
+  "passport.cardWent": "Fomos com o Shelvr.",
+  "passport.shareCity": "Compartilhar %{city}",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "one": "Resta %{formattedCount} salvamento grátis",
