@@ -30,14 +30,29 @@ export function dropOrder(
   };
 }
 
-export function useFreshPinDrop(rows: readonly ListRow[], city: string) {
+export function useFreshPinDrop(
+  rows: readonly ListRow[],
+  city: string,
+  selected: string | null = null,
+) {
   const reduced = useReducedMotion();
   const key = cityKey(city);
   const [shownByCity, setShownByCity] = useState<
-    Record<string, readonly string[]>
-  >({});
-  const shown = shownByCity[key] ?? EMPTY;
-  const order = useMemo(() => dropOrder(rows, new Set(shown)), [rows, shown]);
+    ReadonlyMap<string, readonly string[]>
+  >(() => new Map());
+  const shown = shownByCity.get(key) ?? EMPTY;
+  const order = useMemo(() => {
+    const ids = new Set(shown);
+    if (selected !== null) ids.add(selected);
+    return dropOrder(rows, ids);
+  }, [rows, shown, selected]);
+  useEffect(() => {
+    if (selected === null || shown.includes(selected)) return;
+    if (!rows.some((row) => cityPinId(row.pin) === selected)) return;
+    setShownByCity((current) =>
+      new Map(current).set(key, [...(current.get(key) ?? EMPTY), selected]),
+    );
+  }, [selected, shown, rows, key]);
   useEffect(() => {
     if (reduced || order.waiting.length === 0) return;
     const batch =
@@ -45,10 +60,9 @@ export function useFreshPinDrop(rows: readonly ListRow[], city: string) {
         ? order.waiting
         : order.waiting.slice(0, 1);
     const timer = setTimeout(() => {
-      setShownByCity((current) => ({
-        ...current,
-        [key]: [...(current[key] ?? EMPTY), ...batch],
-      }));
+      setShownByCity((current) =>
+        new Map(current).set(key, [...(current.get(key) ?? EMPTY), ...batch]),
+      );
     }, motion.duration.stagger);
     return () => clearTimeout(timer);
   }, [reduced, order, shown, key]);

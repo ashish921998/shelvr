@@ -205,4 +205,31 @@ describe("useFreshPinDrop", () => {
     expect(result.current.visible).toBe(6);
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  it("opens a list in a city named like an Object property without crashing", () => {
+    const rows = [row("Odd", { city: "__proto__", isNew: true, addedAt: 5 })];
+    for (const city of ["__proto__", "constructor", "toString"]) {
+      const { result } = renderHook(() => useFreshPinDrop(rows, city));
+      expect(result.current.pins).toHaveLength(1);
+      expect(result.current.visible).toBe(0);
+    }
+  });
+
+  it("shows a selected pin at once, and keeps it shown after the selection moves", () => {
+    const rows = [...old, ...fresh(3)];
+    const last = cityPinId(rows[4].pin);
+    const { result, rerender } = renderHook(
+      ({ selected }) => useFreshPinDrop(rows, "Austin", selected),
+      { initialProps: { selected: null as string | null } },
+    );
+    expect(shownNames(result)).not.toContain("Fresh 2");
+    rerender({ selected: last });
+    expect(shownNames(result)).toContain("Fresh 2");
+    rerender({ selected: null });
+    expect(shownNames(result)).toContain("Fresh 2");
+    tick();
+    tick();
+    expect(result.current.visible).toBe(5);
+    expect(vi.getTimerCount()).toBe(0);
+  });
 });

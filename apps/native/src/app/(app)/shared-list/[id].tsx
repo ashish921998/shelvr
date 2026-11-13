@@ -182,12 +182,13 @@ function SharedList({ detail }: { detail: SharedListDetail }) {
     () => listRows(detail.places, city),
     [detail.places, city],
   );
-  const rows = useMemo(() => listSectionRows(places), [places]);
-  const { pins, visible } = useFreshPinDrop(places, city);
+  useAppLocale();
+  const rows = listSectionRows(places);
+  const [selected, setSelected] = useState<string | null>(null);
+  const { pins, visible } = useFreshPinDrop(places, city, selected);
   const canTrip = places.some((row) => row.place.visitedAt === undefined);
   const edits = usePlaceEdits();
   const plan = useListPlan(detail._id, city);
-  const [selected, setSelected] = useState<string | null>(null);
   const hasMap = pins.length > 0;
   const opener = usePlaceOpener<SharedListPlace>(
     stopAction,
