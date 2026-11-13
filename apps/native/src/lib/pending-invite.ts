@@ -29,7 +29,7 @@ export function setPendingInvite(token: string): void {
 
 const PASSPORT_PREFIX = "passport:";
 
-export type PendingInvite =
+type PendingInvite =
   | { kind: "list"; token: string }
   | { kind: "passport"; token: string };
 

@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { compareCities, passportUrl } from "./passport-share";
+import { pendingInviteOf } from "./pending-invite";
 
 vi.mock("@/lib/entitlement", () => ({ openPaywall: vi.fn() }));
 vi.mock("@/lib/share-link", () => ({ shareUrl: vi.fn() }));
@@ -7,9 +9,6 @@ vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
 vi.mock("react-native", () => ({ Alert: {}, Share: {} }));
 vi.mock("expo-router", () => ({ useRouter: vi.fn() }));
 vi.mock("expo-secure-store", () => ({ getItem: vi.fn(), setItem: vi.fn() }));
-
-import { compareCities, passportUrl } from "./passport-share";
-import { pendingInviteOf } from "./pending-invite";
 
 describe("passportUrl", () => {
   it("points at the web passport page", () => {

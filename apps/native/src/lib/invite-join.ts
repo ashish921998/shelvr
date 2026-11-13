@@ -49,7 +49,7 @@ export function inviteJoinOutcome(
         : `/shared-list/${listId}?joined=1`,
   };
 }
-export function passportCompareHref(token: string): string {
+function passportCompareHref(token: string): string {
   return `/passport-invite/${encodeURIComponent(token)}?compare=1`;
 }
 
