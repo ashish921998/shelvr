@@ -11,7 +11,6 @@
 import type * as accountTelemetry from "../accountTelemetry.js";
 import type * as ai from "../ai.js";
 import type * as aiConsent from "../aiConsent.js";
-import type * as aiEmbeddingSweep from "../aiEmbeddingSweep.js";
 import type * as aiRecommendForSpace from "../aiRecommendForSpace.js";
 import type * as analytics from "../analytics.js";
 import type * as appIntents from "../appIntents.js";
@@ -147,7 +146,6 @@ declare const fullApi: ApiFromModules<{
   accountTelemetry: typeof accountTelemetry;
   ai: typeof ai;
   aiConsent: typeof aiConsent;
-  aiEmbeddingSweep: typeof aiEmbeddingSweep;
   aiRecommendForSpace: typeof aiRecommendForSpace;
   analytics: typeof analytics;
   appIntents: typeof appIntents;

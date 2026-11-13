@@ -442,7 +442,7 @@ describe("a user who declined", () => {
     await expectNoThirdPartyCall();
   });
 
-  it("has stored vectors removed, and the sweep leaves the items alone", async () => {
+  it("has stored vectors removed", async () => {
     const t = await signedIn();
     const embedded = await ready(t, { embedding: VECTOR });
     const neverEmbedded = await ready(t);
@@ -454,10 +454,6 @@ describe("a user who declined", () => {
       const item = await t.run((ctx) => ctx.db.get(id));
       expect(item?.embedding).toBeUndefined();
     }
-    expect(await t.action(internal.ai.sweepItemEmbeddings, {})).toEqual({
-      scanned: 0,
-      written: 0,
-    });
     await expectNoThirdPartyCall();
   });
 });

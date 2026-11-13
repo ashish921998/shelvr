@@ -606,7 +606,6 @@ type MessageParams = {
   "refundConsent.syncPending": undefined;
   "refundConsent.withdraw": undefined;
   "refundConsent.review": undefined;
-  "aiConsent.findLinksOff": undefined;
   "updates.title": undefined;
   "updates.check": undefined;
   "updates.checking": undefined;

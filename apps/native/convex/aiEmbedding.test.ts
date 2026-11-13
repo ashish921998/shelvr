@@ -60,16 +60,6 @@ describe("processItem", () => {
   });
 });
 
-describe("the retired embedding sweep", () => {
-  it("does nothing if a queued run still fires", async () => {
-    const t = newConvexTest();
-    await expect(
-      t.action(internal.aiEmbeddingSweep.sweepItemEmbeddings, {}),
-    ).resolves.toEqual({ scanned: 0, written: 0 });
-    expect(embedMany).not.toHaveBeenCalled();
-  });
-});
-
 describe("clearEmbeddings", () => {
   async function shelf(count: number) {
     const { t, userId } = await signedInUser(newConvexTest(), { pro: true });

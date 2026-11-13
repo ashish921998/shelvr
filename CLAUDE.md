@@ -63,8 +63,8 @@ read [localization](docs/architecture/localization.md); before simulator QA read
 
 - **Old-build code looks dead but is a live contract.** `trips.ts`, `tripData.ts`, `plans.ts`,
   the space CRUD and suggestion functions in `spaces.ts`, `ensureCitySpace`,
-  `aiRecommendForSpace.ts`, the no-op `aiEmbeddingSweep.ts` and the old sweep exports in `ai.ts`
-  have no caller in the current app. Installed builds and queued jobs still call them: do not
+  `aiRecommendForSpace.ts` and the `recommendForSpace` wrapper in `ai.ts` have no caller in the
+  current app. Installed builds and queued jobs still call them: do not
   delete or narrow them (see the contract rule under Working conventions).
 - **Declared because rows carry them.** Keep these in the schema through any rollback:
   `users.deleting`, `items.embedding` / `embeddingVersion` /

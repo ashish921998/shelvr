@@ -1,11 +1,6 @@
 import { v, type Infer, type ObjectType } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import {
-  buildEmbeddingText,
-  CURRENT_EMBEDDING_VERSION,
-  isValidEmbedding,
-} from "./embedding";
-import {
   articleMediaValidator,
   enrichmentValidator,
   failureReasonValidator,
@@ -49,9 +44,6 @@ const classificationValidator = v.object({
   placeCuisines: v.optional(placeCuisinesValidator),
   placesHeard: v.optional(v.boolean()),
   recipe: v.optional(recipeValidator),
-  embedding: v.optional(
-    v.object({ text: v.string(), vector: v.array(v.float64()) }),
-  ),
 });
 
 export type Reading = Infer<typeof readingValidator>;
@@ -78,11 +70,6 @@ type Words = {
   placeCuisines: Doc<"items">["placeCuisines"];
   placesHeard: boolean | undefined;
   recipe: Recipe | undefined;
-};
-
-const LEAVE_FOR_EMBEDDING_SWEEP = {
-  embeddingVersion: undefined,
-  embeddingAttempts: undefined,
 };
 
 function readingWords(item: Doc<"items">, reading: Reading): Words {
@@ -157,40 +144,6 @@ function settledTitle(
     : (words.title ?? item.title);
 }
 
-export function embeddingText(item: Doc<"items">, run: Settlement): string {
-  const words = settledWords(item, run, true);
-  return buildEmbeddingText({
-    title: settledTitle(item, run.keepTitle, words),
-    description: words.description,
-    tags: words.tags,
-    siteName: run.reading.siteName,
-    note: item.note,
-    content: run.reading.content,
-  });
-}
-
-function embeddingPatch(
-  item: Doc<"items">,
-  run: Settlement,
-  aiAllowed: boolean,
-): Pick<ItemPatch, "embedding" | "embeddingVersion" | "embeddingAttempts"> {
-  const embedding = run.classification?.embedding;
-  // Convex rejects a wrong-width vector at write time, which would fail this whole transaction.
-  if (
-    aiAllowed &&
-    embedding !== undefined &&
-    embedding.text === embeddingText(item, run) &&
-    isValidEmbedding(embedding.vector)
-  ) {
-    return {
-      embedding: embedding.vector,
-      embeddingVersion: CURRENT_EMBEDDING_VERSION,
-      embeddingAttempts: undefined,
-    };
-  }
-  return LEAVE_FOR_EMBEDDING_SWEEP;
-}
-
 /** A key set to `undefined` removes that field from the row, hence the `??` fallbacks and conditional spreads. */
 export function completionPatch(
   item: Doc<"items">,
@@ -255,7 +208,6 @@ export function completionPatch(
       note: item.note,
       content,
     }),
-    ...embeddingPatch(item, run, aiAllowed),
   };
 }
 
