@@ -17,7 +17,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { Image } from "expo-image";
 import { Stack, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Platform, Pressable, ScrollView, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -122,6 +122,13 @@ export default function AlreadyBeenScreen() {
   };
 
   const { guard } = usePaywallGuard("passport");
+  const active = useRef(true);
+  useEffect(
+    () => () => {
+      active.current = false;
+    },
+    [],
+  );
 
   const submit = async () => {
     if (busy || picked.size === 0) return;
@@ -135,11 +142,14 @@ export default function AlreadyBeenScreen() {
         })),
       });
       analytics.capture("passport_backfilled", { places: count });
+      if (!active.current) return;
       void haptics.success();
       router.dismissTo("/passport");
     } catch (error) {
       analytics.captureError("passport_backfill_failed", error);
+      if (!active.current) return;
       if (saveErrorCode(error) === "pro_required" && !(await guard())) return;
+      if (!active.current) return;
       Alert.alert(t("errors.unexpectedTitle"), t("errors.retrySoon"));
     } finally {
       setBusy(false);

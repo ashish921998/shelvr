@@ -76,11 +76,16 @@ export default function MapScreen() {
   const [focus, setFocus] = useState<MapFocus | undefined>(undefined);
 
   const all = places.data;
-  const { visits, loaded, isError, offerRetry } = usePlaceVisits();
+  const { visits, loaded, isError, error, offerRetry } = usePlaceVisits();
   const visitsFailed = isError && !loaded;
   useEffect(() => {
-    if (visitsFailed && focused.current) offerRetry();
-  }, [visitsFailed, offerRetry]);
+    if (error) analytics.captureError("place_visits_load_failed", error);
+  }, [error]);
+  useFocusEffect(
+    useCallback(() => {
+      if (visitsFailed) offerRetry();
+    }, [visitsFailed, offerRetry]),
+  );
   const visited = useMemo(() => visitMatcher(visits, all ?? []), [visits, all]);
   const [wentFilter, setWentFilter] = useState<WentFilter>("all");
   const anyWent = (all ?? []).some(visited);

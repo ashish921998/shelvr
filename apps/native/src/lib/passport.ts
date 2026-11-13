@@ -35,7 +35,11 @@ export function usePassport() {
   const passport = useQuery(
     convexQuery(api.placeVisits.getPassport, isAuthenticated ? {} : "skip"),
   );
-  return { stamps: passport.data, failed: passport.isError };
+  return {
+    stamps: passport.data,
+    failed: passport.isError,
+    error: passport.error,
+  };
 }
 
 export function passportCounts(stamps: readonly Stamp[]) {

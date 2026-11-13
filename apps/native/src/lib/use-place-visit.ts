@@ -21,6 +21,7 @@ export function usePlaceVisits(): {
   visits: readonly VisitMark[];
   loaded: boolean;
   isError: boolean;
+  error: Error | null;
   offerRetry: () => void;
 } {
   const query = useQuery(convexQuery(api.placeVisits.listVisits, {}));
@@ -37,6 +38,7 @@ export function usePlaceVisits(): {
     visits: query.data ?? NO_VISITS,
     loaded: query.data !== undefined,
     isError: query.isError,
+    error: query.error,
     offerRetry,
   };
 }

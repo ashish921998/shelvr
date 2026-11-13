@@ -72,8 +72,12 @@ export default function PassportScreen() {
   useAppLocale();
   const router = useRouter();
   const { theme } = useUnistyles();
-  const { stamps, failed } = usePassport();
+  const { stamps, failed, error } = usePassport();
   const stamping = useStamping();
+
+  useEffect(() => {
+    if (error) analytics.captureError("passport_load_failed", error);
+  }, [error]);
 
   const opened = useRef(false);
   useEffect(() => {
