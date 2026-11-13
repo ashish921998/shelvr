@@ -214,7 +214,7 @@ describe("submitFeedback", () => {
     });
 
     expect(result.deliveryState).toBe("scheduled");
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     const row = await getSubmission(t, result.submissionId);
     expect(row).toMatchObject({
@@ -310,7 +310,7 @@ describe("submitFeedback", () => {
     vi.stubEnv("RESEND_FEEDBACK_FROM_EMAIL", SENDER);
     expect(isFeedbackInboxConfigured()).toBe(true);
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(await getSubmission(t, result.submissionId)).toMatchObject({
       status: "delivered",
@@ -332,7 +332,7 @@ describe("delivery retries", () => {
       message: "secret words",
       surface: "profile",
     });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     expect(await getSubmission(t, result.submissionId)).toMatchObject({
       status: "failed",
@@ -350,7 +350,7 @@ describe("delivery retries", () => {
 
     fetchMock.mockResolvedValue(new Response("{}", { status: 200 }));
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(await getSubmission(t, result.submissionId)).toMatchObject({
       status: "delivered",
@@ -392,7 +392,7 @@ describe("delivery retries", () => {
     expect(due).toContain(capped);
 
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
     for (const id of [pending, failed, unconfigured]) {
@@ -415,7 +415,7 @@ describe("delivery retries", () => {
     });
 
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(await getSubmission(t, capped)).toMatchObject({
@@ -458,13 +458,13 @@ describe("delivery snapshot ownership", () => {
     const fetch = okFetch();
     vi.stubGlobal("fetch", fetch);
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(
       (await getSubmission(t, submissionId))?.deliveryRequest,
     ).toBeDefined();
     vi.setSystemTime(Date.now() + 90_001);
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     const row = await getSubmission(t, submissionId);
     expect(row).toMatchObject({
       status: "exhausted",
@@ -685,9 +685,9 @@ describe("account deletion", () => {
     const live = await insertSubmission(t, { status: "failed", attempts: 1 });
 
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(await getSubmission(t, live)).toMatchObject({ status: "delivered" });
@@ -724,7 +724,7 @@ describe("classifyResendError", () => {
     const id = await insertSubmission(t, { status: "pending" });
 
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     expect(await getSubmission(t, id)).toMatchObject({
       status: "failed",

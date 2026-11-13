@@ -179,7 +179,7 @@ describe("durable digest delivery", () => {
     expect((await digest())?.deliveredAt).toBeUndefined();
     await advance();
     await t.mutation(internal.notificationDelivery.recover, {});
-    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(await digest()).toMatchObject({
       deliveryAttempts: 2,
       deliveryRecipients: [{ state: "receipt", ticketId: "ticket-a" }],
@@ -391,7 +391,7 @@ describe("durable digest delivery", () => {
       .mockResolvedValue(json([{ status: "ok", id: "ticket-a" }]));
     vi.stubGlobal("fetch", fetchMock);
     await t.mutation(internal.notificationDelivery.recover, {});
-    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect((await digest())?.deliveryRecipients?.[0].state).toBe("receipt");
     expect(

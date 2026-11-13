@@ -100,7 +100,7 @@ async function retried(
     }),
   );
   expect(await t.mutation(api.items.reprocessItem, { id: itemId })).toBe(true);
-  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
   return await t.run((ctx) => ctx.db.get(itemId));
 }
 

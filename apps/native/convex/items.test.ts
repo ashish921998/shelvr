@@ -2886,7 +2886,7 @@ describe("photo rejection before classification", () => {
         }
       }
     });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(await t.run((ctx) => ctx.db.get(id))).toMatchObject({
       productsStatus: "failed",
     });

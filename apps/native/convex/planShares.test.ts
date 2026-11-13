@@ -510,7 +510,7 @@ describe("deletion", () => {
     await vote(backend, token, "a", ["p0"]);
 
     await t.mutation(api.users.deleteCurrentUserAccount, {});
-    await backend.finishAllScheduledFunctions(vi.runAllTimers);
+    await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(await countRows(backend)).toEqual({ shares: 0, votes: 0 });
   });
 });
