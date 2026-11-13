@@ -503,12 +503,14 @@ http.route({
   pathPrefix: "/passport/shares/",
   method: "GET",
   handler: httpAction(async (ctx, req) => {
-    const token = new URL(req.url).pathname.split("/").pop() ?? "";
+    const url = new URL(req.url);
+    const token = url.pathname.split("/").pop() ?? "";
     const shared = await ctx.runQuery(
       internal.passportShares.getPublicPassport,
       { token },
     );
     if (!shared) return json({ message: "Not found." }, 404);
+    if (url.searchParams.has("preview")) return json(shared.passport, 200);
     await ctx.scheduler.runAfter(
       0,
       internal.analytics.capturePassportLinkOpen,
