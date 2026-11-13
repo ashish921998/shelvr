@@ -1,6 +1,11 @@
 import { v } from "convex/values";
 import type { Id } from "./_generated/dataModel";
-import { env, type MutationCtx, type QueryCtx } from "./_generated/server";
+import {
+  env,
+  query,
+  type MutationCtx,
+  type QueryCtx,
+} from "./_generated/server";
 import { authedQuery } from "./model/auth";
 import { logEvent } from "./model/log";
 import { saveError } from "./model/saveErrors";
@@ -12,21 +17,28 @@ export function freeSavesEnabled(): boolean {
   return env.FREE_SAVES_ENABLED === "true";
 }
 
+async function countFreeSaves(
+  ctx: QueryCtx | MutationCtx,
+  userId: string,
+  status: "pending" | "placed",
+): Promise<number> {
+  const rows = await ctx.db
+    .query("freeSaves")
+    .withIndex("by_user_and_status", (q) =>
+      q.eq("userId", userId).eq("status", status),
+    )
+    .take(FREE_SAVE_LIMIT);
+  return rows.length;
+}
+
 async function heldFreeSaves(
   ctx: QueryCtx | MutationCtx,
   userId: string,
 ): Promise<number> {
-  let held = 0;
-  for (const status of ["pending", "placed"] as const) {
-    const rows = await ctx.db
-      .query("freeSaves")
-      .withIndex("by_user_and_status", (q) =>
-        q.eq("userId", userId).eq("status", status),
-      )
-      .take(FREE_SAVE_LIMIT);
-    held += rows.length;
-  }
-  return held;
+  return (
+    (await countFreeSaves(ctx, userId, "pending")) +
+    (await countFreeSaves(ctx, userId, "placed"))
+  );
 }
 
 export async function claimSave(
@@ -114,21 +126,37 @@ export async function settleFreeSave(
   if (status !== row.status) await ctx.db.patch(row._id, { status });
 }
 
+export const freePlanOpen = query({
+  args: {},
+  returns: v.boolean(),
+  handler: async () => freeSavesEnabled(),
+});
+
 export const getFreeSaves = authedQuery({
   args: {},
   returns: v.union(
     v.null(),
-    v.object({ limit: v.number(), used: v.number(), left: v.number() }),
+    v.object({
+      limit: v.number(),
+      used: v.number(),
+      left: v.number(),
+      pending: v.number(),
+      open: v.boolean(),
+    }),
   ),
   handler: async (ctx) => {
     const { userId } = ctx;
-    if (!freeSavesEnabled()) return null;
     if (await hasProEntitlementAt(ctx, userId, Date.now())) return null;
-    const used = await heldFreeSaves(ctx, userId);
+    const open = freeSavesEnabled();
+    const pending = await countFreeSaves(ctx, userId, "pending");
+    const used = pending + (await countFreeSaves(ctx, userId, "placed"));
+    if (!open && used === 0) return null;
     return {
       limit: FREE_SAVE_LIMIT,
       used,
-      left: Math.max(0, FREE_SAVE_LIMIT - used),
+      left: open ? Math.max(0, FREE_SAVE_LIMIT - used) : 0,
+      pending,
+      open,
     };
   },
 });

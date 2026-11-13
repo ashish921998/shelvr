@@ -6,14 +6,17 @@ import { shareUrl } from "@/lib/share-link";
 import { webUrl } from "@/lib/web-url";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { placeKinds } from "@convex/model/placeKinds";
 import { cityKey } from "@convex/model/trip";
+import { placeEmoji } from "@/lib/map-pin-emoji";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth, useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Share } from "react-native";
+import { Alert, Share } from "react-native";
+import { MAX_LIST_PLACES } from "@convex/model/sharedListLimits";
 
 export type SharedListSummary = FunctionReturnType<
   typeof api.sharedLists.listSharedLists
@@ -35,19 +38,35 @@ export function useSharedLists(enabled = true) {
   );
 }
 
+const NAME_LOAD_WAIT_MS = 3000;
+
 let nameAsked = false;
 
-function useMyFirstName() {
+export function useMyFirstName() {
   const { isAuthenticated } = useConvexAuth();
-  return useQuery(
+  const { data, isError } = useQuery(
     convexQuery(api.users.getMyFirstName, isAuthenticated ? {} : "skip"),
-  ).data;
+  );
+  return {
+    firstName: data,
+    loading: isAuthenticated && data === undefined && !isError,
+    failed: isError,
+  };
 }
 
 export function useNameGate() {
-  const firstName = useMyFirstName();
+  const { firstName, loading } = useMyFirstName();
   const [pending, setPending] = useState<(() => void) | null>(null);
-  const gate = useCallback(
+  const waiting = useRef<(() => void) | null>(null);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(
+    () => () => {
+      waiting.current = null;
+      clearTimeout(timer.current);
+    },
+    [],
+  );
+  const decide = useCallback(
     (action: () => void) => {
       if (firstName !== null || nameAsked) {
         action();
@@ -58,6 +77,29 @@ export function useNameGate() {
     },
     [firstName],
   );
+  useEffect(() => {
+    const action = waiting.current;
+    if (action === null || loading) return;
+    waiting.current = null;
+    clearTimeout(timer.current);
+    decide(action);
+  }, [loading, decide]);
+  const gate = useCallback(
+    (action: () => void) => {
+      if (!loading) {
+        decide(action);
+        return;
+      }
+      waiting.current = action;
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => {
+        if (waiting.current !== action) return;
+        waiting.current = null;
+        action();
+      }, NAME_LOAD_WAIT_MS);
+    },
+    [loading, decide],
+  );
   return {
     gate,
     asking: pending !== null,
@@ -65,7 +107,11 @@ export function useNameGate() {
       setPending(null);
       pending?.();
     },
-    cancel: () => setPending(null),
+    cancel: () => {
+      waiting.current = null;
+      clearTimeout(timer.current);
+      setPending(null);
+    },
   };
 }
 
@@ -73,7 +119,7 @@ export function useAskNameOnce(when: boolean): {
   asking: boolean;
   close: () => void;
 } {
-  const firstName = useMyFirstName();
+  const { firstName } = useMyFirstName();
   const [asking, setAsking] = useState(() => when && !nameAsked);
   useEffect(() => {
     if (asking) nameAsked = true;
@@ -152,18 +198,27 @@ export function listRows(places: SharedListPlace[], city: string): ListRow[] {
     ...shown.filter((place) => place.isNew),
     ...shown.filter((place) => !place.isNew),
   ];
-  return ordered.map((place, index) => ({
-    place,
-    pin: {
-      itemId: place._id,
-      name: place.name,
-      lat: place.lat,
-      lng: place.lng,
-      ...(place.appleId !== undefined ? { appleId: place.appleId } : {}),
-      ...(place.category !== undefined ? { category: place.category } : {}),
-      number: index + 1,
-    },
-  }));
+  return ordered.map((place, index) => {
+    const kinds = placeKinds(place.category, []);
+    return {
+      place,
+      pin: {
+        itemId: place._id,
+        name: place.name,
+        lat: place.lat,
+        lng: place.lng,
+        ...(place.appleId !== undefined ? { appleId: place.appleId } : {}),
+        ...(place.category !== undefined ? { category: place.category } : {}),
+        kinds,
+        emoji: placeEmoji({
+          name: place.name,
+          category: place.category,
+          kinds,
+        }),
+        number: index + 1,
+      },
+    };
+  });
 }
 
 type ListSectionRow =
@@ -238,32 +293,51 @@ export function nextAlsoAddState(
 }
 
 export function useAlsoAddTo(itemId: Id<"items">, city: string) {
+  const { isAuthenticated } = useConvexAuth();
   const add = useMutation(api.sharedLists.addSavePlaces);
   const remove = useMutation(api.sharedLists.removeSavePlaces);
-  const [state, setState] = useState<AlsoAddState>({});
-  const toggle = useCallback(
-    async (listId: Id<"sharedLists">) => {
-      const action = nextAlsoAddState(state[listId]);
-      if (action === null) return;
-      setState((s) => ({
-        ...s,
-        [listId]: action === "add" ? "adding" : "removing",
-      }));
-      try {
-        if (action === "add") {
-          await add({ listId, itemId, city });
+  const { data: savedOn } = useQuery(
+    convexQuery(
+      api.sharedLists.listsWithSave,
+      isAuthenticated ? { itemId } : "skip",
+    ),
+  );
+  const [busy, setBusy] = useState<Record<string, "adding" | "removing">>({});
+  const state: AlsoAddState = {
+    ...Object.fromEntries((savedOn ?? []).map((id) => [id, "on" as const])),
+    ...busy,
+  };
+  const toggle = async (list: SharedListSummary) => {
+    const action = nextAlsoAddState(state[list._id]);
+    if (savedOn === undefined || action === null) return;
+    setBusy((b) => ({
+      ...b,
+      [list._id]: action === "add" ? "adding" : "removing",
+    }));
+    try {
+      if (action === "add") {
+        const added = await add({ listId: list._id, itemId, city });
+        if (added > 0) {
           analytics.capture("shared_list_place_added", { from: "spots" });
         } else {
-          await remove({ listId, itemId });
+          Alert.alert(
+            t(
+              list.placeCount >= MAX_LIST_PLACES
+                ? "sharedLists.alsoAddFull"
+                : "sharedLists.alsoAddAlready",
+              { name: list.name },
+            ),
+          );
         }
-        setState((s) => ({ ...s, [listId]: action === "add" ? "on" : "off" }));
-      } catch (error) {
-        analytics.captureError("shared_list_also_add_failed", error);
-        setState((s) => ({ ...s, [listId]: action === "add" ? "off" : "on" }));
+      } else {
+        await remove({ listId: list._id, itemId });
       }
-    },
-    [state, itemId, city, add, remove],
-  );
+    } catch (error) {
+      analytics.captureError("shared_list_also_add_failed", error);
+    } finally {
+      setBusy(({ [list._id]: _, ...rest }) => rest);
+    }
+  };
   return { state, toggle };
 }
 

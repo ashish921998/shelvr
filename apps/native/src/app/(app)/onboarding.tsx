@@ -6,15 +6,17 @@ import { useOnboarding } from "@/lib/onboarding";
 import { noteOnboardingFinished } from "@/lib/welcome-save";
 import { notificationPermissionState } from "@/lib/notification-token";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
+import { useFreePlanOpen } from "@/lib/free-plan";
 import type { SampleCityId } from "@/lib/sample-cities";
 import {
   GOALS,
+  cityQuestion,
   goalSpaces,
   planKindFor,
   type Goal,
-  type Planner,
   type SavedCount,
 } from "@/lib/onboarding-goals";
+import { cityEchoText } from "@/lib/onboarding-echo";
 import { onboardingCompletedProperties } from "@/lib/onboarding-completed";
 import {
   ONBOARDING_FLOW_VERSION,
@@ -24,6 +26,7 @@ import {
   onboardingProgress,
   previousOnboardingStep,
   restoreOnboardingStep,
+  viewedBeforeResume,
   type OnboardingStep,
 } from "@/lib/onboarding-steps";
 import {
@@ -39,16 +42,14 @@ import { SignInView } from "@/components/sign-in-view";
 import { AhaShareStep } from "@/components/onboarding/aha-share";
 import { AhaSpotsStep } from "@/components/onboarding/aha-spots";
 import { CityStep } from "@/components/onboarding/city-step";
-import { CommitmentStep } from "@/components/onboarding/commitment";
+import { CarouselStep } from "@/components/onboarding/carousel";
+import { FirstSaveStep } from "@/components/onboarding/first-save";
 import { NotificationsStep } from "@/components/onboarding/notifications";
 import { OpenerStep } from "@/components/onboarding/opener";
-import { ProgressChartStep } from "@/components/onboarding/progress-chart";
 import { ScalePressable } from "@/components/onboarding/parts";
-import {
-  GoalStep,
-  PlannerStep,
-  SavedCountStep,
-} from "@/components/onboarding/questions";
+import { StatementStep } from "@/components/onboarding/statement";
+import { ProgressChartStep } from "@/components/onboarding/progress-chart";
+import { GoalStep, SavedCountStep } from "@/components/onboarding/questions";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useConvexAuth } from "convex/react";
 import { haptics } from "@/lib/haptics";
@@ -58,17 +59,8 @@ import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/** The question screens a person may skip; skipping the goal plans for all of them, and the city uses the sample's own. */
-const SKIPPABLE: ReadonlySet<OnboardingStep> = new Set([
-  "savedCount",
-  "goal",
-  "planner",
-  "city",
-]);
-
-function useStepAnalytics(step: OnboardingStep) {
+function useStepAnalytics(step: OnboardingStep, viewed: Set<OnboardingStep>) {
   const tracked = useRef(new Set<OnboardingStep>());
-  const viewed = useRef(new Set<OnboardingStep>());
   const enteredAt = useRef(0);
   const current = useRef<OnboardingStep | null>(null);
   const index = ONBOARDING_STEPS.indexOf(step);
@@ -77,25 +69,29 @@ function useStepAnalytics(step: OnboardingStep) {
     if (current.current === step) return;
     current.current = step;
     enteredAt.current = Date.now();
-    if (viewed.current.has(step)) return;
-    viewed.current.add(step);
+    if (viewed.has(step)) return;
+    viewed.add(step);
     analytics.capture("onboarding_step_viewed", {
       step_id: ONBOARDING_STEP_IDS[step],
       step_index: index,
       flow_version: ONBOARDING_FLOW_VERSION,
     });
-  }, [step, index]);
+  }, [step, index, viewed]);
 
-  return useCallback(() => {
-    if (tracked.current.has(step)) return;
-    analytics.capture("onboarding_step_completed", {
-      step_id: ONBOARDING_STEP_IDS[step],
-      step_index: index,
-      flow_version: ONBOARDING_FLOW_VERSION,
-      duration_ms: Math.max(0, Date.now() - enteredAt.current),
-    });
-    tracked.current.add(step);
-  }, [step, index]);
+  return useCallback(
+    (skipped = false) => {
+      if (tracked.current.has(step)) return;
+      analytics.capture("onboarding_step_completed", {
+        step_id: ONBOARDING_STEP_IDS[step],
+        step_index: index,
+        flow_version: ONBOARDING_FLOW_VERSION,
+        duration_ms: Math.max(0, Date.now() - enteredAt.current),
+        skipped,
+      });
+      tracked.current.add(step);
+    },
+    [step, index],
+  );
 }
 
 function Header({
@@ -166,22 +162,34 @@ export default function OnboardingScreen() {
   const [savedCount, setSavedCount] = useState<SavedCount | null>(
     initial.savedCount,
   );
-  const [planner, setPlanner] = useState<Planner | null>(initial.planner);
+  const [skippedShare, setSkippedShare] = useState(initial.skippedShare);
+  const [askingNotifications, setAskingNotifications] = useState(false);
   const [travelCity, setTravelCity] = useState<SampleCityId | null>(
     initial.travelCity,
   );
   const [showSignIn, setShowSignIn] = useState(false);
   const [viewedOpenerPages] = useState(() => new Set<number>());
+  const [viewedSteps] = useState(
+    () =>
+      new Set([
+        ...viewedBeforeResume(initial.step).filter(
+          (passed) => !(initial.skippedShare && passed === "firstSave"),
+        ),
+        ...initial.viewed,
+      ]),
+  );
   const [signedIn, setSignedIn] = useState(false);
-  const recordCurrentStep = useStepAnalytics(step);
+  const recordCurrentStep = useStepAnalytics(step, viewedSteps);
   const kind = planKindFor(goals);
   const spaces = goalSpaces(goals);
   const sample = ahaSample(kind, travelCity);
   const stepIndex = ONBOARDING_STEPS.indexOf(step);
   const currentStep = useRef(step);
+  const stepVisit = useRef(0);
 
   useEffect(() => {
     currentStep.current = step;
+    stepVisit.current += 1;
   }, [step]);
 
   useEffect(() => {
@@ -190,19 +198,21 @@ export default function OnboardingScreen() {
       travelCity,
       goals,
       savedCount,
-      planner,
+      skippedShare,
       step: stepIndex,
+      viewed: [...viewedSteps],
     });
-  }, [travelCity, goals, savedCount, planner, stepIndex]);
+  }, [travelCity, goals, savedCount, skippedShare, stepIndex, viewedSteps]);
 
   const [backward, setBackward] = useState(false);
-  const advance = useCallback(() => {
-    recordCurrentStep();
+  const completeStep = (skipped: boolean) => {
+    recordCurrentStep(skipped);
     setBackward(false);
     setStep((current) =>
       current === step ? nextOnboardingStep(current) : current,
     );
-  }, [recordCurrentStep, step]);
+  };
+  const advance = () => completeStep(false);
 
   useEffect(() => {
     if (!signedIn || !isAuthenticated) return;
@@ -219,38 +229,43 @@ export default function OnboardingScreen() {
         travelCity,
         goals,
         savedCount,
-        planner,
       }),
     );
     recordCurrentStep();
     holdIncomingShare();
     setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
-    // The reel they shared in the demo becomes their first real save once they have Pro.
-    queueDemoUrl(sample.firstSaveUrl);
+    // The reel they shared in the demo becomes their first real save once they can save.
+    if (!skippedShare) queueDemoUrl(sample.firstSaveUrl);
     noteOnboardingFinished();
     completeOnboarding();
   };
 
+  const freePlanOpen = useFreePlanOpen();
   const paywall = useOnboardingPaywall({
     onPro: finish,
     onUnavailable: finish,
+    onClosed: freePlanOpen === false ? undefined : finish,
   });
+  const [checkingNotifications, setCheckingNotifications] = useState(false);
 
-  const askForPlan = () => {
-    recordCurrentStep();
+  const askForPlan = (skipped = false) => {
+    recordCurrentStep(skipped);
     paywall.ask();
   };
 
-  const leaveCommitment = () => {
+  const leaveCarousel = (skipped = false) => {
+    const visit = stepVisit.current;
+    setCheckingNotifications(true);
     void notificationPermissionState()
       .catch((error: unknown) => {
         analytics.captureError("onboarding_notifications_check_failed", error);
         return "blocked" as const;
       })
       .then((state) => {
-        if (currentStep.current !== "commitment") return;
-        if (state === "ask") advance();
-        else askForPlan();
+        if (stepVisit.current !== visit) return;
+        setCheckingNotifications(false);
+        if (state === "ask") completeStep(skipped);
+        else askForPlan(skipped);
       });
   };
 
@@ -263,11 +278,34 @@ export default function OnboardingScreen() {
     );
   }
 
-  const previous = previousOnboardingStep(step);
+  const previous =
+    step === "ahaSpots" && skippedShare
+      ? "ahaShare"
+      : previousOnboardingStep(step);
   const skip = () => {
-    if (step === "goal") setGoals([...GOALS]);
-    if (step === "city") setTravelCity(null);
-    advance();
+    switch (step) {
+      case "goal":
+        setGoals([...GOALS]);
+        return completeStep(true);
+      case "city":
+        setTravelCity(null);
+        return completeStep(true);
+      case "ahaShare":
+        setSkippedShare(true);
+        recordCurrentStep(true);
+        setBackward(false);
+        return setStep((current) => (current === step ? "ahaSpots" : current));
+      case "carousel":
+        return leaveCarousel(true);
+      case "notifications":
+        analytics.capture("onboarding_notifications", {
+          action: "skip",
+          granted: false,
+        });
+        return askForPlan(true);
+      default:
+        return completeStep(true);
+    }
   };
 
   const body = (() => {
@@ -288,24 +326,17 @@ export default function OnboardingScreen() {
             onContinue={advance}
           />
         );
+      case "chart":
+        return <ProgressChartStep kind={kind} onContinue={advance} />;
       case "goal":
         return (
           <GoalStep picked={goals} onChange={setGoals} onContinue={advance} />
         );
-      case "planner":
-        return (
-          <PlannerStep
-            picked={planner}
-            onPick={setPlanner}
-            onContinue={advance}
-          />
-        );
-      case "chart":
-        return <ProgressChartStep kind={kind} onContinue={advance} />;
       case "city":
         return (
           <CityStep
             kind={kind}
+            question={cityQuestion(goals)}
             city={travelCity}
             onPick={(city) => {
               setTravelCity(city);
@@ -313,16 +344,33 @@ export default function OnboardingScreen() {
             }}
           />
         );
+      case "cityEcho":
+        return (
+          <StatementStep
+            text={cityEchoText(travelCity, sample.city)}
+            onContinue={advance}
+          />
+        );
       case "ahaShare":
-        return <AhaShareStep sample={sample} onShared={advance} />;
+        return (
+          <AhaShareStep
+            sample={sample}
+            onShared={() => {
+              setSkippedShare(false);
+              advance();
+            }}
+          />
+        );
+      case "firstSave":
+        return <FirstSaveStep onContinue={advance} />;
       case "ahaSpots":
         return <AhaSpotsStep sample={sample} onContinue={advance} />;
-      case "commitment":
+      case "carousel":
         return (
-          <CommitmentStep
+          <CarouselStep
             sample={sample}
-            leaving={paywall.asked}
-            onContinue={leaveCommitment}
+            leaving={checkingNotifications || paywall.asked}
+            onContinue={() => leaveCarousel()}
           />
         );
       case "notifications":
@@ -330,7 +378,8 @@ export default function OnboardingScreen() {
           <NotificationsStep
             sample={sample}
             leaving={paywall.asked}
-            onContinue={askForPlan}
+            onAsking={setAskingNotifications}
+            onContinue={() => askForPlan()}
           />
         );
     }
@@ -350,10 +399,11 @@ export default function OnboardingScreen() {
             ? null
             : () => {
                 setBackward(true);
+                setCheckingNotifications(false);
                 setStep(previous);
               }
         }
-        onSkip={SKIPPABLE.has(step) ? skip : null}
+        onSkip={paywall.asked || askingNotifications ? null : skip}
       />
       <View style={styles.content}>
         {/* Keyed by step, so a new step springs in while the old one leaves; neither blocks a tap. */}

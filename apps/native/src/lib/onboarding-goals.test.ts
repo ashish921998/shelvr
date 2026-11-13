@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   GOALS,
+  cityQuestion,
   goalSpaces,
   isGoal,
-  isPlanner,
   isSavedCount,
   planKindFor,
   primaryGoal,
@@ -49,6 +49,18 @@ it("knows only the answers onboarding asks", () => {
   expect(isGoal("recipes")).toBe(false);
   expect(isSavedCount("hundreds")).toBe(true);
   expect(isSavedCount("thousands")).toBe(false);
-  expect(isPlanner("explorer")).toBe(true);
-  expect(isPlanner(undefined)).toBe(false);
+});
+
+describe("cityQuestion", () => {
+  it("asks where the next trip goes when trips lead the goals", () => {
+    expect(cityQuestion(["travel"])).toBe("trip");
+    expect(cityQuestion(["travel", "food"])).toBe("trip");
+  });
+
+  it("asks where a person goes out when a date or food leads", () => {
+    expect(cityQuestion(["date"])).toBe("out");
+    expect(cityQuestion(["date", "travel", "food"])).toBe("out");
+    expect(cityQuestion(["food"])).toBe("out");
+    expect(cityQuestion([])).toBe("out");
+  });
 });

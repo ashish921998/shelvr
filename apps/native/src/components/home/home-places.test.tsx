@@ -3,7 +3,11 @@ import type { ReactNode } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { HomePlaces, UnplacedSaves } from "@/components/home/home-places";
+import {
+  HomePlaces,
+  HomePlacesEmptyCard,
+  UnplacedSaves,
+} from "@/components/home/home-places";
 
 const mocks = vi.hoisted(() => ({
   cities: [] as {
@@ -14,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   }[],
   start: vi.fn(),
   busy: null as "date" | "trip" | null,
+  access: { kind: "pro", syncing: false } as Record<string, unknown>,
 }));
 
 vi.mock("@/components/city/city-cover", () => ({
@@ -22,6 +27,11 @@ vi.mock("@/components/city/city-cover", () => ({
   )),
 }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
+vi.mock("@/components/passport/passport-row", () => ({
+  PassportRow: vi.fn(({ hideEmpty }: { hideEmpty?: boolean }) => (
+    <span>{hideEmpty ? "passport if stamped" : "passport"}</span>
+  )),
+}));
 vi.mock("@/components/ui/prompt-sheet", () => ({
   PromptSheet: vi.fn(
     ({
@@ -52,7 +62,11 @@ vi.mock("@/lib/city-plan", () => ({
 }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => ({ entitled: true }),
-  usePaywallGuard: vi.fn(),
+  usePaywallGuard: () => ({ guard: vi.fn() }),
+}));
+vi.mock("@/lib/free-plan", () => ({
+  useAccess: () => mocks.access,
+  useSaveGuard: () => ({ guard: vi.fn(), loading: false }),
 }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: mocks.cities }),
@@ -175,7 +189,28 @@ describe("plan tiles", () => {
   beforeEach(() => {
     mocks.start.mockReset();
     mocks.busy = null;
+    mocks.access = { kind: "pro", syncing: false };
     vi.unstubAllEnvs();
+  });
+
+  it("tags both tiles Pro for a free account and still starts the plan", () => {
+    mocks.access = {
+      kind: "free",
+      limit: 10,
+      used: 4,
+      left: 6,
+      pending: 0,
+      open: true,
+    };
+    mocks.cities = [entry("Lisbon", 3)];
+    render(<HomePlaces />);
+    fireEvent.click(
+      screen.getByRole("button", { name: "Plan a date, In Lisbon, Pro" }),
+    );
+    expect(mocks.start).toHaveBeenCalledWith("date", "Lisbon");
+    expect(
+      screen.getByRole("button", { name: "Plan a trip, In Lisbon, Pro" }),
+    ).toBeTruthy();
   });
 
   it("shows no tiles when no city has a mapped place", () => {
@@ -259,6 +294,17 @@ describe("city cards", () => {
     expect(
       screen.getByRole("button", { name: "Tokyo, 3 saves, no place yet" }),
     ).toBeTruthy();
+  });
+
+  it("keeps the passport on Home once the last city is gone", () => {
+    mocks.cities = [];
+    render(<HomePlaces />);
+    expect(screen.getByText("passport if stamped")).toBeTruthy();
+  });
+
+  it("keeps the passport on Home once the last save is gone", () => {
+    render(<HomePlacesEmptyCard />);
+    expect(screen.getByText("passport if stamped")).toBeTruthy();
   });
 
   it("shows the share tip only for a single city", () => {

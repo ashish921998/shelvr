@@ -51,8 +51,8 @@ it("lists All then each filter, and a second tap on the selected filter returns 
   );
   expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
     "map.filterAll",
-    "map.kindDessert",
-    "map.kindDateNight",
+    "🍰 map.kindDessert",
+    "💕 map.kindDateNight",
   ]);
   expect(screen.getByLabelText("map.filterAll").ariaPressed).toBe("true");
 

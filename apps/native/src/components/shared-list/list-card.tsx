@@ -1,11 +1,10 @@
 import { MemberAvatars } from "@/components/shared-list/member-avatars";
-import { AppSymbolIcon } from "@/components/symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t } from "@/lib/i18n";
 import { type SharedListSummary, withLine } from "@/lib/shared-lists";
 import { useRouter } from "expo-router";
 import { Pressable, View } from "react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StyleSheet } from "react-native-unistyles";
 
 export function SharedListCard({ list }: { list: SharedListSummary }) {
   const router = useRouter();
@@ -43,28 +42,6 @@ export function SharedListCard({ list }: { list: SharedListSummary }) {
   );
 }
 
-export function StartListRow() {
-  const router = useRouter();
-  const { theme } = useUnistyles();
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={t("sharedLists.start")}
-      onPress={() => router.push("/new-shared-list")}
-      style={({ pressed }) => [styles.start, pressed && styles.pressed]}
-    >
-      <AppSymbolIcon
-        name="plus"
-        size={16}
-        tintColor={theme.colors.primaryText}
-      />
-      <ThemedText variant="subheadStrong" style={styles.startLabel}>
-        {t("sharedLists.start")}
-      </ThemedText>
-    </Pressable>
-  );
-}
-
 const styles = StyleSheet.create((theme) => ({
   card: {
     minHeight: theme.control.minHeight,
@@ -87,12 +64,5 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.primarySoft,
   },
   badgeText: { color: theme.colors.primaryText },
-  start: {
-    minHeight: 44,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1),
-  },
-  startLabel: { color: theme.colors.primaryText },
   pressed: { opacity: theme.opacity.pressed },
 }));

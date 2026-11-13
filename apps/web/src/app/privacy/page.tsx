@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMetadata(
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="November 2, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="November 6, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
@@ -118,7 +118,7 @@ export default function PrivacyPage() {
           To find the places in your saves, Shelvr sends content from its server
           to Google’s Gemini API. What is sent: a link’s address and what we
           read from it, such as its title, creator, description, and up to about
-          6,000 characters of page text; a reel’s or TikTok’s caption and what
+          30,000 characters of page text; a reel’s or TikTok’s caption and what
           is said in the video; the places in a shared Google Maps list, with
           their addresses, map points, and notes; a note’s title and up to about
           8,000 characters of its text; and photos you save, with any text you
@@ -205,8 +205,9 @@ export default function PrivacyPage() {
         </p>
         <p className="mt-2">
           A plan can also be shared as an unlisted vote link, which shows your
-          first name, if we have one, and the plan’s city and places. Anyone
-          with the link can vote, up to 20 people at a time, and we store each
+          first name, if we have one, and the plan’s city and places, with the
+          cover image of a saved link but never a photo you saved. Anyone with
+          the link can vote, up to 20 people at a time, and we store each
           voter’s choices with a random browser identifier. The link closes
           after a week, and we delete it and its votes about a week after that.
         </p>

@@ -2,15 +2,16 @@ export const ONBOARDING_STEPS = [
   "opener",
   "savedCount",
   "goal",
-  "planner",
   "chart",
   "city",
+  "cityEcho",
   "ahaShare",
+  "firstSave",
   "ahaSpots",
-  "commitment",
+  "carousel",
   "notifications",
 ] as const;
-export const ONBOARDING_FLOW_VERSION = 23;
+export const ONBOARDING_FLOW_VERSION = 26;
 
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
@@ -18,19 +19,19 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   opener: "opener",
   savedCount: "saved_count",
   goal: "goal",
-  planner: "planner",
   chart: "progress_chart",
   city: "city",
+  cityEcho: "city_echo",
   ahaShare: "aha_share",
+  firstSave: "first_save",
   ahaSpots: "aha_spots",
-  commitment: "commitment",
+  carousel: "carousel",
   notifications: "notification_ask",
 };
 
-/** How far along the header's bar is on `step`, from its place in the flow; the opener has no bar. */
 export function onboardingProgress(step: OnboardingStep): number | null {
   const index = ONBOARDING_STEPS.indexOf(step);
-  return index === 0 ? null : index / (ONBOARDING_STEPS.length - 1);
+  return index <= 0 ? null : index / (ONBOARDING_STEPS.length - 1);
 }
 
 /** The step before `step`; none on the opener. */
@@ -48,4 +49,10 @@ export function nextOnboardingStep(step: OnboardingStep): OnboardingStep {
 export function restoreOnboardingStep(step: number | null): OnboardingStep {
   if (step === null || !Number.isInteger(step)) return "opener";
   return ONBOARDING_STEPS[step] ?? "opener";
+}
+
+export function viewedBeforeResume(step: number | null): OnboardingStep[] {
+  if (step === null || !Number.isInteger(step) || !ONBOARDING_STEPS[step])
+    return [];
+  return ONBOARDING_STEPS.slice(0, step + 1);
 }

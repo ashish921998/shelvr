@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   captureError: vi.fn(),
   query: vi.fn((): { data?: unknown } => ({})),
+  alert: vi.fn(),
 }));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: true }),
@@ -35,6 +36,7 @@ vi.mock("@convex/_generated/api", () => ({
       listSharedLists: { name: "list" },
       addSavePlaces: { name: "add" },
       removeSavePlaces: { name: "remove" },
+      listsWithSave: { name: "listsWithSave" },
     },
     users: { getMyFirstName: { name: "firstName" } },
   },
@@ -53,14 +55,19 @@ vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
 vi.mock("react-native", () => ({
   Platform: { OS: "ios" },
   Share: { share: vi.fn(), sharedAction: "sharedAction" },
+  Alert: { alert: mocks.alert },
 }));
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   mocks.add.mockReset();
   mocks.remove.mockReset();
   mocks.capture.mockReset();
   mocks.captureError.mockReset();
+  mocks.alert.mockReset();
+  mocks.query.mockReset();
+  mocks.query.mockImplementation(() => ({}));
 });
 
 const ITEM = "item1" as Id<"items">;
@@ -183,13 +190,34 @@ describe("withLine and inviteUrl", () => {
 });
 
 describe("useAlsoAddTo", () => {
-  it("is off by default, adds on the first tap and removes on the second", async () => {
-    mocks.add.mockResolvedValue(3);
-    mocks.remove.mockResolvedValue(3);
+  const SUMMARY = {
+    _id: LIST,
+    name: "Ours",
+    placeCount: 4,
+    newCount: 0,
+    isOwner: true,
+    members: [],
+  };
+  let savedOn: Id<"sharedLists">[] = [];
+  function serverLists() {
+    savedOn = [];
+    mocks.query.mockImplementation(() => ({ data: savedOn }));
+  }
+
+  it("follows the server: adds on the first tap and removes on the second", async () => {
+    serverLists();
+    mocks.add.mockImplementation(() => {
+      savedOn = [LIST];
+      return Promise.resolve(3);
+    });
+    mocks.remove.mockImplementation(() => {
+      savedOn = [];
+      return Promise.resolve(3);
+    });
     const { result } = renderHook(() => useAlsoAddTo(ITEM, "Lisbon"));
     expect(nextAlsoAddState(result.current.state[LIST])).toBe("add");
 
-    await act(() => result.current.toggle(LIST));
+    await act(() => result.current.toggle(SUMMARY));
     expect(mocks.add).toHaveBeenCalledWith({
       listId: LIST,
       itemId: ITEM,
@@ -200,16 +228,50 @@ describe("useAlsoAddTo", () => {
       from: "spots",
     });
 
-    await act(() => result.current.toggle(LIST));
+    await act(() => result.current.toggle(SUMMARY));
     expect(mocks.remove).toHaveBeenCalledWith({ listId: LIST, itemId: ITEM });
-    await waitFor(() => expect(result.current.state[LIST]).toBe("off"));
+    await waitFor(() => expect(result.current.state[LIST]).toBeUndefined());
+  });
+
+  it("opens on for a list the save is already on, so the first tap removes it", async () => {
+    serverLists();
+    savedOn = [LIST];
+    mocks.remove.mockResolvedValue(2);
+    const { result } = renderHook(() => useAlsoAddTo(ITEM, "Lisbon"));
+    expect(result.current.state[LIST]).toBe("on");
+    await act(() => result.current.toggle(SUMMARY));
+    expect(mocks.remove).toHaveBeenCalledWith({ listId: LIST, itemId: ITEM });
+    expect(mocks.add).not.toHaveBeenCalled();
+  });
+
+  it("stays off and says why when nothing was added", async () => {
+    serverLists();
+    mocks.add.mockResolvedValue(0);
+    const { result } = renderHook(() => useAlsoAddTo(ITEM, "Lisbon"));
+    await act(() => result.current.toggle(SUMMARY));
+    expect(result.current.state[LIST]).toBeUndefined();
+    expect(mocks.alert).toHaveBeenCalledWith(
+      'sharedLists.alsoAddAlready:{"name":"Ours"}',
+    );
+    await act(() => result.current.toggle({ ...SUMMARY, placeCount: 200 }));
+    expect(mocks.alert).toHaveBeenLastCalledWith(
+      'sharedLists.alsoAddFull:{"name":"Ours"}',
+    );
+    expect(mocks.capture).not.toHaveBeenCalled();
+  });
+
+  it("waits for the server before acting", async () => {
+    const { result } = renderHook(() => useAlsoAddTo(ITEM, "Lisbon"));
+    await act(() => result.current.toggle(SUMMARY));
+    expect(mocks.add).not.toHaveBeenCalled();
   });
 
   it("goes back to off when adding fails, and reports it", async () => {
+    serverLists();
     mocks.add.mockRejectedValue(new Error("offline"));
     const { result } = renderHook(() => useAlsoAddTo(ITEM, "Lisbon"));
-    await act(() => result.current.toggle(LIST));
-    await waitFor(() => expect(result.current.state[LIST]).toBe("off"));
+    await act(() => result.current.toggle(SUMMARY));
+    await waitFor(() => expect(result.current.state[LIST]).toBeUndefined());
     expect(mocks.captureError).toHaveBeenCalled();
   });
 
@@ -256,11 +318,64 @@ describe("useNameGate", () => {
     expect(result.current.asking).toBe(false);
   });
 
-  it("asks a nameless person once, then carries on whatever they chose", () => {
-    mocks.query.mockReturnValue({ data: null });
+  it("waits for the name to load before deciding", () => {
+    mocks.query.mockReturnValue({});
+    const action = vi.fn();
+    const { result, rerender } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    expect(action).not.toHaveBeenCalled();
+    expect(result.current.asking).toBe(false);
+
+    mocks.query.mockReturnValue({ data: "Maya" });
+    rerender();
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(result.current.asking).toBe(false);
+  });
+
+  it("goes on without asking if the name never loads", () => {
+    vi.useFakeTimers();
+    mocks.query.mockReturnValue({});
     const action = vi.fn();
     const { result } = renderHook(() => useNameGate());
     act(() => result.current.gate(action));
+    expect(action).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(3000));
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(result.current.asking).toBe(false);
+  });
+
+  it("drops a parked action when the screen goes away", () => {
+    vi.useFakeTimers();
+    mocks.query.mockReturnValue({});
+    const action = vi.fn();
+    const { result, unmount } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    unmount();
+    act(() => vi.advanceTimersByTime(3000));
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("drops a parked action when the person cancels", () => {
+    vi.useFakeTimers();
+    mocks.query.mockReturnValue({});
+    const action = vi.fn();
+    const { result } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    act(() => result.current.cancel());
+    act(() => vi.advanceTimersByTime(3000));
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("asks a nameless person once, then carries on whatever they chose", () => {
+    vi.useFakeTimers();
+    mocks.query.mockReturnValue({});
+    const action = vi.fn();
+    const { result, rerender } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    expect(result.current.asking).toBe(false);
+    mocks.query.mockReturnValue({ data: null });
+    rerender();
+    act(() => vi.advanceTimersByTime(3000));
     expect(result.current.asking).toBe(true);
     expect(action).not.toHaveBeenCalled();
 

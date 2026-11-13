@@ -6,6 +6,7 @@ import {
   mapFilters,
   searchPlaces,
   topSearchResults,
+  wentView,
 } from "./map-filters";
 
 const place = (kinds: string[], city?: string) => ({ kinds, city });
@@ -108,5 +109,28 @@ describe("searchPlaces", () => {
     expect(
       topSearchResults(Array.from({ length: 12 }, (_, i) => i)),
     ).toHaveLength(5);
+  });
+});
+
+describe("wentView", () => {
+  const places = [{ name: "Tigre" }, { name: "Dante" }];
+  const went = (place: { name: string }) => place.name === "Tigre";
+
+  it("keeps every place, the ones to go to, or the ones visited", () => {
+    expect(wentView(places, "all", went).places).toEqual(places);
+    expect(wentView(places, "want", went).places).toEqual([{ name: "Dante" }]);
+    expect(wentView(places, "went", went)).toEqual({
+      places: [{ name: "Tigre" }],
+      selected: "went",
+      showSwitch: true,
+    });
+  });
+
+  it("hides the switch and shows everything until a place was visited", () => {
+    expect(wentView(places, "went", () => false)).toEqual({
+      places,
+      selected: "all",
+      showSwitch: false,
+    });
   });
 });

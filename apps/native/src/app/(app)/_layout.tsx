@@ -4,13 +4,14 @@ import { releaseSheetLink } from "@/lib/deferred-sheet-link";
 import { useForgetExitOffer } from "@/lib/forget-exit-offer";
 import { endPurchaseLandingSession } from "@/lib/purchase-landing";
 import { t, useAppLocale } from "@/lib/i18n";
-import { useEntitlement } from "@/lib/entitlement";
 import { useOnboarding } from "@/lib/onboarding";
 import { HomeFeedProvider } from "@/lib/home-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { PlanLoadingCover } from "@/components/plan-loading-cover";
 import { TrialReminderPrimerSheet } from "@/components/trial-reminder-sheet";
 import { usePlanGate } from "@/lib/plan-gate";
+import { canSave } from "@/lib/access";
+import { useAccess } from "@/lib/free-plan";
 import { useReplayOnboarding } from "@/lib/replay-onboarding";
 import { useQueuedFirstSave } from "@/lib/queued-first-save";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
@@ -34,8 +35,8 @@ export default function AppLayout() {
   const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
 
-  const entitlement = useEntitlement();
   const { gated, planUnknown } = usePlanGate();
+  const access = useAccess();
   useEffect(() => {
     if (!isAuthenticated && !isLoading) endPurchaseLandingSession();
   }, [isAuthenticated, isLoading]);
@@ -43,17 +44,19 @@ export default function AppLayout() {
   const lists = useSharedLists(isAuthenticated && onboarded);
   const listRoutes = listRouteAllowed({ onboarded, gated, lists: lists.data });
 
-  const planLoading = entitlement.loading;
-  const entitled = entitlement.entitled;
   useEffect(() => {
-    const link = releaseSheetLink(planLoading);
-    if (!link || (link.sheet && !(onboarded && entitled))) return;
+    const link = releaseSheetLink(isLoading || planUnknown);
+    if (!link || (link.sheet && !(isAuthenticated && onboarded && !gated)))
+      return;
     router.push(link.route as never);
-  }, [planLoading, entitled, onboarded, router]);
+  }, [isLoading, planUnknown, gated, onboarded, isAuthenticated, router]);
 
-  useReplayOnboarding();
+  useReplayOnboarding({
+    left: access.kind === "free" && canSave(access),
+    loading: access.kind === "loading",
+  });
   useQueuedFirstSave();
-  useResumePendingShare(gated || planUnknown);
+  useResumePendingShare(!canSave(access));
   useTrialReminder();
   useWelcomeSaveTracker();
   useForgetExitOffer();
@@ -108,6 +111,10 @@ export default function AppLayout() {
           />
           <Stack.Screen
             name="city/[name]"
+            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+          />
+          <Stack.Screen
+            name="passport"
             options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
           />
           <Stack.Screen
@@ -168,6 +175,9 @@ export default function AppLayout() {
             }
           />
           <Stack.Screen name="new-shared-list" options={modal} />
+          <Stack.Screen name="already-been" options={modal} />
+          <Stack.Screen name="passport-card" options={modal} />
+          <Stack.Screen name="city-card" options={modal} />
           <Stack.Screen
             name="edit-save-places"
             options={{ headerShown: true, headerTransparent: false }}
