@@ -428,7 +428,7 @@ describe("the onboarding demo save", () => {
     const { itemId } = await t.mutation(api.demo.createDemoItem, {
       url: "https://example.com/blocked",
     });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect((await t.run((ctx) => ctx.db.get(itemId)))?.status).toBe("ready");
     await expectNoThirdPartyCall();
   });
