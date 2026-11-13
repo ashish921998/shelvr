@@ -37,7 +37,6 @@ describe("compareCities", () => {
 
 describe("pendingInviteOf", () => {
   it("tells a held passport link from a list invite, and reads old list tokens as lists", () => {
-    expect(pendingInviteOf(null)).toBeNull();
     expect(pendingInviteOf("abc")).toEqual({ kind: "list", token: "abc" });
     expect(pendingInviteOf("passport:abc")).toEqual({
       kind: "passport",

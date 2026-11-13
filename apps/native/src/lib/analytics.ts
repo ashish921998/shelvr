@@ -190,7 +190,7 @@ export type AnalyticsEventProperties = {
   passport_sharing_stopped: Record<string, never>;
   passport_invite_opened: { found: boolean; signed_in: boolean };
   passport_compare_tapped: { signed_in: boolean };
-  passport_compare_resumed: { onboarded_before: boolean };
+  passport_compare_resumed: { found: boolean; onboarded_before: boolean };
   passport_compare_opened: {
     both: number;
     only_them: number;

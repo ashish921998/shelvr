@@ -29,12 +29,11 @@ export function setPendingInvite(token: string): void {
 
 const PASSPORT_PREFIX = "passport:";
 
-type PendingInvite =
+export type PendingInvite =
   | { kind: "list"; token: string }
   | { kind: "passport"; token: string };
 
-export function pendingInviteOf(raw: string | null): PendingInvite | null {
-  if (raw === null) return null;
+export function pendingInviteOf(raw: string): PendingInvite {
   return raw.startsWith(PASSPORT_PREFIX)
     ? { kind: "passport", token: raw.slice(PASSPORT_PREFIX.length) }
     : { kind: "list", token: raw };
