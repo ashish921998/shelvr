@@ -297,6 +297,7 @@ describe("useAlsoAddTo", () => {
     placeCount: 4,
     newCount: 0,
     isOwner: true,
+    newFrom: [],
     members: [],
   };
   let savedOn: Id<"sharedLists">[] = [];
