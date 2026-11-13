@@ -26,6 +26,11 @@ test(
       /saves? without a place, Review$/,
     );
     await expect(review).toBeVisible({ timeout: 60_000 });
+    const dismissToast = screen.getByRole("button", "Dismiss");
+    if (await dismissToast.isVisible()) {
+      await dismissToast.tap();
+      await expect(dismissToast).toBeHidden({ timeout: 10_000 });
+    }
     await review.tap();
 
     await expect(
