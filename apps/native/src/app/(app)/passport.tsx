@@ -16,6 +16,7 @@ import {
   type OpenStamp,
   usePassport,
 } from "@/lib/passport";
+import { useSharePassport } from "@/lib/passport-share";
 import { usePlaceVisit } from "@/lib/use-place-visit";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -75,6 +76,7 @@ export default function PassportScreen() {
   const { theme } = useUnistyles();
   const { stamps, failed, error } = usePassport();
   const visit = usePlaceVisit("passport");
+  const sharing = useSharePassport(stamps?.length ?? 0);
   const [open, setOpen] = useState<OpenStamp | null>(null);
   const remove = async () => {
     if (open === null) return;
@@ -124,6 +126,27 @@ export default function PassportScreen() {
           </>
         ) : null}
       </View>
+      {stamps.length > 0 ? (
+        <Pressable
+          testID="passport-share"
+          accessibilityRole="button"
+          disabled={sharing.busy}
+          onPress={() => void sharing.share()}
+          style={({ pressed }) => [
+            styles.sharePassport,
+            (pressed || sharing.busy) && styles.pressed,
+          ]}
+        >
+          <AppSymbolIcon
+            name="square.and.arrow.up"
+            size={15}
+            tintColor={theme.colors.surface}
+          />
+          <Text style={styles.sharePassportText}>
+            {t("passportShare.share")}
+          </Text>
+        </Pressable>
+      ) : null}
       <Pressable
         testID="passport-backfill"
         accessibilityRole="button"
@@ -236,6 +259,20 @@ const styles = StyleSheet.create((theme, rt) => ({
     letterSpacing: 0.8,
   },
   divider: { width: 1, backgroundColor: theme.colors.border },
+  sharePassport: {
+    minHeight: theme.control.minHeight,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.gap(0.75),
+    borderRadius: theme.radius.lg,
+    borderCurve: "continuous",
+    backgroundColor: theme.colors.foreground,
+  },
+  sharePassportText: {
+    ...theme.type.subheadStrong,
+    color: theme.colors.surface,
+  },
   backfill: {
     minHeight: theme.control.minHeight,
     flexDirection: "row",

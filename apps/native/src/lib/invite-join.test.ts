@@ -10,6 +10,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   onboarded: true,
+  pending: "abc",
   join: vi.fn(),
   alert: vi.fn(),
   capture: vi.fn(),
@@ -40,7 +41,11 @@ vi.mock("@/lib/pending-onboarding", () => ({
 }));
 vi.mock("@/lib/pending-invite", () => ({
   clearPendingInvite: mocks.clearPendingInvite,
-  getPendingInvite: () => "abc",
+  getPendingInvite: () => mocks.pending,
+  pendingInviteOf: (raw: string) =>
+    raw.startsWith("passport:")
+      ? { kind: "passport", token: raw.slice(9) }
+      : { kind: "list", token: raw },
   subscribePendingInvite: () => () => {},
 }));
 vi.mock("@convex/_generated/api", () => ({
@@ -65,6 +70,28 @@ describe("useInviteJoinCoordinator", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.pending = "abc";
+  });
+
+  it("opens the comparison for a held passport link, finishing onboarding for a new person", async () => {
+    mocks.pending = "passport:tok1";
+    await joinWith(false, "list1");
+    expect(mocks.join).not.toHaveBeenCalled();
+    expect(mocks.clearPendingInvite).toHaveBeenCalled();
+    expect(mocks.completeOnboarding).toHaveBeenCalled();
+    expect(mocks.router.replace).toHaveBeenCalledWith(
+      "/passport-invite/tok1?compare=1",
+    );
+  });
+
+  it("opens the comparison without touching onboarding for an onboarded person", async () => {
+    mocks.pending = "passport:tok1";
+    await joinWith(true, "list1");
+    expect(mocks.completeOnboarding).not.toHaveBeenCalled();
+    expect(mocks.clearPending).not.toHaveBeenCalled();
+    expect(mocks.router.replace).toHaveBeenCalledWith(
+      "/passport-invite/tok1?compare=1",
+    );
   });
 
   it("keeps a queued reel when an onboarded person joins from the paywall", async () => {

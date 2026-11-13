@@ -6,6 +6,7 @@ import { clearPending } from "@/lib/pending-onboarding";
 import {
   clearPendingInvite,
   getPendingInvite,
+  pendingInviteOf,
   subscribePendingInvite,
 } from "@/lib/pending-invite";
 import { api } from "@convex/_generated/api";
@@ -48,6 +49,10 @@ export function inviteJoinOutcome(
         : `/shared-list/${listId}?joined=1`,
   };
 }
+export function passportCompareHref(token: string): string {
+  return `/passport-invite/${encodeURIComponent(token)}?compare=1`;
+}
+
 export function useInviteJoinCoordinator() {
   const router = useRouter();
   const { isLoading, isAuthenticated } = useConvexAuth();
@@ -72,6 +77,20 @@ export function useInviteJoinCoordinator() {
       inFlight: inFlight.current,
     });
     if (step.kind !== "join") return;
+    const pending = pendingInviteOf(step.token);
+    if (pending?.kind === "passport") {
+      clearPendingInvite();
+      analytics.capture("passport_compare_resumed", {
+        onboarded_before: onboardedRef.current,
+      });
+      if (!onboardedRef.current) {
+        holdIncomingShare();
+        clearPending();
+        completeOnboarding();
+      }
+      router.replace(passportCompareHref(pending.token) as never);
+      return;
+    }
     inFlight.current = step.token;
     join({ token: step.token })
       .then((listId) => {

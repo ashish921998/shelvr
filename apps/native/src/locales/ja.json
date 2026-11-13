@@ -1117,6 +1117,35 @@
   "passport.cardSavedElsewhere": "あとで行く用に保存。",
   "passport.cardWent": "Shelvrで行った。",
   "passport.shareCity": "%{city}を共有",
+  "passportShare.share": "パスポートを共有",
+  "passportShare.stopSetting": "パスポートの共有をやめる",
+  "passportShare.stopTitle": "パスポートの共有をやめますか？",
+  "passportShare.stopBody": "送ったリンクはすべて使えなくなります。いつでもまた共有できます。",
+  "passportShare.stop": "共有をやめる",
+  "passportShare.title": "%{name}のパスポート",
+  "passportShare.titleNoName": "友だちのパスポート",
+  "passportShare.compare": "自分のと比べる",
+  "passportShare.deadTitle": "このパスポートはもう共有されていません",
+  "passportShare.deadBody": "新しいリンクをもらうか、Shelvrで自分のパスポートを始めましょう。",
+  "passportShare.bothHeader": {
+    "other": "2人とも行った場所：%{formattedCount}か所"
+  },
+  "passportShare.compareSub": "あなただけ：%{onlyYou} · %{name}だけ：%{onlyThem}",
+  "passportShare.compareSubNoName": "あなただけ：%{onlyYou} · 相手だけ：%{onlyThem}",
+  "passportShare.compareEmpty": "行った場所にスタンプを押すと、ここで比べられます。",
+  "passportShare.both": "2人とも",
+  "passportShare.onlyThem": "%{name}だけ",
+  "passportShare.onlyThemNoName": "相手だけ",
+  "passportShare.onlyYou": "あなただけ",
+  "passportShare.save": {
+    "other": "相手の%{formattedCount}か所を保存"
+  },
+  "passportShare.saved": {
+    "other": "%{formattedCount}か所を保存しました"
+  },
+  "passportShare.savedNone": "相手の場所はすべて保存済みです",
+  "passportShare.fromFriend": "%{name}のパスポートから",
+  "passportShare.fromFriendNoName": "友だちのパスポートから",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "other": "無料保存は残り%{formattedCount}件"

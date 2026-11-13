@@ -186,6 +186,17 @@ export type AnalyticsEventProperties = {
   passport_opened: { places: number };
   passport_backfilled: { places: number };
   passport_card_share_opened: { places: number; surface: "stamp" | "passport" };
+  passport_shared: { places: number; shared: boolean };
+  passport_sharing_stopped: Record<string, never>;
+  passport_invite_opened: { found: boolean; signed_in: boolean };
+  passport_compare_tapped: { signed_in: boolean };
+  passport_compare_resumed: { onboarded_before: boolean };
+  passport_compare_opened: {
+    both: number;
+    only_them: number;
+    only_you: number;
+  };
+  passport_friend_places_saved: { saved: number; skipped: number };
   plan_shared: { place_count: number; picked: boolean };
   plan_asked: { place_count: number };
   plan_ask_failed: { reason: "link" | "share" };

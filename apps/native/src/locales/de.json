@@ -1155,6 +1155,38 @@
   "passport.cardSavedElsewhere": "Für später gespeichert.",
   "passport.cardWent": "Mit Shelvr dort gewesen.",
   "passport.shareCity": "%{city} teilen",
+  "passportShare.share": "Pass teilen",
+  "passportShare.stopSetting": "Meinen Pass nicht mehr teilen",
+  "passportShare.stopTitle": "Deinen Pass nicht mehr teilen?",
+  "passportShare.stopBody": "Alle Links, die du verschickt hast, funktionieren dann nicht mehr. Du kannst ihn jederzeit wieder teilen.",
+  "passportShare.stop": "Nicht mehr teilen",
+  "passportShare.title": "Der Pass von %{name}",
+  "passportShare.titleNoName": "Der Pass einer Freundin oder eines Freundes",
+  "passportShare.compare": "Mit meinem vergleichen",
+  "passportShare.deadTitle": "Dieser Pass wird nicht mehr geteilt",
+  "passportShare.deadBody": "Frag nach einem neuen Link oder starte deinen eigenen Pass in Shelvr.",
+  "passportShare.bothHeader": {
+    "one": "Ihr wart beide an %{formattedCount} Ort",
+    "other": "Ihr wart beide an %{formattedCount} Orten"
+  },
+  "passportShare.compareSub": "Nur du: %{onlyYou} · Nur %{name}: %{onlyThem}",
+  "passportShare.compareSubNoName": "Nur du: %{onlyYou} · Nur die andere Person: %{onlyThem}",
+  "passportShare.compareEmpty": "Stemple die Orte, an denen du warst, dann kannst du sie hier vergleichen.",
+  "passportShare.both": "Ihr beide",
+  "passportShare.onlyThem": "Nur %{name}",
+  "passportShare.onlyThemNoName": "Nur die andere Person",
+  "passportShare.onlyYou": "Nur du",
+  "passportShare.save": {
+    "one": "Den %{formattedCount} Ort speichern",
+    "other": "Die %{formattedCount} Orte speichern"
+  },
+  "passportShare.saved": {
+    "one": "%{formattedCount} Ort gespeichert",
+    "other": "%{formattedCount} Orte gespeichert"
+  },
+  "passportShare.savedNone": "Du hast schon alle diese Orte gespeichert",
+  "passportShare.fromFriend": "Aus dem Pass von %{name}",
+  "passportShare.fromFriendNoName": "Aus dem Pass einer befreundeten Person",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "one": "Noch %{formattedCount} kostenlose Speicherung",

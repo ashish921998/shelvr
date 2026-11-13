@@ -1117,6 +1117,35 @@
   "passport.cardSavedElsewhere": "나중을 위해 저장.",
   "passport.cardWent": "Shelvr로 다녀옴.",
   "passport.shareCity": "%{city} 공유",
+  "passportShare.share": "여권 공유",
+  "passportShare.stopSetting": "내 여권 공유 중지",
+  "passportShare.stopTitle": "여권 공유를 중지할까요?",
+  "passportShare.stopBody": "보낸 링크가 모두 더 이상 열리지 않아요. 언제든 다시 공유할 수 있어요.",
+  "passportShare.stop": "공유 중지",
+  "passportShare.title": "%{name}의 여권",
+  "passportShare.titleNoName": "친구의 여권",
+  "passportShare.compare": "내 여권과 비교",
+  "passportShare.deadTitle": "더 이상 공유되지 않는 여권이에요",
+  "passportShare.deadBody": "새 링크를 받거나 Shelvr에서 내 여권을 시작해 보세요.",
+  "passportShare.bothHeader": {
+    "other": "둘 다 가 본 곳 %{formattedCount}곳"
+  },
+  "passportShare.compareSub": "나만: %{onlyYou} · %{name}만: %{onlyThem}",
+  "passportShare.compareSubNoName": "나만: %{onlyYou} · 상대만: %{onlyThem}",
+  "passportShare.compareEmpty": "가 본 곳에 스탬프를 찍으면 여기서 비교할 수 있어요.",
+  "passportShare.both": "둘 다",
+  "passportShare.onlyThem": "%{name}만",
+  "passportShare.onlyThemNoName": "상대만",
+  "passportShare.onlyYou": "나만",
+  "passportShare.save": {
+    "other": "상대의 %{formattedCount}곳 저장"
+  },
+  "passportShare.saved": {
+    "other": "%{formattedCount}곳 저장했어요"
+  },
+  "passportShare.savedNone": "상대의 장소를 모두 저장했어요",
+  "passportShare.fromFriend": "%{name}의 여권에서",
+  "passportShare.fromFriendNoName": "친구의 여권에서",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "other": "무료 저장 %{formattedCount}개 남음"

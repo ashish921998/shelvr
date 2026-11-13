@@ -1193,6 +1193,41 @@
   "passport.cardSavedElsewhere": "Salvo para depois.",
   "passport.cardWent": "Fomos com o Shelvr.",
   "passport.shareCity": "Compartilhar %{city}",
+  "passportShare.share": "Compartilhar passaporte",
+  "passportShare.stopSetting": "Parar de compartilhar meu passaporte",
+  "passportShare.stopTitle": "Parar de compartilhar seu passaporte?",
+  "passportShare.stopBody": "Todos os links que você enviou vão parar de funcionar. Você pode compartilhar de novo quando quiser.",
+  "passportShare.stop": "Parar de compartilhar",
+  "passportShare.title": "O passaporte de %{name}",
+  "passportShare.titleNoName": "O passaporte de um amigo",
+  "passportShare.compare": "Comparar com o meu",
+  "passportShare.deadTitle": "Este passaporte não está mais compartilhado",
+  "passportShare.deadBody": "Peça um link novo ou comece seu próprio passaporte no Shelvr.",
+  "passportShare.bothHeader": {
+    "one": "Vocês dois foram a %{formattedCount} lugar",
+    "many": "Vocês dois foram a %{formattedCount} lugares",
+    "other": "Vocês dois foram a %{formattedCount} lugares"
+  },
+  "passportShare.compareSub": "Só você: %{onlyYou} · Só %{name}: %{onlyThem}",
+  "passportShare.compareSubNoName": "Só você: %{onlyYou} · Só a outra pessoa: %{onlyThem}",
+  "passportShare.compareEmpty": "Carimbe os lugares aonde você foi e compare aqui.",
+  "passportShare.both": "Vocês dois",
+  "passportShare.onlyThem": "Só %{name}",
+  "passportShare.onlyThemNoName": "Só a outra pessoa",
+  "passportShare.onlyYou": "Só você",
+  "passportShare.save": {
+    "one": "Salvar o %{formattedCount} lugar dessa pessoa",
+    "many": "Salvar os %{formattedCount} lugares dessa pessoa",
+    "other": "Salvar os %{formattedCount} lugares dessa pessoa"
+  },
+  "passportShare.saved": {
+    "one": "%{formattedCount} lugar salvo",
+    "many": "%{formattedCount} lugares salvos",
+    "other": "%{formattedCount} lugares salvos"
+  },
+  "passportShare.savedNone": "Você já salvou todos os lugares dessa pessoa",
+  "passportShare.fromFriend": "Do passaporte de %{name}",
+  "passportShare.fromFriendNoName": "Do passaporte de um amigo",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "one": "Resta %{formattedCount} salvamento grátis",

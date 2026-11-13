@@ -27,6 +27,23 @@ export function setPendingInvite(token: string): void {
   notifyChanged();
 }
 
+const PASSPORT_PREFIX = "passport:";
+
+export type PendingInvite =
+  | { kind: "list"; token: string }
+  | { kind: "passport"; token: string };
+
+export function pendingInviteOf(raw: string | null): PendingInvite | null {
+  if (raw === null) return null;
+  return raw.startsWith(PASSPORT_PREFIX)
+    ? { kind: "passport", token: raw.slice(PASSPORT_PREFIX.length) }
+    : { kind: "list", token: raw };
+}
+
+export function setPendingPassport(token: string): void {
+  setPendingInvite(`${PASSPORT_PREFIX}${token}`);
+}
+
 export function clearPendingInvite(): void {
   SecureStore.setItem(PENDING_INVITE_KEY, "");
   notifyChanged();

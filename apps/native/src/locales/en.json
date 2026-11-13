@@ -1155,6 +1155,38 @@
   "passport.cardSavedElsewhere": "Saved for later.",
   "passport.cardWent": "Went with Shelvr.",
   "passport.shareCity": "Share %{city}",
+  "passportShare.share": "Share passport",
+  "passportShare.stopSetting": "Stop sharing my passport",
+  "passportShare.stopTitle": "Stop sharing your passport?",
+  "passportShare.stopBody": "Every link you’ve sent stops working. You can share again anytime.",
+  "passportShare.stop": "Stop sharing",
+  "passportShare.title": "%{name}’s passport",
+  "passportShare.titleNoName": "A friend’s passport",
+  "passportShare.compare": "Compare with mine",
+  "passportShare.deadTitle": "This passport isn’t shared anymore",
+  "passportShare.deadBody": "Ask for a new link, or start your own passport in Shelvr.",
+  "passportShare.bothHeader": {
+    "one": "You’ve both been to %{formattedCount} place",
+    "other": "You’ve both been to %{formattedCount} places"
+  },
+  "passportShare.compareSub": "Only you: %{onlyYou} · Only %{name}: %{onlyThem}",
+  "passportShare.compareSubNoName": "Only you: %{onlyYou} · Only them: %{onlyThem}",
+  "passportShare.compareEmpty": "Stamp places you went to, and you can compare them here.",
+  "passportShare.both": "Both of you",
+  "passportShare.onlyThem": "Only %{name}",
+  "passportShare.onlyThemNoName": "Only them",
+  "passportShare.onlyYou": "Only you",
+  "passportShare.save": {
+    "one": "Save their %{formattedCount} place",
+    "other": "Save their %{formattedCount} places"
+  },
+  "passportShare.saved": {
+    "one": "Saved %{formattedCount} place",
+    "other": "Saved %{formattedCount} places"
+  },
+  "passportShare.savedNone": "You’ve saved all their places",
+  "passportShare.fromFriend": "From %{name}’s passport",
+  "passportShare.fromFriendNoName": "From a friend’s passport",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "one": "%{formattedCount} free save left",
