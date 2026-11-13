@@ -1410,13 +1410,6 @@ export const processItem = internalAction({
   },
 });
 
-export const sweepItemEmbeddings = internalAction({
-  args: {},
-  returns: v.object({ scanned: v.number(), written: v.number() }),
-  handler: async (ctx): Promise<{ scanned: number; written: number }> =>
-    await ctx.runAction(internal.aiEmbeddingSweep.sweepItemEmbeddings, {}),
-});
-
 export const recommendForSpace = internalAction({
   args: { spaceId: v.id("spaces") },
   returns: v.null(),

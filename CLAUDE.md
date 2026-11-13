@@ -57,22 +57,21 @@ read [localization](docs/architecture/localization.md); before simulator QA read
 - **External fetches** go through `model/safeFetch.ts`; host knowledge lives in the page readers
   under `model/readers/`, never in `ai.ts`.
 - **Logging** goes through `logEvent` (`model/log.ts`): one JSON line, scalar fields only.
-- For any edit in `convex/`, prefer the `convex-expert` skill.
+- For any edit in `convex/`, prefer the `convex:convex-expert` subagent.
 
 ## What grep won't tell you
 
 - **Old-build code looks dead but is a live contract.** `trips.ts`, `tripData.ts`, `plans.ts`,
   the space CRUD and suggestion functions in `spaces.ts`, `ensureCitySpace`,
-  `aiRecommendForSpace.ts`, the no-op `aiEmbeddingSweep.ts` and the old sweep exports in `ai.ts`
-  have no caller in the current app. Installed builds and queued jobs still call them: do not
+  `aiRecommendForSpace.ts` and the `recommendForSpace` wrapper in `ai.ts` have no caller in the
+  current app. Installed builds and queued jobs still call them: do not
   delete or narrow them (see the contract rule under Working conventions).
 - **Declared because rows carry them.** Keep these in the schema through any rollback:
-  `users.deleting`, `items.embedding` / `embeddingVersion` /
-  `embeddingAttempts`, `items.placeLocations`, `tripPlans.listId`, the `placeVisits` `stampPlaces` and `backfilled` fields, and the `placeRemovals` and
+  `users.deleting`, `items.placeLocations`, `tripPlans.listId`, the `placeVisits` `stampPlaces` and `backfilled` fields, and the `placeRemovals` and
   `tripEveReminders` tables.
 - **Run-by-hand backfills** after deploying the change that needs them, from `apps/native`:
   `pnpm exec convex run --prod <fn> '{"cursor":null}'` with `items:backfillPlaceSearch`
-  (finish it before releasing the search UI), `items:clearEmbeddings`,
+  (finish it before releasing the search UI),
   `placePins:backfillPage` or `placeVisits:backfillCountries` (old "We went" marks get a city
   and country; run it before the Passport client ships). Each schedules its remaining pages and is safe to restart.
 - **Privacy rules the code enforces on purpose:** a shared list's place search sends Apple only
@@ -145,7 +144,7 @@ than a line:
   `tools/verify-ota-compatibility.mjs` blocks a publish whose fingerprint does not match
   `apps/native/released-builds.json`: for production it runs as the `Verify the update can
 reach the released build` step in `.github/workflows/release.yml`, for other profiles as
-  the `before_update` hook in `native-update.yml`. The fix is a store build, then recording
+  the `before_update` hook in `apps/native/.eas/workflows/native-update.yml`. The fix is a store build, then recording
   the release. The pull-request check covers only the production
   variant and cannot see `eas.json` build fields, `.easignore` edits or pnpm patches.
   Details: [push notification builds and updates](docs/architecture/push-notifications.md#what-the-fingerprint-hashes).

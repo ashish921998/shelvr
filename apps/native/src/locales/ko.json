@@ -646,7 +646,6 @@
   "refundConsent.syncFailed": "선택은 저장되었지만 환불 데이터 공유가 켜져 있는지 확인하지 못했습니다. 다시 시도하려면 공유를 끈 다음 다시 허용해 주세요.",
   "refundConsent.withdraw": "공유 끄기",
   "refundConsent.review": "업데이트된 약관 검토",
-  "aiConsent.findLinksOff": "이 계정에서는 AI가 꺼져 있어요. 변경하려면 고객 지원에 문의해 주세요.",
   "updates.title": "앱 업데이트",
   "updates.check": "업데이트 확인",
   "updates.checking": "확인 중…",
@@ -1072,6 +1071,52 @@
   "sharedLists.startWithHint": "도시를 하나 이상 고르세요. 그곳에 이미 저장한 장소도 함께 들어가요.",
   "sharedLists.cityPlaceholder": "또는 도시 입력",
   "sharedLists.typedCity": "직접 입력한 도시",
+  "passport.wentNoDate": "가봄",
+  "passport.stampedTitle": "스탬프 완료",
+  "passport.stampedBody": {
+    "other": "%{name}이(가) 여권에 추가됐어요. 지금까지 %{formattedCount}곳에 가봤어요."
+  },
+  "passport.stampInk": "%{city} · %{date}",
+  "passport.coverCredit": "저장한 게시물의 이미지",
+  "passport.removeStamp": "스탬프 삭제",
+  "passport.wantToGo": "가고 싶어요",
+  "passport.title": "여권",
+  "passport.yourPassport": "내 여권",
+  "passport.beenTitle": "이미 가본 곳이 있나요?",
+  "passport.beenBody": "이미 가본 곳에 스탬프를 찍어요",
+  "passport.beenSomewhere": "이미 가본 곳이 있나요?",
+  "passport.rowCities": "%{places} · %{cities}",
+  "passport.placesCount": {
+    "other": "%{formattedCount}곳"
+  },
+  "passport.citiesCount": {
+    "other": "도시 %{formattedCount}곳"
+  },
+  "passport.places": "장소",
+  "passport.cities": "도시",
+  "passport.countries": "나라",
+  "passport.elsewhere": "기타",
+  "passport.coversCredit": "저장한 게시물의 이미지",
+  "passport.pickBody": "여기에 저장하기 전에 가본 곳을 체크하세요.",
+  "passport.nothingToStamp": "저장한 장소가 모두 여권에 있어요.",
+  "passport.pickNone": "가본 곳을 골라 주세요",
+  "passport.stampCount": {
+    "other": "%{formattedCount}곳에 스탬프"
+  },
+  "passport.cardKicker": "단톡방에서 현실로",
+  "passport.cardTitle": {
+    "other": "저장해 두고 드디어 간 %{formattedCount}곳"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "other": "외 %{formattedCount}곳"
+  },
+  "passport.cardSavedInstagram": "Instagram에 저장.",
+  "passport.cardSavedTiktok": "TikTok에 저장.",
+  "passport.cardSavedBoth": "Instagram과 TikTok에 저장.",
+  "passport.cardSavedElsewhere": "나중을 위해 저장.",
+  "passport.cardWent": "Shelvr로 다녀옴.",
+  "passport.shareCity": "%{city} 공유",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "other": "무료 저장 %{formattedCount}개 남음"
