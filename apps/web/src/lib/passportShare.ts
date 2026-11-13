@@ -1,6 +1,8 @@
 import { convexSiteUrl } from "@/lib/convexSiteUrl";
 import { serverLog } from "@/lib/serverLog";
 
+const TIMEOUT_MS = 5_000;
+
 type Dot = { lat: number; lng: number };
 
 export type PassportCity = { city?: string; dot?: Dot; names: string[] };
@@ -28,6 +30,7 @@ export async function loadPassport(
   try {
     const response = await fetch(shareUrl(siteUrl, token), {
       cache: "no-store",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     });
     if (response.status === 404) return { outcome: "missing" };
     if (!response.ok) {
@@ -50,7 +53,10 @@ export async function recordPassportOpen(token: string): Promise<void> {
   const siteUrl = convexSiteUrl();
   if (!siteUrl) return;
   try {
-    const response = await fetch(shareUrl(siteUrl, token), { method: "POST" });
+    const response = await fetch(shareUrl(siteUrl, token), {
+      method: "POST",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
     if (!response.ok && response.status !== 404) {
       serverLog("error", "passport_open_failed", { status: response.status });
     }

@@ -46,7 +46,10 @@ describe("loadPassport", () => {
     expect(await loadPassport("a/b")).toEqual({ outcome: "found", passport });
     expect(fetch).toHaveBeenLastCalledWith(
       "https://deployment.convex.site/passport/shares/a%2Fb",
-      expect.objectContaining({ cache: "no-store" }),
+      expect.objectContaining({
+        cache: "no-store",
+        signal: expect.any(AbortSignal),
+      }),
     );
   });
 
@@ -74,7 +77,7 @@ describe("recordPassportOpen", () => {
     await recordPassportOpen("a/b");
     expect(fetch).toHaveBeenLastCalledWith(
       "https://deployment.convex.site/passport/shares/a%2Fb",
-      { method: "POST" },
+      { method: "POST", signal: expect.any(AbortSignal) },
     );
     vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 404 }));
     await recordPassportOpen("gone");
