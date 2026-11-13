@@ -52,7 +52,7 @@ export default function PassportCardScreen() {
       if (!image) throw new Error("passport_card_capture_empty");
       const file = new File(Paths.cache, "shelvr-passport.png");
       if (file.exists) file.delete();
-      file.write(image.encodeToBytes());
+      await file.write(image.encodeToBytes());
       analytics.capture("passport_card_share_opened", {
         places: shareCardOf(stamps, city).total,
         surface: surface === "stamp" ? "stamp" : "passport",
