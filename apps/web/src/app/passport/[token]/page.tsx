@@ -66,7 +66,7 @@ function DotMap({ stamps }: { stamps: PassportStamp[] }) {
           ))}
           {city.city ? (
             <text
-              x={city.x}
+              x={city.labelX}
               y={city.labelY}
               textAnchor="middle"
               className="fill-ink-soft text-[13px] font-semibold"

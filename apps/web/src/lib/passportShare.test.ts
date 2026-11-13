@@ -151,6 +151,24 @@ describe("dotMap", () => {
     expect(cities[0].dots).toHaveLength(3);
   });
 
+  it("keeps a long joined label inside the map at either edge", () => {
+    const dot = { lat: 34.1, lng: -118.4 };
+    const cities = dotMap(
+      [
+        { name: "A", city: "West Hollywood", dot },
+        { name: "B", city: "Beverly Hills", dot },
+        { name: "C", city: "Pasadena", dot: { lat: 34.1, lng: -118.1 } },
+      ],
+      box,
+    );
+    for (const city of cities) {
+      const half = (city.city.length * 7.5) / 2;
+      expect(city.labelX - half).toBeGreaterThanOrEqual(0);
+      expect(city.labelX + half).toBeLessThanOrEqual(box.width);
+    }
+    expect(cities[0].labelX).toBeGreaterThan(cities[0].x);
+  });
+
   it("centres a single city and skips places with no dot", () => {
     const [only, ...rest] = dotMap(
       [passport.stamps[0], { name: "Nowhere" }],
