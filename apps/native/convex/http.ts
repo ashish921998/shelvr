@@ -500,6 +500,25 @@ http.route({
 });
 
 http.route({
+  pathPrefix: "/passport/shares/",
+  method: "GET",
+  handler: httpAction(async (ctx, req) => {
+    const token = new URL(req.url).pathname.split("/").pop() ?? "";
+    const shared = await ctx.runQuery(
+      internal.passportShares.getPublicPassport,
+      { token },
+    );
+    if (!shared) return json({ message: "Not found." }, 404);
+    await ctx.scheduler.runAfter(
+      0,
+      internal.analytics.capturePassportLinkOpen,
+      { ownerId: shared.ownerId, openedAt: Date.now() },
+    );
+    return json(shared.passport, 200);
+  }),
+});
+
+http.route({
   pathPrefix: "/list/invites/",
   method: "GET",
   handler: httpAction(async (ctx, req) => {

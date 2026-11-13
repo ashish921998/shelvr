@@ -118,6 +118,7 @@ import type * as notificationDelivery from "../notificationDelivery.js";
 import type * as notifications from "../notifications.js";
 import type * as oracle from "../oracle.js";
 import type * as oracleLimits from "../oracleLimits.js";
+import type * as passportShares from "../passportShares.js";
 import type * as paymentTelemetry from "../paymentTelemetry.js";
 import type * as placeCorrectionSearch from "../placeCorrectionSearch.js";
 import type * as placeCorrections from "../placeCorrections.js";
@@ -254,6 +255,7 @@ declare const fullApi: ApiFromModules<{
   notifications: typeof notifications;
   oracle: typeof oracle;
   oracleLimits: typeof oracleLimits;
+  passportShares: typeof passportShares;
   paymentTelemetry: typeof paymentTelemetry;
   placeCorrectionSearch: typeof placeCorrectionSearch;
   placeCorrections: typeof placeCorrections;
