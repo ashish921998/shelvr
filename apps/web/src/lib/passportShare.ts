@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { convexSiteUrl } from "@/lib/convexSiteUrl";
 import { serverLog } from "@/lib/serverLog";
 
@@ -21,7 +22,7 @@ function shareUrl(siteUrl: string, token: string): string {
   return `${siteUrl}/passport/shares/${encodeURIComponent(token)}`;
 }
 
-export async function loadPassport(
+async function fetchPassport(
   token: string,
 ): Promise<{ outcome: PassportOutcome; passport?: SharedPassport }> {
   const siteUrl = convexSiteUrl();
@@ -48,6 +49,8 @@ export async function loadPassport(
     return { outcome: "unavailable" };
   }
 }
+
+export const loadPassport = cache(fetchPassport);
 
 export async function recordPassportOpen(token: string): Promise<void> {
   const siteUrl = convexSiteUrl();
