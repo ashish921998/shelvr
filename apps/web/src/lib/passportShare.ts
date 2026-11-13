@@ -81,19 +81,26 @@ export function passportCities(
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 const LABEL_GAP = 24;
-const SHARED_DOT_GAP = 96;
 
 export function dotMap(
   stamps: readonly PassportStamp[],
   size: { width: number; height: number; pad: number; spread: number },
 ) {
-  const cities = new Map<string, { city: string; dot: Dot; count: number }>();
+  const cities = new Map<
+    string,
+    { names: string[]; dot: Dot; count: number }
+  >();
   for (const { city, dot } of stamps) {
     if (!dot) continue;
-    const key = `${city?.trim().toLowerCase() ?? ""}|${dot.lat},${dot.lng}`;
-    const found = cities.get(key);
-    if (found) found.count += 1;
-    else cities.set(key, { city: city ?? "", dot, count: 1 });
+    const key = `${dot.lat},${dot.lng}`;
+    const found = cities.get(key) ?? { names: [], dot, count: 0 };
+    found.count += 1;
+    const name = city?.trim() ?? "";
+    const known = found.names.some(
+      (other) => other.toLowerCase() === name.toLowerCase(),
+    );
+    if (name !== "" && !known) found.names.push(name);
+    cities.set(key, found);
   }
   const groups = [...cities.values()];
   if (groups.length === 0) return [];
@@ -124,23 +131,10 @@ export function dotMap(
   const offsetX = inset + (innerW - spanX * scale) / 2;
   const offsetY = inset + (innerH - spanY * scale) / 2;
   return groups.map((group, index) => {
-    const shared = groups.filter(
-      (other) =>
-        other.dot.lat === group.dot.lat && other.dot.lng === group.dot.lng,
-    );
-    const slot = shared.indexOf(group) - (shared.length - 1) / 2;
-    const x = Math.min(
-      size.width - size.pad,
-      Math.max(
-        size.pad,
-        offsetX +
-          (points[index].x - Math.min(...xs)) * scale +
-          slot * SHARED_DOT_GAP,
-      ),
-    );
+    const x = offsetX + (points[index].x - Math.min(...xs)) * scale;
     const y = offsetY + (points[index].y - Math.min(...ys)) * scale;
     return {
-      city: group.city,
+      city: group.names.join(" · "),
       x,
       y,
       labelY: y + LABEL_GAP + step * Math.sqrt(group.count),

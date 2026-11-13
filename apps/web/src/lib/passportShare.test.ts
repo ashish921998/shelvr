@@ -133,19 +133,22 @@ describe("dotMap", () => {
     }
   });
 
-  it("keeps two cities apart when they share a rounded dot", () => {
+  it("names both cities on a dot they share, without moving either", () => {
     const dot = { lat: 38.7, lng: -9.2 };
     const cities = dotMap(
       [
         { name: "A", city: "Lisbon", dot },
         { name: "B", city: "Oeiras", dot },
+        { name: "C", city: "lisbon", dot },
+        { name: "D", city: "Setúbal", dot: { lat: 38.5, lng: -8.9 } },
       ],
       box,
     );
-    expect(cities.map((city) => city.city)).toEqual(["Lisbon", "Oeiras"]);
-    const [lisbon, oeiras] = cities;
-    expect(oeiras.x - lisbon.x).toBeGreaterThanOrEqual(80);
-    expect(lisbon.y).toBe(oeiras.y);
+    expect(cities.map((city) => city.city)).toEqual([
+      "Lisbon · Oeiras",
+      "Setúbal",
+    ]);
+    expect(cities[0].dots).toHaveLength(3);
   });
 
   it("centres a single city and skips places with no dot", () => {
