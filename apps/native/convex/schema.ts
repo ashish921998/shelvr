@@ -337,6 +337,13 @@ export default defineSchema({
     .index("by_user_and_key", ["userId", "key"])
     .index("by_user_and_visited", ["userId", "visitedAt"]),
 
+  passportShares: defineTable({
+    token: v.string(),
+    userId: v.string(),
+  })
+    .index("by_token", ["token"])
+    .index("by_user", ["userId"]),
+
   planShares: defineTable({
     token: v.string(),
     userId: v.string(),

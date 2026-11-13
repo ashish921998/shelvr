@@ -1195,6 +1195,41 @@
   "passport.cardSavedElsewhere": "Guardado para después.",
   "passport.cardWent": "Fuimos con Shelvr.",
   "passport.shareCity": "Compartir %{city}",
+  "passportShare.share": "Compartir pasaporte",
+  "passportShare.stopSetting": "Dejar de compartir mi pasaporte",
+  "passportShare.stopTitle": "¿Dejar de compartir tu pasaporte?",
+  "passportShare.stopBody": "Todos los enlaces que enviaste dejarán de funcionar. Puedes volver a compartirlo cuando quieras.",
+  "passportShare.stop": "Dejar de compartir",
+  "passportShare.title": "El pasaporte de %{name}",
+  "passportShare.titleNoName": "El pasaporte de un amigo",
+  "passportShare.compare": "Comparar con el mío",
+  "passportShare.deadTitle": "Este pasaporte ya no se comparte",
+  "passportShare.deadBody": "Pide un enlace nuevo o empieza tu propio pasaporte en Shelvr.",
+  "passportShare.bothHeader": {
+    "one": "Los dos fueron a %{formattedCount} lugar",
+    "many": "Los dos fueron a %{formattedCount} lugares",
+    "other": "Los dos fueron a %{formattedCount} lugares"
+  },
+  "passportShare.compareSub": "Solo tú: %{onlyYou} · Solo %{name}: %{onlyThem}",
+  "passportShare.compareSubNoName": "Solo tú: %{onlyYou} · Solo la otra persona: %{onlyThem}",
+  "passportShare.compareEmpty": "Sella los lugares a los que fuiste y podrás compararlos aquí.",
+  "passportShare.both": "Los dos",
+  "passportShare.onlyThem": "Solo %{name}",
+  "passportShare.onlyThemNoName": "Solo la otra persona",
+  "passportShare.onlyYou": "Solo tú",
+  "passportShare.save": {
+    "one": "Guardar su %{formattedCount} lugar",
+    "many": "Guardar sus %{formattedCount} lugares",
+    "other": "Guardar sus %{formattedCount} lugares"
+  },
+  "passportShare.saved": {
+    "one": "%{formattedCount} lugar guardado",
+    "many": "%{formattedCount} lugares guardados",
+    "other": "%{formattedCount} lugares guardados"
+  },
+  "passportShare.savedNone": "No hay nada nuevo que guardar",
+  "passportShare.fromFriend": "Del pasaporte de %{name}",
+  "passportShare.fromFriendNoName": "Del pasaporte de un amigo",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "one": "Te queda %{formattedCount} guardado gratis",
