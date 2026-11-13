@@ -44,7 +44,7 @@ export function useFreshPinDrop(
   if (
     selected !== null &&
     !shown.includes(selected) &&
-    rows.some((row) => cityPinId(row.pin) === selected)
+    rows.some((row) => row.place.isNew && cityPinId(row.pin) === selected)
   ) {
     setShownByCity(new Map(shownByCity).set(key, [...shown, selected]));
   }

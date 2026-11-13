@@ -232,4 +232,16 @@ describe("useFreshPinDrop", () => {
     expect(result.current.visible).toBe(5);
     expect(vi.getTimerCount()).toBe(0);
   });
+  it("keeps dropping one at a time when an old pin is selected", () => {
+    const rows = [...old, ...fresh(7)];
+    const { result, rerender } = renderHook(
+      ({ selected }) => useFreshPinDrop(rows, "Austin", selected),
+      { initialProps: { selected: null as string | null } },
+    );
+    for (let beat = 0; beat < 4; beat += 1) tick();
+    expect(result.current.visible).toBe(6);
+    rerender({ selected: cityPinId(old[0].pin) });
+    tick();
+    expect(result.current.visible).toBe(7);
+  });
 });
