@@ -142,16 +142,9 @@ export function linkPlaceFor(
   pins: readonly CityPin[],
 ): LinkPlace | undefined {
   const key = placeKey(pin.name);
-  const sameSave = pins.filter(
-    (other) => other.itemId === pin.itemId && placeKey(other.name) === key,
+  const exact = link.places.find(
+    (place) => place.itemId === pin.itemId && placeKey(place.name) === key,
   );
-  const exact =
-    sameSave.length === 1
-      ? link.places.find(
-          (place) =>
-            place.itemId === pin.itemId && placeKey(place.name) === key,
-        )
-      : undefined;
   if (exact !== undefined) return exact;
   const sameName = pins.filter((other) => placeKey(other.name) === key);
   if (sameName.length !== 1) return undefined;
@@ -191,9 +184,10 @@ export function sameShortlist(
   chosen: readonly CityPin[],
   pins: readonly CityPin[],
 ): boolean {
-  const keys = chosen.map((pin) => linkPlaceFor(link, pin, pins)?.key);
+  const unique = uniqueChoices(chosen);
+  const keys = unique.map((pin) => linkPlaceFor(link, pin, pins)?.key);
   return (
-    chosen.length === link.places.length &&
+    unique.length === link.places.length &&
     keys.every((key) => key !== undefined) &&
     new Set(keys).size === keys.length
   );

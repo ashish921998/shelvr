@@ -683,9 +683,9 @@
   "refundConsent.enabled": "Du erlaubst die Weitergabe von Kauf- und Bereitstellungsinformationen an Apple zur Prüfung von Rückerstattungen.",
   "refundConsent.disabled": "Die Datenweitergabe für Rückerstattungen ist aus.",
   "refundConsent.syncPending": "Deine Auswahl ist gespeichert. RevenueCat wird aktualisiert; bis zum Abschluss kann die bisherige Einstellung gelten.",
+  "refundConsent.syncFailed": "Deine Auswahl ist gespeichert, aber wir konnten nicht bestätigen, ob die Datenweitergabe für Rückerstattungen eingeschaltet ist. Schalte die Weitergabe aus und erlaube sie erneut, um es noch einmal zu versuchen.",
   "refundConsent.withdraw": "Weitergabe ausschalten",
   "refundConsent.review": "Aktualisierte Bedingungen ansehen",
-  "aiConsent.findLinksOff": "KI ist für dieses Konto deaktiviert. Kontaktiere den Support, um deine Einstellung zu ändern.",
   "updates.title": "App-Updates",
   "updates.check": "Nach Updates suchen",
   "updates.checking": "Suche läuft…",
@@ -1053,6 +1053,8 @@
     "other": "%{formattedCount} neu"
   },
   "sharedLists.alsoAddTo": "Auch hinzufügen zu",
+  "sharedLists.alsoAddFull": "%{name} ist voll. Entferne einen Ort, um mehr hinzuzufügen.",
+  "sharedLists.alsoAddAlready": "Diese Orte sind schon auf %{name}.",
   "sharedLists.willSee": {
     "one": "%{name} sieht %{formattedCount} Ort",
     "other": "%{name} sieht diese %{formattedCount}"
@@ -1123,6 +1125,90 @@
   "sharedLists.startWithHint": "Wähle mindestens eine Stadt. Orte, die du dort schon gespeichert hast, kommen mit.",
   "sharedLists.cityPlaceholder": "Oder eine Stadt eingeben",
   "sharedLists.typedCity": "Von dir eingegeben",
+  "passport.wentNoDate": "Dort gewesen",
+  "passport.stampedTitle": "Gestempelt",
+  "passport.stampedBody": {
+    "one": "%{name} ist jetzt in deinem Pass. Bisher %{formattedCount} Ort.",
+    "other": "%{name} ist jetzt in deinem Pass. Bisher %{formattedCount} Orte."
+  },
+  "passport.stampInk": "%{city} · %{date}",
+  "passport.coverCredit": "Bild aus dem gespeicherten Beitrag",
+  "passport.removeStamp": "Stempel entfernen",
+  "passport.wantToGo": "Will hin",
+  "passport.title": "Pass",
+  "passport.yourPassport": "Dein Pass",
+  "passport.beenTitle": "Schon mal dort gewesen?",
+  "passport.beenBody": "Stemple Orte, an denen du schon warst",
+  "passport.beenSomewhere": "Schon irgendwo gewesen?",
+  "passport.rowCities": "%{places} · %{cities}",
+  "passport.placesCount": {
+    "one": "%{formattedCount} Ort",
+    "other": "%{formattedCount} Orte"
+  },
+  "passport.citiesCount": {
+    "one": "%{formattedCount} Stadt",
+    "other": "%{formattedCount} Städte"
+  },
+  "passport.places": "Orte",
+  "passport.cities": "Städte",
+  "passport.countries": "Länder",
+  "passport.elsewhere": "Anderswo",
+  "passport.coversCredit": "Bilder aus den gespeicherten Beiträgen",
+  "passport.pickBody": "Hake die Orte ab, an denen du schon warst, bevor du sie hier gespeichert hast.",
+  "passport.nothingToStamp": "Alle gespeicherten Orte sind schon in deinem Pass.",
+  "passport.pickNone": "Wähle die Orte, an denen du warst",
+  "passport.stampCount": {
+    "one": "%{formattedCount} Ort stempeln",
+    "other": "%{formattedCount} Orte stempeln"
+  },
+  "passport.cardKicker": "Raus aus dem Gruppenchat",
+  "passport.cardTitle": {
+    "one": "%{formattedCount} gespeicherter Ort, an dem wir endlich waren",
+    "other": "%{formattedCount} gespeicherte Orte, an denen wir endlich waren"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "one": "+%{formattedCount} weiterer",
+    "other": "+%{formattedCount} weitere"
+  },
+  "passport.cardSavedInstagram": "Auf Instagram gespeichert.",
+  "passport.cardSavedTiktok": "Auf TikTok gespeichert.",
+  "passport.cardSavedBoth": "Auf Instagram und TikTok gespeichert.",
+  "passport.cardSavedElsewhere": "Für später gespeichert.",
+  "passport.cardWent": "Mit Shelvr dort gewesen.",
+  "passport.shareCity": "%{city} teilen",
+  "passportShare.share": "Pass teilen",
+  "passportShare.stopSetting": "Meinen Pass nicht mehr teilen",
+  "passportShare.stopTitle": "Deinen Pass nicht mehr teilen?",
+  "passportShare.stopBody": "Alle Links, die du verschickt hast, funktionieren dann nicht mehr. Du kannst ihn jederzeit wieder teilen.",
+  "passportShare.stop": "Nicht mehr teilen",
+  "passportShare.title": "Der Pass von %{name}",
+  "passportShare.titleNoName": "Der Pass einer Freundin oder eines Freundes",
+  "passportShare.compare": "Mit meinem vergleichen",
+  "passportShare.deadTitle": "Dieser Pass wird nicht mehr geteilt",
+  "passportShare.deadBody": "Frag nach einem neuen Link oder starte deinen eigenen Pass in Shelvr.",
+  "passportShare.bothHeader": {
+    "one": "Ihr wart beide an %{formattedCount} Ort",
+    "other": "Ihr wart beide an %{formattedCount} Orten"
+  },
+  "passportShare.compareSub": "Nur du: %{onlyYou} · Nur %{name}: %{onlyThem}",
+  "passportShare.compareSubNoName": "Nur du: %{onlyYou} · Nur die andere Person: %{onlyThem}",
+  "passportShare.compareEmpty": "Stemple die Orte, an denen du warst, dann kannst du sie hier vergleichen.",
+  "passportShare.both": "Ihr beide",
+  "passportShare.onlyThem": "Nur %{name}",
+  "passportShare.onlyThemNoName": "Nur die andere Person",
+  "passportShare.onlyYou": "Nur du",
+  "passportShare.save": {
+    "one": "Den %{formattedCount} Ort speichern",
+    "other": "Die %{formattedCount} Orte speichern"
+  },
+  "passportShare.saved": {
+    "one": "%{formattedCount} Ort gespeichert",
+    "other": "%{formattedCount} Orte gespeichert"
+  },
+  "passportShare.savedNone": "Nichts Neues zu speichern",
+  "passportShare.fromFriend": "Aus dem Pass von %{name}",
+  "passportShare.fromFriendNoName": "Aus dem Pass einer befreundeten Person",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "one": "Noch %{formattedCount} kostenlose Speicherung",

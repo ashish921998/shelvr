@@ -249,12 +249,19 @@ describe("linkPlaceFor and tallyFor", () => {
     expect(tallyFor(chain, south, all)).toBeUndefined();
   });
 
-  it("matches neither of two same-name pins from one save", () => {
+  it("matches both same-name branches of one save to the one place the link holds for them", () => {
     const first = pin("Starbucks", "save-1", 30.4);
     const second = pin("Starbucks", "save-1", 30.5);
-    const chain = voteLink({ voters: 1, places: [place("p0", first)] });
-    expect(linkPlaceFor(chain, first, [first, second])).toBeUndefined();
-    expect(linkPlaceFor(chain, second, [first, second])).toBeUndefined();
+    const chain = voteLink({
+      voters: 1,
+      places: [place("p0", first, { picks: 1 })],
+    });
+    expect(linkPlaceFor(chain, first, [first, second])?.key).toBe("p0");
+    expect(linkPlaceFor(chain, second, [first, second])?.key).toBe("p0");
+    expect(tallyFor(chain, second, [first, second])).toEqual({
+      picks: 1,
+      passes: 0,
+    });
   });
 
   it("has no tally off the link, before any vote, or without a link", () => {
@@ -302,6 +309,13 @@ describe("sameShortlist", () => {
 
   it("is false when one place is chosen twice", () => {
     expect(sameShortlist(link, [jo, jo], pins)).toBe(false);
+  });
+
+  it("counts two same-name branches of one save as the link's one place for them", () => {
+    const first = pin("Starbucks", "save-1", 30.4);
+    const second = pin("Starbucks", "save-1", 30.5);
+    const chain = voteLink({ places: [place("p0", first)] });
+    expect(sameShortlist(chain, [first, second], [first, second])).toBe(true);
   });
 });
 

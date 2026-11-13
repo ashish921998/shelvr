@@ -1,13 +1,7 @@
 import { v } from "convex/values";
-import { internal } from "./_generated/api";
-import {
-  internalMutation,
-  internalQuery,
-  type QueryCtx,
-} from "./_generated/server";
+import { internalQuery, type QueryCtx } from "./_generated/server";
 import { AI_CONSENT_VERSION } from "./model/aiConsent";
 import { liveOwner, authedMutation, authedQuery } from "./model/auth";
-import { CURRENT_EMBEDDING_VERSION } from "./model/embedding";
 
 async function consentRow(ctx: QueryCtx, userId: string) {
   return await ctx.db
@@ -73,53 +67,6 @@ export const setConsent = authedMutation({
       await ctx.db.insert("aiConsents", { userId, ...values });
     } else {
       await ctx.db.patch(row._id, values);
-    }
-    // A first answer always syncs: an account with no row may hold vectors from
-    // before unanswered counted as declined, and needs them cleared or refreshed.
-    if (row === null || (row.status === "granted") !== args.granted) {
-      await ctx.scheduler.runAfter(0, internal.aiConsent.syncEmbeddings, {
-        userId,
-        cursor: null,
-      });
-    }
-    return null;
-  },
-});
-
-const SYNC_BATCH = 50;
-
-export const syncEmbeddings = internalMutation({
-  args: { userId: v.string(), cursor: v.union(v.string(), v.null()) },
-  returns: v.null(),
-  handler: async (ctx, args) => {
-    const allowed = await aiAllowed(ctx, args.userId);
-    const { page, isDone, continueCursor } = await ctx.db
-      .query("items")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
-      .paginate({ numItems: SYNC_BATCH, cursor: args.cursor });
-    for (const item of page) {
-      if (allowed) {
-        if (item.embedding === undefined && item.embeddingVersion !== undefined)
-          await ctx.db.patch(item._id, {
-            embeddingVersion: undefined,
-            embeddingAttempts: undefined,
-          });
-      } else if (
-        item.embedding !== undefined ||
-        item.embeddingVersion !== CURRENT_EMBEDDING_VERSION
-      ) {
-        await ctx.db.patch(item._id, {
-          embedding: undefined,
-          embeddingVersion: CURRENT_EMBEDDING_VERSION,
-          embeddingAttempts: undefined,
-        });
-      }
-    }
-    if (!isDone) {
-      await ctx.scheduler.runAfter(0, internal.aiConsent.syncEmbeddings, {
-        userId: args.userId,
-        cursor: continueCursor,
-      });
     }
     return null;
   },

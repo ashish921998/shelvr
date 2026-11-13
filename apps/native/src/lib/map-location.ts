@@ -1,6 +1,7 @@
 import { analytics } from "@/lib/analytics";
 import { getPermissionsAsync, requestPermissionsAsync } from "expo-maps";
 import { useEffect, useState } from "react";
+import { AppState } from "react-native";
 
 type MapLocation = "asking" | "granted" | "denied";
 
@@ -16,19 +17,34 @@ export function useMapLocation(opened: boolean): MapLocation {
   useEffect(() => {
     if (process.env.EXPO_OS !== "ios" || !opened) return;
     let live = true;
-    void (async () => {
+    let latest = 0;
+    let asking = false;
+    const read = async (ask: boolean) => {
+      if (asking) return;
+      asking = ask;
+      const id = ++latest;
       try {
         let permission = await getPermissionsAsync();
-        if (!permission.granted && permission.canAskAgain)
+        if (!live || id !== latest) return;
+        if (ask && !permission.granted && permission.canAskAgain)
           permission = await requestPermissionsAsync();
-        if (live) setState(permission.granted ? "granted" : "denied");
+        if (live && id === latest)
+          setState(permission.granted ? "granted" : "denied");
       } catch (error) {
+        if (!live || id !== latest) return;
         analytics.captureError("map_location_failed", error);
-        if (live) setState("denied");
+        setState("denied");
+      } finally {
+        if (ask) asking = false;
       }
-    })();
+    };
+    void read(true);
+    const listener = AppState.addEventListener("change", (appState) => {
+      if (appState === "active") void read(false);
+    });
     return () => {
       live = false;
+      listener.remove();
     };
   }, [opened]);
   return state;

@@ -1,10 +1,19 @@
 // @vitest-environment edge-runtime
 /// <reference types="vite/client" />
 import type { FunctionArgs, FunctionReference } from "convex/server";
-import { describe, expect, expectTypeOf, it } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  expectTypeOf,
+  it,
+  vi,
+} from "vitest";
 
-import { newConvexTest, signedInUser } from "./test.setup";
-import { api } from "./_generated/api";
+import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
+import { newConvexTest, setTestConsent, signedInUser } from "./test.setup";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { visitMatcher } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
@@ -520,5 +529,1069 @@ describe("listVisits", () => {
       { key: "caffedante", name: "Caffé Dante" },
     ]);
     expect(await other.t.query(api.placeVisits.listVisits, {})).toEqual([]);
+  });
+});
+
+async function testKey(): Promise<string> {
+  const pair = await crypto.subtle.generateKey(
+    { name: "ECDSA", namedCurve: "P-256" },
+    true,
+    ["sign", "verify"],
+  );
+  const der = new Uint8Array(
+    await crypto.subtle.exportKey("pkcs8", pair.privateKey),
+  );
+  return btoa(String.fromCharCode(...der));
+}
+
+async function withMaps(failures = 0) {
+  let failed = 0;
+  vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+  vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+  vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+  const fetchMock = vi.fn(async (input: string) => {
+    const url = new URL(input);
+    if (url.pathname === "/v1/token") {
+      return Response.json({ accessToken: "maps", expiresInSeconds: 1800 });
+    }
+    if (failed < failures) {
+      failed += 1;
+      return new Response("busy", { status: 429 });
+    }
+    return Response.json({
+      results: [{ country: "Portugal", countryCode: "pt" }],
+    });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return () =>
+    fetchMock.mock.calls.filter(
+      ([input]) => new URL(input).pathname === "/v1/reverseGeocode",
+    ).length;
+}
+
+const PIN = { name: "Tigre", lat: 38.71, lng: -9.14 };
+
+async function passportSetup(options: { pro?: boolean } = {}) {
+  const backend = newConvexTest();
+  const { t, userId } = await signedInUser(backend, {
+    pro: options.pro ?? true,
+  });
+  const itemId = await t.run(async (ctx) =>
+    ctx.db.insert("items", {
+      userId,
+      type: "link",
+      status: "ready",
+      title: "Tigre",
+      tags: [],
+      searchText: "Tigre",
+      cities: ["Lisbon"],
+      heroImageUrl: "https://example.com/tigre.jpg",
+      placePins: [PIN],
+    }),
+  );
+  const visits = () =>
+    t.run(async (ctx) =>
+      ctx.db
+        .query("placeVisits")
+        .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
+        .collect(),
+    );
+  const stamps = () => t.query(api.placeVisits.getPassport, {});
+  return { backend, t, userId, itemId, visits, stamps };
+}
+
+async function settle(
+  t: Awaited<ReturnType<typeof passportSetup>>["t"],
+  run: () => Promise<unknown>,
+) {
+  await run();
+  await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
+}
+
+describe("the passport", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.useRealTimers();
+  });
+
+  it("takes back a stamp after its save is deleted, and only the caller's", async () => {
+    const { backend, t, itemId, visits, stamps } = await passportSetup();
+    const other = await signedInUser(backend, { pro: true });
+    const spot = { lat: PIN.lat, lng: PIN.lng };
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: true,
+      spot,
+    });
+    await t.run((ctx) => ctx.db.delete(itemId));
+    expect(await stamps()).toHaveLength(1);
+
+    await other.t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+      spot,
+    });
+    expect(await visits()).toHaveLength(1);
+
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+      spot,
+    });
+    expect(await visits()).toEqual([]);
+    expect(await stamps()).toEqual([]);
+    await expect(
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    ).rejects.toThrow("Item not found");
+  });
+
+  it("takes back one branch of an old stamp and keeps the other", async () => {
+    const { t, userId, itemId, visits, stamps } = await passportSetup();
+    const first = { lat: PIN.lat, lng: PIN.lng };
+    const second = { lat: 41.15, lng: -8.61 };
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        stampPlaces: [
+          { ...first, city: "Lisbon", countryCode: "PT" },
+          { ...second, city: "Porto", countryCode: "PT" },
+        ],
+      });
+      await ctx.db.delete(itemId);
+    });
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+      spot: first,
+    });
+    expect(await visits()).toHaveLength(1);
+    expect(await stamps()).toMatchObject([{ ...second, city: "Porto" }]);
+  });
+
+  it("unmarks an old stamp by name after its save is deleted", async () => {
+    const { t, userId, itemId, visits } = await passportSetup();
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        stampPlaces: [{ lat: PIN.lat, lng: PIN.lng, city: "Lisbon" }],
+      });
+      await ctx.db.delete(itemId);
+    });
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+    });
+    expect(await visits()).toEqual([]);
+  });
+
+  it("keeps a stored branch the save no longer pins when another is cleared", async () => {
+    const { t, userId, itemId, visits, stamps } = await passportSetup();
+    const second = { name: "Tigre", lat: 41.15, lng: -8.61 };
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        stampPlaces: [
+          { lat: PIN.lat, lng: PIN.lng, city: "Lisbon" },
+          { lat: second.lat, lng: second.lng, city: "Porto" },
+        ],
+      });
+    });
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+      spot: { lat: PIN.lat, lng: PIN.lng },
+    });
+    expect(await visits()).toHaveLength(1);
+    expect(await stamps()).toMatchObject([
+      { lat: second.lat, lng: second.lng, city: "Porto" },
+    ]);
+  });
+
+  it("keeps a stored stamp in the passport after the save drops its pin", async () => {
+    await withMaps();
+    const { t, userId, itemId, stamps } = await passportSetup();
+    const second = { lat: 41.15, lng: -8.61 };
+    await t.run((ctx) =>
+      ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        stampPlaces: [
+          { lat: PIN.lat, lng: PIN.lng, city: "Lisbon", countryCode: "PT" },
+          { ...second, city: "Porto", countryCode: "PT" },
+        ],
+      }),
+    );
+    await settle(t, () =>
+      t.mutation(internal.placeVisits.backfillCountries, { cursor: null }),
+    );
+    expect(await stamps()).toMatchObject([
+      { lat: PIN.lat, lng: PIN.lng, city: "Lisbon" },
+      { ...second, city: "Porto" },
+    ]);
+  });
+
+  it("still lists every stamp when its saves are too large to read", async () => {
+    const { t, userId, stamps } = await passportSetup();
+    const count = 50;
+    await t.run(async (ctx) => {
+      for (let i = 0; i < count; i++) {
+        const spot = { lat: 38 + i / 100, lng: -9 };
+        const itemId = await ctx.db.insert("items", {
+          userId,
+          type: "link",
+          status: "ready",
+          title: `Place ${i}`,
+          tags: [],
+          searchText: "x".repeat(100_000),
+          cities: ["Lisbon"],
+          heroImageUrl: "https://example.com/cover.jpg",
+          placePins: [{ name: `Place ${i}`, ...spot }],
+        });
+        await ctx.db.insert("placeVisits", {
+          userId,
+          key: placeKey(`Place ${i}`),
+          name: `Place ${i}`,
+          itemId,
+          visitedAt: i + 1,
+          spots: [spot],
+          stampPlaces: [{ ...spot, city: "Lisbon", countryCode: "PT" }],
+        });
+      }
+    });
+    const listed = await stamps();
+    expect(listed).toHaveLength(count);
+    expect(listed.every((stamp) => stamp.countryCode === "PT")).toBe(true);
+    expect(listed[0]?.cover).toBe("https://example.com/cover.jpg");
+    expect(listed.at(-1)?.cover).toBeNull();
+  });
+
+  it("backfills the pin and country of a mark made before the Passport", async () => {
+    const lookups = await withMaps();
+    const { t, userId, itemId, stamps } = await passportSetup();
+    await t.run((ctx) =>
+      ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+      }),
+    );
+    await settle(t, () =>
+      t.mutation(internal.placeVisits.backfillCountries, { cursor: null }),
+    );
+    expect(await stamps()).toMatchObject([
+      { lat: PIN.lat, lng: PIN.lng, city: "Lisbon", countryCode: "PT" },
+    ]);
+    expect(lookups()).toBe(1);
+  });
+
+  it("finds the pin of an old mark whose name was cut short", async () => {
+    await withMaps();
+    const { t, userId, itemId, stamps } = await passportSetup();
+    const long = `Tigre ${"x".repeat(120)}`;
+    await t.run(async (ctx) => {
+      await ctx.db.patch(itemId, { placePins: [{ ...PIN, name: long }] });
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: placeKey(long),
+        name: long.slice(0, MAX_PLACE_NAME_CHARS),
+        itemId,
+        visitedAt: 1,
+      });
+    });
+    await settle(t, () =>
+      t.mutation(internal.placeVisits.backfillCountries, { cursor: null }),
+    );
+    expect(await stamps()).toMatchObject([{ lat: PIN.lat, countryCode: "PT" }]);
+  });
+
+  it("keeps an old mark's city and country after its save is deleted", async () => {
+    await withMaps();
+    const { t, userId, itemId, visits, stamps } = await passportSetup();
+    await t.run((ctx) =>
+      ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+      }),
+    );
+    await settle(t, () =>
+      t.mutation(internal.placeVisits.backfillCountries, { cursor: null }),
+    );
+    await t.run((ctx) => ctx.db.delete(itemId));
+    await settle(t, () =>
+      t.mutation(internal.placeVisits.backfillCountries, { cursor: null }),
+    );
+    expect((await visits())[0].stampPlaces).toMatchObject([
+      { lat: PIN.lat, city: "Lisbon", countryCode: "PT" },
+    ]);
+    expect(await stamps()).toMatchObject([
+      { lat: PIN.lat, city: "Lisbon", countryCode: "PT" },
+    ]);
+  });
+
+  it("leaves a deleting account's marks alone in the backfill", async () => {
+    const lookups = await withMaps();
+    const { t, userId, itemId, visits } = await passportSetup();
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+      });
+      await ctx.db.patch(userId, { deleting: true });
+    });
+    await settle(t, () =>
+      t.mutation(internal.placeVisits.backfillCountries, { cursor: null }),
+    );
+    expect((await visits())[0].stampPlaces).toBeUndefined();
+    expect(lookups()).toBe(0);
+  });
+
+  it("keeps the pin, city and country of a place marked I went", async () => {
+    const lookups = await withMaps();
+    const { backend, t, itemId, visits, stamps } = await passportSetup();
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    expect(await stamps()).toMatchObject([
+      { lat: PIN.lat, lng: PIN.lng, city: "Lisbon", countryCode: "PT" },
+    ]);
+    expect((await visits())[0]?.backfilled).toBeUndefined();
+
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    expect(lookups()).toBe(1);
+    expect(await stamps()).toMatchObject([{ countryCode: "PT" }]);
+  });
+
+  it("stamps the city of the pin a city page marks, and keeps the same name elsewhere unstamped", async () => {
+    await withMaps();
+    const { backend, t, userId, itemId, stamps } = await passportSetup();
+    await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Tigre Porto",
+        tags: [],
+        searchText: "Tigre",
+        cities: ["Porto"],
+        placePins: [{ ...PIN, lat: 41.15, lng: -8.61 }],
+      }),
+    );
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+        spot: { lat: PIN.lat, lng: PIN.lng },
+      }),
+    );
+    expect(await stamps()).toMatchObject([
+      { lat: PIN.lat, city: "Lisbon", countryCode: "PT" },
+    ]);
+    expect(
+      await t.query(api.placeVisits.listUnstampedPlaces, {}),
+    ).toMatchObject([{ name: "Tigre", city: "Porto" }]);
+  });
+
+  it("tries a failed country lookup again, and gives up after three", async () => {
+    const lookups = await withMaps(1);
+    const { backend, t, itemId, stamps } = await passportSetup();
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    expect(lookups()).toBe(2);
+    expect(await stamps()).toMatchObject([{ countryCode: "PT" }]);
+
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+    });
+    const failing = await withMaps(10);
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.markVisitedBefore, {
+        places: [{ itemId, name: "Tigre" }],
+      }),
+    );
+    expect(failing()).toBe(3);
+  });
+
+  it("asks Apple nothing for someone who declined AI", async () => {
+    const lookups = await withMaps();
+    const { backend, t, userId, itemId, stamps } = await passportSetup();
+    await backend.run((ctx) => setTestConsent(ctx, userId, "declined"));
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    expect(lookups()).toBe(0);
+    expect(await stamps()).toMatchObject([{ city: "Lisbon" }]);
+    expect((await stamps())[0]?.countryCode).toBeUndefined();
+  });
+
+  it("drops a country found for a point the visit no longer has", async () => {
+    const { t, itemId, visits, stamps } = await passportSetup();
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: true,
+    });
+    const [visit] = await visits();
+    await t.mutation(internal.placeVisits.storeCountry, {
+      visitId: visit!._id,
+      lat: 1,
+      lng: 2,
+      countryCode: "ES",
+    });
+    expect((await stamps())[0]?.countryCode).toBeUndefined();
+  });
+
+  it("keeps a stamp's country when its save's pin moves a little", async () => {
+    const lookups = await withMaps();
+    const { t, userId, itemId, stamps } = await passportSetup();
+    const moved = { ...PIN, lat: PIN.lat + 0.0005 };
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        stampPlaces: [
+          { lat: PIN.lat, lng: PIN.lng, city: "Lisbon", countryCode: "PT" },
+        ],
+      });
+      await ctx.db.patch(itemId, { placePins: [moved] });
+    });
+    expect(await stamps()).toMatchObject([
+      { lat: moved.lat, countryCode: "PT" },
+    ]);
+    await settle(t, () =>
+      t.mutation(internal.placeVisits.backfillCountries, { cursor: null }),
+    );
+    expect(await stamps()).toMatchObject([
+      { lat: moved.lat, city: "Lisbon", countryCode: "PT" },
+    ]);
+    expect(lookups()).toBe(0);
+  });
+
+  it("looks up a nearby branch's country instead of copying another branch's", async () => {
+    const lookups = await withMaps();
+    const { t, userId, itemId, visits } = await passportSetup();
+    const branch = { ...PIN, lat: PIN.lat + 0.001 };
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        spots: [{ lat: PIN.lat, lng: PIN.lng }],
+        stampPlaces: [
+          { lat: PIN.lat, lng: PIN.lng, city: "Lisbon", countryCode: "ES" },
+        ],
+      });
+      await ctx.db.patch(itemId, { placePins: [PIN, branch] });
+    });
+    await settle(t, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+        spot: { lat: branch.lat, lng: branch.lng },
+      }),
+    );
+    const [visit] = await visits();
+    expect(visit?.stampPlaces).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ lat: PIN.lat, countryCode: "ES" }),
+        expect.objectContaining({ lat: branch.lat, countryCode: "PT" }),
+      ]),
+    );
+    expect(lookups()).toBe(1);
+  });
+
+  it("looks up the country of a moved stamp that has none", async () => {
+    const lookups = await withMaps();
+    const { t, userId, itemId, visits } = await passportSetup();
+    const moved = { ...PIN, lat: PIN.lat + 0.0005 };
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        stampPlaces: [{ lat: PIN.lat, lng: PIN.lng, city: "Lisbon" }],
+      });
+      await ctx.db.patch(itemId, { placePins: [moved] });
+    });
+    await settle(t, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    const [visit] = await visits();
+    expect(visit?.stampPlaces).toEqual([
+      { lat: moved.lat, lng: moved.lng, city: "Lisbon", countryCode: "PT" },
+    ]);
+    expect(lookups()).toBe(1);
+  });
+
+  it("gives a branch marked next to a cleared one its own country", async () => {
+    const lookups = await withMaps();
+    const { t, userId, itemId, visits } = await passportSetup();
+    const near = { ...PIN, lat: PIN.lat + 0.001 };
+    const far = { ...PIN, lat: PIN.lat + 0.05 };
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        spots: [
+          { lat: PIN.lat, lng: PIN.lng },
+          { lat: far.lat, lng: far.lng },
+        ],
+        stampPlaces: [
+          { lat: PIN.lat, lng: PIN.lng, city: "Lisbon", countryCode: "ES" },
+          { lat: far.lat, lng: far.lng, city: "Lisbon", countryCode: "ES" },
+        ],
+      });
+      await ctx.db.patch(itemId, { placePins: [PIN, near, far] });
+    });
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+      spot: { lat: PIN.lat, lng: PIN.lng },
+    });
+    await settle(t, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+        spot: { lat: near.lat, lng: near.lng },
+      }),
+    );
+    const [visit] = await visits();
+    expect(visit?.stampPlaces).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ lat: far.lat, countryCode: "ES" }),
+        expect.objectContaining({ lat: near.lat, countryCode: "PT" }),
+      ]),
+    );
+    expect(visit?.stampPlaces).toHaveLength(2);
+    expect(lookups()).toBe(1);
+  });
+
+  it("keeps a corrected branch's own country when a nearby branch is cleared", async () => {
+    const { t, userId, itemId, visits } = await passportSetup();
+    const oldBranch = { lat: PIN.lat + 0.0018, lng: PIN.lng };
+    const corrected = { ...PIN, lat: PIN.lat + 0.00045 };
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        stampPlaces: [
+          { lat: PIN.lat, lng: PIN.lng, city: "Lisbon", countryCode: "ES" },
+          { ...oldBranch, city: "Lisbon", countryCode: "FR" },
+        ],
+      });
+      await ctx.db.patch(itemId, { placePins: [PIN, corrected] });
+    });
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+      spot: { lat: PIN.lat, lng: PIN.lng },
+    });
+    const [visit] = await visits();
+    expect(visit?.stampPlaces).toEqual([
+      expect.objectContaining({ countryCode: "FR" }),
+    ]);
+  });
+
+  it("lets a surviving branch keep a nearby stamp the cleared branch had taken", async () => {
+    const { t, userId, itemId, visits } = await passportSetup();
+    const second = { lat: PIN.lat + 0.0018, lng: PIN.lng };
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        spots: [{ lat: PIN.lat, lng: PIN.lng }, second],
+        stampPlaces: [
+          { lat: PIN.lat + 0.0009, lng: PIN.lng, countryCode: "FR" },
+          { lat: PIN.lat - 0.0018, lng: PIN.lng, countryCode: "ES" },
+        ],
+      });
+    });
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: false,
+      spot: { lat: PIN.lat, lng: PIN.lng },
+    });
+    const [visit] = await visits();
+    expect(visit?.spots).toEqual([second]);
+    expect(visit?.stampPlaces).toEqual([
+      expect.objectContaining({ countryCode: "FR" }),
+    ]);
+  });
+
+  it("stores no country once the account is being deleted", async () => {
+    const { t, userId, itemId, visits } = await passportSetup();
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: true,
+    });
+    const [visit] = await visits();
+    await t.run((ctx) => ctx.db.patch(userId, { deleting: true }));
+    await t.mutation(internal.placeVisits.storeCountry, {
+      visitId: visit!._id,
+      lat: PIN.lat,
+      lng: PIN.lng,
+      countryCode: "PT",
+    });
+    const [after] = await visits();
+    expect(after?.stampPlaces?.[0]?.countryCode).toBeUndefined();
+  });
+
+  it("counts an old stamp once after its save's pin is corrected", async () => {
+    const { t, userId, itemId, stamps } = await passportSetup();
+    await t.run(async (ctx) => {
+      await ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+        stampPlaces: [{ lat: PIN.lat, lng: PIN.lng, city: "Lisbon" }],
+      });
+      await ctx.db.patch(itemId, {
+        placePins: [{ ...PIN, lat: PIN.lat + 0.0005 }],
+      });
+    });
+    expect(await stamps()).toHaveLength(1);
+  });
+
+  it("marks places from before Shelvr without a date, in one go, past the single-mark limit", async () => {
+    const { t, itemId, visits } = await passportSetup();
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Tigre",
+      visited: true,
+    });
+    const [kept] = await visits();
+    const names = Array.from({ length: 30 }, (_, i) => `Spot ${i + 1}`);
+    const count = await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [...names, "Tigre", "spot 1"].map((name) => ({ itemId, name })),
+    });
+    expect(count).toBe(31);
+    const all = await visits();
+    expect(all).toHaveLength(31);
+    expect(all.find((visit) => visit.key === "tigre")).toEqual(kept);
+    expect(
+      all
+        .filter((visit) => visit.key !== "tigre")
+        .every((visit) => visit.backfilled),
+    ).toBe(true);
+  });
+
+  it("stamps one name once in each city a batch marks it in", async () => {
+    const { t, userId, itemId, stamps } = await passportSetup();
+    const porto = await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Tigre Porto",
+        tags: [],
+        searchText: "Tigre",
+        cities: ["Porto"],
+        placePins: [{ ...PIN, lat: 41.15, lng: -8.61 }],
+      }),
+    );
+    await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [
+        { itemId, name: "Tigre" },
+        { itemId: porto, name: "tigre" },
+      ],
+    });
+    expect(await stamps()).toMatchObject([
+      { key: "tigre", city: "Lisbon" },
+      { key: "tigre", city: "Porto" },
+    ]);
+  });
+
+  it("waits for the shared budget, then finds the country", async () => {
+    const lookups = await withMaps();
+    const { backend, t, itemId, stamps } = await passportSetup();
+    await backend.run((ctx) =>
+      rateLimiter.limit(ctx, "visitCountryGlobal", { count: 100 }),
+    );
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    expect(lookups()).toBe(1);
+    expect(await stamps()).toMatchObject([
+      { city: "Lisbon", countryCode: "PT" },
+    ]);
+  });
+
+  it("spends no shared budget for someone who declined AI", async () => {
+    await withMaps();
+    const { backend, t, userId, itemId } = await passportSetup();
+    await backend.run((ctx) => setTestConsent(ctx, userId, "declined"));
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    const left = await backend.run((ctx) =>
+      rateLimiter.check(ctx, "visitCountryGlobal", { count: 100 }),
+    );
+    expect(left.ok).toBe(true);
+  });
+
+  it("refuses a batch over another user's save, and marks nothing", async () => {
+    const { backend, itemId } = await passportSetup();
+    const other = await signedInUser(backend, { pro: true });
+    const ownItem = await other.t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId: other.userId,
+        type: "link",
+        status: "ready",
+        title: "Tigre",
+        tags: [],
+        searchText: "Tigre",
+        placePins: [PIN],
+      }),
+    );
+    await expect(
+      other.t.mutation(api.placeVisits.markVisitedBefore, {
+        places: [
+          { itemId: ownItem, name: "Tigre" },
+          { itemId, name: "Tigre" },
+        ],
+      }),
+    ).rejects.toThrow("Item not found");
+    expect(
+      await other.t.run((ctx) =>
+        ctx.db
+          .query("placeVisits")
+          .withIndex("by_user_and_visited", (q) => q.eq("userId", other.userId))
+          .take(5),
+      ),
+    ).toEqual([]);
+  });
+
+  it("keeps a visit's pin and country when a save without that pin marks it again", async () => {
+    await withMaps();
+    const { backend, t, userId, itemId, stamps } = await passportSetup();
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    const bare = await t.run(async (ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Tigre again",
+        tags: [],
+        searchText: "Tigre",
+      }),
+    );
+    await t.mutation(api.placeVisits.setVisited, {
+      itemId: bare,
+      name: "Tigre",
+      visited: true,
+    });
+    expect(await stamps()).toMatchObject([
+      { itemId, lat: PIN.lat, city: "Lisbon", countryCode: "PT" },
+    ]);
+  });
+
+  it("finds the country past a malformed result", async () => {
+    vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
+    vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
+    vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) =>
+        new URL(input).pathname === "/v1/token"
+          ? Response.json({ accessToken: "maps", expiresInSeconds: 1800 })
+          : Response.json({
+              results: [{ countryCode: "PRT" }, { countryCode: "pt" }],
+            }),
+      ),
+    );
+    const { backend, t, itemId, stamps } = await passportSetup();
+    await settle(backend, () =>
+      t.mutation(api.placeVisits.setVisited, {
+        itemId,
+        name: "Tigre",
+        visited: true,
+      }),
+    );
+    expect(await stamps()).toMatchObject([{ countryCode: "PT" }]);
+  });
+
+  it("lists stamps newest first with covers, and pins old plan marks from their save", async () => {
+    const { t, userId, itemId } = await passportSetup();
+    await t.run((ctx) =>
+      ctx.db.insert("placeVisits", {
+        userId,
+        key: "tigre",
+        name: "Tigre",
+        itemId,
+        visitedAt: 1,
+      }),
+    );
+    await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [{ itemId, name: "Cervejaria" }],
+    });
+    expect(await t.query(api.placeVisits.getPassport, {})).toEqual([
+      expect.objectContaining({
+        key: "cervejaria",
+        backfilled: true,
+        cover: "https://example.com/tigre.jpg",
+      }),
+      expect.objectContaining({
+        key: "tigre",
+        lat: PIN.lat,
+        lng: PIN.lng,
+        city: "Lisbon",
+        cover: "https://example.com/tigre.jpg",
+      }),
+    ]);
+  });
+
+  it("names the app a stamp's reel was saved from", async () => {
+    const { t, itemId } = await passportSetup();
+    const app = async (url: string) => {
+      await t.run((ctx) => ctx.db.patch(itemId, { url }));
+      const [stamp] = await t.query(api.placeVisits.getPassport, {});
+      return stamp.source;
+    };
+    await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [{ itemId, name: "Tigre" }],
+    });
+    expect(await app("https://www.instagram.com/reel/abc/")).toBe("instagram");
+    expect(await app("https://www.tiktok.com/@a/video/123")).toBe("tiktok");
+    expect(await app("https://www.youtube.com/watch?v=abcdefghijk")).toBe(
+      undefined,
+    );
+  });
+
+  it("lists unstamped places with a city, newest save first, once each", async () => {
+    const { t, userId, itemId } = await passportSetup();
+    const newer = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Porto and Lisbon",
+        tags: [],
+        searchText: "Porto and Lisbon",
+        cities: ["Porto", "Lisbon"],
+        placePins: [
+          { name: "Majestic", lat: 41.15, lng: -8.61, city: "Porto" },
+          { name: "Somewhere", lat: 40, lng: -8 },
+          { name: "Tigre", lat: PIN.lat, lng: PIN.lng, city: "Lisbon" },
+        ],
+      }),
+    );
+    await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [{ itemId, name: "Majestic" }],
+    });
+
+    expect(await t.query(api.placeVisits.listUnstampedPlaces, {})).toEqual([
+      {
+        itemId: newer,
+        name: "Tigre",
+        city: "Lisbon",
+        spot: { lat: PIN.lat, lng: PIN.lng },
+        title: "Porto and Lisbon",
+        cover: null,
+      },
+    ]);
+  });
+
+  it("lists a name once per city, with its own pin's city", async () => {
+    const { t, userId, stamps } = await passportSetup();
+    const save = (city: string, lat: number) =>
+      t.run((ctx) =>
+        ctx.db.insert("items", {
+          userId,
+          type: "link",
+          status: "ready",
+          title: city,
+          tags: [],
+          searchText: city,
+          cities: ["Lisbon", "Porto"],
+          placePins: [
+            { name: "Cafe Uno", lat: lat + 1, lng: -8 },
+            { name: "Cafe Uno", lat, lng: -8, city },
+          ],
+        }),
+      );
+    const porto = await save("Porto", 41.15);
+    const newer = await save("Lisbon", 38.7);
+
+    const rows = await t.query(api.placeVisits.listUnstampedPlaces, {});
+    expect(rows.filter((row) => row.name === "Cafe Uno")).toEqual([
+      {
+        itemId: newer,
+        name: "Cafe Uno",
+        city: "Lisbon",
+        spot: { lat: 38.7, lng: -8 },
+        title: "Lisbon",
+        cover: null,
+      },
+      {
+        itemId: porto,
+        name: "Cafe Uno",
+        city: "Porto",
+        spot: { lat: 41.15, lng: -8 },
+        title: "Porto",
+        cover: null,
+      },
+    ]);
+
+    await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [{ itemId: newer, name: "Cafe Uno" }],
+    });
+    expect(await stamps()).toContainEqual(
+      expect.objectContaining({ lat: 38.7, city: "Lisbon" }),
+    );
+    expect(
+      (await t.query(api.placeVisits.listUnstampedPlaces, {}))
+        .filter((row) => row.name === "Cafe Uno")
+        .map((row) => row.city),
+    ).toEqual(["Porto"]);
+  });
+
+  it("marks only the branch picked when one save has two of the same name", async () => {
+    const { t, userId, stamps } = await passportSetup();
+    const both = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "ready",
+        title: "Cafe Uno twice",
+        tags: [],
+        searchText: "Cafe Uno",
+        cities: ["Lisbon", "Porto"],
+        placePins: [
+          { name: "Cafe Uno", lat: 38.7, lng: -9.1, city: "Lisbon" },
+          { name: "Cafe Uno", lat: 41.15, lng: -8.6, city: "Porto" },
+        ],
+      }),
+    );
+    const listed = (
+      await t.query(api.placeVisits.listUnstampedPlaces, {})
+    ).filter((row) => row.name === "Cafe Uno");
+    const lisbon = listed.find((row) => row.city === "Lisbon")!;
+    await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [{ itemId: both, name: lisbon.name, spot: lisbon.spot }],
+    });
+    expect(
+      (await stamps()).filter((stamp) => stamp.name === "Cafe Uno"),
+    ).toMatchObject([{ city: "Lisbon", lat: 38.7 }]);
+    expect(
+      (await t.query(api.placeVisits.listUnstampedPlaces, {}))
+        .filter((row) => row.name === "Cafe Uno")
+        .map((row) => row.city),
+    ).toEqual(["Porto"]);
+  });
+
+  it("reads a pin's empty city as the save's own city, in the list and the stamp", async () => {
+    const { t, itemId, stamps } = await passportSetup();
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, { placePins: [{ ...PIN, city: "" }] }),
+    );
+
+    const rows = await t.query(api.placeVisits.listUnstampedPlaces, {});
+    expect(rows).toMatchObject([{ name: "Tigre", city: "Lisbon" }]);
+
+    await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [{ itemId, name: "Tigre" }],
+    });
+    expect(await stamps()).toMatchObject([{ city: "Lisbon" }]);
   });
 });

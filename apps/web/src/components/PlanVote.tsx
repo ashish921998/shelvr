@@ -84,6 +84,17 @@ function storeIfNewer(key: string, ballot: Ballot) {
   storeQuietly(key, ballot);
 }
 
+function newestChoices(
+  own: Ballot,
+  stored: readonly (Ballot | undefined)[],
+): Choices {
+  let newest = own;
+  for (const ballot of stored) {
+    if (ballot && ballot.revision > newest.revision) newest = ballot;
+  }
+  return newest.choices;
+}
+
 function nextRevision(last: { current: number }): number {
   last.current = Math.max(Date.now(), last.current + 1);
   return last.current;
@@ -237,7 +248,11 @@ export default function PlanVote({
   };
 
   const onName = (value: string) => {
-    const current = pending.current?.choices ?? choices;
+    const current = newestChoices(
+      pending.current ?? { choices, revision: lastRevision.current },
+      [storedBallot(savedKey(token)), storedBallot(pendingKey(token))],
+    );
+    if (current !== (pending.current?.choices ?? choices)) setChoices(current);
     const withVotes = Object.keys(current).length > 0;
     setTyped(value);
     nameRef.current = value;

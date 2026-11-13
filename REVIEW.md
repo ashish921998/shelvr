@@ -110,7 +110,8 @@ Backend (`apps/native/convex`):
       Public actions get the user through the internal function they run. No `userId`
       argument from the client. Code acting for an account checks `liveOwner`.
 - [ ] Pro features call `requireProEntitlement`. New link or note saves go through
-      `createLinkOrNote`, whose `claimSave` counts free saves.
+      `createLinkOrNote`, or `createReadyPlaceSave` for a place save that is ready without
+      a processing run. Both call `claimSave`, which counts free saves.
 - [ ] Content sent to Gemini, SerpAPI or Treg is checked with `aiAllowed` /
       `internal.aiConsent.isAllowed` first. New accounts default to AI on; never call that
       collected consent.

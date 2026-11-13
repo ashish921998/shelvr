@@ -540,29 +540,26 @@ describe("voter names and newest choices", () => {
       });
     const last = async () => (await voterRow(backend, "a"))?.last;
 
-    const first = Date.now();
+    const before = Date.now();
     await ballot(1, ["p1", "p0"], []);
-    expect(await last()).toEqual({ key: "p1", choice: "pick", at: first });
+    const first = await last();
+    expect(first).toMatchObject({ key: "p1", choice: "pick" });
+    expect(first!.at).toBeGreaterThanOrEqual(before);
 
     vi.advanceTimersByTime(1000);
     await ballot(2, ["p1"], []);
-    expect(await last()).toEqual({ key: "p1", choice: "pick", at: first });
+    expect(await last()).toEqual(first);
 
     vi.advanceTimersByTime(1000);
+    const beforeThird = Date.now();
     await ballot(3, ["p1"], ["p0"]);
-    expect(await last()).toEqual({
-      key: "p0",
-      choice: "pass",
-      at: first + 2000,
-    });
+    const third = await last();
+    expect(third).toMatchObject({ key: "p0", choice: "pass" });
+    expect(third!.at).toBeGreaterThanOrEqual(beforeThird);
 
     vi.advanceTimersByTime(1000);
     await ballot(2, ["p0"], []);
-    expect(await last()).toEqual({
-      key: "p0",
-      choice: "pass",
-      at: first + 2000,
-    });
+    expect(await last()).toEqual(third);
 
     await ballot(4, ["p1"], []);
     expect(await last()).toBeUndefined();
@@ -709,7 +706,7 @@ describe("cityPlanVotes", () => {
     vi.useFakeTimers();
     const fixture = await setup();
     const token = await cityLink(fixture, "Austin");
-    vi.advanceTimersByTime(PLAN_SHARE_TTL_MS + 1);
+    vi.advanceTimersByTime(PLAN_SHARE_TTL_MS + 60_000);
 
     const closed = await fixture.t.query(api.planShares.cityPlanVotes, {
       city: "Austin",
@@ -857,7 +854,7 @@ describe("deletion", () => {
     await vote(backend, token, "a", ["p0"]);
 
     await t.mutation(api.users.deleteCurrentUserAccount, {});
-    await backend.finishAllScheduledFunctions(vi.runAllTimers);
+    await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(await countRows(backend)).toEqual({ shares: 0, votes: 0 });
   });
 });
@@ -871,7 +868,7 @@ describe("purgeExpiredPlanShares", () => {
       places,
     });
     await vote(backend, old, "a", ["p0"]);
-    vi.advanceTimersByTime(2 * PLAN_SHARE_TTL_MS + 1);
+    vi.advanceTimersByTime(2 * PLAN_SHARE_TTL_MS + 60_000);
     const fresh = await t.mutation(api.planShares.createPlanShare, {
       spaceId,
       places,

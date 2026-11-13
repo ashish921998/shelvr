@@ -229,6 +229,12 @@ export function queueDemoUrl(
   if (existing === null) return;
   writePendingRecord({
     ...existing,
+    operationId:
+      existing.demoUrl === url &&
+      existing.demoSpace === space &&
+      existing.demoOwner === owner
+        ? existing.operationId
+        : createOperationId(),
     demoUrl: url,
     demoSpace: space,
     demoOwner: owner,
