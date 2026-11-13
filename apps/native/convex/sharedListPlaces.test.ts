@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { MAX_LIST_PLACES } from "./model/sharedLists";
+import { MAX_LIST_PLACES } from "./model/sharedListLimits";
 import { MAX_CITY_CHARS } from "./model/trip";
 import {
   joiner,
@@ -213,6 +213,36 @@ describe("addSavePlaces", () => {
       "Ramiro",
     ]);
     expect(await placeCount(base, listId)).toBe(1);
+  });
+
+  it("listsWithSave names the lists holding places the caller added from that save", async () => {
+    const { base, owner, itemId, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token, { pro: true });
+    const boItem = await seedSave(base, bo.userId, {
+      pins: [{ name: "Time Out Market", ...near(0) }],
+    });
+    expect(
+      await owner.t.query(api.sharedLists.listsWithSave, { itemId }),
+    ).toEqual([listId]);
+    expect(
+      await bo.t.mutation(api.sharedLists.addSavePlaces, {
+        listId,
+        itemId: boItem,
+      }),
+    ).toBe(0);
+    expect(
+      await bo.t.query(api.sharedLists.listsWithSave, { itemId: boItem }),
+    ).toEqual([]);
+    expect(await bo.t.query(api.sharedLists.listsWithSave, { itemId })).toEqual(
+      [],
+    );
+    await owner.t.mutation(api.sharedLists.removeSavePlaces, {
+      listId,
+      itemId,
+    });
+    expect(
+      await owner.t.query(api.sharedLists.listsWithSave, { itemId }),
+    ).toEqual([]);
   });
 });
 

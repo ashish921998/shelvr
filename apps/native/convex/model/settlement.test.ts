@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Doc, Id } from "../_generated/dataModel";
 import recorded from "../testdata/settlement/rows.json";
-import { CURRENT_EMBEDDING_VERSION, EMBEDDING_DIMENSIONS } from "./embedding";
-import { completionPatch, embeddingText, type ItemPatch } from "./settlement";
+import { completionPatch, type ItemPatch } from "./settlement";
 import {
   consentOf,
   gridArgs,
@@ -205,10 +204,6 @@ describe("a decline that lands at commit", () => {
     tags: ["model"],
     intents: [],
     cities: ["Paris"],
-    embedding: {
-      text: "any text",
-      vector: Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.25),
-    },
   };
 
   it.each(
@@ -232,7 +227,6 @@ describe("a decline that lands at commit", () => {
       tags: ["saved"],
     });
     expect(patch.cities).toBeUndefined();
-    expect(patch.embeddingVersion).toBeUndefined();
   });
 });
 
@@ -331,61 +325,6 @@ describe("the cuisines a run brings", () => {
       true,
     );
     expect("placeCuisines" in patch).toBe(false);
-  });
-});
-
-describe("the embedding a run brings", () => {
-  const reading = { siteName: "Example", content: "Body text" };
-  const classification = {
-    title: "Soup",
-    description: "A soup",
-    tags: ["food"],
-  };
-  const vector = Array.from({ length: EMBEDDING_DIMENSIONS }, () => 0.25);
-
-  function lands(item: Doc<"items">, text: string): boolean {
-    const patch = completionPatch(
-      item,
-      {
-        reading,
-        classification: { ...classification, embedding: { text, vector } },
-      },
-      true,
-    );
-    return patch.embeddingVersion === CURRENT_EMBEDDING_VERSION;
-  }
-
-  it("embeds the title, description, tags, site and body the save settles to", () => {
-    expect(embeddingText(savedItem(), { reading, classification })).toBe(
-      "Soup\nA soup\nfood\nExample\n\nBody text",
-    );
-  });
-
-  it("embeds the note a save holds in place of a page body", () => {
-    const note = savedItem({ type: "note", note: "Buy lentils" });
-    expect(embeddingText(note, { reading: {}, classification })).toBe(
-      "Soup\nA soup\nfood\n\nBuy lentils",
-    );
-  });
-
-  it("embeds the typed title a save keeps", () => {
-    const typed = savedItem({ title: "My soup", titleSource: "user" });
-    expect(embeddingText(typed, { reading, classification })).toMatch(
-      /^My soup\n/,
-    );
-  });
-
-  it("lands a vector computed from the text the save settles to", () => {
-    const item = savedItem();
-    expect(lands(item, embeddingText(item, { reading, classification }))).toBe(
-      true,
-    );
-  });
-
-  it("drops a vector computed before the user typed a title", () => {
-    const before = embeddingText(savedItem(), { reading, classification });
-    const typed = savedItem({ title: "My soup", titleSource: "user" });
-    expect(lands(typed, before)).toBe(false);
   });
 });
 

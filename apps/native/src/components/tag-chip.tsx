@@ -1,10 +1,18 @@
-import { Text, View } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { Text, View } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
-export function TagChip({ label, emphasized }: { label: string; emphasized?: boolean }) {
+export function TagChip({
+  label,
+  emphasized,
+}: {
+  label: string;
+  emphasized?: boolean;
+}) {
   return (
     <View style={[styles.chip, emphasized && styles.chipEmphasized]}>
-      <Text style={[styles.label, emphasized && styles.labelEmphasized]}>{label}</Text>
+      <Text style={[styles.label, emphasized && styles.labelEmphasized]}>
+        {label}
+      </Text>
     </View>
   );
 }

@@ -5,7 +5,6 @@ import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { TestConvexForDataModel } from "convex-test";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
-import { EMBEDDING_DIMENSIONS } from "./model/embedding";
 import { FIXTURE_ORIGIN } from "./model/fakeAi";
 import { newConvexTest, signedInUser } from "./test.setup";
 
@@ -16,22 +15,10 @@ vi.hoisted(() => {
   vi.stubEnv("CONVEX_CLOUD_URL", "http://127.0.0.1:3210");
 });
 
-const embedMany = vi.hoisted(() => vi.fn());
-vi.mock("ai", async (original) => ({
-  ...(await original<typeof import("ai")>()),
-  embedMany,
-}));
-
 type T = TestConvexForDataModel<DataModel>;
 
 beforeEach(() => {
   vi.stubEnv("POSTHOG_PROJECT_TOKEN", "");
-  embedMany.mockReset();
-  embedMany.mockImplementation(async ({ values }: { values: string[] }) => ({
-    embeddings: values.map(() =>
-      Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) => (i === 0 ? 1 : 0)),
-    ),
-  }));
   vi.stubGlobal(
     "fetch",
     vi.fn(() => {
@@ -159,7 +146,6 @@ describe("the e2e fake model from a saved page to a date plan", () => {
 
 describe("the e2e fake model behind recommendForSpace", () => {
   it("suggests the saves that share a word with the new space's name", async () => {
-    embedMany.mockRejectedValue(new Error("no embedding provider"));
     const { t, userId } = await signedInUser(newConvexTest());
     const spaceId = await t.run(async (ctx) => {
       for (const title of ["Weeknight Miso Ramen", "Belém Tower"]) {
