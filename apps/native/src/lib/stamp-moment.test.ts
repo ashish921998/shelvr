@@ -1,13 +1,18 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
+import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   bulkStampMoment,
   placeStampMoment,
   STAMP_TIMING,
+  type StampMoment,
+  type StampMomentControls,
+  StampMomentPlayContext,
   stampLine,
   useStampMoment,
+  useStampMomentLanding,
   useStampMomentPlayer,
 } from "@/lib/stamp-moment";
 
@@ -16,6 +21,8 @@ const mocks = vi.hoisted(() => ({
   impact: vi.fn(),
   success: vi.fn(),
   announce: vi.fn(),
+  transitionEnd: [] as ((event: { data?: { closing?: boolean } }) => void)[],
+  off: vi.fn(),
 }));
 
 vi.mock("@/lib/analytics", () => ({ analytics: { capture: mocks.capture } }));
@@ -26,6 +33,21 @@ vi.mock("@/lib/i18n", () => ({
   t: (key: string, params?: Record<string, unknown>) =>
     params ? `${key} ${JSON.stringify(params)}` : key,
 }));
+vi.mock("expo-router", async () => {
+  const { useEffect } = await import("react");
+  return {
+    useFocusEffect: (effect: () => () => void) => useEffect(effect, [effect]),
+    useNavigation: () => ({
+      addListener: (
+        _type: string,
+        listener: (event: { data?: { closing?: boolean } }) => void,
+      ) => {
+        mocks.transitionEnd.push(listener);
+        return mocks.off;
+      },
+    }),
+  };
+});
 vi.mock("react-native", () => ({
   AccessibilityInfo: { announceForAccessibility: mocks.announce },
 }));
@@ -34,6 +56,7 @@ const lisbon = { city: "Lisbon", cover: "https://img/cover.jpg" };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.transitionEnd = [];
   vi.useFakeTimers();
 });
 
@@ -98,19 +121,22 @@ describe("stampLine", () => {
 describe("useStampMoment", () => {
   it("does nothing outside the provider", () => {
     const { result } = renderHook(() => useStampMoment());
-    expect(() =>
-      result.current({ kind: "bulk", count: 1, cover: null }, "already_been"),
-    ).not.toThrow();
+    const moment: StampMoment = { kind: "bulk", count: 1, cover: null };
+    expect(() => {
+      result.current.play(moment, "already_been");
+      result.current.queue(moment, "already_been");
+    }).not.toThrow();
     expect(mocks.capture).not.toHaveBeenCalled();
   });
 });
 
 describe("useStampMomentPlayer", () => {
   const first = placeStampMoment("Tigre", { ...lisbon, cityVisited: 0 });
+  const batch: StampMoment = { kind: "bulk", count: 2, cover: null };
 
   it("shows the moment, reports and announces it once, and taps once on landing", () => {
     const { result } = renderHook(() => useStampMomentPlayer(false));
-    act(() => result.current.play(first, "city"));
+    act(() => result.current.controls.play(first, "city"));
 
     expect(result.current.shown).toMatchObject({
       moment: first,
@@ -141,7 +167,7 @@ describe("useStampMomentPlayer", () => {
 
   it("taps right away under Reduce Motion", () => {
     const { result } = renderHook(() => useStampMomentPlayer(true));
-    act(() => result.current.play(first, "city"));
+    act(() => result.current.controls.play(first, "city"));
     expect(mocks.impact).toHaveBeenCalledTimes(1);
     act(() => vi.advanceTimersByTime(STAMP_TIMING.shown));
     expect(mocks.impact).toHaveBeenCalledTimes(1);
@@ -150,7 +176,7 @@ describe("useStampMomentPlayer", () => {
   it("plays one moment for a batch with its count", () => {
     const { result } = renderHook(() => useStampMomentPlayer(false));
     act(() =>
-      result.current.play(
+      result.current.controls.play(
         { kind: "bulk", count: 5, cover: null },
         "already_been",
       ),
@@ -165,31 +191,62 @@ describe("useStampMomentPlayer", () => {
     });
   });
 
-  it("waits for a closing sheet before it shows anything", () => {
+  it("holds a queued moment until it is released, then plays it once", () => {
     const { result } = renderHook(() => useStampMomentPlayer(false));
-    act(() =>
-      result.current.play(
-        { kind: "bulk", count: 2, cover: null },
-        "already_been",
-        STAMP_TIMING.afterSheet,
-      ),
-    );
+    act(() => result.current.controls.queue(batch, "already_been"));
+    act(() => vi.advanceTimersByTime(STAMP_TIMING.queueLimit - 1));
     expect(result.current.shown).toBeNull();
     expect(mocks.capture).not.toHaveBeenCalled();
     expect(mocks.announce).not.toHaveBeenCalled();
+    expect(mocks.impact).not.toHaveBeenCalled();
 
-    act(() => vi.advanceTimersByTime(STAMP_TIMING.afterSheet));
-    expect(result.current.shown?.moment).toEqual({
-      kind: "bulk",
-      count: 2,
-      cover: null,
-    });
+    act(() => result.current.controls.release());
+    expect(result.current.shown?.moment).toEqual(batch);
     expect(mocks.capture).toHaveBeenCalledTimes(1);
+    expect(mocks.announce).toHaveBeenCalledWith(
+      'passport.momentBulk {"count":2}',
+    );
+    act(() => vi.advanceTimersByTime(STAMP_TIMING.drop));
+    expect(mocks.impact).toHaveBeenCalledTimes(1);
+
+    act(() => result.current.controls.release());
+    expect(mocks.capture).toHaveBeenCalledTimes(1);
+  });
+
+  it("drops a queued moment that is never released in time", () => {
+    const { result } = renderHook(() => useStampMomentPlayer(false));
+    act(() => result.current.controls.queue(batch, "already_been"));
+    act(() => vi.advanceTimersByTime(STAMP_TIMING.queueLimit));
+    act(() => result.current.controls.release());
+    act(() => vi.advanceTimersByTime(STAMP_TIMING.shown));
+    expect(result.current.shown).toBeNull();
+    expect(mocks.capture).not.toHaveBeenCalled();
+    expect(mocks.announce).not.toHaveBeenCalled();
+    expect(mocks.impact).not.toHaveBeenCalled();
+  });
+
+  it("keeps only the latest queued moment", () => {
+    const { result } = renderHook(() => useStampMomentPlayer(false));
+    act(() => result.current.controls.queue(batch, "already_been"));
+    const later = { ...batch, count: 6 };
+    act(() => result.current.controls.queue(later, "already_been"));
+    act(() => result.current.controls.release());
+    expect(result.current.shown?.moment).toEqual(later);
+    expect(mocks.capture).toHaveBeenCalledTimes(1);
+  });
+
+  it("forgets a queued moment when it unmounts", () => {
+    const { result, unmount } = renderHook(() => useStampMomentPlayer(false));
+    act(() => result.current.controls.queue(batch, "already_been"));
+    const { release } = result.current.controls;
+    unmount();
+    release();
+    expect(mocks.capture).not.toHaveBeenCalled();
   });
 
   it("goes away early on a tap and keeps the landing tap", () => {
     const { result } = renderHook(() => useStampMomentPlayer(false));
-    act(() => result.current.play(first, "city"));
+    act(() => result.current.controls.play(first, "city"));
     act(() => result.current.dismiss());
     expect(result.current.shown).toBeNull();
     act(() => vi.advanceTimersByTime(STAMP_TIMING.shown));
@@ -199,11 +256,11 @@ describe("useStampMomentPlayer", () => {
 
   it("replaces a showing moment and gives each stamp its own tap", () => {
     const { result } = renderHook(() => useStampMomentPlayer(false));
-    act(() => result.current.play(first, "city"));
+    act(() => result.current.controls.play(first, "city"));
     const firstId = result.current.shown?.id;
     act(() => vi.advanceTimersByTime(STAMP_TIMING.shown - 100));
     const second = placeStampMoment("Ramiro", { ...lisbon, cityVisited: 1 });
-    act(() => result.current.play(second, "city"));
+    act(() => result.current.controls.play(second, "city"));
     expect(result.current.shown?.id).not.toBe(firstId);
     act(() => vi.advanceTimersByTime(200));
     expect(result.current.shown?.moment).toEqual(second);
@@ -214,9 +271,44 @@ describe("useStampMomentPlayer", () => {
 
   it("drops a pending landing tap when it unmounts", () => {
     const { result, unmount } = renderHook(() => useStampMomentPlayer(false));
-    act(() => result.current.play(first, "city"));
+    act(() => result.current.controls.play(first, "city"));
     unmount();
     vi.advanceTimersByTime(STAMP_TIMING.shown);
     expect(mocks.impact).not.toHaveBeenCalled();
+  });
+});
+
+describe("useStampMomentLanding", () => {
+  const controls: StampMomentControls = {
+    play: vi.fn(),
+    queue: vi.fn(),
+    release: vi.fn(),
+  };
+  const wrapper = ({ children }: { children: ReactNode }) =>
+    createElement(StampMomentPlayContext, { value: controls }, children);
+
+  it("releases once the screen it focuses has finished appearing", () => {
+    renderHook(() => useStampMomentLanding(), { wrapper });
+    expect(controls.release).not.toHaveBeenCalled();
+    act(() => mocks.transitionEnd[0]({ data: { closing: true } }));
+    expect(controls.release).not.toHaveBeenCalled();
+    act(() => mocks.transitionEnd[0]({ data: { closing: false } }));
+    expect(controls.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases after the sheet has settled when no transition event comes", () => {
+    renderHook(() => useStampMomentLanding(), { wrapper });
+    act(() => vi.advanceTimersByTime(STAMP_TIMING.sheetSettle - 1));
+    expect(controls.release).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1));
+    expect(controls.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops waiting when the screen loses focus", () => {
+    const { unmount } = renderHook(() => useStampMomentLanding(), { wrapper });
+    unmount();
+    expect(mocks.off).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(STAMP_TIMING.sheetSettle);
+    expect(controls.release).not.toHaveBeenCalled();
   });
 });

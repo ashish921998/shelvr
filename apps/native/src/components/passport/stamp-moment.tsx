@@ -156,9 +156,9 @@ function StampMomentView({
 
 export function StampMomentProvider({ children }: { children: ReactNode }) {
   const reduced = useReducedMotion();
-  const { shown, play, dismiss } = useStampMomentPlayer(reduced);
+  const { shown, controls, dismiss } = useStampMomentPlayer(reduced);
   return (
-    <StampMomentPlayContext value={play}>
+    <StampMomentPlayContext value={controls}>
       {children}
       {shown ? (
         <StampMomentView key={shown.id} shown={shown} onDismiss={dismiss} />

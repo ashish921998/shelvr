@@ -87,6 +87,10 @@ vi.mock("@/components/passport/stamp-sheet", () => ({
     <figure data-cover={cover ?? "pin"}>{ink}</figure>
   )),
 }));
+vi.mock("expo-router", () => ({
+  useFocusEffect: vi.fn(),
+  useNavigation: vi.fn(),
+}));
 vi.mock("@/lib/analytics", () => ({ analytics: { capture: mocks.capture } }));
 vi.mock("@/lib/haptics", () => ({ haptics: { impact: mocks.impact } }));
 vi.mock("@/lib/i18n", () => ({
@@ -107,7 +111,7 @@ function Surface({
   moment: StampMoment;
   surface: StampSurface;
 }) {
-  const play = useStampMoment();
+  const { play } = useStampMoment();
   return (
     <button data-testid="stamp" onClick={() => play(moment, surface)}>
       city page

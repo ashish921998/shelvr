@@ -1,11 +1,13 @@
 import { analytics } from "@/lib/analytics";
 import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
+import { useFocusEffect, useNavigation } from "expo-router";
 import {
   createContext,
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -42,7 +44,8 @@ export const STAMP_TIMING = {
   settle: 130,
   ring: 320,
   shown: 1800,
-  afterSheet: 400,
+  sheetSettle: 550,
+  queueLimit: 4000,
 } as const;
 
 const NO_CITY: StampPlace = { city: "", cover: null, cityVisited: 1 };
@@ -78,50 +81,91 @@ function stampInk(moment: StampMoment): string {
     : t("passport.wentNoDate");
 }
 
-type Play = (
-  moment: StampMoment,
-  surface: StampSurface,
-  afterMs?: number,
-) => void;
+type Play = (moment: StampMoment, surface: StampSurface) => void;
 
-const StampMomentContext = createContext<Play>(() => {});
+export type StampMomentControls = {
+  play: Play;
+  queue: Play;
+  release: () => void;
+};
+
+const StampMomentContext = createContext<StampMomentControls>({
+  play: () => {},
+  queue: () => {},
+  release: () => {},
+});
 
 export const StampMomentPlayContext = StampMomentContext.Provider;
 
-export function useStampMoment(): Play {
+export function useStampMoment(): Pick<StampMomentControls, "play" | "queue"> {
   return useContext(StampMomentContext);
+}
+
+type TransitionListener = (
+  type: "transitionEnd",
+  callback: (event: { data?: { closing?: boolean } }) => void,
+) => () => void;
+
+export function useStampMomentLanding(): void {
+  const { release } = useContext(StampMomentContext);
+  const navigation = useNavigation() as unknown as {
+    addListener: TransitionListener;
+  };
+  useFocusEffect(
+    useCallback(() => {
+      const settle = setTimeout(release, STAMP_TIMING.sheetSettle);
+      const off = navigation.addListener("transitionEnd", (event) => {
+        if (!event.data?.closing) release();
+      });
+      return () => {
+        clearTimeout(settle);
+        off();
+      };
+    }, [navigation, release]),
+  );
 }
 
 export function useStampMomentPlayer(reduced: boolean): {
   shown: ShownStamp | null;
-  play: Play;
+  controls: StampMomentControls;
   dismiss: () => void;
 } {
   const [shown, setShown] = useState<ShownStamp | null>(null);
   const nextId = useRef(0);
-  const showing = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const showing = useRef<ReturnType<typeof setTimeout> | null>(null);
   const landing = useRef(new Set<ReturnType<typeof setTimeout>>());
+  const pending = useRef<{ moment: StampMoment; surface: StampSurface } | null>(
+    null,
+  );
+  const expiry = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const clearShowing = useCallback(() => {
-    for (const timer of showing.current) clearTimeout(timer);
-    showing.current = [];
+    if (showing.current !== null) clearTimeout(showing.current);
+    showing.current = null;
+  }, []);
+
+  const clearPending = useCallback(() => {
+    if (expiry.current !== null) clearTimeout(expiry.current);
+    expiry.current = null;
+    pending.current = null;
   }, []);
 
   useEffect(() => {
     const landings = landing.current;
     return () => {
       clearShowing();
+      clearPending();
       for (const timer of landings) clearTimeout(timer);
     };
-  }, [clearShowing]);
+  }, [clearShowing, clearPending]);
 
   const dismiss = useCallback(() => {
     clearShowing();
     setShown(null);
   }, [clearShowing]);
 
-  const show = useCallback(
-    (moment: StampMoment, surface: StampSurface) => {
+  const play = useCallback<Play>(
+    (moment, surface) => {
       clearShowing();
       const line = stampLine(moment);
       nextId.current += 1;
@@ -141,22 +185,30 @@ export function useStampMomentPlayer(reduced: boolean): {
         }, STAMP_TIMING.drop);
         landing.current.add(timer);
       }
-      showing.current.push(setTimeout(dismiss, STAMP_TIMING.shown));
+      showing.current = setTimeout(dismiss, STAMP_TIMING.shown);
     },
     [clearShowing, dismiss, reduced],
   );
 
-  const play = useCallback<Play>(
-    (moment, surface, afterMs = 0) => {
-      if (afterMs <= 0) {
-        show(moment, surface);
-        return;
-      }
-      clearShowing();
-      showing.current.push(setTimeout(() => show(moment, surface), afterMs));
+  const queue = useCallback<Play>(
+    (moment, surface) => {
+      clearPending();
+      pending.current = { moment, surface };
+      expiry.current = setTimeout(clearPending, STAMP_TIMING.queueLimit);
     },
-    [clearShowing, show],
+    [clearPending],
   );
 
-  return { shown, play, dismiss };
+  const release = useCallback(() => {
+    const next = pending.current;
+    if (next === null) return;
+    clearPending();
+    play(next.moment, next.surface);
+  }, [clearPending, play]);
+
+  const controls = useMemo(
+    () => ({ play, queue, release }),
+    [play, queue, release],
+  );
+  return { shown, controls, dismiss };
 }

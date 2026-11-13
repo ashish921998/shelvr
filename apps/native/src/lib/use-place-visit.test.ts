@@ -29,7 +29,7 @@ vi.mock("@/lib/haptics", () => ({
 }));
 vi.mock("@/lib/stamp-moment", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/stamp-moment")>()),
-  useStampMoment: () => mocks.play,
+  useStampMoment: () => ({ play: mocks.play, queue: vi.fn() }),
 }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
 vi.mock("react-native", () => ({ Alert: { alert: mocks.alert } }));
