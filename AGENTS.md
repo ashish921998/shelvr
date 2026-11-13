@@ -89,8 +89,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   Re-record only for a change you intend, with the command in the test header,
   and review the row diff.
 - **Large files:** `convex/items.ts` (about 2,600 lines), `convex/ai.ts` (about 1,650)
-  and `convex/model/pageReadCore.ts` (about 500). Embedding and recommendation actions
-  live in `convex/aiEmbeddingSweep.ts` and `convex/aiRecommendForSpace.ts`.
+  and `convex/model/pageReadCore.ts` (about 500). The recommendation action
+  lives in `convex/aiRecommendForSpace.ts`.
   Search for the export name first and read that range, not the whole file.
 - **Dev fixtures:** `convex/devFixtures.ts` seeds items, spaces and a Pro
   subscription for the anonymous dev user.
