@@ -281,7 +281,7 @@ it("keeps a pin its save no longer names when a failed retry puts it back", asyn
       reason: "not_found",
       runId: RUN_ID,
     });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     const after = await t.run((ctx) => ctx.db.get(itemId));
     expect(after?.status).toBe("ready");
     expect(after?.placePins).toEqual([pin]);

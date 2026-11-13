@@ -1,5 +1,5 @@
-import { Text } from 'react-native';
-import { StyleSheet } from 'react-native-unistyles';
+import { Text } from "react-native";
+import { StyleSheet } from "react-native-unistyles";
 
 export function Wordmark({ size = 24 }: { size?: number }) {
   return <Text style={[styles.wordmark, { fontSize: size }]}>shelvr</Text>;

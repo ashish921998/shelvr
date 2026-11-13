@@ -99,33 +99,44 @@ async function seedFixtures(
   ctx: MutationCtx,
   userId: Id<"users">,
 ): Promise<{ items: number; spaces: number; memberships: number }> {
-  const [memberships, operations, items, spaces, subscriptions, removals] =
-    await Promise.all([
-      ctx.db
-        .query("spaceItems")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .take(RESET_LIMIT + 1),
-      ctx.db
-        .query("itemOperations")
-        .withIndex("by_user_operation", (q) => q.eq("userId", userId))
-        .take(RESET_LIMIT + 1),
-      ctx.db
-        .query("items")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .take(RESET_LIMIT + 1),
-      ctx.db
-        .query("spaces")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .take(RESET_LIMIT + 1),
-      ctx.db
-        .query("subscriptions")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .take(2),
-      ctx.db
-        .query("placeRemovals")
-        .withIndex("by_user", (q) => q.eq("userId", userId))
-        .take(RESET_LIMIT + 1),
-    ]);
+  const [
+    memberships,
+    operations,
+    items,
+    spaces,
+    subscriptions,
+    removals,
+    visits,
+  ] = await Promise.all([
+    ctx.db
+      .query("spaceItems")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
+      .query("itemOperations")
+      .withIndex("by_user_operation", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
+      .query("items")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
+      .query("spaces")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
+      .query("subscriptions")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(2),
+    ctx.db
+      .query("placeRemovals")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
+      .query("placeVisits")
+      .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+  ]);
 
   for (const [name, count] of [
     ["memberships", memberships.length],
@@ -133,6 +144,7 @@ async function seedFixtures(
     ["items", items.length],
     ["spaces", spaces.length],
     ["removals", removals.length],
+    ["visits", visits.length],
   ] as const) {
     if (count > RESET_LIMIT) {
       throw new Error(
@@ -155,6 +167,7 @@ async function seedFixtures(
   }
 
   for (const row of removals) await ctx.db.delete(row._id);
+  for (const row of visits) await ctx.db.delete(row._id);
   for (const row of memberships) await ctx.db.delete(row._id);
   for (const row of operations) await ctx.db.delete(row._id);
   for (const row of items) await ctx.db.delete(row._id);

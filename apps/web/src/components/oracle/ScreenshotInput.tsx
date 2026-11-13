@@ -1,6 +1,6 @@
 "use client";
 
-import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 
 import type { OracleInputProps } from "@/lib/oracle";
 
@@ -36,6 +36,14 @@ export default function ScreenshotInput({ busy, onSubmit }: OracleInputProps) {
   const [error, setError] = useState<string>();
   const [preparing, setPreparing] = useState(false);
   const [preview, setPreview] = useState<string>();
+  const generation = useRef(0);
+
+  useEffect(
+    () => () => {
+      generation.current += 1;
+    },
+    [],
+  );
 
   useEffect(() => {
     return () => {
@@ -60,9 +68,11 @@ export default function ScreenshotInput({ busy, onSubmit }: OracleInputProps) {
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!file) return;
+    const request = ++generation.current;
     setPreparing(true);
     try {
       const imageBase64 = await encodeImage(file);
+      if (request !== generation.current) return;
       if (imageBase64.length > MAX_IMAGE_BASE64_CHARS) {
         setError(
           "That one is too big for the oracle. Try a smaller screenshot.",
@@ -71,9 +81,10 @@ export default function ScreenshotInput({ busy, onSubmit }: OracleInputProps) {
       }
       onSubmit({ kind: "screenshot", imageBase64, mediaType: "image/jpeg" });
     } catch {
-      setError("Couldn’t read that image. Try a JPEG or PNG.");
+      if (request === generation.current)
+        setError("Couldn’t read that image. Try a JPEG or PNG.");
     } finally {
-      setPreparing(false);
+      if (request === generation.current) setPreparing(false);
     }
   }
 

@@ -179,7 +179,7 @@ describe("durable digest delivery", () => {
     expect((await digest())?.deliveredAt).toBeUndefined();
     await advance();
     await t.mutation(internal.notificationDelivery.recover, {});
-    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(await digest()).toMatchObject({
       deliveryAttempts: 2,
       deliveryRecipients: [{ state: "receipt", ticketId: "ticket-a" }],
@@ -391,7 +391,7 @@ describe("durable digest delivery", () => {
       .mockResolvedValue(json([{ status: "ok", id: "ticket-a" }]));
     vi.stubGlobal("fetch", fetchMock);
     await t.mutation(internal.notificationDelivery.recover, {});
-    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect((await digest())?.deliveryRecipients?.[0].state).toBe("receipt");
     expect(
@@ -434,13 +434,14 @@ describe("durable digest delivery", () => {
   it("records one send event when delivery reaches a terminal state", async () => {
     vi.setSystemTime(new Date("2026-10-01T10:00:00Z"));
     const { t, userId, digestId, advance } = await seed();
-    const firstSendAt = Date.now();
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(json([{ status: "ok", id: "ticket-a" }]))
       .mockResolvedValue(json({ "ticket-a": { status: "ok" } }));
     vi.stubGlobal("fetch", fetchMock);
     await t.action(internal.notificationDelivery.send, { digestId });
+    const firstSendAt = (await t.run((ctx) => ctx.db.get(digestId)))!
+      .deliverySentAt!;
     const telemetry = async () =>
       (
         await t.run((ctx) =>

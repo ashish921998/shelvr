@@ -47,6 +47,18 @@ describe("redirectSystemPath", () => {
     expect(markPendingShareOnDevice).not.toHaveBeenCalled();
   });
 
+  it("opens a shared passport link on the passport invite screen", () => {
+    expect(
+      redirectSystemPath({
+        path: "https://shelvr-web.vercel.app/passport/tok123",
+        initial: true,
+      }),
+    ).toBe("/passport-invite/tok123");
+    expect(
+      redirectSystemPath({ path: "shelvr://passport-invite/tok123", initial: true }),
+    ).toBe("shelvr://passport-invite/tok123");
+  });
+
   it("continues routing share intents to the share receiver", () => {
     expect(
       redirectSystemPath({ path: "shelvr://expo-sharing", initial: false }),

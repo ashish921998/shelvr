@@ -16,9 +16,12 @@ import {
   requireUserId,
   senderFirstName,
 } from "./model/auth";
-import { recentVisits } from "./model/placeVisits";
+import {
+  unscopedVisitNames,
+  userVisits,
+  visitMatcher,
+} from "./model/placeVisits";
 import { userRemovals, visibleSave } from "./model/placeRemovals";
-import { placeKey } from "./model/plan";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   departMember,
@@ -33,7 +36,6 @@ import {
   LIST_DRAIN_BATCH,
   LIST_TRIPS_SHOWN,
   MAX_LIST_MEMBERS,
-  MAX_LIST_PLACES,
   MAX_LISTS_PER_USER,
   memberOf,
   newPlaceCount,
@@ -47,7 +49,8 @@ import {
   type ListPlanClaim,
   type NewListPlace,
 } from "./model/sharedLists";
-import { MAX_LIST_CITIES } from "./model/sharedListLimits";
+import { MAX_LIST_CITIES, MAX_LIST_PLACES } from "./model/sharedListLimits";
+import { MAX_ITEM_PLACES } from "./model/itemFields";
 import { sameTripPlace } from "./model/placeIdentity";
 import { saveError } from "./model/saveErrors";
 import { cityKey, MAX_CITY_CHARS } from "./model/trip";
@@ -490,6 +493,21 @@ export const addSavePlaces = authedMutation({
   },
 });
 
+export const listsWithSave = authedQuery({
+  args: { itemId: v.id("items") },
+  returns: v.array(v.id("sharedLists")),
+  handler: async (ctx, args) => {
+    const { userId } = ctx;
+    const places = await ctx.db
+      .query("sharedListPlaces")
+      .withIndex("by_item_and_added_by", (q) =>
+        q.eq("itemId", args.itemId).eq("addedBy", userId),
+      )
+      .take(MAX_ITEM_PLACES * MAX_LISTS_PER_USER);
+    return [...new Set(places.map((place) => place.listId))];
+  },
+});
+
 export const removeSavePlaces = authedMutation({
   args: { listId: v.id("sharedLists"), itemId: v.id("items") },
   returns: v.number(),
@@ -625,10 +643,10 @@ export async function claimListPlan(
   const inCity = (await listPlaces(ctx, list._id)).filter(
     (row) => cityKey(row.city) === wanted,
   );
-  const visited = await recentVisits(ctx, userId);
-  const skipped = new Set(visited.map(placeKey));
+  const visits = await userVisits(ctx, userId);
+  const visited = visitMatcher(visits, inCity);
   const rows = inCity.filter(
-    (row) => row.visitedAt === undefined && !skipped.has(placeKey(row.name)),
+    (row) => row.visitedAt === undefined && !visited(row),
   );
   if (options.needsPlaces && rows.length === 0) {
     throw new Error("No places in this city");
@@ -652,12 +670,13 @@ export async function claimListPlan(
     places,
     been: [
       ...new Set([
-        ...visited,
+        ...unscopedVisitNames(visits),
         ...inCity
           .filter((row) => row.visitedAt !== undefined)
           .map((row) => row.name),
       ]),
     ],
+    visitMarks: visits,
     removed: await userRemovals(ctx, userId),
     aiAllowed: await listAiAllowed(ctx, userId, rows),
   };

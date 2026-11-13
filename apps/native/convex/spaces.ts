@@ -7,7 +7,7 @@ import type { MutationCtx, QueryCtx } from "./_generated/server";
 import { authedMutation, authedQuery } from "./model/auth";
 import { aiAllowed } from "./aiConsent";
 import { planSourceValidator } from "./model/plan";
-import { RECOMMEND_CANDIDATES } from "./model/embedding";
+import { RECOMMEND_CANDIDATES } from "./model/recommend";
 import { validateSpaceDescription, validateSpaceName } from "./model/spaceName";
 import { hasProEntitlement, requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
