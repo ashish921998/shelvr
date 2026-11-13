@@ -98,12 +98,14 @@ so the existing tests must pass untouched.
 ## Decisions
 
 - **The replay asks at most once for each batch of queued onboarding work.** A
-  "no" (a `cancelled` outcome, not a paywall that could not open) is stored in
-  the pending onboarding record as `declinedOperationId`, so it survives a cold
-  launch (`noteReplayDeclined`, `replayDeclined` in
-  `src/lib/pending-onboarding.ts`). The work stays queued and is saved without
-  another ask if access arrives later; new work gets a new operation id and one
-  new ask. Tests: `replay-onboarding-retry.test.tsx`, "a no to the replay's
+  "no" is a `cancelled` outcome on a sheet the person answered
+  (`openPaywallAnswer` in `src/lib/entitlement.ts`), not a paywall that could
+  not open, never showed, or joined another sheet. It is stored in the pending
+  onboarding record as `declinedOperationId`, against the operation id queued
+  when the paywall opened, so it survives a cold launch (`noteReplayDeclined`,
+  `replayDeclined` in `src/lib/pending-onboarding.ts`). The work stays queued
+  and is saved without another ask if access arrives later; new work gets a new
+  operation id and one new ask. Tests: `replay-onboarding-retry.test.tsx`, "a no to the replay's
   paywall".
 
 ## Open questions

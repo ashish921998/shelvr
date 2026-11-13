@@ -302,10 +302,10 @@ export function setOnboardingProgress(
   notifyChanged();
 }
 
-export function noteReplayDeclined() {
+export function noteReplayDeclined(operationId: string | null) {
   const record = readPendingRecord();
-  if (record === null) return;
-  writePendingRecord({ ...record, declinedOperationId: record.operationId });
+  if (record === null || record.operationId !== operationId) return;
+  writePendingRecord({ ...record, declinedOperationId: operationId });
 }
 
 export function replayDeclined(): boolean {

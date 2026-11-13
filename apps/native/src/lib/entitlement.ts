@@ -494,18 +494,26 @@ export function isPaywallPending(): boolean {
   return liveSheet() !== null;
 }
 
-type Presentation = { outcome: PaywallOutcome; owned: boolean };
+type Presentation = {
+  outcome: PaywallOutcome;
+  owned: boolean;
+  answered: boolean;
+};
 
 async function presentPaywall(placement = "pro_gate"): Promise<Presentation> {
   // iOS presents one sheet at a time; a concurrent second presentation leaves both RevenueCat promises unsettled.
   const live = liveSheet();
   if (live) {
     const outcome = live.paywall ? await live.paywall : "cancelled";
-    return { outcome, owned: false };
+    return { outcome, owned: false, answered: false };
   }
   const sheet: OpenSheet = { startedAt: Date.now(), paywall: null };
+  let dropped = false;
   const abandoned = new Promise<PaywallOutcome>((resolve) => {
-    sheet.abandon = () => resolve("cancelled");
+    sheet.abandon = () => {
+      dropped = true;
+      resolve("cancelled");
+    };
   });
   openSheet = sheet;
   const landing = reservePurchaseLanding();
@@ -517,7 +525,8 @@ async function presentPaywall(placement = "pro_gate"): Promise<Presentation> {
     .finally(() => {
       releaseSheet(sheet);
     });
-  return { outcome: await sheet.paywall, owned: true };
+  const outcome = await sheet.paywall;
+  return { outcome, owned: true, answered: !dropped };
 }
 
 /** Resolves true only on purchase/restore; routes to the paywall screen when unavailable, never on cancel. */
@@ -535,14 +544,22 @@ export async function openPaywall(
 export async function openPaywallOutcome(
   router: ReturnType<typeof useRouter>,
   placement: string,
-  { fallback = placement !== "onboarding" }: { fallback?: boolean } = {},
+  options: { fallback?: boolean } = {},
 ): Promise<PaywallOutcome> {
-  const { outcome, owned } = await presentPaywall(placement);
+  return (await openPaywallAnswer(router, placement, options)).outcome;
+}
+
+export async function openPaywallAnswer(
+  router: ReturnType<typeof useRouter>,
+  placement: string,
+  { fallback = placement !== "onboarding" }: { fallback?: boolean } = {},
+): Promise<{ outcome: PaywallOutcome; answered: boolean }> {
+  const { outcome, owned, answered } = await presentPaywall(placement);
   if (owned && shouldOpenPaywallFallback(outcome) && fallback) {
     router.push("/(app)/paywall");
   }
   recordBlockedAction(placement, outcome === "success");
-  return outcome;
+  return { outcome, answered };
 }
 
 /** True if the Customer Center (set up in the RevenueCat dashboard) was presented; false if the SDK lacks it or sync timed out. */

@@ -54,10 +54,13 @@ vi.mock("@/lib/onboarding", () => ({
 }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => ({ ...entitlement }),
-  openPaywallOutcome: async (...args: unknown[]) => {
+  openPaywallAnswer: async (...args: unknown[]) => {
     const result: unknown = await openPaywall(...args);
-    if (result === true) return "success";
-    return result === false ? "cancelled" : result;
+    if (result === true) return { outcome: "success", answered: true };
+    if (result === false) return { outcome: "cancelled", answered: true };
+    if (result === "abandoned")
+      return { outcome: "cancelled", answered: false };
+    return { outcome: result, answered: false };
   },
   waitForSheetTransition: () => Promise.resolve(),
 }));
@@ -137,6 +140,32 @@ describe("a no to the replay's paywall", () => {
     renderHook(() => useReplayOnboarding());
     await settle();
     act(() => queueDemoUrl(reel));
+    await settle();
+    expect(openPaywall).toHaveBeenCalledTimes(2);
+  });
+
+  it("asks again after a paywall that never showed, since nobody said no", async () => {
+    entitlement.entitled = false;
+    openPaywall.mockResolvedValueOnce("abandoned");
+    queueDemoUrl(reel);
+    renderHook(() => useReplayOnboarding());
+    await settle();
+    act(() => queueDemoUrl(reel));
+    await settle();
+    expect(openPaywall).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a no to the work it was asked about when more work arrives meanwhile", async () => {
+    entitlement.entitled = false;
+    const other = "https://www.instagram.com/reel/other/";
+    openPaywall.mockImplementationOnce(() => {
+      queueDemoUrl(other);
+      return Promise.resolve(false);
+    });
+    queueDemoUrl(reel);
+    renderHook(() => useReplayOnboarding());
+    await settle();
+    act(() => queueDemoUrl(other));
     await settle();
     expect(openPaywall).toHaveBeenCalledTimes(2);
   });

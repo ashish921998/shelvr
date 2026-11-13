@@ -26,7 +26,7 @@ import {
   subscribePurchaseBeforeSignIn,
 } from "@/lib/purchase-before-sign-in";
 import {
-  openPaywallOutcome,
+  openPaywallAnswer,
   useEntitlement,
   waitForSheetTransition,
 } from "@/lib/entitlement";
@@ -167,12 +167,15 @@ export function useReplayOnboarding(
     const run = async () => {
       try {
         if (step.action === "sell") {
+          const askedFor = getPendingOperationId();
           await waitForSheetTransition();
-          const outcome = await openPaywallOutcome(router, "onboarding", {
-            fallback: true,
-          });
+          const { outcome, answered } = await openPaywallAnswer(
+            router,
+            "onboarding",
+            { fallback: true },
+          );
           purchased = outcome === "success";
-          if (outcome === "cancelled") noteReplayDeclined();
+          if (outcome === "cancelled" && answered) noteReplayDeclined(askedFor);
           return;
         }
 
