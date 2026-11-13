@@ -665,7 +665,6 @@
   "refundConsent.syncPending": "Your choice is saved. Updating RevenueCat; the previous setting may apply until this finishes.",
   "refundConsent.withdraw": "Turn off sharing",
   "refundConsent.review": "Review updated terms",
-  "aiConsent.findLinksOff": "AI is off for this account. Contact Support to change your preference.",
   "updates.title": "App updates",
   "updates.check": "Check for updates",
   "updates.checking": "Checking…",

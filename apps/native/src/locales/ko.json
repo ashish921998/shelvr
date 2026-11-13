@@ -645,7 +645,6 @@
   "refundConsent.syncPending": "선택이 저장되었습니다. RevenueCat을 업데이트하는 중이며, 완료될 때까지 이전 설정이 적용될 수 있습니다.",
   "refundConsent.withdraw": "공유 끄기",
   "refundConsent.review": "업데이트된 약관 검토",
-  "aiConsent.findLinksOff": "이 계정에서는 AI가 꺼져 있어요. 변경하려면 고객 지원에 문의해 주세요.",
   "updates.title": "앱 업데이트",
   "updates.check": "업데이트 확인",
   "updates.checking": "확인 중…",
