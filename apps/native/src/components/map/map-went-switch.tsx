@@ -1,6 +1,6 @@
 import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
-import type { WentFilter } from "@/lib/passport";
+import type { WentFilter } from "@/lib/map-filters";
 import type { TextMessageKey } from "@/locales/message-types";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";

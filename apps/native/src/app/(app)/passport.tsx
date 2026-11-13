@@ -13,11 +13,12 @@ import {
   passportCounts,
   shareCardHref,
   stampDate,
+  type OpenStamp,
   usePassport,
-  useStamping,
 } from "@/lib/passport";
+import { usePlaceVisit } from "@/lib/use-place-visit";
 import { useRouter } from "expo-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -73,7 +74,15 @@ export default function PassportScreen() {
   const router = useRouter();
   const { theme } = useUnistyles();
   const { stamps, failed, error } = usePassport();
-  const stamping = useStamping();
+  const visit = usePlaceVisit("passport");
+  const [open, setOpen] = useState<OpenStamp | null>(null);
+  const remove = async () => {
+    if (open === null) return;
+    const { itemId, name, spot } = open;
+    if (await visit.toggle(itemId, { name, ...spot }, false)) {
+      setOpen((current) => (current === open ? null : current));
+    }
+  };
 
   useEffect(() => {
     if (error) analytics.captureError("passport_load_failed", error);
@@ -175,9 +184,7 @@ export default function PassportScreen() {
                 key={stampId(stamp)}
                 stamp={stamp}
                 index={index}
-                onPress={() =>
-                  stamping.show(openStampOf(stamp, group.city ?? ""))
-                }
+                onPress={() => setOpen(openStampOf(stamp, group.city ?? ""))}
               />
             ))}
           </ScrollView>
@@ -187,11 +194,11 @@ export default function PassportScreen() {
         <Text style={styles.credit}>{t("passport.coversCredit")}</Text>
       ) : null}
       <StampSheet
-        stamp={stamping.open}
+        stamp={open}
         count={stamps.length}
-        busy={stamping.busy}
-        onClose={stamping.close}
-        onRemove={() => void stamping.remove()}
+        busy={visit.busy}
+        onClose={() => setOpen(null)}
+        onRemove={() => void remove()}
         onShare={(city) => {
           router.push(shareCardHref(city, "stamp"));
         }}

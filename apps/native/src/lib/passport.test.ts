@@ -1,50 +1,15 @@
-// @vitest-environment jsdom
-import { act, renderHook } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   CARD_PLACES,
-  filterByWent,
   passportCities,
   passportCounts,
   shareCardOf,
   type Stamp,
   stampDate,
   unstampedCities,
-  useStamping,
   wentInCity,
 } from "./passport";
-
-const mocks = vi.hoisted(() => ({
-  setVisited: vi.fn(),
-  capture: vi.fn(),
-  captureError: vi.fn(),
-  alert: vi.fn(),
-  query: vi.fn((): { data?: unknown } => ({})),
-}));
-vi.mock("convex/react", () => ({
-  useConvexAuth: () => ({ isAuthenticated: true }),
-  useMutation: () => mocks.setVisited,
-}));
-vi.mock("@convex/_generated/api", () => ({
-  api: { placeVisits: { getPassport: {}, setVisited: {} } },
-}));
-vi.mock("@/lib/analytics", () => ({
-  analytics: { capture: mocks.capture, captureError: mocks.captureError },
-}));
-vi.mock("@/lib/haptics", () => ({
-  haptics: { impact: vi.fn(), selection: vi.fn() },
-}));
-vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
-vi.mock("@tanstack/react-query", () => ({ useQuery: () => mocks.query() }));
-vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
-vi.mock("react-native", () => ({ Alert: { alert: mocks.alert } }));
-
-afterEach(() => {
-  mocks.setVisited.mockReset();
-  mocks.capture.mockReset();
-  mocks.alert.mockReset();
-});
 
 const ITEM = "item1" as Id<"items">;
 
@@ -122,17 +87,6 @@ describe("grouping by city", () => {
   });
 });
 
-describe("filterByWent", () => {
-  const places = [{ name: "Tigre" }, { name: "Dante" }];
-  const went = (place: { name: string }) => place.name === "Tigre";
-
-  it("keeps every place, the ones to go to, or the ones visited", () => {
-    expect(filterByWent(places, "all", went)).toEqual(places);
-    expect(filterByWent(places, "want", went)).toEqual([{ name: "Dante" }]);
-    expect(filterByWent(places, "went", went)).toEqual([{ name: "Tigre" }]);
-  });
-});
-
 describe("shareCardOf", () => {
   it("numbers the city's places and pins only the located ones", () => {
     const card = shareCardOf(
@@ -183,95 +137,5 @@ describe("shareCardOf", () => {
     const card = shareCardOf(stamps, "Lisbon");
     expect(card.total).toBe(CARD_PLACES + 3);
     expect(card.places).toHaveLength(CARD_PLACES);
-  });
-});
-
-describe("useStamping", () => {
-  const open = {
-    itemId: ITEM,
-    name: "Tigre",
-    city: "Lisbon",
-    cover: null,
-    at: null,
-    spot: { lat: 1, lng: 2 },
-  };
-
-  it("takes back the mark at the stamp's own spot, and closes it", async () => {
-    mocks.setVisited.mockResolvedValue(null);
-    const { result } = renderHook(() => useStamping());
-    act(() => result.current.show(open));
-    await act(() => result.current.remove());
-    expect(mocks.setVisited).toHaveBeenCalledWith({
-      itemId: ITEM,
-      name: "Tigre",
-      visited: false,
-      spot: { lat: 1, lng: 2 },
-    });
-    expect(mocks.capture).toHaveBeenCalledWith("place_unstamped", {
-      surface: "passport",
-    });
-    expect(result.current.open).toBeNull();
-  });
-
-  it("takes back a stamp with no spot by its name alone", async () => {
-    mocks.setVisited.mockResolvedValue(null);
-    const { result } = renderHook(() => useStamping());
-    const { spot: _spot, ...named } = open;
-    act(() => result.current.show(named));
-    await act(() => result.current.remove());
-    expect(mocks.setVisited).toHaveBeenCalledWith({
-      itemId: ITEM,
-      name: "Tigre",
-      visited: false,
-    });
-  });
-
-  it("keeps the stamp open and says so when taking it back fails", async () => {
-    mocks.setVisited.mockRejectedValueOnce(new Error("offline"));
-    const { result } = renderHook(() => useStamping());
-    act(() => result.current.show(open));
-    await act(() => result.current.remove());
-    expect(result.current.open).toMatchObject({ name: "Tigre" });
-    expect(mocks.alert).toHaveBeenCalled();
-    expect(mocks.captureError).toHaveBeenLastCalledWith(
-      "place_unstamp_failed",
-      expect.any(Error),
-    );
-  });
-
-  it("sends one request for a double tap", async () => {
-    let finish = () => {};
-    mocks.setVisited.mockImplementation(
-      () => new Promise<null>((resolve) => (finish = () => resolve(null))),
-    );
-    const { result } = renderHook(() => useStamping());
-    act(() => result.current.show(open));
-    await act(async () => {
-      const first = result.current.remove();
-      void result.current.remove();
-      finish();
-      await first;
-    });
-    expect(mocks.setVisited).toHaveBeenCalledTimes(1);
-  });
-
-  it("keeps another stamp open when an earlier removal finishes", async () => {
-    let finish = () => {};
-    mocks.setVisited.mockImplementation(
-      () => new Promise<null>((resolve) => (finish = () => resolve(null))),
-    );
-    const other = { ...open, name: "Ramiro", spot: { lat: 3, lng: 4 } };
-    const { result } = renderHook(() => useStamping());
-    act(() => result.current.show(open));
-    let removing: Promise<void> = Promise.resolve();
-    act(() => {
-      removing = result.current.remove();
-    });
-    act(() => result.current.show(other));
-    await act(async () => {
-      finish();
-      await removing;
-    });
-    expect(result.current.open).toEqual(other);
   });
 });

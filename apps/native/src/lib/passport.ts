@@ -1,15 +1,10 @@
-import { analytics } from "@/lib/analytics";
-import { haptics } from "@/lib/haptics";
-import { t } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { cityKey } from "@convex/model/trip";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useConvexAuth, useMutation } from "convex/react";
+import { useConvexAuth } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
-import { useRef, useState } from "react";
-import { Alert } from "react-native";
 
 export type Stamp = FunctionReturnType<
   typeof api.placeVisits.getPassport
@@ -84,17 +79,6 @@ export function unstampedCities(places: readonly UnstampedPlace[]) {
   return [...groups.values()];
 }
 
-export type WentFilter = "all" | "want" | "went";
-
-export function filterByWent<Place>(
-  places: readonly Place[],
-  filter: WentFilter,
-  went: (place: Place) => boolean,
-): Place[] {
-  if (filter === "all") return [...places];
-  return places.filter((place) => went(place) === (filter === "went"));
-}
-
 export function stampId(stamp: Stamp): string {
   return `${stamp.key}:${stamp.lat ?? ""}:${stamp.lng ?? ""}`;
 }
@@ -164,36 +148,4 @@ export function openStampOf(stamp: Stamp, city: string): OpenStamp {
       ? { spot: { lat: stamp.lat, lng: stamp.lng } }
       : {}),
   };
-}
-
-export function useStamping() {
-  const setVisited = useMutation(api.placeVisits.setVisited);
-  const working = useRef(false);
-  const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState<OpenStamp | null>(null);
-
-  const remove = async () => {
-    if (open === null || working.current) return;
-    working.current = true;
-    setBusy(true);
-    try {
-      await setVisited({
-        itemId: open.itemId,
-        name: open.name,
-        visited: false,
-        ...(open.spot ? { spot: open.spot } : {}),
-      });
-      void haptics.selection();
-      analytics.capture("place_unstamped", { surface: "passport" });
-      setOpen((current) => (current === open ? null : current));
-    } catch (error) {
-      analytics.captureError("place_unstamp_failed", error);
-      Alert.alert(t("errors.unexpectedTitle"), t("errors.retrySoon"));
-    } finally {
-      working.current = false;
-      setBusy(false);
-    }
-  };
-
-  return { busy, open, show: setOpen, close: () => setOpen(null), remove };
 }

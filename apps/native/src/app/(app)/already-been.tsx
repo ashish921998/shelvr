@@ -11,6 +11,7 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { unstampedCities, type UnstampedPlace } from "@/lib/passport";
 import { backOrHome } from "@/lib/screen-dismiss";
 import { api } from "@convex/_generated/api";
+import { MAX_BATCH_PLACES } from "@convex/model/placeVisits";
 import { saveErrorCode } from "@convex/model/saveErrors";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -20,8 +21,6 @@ import { Stack, useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Platform, Pressable, ScrollView, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-
-const MAX_PICKS = 60;
 
 const pickId = (place: UnstampedPlace) =>
   `${place.itemId}|${place.name}|${place.spot.lat},${place.spot.lng}`;
@@ -96,16 +95,10 @@ export default function AlreadyBeenScreen() {
   const { theme } = useUnistyles();
   const places = useQuery(convexQuery(api.placeVisits.listUnstampedPlaces, {}));
   const markVisitedBefore = useMutation(api.placeVisits.markVisitedBefore);
-  const [chosen, setPicked] = useState<ReadonlyMap<string, UnstampedPlace>>(
-    new Map(),
+  const [pickedIds, setPickedIds] = useState<ReadonlySet<string>>(new Set());
+  const picked = (places.data ?? []).filter((place) =>
+    pickedIds.has(pickId(place)),
   );
-  const live = new Set(places.data?.map(pickId));
-  const picked = new Map([...chosen].filter(([id]) => live.has(id)));
-  const [seen, setSeen] = useState(places.data);
-  if (seen !== places.data) {
-    setSeen(places.data);
-    if (picked.size !== chosen.size) setPicked(picked);
-  }
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (places.error) {
@@ -116,12 +109,12 @@ export default function AlreadyBeenScreen() {
 
   const toggle = (place: UnstampedPlace) => {
     const id = pickId(place);
-    if (!picked.has(id) && picked.size >= MAX_PICKS) return;
+    if (!pickedIds.has(id) && picked.length >= MAX_BATCH_PLACES) return;
     void haptics.selection();
-    setPicked((current) => {
-      const next = new Map(current);
+    setPickedIds((current) => {
+      const next = new Set(current);
       if (next.has(id)) next.delete(id);
-      else next.set(id, place);
+      else next.add(id);
       return next;
     });
   };
@@ -136,11 +129,11 @@ export default function AlreadyBeenScreen() {
   );
 
   const submit = async () => {
-    if (busy || picked.size === 0) return;
+    if (busy || picked.length === 0) return;
     setBusy(true);
     try {
       const count = await markVisitedBefore({
-        places: [...picked.values()].map(({ itemId, name, spot }) => ({
+        places: picked.map(({ itemId, name, spot }) => ({
           itemId,
           name,
           spot,
@@ -232,10 +225,11 @@ export default function AlreadyBeenScreen() {
               <PlaceRow
                 key={pickId(place)}
                 place={place}
-                selected={picked.has(pickId(place))}
+                selected={pickedIds.has(pickId(place))}
                 disabled={
                   busy ||
-                  (picked.size >= MAX_PICKS && !picked.has(pickId(place)))
+                  (picked.length >= MAX_BATCH_PLACES &&
+                    !pickedIds.has(pickId(place)))
                 }
                 onPress={() => toggle(place)}
               />
@@ -247,11 +241,11 @@ export default function AlreadyBeenScreen() {
         <Button
           testID="already-been-submit"
           title={
-            picked.size === 0
+            picked.length === 0
               ? t("passport.pickNone")
-              : t("passport.stampCount", { count: picked.size })
+              : t("passport.stampCount", { count: picked.length })
           }
-          disabled={picked.size === 0}
+          disabled={picked.length === 0}
           loading={busy}
           onPress={() => void submit()}
         />
