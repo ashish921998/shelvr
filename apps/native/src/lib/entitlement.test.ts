@@ -739,6 +739,15 @@ describe("restore from the paywall", () => {
     expect(mock.observed).toHaveBeenCalledWith("CANCELLED");
   });
 
+  it("does not count a restore that found nothing as the person answering", async () => {
+    const { openPaywallAnswer } = await loadReady();
+    mock.presentPaywallIfNeeded.mockResolvedValue("RESTORED");
+
+    await expect(
+      openPaywallAnswer(router, "onboarding", { fallback: true }),
+    ).resolves.toEqual({ outcome: "cancelled", answered: false });
+  });
+
   it("keeps a restore whose customer info could not be read", async () => {
     const { openPaywall } = await loadReady();
     mock.presentPaywallIfNeeded.mockImplementation(async () => {

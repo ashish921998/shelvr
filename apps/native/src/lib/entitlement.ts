@@ -397,7 +397,10 @@ async function presentPaywallImpl(
       });
     const result = await observePaywallPresentation(
       enriched,
-      () => nativePresentation(owner, present).then(confirmRestore),
+      () =>
+        nativePresentation(owner, present).then((outcome) =>
+          confirmRestore(outcome, owner),
+        ),
       activeProductId,
     );
     if (result === "PURCHASED" || result === "RESTORED") {
@@ -409,9 +412,14 @@ async function presentPaywallImpl(
   }
 }
 
-async function confirmRestore(result: string): Promise<string> {
+async function confirmRestore(
+  result: string,
+  sheet: OpenSheet | null,
+): Promise<string> {
   if (result !== "RESTORED") return result;
-  return (await restoreCameBackEmpty()) ? "CANCELLED" : result;
+  if (!(await restoreCameBackEmpty())) return result;
+  if (sheet) sheet.emptyRestore = true;
+  return "CANCELLED";
 }
 
 const SHEET_STALE_MS = 5 * 60_000;
@@ -423,6 +431,7 @@ type OpenSheet = {
   paywall: Promise<PaywallOutcome> | null;
   nativeSince?: number;
   abandon?: () => void;
+  emptyRestore?: boolean;
 };
 let openSheet: OpenSheet | null = null;
 let lastAppTouchAt = 0;
@@ -526,7 +535,7 @@ async function presentPaywall(placement = "pro_gate"): Promise<Presentation> {
       releaseSheet(sheet);
     });
   const outcome = await sheet.paywall;
-  return { outcome, owned: true, answered: !dropped };
+  return { outcome, owned: true, answered: !dropped && !sheet.emptyRestore };
 }
 
 /** Resolves true only on purchase/restore; routes to the paywall screen when unavailable, never on cancel. */
