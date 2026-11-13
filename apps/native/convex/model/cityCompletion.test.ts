@@ -260,6 +260,20 @@ describe("completionByCity", () => {
     ).toEqual([{ city: "Lisbon", stamped: 0, total: 2 }]);
   });
 
+  it("leaves out a stamp on a place only an older save holds, as the city page does", () => {
+    expect(
+      completion({
+        saves: [
+          { cities: ["Lisbon"], placePins: [TIGRE] },
+          { cities: ["Lisbon"], placePins: [BLEND] },
+          { cities: ["Lisbon"], placePins: [MANTEIGARIA] },
+        ],
+        ...stamped([MANTEIGARIA], "Lisbon"),
+        savesPerCity: 2,
+      }),
+    ).toEqual([{ city: "Lisbon", stamped: 0, total: 2 }]);
+  });
+
   it("puts the latest dated stamp first, then undated stamps, then unstamped cities by size", () => {
     const pin = (name: string, lat: number) => ({ name, lat, lng: 0 });
     const rows = completion({
