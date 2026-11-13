@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   clearSpotlight: vi.fn(),
   clearCaptureCredentials: vi.fn(),
   deleteThumbs: vi.fn(),
+  clearInvocations: vi.fn(),
   captureError: vi.fn(),
   appState: [] as ((state: string) => void)[],
 }));
@@ -20,7 +21,7 @@ vi.mock("convex/react", () => ({
 vi.mock("expo-app-intents", () => ({
   isAvailable: () => true,
   setEntityCatalogAsync: mocks.setEntityCatalog,
-  clearPendingInvocationsAsync: () => Promise.resolve(),
+  clearPendingInvocationsAsync: mocks.clearInvocations,
 }));
 vi.mock("expo-modules-core", () => ({
   requireOptionalNativeModule: () => ({
@@ -84,6 +85,7 @@ beforeEach(() => {
   mocks.clearSpotlight.mockReset().mockResolvedValue(undefined);
   mocks.clearCaptureCredentials.mockReset().mockResolvedValue(undefined);
   mocks.deleteThumbs.mockReset();
+  mocks.clearInvocations.mockReset().mockResolvedValue(undefined);
   mocks.captureError.mockReset();
   mocks.appState = [];
 });
@@ -103,6 +105,7 @@ it("finishes a sign-out clear that failed partway once the app is back in front"
   await flush();
   expect(mocks.setEntityCatalog).toHaveBeenCalledTimes(4);
   expect(mocks.clearSpotlight).toHaveBeenCalledTimes(2);
+  expect(mocks.clearInvocations).toHaveBeenCalledOnce();
 
   mocks.appState.forEach((listener) => listener("active"));
   await flush();

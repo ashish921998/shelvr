@@ -216,12 +216,12 @@ function clearCatalogs(): Promise<boolean> {
   }, true).then(() => cleared);
 }
 
-async function resetAppIntents(): Promise<boolean> {
+async function resetAppIntents(clearInvocations: boolean): Promise<boolean> {
   if (!AppIntents.isAvailable()) return true;
   store.remove(CAPTURE_OWNER_KEY);
   const [, , cleared] = await Promise.all([
     setup?.clearCaptureCredentials(),
-    AppIntents.clearPendingInvocationsAsync(),
+    clearInvocations ? AppIntents.clearPendingInvocationsAsync() : undefined,
     clearCatalogs(),
   ]);
   return cleared;
@@ -247,10 +247,10 @@ export function useAppIntentsSignOutReset(): void {
       reset.current = false;
       return;
     }
-    const run = () => {
+    const run = (clearInvocations: boolean) => {
       if (reset.current) return;
       reset.current = true;
-      void resetAppIntents()
+      void resetAppIntents(clearInvocations)
         .then((cleared) => {
           if (!cleared) reset.current = false;
         })
@@ -259,9 +259,9 @@ export function useAppIntentsSignOutReset(): void {
           analytics.captureError("app_intents_reset_failed", error);
         });
     };
-    run();
+    run(true);
     const subscription = AppState.addEventListener("change", (state) => {
-      if (state === "active") run();
+      if (state === "active") run(false);
     });
     return () => subscription.remove();
   }, [isAuthenticated, isLoading]);
