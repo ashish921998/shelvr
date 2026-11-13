@@ -26,6 +26,7 @@ import {
 } from "./model/appleTokens";
 import { takeWithinBytes } from "./model/readBudget";
 import { logEvent } from "./model/log";
+import { deletePassportSharesForUser } from "./passportShares";
 import { deletePlanSharesForUser } from "./planShares";
 import { deleteSharedListsBatch } from "./sharedLists";
 
@@ -398,6 +399,7 @@ async function deleteSharingAndPlansBatch(
     (await deleteTripsBatch(ctx, userId)) &&
     (await deleteTripPlansBatch(ctx, userId)) &&
     (await deletePlanSharesForUser(ctx, userId)) &&
+    (await deletePassportSharesForUser(ctx, userId)) &&
     (await deleteSharedListsBatch(ctx, userId))
   );
 }

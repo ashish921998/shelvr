@@ -12,6 +12,7 @@ import { freeSavesTitle } from "@/lib/free-saves-title";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS, SUPPORT_EMAIL, SUPPORT_URL } from "@/lib/legal";
 import { manageSubscription } from "@/lib/manage-subscription";
+import { usePassportShare, useStopSharingPassport } from "@/lib/passport-share";
 import {
   backOrHome,
   closeScreen,
@@ -50,6 +51,8 @@ export default function SettingsScreen() {
     getState: () => { routes: { name: string }[] };
   };
   const { theme } = useUnistyles();
+  const passportShare = usePassportShare();
+  const stopSharingPassport = useStopSharingPassport();
   const { data: notificationPreferences } = useQuery(
     convexQuery(api.notifications.getPreferences, {}),
   );
@@ -267,6 +270,17 @@ export default function SettingsScreen() {
       <UpdateSetting />
 
       <LegalConsentPreference />
+
+      {passportShare !== null ? (
+        <SettingsGroup>
+          <SettingsRow
+            testID="settings-stop-sharing-passport"
+            divider={false}
+            label={t("passportShare.stopSetting")}
+            onPress={stopSharingPassport}
+          />
+        </SettingsGroup>
+      ) : null}
 
       {access.kind === "free" ? (
         <SettingsGroup>

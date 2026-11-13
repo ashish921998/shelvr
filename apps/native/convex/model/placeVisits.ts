@@ -6,6 +6,7 @@ import { placeKey, splitSavedPlace } from "./plan";
 import { distanceKm, otherVenue, SAME_PLACE_KM } from "./trip";
 
 export const MAX_VISIT_SPOTS = 20;
+export const MAX_BATCH_PLACES = 60;
 const MAX_VISITS = 1000;
 
 export const visitSpotValidator = v.object({
@@ -235,7 +236,28 @@ export async function rowSpots(
   ctx: QueryCtx,
   row: Doc<"placeVisits">,
 ): Promise<VisitSpot[] | undefined> {
-  return row.spots ?? spotsOnItem(await ctx.db.get(row.itemId), row.name);
+  return row.spots ?? spotsOfRow(row, await ctx.db.get(row.itemId));
+}
+
+function spotsOfRow(
+  row: Doc<"placeVisits">,
+  item: Doc<"items"> | null,
+): VisitSpot[] | undefined {
+  if (row.spots !== undefined) return row.spots;
+  return withStampedSpots(row, spotsOnItem(item, row.name) ?? []);
+}
+
+export function withStampedSpots(
+  row: Pick<Doc<"placeVisits">, "stampPlaces">,
+  pinned: readonly VisitSpot[],
+): VisitSpot[] | undefined {
+  const stamped = (row.stampPlaces ?? [])
+    .filter(
+      (place) => !pinned.some((pin) => distanceKm(pin, place) <= SAME_PLACE_KM),
+    )
+    .map(({ lat, lng }) => ({ lat, lng }));
+  const spots = [...pinned, ...stamped];
+  return spots.length === 0 ? undefined : spots;
 }
 
 export async function userVisits(
@@ -260,8 +282,7 @@ export async function userVisits(
     items.set(id, item);
   }
   return rows.map((row) => {
-    const spots =
-      row.spots ?? spotsOnItem(items.get(row.itemId) ?? null, row.name);
+    const spots = spotsOfRow(row, items.get(row.itemId) ?? null);
     return spots === undefined
       ? { key: row.key, name: row.name }
       : { key: row.key, name: row.name, spots };

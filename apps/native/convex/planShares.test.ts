@@ -754,7 +754,7 @@ describe("deletion", () => {
     await vote(backend, token, "a", ["p0"]);
 
     await t.mutation(api.users.deleteCurrentUserAccount, {});
-    await backend.finishAllScheduledFunctions(vi.runAllTimers);
+    await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(await countRows(backend)).toEqual({ shares: 0, votes: 0 });
   });
 });
@@ -768,7 +768,7 @@ describe("purgeExpiredPlanShares", () => {
       places,
     });
     await vote(backend, old, "a", ["p0"]);
-    vi.advanceTimersByTime(2 * PLAN_SHARE_TTL_MS + 1);
+    vi.advanceTimersByTime(2 * PLAN_SHARE_TTL_MS + 60_000);
     const fresh = await t.mutation(api.planShares.createPlanShare, {
       spaceId,
       places,
