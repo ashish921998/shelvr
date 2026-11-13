@@ -223,6 +223,29 @@ describe("useReplayOnboarding and the account", () => {
     expect(getPendingDemoUrl()).toBeNull();
   });
 
+  it("clears a link that saved while another account signed in, so that account does not save it again", async () => {
+    let finishSave: (id: string) => void = () => {};
+    createLinkItem.mockImplementationOnce(
+      () => new Promise((resolve) => (finishSave = resolve)),
+    );
+    createLinkItem.mockResolvedValue("item");
+    queueDemoUrl("https://example.com/recipe", null);
+
+    const hook = renderHook(() => useReplayOnboarding());
+    await settle();
+    expect(createLinkItem).toHaveBeenCalledOnce();
+
+    account.user = { _id: "user_2" };
+    hook.rerender();
+    await act(async () => finishSave("item"));
+    await settle();
+    hook.rerender();
+    await settle();
+
+    expect(getPendingDemoUrl()).toBeNull();
+    expect(createLinkItem).toHaveBeenCalledOnce();
+  });
+
   it("writes nothing more once it unmounts mid-run", async () => {
     let finishSpace: (id: string) => void = () => {};
     createSpace.mockImplementationOnce(

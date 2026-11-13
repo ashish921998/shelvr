@@ -204,9 +204,9 @@ export function useReplayOnboarding(
               analyticsSessionId: analytics.sessionId(),
               saveSource: "onboarding_demo",
             });
-            if (!sameAccount()) return;
             if (getPendingOperationId() === demo.operationId)
               clearLegacyDemoUrl();
+            if (!sameAccount()) return;
             remainderKey = pendingWorkKey();
           } catch (error) {
             analytics.captureError("onboarding_demo_save_failed", error);
