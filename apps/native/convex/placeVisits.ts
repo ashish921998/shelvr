@@ -29,6 +29,7 @@ import { linkSource } from "./model/externalUrl";
 import { logEvent } from "./model/log";
 import { normalizeCities, normalizePlaceName } from "./model/itemFields";
 import { type PassportPlace, soleCity } from "./model/passport";
+import { placeKinds } from "./model/placeKinds";
 import { userRemovals, visibleCitySave } from "./model/placeRemovals";
 import { approximateDocBytes } from "./model/readBudget";
 import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
@@ -618,6 +619,35 @@ export const getPassport = authedQuery({
     return stamps.map(({ appleId: _appleId, ...stamp }) => ({
       ...stamp,
       cover: covers.get(stamp.itemId) ?? null,
+    }));
+  },
+});
+
+const badgeStampValidator = v.object({
+  city: v.optional(v.string()),
+  countryCode: v.optional(v.string()),
+  kinds: v.array(v.string()),
+});
+
+function stampKinds(save: Doc<"items"> | null, stamp: StampRow) {
+  if (save === null) return [];
+  const pin = save.placePins?.find(
+    (candidate) =>
+      (stamp.appleId !== undefined && candidate.appleId === stamp.appleId) ||
+      (candidate.lat === stamp.lat && candidate.lng === stamp.lng),
+  );
+  return placeKinds(pin?.category, save.tags, pin?.cuisine);
+}
+
+export const listBadgeStamps = authedQuery({
+  args: {},
+  returns: v.array(badgeStampValidator),
+  handler: async (ctx) => {
+    const { stamps, saves } = await stampRows(ctx, ctx.userId);
+    return stamps.map((stamp) => ({
+      ...(stamp.city ? { city: stamp.city } : {}),
+      ...(stamp.countryCode ? { countryCode: stamp.countryCode } : {}),
+      kinds: stampKinds(saves.get(stamp.itemId) ?? null, stamp),
     }));
   },
 });
