@@ -398,7 +398,7 @@ describe("weekly shelf notifications", () => {
         cursor: expect.any(String),
       });
 
-      await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
       const remaining = await t.run((ctx) =>
         ctx.db
           .query("notificationPreferences")
@@ -530,7 +530,7 @@ describe("weekly shelf notifications", () => {
       });
 
       await t.mutation(internal.notifications.prepareDueWeeklyDigests, {});
-      await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
       const preferences = await t.query(api.notifications.getPreferences, {});
       expect(preferences.nextDigestAt).toBeGreaterThan(now);

@@ -103,7 +103,7 @@ module.exports = defineConfig([
         "error",
         {
           selector:
-            "CallExpression[callee.property.name='finishAllScheduledFunctions'] > MemberExpression.arguments[property.name='runAllTimers']",
+            "CallExpression[callee.property.name='finishAllScheduledFunctions'] MemberExpression[property.name='runAllTimers']",
           message:
             "Pass vi.runOnlyPendingTimers. runAllTimers never lets promises settle inside one call, so a timer that waits on async work aborts the test after 10000 timers when the machine is busy.",
         },
