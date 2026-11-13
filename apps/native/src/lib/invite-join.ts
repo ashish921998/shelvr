@@ -107,8 +107,10 @@ export function useInviteJoinCoordinator() {
               });
               return passportResolution(passport !== null, step.token);
             });
+    const abandoned = () => getPendingInvite() !== step.raw;
     resolve
       .then((resolution) => {
+        if (abandoned()) return;
         const outcome = inviteJoinOutcome(resolution, onboardedRef.current);
         clearPendingInvite();
         if (outcome.completeOnboarding) {
@@ -119,6 +121,7 @@ export function useInviteJoinCoordinator() {
         router.replace(outcome.href as never);
       })
       .catch((error: unknown) => {
+        if (abandoned()) return;
         clearPendingInvite();
         if (step.kind === "list") {
           analytics.captureError("shared_list_join_failed", error);

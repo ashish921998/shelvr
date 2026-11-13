@@ -12,7 +12,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   onboarded: true,
-  pending: "abc",
+  pending: "abc" as string | null,
   join: vi.fn(),
   query: vi.fn(),
   alert: vi.fn(),
@@ -124,6 +124,25 @@ describe("useInviteJoinCoordinator", () => {
       "passport_resume_failed",
       expect.any(Error),
     );
+  });
+
+  it("ignores a passport check that finishes after the person left the invite", async () => {
+    mocks.onboarded = false;
+    mocks.pending = "passport:tok1";
+    let answer: (value: unknown) => void = () => {};
+    mocks.query.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    renderHook(() => useInviteJoinCoordinator());
+    mocks.pending = null;
+    await act(async () => {
+      answer({ places: 1 });
+    });
+    expect(mocks.clearPendingInvite).not.toHaveBeenCalled();
+    expect(mocks.completeOnboarding).not.toHaveBeenCalled();
+    expect(mocks.router.replace).not.toHaveBeenCalled();
   });
 
   it("keeps a queued reel when an onboarded person joins from the paywall", async () => {

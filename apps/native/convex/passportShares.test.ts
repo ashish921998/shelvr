@@ -416,6 +416,28 @@ describe("saveFriendPlaces", () => {
     expect(saves.map((save) => save.places)).toEqual([["Le Comptoir"]]);
   });
 
+  it("saves a place in a city that ends in a period only once", async () => {
+    const backend = newConvexTest();
+    const maya = await person(backend, "Maya Shah");
+    await stamp(backend, maya.userId, {
+      name: "Old Ebbitt Grill",
+      city: "Washington, D.C.",
+      spot: { lat: 38.8979, lng: -77.0331 },
+    });
+    const token = await maya.t.mutation(api.passportShares.sharePassport, {});
+    const sam = await person(backend, "Sam");
+    const run = () =>
+      sam.t.mutation(api.passportShares.saveFriendPlaces, {
+        token,
+        note: "From Maya’s passport",
+      });
+
+    expect(await run()).toEqual({ saved: 1, remaining: 0 });
+    expect(await run()).toEqual({ saved: 0, remaining: 0 });
+    const saves = await savesOf(backend, sam.userId);
+    expect(saves.map((save) => save.cities)).toEqual([["Washington, D.C"]]);
+  });
+
   it("counts a pinned place as saved only in its pin's city", async () => {
     const backend = newConvexTest();
     const maya = await sharedMaya(backend);

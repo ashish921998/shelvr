@@ -18,7 +18,7 @@ import {
 import { authedMutation, authedQuery, liveOwner } from "./model/auth";
 import { linkSource } from "./model/externalUrl";
 import { logEvent } from "./model/log";
-import { normalizePlaceName } from "./model/itemFields";
+import { normalizeCities, normalizePlaceName } from "./model/itemFields";
 import type { PassportPlace } from "./model/passport";
 import { approximateDocBytes } from "./model/readBudget";
 import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
@@ -576,12 +576,16 @@ export async function passportPlaces(
   userId: string,
 ): Promise<PassportPlace[]> {
   const { stamps } = await stampRows(ctx, userId);
-  return stamps.map(({ name, city, lat, lng, countryCode }) => ({
-    name: normalizePlaceName(name, city ? [city] : []),
-    ...(city ? { city } : {}),
-    ...(lat !== undefined && lng !== undefined ? { lat, lng } : {}),
-    ...(countryCode ? { countryCode } : {}),
-  }));
+  return stamps.map(({ name, city: raw, lat, lng, countryCode }) => {
+    const cities = normalizeCities(raw ? [raw] : []);
+    const city = cities.at(0);
+    return {
+      name: normalizePlaceName(name, cities),
+      ...(city ? { city } : {}),
+      ...(lat !== undefined && lng !== undefined ? { lat, lng } : {}),
+      ...(countryCode ? { countryCode } : {}),
+    };
+  });
 }
 
 export const getPassport = authedQuery({
