@@ -1,4 +1,6 @@
+import { BadgeMomentView } from "@/components/passport/badge-moment";
 import { StampArt } from "@/components/passport/stamp-sheet";
+import { useBadgeUnlocks } from "@/lib/badges";
 import { fadeOut, motion } from "@/lib/motion";
 import {
   type ShownStamp,
@@ -156,12 +158,20 @@ function StampMomentView({
 
 export function StampMomentProvider({ children }: { children: ReactNode }) {
   const reduced = useReducedMotion();
-  const { shown, controls, dismiss } = useStampMomentPlayer(reduced);
+  const { shown, controls, dismiss, badge, dismissBadge, unlock } =
+    useStampMomentPlayer(reduced);
+  useBadgeUnlocks(unlock);
   return (
     <StampMomentPlayContext value={controls}>
       {children}
       {shown ? (
         <StampMomentView key={shown.id} shown={shown} onDismiss={dismiss} />
+      ) : badge ? (
+        <BadgeMomentView
+          key={badge.id}
+          shown={badge}
+          onDismiss={dismissBadge}
+        />
       ) : null}
     </StampMomentPlayContext>
   );
