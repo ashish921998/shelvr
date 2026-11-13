@@ -6,7 +6,6 @@ import { api, internal } from "./_generated/api";
 import type { TestConvexForDataModel } from "convex-test";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { AI_CONSENT_VERSION, isAiConsentRequired } from "./model/aiConsent";
-import { EMBEDDING_DIMENSIONS } from "./model/embedding";
 import {
   insertConsentingUser,
   newConvexTest,
@@ -14,12 +13,10 @@ import {
 } from "./test.setup";
 import { aiAllowed } from "./aiConsent";
 
-const embedMany = vi.hoisted(() => vi.fn());
 const generateObject = vi.hoisted(() => vi.fn());
 const safeFetch = vi.hoisted(() => vi.fn());
 
 vi.mock("ai", () => ({
-  embedMany,
   generateObject,
   wrapLanguageModel: vi.fn(() => ({})),
 }));
@@ -30,9 +27,6 @@ vi.mock("./model/safeFetch", async (original) => ({
 }));
 
 let USER: string;
-const VECTOR = Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) =>
-  i === 0 ? 1 : 0,
-);
 
 type T = TestConvexForDataModel<DataModel>;
 
@@ -47,7 +41,6 @@ async function signedIn(
 
 async function expectNoThirdPartyCall() {
   expect(generateObject).not.toHaveBeenCalled();
-  expect(embedMany).not.toHaveBeenCalled();
   const hosts = safeFetch.mock.calls.map(([url]) => new URL(url).hostname);
   expect(hosts).not.toContain("serpapi.com");
 }
@@ -99,10 +92,6 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   vi.stubEnv("POSTHOG_PROJECT_TOKEN", "");
   vi.stubEnv("SERPAPI_KEY", "unit-test-only");
-  embedMany.mockReset();
-  embedMany.mockImplementation(async ({ values }: { values: string[] }) => ({
-    embeddings: values.map(() => VECTOR),
-  }));
   generateObject.mockReset();
   generateObject.mockResolvedValue({
     object: {
@@ -267,7 +256,6 @@ describe("a user who declined", () => {
       intents: [],
     });
     expect(item?.content).toContain("Simmer the lentils.");
-    expect(item?.embedding).toBeUndefined();
     const memberships = await t.run((ctx) =>
       ctx.db
         .query("spaceItems")
@@ -492,7 +480,7 @@ describe("a decline that lands while a run is still out", () => {
     );
   });
 
-  it("discards the model's answer and skips the embedding when AI goes off mid-save", async () => {
+  it("discards the model's answer when AI goes off mid-save", async () => {
     const t = await signedIn();
     const itemId = await processing(t, { type: "note", note: "Buy lentils" });
     generateObject.mockImplementationOnce(async () => {
@@ -510,7 +498,6 @@ describe("a decline that lands while a run is still out", () => {
 
     await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
 
-    expect(embedMany).not.toHaveBeenCalled();
     const item = await t.run((ctx) => ctx.db.get(itemId));
     expect(item).toMatchObject({
       status: "ready",
@@ -518,7 +505,6 @@ describe("a decline that lands while a run is still out", () => {
       description: "",
       tags: [],
     });
-    expect(item?.embedding).toBeUndefined();
     expect(await t.run((ctx) => ctx.db.query("spaceItems").collect())).toEqual(
       [],
     );

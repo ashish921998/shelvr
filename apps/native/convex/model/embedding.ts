@@ -1,5 +1,0 @@
-export const RECOMMEND_CANDIDATES = 100;
-
-export const EMBEDDING_DIMENSIONS = 768;
-
-export const CURRENT_EMBEDDING_VERSION = 1;
