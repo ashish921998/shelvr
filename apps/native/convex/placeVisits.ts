@@ -526,7 +526,7 @@ async function coverOf(
 }
 
 type PassportStamp = Infer<typeof stampValidator>;
-type StampRow = Omit<PassportStamp, "cover">;
+type StampRow = Omit<PassportStamp, "cover"> & { appleId?: string };
 
 async function stampRows(
   ctx: QueryCtx,
@@ -572,6 +572,7 @@ async function stampRows(
         ...base,
         lat: spot.lat,
         lng: spot.lng,
+        ...(spot.appleId === undefined ? {} : { appleId: spot.appleId }),
         ...(city ? { city } : {}),
         ...(place?.countryCode ? { countryCode: place.countryCode } : {}),
       });
@@ -606,7 +607,7 @@ export const getPassport = authedQuery({
     for (const [itemId, owned] of saves) {
       covers.set(itemId, await coverOf(ctx, owned));
     }
-    return stamps.map((stamp) => ({
+    return stamps.map(({ appleId: _appleId, ...stamp }) => ({
       ...stamp,
       cover: covers.get(stamp.itemId) ?? null,
     }));

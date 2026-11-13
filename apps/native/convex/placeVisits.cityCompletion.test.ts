@@ -12,6 +12,7 @@ const TIGRE = { name: "Tigre", lat: 38.71, lng: -9.14 };
 const BLEND = { name: "Blend", lat: 38.72, lng: -9.15 };
 const MANTEIGARIA = { name: "Manteigaria", lat: 38.711, lng: -9.143 };
 const MAJESTIC = { name: "Majestic", lat: 41.15, lng: -8.61 };
+const CERVEJARIA = { name: "Cervejaria", lat: 38.73, lng: -9.16 };
 
 type Pin = { name: string; lat: number; lng: number; city?: string };
 
@@ -119,10 +120,14 @@ describe("cityCompletion", () => {
     ]);
   });
 
-  it("lists the city stamped last first, then unstamped cities by size", async () => {
-    const { save, stamp, rings } = await setup();
+  it("lists the city stamped last first, then undated stamps, then unstamped cities by size", async () => {
+    const { t, save, stamp, rings } = await setup();
     const lisbon = await save(["Lisbon"], [TIGRE]);
     const porto = await save(["Porto"], [MAJESTIC]);
+    const faro = await save(
+      ["Faro"],
+      [{ name: "Gelo", lat: 37.02, lng: -7.93 }],
+    );
     await save(["Madrid"], [{ name: "Sobrino", lat: 40.41, lng: -3.7 }]);
     await save(
       ["Rome"],
@@ -134,16 +139,32 @@ describe("cityCompletion", () => {
     await stamp(porto, MAJESTIC);
     vi.advanceTimersByTime(60_000);
     await stamp(lisbon, TIGRE);
+    vi.advanceTimersByTime(60_000);
+    await t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [{ itemId: faro, name: "Gelo" }],
+    });
     expect((await rings()).map(({ city }) => city)).toEqual([
       "Lisbon",
       "Porto",
+      "Faro",
       "Rome",
       "Madrid",
     ]);
   });
 
+  it("counts one place once when two stamps tick it", async () => {
+    const { save, stamp, rings } = await setup();
+    const nextDoor = { ...TIGRE, lat: TIGRE.lat + 0.0005 };
+    const first = await save(["Lisbon"], [TIGRE]);
+    const second = await save(["Lisbon"], [nextDoor]);
+    await stamp(first, TIGRE);
+    await stamp(second, { ...nextDoor, name: "Tigre, Lisbon" });
+    await stamp(second, nextDoor);
+    expect(await rings()).toEqual([{ city: "Lisbon", stamped: 1, total: 1 }]);
+  });
+
   it("agrees with the city page's progress for the same saves", async () => {
-    const { t, save, stamp, rings } = await setup();
+    const { t, userId, save, stamp, rings } = await setup();
     const both = await save(
       ["Lisbon", "Porto"],
       [
@@ -152,12 +173,24 @@ describe("cityCompletion", () => {
         { name: "Somewhere", lat: 40, lng: -8 },
       ],
     );
+    const nextDoor = { ...TIGRE, lat: TIGRE.lat + 0.0005 };
     const lisbon = await save(
       ["Lisbon"],
-      [{ ...TIGRE, lat: TIGRE.lat + 0.0005 }, BLEND, MANTEIGARIA],
+      [nextDoor, BLEND, MANTEIGARIA, CERVEJARIA],
     );
     await stamp(both, { ...TIGRE, city: "Lisbon" });
+    await stamp(lisbon, nextDoor);
+    await stamp(lisbon, { ...nextDoor, name: "Tigre, Lisbon" });
     await stamp(lisbon, BLEND);
+    await t.run((ctx) =>
+      ctx.db.insert("placeVisits", {
+        userId,
+        key: "cervejaria",
+        name: "Cervejaria",
+        itemId: both,
+        visitedAt: Date.now(),
+      }),
+    );
     await t.mutation(api.placeRemovals.removePlace, {
       itemId: lisbon,
       ...MANTEIGARIA,
@@ -175,8 +208,13 @@ describe("cityCompletion", () => {
     expect(await rings()).toEqual([await page("Lisbon"), await page("Porto")]);
     expect(await page("Lisbon")).toEqual({
       city: "Lisbon",
-      stamped: 2,
-      total: 2,
+      stamped: 3,
+      total: 3,
     });
+    expect(
+      (await t.query(api.placeVisits.getPassport, {})).filter(
+        (row) => row.city === "Lisbon",
+      ),
+    ).toHaveLength(4);
   });
 });
