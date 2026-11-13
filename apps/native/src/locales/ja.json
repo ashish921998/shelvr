@@ -1124,6 +1124,24 @@
   "passport.cardSavedElsewhere": "あとで行く用に保存。",
   "passport.cardWent": "Shelvrで行った。",
   "passport.shareCity": "%{city}を共有",
+  "passport.momentCityComplete": "%{city}コンプリート",
+  "passport.ringCount": "%{visited}/%{total}",
+  "passport.ringLabel": {
+    "other": "%{city}で%{formattedCount}か所中%{visited}か所にスタンプ"
+  },
+  "passport.ringLocked": {
+    "other": "%{city}に%{formattedCount}か所保存済み"
+  },
+  "passport.ringHint": "まだスタンプしていない場所を表示",
+  "passport.ringLockedHint": "Shelvr Proで場所にスタンプ",
+  "passport.notStampedYet": "保存済み・まだスタンプなし",
+  "passport.nextTitle": "次にスタンプする場所",
+  "passport.nextBody": {
+    "other": "%{city}でスタンプしていない場所が%{formattedCount}か所あります"
+  },
+  "passport.cityAllStamped": "%{city}で保存した場所はすべてスタンプ済みです。",
+  "passport.stampPlace": "スタンプ",
+  "passport.stampPlaceLabel": "%{name}にスタンプ",
   "passportShare.share": "パスポートを共有",
   "passportShare.stopSetting": "パスポートの共有をやめる",
   "passportShare.stopTitle": "パスポートの共有をやめますか？",

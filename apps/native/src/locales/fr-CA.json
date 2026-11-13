@@ -1202,6 +1202,30 @@
   "passport.cardSavedElsewhere": "Gardé pour plus tard.",
   "passport.cardWent": "Visité avec Shelvr.",
   "passport.shareCity": "Partager %{city}",
+  "passport.momentCityComplete": "%{city} au complet",
+  "passport.ringCount": "%{visited} sur %{total}",
+  "passport.ringLabel": {
+    "one": "%{visited} sur %{formattedCount} lieu tamponné à %{city}",
+    "many": "%{visited} sur %{formattedCount} lieux tamponnés à %{city}",
+    "other": "%{visited} sur %{formattedCount} lieux tamponnés à %{city}"
+  },
+  "passport.ringLocked": {
+    "one": "%{formattedCount} lieu enregistré à %{city}",
+    "many": "%{formattedCount} lieux enregistrés à %{city}",
+    "other": "%{formattedCount} lieux enregistrés à %{city}"
+  },
+  "passport.ringHint": "Affiche les lieux qui restent à tamponner",
+  "passport.ringLockedHint": "Tamponnez des lieux avec Shelvr Pro",
+  "passport.notStampedYet": "Enregistrés, pas encore tamponnés",
+  "passport.nextTitle": "À tamponner",
+  "passport.nextBody": {
+    "one": "Encore %{formattedCount} lieu à tamponner à %{city}",
+    "many": "Encore %{formattedCount} lieux à tamponner à %{city}",
+    "other": "Encore %{formattedCount} lieux à tamponner à %{city}"
+  },
+  "passport.cityAllStamped": "Tous vos lieux enregistrés à %{city} sont tamponnés.",
+  "passport.stampPlace": "Tamponner",
+  "passport.stampPlaceLabel": "Tamponner %{name}",
   "passportShare.share": "Partager le passeport",
   "passportShare.stopSetting": "Ne plus partager mon passeport",
   "passportShare.stopTitle": "Ne plus partager votre passeport ?",

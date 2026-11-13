@@ -1202,6 +1202,30 @@
   "passport.cardSavedElsewhere": "Salvo para depois.",
   "passport.cardWent": "Fomos com o Shelvr.",
   "passport.shareCity": "Compartilhar %{city}",
+  "passport.momentCityComplete": "Você completou %{city}",
+  "passport.ringCount": "%{visited} de %{total}",
+  "passport.ringLabel": {
+    "one": "%{visited} de %{formattedCount} lugar carimbado em %{city}",
+    "many": "%{visited} de %{formattedCount} lugares carimbados em %{city}",
+    "other": "%{visited} de %{formattedCount} lugares carimbados em %{city}"
+  },
+  "passport.ringLocked": {
+    "one": "%{formattedCount} lugar salvo em %{city}",
+    "many": "%{formattedCount} lugares salvos em %{city}",
+    "other": "%{formattedCount} lugares salvos em %{city}"
+  },
+  "passport.ringHint": "Mostra os lugares que faltam carimbar",
+  "passport.ringLockedHint": "Carimbe lugares com o Shelvr Pro",
+  "passport.notStampedYet": "Salvos, ainda sem carimbo",
+  "passport.nextTitle": "Para carimbar",
+  "passport.nextBody": {
+    "one": "Falta carimbar %{formattedCount} lugar em %{city}",
+    "many": "Faltam carimbar %{formattedCount} lugares em %{city}",
+    "other": "Faltam carimbar %{formattedCount} lugares em %{city}"
+  },
+  "passport.cityAllStamped": "Todos os lugares que você salvou em %{city} estão carimbados.",
+  "passport.stampPlace": "Carimbar",
+  "passport.stampPlaceLabel": "Carimbar %{name}",
   "passportShare.share": "Compartilhar passaporte",
   "passportShare.stopSetting": "Parar de compartilhar meu passaporte",
   "passportShare.stopTitle": "Parar de compartilhar seu passaporte?",

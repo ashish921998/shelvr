@@ -1047,6 +1047,18 @@ type MessageParams = {
   "passport.cardSavedElsewhere": undefined;
   "passport.cardWent": undefined;
   "passport.shareCity": { city: string };
+  "passport.momentCityComplete": { city: string };
+  "passport.ringCount": { visited: number; total: number };
+  "passport.ringLabel": { visited: number; count: number; city: string };
+  "passport.ringLocked": { count: number; city: string };
+  "passport.ringHint": undefined;
+  "passport.ringLockedHint": undefined;
+  "passport.notStampedYet": undefined;
+  "passport.nextTitle": undefined;
+  "passport.nextBody": { count: number; city: string };
+  "passport.cityAllStamped": { city: string };
+  "passport.stampPlace": undefined;
+  "passport.stampPlaceLabel": { name: string };
   "passportShare.share": undefined;
   "passportShare.stopSetting": undefined;
   "passportShare.stopTitle": undefined;
