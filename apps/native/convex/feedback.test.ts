@@ -480,7 +480,7 @@ describe("delivery snapshot ownership", () => {
       submissionId,
     });
     expect((await getSubmission(t, submissionId))?.deliveryRequest).toEqual({
-      key: claimed?.key,
+      attempt: 1,
       body: claimed?.body,
       startedAt: expect.any(Number),
     });
@@ -537,6 +537,46 @@ describe("delivery snapshot ownership", () => {
       status: "delivered",
       attempts: 2,
     });
+  });
+
+  it("keeps the key after an auth rejection that follows an uncertain send", async () => {
+    const t = setup();
+    const submissionId = await insertSubmission(t, {});
+    const fetch = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("connection lost"))
+      .mockResolvedValueOnce(new Response("bad key", { status: 403 }))
+      .mockResolvedValue(Response.json({ id: "email" }));
+    vi.stubGlobal("fetch", fetch);
+    for (let i = 0; i < 3; i++)
+      await t.action(internal.feedback.deliver, { submissionId });
+    const keys = fetch.mock.calls.map((call) =>
+      new Headers((call[1] as RequestInit).headers).get("Idempotency-Key"),
+    );
+    expect(keys).toEqual([
+      `feedback/${submissionId}/1`,
+      `feedback/${submissionId}/1`,
+      `feedback/${submissionId}/1`,
+    ]);
+  });
+
+  it("rebuilds after an auth rejection on the key's first send", async () => {
+    const t = setup();
+    const submissionId = await insertSubmission(t, {});
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("unverified", { status: 403 }))
+      .mockResolvedValue(Response.json({ id: "email" }));
+    vi.stubGlobal("fetch", fetch);
+    await t.action(internal.feedback.deliver, { submissionId });
+    await t.action(internal.feedback.deliver, { submissionId });
+    const keys = fetch.mock.calls.map((call) =>
+      new Headers((call[1] as RequestInit).headers).get("Idempotency-Key"),
+    );
+    expect(keys).toEqual([
+      `feedback/${submissionId}/1`,
+      `feedback/${submissionId}/2`,
+    ]);
   });
 
   it("keeps a pre-deploy success that no new claim has taken over", async () => {

@@ -276,7 +276,11 @@ export default defineSchema({
     deliveredAt: v.optional(v.number()),
     deliveryLeaseUntil: v.optional(v.number()),
     deliveryRequest: v.optional(
-      v.object({ key: v.string(), body: v.string(), startedAt: v.number() }),
+      v.object({
+        attempt: v.number(),
+        body: v.string(),
+        startedAt: v.number(),
+      }),
     ),
   })
     .index("by_user", ["userId"])

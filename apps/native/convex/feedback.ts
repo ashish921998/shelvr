@@ -34,9 +34,10 @@ const CLEARED_DELIVERY = {
   deliveryRequest: undefined,
   deliveryLeaseUntil: undefined,
 };
-const REJECTED_CATEGORIES = new Set<Infer<typeof resendErrorCategoryValidator>>(
-  ["invalid_request", "invalid_recipient", "auth_error"],
-);
+const REJECTED_PAYLOADS = new Set<Infer<typeof resendErrorCategoryValidator>>([
+  "invalid_request",
+  "invalid_recipient",
+]);
 
 const claimedDeliveryValidator = v.object({
   key: v.string(),
@@ -174,7 +175,7 @@ export const claimDelivery = internalMutation({
     }
     const attempt = row.attempts + 1;
     const request = row.deliveryRequest ?? {
-      key: `feedback/${row._id}/${attempt}`,
+      attempt,
       body: feedbackEmailBody(config, row, user.email),
       startedAt: now,
     };
@@ -183,7 +184,11 @@ export const claimDelivery = internalMutation({
       deliveryLeaseUntil: now + DELIVERY_LEASE_MS,
       deliveryRequest: request,
     });
-    return { attempt, key: request.key, body: request.body };
+    return {
+      attempt,
+      key: `feedback/${row._id}/${request.attempt}`,
+      body: request.body,
+    };
   },
 });
 
@@ -225,7 +230,10 @@ export const finishDelivery = internalMutation({
     await ctx.db.patch(args.submissionId, {
       status: exhausted ? "exhausted" : "failed",
       deliveryLeaseUntil: undefined,
-      ...(exhausted || REJECTED_CATEGORIES.has(category)
+      ...(exhausted ||
+      REJECTED_PAYLOADS.has(category) ||
+      (category === "auth_error" &&
+        row.deliveryRequest?.attempt === row.attempts)
         ? { deliveryRequest: undefined }
         : {}),
       deliveryError: formatResendError(category, args.errorStatus),
