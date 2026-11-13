@@ -88,6 +88,9 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `convex/failItem.test.ts` tests it through `failItem` and the stale cron.
   Re-record only for a change you intend, with the command in the test header,
   and review the row diff.
+- **State machines:** `docs/architecture/state-machines.md` lists every status
+  field and flag machine, which are explicit, and the patterns their bugs
+  follow. Read it before adding a status value, flag, retry or lease.
 - **Large files:** `convex/items.ts` (about 2,600 lines), `convex/ai.ts` (about 1,650)
   and `convex/model/pageReadCore.ts` (about 500). Embedding and recommendation actions
   live in `convex/aiEmbeddingSweep.ts` and `convex/aiRecommendForSpace.ts`.
