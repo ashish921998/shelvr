@@ -450,7 +450,8 @@ export default defineSchema({
     visitedAt: v.optional(v.number()),
   })
     .index("by_list_and_added", ["listId", "addedAt"])
-    .index("by_added_by", ["addedBy"]),
+    .index("by_added_by", ["addedBy"])
+    .index("by_item_and_added_by", ["itemId", "addedBy"]),
 
   captureTokens: defineTable({
     userId: v.id("users"),

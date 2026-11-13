@@ -1003,6 +1003,8 @@
     "other": "새 장소 %{formattedCount}곳"
   },
   "sharedLists.alsoAddTo": "여기에도 추가",
+  "sharedLists.alsoAddFull": "%{name} 목록이 가득 찼어요. 더 추가하려면 장소를 하나 삭제하세요.",
+  "sharedLists.alsoAddAlready": "이 장소들은 이미 %{name} 목록에 있어요.",
   "sharedLists.willSee": {
     "other": "%{name}에게 이 %{formattedCount}곳이 보여요"
   },
