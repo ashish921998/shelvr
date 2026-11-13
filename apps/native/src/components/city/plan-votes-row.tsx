@@ -76,7 +76,12 @@ export function CityVotes({
           pins={pins}
           filtered={filtered}
           link={openLink}
-          onClose={() => setSheet((current) => ({ ...current, open: false }))}
+          onClose={() => {
+            const round = sheet.round;
+            setSheet((current) =>
+              current.round === round ? { ...current, open: false } : current,
+            );
+          }}
         />
       ) : null}
     </>
