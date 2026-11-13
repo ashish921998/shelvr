@@ -643,6 +643,7 @@
   "refundConsent.enabled": "환불 심사를 위해 구매 및 제공 정보를 Apple과 공유하도록 허용했습니다.",
   "refundConsent.disabled": "환불 데이터 공유가 꺼져 있습니다.",
   "refundConsent.syncPending": "선택이 저장되었습니다. RevenueCat을 업데이트하는 중이며, 완료될 때까지 이전 설정이 적용될 수 있습니다.",
+  "refundConsent.syncFailed": "선택은 저장되었지만 환불 데이터 공유가 켜져 있는지 확인하지 못했습니다. 다시 시도하려면 공유를 끈 다음 다시 허용해 주세요.",
   "refundConsent.withdraw": "공유 끄기",
   "refundConsent.review": "업데이트된 약관 검토",
   "updates.title": "앱 업데이트",

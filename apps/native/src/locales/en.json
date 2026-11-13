@@ -663,6 +663,7 @@
   "refundConsent.enabled": "You allow purchase and delivery information to be shared with Apple for refund reviews.",
   "refundConsent.disabled": "Refund data sharing is off.",
   "refundConsent.syncPending": "Your choice is saved. Updating RevenueCat; the previous setting may apply until this finishes.",
+  "refundConsent.syncFailed": "Your choice is saved, but we couldn’t confirm whether refund data sharing is on. Turn sharing off and allow it again to retry.",
   "refundConsent.withdraw": "Turn off sharing",
   "refundConsent.review": "Review updated terms",
   "updates.title": "App updates",

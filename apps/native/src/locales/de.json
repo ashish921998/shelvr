@@ -663,6 +663,7 @@
   "refundConsent.enabled": "Du erlaubst die Weitergabe von Kauf- und Bereitstellungsinformationen an Apple zur Prüfung von Rückerstattungen.",
   "refundConsent.disabled": "Die Datenweitergabe für Rückerstattungen ist aus.",
   "refundConsent.syncPending": "Deine Auswahl ist gespeichert. RevenueCat wird aktualisiert; bis zum Abschluss kann die bisherige Einstellung gelten.",
+  "refundConsent.syncFailed": "Deine Auswahl ist gespeichert, aber wir konnten nicht bestätigen, ob die Datenweitergabe für Rückerstattungen eingeschaltet ist. Schalte die Weitergabe aus und erlaube sie erneut, um es noch einmal zu versuchen.",
   "refundConsent.withdraw": "Weitergabe ausschalten",
   "refundConsent.review": "Aktualisierte Bedingungen ansehen",
   "updates.title": "App-Updates",
