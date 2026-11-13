@@ -416,6 +416,27 @@ describe("PlanVote name", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  it("builds a name-only ballot on picks another tab saved later, not this tab's older ones", async () => {
+    render();
+    tap("Yes to Bastian");
+    await settle();
+    const mine = body(0).revision as number;
+    window.localStorage.setItem(
+      "shelvr.planVote.tok",
+      JSON.stringify({ choices: { p1: "pick" }, revision: mine + 1 }),
+    );
+
+    type("Maya");
+    await blur();
+    const last = fetchMock.mock.calls.length - 1;
+    expect(body(last)).toMatchObject({
+      name: "Maya",
+      picks: ["p1"],
+      passes: [],
+    });
+    expect(body(last).revision as number).toBeGreaterThan(mine + 1);
+  });
+
   it("sends a cleared name as empty, and keeps it cleared", async () => {
     window.localStorage.setItem(nameKey, JSON.stringify("Maya"));
     render();
