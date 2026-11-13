@@ -164,6 +164,7 @@ describe("merged note refresh regression audit", () => {
     const { t, owner, itemId } = await setup("processing");
     const delays: number[] = [];
     for (let edit = 0; edit < 21; edit++) {
+      vi.advanceTimersByTime(1);
       const editedAt = Date.now();
       await owner.mutation(api.items.updateNoteItem, {
         id: itemId,
