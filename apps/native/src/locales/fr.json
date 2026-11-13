@@ -683,9 +683,9 @@
   "refundConsent.enabled": "Vous autorisez le partage d’informations d’achat et de fourniture avec Apple pour examiner les remboursements.",
   "refundConsent.disabled": "Le partage de données pour les remboursements est désactivé.",
   "refundConsent.syncPending": "Votre choix est enregistré. Mise à jour de RevenueCat ; le réglage précédent peut s’appliquer jusqu’à la fin.",
+  "refundConsent.syncFailed": "Votre choix est enregistré, mais nous n’avons pas pu confirmer si le partage de données pour les remboursements est activé. Désactivez le partage, puis autorisez-le à nouveau pour réessayer.",
   "refundConsent.withdraw": "Désactiver le partage",
   "refundConsent.review": "Consulter les nouvelles conditions",
-  "aiConsent.findLinksOff": "L’IA est désactivée pour ce compte. Contactez l’assistance pour modifier votre choix.",
   "updates.title": "Mises à jour de l’app",
   "updates.check": "Rechercher des mises à jour",
   "updates.checking": "Recherche…",
@@ -1063,6 +1063,8 @@
     "other": "%{formattedCount} nouveaux"
   },
   "sharedLists.alsoAddTo": "Ajouter aussi à",
+  "sharedLists.alsoAddFull": "%{name} est pleine. Retirez un lieu pour en ajouter d’autres.",
+  "sharedLists.alsoAddAlready": "Ces lieux sont déjà sur %{name}.",
   "sharedLists.willSee": {
     "one": "%{name} verra %{formattedCount} lieu",
     "many": "%{name} verra ces %{formattedCount} lieux",
@@ -1135,6 +1137,99 @@
   "sharedLists.startWithHint": "Choisissez au moins une ville. Les lieux que vous y avez déjà enregistrés viennent avec.",
   "sharedLists.cityPlaceholder": "Ou saisissez une ville",
   "sharedLists.typedCity": "Saisie par vous",
+  "passport.wentNoDate": "Visité",
+  "passport.stampedTitle": "Tamponné",
+  "passport.stampedBody": {
+    "one": "%{name} est dans votre passeport. %{formattedCount} lieu pour l'instant.",
+    "many": "%{name} est dans votre passeport. %{formattedCount} lieux pour l'instant.",
+    "other": "%{name} est dans votre passeport. %{formattedCount} lieux pour l'instant."
+  },
+  "passport.stampInk": "%{city} · %{date}",
+  "passport.coverCredit": "Image de la publication enregistrée",
+  "passport.removeStamp": "Retirer le tampon",
+  "passport.wantToGo": "À visiter",
+  "passport.title": "Passeport",
+  "passport.yourPassport": "Votre passeport",
+  "passport.beenTitle": "Déjà visité l'un d'eux ?",
+  "passport.beenBody": "Tamponnez les lieux que vous avez déjà visités",
+  "passport.beenSomewhere": "Déjà visité un lieu ?",
+  "passport.rowCities": "%{places} · %{cities}",
+  "passport.placesCount": {
+    "one": "%{formattedCount} lieu",
+    "many": "%{formattedCount} lieux",
+    "other": "%{formattedCount} lieux"
+  },
+  "passport.citiesCount": {
+    "one": "%{formattedCount} ville",
+    "many": "%{formattedCount} villes",
+    "other": "%{formattedCount} villes"
+  },
+  "passport.places": "Lieux",
+  "passport.cities": "Villes",
+  "passport.countries": "Pays",
+  "passport.elsewhere": "Ailleurs",
+  "passport.coversCredit": "Images des publications enregistrées",
+  "passport.pickBody": "Cochez les lieux que vous avez visités avant de les enregistrer ici.",
+  "passport.nothingToStamp": "Tous vos lieux enregistrés sont déjà dans votre passeport.",
+  "passport.pickNone": "Choisissez les lieux visités",
+  "passport.stampCount": {
+    "one": "Tamponner %{formattedCount} lieu",
+    "many": "Tamponner %{formattedCount} lieux",
+    "other": "Tamponner %{formattedCount} lieux"
+  },
+  "passport.cardKicker": "Sorti du chat de groupe",
+  "passport.cardTitle": {
+    "one": "%{formattedCount} lieu enregistré, enfin visité",
+    "many": "%{formattedCount} lieux enregistrés, enfin visités",
+    "other": "%{formattedCount} lieux enregistrés, enfin visités"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "one": "+%{formattedCount} autre",
+    "many": "+%{formattedCount} autres",
+    "other": "+%{formattedCount} autres"
+  },
+  "passport.cardSavedInstagram": "Enregistré sur Instagram.",
+  "passport.cardSavedTiktok": "Enregistré sur TikTok.",
+  "passport.cardSavedBoth": "Enregistré sur Instagram et TikTok.",
+  "passport.cardSavedElsewhere": "Gardé pour plus tard.",
+  "passport.cardWent": "Visité avec Shelvr.",
+  "passport.shareCity": "Partager %{city}",
+  "passportShare.share": "Partager le passeport",
+  "passportShare.stopSetting": "Ne plus partager mon passeport",
+  "passportShare.stopTitle": "Ne plus partager votre passeport ?",
+  "passportShare.stopBody": "Tous les liens que vous avez envoyés cesseront de fonctionner. Vous pourrez le repartager à tout moment.",
+  "passportShare.stop": "Ne plus partager",
+  "passportShare.title": "Le passeport de %{name}",
+  "passportShare.titleNoName": "Le passeport d’un ami",
+  "passportShare.compare": "Comparer avec le mien",
+  "passportShare.deadTitle": "Ce passeport n’est plus partagé",
+  "passportShare.deadBody": "Demandez un nouveau lien, ou commencez votre propre passeport dans Shelvr.",
+  "passportShare.bothHeader": {
+    "one": "Vous êtes allés tous les deux dans %{formattedCount} lieu",
+    "many": "Vous êtes allés tous les deux dans %{formattedCount} lieux",
+    "other": "Vous êtes allés tous les deux dans %{formattedCount} lieux"
+  },
+  "passportShare.compareSub": "Vous seul : %{onlyYou} · %{name} seul : %{onlyThem}",
+  "passportShare.compareSubNoName": "Vous seul : %{onlyYou} · L’autre seul : %{onlyThem}",
+  "passportShare.compareEmpty": "Tamponnez les lieux où vous êtes allé, puis comparez-les ici.",
+  "passportShare.both": "Vous deux",
+  "passportShare.onlyThem": "Seulement %{name}",
+  "passportShare.onlyThemNoName": "Seulement l’autre",
+  "passportShare.onlyYou": "Seulement vous",
+  "passportShare.save": {
+    "one": "Enregistrer son %{formattedCount} lieu",
+    "many": "Enregistrer ses %{formattedCount} lieux",
+    "other": "Enregistrer ses %{formattedCount} lieux"
+  },
+  "passportShare.saved": {
+    "one": "%{formattedCount} lieu enregistré",
+    "many": "%{formattedCount} lieux enregistrés",
+    "other": "%{formattedCount} lieux enregistrés"
+  },
+  "passportShare.savedNone": "Rien de nouveau à enregistrer",
+  "passportShare.fromFriend": "Du passeport de %{name}",
+  "passportShare.fromFriendNoName": "Du passeport d’un ami",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "one": "Il vous reste %{formattedCount} enregistrement gratuit",

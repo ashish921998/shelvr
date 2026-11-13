@@ -106,15 +106,6 @@ afterEach(() => {
 });
 
 describe("saved venue lookup", () => {
-  it("discards an older action's unversioned result without throwing", async () => {
-    const { t, itemId, pins } = await setup(["Cafe"]);
-    await t.mutation(internal.placePins.storePins, {
-      itemId,
-      found: [{ name: "Cafe", lat: 38.7, lng: -9.1 }],
-    });
-    expect(await pins()).toBeUndefined();
-  });
-
   it("fails the test helper when the lookup is ineligible", async () => {
     const { t, itemId } = await setup(["Cafe"]);
     await t.run((ctx) => ctx.db.patch(itemId, { status: "processing" }));
@@ -160,7 +151,7 @@ describe("saved venue lookup", () => {
       itemId,
       found: [{ name: "Cafe Joe", city: "Paris", lat: 48.86, lng: 2.36 }],
       cluesSearched: old?.locations,
-      version: old?.version,
+      version: old!.version,
     });
     expect((await t.run((ctx) => ctx.db.get(itemId)))?.placePins ?? []).toEqual(
       [],
@@ -1529,7 +1520,7 @@ describe("placePins", () => {
         spaceId,
         intents: [maps("Pink Street")],
       });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1565,7 +1556,7 @@ describe("placePins", () => {
           .unique();
         await deleteMembership(ctx, row!);
       });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1591,7 +1582,7 @@ describe("placePins", () => {
         reason: "error",
         runId: "run-1",
       });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1621,7 +1612,7 @@ describe("placePins", () => {
         reason: "not_found",
         runId: "run-1",
       });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1645,7 +1636,7 @@ describe("placePins", () => {
     vi.useFakeTimers();
     try {
       await t.mutation(internal.placePins.backfillPage, { cursor: null });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1668,7 +1659,7 @@ describe("placePins", () => {
     vi.useFakeTimers();
     try {
       await t.mutation(internal.placePins.backfillPage, { cursor: null });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1685,7 +1676,7 @@ describe("placePins", () => {
     vi.useFakeTimers();
     try {
       await t.mutation(internal.placePins.backfillPage, { cursor: null });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1719,7 +1710,7 @@ describe("placePins", () => {
     vi.useFakeTimers();
     try {
       await t.mutation(internal.placePins.backfillPage, { cursor: null });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1788,7 +1779,7 @@ describe("placePins", () => {
         { itemId, keepPins: true, attempt: 2 },
       ]);
       await withMaps();
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1815,7 +1806,7 @@ describe("placePins", () => {
         { itemId, refresh: true, attempt: 2 },
       ]);
       await withMaps(true);
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1949,7 +1940,7 @@ describe("pin cuisines", () => {
     vi.useFakeTimers();
     try {
       await t.mutation(internal.placePins.backfillPage, { cursor: null });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }

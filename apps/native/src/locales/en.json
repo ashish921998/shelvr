@@ -663,9 +663,9 @@
   "refundConsent.enabled": "You allow purchase and delivery information to be shared with Apple for refund reviews.",
   "refundConsent.disabled": "Refund data sharing is off.",
   "refundConsent.syncPending": "Your choice is saved. Updating RevenueCat; the previous setting may apply until this finishes.",
+  "refundConsent.syncFailed": "Your choice is saved, but we couldn’t confirm whether refund data sharing is on. Turn sharing off and allow it again to retry.",
   "refundConsent.withdraw": "Turn off sharing",
   "refundConsent.review": "Review updated terms",
-  "aiConsent.findLinksOff": "AI is off for this account. Contact Support to change your preference.",
   "updates.title": "App updates",
   "updates.check": "Check for updates",
   "updates.checking": "Checking…",
@@ -1033,6 +1033,8 @@
     "other": "%{formattedCount} new"
   },
   "sharedLists.alsoAddTo": "Also add to",
+  "sharedLists.alsoAddFull": "%{name} is full. Remove a place from it to add more.",
+  "sharedLists.alsoAddAlready": "These places are already on %{name}.",
   "sharedLists.willSee": {
     "one": "%{name} will see %{formattedCount} place",
     "other": "%{name} will see these %{formattedCount}"
@@ -1103,6 +1105,90 @@
   "sharedLists.startWithHint": "Pick at least one city. Places you already saved there come along.",
   "sharedLists.cityPlaceholder": "Or type a city",
   "sharedLists.typedCity": "Typed by you",
+  "passport.wentNoDate": "Went",
+  "passport.stampedTitle": "Stamped",
+  "passport.stampedBody": {
+    "one": "%{name} is in your passport. %{formattedCount} place so far.",
+    "other": "%{name} is in your passport. %{formattedCount} places so far."
+  },
+  "passport.stampInk": "%{city} · %{date}",
+  "passport.coverCredit": "Picture from the post you saved",
+  "passport.removeStamp": "Remove stamp",
+  "passport.wantToGo": "Want to go",
+  "passport.title": "Passport",
+  "passport.yourPassport": "Your passport",
+  "passport.beenTitle": "Been to any of these?",
+  "passport.beenBody": "Stamp places you already went",
+  "passport.beenSomewhere": "Already been somewhere?",
+  "passport.rowCities": "%{places} · %{cities}",
+  "passport.placesCount": {
+    "one": "%{formattedCount} place",
+    "other": "%{formattedCount} places"
+  },
+  "passport.citiesCount": {
+    "one": "%{formattedCount} city",
+    "other": "%{formattedCount} cities"
+  },
+  "passport.places": "Places",
+  "passport.cities": "Cities",
+  "passport.countries": "Countries",
+  "passport.elsewhere": "Somewhere else",
+  "passport.coversCredit": "Pictures from the posts you saved",
+  "passport.pickBody": "Tick the places you went before you saved them here.",
+  "passport.nothingToStamp": "Every place you saved is already in your passport.",
+  "passport.pickNone": "Pick the places you went",
+  "passport.stampCount": {
+    "one": "Stamp %{formattedCount} place",
+    "other": "Stamp %{formattedCount} places"
+  },
+  "passport.cardKicker": "Out of the group chat",
+  "passport.cardTitle": {
+    "one": "%{formattedCount} saved spot we finally went to",
+    "other": "%{formattedCount} saved spots we finally went to"
+  },
+  "passport.cardSub": "%{city} · %{month}",
+  "passport.cardMore": {
+    "one": "+%{formattedCount} more",
+    "other": "+%{formattedCount} more"
+  },
+  "passport.cardSavedInstagram": "Saved on Instagram.",
+  "passport.cardSavedTiktok": "Saved on TikTok.",
+  "passport.cardSavedBoth": "Saved on Instagram and TikTok.",
+  "passport.cardSavedElsewhere": "Saved for later.",
+  "passport.cardWent": "Went with Shelvr.",
+  "passport.shareCity": "Share %{city}",
+  "passportShare.share": "Share passport",
+  "passportShare.stopSetting": "Stop sharing my passport",
+  "passportShare.stopTitle": "Stop sharing your passport?",
+  "passportShare.stopBody": "Every link you’ve sent stops working. You can share again anytime.",
+  "passportShare.stop": "Stop sharing",
+  "passportShare.title": "%{name}’s passport",
+  "passportShare.titleNoName": "A friend’s passport",
+  "passportShare.compare": "Compare with mine",
+  "passportShare.deadTitle": "This passport isn’t shared anymore",
+  "passportShare.deadBody": "Ask for a new link, or start your own passport in Shelvr.",
+  "passportShare.bothHeader": {
+    "one": "You’ve both been to %{formattedCount} place",
+    "other": "You’ve both been to %{formattedCount} places"
+  },
+  "passportShare.compareSub": "Only you: %{onlyYou} · Only %{name}: %{onlyThem}",
+  "passportShare.compareSubNoName": "Only you: %{onlyYou} · Only them: %{onlyThem}",
+  "passportShare.compareEmpty": "Stamp places you went to, and you can compare them here.",
+  "passportShare.both": "Both of you",
+  "passportShare.onlyThem": "Only %{name}",
+  "passportShare.onlyThemNoName": "Only them",
+  "passportShare.onlyYou": "Only you",
+  "passportShare.save": {
+    "one": "Save their %{formattedCount} place",
+    "other": "Save their %{formattedCount} places"
+  },
+  "passportShare.saved": {
+    "one": "Saved %{formattedCount} place",
+    "other": "Saved %{formattedCount} places"
+  },
+  "passportShare.savedNone": "Nothing new to save",
+  "passportShare.fromFriend": "From %{name}’s passport",
+  "passportShare.fromFriendNoName": "From a friend’s passport",
   "freePlan.proTag": "Pro",
   "freePlan.leftTitle": {
     "one": "%{formattedCount} free save left",

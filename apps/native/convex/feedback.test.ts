@@ -93,7 +93,7 @@ describe("submitFeedback", () => {
     expect(second?.attempt).toBe(2);
     await t.mutation(internal.feedback.finishDelivery, {
       submissionId,
-      attempt: first?.attempt,
+      attempt: first!.attempt,
       status: "failed",
     });
     expect(
@@ -101,7 +101,7 @@ describe("submitFeedback", () => {
     ).toBeGreaterThan(Date.now());
     await t.mutation(internal.feedback.finishDelivery, {
       submissionId,
-      attempt: second?.attempt,
+      attempt: second!.attempt,
       status: "delivered",
     });
     expect(await getSubmission(t, submissionId)).toMatchObject({
@@ -214,7 +214,7 @@ describe("submitFeedback", () => {
     });
 
     expect(result.deliveryState).toBe("scheduled");
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     const row = await getSubmission(t, result.submissionId);
     expect(row).toMatchObject({
@@ -310,7 +310,7 @@ describe("submitFeedback", () => {
     vi.stubEnv("RESEND_FEEDBACK_FROM_EMAIL", SENDER);
     expect(isFeedbackInboxConfigured()).toBe(true);
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(await getSubmission(t, result.submissionId)).toMatchObject({
       status: "delivered",
@@ -332,7 +332,7 @@ describe("delivery retries", () => {
       message: "secret words",
       surface: "profile",
     });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     expect(await getSubmission(t, result.submissionId)).toMatchObject({
       status: "failed",
@@ -350,7 +350,7 @@ describe("delivery retries", () => {
 
     fetchMock.mockResolvedValue(new Response("{}", { status: 200 }));
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(await getSubmission(t, result.submissionId)).toMatchObject({
       status: "delivered",
@@ -392,7 +392,7 @@ describe("delivery retries", () => {
     expect(due).toContain(capped);
 
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     expect(fetchMock).toHaveBeenCalledTimes(3);
     for (const id of [pending, failed, unconfigured]) {
@@ -415,7 +415,7 @@ describe("delivery retries", () => {
     });
 
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(await getSubmission(t, capped)).toMatchObject({
@@ -458,13 +458,13 @@ describe("delivery snapshot ownership", () => {
     const fetch = okFetch();
     vi.stubGlobal("fetch", fetch);
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(
       (await getSubmission(t, submissionId))?.deliveryRequest,
     ).toBeDefined();
     vi.setSystemTime(Date.now() + 90_001);
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     const row = await getSubmission(t, submissionId);
     expect(row).toMatchObject({
       status: "exhausted",
@@ -539,40 +539,80 @@ describe("delivery snapshot ownership", () => {
     });
   });
 
-  it("keeps a pre-deploy success that no new claim has taken over", async () => {
+  it("keeps the key after an auth rejection that follows an uncertain send", async () => {
     const t = setup();
-    const submissionId = await insertSubmission(t, { attempts: 1 });
-    await t.mutation(internal.feedback.finishDelivery, {
-      submissionId,
-      status: "failed",
-    });
-    expect(await getSubmission(t, submissionId)).toMatchObject({
-      status: "pending",
-    });
-    await t.mutation(internal.feedback.finishDelivery, {
-      submissionId,
-      status: "delivered",
-    });
-    const fetch = okFetch();
+    const submissionId = await insertSubmission(t, {});
+    const fetch = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("connection lost"))
+      .mockResolvedValueOnce(new Response("bad key", { status: 403 }))
+      .mockResolvedValue(Response.json({ id: "email" }));
+    vi.stubGlobal("fetch", fetch);
+    for (let i = 0; i < 3; i++)
+      await t.action(internal.feedback.deliver, { submissionId });
+    const keys = fetch.mock.calls.map((call) =>
+      new Headers((call[1] as RequestInit).headers).get("Idempotency-Key"),
+    );
+    expect(keys).toEqual([
+      `feedback/${submissionId}/1`,
+      `feedback/${submissionId}/1`,
+      `feedback/${submissionId}/1`,
+    ]);
+  });
+
+  it("rebuilds after an auth rejection on the key's first send", async () => {
+    const t = setup();
+    const submissionId = await insertSubmission(t, {});
+    const fetch = vi
+      .fn()
+      .mockResolvedValueOnce(new Response("unverified", { status: 403 }))
+      .mockResolvedValue(Response.json({ id: "email" }));
     vi.stubGlobal("fetch", fetch);
     await t.action(internal.feedback.deliver, { submissionId });
-    expect(fetch).not.toHaveBeenCalled();
+    await t.action(internal.feedback.deliver, { submissionId });
+    const keys = fetch.mock.calls.map((call) =>
+      new Headers((call[1] as RequestInit).headers).get("Idempotency-Key"),
+    );
+    expect(keys).toEqual([
+      `feedback/${submissionId}/1`,
+      `feedback/${submissionId}/2`,
+    ]);
+  });
+
+  it("replays a stored request after the sender and inbox settings are removed", async () => {
+    const t = setup();
+    const submissionId = await insertSubmission(t, {});
+    const fetch = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("connection lost"))
+      .mockResolvedValue(Response.json({ id: "email" }));
+    vi.stubGlobal("fetch", fetch);
+    await t.action(internal.feedback.deliver, { submissionId });
+    vi.stubEnv("RESEND_FEEDBACK_FROM_EMAIL", "");
+    vi.stubEnv("RESEND_FEEDBACK_INBOX_EMAIL", "");
+    await t.action(internal.feedback.deliver, { submissionId });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch.mock.calls[1][1].body).toBe(fetch.mock.calls[0][1].body);
     expect(await getSubmission(t, submissionId)).toMatchObject({
       status: "delivered",
-      attempts: 1,
     });
   });
 
-  it("discards a pre-deploy completion without finishing the current attempt", async () => {
+  it("marks a stored request unconfigured once the API key is removed", async () => {
     const t = setup();
     const submissionId = await insertSubmission(t, {});
-    await t.mutation(internal.feedback.claimDelivery, { submissionId });
-    const before = await getSubmission(t, submissionId);
-    await t.mutation(internal.feedback.finishDelivery, {
-      submissionId,
-      status: "delivered",
+    const fetch = vi
+      .fn()
+      .mockRejectedValueOnce(new TypeError("connection lost"));
+    vi.stubGlobal("fetch", fetch);
+    await t.action(internal.feedback.deliver, { submissionId });
+    vi.stubEnv("RESEND_API_KEY", "");
+    await t.action(internal.feedback.deliver, { submissionId });
+    expect(fetch).toHaveBeenCalledOnce();
+    expect(await getSubmission(t, submissionId)).toMatchObject({
+      status: "unconfigured",
+      attempts: 1,
     });
-    expect(await getSubmission(t, submissionId)).toEqual(before);
   });
 });
 
@@ -585,6 +625,22 @@ describe("account deletion", () => {
       ctx.db.insert("users", { email: "gone@example.com", deleting: true }),
     );
     const id = await insertSubmission(t, { userId, status: "failed" });
+
+    await t.action(internal.feedback.deliver, { submissionId: id });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(await getSubmission(t, id)).toBeNull();
+  });
+
+  it("deletes a deleting owner's feedback even while the inbox is unconfigured", async () => {
+    const t = setup();
+    vi.stubEnv("RESEND_API_KEY", "");
+    const fetchMock = okFetch();
+    vi.stubGlobal("fetch", fetchMock);
+    const userId = await t.run(async (ctx) =>
+      ctx.db.insert("users", { email: "gone@example.com", deleting: true }),
+    );
+    const id = await insertSubmission(t, { userId });
 
     await t.action(internal.feedback.deliver, { submissionId: id });
 
@@ -629,9 +685,9 @@ describe("account deletion", () => {
     const live = await insertSubmission(t, { status: "failed", attempts: 1 });
 
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(await getSubmission(t, live)).toMatchObject({ status: "delivered" });
@@ -668,7 +724,7 @@ describe("classifyResendError", () => {
     const id = await insertSubmission(t, { status: "pending" });
 
     await t.action(internal.feedback.retryFailedDeliveries, {});
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     expect(await getSubmission(t, id)).toMatchObject({
       status: "failed",

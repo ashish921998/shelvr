@@ -29,6 +29,11 @@ import {
   waitForSheetTransition,
 } from "@/lib/entitlement";
 import {
+  finishReplay,
+  initialReplay,
+  observeReplay,
+} from "@/lib/replay-onboarding-machine";
+import {
   readPurchaseLanding,
   settlePurchaseLanding,
   subscribePurchaseLanding,
@@ -106,12 +111,7 @@ export function useReplayOnboarding(
   const entitlementLoading = entitlement.loading || freeSaves.loading;
   const createSpace = useMutation(api.spaces.createSpace);
   const createLinkItem = useMutation(api.items.createLinkItem);
-  const runningRef = useRef(false);
-  const startedEntitledRef = useRef(false);
-  const rerunRef = useRef(false);
-  const awaitingEntitlementRef = useRef(false);
-  const settledWorkRef = useRef<string | null>(null);
-  const settledEntitledRef = useRef(entitled);
+  const machine = useRef(initialReplay(entitled));
   const [retryNonce, setRetryNonce] = useState(0);
   const accountRef = useRef<string | null>(null);
   useEffect(() => {
@@ -132,37 +132,25 @@ export function useReplayOnboarding(
   );
 
   useEffect(() => {
-    if (entitled !== settledEntitledRef.current) {
-      settledEntitledRef.current = entitled;
-      settledWorkRef.current = null;
-    }
-    if (!isAuthenticated) return;
-    if (!accountLoaded) return;
-    if (!onboarded) return;
-    if (entitlementLoading) return;
-    if (runningRef.current) {
-      if (entitled !== startedEntitledRef.current) {
-        rerunRef.current = true;
-      }
-      return;
-    }
-    const demoOwner = getPendingDemoOwner();
-    if (demoOwner !== null && demoOwner !== userId) clearLegacyDemoUrl();
-    if (!hasPending()) return;
-    if (pendingWorkKey() === settledWorkRef.current) return;
-    if (
-      !entitled &&
-      (awaitingEntitlementRef.current ||
-        onboardingPaywall !== "unseen" ||
-        hasPurchaseBeforeSignIn())
-    )
-      return;
+    const step = observeReplay(machine.current, {
+      ready:
+        isAuthenticated && accountLoaded && onboarded && !entitlementLoading,
+      entitled,
+      paywallBlocked:
+        onboardingPaywall !== "unseen" || hasPurchaseBeforeSignIn(),
+      readPending: () => {
+        const demoOwner = getPendingDemoOwner();
+        if (demoOwner !== null && demoOwner !== userId) clearLegacyDemoUrl();
+        return { has: hasPending(), key: pendingWorkKey() };
+      },
+    });
+    machine.current = step.state;
+    if (step.action === "none") return;
+    if (step.action === "save") onboardingPaywall = "unseen";
 
     const demo = pendingDemo();
 
-    runningRef.current = true;
-    startedEntitledRef.current = entitled;
-
+    let purchased = false;
     let remainderKey: string | null = null;
     let lateDemoUrl = false;
     const runAccount = userId;
@@ -174,17 +162,12 @@ export function useReplayOnboarding(
     };
     const run = async () => {
       try {
-        if (!entitled) {
+        if (step.action === "sell") {
           await waitForSheetTransition();
-          const purchased = await openPaywall(router, "onboarding");
-          if (purchased) {
-            awaitingEntitlementRef.current = true;
-          }
+          purchased = await openPaywall(router, "onboarding");
           return;
         }
 
-        awaitingEntitlementRef.current = false;
-        onboardingPaywall = "unseen";
         if (!sameAccount()) return;
 
         remainderKey = pendingWorkKey();
@@ -223,21 +206,15 @@ export function useReplayOnboarding(
 
         clearPending();
       } finally {
-        const entitlementRerun =
-          rerunRef.current || lateDemoUrl || accountChanged;
-        if (remainderKey !== null && !entitlementRerun) {
-          settledWorkRef.current = remainderKey;
-        }
-        const newWork =
-          remainderKey !== null &&
-          hasPending() &&
-          pendingWorkKey() !== remainderKey;
-        const shouldRerun = entitlementRerun || newWork;
-        rerunRef.current = false;
-        runningRef.current = false;
-        if (shouldRerun) {
-          setRetryNonce((nonce) => nonce + 1);
-        }
+        const done = finishReplay(machine.current, {
+          purchased,
+          remainderKey,
+          lateDemoUrl,
+          accountChanged,
+          pending: { has: hasPending(), key: pendingWorkKey() },
+        });
+        machine.current = done.state;
+        if (done.rerun) setRetryNonce((nonce) => nonce + 1);
       }
     };
 
