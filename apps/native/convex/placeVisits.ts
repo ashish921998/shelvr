@@ -19,7 +19,7 @@ import { authedMutation, authedQuery, liveOwner } from "./model/auth";
 import { linkSource } from "./model/externalUrl";
 import { logEvent } from "./model/log";
 import { normalizeCities, normalizePlaceName } from "./model/itemFields";
-import type { PassportPlace } from "./model/passport";
+import { type PassportPlace, soleCity } from "./model/passport";
 import { approximateDocBytes } from "./model/readBudget";
 import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
 import {
@@ -278,9 +278,7 @@ function pinCity(
   item: Doc<"items">,
   pin: { city?: string },
 ): string | undefined {
-  const cities = item.cities ?? [];
-  const city = pin.city || (cities.length === 1 ? cities[0] : undefined);
-  return city || undefined;
+  return pin.city || soleCity(item.cities);
 }
 
 function cityAt(item: Doc<"items"> | null, point: Point): string | undefined {

@@ -9,12 +9,12 @@ import {
 import { createReadyPlaceSave, readySavesNewestFirst } from "./items";
 import { authedMutation, authedQuery, liveOwner } from "./model/auth";
 import { firstNameOf } from "./model/firstName";
-import { normalizePlaceName } from "./model/itemFields";
 import {
   comparePassports,
   groupByCity,
   passportCounts,
   type PassportPlace,
+  placesOnSave,
 } from "./model/passport";
 import { rateLimiter } from "./model/rateLimiter";
 import { inviteToken } from "./model/sharedLists";
@@ -108,32 +108,6 @@ async function sharedPassport(ctx: QueryCtx, token: string) {
     firstNameOf(owner.name),
     await passportPlaces(ctx, owner._id),
   );
-}
-
-function placesOnSave(item: Doc<"items">): PassportPlace[] {
-  const cities = item.cities ?? [];
-  const only = cities.length === 1 ? cities[0] : undefined;
-  const pins = (item.placePins ?? []).flatMap((pin) => {
-    const city = pin.city || only;
-    return city
-      ? [
-          {
-            name: normalizePlaceName(pin.name, [city]),
-            city,
-            lat: pin.lat,
-            lng: pin.lng,
-          },
-        ]
-      : [];
-  });
-  const names =
-    only === undefined
-      ? []
-      : (item.places ?? []).map((name) => ({
-          name: normalizePlaceName(name, [only]),
-          city: only,
-        }));
-  return [...pins, ...names];
 }
 
 async function compareWith(

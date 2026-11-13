@@ -1,3 +1,4 @@
+import { normalizePlaceName } from "./itemFields";
 import { samePlace } from "./placeIdentity";
 import { placeKey } from "./plan";
 import { cityKey } from "./trip";
@@ -11,6 +12,41 @@ export type PassportPlace = {
 };
 
 type NamedPlace = { name: string; city?: string };
+
+type SavePlaces = {
+  cities?: readonly string[];
+  places?: readonly string[];
+  placePins?: readonly {
+    name: string;
+    city?: string;
+    lat: number;
+    lng: number;
+  }[];
+};
+
+export function soleCity(
+  cities: readonly string[] | undefined,
+): string | undefined {
+  return cities?.length === 1 ? cities[0] || undefined : undefined;
+}
+
+export function placesOnSave(save: SavePlaces): PassportPlace[] {
+  const only = soleCity(save.cities);
+  const pins = (save.placePins ?? []).flatMap(({ name, city, lat, lng }) => {
+    const place = city || only;
+    return place
+      ? [{ name: normalizePlaceName(name, [place]), city: place, lat, lng }]
+      : [];
+  });
+  const names =
+    only === undefined
+      ? []
+      : (save.places ?? []).map((name) => ({
+          name: normalizePlaceName(name, [only]),
+          city: only,
+        }));
+  return [...pins, ...names];
+}
 
 export function samePassportPlace(a: PassportPlace, b: PassportPlace): boolean {
   if (cityKey(a.city ?? "") !== cityKey(b.city ?? "")) return false;

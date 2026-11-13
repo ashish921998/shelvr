@@ -3,6 +3,7 @@ import {
   comparePassports,
   groupByCity,
   passportCounts,
+  placesOnSave,
   samePassportPlace,
 } from "./passport";
 
@@ -74,6 +75,22 @@ describe("comparePassports", () => {
     );
     expect(result.onlyThem).toEqual([{ name: "Santa Joana", city: "Lisbon" }]);
     expect(result.toSave).toEqual([]);
+  });
+});
+
+describe("placesOnSave", () => {
+  it("counts names only on a one-city save, and a pin by its own city", () => {
+    const pin = { name: "Majestic", city: "Porto", ...PORTO };
+    expect(
+      placesOnSave({
+        cities: ["Porto", "Lisbon"],
+        places: ["Bar Alto"],
+        placePins: [pin, { name: "Nowhere", ...PORTO }],
+      }),
+    ).toEqual([pin]);
+    expect(placesOnSave({ cities: ["Porto"], places: ["Majestic"] })).toEqual([
+      { name: "Majestic", city: "Porto" },
+    ]);
   });
 });
 
