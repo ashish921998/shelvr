@@ -4,14 +4,12 @@ import { serverLog } from "@/lib/serverLog";
 
 const TIMEOUT_MS = 5_000;
 
-export type PassportCity = { city?: string; names: string[] };
-
 export type SharedPassport = {
   ownerName?: string;
   places: number;
   cities: number;
   countries: number | null;
-  byCity: PassportCity[];
+  byCity: { city?: string; names: string[] }[];
   mapUrl?: string;
 };
 
