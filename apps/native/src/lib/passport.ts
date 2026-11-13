@@ -37,10 +37,13 @@ export function usePassport() {
   };
 }
 
-export function useCityCompletion() {
+export function useCityCompletion(enabled = true) {
   const { isAuthenticated } = useConvexAuth();
   const completion = useQuery(
-    convexQuery(api.placeVisits.cityCompletion, isAuthenticated ? {} : "skip"),
+    convexQuery(
+      api.placeVisits.cityCompletion,
+      isAuthenticated && enabled ? {} : "skip",
+    ),
   );
   return { rows: completion.data, error: completion.error };
 }

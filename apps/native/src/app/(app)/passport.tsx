@@ -3,11 +3,16 @@ import {
   PassportCityHead,
   useRingAccess,
 } from "@/components/passport/passport-city-head";
+import {
+  MilestonesRow,
+  useBadgeAccess,
+} from "@/components/passport/milestones-row";
 import { PassportCounts } from "@/components/passport/passport-counts";
 import { StampArt, StampSheet } from "@/components/passport/stamp-sheet";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
+import { useBadgeTotals, useShareBadge } from "@/lib/badges";
 import { formatRecentDate } from "@/lib/date";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
@@ -83,6 +88,9 @@ export default function PassportScreen() {
   const sharing = useSharePassport(stamps?.length ?? 0);
   const completion = useCityCompletion();
   const ring = useRingAccess();
+  const badges = useBadgeTotals();
+  const badgeAccess = useBadgeAccess();
+  const shareBadge = useShareBadge("milestones");
   const [open, setOpen] = useState<OpenStamp | null>(null);
   const remove = async () => {
     if (open === null) return;
@@ -100,6 +108,11 @@ export default function PassportScreen() {
       analytics.captureError("passport_rings_load_failed", completion.error);
     }
   }, [completion.error]);
+  useEffect(() => {
+    if (badges.error) {
+      analytics.captureError("passport_badges_load_failed", badges.error);
+    }
+  }, [badges.error]);
 
   const opened = useRef(false);
   useEffect(() => {
@@ -174,6 +187,14 @@ export default function PassportScreen() {
       </Pressable>
       {stamps.length === 0 ? (
         <Text style={styles.muted}>{t("passport.beenBody")}</Text>
+      ) : null}
+      {badges.totals ? (
+        <MilestonesRow
+          totals={badges.totals}
+          locked={badgeAccess.locked}
+          onUnlock={badgeAccess.unlock}
+          onShare={(badge) => void shareBadge(badge)}
+        />
       ) : null}
       {sections.stamped.map((section) => (
         <View key={section.key} style={styles.city}>
