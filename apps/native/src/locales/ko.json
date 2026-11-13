@@ -1143,7 +1143,7 @@
   "passportShare.saved": {
     "other": "%{formattedCount}곳 저장했어요"
   },
-  "passportShare.savedNone": "상대의 장소를 모두 저장했어요",
+  "passportShare.savedNone": "새로 저장할 장소가 없어요",
   "passportShare.fromFriend": "%{name}의 여권에서",
   "passportShare.fromFriendNoName": "친구의 여권에서",
   "freePlan.proTag": "Pro",

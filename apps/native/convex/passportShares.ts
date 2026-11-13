@@ -85,7 +85,13 @@ async function liveSharer(
 }
 
 async function placesOf(ctx: QueryCtx, userId: string): Promise<Place[]> {
-  return await passportStamps(ctx, userId, async () => null);
+  const places = await passportStamps(ctx, userId, async () => null);
+  return places.map((place) => {
+    const name = normalizePlaceName(place.name, place.city ? [place.city] : []);
+    return name === place.name
+      ? place
+      : { ...place, name, key: placeKey(name) };
+  });
 }
 
 function roundDot(value: number): number {
@@ -172,18 +178,15 @@ function samePlace(a: Place, b: Place): boolean {
   );
 }
 
-function placeId(place: Place): string {
-  return `${place.key}|${cityKey(place.city ?? "")}`;
-}
-
 function distinct(places: readonly Place[]) {
-  const seen = new Set<string>();
-  return places.flatMap((place) => {
-    const id = placeId(place);
-    if (seen.has(id)) return [];
-    seen.add(id);
-    return [{ name: place.name, ...(place.city ? { city: place.city } : {}) }];
-  });
+  const kept: Place[] = [];
+  for (const place of places) {
+    if (!kept.some((other) => samePlace(place, other))) kept.push(place);
+  }
+  return kept.map((place) => ({
+    name: place.name,
+    ...(place.city ? { city: place.city } : {}),
+  }));
 }
 
 function comparePlaces(mine: readonly Place[], theirs: readonly Place[]) {
@@ -203,12 +206,18 @@ async function savedPlaceIds(
   const ids = new Set<string>();
   for (const item of await readySavesNewestFirst(ctx, userId)) {
     const cities = (item.cities ?? []).map(cityKey);
+    const keyOf = (name: string) =>
+      placeKey(normalizePlaceName(name, item.cities ?? []));
+    const pinned = new Set(
+      (item.placePins ?? []).map((pin) => keyOf(pin.name)),
+    );
     for (const name of item.places ?? []) {
-      for (const city of cities) ids.add(`${placeKey(name)}|${city}`);
+      if (pinned.has(keyOf(name))) continue;
+      for (const city of cities) ids.add(`${keyOf(name)}|${city}`);
     }
     for (const pin of item.placePins ?? []) {
       for (const city of pin.city ? [cityKey(pin.city)] : cities) {
-        ids.add(`${placeKey(pin.name)}|${city}`);
+        ids.add(`${keyOf(pin.name)}|${city}`);
       }
     }
   }
@@ -234,6 +243,8 @@ async function saveFriendPlace(
     intents: [],
     cities,
     places: [name],
+    placesEdited: true,
+    titleSource: "user",
     searchText: buildSearchText({ title: name, tags: [], note, cities }),
   });
   if (free) {
@@ -331,7 +342,11 @@ export const saveFriendPlaces = authedMutation({
   args: { token: v.string(), note: v.string() },
   returns: v.union(
     v.null(),
-    v.object({ saved: v.number(), skipped: v.number() }),
+    v.object({
+      saved: v.number(),
+      skipped: v.number(),
+      remaining: v.number(),
+    }),
   ),
   handler: async (ctx, args) => {
     const { userId } = ctx;
@@ -342,7 +357,8 @@ export const saveFriendPlaces = authedMutation({
       await placesOf(ctx, owner._id),
     );
     const saved = await savedPlaceIds(ctx, userId);
-    const fresh = distinct(onlyThem).flatMap((place) => {
+    const candidates = distinct(onlyThem);
+    const fresh = candidates.flatMap((place) => {
       const [city] = normalizeCities(place.city ? [place.city] : []);
       if (city === undefined) return [];
       const name = normalizePlaceName(place.name, [city]);
@@ -352,8 +368,9 @@ export const saveFriendPlaces = authedMutation({
       return [{ name, city }];
     });
     const picked = fresh.slice(0, MAX_FRIEND_SAVES);
-    const skipped = distinct(onlyThem).length - picked.length;
-    if (picked.length === 0) return { saved: 0, skipped };
+    const skipped = candidates.length - fresh.length;
+    const remaining = fresh.length - picked.length;
+    if (picked.length === 0) return { saved: 0, skipped, remaining };
     await rateLimiter.limit(ctx, "friendPlaceSave", {
       key: userId,
       count: picked.length,
@@ -371,7 +388,7 @@ export const saveFriendPlaces = authedMutation({
         { itemId },
       );
     }
-    return { saved: picked.length, skipped };
+    return { saved: picked.length, skipped, remaining };
   },
 });
 

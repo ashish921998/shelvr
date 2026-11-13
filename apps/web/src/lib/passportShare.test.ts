@@ -83,13 +83,13 @@ describe("passport text", () => {
   });
 
   it("groups places by city, with places that have none last", () => {
-    expect(
-      passportCities([{ name: "Somewhere" }, ...passport.stamps]),
-    ).toEqual([
-      { city: "Lisbon", names: ["Tigre", "Bar Alto"] },
-      { city: "Porto", names: ["Majestic"] },
-      { city: null, names: ["Somewhere"] },
-    ]);
+    expect(passportCities([{ name: "Somewhere" }, ...passport.stamps])).toEqual(
+      [
+        { city: "Lisbon", names: ["Tigre", "Bar Alto"] },
+        { city: "Porto", names: ["Majestic"] },
+        { city: null, names: ["Somewhere"] },
+      ],
+    );
   });
 });
 
@@ -109,6 +109,40 @@ describe("dotMap", () => {
       expect(city.y).toBeLessThan(box.height - box.pad + 0.01);
     }
     expect(cities[1].y).toBeLessThan(cities[0].y);
+  });
+
+  it("keeps a big southern cluster and its label inside the box", () => {
+    for (const count of [50, 500]) {
+      const stamps = [
+        { name: "North", city: "Porto", dot: { lat: 41.1, lng: -8.6 } },
+        ...Array.from({ length: count }, (_, index) => ({
+          name: `Spot ${index}`,
+          city: "Lisbon",
+          dot: { lat: 38.7, lng: -9.1 },
+        })),
+      ];
+      for (const city of dotMap(stamps, box)) {
+        expect(city.labelY).toBeLessThanOrEqual(box.height - 16);
+        for (const dot of city.dots) {
+          expect(dot.x).toBeGreaterThanOrEqual(0);
+          expect(dot.x).toBeLessThanOrEqual(box.width);
+          expect(dot.y).toBeGreaterThanOrEqual(0);
+          expect(dot.y).toBeLessThanOrEqual(box.height);
+        }
+      }
+    }
+  });
+
+  it("keeps two cities apart when they share a rounded dot", () => {
+    const dot = { lat: 38.7, lng: -9.2 };
+    const cities = dotMap(
+      [
+        { name: "A", city: "Lisbon", dot },
+        { name: "B", city: "Oeiras", dot },
+      ],
+      box,
+    );
+    expect(cities.map((city) => city.city)).toEqual(["Lisbon", "Oeiras"]);
   });
 
   it("centres a single city and skips places with no dot", () => {

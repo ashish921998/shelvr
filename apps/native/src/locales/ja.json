@@ -1143,7 +1143,7 @@
   "passportShare.saved": {
     "other": "%{formattedCount}か所を保存しました"
   },
-  "passportShare.savedNone": "相手の場所はすべて保存済みです",
+  "passportShare.savedNone": "新しく保存する場所はありません",
   "passportShare.fromFriend": "%{name}のパスポートから",
   "passportShare.fromFriendNoName": "友だちのパスポートから",
   "freePlan.proTag": "Pro",

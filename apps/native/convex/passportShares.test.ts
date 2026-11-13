@@ -235,6 +235,42 @@ describe("comparePassport", () => {
     expect(leaks(compare)).toEqual([]);
   });
 
+  it("matches a stamp named with its city, and keeps two branches of one name apart", async () => {
+    const backend = newConvexTest();
+    const maya = await person(backend, "Maya Shah");
+    await stamp(backend, maya.userId, {
+      name: "Le Comptoir, Paris",
+      city: "Paris",
+      spot: { lat: 48.85, lng: 2.34 },
+    });
+    await stamp(backend, maya.userId, {
+      name: "Majestic",
+      city: "Porto",
+      spot: PORTO_BRANCH,
+    });
+    await stamp(backend, maya.userId, {
+      name: "Majestic",
+      city: "Porto",
+      spot: PORTO_FAR_BRANCH,
+    });
+    const token = await maya.t.mutation(api.passportShares.sharePassport, {});
+    const sam = await person(backend, "Sam");
+    await stamp(backend, sam.userId, {
+      name: "Le Comptoir",
+      city: "Paris",
+      spot: { lat: 48.8501, lng: 2.3401 },
+    });
+
+    const compare = await sam.t.query(api.passportShares.comparePassport, {
+      token,
+    });
+    expect(compare?.both).toEqual([{ name: "Le Comptoir", city: "Paris" }]);
+    expect(compare?.onlyThem).toEqual([
+      { name: "Majestic", city: "Porto" },
+      { name: "Majestic", city: "Porto" },
+    ]);
+  });
+
   it("answers null once sharing stops", async () => {
     const backend = newConvexTest();
     const maya = await sharedMaya(backend);
@@ -285,7 +321,7 @@ describe("saveFriendPlaces", () => {
       note: "From Maya’s passport",
     });
 
-    expect(result).toEqual({ saved: 1, skipped: 1 });
+    expect(result).toEqual({ saved: 1, skipped: 1, remaining: 0 });
     const saves = await savesOf(backend, sam.userId);
     expect(saves).toHaveLength(before + 1);
     const added = saves.at(-1);
@@ -296,6 +332,8 @@ describe("saveFriendPlaces", () => {
       note: "From Maya’s passport",
       cities: ["Lisbon"],
       places: ["Bar Alto"],
+      placesEdited: true,
+      titleSource: "user",
     });
     expect(added?.url).toBeUndefined();
     expect(added?.heroImageUrl).toBeUndefined();
@@ -308,7 +346,7 @@ describe("saveFriendPlaces", () => {
         token: maya.token,
         note: "From Maya’s passport",
       }),
-    ).toEqual({ saved: 0, skipped: 2 });
+    ).toEqual({ saved: 0, skipped: 2, remaining: 0 });
   });
 
   it("saves a place stamped with its city in the name only once", async () => {
@@ -327,10 +365,57 @@ describe("saveFriendPlaces", () => {
         note: "From Maya’s passport",
       });
 
-    expect(await run()).toEqual({ saved: 1, skipped: 0 });
-    expect(await run()).toEqual({ saved: 0, skipped: 1 });
+    expect(await run()).toEqual({ saved: 1, skipped: 0, remaining: 0 });
+    expect(await run()).toEqual({ saved: 0, skipped: 1, remaining: 0 });
     const saves = await savesOf(backend, sam.userId);
     expect(saves.map((save) => save.places)).toEqual([["Le Comptoir"]]);
+  });
+
+  it("counts a pinned place as saved only in its pin's city", async () => {
+    const backend = newConvexTest();
+    const maya = await sharedMaya(backend);
+    const sam = await person(backend, "Sam");
+    await backend.run((ctx) =>
+      ctx.db.insert("items", {
+        userId: sam.userId,
+        type: "link",
+        status: "ready",
+        tags: [],
+        cities: ["Lisbon", "Porto"],
+        places: ["Majestic"],
+        placePins: [{ name: "Majestic", city: "Lisbon", ...LISBON_BAR }],
+        searchText: "",
+      }),
+    );
+
+    const result = await sam.t.mutation(api.passportShares.saveFriendPlaces, {
+      token: maya.token,
+      note: "From Maya’s passport",
+    });
+
+    expect(result).toEqual({ saved: 3, skipped: 0, remaining: 0 });
+  });
+
+  it("saves fifty at a time and reports what is left", async () => {
+    const backend = newConvexTest();
+    const maya = await person(backend, "Maya Shah");
+    for (let index = 0; index < 51; index += 1) {
+      await stamp(backend, maya.userId, {
+        name: `Spot ${index}`,
+        city: "Lisbon",
+        spot: LISBON_BAR,
+      });
+    }
+    const token = await maya.t.mutation(api.passportShares.sharePassport, {});
+    const sam = await person(backend, "Sam");
+    const run = () =>
+      sam.t.mutation(api.passportShares.saveFriendPlaces, {
+        token,
+        note: "From Maya’s passport",
+      });
+
+    expect(await run()).toEqual({ saved: 50, skipped: 0, remaining: 1 });
+    expect(await run()).toEqual({ saved: 1, skipped: 50, remaining: 0 });
   });
 
   it("asks for Pro when free saves are off, and saves nothing", async () => {

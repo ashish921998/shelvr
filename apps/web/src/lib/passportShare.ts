@@ -80,6 +80,7 @@ export function passportCities(
 }
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+const LABEL_GAP = 24;
 
 export function dotMap(
   stamps: readonly PassportStamp[],
@@ -88,15 +89,19 @@ export function dotMap(
   const cities = new Map<string, { city: string; dot: Dot; count: number }>();
   for (const { city, dot } of stamps) {
     if (!dot) continue;
-    const key = `${dot.lat},${dot.lng}`;
+    const key = `${city?.trim().toLowerCase() ?? ""}|${dot.lat},${dot.lng}`;
     const found = cities.get(key);
     if (found) found.count += 1;
     else cities.set(key, { city: city ?? "", dot, count: 1 });
   }
   const groups = [...cities.values()];
   if (groups.length === 0) return [];
+  const most = Math.sqrt(Math.max(...groups.map(({ count }) => count)));
+  const step = Math.min(size.spread, (size.height - 2 * size.pad) / 4 / most);
+  const inset = size.pad + step * most;
   const lats = groups.map(({ dot }) => dot.lat);
-  const midLat = ((Math.min(...lats) + Math.max(...lats)) / 2) * (Math.PI / 180);
+  const midLat =
+    ((Math.min(...lats) + Math.max(...lats)) / 2) * (Math.PI / 180);
   const project = ({ lat, lng }: Dot) => ({
     x: lng * Math.cos(midLat),
     y: -lat,
@@ -106,8 +111,8 @@ export function dotMap(
   const ys = points.map((p) => p.y);
   const spanX = Math.max(...xs) - Math.min(...xs);
   const spanY = Math.max(...ys) - Math.min(...ys);
-  const innerW = size.width - 2 * size.pad;
-  const innerH = size.height - 2 * size.pad;
+  const innerW = size.width - 2 * inset;
+  const innerH = size.height - 2 * inset;
   const scale =
     spanX === 0 && spanY === 0
       ? 0
@@ -115,8 +120,8 @@ export function dotMap(
           spanX === 0 ? Infinity : innerW / spanX,
           spanY === 0 ? Infinity : innerH / spanY,
         );
-  const offsetX = size.pad + (innerW - spanX * scale) / 2;
-  const offsetY = size.pad + (innerH - spanY * scale) / 2;
+  const offsetX = inset + (innerW - spanX * scale) / 2;
+  const offsetY = inset + (innerH - spanY * scale) / 2;
   return groups.map((group, index) => {
     const x = offsetX + (points[index].x - Math.min(...xs)) * scale;
     const y = offsetY + (points[index].y - Math.min(...ys)) * scale;
@@ -124,9 +129,10 @@ export function dotMap(
       city: group.city,
       x,
       y,
+      labelY: y + LABEL_GAP + step * Math.sqrt(group.count),
       dots: Array.from({ length: group.count }, (_, i) => ({
-        x: x + size.spread * Math.sqrt(i) * Math.cos(i * GOLDEN_ANGLE),
-        y: y + size.spread * Math.sqrt(i) * Math.sin(i * GOLDEN_ANGLE),
+        x: x + step * Math.sqrt(i) * Math.cos(i * GOLDEN_ANGLE),
+        y: y + step * Math.sqrt(i) * Math.sin(i * GOLDEN_ANGLE),
       })),
     };
   });

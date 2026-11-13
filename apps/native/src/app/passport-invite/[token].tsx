@@ -53,6 +53,11 @@ export default function PassportInviteScreen() {
       signed_in: isAuthenticated,
     });
   }, [preview.data, isAuthenticated]);
+  useEffect(() => {
+    if (preview.error) {
+      analytics.captureError("passport_preview_failed", preview.error);
+    }
+  }, [preview.error]);
   const compare = () => {
     analytics.capture("passport_compare_tapped", {
       signed_in: isAuthenticated,

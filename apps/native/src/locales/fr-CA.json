@@ -1225,7 +1225,7 @@
     "many": "%{formattedCount} lieux enregistrés",
     "other": "%{formattedCount} lieux enregistrés"
   },
-  "passportShare.savedNone": "Vous avez déjà enregistré tous ses lieux",
+  "passportShare.savedNone": "Rien de nouveau à enregistrer",
   "passportShare.fromFriend": "Du passeport de %{name}",
   "passportShare.fromFriendNoName": "Du passeport d’un ami",
   "freePlan.proTag": "Pro",

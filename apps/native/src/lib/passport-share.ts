@@ -11,7 +11,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth, useMutation } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 import { useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Alert, Share } from "react-native";
 
 type Compare = NonNullable<
@@ -44,6 +44,11 @@ export function usePassportShare() {
       isAuthenticated ? {} : "skip",
     ),
   );
+  useEffect(() => {
+    if (share.error) {
+      analytics.captureError("passport_share_load_failed", share.error);
+    }
+  }, [share.error]);
   return share.data ?? null;
 }
 
@@ -72,28 +77,21 @@ export function useSharePassport(places: number) {
 export function useStopSharingPassport() {
   const stop = useMutation(api.passportShares.stopSharingPassport);
   return useCallback(() => {
-    Alert.alert(
-      t("passportShare.stopTitle"),
-      t("passportShare.stopBody"),
-      [
-        { text: t("common.cancel"), style: "cancel" },
-        {
-          text: t("passportShare.stop"),
-          style: "destructive",
-          onPress: () => {
-            stop({})
-              .then(() => analytics.capture("passport_sharing_stopped", {}))
-              .catch((error: unknown) => {
-                analytics.captureError("passport_stop_sharing_failed", error);
-                Alert.alert(
-                  t("errors.unexpectedTitle"),
-                  t("errors.retrySoon"),
-                );
-              });
-          },
+    Alert.alert(t("passportShare.stopTitle"), t("passportShare.stopBody"), [
+      { text: t("common.cancel"), style: "cancel" },
+      {
+        text: t("passportShare.stop"),
+        style: "destructive",
+        onPress: () => {
+          stop({})
+            .then(() => analytics.capture("passport_sharing_stopped", {}))
+            .catch((error: unknown) => {
+              analytics.captureError("passport_stop_sharing_failed", error);
+              Alert.alert(t("errors.unexpectedTitle"), t("errors.retrySoon"));
+            });
         },
-      ],
-    );
+      },
+    ]);
   }, [stop]);
 }
 
@@ -102,6 +100,7 @@ export function useSaveFriendPlaces(token: string, ownerName?: string) {
   const save = useMutation(api.passportShares.saveFriendPlaces);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState<number | null>(null);
+  const [remaining, setRemaining] = useState(0);
   const run = useCallback(async () => {
     if (busy) return;
     setBusy(true);
@@ -118,7 +117,8 @@ export function useSaveFriendPlaces(token: string, ownerName?: string) {
         return;
       }
       analytics.capture("passport_friend_places_saved", result);
-      setSaved(result.saved);
+      setSaved((before) => (before ?? 0) + result.saved);
+      setRemaining(result.remaining);
     } catch (error) {
       if (saveErrorCode(error) === "pro_required") {
         await openPaywall(router, "passport_friend_places");
@@ -130,5 +130,5 @@ export function useSaveFriendPlaces(token: string, ownerName?: string) {
       setBusy(false);
     }
   }, [busy, save, token, ownerName, router]);
-  return { save: run, busy, saved };
+  return { save: run, busy, saved, remaining };
 }

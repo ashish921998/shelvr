@@ -1225,7 +1225,7 @@
     "many": "%{formattedCount} lugares salvos",
     "other": "%{formattedCount} lugares salvos"
   },
-  "passportShare.savedNone": "Você já salvou todos os lugares dessa pessoa",
+  "passportShare.savedNone": "Nada novo para salvar",
   "passportShare.fromFriend": "Do passaporte de %{name}",
   "passportShare.fromFriendNoName": "Do passaporte de um amigo",
   "freePlan.proTag": "Pro",

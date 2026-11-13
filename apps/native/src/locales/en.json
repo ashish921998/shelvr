@@ -1184,7 +1184,7 @@
     "one": "Saved %{formattedCount} place",
     "other": "Saved %{formattedCount} places"
   },
-  "passportShare.savedNone": "You’ve saved all their places",
+  "passportShare.savedNone": "Nothing new to save",
   "passportShare.fromFriend": "From %{name}’s passport",
   "passportShare.fromFriendNoName": "From a friend’s passport",
   "freePlan.proTag": "Pro",

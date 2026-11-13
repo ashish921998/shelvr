@@ -53,7 +53,7 @@ function DotMap({ stamps }: { stamps: PassportStamp[] }) {
       className="mt-6 w-full rounded-2xl border border-line bg-paper-deep"
     >
       {cities.map((city) => (
-        <g key={`${city.x},${city.y}`}>
+        <g key={`${city.city},${city.x},${city.y}`}>
           {city.dots.map((dot) => (
             <circle
               key={`${dot.x},${dot.y}`}
@@ -67,7 +67,7 @@ function DotMap({ stamps }: { stamps: PassportStamp[] }) {
           {city.city ? (
             <text
               x={city.x}
-              y={city.y + 24 + Math.sqrt(city.dots.length) * MAP.spread}
+              y={city.labelY}
               textAnchor="middle"
               className="fill-ink-soft text-[13px] font-semibold"
             >

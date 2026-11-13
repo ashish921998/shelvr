@@ -1184,7 +1184,7 @@
     "one": "%{formattedCount} Ort gespeichert",
     "other": "%{formattedCount} Orte gespeichert"
   },
-  "passportShare.savedNone": "Du hast schon alle diese Orte gespeichert",
+  "passportShare.savedNone": "Nichts Neues zu speichern",
   "passportShare.fromFriend": "Aus dem Pass von %{name}",
   "passportShare.fromFriendNoName": "Aus dem Pass einer befreundeten Person",
   "freePlan.proTag": "Pro",

@@ -1225,7 +1225,7 @@
     "many": "%{formattedCount} lugares guardados",
     "other": "%{formattedCount} lugares guardados"
   },
-  "passportShare.savedNone": "Ya guardaste todos sus lugares",
+  "passportShare.savedNone": "No hay nada nuevo que guardar",
   "passportShare.fromFriend": "Del pasaporte de %{name}",
   "passportShare.fromFriendNoName": "Del pasaporte de un amigo",
   "freePlan.proTag": "Pro",

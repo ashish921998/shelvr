@@ -122,12 +122,14 @@ export function PassportCompare({
             title={
               friend.saved === null
                 ? t("passportShare.save", { count: themCount })
-                : friend.saved === 0
-                  ? t("passportShare.savedNone")
-                  : t("passportShare.saved", { count: friend.saved })
+                : friend.remaining > 0
+                  ? t("passportShare.save", { count: friend.remaining })
+                  : friend.saved === 0
+                    ? t("passportShare.savedNone")
+                    : t("passportShare.saved", { count: friend.saved })
             }
             loading={friend.busy}
-            disabled={friend.saved !== null}
+            disabled={friend.saved !== null && friend.remaining === 0}
             onPress={() => void friend.save()}
           />
         </View>

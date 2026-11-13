@@ -15,7 +15,7 @@ const PAPER = "#faf6ee";
 const INK = "#2b2418";
 const MUTED = "#6f6455";
 const AMBER = "#935d09";
-const MAX_ROWS = 5;
+const MAX_ROWS = 4;
 
 type ImageProps = { params: Promise<{ token: string }> };
 
@@ -61,7 +61,9 @@ export default async function Image({ params }: ImageProps) {
       >
         {passport ? passportTitle(passport) : "A Shelvr passport"}
       </div>
-      <div style={{ display: "flex", marginTop: 14, fontSize: 32, color: MUTED }}>
+      <div
+        style={{ display: "flex", marginTop: 14, fontSize: 32, color: MUTED }}
+      >
         {passport ? passportSummary(passport) : "Places we finally went to"}
       </div>
       <div
