@@ -213,7 +213,7 @@ function SpotRow({
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   screen: {
     flex: 1,
     backgroundColor: theme.colors.background,
@@ -235,7 +235,7 @@ const styles = StyleSheet.create((theme) => ({
   added: {
     position: "absolute",
     top: theme.gap(1.5),
-    left: theme.gap(3),
+    left: rt.insets.left + theme.gap(3),
     paddingVertical: theme.gap(0.75),
     paddingHorizontal: theme.gap(1.5),
     borderRadius: 999,
@@ -250,6 +250,8 @@ const styles = StyleSheet.create((theme) => ({
   sheet: {
     flex: 1,
     marginTop: -theme.gap(3),
+    marginLeft: rt.insets.left,
+    marginRight: rt.insets.right,
     paddingHorizontal: theme.gap(3),
     paddingTop: theme.gap(1),
     gap: theme.gap(1.5),

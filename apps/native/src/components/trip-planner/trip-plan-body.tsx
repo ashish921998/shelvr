@@ -32,6 +32,7 @@ import {
   View,
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { sidePadding } from "@/lib/side-insets";
 
 const MAP_SHARE = 0.42;
 
@@ -302,7 +303,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   scrollContent: { paddingBottom: rt.insets.bottom + theme.gap(4) },
   content: {
     gap: theme.gap(3),
-    paddingHorizontal: theme.gap(2),
+    ...sidePadding(rt.insets, theme.gap(2)),
     paddingTop: theme.gap(2),
   },
   heading: { gap: theme.gap(0.5) },

@@ -14,6 +14,7 @@ import { Redirect, Stack, useLocalSearchParams } from "expo-router";
 import { useEffect } from "react";
 import { ScrollView, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
+import { sidePadding } from "@/lib/side-insets";
 
 /** Plan a date: "What kind of date?", then an evening of two stops from the city's saves. */
 export default function DatePlanScreen() {
@@ -73,7 +74,7 @@ export default function DatePlanScreen() {
         listId !== undefined,
       );
       return (
-        <View style={styles.screen}>
+        <View style={styles.empty}>
           {backTitle}
           <EmptyState title={title} message={message} />
           <View style={styles.footer}>
@@ -112,11 +113,16 @@ export default function DatePlanScreen() {
 const styles = StyleSheet.create((theme, rt) => ({
   screen: { flex: 1, backgroundColor: theme.colors.background },
   content: {
-    paddingHorizontal: theme.gap(2),
+    ...sidePadding(rt.insets, theme.gap(2)),
     paddingTop: theme.gap(2),
     paddingBottom: rt.insets.bottom + theme.gap(4),
   },
   loading: { flex: 1 },
+  empty: {
+    flex: 1,
+    backgroundColor: theme.colors.background,
+    ...sidePadding(rt.insets),
+  },
   footer: {
     paddingHorizontal: theme.gap(2),
     paddingBottom: rt.insets.bottom + theme.gap(2),

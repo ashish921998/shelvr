@@ -26,13 +26,14 @@ import { useReducedMotion } from "react-native-reanimated";
 import { useEffect } from "react";
 import { Platform } from "react-native";
 import { useUnistyles } from "react-native-unistyles";
+import { sidePadding } from "@/lib/side-insets";
 
 export default function AppLayout() {
   useAppLocale();
   const router = useRouter();
   const { isLoading, isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
-  const { theme } = useUnistyles();
+  const { theme, rt } = useUnistyles();
   const reducedMotion = useReducedMotion();
 
   const { gated, planUnknown } = usePlanGate();
@@ -74,6 +75,12 @@ export default function AppLayout() {
     : gated
       ? "/plan-gate"
       : "/(app)/(tabs)/(home)";
+  const inset = {
+    contentStyle: {
+      backgroundColor: theme.colors.background,
+      ...sidePadding(rt.insets),
+    },
+  } as const;
   const modal = {
     presentation: "modal",
     headerShown: true,
@@ -101,7 +108,10 @@ export default function AppLayout() {
           redirectTo={onboarded ? "/plan-gate" : "/onboarding"}
         >
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="share" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="share"
+            options={{ ...inset, headerShown: false }}
+          />
           <Stack.Screen
             name="item/[id]"
             options={{
@@ -180,7 +190,7 @@ export default function AppLayout() {
           <Stack.Screen name="city-card" options={modal} />
           <Stack.Screen
             name="edit-save-places"
-            options={{ headerShown: true, headerTransparent: false }}
+            options={{ ...inset, headerShown: true, headerTransparent: false }}
           />
         </Stack.Protected>
         <Stack.Protected guard={onboarded} redirectTo="/onboarding">
@@ -212,7 +222,10 @@ export default function AppLayout() {
           <Stack.Screen name="plan-gate" options={{ headerShown: false }} />
         </Stack.Protected>
         <Stack.Protected guard={!onboarded} redirectTo="/(app)/(tabs)/(home)">
-          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          <Stack.Screen
+            name="onboarding"
+            options={{ ...inset, headerShown: false }}
+          />
         </Stack.Protected>
         {/* Without a redirectTo, Expo Router falls back to the shortest unguarded route name: `paywall`. */}
         <Stack.Screen

@@ -18,6 +18,7 @@ import Animated, {
   withSpring,
 } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
+import { sideOffsets } from "@/lib/side-insets";
 import { scheduleOnRN } from "react-native-worklets";
 
 export function moveSheet(top: SharedValue<number>, to: number) {
@@ -158,11 +159,10 @@ export function CitySheet({ snaps, top, header, list, onHeaderHeight }: Props) {
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   sheet: {
     position: "absolute",
-    left: 0,
-    right: 0,
+    ...sideOffsets(rt.insets),
     bottom: 0,
     backgroundColor: theme.colors.background,
     borderTopLeftRadius: theme.radius.xl,

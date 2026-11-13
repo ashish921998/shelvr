@@ -46,6 +46,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { contentWidth } from "@/lib/side-insets";
 import { StitchRing } from "@/components/ui/stitch-loader";
 
 type CardRow = FunctionReturnType<
@@ -114,8 +115,9 @@ export const ItemDetail = memo(function ItemDetail({
 }: Props) {
   useAppLocale();
   const headerHeight = useAppHeaderHeight();
-  const { theme } = useUnistyles();
-  const { width, height } = useWindowDimensions();
+  const { theme, rt } = useUnistyles();
+  const { width: windowWidth, height } = useWindowDimensions();
+  const width = contentWidth(windowWidth, rt.insets);
   const insets = useSafeAreaInsets();
 
   const headerInset = Platform.OS === "ios" ? headerHeight : 0;
@@ -380,8 +382,9 @@ function pageHeroLook(
 type ItemIntent = NonNullable<DetailItem["intents"]>[number];
 
 function MoreMedia({ item, site }: { item: DetailItem; site: string }) {
-  const { theme } = useUnistyles();
-  const { width, height } = useWindowDimensions();
+  const { theme, rt } = useUnistyles();
+  const { width: windowWidth, height } = useWindowDimensions();
+  const width = contentWidth(windowWidth, rt.insets);
   const rest = (item.media ?? []).slice(1);
   if (rest.length === 0) return null;
   const inset = theme.gap(2) * 2 + theme.gap(1) * 2;

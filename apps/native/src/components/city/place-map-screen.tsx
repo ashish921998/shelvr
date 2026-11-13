@@ -2,6 +2,7 @@ import { CityMap } from "@/components/city/city-map";
 import { CitySheet, moveSheet } from "@/components/city/city-sheet";
 import type { CityPin } from "@/lib/city-pins";
 import { sheetSnaps } from "@/lib/city-sheet";
+import { sideOffsets } from "@/lib/side-insets";
 import {
   type ReactElement,
   type ReactNode,
@@ -146,8 +147,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   plans: {
     position: "absolute",
-    left: 0,
-    right: 0,
+    ...sideOffsets(rt.insets),
     bottom: 0,
     flexDirection: "row",
     gap: theme.gap(1.5),

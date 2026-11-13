@@ -140,13 +140,16 @@ vi.mock("@/components/trip-planner/chip", () => ({
   ),
 }));
 vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => new Proxy({}, { get: () => ({}) }) },
+  StyleSheet: { create: () => new Proxy({}, { get: () => () => ({}) }) },
   useUnistyles: () => ({
     theme: {
       colors: { muted: "m", foreground: "f", primary: "p", onTint: "o" },
       type: { title: {} },
     },
   }),
+}));
+vi.mock("@/lib/use-sheet-insets", () => ({
+  useSheetInsets: () => ({ insets: { left: 0, right: 0 }, onLayout: vi.fn() }),
 }));
 vi.mock("react-native", () => ({
   ActivityIndicator: vi.fn(() => <span>spinner</span>),

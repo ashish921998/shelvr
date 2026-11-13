@@ -45,6 +45,7 @@ import {
 import { ProgressiveBlurHeader } from "progressive-blur";
 import { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { contentWidth, sidePadding } from "@/lib/side-insets";
 import { confirmItemDelete } from "@/lib/confirm-item-delete";
 import { analytics } from "@/lib/analytics";
 import { useHomeFeed } from "@/lib/home-feed";
@@ -260,8 +261,9 @@ function ItemScreenContent() {
     from?: string;
   }>();
   const router = useRouter();
-  const { theme } = useUnistyles();
-  const { width, height } = useWindowDimensions();
+  const { theme, rt } = useUnistyles();
+  const { width: windowWidth, height } = useWindowDimensions();
+  const width = contentWidth(windowWidth, rt.insets);
   const deleteItem = useMutation(api.items.deleteItem);
   const markItemOpened = useMutation(api.notifications.markItemOpened);
   const { listRef, reducedMotion } = usePagerScroll();
@@ -406,6 +408,10 @@ function ItemScreenContent() {
           headerShown: true,
           headerBackButtonDisplayMode: "minimal",
           headerTintColor: media.tint,
+          contentStyle: {
+            backgroundColor: media.background,
+            ...sidePadding(rt.insets),
+          },
           ...(Platform.OS === "android"
             ? {
                 headerTransparent: false,

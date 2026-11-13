@@ -16,6 +16,8 @@ import {
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import { useNotificationSession } from "@/lib/notifications";
+import { useSheetInsets } from "@/lib/use-sheet-insets";
+import { sidePadding, type SideInsets } from "@/lib/side-insets";
 import { useNavigation, useRouter } from "expo-router";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useState } from "react";
@@ -31,6 +33,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const navigation = useNavigation() as ClosingScreen;
   const { theme } = useUnistyles();
+  const sheet = useSheetInsets();
   const { status, loading } = useEntitlement();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const { mode: appearanceMode, setMode: setAppearanceMode } =
@@ -78,9 +81,10 @@ export default function ProfileScreen() {
 
   return (
     <ScrollView
+      onLayout={sheet.onLayout}
       contentInsetAdjustmentBehavior="automatic"
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={styles.content(sheet.insets)}
     >
       <View style={styles.sheetHeader}>
         <Wordmark size={30} />
@@ -182,14 +186,14 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create((theme) => ({
-  content: {
+  content: (insets: SideInsets) => ({
     flexGrow: 1,
-    padding: theme.gap(3),
     paddingTop: theme.gap(4),
     paddingBottom: theme.gap(4),
+    ...sidePadding(insets, theme.gap(3)),
     gap: theme.gap(1.5),
     alignItems: "center",
-  },
+  }),
   sheetHeader: {
     width: "100%",
     minHeight: 40,

@@ -26,6 +26,7 @@ import {
   type FeedbackSurface,
 } from "@/lib/feedback";
 import { SUPPORT_URL } from "@/lib/legal";
+import { sidePadding } from "@/lib/side-insets";
 
 function submissionContext() {
   const version = Constants.expoConfig?.version;
@@ -256,7 +257,7 @@ function SupportLink() {
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   backdrop: {
     flex: 1,
     backgroundColor: theme.colors.overlay,
@@ -277,6 +278,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   scrollContent: {
     padding: theme.gap(3),
+    ...sidePadding(rt.insets, theme.gap(3)),
     gap: theme.gap(1.5),
   },
   title: {
