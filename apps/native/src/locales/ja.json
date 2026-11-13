@@ -1140,6 +1140,7 @@
     "other": "%{city}でスタンプしていない場所が%{formattedCount}か所あります"
   },
   "passport.cityAllStamped": "%{city}で保存した場所はすべてスタンプ済みです。",
+  "passport.nextEmpty": "%{city}で表示できる場所は今はありません。",
   "passport.stampPlace": "スタンプ",
   "passport.stampPlaceLabel": "%{name}にスタンプ",
   "passportShare.share": "パスポートを共有",

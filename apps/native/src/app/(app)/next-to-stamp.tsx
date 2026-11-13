@@ -7,7 +7,6 @@ import { t, useAppLocale } from "@/lib/i18n";
 import {
   completionFor,
   type UnstampedPlace,
-  unstampedIn,
   useCityCompletion,
 } from "@/lib/passport";
 import { backOrHome } from "@/lib/screen-dismiss";
@@ -26,7 +25,11 @@ export default function NextToStampScreen() {
   const router = useRouter();
   const { theme } = useUnistyles();
   const { city: param } = useLocalSearchParams<{ city: string }>();
-  const places = useQuery(convexQuery(api.placeVisits.listUnstampedPlaces, {}));
+  const places = useQuery(
+    convexQuery(api.placeVisits.listUnstampedPlacesInCity, {
+      city: param ?? "",
+    }),
+  );
   const completion = useCityCompletion();
   const row = completionFor(completion.rows, param ?? "");
   const city = row?.city ?? param ?? "";
@@ -105,7 +108,7 @@ export default function NextToStampScreen() {
       ) : (
         <NextToStampList
           city={city}
-          places={unstampedIn(places.data, city)}
+          places={places.data}
           completion={row}
           busy={visit.busy}
           onStamp={(place) => void stamp(place)}

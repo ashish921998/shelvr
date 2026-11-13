@@ -103,9 +103,11 @@ export function NextToStampList({
             {city}
           </ThemedText>
           <ThemedText variant="subhead" style={styles.muted}>
-            {places.length === 0
-              ? t("passport.cityAllStamped", { city })
-              : t("passport.nextBody", { count: places.length, city })}
+            {places.length > 0
+              ? t("passport.nextBody", { count: places.length, city })
+              : completion && completion.stamped >= completion.total
+                ? t("passport.cityAllStamped", { city })
+                : t("passport.nextEmpty", { city })}
           </ThemedText>
         </View>
       </View>

@@ -1224,6 +1224,7 @@
     "other": "Faltan por sellar %{formattedCount} lugares en %{city}"
   },
   "passport.cityAllStamped": "Todos los lugares que guardaste en %{city} están sellados.",
+  "passport.nextEmpty": "No hay lugares para mostrar en %{city} por ahora.",
   "passport.stampPlace": "Sellar",
   "passport.stampPlaceLabel": "Sellar %{name}",
   "passportShare.share": "Compartir pasaporte",

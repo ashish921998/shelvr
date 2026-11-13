@@ -1182,6 +1182,7 @@
     "other": "Noch %{formattedCount} Orte in %{city} zu stempeln"
   },
   "passport.cityAllStamped": "Alle gespeicherten Orte in %{city} sind gestempelt.",
+  "passport.nextEmpty": "Für %{city} gibt es gerade keine Orte zum Anzeigen.",
   "passport.stampPlace": "Stempeln",
   "passport.stampPlaceLabel": "%{name} stempeln",
   "passportShare.share": "Pass teilen",

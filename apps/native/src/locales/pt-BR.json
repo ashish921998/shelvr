@@ -1224,6 +1224,7 @@
     "other": "Faltam carimbar %{formattedCount} lugares em %{city}"
   },
   "passport.cityAllStamped": "Todos os lugares que você salvou em %{city} estão carimbados.",
+  "passport.nextEmpty": "Nenhum lugar para mostrar em %{city} no momento.",
   "passport.stampPlace": "Carimbar",
   "passport.stampPlaceLabel": "Carimbar %{name}",
   "passportShare.share": "Compartilhar passaporte",

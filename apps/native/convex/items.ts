@@ -349,9 +349,22 @@ export async function readyCitySaves(
   limit = CITY_ITEMS_MAX,
   removals?: readonly Removal[],
 ): Promise<Doc<"items">[]> {
+  if (cityKey(city) === "") return [];
+  return citySaves(
+    await readySavesNewestFirst(ctx, userId, removals),
+    city,
+    limit,
+  );
+}
+
+export function citySaves(
+  saves: readonly Doc<"items">[],
+  city: string,
+  limit = CITY_ITEMS_MAX,
+): Doc<"items">[] {
   const wanted = cityKey(city);
   if (wanted === "") return [];
-  return (await readySavesNewestFirst(ctx, userId, removals))
+  return saves
     .filter((item) => (item.cities ?? []).some((c) => cityKey(c) === wanted))
     .slice(0, limit);
 }

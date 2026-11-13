@@ -1224,6 +1224,7 @@
     "other": "Encore %{formattedCount} lieux à tamponner à %{city}"
   },
   "passport.cityAllStamped": "Tous vos lieux enregistrés à %{city} sont tamponnés.",
+  "passport.nextEmpty": "Aucun lieu à afficher pour %{city} pour le moment.",
   "passport.stampPlace": "Tamponner",
   "passport.stampPlaceLabel": "Tamponner %{name}",
   "passportShare.share": "Partager le passeport",

@@ -126,4 +126,33 @@ describe("NextToStampList", () => {
     ).toBeTruthy();
     expect(screen.queryByTestId("next-to-stamp-stamp")).toBeNull();
   });
+
+  it("does not call the city done when the list is empty but its ring is not full", () => {
+    const { rerender } = render(
+      <NextToStampList
+        city="Tokyo"
+        places={[]}
+        completion={{ city: "Tokyo", stamped: 0, total: 100 }}
+        busy={false}
+        onStamp={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText('passport.nextEmpty {"city":"Tokyo"}'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/passport\.cityAllStamped/)).toBeNull();
+    rerender(
+      <NextToStampList
+        city="Tokyo"
+        places={[]}
+        completion={undefined}
+        busy={false}
+        onStamp={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText('passport.nextEmpty {"city":"Tokyo"}'),
+    ).toBeTruthy();
+    expect(screen.queryByText(/passport\.cityAllStamped/)).toBeNull();
+  });
 });

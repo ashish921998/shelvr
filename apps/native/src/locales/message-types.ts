@@ -1057,6 +1057,7 @@ type MessageParams = {
   "passport.nextTitle": undefined;
   "passport.nextBody": { count: number; city: string };
   "passport.cityAllStamped": { city: string };
+  "passport.nextEmpty": { city: string };
   "passport.stampPlace": undefined;
   "passport.stampPlaceLabel": { name: string };
   "passportShare.share": undefined;

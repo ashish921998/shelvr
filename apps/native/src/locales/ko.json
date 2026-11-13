@@ -1140,6 +1140,7 @@
     "other": "%{city}에 스탬프할 곳이 %{formattedCount}곳 남았어요"
   },
   "passport.cityAllStamped": "%{city}에 저장한 장소에 모두 스탬프를 찍었어요.",
+  "passport.nextEmpty": "지금은 %{city}에서 보여 줄 장소가 없어요.",
   "passport.stampPlace": "스탬프",
   "passport.stampPlaceLabel": "%{name}에 스탬프",
   "passportShare.share": "여권 공유",

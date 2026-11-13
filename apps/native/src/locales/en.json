@@ -1182,6 +1182,7 @@
     "other": "%{formattedCount} places in %{city} left to stamp"
   },
   "passport.cityAllStamped": "Every place you saved in %{city} is stamped.",
+  "passport.nextEmpty": "No places to show for %{city} right now.",
   "passport.stampPlace": "Stamp",
   "passport.stampPlaceLabel": "Stamp %{name}",
   "passportShare.share": "Share passport",

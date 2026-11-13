@@ -8,7 +8,6 @@ import {
   type Stamp,
   stampDate,
   unstampedCities,
-  unstampedIn,
   wentInCity,
 } from "./passport";
 
@@ -174,21 +173,6 @@ describe("passportSections", () => {
 });
 
 describe("next to stamp", () => {
-  const place = { itemId: ITEM, cover: null, spot: { lat: 1, lng: 2 } };
-  const places = [
-    { ...place, name: "Tigre", city: "Lisbon" },
-    { ...place, name: "Majestic", city: "Porto" },
-    { ...place, name: "Dante", city: "LISBON" },
-  ];
-
-  it("lists only the city's unstamped places, whatever the spelling", () => {
-    expect(unstampedIn(places, "lisbon").map((p) => p.name)).toEqual([
-      "Tigre",
-      "Dante",
-    ]);
-    expect(unstampedIn(places, "Kyoto")).toEqual([]);
-  });
-
   it("finds the city's ring by name", () => {
     const rows = [row("Lisbon", 2, 5), row("Porto", 0, 1)];
     expect(completionFor(rows, "LISBON")).toEqual(row("Lisbon", 2, 5));

@@ -109,14 +109,6 @@ export function unstampedCities(places: readonly UnstampedPlace[]) {
   return [...groups.values()];
 }
 
-export function unstampedIn(
-  places: readonly UnstampedPlace[],
-  city: string,
-): UnstampedPlace[] {
-  const key = cityKey(city);
-  return places.filter((place) => cityKey(place.city) === key);
-}
-
 export function stampId(stamp: Stamp): string {
   return `${stamp.key}:${stamp.lat ?? ""}:${stamp.lng ?? ""}`;
 }
