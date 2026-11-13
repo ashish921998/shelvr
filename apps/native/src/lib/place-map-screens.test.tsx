@@ -563,6 +563,22 @@ describe("city page", () => {
       "item-1",
       expect.objectContaining({ name: "BBQ Pit", lat: 30.2, lng: -97.2 }),
       true,
+      { city: "Austin", cover: null, cityVisited: 1 },
+    );
+  });
+
+  it("stamps the city's first place with its cover and nothing visited before", () => {
+    mocks.queries[CITY_ITEMS] = [
+      { ...save, imageUrl: null, heroImageUrl: "https://img/reel.jpg" },
+    ];
+    render(<CityScreen />);
+    fireEvent.click(screen.getByText("🍖 BBQ Pit"));
+    fireEvent.click(screen.getByText("went BBQ Pit"));
+    expect(mocks.toggleVisit).toHaveBeenCalledWith(
+      "item-1",
+      expect.objectContaining({ name: "BBQ Pit" }),
+      true,
+      { city: "Austin", cover: "https://img/reel.jpg", cityVisited: 0 },
     );
   });
 
@@ -625,6 +641,7 @@ describe("city page", () => {
         appleId: "taco",
       }),
       false,
+      { city: "Austin", cover: null, cityVisited: 1 },
     );
   });
 

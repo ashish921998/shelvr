@@ -10,6 +10,11 @@ import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { unstampedCities, type UnstampedPlace } from "@/lib/passport";
 import { backOrHome } from "@/lib/screen-dismiss";
+import {
+  bulkStampMoment,
+  STAMP_TIMING,
+  useStampMoment,
+} from "@/lib/stamp-moment";
 import { api } from "@convex/_generated/api";
 import { MAX_BATCH_PLACES } from "@convex/model/placeVisits";
 import { saveErrorCode } from "@convex/model/saveErrors";
@@ -100,6 +105,7 @@ export default function AlreadyBeenScreen() {
     pickedIds.has(pickId(place)),
   );
   const [busy, setBusy] = useState(false);
+  const playStamp = useStampMoment();
   useEffect(() => {
     if (places.error) {
       analytics.captureError("passport_picker_load_failed", places.error);
@@ -141,7 +147,8 @@ export default function AlreadyBeenScreen() {
       });
       analytics.capture("passport_backfilled", { places: count });
       if (!active.current) return;
-      void haptics.success();
+      const moment = bulkStampMoment(count, picked);
+      if (moment) playStamp(moment, "already_been", STAMP_TIMING.afterSheet);
       router.dismissTo("/passport");
     } catch (error) {
       analytics.captureError("passport_backfill_failed", error);

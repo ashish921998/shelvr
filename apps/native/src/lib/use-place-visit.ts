@@ -2,6 +2,11 @@ import { analytics } from "@/lib/analytics";
 import { openPaywall } from "@/lib/entitlement";
 import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
+import {
+  placeStampMoment,
+  type StampPlace,
+  useStampMoment,
+} from "@/lib/stamp-moment";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { isRateLimitedError } from "@convex/model/demoErrors";
@@ -52,12 +57,14 @@ type VisitPlace = {
 export function usePlaceVisit(surface: "city" | "passport" = "city") {
   const router = useRouter();
   const setVisited = useMutation(api.placeVisits.setVisited);
+  const playStamp = useStampMoment();
   const working = useRef(false);
   const [busy, setBusy] = useState(false);
   const toggle = async (
     itemId: Id<"items">,
     place: VisitPlace,
     visited: boolean,
+    stamp?: StampPlace,
   ): Promise<boolean> => {
     if (working.current) return false;
     working.current = true;
@@ -78,7 +85,8 @@ export function usePlaceVisit(surface: "city" | "passport" = "city") {
               },
             }),
       });
-      void (visited ? haptics.success() : haptics.selection());
+      if (visited) playStamp(placeStampMoment(name, stamp), "city");
+      else void haptics.selection();
       if (surface === "passport") {
         analytics.capture("place_unstamped", { surface });
       } else {

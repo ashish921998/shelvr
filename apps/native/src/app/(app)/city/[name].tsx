@@ -178,7 +178,12 @@ export default function CityScreen() {
               row.kind !== "place"
                 ? undefined
                 : placeVisits.loaded
-                  ? () => void visit.toggle(item._id, row.pin, !went)
+                  ? () =>
+                      void visit.toggle(item._id, row.pin, !went, {
+                        city,
+                        cover: item.imageUrl ?? item.heroImageUrl ?? null,
+                        cityVisited: progress.visited,
+                      })
                   : placeVisits.offerRetry
             }
             onRemove={
