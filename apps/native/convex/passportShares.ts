@@ -240,6 +240,15 @@ async function saveFriendPlace(
     await recordFreeSave(ctx, userId, itemId);
     await settleFreeSave(ctx, itemId);
   }
+  const item = await ctx.db.get(itemId);
+  if (item !== null) {
+    await ctx.scheduler.runAfter(0, internal.analytics.captureSave, {
+      itemId,
+      userId,
+      itemType: item.type,
+      savedAt: item._creationTime,
+    });
+  }
   return itemId;
 }
 
@@ -333,12 +342,15 @@ export const saveFriendPlaces = authedMutation({
       await placesOf(ctx, owner._id),
     );
     const saved = await savedPlaceIds(ctx, userId);
-    const fresh = distinct(onlyThem).filter(
-      (place): place is { name: string; city: string } =>
-        place.city !== undefined &&
-        normalizeCities([place.city]).length > 0 &&
-        !saved.has(`${placeKey(place.name)}|${cityKey(place.city)}`),
-    );
+    const fresh = distinct(onlyThem).flatMap((place) => {
+      const [city] = normalizeCities(place.city ? [place.city] : []);
+      if (city === undefined) return [];
+      const name = normalizePlaceName(place.name, [city]);
+      const id = `${placeKey(name)}|${cityKey(city)}`;
+      if (saved.has(id)) return [];
+      saved.add(id);
+      return [{ name, city }];
+    });
     const picked = fresh.slice(0, MAX_FRIEND_SAVES);
     const skipped = distinct(onlyThem).length - picked.length;
     if (picked.length === 0) return { saved: 0, skipped };

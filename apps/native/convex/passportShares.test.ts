@@ -311,6 +311,28 @@ describe("saveFriendPlaces", () => {
     ).toEqual({ saved: 0, skipped: 2 });
   });
 
+  it("saves a place stamped with its city in the name only once", async () => {
+    const backend = newConvexTest();
+    const maya = await person(backend, "Maya Shah");
+    await stamp(backend, maya.userId, {
+      name: "Le Comptoir, Paris",
+      city: "Paris",
+      spot: { lat: 48.85, lng: 2.34 },
+    });
+    const token = await maya.t.mutation(api.passportShares.sharePassport, {});
+    const sam = await person(backend, "Sam");
+    const run = () =>
+      sam.t.mutation(api.passportShares.saveFriendPlaces, {
+        token,
+        note: "From Maya’s passport",
+      });
+
+    expect(await run()).toEqual({ saved: 1, skipped: 0 });
+    expect(await run()).toEqual({ saved: 0, skipped: 1 });
+    const saves = await savesOf(backend, sam.userId);
+    expect(saves.map((save) => save.places)).toEqual([["Le Comptoir"]]);
+  });
+
   it("asks for Pro when free saves are off, and saves nothing", async () => {
     const backend = newConvexTest();
     const maya = await sharedMaya(backend);
