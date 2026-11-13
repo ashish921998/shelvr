@@ -39,6 +39,7 @@ export type CompletionStamp = {
 type CityTally = {
   spellings: Map<string, number>;
   savePins: SavePin[];
+  olderPins: SavePin[];
   pins: SavePin[];
   savesRead: number;
   strays: Placed[];
@@ -60,6 +61,7 @@ function tallyFor(
     tally = {
       spellings: new Map(),
       savePins: [],
+      olderPins: [],
       pins: [],
       savesRead: 0,
       strays: [],
@@ -84,7 +86,11 @@ function addSaves(
       if (key === "" || seen.has(key)) continue;
       seen.add(key);
       const tally = tallyFor(tallies, city);
-      if (tally === undefined || tally.savesRead >= savesPerCity) continue;
+      if (tally === undefined) continue;
+      if (tally.savesRead >= savesPerCity) {
+        tally.olderPins.push(...pinsForCity(save, city));
+        continue;
+      }
       tally.savesRead += 1;
       tally.savePins.push(...pinsForCity(save, city));
     }
@@ -102,7 +108,7 @@ function pinIndex(tallies: Iterable<CityTally>): Map<string, CityPin[]> {
   const index = new Map<string, CityPin[]>();
   for (const tally of tallies) {
     tally.pins = uniquePlacePins(tally.savePins);
-    for (const pin of tally.pins) {
+    for (const pin of [...tally.pins, ...tally.olderPins]) {
       const entry = { ...pin, tally };
       addTo(index, `name:${placeKey(pin.name)}`, entry);
       addTo(index, `name:${barePlaceKey(pin.name)}`, entry);
