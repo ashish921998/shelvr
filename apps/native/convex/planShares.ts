@@ -441,7 +441,7 @@ async function queueVoteNotice(
   voterId: string,
   firstChoice: boolean,
 ) {
-  if (!firstChoice || share.city === undefined || !planVotePushLive()) return;
+  if (!firstChoice || share.city === undefined) return;
   const queued = await ctx.db
     .query("planVoteNotices")
     .withIndex("by_share", (q) => q.eq("shareId", share._id))
@@ -450,6 +450,16 @@ async function queueVoteNotice(
   const votes = await shareVotes(ctx, share._id);
   if (votes.some((vote) => vote.voterId !== voterId)) return;
   const now = Date.now();
+  if (!planVotePushLive()) {
+    await ctx.db.insert("planVoteNotices", {
+      shareId: share._id,
+      voterId,
+      createdAt: now,
+      deliveryStatus: "failed",
+      deliveryError: "push_off",
+    });
+    return;
+  }
   const noticeId = await ctx.db.insert("planVoteNotices", {
     shareId: share._id,
     voterId,

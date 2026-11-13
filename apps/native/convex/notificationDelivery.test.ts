@@ -748,6 +748,14 @@ describe("first-vote push", () => {
   it.each<[string, (link: Link) => Promise<unknown>]>([
     ["link_gone", (link) => link.t.run((ctx) => ctx.db.delete(link.shareId))],
     [
+      "link_gone",
+      (link) =>
+        link.t.run(async (ctx) => {
+          const share = await ctx.db.get(link.shareId);
+          await ctx.db.delete(share!.spaceId);
+        }),
+    ],
+    [
       "owner_unavailable",
       (link) =>
         link.t.run((ctx) => ctx.db.patch(link.userId, { deleting: true })),

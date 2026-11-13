@@ -935,16 +935,23 @@ export const claimPlanVote = internalMutation({
     )
       return null;
     const share = await ctx.db.get(notice.shareId);
-    if (share === null) {
-      await ctx.db.patch(noticeId, {
+    const linkGone = () =>
+      ctx.db.patch(noticeId, {
         deliveryStatus: "failed",
         deliveryNextAttemptAt: undefined,
         deliveryError: "link_gone",
       });
+    if (share === null) {
+      await linkGone();
       return null;
     }
     if ((await liveOwner(ctx, share.userId)) === null) {
       await ctx.db.patch(noticeId, OWNER_UNAVAILABLE);
+      return null;
+    }
+    const space = await ctx.db.get(share.spaceId);
+    if (space === null || space.userId !== share.userId) {
+      await linkGone();
       return null;
     }
     const preferences = await ctx.db

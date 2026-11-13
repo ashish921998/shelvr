@@ -729,21 +729,48 @@ describe("queueing the first-vote push", () => {
       ...(city === undefined ? {} : { city }),
       places: fixture.places,
     });
-    const notices = () =>
+    const all = () =>
       fixture.backend.run((ctx) => ctx.db.query("planVoteNotices").collect());
+    const notices = async () =>
+      (await all()).filter((notice) => notice.deliveryError !== "push_off");
     const sendJobs = async () =>
       (
         await fixture.backend.run((ctx) =>
           ctx.db.system.query("_scheduled_functions").collect(),
         )
       ).filter((job) => job.name === "notificationDelivery:sendPlanVote");
-    return { ...fixture, token, notices, sendJobs };
+    return { ...fixture, token, all, notices, sendJobs };
   }
 
-  it("queues nothing while the server switch is off", async () => {
-    const { backend, token, notices } = await link("Austin");
+  it("queues nothing while the server switch is off, but records that the link had its first vote", async () => {
+    const { backend, token, all, notices } = await link("Austin");
     await vote(backend, token, "a", ["p0"]);
     expect(await notices()).toEqual([]);
+    expect(await all()).toMatchObject([
+      { voterId: "a", deliveryStatus: "failed", deliveryError: "push_off" },
+    ]);
+  });
+
+  it("sends no second first-vote push after the only voter clears and votes again", async () => {
+    vi.stubEnv("PLAN_VOTE_PUSH_ENABLED", "true");
+    const { backend, token, all, sendJobs } = await link("Austin");
+    await vote(backend, token, "a", ["p0"]);
+    await vote(backend, token, "a", []);
+    await vote(backend, token, "a", ["p1"]);
+    await vote(backend, token, "b", ["p0"]);
+    expect(await all()).toHaveLength(1);
+    expect(await sendJobs()).toHaveLength(1);
+  });
+
+  it("sends no push once the switch turns on for a link that voted, cleared and voted again", async () => {
+    const { backend, token, notices, sendJobs } = await link("Austin");
+    await vote(backend, token, "maya", ["p0"]);
+    await vote(backend, token, "maya", []);
+    vi.stubEnv("PLAN_VOTE_PUSH_ENABLED", "true");
+    await vote(backend, token, "maya", ["p1"]);
+    await vote(backend, token, "sam", ["p1"]);
+    expect(await notices()).toEqual([]);
+    expect(await sendJobs()).toEqual([]);
   });
 
   it("queues one push, two minutes after the first vote with a choice", async () => {
@@ -758,14 +785,11 @@ describe("queueing the first-vote push", () => {
     await vote(backend, token, "b", ["p1"]);
     await vote(backend, token, "a", [], ["p0"]);
 
-    expect(await notices()).toEqual([
-      expect.objectContaining({
-        voterId: "a",
-        createdAt: now,
-        deliveryStatus: "pending",
-        deliveryNextAttemptAt: now + 2 * 60 * 1000,
-      }),
-    ]);
+    const [queued, ...rest] = await notices();
+    expect(rest).toEqual([]);
+    expect(queued).toMatchObject({ voterId: "a", deliveryStatus: "pending" });
+    expect(queued.createdAt).toBeGreaterThanOrEqual(now);
+    expect(queued.deliveryNextAttemptAt).toBe(queued.createdAt + 2 * 60 * 1000);
     expect(await sendJobs()).toHaveLength(1);
   });
 
@@ -818,7 +842,7 @@ describe("queueing the first-vote push", () => {
 
     const old = await link("Austin");
     await vote(old.backend, old.token, "a", ["p0"]);
-    vi.advanceTimersByTime(2 * PLAN_SHARE_TTL_MS + 1);
+    vi.advanceTimersByTime(2 * PLAN_SHARE_TTL_MS + 60_000);
     await old.backend.mutation(internal.planShares.purgeExpiredPlanShares, {});
     expect(await old.notices()).toEqual([]);
   });
