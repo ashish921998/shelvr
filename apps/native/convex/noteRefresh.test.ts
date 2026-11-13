@@ -75,7 +75,7 @@ describe("merged note refresh regression audit", () => {
       title: "",
       text: "Buy milk and eggs",
     });
-    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(generateObject).toHaveBeenCalledTimes(1);
     expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({
       status: "ready",
@@ -109,7 +109,7 @@ describe("merged note refresh regression audit", () => {
       title: "",
       text: "Buy milk and eggs",
     });
-    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     const joins = await t.run((ctx) =>
       ctx.db
         .query("spaceItems")
@@ -150,7 +150,7 @@ describe("merged note refresh regression audit", () => {
     });
     releaseModel();
     await firstRun;
-    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     const item = await t.run((ctx) => ctx.db.get(itemId));
     expect(item?.note).toBe("Buy milk and eggs");
     expect(item).toMatchObject({
@@ -164,6 +164,7 @@ describe("merged note refresh regression audit", () => {
     const { t, owner, itemId } = await setup("processing");
     const delays: number[] = [];
     for (let edit = 0; edit < 21; edit++) {
+      vi.advanceTimersByTime(1);
       const editedAt = Date.now();
       await owner.mutation(api.items.updateNoteItem, {
         id: itemId,
@@ -177,7 +178,7 @@ describe("merged note refresh regression audit", () => {
     expect(delays.slice(0, 20).every((d) => d === 20_000)).toBe(true);
     expect(delays[20]).toBeGreaterThan(20_000);
 
-    await t.finishAllScheduledFunctions(() => vi.runAllTimers());
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(generateObject).toHaveBeenCalledTimes(1);
     expect(generateObject.mock.calls[0][0].prompt).toContain("Edit 20");
     expect(await t.run((ctx) => ctx.db.get(itemId))).toMatchObject({

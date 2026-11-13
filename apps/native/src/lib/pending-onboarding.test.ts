@@ -54,12 +54,42 @@ describe("onboarding recovery", () => {
     expect(getOnboardingProgress()).toEqual({
       spaces: ["Travel"],
       step: 2,
+      viewed: [],
       travelCity: null,
       goals: [],
       savedCount: null,
-      planner: null,
-      tripSoon: null,
+      skippedShare: false,
     });
+  });
+});
+
+describe("the steps already viewed", () => {
+  it("are kept with the progress through a relaunch and the hand-off to the replay", () => {
+    setOnboardingProgress({
+      spaces: [],
+      step: 10,
+      viewed: ["opener", "goal", "carousel"],
+    });
+    setPendingSpaces(["Date nights"]);
+    expect(getOnboardingProgress().viewed).toEqual([
+      "opener",
+      "goal",
+      "carousel",
+    ]);
+  });
+
+  it("read back as only the steps this flow has", () => {
+    setOnboardingProgress({ spaces: [], step: 2 });
+    const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");
+    const storeViewed = (viewed: unknown) =>
+      storage.set(
+        "shelvr.pending.onboarding",
+        JSON.stringify({ ...stored, viewed }),
+      );
+    storeViewed(["commitment", 3, "goal"]);
+    expect(getOnboardingProgress().viewed).toEqual(["goal"]);
+    storeViewed("goal");
+    expect(getOnboardingProgress().viewed).toEqual([]);
   });
 });
 
@@ -70,15 +100,13 @@ describe("the survey answers", () => {
       step: 5,
       goals: ["date", "food"],
       savedCount: "hundreds",
-      planner: "explorer",
-      tripSoon: "notYet",
+      skippedShare: true,
     });
     setPendingSpaces(["Date nights"]);
     expect(getOnboardingProgress()).toMatchObject({
       goals: ["date", "food"],
       savedCount: "hundreds",
-      planner: "explorer",
-      tripSoon: "notYet",
+      skippedShare: true,
     });
   });
 
@@ -91,15 +119,13 @@ describe("the survey answers", () => {
         ...stored,
         goals: ["shopping", "travel"],
         savedCount: "millions",
-        planner: "chaotic",
-        tripSoon: "maybe",
+        skippedShare: "yes",
       }),
     );
     expect(getOnboardingProgress()).toMatchObject({
       goals: ["travel"],
       savedCount: null,
-      planner: null,
-      tripSoon: null,
+      skippedShare: false,
     });
   });
 
@@ -172,11 +198,11 @@ describe("progress written by an older onboarding flow", () => {
   const fresh = {
     spaces: [],
     step: null,
+    viewed: [],
     travelCity: null,
     goals: [],
     savedCount: null,
-    planner: null,
-    tripSoon: null,
+    skippedShare: false,
   };
 
   it.each([0, 1, 2, 3, 4, 5, 6, 7])(
@@ -211,6 +237,7 @@ describe("progress written by an older onboarding flow", () => {
     ["the flow without the chart step", { progressVersion: 9 }],
     ["the flow that had the sample plan step", { progressVersion: 10 }],
     ["the flow with the chart and commitment", { progressVersion: 11 }],
+    ["the flow with the trip and planner questions", { progressVersion: 12 }],
     ["a non-numeric version", { progressVersion: "2" }],
   ])("restarts a record with %s", (_name, version) => {
     storage.set(
@@ -221,6 +248,7 @@ describe("progress written by an older onboarding flow", () => {
         demoUrl: null,
         saveKinds: ["Travel"],
         step: 2,
+        viewed: ["opener", "goal"],
         ...version,
       }),
     );
@@ -234,7 +262,7 @@ describe("progress written by an older onboarding flow", () => {
         operationId: "op",
         spaces: ["Travel"],
         demoUrl: null,
-        progressVersion: 12,
+        progressVersion: 13,
         step: 2,
         spaceNames: {},
       }),
@@ -242,11 +270,11 @@ describe("progress written by an older onboarding flow", () => {
     expect(getOnboardingProgress()).toEqual({
       spaces: ["Travel"],
       step: 2,
+      viewed: [],
       travelCity: null,
       goals: [],
       savedCount: null,
-      planner: null,
-      tripSoon: null,
+      skippedShare: false,
     });
   });
 
@@ -265,11 +293,11 @@ describe("progress written by an older onboarding flow", () => {
     expect(getOnboardingProgress()).toEqual({
       spaces: [],
       step: 0,
+      viewed: [],
       travelCity: null,
       goals: [],
       savedCount: null,
-      planner: null,
-      tripSoon: null,
+      skippedShare: false,
     });
     expect(getPendingDemoUrl()).toBe("https://example.com/queued");
     expect(getOrCreatePendingOperationId()).toBe("legacy-operation");

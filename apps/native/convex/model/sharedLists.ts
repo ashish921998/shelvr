@@ -1,10 +1,11 @@
+import { namedVisitMarkValidator } from "./placeVisits";
 import { type Infer, v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { liveOwner } from "./auth";
 import { namesOneVenue } from "./dateRank";
 import { removalValidator } from "./placeRemovals";
-import { MAX_LIST_NAME_CHARS } from "./sharedListLimits";
+import { MAX_LIST_NAME_CHARS, MAX_LIST_PLACES } from "./sharedListLimits";
 import {
   cityKey,
   countCities,
@@ -19,7 +20,6 @@ import {
   type TripPlace,
 } from "./tripPlan";
 
-export const MAX_LIST_PLACES = 200;
 export const MAX_LIST_MEMBERS = 8;
 export const MAX_LISTS_PER_USER = 20;
 export const LIST_DRAIN_BATCH = 100;
@@ -104,6 +104,7 @@ const listPlanPlaceValidator = v.object({
 export const listPlanClaimValidator = v.object({
   places: v.array(listPlanPlaceValidator),
   been: v.array(v.string()),
+  visitMarks: v.array(namedVisitMarkValidator),
   removed: v.array(removalValidator),
   aiAllowed: v.boolean(),
 });

@@ -24,6 +24,7 @@ import { Directory, File, Paths } from "expo-file-system";
 import { requireOptionalNativeModule } from "expo-modules-core";
 import { useNavigationContainerRef, useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
+import { AppState } from "react-native";
 import { createMMKV } from "react-native-mmkv";
 import { Images } from "react-native-nitro-image";
 
@@ -176,35 +177,54 @@ async function writeThumbnails(
 let publishChain: Promise<void> = Promise.resolve();
 let publishGeneration = 0;
 
-function publish(work: (isCurrent: () => boolean) => Promise<void>) {
+function publish(
+  work: (isCurrent: () => boolean) => Promise<void>,
+  always = false,
+) {
   const generation = ++publishGeneration;
   const isCurrent = () => generation === publishGeneration;
   publishChain = publishChain
-    .then(() => (isCurrent() ? work(isCurrent) : undefined))
+    .then(() => (always || isCurrent() ? work(isCurrent) : undefined))
     .catch((error) =>
       analytics.captureError("app_intents_publish_failed", error),
     );
   return publishChain;
 }
 
-function clearCatalogs() {
+function clearCatalogs(): Promise<boolean> {
+  let cleared = false;
   return publish(async () => {
-    await AppIntents.setEntityCatalogAsync(ITEM_KIND, []);
-    await AppIntents.setEntityCatalogAsync(SPACE_KIND, []);
-    await setup?.clearSpotlight();
-    const dir = thumbDirectory();
-    if (dir.exists) dir.delete();
-  });
+    const steps = [
+      () => AppIntents.setEntityCatalogAsync(ITEM_KIND, []),
+      () => AppIntents.setEntityCatalogAsync(SPACE_KIND, []),
+      async () => setup?.clearSpotlight(),
+      async () => {
+        const dir = thumbDirectory();
+        if (dir.exists) dir.delete();
+      },
+    ];
+    const failures: unknown[] = [];
+    for (const step of steps) {
+      try {
+        await step();
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    if (failures.length > 0) throw failures[0];
+    cleared = true;
+  }, true).then(() => cleared);
 }
 
-async function resetAppIntents(): Promise<void> {
-  if (!AppIntents.isAvailable()) return;
+async function resetAppIntents(clearInvocations: boolean): Promise<boolean> {
+  if (!AppIntents.isAvailable()) return true;
   store.remove(CAPTURE_OWNER_KEY);
-  await Promise.all([
+  const [, , cleared] = await Promise.all([
     setup?.clearCaptureCredentials(),
-    AppIntents.clearPendingInvocationsAsync(),
+    clearInvocations ? AppIntents.clearPendingInvocationsAsync() : undefined,
     clearCatalogs(),
   ]);
+  return cleared;
 }
 
 export async function revokeSiriCapture(
@@ -227,11 +247,23 @@ export function useAppIntentsSignOutReset(): void {
       reset.current = false;
       return;
     }
-    if (reset.current) return;
-    reset.current = true;
-    void resetAppIntents().catch((error) =>
-      analytics.captureError("app_intents_reset_failed", error),
-    );
+    const run = (clearInvocations: boolean) => {
+      if (reset.current) return;
+      reset.current = true;
+      void resetAppIntents(clearInvocations)
+        .then((cleared) => {
+          if (!cleared) reset.current = false;
+        })
+        .catch((error) => {
+          reset.current = false;
+          analytics.captureError("app_intents_reset_failed", error);
+        });
+    };
+    run(true);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") run(false);
+    });
+    return () => subscription.remove();
   }, [isAuthenticated, isLoading]);
 }
 

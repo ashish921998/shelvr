@@ -88,9 +88,12 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `convex/failItem.test.ts` tests it through `failItem` and the stale cron.
   Re-record only for a change you intend, with the command in the test header,
   and review the row diff.
+- **State machines:** `docs/architecture/state-machines.md` lists every status
+  field and flag machine, which are explicit, and the patterns their bugs
+  follow. Read it before adding a status value, flag, retry or lease.
 - **Large files:** `convex/items.ts` (about 2,600 lines), `convex/ai.ts` (about 1,650)
-  and `convex/model/pageReadCore.ts` (about 500). Embedding and recommendation actions
-  live in `convex/aiEmbeddingSweep.ts` and `convex/aiRecommendForSpace.ts`.
+  and `convex/model/pageReadCore.ts` (about 500). The recommendation action
+  lives in `convex/aiRecommendForSpace.ts`.
   Search for the export name first and read that range, not the whole file.
 - **Dev fixtures:** `convex/devFixtures.ts` seeds items, spaces and a Pro
   subscription for the anonymous dev user.
@@ -102,6 +105,14 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Running on a simulator:** `docs/architecture/local-qa.md` covers worktree
   setup, the dev client link, sign-in, fixtures, and forcing onboarding or the
   paywall.
+  For local development and agent testing, use the `E2E_DEVICE` in the
+  gitignored `tools/e2e/.env.local` when present, including when passing
+  `--device` to an Expo build. Final QA uses its `E2E_QA_DEVICE` explicitly;
+  keep that simulator stock and never apply SimSlim to it. An explicit user
+  device request takes precedence. If the configured development device is
+  missing, report it rather than falling back to the final-QA device.
+  New worktrees copy that local file from the main checkout before choosing
+  a development device.
 - **Proving a change on the simulator:** `.agents/skills/verify-shelvr`
   drives the `tools/e2e` suite and maps the core features it covers to their tests.
 - **Proving account deletion:** `.agents/skills/account-deletion` runs
@@ -254,6 +265,7 @@ cannot happen.
 | Complexity limits, zero lint warnings                                                                        | ESLint `complexity`, `max-*`, `--max-warnings 0`                                                                 | `lint`                               |
 | No `console.*` in app code outside the loggers                                                               | ESLint `no-console` (native `src/` allows `warn`)                                                                | `lint`                               |
 | `check:code` is the one gate                                                                                 | Wiring only: `.husky/pre-push` and the CI `Gate` step call it                                                    | nowhere if they stop                 |
+| Local E2E settings precede launch values; overrides and CI semantics hold                                    | `tools/e2e-config.test.mjs` imports config and launch settings in isolated processes                             | `check:code`                         |
 | The pre-push hook gates a push of branch commits, not deletes or tags                                        | `tools/pre-push.test.mjs` pushes through the real hook                                                           | `check:code`                         |
 | Convex modules the app imports pull in no server-only package (zod, ai, linkedom)                            | `src/lib/client-bundle-imports.test.ts` walks their imports                                                      | `check:code`                         |
 | `_generated/api.d.ts` lists every Convex module                                                              | `tools/verify-convex-codegen.mjs`                                                                                | `check:code`                         |
@@ -279,6 +291,7 @@ cannot happen.
 | No database `.filter((q) => ...)` in `convex/` outside tests                                                 | ESLint `no-restricted-syntax` (name an index instead)                                                            | `lint`                               |
 | `logEvent` scalars; `safeFetch`                                                                              | Review against `REVIEW.md`                                                                                       | nowhere                              |
 | Convex test harnesses come from `newConvexTest()`                                                            | ESLint `no-restricted-imports` on `convexTest` outside `convex/test.setup.ts`                                    | `lint`                               |
+| Convex tests drain scheduled work with `vi.runOnlyPendingTimers`, not `vi.runAllTimers`                      | ESLint `no-restricted-syntax` on `finishAllScheduledFunctions(vi.runAllTimers)`                                  | `lint`                               |
 | No test file under `src/app`                                                                                 | ESLint `no-restricted-syntax` on `src/app/**/*.{test,spec}.*`                                                    | `lint`                               |
 | Haptics go through `@/lib/haptics`                                                                           | ESLint `no-restricted-imports` on `expo-haptics` outside the helper and its test                                 | `lint`                               |
 | `captureError`                                                                                               | Review against `REVIEW.md`                                                                                       | nowhere                              |
