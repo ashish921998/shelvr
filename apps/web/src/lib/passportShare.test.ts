@@ -158,6 +158,18 @@ describe("dotMap", () => {
         { name: "A", city: "West Hollywood", dot },
         { name: "B", city: "Beverly Hills", dot },
         { name: "C", city: "Pasadena", dot: { lat: 34.1, lng: -118.1 } },
+        ...[
+          "Santa Monica",
+          "Culver City",
+          "Inglewood",
+          "Marina del Rey",
+          "Playa Vista",
+          "El Segundo",
+        ].map((city) => ({
+          name: city,
+          city,
+          dot: { lat: 34.0, lng: -118.4 },
+        })),
       ],
       box,
     );
@@ -167,6 +179,7 @@ describe("dotMap", () => {
       expect(city.labelX + half).toBeLessThanOrEqual(box.width);
     }
     expect(cities[0].labelX).toBeGreaterThan(cities[0].x);
+    expect(cities[2].city.endsWith("…")).toBe(true);
   });
 
   it("centres a single city and skips places with no dot", () => {

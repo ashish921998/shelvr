@@ -135,7 +135,10 @@ export function dotMap(
   return groups.map((group, index) => {
     const x = offsetX + (points[index].x - Math.min(...xs)) * scale;
     const y = offsetY + (points[index].y - Math.min(...ys)) * scale;
-    const city = group.names.join(" · ");
+    const joined = group.names.join(" · ");
+    const fits = Math.floor((size.width - 2 * LABEL_EDGE) / LABEL_CHAR_WIDTH);
+    const city =
+      joined.length > fits ? `${joined.slice(0, fits - 1).trimEnd()}…` : joined;
     const half = (city.length * LABEL_CHAR_WIDTH) / 2;
     return {
       city,
