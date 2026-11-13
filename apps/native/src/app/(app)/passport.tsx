@@ -1,4 +1,5 @@
 import { EmptyState } from "@/components/empty-state";
+import { PassportCounts } from "@/components/passport/passport-counts";
 import { StampArt, StampSheet } from "@/components/passport/stamp-sheet";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ScreenLoader } from "@/components/ui/screen-loader";
@@ -9,14 +10,13 @@ import {
   type Stamp,
   openStampOf,
   stampId,
-  passportCities,
-  passportCounts,
   shareCardHref,
   stampDate,
   type OpenStamp,
   usePassport,
 } from "@/lib/passport";
 import { useSharePassport } from "@/lib/passport-share";
+import { groupByCity, passportCounts } from "@convex/model/passport";
 import { usePlaceVisit } from "@/lib/use-place-visit";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -25,15 +25,6 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const STAMP_SIZE = 92;
 const TILTS = ["-4deg", "3deg", "-2deg", "4deg"];
-
-function Count({ value, label }: { value: number; label: string }) {
-  return (
-    <View style={styles.count}>
-      <Text style={styles.countValue}>{value}</Text>
-      <Text style={styles.countLabel}>{label}</Text>
-    </View>
-  );
-}
 
 function StampTile({
   stamp,
@@ -106,7 +97,6 @@ export default function PassportScreen() {
     );
   }
   if (stamps === undefined) return <ScreenLoader />;
-  const counts = passportCounts(stamps);
 
   return (
     <ScrollView
@@ -115,17 +105,7 @@ export default function PassportScreen() {
       contentContainerStyle={styles.content}
     >
       <Text style={styles.title}>{t("passport.title")}</Text>
-      <View style={styles.counts}>
-        <Count value={counts.places} label={t("passport.places")} />
-        <View style={styles.divider} />
-        <Count value={counts.cities} label={t("passport.cities")} />
-        {counts.countries !== null ? (
-          <>
-            <View style={styles.divider} />
-            <Count value={counts.countries} label={t("passport.countries")} />
-          </>
-        ) : null}
-      </View>
+      <PassportCounts {...passportCounts(stamps)} />
       {stamps.length > 0 ? (
         <Pressable
           testID="passport-share"
@@ -163,14 +143,14 @@ export default function PassportScreen() {
       {stamps.length === 0 ? (
         <Text style={styles.muted}>{t("passport.beenBody")}</Text>
       ) : null}
-      {passportCities(stamps).map((group) => (
+      {groupByCity(stamps).map((group) => (
         <View key={group.city ?? ""} style={styles.city}>
           <View style={styles.cityHead}>
             <Text style={styles.cityName} numberOfLines={1}>
               {group.city ?? t("passport.elsewhere")}
             </Text>
             <Text style={styles.cityCount}>
-              {t("passport.placesCount", { count: group.stamps.length })}
+              {t("passport.placesCount", { count: group.items.length })}
             </Text>
             {group.city ? (
               <Pressable
@@ -202,7 +182,7 @@ export default function PassportScreen() {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.stamps}
           >
-            {group.stamps.map((stamp, index) => (
+            {group.items.map((stamp, index) => (
               <StampTile
                 key={stampId(stamp)}
                 stamp={stamp}
@@ -238,27 +218,6 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingBottom: rt.insets.bottom + theme.gap(4),
   },
   title: { ...theme.type.displayTitle, color: theme.colors.foreground },
-  counts: {
-    flexDirection: "row",
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  count: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: theme.gap(1.5),
-  },
-  countValue: { ...theme.type.displayTitle, color: theme.colors.foreground },
-  countLabel: {
-    ...theme.type.labelStrong,
-    color: theme.colors.muted,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-  },
-  divider: { width: 1, backgroundColor: theme.colors.border },
   sharePassport: {
     minHeight: theme.control.minHeight,
     flexDirection: "row",

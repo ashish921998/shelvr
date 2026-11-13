@@ -5,35 +5,15 @@ import { shareUrl } from "@/lib/share-link";
 import { webUrl } from "@/lib/web-url";
 import { api } from "@convex/_generated/api";
 import { saveErrorCode } from "@convex/model/saveErrors";
-import { cityKey } from "@convex/model/trip";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth, useMutation } from "convex/react";
-import type { FunctionReturnType } from "convex/server";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Share } from "react-native";
 
-type Compare = NonNullable<
-  FunctionReturnType<typeof api.passportShares.comparePassport>
->;
-type ComparePlace = Compare["both"][number];
-
 export function passportUrl(token: string): string {
   return webUrl(`/passport/${encodeURIComponent(token)}`);
-}
-
-export function compareCities(places: readonly ComparePlace[]) {
-  const groups = new Map<string, { city: string | null; names: string[] }>();
-  for (const place of places) {
-    const key = place.city ? cityKey(place.city) : "";
-    const group = groups.get(key);
-    if (group) group.names.push(place.name);
-    else groups.set(key, { city: place.city ?? null, names: [place.name] });
-  }
-  return [...groups.values()].sort(
-    (a, b) => Number(a.city === null) - Number(b.city === null),
-  );
 }
 
 export function usePassportShare() {
@@ -100,7 +80,6 @@ export function useSaveFriendPlaces(token: string, ownerName?: string) {
   const save = useMutation(api.passportShares.saveFriendPlaces);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState<number | null>(null);
-  const [remaining, setRemaining] = useState(0);
   const run = useCallback(async () => {
     if (busy) return;
     setBusy(true);
@@ -118,7 +97,6 @@ export function useSaveFriendPlaces(token: string, ownerName?: string) {
       }
       analytics.capture("passport_friend_places_saved", result);
       setSaved((before) => (before ?? 0) + result.saved);
-      setRemaining(result.remaining);
     } catch (error) {
       if (saveErrorCode(error) === "pro_required") {
         await openPaywall(router, "passport_friend_places");
@@ -130,5 +108,5 @@ export function useSaveFriendPlaces(token: string, ownerName?: string) {
       setBusy(false);
     }
   }, [busy, save, token, ownerName, router]);
-  return { save: run, busy, saved, remaining };
+  return { save: run, busy, saved };
 }

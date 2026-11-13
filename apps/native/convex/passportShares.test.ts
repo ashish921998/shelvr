@@ -151,10 +151,13 @@ describe("the public passport", () => {
       places: 3,
       cities: 2,
       countries: 1,
-      stamps: expect.arrayContaining([
-        { name: "Café Secreto", city: "Lisbon", dot: { lat: 38.7, lng: -9.1 } },
-        { name: "Bar Alto", city: "Lisbon", dot: { lat: 38.7, lng: -9.1 } },
-        { name: "Majestic", city: "Porto", dot: { lat: 41.1, lng: -8.6 } },
+      byCity: expect.arrayContaining([
+        {
+          city: "Lisbon",
+          dot: { lat: 38.7, lng: -9.1 },
+          names: expect.arrayContaining(["Café Secreto", "Bar Alto"]),
+        },
+        { city: "Porto", dot: { lat: 41.1, lng: -8.6 }, names: ["Majestic"] },
       ]),
     });
     expect(leaks(preview)).toEqual([]);
@@ -232,7 +235,25 @@ describe("comparePassport", () => {
       { name: "Bar Alto", city: "Madrid" },
       { name: "Majestic", city: "Porto" },
     ]);
+    expect(compare?.toSave).toBe(1);
     expect(leaks(compare)).toEqual([]);
+  });
+
+  it("stops offering places once they are saved, and keeps them in Only them", async () => {
+    const backend = newConvexTest();
+    const maya = await sharedMaya(backend);
+    const sam = await person(backend, "Sam");
+    const compare = () =>
+      sam.t.query(api.passportShares.comparePassport, { token: maya.token });
+
+    expect((await compare())?.toSave).toBe(3);
+    await sam.t.mutation(api.passportShares.saveFriendPlaces, {
+      token: maya.token,
+      note: "From Maya’s passport",
+    });
+    const after = await compare();
+    expect(after?.toSave).toBe(0);
+    expect(after?.onlyThem).toHaveLength(3);
   });
 
   it("matches a stamp named with its city, and keeps two branches of one name apart", async () => {
@@ -321,7 +342,7 @@ describe("saveFriendPlaces", () => {
       note: "From Maya’s passport",
     });
 
-    expect(result).toEqual({ saved: 1, skipped: 1, remaining: 0 });
+    expect(result).toEqual({ saved: 1, remaining: 0 });
     const saves = await savesOf(backend, sam.userId);
     expect(saves).toHaveLength(before + 1);
     const added = saves.at(-1);
@@ -346,7 +367,7 @@ describe("saveFriendPlaces", () => {
         token: maya.token,
         note: "From Maya’s passport",
       }),
-    ).toEqual({ saved: 0, skipped: 2, remaining: 0 });
+    ).toEqual({ saved: 0, remaining: 0 });
   });
 
   it("saves a place stamped with its city in the name only once", async () => {
@@ -365,8 +386,8 @@ describe("saveFriendPlaces", () => {
         note: "From Maya’s passport",
       });
 
-    expect(await run()).toEqual({ saved: 1, skipped: 0, remaining: 0 });
-    expect(await run()).toEqual({ saved: 0, skipped: 1, remaining: 0 });
+    expect(await run()).toEqual({ saved: 1, remaining: 0 });
+    expect(await run()).toEqual({ saved: 0, remaining: 0 });
     const saves = await savesOf(backend, sam.userId);
     expect(saves.map((save) => save.places)).toEqual([["Le Comptoir"]]);
   });
@@ -393,7 +414,7 @@ describe("saveFriendPlaces", () => {
       note: "From Maya’s passport",
     });
 
-    expect(result).toEqual({ saved: 3, skipped: 0, remaining: 0 });
+    expect(result).toEqual({ saved: 3, remaining: 0 });
   });
 
   it("saves fifty at a time and reports what is left", async () => {
@@ -414,8 +435,8 @@ describe("saveFriendPlaces", () => {
         note: "From Maya’s passport",
       });
 
-    expect(await run()).toEqual({ saved: 50, skipped: 0, remaining: 1 });
-    expect(await run()).toEqual({ saved: 1, skipped: 50, remaining: 0 });
+    expect(await run()).toEqual({ saved: 50, remaining: 1 });
+    expect(await run()).toEqual({ saved: 1, remaining: 0 });
   });
 
   it("asks for Pro when free saves are off, and saves nothing", async () => {

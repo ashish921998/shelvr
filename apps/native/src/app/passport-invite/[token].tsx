@@ -1,14 +1,15 @@
 import {
+  CityNames,
   DeadPassport,
   PassportCompare,
 } from "@/components/passport/passport-compare";
+import { PassportCounts } from "@/components/passport/passport-counts";
 import { SignInView } from "@/components/sign-in-view";
 import { Button } from "@/components/ui/button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
-import { compareCities } from "@/lib/passport-share";
 import { clearPendingInvite, setPendingPassport } from "@/lib/pending-invite";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
@@ -16,18 +17,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth } from "convex/react";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StyleSheet } from "react-native-unistyles";
-
-function Count({ value, label }: { value: number; label: string }) {
-  return (
-    <View style={styles.count}>
-      <Text style={styles.countValue}>{value}</Text>
-      <Text style={styles.countLabel}>{label}</Text>
-    </View>
-  );
-}
 
 export default function PassportInviteScreen() {
   useAppLocale();
@@ -107,7 +99,7 @@ export default function PassportInviteScreen() {
     );
   }
 
-  const { ownerName, places, cities, countries, stamps } = preview.data;
+  const { ownerName, places, cities, countries, byCity } = preview.data;
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
@@ -121,33 +113,19 @@ export default function PassportInviteScreen() {
             ? t("passportShare.titleNoName")
             : t("passportShare.title", { name: ownerName })}
         </ThemedText>
-        <View style={styles.counts}>
-          <Count value={places} label={t("passport.places")} />
-          <View style={styles.divider} />
-          <Count value={cities} label={t("passport.cities")} />
-          {countries !== null ? (
-            <>
-              <View style={styles.divider} />
-              <Count value={countries} label={t("passport.countries")} />
-            </>
-          ) : null}
-        </View>
+        <PassportCounts places={places} cities={cities} countries={countries} />
         <Button
           testID="passport-invite-compare"
           title={t("passportShare.compare")}
           onPress={compare}
         />
-        {compareCities(stamps).map((group) => (
-          <View key={group.city ?? ""} style={styles.card}>
-            <ThemedText variant="title">
-              {group.city ?? t("passport.elsewhere")}
-            </ThemedText>
-            {group.names.map((name, index) => (
-              <ThemedText key={`${name}-${index}`} variant="body">
-                {name}
-              </ThemedText>
-            ))}
-          </View>
+        {byCity.map((group) => (
+          <CityNames
+            key={group.city ?? ""}
+            city={group.city ?? null}
+            names={group.names}
+            heading="title"
+          />
         ))}
         <Pressable
           accessibilityRole="button"
@@ -181,32 +159,6 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.foreground,
   },
   avatarText: { color: theme.colors.surface },
-  counts: {
-    flexDirection: "row",
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  count: { flex: 1, alignItems: "center", paddingVertical: theme.gap(1.5) },
-  countValue: { ...theme.type.displayTitle, color: theme.colors.foreground },
-  countLabel: {
-    ...theme.type.labelStrong,
-    color: theme.colors.muted,
-    textTransform: "uppercase",
-    letterSpacing: 0.8,
-  },
-  divider: { width: 1, backgroundColor: theme.colors.border },
-  card: {
-    gap: theme.gap(0.5),
-    padding: theme.gap(2),
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
   notNow: { alignItems: "center", paddingVertical: theme.gap(1) },
   muted: { color: theme.colors.muted },
   pressed: { opacity: theme.opacity.pressed },

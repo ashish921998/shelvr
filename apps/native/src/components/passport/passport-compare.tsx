@@ -3,8 +3,9 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
-import { compareCities, useSaveFriendPlaces } from "@/lib/passport-share";
+import { useSaveFriendPlaces } from "@/lib/passport-share";
 import { api } from "@convex/_generated/api";
+import { groupByCity } from "@convex/model/passport";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef } from "react";
@@ -12,6 +13,37 @@ import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 type Place = { name: string; city?: string };
+
+export function CityNames({
+  city,
+  names,
+  heading = "subheadStrong",
+}: {
+  city: string | null;
+  names: string[];
+  heading?: "subheadStrong" | "title";
+}) {
+  return (
+    <View style={styles.card}>
+      <ThemedText variant={heading}>
+        {city ?? t("passport.elsewhere")}
+      </ThemedText>
+      {names.map((name, index) => (
+        <ThemedText key={`${name}-${index}`} variant="body">
+          {name}
+        </ThemedText>
+      ))}
+    </View>
+  );
+}
+
+function saveTitle(toSave: number, saved: number | null): string {
+  if (toSave > 0) return t("passportShare.save", { count: toSave });
+  if (saved !== null && saved > 0) {
+    return t("passportShare.saved", { count: saved });
+  }
+  return t("passportShare.savedNone");
+}
 
 function Section({
   title,
@@ -31,17 +63,12 @@ function Section({
           {places.length}
         </ThemedText>
       </View>
-      {compareCities(places).map((group) => (
-        <View key={group.city ?? ""} style={styles.card}>
-          <ThemedText variant="subheadStrong">
-            {group.city ?? t("passport.elsewhere")}
-          </ThemedText>
-          {group.names.map((name, index) => (
-            <ThemedText key={`${name}-${index}`} variant="body">
-              {name}
-            </ThemedText>
-          ))}
-        </View>
+      {groupByCity(places).map(({ city, items }) => (
+        <CityNames
+          key={city ?? ""}
+          city={city}
+          names={items.map((place) => place.name)}
+        />
       ))}
     </View>
   );
@@ -119,17 +146,9 @@ export function PassportCompare({
         <View style={styles.save}>
           <Button
             testID="passport-save-their-places"
-            title={
-              friend.saved === null
-                ? t("passportShare.save", { count: themCount })
-                : friend.remaining > 0
-                  ? t("passportShare.save", { count: friend.remaining })
-                  : friend.saved === 0
-                    ? t("passportShare.savedNone")
-                    : t("passportShare.saved", { count: friend.saved })
-            }
+            title={saveTitle(data.toSave, friend.saved)}
             loading={friend.busy}
-            disabled={friend.saved !== null && friend.remaining === 0}
+            disabled={data.toSave === 0}
             onPress={() => void friend.save()}
           />
         </View>

@@ -18,6 +18,8 @@ import {
 import { authedMutation, authedQuery, liveOwner } from "./model/auth";
 import { linkSource } from "./model/externalUrl";
 import { logEvent } from "./model/log";
+import { normalizePlaceName } from "./model/itemFields";
+import type { PassportPlace } from "./model/passport";
 import { approximateDocBytes } from "./model/readBudget";
 import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
 import {
@@ -517,31 +519,28 @@ async function coverOf(
 }
 
 type PassportStamp = Infer<typeof stampValidator>;
+type StampRow = Omit<PassportStamp, "cover">;
 
-export async function passportStamps(
+async function stampRows(
   ctx: QueryCtx,
   userId: string,
-  cover: (item: Doc<"items"> | null) => Promise<string | null>,
-): Promise<PassportStamp[]> {
+): Promise<{
+  stamps: StampRow[];
+  saves: Map<Id<"items">, Doc<"items"> | null>;
+}> {
   const rows = (await visitRows(ctx, userId)).slice(0, MAX_PASSPORT_STAMPS);
-  const saves = new Map<
-    Id<"items">,
-    { owned: Doc<"items"> | null; cover: string | null }
-  >();
+  const saves = new Map<Id<"items">, Doc<"items"> | null>();
   let bytes = 0;
   for (const { itemId } of rows) {
     if (saves.has(itemId)) continue;
     if (bytes >= PASSPORT_SAVE_BYTES) break;
     const owned = await ownedSave(ctx, userId, itemId);
     bytes += approximateDocBytes(owned);
-    saves.set(itemId, { owned, cover: await cover(owned) });
+    saves.set(itemId, owned);
   }
-  const stamps: PassportStamp[] = [];
+  const stamps: StampRow[] = [];
   for (const row of rows) {
-    const { owned, cover } = saves.get(row.itemId) ?? {
-      owned: null,
-      cover: null,
-    };
+    const owned = saves.get(row.itemId) ?? null;
     const source = reelSource(owned);
     const base = {
       key: row.key,
@@ -550,7 +549,6 @@ export async function passportStamps(
       visitedAt: row.visitedAt,
       ...(row.backfilled ? { backfilled: true } : {}),
       ...(source ? { source } : {}),
-      cover,
     };
     const spots = stampSpots(row, owned);
     if (spots === undefined) {
@@ -570,14 +568,36 @@ export async function passportStamps(
       });
     }
   }
-  return stamps.slice(0, MAX_PASSPORT_STAMPS);
+  return { stamps: stamps.slice(0, MAX_PASSPORT_STAMPS), saves };
+}
+
+export async function passportPlaces(
+  ctx: QueryCtx,
+  userId: string,
+): Promise<PassportPlace[]> {
+  const { stamps } = await stampRows(ctx, userId);
+  return stamps.map(({ name, city, lat, lng, countryCode }) => ({
+    name: normalizePlaceName(name, city ? [city] : []),
+    ...(city ? { city } : {}),
+    ...(lat !== undefined && lng !== undefined ? { lat, lng } : {}),
+    ...(countryCode ? { countryCode } : {}),
+  }));
 }
 
 export const getPassport = authedQuery({
   args: {},
   returns: v.array(stampValidator),
-  handler: async (ctx) =>
-    await passportStamps(ctx, ctx.userId, (item) => coverOf(ctx, item)),
+  handler: async (ctx) => {
+    const { stamps, saves } = await stampRows(ctx, ctx.userId);
+    const covers = new Map<Id<"items">, string | null>();
+    for (const [itemId, owned] of saves) {
+      covers.set(itemId, await coverOf(ctx, owned));
+    }
+    return stamps.map((stamp) => ({
+      ...stamp,
+      cover: covers.get(stamp.itemId) ?? null,
+    }));
+  },
 });
 
 async function unstampedPins(ctx: QueryCtx, userId: Id<"users">) {

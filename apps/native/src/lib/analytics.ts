@@ -196,11 +196,7 @@ export type AnalyticsEventProperties = {
     only_them: number;
     only_you: number;
   };
-  passport_friend_places_saved: {
-    saved: number;
-    skipped: number;
-    remaining: number;
-  };
+  passport_friend_places_saved: { saved: number; remaining: number };
   plan_shared: { place_count: number; picked: boolean };
   plan_asked: { place_count: number };
   plan_ask_failed: { reason: "link" | "share" };

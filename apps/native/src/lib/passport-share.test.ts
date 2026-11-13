@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { compareCities, passportUrl } from "./passport-share";
+import { passportUrl } from "./passport-share";
 import { pendingInviteOf } from "./pending-invite";
 
 vi.mock("@/lib/entitlement", () => ({ openPaywall: vi.fn() }));
@@ -15,23 +15,6 @@ describe("passportUrl", () => {
     expect(passportUrl("ab/c")).toBe(
       "https://shelvr-web.vercel.app/passport/ab%2Fc",
     );
-  });
-});
-
-describe("compareCities", () => {
-  it("groups places by city, ignoring case, with no-city places last", () => {
-    expect(
-      compareCities([
-        { name: "Nowhere" },
-        { name: "Tigre", city: "Lisbon" },
-        { name: "Majestic", city: "Porto" },
-        { name: "Bar Alto", city: "lisbon" },
-      ]),
-    ).toEqual([
-      { city: "Lisbon", names: ["Tigre", "Bar Alto"] },
-      { city: "Porto", names: ["Majestic"] },
-      { city: null, names: ["Nowhere"] },
-    ]);
   });
 });
 

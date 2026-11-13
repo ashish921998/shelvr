@@ -2,8 +2,6 @@ import { describe, expect, it } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
 import {
   CARD_PLACES,
-  passportCities,
-  passportCounts,
   shareCardOf,
   type Stamp,
   stampDate,
@@ -24,24 +22,7 @@ function stamp(over: Partial<Stamp> = {}): Stamp {
   };
 }
 
-describe("passportCounts", () => {
-  it("counts cities by name and hides countries until one is known", () => {
-    expect(
-      passportCounts([
-        stamp({ city: "Lisbon" }),
-        stamp({ key: "b", city: "lisbon " }),
-        stamp({ key: "c" }),
-      ]),
-    ).toEqual({ places: 3, cities: 1, countries: null });
-    expect(
-      passportCounts([
-        stamp({ city: "Lisbon", countryCode: "PT" }),
-        stamp({ key: "b", city: "Paris", countryCode: "FR" }),
-        stamp({ key: "c", city: "Porto", countryCode: "PT" }),
-      ]),
-    ).toEqual({ places: 3, cities: 3, countries: 2 });
-  });
-
+describe("stampDate", () => {
   it("gives a place from before Shelvr no date", () => {
     expect(stampDate(stamp({ backfilled: true }))).toBeNull();
     expect(stampDate(stamp())).toBe(5);
@@ -49,20 +30,6 @@ describe("passportCounts", () => {
 });
 
 describe("grouping by city", () => {
-  it("groups stamps by city name and puts places with no city last", () => {
-    const groups = passportCities([
-      stamp({ key: "a", city: undefined }),
-      stamp({ key: "b", city: "Lisbon" }),
-      stamp({ key: "c", city: "lisbon " }),
-      stamp({ key: "d", city: "Porto" }),
-    ]);
-    expect(groups.map((group) => [group.city, group.stamps.length])).toEqual([
-      ["Lisbon", 2],
-      ["Porto", 1],
-      [null, 1],
-    ]);
-  });
-
   it("groups places to stamp by city in the order they come", () => {
     const place = { itemId: ITEM, cover: null, spot: { lat: 1, lng: 2 } };
     const groups = unstampedCities([

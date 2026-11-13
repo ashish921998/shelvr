@@ -14,8 +14,6 @@ export type UnstampedPlace = FunctionReturnType<
   typeof api.placeVisits.listUnstampedPlaces
 >[number];
 
-type StampCity = { city: string | null; stamps: Stamp[] };
-
 export type OpenStamp = {
   itemId: Id<"items">;
   name: string;
@@ -37,35 +35,8 @@ export function usePassport() {
   };
 }
 
-export function passportCounts(stamps: readonly Stamp[]) {
-  const cities = new Set(
-    stamps.flatMap((stamp) => (stamp.city ? [cityKey(stamp.city)] : [])),
-  );
-  const countries = new Set(
-    stamps.flatMap((stamp) => (stamp.countryCode ? [stamp.countryCode] : [])),
-  );
-  return {
-    places: stamps.length,
-    cities: cities.size,
-    countries: countries.size > 0 ? countries.size : null,
-  };
-}
-
 export function stampDate(stamp: Pick<Stamp, "visitedAt" | "backfilled">) {
   return stamp.backfilled ? null : stamp.visitedAt;
-}
-
-export function passportCities(stamps: readonly Stamp[]): StampCity[] {
-  const groups = new Map<string, StampCity>();
-  for (const stamp of stamps) {
-    const key = stamp.city ? cityKey(stamp.city) : "";
-    const group = groups.get(key);
-    if (group) group.stamps.push(stamp);
-    else groups.set(key, { city: stamp.city ?? null, stamps: [stamp] });
-  }
-  return [...groups.values()].sort(
-    (a, b) => Number(a.city === null) - Number(b.city === null),
-  );
 }
 
 export function unstampedCities(places: readonly UnstampedPlace[]) {
