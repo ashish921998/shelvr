@@ -24,8 +24,10 @@ import {
   MAX_ITEM_PLACES,
   normalizeCities,
   normalizePlaces,
+  normalizePlaceCuisines,
   normalizePlaceLocations,
 } from "./model/itemFields";
+import { CUISINES } from "./model/placeKinds";
 import { logEvent } from "./model/log";
 import {
   PLACE_LIST_CITIES_SYSTEM,
@@ -279,6 +281,17 @@ const itemAnalysisSchema = z.object({
     .describe(
       "Location clues that distinguish branches of the named places. Preserve every explicit branch, street address or neighbourhood; omit entries without such evidence. These are lookup context, not display names.",
     ),
+  placeCuisines: z
+    .array(
+      z.object({
+        name: z.string().describe("The exact corresponding name from places"),
+        cuisine: z.enum(CUISINES).describe("What this place mainly serves"),
+      }),
+    )
+    .optional()
+    .describe(
+      "For each place in places that serves food or drink, what it mainly serves, when the item or the place's name makes it clear, e.g. a burger bar is 'burger', a taquería 'tacos', a cocktail bar 'cocktails'. Omit places that serve none of these or whose food is not clear; never guess.",
+    ),
 });
 
 const recipeSchema = z
@@ -329,6 +342,7 @@ const speechRecipeSchema = z.object({ recipe: recipeSchema });
 const speechPlacesSchema = z.object({
   places: z.array(z.string()).describe(PLACES_DESCRIPTION),
   placeLocations: itemAnalysisSchema.shape.placeLocations,
+  placeCuisines: itemAnalysisSchema.shape.placeCuisines,
   cities: itemAnalysisSchema.shape.cities,
 });
 
@@ -471,6 +485,15 @@ function classificationOf(model: ModelResult): Classification {
       ? {
           placeLocations: normalizePlaceLocations(
             model.placeLocations,
+            model.places,
+            model.cities,
+          ),
+        }
+      : {}),
+    ...(model.placeCuisines !== undefined
+      ? {
+          placeCuisines: normalizePlaceCuisines(
+            model.placeCuisines,
             model.places,
             model.cities,
           ),
@@ -799,7 +822,12 @@ function speechPlacesPrompt(page: PageData, transcript: string): string {
 type Spoken = Partial<
   Pick<
     LinkAnalysis,
-    "recipe" | "places" | "cities" | "placesHeard" | "placeLocations"
+    | "recipe"
+    | "places"
+    | "cities"
+    | "placesHeard"
+    | "placeLocations"
+    | "placeCuisines"
   >
 >;
 
@@ -845,6 +873,14 @@ async function fromSpeech(
         [
           ...(spoken.placeLocations ?? result.placeLocations ?? []),
           ...(item.placeLocations ?? []),
+        ],
+        [...(spoken.places ?? result.places ?? []), ...item.places],
+        cities,
+      ),
+      placeCuisines: normalizePlaceCuisines(
+        [
+          ...(spoken.placeCuisines ?? result.placeCuisines ?? []),
+          ...(failed ? (item.placeCuisines ?? []) : []),
         ],
         [...(spoken.places ?? result.places ?? []), ...item.places],
         cities,
@@ -990,7 +1026,10 @@ async function speechPlaces(
   result: LinkAnalysis,
   log: (outcome: string) => void,
 ): Promise<
-  | Pick<LinkAnalysis, "places" | "cities" | "placesHeard" | "placeLocations">
+  | Pick<
+      LinkAnalysis,
+      "places" | "cities" | "placesHeard" | "placeLocations" | "placeCuisines"
+    >
   | undefined
 > {
   try {
@@ -1014,6 +1053,11 @@ async function speechPlaces(
       places,
       placeLocations: normalizePlaceLocations(
         [...(result.placeLocations ?? []), ...(object.placeLocations ?? [])],
+        places,
+        result.cities,
+      ),
+      placeCuisines: normalizePlaceCuisines(
+        [...(result.placeCuisines ?? []), ...(object.placeCuisines ?? [])],
         places,
         result.cities,
       ),
@@ -1318,6 +1362,7 @@ export const processItem = internalAction({
           itemId: args.itemId,
           runId: args.runId,
           parts: outcome.listParts ?? [],
+          placeCuisines: model.placeCuisines,
         });
       }
       const autoFiled = model
@@ -1363,13 +1408,6 @@ export const processItem = internalAction({
     }
     return null;
   },
-});
-
-export const sweepItemEmbeddings = internalAction({
-  args: {},
-  returns: v.object({ scanned: v.number(), written: v.number() }),
-  handler: async (ctx): Promise<{ scanned: number; written: number }> =>
-    await ctx.runAction(internal.aiEmbeddingSweep.sweepItemEmbeddings, {}),
 });
 
 export const recommendForSpace = internalAction({

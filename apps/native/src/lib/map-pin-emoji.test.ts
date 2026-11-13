@@ -33,4 +33,118 @@ describe("placeEmoji", () => {
     expect(placeEmoji({ kinds: ["dateNight"] })).toBeUndefined();
     expect(placeEmoji({ category: "Pharmacy", kinds: [] })).toBeUndefined();
   });
+
+  it("reads a food place's name when Apple only says Restaurant", () => {
+    expect(
+      placeEmoji({
+        name: "P. Terry's Burger Stand",
+        category: "Restaurant",
+        kinds: ["food"],
+      }),
+    ).toBe("🍔");
+    expect(placeEmoji({ name: "Veracruz All Natural", kinds: ["food"] })).toBe(
+      "🍽️",
+    );
+    expect(placeEmoji({ name: "Taquería Arandas", kinds: [] })).toBe("🌮");
+    expect(
+      placeEmoji({ name: "Café Luna", category: "Restaurant", kinds: [] }),
+    ).toBe("☕");
+    expect(placeEmoji({ name: "Phở Saigon", kinds: [] })).toBe("🍜");
+    expect(placeEmoji({ name: "Lick Honest Ice Creams", kinds: [] })).toBe(
+      "🍨",
+    );
+  });
+
+  it("keeps a specific category over the name", () => {
+    expect(
+      placeEmoji({ name: "Pizza Museum", category: "Museum", kinds: [] }),
+    ).toBe("🏛️");
+  });
+
+  it("ignores the name under a category it has no emoji for", () => {
+    expect(
+      placeEmoji({
+        name: "Indian Creek Golf Club",
+        category: "GolfCourse",
+        kinds: ["activities"],
+      }),
+    ).toBe("🎟️");
+  });
+
+  it("takes the word that comes first in the name", () => {
+    expect(placeEmoji({ name: "Coffee & Donuts", kinds: [] })).toBe("☕");
+    expect(placeEmoji({ name: "Bagel Bakery", kinds: [] })).toBe("🥯");
+  });
+
+  it("matches whole words only", () => {
+    expect(placeEmoji({ name: "Teatro", kinds: [] })).toBeUndefined();
+    expect(
+      placeEmoji({ name: "Grillhaus", category: "Restaurant", kinds: [] }),
+    ).toBe("🍽️");
+  });
+
+  it("draws the place's cuisine ahead of the name and a broad category", () => {
+    expect(
+      placeEmoji({
+        name: "Lucy's Pizza",
+        category: "Restaurant",
+        cuisine: "burger",
+        kinds: ["food"],
+      }),
+    ).toBe("🍔");
+    expect(
+      placeEmoji({ name: "Lucy's", cuisine: "ice cream", kinds: [] }),
+    ).toBe("🍨");
+  });
+
+  it("keeps a specific category over the cuisine", () => {
+    expect(
+      placeEmoji({
+        name: "Lucy's",
+        category: "Brewery",
+        cuisine: "burger",
+        kinds: [],
+      }),
+    ).toBe("🍺");
+  });
+
+  it("keeps a market's cart whatever its name says", () => {
+    expect(
+      placeEmoji({
+        name: "Coffee Corner Market",
+        category: "FoodMarket",
+        kinds: ["food"],
+      }),
+    ).toBe("🛒");
+  });
+
+  it("keeps a market's cart whatever the save says it serves", () => {
+    expect(
+      placeEmoji({
+        name: "Central Market",
+        category: "FoodMarket",
+        cuisine: "coffee",
+        kinds: ["food"],
+      }),
+    ).toBe("🛒");
+  });
+
+  it("leaves a restaurant generic when its name only hints at a cuisine", () => {
+    for (const name of [
+      "Lotus Thai",
+      "Garden Grill",
+      "Blue Fish",
+      "Sky Lounge",
+    ])
+      expect(
+        placeEmoji({ name, category: "Restaurant", kinds: ["food"] }),
+      ).toBe("🍽️");
+    expect(
+      placeEmoji({
+        name: "Gino's Pizzeria",
+        category: "Restaurant",
+        kinds: [],
+      }),
+    ).toBe("🍕");
+  });
 });

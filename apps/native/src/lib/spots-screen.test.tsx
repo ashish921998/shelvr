@@ -32,6 +32,7 @@ const mocks = vi.hoisted(() => ({
   focused: true,
   save: undefined as Save | null | undefined,
   impact: vi.fn(),
+  dropped: undefined as number | undefined,
   success: vi.fn(),
 }));
 
@@ -86,11 +87,8 @@ vi.mock("@/lib/place-category", () => ({
   placeCategoryLabel: (category?: string) =>
     category ? `label ${category}` : undefined,
 }));
-vi.mock("expo-haptics", () => ({
-  impactAsync: mocks.impact,
-  notificationAsync: mocks.success,
-  ImpactFeedbackStyle: { Light: "light" },
-  NotificationFeedbackType: { Success: "success" },
+vi.mock("@/lib/haptics", () => ({
+  haptics: { landing: mocks.impact, success: mocks.success },
 }));
 vi.mock("@/components/onboarding/sample-trip-map", () => ({
   PinBadge: vi.fn(({ number }: { number: number }) => <span>{number}</span>),
@@ -101,7 +99,7 @@ vi.mock("@/components/ui/stitch-mark", () => ({
 vi.mock("@/components/ui/button", () => ({ Button: vi.fn(fakes.pressable) }));
 vi.mock("@/lib/motion", () => ({ springIn: () => undefined }));
 vi.mock("@/lib/use-dropped-pins", () => ({
-  useDroppedPins: (count: number) => count,
+  useDroppedPins: (count: number) => mocks.dropped ?? count,
 }));
 vi.mock("react-native-reanimated", () => ({
   default: { View: vi.fn(fakes.passThrough) },
@@ -130,6 +128,7 @@ beforeEach(() => {
   mocks.dismissTo.mockReset();
   mocks.push.mockReset();
   mocks.focused = true;
+  mocks.dropped = undefined;
   mocks.save = undefined;
   mocks.impact.mockReset();
   mocks.success.mockReset();
@@ -147,6 +146,54 @@ it("finds the spots while the save is read", () => {
   render(<SpotsScreen />);
   expect(screen.getByText("spots.finding")).toBeTruthy();
   expect(mocks.replace).not.toHaveBeenCalled();
+});
+
+it.each(["ios", "android"])(
+  "lands each new pin once on %s and finishes once",
+  (platform) => {
+    vi.stubEnv("EXPO_OS", platform);
+    mocks.save = {
+      _id: "item-1",
+      status: "ready",
+      cities: ["Austin"],
+      placePins: [
+        { name: "Uchi", lat: 30.26, lng: -97.75, city: "Austin" },
+        { name: "Odd Duck", lat: 30.25, lng: -97.76, city: "Austin" },
+      ],
+    };
+    mocks.dropped = 0;
+    const { rerender } = render(<SpotsScreen />);
+    expect(mocks.impact).not.toHaveBeenCalled();
+    expect(mocks.success).not.toHaveBeenCalled();
+    mocks.dropped = 1;
+    rerender(<SpotsScreen />);
+    expect(mocks.impact).toHaveBeenCalledOnce();
+    rerender(<SpotsScreen />);
+    expect(mocks.impact).toHaveBeenCalledOnce();
+    mocks.dropped = 2;
+    rerender(<SpotsScreen />);
+    expect(mocks.success).toHaveBeenCalledOnce();
+    mocks.focused = false;
+    rerender(<SpotsScreen />);
+    mocks.focused = true;
+    rerender(<SpotsScreen />);
+    expect(mocks.success).toHaveBeenCalledOnce();
+  },
+);
+
+it("does not play hidden landings on return", () => {
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [{ name: "Uchi", lat: 30.26, lng: -97.75, city: "Austin" }],
+  };
+  mocks.focused = false;
+  const { rerender } = render(<SpotsScreen />);
+  mocks.focused = true;
+  rerender(<SpotsScreen />);
+  expect(mocks.success).not.toHaveBeenCalled();
+  expect(mocks.impact).not.toHaveBeenCalled();
 });
 
 it("drops a pinned save's spots on its city and opens that city", () => {
@@ -171,7 +218,7 @@ it("drops a pinned save's spots on its city and opens that city", () => {
   expect(screen.getByText("Odd Duck")).toBeTruthy();
   expect(screen.getByText("from Austin's best tacos")).toBeTruthy();
   expect(screen.getAllByText(/^label /)).toHaveLength(1);
-  expect(mocks.success).toHaveBeenCalledWith("success");
+  expect(mocks.success).toHaveBeenCalledOnce();
   expect(mocks.capture).toHaveBeenCalledWith("share_spots_revealed", {
     pin_count: 2,
     waited_ms: 0,

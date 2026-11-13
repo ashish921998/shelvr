@@ -33,6 +33,34 @@ export function isUiFile(path) {
 
 export const WAIVER_LABEL = "no-ui-change";
 
+const OWNER_PATTERNS = [
+  /^apps\/native\/convex\/(subscriptions|http|auth|auth\.config|users|freeSaves)\.ts$/,
+  /^apps\/native\/convex\/model\/(auth|publicFunctions)\.ts$/,
+  /^apps\/native\/src\/lib\/(entitlement|revenuecat-[\w-]+|paywall-[\w-]+|onboarding-paywall|plan-gate|trial-[\w-]+|purchase-[\w-]+|use-restore-purchases|manage-subscription|list-gate)\.ts$/,
+  /^apps\/native\/src\/app\/\(app\)\/(paywall|plan-gate)\.tsx$/,
+  /^apps\/native\/(eas\.json|app\.json|app\.config\.js|released-builds\.json)$/,
+  /^\.github\/(workflows|actions)\//,
+  /^\.github\/CODEOWNERS$/,
+  /^tools\/verify-pr-evidence\.mjs$/,
+];
+
+export const isOwnerFile = (path) => OWNER_PATTERNS.some((re) => re.test(path));
+
+export const DEPENDENCY_BOTS = ["renovate[bot]", "dependabot[bot]"];
+
+const APPROVE = /^\/approve\s+([0-9a-f]{7,40})\b/i;
+
+export function ownerApproved(comments, owner, head) {
+  return comments.some((comment) => {
+    const named = APPROVE.exec(comment.body?.trim() ?? "")?.[1];
+    return (
+      comment.user?.login === owner &&
+      named !== undefined &&
+      head.toLowerCase().startsWith(named.toLowerCase())
+    );
+  });
+}
+
 const markdown = new MarkdownIt({ html: true, linkify: true });
 
 const parse = (body) => markdown.parse(body ?? "", {});
@@ -199,8 +227,26 @@ export function hasVisualEvidence(text) {
   return tokensShowMedia(parse(text));
 }
 
-export function evidenceProblems(body, changedFiles, labels = []) {
+export function evidenceProblems(
+  body,
+  changedFiles,
+  labels = [],
+  { approved = false, author = "" } = {},
+) {
   const problems = [];
+  const ownerFiles = changedFiles.filter(isOwnerFile);
+  if (ownerFiles.length > 0 && !approved) {
+    const list = ownerFiles.slice(0, 5).join(", ");
+    const more =
+      ownerFiles.length > 5 ? ` and ${ownerFiles.length - 5} more` : "";
+    problems.push(
+      `This pull request changes files only the owner may approve (${list}${more}). ` +
+        'Ashish reads the change and comments "/approve <commit>" naming the commit he read; an agent never posts it. ' +
+        "A later push needs a new /approve for its commit.",
+    );
+  }
+  if (DEPENDENCY_BOTS.includes(author)) return problems;
+
   const tokens = parse(body);
 
   const verification = sectionTokens(tokens, "Verification");
@@ -219,6 +265,11 @@ export function evidenceProblems(body, changedFiles, labels = []) {
     if (!tokensHaveContent(evidence)) {
       problems.push(
         '"### Evidence" is empty. Link the CI run, paste the output, or add screenshots.',
+      );
+    }
+    if (!tokensHaveContent(sectionTokens(verification, "Review"))) {
+      problems.push(
+        '"### Review" is empty. Run a REVIEW.md review in a fresh context and give its count line, and what happened to each Important finding.',
       );
     }
     if (!tokensHaveContent(sectionTokens(verification, "Not verified"))) {
@@ -250,11 +301,26 @@ function changedFilesSince(base, head) {
     .filter(Boolean);
 }
 
+function prComments() {
+  const { GITHUB_REPOSITORY: repo, PR_NUMBER: number } = process.env;
+  if (!repo || !number) return [];
+  const pages = execFileSync(
+    "gh",
+    ["api", "--paginate", "--slurp", `repos/${repo}/issues/${number}/comments`],
+    { encoding: "utf8" },
+  );
+  return JSON.parse(pages).flat();
+}
+
+function resolve(ref) {
+  return execFileSync("git", ["rev-parse", ref], { encoding: "utf8" }).trim();
+}
+
 function main() {
   const [base, head = "HEAD"] = process.argv.slice(2);
   if (!base) {
     console.error(
-      "usage: verify-pr-evidence.mjs <base-sha> [head-sha]  (PR_BODY, PR_LABELS in env)",
+      "usage: verify-pr-evidence.mjs <base-sha> [head-sha]  (PR_BODY, PR_LABELS, PR_AUTHOR, PR_NUMBER, GH_TOKEN in env)",
     );
     process.exit(2);
   }
@@ -263,6 +329,14 @@ function main() {
     process.env.PR_BODY ?? "",
     changedFilesSince(base, head),
     labels,
+    {
+      approved: ownerApproved(
+        prComments(),
+        process.env.GITHUB_REPOSITORY_OWNER ?? "",
+        resolve(head),
+      ),
+      author: process.env.PR_AUTHOR ?? "",
+    },
   );
   const summary = process.env.GITHUB_STEP_SUMMARY;
   if (problems.length === 0) {

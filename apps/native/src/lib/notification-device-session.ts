@@ -114,7 +114,10 @@ export class NotificationDeviceSession {
     return !this.paused && !this.registrationBlocked && !this.isRegistered();
   }
 
-  register(getToken = () => this.deps.getToken(false)): Promise<boolean> {
+  register(
+    getToken = () => this.deps.getToken(false),
+    force = false,
+  ): Promise<boolean> {
     const generation = this.generation;
     const current = () =>
       !this.paused &&
@@ -135,7 +138,7 @@ export class NotificationDeviceSession {
         const context = this.context();
         const { locale, timezone } = context;
         const key = `${token}${context.key}`;
-        if (key === this.registeredKey) return true;
+        if (!force && key === this.registeredKey) return true;
         const tokens = await this.store.read();
         if (!tokens.includes(token)) await this.store.write([...tokens, token]);
         if (!current()) return false;
@@ -178,7 +181,10 @@ export class NotificationDeviceSession {
     save: (enabled: boolean) => Promise<unknown>,
   ) {
     return this.runOperation("preferences", async () => {
-      if (enabled && !(await this.register(() => this.deps.getToken(true))))
+      if (
+        enabled &&
+        !(await this.register(() => this.deps.getToken(true), true))
+      )
         return false;
       await save(enabled);
       return true;

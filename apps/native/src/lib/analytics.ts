@@ -6,9 +6,8 @@ import {
 import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import type { SaveSource } from "@convex/model/saveSource";
 import type { SaveFailureStage } from "@convex/model/saveErrors";
-import type { Goal, Planner, SavedCount } from "@/lib/onboarding-goals";
+import type { Goal, SavedCount } from "@/lib/onboarding-goals";
 import type { SampleCityId } from "@/lib/sample-cities";
-import type { PlanKind } from "@/lib/sample-plans";
 import Constants from "expo-constants";
 
 export type AnalyticsItem = {
@@ -79,14 +78,9 @@ export type AnalyticsEventProperties = {
     step_index: number;
     flow_version: number;
     duration_ms: number;
+    skipped: boolean;
   };
   onboarding_opener_page_viewed: { page_index: number };
-  onboarding_commitment: {
-    action: "confirmed" | "skipped";
-    plan_kind: PlanKind;
-    sample_city: SampleCityId;
-    flow_version: number;
-  };
   onboarding_notifications: { action: "allow" | "skip"; granted: boolean };
   auth_started: {
     provider: string;
@@ -188,6 +182,21 @@ export type AnalyticsEventProperties = {
   plan_picked: { place_count: number };
   plan_place_opened: { rank: number };
   plan_place_visited: { visited: boolean };
+  place_unstamped: { surface: "passport" };
+  passport_opened: { places: number };
+  passport_backfilled: { places: number };
+  passport_card_share_opened: { places: number; surface: "stamp" | "passport" };
+  passport_shared: { places: number; shared: boolean };
+  passport_sharing_stopped: Record<string, never>;
+  passport_invite_opened: { found: boolean; signed_in: boolean };
+  passport_compare_tapped: { signed_in: boolean };
+  passport_compare_resumed: { found: boolean; onboarded_before: boolean };
+  passport_compare_opened: {
+    both: number;
+    only_them: number;
+    only_you: number;
+  };
+  passport_friend_places_saved: { saved: number; remaining: number };
   plan_shared: { place_count: number; picked: boolean };
   plan_asked: { place_count: number };
   plan_ask_failed: { reason: "link" | "share" };
@@ -199,6 +208,8 @@ export type AnalyticsEventProperties = {
   };
   trip_failed: { reason: "error" };
   city_opened: { count: number };
+  city_place_visited: { visited: boolean };
+  city_card_share_sheet_opened: { place_count: number; visited_count: number };
   map_opened: { count: number; located: boolean };
   map_filter_selected: { kind: string };
   map_place_opened: { card: boolean };
@@ -260,7 +271,6 @@ export type AnalyticsEventProperties = {
     goal: Goal | null;
     goals: Goal[];
     saved_count: SavedCount | null;
-    planner: Planner | null;
     space_count: number;
     space_names: string[];
     custom_space_count: number;
@@ -296,7 +306,7 @@ export type AnalyticsEventProperties = {
   shared_list_join_tapped: { signed_in: boolean };
   shared_list_joined: { joined: boolean; onboarded_before: boolean };
   shared_list_name_prompt: {
-    kind: "join" | "create" | "joined";
+    kind: "join" | "create" | "joined" | "welcome";
     outcome: "named" | "skipped";
   };
   shared_list_opened: { places: number; members: number; fresh: number };

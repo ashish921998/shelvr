@@ -138,7 +138,7 @@ describe("asking about a saved place", () => {
       NOW,
       undefined,
       new Set([stop._id]),
-      been("Time Out Market"),
+      () => been("Time Out Market"),
     );
     expect(candidates.map((c) => [c.item._id, c.kind])).toEqual([
       [visitedGuide._id, "read"],

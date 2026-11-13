@@ -1,20 +1,20 @@
 import type { Device } from "@e2e-dev/mobile";
-import { expect, type Screen } from "e2e";
+import { expect, type Locator, type Screen } from "e2e";
 
 import { BUNDLE_ID, LAUNCH_ARGUMENTS } from "./launch.ts";
 import { pollUntil } from "./poll.ts";
 import { tapUntilVisible } from "./seeded-home.ts";
 
-export async function startFreshOnboarding({
-  device,
-  screen,
-}: {
-  device: Device;
-  screen: Screen;
-}): Promise<void> {
+export async function startFreshOnboarding(
+  { device, screen }: { device: Device; screen: Screen },
+  extraLaunchArguments: readonly string[] = [],
+): Promise<void> {
   const start = screen.getByRole("button", "Get started");
-  await relaunchWith(device, screen, FRESH_INSTALL_ARGUMENTS, () =>
-    start.isVisible(),
+  await relaunchWith(
+    device,
+    screen,
+    [...FRESH_INSTALL_ARGUMENTS, ...extraLaunchArguments],
+    () => start.isVisible(),
   );
 }
 
@@ -51,23 +51,24 @@ export async function walkToSampleReel(
   const next = screen.getByRole("button", "Continue");
   await expect(next).toBeEnabled({ timeout: 10_000 });
   await next.tap();
-  await expect(screen.getByText("How do you like to plan?")).toBeVisible({
-    timeout: 30_000,
-  });
-  await skip.tap();
   await expect(screen.getByText("Let’s put your saves to use.")).toBeVisible({
     timeout: 30_000,
   });
   await screen.getByTestId("onboarding-chart-continue").tap();
-  await expect(screen.getByText("Pick a city to try.")).toBeVisible({
-    timeout: 30_000,
-  });
+  await expect(
+    screen.getByText(
+      options.goal === "travel"
+        ? "Where’s your next trip?"
+        : "Where do you go out?",
+    ),
+  ).toBeVisible({ timeout: 30_000 });
   if (options.city) {
     await screen.getByPlaceholder("Search cities").fill(options.city);
     await screen.getByRole("radio", options.city).tap();
   } else {
     await skip.tap();
   }
+  await screen.getByRole("button", "Continue").tap({ timeout: 30_000 });
   await expect(screen.getByRole("button", SHARE_ON_REEL)).toBeVisible({
     timeout: 30_000,
   });
@@ -83,6 +84,10 @@ export async function shareTheSampleReel(screen: Screen): Promise<void> {
     screen.getByRole("button", "Add Shelvr to Favorites"),
   ).toBeHidden();
   await screen.getByRole("button", SHARE_TO_SHELVR).tap({ timeout: 30_000 });
+  await expect(screen.getByText(/^Your first save!/)).toBeVisible({
+    timeout: 30_000,
+  });
+  await screen.getByRole("button", "Continue").tap();
   await expect(screen.getByText(/· 3 places$/)).toBeVisible({
     timeout: 30_000,
   });
@@ -91,22 +96,26 @@ export async function shareTheSampleReel(screen: Screen): Promise<void> {
   });
 }
 
-/** The map reveal leads to one commitment screen; confirming never opens the paywall on its own. */
-export async function walkToCommitment(screen: Screen): Promise<void> {
-  await screen.getByRole("button", "Continue").tap();
-  await expect(screen.getByText("Visit a place you’ve saved.")).toBeVisible({
-    timeout: 30_000,
-  });
-  await expect(screen.getByRole("button", "Hold to commit")).toBeVisible({
-    timeout: 10_000,
-  });
+/** The map reveal leads to a three-slide carousel; the last slide's Continue is returned, and nothing opens the paywall on its own. */
+export async function walkToCarouselEnd(screen: Screen): Promise<Locator> {
+  const next = screen.getByRole("button", "Continue");
+  await next.tap();
+  await expect(
+    screen.getByText("Plan it together with your people."),
+  ).toBeVisible({ timeout: 30_000 });
+  await next.tap();
+  await next.tap();
+  await expect(
+    screen.getByText("Every place you saved, on one map."),
+  ).toBeVisible({ timeout: 30_000 });
+  return next;
 }
 
 const STALLED_LAUNCH_MS = 75_000;
 
 const LAUNCHER_GRACE_MS = 15_000;
 
-export async function relaunchWith(
+async function relaunchWith(
   device: Device,
   screen: Screen,
   launchArguments: readonly string[],
@@ -138,4 +147,4 @@ export async function relaunchWith(
 const SHARE_TO_SHELVR = "Shelvr";
 
 // The ringed share button on the sample reel; exact, so it never matches "Share to…".
-export const SHARE_ON_REEL = /^Share$/;
+const SHARE_ON_REEL = /^Share$/;

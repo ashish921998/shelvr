@@ -12,6 +12,7 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
 import { canOpenPlaceCard } from "@/lib/apple-place-card";
+import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
 import { stopAction } from "@/lib/trip-planner";
@@ -67,7 +68,11 @@ function usePlaceEdits() {
   };
   return {
     visited: (placeId: Id<"sharedListPlaces">, visited: boolean) =>
-      setVisited({ placeId, visited }).catch(report),
+      setVisited({ placeId, visited })
+        .then(() => {
+          if (visited) void haptics.success();
+        })
+        .catch(report),
     remove: (placeId: Id<"sharedListPlaces">) =>
       remove({ placeId }).catch(report),
   };
@@ -275,7 +280,7 @@ function SharedList({ detail }: { detail: SharedListDetail }) {
           ) : (
             <ListPlaceRow
               place={item.row.place}
-              number={item.row.pin.number}
+              emoji={item.row.pin.emoji ?? "📍"}
               selected={selected === item.id}
               onPress={() =>
                 selected === item.id ? open(item.row) : select(item.id)
