@@ -102,10 +102,63 @@ describe("usePlaceVisit", () => {
     expect(mocks.captureError).toHaveBeenCalledWith(
       "place_visit_failed",
       error,
+      { surface: "city" },
     );
     expect(mocks.alert).toHaveBeenCalledWith(
       "errors.unexpectedTitle",
       "errors.retrySoon",
     );
+  });
+
+  it("takes back a passport stamp by its spot, or by name when it has none", async () => {
+    const { result } = renderHook(() => usePlaceVisit("passport"));
+    let done = false;
+    await act(async () => {
+      done = await result.current.toggle(
+        itemId,
+        { name: "Tigre", lat: 1, lng: 2 },
+        false,
+      );
+    });
+    await act(() => result.current.toggle(itemId, { name: "Tigre" }, false));
+    expect(done).toBe(true);
+    expect(mocks.setVisited.mock.calls).toEqual([
+      [{ itemId, name: "Tigre", visited: false, spot: { lat: 1, lng: 2 } }],
+      [{ itemId, name: "Tigre", visited: false }],
+    ]);
+    expect(mocks.capture).toHaveBeenCalledWith("place_unstamped", {
+      surface: "passport",
+    });
+  });
+
+  it("answers false and names the passport when taking a stamp back fails", async () => {
+    const error = new Error("offline");
+    mocks.setVisited.mockRejectedValue(error);
+    const { result } = renderHook(() => usePlaceVisit("passport"));
+    let done = true;
+    await act(async () => {
+      done = await result.current.toggle(itemId, { name: "Tigre" }, false);
+    });
+    expect(done).toBe(false);
+    expect(mocks.captureError).toHaveBeenCalledWith(
+      "place_visit_failed",
+      error,
+      { surface: "passport" },
+    );
+  });
+
+  it("sends one request for a double tap", async () => {
+    let finish = () => {};
+    mocks.setVisited.mockImplementation(
+      () => new Promise<null>((resolve) => (finish = () => resolve(null))),
+    );
+    const { result } = renderHook(() => usePlaceVisit("passport"));
+    await act(async () => {
+      const first = result.current.toggle(itemId, { name: "Tigre" }, false);
+      void result.current.toggle(itemId, { name: "Tigre" }, false);
+      finish();
+      await first;
+    });
+    expect(mocks.setVisited).toHaveBeenCalledTimes(1);
   });
 });

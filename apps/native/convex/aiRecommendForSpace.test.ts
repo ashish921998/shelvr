@@ -6,11 +6,9 @@ import { newConvexTest, insertConsentingUser } from "./test.setup";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 
-const embedMany = vi.hoisted(() => vi.fn());
 const generateObject = vi.hoisted(() => vi.fn());
 
 vi.mock("ai", () => ({
-  embedMany,
   generateObject,
   wrapLanguageModel: vi.fn(() => ({})),
 }));
@@ -69,18 +67,16 @@ async function suggestedTitles(t: Awaited<ReturnType<typeof seed>>["t"]) {
 }
 
 beforeEach(() => {
-  embedMany.mockReset();
   generateObject.mockReset();
   generateObject.mockResolvedValue({ object: { itemNumbers: [] } });
 });
 
 describe("recommendForSpace candidate selection", () => {
-  it("never asks the embedding model", async () => {
+  it("asks the model once for a space's candidates", async () => {
     const { t, spaceId } = await seed([{ title: "Carbonara" }]);
 
     await t.action(internal.ai.recommendForSpace, { spaceId });
 
-    expect(embedMany).not.toHaveBeenCalled();
     expect(generateObject).toHaveBeenCalledTimes(1);
   });
 

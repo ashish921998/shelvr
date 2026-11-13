@@ -24,6 +24,7 @@ import {
   barePlaceKey,
   closestUnidentifiedSpot,
   findVisit,
+  MAX_BATCH_PLACES,
   MAX_VISIT_SPOTS,
   knowsSpot,
   matchesVisitSpot,
@@ -259,7 +260,6 @@ export const listVisits = authedQuery({
   handler: async (ctx) => await userVisits(ctx, ctx.userId),
 });
 
-const MAX_BATCH_PLACES = 60;
 const MAX_PASSPORT_STAMPS = 500;
 const PASSPORT_SAVE_BYTES = 4 * 1024 * 1024;
 const MAX_UNSTAMPED_PLACES = 200;
