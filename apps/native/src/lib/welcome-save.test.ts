@@ -10,6 +10,7 @@ import {
   noteOnboardingFinished,
   useWelcomeSaveTracker,
   useWelcomeSheetVisible,
+  welcomeName,
   welcomeSave,
 } from "./welcome-save";
 
@@ -118,6 +119,7 @@ describe("useWelcomeSaveTracker", () => {
     signIn("u1", "trialing");
     renderHook(() => useWelcomeSaveTracker());
     expect(welcomeSave.isPending("u1")).toBe(true);
+    expect(welcomeName.isPending("u1")).toBe(true);
 
     signIn("u2", "trialing");
     renderHook(() => useWelcomeSaveTracker());
@@ -133,6 +135,7 @@ describe("useWelcomeSaveTracker", () => {
     mock.priorSaves = 2;
     rerender();
     expect(welcomeSave.isPending("u4")).toBe(false);
+    expect(welcomeName.isPending("u4")).toBe(true);
     expect(mock.store.get("shelvr.welcomeAfterOnboarding")).toBe("");
   });
 
@@ -140,6 +143,7 @@ describe("useWelcomeSaveTracker", () => {
     signIn("u3", "pro");
     renderHook(() => useWelcomeSaveTracker());
     expect(welcomeSave.isPending("u3")).toBe(false);
+    expect(welcomeName.isPending("u3")).toBe(false);
   });
 });
 

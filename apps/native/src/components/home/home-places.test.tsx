@@ -3,7 +3,11 @@ import type { ReactNode } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { HomePlaces, UnplacedSaves } from "@/components/home/home-places";
+import {
+  HomePlaces,
+  HomePlacesEmptyCard,
+  UnplacedSaves,
+} from "@/components/home/home-places";
 
 vi.mock("@/lib/motion", () => ({
   motion: { duration: { feedback: 120, state: 180 }, easing: { out: "out" } },
@@ -39,6 +43,11 @@ vi.mock("@/components/city/city-cover", () => ({
   )),
 }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
+vi.mock("@/components/passport/passport-row", () => ({
+  PassportRow: vi.fn(({ hideEmpty }: { hideEmpty?: boolean }) => (
+    <span>{hideEmpty ? "passport if stamped" : "passport"}</span>
+  )),
+}));
 vi.mock("@/components/ui/prompt-sheet", () => ({
   PromptSheet: vi.fn(
     ({
@@ -69,7 +78,7 @@ vi.mock("@/lib/city-plan", () => ({
 }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => ({ entitled: true }),
-  usePaywallGuard: vi.fn(),
+  usePaywallGuard: () => ({ guard: vi.fn() }),
 }));
 vi.mock("@/lib/free-plan", () => ({
   useAccess: () => mocks.access,
@@ -301,6 +310,17 @@ describe("city cards", () => {
     expect(
       screen.getByRole("button", { name: "Tokyo, 3 saves, no place yet" }),
     ).toBeTruthy();
+  });
+
+  it("keeps the passport on Home once the last city is gone", () => {
+    mocks.cities = [];
+    render(<HomePlaces />);
+    expect(screen.getByText("passport if stamped")).toBeTruthy();
+  });
+
+  it("keeps the passport on Home once the last save is gone", () => {
+    render(<HomePlacesEmptyCard />);
+    expect(screen.getByText("passport if stamped")).toBeTruthy();
   });
 
   it("shows the share tip only for a single city", () => {

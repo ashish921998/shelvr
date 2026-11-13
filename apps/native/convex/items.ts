@@ -37,6 +37,7 @@ import {
 import { logEvent } from "./model/log";
 import { rateLimiter } from "./model/rateLimiter";
 import { takeWithinBytes } from "./model/readBudget";
+import { userVisits, visitMatcher } from "./model/placeVisits";
 import {
   cityKey,
   countCities,
@@ -64,7 +65,10 @@ import {
   MAX_ITEM_TITLE_CHARS,
   MAX_NOTE_TEXT_CHARS,
   normalizeCities,
+  normalizePlaceCuisines,
+  normalizePlaceName,
   normalizePlaces,
+  placeCuisinesValidator,
   placeLocationsValidator,
   placePinsValidator,
   postMediaValidator,
@@ -233,17 +237,15 @@ export const itemCardValidator = enrichedItemValidator
 
 export type ItemCard = Infer<typeof itemCardValidator>;
 
-function stripEmbedding(
+function withoutServerFields(
   item: Doc<"items">,
 ): Omit<
   Doc<"items">,
-  | "embedding"
-  | "embeddingVersion"
-  | "embeddingAttempts"
   | "productsSearchStartedAt"
   | "places"
   | "placesHeard"
   | "placeLocations"
+  | "placeCuisines"
   | "placesEdited"
 > {
   const {
@@ -251,9 +253,7 @@ function stripEmbedding(
     places: _places,
     placesHeard: _placesHeard,
     placeLocations: _placeLocations,
-    embedding: _embedding,
-    embeddingVersion: _version,
-    embeddingAttempts: _attempts,
+    placeCuisines: _placeCuisines,
     productsSearchStartedAt: _searchStartedAt,
     ...rest
   } = item;
@@ -269,7 +269,7 @@ export async function enrichItem(
     ? await ctx.storage.getUrl(item.storageId)
     : null;
   return {
-    ...stripEmbedding(await visibleSave(ctx, item, removals)),
+    ...withoutServerFields(await visibleSave(ctx, item, removals)),
     imageUrl,
     heroImageUrl: item.type === "link" ? (imageUrl ?? undefined) : undefined,
   };
@@ -418,17 +418,16 @@ export const listCities = authedQuery({
       city: v.string(),
       count: v.number(),
       placeCount: v.optional(v.number()),
+      visitedCount: v.optional(v.number()),
       cover: v.union(v.string(), v.null()),
     }),
   ),
   handler: async (ctx) => {
     const items = await readySavesNewestFirst(ctx, ctx.userId);
+    const visits = await userVisits(ctx, ctx.userId, items);
     const cities = countCities(items)
-      .map(({ city, count }) => ({
-        city,
-        // Older installed clients use count as the number of saves.
-        count,
-        placeCount: uniquePlacePins(
+      .map(({ city, count }) => {
+        const pins = uniquePlacePins(
           items
             .filter((item) =>
               (item.cities ?? []).some(
@@ -437,8 +436,17 @@ export const listCities = authedQuery({
             )
             .slice(0, CITY_ITEMS_MAX)
             .flatMap((item) => pinsForCity(item, city)),
-        ).length,
-      }))
+        );
+        const visited = visitMatcher(visits, pins);
+        const visitedCount = pins.filter((pin) => visited(pin)).length;
+        return {
+          city,
+          // Older installed clients use count as the number of saves.
+          count,
+          placeCount: pins.length,
+          ...(visitedCount > 0 ? { visitedCount } : {}),
+        };
+      })
       .sort(
         (a, b) => b.placeCount - a.placeCount || (a.city < b.city ? -1 : 1),
       );
@@ -737,49 +745,6 @@ export const backfillPlaceSearch = internalMutation({
     }
     if (!batch.isDone) {
       await ctx.scheduler.runAfter(0, internal.items.backfillPlaceSearch, {
-        cursor: batch.continueCursor,
-      });
-    }
-    return null;
-  },
-});
-
-/**
- * Run once after deploying the end of embeddings, to shrink every save:
- * convex run items:clearEmbeddings '{"cursor":null}'. Safe to restart from a null cursor.
- */
-export const clearEmbeddings = internalMutation({
-  args: { cursor: v.union(v.string(), v.null()) },
-  returns: v.null(),
-  handler: async (ctx, { cursor }) => {
-    const batch = await ctx.db.query("items").paginate({
-      cursor,
-      numItems: 25,
-      maximumBytesRead: 2 * 1024 * 1024,
-    });
-    let cleared = 0;
-    for (const item of batch.page) {
-      if (
-        item.embedding === undefined &&
-        item.embeddingVersion === undefined &&
-        item.embeddingAttempts === undefined
-      ) {
-        continue;
-      }
-      await ctx.db.patch(item._id, {
-        embedding: undefined,
-        embeddingVersion: undefined,
-        embeddingAttempts: undefined,
-      });
-      cleared++;
-    }
-    logEvent("info", "embeddings_cleared", {
-      scanned: batch.page.length,
-      cleared,
-      done: batch.isDone,
-    });
-    if (!batch.isDone) {
-      await ctx.scheduler.runAfter(0, internal.items.clearEmbeddings, {
         cursor: batch.continueCursor,
       });
     }
@@ -1566,6 +1531,41 @@ async function createLinkOrNote(
   return itemId;
 }
 
+export async function createReadyPlaceSave(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  place: { name: string; city: string },
+  note: string,
+  locateAfterMs: number,
+): Promise<Id<"items">> {
+  const free = await claimSave(ctx, userId);
+  const cities = normalizeCities([place.city]);
+  const name = normalizePlaceName(place.name, cities);
+  const itemId = await ctx.db.insert("items", {
+    userId,
+    type: "note",
+    status: "ready",
+    title: name,
+    note,
+    tags: [],
+    intents: [],
+    cities,
+    places: [name],
+    placesEdited: true,
+    titleSource: "user",
+    searchText: buildSearchText({ title: name, tags: [], note, cities }),
+  });
+  if (free) {
+    await recordFreeSave(ctx, userId, itemId);
+    await settleFreeSave(ctx, itemId);
+  }
+  await scheduleSaveTelemetry(ctx, itemId);
+  await ctx.scheduler.runAfter(locateAfterMs, internal.placePins.locateItem, {
+    itemId,
+  });
+  return itemId;
+}
+
 async function scheduleSaveTelemetry(
   ctx: MutationCtx,
   itemId: Id<"items">,
@@ -1865,8 +1865,6 @@ export const updateNoteItem = authedMutation({
         note: text,
         content: item.content,
       }),
-      embeddingVersion: undefined,
-      embeddingAttempts: undefined,
       ...(refreshRunId !== undefined ? { processingRunId: refreshRunId } : {}),
       ...(refreshRunId !== undefined && item.status === "processing"
         ? { processingStartedAt: Date.now() }
@@ -2122,18 +2120,20 @@ export const getItemInternal = internalQuery({
       places: v.optional(v.array(v.string())),
       placesHeard: v.optional(v.boolean()),
       placeLocations: v.optional(placeLocationsValidator),
+      placeCuisines: v.optional(placeCuisinesValidator),
     }),
     v.null(),
   ),
   handler: async (ctx, args) => {
     const item = await ctx.db.get(args.itemId);
     if (item === null) return null;
-    const { places, placesHeard, placeLocations } = item;
+    const { places, placesHeard, placeLocations, placeCuisines } = item;
     return {
-      ...stripEmbedding(item),
+      ...withoutServerFields(item),
       ...(places ? { places } : {}),
       ...(placesHeard !== undefined ? { placesHeard } : {}),
       ...(placeLocations !== undefined ? { placeLocations } : {}),
+      ...(placeCuisines !== undefined ? { placeCuisines } : {}),
     };
   },
 });
@@ -2187,7 +2187,7 @@ export const listReadyItemsInternal = internalQuery({
       )
       .order("desc")
       .take(limit);
-    return rows.map(stripEmbedding);
+    return rows.map(withoutServerFields);
   },
 });
 
@@ -2318,6 +2318,7 @@ export const addPlaceListParts = internalMutation({
     itemId: v.id("items"),
     runId: v.optional(v.string()),
     parts: v.array(placeListPartValidator),
+    placeCuisines: v.optional(placeCuisinesValidator),
   },
   returns: v.number(),
   handler: async (ctx, args) => {
@@ -2368,6 +2369,11 @@ export const addPlaceListParts = internalMutation({
       const cities = normalizeCities(part.cities);
       const places = normalizePlaces(part.places, cities);
       const placePins = withListPins([], part.pins, cities);
+      const placeCuisines = normalizePlaceCuisines(
+        args.placeCuisines,
+        places,
+        cities,
+      );
       const partId = await ctx.db.insert("items", {
         userId: item.userId,
         type: "link",
@@ -2384,6 +2390,7 @@ export const addPlaceListParts = internalMutation({
         intents: [],
         cities,
         places,
+        ...(placeCuisines.length > 0 ? { placeCuisines } : {}),
         placePins,
         searchText: buildSearchText({
           title: part.title,
@@ -2480,6 +2487,7 @@ async function writeFailure(
       keepPins: true,
     });
   }
+  if (item.status === "failed") return;
   await scheduleProcessedTelemetry(ctx, item, {
     status: "failed",
     failureReason: reason,

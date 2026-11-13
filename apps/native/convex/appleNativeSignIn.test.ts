@@ -352,7 +352,7 @@ describe("native Sign in with Apple", () => {
       nonce: NONCE,
       name: "Ada Lovelace",
     });
-    await backend.finishAllScheduledFunctions(vi.runAllTimers);
+    await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     expect(result).toMatchObject({
       tokens: { token: expect.any(String), refreshToken: expect.any(String) },
@@ -384,7 +384,7 @@ describe("native Sign in with Apple", () => {
       identityToken: await identityToken({ email: undefined }),
       nonce: NONCE,
     });
-    await backend.finishAllScheduledFunctions(vi.runAllTimers);
+    await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     expect(result).toMatchObject({ tokens: { token: expect.any(String) } });
     const { users, accounts } = await tables(backend);
@@ -416,7 +416,7 @@ describe("native Sign in with Apple", () => {
       nonce: NONCE,
       name: "Someone Else",
     });
-    await backend.finishAllScheduledFunctions(vi.runAllTimers);
+    await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     expect(result).toMatchObject({ tokens: { token: expect.any(String) } });
     const { users, accounts } = await tables(backend);
@@ -448,7 +448,7 @@ describe("native Sign in with Apple", () => {
       identityToken: await identityToken(),
       nonce: NONCE,
     });
-    await backend.finishAllScheduledFunctions(vi.runAllTimers);
+    await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     const { users, accounts } = await tables(backend);
     expect(users).toHaveLength(1);
@@ -472,7 +472,7 @@ describe("native Sign in with Apple", () => {
       identityToken: await identityToken({ email_verified: false }),
       nonce: NONCE,
     });
-    await backend.finishAllScheduledFunctions(vi.runAllTimers);
+    await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     expect((await tables(backend)).users).toHaveLength(2);
   });
@@ -508,7 +508,7 @@ describe("native Sign in with Apple", () => {
       identityToken: await identityToken({ sub: "other" }, "app.shelvr.save"),
       nonce: NONCE,
     });
-    await backend.finishAllScheduledFunctions(vi.runAllTimers);
+    await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
     expect(dev).toMatchObject({ tokens: { token: expect.any(String) } });
     expect(store).toEqual({ tokens: null });

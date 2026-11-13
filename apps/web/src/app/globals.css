@@ -61,6 +61,9 @@
   --color-dark-plank-2: #4a3c24;
   --color-dark-text: #f4eddd;
   --color-dark-muted: #a2977f;
+  --color-map-water: #dde7ea;
+  --color-map-park: #e6e3c8;
+  --color-map-label: #8b9da2;
 
   --font-display: "Crimson Pro", ui-serif, georgia, serif;
   --font-sans: "Satoshi", ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -131,6 +134,12 @@
   border: 1px solid var(--color-line);
   background: var(--color-card);
   box-shadow: var(--shadow-card);
+}
+
+.dot-grid {
+  background-image: radial-gradient(circle, var(--color-line-strong) 0.9px, transparent 1.2px);
+  background-size: 14px 14px;
+  background-position: 7px 7px;
 }
 
 .display {

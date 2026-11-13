@@ -9,6 +9,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { enrichItems, enrichedItemValidator } from "./items";
 import { tripStopItemIds } from "./tripData";
 import { liveOwner, authedMutation, authedQuery } from "./model/auth";
+import { MAX_CAPTURE_TOKEN_LENGTH, sha256Hex } from "./model/captureTokens";
 import {
   localHour,
   nextLocalHourAt,
@@ -54,7 +55,7 @@ import {
   tripSavedStopCount,
 } from "./model/tripEve";
 import { visibleItemPlaces, userRemovals } from "./model/placeRemovals";
-import { visitedPlaceKeys } from "./model/placeVisits";
+import { userVisits, visitedKeysOnItem } from "./model/placeVisits";
 
 const digestResponseValidator = v.object({
   _id: v.id("weeklyDigests"),
@@ -171,6 +172,7 @@ export const registerDevice = authedMutation({
     platform: v.union(v.literal("ios"), v.literal("android")),
     nextDigestAt: v.optional(v.number()),
     timezone: v.optional(v.string()),
+    installSecret: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -179,6 +181,17 @@ export const registerDevice = authedMutation({
     if (token.length === 0 || token.length > 4096) {
       throw new Error("Invalid notification token");
     }
+    if (
+      args.installSecret !== undefined &&
+      (args.installSecret.length === 0 ||
+        args.installSecret.length > MAX_CAPTURE_TOKEN_LENGTH)
+    ) {
+      throw new Error("Invalid install secret");
+    }
+    const installSecretHash =
+      args.installSecret === undefined
+        ? undefined
+        : await sha256Hex(args.installSecret);
     const timezone = parseTimezoneInput(args.timezone);
     const locale = notificationLocale(args.locale);
     const languageFields = locale === undefined ? {} : { locale };
@@ -194,12 +207,23 @@ export const registerDevice = authedMutation({
         token,
         platform: args.platform,
         ...languageFields,
+        installSecretHash,
         enabled: true,
         lastSeenAt: now,
       });
-    } else if (existingToken.userId === userId || !existingToken.enabled) {
+    } else if (
+      existingToken.userId === userId ||
+      !existingToken.enabled ||
+      (installSecretHash !== undefined &&
+        existingToken.installSecretHash === installSecretHash)
+    ) {
       await ctx.db.patch(existingToken._id, {
         userId,
+        installSecretHash:
+          installSecretHash ??
+          (existingToken.userId === userId
+            ? existingToken.installSecretHash
+            : undefined),
         platform: args.platform,
         ...languageFields,
         enabled: true,
@@ -763,12 +787,13 @@ export const prepareSaveReminder = internalMutation({
 
     const checks = { read: 0, cook: 0, visit: 0 };
     const removals = await userRemovals(ctx, userId);
+    const visits = await userVisits(ctx, userId, items);
     for (const candidate of reminderCandidates(
       items.map((item) => visibleItemPlaces(item, removals)),
       now,
       reminders[0]?.kind,
       await tripStopItemIds(ctx, userId),
-      await visitedPlaceKeys(ctx, userId),
+      (item) => visitedKeysOnItem(visits, item),
     )) {
       if (checks[candidate.kind]++ >= REMINDER_CHECKS_PER_KIND) continue;
       const earlier = await ctx.db

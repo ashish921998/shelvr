@@ -1,75 +1,147 @@
-# Review checklist
+# Reviewing a change
 
-Every reviewer of a Shelvr pull request reads this first: the CI Claude review, Codex, and
-any agent asked to review. It is a checklist, not the rules themselves. Each line points to
-where the rule lives in `CLAUDE.md` or `AGENTS.md`; when they disagree, those files win.
+Any agent can review a Shelvr change with this file alone. Ask: "Review this branch
+against REVIEW.md."
 
-## What to report
+**The job in five lines:**
 
-Report only what would hurt a person using the app or the business:
+1. Review in a fresh context, never the session that wrote the code.
+2. Read the diff from the fork point, and the code that calls it.
+3. Look for what would hurt a person or the business, nothing else.
+4. Prove every finding with a failing command or a `file:line` path.
+5. Report the count first, then each finding. Then stop.
 
-- a correctness bug on a real path (name the caller or input that reaches it)
-- a security or privacy problem
-- a broken contract with installed apps, a stuck deploy, or a stranded OTA
-- evidence that does not prove what the pull request claims
+`CLAUDE.md` and `AGENTS.md` hold the rules this file checks. When they disagree, they win.
 
-Skip style, naming, formatting, and "could be cleaner" notes. Do not report the same
-finding twice across reruns, and do not count two reviewers agreeing as proof: check it.
+## Who reviews
 
-## Shelvr house rules
+A subagent, a new session or another model: anything that did not write the code. On a
+risky change, also ask Codex: `codex exec --sandbox read-only --ephemeral`, naming this
+file in the prompt.
+
+## Steps
+
+1. **Scope.** `base=$(git merge-base origin/main HEAD)`, then read `git diff $base...HEAD`,
+   `git log $base..HEAD` and the PR description. They say what the change claims to do.
+2. **Read around the diff.** The whole of each changed function, and its callers. A public
+   Convex function also has callers you cannot grep: app builds already installed.
+3. **Run the cheap checks.** `pnpm --filter native-app test <changed test files>`, and
+   `pnpm run verify:convex-api` for a Convex change. A failure is a finding.
+4. **Hunt.** Go through the house rules below. Then ask the four questions this app
+   gets wrong most often:
+   - Does an installed app still work against the new backend?
+   - What happens on a retry, a second run, or two writes at once?
+   - Can an automatic or AI write overwrite something the person chose?
+   - Does a person's content, or a deleting account's data, go where it should not?
+
+   When the change touches a flow with steps that can happen in any order (onboarding and
+   the paywall, a save being processed and edited, push devices across accounts, account
+   deletion, reminders, shared lists), model it with the `pstack:statechart` skill. Write
+   rules about what the person sees, what they chose, and what gets recorded, such as "a
+   person is never charged twice" or "a choice the person takes back is undone".
+   Confirm each broken rule against the code before reporting it.
+
+5. **Prove it.** Each finding needs a test or command you ran that fails, or a path from a
+   real input to the wrong result with `file:line` at each step. Two reviewers agreeing is
+   not proof. Drop what you cannot prove, or list up to three under "Could not prove".
+6. **Tag it.**
+   - **Important:** this change breaks something for a person or the business. Blocks
+     the merge.
+   - **Nit:** worth a minute. Never blocks. At most three.
+   - **Pre-existing:** `git blame` says the line is older than `$base`. Report once,
+     never block.
+
+What counts as Important: a bug on a real path, a security or privacy problem, a break
+for installed apps, a stuck deploy or stranded OTA, or evidence that does not show what
+the PR claims. Style, naming and "could be cleaner" are not findings. Report a repeated
+bug once, with every place it occurs.
+
+## Report
+
+First line: `2 Important, 1 Nit, 0 Pre-existing.` or `Nothing to fix.` An empty review
+is a good result; say it plainly.
+
+Then each finding:
+
+```
+[Important] apps/native/convex/items.ts:812
+What fails: <what a person would notice>
+How: <the input or caller, and the path to the wrong result>
+Proof: <the command and its output, or the file:line chain>
+Fix: <the smallest change that removes it>
+```
+
+End with "Could not prove" (if any) and "Not checked": what you skipped, such as the
+running app, a real device or production data.
+
+## Next rounds
+
+- Review only the commits since the last review. Never repeat a finding.
+- Each Important finding ends fixed, or answered with a reason. Unanswered blocks merge.
+- Three rounds in a row with something Important means the approach is wrong. Say so.
+
+## Owner-only changes
+
+Billing, sign-in, account deletion, release config and CI wait for Ashish, whatever the
+review says. Put that in the report's first line. The exact files are `OWNER_PATTERNS` in
+`tools/verify-pr-evidence.mjs`.
+
+The `verification evidence` check fails these PRs until Ashish comments
+`/approve <commit>`, naming the commit he read. It counts only for that commit, so a later
+push needs a new `/approve`. The comment re-runs the check. Bot PRs are held too. An agent
+never posts it.
+
+Removing or narrowing a field in `convex/schema.ts` is owner-only too, but no check can
+see it. Flag it in the report.
+
+## When a review misses something
+
+- The same finding twice means a rule should become a lint, type or test, with a row in
+  the `AGENTS.md` rules table.
+- A bug that shipped past review becomes a case in `tools/review-eval`. Score any change
+  to this file against those cases.
+
+## House rules
 
 Backend (`apps/native/convex`):
 
-- [ ] A public query or mutation is built with `authedQuery` / `authedMutation`
-      (`model/auth.ts`) and reads `ctx.userId`, or is listed in `PUBLIC_ON_PURPOSE`
-      (`model/publicFunctions.ts`). `model/publicFunctions.test.ts` fails an unlisted one,
-      and a built one that does not refuse a signed-out or deleting caller before its
-      handler runs. A `PUBLIC_ON_PURPOSE` entry's reason is yours to check against its
-      handler. A public action still derives the user with
-      `requireUserId(ctx)` inside the internal function it runs. No `userId` argument from
-      the client. Code that acts for an account checks it is still live (`liveOwner`), not
-      mid-deletion.
-- [ ] Every Pro feature calls `requireProEntitlement(ctx, userId)`; every new link or note
-      save path goes through `createLinkOrNote`, whose `claimSave` counts free saves.
-- [ ] Anything that sends user content to Gemini, SerpAPI or Treg checks AI
-      eligibility first (`aiAllowed` in `aiConsent.ts`, `internal.aiConsent.isAllowed`
-      from actions): live ownership and legacy opt-outs remain enforced. New accounts
-      default to AI enabled; do not describe this as collected consent.
-- [ ] Public `args` / `returns` shapes are unchanged, or the change is expand-first with a
-      `Convex-Api: changed` trailer. Validators match what the function really returns.
-- [ ] AI passes only create or remove `suggested` memberships. Documented exceptions: the
-      classifier inserts new matches as `saved` in a space set to auto-file, and
-      `steerItemForSpace` may update `intents` on `saved` rows. No AI pass ever overwrites a
-      `saved` or `dismissed` decision.
-- [ ] A new table field is a one-way door: rolling back means leaving it `v.optional`.
-- [ ] Reads on growing tables use an index, not `.filter()`.
-- [ ] Logging goes through `logEvent` with scalar fields only: no messages, URLs, user
-      content, tokens or secrets.
-- [ ] Every external fetch goes through `safeFetch`.
-- [ ] Tests build the harness with `newConvexTest()`.
+- [ ] Public queries and mutations use `authedQuery` / `authedMutation` and read
+      `ctx.userId`, or sit in `PUBLIC_ON_PURPOSE` with a reason that matches the handler.
+      Public actions get the user through the internal function they run. No `userId`
+      argument from the client. Code acting for an account checks `liveOwner`.
+- [ ] Pro features call `requireProEntitlement`. New link or note saves go through
+      `createLinkOrNote`, or `createReadyPlaceSave` for a place save that is ready without
+      a processing run. Both call `claimSave`, which counts free saves.
+- [ ] Content sent to Gemini, SerpAPI or Treg is checked with `aiAllowed` /
+      `internal.aiConsent.isAllowed` first. New accounts default to AI on; never call that
+      collected consent.
+- [ ] Public `args` / `returns` are unchanged, or expand-first with a `Convex-Api: changed`
+      trailer. Validators match what the function returns.
+- [ ] AI passes only add or remove `suggested` memberships. Exceptions: new matches go in
+      as `saved` in an auto-file space, and `steerItemForSpace` may update `intents`. No AI
+      pass overwrites `saved` or `dismissed`.
+- [ ] A new table field stays declared once rows have it: roll back to `v.optional`.
+- [ ] Growing tables are read through an index, not `.filter()`.
+- [ ] Logs go through `logEvent` with scalar fields: no messages, URLs, user content or
+      secrets.
+- [ ] External fetches go through `safeFetch`.
+- [ ] Test harnesses come from `newConvexTest()`.
 
 Native app (`apps/native/src`):
 
-- [ ] New visible copy is in every locale catalog, with generated files regenerated, not
-      hand-edited.
-- [ ] A change to a native module, a config plugin, `app.json` or `app.config.js` may move
-      the fingerprint. CI's `native fingerprint` job reports it: when it says CHANGED, the
-      PR needs the `Native-Fingerprint: changed` trailer and a store build. The job checks
-      the production variant only, never blocks, and cannot see `eas.json` build fields,
-      `.easignore` edits or pnpm patches, so decide those by hand
-      ([what the fingerprint hashes](docs/architecture/push-notifications.md#what-the-fingerprint-hashes)).
+- [ ] New copy is in every locale catalog; generated files are regenerated, not edited.
+- [ ] A native module, config plugin, `app.json` or `app.config.js` change may move the
+      fingerprint. If CI's `native fingerprint` job says CHANGED, the PR needs the
+      `Native-Fingerprint: changed` trailer and a store build. The job cannot see `eas.json`
+      build fields, `.easignore` or pnpm patches; judge those yourself
+      ([details](docs/architecture/push-notifications.md#what-the-fingerprint-hashes)).
 - [ ] No test file under `src/app`.
 - [ ] Handled failures report through `analytics.captureError`.
 
-## Evidence
+Evidence (the check only sees that each section is filled in; you check it is true):
 
-The PR evidence check only confirms that the Verification section's three subsections
-(What I ran, Evidence, Not verified) are filled in, and that UI changes carry a screenshot
-or recording unless the `no-ui-change` label is set. The reviewer checks that they are
-right:
-
-- [ ] The evidence was taken on the current head commit, or on one whose later commits
-      cannot change what it shows.
-- [ ] The result shown is the result claimed (a passing run, the screen described).
+- [ ] It was taken on the current commit, or later commits cannot change what it shows.
+- [ ] It shows what it claims: a passing run, the screen described.
 - [ ] "Not verified" names what was skipped, and nothing risky hides there.
-- [ ] A change to a flow covered by `tools/e2e` says whether that flow was run.
+- [ ] A change to a flow in `tools/e2e` says whether that flow was run.
+- [ ] The Review section has a count line, and each Important finding is fixed or answered.
