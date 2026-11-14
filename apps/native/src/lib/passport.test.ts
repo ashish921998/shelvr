@@ -188,6 +188,17 @@ describe("passportSections", () => {
     expect(waiting.map((section) => section.city)).toEqual(["Tokyo"]);
   });
 
+  it("keeps a city stamp off a same-named city in another country", () => {
+    const paris = { city: "paris", country: "FR", stampedAt: 1 };
+    const { stamped, cities } = passportSections(
+      [stamp({ city: "Paris", countryCode: "US" })],
+      [],
+      [paris],
+    );
+    expect(stamped[0].cityStamp).toBeUndefined();
+    expect(cities).toEqual([paris]);
+  });
+
   it("keeps a city stamp off the stamps with no city and drops one no longer in the list", () => {
     const { stamped, cities } = passportSections(
       [stamp({ key: "x", city: undefined })],

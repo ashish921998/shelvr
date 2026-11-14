@@ -23,7 +23,8 @@ function readQueued(): QueuedCities | null {
       cities,
       owner: typeof value?.owner === "string" ? value.owner : null,
     };
-  } catch {
+  } catch (error) {
+    analytics.captureError("read_city_stamps_failed", error);
     return null;
   }
 }
@@ -77,7 +78,7 @@ export function useSyncPendingCityStamps(): void {
           picked: cities.length,
           stamped,
         });
-        clearQueuedCityStamps();
+        if (readQueued()?.owner === userId) clearQueuedCityStamps();
       },
       (error: unknown) =>
         analytics.captureError("city_stamps_claim_failed", error),

@@ -62,7 +62,13 @@ vi.mock("react-native", () => ({ Alert: { alert: mocks.alert } }));
 
 function toggle(city: "lisbon" | "tokyo", stamped: boolean) {
   const { result } = renderHook(() => useCityStampToggle());
-  return act(() => result.current(city, stamped, stamped ? 3 : 1));
+  return act(() =>
+    result.current(
+      city,
+      stamped,
+      stamped ? ["paris", "rome"] : ["paris", city],
+    ),
+  );
 }
 
 beforeEach(() => {
@@ -97,7 +103,7 @@ describe("useCityStampToggle", () => {
     const { result } = renderHook(() => useCityStampToggle());
     let pending: Promise<boolean> = Promise.resolve(false);
     act(() => {
-      pending = result.current("tokyo", true, 3);
+      pending = result.current("tokyo", true, ["paris", "rome"]);
     });
     expect(mocks.optimistic).not.toHaveBeenCalledWith(
       expect.stringContaining("addCityStamp"),
@@ -111,6 +117,31 @@ describe("useCityStampToggle", () => {
     expect(mocks.play).toHaveBeenCalledTimes(1);
   });
 
+  it("counts every stamp still saving when two cities are tapped quickly", async () => {
+    const finishes: ((added: boolean) => void)[] = [];
+    mocks.add.mockImplementation(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finishes.push(resolve);
+        }),
+    );
+    const { result } = renderHook(() => useCityStampToggle());
+    let first: Promise<boolean> = Promise.resolve(false);
+    let second: Promise<boolean> = Promise.resolve(false);
+    act(() => {
+      first = result.current("lisbon", true, []);
+      second = result.current("tokyo", true, []);
+    });
+    await act(async () => {
+      for (const finish of finishes) finish(true);
+      await Promise.all([first, second]);
+    });
+    expect(mocks.capture.mock.calls).toEqual([
+      ["passport_city_stamp_changed", { stamped: true, count: 1 }],
+      ["passport_city_stamp_changed", { stamped: true, count: 2 }],
+    ]);
+  });
+
   it("saves but plays nothing when the person left the grid before the save landed", async () => {
     let finish: (added: boolean) => void = () => {};
     mocks.add.mockReturnValue(
@@ -121,7 +152,7 @@ describe("useCityStampToggle", () => {
     const { result } = renderHook(() => useCityStampToggle());
     let pending: Promise<boolean> = Promise.resolve(false);
     act(() => {
-      pending = result.current("tokyo", true, 3);
+      pending = result.current("tokyo", true, ["paris", "rome"]);
     });
     mocks.focused = false;
     await act(async () => {

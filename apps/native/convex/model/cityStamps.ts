@@ -63,17 +63,32 @@ export function knownCityStamps<T extends CityStampEntry>(
   });
 }
 
+export function cityStampFits(
+  stamp: CityStampEntry,
+  place: { city?: string; countryCode?: string },
+): boolean {
+  if (!place.city || !cityStampKeys(stamp.city).includes(cityKey(place.city))) {
+    return false;
+  }
+  return place.countryCode === undefined || place.countryCode === stamp.country;
+}
+
 export function cityStampCounts(
-  placeCities: readonly string[],
-  placeCountries: readonly string[],
+  places: readonly { city?: string; countryCode?: string }[],
   cityStamps: readonly CityStampEntry[],
 ): { cities: number; countries: Set<string> } {
-  const keys = new Set(placeCities.map(cityKey).filter((key) => key !== ""));
-  const countries = new Set(placeCountries);
+  const keys = new Set(
+    places
+      .map((place) => cityKey(place.city ?? ""))
+      .filter((key) => key !== ""),
+  );
+  const countries = new Set(
+    places.flatMap((place) => (place.countryCode ? [place.countryCode] : [])),
+  );
   let cities = keys.size;
   for (const stamp of knownCityStamps(cityStamps)) {
     countries.add(stamp.country);
-    if (!cityStampKeys(stamp.city).some((key) => keys.has(key))) cities += 1;
+    if (!places.some((place) => cityStampFits(stamp, place))) cities += 1;
   }
   return { cities, countries };
 }

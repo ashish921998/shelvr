@@ -2,7 +2,7 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import type { CityStamp } from "@/lib/city-stamp-data";
 import type { CityCompletion } from "@convex/model/cityCompletion";
-import { cityStampKeys, knownCityStamps } from "@convex/model/cityStamps";
+import { cityStampFits, knownCityStamps } from "@convex/model/cityStamps";
 import { groupByCity } from "@convex/model/passport";
 import { cityKey } from "@convex/model/trip";
 import { convexQuery } from "@convex-dev/react-query";
@@ -58,6 +58,14 @@ export type PassportSection = {
   cityStamp?: CityStamp;
 };
 
+function sectionFits(cityStamp: CityStamp, section: PassportSection): boolean {
+  const city = section.city ?? undefined;
+  if (section.stamps.length === 0) return cityStampFits(cityStamp, { city });
+  return section.stamps.some((stamp) =>
+    cityStampFits(cityStamp, { city, countryCode: stamp.countryCode }),
+  );
+}
+
 function withCityStamps(
   stamped: PassportSection[],
   cityStamps: readonly CityStamp[],
@@ -65,12 +73,11 @@ function withCityStamps(
   const cities: CityStamp[] = [];
   const headed = [...stamped];
   for (const cityStamp of knownCityStamps(cityStamps)) {
-    const keys = cityStampKeys(cityStamp.city);
     const index = headed.findIndex(
       (section) =>
         section.city !== null &&
         section.cityStamp === undefined &&
-        keys.includes(cityKey(section.city)),
+        sectionFits(cityStamp, section),
     );
     if (index === -1) cities.push(cityStamp);
     else headed[index] = { ...headed[index], cityStamp };

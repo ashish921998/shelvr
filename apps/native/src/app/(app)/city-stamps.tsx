@@ -20,7 +20,7 @@ function CityStampsEditor({ ids }: { ids: SampleCityId[] }) {
         picked={ids}
         onToggle={(city) => {
           const stamped = !ids.includes(city);
-          void toggle(city, stamped, ids.length + (stamped ? 1 : -1));
+          void toggle(city, stamped, ids);
         }}
       />
     </View>
