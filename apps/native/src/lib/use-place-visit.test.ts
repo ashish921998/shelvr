@@ -17,10 +17,14 @@ const mocks = vi.hoisted(() => ({
   success: vi.fn(),
   selection: vi.fn(),
   router: { push: vi.fn() },
+  focused: true,
 }));
 
 vi.mock("convex/react", () => ({ useMutation: () => mocks.setVisited }));
-vi.mock("expo-router", () => ({ useRouter: () => mocks.router }));
+vi.mock("expo-router", () => ({
+  useRouter: () => mocks.router,
+  useNavigation: () => ({ isFocused: () => mocks.focused }),
+}));
 vi.mock("@/lib/entitlement", () => ({ openPaywall: mocks.openPaywall }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mocks.capture, captureError: mocks.captureError },
@@ -53,6 +57,7 @@ function toggle(
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.setVisited.mockResolvedValue(null);
+  mocks.focused = true;
 });
 
 describe("usePlaceVisit", () => {
@@ -161,6 +166,17 @@ describe("usePlaceVisit", () => {
     expect(mocks.play.mock.calls[0][0]).toMatchObject({
       name: "Taco Spot",
       firstInCity: false,
+    });
+  });
+
+  it("skips the moment when the city page was left before the stamp landed", async () => {
+    mocks.focused = false;
+    await expect(toggle(taco, { ...austin, cityVisited: 0 })).resolves.toBe(
+      true,
+    );
+    expect(mocks.play).not.toHaveBeenCalled();
+    expect(mocks.capture).toHaveBeenCalledWith("city_place_visited", {
+      visited: true,
     });
   });
 

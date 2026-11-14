@@ -15,7 +15,7 @@ import { saveErrorCode } from "@convex/model/saveErrors";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { Alert } from "react-native";
 
@@ -56,6 +56,7 @@ type VisitPlace = {
 
 export function usePlaceVisit(surface: "city" | "passport" = "city") {
   const router = useRouter();
+  const navigation = useNavigation();
   const setVisited = useMutation(api.placeVisits.setVisited);
   const { play: playStamp } = useStampMoment();
   const working = useRef(false);
@@ -85,8 +86,10 @@ export function usePlaceVisit(surface: "city" | "passport" = "city") {
               },
             }),
       });
-      if (visited) playStamp(placeStampMoment(name, stamp), "city");
-      else void haptics.selection();
+      if (!visited) void haptics.selection();
+      else if (navigation.isFocused()) {
+        playStamp(placeStampMoment(name, stamp), "city");
+      }
       if (surface === "passport") {
         analytics.capture("place_unstamped", { surface });
       } else {
