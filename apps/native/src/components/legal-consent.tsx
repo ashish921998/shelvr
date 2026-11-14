@@ -133,7 +133,11 @@ export function LegalConsentPreference() {
       note={
         [
           failed ? t("refundConsent.error") : null,
-          consent?.syncPending ? t("refundConsent.syncPending") : null,
+          consent?.syncFailed
+            ? t("refundConsent.syncFailed")
+            : consent?.syncPending
+              ? t("refundConsent.syncPending")
+              : null,
         ]
           .filter(Boolean)
           .join("\n") || null

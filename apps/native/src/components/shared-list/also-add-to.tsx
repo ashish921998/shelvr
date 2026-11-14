@@ -49,7 +49,7 @@ export function AlsoAddTo({
             accessibilityLabel={`${list.name}, ${line}`}
             accessibilityState={{ checked: on, busy, disabled: busy }}
             disabled={busy}
-            onPress={() => void toggle(list._id)}
+            onPress={() => void toggle(list)}
             style={({ pressed }) => [
               styles.row,
               on && styles.on,

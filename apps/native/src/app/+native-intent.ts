@@ -37,6 +37,11 @@ export function redirectSystemPath({
       return `/list-invite/${invite[1]}`;
     }
 
+    const passport = /^\/passport\/([^/?#]+)\/?$/.exec(url.pathname);
+    if (passport !== null && url.protocol === "https:") {
+      return `/passport-invite/${passport[1]}`;
+    }
+
     if (url.hostname === "expo-sharing") {
       if (!onboardedOrUnknown()) return "/onboarding";
       markPendingShareQuietly();

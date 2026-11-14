@@ -99,6 +99,19 @@ vi.mock("@/components/map/map-filter-chips", () => ({
 vi.mock("@/components/map/map-round-button", () => ({
   MapRoundButton: vi.fn(() => null),
 }));
+vi.mock("@/components/map/map-went-switch", () => ({
+  MapWentSwitch: vi.fn(() => null),
+}));
+vi.mock("@/lib/use-place-visit", () => ({
+  usePlaceVisits: () => ({
+    visits: [],
+    loaded: true,
+    isError: false,
+    error: null,
+    offerRetry: vi.fn(),
+  }),
+}));
+vi.mock("@/lib/appearance", () => ({ isDarkThemeName: () => false }));
 vi.mock("@/components/empty-state", () => ({ EmptyState: vi.fn(() => null) }));
 vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: vi.fn(() => null),

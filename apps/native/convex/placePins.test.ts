@@ -9,6 +9,8 @@ import {
   newConvexTest,
   insertConsentingUser,
   setTestConsent,
+  storeCurrentPins,
+  signedInUser,
 } from "./test.setup";
 
 async function testKey(): Promise<string> {
@@ -105,6 +107,58 @@ afterEach(() => {
 });
 
 describe("saved venue lookup", () => {
+  it("fails the test helper when the lookup is ineligible", async () => {
+    const { t, itemId } = await setup(["Cafe"]);
+    await t.run((ctx) => ctx.db.patch(itemId, { status: "processing" }));
+    await expect(storeCurrentPins(t, { itemId, found: [] })).rejects.toThrow(
+      "Expected an eligible pin lookup",
+    );
+  });
+  it("rejects a lookup from before a retry changed the save's city", async () => {
+    vi.useFakeTimers();
+    const t = newConvexTest();
+    const { userId, t: owner } = await signedInUser(t, { pro: true });
+    const itemId = await t.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        url: "https://example.com/cafe",
+        status: "ready",
+        enrichment: "partial",
+        tags: [],
+        cities: ["Paris"],
+        places: ["Cafe Joe"],
+        searchText: "",
+        processingRunId: "first",
+      }),
+    );
+    const old = await t.query(internal.placePins.toLocate, { itemId });
+    await owner.mutation(api.items.reprocessItem, { id: itemId });
+    const runId = await t.run(
+      async (ctx) => (await ctx.db.get(itemId))?.processingRunId,
+    );
+    await t.mutation(internal.items.finalizeItem, {
+      itemId,
+      runId,
+      reading: {},
+      classification: {
+        description: "",
+        tags: [],
+        cities: ["London"],
+        places: ["Cafe Joe"],
+      },
+    });
+    await t.mutation(internal.placePins.storePins, {
+      itemId,
+      found: [{ name: "Cafe Joe", city: "Paris", lat: 48.86, lng: 2.36 }],
+      cluesSearched: old?.locations,
+      version: old!.version,
+    });
+    expect((await t.run((ctx) => ctx.db.get(itemId)))?.placePins ?? []).toEqual(
+      [],
+    );
+    vi.useRealTimers();
+  });
   it.each([
     {
       saved: "5 Napkin Burger",
@@ -738,6 +792,7 @@ describe("placePins", () => {
       ).toBe("applied");
       const oldStores = () =>
         t.mutation(internal.placePins.storePins, {
+          version: old.version,
           itemId,
           found: [
             { name: "Carette", lat: 48.862, lng: 2.365, appleId: "vosges" },
@@ -819,7 +874,7 @@ describe("placePins", () => {
     await t.run((ctx) =>
       ctx.db.patch(itemId, { cities: ["Austin"], placePins: existing }),
     );
-    await t.mutation(internal.placePins.storePins, { itemId, found: [] });
+    await storeCurrentPins(t, { itemId, found: [] });
     expect((await t.run((ctx) => ctx.db.get(itemId)))?.places).toEqual([
       "Guest House",
       "Eberly",
@@ -831,7 +886,7 @@ describe("placePins", () => {
     expect(
       await t.query(internal.placePins.toLocate, { itemId }),
     ).toMatchObject({ names: [] });
-    await t.mutation(internal.placePins.storePins, { itemId, found: [] });
+    await storeCurrentPins(t, { itemId, found: [] });
     expect(await pins()).toHaveLength(2);
   });
 
@@ -970,7 +1025,7 @@ describe("placePins", () => {
     await t.run(async (ctx) =>
       ctx.db.patch(itemId, { cities: ["Lisbon", "Porto"] }),
     );
-    await t.mutation(internal.placePins.storePins, {
+    await storeCurrentPins(t, {
       itemId,
       found: [
         { name: "Cafe", city: " lisbon ", lat: 38.72, lng: -9.1 },
@@ -1022,7 +1077,7 @@ describe("placePins", () => {
         placePins: [{ name: "Cafe", lat: 38.72, lng: -9.1 }],
       }),
     );
-    await t.mutation(internal.placePins.storePins, {
+    await storeCurrentPins(t, {
       itemId,
       found: [{ name: "Tower", city: "Porto", lat: 41.15, lng: -8.6 }],
     });
@@ -1123,7 +1178,7 @@ describe("placePins", () => {
         placePins: [{ ...pin, category: "Cafe" }],
       }),
     );
-    await t.mutation(internal.placePins.storePins, { itemId, found: [pin] });
+    await storeCurrentPins(t, { itemId, found: [pin] });
     expect(await pins()).toEqual([{ ...pin, category: "Cafe" }]);
   });
 
@@ -1144,7 +1199,7 @@ describe("placePins", () => {
         ],
       }),
     );
-    await t.mutation(internal.placePins.storePins, {
+    await storeCurrentPins(t, {
       itemId,
       found: [
         { name: "Cafe", lat: 38.7, lng: -9.1, city: "Lisbon" },
@@ -1165,7 +1220,7 @@ describe("placePins", () => {
         places: ["Cafe"],
       }),
     );
-    await t.mutation(internal.placePins.storePins, {
+    await storeCurrentPins(t, {
       itemId,
       found: [
         { name: "Cafe", city: "Porto", lat: 41.15, lng: -8.6, appleId: "X1" },
@@ -1250,7 +1305,7 @@ describe("placePins", () => {
     await t.run(async (ctx) => {
       await ctx.db.patch(itemId, { intents: [maps("Pink Street")] });
     });
-    await t.mutation(internal.placePins.storePins, {
+    await storeCurrentPins(t, {
       itemId,
       found: [
         { name: "Time Out Market", lat: 1, lng: 1 },
@@ -1314,7 +1369,7 @@ describe("placePins", () => {
   it("drops a pin far from the save's other places, a same-named place elsewhere", async () => {
     const names = ["PNY", "Blend", "Bomaye", "Micho"];
     const { t, itemId, pins } = await setup(names);
-    await t.mutation(internal.placePins.storePins, {
+    await storeCurrentPins(t, {
       itemId,
       found: [
         { city: "Paris", name: "PNY", lat: 48.8638, lng: 2.3627 },
@@ -1340,7 +1395,7 @@ describe("placePins", () => {
     await t.run(async (ctx) => {
       await ctx.db.patch(itemId, { cities: ["Lisbon", "Porto"] });
     });
-    await t.mutation(internal.placePins.storePins, {
+    await storeCurrentPins(t, {
       itemId,
       found: [
         { name: "Time Out", lat: 38.707, lng: -9.1457 },
@@ -1354,7 +1409,7 @@ describe("placePins", () => {
 
   it("keeps every pin when no majority agrees where the save is", async () => {
     const { t, itemId, pins } = await setup(["P1", "P2", "R1", "R2"]);
-    await t.mutation(internal.placePins.storePins, {
+    await storeCurrentPins(t, {
       itemId,
       found: [
         { name: "P1", lat: 48.86, lng: 2.35 },
@@ -1368,7 +1423,7 @@ describe("placePins", () => {
 
   it("keeps two far-apart pins, with nothing to say which is wrong", async () => {
     const { t, itemId, pins } = await setup(["Here", "There"]);
-    await t.mutation(internal.placePins.storePins, {
+    await storeCurrentPins(t, {
       itemId,
       found: [
         { name: "Here", lat: 48.86, lng: 2.36 },
@@ -1381,7 +1436,7 @@ describe("placePins", () => {
   it("keeps at most thirty pins", async () => {
     const names = Array.from({ length: 32 }, (_, i) => `Place ${i}`);
     const { t, itemId, pins } = await setup(names);
-    await t.mutation(internal.placePins.storePins, {
+    await storeCurrentPins(t, {
       itemId,
       found: names.map((name) => ({ name, lat: 1, lng: 1 })),
     });
@@ -1466,7 +1521,7 @@ describe("placePins", () => {
         spaceId,
         intents: [maps("Pink Street")],
       });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1502,7 +1557,7 @@ describe("placePins", () => {
           .unique();
         await deleteMembership(ctx, row!);
       });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1528,7 +1583,7 @@ describe("placePins", () => {
         reason: "error",
         runId: "run-1",
       });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1558,7 +1613,7 @@ describe("placePins", () => {
         reason: "not_found",
         runId: "run-1",
       });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1582,7 +1637,7 @@ describe("placePins", () => {
     vi.useFakeTimers();
     try {
       await t.mutation(internal.placePins.backfillPage, { cursor: null });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1605,7 +1660,7 @@ describe("placePins", () => {
     vi.useFakeTimers();
     try {
       await t.mutation(internal.placePins.backfillPage, { cursor: null });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1622,7 +1677,7 @@ describe("placePins", () => {
     vi.useFakeTimers();
     try {
       await t.mutation(internal.placePins.backfillPage, { cursor: null });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1656,7 +1711,7 @@ describe("placePins", () => {
     vi.useFakeTimers();
     try {
       await t.mutation(internal.placePins.backfillPage, { cursor: null });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1725,7 +1780,7 @@ describe("placePins", () => {
         { itemId, keepPins: true, attempt: 2 },
       ]);
       await withMaps();
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1752,7 +1807,7 @@ describe("placePins", () => {
         { itemId, refresh: true, attempt: 2 },
       ]);
       await withMaps(true);
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }
@@ -1813,7 +1868,7 @@ describe("pin cuisines", () => {
         placePins: [{ ...bar, cuisine: "wine" }],
       }),
     );
-    await t.mutation(internal.placePins.storePins, {
+    await storeCurrentPins(t, {
       itemId,
       found: [lucys, bar],
     });
@@ -1831,7 +1886,7 @@ describe("pin cuisines", () => {
         placePins: [lucys, { ...bar, cuisine: "wine" }],
       }),
     );
-    await t.mutation(internal.placePins.storePins, {
+    await storeCurrentPins(t, {
       itemId,
       found: [],
       keepPins: true,
@@ -1853,7 +1908,7 @@ describe("pin cuisines", () => {
         placePins: [lucys],
       }),
     );
-    await t.mutation(internal.placePins.storePins, {
+    await storeCurrentPins(t, {
       itemId,
       found: [{ ...bar, lat: 38.72 }],
       keepPins: true,
@@ -1886,7 +1941,7 @@ describe("pin cuisines", () => {
     vi.useFakeTimers();
     try {
       await t.mutation(internal.placePins.backfillPage, { cursor: null });
-      await t.finishAllScheduledFunctions(vi.runAllTimers);
+      await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     } finally {
       vi.useRealTimers();
     }

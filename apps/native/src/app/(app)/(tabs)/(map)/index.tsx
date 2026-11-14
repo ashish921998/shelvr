@@ -4,6 +4,7 @@ import { MapEmpty } from "@/components/map/map-empty";
 import { MapHeader, MAP_HEADER_HEIGHT } from "@/components/map/map-header";
 import { MapRoundButton } from "@/components/map/map-round-button";
 import { MapSearchResults } from "@/components/map/map-search";
+import { MapWentSwitch } from "@/components/map/map-went-switch";
 import {
   type MapFocus,
   type MapPin,
@@ -16,6 +17,7 @@ import {
   cancelPlaceDetails,
   openPlaceDetails,
 } from "@/lib/apple-place-card";
+import { isDarkThemeName } from "@/lib/appearance";
 import { framedPins } from "@/lib/city-pins";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
@@ -24,12 +26,16 @@ import {
   mapFilters,
   searchPlaces,
   topSearchResults,
+  type WentFilter,
+  wentView,
 } from "@/lib/map-filters";
 import { setMapCityInView } from "@/lib/map-city-in-view";
 import { canShowAllCities } from "@/lib/map-city-zoom";
 import { useMapLocation } from "@/lib/map-location";
 import { useMapCity } from "@/lib/use-map-city";
 import { placeEmoji } from "@/lib/map-pin-emoji";
+import { usePlaceVisits } from "@/lib/use-place-visit";
+import { visitMatcher } from "@convex/model/placeVisits";
 import { api } from "@convex/_generated/api";
 import type { PlaceKind } from "@convex/model/placeKinds";
 import { convexQuery } from "@convex-dev/react-query";
@@ -83,12 +89,32 @@ export default function MapScreen() {
   const barHeight = useBottomTabBarHeight();
 
   const all = places.data;
+  const { visits, loaded, isError, error, offerRetry } = usePlaceVisits();
+  const visitsFailed = isError && !loaded;
+  useEffect(() => {
+    if (error) analytics.captureError("place_visits_load_failed", error);
+  }, [error]);
+  useFocusEffect(
+    useCallback(() => {
+      if (visitsFailed) offerRetry();
+    }, [visitsFailed, offerRetry]),
+  );
+  const visited = useMemo(() => visitMatcher(visits, all ?? []), [visits, all]);
+  const [wentFilter, setWentFilter] = useState<WentFilter>("all");
+  const went = useMemo(
+    () => wentView(all ?? [], wentFilter, visited),
+    [all, wentFilter, visited],
+  );
   const { city, onCentreChange } = useMapCity(all ?? NO_PLACES);
-  const filters = useMemo(() => mapFilters(all ?? []), [all]);
+  const filters = useMemo(() => mapFilters(went.places), [went.places]);
   // A filter that no longer has enough places (a save was deleted) falls back to All.
   const active = filters.some((filter) => filter.kind === kind) ? kind : null;
-  const shown = useMemo(() => filterPlaces(all ?? [], active), [all, active]);
+  const shown = useMemo(
+    () => filterPlaces(went.places, active),
+    [went.places, active],
+  );
   const searching = searchText.trim() !== "";
+  const showWent = went.showSwitch && !searchOpen;
   // Search narrows whatever the filter shows; every match stays on the map, the first few are listed.
   const matches = useMemo(
     () => (searching ? searchPlaces(shown, searchText) : shown),
@@ -100,8 +126,16 @@ export default function MapScreen() {
         ...place,
         id: placeId(place),
         emoji: placeEmoji(place),
+        ...(visited(place)
+          ? {
+              tintColor: isDarkThemeName(rt.themeName)
+                ? theme.colors.primarySoft
+                : theme.colors.primaryText,
+              title: `✓ ${place.name}`,
+            }
+          : {}),
       })),
-    [matches],
+    [matches, visited, rt.themeName, theme],
   );
   const overview = useMemo(
     () => shown.map((place) => ({ ...place, id: placeId(place) })),
@@ -196,7 +230,9 @@ export default function MapScreen() {
           height={mapHeight}
           topInset={headerBottom + theme.gap(1)}
           bottomInset={
-            barHeight + (filters.length > 0 ? stripHeight : 0) + theme.gap(1)
+            barHeight +
+            (filters.length > 0 || showWent ? stripHeight : 0) +
+            theme.gap(1)
           }
           focus={focus}
           locate={locate}
@@ -256,18 +292,26 @@ export default function MapScreen() {
             />
           </View>
         ) : null}
-        {filters.length > 0 ? (
+        {filters.length > 0 || showWent ? (
           <View
             style={styles.strip}
             onLayout={(event) =>
               setStripHeight(event.nativeEvent.layout.height)
             }
           >
-            <MapFilterChips
-              kinds={filters.map((filter) => filter.kind)}
-              selected={active}
-              onSelect={choose}
-            />
+            {showWent ? (
+              <MapWentSwitch
+                selected={went.selected}
+                onSelect={setWentFilter}
+              />
+            ) : null}
+            {filters.length > 0 ? (
+              <MapFilterChips
+                kinds={filters.map((filter) => filter.kind)}
+                selected={active}
+                onSelect={choose}
+              />
+            ) : null}
           </View>
         ) : null}
       </View>

@@ -639,7 +639,7 @@ async function settle(
   run: () => Promise<unknown>,
 ) {
   await run();
-  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 }
 
 describe("the passport", () => {

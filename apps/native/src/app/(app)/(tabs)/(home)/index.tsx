@@ -208,6 +208,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   rows: { paddingHorizontal: theme.gap(2.5) },
   empty: {
+    gap: theme.gap(1.5),
     paddingHorizontal: theme.gap(2),
     paddingTop: theme.gap(3),
   },

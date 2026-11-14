@@ -163,11 +163,6 @@ export default defineSchema({
     processingRunId: v.optional(v.string()),
     processingStartedAt: v.optional(v.number()),
     searchText: v.string(),
-    // Retired: nothing reads it, and `items:clearEmbeddings` removes it. Stays declared
-    // until no row carries it (one-way door).
-    embedding: v.optional(v.array(v.float64())),
-    embeddingVersion: v.optional(v.number()),
-    embeddingAttempts: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_user_and_type", ["userId", "type"])
@@ -178,7 +173,6 @@ export default defineSchema({
       "processingStartedAt",
     ])
     .index("by_storage", ["storageId"])
-    .index("by_status_and_embeddingVersion", ["status", "embeddingVersion"])
     .searchIndex("search_text", {
       searchField: "searchText",
       filterFields: ["userId"],
@@ -274,6 +268,10 @@ export default defineSchema({
     attempts: v.number(),
     deliveryError: v.optional(v.string()),
     deliveredAt: v.optional(v.number()),
+    deliveryLeaseUntil: v.optional(v.number()),
+    deliveryRequest: v.optional(
+      v.object({ key: v.string(), body: v.string(), startedAt: v.number() }),
+    ),
   })
     .index("by_user", ["userId"])
     .index("by_status_attempts", ["status", "attempts"]),
@@ -342,6 +340,13 @@ export default defineSchema({
   })
     .index("by_user_and_key", ["userId", "key"])
     .index("by_user_and_visited", ["userId", "visitedAt"]),
+
+  passportShares: defineTable({
+    token: v.string(),
+    userId: v.string(),
+  })
+    .index("by_token", ["token"])
+    .index("by_user", ["userId"]),
 
   planShares: defineTable({
     token: v.string(),
@@ -463,7 +468,8 @@ export default defineSchema({
     visitedAt: v.optional(v.number()),
   })
     .index("by_list_and_added", ["listId", "addedAt"])
-    .index("by_added_by", ["addedBy"]),
+    .index("by_added_by", ["addedBy"])
+    .index("by_item_and_added_by", ["itemId", "addedBy"]),
 
   captureTokens: defineTable({
     userId: v.id("users"),
