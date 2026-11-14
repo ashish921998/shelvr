@@ -9,6 +9,7 @@ import { TogetherSection } from "./together-section";
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   lists: [] as unknown[] | undefined,
+  failed: false,
 }));
 
 vi.mock("@/lib/analytics", () => ({
@@ -17,7 +18,7 @@ vi.mock("@/lib/analytics", () => ({
 vi.mock("@/lib/share-link", () => ({ shareUrl: vi.fn() }));
 vi.mock("@/lib/shared-lists", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/shared-lists")>()),
-  useSharedLists: () => ({ data: mocks.lists }),
+  useSharedLists: () => ({ data: mocks.lists, isError: mocks.failed }),
 }));
 vi.mock("@/components/shared-list/list-card", () => ({
   SharedListCard: vi.fn(({ list }: { list: { name: string } }) => (
@@ -72,6 +73,7 @@ function summary(over: Partial<SharedListSummary> = {}): SharedListSummary {
 beforeEach(() => {
   mocks.push.mockReset();
   mocks.lists = [];
+  mocks.failed = false;
 });
 
 describe("TogetherSection", () => {
@@ -92,6 +94,17 @@ describe("TogetherSection", () => {
     expect(screen.getByText("Together")).toBeTruthy();
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.getByLabelText("Loading")).toBeTruthy();
+  });
+
+  it("still offers to start a list when the lists fail to load", () => {
+    mocks.lists = undefined;
+    mocks.failed = true;
+    render(<TogetherSection showTripsHeading={false} />);
+    expect(screen.queryByLabelText("Loading")).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Start a shared list" }),
+    );
+    expect(mocks.push).toHaveBeenCalledWith("/new-shared-list");
   });
 
   it("lists shared lists above the trips heading", () => {

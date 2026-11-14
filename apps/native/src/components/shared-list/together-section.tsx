@@ -31,7 +31,7 @@ export function TogetherSection({
 }) {
   useAppLocale();
   const lists = useSharedLists();
-  const loading = lists.data === undefined;
+  const loading = lists.data === undefined && !lists.isError;
   const rows = lists.data ?? [];
   return (
     <View style={styles.container} testID="plans-together">
