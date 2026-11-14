@@ -35,6 +35,7 @@ vi.mock("react-native-unistyles", () => ({
   useUnistyles: () => ({ theme: { colors: { muted: "#999" } } }),
 }));
 vi.mock("react-native", () => ({
+  ActivityIndicator: vi.fn(() => <progress aria-label="Loading" />),
   View: vi.fn(({ children }: { children: ReactNode }) => (
     <section>{children}</section>
   )),
@@ -78,6 +79,7 @@ describe("TogetherSection", () => {
     render(<TogetherSection showTripsHeading={false} />);
     expect(screen.getByText("Together")).toBeTruthy();
     expect(screen.queryByText("Trips")).toBeNull();
+    expect(screen.queryByLabelText("Loading")).toBeNull();
     fireEvent.click(
       screen.getByRole("button", { name: "Start a shared list" }),
     );
@@ -89,6 +91,7 @@ describe("TogetherSection", () => {
     render(<TogetherSection showTripsHeading={false} />);
     expect(screen.getByText("Together")).toBeTruthy();
     expect(screen.queryByRole("button")).toBeNull();
+    expect(screen.getByLabelText("Loading")).toBeTruthy();
   });
 
   it("lists shared lists above the trips heading", () => {

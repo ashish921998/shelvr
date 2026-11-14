@@ -3,7 +3,7 @@ import { ThemedText } from "@/components/ui/themed-text";
 import { t, useAppLocale } from "@/lib/i18n";
 import { useSharedLists } from "@/lib/shared-lists";
 import { useRouter } from "expo-router";
-import { Pressable, View } from "react-native";
+import { ActivityIndicator, Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 function NewListLink({ label }: { label: string }) {
@@ -44,7 +44,9 @@ export function TogetherSection({
             {t("sharedLists.hint")}
           </ThemedText>
         </View>
-        {loading ? null : (
+        {loading ? (
+          <ActivityIndicator testID="plans-together-loading" />
+        ) : (
           <NewListLink
             label={
               rows.length > 0 ? t("plans.newList") : t("sharedLists.start")
