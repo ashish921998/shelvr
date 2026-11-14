@@ -1,5 +1,4 @@
 // @vitest-environment edge-runtime
-/// <reference types="vite/client" />
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { api, internal } from "./_generated/api";

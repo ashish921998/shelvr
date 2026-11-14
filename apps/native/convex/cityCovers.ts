@@ -24,15 +24,20 @@ export const setCityCover = authedMutation({
     }
     if (args.on) {
       for (const other of await rawReadySavesNewestFirst(ctx, ctx.userId)) {
-        if (other._id === item._id || !other.coverFor?.includes(key)) continue;
-        const kept = other.coverFor.filter((k) => k !== key);
+        if (
+          other._id === item._id ||
+          !other.coverFor?.some((pick) => pick.key === key)
+        ) {
+          continue;
+        }
+        const kept = other.coverFor.filter((pick) => pick.key !== key);
         await ctx.db.patch(other._id, {
           coverFor: kept.length > 0 ? kept : undefined,
         });
       }
     }
-    const rest = (item.coverFor ?? []).filter((k) => k !== key);
-    const next = args.on ? [...rest, key] : rest;
+    const rest = (item.coverFor ?? []).filter((pick) => pick.key !== key);
+    const next = args.on ? [...rest, { key, at: Date.now() }] : rest;
     await ctx.db.patch(item._id, {
       coverFor: next.length > 0 ? next : undefined,
     });

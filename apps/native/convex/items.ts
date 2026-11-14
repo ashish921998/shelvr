@@ -435,11 +435,19 @@ async function pickedCovers(
   const picked = new Map<string, { url: string; itemId: Id<"items"> }>();
   for (const city of cities) {
     const key = cityKey(city);
-    const item = items.find(
-      (save) =>
-        save.coverFor?.includes(key) &&
-        (save.cities ?? []).some((name) => cityKey(name) === key),
-    );
+    let item: Doc<"items"> | undefined;
+    let latest = -Infinity;
+    for (const save of items) {
+      const at = save.coverFor?.find((pick) => pick.key === key)?.at;
+      if (
+        at !== undefined &&
+        at > latest &&
+        (save.cities ?? []).some((name) => cityKey(name) === key)
+      ) {
+        item = save;
+        latest = at;
+      }
+    }
     if (item === undefined || picked.has(key)) continue;
     const url = item.storageId
       ? await ctx.storage.getUrl(item.storageId)

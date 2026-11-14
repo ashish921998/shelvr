@@ -1,5 +1,4 @@
 // @vitest-environment edge-runtime
-/// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
 
 import { api } from "./_generated/api";
@@ -41,6 +40,32 @@ async function kyotoPhoto(backend: Backend) {
 }
 
 describe("setCityCover", () => {
+  it("shows the latest pick even when an older pick was not cleared", async () => {
+    const backend = newConvexTest();
+    const { userId, t } = await signedInUser(backend);
+    const temple = await readySave(
+      backend,
+      userId,
+      ["Kyoto"],
+      "https://cdn/temple.jpg",
+    );
+    const tea = await readySave(
+      backend,
+      userId,
+      ["Kyoto"],
+      "https://cdn/tea.jpg",
+    );
+    await backend.run(async (ctx) => {
+      await ctx.db.patch(tea, { coverFor: [{ key: "kyoto", at: 1 }] });
+      await ctx.db.patch(temple, { coverFor: [{ key: "kyoto", at: 2 }] });
+    });
+    const [kyoto] = await t.query(api.items.listCities, {});
+    expect(kyoto).toMatchObject({
+      cover: "https://cdn/temple.jpg",
+      coverItemId: temple,
+    });
+  });
+
   it("puts the picked save's photo on the city card over the city photo", async () => {
     const backend = newConvexTest();
     const { userId, t } = await signedInUser(backend);
@@ -90,7 +115,10 @@ describe("setCityCover", () => {
       on: true,
     });
     const rows = await backend.run((ctx) => ctx.db.query("items").collect());
-    expect(rows.map((row) => row.coverFor)).toEqual([undefined, ["kyoto"]]);
+    expect(rows.map((row) => row.coverFor?.map((pick) => pick.key))).toEqual([
+      undefined,
+      ["kyoto"],
+    ]);
     await t.mutation(api.cityCovers.setCityCover, {
       itemId: tea,
       city: "Kyoto",

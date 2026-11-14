@@ -121,7 +121,9 @@ export default defineSchema({
     longitude: v.optional(v.number()),
     placePins: v.optional(placePinsValidator),
     placesEdited: v.optional(v.boolean()),
-    coverFor: v.optional(v.array(v.string())),
+    coverFor: v.optional(
+      v.array(v.object({ key: v.string(), at: v.number() })),
+    ),
     isSticker: v.optional(v.boolean()),
     tags: v.array(v.string()),
     content: v.optional(v.string()),
