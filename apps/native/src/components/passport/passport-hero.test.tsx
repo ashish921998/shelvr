@@ -116,6 +116,11 @@ describe("PassportHero", () => {
     expect(screen.getByText("4 of 10 places")).toBeTruthy();
   });
 
+  it("reads the count as one plural phrase", () => {
+    hero([stamp("Franklin", "Austin", 1)]);
+    expect(screen.getByLabelText("1 place, 1 city · 1 country")).toBeTruthy();
+  });
+
   it("piles the two newest place stamps on the city stamp", () => {
     hero(AUSTIN, [{ city: "Austin", country: "USA" } as CityStamp]);
     expect(screen.getByTestId("place-Veracruz")).toBeTruthy();
@@ -138,6 +143,9 @@ describe("PassportHero", () => {
     cleanup();
     hero(AUSTIN);
     const next = screen.getByTestId("passport-hero-next");
-    expect((next as HTMLButtonElement).disabled).toBe(true);
+    expect(next.tagName).toBe("DIV");
+    expect(next.getAttribute("aria-label")).toBe(
+      "Next badge: Explorer, 4 of 10 places",
+    );
   });
 });

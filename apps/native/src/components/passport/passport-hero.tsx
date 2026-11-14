@@ -88,16 +88,9 @@ function NextBadge({
   const name = badgeName(next.badge.id);
   const progress = badgeProgress(next);
   const title = t("passport.heroNext", { badge: name });
-  return (
-    <Pressable
-      testID="passport-hero-next"
-      accessibilityRole={locked ? "button" : undefined}
-      accessibilityLabel={`${title}, ${progress}`}
-      accessibilityHint={locked ? t("badges.lockedHint") : undefined}
-      disabled={!locked}
-      onPress={onUnlock}
-      style={({ pressed }) => [styles.next, pressed && styles.pressed]}
-    >
+  const label = `${title}, ${progress}`;
+  const content = (
+    <>
       <View style={styles.nextLine}>
         <Text style={styles.nextEmoji}>{badgeEmoji(next.badge.id)}</Text>
         <Text style={styles.nextTitle} numberOfLines={1}>
@@ -118,6 +111,30 @@ function NextBadge({
           ]}
         />
       </View>
+    </>
+  );
+  if (!locked) {
+    return (
+      <View
+        testID="passport-hero-next"
+        accessible
+        accessibilityLabel={label}
+        style={styles.next}
+      >
+        {content}
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      testID="passport-hero-next"
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={t("badges.lockedHint")}
+      onPress={onUnlock}
+      style={({ pressed }) => [styles.next, pressed && styles.pressed]}
+    >
+      {content}
     </Pressable>
   );
 }
@@ -151,7 +168,7 @@ export function PassportHero({
         <View
           style={styles.counts}
           accessible
-          accessibilityLabel={`${counts.places} ${t("passport.heroStamped")}, ${where}`}
+          accessibilityLabel={`${t("passport.placesCount", { count: counts.places })}, ${where}`}
         >
           <Text style={styles.number}>{counts.places}</Text>
           <Text style={styles.label}>{t("passport.heroStamped")}</Text>
