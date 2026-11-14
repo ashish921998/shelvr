@@ -17,6 +17,8 @@ import {
   hasPending,
   subscribePendingOnboarding,
   getPendingOnboardingRevision,
+  noteReplayDeclined,
+  replayDeclined,
 } from "@/lib/pending-onboarding";
 import {
   getPurchaseBeforeSignInRevision,
@@ -24,7 +26,7 @@ import {
   subscribePurchaseBeforeSignIn,
 } from "@/lib/purchase-before-sign-in";
 import {
-  openPaywall,
+  openPaywallAnswer,
   useEntitlement,
   waitForSheetTransition,
 } from "@/lib/entitlement";
@@ -137,7 +139,9 @@ export function useReplayOnboarding(
         isAuthenticated && accountLoaded && onboarded && !entitlementLoading,
       entitled,
       paywallBlocked:
-        onboardingPaywall !== "unseen" || hasPurchaseBeforeSignIn(),
+        onboardingPaywall !== "unseen" ||
+        hasPurchaseBeforeSignIn() ||
+        replayDeclined(),
       readPending: () => {
         const demoOwner = getPendingDemoOwner();
         if (demoOwner !== null && demoOwner !== userId) clearLegacyDemoUrl();
@@ -163,8 +167,15 @@ export function useReplayOnboarding(
     const run = async () => {
       try {
         if (step.action === "sell") {
+          const askedFor = getPendingOperationId();
           await waitForSheetTransition();
-          purchased = await openPaywall(router, "onboarding");
+          const { outcome, answered } = await openPaywallAnswer(
+            router,
+            "onboarding",
+            { fallback: true },
+          );
+          purchased = outcome === "success";
+          if (outcome === "cancelled" && answered) noteReplayDeclined(askedFor);
           return;
         }
 

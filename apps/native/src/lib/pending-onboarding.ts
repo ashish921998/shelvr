@@ -26,6 +26,7 @@ export type PendingDemo = {
 
 type PendingRecord = {
   operationId: string;
+  declinedOperationId?: string | null;
   spaces: string[];
   demoUrl: string | null;
   demoSpace: string | null;
@@ -118,6 +119,10 @@ function readPendingRecord(): PendingRecord | null {
     }
     return {
       operationId: record.operationId,
+      declinedOperationId:
+        typeof record.declinedOperationId === "string"
+          ? record.declinedOperationId
+          : null,
       spaces,
       demoUrl: record.demoUrl === "" ? null : record.demoUrl,
       demoSpace:
@@ -193,6 +198,7 @@ export function setPendingSpaces(spaces: string[]) {
       : (existing?.operationId ?? createOperationId());
   writePendingRecord({
     operationId,
+    declinedOperationId: existing?.declinedOperationId ?? null,
     spaces,
     demoUrl: existing?.demoUrl ?? null,
     demoSpace: existing?.demoSpace ?? null,
@@ -290,6 +296,7 @@ export function setOnboardingProgress(
   const operationId = existing?.operationId ?? createOperationId();
   writePendingRecord({
     operationId,
+    declinedOperationId: existing?.declinedOperationId ?? null,
     spaces: progress.spaces,
     demoUrl: existing?.demoUrl ?? null,
     demoSpace: existing?.demoSpace ?? null,
@@ -301,6 +308,17 @@ export function setOnboardingProgress(
     ...answersOf(progress),
   });
   notifyChanged();
+}
+
+export function noteReplayDeclined(operationId: string | null) {
+  const record = readPendingRecord();
+  if (record === null || record.operationId !== operationId) return;
+  writePendingRecord({ ...record, declinedOperationId: operationId });
+}
+
+export function replayDeclined(): boolean {
+  const record = readPendingRecord();
+  return record !== null && record.declinedOperationId === record.operationId;
 }
 
 export function hasPending(): boolean {
