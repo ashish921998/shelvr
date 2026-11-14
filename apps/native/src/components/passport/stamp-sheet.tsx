@@ -13,14 +13,23 @@ export function StampArt({
   cover,
   ink,
   size = 168,
+  solid = false,
 }: {
   cover: string | null;
   ink: string;
   size?: number;
+  solid?: boolean;
 }) {
   const { theme } = useUnistyles();
   return (
-    <View style={[styles.stamp, { width: size, height: size }]}>
+    <View
+      testID={solid ? "stamp-art-solid" : undefined}
+      style={[
+        styles.stamp,
+        solid && styles.solid,
+        { width: size, height: size },
+      ]}
+    >
       {cover ? (
         <Image
           source={{ uri: cover }}
@@ -154,6 +163,7 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface,
     transform: [{ rotate: "-4deg" }],
   },
+  solid: { borderStyle: "solid" },
   cover: {
     flex: 1,
     borderRadius: theme.radius.sm,

@@ -190,6 +190,20 @@ describe("resetCurrentUser", () => {
       });
       return keepId;
     });
+    await backend.run(async (ctx) => {
+      await ctx.db.insert("cityStamps", {
+        userId,
+        city: "paris",
+        country: "FR",
+        stampedAt: 1,
+      });
+      await ctx.db.insert("cityStamps", {
+        userId: otherUserId,
+        city: "tokyo",
+        country: "JP",
+        stampedAt: 1,
+      });
+    });
 
     await expect(
       client.mutation(api.devFixtures.resetCurrentUser, {}),
@@ -197,8 +211,24 @@ describe("resetCurrentUser", () => {
     await expect(
       client.mutation(api.devFixtures.resetCurrentUser, {}),
     ).resolves.toEqual({ items: 7, spaces: 3, memberships: 4 });
+    await expect(
+      client.query(api.cityStamps.listCityStamps, {}),
+    ).resolves.toEqual([
+      expect.objectContaining({ city: "austin", country: "US" }),
+      expect.objectContaining({ city: "lisbon", country: "PT" }),
+      expect.objectContaining({ city: "madrid", country: "ES" }),
+    ]);
 
     await backend.run(async (ctx) => {
+      const stampsOf = async (id: typeof userId) =>
+        (
+          await ctx.db
+            .query("cityStamps")
+            .withIndex("by_user_and_city", (q) => q.eq("userId", id))
+            .collect()
+        ).map((row) => row.city);
+      expect(await stampsOf(userId)).toEqual(["austin", "lisbon", "madrid"]);
+      expect(await stampsOf(otherUserId)).toEqual(["tokyo"]);
       const items = await ctx.db
         .query("items")
         .withIndex("by_user", (q) => q.eq("userId", userId))

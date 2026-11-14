@@ -1,6 +1,5 @@
 import { CityCover, type CoverLayout } from "@/components/city/city-cover";
 import { PlanCitySheet } from "@/components/home/plan-city-sheet";
-import { PassportRow } from "@/components/passport/passport-row";
 import { AppSymbolIcon } from "@/components/symbol";
 import { type CityPlanKind, useCityPlan } from "@/lib/city-plan";
 import { canBrowse } from "@/lib/access";
@@ -277,21 +276,18 @@ export function HomePlacesEmptyCard() {
   const router = useRouter();
   const { guard } = useSaveGuard("home");
   return (
-    <>
-      <PassportRow hideEmpty />
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>{t("homePlaces.emptyTitle")}</Text>
-        <Text style={styles.muted}>{t("homePlaces.emptyBody")}</Text>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("homePlaces.addSpot")}
-          onPress={() => void guard(() => router.push("/add"))}
-          style={({ pressed }) => [styles.button, pressed && styles.pressed]}
-        >
-          <Text style={styles.buttonLabel}>{t("homePlaces.addSpot")}</Text>
-        </Pressable>
-      </View>
-    </>
+    <View style={styles.card}>
+      <Text style={styles.cardTitle}>{t("homePlaces.emptyTitle")}</Text>
+      <Text style={styles.muted}>{t("homePlaces.emptyBody")}</Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("homePlaces.addSpot")}
+        onPress={() => void guard(() => router.push("/add"))}
+        style={({ pressed }) => [styles.button, pressed && styles.pressed]}
+      >
+        <Text style={styles.buttonLabel}>{t("homePlaces.addSpot")}</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -316,7 +312,6 @@ export function HomePlaces() {
         cities={plannableCities(cities.data)}
         pro={access.kind === "pro"}
       />
-      <PassportRow />
       <CityGrid cities={cities.data} />
     </View>
   );

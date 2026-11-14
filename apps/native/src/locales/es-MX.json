@@ -1147,13 +1147,18 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "Imagen de la publicación que guardaste",
   "passport.removeStamp": "Quitar sello",
+  "passport.momentStamped": "%{name} sellado",
+  "passport.momentFirstInCity": "Primer sello en %{city}",
+  "passport.momentBulk": {
+    "one": "%{formattedCount} lugar sellado",
+    "many": "%{formattedCount} lugares sellados",
+    "other": "%{formattedCount} lugares sellados"
+  },
   "passport.wantToGo": "Quiero ir",
   "passport.title": "Pasaporte",
-  "passport.yourPassport": "Tu pasaporte",
   "passport.beenTitle": "¿Ya fuiste a alguno?",
   "passport.beenBody": "Sella los lugares a los que ya fuiste",
   "passport.beenSomewhere": "¿Ya fuiste a algún lugar?",
-  "passport.rowCities": "%{places} · %{cities}",
   "passport.placesCount": {
     "one": "%{formattedCount} lugar",
     "many": "%{formattedCount} lugares",
@@ -1164,6 +1169,14 @@
     "many": "%{formattedCount} ciudades",
     "other": "%{formattedCount} ciudades"
   },
+  "passport.countriesCount": {
+    "one": "%{formattedCount} país",
+    "many": "%{formattedCount} países",
+    "other": "%{formattedCount} países"
+  },
+  "passport.heroStamped": "Lugares sellados",
+  "passport.heroWhere": "%{cities} · %{countries}",
+  "passport.heroNext": "Próxima insignia: %{badge}",
   "passport.places": "Lugares",
   "passport.cities": "Ciudades",
   "passport.countries": "Países",
@@ -1195,6 +1208,144 @@
   "passport.cardSavedElsewhere": "Guardado para después.",
   "passport.cardWent": "Fuimos con Shelvr.",
   "passport.shareCity": "Compartir %{city}",
+  "passport.momentCityComplete": "Completaste %{city}",
+  "passport.ringCount": "%{visited} de %{total}",
+  "passport.ringLabel": {
+    "one": "%{visited} de %{formattedCount} lugar sellado en %{city}",
+    "many": "%{visited} de %{formattedCount} lugares sellados en %{city}",
+    "other": "%{visited} de %{formattedCount} lugares sellados en %{city}"
+  },
+  "passport.ringLocked": {
+    "one": "%{formattedCount} lugar guardado en %{city}",
+    "many": "%{formattedCount} lugares guardados en %{city}",
+    "other": "%{formattedCount} lugares guardados en %{city}"
+  },
+  "passport.ringHint": "Muestra los lugares que faltan por sellar",
+  "passport.ringLockedHint": "Sella lugares con Shelvr Pro",
+  "passport.notStampedYet": "Guardados, aún sin sellar",
+  "passport.nextTitle": "Por sellar",
+  "passport.nextBody": {
+    "one": "Falta por sellar %{formattedCount} lugar en %{city}",
+    "many": "Faltan por sellar %{formattedCount} lugares en %{city}",
+    "other": "Faltan por sellar %{formattedCount} lugares en %{city}"
+  },
+  "passport.cityAllStamped": "Todos los lugares que guardaste en %{city} están sellados.",
+  "passport.nextEmpty": "No hay lugares para mostrar en %{city} por ahora.",
+  "passport.stampPlace": "Sellar",
+  "passport.stampPlaceLabel": "Sellar %{name}",
+  "badges.title": "Logros",
+  "badges.earned": "Insignia conseguida",
+  "badges.unlocked": "Insignia %{badge} conseguida",
+  "badges.moreEarned": {
+    "one": "Y %{formattedCount} insignia más",
+    "many": "Y %{formattedCount} insignias más",
+    "other": "Y %{formattedCount} insignias más"
+  },
+  "badges.shareMessage": "Conseguí la insignia %{badge} en mi pasaporte de Shelvr.",
+  "badges.shareHint": "Comparte esta insignia",
+  "badges.lockedHint": "Consigue insignias con Shelvr Pro",
+  "badges.firstStamp": "Primer sello",
+  "badges.explorer": "Explorador",
+  "badges.wanderer": "Andariego",
+  "badges.globetrotter": "Trotamundos",
+  "badges.cityHopper": "De ciudad en ciudad",
+  "badges.passportHolder": "Pasaporte en mano",
+  "badges.completionist": "Completista",
+  "badges.coffeeCrawler": "Ruta del café",
+  "badges.foodie": "Sibarita",
+  "badges.sweetTooth": "Goloso",
+  "badges.nightOwl": "Noctámbulo",
+  "badges.outAndAbout": "De paseo",
+  "badges.goalPlaces": {
+    "one": "%{formattedCount} lugar sellado",
+    "many": "%{formattedCount} lugares sellados",
+    "other": "%{formattedCount} lugares sellados"
+  },
+  "badges.goalCities": {
+    "one": "%{formattedCount} ciudad sellada",
+    "many": "%{formattedCount} ciudades selladas",
+    "other": "%{formattedCount} ciudades selladas"
+  },
+  "badges.goalCountries": {
+    "one": "%{formattedCount} país sellado",
+    "many": "%{formattedCount} países sellados",
+    "other": "%{formattedCount} países sellados"
+  },
+  "badges.goalCompleteCities": {
+    "one": "%{formattedCount} ciudad completa",
+    "many": "%{formattedCount} ciudades completas",
+    "other": "%{formattedCount} ciudades completas"
+  },
+  "badges.goalCoffee": {
+    "one": "%{formattedCount} café sellado",
+    "many": "%{formattedCount} cafés sellados",
+    "other": "%{formattedCount} cafés sellados"
+  },
+  "badges.goalFood": {
+    "one": "%{formattedCount} restaurante sellado",
+    "many": "%{formattedCount} restaurantes sellados",
+    "other": "%{formattedCount} restaurantes sellados"
+  },
+  "badges.goalDessert": {
+    "one": "%{formattedCount} sitio de postres sellado",
+    "many": "%{formattedCount} sitios de postres sellados",
+    "other": "%{formattedCount} sitios de postres sellados"
+  },
+  "badges.goalDrinks": {
+    "one": "%{formattedCount} bar sellado",
+    "many": "%{formattedCount} bares sellados",
+    "other": "%{formattedCount} bares sellados"
+  },
+  "badges.goalActivities": {
+    "one": "%{formattedCount} actividad sellada",
+    "many": "%{formattedCount} actividades selladas",
+    "other": "%{formattedCount} actividades selladas"
+  },
+  "badges.progressPlaces": {
+    "one": "%{visited} de %{formattedCount} lugar",
+    "many": "%{visited} de %{formattedCount} lugares",
+    "other": "%{visited} de %{formattedCount} lugares"
+  },
+  "badges.progressCities": {
+    "one": "%{visited} de %{formattedCount} ciudad",
+    "many": "%{visited} de %{formattedCount} ciudades",
+    "other": "%{visited} de %{formattedCount} ciudades"
+  },
+  "badges.progressCountries": {
+    "one": "%{visited} de %{formattedCount} país",
+    "many": "%{visited} de %{formattedCount} países",
+    "other": "%{visited} de %{formattedCount} países"
+  },
+  "badges.progressCompleteCities": {
+    "one": "%{visited} de %{formattedCount} ciudad completa",
+    "many": "%{visited} de %{formattedCount} ciudades completas",
+    "other": "%{visited} de %{formattedCount} ciudades completas"
+  },
+  "badges.progressCoffee": {
+    "one": "%{visited} de %{formattedCount} café",
+    "many": "%{visited} de %{formattedCount} cafés",
+    "other": "%{visited} de %{formattedCount} cafés"
+  },
+  "badges.progressFood": {
+    "one": "%{visited} de %{formattedCount} restaurante",
+    "many": "%{visited} de %{formattedCount} restaurantes",
+    "other": "%{visited} de %{formattedCount} restaurantes"
+  },
+  "badges.progressDessert": {
+    "one": "%{visited} de %{formattedCount} sitio de postres",
+    "many": "%{visited} de %{formattedCount} sitios de postres",
+    "other": "%{visited} de %{formattedCount} sitios de postres"
+  },
+  "badges.progressDrinks": {
+    "one": "%{visited} de %{formattedCount} bar",
+    "many": "%{visited} de %{formattedCount} bares",
+    "other": "%{visited} de %{formattedCount} bares"
+  },
+  "badges.progressActivities": {
+    "one": "%{visited} de %{formattedCount} actividad",
+    "many": "%{visited} de %{formattedCount} actividades",
+    "other": "%{visited} de %{formattedCount} actividades"
+  },
   "passportShare.share": "Compartir pasaporte",
   "passportShare.stopSetting": "Dejar de compartir mi pasaporte",
   "passportShare.stopTitle": "¿Dejar de compartir tu pasaporte?",
@@ -1267,5 +1418,24 @@
   "onboardingCarousel.eat": "Se acabó el «¿dónde\ncomemos?»",
   "onboardingCarousel.map": "Cada lugar que guardaste,\nen un solo mapa.",
   "onboardingCarousel.next": "Siguiente diapositiva",
-  "sharedLists.nameBodyWelcome": "Las personas de tus listas compartidas lo ven, y también cualquiera con un enlace a un contenido que compartas o a una lista que te pertenezca."
+  "sharedLists.nameBodyWelcome": "Las personas de tus listas compartidas lo ven, y también cualquiera con un enlace a un contenido que compartas o a una lista que te pertenezca.",
+  "cityStamps.add": "He estado en…",
+  "cityStamps.title": "Ciudades que has visitado",
+  "cityStamps.body": "Toca una ciudad que has visitado y tendrá un sello en tu pasaporte. Vuelve a tocarla para quitarlo.",
+  "cityStamps.noMatch": "Todavía no tenemos esa ciudad.",
+  "cityStamps.label": "%{city}, sello de ciudad",
+  "cityStamps.removeHint": "Quita el sello de tu pasaporte",
+  "cityStamps.removeTitle": "¿Quitar %{city} de tu pasaporte?",
+  "cityStamps.remove": "Quitar sello",
+  "cityStamps.lockedHint": "Sella ciudades con Shelvr Pro",
+  "cityStamps.saveFailed": "No se pudieron actualizar tus ciudades",
+  "cityStamps.rateLimited": "Demasiados cambios de ciudades. Inténtalo de nuevo en unos minutos.",
+  "cityStamps.onboardingTitle": "¿Dónde has estado?",
+  "cityStamps.onboardingBody": "Toca las ciudades que has visitado. Cada una será un sello en tu pasaporte.",
+  "passport.momentCityStamp": "Has estado en %{city}",
+  "passport.paywallHeadline": {
+    "one": "Tu pasaporte tiene %{formattedCount} ciudad",
+    "many": "Tu pasaporte tiene %{formattedCount} ciudades",
+    "other": "Tu pasaporte tiene %{formattedCount} ciudades"
+  }
 }

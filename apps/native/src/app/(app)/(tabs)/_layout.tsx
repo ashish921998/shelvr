@@ -41,6 +41,15 @@ export default function TabsLayout() {
           {t("navigation.trips")}
         </NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="(passport)">
+        <NativeTabs.Trigger.Icon
+          sf={{ default: "book.closed", selected: "book.closed.fill" }}
+          md="menu_book"
+        />
+        <NativeTabs.Trigger.Label>
+          {t("passport.title")}
+        </NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }

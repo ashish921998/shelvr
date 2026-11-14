@@ -56,6 +56,7 @@ describe("onboarding recovery", () => {
       step: 2,
       viewed: [],
       travelCity: null,
+      beenCities: [],
       goals: [],
       savedCount: null,
       skippedShare: false,
@@ -162,6 +163,40 @@ describe("the sample trip's city", () => {
   });
 });
 
+describe("the cities they have been to", () => {
+  it("are kept with the progress beside the steps viewed", () => {
+    setOnboardingProgress({
+      spaces: [],
+      step: 5,
+      beenCities: ["lisbon", "madrid"],
+      viewed: ["opener", "been"],
+    });
+    expect(getOnboardingProgress()).toMatchObject({
+      beenCities: ["lisbon", "madrid"],
+      viewed: ["opener", "been"],
+    });
+  });
+
+  it("read back once each, in the list's order, without unknown cities", () => {
+    setOnboardingProgress({ spaces: [], step: 5 });
+    const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({
+        ...stored,
+        beenCities: ["madrid", "lisbon", "atlantis", "lisbon"],
+      }),
+    );
+    expect(getOnboardingProgress().beenCities).toEqual(["lisbon", "madrid"]);
+  });
+
+  it("survive the hand-off to the replay", () => {
+    setOnboardingProgress({ spaces: [], step: 5, beenCities: ["tokyo"] });
+    setPendingSpaces(["Date nights"]);
+    expect(getOnboardingProgress().beenCities).toEqual(["tokyo"]);
+  });
+});
+
 describe("a first save queued before sign-in", () => {
   it("waits for the replay and survives finishing onboarding", () => {
     queueDemoUrl("https://example.com/recipe");
@@ -200,6 +235,7 @@ describe("progress written by an older onboarding flow", () => {
     step: null,
     viewed: [],
     travelCity: null,
+    beenCities: [],
     goals: [],
     savedCount: null,
     skippedShare: false,
@@ -238,6 +274,7 @@ describe("progress written by an older onboarding flow", () => {
     ["the flow that had the sample plan step", { progressVersion: 10 }],
     ["the flow with the chart and commitment", { progressVersion: 11 }],
     ["the flow with the trip and planner questions", { progressVersion: 12 }],
+    ["the flow before the been step", { progressVersion: 13 }],
     ["a non-numeric version", { progressVersion: "2" }],
   ])("restarts a record with %s", (_name, version) => {
     storage.set(
@@ -262,7 +299,7 @@ describe("progress written by an older onboarding flow", () => {
         operationId: "op",
         spaces: ["Travel"],
         demoUrl: null,
-        progressVersion: 13,
+        progressVersion: 14,
         step: 2,
         spaceNames: {},
       }),
@@ -272,6 +309,7 @@ describe("progress written by an older onboarding flow", () => {
       step: 2,
       viewed: [],
       travelCity: null,
+      beenCities: [],
       goals: [],
       savedCount: null,
       skippedShare: false,
@@ -295,6 +333,7 @@ describe("progress written by an older onboarding flow", () => {
       step: 0,
       viewed: [],
       travelCity: null,
+      beenCities: [],
       goals: [],
       savedCount: null,
       skippedShare: false,

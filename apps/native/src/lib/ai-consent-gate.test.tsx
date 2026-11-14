@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   entitlement: { entitled: true, loading: false },
   replay: vi.fn(),
   resumeShare: vi.fn(),
+  syncCityStamps: vi.fn(),
   awaitingPurchase: false,
   authLoading: false,
   freeSaves: null as null | {
@@ -32,6 +33,9 @@ vi.mock("@/lib/replay-onboarding", () => ({
 }));
 vi.mock("@/lib/queued-first-save", () => ({
   useQueuedFirstSave: vi.fn(),
+}));
+vi.mock("@/lib/pending-city-stamps", () => ({
+  useSyncPendingCityStamps: mocks.syncCityStamps,
 }));
 vi.mock("@/lib/share/use-resume-pending-share", () => ({
   useResumePendingShare: mocks.resumeShare,
@@ -98,6 +102,11 @@ vi.mock("@/lib/home-feed", () => ({
 vi.mock("@/components/home/unplaced-toast", () => ({
   UnplacedToast: vi.fn(() => null),
 }));
+vi.mock("@/components/passport/stamp-moment", () => ({
+  StampMomentProvider: vi.fn(
+    ({ children }: { children: ReactNode }) => children,
+  ),
+}));
 vi.mock("@/components/plan-loading-cover", () => ({
   PlanLoadingCover: vi.fn(() => <div>plan-loading-cover</div>),
 }));
@@ -144,6 +153,7 @@ it.each(["unset", "loading", "granted", "declined"])(
     expect(shows("consent-card")).toBe(false);
     expect(mocks.replay).toHaveBeenCalled();
     expect(mocks.resumeShare).toHaveBeenCalled();
+    expect(mocks.syncCityStamps).toHaveBeenCalled();
   },
 );
 
@@ -159,6 +169,7 @@ describe("plan gate", () => {
     expect(shows("screen:(tabs)")).toBe(false);
     expect(shows("screen:add")).toBe(false);
     expect(shows("screen:item/[id]")).toBe(false);
+    expect(shows("screen:city-stamps")).toBe(false);
     expect(shows("screen:profile")).toBe(true);
     expect(shows("screen:settings")).toBe(true);
     expect(shows("screen:paywall")).toBe(true);
@@ -170,6 +181,7 @@ describe("plan gate", () => {
     const view = render(<AppLayout />);
     expect(shows("screen:(tabs)")).toBe(true);
     expect(shows("screen:add")).toBe(true);
+    expect(shows("screen:city-stamps")).toBe(true);
     expect(shows("screen:plan-gate")).toBe(false);
     expect(mocks.resumeShare).toHaveBeenLastCalledWith(false);
 

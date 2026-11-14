@@ -1,0 +1,262 @@
+// @vitest-environment jsdom
+import { act, renderHook } from "@testing-library/react";
+import { getFunctionName } from "convex/server";
+import { ConvexError } from "convex/values";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import {
+  applyCityStampChange,
+  useCityStampAccess,
+  useCityStampToggle,
+  useRemoveCityStamp,
+} from "@/lib/city-stamps";
+
+const mocks = vi.hoisted(() => ({
+  add: vi.fn(),
+  remove: vi.fn(),
+  openPaywall: vi.fn(),
+  guard: vi.fn(),
+  entitlement: { entitled: false, loading: false },
+  alert: vi.fn(),
+  capture: vi.fn(),
+  captureError: vi.fn(),
+  play: vi.fn(),
+  optimistic: vi.fn(),
+  router: { push: vi.fn() },
+  focused: true,
+}));
+
+vi.mock("convex/react", () => ({
+  useMutation: (ref: Parameters<typeof getFunctionName>[0]) => {
+    const name = getFunctionName(ref);
+    const run = name.endsWith("addCityStamp") ? mocks.add : mocks.remove;
+    return Object.assign((args: unknown) => run(args), {
+      withOptimisticUpdate: (update: unknown) => {
+        mocks.optimistic(name, update);
+        return run;
+      },
+    });
+  },
+}));
+vi.mock("expo-router", () => ({
+  useRouter: () => mocks.router,
+  useNavigation: () => ({ isFocused: () => mocks.focused }),
+}));
+vi.mock("@/lib/entitlement", () => ({
+  openPaywall: mocks.openPaywall,
+  useEntitlement: () => mocks.entitlement,
+  usePaywallGuard: () => ({ guard: mocks.guard }),
+}));
+vi.mock("@/lib/analytics", () => ({
+  analytics: { capture: mocks.capture, captureError: mocks.captureError },
+}));
+vi.mock("@/lib/stamp-moment", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/stamp-moment")>()),
+  useStampMoment: () => ({ play: mocks.play }),
+}));
+vi.mock("@/lib/city-stamp-data", () => ({
+  cityStampLabel: (city: string) => `label:${city}`,
+}));
+vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
+vi.mock("react-native", () => ({ Alert: { alert: mocks.alert } }));
+
+function toggle(city: "lisbon" | "tokyo", stamped: boolean) {
+  const { result } = renderHook(() => useCityStampToggle());
+  return act(() =>
+    result.current(
+      city,
+      stamped,
+      stamped ? ["paris", "rome"] : ["paris", city],
+    ),
+  );
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.add.mockResolvedValue(true);
+  mocks.remove.mockResolvedValue(true);
+  mocks.entitlement = { entitled: false, loading: false };
+  mocks.focused = true;
+});
+
+describe("useCityStampToggle", () => {
+  it("plays the stamp moment when a city is stamped", async () => {
+    expect(await toggle("lisbon", true)).toBe(true);
+    expect(mocks.add).toHaveBeenCalledWith({ city: "lisbon" });
+    expect(mocks.play).toHaveBeenCalledWith(
+      { kind: "city", city: "label:lisbon" },
+      "city_stamps",
+    );
+    expect(mocks.capture).toHaveBeenCalledWith("passport_city_stamp_changed", {
+      stamped: true,
+      count: 3,
+    });
+  });
+
+  it("waits for the server before the stamp moves any count", async () => {
+    let finish: (added: boolean) => void = () => {};
+    mocks.add.mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useCityStampToggle());
+    let pending: Promise<boolean> = Promise.resolve(false);
+    act(() => {
+      pending = result.current("tokyo", true, ["paris", "rome"]);
+    });
+    expect(mocks.optimistic).not.toHaveBeenCalledWith(
+      expect.stringContaining("addCityStamp"),
+      expect.anything(),
+    );
+    expect(mocks.play).not.toHaveBeenCalled();
+    await act(async () => {
+      finish(true);
+      await pending;
+    });
+    expect(mocks.play).toHaveBeenCalledTimes(1);
+  });
+
+  it("counts every stamp still saving when two cities are tapped quickly", async () => {
+    const finishes: ((added: boolean) => void)[] = [];
+    mocks.add.mockImplementation(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finishes.push(resolve);
+        }),
+    );
+    const { result } = renderHook(() => useCityStampToggle());
+    let first: Promise<boolean> = Promise.resolve(false);
+    let second: Promise<boolean> = Promise.resolve(false);
+    act(() => {
+      first = result.current("lisbon", true, []);
+      second = result.current("tokyo", true, []);
+    });
+    await act(async () => {
+      for (const finish of finishes) finish(true);
+      await Promise.all([first, second]);
+    });
+    expect(mocks.capture.mock.calls).toEqual([
+      ["passport_city_stamp_changed", { stamped: true, count: 1 }],
+      ["passport_city_stamp_changed", { stamped: true, count: 2 }],
+    ]);
+  });
+
+  it("saves but plays nothing when the person left the grid before the save landed", async () => {
+    let finish: (added: boolean) => void = () => {};
+    mocks.add.mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useCityStampToggle());
+    let pending: Promise<boolean> = Promise.resolve(false);
+    act(() => {
+      pending = result.current("tokyo", true, ["paris", "rome"]);
+    });
+    mocks.focused = false;
+    await act(async () => {
+      finish(true);
+      await pending;
+    });
+    expect(mocks.play).not.toHaveBeenCalled();
+    expect(mocks.capture).toHaveBeenCalledWith("passport_city_stamp_changed", {
+      stamped: true,
+      count: 3,
+    });
+  });
+
+  it("plays nothing when the city was already stamped", async () => {
+    mocks.add.mockResolvedValue(false);
+    expect(await toggle("lisbon", true)).toBe(true);
+    expect(mocks.play).not.toHaveBeenCalled();
+  });
+
+  it("plays nothing when a city stamp is removed", async () => {
+    expect(await toggle("tokyo", false)).toBe(true);
+    expect(mocks.remove).toHaveBeenCalledWith({ city: "tokyo" });
+    expect(mocks.add).not.toHaveBeenCalled();
+    expect(mocks.play).not.toHaveBeenCalled();
+  });
+
+  it("opens the paywall when the server says Pro is needed", async () => {
+    mocks.add.mockRejectedValue(
+      new ConvexError({ code: "pro_required", message: "Pro required" }),
+    );
+    expect(await toggle("lisbon", true)).toBe(false);
+    expect(mocks.openPaywall).toHaveBeenCalledWith(mocks.router, "passport");
+    expect(mocks.play).not.toHaveBeenCalled();
+    expect(mocks.captureError).not.toHaveBeenCalled();
+  });
+
+  it("reports any other failure and says so", async () => {
+    mocks.add.mockRejectedValue(new Error("offline"));
+    expect(await toggle("lisbon", true)).toBe(false);
+    expect(mocks.captureError).toHaveBeenCalledWith(
+      "city_stamp_update_failed",
+      expect.any(Error),
+    );
+    expect(mocks.alert).toHaveBeenCalledWith(
+      "cityStamps.saveFailed",
+      "errors.connection",
+    );
+  });
+});
+
+describe("useRemoveCityStamp", () => {
+  it("removes the city stamp only once confirmed, with no moment", async () => {
+    const { result } = renderHook(() => useRemoveCityStamp());
+    result.current("lisbon", 0);
+    expect(mocks.remove).not.toHaveBeenCalled();
+    const buttons = mocks.alert.mock.calls[0][2] as {
+      style: string;
+      onPress?: () => void;
+    }[];
+    await act(async () => {
+      buttons.find((button) => button.style === "destructive")?.onPress?.();
+    });
+    expect(mocks.remove).toHaveBeenCalledWith({ city: "lisbon" });
+    expect(mocks.play).not.toHaveBeenCalled();
+    expect(mocks.capture).toHaveBeenCalledWith("passport_city_stamp_changed", {
+      stamped: false,
+      count: 0,
+    });
+  });
+});
+
+describe("useCityStampAccess", () => {
+  it("sends a free user to the paywall from the passport", () => {
+    const { result } = renderHook(() => useCityStampAccess(2));
+    expect(result.current.locked).toBe(true);
+    result.current.open();
+    expect(mocks.capture).toHaveBeenCalledWith("passport_paywall_opened", {
+      surface: "city_stamp",
+    });
+    expect(mocks.guard).toHaveBeenCalled();
+    expect(mocks.router.push).not.toHaveBeenCalled();
+  });
+
+  it("opens the city grid for Pro", () => {
+    mocks.entitlement = { entitled: true, loading: false };
+    const { result } = renderHook(() => useCityStampAccess(2));
+    expect(result.current.locked).toBe(false);
+    result.current.open();
+    expect(mocks.capture).toHaveBeenCalledWith("passport_city_stamps_opened", {
+      count: 2,
+    });
+    expect(mocks.router.push).toHaveBeenCalledWith("/city-stamps");
+    expect(mocks.guard).not.toHaveBeenCalled();
+  });
+});
+
+describe("applyCityStampChange", () => {
+  it("adds a known city in order and removes one", () => {
+    const tokyo = { city: "tokyo", country: "JP", stampedAt: 1 };
+    expect(applyCityStampChange([tokyo], "lisbon", true, 9)).toEqual([
+      { city: "lisbon", country: "PT", stampedAt: 9 },
+      tokyo,
+    ]);
+    expect(applyCityStampChange([tokyo], "tokyo", false, 9)).toEqual([]);
+    expect(applyCityStampChange([tokyo], "atlantis", true, 9)).toEqual([tokyo]);
+  });
+});
