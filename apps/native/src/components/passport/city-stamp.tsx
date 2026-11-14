@@ -43,11 +43,14 @@ export function CityStampArt({
           numberOfLines={2}
           adjustsFontSizeToFit
           minimumFontScale={0.6}
+          maxFontSizeMultiplier={1}
         >
           {name}
         </Text>
         {country && !small ? (
-          <Text style={styles.country}>{country}</Text>
+          <Text style={styles.country} maxFontSizeMultiplier={1}>
+            {country}
+          </Text>
         ) : null}
       </View>
     </View>
