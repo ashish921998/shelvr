@@ -241,6 +241,10 @@ describe("useShareBadge", () => {
     expect(mocks.share).toHaveBeenCalledWith({
       message: "I earned the Explorer badge on my Shelvr passport.",
     });
+    expect(mocks.captureError).toHaveBeenCalledWith(
+      "passport_badge_link_failed",
+      expect.any(Error),
+    );
   });
 
   it("reports a failed share", async () => {
