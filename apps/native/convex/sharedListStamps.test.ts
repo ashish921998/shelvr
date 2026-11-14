@@ -151,6 +151,7 @@ describe("Went on a shared list", () => {
     const rows = await visitRows(base, owner.userId);
     expect(rows).toHaveLength(1);
     expect(rows[0]?.itemId).toBe(place.itemId);
+    expect(rows[0]?.spots).toEqual([]);
   });
 
   it("can be taken out of the Passport without touching the list", async () => {

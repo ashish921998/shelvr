@@ -305,7 +305,7 @@ async function unstampListPlace(
     return;
   }
   await ctx.db.patch(row._id, {
-    spots: remaining.length === 0 ? undefined : remaining,
+    spots: remaining,
     stampPlaces: row.stampPlaces?.filter((entry) => !fromList(entry)),
   });
 }
