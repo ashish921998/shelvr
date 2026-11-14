@@ -11,7 +11,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-export type RingCount = { stamped: number; total: number };
+type RingCount = { stamped: number; total: number };
 
 export function ringShare({ stamped, total }: RingCount): number {
   if (total <= 0) return 0;
