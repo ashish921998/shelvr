@@ -1,46 +1,43 @@
+import { analytics } from "@/lib/analytics";
+import { useSheetTurn } from "@/lib/one-time-sheets";
 import { useMyFirstName } from "@/lib/shared-lists";
-import { whenSheetSettled } from "@/lib/entitlement";
-import { whenTrialPrimerDone } from "@/lib/trial-reminder";
 import { welcomeName } from "@/lib/welcome-save";
 import { useIsFocused } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 export function useWelcomeName(
   userId: string | undefined,
   ready: boolean,
-): { open: boolean; holding: boolean; close: () => void } {
+): { open: boolean; pending: boolean; close: () => void } {
   const pending = welcomeName.usePending(userId);
-  const { firstName, failed } = useMyFirstName();
+  const { firstName, failed, error } = useMyFirstName();
   const focused = useIsFocused();
-  const [open, setOpen] = useState(false);
-  const started = useRef<string | null>(null);
+  const [asked, setAsked] = useState<{ userId: string; open: boolean } | null>(
+    null,
+  );
+  const askedHere = asked !== null && asked.userId === userId;
+  const open = asked !== null && askedHere && asked.open;
+  const due = pending && ready && focused;
   useEffect(() => {
-    if (
-      userId === undefined ||
-      started.current === userId ||
-      !pending ||
-      !ready ||
-      !focused ||
-      (firstName === undefined && !failed)
-    )
-      return;
-    started.current = userId;
-    if (firstName !== null) {
-      welcomeName.finish(userId);
-      return;
+    if (userId === undefined || !due || firstName === null) return;
+    if (firstName === undefined) {
+      if (!failed) return;
+      analytics.captureError("welcome_name_lookup_failed", error);
     }
-    let live = true;
-    void whenSheetSettled()
-      .then(whenTrialPrimerDone)
-      .then(() => {
-        if (!live) return;
-        welcomeName.finish(userId);
-        setOpen(true);
-      });
-    return () => {
-      live = false;
-      started.current = null;
-    };
-  }, [userId, pending, ready, focused, firstName, failed]);
-  return { open, holding: open || pending, close: () => setOpen(false) };
+    welcomeName.finish(userId);
+  }, [userId, due, firstName, failed, error]);
+  const turn = useSheetTurn(
+    "name",
+    (userId !== undefined && due && firstName === null && !askedHere) || open,
+  );
+  if (turn && userId !== undefined && !askedHere)
+    setAsked({ userId, open: true });
+  useEffect(() => {
+    if (open && userId !== undefined) welcomeName.finish(userId);
+  }, [open, userId]);
+  return {
+    open,
+    pending,
+    close: () => setAsked((current) => current && { ...current, open: false }),
+  };
 }

@@ -17,7 +17,7 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 import { HeaderScrim } from "@/components/ui/header-scrim";
 import { useCurrentUser } from "@/lib/current-user";
 import { type Entitlement, useEntitlement } from "@/lib/entitlement";
-import { type Access, FREE_SAVES_NUDGE_AT, saveWaiting } from "@/lib/access";
+import { FREE_SAVES_NUDGE_AT, saveWaiting } from "@/lib/access";
 import { useAccess } from "@/lib/free-plan";
 import { useHomeFeed } from "@/lib/home-feed";
 import { unplacedSaves } from "@/lib/home-places";
@@ -28,8 +28,12 @@ import {
 import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
 import { NameSheet } from "@/components/shared-list/name-sheet";
+import {
+  useHoldSheetTurns,
+  useSheetTurnUp,
+  useSheetTurnsBusy,
+} from "@/lib/one-time-sheets";
 import { useWelcomeName } from "@/lib/welcome-name";
-import { welcomeSave } from "@/lib/welcome-save";
 import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -46,18 +50,6 @@ const AUTO_LOAD_UNPLACED = 5;
 
 function trialEnd(entitlement: Entitlement): number | undefined {
   return entitlement.status === "trialing" ? entitlement.expiresAt : undefined;
-}
-
-function nameAskWaits(
-  entitlement: Entitlement,
-  access: Access,
-  letterPending: boolean,
-): boolean {
-  return (
-    entitlement.loading ||
-    saveWaiting(access) ||
-    (letterPending && entitlement.entitled)
-  );
 }
 
 export default function HomeScreen() {
@@ -89,20 +81,23 @@ export default function HomeScreen() {
   const nearLimit =
     access.kind === "free" && access.left <= FREE_SAVES_NUDGE_AT;
   const { data: user } = useCurrentUser();
-  const welcomePending = welcomeSave.usePending(user?._id);
   const welcomeName = useWelcomeName(
     user?._id,
     items !== undefined &&
       !cancelSurvey.visible &&
-      !nameAskWaits(entitlement, access, welcomePending),
+      !entitlement.loading &&
+      !saveWaiting(access),
   );
+  const sheetsBusy = useSheetTurnsBusy();
+  const sheetUp = useSheetTurnUp();
   const deferPrompts =
     cancelSurvey.visible ||
     entitlement.loading ||
     locked ||
-    welcomePending ||
-    welcomeName.holding;
+    sheetsBusy ||
+    welcomeName.pending;
   const feedback = useFeedbackInvitation(items, { defer: deferPrompts });
+  useHoldSheetTurns(feedback.modalOpen);
   useReviewPrompt(items, {
     defer: deferPrompts || feedback.invitationVisible || feedback.modalOpen,
   });
@@ -124,7 +119,7 @@ export default function HomeScreen() {
     <ProCard lapsed={entitlement.status === "lapsed"} />
   ) : nearLimit ? (
     <FreeSavesCard left={access.left} limit={access.limit} open={access.open} />
-  ) : feedback.invitationVisible && !busySaving ? (
+  ) : feedback.invitationVisible && !busySaving && !sheetUp ? (
     <FeedbackInvitation
       onSendFeedback={feedback.openFeedbackFromInvitation}
       onDismiss={feedback.dismissInvitation}
