@@ -87,12 +87,14 @@ export type StampMomentControls = {
   play: Play;
   queue: Play;
   release: () => void;
+  cancel: () => void;
 };
 
 const StampMomentContext = createContext<StampMomentControls>({
   play: () => {},
   queue: () => {},
   release: () => {},
+  cancel: () => {},
 });
 
 export const StampMomentPlayContext = StampMomentContext.Provider;
@@ -107,7 +109,7 @@ type TransitionListener = (
 ) => () => void;
 
 export function useStampMomentLanding(): void {
-  const { release } = useContext(StampMomentContext);
+  const { release, cancel } = useContext(StampMomentContext);
   const navigation = useNavigation() as unknown as {
     addListener: TransitionListener;
   };
@@ -120,8 +122,9 @@ export function useStampMomentLanding(): void {
       return () => {
         clearTimeout(settle);
         off();
+        cancel();
       };
-    }, [navigation, release]),
+    }, [navigation, release, cancel]),
   );
 }
 
@@ -207,8 +210,8 @@ export function useStampMomentPlayer(reduced: boolean): {
   }, [clearPending, play]);
 
   const controls = useMemo(
-    () => ({ play, queue, release }),
-    [play, queue, release],
+    () => ({ play, queue, release, cancel: clearPending }),
+    [play, queue, release, clearPending],
   );
   return { shown, controls, dismiss };
 }
