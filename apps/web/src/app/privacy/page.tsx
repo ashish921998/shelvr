@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMetadata(
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="November 6, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="November 14, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
@@ -104,9 +104,12 @@ export default function PrivacyPage() {
             random anonymous identifier in your browser’s local storage and send
             basic usage events (such as page views, store button clicks,
             waitlist form interactions, and the page URL) to PostHog before you
-            have an account. Website identifiers are not linked to your account
-            or to your saved content, and the website does not record sessions.
-            No analytics data is used for advertising.
+            have an account. We also keep a note in local storage of which
+            version of the site’s buttons your browser was shown, so it keeps
+            seeing the same one, and send it with those events to compare the
+            versions. Website identifiers are not linked to your account or to
+            your saved content, and the website does not record sessions. No
+            analytics data is used for advertising.
           </li>
           <li>
             <strong>On your device only.</strong> Widget data and Spotlight and
@@ -334,10 +337,10 @@ export default function PrivacyPage() {
           <strong>{SUPPORT_EMAIL}</strong> to request deletion of that data.
           Waitlist email addresses are kept until you ask us to remove them.
           Clearing your browser’s local storage only discards this browser’s
-          anonymous identifier: events already recorded remain, and the next
-          event starts a new identifier. Deleting your Shelvr account does not
-          cancel an App Store subscription; manage that in your Apple ID
-          settings.
+          anonymous identifier and button version: events already recorded
+          remain, and the next visit starts new ones. Deleting your Shelvr
+          account does not cancel an App Store subscription; manage that in your
+          Apple ID settings.
         </p>
         <p className="mt-3">
           Account deletion also requests that refund data sharing stop. A

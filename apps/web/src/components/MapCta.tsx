@@ -1,13 +1,16 @@
 "use client";
 
+import { useLayoutEffect } from "react";
+
 import { useAppStoreLink } from "@/lib/appStoreLink";
+import { ctaVariant } from "@/lib/ctaVariant";
 
 const BIG =
   "min-h-14 rounded-xl px-7 text-[17px] bg-ink text-paper shadow-[0_12px_28px_rgba(43,36,24,0.2)] hover:-translate-y-0.5 hover:bg-ember-deep focus-visible:outline-ember-deep";
 
 const LOOKS = {
   header:
-    "h-11 gap-1.5 rounded-full px-4 text-sm bg-ink text-paper hover:bg-ember-deep focus-visible:outline-ember-deep",
+    "h-11 gap-1.5 rounded-full px-3 min-[360px]:px-4 text-sm bg-ink text-paper hover:bg-ember-deep focus-visible:outline-ember-deep",
   hero: BIG,
   footer: BIG,
   place_tool:
@@ -29,6 +32,10 @@ export default function MapCta({ source }: { source: keyof typeof LOOKS }) {
   const { href, onClick } = useAppStoreLink(source);
   const label =
     source === "place_tool" ? "Save these to Shelvr" : "Map my saves";
+  useLayoutEffect(() => {
+    const variant = ctaVariant();
+    if (variant) document.documentElement.setAttribute("data-cta", variant);
+  }, []);
   return (
     <a
       href={href}
@@ -39,7 +46,12 @@ export default function MapCta({ source }: { source: keyof typeof LOOKS }) {
       className={`inline-flex shrink-0 items-center justify-center font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 ${LOOKS[source]}`}
     >
       {source === "header" ? APPLE_LOGO : null}
-      <span>{label}</span>
+      <span>
+        {label}
+        <span aria-hidden="true" className="cta-emoji">
+          {"\u00a0📍"}
+        </span>
+      </span>
     </a>
   );
 }

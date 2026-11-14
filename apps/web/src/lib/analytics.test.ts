@@ -40,6 +40,7 @@ describe("web analytics", () => {
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://us.i.posthog.com/");
     window.localStorage.clear();
     window.localStorage.setItem("shelvr_web_distinct_id", "browser-123");
+    document.documentElement.removeAttribute("data-cta");
     fetchMock.mockReset();
     fetchMock.mockResolvedValue(new Response(null, { status: 200 }));
   });
@@ -63,6 +64,28 @@ describe("web analytics", () => {
         source: "hero",
       },
     });
+  });
+
+  it("sends the browser's button variant with every event", () => {
+    window.localStorage.setItem("shelvr_cta_variant", "emoji");
+
+    captureWebAnalyticsEvent("app_store_clicked", { source: "hero" });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).properties).toMatchObject({
+      distinct_id: "browser-123",
+      source: "hero",
+      cta_variant: "emoji",
+    });
+  });
+
+  it("sends no button variant when the browser has none", () => {
+    captureWebAnalyticsEvent("app_store_clicked", { source: "hero" });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).properties).not.toHaveProperty(
+      "cta_variant",
+    );
   });
 
   it("sanitizes email addresses and URLs in exception events", () => {
