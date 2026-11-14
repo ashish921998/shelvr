@@ -38,7 +38,7 @@ export type StampPlace = {
   cover: string | null;
   cityVisited: number;
   cityTotal?: number;
-  cityStamps?: number;
+  cityStamps?: number | null;
 };
 
 type CityCount = { stamped: number; total: number };
@@ -180,15 +180,18 @@ function useBadgeQueue(reduced: boolean) {
         const kept = next.ids.filter((id) => !ids.includes(id));
         waiting.current = kept.length > 0 ? { ...next, ids: kept } : null;
       }
-      const [first, ...rest] = shownIds.current;
-      if (first === undefined) return;
-      if (ids.includes(first)) {
+      if (!shownIds.current.some((id) => ids.includes(id))) return;
+      const [first, ...more] = shownIds.current.filter(
+        (id) => !ids.includes(id),
+      );
+      if (first === undefined) {
         dismissBadge();
         return;
       }
-      const more = rest.filter((id) => !ids.includes(id));
       shownIds.current = [first, ...more];
-      setBadge((shown) => (shown ? { ...shown, more: more.length } : shown));
+      setBadge((shown) =>
+        shown ? { ...shown, badge: first, more: more.length } : shown,
+      );
     },
     [dismissBadge],
   );
