@@ -33,7 +33,7 @@ import { personalPlanAllowed } from "@/lib/list-gate";
 import type { Id } from "@convex/_generated/dataModel";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import { ScrollView, View } from "react-native";
+import { Platform, ScrollView, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 export default function NewTripScreen() {
@@ -208,6 +208,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: "center",
     gap: theme.gap(1),
     padding: theme.gap(1),
+    paddingTop: theme.gap(1) + (Platform.OS === "android" ? rt.insets.top : 0),
   },
   content: {
     gap: theme.gap(3),

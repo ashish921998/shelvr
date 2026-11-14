@@ -687,7 +687,7 @@ export function TripSetup({
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   grow: { flex: 1 },
   screen: { flex: 1, backgroundColor: theme.colors.background },
   toolbar: {
@@ -695,6 +695,7 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     gap: theme.gap(1),
     paddingHorizontal: theme.gap(1),
+    paddingTop: Platform.OS === "android" ? rt.insets.top : 0,
   },
   toolbarTitle: { flex: 1, paddingVertical: theme.gap(1) },
   content: {
