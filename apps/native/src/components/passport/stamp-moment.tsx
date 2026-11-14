@@ -175,9 +175,9 @@ function StampMomentView({
 
 export function StampMomentProvider({ children }: { children: ReactNode }) {
   const reduced = useReducedMotion();
-  const { shown, controls, dismiss, badge, dismissBadge, unlock } =
+  const { shown, controls, dismiss, badge, dismissBadge, unlock, revoke } =
     useStampMomentPlayer(reduced);
-  useBadgeUnlocks(unlock);
+  useBadgeUnlocks(unlock, revoke);
   return (
     <StampMomentPlayContext value={controls}>
       {children}

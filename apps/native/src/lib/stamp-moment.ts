@@ -38,6 +38,7 @@ export type StampPlace = {
   cover: string | null;
   cityVisited: number;
   cityTotal?: number;
+  cityStamps?: number;
 };
 
 type CityCount = { stamped: number; total: number };
@@ -108,12 +109,14 @@ function useBadgeQueue(reduced: boolean) {
   const stampBusy = useRef(false);
   const stampHeld = useRef(false);
   const showing = useRef<Timer | null>(null);
+  const shownIds = useRef<BadgeId[]>([]);
   const later = useTimers();
   const flushNext = useRef<() => void>(() => {});
 
   const dismissBadge = useCallback(() => {
     if (showing.current !== null) clearTimeout(showing.current);
     showing.current = null;
+    shownIds.current = [];
     setBadge(null);
     flushNext.current();
   }, []);
@@ -123,6 +126,7 @@ function useBadgeQueue(reduced: boolean) {
       const [first, ...rest] = ids;
       if (first === undefined) return;
       nextId.current += 1;
+      shownIds.current = [first, ...rest];
       setBadge({ id: nextId.current, badge: first, more: rest.length });
       for (const id of [first, ...rest]) {
         analytics.capture("passport_badge_unlocked", { badge: id });
@@ -169,6 +173,26 @@ function useBadgeQueue(reduced: boolean) {
     [flush, later],
   );
 
+  const revoke = useCallback(
+    (ids: readonly BadgeId[]) => {
+      const next = waiting.current;
+      if (next !== null) {
+        const kept = next.ids.filter((id) => !ids.includes(id));
+        waiting.current = kept.length > 0 ? { ...next, ids: kept } : null;
+      }
+      const [first, ...rest] = shownIds.current;
+      if (first === undefined) return;
+      if (ids.includes(first)) {
+        dismissBadge();
+        return;
+      }
+      const more = rest.filter((id) => !ids.includes(id));
+      shownIds.current = [first, ...more];
+      setBadge((shown) => (shown ? { ...shown, more: more.length } : shown));
+    },
+    [dismissBadge],
+  );
+
   const stampStarted = useCallback(() => {
     const now = Date.now();
     lastStampAt.current = now;
@@ -196,6 +220,7 @@ function useBadgeQueue(reduced: boolean) {
   return {
     badge,
     unlock,
+    revoke,
     dismissBadge,
     stampStarted,
     stampEnded,
@@ -217,14 +242,14 @@ export function cityStampPlace(
 
 export function placeStampMoment(
   name: string,
-  { city, cover, cityVisited, cityTotal }: StampPlace = NO_CITY,
+  { city, cover, cityVisited, cityTotal, cityStamps = 0 }: StampPlace = NO_CITY,
 ): StampMoment {
   return {
     kind: "place",
     name,
     city,
     cover,
-    firstInCity: cityVisited === 0,
+    firstInCity: cityVisited === 0 && cityStamps === 0,
     completedTotal: city && cityVisited + 1 === cityTotal ? cityTotal : null,
   };
 }
@@ -317,11 +342,13 @@ export function useStampMomentPlayer(reduced: boolean): {
   badge: ShownBadge | null;
   dismissBadge: () => void;
   unlock: (ids: readonly BadgeId[]) => void;
+  revoke: (ids: readonly BadgeId[]) => void;
 } {
   const [shown, setShown] = useState<ShownStamp | null>(null);
   const {
     badge,
     unlock,
+    revoke,
     dismissBadge,
     stampStarted,
     stampEnded,
@@ -420,5 +447,5 @@ export function useStampMomentPlayer(reduced: boolean): {
     () => ({ play, queue, release, cancel: dropPending }),
     [play, queue, release, dropPending],
   );
-  return { shown, controls, dismiss, badge, dismissBadge, unlock };
+  return { shown, controls, dismiss, badge, dismissBadge, unlock, revoke };
 }

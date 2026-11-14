@@ -14,7 +14,7 @@ import { isRateLimitedError } from "@convex/model/demoErrors";
 import { saveErrorCode } from "@convex/model/saveErrors";
 import type { OptimisticLocalStore } from "convex/browser";
 import { useMutation } from "convex/react";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 import { useCallback, useMemo, useRef } from "react";
 import { Alert } from "react-native";
 
@@ -69,6 +69,7 @@ export function useCityStampToggle(): (
   count: number,
 ) => Promise<boolean> {
   const router = useRouter();
+  const navigation = useNavigation();
   const mutations = useCityStampMutations();
   const { play } = useStampMoment();
   const working = useRef(new Set<string>());
@@ -79,7 +80,7 @@ export function useCityStampToggle(): (
       try {
         if (!stamped) {
           await mutations.remove(city);
-        } else if (await mutations.add(city)) {
+        } else if ((await mutations.add(city)) && navigation.isFocused()) {
           play(cityStampMoment(cityStampLabel(city)), "city_stamps");
         }
         analytics.capture("passport_city_stamp_changed", { stamped, count });
@@ -95,7 +96,7 @@ export function useCityStampToggle(): (
         working.current.delete(city);
       }
     },
-    [mutations, play, router],
+    [mutations, navigation, play, router],
   );
 }
 

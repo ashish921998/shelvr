@@ -23,6 +23,7 @@ const mocks = vi.hoisted(() => ({
   play: vi.fn(),
   optimistic: vi.fn(),
   router: { push: vi.fn() },
+  focused: true,
 }));
 
 vi.mock("convex/react", () => ({
@@ -37,7 +38,10 @@ vi.mock("convex/react", () => ({
     });
   },
 }));
-vi.mock("expo-router", () => ({ useRouter: () => mocks.router }));
+vi.mock("expo-router", () => ({
+  useRouter: () => mocks.router,
+  useNavigation: () => ({ isFocused: () => mocks.focused }),
+}));
 vi.mock("@/lib/entitlement", () => ({
   openPaywall: mocks.openPaywall,
   useEntitlement: () => mocks.entitlement,
@@ -66,6 +70,7 @@ beforeEach(() => {
   mocks.add.mockResolvedValue(true);
   mocks.remove.mockResolvedValue(true);
   mocks.entitlement = { entitled: false, loading: false };
+  mocks.focused = true;
 });
 
 describe("useCityStampToggle", () => {
@@ -104,6 +109,30 @@ describe("useCityStampToggle", () => {
       await pending;
     });
     expect(mocks.play).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves but plays nothing when the person left the grid before the save landed", async () => {
+    let finish: (added: boolean) => void = () => {};
+    mocks.add.mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useCityStampToggle());
+    let pending: Promise<boolean> = Promise.resolve(false);
+    act(() => {
+      pending = result.current("tokyo", true, 3);
+    });
+    mocks.focused = false;
+    await act(async () => {
+      finish(true);
+      await pending;
+    });
+    expect(mocks.play).not.toHaveBeenCalled();
+    expect(mocks.capture).toHaveBeenCalledWith("passport_city_stamp_changed", {
+      stamped: true,
+      count: 3,
+    });
   });
 
   it("plays nothing when the city was already stamped", async () => {
