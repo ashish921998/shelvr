@@ -407,6 +407,103 @@ describe("a place on the list", () => {
   });
 });
 
+describe("who added the new places", () => {
+  type Member = { t: ReturnType<TestBackend["withIdentity"]> };
+
+  async function addPlace(
+    member: Member,
+    listId: Id<"sharedLists">,
+    name: string,
+    steps: number,
+  ) {
+    await member.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: { name, ...near(steps), city: "Lisbon" },
+    });
+  }
+
+  async function newFromBoth(member: Member, listId: Id<"sharedLists">) {
+    const [summary] = await member.t.query(api.sharedLists.listSharedLists, {});
+    const detail = await member.t.query(api.sharedLists.getSharedList, {
+      listId,
+    });
+    return {
+      newCount: summary?.newCount,
+      summary: summary?.newFrom,
+      detail: detail?.newFrom,
+    };
+  }
+
+  it("names each adder, busiest first, and leaves out the viewer's own", async () => {
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const cy = await joiner(base, token, { name: "Cy Reis" });
+    later();
+    await addPlace(bo, listId, "Cervejaria Ramiro", 10);
+    await addPlace(cy, listId, "Taberna da Rua", 12);
+    await addPlace(cy, listId, "Prado", 14);
+    await addPlace(owner, listId, "Ana's corner", 16);
+
+    const ownerSees = [
+      { firstName: "Cy", count: 2 },
+      { firstName: "Bo", count: 1 },
+    ];
+    expect(await newFromBoth(owner, listId)).toEqual({
+      newCount: 3,
+      summary: ownerSees,
+      detail: ownerSees,
+    });
+    const boSees = [
+      { firstName: "Cy", count: 2 },
+      { firstName: "Ana", count: 1 },
+    ];
+    expect(await newFromBoth(bo, listId)).toEqual({
+      newCount: 3,
+      summary: boSees,
+      detail: boSees,
+    });
+  });
+
+  it("merges a past member and a member with no name into one group, last", async () => {
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const cy = await joiner(base, token, { name: "Cy Reis" });
+    const nameless = await joiner(base, token, { name: "" });
+    later();
+    await addPlace(cy, listId, "Prado", 14);
+    await addPlace(bo, listId, "Cervejaria Ramiro", 10);
+    await addPlace(nameless, listId, "Taberna da Rua", 12);
+    await bo.t.mutation(api.sharedLists.leaveSharedList, { listId });
+
+    const seen = [{ firstName: "Cy", count: 1 }, { count: 2 }];
+    expect(await newFromBoth(owner, listId)).toEqual({
+      newCount: 3,
+      summary: seen,
+      detail: seen,
+    });
+  });
+
+  it("is empty from both once the member has looked", async () => {
+    const { base, owner, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    later();
+    await addPlace(bo, listId, "Cervejaria Ramiro", 10);
+    expect(await newFromBoth(owner, listId)).toEqual({
+      newCount: 1,
+      summary: [{ firstName: "Bo", count: 1 }],
+      detail: [{ firstName: "Bo", count: 1 }],
+    });
+
+    later();
+    await owner.t.mutation(api.sharedLists.markSharedListSeen, { listId });
+    expect(await newFromBoth(owner, listId)).toEqual({
+      newCount: 0,
+      summary: [],
+      detail: [],
+    });
+  });
+});
+
 async function testKey(): Promise<string> {
   const pair = await crypto.subtle.generateKey(
     { name: "ECDSA", namedCurve: "P-256" },

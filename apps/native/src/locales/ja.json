@@ -999,8 +999,14 @@
   "sharedLists.with": "%{names}と",
   "sharedLists.onlyYou": "今はあなただけ",
   "sharedLists.someone": "誰か",
-  "sharedLists.newCount": {
-    "other": "新着%{formattedCount}件"
+  "sharedLists.activityOne": {
+    "other": "%{name}が%{formattedCount}か所を追加しました"
+  },
+  "sharedLists.activitySomeone": {
+    "other": "誰かが%{formattedCount}か所を追加しました"
+  },
+  "sharedLists.activityMany": {
+    "other": "%{names}から新着%{formattedCount}か所"
   },
   "sharedLists.alsoAddTo": "こちらにも追加",
   "sharedLists.alsoAddFull": "%{name}はいっぱいです。さらに追加するには、場所を削除してください。",

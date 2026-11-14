@@ -5,6 +5,8 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
 import {
+  activityLine,
+  freshCity,
   inviteUrl,
   listRows,
   listSectionRows,
@@ -132,9 +134,7 @@ describe("listSectionRows", () => {
       [place({ name: "Old" }), place({ name: "New", isNew: true })],
       "Lisbon",
     );
-    const places = listSectionRows(rows, "Maya").filter(
-      (row) => row.kind === "place",
-    );
+    const places = listSectionRows(rows).filter((row) => row.kind === "place");
     expect(places.map((row) => row.id)).toEqual(
       rows.map((row) => cityPinId(row.pin)),
     );
@@ -142,19 +142,120 @@ describe("listSectionRows", () => {
 
   it("heads the sections only when something is new", () => {
     const old = listRows([place({ name: "Old" })], "Lisbon");
-    expect(listSectionRows(old, "Maya").map((row) => row.kind)).toEqual([
-      "place",
-    ]);
+    expect(listSectionRows(old).map((row) => row.kind)).toEqual(["place"]);
     const both = listRows(
       [place({ name: "Old" }), place({ name: "New", isNew: true })],
       "Lisbon",
     );
-    expect(listSectionRows(both, "Maya").map((row) => row.kind)).toEqual([
+    expect(listSectionRows(both).map((row) => row.kind)).toEqual([
       "heading",
       "place",
       "heading",
       "place",
     ]);
+  });
+
+  const freshHeading = (places: SharedListPlace[]) =>
+    listSectionRows(listRows(places, "Lisbon")).find(
+      (row) => row.kind === "heading" && row.fresh,
+    );
+
+  it("names the one person who added the new places", () => {
+    expect(
+      freshHeading([
+        place({ name: "A", isNew: true, addedByName: "Priya" }),
+        place({ name: "B", isNew: true, addedByName: "Priya" }),
+        place({ name: "Old", addedByName: "Sam" }),
+      ]),
+    ).toMatchObject({ label: 'sharedLists.newFrom:{"name":"Priya"}' });
+  });
+
+  it("names everyone who added a new place, in row order, once each", () => {
+    expect(
+      freshHeading([
+        place({ name: "A", isNew: true, addedByName: "Priya" }),
+        place({ name: "B", isNew: true, addedByName: "Sam" }),
+        place({ name: "C", isNew: true, addedByName: "Priya" }),
+      ]),
+    ).toMatchObject({ label: 'sharedLists.newFrom:{"name":"Priya, Sam"}' });
+  });
+
+  it("calls a past member Someone", () => {
+    expect(
+      freshHeading([
+        place({ name: "A", isNew: true, addedByPastMember: true }),
+        place({ name: "B", isNew: true, addedByName: "Sam" }),
+      ]),
+    ).toMatchObject({
+      label: 'sharedLists.newFrom:{"name":"sharedLists.someone, Sam"}',
+    });
+  });
+
+  it("names only the adders of the city shown", () => {
+    expect(
+      freshHeading([
+        place({ name: "A", isNew: true, addedByName: "Priya" }),
+        place({
+          name: "B",
+          isNew: true,
+          addedByName: "Sam",
+          city: "Porto",
+        }),
+      ]),
+    ).toMatchObject({ label: 'sharedLists.newFrom:{"name":"Priya"}' });
+  });
+});
+
+describe("activityLine", () => {
+  it("says nothing when nothing is new", () => {
+    expect(activityLine([])).toBeNull();
+  });
+
+  it("names one adder with their count", () => {
+    expect(activityLine([{ firstName: "Priya", count: 3 }])).toBe(
+      'sharedLists.activityOne:{"name":"Priya","count":3}',
+    );
+  });
+
+  it("says someone for one adder with no name", () => {
+    expect(activityLine([{ count: 1 }])).toBe(
+      'sharedLists.activitySomeone:{"count":1}',
+    );
+  });
+
+  it("adds the counts up and names every group for two or more", () => {
+    expect(
+      activityLine([
+        { firstName: "Priya", count: 3 },
+        { firstName: "Sam", count: 1 },
+        { count: 2 },
+      ]),
+    ).toBe(
+      'sharedLists.activityMany:{"count":6,"names":"Priya, Sam, sharedLists.someone"}',
+    );
+  });
+});
+
+describe("freshCity", () => {
+  const cities = ["Lisbon", "Porto", "Faro"];
+
+  it("opens on the first city that has something new", () => {
+    expect(
+      freshCity({
+        cities,
+        places: [
+          place({ name: "Old", city: "Lisbon" }),
+          place({ name: "Faro new", city: "Faro", isNew: true }),
+          place({ name: "Porto new", city: "Porto", isNew: true }),
+        ],
+      }),
+    ).toBe("Porto");
+  });
+
+  it("has no city when nothing is new", () => {
+    expect(
+      freshCity({ cities, places: [place({ name: "Old", city: "Porto" })] }),
+    ).toBeNull();
   });
 });
 
@@ -196,6 +297,7 @@ describe("useAlsoAddTo", () => {
     placeCount: 4,
     newCount: 0,
     isOwner: true,
+    newFrom: [],
     members: [],
   };
   let savedOn: Id<"sharedLists">[] = [];

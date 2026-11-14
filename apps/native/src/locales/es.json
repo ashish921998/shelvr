@@ -1057,10 +1057,20 @@
   "sharedLists.with": "Con %{names}",
   "sharedLists.onlyYou": "Solo tú por ahora",
   "sharedLists.someone": "Alguien",
-  "sharedLists.newCount": {
-    "one": "%{formattedCount} nuevo",
-    "many": "%{formattedCount} nuevos",
-    "other": "%{formattedCount} nuevos"
+  "sharedLists.activityOne": {
+    "one": "%{name} añadió %{formattedCount} lugar",
+    "many": "%{name} añadió %{formattedCount} lugares",
+    "other": "%{name} añadió %{formattedCount} lugares"
+  },
+  "sharedLists.activitySomeone": {
+    "one": "Alguien añadió %{formattedCount} lugar",
+    "many": "Alguien añadió %{formattedCount} lugares",
+    "other": "Alguien añadió %{formattedCount} lugares"
+  },
+  "sharedLists.activityMany": {
+    "one": "%{formattedCount} lugar nuevo de %{names}",
+    "many": "%{formattedCount} lugares nuevos de %{names}",
+    "other": "%{formattedCount} lugares nuevos de %{names}"
   },
   "sharedLists.alsoAddTo": "Añadir también a",
   "sharedLists.alsoAddFull": "%{name} está llena. Quita un lugar para añadir más.",
