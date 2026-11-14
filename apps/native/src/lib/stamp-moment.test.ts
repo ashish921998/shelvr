@@ -4,7 +4,10 @@ import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  BADGE_TIMING,
   bulkStampMoment,
+  cityStampMoment,
+  cityStampPlace,
   placeStampMoment,
   STAMP_TIMING,
   type StampMoment,
@@ -88,6 +91,59 @@ describe("placeStampMoment", () => {
       city: "",
       cover: null,
       firstInCity: false,
+      completedTotal: null,
+    });
+  });
+
+  it("completes the city only when this stamp is its last unstamped place", () => {
+    expect(
+      placeStampMoment("Tigre", { ...lisbon, cityVisited: 6, cityTotal: 7 }),
+    ).toMatchObject({ completedTotal: 7, firstInCity: false });
+    expect(
+      placeStampMoment("Tigre", { ...lisbon, cityVisited: 0, cityTotal: 1 }),
+    ).toMatchObject({ completedTotal: 1, firstInCity: true });
+    expect(
+      placeStampMoment("Tigre", { ...lisbon, cityVisited: 5, cityTotal: 7 }),
+    ).toMatchObject({ completedTotal: null });
+    expect(
+      placeStampMoment("Tigre", { ...lisbon, cityVisited: 7, cityTotal: 7 }),
+    ).toMatchObject({ completedTotal: null });
+    expect(
+      placeStampMoment("Tigre", { ...lisbon, cityVisited: 2 }),
+    ).toMatchObject({ completedTotal: null });
+    expect(
+      placeStampMoment("Tigre", { ...lisbon, cityVisited: 0, cityTotal: 0 }),
+    ).toMatchObject({ completedTotal: null });
+    expect(
+      placeStampMoment("Tigre", {
+        city: "",
+        cover: null,
+        cityVisited: 0,
+        cityTotal: 1,
+      }),
+    ).toMatchObject({ completedTotal: null });
+  });
+});
+
+describe("cityStampPlace", () => {
+  it("carries the city's counts before the stamp so the moment can tell first and last", () => {
+    const place = cityStampPlace("Lisbon", null, { stamped: 11, total: 12 });
+    expect(place).toEqual({
+      city: "Lisbon",
+      cover: null,
+      cityVisited: 11,
+      cityTotal: 12,
+    });
+    expect(placeStampMoment("Tigre", place)).toMatchObject({
+      completedTotal: 12,
+    });
+  });
+
+  it("claims neither first nor last while the city's counts are unknown", () => {
+    const place = cityStampPlace("Lisbon", "c", undefined);
+    expect(placeStampMoment("Tigre", place)).toMatchObject({
+      firstInCity: false,
+      completedTotal: null,
     });
   });
 });
@@ -122,6 +178,15 @@ describe("stampLine", () => {
         placeStampMoment("Tigre", { city: "", cover: null, cityVisited: 0 }),
       ),
     ).toBe('passport.momentStamped {"name":"Tigre"}');
+    expect(
+      stampLine(
+        placeStampMoment("Tigre", {
+          ...lisbon,
+          cityVisited: 0,
+          cityTotal: 1,
+        }),
+      ),
+    ).toBe('passport.momentCityComplete {"city":"Lisbon"}');
     expect(stampLine({ kind: "bulk", count: 4, cover: null })).toBe(
       'passport.momentBulk {"count":4}',
     );
@@ -183,6 +248,42 @@ describe("useStampMomentPlayer", () => {
     expect(mocks.impact).toHaveBeenCalledTimes(1);
   });
 
+  it("reports a city completed once, alongside the landing, with its total", () => {
+    const { result } = renderHook(() => useStampMomentPlayer(false));
+    const last = placeStampMoment("Tigre", {
+      ...lisbon,
+      cityVisited: 11,
+      cityTotal: 12,
+    });
+    act(() => result.current.controls.play(last, "next_to_stamp"));
+    expect(result.current.shown?.line).toBe(
+      'passport.momentCityComplete {"city":"Lisbon"}',
+    );
+    expect(mocks.capture.mock.calls).toEqual([
+      [
+        "passport_stamp_landed",
+        { surface: "next_to_stamp", first_in_city: false, count: 1 },
+      ],
+      ["passport_city_completed", { surface: "next_to_stamp", total: 12 }],
+    ]);
+    expect(mocks.announce).toHaveBeenCalledWith(
+      'passport.momentCityComplete {"city":"Lisbon"}',
+    );
+
+    mocks.capture.mockClear();
+    act(() =>
+      result.current.controls.play(
+        placeStampMoment("Tigre", { ...lisbon, cityVisited: 3, cityTotal: 12 }),
+        "city",
+      ),
+    );
+    expect(mocks.capture).toHaveBeenCalledTimes(1);
+    expect(mocks.capture).not.toHaveBeenCalledWith(
+      "passport_city_completed",
+      expect.anything(),
+    );
+  });
+
   it("plays one moment for a batch with its count", () => {
     const { result } = renderHook(() => useStampMomentPlayer(false));
     act(() =>
@@ -199,6 +300,29 @@ describe("useStampMomentPlayer", () => {
       first_in_city: false,
       count: 5,
     });
+  });
+
+  it("plays a city stamp as its own round moment, with no place and no completion", () => {
+    const { result } = renderHook(() => useStampMomentPlayer(false));
+    act(() =>
+      result.current.controls.play(cityStampMoment("Lisbon"), "city_stamps"),
+    );
+    expect(result.current.shown).toMatchObject({
+      moment: { kind: "city", city: "Lisbon" },
+      line: 'passport.momentCityStamp {"city":"Lisbon"}',
+      ink: "Lisbon",
+    });
+    expect(mocks.capture.mock.calls).toEqual([
+      [
+        "passport_stamp_landed",
+        { surface: "city_stamps", first_in_city: false, count: 1 },
+      ],
+    ]);
+    expect(mocks.announce).toHaveBeenCalledWith(
+      'passport.momentCityStamp {"city":"Lisbon"}',
+    );
+    act(() => vi.advanceTimersByTime(STAMP_TIMING.drop));
+    expect(mocks.impact).toHaveBeenCalledWith("medium");
   });
 
   it("holds a queued moment until it is released, then plays it once", () => {
@@ -221,6 +345,28 @@ describe("useStampMomentPlayer", () => {
 
     act(() => result.current.controls.release());
     expect(mocks.capture).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds a badge that lands while a stamp waits, then plays it after the stamp", () => {
+    const { result } = renderHook(() => useStampMomentPlayer(false));
+    act(() => result.current.controls.queue(batch, "already_been"));
+    act(() => result.current.unlock(["passportHolder"]));
+    act(() => vi.advanceTimersByTime(BADGE_TIMING.grace));
+    expect(result.current.badge).toBeNull();
+    act(() => result.current.controls.release());
+    expect(result.current.shown?.moment).toEqual(batch);
+    expect(result.current.badge).toBeNull();
+    act(() => vi.advanceTimersByTime(STAMP_TIMING.shown));
+    expect(result.current.badge?.badge).toBe("passportHolder");
+  });
+
+  it("lets a held badge play once its queued stamp expires unreleased", () => {
+    const { result } = renderHook(() => useStampMomentPlayer(false));
+    act(() => result.current.controls.queue(batch, "already_been"));
+    act(() => result.current.unlock(["passportHolder"]));
+    act(() => vi.advanceTimersByTime(STAMP_TIMING.queueLimit));
+    expect(result.current.shown).toBeNull();
+    expect(result.current.badge?.badge).toBe("passportHolder");
   });
 
   it("drops a queued moment that is never released in time", () => {
@@ -251,6 +397,16 @@ describe("useStampMomentPlayer", () => {
     act(() => result.current.controls.cancel());
     act(() => result.current.controls.release());
     expect(result.current.shown).toBeNull();
+  });
+
+  it("lets a held badge play once its queued stamp is cancelled", () => {
+    const { result } = renderHook(() => useStampMomentPlayer(false));
+    act(() => result.current.controls.queue(batch, "already_been"));
+    act(() => result.current.unlock(["passportHolder"]));
+    act(() => result.current.controls.cancel());
+    act(() => vi.advanceTimersByTime(BADGE_TIMING.grace));
+    expect(result.current.shown).toBeNull();
+    expect(result.current.badge?.badge).toBe("passportHolder");
   });
 
   it("forgets a queued moment when it unmounts", () => {

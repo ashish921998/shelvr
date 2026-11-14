@@ -1,5 +1,9 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import type { CityStamp } from "@/lib/city-stamp-data";
+import type { CityCompletion } from "@convex/model/cityCompletion";
+import { cityStampFits, knownCityStamps } from "@convex/model/cityStamps";
+import { groupByCity } from "@convex/model/passport";
 import { cityKey } from "@convex/model/trip";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
@@ -33,6 +37,99 @@ export function usePassport() {
     failed: passport.isError,
     error: passport.error,
   };
+}
+
+export function useCityCompletion(enabled = true) {
+  const { isAuthenticated } = useConvexAuth();
+  const completion = useQuery(
+    convexQuery(
+      api.placeVisits.cityCompletion,
+      isAuthenticated && enabled ? {} : "skip",
+    ),
+  );
+  return { rows: completion.data, error: completion.error };
+}
+
+export type PassportSection = {
+  key: string;
+  city: string | null;
+  stamps: Stamp[];
+  completion: CityCompletion | null;
+  cityStamp?: CityStamp;
+};
+
+function sectionFits(cityStamp: CityStamp, section: PassportSection): boolean {
+  const city = section.city ?? undefined;
+  if (section.stamps.length === 0) return cityStampFits(cityStamp, { city });
+  return section.stamps.some((stamp) =>
+    cityStampFits(cityStamp, { city, countryCode: stamp.countryCode }),
+  );
+}
+
+function withCityStamps(
+  stamped: PassportSection[],
+  cityStamps: readonly CityStamp[],
+): { stamped: PassportSection[]; cities: CityStamp[] } {
+  const cities: CityStamp[] = [];
+  const headed = [...stamped];
+  for (const cityStamp of knownCityStamps(cityStamps)) {
+    const index = headed.findIndex(
+      (section) =>
+        section.city !== null &&
+        section.cityStamp === undefined &&
+        sectionFits(cityStamp, section),
+    );
+    if (index === -1) cities.push(cityStamp);
+    else headed[index] = { ...headed[index], cityStamp };
+  }
+  return { stamped: headed, cities };
+}
+
+export function passportSections(
+  stamps: readonly Stamp[],
+  completion: readonly CityCompletion[],
+  cityStamps: readonly CityStamp[] = [],
+): {
+  stamped: PassportSection[];
+  waiting: PassportSection[];
+  cities: CityStamp[];
+} {
+  const rows = new Map(completion.map((row) => [cityKey(row.city), row]));
+  const used = new Set<string>();
+  const stamped = groupByCity(stamps).map((group): PassportSection => {
+    const key = group.city === null ? "" : cityKey(group.city);
+    const row = rows.get(key);
+    if (row) used.add(key);
+    return {
+      key: key === "" ? "~elsewhere" : key,
+      city: row?.city ?? group.city,
+      stamps: group.items,
+      completion: row ?? null,
+    };
+  });
+  const rest = completion.filter((row) => !used.has(cityKey(row.city)));
+  const toSection = (row: CityCompletion): PassportSection => ({
+    key: cityKey(row.city),
+    city: row.city,
+    stamps: [],
+    completion: row,
+  });
+  const elsewhere = stamped.findIndex((section) => section.city === null);
+  const withStamps = rest.filter((row) => row.stamped > 0).map(toSection);
+  if (elsewhere === -1) stamped.push(...withStamps);
+  else stamped.splice(elsewhere, 0, ...withStamps);
+  return {
+    ...withCityStamps(stamped, cityStamps),
+    waiting: rest.filter((row) => row.stamped === 0).map(toSection),
+  };
+}
+
+export function completionFor(
+  rows: readonly CityCompletion[] | undefined,
+  city: string,
+): CityCompletion | undefined {
+  const key = cityKey(city);
+  return rows?.find((row) => cityKey(row.city) === key);
 }
 
 export function stampDate(stamp: Pick<Stamp, "visitedAt" | "backfilled">) {

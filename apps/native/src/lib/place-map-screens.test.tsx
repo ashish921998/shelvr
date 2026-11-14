@@ -80,10 +80,18 @@ vi.mock("@/lib/use-place-visit", () => ({
   }),
   usePlaceVisit: () => ({ busy: false, toggle: mocks.toggleVisit }),
 }));
-vi.mock("@/components/city/progress-bar", () => ({
-  ProgressBar: vi.fn(({ value }: { value: number }) => (
-    <div data-testid="progress">{value}</div>
-  )),
+vi.mock("@/components/passport/city-ring", () => ({
+  CityRing: vi.fn(
+    ({
+      stamped,
+      total,
+      city,
+    }: {
+      stamped: number;
+      total: number;
+      city: string;
+    }) => <div data-testid="progress">{`${city} ${stamped}/${total}`}</div>,
+  ),
 }));
 vi.mock("@/lib/share-link", () => ({ shareUrl: vi.fn() }));
 vi.mock("@/lib/shared-lists", async (importActual) => ({
@@ -591,7 +599,7 @@ describe("city page", () => {
     expect(
       screen.getByText('cityProgress.visited {"count":2,"visited":1}'),
     ).toBeTruthy();
-    expect(screen.getByTestId("progress").textContent).toBe("0.5");
+    expect(screen.getByTestId("progress").textContent).toBe("Austin 1/2");
     expect(screen.getByText("🌮 Taco Spot ✓")).toBeTruthy();
     expect(screen.queryByText("went BBQ Pit")).toBeNull();
     fireEvent.click(screen.getByText("🍖 BBQ Pit"));
@@ -600,7 +608,13 @@ describe("city page", () => {
       "item-1",
       expect.objectContaining({ name: "BBQ Pit", lat: 30.2, lng: -97.2 }),
       true,
-      { city: "Austin", cover: null, cityVisited: 1, cityStamps: null },
+      {
+        city: "Austin",
+        cover: null,
+        cityVisited: 1,
+        cityTotal: 2,
+        cityStamps: null,
+      },
     );
   });
 
@@ -619,6 +633,7 @@ describe("city page", () => {
         city: "Austin",
         cover: "https://img/reel.jpg",
         cityVisited: 0,
+        cityTotal: 2,
         cityStamps: null,
       },
     );
@@ -637,7 +652,13 @@ describe("city page", () => {
       "item-1",
       expect.objectContaining({ name: "BBQ Pit" }),
       true,
-      { city: "Austin", cover: null, cityVisited: 0, cityStamps: 1 },
+      {
+        city: "Austin",
+        cover: null,
+        cityVisited: 0,
+        cityTotal: 2,
+        cityStamps: 1,
+      },
     );
   });
 
@@ -700,7 +721,13 @@ describe("city page", () => {
         appleId: "taco",
       }),
       false,
-      { city: "Austin", cover: null, cityVisited: 1, cityStamps: null },
+      {
+        city: "Austin",
+        cover: null,
+        cityVisited: 1,
+        cityTotal: 2,
+        cityStamps: null,
+      },
     );
   });
 

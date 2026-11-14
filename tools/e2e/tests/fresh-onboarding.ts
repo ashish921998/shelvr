@@ -30,7 +30,11 @@ const FRESH_INSTALL_ARGUMENTS = [
 /** From the opener to the sample reel; defaults to date nights in Austin when the city is skipped. */
 export async function walkToSampleReel(
   screen: Screen,
-  options: { goal?: "date" | "travel"; city?: string } = {},
+  options: {
+    goal?: "date" | "travel";
+    city?: string;
+    been?: readonly string[];
+  } = {},
 ): Promise<void> {
   await tapUntilVisible(
     screen.getByRole("button", "Get started"),
@@ -51,6 +55,21 @@ export async function walkToSampleReel(
   const next = screen.getByRole("button", "Continue");
   await expect(next).toBeEnabled({ timeout: 10_000 });
   await next.tap();
+  await expect(screen.getByText("Where have you been?")).toBeVisible({
+    timeout: 30_000,
+  });
+  if (options.been) {
+    for (const city of options.been) {
+      await screen.getByPlaceholder("Search cities").fill(city);
+      await screen.getByRole("checkbox", city).tap();
+    }
+    const proceed = screen.getByTestId("onboarding-been-continue");
+    await expect(proceed).toBeVisible();
+    await expect(proceed).toBeEnabled();
+    await proceed.tap();
+  } else {
+    await skip.tap();
+  }
   await expect(screen.getByText("Let’s put your saves to use.")).toBeVisible({
     timeout: 30_000,
   });

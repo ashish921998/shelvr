@@ -1235,6 +1235,144 @@
   "passport.cardSavedElsewhere": "Gardé pour plus tard.",
   "passport.cardWent": "Visité avec Shelvr.",
   "passport.shareCity": "Partager %{city}",
+  "passport.momentCityComplete": "%{city} au complet",
+  "passport.ringCount": "%{visited} sur %{total}",
+  "passport.ringLabel": {
+    "one": "%{visited} sur %{formattedCount} lieu tamponné à %{city}",
+    "many": "%{visited} sur %{formattedCount} lieux tamponnés à %{city}",
+    "other": "%{visited} sur %{formattedCount} lieux tamponnés à %{city}"
+  },
+  "passport.ringLocked": {
+    "one": "%{formattedCount} lieu enregistré à %{city}",
+    "many": "%{formattedCount} lieux enregistrés à %{city}",
+    "other": "%{formattedCount} lieux enregistrés à %{city}"
+  },
+  "passport.ringHint": "Affiche les lieux qui restent à tamponner",
+  "passport.ringLockedHint": "Tamponnez des lieux avec Shelvr Pro",
+  "passport.notStampedYet": "Enregistrés, pas encore tamponnés",
+  "passport.nextTitle": "À tamponner",
+  "passport.nextBody": {
+    "one": "Encore %{formattedCount} lieu à tamponner à %{city}",
+    "many": "Encore %{formattedCount} lieux à tamponner à %{city}",
+    "other": "Encore %{formattedCount} lieux à tamponner à %{city}"
+  },
+  "passport.cityAllStamped": "Tous vos lieux enregistrés à %{city} sont tamponnés.",
+  "passport.nextEmpty": "Aucun lieu à afficher pour %{city} pour le moment.",
+  "passport.stampPlace": "Tamponner",
+  "passport.stampPlaceLabel": "Tamponner %{name}",
+  "badges.title": "Badges",
+  "badges.earned": "Badge obtenu",
+  "badges.unlocked": "Badge %{badge} obtenu",
+  "badges.moreEarned": {
+    "one": "Et %{formattedCount} autre badge",
+    "many": "Et %{formattedCount} autres badges",
+    "other": "Et %{formattedCount} autres badges"
+  },
+  "badges.shareMessage": "J’ai obtenu le badge %{badge} dans mon passeport Shelvr.",
+  "badges.shareHint": "Pour partager ce badge",
+  "badges.lockedHint": "Obtenez des badges avec Shelvr Pro",
+  "badges.firstStamp": "Premier tampon",
+  "badges.explorer": "Explorateur",
+  "badges.wanderer": "Baroudeur",
+  "badges.globetrotter": "Globe-trotteur",
+  "badges.cityHopper": "Saute-villes",
+  "badges.passportHolder": "Passeport en poche",
+  "badges.completionist": "Complétiste",
+  "badges.coffeeCrawler": "Tournée des cafés",
+  "badges.foodie": "Gourmet",
+  "badges.sweetTooth": "Bec sucré",
+  "badges.nightOwl": "Oiseau de nuit",
+  "badges.outAndAbout": "Toujours dehors",
+  "badges.goalPlaces": {
+    "one": "%{formattedCount} lieu tamponné",
+    "many": "%{formattedCount} lieux tamponnés",
+    "other": "%{formattedCount} lieux tamponnés"
+  },
+  "badges.goalCities": {
+    "one": "%{formattedCount} ville tamponnée",
+    "many": "%{formattedCount} villes tamponnées",
+    "other": "%{formattedCount} villes tamponnées"
+  },
+  "badges.goalCountries": {
+    "one": "%{formattedCount} pays tamponné",
+    "many": "%{formattedCount} pays tamponnés",
+    "other": "%{formattedCount} pays tamponnés"
+  },
+  "badges.goalCompleteCities": {
+    "one": "%{formattedCount} ville complète",
+    "many": "%{formattedCount} villes complètes",
+    "other": "%{formattedCount} villes complètes"
+  },
+  "badges.goalCoffee": {
+    "one": "%{formattedCount} café tamponné",
+    "many": "%{formattedCount} cafés tamponnés",
+    "other": "%{formattedCount} cafés tamponnés"
+  },
+  "badges.goalFood": {
+    "one": "%{formattedCount} restaurant tamponné",
+    "many": "%{formattedCount} restaurants tamponnés",
+    "other": "%{formattedCount} restaurants tamponnés"
+  },
+  "badges.goalDessert": {
+    "one": "%{formattedCount} adresse sucrée tamponnée",
+    "many": "%{formattedCount} adresses sucrées tamponnées",
+    "other": "%{formattedCount} adresses sucrées tamponnées"
+  },
+  "badges.goalDrinks": {
+    "one": "%{formattedCount} bar tamponné",
+    "many": "%{formattedCount} bars tamponnés",
+    "other": "%{formattedCount} bars tamponnés"
+  },
+  "badges.goalActivities": {
+    "one": "%{formattedCount} activité tamponnée",
+    "many": "%{formattedCount} activités tamponnées",
+    "other": "%{formattedCount} activités tamponnées"
+  },
+  "badges.progressPlaces": {
+    "one": "%{visited} sur %{formattedCount} lieu",
+    "many": "%{visited} sur %{formattedCount} lieux",
+    "other": "%{visited} sur %{formattedCount} lieux"
+  },
+  "badges.progressCities": {
+    "one": "%{visited} sur %{formattedCount} ville",
+    "many": "%{visited} sur %{formattedCount} villes",
+    "other": "%{visited} sur %{formattedCount} villes"
+  },
+  "badges.progressCountries": {
+    "one": "%{visited} sur %{formattedCount} pays",
+    "many": "%{visited} sur %{formattedCount} pays",
+    "other": "%{visited} sur %{formattedCount} pays"
+  },
+  "badges.progressCompleteCities": {
+    "one": "%{visited} sur %{formattedCount} ville complète",
+    "many": "%{visited} sur %{formattedCount} villes complètes",
+    "other": "%{visited} sur %{formattedCount} villes complètes"
+  },
+  "badges.progressCoffee": {
+    "one": "%{visited} sur %{formattedCount} café",
+    "many": "%{visited} sur %{formattedCount} cafés",
+    "other": "%{visited} sur %{formattedCount} cafés"
+  },
+  "badges.progressFood": {
+    "one": "%{visited} sur %{formattedCount} restaurant",
+    "many": "%{visited} sur %{formattedCount} restaurants",
+    "other": "%{visited} sur %{formattedCount} restaurants"
+  },
+  "badges.progressDessert": {
+    "one": "%{visited} sur %{formattedCount} adresse sucrée",
+    "many": "%{visited} sur %{formattedCount} adresses sucrées",
+    "other": "%{visited} sur %{formattedCount} adresses sucrées"
+  },
+  "badges.progressDrinks": {
+    "one": "%{visited} sur %{formattedCount} bar",
+    "many": "%{visited} sur %{formattedCount} bars",
+    "other": "%{visited} sur %{formattedCount} bars"
+  },
+  "badges.progressActivities": {
+    "one": "%{visited} sur %{formattedCount} activité",
+    "many": "%{visited} sur %{formattedCount} activités",
+    "other": "%{visited} sur %{formattedCount} activités"
+  },
   "passportShare.share": "Partager le passeport",
   "passportShare.stopSetting": "Ne plus partager mon passeport",
   "passportShare.stopTitle": "Ne plus partager votre passeport ?",
@@ -1343,5 +1481,24 @@
   "tripDay.keep": "Garder",
   "tripDay.skip": "Passer",
   "tripDay.addSelected": "Ajouter les arrêts retenus",
-  "tripDay.addSaveToDay": "Ajouter %{name} à %{day}"
+  "tripDay.addSaveToDay": "Ajouter %{name} à %{day}",
+  "cityStamps.add": "J’ai visité…",
+  "cityStamps.title": "Villes visitées",
+  "cityStamps.body": "Touchez une ville que vous avez visitée pour la tamponner dans votre passeport. Touchez-la de nouveau pour retirer le tampon.",
+  "cityStamps.noMatch": "Nous n’avons pas encore cette ville.",
+  "cityStamps.label": "%{city}, tampon de ville",
+  "cityStamps.removeHint": "Retire le tampon de votre passeport",
+  "cityStamps.removeTitle": "Retirer %{city} de votre passeport ?",
+  "cityStamps.remove": "Retirer le tampon",
+  "cityStamps.lockedHint": "Tamponnez des villes avec Shelvr Pro",
+  "cityStamps.saveFailed": "Impossible de mettre à jour vos villes",
+  "cityStamps.rateLimited": "Trop de changements de villes. Réessayez dans quelques minutes.",
+  "cityStamps.onboardingTitle": "Quelles villes avez-vous visitées ?",
+  "cityStamps.onboardingBody": "Touchez les villes que vous avez visitées. Chacune devient un tampon dans votre passeport.",
+  "passport.momentCityStamp": "Vous avez visité %{city}",
+  "passport.paywallHeadline": {
+    "one": "Votre passeport compte %{formattedCount} ville",
+    "many": "Votre passeport compte %{formattedCount} villes",
+    "other": "Votre passeport compte %{formattedCount} villes"
+  }
 }

@@ -1198,6 +1198,122 @@
   "passport.cardSavedElsewhere": "Saved for later.",
   "passport.cardWent": "Went with Shelvr.",
   "passport.shareCity": "Share %{city}",
+  "passport.momentCityComplete": "%{city} complete",
+  "passport.ringCount": "%{visited} of %{total}",
+  "passport.ringLabel": {
+    "one": "%{visited} of %{formattedCount} place stamped in %{city}",
+    "other": "%{visited} of %{formattedCount} places stamped in %{city}"
+  },
+  "passport.ringLocked": {
+    "one": "%{formattedCount} place saved in %{city}",
+    "other": "%{formattedCount} places saved in %{city}"
+  },
+  "passport.ringHint": "Shows the places left to stamp",
+  "passport.ringLockedHint": "Stamp places with Shelvr Pro",
+  "passport.notStampedYet": "Saved, not stamped yet",
+  "passport.nextTitle": "Next to stamp",
+  "passport.nextBody": {
+    "one": "%{formattedCount} place in %{city} left to stamp",
+    "other": "%{formattedCount} places in %{city} left to stamp"
+  },
+  "passport.cityAllStamped": "Every place you saved in %{city} is stamped.",
+  "passport.nextEmpty": "No places to show for %{city} right now.",
+  "passport.stampPlace": "Stamp",
+  "passport.stampPlaceLabel": "Stamp %{name}",
+  "badges.title": "Milestones",
+  "badges.earned": "Badge earned",
+  "badges.unlocked": "%{badge} badge earned",
+  "badges.moreEarned": {
+    "one": "And %{formattedCount} more badge",
+    "other": "And %{formattedCount} more badges"
+  },
+  "badges.shareMessage": "I earned the %{badge} badge on my Shelvr passport.",
+  "badges.shareHint": "Shares this badge",
+  "badges.lockedHint": "Earn badges with Shelvr Pro",
+  "badges.firstStamp": "First stamp",
+  "badges.explorer": "Explorer",
+  "badges.wanderer": "Wanderer",
+  "badges.globetrotter": "Globetrotter",
+  "badges.cityHopper": "City hopper",
+  "badges.passportHolder": "Passport holder",
+  "badges.completionist": "Completionist",
+  "badges.coffeeCrawler": "Coffee crawler",
+  "badges.foodie": "Foodie",
+  "badges.sweetTooth": "Sweet tooth",
+  "badges.nightOwl": "Night owl",
+  "badges.outAndAbout": "Out and about",
+  "badges.goalPlaces": {
+    "one": "%{formattedCount} place stamped",
+    "other": "%{formattedCount} places stamped"
+  },
+  "badges.goalCities": {
+    "one": "%{formattedCount} city stamped",
+    "other": "%{formattedCount} cities stamped"
+  },
+  "badges.goalCountries": {
+    "one": "%{formattedCount} country stamped",
+    "other": "%{formattedCount} countries stamped"
+  },
+  "badges.goalCompleteCities": {
+    "one": "%{formattedCount} city complete",
+    "other": "%{formattedCount} cities complete"
+  },
+  "badges.goalCoffee": {
+    "one": "%{formattedCount} café stamped",
+    "other": "%{formattedCount} cafés stamped"
+  },
+  "badges.goalFood": {
+    "one": "%{formattedCount} food spot stamped",
+    "other": "%{formattedCount} food spots stamped"
+  },
+  "badges.goalDessert": {
+    "one": "%{formattedCount} dessert spot stamped",
+    "other": "%{formattedCount} dessert spots stamped"
+  },
+  "badges.goalDrinks": {
+    "one": "%{formattedCount} bar stamped",
+    "other": "%{formattedCount} bars stamped"
+  },
+  "badges.goalActivities": {
+    "one": "%{formattedCount} activity stamped",
+    "other": "%{formattedCount} activities stamped"
+  },
+  "badges.progressPlaces": {
+    "one": "%{visited} of %{formattedCount} place",
+    "other": "%{visited} of %{formattedCount} places"
+  },
+  "badges.progressCities": {
+    "one": "%{visited} of %{formattedCount} city",
+    "other": "%{visited} of %{formattedCount} cities"
+  },
+  "badges.progressCountries": {
+    "one": "%{visited} of %{formattedCount} country",
+    "other": "%{visited} of %{formattedCount} countries"
+  },
+  "badges.progressCompleteCities": {
+    "one": "%{visited} of %{formattedCount} city complete",
+    "other": "%{visited} of %{formattedCount} cities complete"
+  },
+  "badges.progressCoffee": {
+    "one": "%{visited} of %{formattedCount} café",
+    "other": "%{visited} of %{formattedCount} cafés"
+  },
+  "badges.progressFood": {
+    "one": "%{visited} of %{formattedCount} food spot",
+    "other": "%{visited} of %{formattedCount} food spots"
+  },
+  "badges.progressDessert": {
+    "one": "%{visited} of %{formattedCount} dessert spot",
+    "other": "%{visited} of %{formattedCount} dessert spots"
+  },
+  "badges.progressDrinks": {
+    "one": "%{visited} of %{formattedCount} bar",
+    "other": "%{visited} of %{formattedCount} bars"
+  },
+  "badges.progressActivities": {
+    "one": "%{visited} of %{formattedCount} activity",
+    "other": "%{visited} of %{formattedCount} activities"
+  },
   "passportShare.share": "Share passport",
   "passportShare.stopSetting": "Stop sharing my passport",
   "passportShare.stopTitle": "Stop sharing your passport?",
@@ -1302,5 +1418,23 @@
   "tripDay.keep": "Keep",
   "tripDay.skip": "Skip",
   "tripDay.addSelected": "Add selected stops",
-  "tripDay.addSaveToDay": "Add %{name} to %{day}"
+  "tripDay.addSaveToDay": "Add %{name} to %{day}",
+  "cityStamps.add": "I’ve been to…",
+  "cityStamps.title": "Cities you’ve been to",
+  "cityStamps.body": "Tap a city you’ve been to and it gets a stamp in your passport. Tap it again to take the stamp off.",
+  "cityStamps.noMatch": "We don’t have that city yet.",
+  "cityStamps.label": "%{city}, city stamp",
+  "cityStamps.removeHint": "Takes the stamp off your passport",
+  "cityStamps.removeTitle": "Take %{city} off your passport?",
+  "cityStamps.remove": "Remove stamp",
+  "cityStamps.lockedHint": "Stamp cities with Shelvr Pro",
+  "cityStamps.saveFailed": "Couldn’t update your cities",
+  "cityStamps.rateLimited": "Too many city changes. Try again in a few minutes.",
+  "cityStamps.onboardingTitle": "Where have you been?",
+  "cityStamps.onboardingBody": "Tap the cities you’ve visited. Each one becomes a stamp in your passport.",
+  "passport.momentCityStamp": "You’ve been to %{city}",
+  "passport.paywallHeadline": {
+    "one": "Your passport has %{formattedCount} city",
+    "other": "Your passport has %{formattedCount} cities"
+  }
 }

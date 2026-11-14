@@ -5,10 +5,10 @@ import {
   PlanButton,
   ShareMapButton,
 } from "@/components/city/plan-button";
-import { ProgressBar } from "@/components/city/progress-bar";
 import { SaveRow } from "@/components/city/save-row";
 import { PlaceRemovalUndo } from "@/components/city/place-removal";
 import { EmptyState } from "@/components/empty-state";
+import { CityRing } from "@/components/passport/city-ring";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
 import { canOpenPlaceCard, openPlaceDetails } from "@/lib/apple-place-card";
@@ -128,16 +128,20 @@ export default function CityScreen() {
               />
             ) : null}
           </View>
-          {pins.length > 0 ? (
-            <Text style={styles.count}>
-              {progressText ??
-                t("cityMap.placesFromSaves", { count: allPins.length })}
-            </Text>
-          ) : null}
           {pins.length > 0 && progressText !== null ? (
             <View style={styles.progress}>
-              <ProgressBar value={progress.visited / progress.total} />
+              <CityRing
+                stamped={progress.visited}
+                total={progress.total}
+                city={city}
+                size={28}
+              />
+              <Text style={styles.count}>{progressText}</Text>
             </View>
+          ) : pins.length > 0 ? (
+            <Text style={styles.count}>
+              {t("cityMap.placesFromSaves", { count: allPins.length })}
+            </Text>
           ) : null}
           {filters.length > 0 ? (
             <View style={styles.chips}>
@@ -185,6 +189,7 @@ export default function CityScreen() {
                         city,
                         cover: item.imageUrl ?? item.heroImageUrl ?? null,
                         cityVisited: progress.visited,
+                        cityTotal: progress.total,
                         cityStamps: wentInCity(stamps, city),
                       })
                   : placeVisits.offerRetry
@@ -254,7 +259,12 @@ const styles = StyleSheet.create((theme) => ({
   },
   name: { ...theme.type.largeTitle, color: theme.colors.foreground, flex: 1 },
   count: { ...theme.type.footnote, color: theme.colors.muted },
-  progress: { marginTop: theme.gap(0.75) },
+  progress: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1),
+    marginTop: theme.gap(0.5),
+  },
   chips: { marginTop: theme.gap(1), marginHorizontal: -theme.gap(0.5) },
   empty: { gap: theme.gap(0.5), paddingTop: theme.gap(0.5) },
   emptyTitle: { ...theme.type.headline, color: theme.colors.foreground },
