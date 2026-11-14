@@ -108,8 +108,9 @@ describe("useBadgeTotals", () => {
 describe("useBadgeUnlocks", () => {
   it("reports only badges earned after the first reading", () => {
     const unlock = vi.fn();
+    const revoke = vi.fn();
     mocks.stamps = [cafe("Lisbon")];
-    const { rerender } = renderHook(() => useBadgeUnlocks(unlock));
+    const { rerender } = renderHook(() => useBadgeUnlocks(unlock, revoke));
     expect(unlock).not.toHaveBeenCalled();
 
     mocks.stamps = [...Array(5)].map(() => cafe("Lisbon"));
@@ -117,12 +118,15 @@ describe("useBadgeUnlocks", () => {
     expect(unlock).toHaveBeenCalledWith(["coffeeCrawler"]);
   });
 
-  it("lets a relocked badge unlock again", () => {
+  it("reports a badge lost to an undone stamp, and lets it unlock again", () => {
     const unlock = vi.fn();
+    const revoke = vi.fn();
     mocks.stamps = [cafe("Lisbon")];
-    const { rerender } = renderHook(() => useBadgeUnlocks(unlock));
+    const { rerender } = renderHook(() => useBadgeUnlocks(unlock, revoke));
+    expect(revoke).not.toHaveBeenCalled();
     mocks.stamps = [];
     rerender();
+    expect(revoke).toHaveBeenCalledWith(["firstStamp"]);
     expect(unlock).not.toHaveBeenCalled();
     mocks.stamps = [cafe("Porto")];
     rerender();
@@ -132,7 +136,8 @@ describe("useBadgeUnlocks", () => {
   it("watches nothing for a free user", () => {
     mocks.entitled = false;
     const unlock = vi.fn();
-    renderHook(() => useBadgeUnlocks(unlock));
+    const revoke = vi.fn();
+    renderHook(() => useBadgeUnlocks(unlock, revoke));
     expect(mocks.queryArgs).toEqual(["skip"]);
     expect(unlock).not.toHaveBeenCalled();
   });
