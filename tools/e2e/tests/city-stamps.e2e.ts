@@ -7,7 +7,7 @@ startOnSeededHome();
 
 test("takes a city stamp off the passport", async ({ app, screen }) => {
   const madrid = screen.getByRole("button", "Madrid, city stamp");
-  await tapUntilVisible(screen.getByTestId("home-passport"), madrid, {
+  await tapUntilVisible(screen.getByRole("button", "Passport"), madrid, {
     waitMs: 15_000,
     timeout: 60_000,
   });

@@ -1122,11 +1122,9 @@
   },
   "passport.wantToGo": "Will hin",
   "passport.title": "Pass",
-  "passport.yourPassport": "Dein Pass",
   "passport.beenTitle": "Schon mal dort gewesen?",
   "passport.beenBody": "Stemple Orte, an denen du schon warst",
   "passport.beenSomewhere": "Schon irgendwo gewesen?",
-  "passport.rowCities": "%{places} · %{cities}",
   "passport.placesCount": {
     "one": "%{formattedCount} Ort",
     "other": "%{formattedCount} Orte"
@@ -1135,6 +1133,13 @@
     "one": "%{formattedCount} Stadt",
     "other": "%{formattedCount} Städte"
   },
+  "passport.countriesCount": {
+    "one": "%{formattedCount} Land",
+    "other": "%{formattedCount} Länder"
+  },
+  "passport.heroStamped": "Orte gestempelt",
+  "passport.heroWhere": "%{cities} · %{countries}",
+  "passport.heroNext": "Nächstes Abzeichen: %{badge}",
   "passport.places": "Orte",
   "passport.cities": "Städte",
   "passport.countries": "Länder",

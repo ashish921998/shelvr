@@ -1122,11 +1122,9 @@
   },
   "passport.wantToGo": "Want to go",
   "passport.title": "Passport",
-  "passport.yourPassport": "Your passport",
   "passport.beenTitle": "Been to any of these?",
   "passport.beenBody": "Stamp places you already went",
   "passport.beenSomewhere": "Already been somewhere?",
-  "passport.rowCities": "%{places} · %{cities}",
   "passport.placesCount": {
     "one": "%{formattedCount} place",
     "other": "%{formattedCount} places"
@@ -1135,6 +1133,13 @@
     "one": "%{formattedCount} city",
     "other": "%{formattedCount} cities"
   },
+  "passport.countriesCount": {
+    "one": "%{formattedCount} country",
+    "other": "%{formattedCount} countries"
+  },
+  "passport.heroStamped": "Places stamped",
+  "passport.heroWhere": "%{cities} · %{countries}",
+  "passport.heroNext": "Next badge: %{badge}",
   "passport.places": "Places",
   "passport.cities": "Cities",
   "passport.countries": "Countries",

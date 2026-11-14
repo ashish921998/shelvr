@@ -56,7 +56,7 @@ export default function NextToStampScreen() {
       true,
       cityStampPlace(city, place.cover, row),
     );
-    if (done && active.current) router.dismissTo("/passport");
+    if (done && active.current) router.dismissTo("/(app)/(tabs)/(passport)");
   };
 
   const header = (

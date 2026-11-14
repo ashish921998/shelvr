@@ -1156,11 +1156,9 @@
   },
   "passport.wantToGo": "À visiter",
   "passport.title": "Passeport",
-  "passport.yourPassport": "Votre passeport",
   "passport.beenTitle": "Déjà visité l'un d'eux ?",
   "passport.beenBody": "Tamponnez les lieux que vous avez déjà visités",
   "passport.beenSomewhere": "Déjà visité un lieu ?",
-  "passport.rowCities": "%{places} · %{cities}",
   "passport.placesCount": {
     "one": "%{formattedCount} lieu",
     "many": "%{formattedCount} lieux",
@@ -1171,6 +1169,14 @@
     "many": "%{formattedCount} villes",
     "other": "%{formattedCount} villes"
   },
+  "passport.countriesCount": {
+    "one": "%{formattedCount} pays",
+    "many": "%{formattedCount} pays",
+    "other": "%{formattedCount} pays"
+  },
+  "passport.heroStamped": "Lieux tamponnés",
+  "passport.heroWhere": "%{cities} · %{countries}",
+  "passport.heroNext": "Prochain badge : %{badge}",
   "passport.places": "Lieux",
   "passport.cities": "Villes",
   "passport.countries": "Pays",

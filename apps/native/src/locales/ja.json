@@ -1088,17 +1088,21 @@
   },
   "passport.wantToGo": "行きたい",
   "passport.title": "パスポート",
-  "passport.yourPassport": "あなたのパスポート",
   "passport.beenTitle": "行ったことのある場所は？",
   "passport.beenBody": "もう行った場所にスタンプを押しましょう",
   "passport.beenSomewhere": "もう行った場所がある？",
-  "passport.rowCities": "%{places} · %{cities}",
   "passport.placesCount": {
     "other": "%{formattedCount}か所"
   },
   "passport.citiesCount": {
     "other": "%{formattedCount}都市"
   },
+  "passport.countriesCount": {
+    "other": "%{formattedCount}か国"
+  },
+  "passport.heroStamped": "スタンプした場所",
+  "passport.heroWhere": "%{cities} · %{countries}",
+  "passport.heroNext": "次のバッジ：%{badge}",
   "passport.places": "場所",
   "passport.cities": "都市",
   "passport.countries": "国",

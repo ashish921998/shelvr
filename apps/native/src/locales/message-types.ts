@@ -1021,13 +1021,15 @@ type MessageParams = {
   "passport.momentBulk": { count: number };
   "passport.wantToGo": undefined;
   "passport.title": undefined;
-  "passport.yourPassport": undefined;
   "passport.beenTitle": undefined;
   "passport.beenBody": undefined;
   "passport.beenSomewhere": undefined;
-  "passport.rowCities": { places: string; cities: string };
   "passport.placesCount": { count: number };
   "passport.citiesCount": { count: number };
+  "passport.countriesCount": { count: number };
+  "passport.heroStamped": undefined;
+  "passport.heroWhere": { cities: string; countries: string };
+  "passport.heroNext": { badge: string };
   "passport.places": undefined;
   "passport.cities": undefined;
   "passport.countries": undefined;

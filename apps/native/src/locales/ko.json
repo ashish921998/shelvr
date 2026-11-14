@@ -1088,17 +1088,21 @@
   },
   "passport.wantToGo": "가고 싶어요",
   "passport.title": "여권",
-  "passport.yourPassport": "내 여권",
   "passport.beenTitle": "이미 가본 곳이 있나요?",
   "passport.beenBody": "이미 가본 곳에 스탬프를 찍어요",
   "passport.beenSomewhere": "이미 가본 곳이 있나요?",
-  "passport.rowCities": "%{places} · %{cities}",
   "passport.placesCount": {
     "other": "%{formattedCount}곳"
   },
   "passport.citiesCount": {
     "other": "도시 %{formattedCount}곳"
   },
+  "passport.countriesCount": {
+    "other": "%{formattedCount}개국"
+  },
+  "passport.heroStamped": "스탬프 찍은 장소",
+  "passport.heroWhere": "%{cities} · %{countries}",
+  "passport.heroNext": "다음 배지: %{badge}",
   "passport.places": "장소",
   "passport.cities": "도시",
   "passport.countries": "나라",
