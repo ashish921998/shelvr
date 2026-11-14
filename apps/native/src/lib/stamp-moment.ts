@@ -112,7 +112,7 @@ function useBadgeQueue(reduced: boolean) {
 
   const show = useCallback(
     (ids: readonly BadgeId[]) => {
-      const [first, ...rest] = inTableOrder(ids);
+      const [first, ...rest] = ids;
       if (first === undefined) return;
       nextId.current += 1;
       setBadge({ id: nextId.current, badge: first, more: rest.length });
