@@ -28,10 +28,12 @@ export const setCityCover = authedMutation({
         other._id !== item._id &&
         other.coverFor?.some((pick) => pick.key === key),
     );
-    const newer = others.some((other) =>
-      other.coverFor?.some(
-        (pick) => pick.key === key && (own === undefined || pick.at > own),
-      ),
+    const newer = others.some(
+      (other) =>
+        (other.cities ?? []).some((name) => cityKey(name) === key) &&
+        other.coverFor?.some(
+          (pick) => pick.key === key && (own === undefined || pick.at > own),
+        ),
     );
     if (args.on || !newer) {
       for (const other of others) {
