@@ -41,6 +41,7 @@ import type * as model_appleMaps from "../model/appleMaps.js";
 import type * as model_appleSigning from "../model/appleSigning.js";
 import type * as model_appleTokens from "../model/appleTokens.js";
 import type * as model_auth from "../model/auth.js";
+import type * as model_badges from "../model/badges.js";
 import type * as model_cancelSurveyFields from "../model/cancelSurveyFields.js";
 import type * as model_captureRequest from "../model/captureRequest.js";
 import type * as model_captureTokens from "../model/captureTokens.js";
@@ -180,6 +181,7 @@ declare const fullApi: ApiFromModules<{
   "model/appleSigning": typeof model_appleSigning;
   "model/appleTokens": typeof model_appleTokens;
   "model/auth": typeof model_auth;
+  "model/badges": typeof model_badges;
   "model/cancelSurveyFields": typeof model_cancelSurveyFields;
   "model/captureRequest": typeof model_captureRequest;
   "model/captureTokens": typeof model_captureTokens;

@@ -1143,6 +1143,81 @@
   "passport.nextEmpty": "%{city}で表示できる場所は今はありません。",
   "passport.stampPlace": "スタンプ",
   "passport.stampPlaceLabel": "%{name}にスタンプ",
+  "badges.title": "マイルストーン",
+  "badges.earned": "バッジ獲得",
+  "badges.unlocked": "「%{badge}」バッジを獲得",
+  "badges.moreEarned": {
+    "other": "ほかに%{formattedCount}個のバッジ"
+  },
+  "badges.shareMessage": "Shelvrのパスポートで「%{badge}」バッジを獲得しました。",
+  "badges.shareHint": "このバッジを共有",
+  "badges.lockedHint": "Shelvr Proでバッジを獲得",
+  "badges.firstStamp": "最初のスタンプ",
+  "badges.explorer": "探検家",
+  "badges.wanderer": "放浪者",
+  "badges.globetrotter": "世界旅行者",
+  "badges.cityHopper": "街めぐり",
+  "badges.passportHolder": "パスポート所持者",
+  "badges.completionist": "コンプリート達成",
+  "badges.coffeeCrawler": "カフェめぐり",
+  "badges.foodie": "グルメ",
+  "badges.sweetTooth": "甘党",
+  "badges.nightOwl": "夜ふかし",
+  "badges.outAndAbout": "おでかけ上手",
+  "badges.goalPlaces": {
+    "other": "%{formattedCount}か所にスタンプ"
+  },
+  "badges.goalCities": {
+    "other": "%{formattedCount}都市にスタンプ"
+  },
+  "badges.goalCountries": {
+    "other": "%{formattedCount}か国にスタンプ"
+  },
+  "badges.goalCompleteCities": {
+    "other": "%{formattedCount}都市をコンプリート"
+  },
+  "badges.goalCoffee": {
+    "other": "カフェ%{formattedCount}軒にスタンプ"
+  },
+  "badges.goalFood": {
+    "other": "飲食店%{formattedCount}軒にスタンプ"
+  },
+  "badges.goalDessert": {
+    "other": "スイーツ店%{formattedCount}軒にスタンプ"
+  },
+  "badges.goalDrinks": {
+    "other": "バー%{formattedCount}軒にスタンプ"
+  },
+  "badges.goalActivities": {
+    "other": "アクティビティ%{formattedCount}件にスタンプ"
+  },
+  "badges.progressPlaces": {
+    "other": "%{formattedCount}か所中%{visited}か所"
+  },
+  "badges.progressCities": {
+    "other": "%{formattedCount}都市中%{visited}都市"
+  },
+  "badges.progressCountries": {
+    "other": "%{formattedCount}か国中%{visited}か国"
+  },
+  "badges.progressCompleteCities": {
+    "other": "%{formattedCount}都市中%{visited}都市コンプリート"
+  },
+  "badges.progressCoffee": {
+    "other": "カフェ%{formattedCount}軒中%{visited}軒"
+  },
+  "badges.progressFood": {
+    "other": "飲食店%{formattedCount}軒中%{visited}軒"
+  },
+  "badges.progressDessert": {
+    "other": "スイーツ店%{formattedCount}軒中%{visited}軒"
+  },
+  "badges.progressDrinks": {
+    "other": "バー%{formattedCount}軒中%{visited}軒"
+  },
+  "badges.progressActivities": {
+    "other": "アクティビティ%{formattedCount}件中%{visited}件"
+  },
   "passportShare.share": "パスポートを共有",
   "passportShare.stopSetting": "パスポートの共有をやめる",
   "passportShare.stopTitle": "パスポートの共有をやめますか？",
