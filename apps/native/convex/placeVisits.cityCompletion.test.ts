@@ -40,7 +40,7 @@ async function setup() {
       spot: { lat: pin.lat, lng: pin.lng },
     });
   const rings = () => t.query(api.placeVisits.cityCompletion, {});
-  return { backend, t, userId, save, stamp, rings };
+  return { t, userId, save, stamp, rings };
 }
 
 describe("cityCompletion", () => {
