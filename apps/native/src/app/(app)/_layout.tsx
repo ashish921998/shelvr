@@ -120,6 +120,10 @@ export default function AppLayout() {
               options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
             />
             <Stack.Screen
+              name="city-stamps"
+              options={{ headerBackButtonDisplayMode: "minimal" }}
+            />
+            <Stack.Screen
               name="spots/[id]"
               options={{ headerShown: false, gestureEnabled: false }}
             />

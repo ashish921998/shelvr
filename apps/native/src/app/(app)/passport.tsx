@@ -7,12 +7,15 @@ import {
   MilestonesRow,
   useBadgeAccess,
 } from "@/components/passport/milestones-row";
+import { CityStampsSection } from "@/components/passport/city-stamps-section";
 import { PassportCounts } from "@/components/passport/passport-counts";
 import { StampArt, StampSheet } from "@/components/passport/stamp-sheet";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
 import { useBadgeTotals, useShareBadge } from "@/lib/badges";
+import { type CityStamp, useCityStamps } from "@/lib/city-stamp-data";
+import { useRemoveCityStamp } from "@/lib/city-stamps";
 import { formatRecentDate } from "@/lib/date";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
@@ -38,6 +41,7 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const STAMP_SIZE = 92;
+const NO_CITY_STAMPS: CityStamp[] = [];
 const TILTS = ["-4deg", "3deg", "-2deg", "4deg"];
 
 function StampTile({
@@ -87,6 +91,8 @@ export default function PassportScreen() {
   useStampMomentLanding();
   const sharing = useSharePassport(stamps?.length ?? 0);
   const completion = useCityCompletion();
+  const cityStamps = useCityStamps();
+  const removeCityStamp = useRemoveCityStamp();
   const ring = useRingAccess();
   const badges = useBadgeTotals();
   const badgeAccess = useBadgeAccess();
@@ -109,6 +115,14 @@ export default function PassportScreen() {
     }
   }, [completion.error]);
   useEffect(() => {
+    if (cityStamps.error) {
+      analytics.captureError(
+        "passport_city_stamps_load_failed",
+        cityStamps.error,
+      );
+    }
+  }, [cityStamps.error]);
+  useEffect(() => {
     if (badges.error) {
       analytics.captureError("passport_badges_load_failed", badges.error);
     }
@@ -130,7 +144,12 @@ export default function PassportScreen() {
     );
   }
   if (stamps === undefined) return <ScreenLoader />;
-  const sections = passportSections(stamps, completion.rows ?? []);
+  const stampedCities = cityStamps.stamps ?? NO_CITY_STAMPS;
+  const sections = passportSections(
+    stamps,
+    completion.rows ?? [],
+    stampedCities,
+  );
   const head = (section: PassportSection) => (
     <PassportCityHead
       section={section}
@@ -140,6 +159,7 @@ export default function PassportScreen() {
       }
       onUnlock={ring.unlock}
       onShare={(city) => router.push(shareCardHref(city, "passport"))}
+      onCityStamp={(city) => removeCityStamp(city, stampedCities.length - 1)}
     />
   );
 
@@ -150,7 +170,7 @@ export default function PassportScreen() {
       contentContainerStyle={styles.content}
     >
       <Text style={styles.title}>{t("passport.title")}</Text>
-      <PassportCounts {...passportCounts(stamps)} />
+      <PassportCounts {...passportCounts(stamps, stampedCities)} />
       {stamps.length > 0 ? (
         <Pressable
           testID="passport-share"
@@ -188,6 +208,10 @@ export default function PassportScreen() {
       {stamps.length === 0 ? (
         <Text style={styles.muted}>{t("passport.beenBody")}</Text>
       ) : null}
+      <CityStampsSection
+        cities={sections.cities}
+        total={stampedCities.length}
+      />
       {badges.totals ? (
         <MilestonesRow
           totals={badges.totals}

@@ -1347,5 +1347,23 @@
   "onboardingCarousel.eat": "No more “where\nshould we eat?”",
   "onboardingCarousel.map": "Every place you saved,\non one map.",
   "onboardingCarousel.next": "Next slide",
-  "sharedLists.nameBodyWelcome": "People on your shared lists see it, and so does anyone with a link to a save you share or a list you own."
+  "sharedLists.nameBodyWelcome": "People on your shared lists see it, and so does anyone with a link to a save you share or a list you own.",
+  "cityStamps.add": "I’ve been to…",
+  "cityStamps.title": "Cities you’ve been to",
+  "cityStamps.body": "Tap a city you’ve been to and it gets a stamp in your passport. Tap it again to take the stamp off.",
+  "cityStamps.noMatch": "We don’t have that city yet.",
+  "cityStamps.label": "%{city}, city stamp",
+  "cityStamps.removeHint": "Takes the stamp off your passport",
+  "cityStamps.removeTitle": "Take %{city} off your passport?",
+  "cityStamps.remove": "Remove stamp",
+  "cityStamps.lockedHint": "Stamp cities with Shelvr Pro",
+  "cityStamps.saveFailed": "Couldn’t update your cities",
+  "cityStamps.rateLimited": "Too many city changes. Try again in a few minutes.",
+  "cityStamps.onboardingTitle": "Where have you been?",
+  "cityStamps.onboardingBody": "Tap the cities you’ve visited. Each one becomes a stamp in your passport.",
+  "passport.momentCityStamp": "You’ve been to %{city}",
+  "passport.paywallHeadline": {
+    "one": "Your passport has %{formattedCount} city",
+    "other": "Your passport has %{formattedCount} cities"
+  }
 }

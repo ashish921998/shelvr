@@ -1,5 +1,6 @@
 import { analytics } from "@/lib/analytics";
 import { badgeName } from "@/lib/badge-copy";
+import { type CityStamp, useCityStamps } from "@/lib/city-stamp-data";
 import { useEntitlement } from "@/lib/entitlement";
 import { t } from "@/lib/i18n";
 import { useCityCompletion } from "@/lib/passport";
@@ -18,6 +19,8 @@ import { useConvexAuth } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Alert, Platform, Share } from "react-native";
 
+const NO_CITY_STAMPS: CityStamp[] = [];
+
 export function useBadgeTotals(enabled = true): {
   totals: BadgeTotals | undefined;
   error: Error | null;
@@ -30,14 +33,21 @@ export function useBadgeTotals(enabled = true): {
     ),
   );
   const completion = useCityCompletion(enabled);
+  const cities = useCityStamps(enabled);
+  const cityRows = cities.error ? NO_CITY_STAMPS : cities.stamps;
   const totals = useMemo(
     () =>
-      stamps.data === undefined || completion.rows === undefined
+      stamps.data === undefined ||
+      completion.rows === undefined ||
+      cityRows === undefined
         ? undefined
-        : badgeTotals(stamps.data, completion.rows),
-    [stamps.data, completion.rows],
+        : badgeTotals(stamps.data, completion.rows, cityRows),
+    [stamps.data, completion.rows, cityRows],
   );
-  return { totals, error: stamps.error ?? completion.error };
+  return {
+    totals,
+    error: stamps.error ?? completion.error ?? cities.error,
+  };
 }
 
 export function useBadgeUnlocks(unlock: (ids: BadgeId[]) => void): void {

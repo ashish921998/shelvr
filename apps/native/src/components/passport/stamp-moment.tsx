@@ -1,4 +1,5 @@
 import { BadgeMomentView } from "@/components/passport/badge-moment";
+import { CityStampArt } from "@/components/passport/city-stamp";
 import { StampArt } from "@/components/passport/stamp-sheet";
 import { useBadgeUnlocks } from "@/lib/badges";
 import { fadeOut, motion } from "@/lib/motion";
@@ -137,13 +138,29 @@ function StampMomentView({
         style={styles.moment}
       >
         <View style={styles.art}>
-          {reduced ? null : <Animated.View style={[styles.ring, inkRing]} />}
-          <Animated.View style={stamp}>
-            <StampArt
-              cover={shown.moment.cover}
-              ink={shown.ink}
-              size={STAMP_SIZE}
+          {reduced ? null : (
+            <Animated.View
+              style={[
+                styles.ring,
+                shown.moment.kind === "city" && styles.roundRing,
+                inkRing,
+              ]}
             />
+          )}
+          <Animated.View style={stamp}>
+            {shown.moment.kind === "city" ? (
+              <CityStampArt
+                name={shown.moment.city}
+                country={null}
+                size={STAMP_SIZE}
+              />
+            ) : (
+              <StampArt
+                cover={shown.moment.cover}
+                ink={shown.ink}
+                size={STAMP_SIZE}
+              />
+            )}
           </Animated.View>
         </View>
         <Animated.View style={[styles.pill, caption]}>
@@ -203,6 +220,7 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: 3,
     borderColor: theme.colors.primaryText,
   },
+  roundRing: { borderRadius: STAMP_SIZE / 2 },
   pill: {
     maxWidth: 280,
     paddingVertical: theme.gap(1),

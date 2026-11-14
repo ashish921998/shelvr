@@ -1158,6 +1158,21 @@ type MessageParams = {
   "onboardingCarousel.map": undefined;
   "onboardingCarousel.next": undefined;
   "sharedLists.nameBodyWelcome": undefined;
+  "cityStamps.add": undefined;
+  "cityStamps.title": undefined;
+  "cityStamps.body": undefined;
+  "cityStamps.noMatch": undefined;
+  "cityStamps.label": { city: string };
+  "cityStamps.removeHint": undefined;
+  "cityStamps.removeTitle": { city: string };
+  "cityStamps.remove": undefined;
+  "cityStamps.lockedHint": undefined;
+  "cityStamps.saveFailed": undefined;
+  "cityStamps.rateLimited": undefined;
+  "cityStamps.onboardingTitle": undefined;
+  "cityStamps.onboardingBody": undefined;
+  "passport.momentCityStamp": { city: string };
+  "passport.paywallHeadline": { count: number };
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

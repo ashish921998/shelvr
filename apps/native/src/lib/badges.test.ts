@@ -11,6 +11,9 @@ const mocks = vi.hoisted(() => ({
   stamps: undefined as BadgeStamp[] | undefined,
   rows: undefined as BadgeCity[] | undefined,
   completionEnabled: [] as boolean[],
+  cityStamps: [] as { city: string; country: string; stampedAt: number }[],
+  cityStampsEnabled: [] as boolean[],
+  cityStampsError: null as Error | null,
   queryArgs: [] as unknown[],
   token: null as string | null,
   os: "ios",
@@ -36,6 +39,15 @@ vi.mock("@/lib/passport", () => ({
   useCityCompletion: (enabled: boolean) => {
     mocks.completionEnabled.push(enabled);
     return { rows: enabled ? mocks.rows : undefined, error: null };
+  },
+}));
+vi.mock("@/lib/city-stamp-data", () => ({
+  useCityStamps: (enabled: boolean) => {
+    mocks.cityStampsEnabled.push(enabled);
+    return {
+      stamps: enabled ? mocks.cityStamps : undefined,
+      error: mocks.cityStampsError,
+    };
   },
 }));
 vi.mock("@/lib/entitlement", () => ({
@@ -67,6 +79,9 @@ beforeEach(() => {
   mocks.stamps = [];
   mocks.rows = [];
   mocks.completionEnabled = [];
+  mocks.cityStamps = [];
+  mocks.cityStampsEnabled = [];
+  mocks.cityStampsError = null;
   mocks.queryArgs = [];
   mocks.token = null;
   mocks.os = "ios";
@@ -74,6 +89,28 @@ beforeEach(() => {
 });
 
 describe("useBadgeTotals", () => {
+  it("counts city stamps toward cities and countries, never places", () => {
+    mocks.stamps = [cafe("Lisbon")];
+    mocks.cityStamps = [
+      { city: "lisbon", country: "PT", stampedAt: 1 },
+      { city: "tokyo", country: "JP", stampedAt: 1 },
+    ];
+    const { result } = renderHook(() => useBadgeTotals());
+    expect(result.current.totals).toMatchObject({
+      places: 1,
+      cities: 2,
+      countries: 2,
+    });
+  });
+
+  it("still adds up place stamps when city stamps fail to load", () => {
+    mocks.stamps = [cafe("Lisbon")];
+    mocks.cityStampsError = new Error("offline");
+    const { result } = renderHook(() => useBadgeTotals());
+    expect(result.current.totals).toMatchObject({ places: 1, cities: 1 });
+    expect(result.current.error).toBe(mocks.cityStampsError);
+  });
+
   it("adds up stamps and full rings", () => {
     mocks.stamps = [cafe("Lisbon"), cafe("Porto")];
     mocks.rows = [{ stamped: 2, total: 2 }];
@@ -99,10 +136,28 @@ describe("useBadgeTotals", () => {
     renderHook(() => useBadgeTotals());
     expect(mocks.queryArgs).toEqual(["skip", "skip"]);
     expect(mocks.completionEnabled).toEqual([false, true]);
+    expect(mocks.cityStampsEnabled).toEqual([false, true]);
   });
 });
 
 describe("useBadgeUnlocks", () => {
+  it("reports City hopper when a city stamp brings the fifth city", () => {
+    const unlock = vi.fn();
+    mocks.stamps = [cafe("Porto")];
+    mocks.cityStamps = ["lisbon", "tokyo", "paris"].map((city) => ({
+      city,
+      country: "XX",
+      stampedAt: 1,
+    }));
+    const { rerender } = renderHook(() => useBadgeUnlocks(unlock));
+    mocks.cityStamps = [
+      ...mocks.cityStamps,
+      { city: "rome", country: "IT", stampedAt: 2 },
+    ];
+    rerender();
+    expect(unlock).toHaveBeenCalledWith(["cityHopper"]);
+  });
+
   it("reports only badges earned after the first reading", () => {
     const unlock = vi.fn();
     mocks.stamps = [cafe("Lisbon")];

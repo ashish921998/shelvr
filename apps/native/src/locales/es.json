@@ -1412,5 +1412,24 @@
   "onboardingCarousel.eat": "Se acabó el «¿dónde\ncomemos?»",
   "onboardingCarousel.map": "Cada lugar que guardaste,\nen un solo mapa.",
   "onboardingCarousel.next": "Siguiente diapositiva",
-  "sharedLists.nameBodyWelcome": "Las personas de tus listas compartidas lo ven, y también cualquiera con un enlace a un contenido que compartas o a una lista que te pertenezca."
+  "sharedLists.nameBodyWelcome": "Las personas de tus listas compartidas lo ven, y también cualquiera con un enlace a un contenido que compartas o a una lista que te pertenezca.",
+  "cityStamps.add": "He estado en…",
+  "cityStamps.title": "Ciudades que has visitado",
+  "cityStamps.body": "Toca una ciudad que has visitado y tendrá un sello en tu pasaporte. Vuelve a tocarla para quitarlo.",
+  "cityStamps.noMatch": "Todavía no tenemos esa ciudad.",
+  "cityStamps.label": "%{city}, sello de ciudad",
+  "cityStamps.removeHint": "Quita el sello de tu pasaporte",
+  "cityStamps.removeTitle": "¿Quitar %{city} de tu pasaporte?",
+  "cityStamps.remove": "Quitar sello",
+  "cityStamps.lockedHint": "Sella ciudades con Shelvr Pro",
+  "cityStamps.saveFailed": "No se pudieron actualizar tus ciudades",
+  "cityStamps.rateLimited": "Demasiados cambios de ciudades. Inténtalo de nuevo en unos minutos.",
+  "cityStamps.onboardingTitle": "¿Dónde has estado?",
+  "cityStamps.onboardingBody": "Toca las ciudades que has visitado. Cada una será un sello en tu pasaporte.",
+  "passport.momentCityStamp": "Has estado en %{city}",
+  "passport.paywallHeadline": {
+    "one": "Tu pasaporte tiene %{formattedCount} ciudad",
+    "many": "Tu pasaporte tiene %{formattedCount} ciudades",
+    "other": "Tu pasaporte tiene %{formattedCount} ciudades"
+  }
 }

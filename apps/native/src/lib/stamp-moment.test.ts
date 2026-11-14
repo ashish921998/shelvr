@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   bulkStampMoment,
+  cityStampMoment,
   cityStampPlace,
   completesCity,
   placeStampMoment,
@@ -303,6 +304,29 @@ describe("useStampMomentPlayer", () => {
       first_in_city: false,
       count: 5,
     });
+  });
+
+  it("plays a city stamp as its own round moment, with no place and no completion", () => {
+    const { result } = renderHook(() => useStampMomentPlayer(false));
+    act(() =>
+      result.current.controls.play(cityStampMoment("Lisbon"), "city_stamps"),
+    );
+    expect(result.current.shown).toMatchObject({
+      moment: { kind: "city", city: "Lisbon", cover: null },
+      line: 'passport.momentCityStamp {"city":"Lisbon"}',
+      ink: "Lisbon",
+    });
+    expect(mocks.capture.mock.calls).toEqual([
+      [
+        "passport_stamp_landed",
+        { surface: "city_stamps", first_in_city: false, count: 1 },
+      ],
+    ]);
+    expect(mocks.announce).toHaveBeenCalledWith(
+      'passport.momentCityStamp {"city":"Lisbon"}',
+    );
+    act(() => vi.advanceTimersByTime(STAMP_TIMING.drop));
+    expect(mocks.impact).toHaveBeenCalledWith("medium");
   });
 
   it("holds a queued moment until it is released, then plays it once", () => {

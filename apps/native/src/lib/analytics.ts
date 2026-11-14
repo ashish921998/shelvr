@@ -186,15 +186,17 @@ export type AnalyticsEventProperties = {
   passport_opened: { places: number };
   passport_backfilled: { places: number };
   passport_stamp_landed: {
-    surface: "city" | "already_been" | "next_to_stamp";
+    surface: "city" | "already_been" | "next_to_stamp" | "city_stamps";
     first_in_city: boolean;
     count: number;
   };
   passport_city_completed: {
-    surface: "city" | "already_been" | "next_to_stamp";
+    surface: "city" | "already_been" | "next_to_stamp" | "city_stamps";
     total: number;
   };
-  passport_paywall_opened: { surface: "ring" | "badge" };
+  passport_paywall_opened: { surface: "ring" | "badge" | "city_stamp" };
+  passport_city_stamps_opened: { count: number };
+  passport_city_stamp_changed: { stamped: boolean; count: number };
   passport_badge_unlocked: { badge: string };
   passport_badge_shared: {
     badge: string;

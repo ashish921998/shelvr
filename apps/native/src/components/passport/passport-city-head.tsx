@@ -1,4 +1,6 @@
 import { CityRing, cityRingLabel } from "@/components/passport/city-ring";
+import { CityStampArt } from "@/components/passport/city-stamp";
+import { cityStampLabel } from "@/lib/city-stamp-data";
 import { AppSymbolIcon } from "@/components/symbol";
 import { analytics } from "@/lib/analytics";
 import { useEntitlement, usePaywallGuard } from "@/lib/entitlement";
@@ -10,6 +12,7 @@ import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const RING_SIZE = 40;
+const HEAD_STAMP_SIZE = 64;
 
 export function useRingAccess(): { locked: boolean; unlock: () => void } {
   const { entitled, loading } = useEntitlement();
@@ -75,18 +78,39 @@ export function PassportCityHead({
   onOpen,
   onUnlock,
   onShare,
+  onCityStamp,
 }: {
   section: PassportSection;
   locked: boolean;
   onOpen: (city: string) => void;
   onUnlock: () => void;
   onShare: (city: string) => void;
+  onCityStamp?: (city: string) => void;
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
-  const { city, completion, stamps } = section;
+  const { city, completion, stamps, cityStamp } = section;
   return (
     <View style={styles.cityHead}>
+      {cityStamp ? (
+        <Pressable
+          testID="passport-city-head-stamp"
+          accessibilityRole="button"
+          accessibilityLabel={t("cityStamps.label", {
+            city: cityStampLabel(cityStamp.city),
+          })}
+          accessibilityHint={t("cityStamps.removeHint")}
+          disabled={onCityStamp === undefined}
+          onPress={() => onCityStamp?.(cityStamp.city)}
+          style={({ pressed }) => pressed && styles.pressed}
+        >
+          <CityStampArt
+            name={cityStampLabel(cityStamp.city)}
+            country={cityStamp.country}
+            size={HEAD_STAMP_SIZE}
+          />
+        </Pressable>
+      ) : null}
       {completion ? (
         <RingButton
           completion={completion}

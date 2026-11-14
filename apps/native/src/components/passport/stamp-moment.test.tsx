@@ -375,3 +375,19 @@ describe("badge unlock moment", () => {
     expect(screen.getByTestId("stamp-moment")).toBeTruthy();
   });
 });
+
+it("stamps a city with the round city stamp, not a place cover", () => {
+  mount({ kind: "city", city: "Lisbon", cover: null }, "city_stamps");
+
+  stamp();
+
+  expect(
+    screen.getByText('passport.momentCityStamp {"city":"Lisbon"}'),
+  ).toBeTruthy();
+  expect(screen.getByText("Lisbon").closest("figure")).toBeNull();
+  expect(mocks.capture).toHaveBeenCalledWith("passport_stamp_landed", {
+    surface: "city_stamps",
+    first_in_city: false,
+    count: 1,
+  });
+});
