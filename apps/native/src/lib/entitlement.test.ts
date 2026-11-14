@@ -238,6 +238,29 @@ describe("selling before sign-in", () => {
     );
   });
 
+  it("tries sign-in again when a paywall opens after its automatic retries ran out", async () => {
+    const offline = new Error("offline");
+    mock.logIn
+      .mockRejectedValueOnce(offline)
+      .mockRejectedValueOnce(offline)
+      .mockRejectedValueOnce(offline);
+    vi.resetModules();
+    const mod = await import("./entitlement");
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      renderHook(() => mod.useEntitlementSync());
+      await vi.advanceTimersByTimeAsync(6000);
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(mock.logIn).toHaveBeenCalledTimes(3);
+    mock.presentPaywallIfNeeded.mockResolvedValue("CANCELLED");
+    await mod.openPaywall(router, "share");
+    expect(mock.logIn).toHaveBeenCalledTimes(4);
+    expect(mock.presentPaywallIfNeeded).toHaveBeenCalledOnce();
+    expect(push).not.toHaveBeenCalled();
+  });
+
   it("does not start an anonymous customer while sign-in is still loading", async () => {
     mock.auth = { isAuthenticated: false, isLoading: true };
     await loadReady();
@@ -542,6 +565,37 @@ describe("a paywall that never came up", () => {
     expect(push).not.toHaveBeenCalled();
   });
 
+  it("reports only a sheet the person closed as answered", async () => {
+    const mod = await loadReady();
+    mock.presentPaywallIfNeeded.mockResolvedValueOnce("CANCELLED");
+    await expect(
+      mod.openPaywallAnswer(router, "onboarding", { fallback: true }),
+    ).resolves.toEqual({ outcome: "cancelled", answered: true });
+
+    mock.presentPaywallIfNeeded.mockReturnValueOnce(new Promise(() => {}));
+    const dead = mod.openPaywallAnswer(router, "onboarding", {
+      fallback: true,
+    });
+    await vi.waitFor(() =>
+      expect(mock.presentPaywallIfNeeded).toHaveBeenCalledTimes(2),
+    );
+    vi.useFakeTimers();
+    const joined = mod.openPaywallAnswer(router, "share");
+    vi.advanceTimersByTime(2000);
+    mod.noteAppTouch();
+    mock.presentPaywallIfNeeded.mockResolvedValueOnce("CANCELLED");
+    await mod.openPaywall(router, "new_space");
+
+    await expect(dead).resolves.toEqual({
+      outcome: "cancelled",
+      answered: false,
+    });
+    await expect(joined).resolves.toEqual({
+      outcome: "cancelled",
+      answered: false,
+    });
+  });
+
   it("presents again when the app takes a touch after it should have covered it", async () => {
     const { openPaywall, noteAppTouch } = await hungSheet();
     mock.presentPaywallIfNeeded.mockResolvedValueOnce("PURCHASED");
@@ -706,6 +760,15 @@ describe("restore from the paywall", () => {
 
     await expect(openPaywall(router, "share")).resolves.toBe(false);
     expect(mock.observed).toHaveBeenCalledWith("CANCELLED");
+  });
+
+  it("does not count a restore that found nothing as the person answering", async () => {
+    const { openPaywallAnswer } = await loadReady();
+    mock.presentPaywallIfNeeded.mockResolvedValue("RESTORED");
+
+    await expect(
+      openPaywallAnswer(router, "onboarding", { fallback: true }),
+    ).resolves.toEqual({ outcome: "cancelled", answered: false });
   });
 
   it("keeps a restore whose customer info could not be read", async () => {

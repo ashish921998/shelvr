@@ -8,8 +8,11 @@ import {
   getPendingDemoSpace,
   getPendingDemoUrl,
   getPendingSpaces,
+  getPendingOperationId,
   hasPending,
+  noteReplayDeclined,
   queueDemoUrl,
+  replayDeclined,
   setOnboardingProgress,
   setPendingSpaces,
 } from "./pending-onboarding";
@@ -22,6 +25,29 @@ vi.mock("expo-secure-store", () => ({
 vi.mock("expo-crypto", () => ({ randomUUID: () => "new-operation-id" }));
 
 beforeEach(() => storage.clear());
+
+describe("a no to the replay's paywall", () => {
+  it("is kept for the work it was asked about, through the record's rewrites", () => {
+    queueDemoUrl("https://example.com/reel");
+    noteReplayDeclined(getPendingOperationId());
+    expect(replayDeclined()).toBe(true);
+    setPendingSpaces(["Recipes"]);
+    setOnboardingProgress({ spaces: ["Recipes"], step: 2 });
+    clearLegacyDemoUrl();
+    expect(replayDeclined()).toBe(true);
+    clearPending();
+    expect(replayDeclined()).toBe(false);
+  });
+
+  it("is ignored for other work, or when nothing is queued", () => {
+    noteReplayDeclined("onboarding:gone");
+    expect(replayDeclined()).toBe(false);
+    queueDemoUrl("https://example.com/reel");
+    noteReplayDeclined("onboarding:gone");
+    noteReplayDeclined(null);
+    expect(replayDeclined()).toBe(false);
+  });
+});
 
 describe("onboarding recovery", () => {
   it("does not request a replay or paywall when storage is absent, cleared, or corrupt", () => {

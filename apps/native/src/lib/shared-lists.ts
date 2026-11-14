@@ -44,13 +44,14 @@ let nameAsked = false;
 
 export function useMyFirstName() {
   const { isAuthenticated } = useConvexAuth();
-  const { data, isError } = useQuery(
+  const { data, isError, error } = useQuery(
     convexQuery(api.users.getMyFirstName, isAuthenticated ? {} : "skip"),
   );
   return {
     firstName: data,
     loading: isAuthenticated && data === undefined && !isError,
     failed: isError,
+    error,
   };
 }
 

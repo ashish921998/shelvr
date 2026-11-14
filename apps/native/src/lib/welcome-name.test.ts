@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { analytics } from "@/lib/analytics";
 import { useWelcomeName } from "./welcome-name";
 import { welcomeName } from "./welcome-save";
 
@@ -10,6 +11,7 @@ const mock = vi.hoisted(() => ({
   failed: false,
   settle: [] as (() => void)[],
   focused: true,
+  lookupError: new Error("offline"),
 }));
 vi.mock("expo-router", () => ({ useIsFocused: () => mock.focused }));
 vi.mock("expo-secure-store", () => ({
@@ -20,16 +22,17 @@ vi.mock("expo-secure-store", () => ({
 }));
 vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
 vi.mock("@/lib/shared-lists", () => ({
-  useMyFirstName: () => ({ firstName: mock.firstName, failed: mock.failed }),
+  useMyFirstName: () => ({
+    firstName: mock.firstName,
+    failed: mock.failed,
+    error: mock.failed ? mock.lookupError : null,
+  }),
 }));
 vi.mock("@/lib/entitlement", () => ({
   whenSheetSettled: () =>
     new Promise<void>((resolve) => {
       mock.settle.push(resolve);
     }),
-}));
-vi.mock("@/lib/trial-reminder", () => ({
-  whenTrialPrimerDone: () => Promise.resolve(),
 }));
 vi.mock("@/lib/welcome-save", async () => {
   const { oncePerAccount } = await import("./once-per-account");
@@ -43,9 +46,10 @@ async function settleSheets() {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   mock.store.clear();
   mock.firstName = null;
-  mock.settle.length = 0;
+  for (const resolve of mock.settle.splice(0)) resolve();
   mock.focused = true;
   mock.failed = false;
 });
@@ -121,14 +125,19 @@ describe("useWelcomeName", () => {
     expect(result.current.open).toBe(true);
   });
 
-  it("spends its turn without asking when the name cannot be read", async () => {
+  it("spends its turn without asking when the name cannot be read, and reports why", async () => {
     mock.firstName = undefined;
     mock.failed = true;
     welcomeName.mark("u5");
     const { result } = renderHook(() => useWelcomeName("u5", true));
     expect(result.current.open).toBe(false);
     expect(welcomeName.isPending("u5")).toBe(false);
-    expect(result.current.holding).toBe(false);
+    expect(mock.settle).toHaveLength(0);
+    expect(analytics.captureError).toHaveBeenCalledTimes(1);
+    expect(analytics.captureError).toHaveBeenCalledWith(
+      "welcome_name_lookup_failed",
+      mock.lookupError,
+    );
   });
 
   it("stays shut for an account the flag was never set for", async () => {
