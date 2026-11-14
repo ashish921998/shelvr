@@ -9,7 +9,7 @@ import ja from "@/locales/ja.json";
 import ko from "@/locales/ko.json";
 import ptBR from "@/locales/pt-BR.json";
 import { GOALS, type Goal } from "@/lib/onboarding-goals";
-import { goalPaywallVariables } from "@/lib/paywall-goal";
+import { goalPaywallVariables, goalProgressFor } from "@/lib/paywall-goal";
 import { paywallVariables } from "@/lib/paywall-funnel";
 import { planCities } from "@/lib/sample-plans";
 
@@ -115,6 +115,18 @@ describe("goalPaywallVariables", () => {
     expect(
       values({ goals: [], travelCity: null, beenCities: ["lisbon"] }),
     ).toEqual({});
+  });
+
+  it("counts picked cities only on the onboarding paywall", () => {
+    const picked = { ...progress("date"), beenCities: ["lisbon" as const] };
+    expect(
+      goalPaywallVariables(goalProgressFor(picked, "onboarding")).goal_headline
+        .value,
+    ).toBe("Your passport has 1 city");
+    expect(
+      goalPaywallVariables(goalProgressFor(picked, "passport")).goal_headline
+        .value,
+    ).toBe("Make date night easy.");
   });
 
   it("keeps the goal id unlocalized for every goal", () => {

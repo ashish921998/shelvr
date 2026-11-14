@@ -89,6 +89,15 @@ const GOAL_COPY: Record<Goal, GoalCopy> = {
 
 const string = (value: string) => ({ type: "string" as const, value });
 
+export function goalProgressFor<P extends GoalProgress>(
+  progress: P,
+  placement: string,
+): P {
+  if (placement === "onboarding") return progress;
+  const { beenCities: _beenCities, ...rest } = progress;
+  return rest as P;
+}
+
 function headline(progress: GoalProgress, goalHeadline: string): string {
   const count = progress.beenCities?.length ?? 0;
   return count > 0 ? t("passport.paywallHeadline", { count }) : goalHeadline;
