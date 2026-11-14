@@ -78,7 +78,7 @@ export function useSyncPendingCityStamps(): void {
           picked: cities.length,
           stamped,
         });
-        clearQueuedCityStamps();
+        if (readQueued()?.owner === userId) clearQueuedCityStamps();
       },
       (error: unknown) =>
         analytics.captureError("city_stamps_claim_failed", error),

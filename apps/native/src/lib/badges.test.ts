@@ -189,6 +189,24 @@ describe("useBadgeUnlocks", () => {
     expect(unlock).toHaveBeenCalledWith(["firstStamp"]);
   });
 
+  it("neither revokes nor replays a badge while city stamps fail to load", () => {
+    const unlock = vi.fn();
+    const revoke = vi.fn();
+    mocks.stamps = [cafe("Porto")];
+    mocks.cityStamps = ["lisbon", "tokyo", "paris", "rome"].map((city) => ({
+      city,
+      country: "XX",
+      stampedAt: 1,
+    }));
+    const { rerender } = renderHook(() => useBadgeUnlocks(unlock, revoke));
+    mocks.cityStampsError = new Error("offline");
+    rerender();
+    mocks.cityStampsError = null;
+    rerender();
+    expect(revoke).not.toHaveBeenCalled();
+    expect(unlock).not.toHaveBeenCalled();
+  });
+
   it("watches nothing for a free user", () => {
     mocks.entitled = false;
     const unlock = vi.fn();

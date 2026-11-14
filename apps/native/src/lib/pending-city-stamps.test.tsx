@@ -190,6 +190,26 @@ describe("the cities picked in onboarding, before sign-in", () => {
     expect(mock.update).not.toHaveBeenCalled();
   });
 
+  it("keep a newer pick queued while an earlier claim was still saving", async () => {
+    let finish: (stamped: number) => void = () => {};
+    mock.update.mockReturnValue(
+      new Promise<number>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    queueCityStamps(["lisbon"]);
+    await mount();
+    queueCityStamps(["tokyo"]);
+    await act(async () => {
+      finish(1);
+      await Promise.resolve();
+    });
+    expect(JSON.parse(slot() ?? "")).toEqual({
+      cities: ["tokyo"],
+      owner: null,
+    });
+  });
+
   it("report a keychain that cannot be read, and send nothing", async () => {
     queueCityStamps(["lisbon"]);
     mock.readFailing = true;

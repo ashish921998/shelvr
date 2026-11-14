@@ -55,10 +55,10 @@ export function useBadgeUnlocks(
   revoke: (ids: BadgeId[]) => void,
 ): void {
   const { entitled } = useEntitlement();
-  const { totals } = useBadgeTotals(entitled);
+  const { totals, error } = useBadgeTotals(entitled);
   const known = useRef<BadgeId[] | null>(null);
   useEffect(() => {
-    if (totals === undefined) return;
+    if (totals === undefined || error !== null) return;
     const earned = earnedBadges(totals);
     const before = known.current;
     known.current = earned;
@@ -67,7 +67,7 @@ export function useBadgeUnlocks(
     if (lost.length > 0) revoke(lost);
     const fresh = newlyEarned(before, earned);
     if (fresh.length > 0) unlock(fresh);
-  }, [totals, unlock, revoke]);
+  }, [totals, error, unlock, revoke]);
 }
 
 type ShareSurface = "moment" | "milestones";
