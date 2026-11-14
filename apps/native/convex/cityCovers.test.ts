@@ -167,6 +167,50 @@ describe("setCityCover", () => {
     expect(kyoto).not.toHaveProperty("coverItemId");
   });
 
+  it("ignores a newer pick on a save whose Kyoto place was removed when the shown cover stops", async () => {
+    const backend = newConvexTest();
+    const { userId, t } = await signedInUser(backend);
+    await kyotoPhoto(backend);
+    const temple = await readySave(
+      backend,
+      userId,
+      ["Kyoto"],
+      "https://cdn/temple.jpg",
+    );
+    const tea = await readySave(
+      backend,
+      userId,
+      ["Kyoto"],
+      "https://cdn/tea.jpg",
+    );
+    const hidden = await readySave(
+      backend,
+      userId,
+      ["Kyoto"],
+      "https://cdn/hidden.jpg",
+    );
+    const pin = { name: "Fushimi Inari", lat: 34.97, lng: 135.77 };
+    await backend.run(async (ctx) => {
+      await ctx.db.patch(tea, { coverFor: [{ key: "kyoto", at: 1 }] });
+      await ctx.db.patch(temple, { coverFor: [{ key: "kyoto", at: 2 }] });
+      await ctx.db.patch(hidden, {
+        coverFor: [{ key: "kyoto", at: 3 }],
+        placePins: [{ ...pin, city: "Kyoto" }],
+      });
+      await ctx.db.insert("placeRemovals", { userId, city: "Kyoto", ...pin });
+    });
+    const [before] = await t.query(api.items.listCities, {});
+    expect(before).toMatchObject({ coverItemId: temple });
+    await t.mutation(api.cityCovers.setCityCover, {
+      itemId: temple,
+      city: "Kyoto",
+      on: false,
+    });
+    const [kyoto] = await t.query(api.items.listCities, {});
+    expect(kyoto.cover).toBe("https://upload.wikimedia.org/kyoto.jpg");
+    expect(kyoto).not.toHaveProperty("coverItemId");
+  });
+
   it("puts the picked save's photo on the city card over the city photo", async () => {
     const backend = newConvexTest();
     const { userId, t } = await signedInUser(backend);

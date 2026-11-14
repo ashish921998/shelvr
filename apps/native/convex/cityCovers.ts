@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { rawReadySavesNewestFirst } from "./items";
+import { readySavesNewestFirst } from "./items";
 import { authedMutation } from "./model/auth";
 import { cityKey } from "./model/trip";
 
@@ -23,7 +23,7 @@ export const setCityCover = authedMutation({
       throw new Error("Save has no photo");
     }
     const own = item.coverFor?.find((pick) => pick.key === key)?.at;
-    const others = (await rawReadySavesNewestFirst(ctx, ctx.userId)).filter(
+    const others = (await readySavesNewestFirst(ctx, ctx.userId)).filter(
       (other) =>
         other._id !== item._id &&
         other.coverFor?.some((pick) => pick.key === key),
