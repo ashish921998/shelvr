@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   bulkStampMoment,
+  cityStampPlace,
   placeStampMoment,
   STAMP_TIMING,
   type StampMoment,
@@ -88,6 +89,59 @@ describe("placeStampMoment", () => {
       city: "",
       cover: null,
       firstInCity: false,
+      completedTotal: null,
+    });
+  });
+
+  it("completes the city only when this stamp is its last unstamped place", () => {
+    expect(
+      placeStampMoment("Tigre", { ...lisbon, cityVisited: 6, cityTotal: 7 }),
+    ).toMatchObject({ completedTotal: 7, firstInCity: false });
+    expect(
+      placeStampMoment("Tigre", { ...lisbon, cityVisited: 0, cityTotal: 1 }),
+    ).toMatchObject({ completedTotal: 1, firstInCity: true });
+    expect(
+      placeStampMoment("Tigre", { ...lisbon, cityVisited: 5, cityTotal: 7 }),
+    ).toMatchObject({ completedTotal: null });
+    expect(
+      placeStampMoment("Tigre", { ...lisbon, cityVisited: 7, cityTotal: 7 }),
+    ).toMatchObject({ completedTotal: null });
+    expect(
+      placeStampMoment("Tigre", { ...lisbon, cityVisited: 2 }),
+    ).toMatchObject({ completedTotal: null });
+    expect(
+      placeStampMoment("Tigre", { ...lisbon, cityVisited: 0, cityTotal: 0 }),
+    ).toMatchObject({ completedTotal: null });
+    expect(
+      placeStampMoment("Tigre", {
+        city: "",
+        cover: null,
+        cityVisited: 0,
+        cityTotal: 1,
+      }),
+    ).toMatchObject({ completedTotal: null });
+  });
+});
+
+describe("cityStampPlace", () => {
+  it("carries the city's counts before the stamp so the moment can tell first and last", () => {
+    const place = cityStampPlace("Lisbon", null, { stamped: 11, total: 12 });
+    expect(place).toEqual({
+      city: "Lisbon",
+      cover: null,
+      cityVisited: 11,
+      cityTotal: 12,
+    });
+    expect(placeStampMoment("Tigre", place)).toMatchObject({
+      completedTotal: 12,
+    });
+  });
+
+  it("claims neither first nor last while the city's counts are unknown", () => {
+    const place = cityStampPlace("Lisbon", "c", undefined);
+    expect(placeStampMoment("Tigre", place)).toMatchObject({
+      firstInCity: false,
+      completedTotal: null,
     });
   });
 });
@@ -122,6 +176,15 @@ describe("stampLine", () => {
         placeStampMoment("Tigre", { city: "", cover: null, cityVisited: 0 }),
       ),
     ).toBe('passport.momentStamped {"name":"Tigre"}');
+    expect(
+      stampLine(
+        placeStampMoment("Tigre", {
+          ...lisbon,
+          cityVisited: 0,
+          cityTotal: 1,
+        }),
+      ),
+    ).toBe('passport.momentCityComplete {"city":"Lisbon"}');
     expect(stampLine({ kind: "bulk", count: 4, cover: null })).toBe(
       'passport.momentBulk {"count":4}',
     );
@@ -181,6 +244,42 @@ describe("useStampMomentPlayer", () => {
     expect(mocks.impact).toHaveBeenCalledTimes(1);
     act(() => vi.advanceTimersByTime(STAMP_TIMING.shown));
     expect(mocks.impact).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a city completed once, alongside the landing, with its total", () => {
+    const { result } = renderHook(() => useStampMomentPlayer(false));
+    const last = placeStampMoment("Tigre", {
+      ...lisbon,
+      cityVisited: 11,
+      cityTotal: 12,
+    });
+    act(() => result.current.controls.play(last, "next_to_stamp"));
+    expect(result.current.shown?.line).toBe(
+      'passport.momentCityComplete {"city":"Lisbon"}',
+    );
+    expect(mocks.capture.mock.calls).toEqual([
+      [
+        "passport_stamp_landed",
+        { surface: "next_to_stamp", first_in_city: false, count: 1 },
+      ],
+      ["passport_city_completed", { surface: "next_to_stamp", total: 12 }],
+    ]);
+    expect(mocks.announce).toHaveBeenCalledWith(
+      'passport.momentCityComplete {"city":"Lisbon"}',
+    );
+
+    mocks.capture.mockClear();
+    act(() =>
+      result.current.controls.play(
+        placeStampMoment("Tigre", { ...lisbon, cityVisited: 3, cityTotal: 12 }),
+        "city",
+      ),
+    );
+    expect(mocks.capture).toHaveBeenCalledTimes(1);
+    expect(mocks.capture).not.toHaveBeenCalledWith(
+      "passport_city_completed",
+      expect.anything(),
+    );
   });
 
   it("plays one moment for a batch with its count", () => {

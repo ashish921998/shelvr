@@ -1202,6 +1202,31 @@
   "passport.cardSavedElsewhere": "Guardado para luego.",
   "passport.cardWent": "Fuimos con Shelvr.",
   "passport.shareCity": "Compartir %{city}",
+  "passport.momentCityComplete": "Has completado %{city}",
+  "passport.ringCount": "%{visited} de %{total}",
+  "passport.ringLabel": {
+    "one": "%{visited} de %{formattedCount} lugar sellado en %{city}",
+    "many": "%{visited} de %{formattedCount} lugares sellados en %{city}",
+    "other": "%{visited} de %{formattedCount} lugares sellados en %{city}"
+  },
+  "passport.ringLocked": {
+    "one": "%{formattedCount} lugar guardado en %{city}",
+    "many": "%{formattedCount} lugares guardados en %{city}",
+    "other": "%{formattedCount} lugares guardados en %{city}"
+  },
+  "passport.ringHint": "Muestra los lugares que faltan por sellar",
+  "passport.ringLockedHint": "Sella lugares con Shelvr Pro",
+  "passport.notStampedYet": "Guardados, aún sin sellar",
+  "passport.nextTitle": "Por sellar",
+  "passport.nextBody": {
+    "one": "Falta por sellar %{formattedCount} lugar en %{city}",
+    "many": "Faltan por sellar %{formattedCount} lugares en %{city}",
+    "other": "Faltan por sellar %{formattedCount} lugares en %{city}"
+  },
+  "passport.cityAllStamped": "Todos los lugares que guardaste en %{city} están sellados.",
+  "passport.nextEmpty": "No hay lugares para mostrar en %{city} por ahora.",
+  "passport.stampPlace": "Sellar",
+  "passport.stampPlaceLabel": "Sellar %{name}",
   "passportShare.share": "Compartir pasaporte",
   "passportShare.stopSetting": "Dejar de compartir mi pasaporte",
   "passportShare.stopTitle": "¿Dejar de compartir tu pasaporte?",

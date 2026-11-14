@@ -11,6 +11,7 @@ import {
 import { aiAllowed } from "./aiConsent";
 import {
   CITY_ITEMS_MAX,
+  citySaves,
   rawReadySavesNewestFirst,
   readySavesNewestFirst,
 } from "./items";
@@ -52,7 +53,14 @@ import {
 } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import { MAX_APPLE_ID_CHARS, tidyText, validPoint } from "./model/tripPlace";
-import { distanceKm, SAME_PLACE_KM, uniquePlacePins } from "./model/trip";
+import {
+  cityKey,
+  distanceKm,
+  pinsForCity,
+  SAME_PLACE_KM,
+  tidyCity,
+  uniquePlacePins,
+} from "./model/trip";
 import { requireProEntitlement } from "./subscriptions";
 
 type Visit = { name: string; itemId: Id<"items">; visitedAt: number };
@@ -626,6 +634,43 @@ async function unstampedPins(ctx: QueryCtx, userId: Id<"users">) {
   return pins.filter((pin) => !visited(pin));
 }
 
+const unstampedPlaceValidator = v.object({
+  itemId: v.id("items"),
+  name: v.string(),
+  city: v.string(),
+  spot: visitSpotValidator,
+  title: v.optional(v.string()),
+  cover: v.union(v.string(), v.null()),
+});
+
+type UnstampedPin = Point & {
+  name: string;
+  appleId?: string;
+  city: string;
+  item: Doc<"items">;
+};
+
+async function unstampedRows(ctx: QueryCtx, places: readonly UnstampedPin[]) {
+  const covers = new Map<Id<"items">, Promise<string | null>>();
+  return await Promise.all(
+    places.map(async ({ name, city, item, lat, lng, appleId }) => {
+      let cover = covers.get(item._id);
+      if (cover === undefined) {
+        cover = coverOf(ctx, item);
+        covers.set(item._id, cover);
+      }
+      return {
+        itemId: item._id,
+        name,
+        city,
+        spot: { lat, lng, ...(appleId === undefined ? {} : { appleId }) },
+        ...(item.title ? { title: item.title } : {}),
+        cover: await cover,
+      };
+    }),
+  );
+}
+
 export const listUnstampedPlaces = authedQuery({
   args: {},
   returns: v.array(
@@ -638,30 +683,49 @@ export const listUnstampedPlaces = authedQuery({
       cover: v.union(v.string(), v.null()),
     }),
   ),
-  handler: async (ctx) => {
-    const places = uniquePlacePins(await unstampedPins(ctx, ctx.userId)).slice(
-      0,
-      MAX_UNSTAMPED_PLACES,
-    );
-    const covers = new Map<Id<"items">, Promise<string | null>>();
-    return await Promise.all(
-      places.map(async ({ name, city, item, lat, lng, appleId }) => {
-        let cover = covers.get(item._id);
-        if (cover === undefined) {
-          cover = coverOf(ctx, item);
-          covers.set(item._id, cover);
-        }
-        return {
-          itemId: item._id,
-          name,
-          city,
-          spot: { lat, lng, ...(appleId === undefined ? {} : { appleId }) },
-          ...(item.title ? { title: item.title } : {}),
-          cover: await cover,
-        };
-      }),
-    );
-  },
+  handler: async (ctx) =>
+    await unstampedRows(
+      ctx,
+      uniquePlacePins(await unstampedPins(ctx, ctx.userId)).slice(
+        0,
+        MAX_UNSTAMPED_PLACES,
+      ),
+    ),
+});
+
+async function unstampedPinsInCity(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  city: string,
+): Promise<UnstampedPin[]> {
+  if (cityKey(city) === "") return [];
+  const saves = await rawReadySavesNewestFirst(ctx, userId);
+  const removals = await userRemovals(ctx, userId);
+  const visible = saves.map((item) => visibleCitySave(item, removals));
+  const pins = uniquePlacePins(
+    citySaves(visible, city).flatMap((item) =>
+      pinsForCity(item, city).map((pin) => ({
+        ...pin,
+        city: pinCity(item, pin) ?? tidyCity(city),
+        item,
+      })),
+    ),
+  );
+  const visited = visitMatcher(await userVisits(ctx, userId, saves), pins);
+  return pins.filter((pin) => !visited(pin));
+}
+
+export const listUnstampedPlacesInCity = authedQuery({
+  args: { city: v.string() },
+  returns: v.array(unstampedPlaceValidator),
+  handler: async (ctx, { city }) =>
+    await unstampedRows(
+      ctx,
+      (await unstampedPinsInCity(ctx, ctx.userId, city)).slice(
+        0,
+        MAX_UNSTAMPED_PLACES,
+      ),
+    ),
 });
 
 export const cityCompletion = authedQuery({

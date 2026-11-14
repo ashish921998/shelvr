@@ -218,3 +218,124 @@ describe("cityCompletion", () => {
     ).toHaveLength(4);
   });
 });
+
+describe("listUnstampedPlacesInCity", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const spots = (city: string, count: number, lat: number, lng: number) =>
+    Array.from({ length: count }, (_, index) => ({
+      name: `${city} spot ${index}`,
+      lat: lat + index * 0.01,
+      lng,
+    }));
+
+  it("refuses a signed-out caller", async () => {
+    const backend = newConvexTest();
+    await expect(
+      backend.query(api.placeVisits.listUnstampedPlacesInCity, {
+        city: "Tokyo",
+      }),
+    ).rejects.toThrow("Not authenticated");
+  });
+
+  it("lists an older city's places when newer cities hold more than 200", async () => {
+    const { t, save, stamp, rings } = await setup();
+    const tokyo = spots("Tokyo", 100, 35, 139.7);
+    const tokyoSaves: Id<"items">[] = [];
+    for (let at = 0; at < tokyo.length; at += 10) {
+      tokyoSaves.push(await save(["Tokyo"], tokyo.slice(at, at + 10)));
+      vi.advanceTimersByTime(1_000);
+    }
+    const paris = spots("Paris", 150, 48, 2.35);
+    for (let at = 0; at < paris.length; at += 10) {
+      await save(["Paris"], paris.slice(at, at + 10));
+      vi.advanceTimersByTime(1_000);
+    }
+    const york = spots("New York", 60, 40, -74);
+    for (let at = 0; at < york.length; at += 10) {
+      await save(["New York"], york.slice(at, at + 10));
+      vi.advanceTimersByTime(1_000);
+    }
+    await stamp(tokyoSaves[0], tokyo[0]);
+    await stamp(tokyoSaves[3], tokyo[35]);
+    await stamp(tokyoSaves[9], tokyo[99]);
+
+    const everywhere = await t.query(api.placeVisits.listUnstampedPlaces, {});
+    expect(everywhere.filter((place) => place.city === "Tokyo")).toEqual([]);
+
+    const left = await t.query(api.placeVisits.listUnstampedPlacesInCity, {
+      city: "tokyo",
+    });
+    const ring = (await rings()).find((row) => row.city === "Tokyo");
+    expect(ring).toEqual({ city: "Tokyo", stamped: 3, total: 100 });
+    expect(left).toHaveLength(97);
+    expect(left).toHaveLength((ring?.total ?? 0) - (ring?.stamped ?? 0));
+    expect(new Set(left.map((place) => place.city))).toEqual(
+      new Set(["Tokyo"]),
+    );
+    expect(left.map((place) => place.name)).not.toContain(tokyo[35].name);
+    expect(left[0]).toMatchObject({
+      itemId: tokyoSaves[9],
+      name: tokyo[90].name,
+      spot: { lat: tokyo[90].lat, lng: tokyo[90].lng },
+      title: "Tokyo",
+      cover: null,
+    });
+    expect(
+      await t.query(api.placeVisits.listUnstampedPlacesInCity, { city: " " }),
+    ).toEqual([]);
+  });
+
+  it("agrees with the ring after removals, a name-only mark and a repeat pin", async () => {
+    const { t, userId, save, stamp, rings } = await setup();
+    const both = await save(
+      ["Lisbon", "Porto"],
+      [
+        { ...TIGRE, city: "Lisbon" },
+        { ...MAJESTIC, city: "Porto" },
+      ],
+    );
+    const nextDoor = { ...TIGRE, lat: TIGRE.lat + 0.0005 };
+    const lisbon = await save(
+      ["Lisbon"],
+      [nextDoor, BLEND, MANTEIGARIA, CERVEJARIA],
+    );
+    await stamp(lisbon, BLEND);
+    await t.run((ctx) =>
+      ctx.db.insert("placeVisits", {
+        userId,
+        key: "cervejaria",
+        name: "Cervejaria",
+        itemId: both,
+        visitedAt: Date.now(),
+      }),
+    );
+    await t.mutation(api.placeRemovals.removePlace, {
+      itemId: lisbon,
+      ...MANTEIGARIA,
+    });
+
+    const ringFor = async (city: string) =>
+      (await rings()).find((row) => row.city === city);
+    for (const city of ["Lisbon", "Porto"]) {
+      const ring = await ringFor(city);
+      const left = await t.query(api.placeVisits.listUnstampedPlacesInCity, {
+        city,
+      });
+      expect(left).toHaveLength((ring?.total ?? 0) - (ring?.stamped ?? 0));
+    }
+    expect(
+      (
+        await t.query(api.placeVisits.listUnstampedPlacesInCity, {
+          city: "Lisbon",
+        })
+      ).map((place) => place.name),
+    ).toEqual(["Tigre"]);
+  });
+});

@@ -1124,6 +1124,25 @@
   "passport.cardSavedElsewhere": "나중을 위해 저장.",
   "passport.cardWent": "Shelvr로 다녀옴.",
   "passport.shareCity": "%{city} 공유",
+  "passport.momentCityComplete": "%{city} 완성",
+  "passport.ringCount": "%{visited}/%{total}",
+  "passport.ringLabel": {
+    "other": "%{city}에서 %{formattedCount}곳 중 %{visited}곳 스탬프"
+  },
+  "passport.ringLocked": {
+    "other": "%{city}에 저장한 장소 %{formattedCount}곳"
+  },
+  "passport.ringHint": "아직 스탬프하지 않은 장소를 보여줘요",
+  "passport.ringLockedHint": "Shelvr Pro로 장소에 스탬프",
+  "passport.notStampedYet": "저장했지만 아직 스탬프 없음",
+  "passport.nextTitle": "다음 스탬프",
+  "passport.nextBody": {
+    "other": "%{city}에 스탬프할 곳이 %{formattedCount}곳 남았어요"
+  },
+  "passport.cityAllStamped": "%{city}에 저장한 장소에 모두 스탬프를 찍었어요.",
+  "passport.nextEmpty": "지금은 %{city}에서 보여 줄 장소가 없어요.",
+  "passport.stampPlace": "스탬프",
+  "passport.stampPlaceLabel": "%{name}에 스탬프",
   "passportShare.share": "여권 공유",
   "passportShare.stopSetting": "내 여권 공유 중지",
   "passportShare.stopTitle": "여권 공유를 중지할까요?",

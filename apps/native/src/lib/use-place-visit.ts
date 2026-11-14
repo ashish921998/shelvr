@@ -54,11 +54,13 @@ type VisitPlace = {
   appleId?: string;
 };
 
-export function usePlaceVisit(surface: "city" | "passport" = "city") {
+export function usePlaceVisit(
+  surface: "city" | "passport" | "next_to_stamp" = "city",
+) {
   const router = useRouter();
   const navigation = useNavigation();
   const setVisited = useMutation(api.placeVisits.setVisited);
-  const { play: playStamp } = useStampMoment();
+  const { play: playStamp, queue: queueStamp } = useStampMoment();
   const working = useRef(false);
   const [busy, setBusy] = useState(false);
   const toggle = async (
@@ -88,11 +90,13 @@ export function usePlaceVisit(surface: "city" | "passport" = "city") {
       });
       if (!visited) void haptics.selection();
       else if (navigation.isFocused()) {
-        playStamp(placeStampMoment(name, stamp), "city");
+        const moment = placeStampMoment(name, stamp);
+        if (surface === "next_to_stamp") queueStamp(moment, surface);
+        else playStamp(moment, "city");
       }
       if (surface === "passport") {
         analytics.capture("place_unstamped", { surface });
-      } else {
+      } else if (surface === "city") {
         analytics.capture("city_place_visited", { visited });
       }
       return true;

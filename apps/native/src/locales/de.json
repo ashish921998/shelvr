@@ -1163,6 +1163,28 @@
   "passport.cardSavedElsewhere": "Für später gespeichert.",
   "passport.cardWent": "Mit Shelvr dort gewesen.",
   "passport.shareCity": "%{city} teilen",
+  "passport.momentCityComplete": "%{city} komplett",
+  "passport.ringCount": "%{visited} von %{total}",
+  "passport.ringLabel": {
+    "one": "%{visited} von %{formattedCount} Ort in %{city} gestempelt",
+    "other": "%{visited} von %{formattedCount} Orten in %{city} gestempelt"
+  },
+  "passport.ringLocked": {
+    "one": "%{formattedCount} Ort in %{city} gespeichert",
+    "other": "%{formattedCount} Orte in %{city} gespeichert"
+  },
+  "passport.ringHint": "Zeigt die Orte, die noch fehlen",
+  "passport.ringLockedHint": "Mit Shelvr Pro Orte stempeln",
+  "passport.notStampedYet": "Gespeichert, noch nicht gestempelt",
+  "passport.nextTitle": "Als Nächstes stempeln",
+  "passport.nextBody": {
+    "one": "Noch %{formattedCount} Ort in %{city} zu stempeln",
+    "other": "Noch %{formattedCount} Orte in %{city} zu stempeln"
+  },
+  "passport.cityAllStamped": "Alle gespeicherten Orte in %{city} sind gestempelt.",
+  "passport.nextEmpty": "Für %{city} gibt es gerade keine Orte zum Anzeigen.",
+  "passport.stampPlace": "Stempeln",
+  "passport.stampPlaceLabel": "%{name} stempeln",
   "passportShare.share": "Pass teilen",
   "passportShare.stopSetting": "Meinen Pass nicht mehr teilen",
   "passportShare.stopTitle": "Deinen Pass nicht mehr teilen?",

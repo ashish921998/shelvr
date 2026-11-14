@@ -1163,6 +1163,28 @@
   "passport.cardSavedElsewhere": "Saved for later.",
   "passport.cardWent": "Went with Shelvr.",
   "passport.shareCity": "Share %{city}",
+  "passport.momentCityComplete": "%{city} complete",
+  "passport.ringCount": "%{visited} of %{total}",
+  "passport.ringLabel": {
+    "one": "%{visited} of %{formattedCount} place stamped in %{city}",
+    "other": "%{visited} of %{formattedCount} places stamped in %{city}"
+  },
+  "passport.ringLocked": {
+    "one": "%{formattedCount} place saved in %{city}",
+    "other": "%{formattedCount} places saved in %{city}"
+  },
+  "passport.ringHint": "Shows the places left to stamp",
+  "passport.ringLockedHint": "Stamp places with Shelvr Pro",
+  "passport.notStampedYet": "Saved, not stamped yet",
+  "passport.nextTitle": "Next to stamp",
+  "passport.nextBody": {
+    "one": "%{formattedCount} place in %{city} left to stamp",
+    "other": "%{formattedCount} places in %{city} left to stamp"
+  },
+  "passport.cityAllStamped": "Every place you saved in %{city} is stamped.",
+  "passport.nextEmpty": "No places to show for %{city} right now.",
+  "passport.stampPlace": "Stamp",
+  "passport.stampPlaceLabel": "Stamp %{name}",
   "passportShare.share": "Share passport",
   "passportShare.stopSetting": "Stop sharing my passport",
   "passportShare.stopTitle": "Stop sharing your passport?",
