@@ -564,7 +564,7 @@ describe("city page", () => {
       "item-1",
       expect.objectContaining({ name: "BBQ Pit", lat: 30.2, lng: -97.2 }),
       true,
-      { city: "Austin", cover: null, cityVisited: 1, cityStamps: 0 },
+      { city: "Austin", cover: null, cityVisited: 1, cityStamps: null },
     );
   });
 
@@ -583,7 +583,7 @@ describe("city page", () => {
         city: "Austin",
         cover: "https://img/reel.jpg",
         cityVisited: 0,
-        cityStamps: 0,
+        cityStamps: null,
       },
     );
   });
@@ -664,7 +664,7 @@ describe("city page", () => {
         appleId: "taco",
       }),
       false,
-      { city: "Austin", cover: null, cityVisited: 1, cityStamps: 0 },
+      { city: "Austin", cover: null, cityVisited: 1, cityStamps: null },
     );
   });
 

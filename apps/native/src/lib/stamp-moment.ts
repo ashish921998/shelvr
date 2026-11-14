@@ -29,7 +29,7 @@ export type StampPlace = {
   city: string;
   cover: string | null;
   cityVisited: number;
-  cityStamps?: number;
+  cityStamps?: number | null;
 };
 
 export type ShownStamp = {
