@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { badgeTotals, earnedBadges } from "./badges";
-import {
-  cityStampFor,
-  cityStampKeys,
-  cityStampName,
-  isCityStampId,
-  knownCityStamps,
-} from "./cityStamps";
+import { cityStampKeys, isCityStampId, knownCityStamps } from "./cityStamps";
 import { passportCounts } from "./passport";
 
 const LISBON = { city: "lisbon", country: "PT" };
@@ -19,14 +13,6 @@ describe("the city list", () => {
     expect(isCityStampId("toString")).toBe(false);
     expect(isCityStampId("__proto__")).toBe(false);
     expect(cityStampKeys("atlantis")).toEqual([]);
-  });
-
-  it("names a city in English and finds it again by any of its names", () => {
-    expect(cityStampName("new-york")).toBe("New York");
-    expect(cityStampFor("new york city")).toBe("new-york");
-    expect(cityStampFor(" Montréal ")).toBe("montreal");
-    expect(cityStampFor("Porto")).toBeUndefined();
-    expect(cityStampFor("")).toBeUndefined();
   });
 
   it("drops unknown and repeated stamps", () => {

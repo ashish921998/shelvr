@@ -25,7 +25,7 @@ export type StampMoment =
       completedTotal: number | null;
     }
   | { kind: "bulk"; count: number; cover: string | null }
-  | { kind: "city"; city: string; cover: null };
+  | { kind: "city"; city: string };
 
 export type StampSurface =
   | "city"
@@ -216,7 +216,7 @@ export function bulkStampMoment(
 }
 
 export function cityStampMoment(city: string): StampMoment {
-  return { kind: "city", city, cover: null };
+  return { kind: "city", city };
 }
 
 export function stampLine(moment: StampMoment): string {

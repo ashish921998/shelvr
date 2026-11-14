@@ -14,7 +14,7 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
 import { useBadgeTotals, useShareBadge } from "@/lib/badges";
-import { type CityStamp, useCityStamps } from "@/lib/city-stamp-data";
+import { useCityStamps } from "@/lib/city-stamp-data";
 import { useRemoveCityStamp } from "@/lib/city-stamps";
 import { formatRecentDate } from "@/lib/date";
 import { t, useAppLocale } from "@/lib/i18n";
@@ -41,7 +41,6 @@ import { Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const STAMP_SIZE = 92;
-const NO_CITY_STAMPS: CityStamp[] = [];
 const TILTS = ["-4deg", "3deg", "-2deg", "4deg"];
 
 function StampTile({
@@ -144,7 +143,7 @@ export default function PassportScreen() {
     );
   }
   if (stamps === undefined) return <ScreenLoader />;
-  const stampedCities = cityStamps.stamps ?? NO_CITY_STAMPS;
+  const stampedCities = cityStamps.stamps ?? [];
   const sections = passportSections(
     stamps,
     completion.rows ?? [],

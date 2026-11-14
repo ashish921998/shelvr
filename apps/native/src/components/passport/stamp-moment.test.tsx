@@ -377,7 +377,7 @@ describe("badge unlock moment", () => {
 });
 
 it("stamps a city with the round city stamp, not a place cover", () => {
-  mount({ kind: "city", city: "Lisbon", cover: null }, "city_stamps");
+  mount({ kind: "city", city: "Lisbon" }, "city_stamps");
 
   stamp();
 

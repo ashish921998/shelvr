@@ -48,18 +48,8 @@ export function isCityStampId(value: string): value is CityStampId {
   return Object.hasOwn(CITY_STAMP_CITIES, value);
 }
 
-export function cityStampName(id: CityStampId): string {
-  return CITY_STAMP_CITIES[id].names[0];
-}
-
 export function cityStampKeys(id: string): string[] {
   return isCityStampId(id) ? CITY_STAMP_CITIES[id].names.map(cityKey) : [];
-}
-
-export function cityStampFor(city: string): CityStampId | undefined {
-  const key = cityKey(city);
-  if (key === "") return undefined;
-  return CITY_STAMP_IDS.find((id) => cityStampKeys(id).includes(key));
 }
 
 export function knownCityStamps<T extends CityStampEntry>(

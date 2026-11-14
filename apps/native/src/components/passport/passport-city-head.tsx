@@ -78,7 +78,7 @@ export function PassportCityHead({
   onOpen: (city: string) => void;
   onUnlock: () => void;
   onShare: (city: string) => void;
-  onCityStamp?: (city: string) => void;
+  onCityStamp: (city: string) => void;
 }) {
   useAppLocale();
   const { theme } = useUnistyles();
@@ -93,8 +93,7 @@ export function PassportCityHead({
             city: cityStampLabel(cityStamp.city),
           })}
           accessibilityHint={t("cityStamps.removeHint")}
-          disabled={onCityStamp === undefined}
-          onPress={() => onCityStamp?.(cityStamp.city)}
+          onPress={() => onCityStamp(cityStamp.city)}
           style={({ pressed }) => pressed && styles.pressed}
         >
           <CityStampArt

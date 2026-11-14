@@ -56,13 +56,9 @@ vi.mock("@/lib/city-stamp-data", () => ({
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
 vi.mock("react-native", () => ({ Alert: { alert: mocks.alert } }));
 
-async function toggle(city: "lisbon" | "tokyo", stamped: boolean) {
+function toggle(city: "lisbon" | "tokyo", stamped: boolean) {
   const { result } = renderHook(() => useCityStampToggle());
-  let done = false;
-  await act(async () => {
-    done = await result.current(city, stamped, stamped ? 3 : 1);
-  });
-  return done;
+  return act(() => result.current(city, stamped, stamped ? 3 : 1));
 }
 
 beforeEach(() => {
@@ -77,7 +73,7 @@ describe("useCityStampToggle", () => {
     expect(await toggle("lisbon", true)).toBe(true);
     expect(mocks.add).toHaveBeenCalledWith({ city: "lisbon" });
     expect(mocks.play).toHaveBeenCalledWith(
-      { kind: "city", city: "label:lisbon", cover: null },
+      { kind: "city", city: "label:lisbon" },
       "city_stamps",
     );
     expect(mocks.capture).toHaveBeenCalledWith("passport_city_stamp_changed", {

@@ -297,7 +297,7 @@ describe("useStampMomentPlayer", () => {
       result.current.controls.play(cityStampMoment("Lisbon"), "city_stamps"),
     );
     expect(result.current.shown).toMatchObject({
-      moment: { kind: "city", city: "Lisbon", cover: null },
+      moment: { kind: "city", city: "Lisbon" },
       line: 'passport.momentCityStamp {"city":"Lisbon"}',
       ink: "Lisbon",
     });

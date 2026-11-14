@@ -5,7 +5,6 @@ import {
   type SampleCityId,
 } from "@/lib/sample-cities";
 import { api } from "@convex/_generated/api";
-import { cityStampName, isCityStampId } from "@convex/model/cityStamps";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth } from "convex/react";
@@ -35,14 +34,11 @@ export function useCityStamps(enabled = true): {
 }
 
 export function cityStampLabel(city: string): string {
-  if (isSampleCity(city)) return t(SAMPLE_CITIES[city].name);
-  return isCityStampId(city) ? cityStampName(city) : city;
+  return isSampleCity(city) ? t(SAMPLE_CITIES[city].name) : city;
 }
 
-export function stampedCityIds(
-  stamps: readonly CityStamp[] | undefined,
-): SampleCityId[] {
-  return (stamps ?? []).flatMap((stamp) =>
+export function stampedCityIds(stamps: readonly CityStamp[]): SampleCityId[] {
+  return stamps.flatMap((stamp) =>
     isSampleCity(stamp.city) ? [stamp.city] : [],
   );
 }
