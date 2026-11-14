@@ -50,6 +50,16 @@ export default function PrivacyPage() {
             in your account until you delete them.
           </li>
           <li>
+            <strong>Cities you’ve been to.</strong> If you pick cities you have
+            visited, during onboarding or from your passport, we store which of
+            our listed cities you picked, its country and when you added it, so
+            it shows as a city stamp in your passport and counts toward your
+            cities and countries. We do not use your location for this. Cities
+            you pick during onboarding stay on your device until you sign in.
+            You can remove a city stamp in the app, and deleting your account
+            deletes them.
+          </li>
+          <li>
             <strong>Photo metadata.</strong> When you send a photo to Shelvr
             from another app, Shelvr normally removes its EXIF metadata before
             uploading it. A photo saved through Siri, Shortcuts, or the Save an
