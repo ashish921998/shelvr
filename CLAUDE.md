@@ -90,6 +90,7 @@ read [localization](docs/architecture/localization.md); before simulator QA read
   (`model/readers/googleMaps.ts`). A format change fails quietly to a plain page read.
 - **Retired screens' links** open Home through `src/lib/home-href.ts` and
   `src/app/+native-intent.ts`, so an old link or notification never lands on a missing screen.
+  A bare `/` link opens the Map tab, where the app starts.
 
 ## Environment variables
 

@@ -419,6 +419,29 @@ export function matchSavePlaces(
   });
 }
 
+export function tripStopSearchResults(
+  saves: TripSavePlace[],
+  query: string,
+  search: PlaceSearch,
+): { saves: TripSavePlace[]; search: PlaceSearch } {
+  const matching = new Set(matchSavePlaces(saves, query));
+  if (search.status !== "done") return { saves: [...matching], search };
+  const places = search.places.filter((place) => {
+    const saved = saves.find(
+      (save) =>
+        save.location &&
+        sameTripPlace(
+          { ...save.location, name: save.name, itemId: save.itemId },
+          place,
+        ),
+    );
+    if (!saved) return true;
+    matching.add(saved);
+    return false;
+  });
+  return { saves: [...matching], search: { status: "done", places } };
+}
+
 /** Whether a search result is already one of the trip's stops, by the rule adding it uses. */
 export function onTrip(trip: TripLayout, place: TripPlace): boolean {
   return [...trip.days.flat(), ...trip.unplanned].some((stop) =>

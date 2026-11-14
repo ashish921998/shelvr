@@ -10,7 +10,7 @@ import { fadeIn } from "@/lib/motion";
 import { api } from "@convex/_generated/api";
 import { useConvexAuth, usePaginatedQuery } from "convex/react";
 import { useIsFocused, useRouter } from "expo-router";
-import { FlatList, View } from "react-native";
+import { FlatList, Pressable, useWindowDimensions, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -35,13 +35,64 @@ function NoTrips({ onPlan }: { onPlan: () => void }) {
         testID="trips-plan-trip"
         title={t("tripPlanner.planTrip")}
         onPress={onPlan}
-        style={styles.emptyButton}
       />
     </Animated.View>
   );
 }
 
 const PAGE_SIZE = 20;
+const SCREEN_INSET = 2.5;
+const GRID_GAP = 1.5;
+
+function TripsHeader() {
+  const router = useRouter();
+  const { theme } = useUnistyles();
+  return (
+    <View style={styles.header}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={t("navigation.library")}
+        onPress={() => router.navigate("/(app)/(tabs)/(home)")}
+        style={({ pressed }) => [styles.back, pressed && styles.pressed]}
+      >
+        <AppSymbolIcon
+          name="chevron.left"
+          size={16}
+          tintColor={theme.colors.foreground}
+        />
+        <ThemedText variant="bodyLabel">{t("navigation.library")}</ThemedText>
+      </Pressable>
+      <ThemedText variant="displayTitle" accessibilityRole="header">
+        {t("tripPlanner.listTitle")}
+      </ThemedText>
+    </View>
+  );
+}
+
+function NewTripTile({ onPress }: { onPress: () => void }) {
+  const { theme } = useUnistyles();
+  return (
+    <Pressable
+      testID="trips-plan-trip"
+      accessibilityRole="button"
+      accessibilityLabel={t("tripPlanner.planTrip")}
+      onPress={onPress}
+      style={({ pressed }) => [styles.planTile, pressed && styles.pressed]}
+    >
+      <View style={styles.planIcon}>
+        <AppSymbolIcon
+          name="plus"
+          size={22}
+          weight="semibold"
+          tintColor={theme.colors.primaryText}
+        />
+      </View>
+      <ThemedText variant="bodyLabel" style={styles.accent}>
+        {t("tripPlanner.planTrip")}
+      </ThemedText>
+    </Pressable>
+  );
+}
 
 export default function TripsScreen() {
   const { isAuthenticated } = useConvexAuth();
@@ -62,66 +113,117 @@ function TripsList({ signedIn }: { signedIn: boolean }) {
     { initialNumItems: PAGE_SIZE },
   );
   const deleteTrip = useDeleteTripPlan();
-  const sorted = trips.results;
-  const plan = () => router.push("/new-trip");
+  const { width } = useWindowDimensions();
+  const { theme } = useUnistyles();
+  const tileWidth = (width - theme.gap(SCREEN_INSET * 2 + GRID_GAP)) / 2;
+  const planTrip = () => router.push("/new-trip");
+  const tiles = trips.results.length > 0 ? [null, ...trips.results] : [];
   // Under the Plan a trip sheet the list is still on screen; hidden from VoiceOver and TalkBack
   // then, so a swipe cannot leave the sheet for the list behind it.
   const focused = useIsFocused();
 
   if (trips.status === "LoadingFirstPage") {
-    return <ScreenLoader label={t("tripPlanner.loading")} />;
+    return (
+      <View style={styles.screen}>
+        <TripsHeader />
+        <ScreenLoader label={t("tripPlanner.loading")} />
+      </View>
+    );
   }
 
   return (
-    <FlatList
+    <View
       style={styles.screen}
       accessibilityElementsHidden={!focused}
       importantForAccessibility={focused ? "auto" : "no-hide-descendants"}
-      data={sorted}
-      keyExtractor={(trip) => trip._id}
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={[
-        styles.content,
-        sorted.length === 0 && styles.contentEmpty,
-      ]}
-      renderItem={({ item: trip }) => (
-        <TripCard
-          trip={trip}
-          onOpen={() =>
-            router.push({
-              pathname: "/trip-plan/[id]",
-              params: { id: trip._id },
-            })
-          }
-          onDelete={() => deleteTrip(trip._id)}
-        />
-      )}
-      onEndReached={() => {
-        if (trips.status === "CanLoadMore") trips.loadMore(PAGE_SIZE);
-      }}
-      onEndReachedThreshold={0.5}
-      ListEmptyComponent={<NoTrips onPlan={plan} />}
-      ListFooterComponent={
-        sorted.length > 0 ? (
-          <Button
-            testID="trips-plan-another"
-            title={t("tripPlanner.planTrip")}
-            onPress={plan}
-            style={styles.footerButton}
-          />
-        ) : undefined
-      }
-    />
+    >
+      <TripsHeader />
+      <FlatList
+        data={tiles}
+        numColumns={2}
+        columnWrapperStyle={styles.columns}
+        keyExtractor={(trip) => trip?._id ?? "new-trip"}
+        contentContainerStyle={[
+          styles.content,
+          tiles.length === 0 && styles.contentEmpty,
+        ]}
+        renderItem={({ item: trip }) => (
+          <View style={{ width: tileWidth }}>
+            {trip === null ? (
+              <NewTripTile onPress={planTrip} />
+            ) : (
+              <TripCard
+                trip={trip}
+                onOpen={() =>
+                  router.push({
+                    pathname: "/trip-plan/[id]",
+                    params: { id: trip._id },
+                  })
+                }
+                onDelete={() => deleteTrip(trip._id)}
+                onEdit={() =>
+                  router.push({
+                    pathname: "/trip-plan/[id]",
+                    params: { id: trip._id, mode: "edit" },
+                  })
+                }
+              />
+            )}
+          </View>
+        )}
+        onEndReached={() => {
+          if (trips.status === "CanLoadMore") trips.loadMore(PAGE_SIZE);
+        }}
+        onEndReachedThreshold={0.5}
+        ListEmptyComponent={<NoTrips onPlan={planTrip} />}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create((theme, rt) => ({
   screen: { flex: 1, backgroundColor: theme.colors.background },
-  content: {
+  header: {
     gap: theme.gap(1.5),
-    paddingHorizontal: theme.gap(2),
-    paddingTop: theme.gap(1),
-    paddingBottom: rt.insets.bottom + theme.gap(12),
+    paddingHorizontal: theme.gap(SCREEN_INSET),
+    paddingTop: rt.insets.top + theme.gap(0.5),
+    paddingBottom: theme.gap(1.5),
+  },
+  back: {
+    alignSelf: "flex-start",
+    minHeight: theme.control.minHeight,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(0.75),
+  },
+  planTile: {
+    aspectRatio: 1.1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: theme.gap(1),
+    borderRadius: theme.radius.lg,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: theme.colors.primaryText,
+    backgroundColor: theme.colors.surface,
+    paddingHorizontal: theme.gap(1),
+  },
+  planIcon: {
+    width: theme.control.minHeight,
+    height: theme.control.minHeight,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 999,
+    backgroundColor: theme.colors.primarySoft,
+  },
+  accent: { color: theme.colors.primaryText, textAlign: "center" },
+  pressed: { opacity: theme.opacity.pressed },
+  columns: { gap: theme.gap(GRID_GAP) },
+  content: {
+    gap: theme.gap(2.5),
+    paddingHorizontal: theme.gap(SCREEN_INSET),
+    paddingBottom: rt.insets.bottom + theme.gap(2),
   },
   contentEmpty: { flexGrow: 1, justifyContent: "center" },
   empty: {
@@ -140,6 +242,4 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   center: { textAlign: "center" },
   muted: { color: theme.colors.muted },
-  emptyButton: { alignSelf: "stretch", marginTop: theme.gap(1) },
-  footerButton: { marginTop: theme.gap(1.5) },
 }));

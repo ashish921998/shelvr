@@ -118,11 +118,24 @@ describe("redirectSystemPath and the launch animation", () => {
   });
 
   it.each([
-    ["the root URL a home-screen launch produces", "shelvr:///"],
-    ["the same root without its trailing slash", "shelvr://"],
-    ["a path that is not a link at all", "/share"],
-  ])("leaves the splash alone for %s", (_name, path) => {
-    expect(redirectSystemPath({ path, initial: true })).toBe(path);
+    [
+      "the root URL a home-screen launch produces",
+      "shelvr:///",
+      "/(app)/(tabs)/(map)",
+    ],
+    [
+      "the same root without its trailing slash",
+      "shelvr://",
+      "/(app)/(tabs)/(map)",
+    ],
+    [
+      "the bare root the router falls back to without a scheme",
+      "/",
+      "/(app)/(tabs)/(map)",
+    ],
+    ["a path that is not a link at all", "/share", "/share"],
+  ])("leaves the splash alone for %s", (_name, path, href) => {
+    expect(redirectSystemPath({ path, initial: true })).toBe(href);
     expect(isDirectLaunch()).toBe(false);
   });
 });

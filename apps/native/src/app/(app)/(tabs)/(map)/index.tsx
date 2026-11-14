@@ -1,6 +1,9 @@
 import { EmptyState } from "@/components/empty-state";
 import { MapFilterChips } from "@/components/map/map-filter-chips";
-import { MapSearch } from "@/components/map/map-search";
+import { MapEmpty } from "@/components/map/map-empty";
+import { MapHeader, MAP_HEADER_HEIGHT } from "@/components/map/map-header";
+import { MapRoundButton } from "@/components/map/map-round-button";
+import { MapSearchResults } from "@/components/map/map-search";
 import { MapWentSwitch } from "@/components/map/map-went-switch";
 import {
   type MapFocus,
@@ -9,7 +12,6 @@ import {
 } from "@/components/map/places-map";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
-import { withAlpha } from "@/lib/color";
 import {
   canOpenPlaceCard,
   cancelPlaceDetails,
@@ -27,7 +29,10 @@ import {
   type WentFilter,
   wentView,
 } from "@/lib/map-filters";
+import { setMapCityInView } from "@/lib/map-city-in-view";
+import { canShowAllCities } from "@/lib/map-city-zoom";
 import { useMapLocation } from "@/lib/map-location";
+import { useMapCity } from "@/lib/use-map-city";
 import { placeEmoji } from "@/lib/map-pin-emoji";
 import { usePlaceVisits } from "@/lib/use-place-visit";
 import { visitMatcher } from "@convex/model/placeVisits";
@@ -36,12 +41,12 @@ import type { PlaceKind } from "@convex/model/placeKinds";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/** Room left at the right of the filter row for MapKit's my-location button. */
-const LOCATE_BUTTON_CLEARANCE = 64;
+const NO_PLACES: never[] = [];
 
 function placeId(place: {
   itemId: string;
@@ -76,6 +81,12 @@ export default function MapScreen() {
   // Closed once a result is picked, so the map and place card get the room; typing opens it again.
   const [listOpen, setListOpen] = useState(true);
   const [focus, setFocus] = useState<MapFocus | undefined>(undefined);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [locate, setLocate] = useState(0);
+  const [zoomOut, setZoomOut] = useState(0);
+  const [mapHeight, setMapHeight] = useState(0);
+  const [stripHeight, setStripHeight] = useState(0);
+  const barHeight = useBottomTabBarHeight();
 
   const all = places.data;
   const { visits, loaded, isError, error, offerRetry } = usePlaceVisits();
@@ -94,6 +105,7 @@ export default function MapScreen() {
     () => wentView(all ?? [], wentFilter, visited),
     [all, wentFilter, visited],
   );
+  const { city, onCentreChange } = useMapCity(all ?? NO_PLACES);
   const filters = useMemo(() => mapFilters(went.places), [went.places]);
   // A filter that no longer has enough places (a save was deleted) falls back to All.
   const active = filters.some((filter) => filter.kind === kind) ? kind : null;
@@ -102,6 +114,7 @@ export default function MapScreen() {
     [went.places, active],
   );
   const searching = searchText.trim() !== "";
+  const showWent = went.showSwitch && !searchOpen;
   // Search narrows whatever the filter shows; every match stays on the map, the first few are listed.
   const matches = useMemo(
     () => (searching ? searchPlaces(shown, searchText) : shown),
@@ -115,15 +128,22 @@ export default function MapScreen() {
         emoji: placeEmoji(place),
         ...(visited(place)
           ? {
-              tint: isDarkThemeName(rt.themeName)
+              tintColor: isDarkThemeName(rt.themeName)
                 ? theme.colors.primarySoft
                 : theme.colors.primaryText,
-              snippet: t("passport.wentNoDate"),
+              title: `✓ ${place.name}`,
             }
           : {}),
       })),
     [matches, visited, rt.themeName, theme],
   );
+  const overview = useMemo(
+    () => shown.map((place) => ({ ...place, id: placeId(place) })),
+    [shown],
+  );
+  useEffect(() => {
+    setMapCityInView(city);
+  }, [city]);
   const framed = useMemo(
     () =>
       // As on the city page, a pin far out of town stays on the map but does not set the zoom.
@@ -155,23 +175,8 @@ export default function MapScreen() {
     );
   }
   if (all === undefined || location === "asking") return <ScreenLoader />;
-  if (all.length === 0) {
-    return (
-      <View style={styles.empty}>
-        <EmptyState title={t("map.emptyTitle")} message={t("map.emptyBody")} />
-      </View>
-    );
-  }
-
-  const top = rt.insets.top + theme.gap(1);
+  const headerBottom = rt.insets.top + MAP_HEADER_HEIGHT;
   const located = location === "granted";
-  // The search field, then the chips under it.
-  const overlayHeight =
-    theme.control.minHeight +
-    (went.showSwitch && !searching
-      ? theme.gap(1) + theme.control.minHeight
-      : 0) +
-    (filters.length > 0 ? theme.gap(1) + theme.control.minHeight : 0);
   const select = (id: string) => {
     const place = shown.find((candidate) => placeId(candidate) === id);
     if (!place || !focused.current) return;
@@ -205,62 +210,109 @@ export default function MapScreen() {
     if (next !== null) analytics.capture("map_filter_selected", { kind: next });
   };
 
+  const cancelSearch = () => {
+    setSearchText("");
+    setListOpen(true);
+    setSearchOpen(false);
+    Keyboard.dismiss();
+  };
+
   return (
-    <View style={styles.container}>
-      <PlacesMap
-        pins={pins}
-        framed={framed}
-        showsUser={located}
-        topInset={top + overlayHeight}
-        focus={focus}
-        onSelect={select}
-      />
-      <View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: top + overlayHeight + theme.gap(2),
-          // Built in render: Unistyles drops a stylesheet's backgroundImage on theme change.
-          experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0.92)} 0%, ${withAlpha(theme.colors.background, 0.6)} 60%, ${withAlpha(theme.colors.background, 0)} 100%)`,
-        }}
-      />
-      <View
-        style={[
-          styles.overlay,
-          // Kept clear of MapKit's my-location button in the top right corner, which it would cover.
-          { top, right: located ? LOCATE_BUTTON_CLEARANCE : 0 },
-        ]}
-      >
-        <MapSearch
-          text={searchText}
-          onChangeText={(text) => {
-            setSearchText(text);
-            setListOpen(true);
-          }}
-          total={matches.length}
-          results={
-            searching && listOpen
-              ? topSearchResults(matches).map((place) => ({
-                  id: placeId(place),
-                  name: place.name,
-                  city: place.city,
-                }))
-              : undefined
+    <View
+      style={styles.container}
+      onLayout={(event) => setMapHeight(event.nativeEvent.layout.height)}
+    >
+      {mapHeight > 0 ? (
+        <PlacesMap
+          pins={pins}
+          framed={framed}
+          showsUser={located}
+          height={mapHeight}
+          topInset={headerBottom + theme.gap(1)}
+          bottomInset={
+            barHeight +
+            (filters.length > 0 || showWent ? stripHeight : 0) +
+            theme.gap(1)
           }
-          onSelect={pickResult}
+          focus={focus}
+          locate={locate}
+          overview={overview}
+          zoomOut={zoomOut}
+          onCentreChange={onCentreChange}
+          onSelect={select}
         />
-        {went.showSwitch && !searching ? (
-          <MapWentSwitch selected={went.selected} onSelect={setWentFilter} />
-        ) : null}
-        {filters.length > 0 && !searching ? (
-          <MapFilterChips
-            kinds={filters.map((filter) => filter.kind)}
-            selected={active}
-            onSelect={choose}
+      ) : null}
+      <MapHeader
+        city={city}
+        canSearch={all.length > 0}
+        searchOpen={searchOpen}
+        text={searchText}
+        onChangeText={(text) => {
+          setSearchText(text);
+          setListOpen(true);
+        }}
+        onOpenSearch={() => setSearchOpen(true)}
+        onCancel={cancelSearch}
+        onShowAllCities={
+          canShowAllCities(city, shown)
+            ? () => setZoomOut((n) => n + 1)
+            : undefined
+        }
+      />
+      {searchOpen && listOpen ? (
+        <View style={[styles.results, { top: headerBottom }]}>
+          <MapSearchResults
+            text={searchText}
+            total={matches.length}
+            results={topSearchResults(matches).map((place) => ({
+              id: placeId(place),
+              name: place.name,
+              city: place.city,
+            }))}
+            onSelect={pickResult}
           />
+        </View>
+      ) : null}
+      <View
+        pointerEvents="box-none"
+        style={[styles.aboveBar, { bottom: barHeight }]}
+      >
+        {all.length === 0 ? (
+          <MapEmpty
+            located={located}
+            onLocate={() => setLocate((n) => n + 1)}
+          />
+        ) : null}
+        {all.length > 0 && located ? (
+          <View style={styles.locate}>
+            <MapRoundButton
+              icon="location"
+              label={t("map.showMyLocation")}
+              onPress={() => setLocate((n) => n + 1)}
+            />
+          </View>
+        ) : null}
+        {filters.length > 0 || showWent ? (
+          <View
+            style={styles.strip}
+            onLayout={(event) =>
+              setStripHeight(event.nativeEvent.layout.height)
+            }
+          >
+            {showWent ? (
+              <MapWentSwitch
+                selected={went.selected}
+                onSelect={setWentFilter}
+              />
+            ) : null}
+            {filters.length > 0 ? (
+              <MapFilterChips
+                kinds={filters.map((filter) => filter.kind)}
+                selected={active}
+                onSelect={choose}
+              />
+            ) : null}
+          </View>
         ) : null}
       </View>
     </View>
@@ -269,6 +321,12 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create((theme) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  empty: { flex: 1, backgroundColor: theme.colors.background },
-  overlay: { position: "absolute", left: 0, gap: theme.gap(1) },
+  results: { position: "absolute", left: theme.gap(2), right: theme.gap(2) },
+  aboveBar: { ...StyleSheet.absoluteFillObject, justifyContent: "flex-end" },
+  locate: {
+    alignSelf: "flex-end",
+    marginRight: theme.gap(2.5),
+    marginBottom: 10,
+  },
+  strip: { paddingTop: theme.gap(1), paddingBottom: 13 },
 }));

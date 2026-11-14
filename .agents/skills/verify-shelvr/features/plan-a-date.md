@@ -1,12 +1,12 @@
 # Plan a date
 
 The core flow: a saved Reel or page names places, the save lands under its
-city on Home, and the city page plans a date from those places.
+city on Cities, and the city page plans a date from those places.
 
 ## How to get to it (user POV)
 
-Home, `Add`, paste a link that names places in a city. Tap that city's card,
-then `Plan a date`. Needs Pro (seeded).
+`Add`, `Paste a link`, paste a link that names places in a city. On Home, tap
+`Cities`, then that city's card, then `Plan a date`. Needs Pro (seeded).
 
 ## Driving it with e2e
 
@@ -14,7 +14,8 @@ then `Plan a date`. Needs Pro (seeded).
 elsewhere. It saves the fixture page `/lisbon-date-night` from
 `convex/model/fakeAi.ts`. The fake model reads Lisbon and three places off
 it, and answers the plan call with every place the saves list, in order.
-Locators: the city card is a button labelled `Lisbon` before pins arrive, or
+Locators: `openCities` taps Home's `Cities` row; the city card is a button
+labelled `Lisbon` before pins arrive, or
 `Lisbon, N places` once mapped; match `/^Lisbon(?:,|$)/`. The plan
 button is `Plan a date`; the plan screen says `Your shortlist`, and each card
 is a button whose label starts with the place name.

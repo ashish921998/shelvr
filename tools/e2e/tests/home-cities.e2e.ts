@@ -1,24 +1,22 @@
 import { test } from "@e2e-dev/mobile";
 import { expect } from "e2e";
 
-import { startOnSeededHome } from "./seeded-home.ts";
+import { openCities, startOnSeededHome } from "./seeded-home.ts";
 
 startOnSeededHome();
 
-test("opens Home on the seeded cities", async ({ screen }) => {
-  await expect(screen.getByRole("button", /^Lisbon/)).toBeVisible({
-    timeout: 30_000,
-  });
+test("opens the seeded cities from Home", async ({ screen }) => {
+  await openCities(screen);
   // The seeded save has no map pins: the city stays visible without a zero count.
   const lisbon = screen.getByRole("button", /^Lisbon/);
-  await expect(lisbon).toBeVisible();
+  await expect(lisbon).toBeVisible({ timeout: 30_000 });
   await expect(screen.getByText("0 places")).toBeHidden();
   await lisbon.tap();
   await expect(screen.getByRole("button", "Belém Tower")).toBeVisible();
   await expect(screen.getByText("0 places from your saves")).toBeHidden();
 });
 
-test("searches saved places from Home and clears back to cities", async ({
+test("searches saved places from Home and clears back to its rows", async ({
   app,
   screen,
 }) => {
@@ -30,7 +28,8 @@ test("searches saved places from Home and clears back to cities", async ({
   await search.fill("Lisbon");
   const result = screen.getByRole("button", /^Belém Tower/);
   await expect(result).toBeVisible();
-  await expect(screen.getByRole("button", /^Lisbon/)).toBeHidden();
+  const cities = screen.getByRole("button", /^Cities(?:,|$)/);
+  await expect(cities).toBeHidden();
   await app.screenshot("home-search-results");
   await clear.tap();
   await expect(clear).toBeHidden();
@@ -41,7 +40,7 @@ test("searches saved places from Home and clears back to cities", async ({
   ).toBeVisible();
   await app.screenshot("home-search-no-results");
   await clear.tap();
-  await expect(screen.getByRole("button", /^Lisbon/)).toBeVisible();
+  await expect(cities).toBeVisible();
   await search.tap();
   await search.fill("Belém");
   await expect(result).toBeVisible();

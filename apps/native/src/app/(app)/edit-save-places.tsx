@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { type ComponentRef, useRef, useState } from "react";
 import {
   Alert,
   Keyboard,
@@ -44,6 +44,8 @@ function PlacesEditor({
   const [results, setResults] = useState<(Place & { area?: string })[]>([]);
   const [replace, setReplace] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
+  const editorTop = useRef(0);
   const search = useAction(api.placeCorrectionSearch.search);
   const save = useMutation(api.placeCorrections.savePlaces);
 
@@ -96,8 +98,10 @@ function PlacesEditor({
   };
   return (
     <ScrollView
+      ref={scroll}
       contentContainerStyle={styles.content}
       keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets
     >
       <ThemedText>{t("placeCorrection.hint")}</ThemedText>
       {places.map((place, index) => (
@@ -113,6 +117,10 @@ function PlacesEditor({
                 setCity(place.city ?? "");
                 setQuery(place.name);
                 setResults([]);
+                scroll.current?.scrollTo({
+                  y: editorTop.current,
+                  animated: true,
+                });
               }}
             >
               <ThemedText>{t("placeCorrection.replace")}</ThemedText>
@@ -131,7 +139,12 @@ function PlacesEditor({
           </View>
         </View>
       ))}
-      <ThemedText variant="subheadStrong">
+      <ThemedText
+        variant="subheadStrong"
+        onLayout={(event) => {
+          editorTop.current = event.nativeEvent.layout.y;
+        }}
+      >
         {replace === null
           ? t("tripPlanner.addPlace")
           : t("placeCorrection.replace")}

@@ -59,28 +59,24 @@ function OptionRow({
   );
 }
 
-/** "What kind of date?": the kinds the planner makes. */
 export function DateKindPicker({
   city,
   onList,
   problem,
   onPick,
+  onPickFirst,
 }: {
   city: string;
   onList: boolean;
   problem: string | null;
   onPick: (ask: DateOption["ask"]) => void;
+  onPickFirst: () => void;
 }) {
   return (
     <View style={styles.container}>
-      <View style={styles.heading}>
-        <ThemedText variant="largeTitle" accessibilityRole="header">
-          {t("datePlan.title", { city })}
-        </ThemedText>
-        <ThemedText variant="subhead" style={styles.muted}>
-          {t("datePlan.question")}
-        </ThemedText>
-      </View>
+      <ThemedText variant="largeTitle" accessibilityRole="header">
+        {t("datePlan.title", { city })}
+      </ThemedText>
       {problem !== null ? (
         <ThemedText
           variant="footnote"
@@ -91,6 +87,13 @@ export function DateKindPicker({
         </ThemedText>
       ) : null}
       <View style={styles.list}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onPickFirst}
+          style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+        >
+          <ThemedText variant="headline">{t("datePlan.pickFirst")}</ThemedText>
+        </Pressable>
         {DATE_OPTIONS.map((option) => (
           <OptionRow
             key={option.ask}
@@ -106,7 +109,6 @@ export function DateKindPicker({
 
 const styles = StyleSheet.create((theme) => ({
   container: { gap: theme.gap(3) },
-  heading: { gap: theme.gap(0.5) },
   muted: { color: theme.colors.muted },
   problem: { color: theme.colors.danger },
   list: { gap: theme.gap(1) },

@@ -8,6 +8,7 @@ import {
   StayField,
 } from "@/components/trip-planner/trip-planner-form";
 import { TripPlannerReveal } from "@/components/trip-planner/trip-planner-reveal";
+import { TripSetup } from "@/components/trip-planner/trip-setup";
 import { Button } from "@/components/ui/button";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { ThemedText } from "@/components/ui/themed-text";
@@ -30,15 +31,44 @@ import { haptics } from "@/lib/haptics";
 import { usePlanGate } from "@/lib/plan-gate";
 import { personalPlanAllowed } from "@/lib/list-gate";
 import type { Id } from "@convex/_generated/dataModel";
-import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
+import { useEffect, useMemo, useState } from "react";
 import { Platform, ScrollView, View } from "react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import { StyleSheet } from "react-native-unistyles";
 
 export default function NewTripScreen() {
-  const locale = useAppLocale();
   const router = useRouter();
-  const { theme } = useUnistyles();
+  const { city, listId, mode } = useLocalSearchParams<{
+    city?: string;
+    listId?: string;
+    mode?: string;
+  }>();
+  const { gated } = usePlanGate();
+  if (!personalPlanAllowed(gated, listId))
+    return <Redirect href="/plan-gate" />;
+  if (listId !== undefined)
+    return <GenerateTripScreen onClose={() => backOrHome(router)} />;
+  const generating = mode === "generate";
+  return (
+    <View style={styles.screen}>
+      <View style={generating ? styles.hidden : styles.screen}>
+        <TripSetup
+          city={city}
+          onGenerate={() => router.setParams({ mode: "generate" })}
+          onClose={() => backOrHome(router)}
+        />
+      </View>
+      {generating ? (
+        <GenerateTripScreen
+          onClose={() => router.setParams({ mode: "setup" })}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function GenerateTripScreen({ onClose }: { onClose: () => void }) {
+  const locale = useAppLocale();
   const { city: cityParam, listId } = useLocalSearchParams<{
     city?: string;
     listId?: string;
@@ -56,7 +86,6 @@ export default function NewTripScreen() {
   );
   const update = (patch: Partial<TripForm>) =>
     setForm((current) => ({ ...current, ...patch }));
-  const close = useCallback(() => backOrHome(router), [router]);
   const problem = tripFormProblem(form);
 
   const ready = state.status === "ready";
@@ -66,50 +95,18 @@ export default function NewTripScreen() {
     }
   }, [ready]);
 
-  // Memoised so a form change does not push new header options: each push re-lays out the
-  // modal's navigation bar, and the form under it jumped a few points with every tap.
-  const header = useMemo(
-    () => (
-      <>
-        <Stack.Screen
-          options={{
-            title: t("tripPlanner.planTrip"),
-            headerTitleStyle: {
-              ...theme.type.title,
-              color: theme.colors.foreground,
-            },
-            ...(Platform.OS === "android"
-              ? {
-                  headerLeft: () => (
-                    <HeaderIconButton
-                      icon="xmark"
-                      label={t("common.close")}
-                      onPress={close}
-                    />
-                  ),
-                }
-              : {}),
-          }}
-        />
-        {Platform.OS === "ios" ? (
-          <Stack.Toolbar placement="left">
-            <Stack.Toolbar.Button
-              icon="xmark"
-              tintColor={theme.colors.foreground}
-              onPress={close}
-            >
-              {t("common.close")}
-            </Stack.Toolbar.Button>
-          </Stack.Toolbar>
-        ) : null}
-      </>
-    ),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `t()` reads the locale, so a language change must rebuild the header
-    [theme, close, locale],
+  const header = (
+    <View style={styles.header}>
+      <HeaderIconButton
+        icon="xmark"
+        label={t("common.close")}
+        onPress={onClose}
+      />
+      <ThemedText variant="title" accessibilityRole="header">
+        {t("tripPlanner.planTrip")}
+      </ThemedText>
+    </View>
   );
-
-  if (!personalPlanAllowed(gated, listId))
-    return <Redirect href="/plan-gate" />;
 
   // The sheet is modal to VoiceOver too, so a swipe never leaves it for the Trips list behind.
   if (state.status !== "idle") {
@@ -204,7 +201,15 @@ export default function NewTripScreen() {
 }
 
 const styles = StyleSheet.create((theme, rt) => ({
+  hidden: { display: "none" },
   screen: { flex: 1, backgroundColor: theme.colors.background },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1),
+    padding: theme.gap(1),
+    paddingTop: theme.gap(1) + (Platform.OS === "android" ? rt.insets.top : 0),
+  },
   content: {
     gap: theme.gap(3),
     paddingHorizontal: theme.gap(2.5),

@@ -56,11 +56,13 @@ function useInfoOpener() {
 export function DateEvening({
   result,
   evening,
+  firstLocked,
   onSwap,
   onRestart,
 }: {
   result: DatePlanResult;
   evening: Evening;
+  firstLocked: boolean;
   onSwap: (slot: DateSlot) => void;
   onRestart: () => void;
 }) {
@@ -145,11 +147,15 @@ export function DateEvening({
         <DateStopCard
           stop={first}
           number={1}
-          slot={slotLabel(result.kind, "first")}
+          slot={
+            firstLocked
+              ? t("datePlan.firstStop")
+              : slotLabel(result.kind, "first")
+          }
           color={color}
           onColor={theme.colors.onTripDay}
           onOpen={() => openInfo(first)}
-          onSwap={change("first")}
+          onSwap={firstLocked ? undefined : change("first")}
         />
         <View style={styles.walk}>
           <View style={styles.walkLine} />
@@ -190,9 +196,6 @@ export function DateEvening({
             </ThemedText>
           </Pressable>
         </View>
-        <ThemedText variant="caption" style={[styles.muted, styles.note]}>
-          {t("datePlan.approximate")}
-        </ThemedText>
       </Animated.View>
     </ScrollView>
   );
@@ -239,6 +242,5 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.primarySoft,
   },
   secondaryText: { color: theme.colors.primaryText },
-  note: { textAlign: "center" },
   pressed: { opacity: theme.opacity.pressed },
 }));

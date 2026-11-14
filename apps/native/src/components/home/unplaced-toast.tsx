@@ -105,7 +105,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   overlay: {
     position: "absolute",
     // Above the floating tab bar, clear of the header's Profile and Add buttons.
-    bottom: rt.insets.bottom + theme.gap(8),
+    bottom: rt.insets.bottom + theme.gap(12),
     left: theme.gap(2),
     right: theme.gap(2),
   },

@@ -15,9 +15,12 @@ Each one names a family/size pair the app already renders as a literal, so the
 ramp is a census of the type in use rather than a wish list. Read it that way
 before pruning it: a step no component passes to `variant` yet still describes
 sizes written by hand across `src/`, and deleting it only means re-deriving it
-from those literals later. The display face (`CrimsonProRoman-Regular`) carries titles
-(`hero`, `displayTitle`, `largeTitle`, `sheetTitle`, `title`, `header`, `displaySmall`);
-Satoshi regular/medium/bold carries body and label steps. `ThemedText` takes a
+from those literals later. The title steps (`hero`, `displayTitle`, `largeTitle`,
+`sheetTitle`, `title`, `header`, `displaySmall`) are Satoshi bold with negative
+letter spacing, and Satoshi regular/medium/bold carries body and label steps. The
+display face (`CrimsonProRoman-Regular`, `theme.fonts.display`) stays on the
+wordmark, the launch splash, sign-in, the onboarding opener, legal consent, the
+error screen, the site-panel monogram and the paywall. `ThemedText` takes a
 `variant` prop keyed by ramp name, defaults its color to
 `theme.colors.foreground`, and applies `style` last so callers can override.
 Use variants in new UI; a `fontSize` literal in a new component is a smell.
@@ -55,10 +58,13 @@ white in the light theme and the card surface in the dark ones, so a photo
 never sits in a bright border at night. Content drawn on a filled tint
 uses the paired `on*` role: `onTint` on `primary` (a dark label, since white on
 the amber fill is 2.19:1), `onKeep` on `keep`, `onOverlay` on `overlay`.
-`tabTint` is the tab bar tint (Home and Map).
-iOS `NativeTabs` paints the selected tab's icon and its label with it, so it
-carries normal-size text: the light theme darkens
-it to 5.03:1 on `surfaceMuted`, the darkest surface the bar sits over. The
+`tabTint` is the tint color for the plus icon on the tab bar's Add button
+(`src/components/tab-bar.tsx`).
+The button is `surface`, where the light theme's value is 5.82:1, and it still
+clears 5.03:1 on `surfaceMuted`. The tab bar floats without a background or
+fade. Library, Map and Plan a date use matching native symbols on small `frame`
+tiles with `primaryText` icons. Each has a `muted`
+label. The controls leave space below for the map's attribution and Legal link. The
 light theme's text colors are deliberately darkened to clear WCAG AA (`muted`
 4.92:1 on `surfaceMuted`, the darkest surface it renders on; `faint` uses the
 same accessible color for small captions; `primaryText` and `danger` just over

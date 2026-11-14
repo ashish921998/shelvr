@@ -8,7 +8,7 @@ import {
 } from "@/lib/city-pins";
 import { moveCamera, sameCamera } from "@/lib/map-camera";
 import { fitCamera } from "@/lib/trip";
-import { useImage } from "expo-image";
+import { useMapPinClusters } from "@/lib/use-map-pin-clusters";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -38,6 +38,25 @@ export function CityMap({
   const { theme, rt } = useUnistyles();
   const ref = useRef<AppleMaps.MapView>(null);
   const { width } = rt.screen;
+  const shown = useMemo(
+    () =>
+      pins.slice(0, visible).map((pin) => {
+        const id = cityPinId(pin);
+        return visited?.has(id)
+          ? {
+              ...pin,
+              id,
+              title: `✓ ${pin.name}`,
+              tintColor: theme.colors.muted,
+            }
+          : { ...pin, id };
+      }),
+    [pins, visible, visited, theme.colors.muted],
+  );
+  const clustered = useMapPinClusters(shown, onSelect, {
+    selectedId: selected,
+    clearSelection: () => ref.current?.selectMarker(undefined),
+  });
 
   const fit = useMemo(
     () =>
@@ -104,37 +123,8 @@ export function CityMap({
     );
   }, [steady, firstCamera]);
 
-  const bubble = useImage(require("../../../assets/map/place-bubble.png"));
-  const selectedBubble = useImage(
-    require("../../../assets/map/place-bubble-selected.png"),
-  );
-  const visitedBubble = useImage(
-    require("../../../assets/map/place-bubble-visited.png"),
-  );
-  const annotations = pins.slice(0, visible).map((pin) => {
-    const id = cityPinId(pin);
-    const isSelected = id === selected;
-    const went = visited?.has(id) ?? false;
-    return {
-      id,
-      coordinates: { latitude: pin.lat, longitude: pin.lng },
-      title: pin.name,
-      text: pin.emoji ?? "📍",
-      icon:
-        (isSelected ? selectedBubble : went ? visitedBubble : bubble) ??
-        undefined,
-      went,
-      anchor: { x: 0.5, y: 0.5 },
-      backgroundColor: theme.colors.surface,
-      textColor: theme.colors.foreground,
-    };
-  });
-  const select = (id: string | undefined) => {
-    if (id) onSelect(id);
-  };
-
-  if (process.env.EXPO_OS === "ios") {
-    return (
+  const map =
+    process.env.EXPO_OS === "ios" ? (
       <AppleMaps.View
         ref={ref}
         style={styles.map}
@@ -145,22 +135,24 @@ export function CityMap({
             : AppleMaps.MapColorScheme.LIGHT
         }
         uiSettings={{ compassEnabled: false, myLocationButtonEnabled: false }}
-        annotations={annotations}
-        onAnnotationClick={(pin) => select(pin.id)}
+        markers={clustered.markers}
+        onMarkerClick={(pin) => clustered.select(pin.id)}
+        onCameraMove={({ zoom }) => clustered.trackZoom(zoom)}
+      />
+    ) : (
+      <GoogleMaps.View
+        style={styles.map}
+        cameraPosition={steady}
+        markers={clustered.markers}
+        onMarkerClick={(marker) => clustered.select(marker.id)}
+        onCameraMove={({ zoom }) => clustered.trackZoom(zoom)}
       />
     );
-  }
   return (
-    <GoogleMaps.View
-      style={styles.map}
-      cameraPosition={steady}
-      markers={annotations.map((pin) => ({
-        id: pin.id,
-        coordinates: pin.coordinates,
-        title: `${pin.went ? "✓ " : ""}${pin.text} ${pin.title}`,
-      }))}
-      onMarkerClick={(marker) => select(marker.id)}
-    />
+    <>
+      {map}
+      {clustered.sheet}
+    </>
   );
 }
 

@@ -107,6 +107,255 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("blank trip setup", () => {
+  it("persists countries, dates, cover, and empty days, and accepts a saved stop", async () => {
+    const { base, t, itemId } = await setup([]);
+    const cover = "/9j/AAAA";
+    const tripId = await t.mutation(api.tripPlannerData.createBlankTrip, {
+      name: " Iberia ",
+      countries: ["PT", "ES", "PT"],
+      city: "Lisbon",
+      dayCount: 3,
+      startDate: "2027-05-01",
+      cover,
+    });
+    expect(
+      await t.query(api.tripPlannerData.getTripPlan, { tripId }),
+    ).toMatchObject({
+      name: "Iberia",
+      countries: ["PT", "ES"],
+      city: "Lisbon",
+      dayCount: 3,
+      startDate: "2027-05-01",
+      cover,
+      days: [[], [], []],
+    });
+    await t.mutation(api.tripPlannerData.addTripStop, {
+      tripId,
+      day: 2,
+      place: { kind: "save", itemId, name: "Time Out Market" },
+    });
+    expect(await layout(t, tripId)).toEqual({
+      days: [[], ["Time Out Market"], []],
+      unplanned: [],
+    });
+    expect(
+      await t.mutation(api.tripPlannerData.fillBlankTripDay, {
+        tripId,
+        day: 1,
+      }),
+    ).toBe(1);
+    expect(
+      await t.mutation(api.tripPlannerData.fillBlankTripDay, {
+        tripId,
+        day: 1,
+      }),
+    ).toBe(0);
+    expect(await layout(t, tripId)).toEqual({
+      days: [["Manteigaria"], ["Time Out Market"], []],
+      unplanned: [],
+    });
+    const other = await signedInUser(base, { pro: true });
+    expect(
+      await other.t.query(api.tripPlannerData.getTripPlan, { tripId }),
+    ).toBeNull();
+  });
+
+  it("requires Pro and rejects invalid countries and dates", async () => {
+    const args = { name: "Trip", countries: ["PT"], dayCount: 2 };
+    const free = await setup([], { pro: false });
+    await expect(
+      free.t.mutation(api.tripPlannerData.createBlankTrip, args),
+    ).rejects.toThrow();
+    const { t } = await setup([]);
+    await expect(
+      t.mutation(api.tripPlannerData.createBlankTrip, {
+        ...args,
+        countries: ["ZZ"],
+      }),
+    ).rejects.toThrow();
+    await expect(
+      t.mutation(api.tripPlannerData.createBlankTrip, {
+        ...args,
+        startDate: "2027-02-29",
+      }),
+    ).rejects.toThrow();
+    const tripId = await t.mutation(api.tripPlannerData.createBlankTrip, args);
+    expect(
+      await t.query(api.tripPlannerData.getTripPlan, { tripId }),
+    ).toMatchObject({
+      city: "Portugal",
+      days: [[], []],
+    });
+  });
+});
+
+describe("applying day suggestions", () => {
+  it("requires personal access to fill a day from saves on a covered shared trip", async () => {
+    const { base, t, tripId, itemId } = await setup([], { pro: false });
+    const owner = await signedInUser(base, { pro: true });
+    const { listId, inviteToken } = await owner.t.mutation(
+      api.sharedLists.createSharedList,
+      {
+        name: "Lisbon plans",
+        cities: ["Lisbon"],
+      },
+    );
+    await t.mutation(api.sharedLists.joinSharedList, { token: inviteToken });
+    await base.run((ctx) => ctx.db.patch(tripId, { listId }));
+    await expect(
+      t.mutation(api.tripPlannerData.applyTripDaySuggestions, {
+        tripId,
+        day: 1,
+        places: [{ itemId, name: "Time Out Market" }],
+      }),
+    ).rejects.toMatchObject({ data: { code: "pro_required" } });
+    expect(await layout(t, tripId)).toEqual({ days: [[], []], unplanned: [] });
+  });
+
+  it("adds only kept places in review order and leaves an edited day alone", async () => {
+    const { t, tripId, itemId } = await setup([]);
+    const apply = api.tripPlannerData.applyTripDaySuggestions;
+    const market = { itemId, name: "Time Out Market" };
+    const bakery = { itemId, name: "Manteigaria" };
+    expect(
+      await t.mutation(apply, { tripId, day: 1, places: [bakery, market] }),
+    ).toBe(true);
+    expect(await t.mutation(apply, { tripId, day: 1, places: [market] })).toBe(
+      false,
+    );
+    expect(await layout(t, tripId)).toEqual({
+      days: [["Manteigaria", "Time Out Market"], []],
+      unplanned: [],
+    });
+  });
+
+  it("refuses duplicate and stale suggestions without applying any of the picks", async () => {
+    const { base, t, tripId, itemId } = await setup([]);
+    const apply = api.tripPlannerData.applyTripDaySuggestions;
+    const market = { itemId, name: "Time Out Market" };
+    const bakery = { itemId, name: "Manteigaria" };
+    const other = await signedInUser(base, { pro: true });
+    await expect(
+      other.t.mutation(apply, { tripId, day: 1, places: [market] }),
+    ).rejects.toThrow();
+    await expect(
+      t.mutation(apply, {
+        tripId,
+        day: 1,
+        places: [market, { itemId, name: "Unavailable place" }],
+      }),
+    ).rejects.toThrow();
+    expect(
+      await t.mutation(apply, { tripId, day: 1, places: [market, market] }),
+    ).toBe(false);
+    expect(await layout(t, tripId)).toEqual({ days: [[], []], unplanned: [] });
+    expect(await t.mutation(apply, { tripId, day: 2, places: [market] })).toBe(
+      true,
+    );
+    expect(
+      await t.mutation(apply, { tripId, day: 1, places: [bakery, market] }),
+    ).toBe(false);
+    expect(await layout(t, tripId)).toEqual({
+      days: [[], ["Time Out Market"]],
+      unplanned: [],
+    });
+  });
+});
+
+describe("stop details", () => {
+  it("persists optional time and note through a move and allows clearing both", async () => {
+    const { base, t, tripId, ids } = await setup(TRIP);
+    const update = api.tripPlannerData.updateTripStopDetails;
+    const fields = { stopId: ids.A, time: "18:30", note: " Window seat " };
+    const other = await signedInUser(base, { pro: true });
+    await expect(other.t.mutation(update, fields)).rejects.toThrow();
+    await expect(
+      t.mutation(update, { ...fields, time: "24:00" }),
+    ).rejects.toThrow();
+    await t.mutation(update, fields);
+    await t.mutation(api.tripPlannerData.moveTripStop, {
+      stopId: ids.A,
+      day: 2,
+      index: 0,
+    });
+    const get = () => t.query(api.tripPlannerData.getTripPlan, { tripId });
+    expect((await get())?.days[1][0]).toMatchObject({
+      name: "A",
+      time: "18:30",
+      note: "Window seat",
+    });
+    await t.mutation(update, { stopId: ids.A, time: null, note: null });
+    const stop = (await get())?.days[1][0];
+    expect(stop).not.toHaveProperty("time");
+    expect(stop).not.toHaveProperty("note");
+  });
+});
+
+describe("trip share link", () => {
+  it("lets an owner find and revoke active links after Pro lapses", async () => {
+    const { base, t, tripId, userId } = await setup(TRIP);
+    const paginationOpts = { cursor: null, numItems: 10 };
+    const token = await t.mutation(api.tripShares.createShare, { tripId });
+    await base.run(async (ctx) => {
+      const sub = await ctx.db
+        .query("subscriptions")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .unique();
+      if (!sub) throw new Error("Expected seeded subscription");
+      await ctx.db.patch(sub._id, {
+        status: "lapsed",
+        expiresAt: Date.now() - 1,
+      });
+    });
+    const other = await signedInUser(base);
+    expect(
+      (await other.t.query(api.tripShares.listSharedTrips, { paginationOpts }))
+        .page,
+    ).toEqual([]);
+    expect(
+      (await t.query(api.tripShares.listSharedTrips, { paginationOpts })).page,
+    ).toEqual([{ _id: tripId, city: "Lisbon" }]);
+    await t.mutation(api.tripShares.revokeShare, { tripId, token });
+    expect(
+      (await t.query(api.tripShares.listSharedTrips, { paginationOpts })).page,
+    ).toEqual([]);
+  });
+
+  it("reads the live scheduled itinerary without authentication and invalidates revoked links", async () => {
+    const { base, t, tripId, ids, userId } = await setup(TRIP);
+    const { createShare, revokeShare } = api.tripShares;
+    const other = await signedInUser(base, { pro: true });
+    await expect(other.t.mutation(createShare, { tripId })).rejects.toThrow();
+    const token = await t.mutation(createShare, { tripId });
+    await expect(
+      other.t.mutation(revokeShare, { tripId, token }),
+    ).rejects.toThrow();
+    const path = `/trip/shared/${token}`;
+    await t.mutation(api.tripPlannerData.updateTripStopDetails, {
+      stopId: ids.A,
+      time: "18:30",
+      note: "<script>example</script>",
+    });
+    const response = await base.fetch(path);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    const page = await response.text();
+    expect(page).toContain("18:30");
+    expect(page).toContain("&lt;script&gt;example&lt;/script&gt;");
+    expect(page).not.toContain("<script>");
+    expect(page).not.toContain("Extra");
+    await t.mutation(revokeShare, { tripId, token });
+    expect((await base.fetch(path)).status).toBe(404);
+    const next = await t.mutation(createShare, { tripId });
+    expect(next).not.toBe(token);
+    await t.mutation(revokeShare, { tripId, token });
+    expect((await base.fetch(`/trip/shared/${next}`)).status).toBe(200);
+    await base.run((ctx) => ctx.db.patch(userId, { deleting: true }));
+    expect((await base.fetch(`/trip/shared/${next}`)).status).toBe(404);
+  });
+});
+
 describe("moveTripStop", () => {
   it("reorders within a day and returns where the stop was", async () => {
     const { t, tripId, ids } = await setup(TRIP);
@@ -556,5 +805,164 @@ describe("searchTripPlaces", () => {
     await expect(
       t.action(api.tripPlanner.searchTripPlaces, { tripId, query: "coffee" }),
     ).rejects.toMatchObject({ data: { code: "pro_required" } });
+  });
+});
+
+const PARIS_STAY = { name: "Hotel du Louvre", lat: 48.8625, lng: 2.3355 };
+
+async function countryTrip(stay?: typeof PARIS_STAY) {
+  const base = newConvexTest();
+  const user = await signedInUser(base, { pro: true });
+  const itemId = await base.run((ctx) =>
+    ctx.db.insert("items", {
+      userId: user.userId,
+      type: "link",
+      status: "ready",
+      title: "France food",
+      cities: ["Paris", "Lyon"],
+      places: ["Du Pain et des Idées", "Paul Bocuse"],
+      placePins: [
+        {
+          name: "Du Pain et des Idées",
+          lat: 48.8717,
+          lng: 2.3632,
+          city: "Paris",
+        },
+        { name: "Paul Bocuse", lat: 45.8164, lng: 4.8495, city: "Lyon" },
+      ],
+      url: "https://www.tiktok.com/@someone/video/9",
+      tags: ["food"],
+      searchText: "France food",
+    }),
+  );
+  const tripId = await user.t.mutation(api.tripPlannerData.createBlankTrip, {
+    name: "France",
+    countries: ["FR"],
+    city: "",
+    dayCount: 2,
+    ...(stay ? { stay } : {}),
+  });
+  return { base, ...user, itemId, tripId };
+}
+
+describe("a trip with no base city", () => {
+  it("finds saves near the stay for Fill my day, From your saves and adding a stop", async () => {
+    const { t, itemId, tripId } = await countryTrip(PARIS_STAY);
+    expect(
+      (await t.query(api.tripPlannerData.tripSavePlaces, { tripId })).map(
+        (place) => place.name,
+      ),
+    ).toEqual(["Du Pain et des Idées"]);
+    expect(
+      await t.mutation(api.tripPlannerData.fillBlankTripDay, {
+        tripId,
+        day: 1,
+      }),
+    ).toBe(1);
+    await expect(
+      t.mutation(api.tripPlannerData.addTripStop, {
+        tripId,
+        day: 2,
+        place: { kind: "save", itemId, name: "Paul Bocuse" },
+      }),
+    ).rejects.toThrow("Place not found");
+    expect(await layout(t, tripId)).toEqual({
+      days: [["Du Pain et des Idées"], []],
+      unplanned: [],
+    });
+  });
+
+  it("accepts a nearby saved place picked before any fill", async () => {
+    const { t, itemId, tripId } = await countryTrip(PARIS_STAY);
+    expect(
+      await t.mutation(api.tripPlannerData.applyTripDaySuggestions, {
+        tripId,
+        day: 2,
+        places: [{ itemId, name: "Du Pain et des Idées" }],
+      }),
+    ).toBe(true);
+    expect(await layout(t, tripId)).toEqual({
+      days: [[], ["Du Pain et des Idées"]],
+      unplanned: [],
+    });
+  });
+
+  it("offers no saves while the trip has no stay or stops to anchor it", async () => {
+    const { t, tripId } = await countryTrip();
+    expect(
+      await t.query(api.tripPlannerData.tripSavePlaces, { tripId }),
+    ).toEqual([]);
+    expect(
+      await t.mutation(api.tripPlannerData.fillBlankTripDay, {
+        tripId,
+        day: 1,
+      }),
+    ).toBe(0);
+  });
+});
+
+describe("searching a new blank trip", () => {
+  function searched(fetchMock: ReturnType<typeof fakeApple>) {
+    const urls = fetchMock.mock.calls.map(([input]) => new URL(input));
+    const search = urls.find((url) => url.pathname === "/v1/search");
+    return {
+      geocoded: urls.some((url) => url.pathname === "/v1/geocode"),
+      near: search?.searchParams.get("searchLocation") ?? null,
+      countries: search?.searchParams.get("limitToCountries") ?? null,
+    };
+  }
+
+  it("searches near the stay before the first stop", async () => {
+    await stubMaps();
+    const fetchMock = fakeApple();
+    vi.stubGlobal("fetch", fetchMock);
+    const { t, tripId } = await countryTrip(PARIS_STAY);
+    await t.action(api.tripPlanner.searchTripPlaces, {
+      tripId,
+      query: "croissant",
+    });
+    expect(searched(fetchMock)).toEqual({
+      geocoded: false,
+      near: `${PARIS_STAY.lat},${PARIS_STAY.lng}`,
+      countries: "FR",
+    });
+  });
+
+  it("searches near the base city when there is no stay yet", async () => {
+    await stubMaps();
+    const fetchMock = fakeApple();
+    vi.stubGlobal("fetch", fetchMock);
+    const { t } = await setup([]);
+    const tripId = await t.mutation(api.tripPlannerData.createBlankTrip, {
+      name: "Portugal",
+      countries: ["PT"],
+      city: "Lisbon",
+      dayCount: 2,
+    });
+    await t.action(api.tripPlanner.searchTripPlaces, {
+      tripId,
+      query: "pastel de nata",
+    });
+    expect(searched(fetchMock)).toEqual({
+      geocoded: true,
+      near: "38.72,-9.14",
+      countries: "PT",
+    });
+  });
+
+  it("searches the whole country when no city or stay was chosen", async () => {
+    await stubMaps();
+    const fetchMock = fakeApple();
+    vi.stubGlobal("fetch", fetchMock);
+    const { t, tripId } = await countryTrip();
+    await t.action(api.tripPlanner.searchTripPlaces, {
+      tripId,
+      query: "croissant",
+    });
+    expect(searched(fetchMock)).toEqual({
+      geocoded: false,
+      near: null,
+      countries: "FR",
+    });
   });
 });

@@ -1,14 +1,19 @@
 import { formattingLocale, t } from "@/lib/i18n";
 import { formatTripDay, toDateKey, tripDayDate } from "@/lib/trip";
 import type { TextMessageKey } from "@/locales/message-types";
+import type { api } from "@convex/_generated/api";
+import type { FunctionReturnType } from "convex/server";
 import { isRateLimitedError } from "@convex/model/demoErrors";
 import { saveErrorCode } from "@convex/model/saveErrors";
+import { countryName } from "@convex/model/tripCountries";
 import {
   cityKey,
+  distanceKm,
   MAX_TRIP_DAYS,
   MIN_TRIP_DAYS,
   STOPS_PER_DAY,
   tidyCity,
+  type LatLng,
   type TripPace,
 } from "@convex/model/trip";
 import {
@@ -25,6 +30,20 @@ export const TRIP_PACES: TripPace[] = ["easy", "balanced", "packed"];
 export const DEFAULT_INTERESTS: TripInterest[] = ["food", "coffee", "sights"];
 
 const DEFAULT_TRIP_DAYS = 3;
+
+export function countryFlag(code: string) {
+  return String.fromCodePoint(
+    ...Array.from(code, (letter) => letter.charCodeAt(0) + 127397),
+  );
+}
+
+export function tripCountryLine(countries: string[]) {
+  return countries.map((code) => countryName(code) ?? code).join(" · ");
+}
+
+export function tripCoverUri(cover: string) {
+  return `data:image/jpeg;base64,${cover}`;
+}
 
 // Kept short so a typed city or hotel stays one line and one Apple Maps query.
 export const MAX_CITY_LENGTH = 80;
@@ -89,6 +108,56 @@ export function cityChoices(
 
 export function sameCity(a: string, b: string): boolean {
   return cityKey(a) === cityKey(b);
+}
+
+export type TripCityCompletion = FunctionReturnType<
+  typeof api.tripPlanner.searchTripCities
+>[number];
+
+export function tripCitySuggestions(
+  cities: CityChoice[],
+  completions: TripCityCompletion[],
+  pins: readonly (LatLng & { city?: string })[],
+  query: string,
+) {
+  if (!query) return [];
+  const wanted = cityKey(query);
+  const suggestions = new Map<
+    string,
+    { city: string; label: string; count?: number; location?: LatLng }
+  >();
+  for (const saved of cities) {
+    const key = cityKey(saved.city);
+    if (key.includes(wanted))
+      suggestions.set(key, { ...saved, label: saved.city });
+  }
+  for (const { label, locality, location } of completions) {
+    const saved = cities.find(
+      ({ city }) =>
+        sameCity(city, label) ||
+        (sameCity(city, locality) &&
+          location !== undefined &&
+          pins.some(
+            (pin) =>
+              pin.city !== undefined &&
+              sameCity(pin.city, city) &&
+              distanceKm(pin, location) <= 30,
+          )),
+    );
+    const city = saved?.city ?? label;
+    const key = cityKey(city);
+    if (
+      !suggestions.has(key) ||
+      (saved && suggestions.get(key)?.label === city)
+    )
+      suggestions.set(key, {
+        city,
+        label,
+        count: saved?.count,
+        ...(location ? { location } : {}),
+      });
+  }
+  return [...suggestions.values()].slice(0, 5);
 }
 
 export type TripForm = {
@@ -202,19 +271,21 @@ export function tripLengthLine(
     : t("tripPlanner.lengthWithDates", { days, dates });
 }
 
-/**
- * The length line on a trip's card. Without dates it says when the trip was planned, so two
- * trips to one city still read apart: "3 days · Planned Oct 27".
- */
+export function tripCardDate(
+  trip: Pick<TripPlanSummary, "dayCount" | "startDate" | "createdAt">,
+): string {
+  return (
+    tripDateRange(trip.startDate, trip.dayCount) ??
+    t("tripPlanner.plannedDate", { date: shortDate(new Date(trip.createdAt)) })
+  );
+}
+
 export function tripCardLine(
   trip: Pick<TripPlanSummary, "dayCount" | "startDate" | "createdAt">,
 ): string {
-  if (tripDateRange(trip.startDate, trip.dayCount) !== null) {
-    return tripLengthLine(trip);
-  }
-  return t("tripPlanner.lengthPlanned", {
+  return t("tripPlanner.lengthWithDates", {
     days: t("trip.dayCount", { count: trip.dayCount }),
-    date: shortDate(new Date(trip.createdAt)),
+    dates: tripCardDate(trip),
   });
 }
 
@@ -287,7 +358,10 @@ export function stopWhyLine(
  * "Stop 3, Kafeine, Yours, Alfama, From “Best of Lisbon”". Unplanned stops have no number.
  */
 export function stopRowLabel(
-  stop: Pick<TripPlanStop, "name" | "source" | "itemId" | "area" | "why">,
+  stop: Pick<
+    TripPlanStop,
+    "name" | "source" | "itemId" | "area" | "why" | "time" | "note"
+  >,
   { number, fromSave }: { number?: number; fromSave: boolean },
 ): string {
   return [
@@ -295,9 +369,11 @@ export function stopRowLabel(
       ? null
       : t("tripPlanner.stopNumber", { number: String(number) }),
     stop.name,
+    stop.time,
     t(stopBadge(stop)),
     stop.area,
     stopWhyLine(stop, fromSave),
+    stop.note,
   ]
     .filter(Boolean)
     .join(", ");
@@ -407,133 +483,6 @@ export function planPins(
       };
     }),
   );
-}
-
-/** The day a trip opens on: its first day with a stop, or every day when none has one. */
-export function firstFocusDay(
-  days: readonly (readonly unknown[])[],
-): number | null {
-  const day = days.findIndex((stops) => stops.length > 0);
-  return day === -1 ? null : day;
-}
-
-/** Where to scroll so a day's header sits just under the map pinned over the list. */
-export function dayScrollOffset(
-  headerY: number,
-  mapHeight: number,
-  gap: number,
-): number {
-  return Math.max(0, headerY - mapHeight - gap);
-}
-
-/**
- * The day whose section sits under the pinned map once the list has scrolled to `scrollY`:
- * the last day whose header has reached `probe` points below the top, the first day before
- * any has. At the very end of the list the last day wins, since its header may never reach
- * the probe. `dayTops` holds each day's header offset in the scroll content, or undefined
- * before that day has laid out.
- */
-export function dayAtScroll(
-  scrollY: number,
-  probe: number,
-  dayTops: readonly (number | undefined)[],
-  atEnd: boolean,
-): number | null {
-  const laidOut = dayTops.flatMap((top, day) =>
-    top === undefined ? [] : [{ top, day }],
-  );
-  if (laidOut.length === 0) return null;
-  if (atEnd) return laidOut[laidOut.length - 1]?.day ?? null;
-  const reached = laidOut.filter(({ top }) => top <= scrollY + probe);
-  return (reached[reached.length - 1] ?? laidOut[0])?.day ?? null;
-}
-
-/** True when the list is scrolled to (or within a point of) its end. */
-export function scrolledToEnd(
-  scrollY: number,
-  viewportHeight: number,
-  contentHeight: number,
-): boolean {
-  return (
-    contentHeight > viewportHeight &&
-    scrollY + viewportHeight >= contentHeight - 1
-  );
-}
-
-/**
- * The trip page's focused day and whether the list is moving under the person's finger.
- * `day` null is "All days". `scroll` is `dragging` from the moment a finger moves the list,
- * `released` once it lifts, `momentum` while a flick decelerates, and `idle` otherwise,
- * including while a picked day's scroll animates and while layout or VoiceOver moves the list.
- */
-export type DayFocus = {
-  day: number | null;
-  scroll: "idle" | "dragging" | "released" | "momentum";
-};
-
-/**
- * What can move the trip page's focus. `pick` is a chip, a day header, a pin or a stop;
- * the scroll events carry the day `dayAtScroll` reports for the list's position then, or
- * null when no day has laid out.
- */
-export type DayFocusEvent =
-  | { type: "pick"; day: number | null }
-  | { type: "dragStart" }
-  | { type: "dragEnd"; day: number | null }
-  | { type: "momentumStart" }
-  | { type: "momentumEnd"; day: number | null }
-  | { type: "scroll"; day: number | null };
-
-export function initialDayFocus(
-  days: readonly (readonly unknown[])[],
-): DayFocus {
-  return { day: firstFocusDay(days), scroll: "idle" };
-}
-
-function follow(focus: DayFocus, day: number | null): number | null {
-  // "All days" holds until the person picks a day; the list's position never replaces it.
-  if (focus.day === null || day === null) return focus.day;
-  return day;
-}
-
-function withFocus(
-  focus: DayFocus,
-  day: number | null,
-  scroll: DayFocus["scroll"],
-): DayFocus {
-  return focus.day === day && focus.scroll === scroll ? focus : { day, scroll };
-}
-
-/**
- * The focus after `event`. Only the person's own scrolling (a drag and the flick after it)
- * moves the focused day, and never away from "All days"; a pick always wins, and ends any
- * scroll still settling, so what the person tapped is what stays focused. Scroll events
- * outside a drag (a picked day's animation, layout, VoiceOver bringing an element into view)
- * change nothing. Returns `focus` itself when nothing changes, so React skips the render.
- */
-export function nextDayFocus(focus: DayFocus, event: DayFocusEvent): DayFocus {
-  switch (event.type) {
-    case "pick":
-      return withFocus(focus, event.day, "idle");
-    case "dragStart":
-      return withFocus(focus, focus.day, "dragging");
-    case "dragEnd":
-      return focus.scroll === "dragging"
-        ? withFocus(focus, follow(focus, event.day), "released")
-        : focus;
-    case "momentumStart":
-      return focus.scroll === "released"
-        ? withFocus(focus, focus.day, "momentum")
-        : focus;
-    case "momentumEnd":
-      return focus.scroll === "momentum"
-        ? withFocus(focus, follow(focus, event.day), "idle")
-        : withFocus(focus, focus.day, "idle");
-    case "scroll":
-      return focus.scroll === "dragging" || focus.scroll === "momentum"
-        ? withFocus(focus, follow(focus, event.day), focus.scroll)
-        : focus;
-  }
 }
 
 /**

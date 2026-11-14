@@ -57,7 +57,30 @@ it("opens the trip form again once the city page is back in focus", async () => 
   expect(mocks.push).toHaveBeenCalledTimes(2);
 });
 
-it("opens one date planner for a double tap on Plan a date", async () => {
+it("runs the plan check before leaving, then opens the planner", async () => {
+  const order: string[] = [];
+  mocks.guard.mockImplementation(async () => {
+    order.push("check");
+    return true;
+  });
+  mocks.push.mockImplementation(() => order.push("open"));
+  const { result } = renderHook(() => useCityPlan());
+  await act(() =>
+    result.current.start("date", "Lisbon", () => order.push("leave")),
+  );
+  expect(order).toEqual(["check", "leave", "open"]);
+});
+
+it("stays put when the paywall stops the plan", async () => {
+  mocks.guard.mockResolvedValue(false);
+  const leave = vi.fn();
+  const { result } = renderHook(() => useCityPlan());
+  await act(() => result.current.start("trip", "Lisbon", leave));
+  expect(leave).not.toHaveBeenCalled();
+  expect(mocks.push).not.toHaveBeenCalled();
+});
+
+it("opens one picker for a double tap on Go out", async () => {
   const { result } = renderHook(() => useCityPlan());
   await act(async () => {
     await Promise.all([
@@ -67,7 +90,7 @@ it("opens one date planner for a double tap on Plan a date", async () => {
   });
   expect(mocks.push).toHaveBeenCalledTimes(1);
   expect(mocks.push).toHaveBeenCalledWith({
-    pathname: "/date-plan",
+    pathname: "/go-out",
     params: { city: "Lisbon" },
   });
   expect(result.current.busy).toBeNull();

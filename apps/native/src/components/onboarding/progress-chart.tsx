@@ -246,10 +246,9 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(4),
   },
   title: {
-    ...theme.type.hero,
-    fontSize: 34,
-    lineHeight: 40,
-    letterSpacing: -0.4,
+    ...theme.type.displayTitle,
+    fontSize: 29,
+    lineHeight: 33,
     color: theme.colors.foreground,
   },
   chart: {

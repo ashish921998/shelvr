@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   busiestCityPlaces,
+  cityNear,
   filterPlaces,
   hasPlaceNear,
   mapFilters,
@@ -60,6 +61,30 @@ describe("busiestCityPlaces", () => {
   it("frames every place when none has a city", () => {
     const places = [place([]), place([])];
     expect(busiestCityPlaces(places)).toEqual(places);
+  });
+});
+
+describe("cityNear", () => {
+  const spots = [
+    { lat: 38.72, lng: -9.14, city: "Lisbon" },
+    { lat: 41.15, lng: -8.61, city: "Porto" },
+    { lat: 41.14, lng: -8.62 },
+  ];
+
+  it("names the city of the nearest place that has one", () => {
+    expect(cityNear(spots, { lat: 38.7, lng: -9.1 })).toBe("Lisbon");
+    expect(cityNear(spots, { lat: 41.14, lng: -8.62 })).toBe("Porto");
+  });
+
+  it("is undefined when no place has a city", () => {
+    expect(cityNear([spots[2]], { lat: 41, lng: -8 })).toBeUndefined();
+    expect(cityNear([], { lat: 41, lng: -8 })).toBeUndefined();
+  });
+
+  it("is undefined when every place with a city is more than 50 km from the centre", () => {
+    expect(cityNear(spots, { lat: 40.42, lng: -3.7 })).toBeUndefined();
+    expect(cityNear(spots, { lat: 39.2, lng: -9.1 })).toBeUndefined();
+    expect(cityNear(spots, { lat: 38.9, lng: -9.1 })).toBe("Lisbon");
   });
 });
 

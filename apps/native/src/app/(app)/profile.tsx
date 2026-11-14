@@ -90,7 +90,6 @@ export default function ProfileScreen() {
           onPress={closeProfile}
         />
       </View>
-      <Text style={styles.slogan}>{t("brand.tagline")}</Text>
 
       <View style={styles.card}>
         <View style={styles.accountRow}>
@@ -196,12 +195,6 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-  slogan: {
-    fontFamily: theme.fonts.regular,
-    fontSize: 14,
-    color: theme.colors.muted,
-    marginBottom: theme.gap(1),
   },
   card: {
     backgroundColor: theme.colors.surface,

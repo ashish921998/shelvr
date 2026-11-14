@@ -1,55 +1,22 @@
+import { TabBar } from "@/components/tab-bar";
+import { ROOT_TAB } from "@/lib/home-href";
 import { t, useAppLocale } from "@/lib/i18n";
-import { NativeTabs } from "expo-router/native-tabs";
-import { useUnistyles } from "react-native-unistyles";
+import { Tabs } from "expo-router/js-tabs";
 
-// Without an anchor, Expo Router 58 opens the tab with the shortest name (Map).
 // eslint-disable-next-line @typescript-eslint/naming-convention -- Expo Router reads this exact export name.
-export const unstable_settings = { anchor: "(home)" };
+export const unstable_settings = { anchor: ROOT_TAB };
 
 export default function TabsLayout() {
   useAppLocale();
-  const { theme } = useUnistyles();
   return (
-    <NativeTabs
-      tintColor={theme.colors.tabTint}
-      minimizeBehavior="onScrollDown"
+    <Tabs
+      screenOptions={{ headerShown: false }}
+      tabBar={(props) => <TabBar {...props} />}
     >
-      <NativeTabs.Trigger name="(home)">
-        <NativeTabs.Trigger.Icon
-          sf={{ default: "house", selected: "house.fill" }}
-          md="home"
-        />
-        <NativeTabs.Trigger.Label>
-          {t("navigation.home")}
-        </NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="(map)">
-        <NativeTabs.Trigger.Icon
-          sf={{ default: "map", selected: "map.fill" }}
-          md="map"
-        />
-        <NativeTabs.Trigger.Label>
-          {t("navigation.map")}
-        </NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="(trips)">
-        <NativeTabs.Trigger.Icon
-          sf={{ default: "suitcase", selected: "suitcase.fill" }}
-          md="luggage"
-        />
-        <NativeTabs.Trigger.Label>
-          {t("navigation.trips")}
-        </NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-      <NativeTabs.Trigger name="(passport)">
-        <NativeTabs.Trigger.Icon
-          sf={{ default: "book.closed", selected: "book.closed.fill" }}
-          md="menu_book"
-        />
-        <NativeTabs.Trigger.Label>
-          {t("passport.title")}
-        </NativeTabs.Trigger.Label>
-      </NativeTabs.Trigger>
-    </NativeTabs>
+      <Tabs.Screen name="(home)" options={{ title: t("navigation.library") }} />
+      <Tabs.Screen name="(map)" options={{ title: t("navigation.map") }} />
+      <Tabs.Screen name="(trips)" options={{ title: t("navigation.trips") }} />
+      <Tabs.Screen name="(passport)" options={{ title: t("passport.title") }} />
+    </Tabs>
   );
 }

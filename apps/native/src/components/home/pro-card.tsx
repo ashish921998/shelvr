@@ -83,8 +83,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(0.5),
   },
   title: {
-    fontFamily: theme.fonts.display,
-    fontSize: 22,
+    ...theme.type.title,
     color: theme.colors.foreground,
   },
   body: {

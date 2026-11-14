@@ -7,7 +7,6 @@ import { Alert } from "react-native";
 
 export type CityPlanKind = "date" | "trip";
 
-/** Opens the date planner for the city's saves, or the trip planner with the city filled in. */
 export function useCityPlan() {
   const router = useRouter();
   const planGuard = usePaywallGuard("make_plan").guard;
@@ -21,7 +20,11 @@ export function useCityPlan() {
     }, []),
   );
 
-  const start = async (kind: CityPlanKind, city: string) => {
+  const start = async (
+    kind: CityPlanKind,
+    city: string,
+    onLeave?: () => void,
+  ) => {
     if (busy !== null || locked.current) return;
     locked.current = true;
     setBusy(kind);
@@ -30,8 +33,9 @@ export function useCityPlan() {
       const allowed = await planGuard(() => undefined);
       if (!allowed) return;
       analytics.capture("city_plan_started", { kind });
+      onLeave?.();
       router.push({
-        pathname: kind === "trip" ? "/new-trip" : "/date-plan",
+        pathname: kind === "trip" ? "/new-trip" : "/go-out",
         params: { city },
       });
       formOpen = kind === "trip";

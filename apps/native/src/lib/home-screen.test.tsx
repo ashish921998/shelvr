@@ -145,13 +145,20 @@ const fakes = vi.hoisted(() => ({
         name sheet
       </button>
     ) : null,
+  libraryRows: () => <div>library rows</div>,
+  search: ({ top, children }: { top?: ReactNode; children?: ReactNode }) => (
+    <div>
+      {top}
+      {children}
+    </div>
+  ),
 }));
 vi.mock("@/components/home/pro-card", () => ({
   FreeSavesCard: fakes.nothing,
   ProCard: fakes.nothing,
 }));
 vi.mock("@/components/home/home-search", () => ({
-  HomeSearch: fakes.passThrough,
+  HomeSearch: fakes.search,
 }));
 vi.mock("@/components/home/shared-lists-section", () => ({
   SharedListsSection: fakes.nothing,
@@ -168,15 +175,20 @@ vi.mock("@/components/feedback/feedback-modal", () => ({
 vi.mock("@/components/home/home-places", () => ({
   HomePlaces: fakes.nothing,
   HomePlacesEmptyCard: fakes.nothing,
-  UnplacedSaves: fakes.nothing,
 }));
-vi.mock("@/components/home/review-saves", () => ({
-  ReviewSaves: fakes.nothing,
+vi.mock("@/components/home/library-rows", () => ({
+  LibraryRows: fakes.libraryRows,
+}));
+vi.mock("@/components/home/home-header", () => ({
+  HomeHeader: fakes.nothing,
+}));
+vi.mock("@/components/home/recent-saves", () => ({
+  RecentSaves: fakes.nothing,
 }));
 vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: fakes.nothing,
 }));
-vi.mock("@/components/ui/header-scrim", () => ({ HeaderScrim: fakes.nothing }));
+vi.mock("expo-router/js-tabs", () => ({ useBottomTabBarHeight: () => 0 }));
 vi.mock("@/components/shared-list/name-sheet", () => ({
   NameSheet: fakes.nameSheet,
 }));
@@ -202,6 +214,7 @@ vi.mock("react-native", () => ({
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
+  useUnistyles: () => ({ theme: { gap: (n: number) => n * 8 } }),
 }));
 
 const notEntitled = { entitled: false, loading: false, status: "none" };
@@ -412,4 +425,11 @@ it("hides the feedback invitation while the trial primer holds its turn but has 
   openGate();
   await settle();
   expect(sheets().primer).toBe(true);
+});
+
+it("shows the library rows on a Home with no saves", async () => {
+  mocks.access = FREE;
+  render(<HomeScreen />);
+  await settle();
+  expect(screen.getByText("library rows")).toBeTruthy();
 });

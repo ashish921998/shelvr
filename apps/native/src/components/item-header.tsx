@@ -62,8 +62,7 @@ const styles = StyleSheet.create((theme) => ({
     overflow: "visible",
   },
   title: {
-    fontFamily: theme.fonts.display,
-    fontSize: 22,
+    ...theme.type.title,
     color: theme.colors.foreground,
   },
   mediaDate: {

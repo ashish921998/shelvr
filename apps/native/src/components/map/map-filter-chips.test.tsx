@@ -40,7 +40,7 @@ vi.mock("react-native", () => ({
   ),
 }));
 
-it("lists All then each filter, and a second tap on the selected filter returns to All", () => {
+it("lists only the filters, and a second tap on the selected one turns it off", () => {
   const onSelect = vi.fn();
   const { rerender } = render(
     <MapFilterChips
@@ -50,11 +50,9 @@ it("lists All then each filter, and a second tap on the selected filter returns 
     />,
   );
   expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
-    "map.filterAll",
     "🍰 map.kindDessert",
     "💕 map.kindDateNight",
   ]);
-  expect(screen.getByLabelText("map.filterAll").ariaPressed).toBe("true");
 
   fireEvent.click(screen.getByLabelText("map.kindDateNight"));
   expect(onSelect).toHaveBeenLastCalledWith("dateNight");
@@ -71,24 +69,18 @@ it("lists All then each filter, and a second tap on the selected filter returns 
 });
 
 it.each([
-  ["a new filter", null, "map.kindDessert", 1],
-  ["clearing the selected filter", "dessert", "map.kindDessert", 1],
-  ["All when a filter is on", "dessert", "map.filterAll", 1],
-  ["All when it is already on", null, "map.filterAll", 0],
-] as const)(
-  "ticks %s the right number of times",
-  (_, selected, label, ticks) => {
-    const selection = vi.spyOn(haptics, "selection");
-    const { unmount } = render(
-      <MapFilterChips
-        kinds={["dessert"]}
-        selected={selected}
-        onSelect={vi.fn()}
-      />,
-    );
-    fireEvent.click(screen.getByLabelText(label));
-    expect(selection).toHaveBeenCalledTimes(ticks);
-    selection.mockRestore();
-    unmount();
-  },
-);
+  ["a new filter", null, 1],
+  ["turning the selected filter off", "dessert", 1],
+] as const)("ticks %s once", (_, selected, ticks) => {
+  const selection = vi.spyOn(haptics, "selection");
+  render(
+    <MapFilterChips
+      kinds={["dessert"]}
+      selected={selected}
+      onSelect={vi.fn()}
+    />,
+  );
+  fireEvent.click(screen.getByLabelText("map.kindDessert"));
+  expect(selection).toHaveBeenCalledTimes(ticks);
+  selection.mockRestore();
+});

@@ -1,7 +1,19 @@
 import { PLACE_KINDS, type PlaceKind } from "@convex/model/placeKinds";
 import { cityKey, distanceKm, type LatLng } from "@convex/model/trip";
+import type { TextMessageKey } from "@/locales/message-types";
 
-/** How far from the person a saved place still counts as nearby when the map opens on them. */
+export const KIND_LABELS: Record<PlaceKind, TextMessageKey> = {
+  food: "map.kindFood",
+  coffee: "map.kindCoffee",
+  dessert: "map.kindDessert",
+  drinks: "map.kindDrinks",
+  dateNight: "map.kindDateNight",
+  activities: "map.kindActivities",
+  shopping: "map.kindShopping",
+  stay: "map.kindStay",
+};
+
+/** How far from the person, or from the map's centre, a saved place still counts as nearby. */
 const NEARBY_KM = 50;
 
 /** A filter shows only once enough of your places fit it to be worth a tap. */
@@ -70,6 +82,23 @@ export function busiestCityPlaces<T extends { city?: string }>(
   return top === undefined
     ? [...places]
     : places.filter((place) => cityKey(place.city ?? "") === top);
+}
+
+export function cityNear(
+  places: readonly (LatLng & { city?: string })[],
+  centre: LatLng,
+): string | undefined {
+  let nearest: string | undefined;
+  let best = Infinity;
+  for (const place of places) {
+    if (!place.city) continue;
+    const gap = distanceKm(centre, place);
+    if (gap <= NEARBY_KM && gap < best) {
+      best = gap;
+      nearest = place.city;
+    }
+  }
+  return nearest;
 }
 
 /** Whether opening on the person shows any of their places; if not, the map opens on their busiest city. */

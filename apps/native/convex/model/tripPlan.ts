@@ -36,6 +36,9 @@ export const tripStayValidator = v.object({
 /** Day 0 holds the unplanned stops; days 1..dayCount are the itinerary. */
 export const UNPLANNED_DAY = 0;
 
+export const MAX_TRIP_STOP_NOTE_CHARS = 500;
+export const TRIP_STOP_TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+
 export const tripPlanStopValidator = v.object({
   _id: v.id("tripStops"),
   source: tripStopSourceValidator,
@@ -48,6 +51,8 @@ export const tripPlanStopValidator = v.object({
   category: v.optional(v.string()),
   why: v.optional(v.string()),
   slot: v.optional(tripSlotValidator),
+  time: v.optional(v.string()),
+  note: v.optional(v.string()),
 });
 export type TripPlanStop = Infer<typeof tripPlanStopValidator>;
 
@@ -58,6 +63,8 @@ export const tripPlanSummaryValidator = v.object({
   _id: v.id("tripPlans"),
   /** Set once the person renames the trip; the app shows "<city> trip" until then. */
   name: v.optional(v.string()),
+  countries: v.optional(v.array(v.string())),
+  cover: v.optional(v.string()),
   city: v.string(),
   startDate: v.optional(v.string()),
   dayCount: v.number(),
@@ -72,6 +79,8 @@ export const tripPlanDetailValidator = v.object({
   _id: v.id("tripPlans"),
   listId: v.optional(v.id("sharedLists")),
   name: v.optional(v.string()),
+  countries: v.optional(v.array(v.string())),
+  cover: v.optional(v.string()),
   city: v.string(),
   startDate: v.optional(v.string()),
   dayCount: v.number(),
@@ -112,6 +121,13 @@ export const searchTripPlacesResultValidator = v.object({
 export const tripSavePlaceValidator = v.object({
   itemId: v.id("items"),
   name: v.string(),
+  location: v.optional(
+    v.object({
+      lat: v.number(),
+      lng: v.number(),
+      appleId: v.optional(v.string()),
+    }),
+  ),
   /** The save's title, so the person knows which save the place came from. */
   title: v.optional(v.string()),
   category: v.optional(v.string()),

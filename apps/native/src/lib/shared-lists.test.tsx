@@ -296,6 +296,7 @@ describe("useAlsoAddTo", () => {
     name: "Ours",
     placeCount: 4,
     newCount: 0,
+    cities: [],
     isOwner: true,
     newFrom: [],
     members: [],

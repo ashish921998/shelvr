@@ -217,6 +217,57 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+describe("searchTripCities", () => {
+  it("completes a city the user has not saved and keeps the region in its name", async () => {
+    await stubMaps();
+    const fetchMock = vi.fn(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname === "/v1/token")
+        return Response.json({ accessToken: "maps" });
+      expect(url.pathname).toBe("/v1/searchAutocomplete");
+      expect(url.searchParams.get("includeAddressCategories")).toBe("Locality");
+      expect(url.searchParams.get("resultTypeFilter")).toBe("address");
+      expect(url.searchParams.get("q")).toBe("New");
+      return Response.json({
+        results: [
+          {
+            displayLines: ["New York", "NY, United States"],
+            location: { latitude: 40.71, longitude: -74.01 },
+          },
+          { displayLines: ["New Delhi", "Delhi, India"] },
+          { displayLines: ["New York", "NY, United States"] },
+          { displayLines: [null] },
+        ],
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { t } = await setup([]);
+    expect(
+      await t.action(api.tripPlanner.searchTripCities, { query: " New " }),
+    ).toEqual([
+      {
+        label: "New York, NY, United States",
+        locality: "New York",
+        location: { lat: 40.71, lng: -74.01 },
+      },
+      { label: "New Delhi, Delhi, India", locality: "New Delhi" },
+    ]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("skips Apple Maps autocomplete after an AI consent decline", async () => {
+    await stubMaps();
+    const { base, t, userId } = await setup([]);
+    await base.run((ctx) => setTestConsent(ctx, userId, "declined"));
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    expect(
+      await t.action(api.tripPlanner.searchTripCities, { query: "New" }),
+    ).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
 describe("claimTripPlanInternal", () => {
   it("refuses an account without Pro", async () => {
     const { t } = await setup(SAVES, { pro: false });

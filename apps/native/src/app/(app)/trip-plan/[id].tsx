@@ -1,8 +1,6 @@
 import { EmptyState } from "@/components/empty-state";
-import {
-  hasMapPoints,
-  TripPlanBody,
-} from "@/components/trip-planner/trip-plan-body";
+import { Button } from "@/components/ui/button";
+import { TripPlanBody } from "@/components/trip-planner/trip-plan-body";
 import {
   TripEditHeader,
   TripEditList,
@@ -17,11 +15,13 @@ import { useDeleteTripPlan } from "@/lib/delete-trip-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
 import { useRenameTrip } from "@/lib/trip-edit";
+import { useTripShare } from "@/lib/trip-share";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { usePlanGate } from "@/lib/plan-gate";
+import { canBrowse } from "@/lib/access";
+import { useAccess } from "@/lib/free-plan";
 import { personalPlanAllowed } from "@/lib/list-gate";
 import { Redirect, Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -29,19 +29,21 @@ import { Platform, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 function TripHeader({
-  overMap,
   editing,
   onEdit,
   onDone,
   onAddPlace,
   onDelete,
+  onShare,
+  shareLoading,
 }: {
-  overMap: boolean;
   editing: boolean;
   onEdit: () => void;
   onDone: () => void;
   onAddPlace: () => void;
   onDelete: () => void;
+  onShare: () => void;
+  shareLoading: boolean;
 }) {
   const { theme } = useUnistyles();
   const actions = [
@@ -53,12 +55,8 @@ function TripHeader({
     return (
       <Stack.Screen
         options={{
-          // Over the map the header floats; without one it needs its own background.
-          headerTransparent: overMap && !editing,
-          headerStyle:
-            overMap && !editing
-              ? undefined
-              : { backgroundColor: theme.colors.background },
+          headerTransparent: false,
+          headerStyle: { backgroundColor: theme.colors.background },
           headerRight: () =>
             editing ? (
               <HeaderIconButton
@@ -67,26 +65,30 @@ function TripHeader({
                 onPress={onDone}
               />
             ) : (
-              <HeaderActionMenu
-                icon="ellipsis"
-                label={t("tripPlanner.tripActions")}
-                title={t("tripPlanner.tripActions")}
-                actions={actions}
-              />
+              <View style={styles.headerActions}>
+                <HeaderIconButton
+                  icon="square.and.arrow.up"
+                  label={t("tripShare.title")}
+                  onPress={onShare}
+                  disabled={shareLoading}
+                />
+                <HeaderActionMenu
+                  icon="ellipsis"
+                  label={t("tripPlanner.tripActions")}
+                  title={t("tripPlanner.tripActions")}
+                  actions={actions}
+                />
+              </View>
             ),
         }}
       />
     );
   }
-  // The edit list has no map under the header, so its rows would scroll under the buttons.
-  // Both states set it, since options a screen set stay after it unmounts.
   const iosHeader = (
     <Stack.Screen
       options={{
-        headerTransparent: !editing,
-        headerStyle: editing
-          ? { backgroundColor: theme.colors.background }
-          : undefined,
+        headerTransparent: false,
+        headerStyle: { backgroundColor: theme.colors.background },
       }}
     />
   );
@@ -110,6 +112,13 @@ function TripHeader({
     <>
       {iosHeader}
       <Stack.Toolbar placement="right">
+        <Stack.Toolbar.Button
+          icon="square.and.arrow.up"
+          disabled={shareLoading}
+          onPress={onShare}
+        >
+          {t("tripShare.title")}
+        </Stack.Toolbar.Button>
         <Stack.Toolbar.Menu icon="ellipsis" tintColor={theme.colors.foreground}>
           <Stack.Toolbar.MenuAction icon="pencil" onPress={onEdit}>
             {t("tripPlanner.edit")}
@@ -129,16 +138,19 @@ function TripHeader({
 export default function TripPlanScreen() {
   useAppLocale();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, mode } = useLocalSearchParams<{ id: string; mode?: "edit" }>();
   const tripId = id as Id<"tripPlans">;
   const trip = useQuery(
     convexQuery(api.tripPlannerData.getTripPlan, { tripId }),
   );
   const deleteTrip = useDeleteTripPlan();
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(mode === "edit");
   const [name, setName] = useState<string | null>(null);
+  const [day, setDay] = useState<number | null>(null);
   const rename = useRenameTrip(tripId, trip.data?.name);
-  const { gated } = usePlanGate();
+  const share = useTripShare(tripId);
+  const access = useAccess();
+  const gated = access.kind === "locked";
 
   const data = trip.data;
   const opened = useRef(false);
@@ -151,7 +163,10 @@ export default function TripPlanScreen() {
       stops: stops.length,
       saved: stops.filter((stop) => stop.source === "save").length,
     });
-  }, [data]);
+    if (mode === "edit") {
+      analytics.capture("trip_plan_edit_started", { stops: stops.length });
+    }
+  }, [data, mode]);
 
   // Without a title VoiceOver read the tab group's route name, "(tabs)".
   const backTitle = (
@@ -189,9 +204,27 @@ export default function TripPlanScreen() {
   }
 
   if (!personalPlanAllowed(gated, data.listId)) {
+    if (share.loading) return <ScreenLoader label={t("trip.loading")} />;
+    if (share.revokeActive) {
+      return (
+        <View style={styles.screen}>
+          {backTitle}
+          <EmptyState
+            title={t("tripShare.title")}
+            message={t("tripShare.active")}
+          />
+          <Button
+            title={t("tripShare.revoke")}
+            onPress={share.revokeActive}
+            style={styles.revoke}
+          />
+        </View>
+      );
+    }
     return <Redirect href="/plan-gate" />;
   }
 
+  const pro = access.kind === "pro" && !access.syncing;
   const addPlace = (day: number) =>
     router.push({
       pathname: "/add-trip-stop",
@@ -201,7 +234,6 @@ export default function TripPlanScreen() {
     <>
       {backTitle}
       <TripHeader
-        overMap={hasMapPoints(data)}
         editing={editing}
         onEdit={() => {
           analytics.capture("trip_plan_edit_started", {
@@ -214,8 +246,10 @@ export default function TripPlanScreen() {
           if (name !== null) void rename(name);
           setEditing(false);
         }}
-        onAddPlace={() => addPlace(1)}
+        onAddPlace={() => addPlace((day ?? 0) + 1)}
         onDelete={() => deleteTrip(data._id, () => backOrHome(router))}
+        onShare={share.open}
+        shareLoading={share.loading}
       />
       {editing ? (
         <TripEditList
@@ -224,7 +258,7 @@ export default function TripPlanScreen() {
           header={
             <TripEditHeader
               city={data.city}
-              name={name ?? ""}
+              name={name ?? data.name ?? ""}
               onChangeName={setName}
               onSubmitName={() => {
                 if (name !== null) void rename(name);
@@ -233,12 +267,24 @@ export default function TripPlanScreen() {
           }
         />
       ) : (
-        <TripPlanBody trip={data} />
+        <TripPlanBody
+          trip={data}
+          canUseSaves={data.listId === undefined ? pro : canBrowse(access)}
+          canFillFromSaves={pro}
+          day={day}
+          onPickDay={setDay}
+          onAddPlace={addPlace}
+        />
       )}
     </>
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   screen: { flex: 1, backgroundColor: theme.colors.background },
+  headerActions: { flexDirection: "row", gap: theme.gap(0.5) },
+  revoke: {
+    marginHorizontal: theme.gap(2),
+    marginBottom: rt.insets.bottom + theme.gap(2),
+  },
 }));

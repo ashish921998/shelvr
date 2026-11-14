@@ -1,15 +1,25 @@
 import { t, useAppLocale } from "@/lib/i18n";
-import { useTabStackChrome } from "@/lib/tab-stack-chrome";
 import { Stack } from "expo-router";
 import { Platform, Text } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 export default function PassportStackLayout() {
   useAppLocale();
-  const { screenOptions } = useTabStackChrome({ softScrollEdge: true });
+  const { theme } = useUnistyles();
 
   return (
-    <Stack screenOptions={screenOptions}>
+    <Stack
+      screenOptions={{
+        headerTransparent: Platform.OS === "ios",
+        headerStyle:
+          Platform.OS === "android"
+            ? { backgroundColor: theme.colors.background }
+            : undefined,
+        headerShadowVisible: false,
+        headerTitleAlign: "center",
+        scrollEdgeEffects: { top: "soft" },
+      }}
+    >
       <Stack.Screen
         name="index"
         options={

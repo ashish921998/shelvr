@@ -25,6 +25,7 @@ export default {
       app: {
         bundleId: BUNDLE_ID,
         launchArguments: LAUNCH_ARGUMENTS,
+        permissions: { location: "deny" },
         command: {
           executable: "pnpm",
           args: ["exec", "expo", "start", "--dev-client", "--port", METRO_PORT],

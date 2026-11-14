@@ -12,7 +12,10 @@ import * as Sharing from "expo-sharing";
 import { useCallback } from "react";
 import { Share } from "react-native";
 
-export function useItemShare(activeItem: DetailItem | undefined) {
+export function useItemShare(
+  activeItem: DetailItem | undefined,
+  surface: "item_detail" | "feed",
+) {
   useAppLocale();
   const shareLink = useShareLink();
   const settleShareLink = useSettleShareLink();
@@ -67,7 +70,7 @@ export function useItemShare(activeItem: DetailItem | undefined) {
     if (shared) {
       const shareRef = await shareRefOf(branded);
       analytics.capture("item_shared", {
-        surface: "item_detail",
+        surface,
         ...(shareRef ? { share_ref: shareRef } : {}),
       });
       analytics.itemAction(
@@ -75,5 +78,5 @@ export function useItemShare(activeItem: DetailItem | undefined) {
         shareSheetOnly ? "share_sheet_opened" : "share",
       );
     }
-  }, [activeItem, shareLink, settleShareLink]);
+  }, [activeItem, surface, shareLink, settleShareLink]);
 }

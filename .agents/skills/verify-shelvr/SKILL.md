@@ -58,7 +58,7 @@ nothing is started by hand. Before a run:
 
 ```bash
 pnpm exec e2e list                          # loads the config, starts nothing; exit 0, one line per test file
-pnpm exec e2e run tests/home-cities.e2e.ts  # Metro up, app opens, dev sign-in, fixture reset, Home lists a Lisbon city card; exit 0
+pnpm exec e2e run tests/home-cities.e2e.ts  # Metro up, app opens, dev sign-in, fixture reset, Home's Cities row lists a Lisbon city card; exit 0
 ```
 
 `list` failing is the config or a dependency (`pnpm install` from the
@@ -71,7 +71,7 @@ Debug dev client (local-qa.md, "Confirm the bundle is yours"). No
 `AUTH_ENABLE_ANONYMOUS` missing on the dev deployment. The home-cities test needs no model. Run Doctor first whenever anything
 looks off.
 
-Taps that can be lost (Home's `Add` and `Profile`) go
+Taps that can be lost (the tab bar's `Add` and the Map's `Profile`) go
 through `tapUntilVisible` in `tests/seeded-home.ts`: it taps again only when
 the result has not appeared after a wait an accepted tap never needs. Each tap
 is its own step in `.e2e/report.json`, so count them there: more than one tap
@@ -82,13 +82,15 @@ fails is a failure to explain, not a flake to rerun away.
 
 Scripted, the normal lane: each core feature has a test under `tests/`
 (see [features/](features/README.md)). Write new ones the same way:
-`startOnSeededHome()` at the top, `openAddSheet` to open the Add sheet,
+`startOnSeededHome()` at the top, `openAddSheet` for the link field (Add, then Paste a link),
 plain `screen` locators, and `agent.waitFor` with `vision: "only"` only where
 the model writes the label (a link's title). Stable handles in this
 app: test ids `add-article-input`, `dev-login-button`, `reset-flow-fixtures`;
-the city cards on Home (buttons named `<City>` without pins, or `<City>, N places`
-once mapped; do not require the comma); the `Profile` and `Add`
-buttons on Home. There is no tab bar.
+the city cards on Cities, which `openCities` opens from Home's `Cities` row
+(buttons named `<City>` without pins, or `<City>, N places` once mapped; do not
+require the comma); the Map's `Profile` button; and the tab bar's `Library`,
+`Add` and `Plan a date` buttons. The app opens on the Map, and `openHome` taps
+`Library`; on Home the same tab bar button reads `Map`.
 
 Live, over MCP: no `e2e mcp` server is registered in this repo. Add one for
 your client with `--config tools/e2e/e2e.config.ts` (topic `mcp`), then
@@ -109,11 +111,11 @@ that touches UI files still needs a screenshot or recording embedded in its
 description (`tools/verify-pr-evidence.mjs`): upload it there, quote the run's
 summary lines beside it, then delete the local copy.
 
-A proof goes through the user's path: Home's Add, the city cards, the labelled
+A proof goes through the user's path: the tab bar's Add, the city cards, the labelled
 fields and buttons, never a Convex function called directly. It captures the
 action and the state after it. Side effects live in the dev Convex deployment
 (`items`, `spaces`, `spaceItems`), and the flows read them back through the app:
-a saved link shows under its city or under "No place found". Nothing
+a saved link shows under its city or under Without a place. Nothing
 is mocked; link reads and titles go through the real backend and model.
 
 ## Bug bash

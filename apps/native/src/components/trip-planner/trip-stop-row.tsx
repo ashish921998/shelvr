@@ -2,6 +2,7 @@ import { ThemedText } from "@/components/ui/themed-text";
 import { t } from "@/lib/i18n";
 import { stopBadge, stopRowLabel, stopWhyLine } from "@/lib/trip-planner";
 import type { TripPlanStop } from "@convex/model/tripPlan";
+import type { ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -14,6 +15,7 @@ type Props = {
   /** Its day's colour for the number badge, matching the day's pins and route on the map. */
   dayColor?: { color: string; on: string };
   onPress: () => void;
+  action: ReactNode;
 };
 
 export function TripStopRow({
@@ -22,84 +24,111 @@ export function TripStopRow({
   fromSave,
   dayColor,
   onPress,
+  action,
 }: Props) {
   const badgeKey = stopBadge(stop);
   const badge = t(badgeKey);
   const yours = badgeKey === "tripPlanner.badgeYours";
   const why = stopWhyLine(stop, fromSave === true);
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={stopRowLabel(stop, {
-        number,
-        fromSave: fromSave === true,
-      })}
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && styles.pressed]}
-    >
-      {number !== undefined ? (
-        <View
-          style={[
-            styles.number,
-            dayColor && { backgroundColor: dayColor.color },
-          ]}
-        >
-          <ThemedText
-            variant="badge"
-            style={[styles.numberText, dayColor && { color: dayColor.on }]}
+    <View style={styles.frame}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={stopRowLabel(stop, {
+          number,
+          fromSave: fromSave === true,
+        })}
+        onPress={onPress}
+        style={({ pressed }) => [styles.row, pressed && styles.pressed]}
+      >
+        {number !== undefined ? (
+          <View
+            style={[
+              styles.number,
+              dayColor && { backgroundColor: dayColor.color },
+            ]}
           >
-            {number}
-          </ThemedText>
-        </View>
-      ) : (
-        <View style={styles.dot} />
-      )}
-      <View style={styles.text}>
-        <View style={styles.titleRow}>
-          <ThemedText
-            variant="subheadStrong"
-            numberOfLines={2}
-            style={styles.name}
-          >
-            {stop.name}
-          </ThemedText>
-          <View style={[styles.badge, yours && styles.badgeYours]}>
             <ThemedText
-              variant="captionStrong"
-              style={yours ? styles.badgeYoursText : styles.badgeText}
+              variant="badge"
+              style={[styles.numberText, dayColor && { color: dayColor.on }]}
             >
-              {badge}
+              {number}
             </ThemedText>
           </View>
+        ) : (
+          <View style={styles.dot} />
+        )}
+        <View style={styles.text}>
+          <View style={styles.titleRow}>
+            <ThemedText
+              variant="subheadStrong"
+              numberOfLines={2}
+              style={styles.name}
+            >
+              {stop.name}
+            </ThemedText>
+            <View style={[styles.badge, yours && styles.badgeYours]}>
+              <ThemedText
+                variant="captionStrong"
+                style={yours ? styles.badgeYoursText : styles.badgeText}
+              >
+                {badge}
+              </ThemedText>
+            </View>
+          </View>
+          {stop.time ? (
+            <ThemedText variant="footnote" style={styles.muted}>
+              {stop.time}
+            </ThemedText>
+          ) : null}
+          {stop.area ? (
+            <ThemedText
+              variant="footnote"
+              numberOfLines={1}
+              style={styles.muted}
+            >
+              {stop.area}
+            </ThemedText>
+          ) : null}
+          {stop.note ? (
+            <ThemedText variant="footnote" numberOfLines={3}>
+              {stop.note}
+            </ThemedText>
+          ) : null}
+          {why !== null && fromSave ? (
+            <ThemedText
+              variant="footnote"
+              numberOfLines={2}
+              style={styles.muted}
+            >
+              {why}
+            </ThemedText>
+          ) : why !== null ? (
+            <ThemedText variant="footnote" numberOfLines={3}>
+              {why}
+            </ThemedText>
+          ) : null}
         </View>
-        {stop.area ? (
-          <ThemedText variant="footnote" numberOfLines={1} style={styles.muted}>
-            {stop.area}
-          </ThemedText>
-        ) : null}
-        {why !== null && fromSave ? (
-          <ThemedText variant="footnote" numberOfLines={2} style={styles.muted}>
-            {why}
-          </ThemedText>
-        ) : why !== null ? (
-          <ThemedText variant="footnote" numberOfLines={3}>
-            {why}
-          </ThemedText>
-        ) : null}
-      </View>
-    </Pressable>
+      </Pressable>
+      {action}
+    </View>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
+  frame: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: theme.colors.border,
+  },
   row: {
+    flex: 1,
     minHeight: theme.control.minHeight,
     flexDirection: "row",
     alignItems: "flex-start",
     gap: theme.gap(1.5),
     paddingVertical: theme.gap(1.25),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: theme.colors.border,
   },
   pressed: { opacity: theme.opacity.pressed },
   number: {

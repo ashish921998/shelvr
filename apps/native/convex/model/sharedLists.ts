@@ -63,6 +63,7 @@ export const sharedListSummaryValidator = v.object({
   name: v.string(),
   placeCount: v.number(),
   newCount: v.number(),
+  cities: v.array(v.string()),
   newFrom: newFromValidator,
   isOwner: v.boolean(),
   members: v.array(

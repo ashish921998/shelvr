@@ -36,6 +36,7 @@ import { ringComplete } from "@/components/passport/city-ring";
 import { useStampMomentLanding } from "@/lib/stamp-moment";
 import { usePlaceVisit } from "@/lib/use-place-visit";
 import { Stack, useRouter } from "expo-router";
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useEffect, useRef, useState } from "react";
 import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -128,6 +129,7 @@ export default function PassportScreen() {
   useAppLocale();
   const router = useRouter();
   const { theme } = useUnistyles();
+  const barHeight = useBottomTabBarHeight();
   const { stamps, failed, error } = usePassport();
   const visit = usePlaceVisit("passport");
   useStampMomentLanding();
@@ -215,7 +217,10 @@ export default function PassportScreen() {
       <ScrollView
         style={styles.screen}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: barHeight + theme.gap(4) },
+        ]}
       >
         <PassportHero
           stamps={stamps}
@@ -312,7 +317,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   content: {
     gap: theme.gap(2),
     paddingHorizontal: theme.gap(2),
-    paddingBottom: rt.insets.bottom + theme.gap(4),
   },
   backfill: {
     minHeight: theme.control.minHeight,

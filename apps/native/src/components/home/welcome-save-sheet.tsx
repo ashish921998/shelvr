@@ -61,8 +61,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingBottom: theme.gap(1),
   },
   name: {
-    fontFamily: theme.fonts.display,
-    fontSize: 26,
+    ...theme.type.largeTitle,
     color: theme.colors.primaryText,
   },
   role: {

@@ -383,7 +383,7 @@ export function useListPlan(listId: Id<"sharedLists">, city: string) {
     (kind: CityPlanKind) => {
       analytics.capture("city_plan_started", { kind });
       router.push({
-        pathname: kind === "date" ? "/date-plan" : "/new-trip",
+        pathname: kind === "date" ? "/go-out" : "/new-trip",
         params: { city, listId },
       });
     },

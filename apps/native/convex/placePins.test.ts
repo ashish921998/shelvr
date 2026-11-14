@@ -100,6 +100,7 @@ async function lookupJobs(t: ReturnType<typeof newConvexTest>) {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllEnvs();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -1999,6 +2000,92 @@ describe("identifyPins", () => {
         category: "Restaurant",
       },
       listed[1],
+    ]);
+  });
+});
+
+it("uses a precise address when POI search has no match", async () => {
+  await withMaps();
+  const { t, itemId, pins } = await setup([], {
+    read: ["123 Broadway", "Eberly"],
+  });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname === "/v1/token")
+        return Response.json({ accessToken: "maps" });
+      if (url.searchParams.get("resultTypeFilter") === "Poi")
+        return Response.json({ results: [] });
+      const query = url.searchParams.get("q");
+      return Response.json({
+        results: [
+          {
+            name: query?.startsWith("123 Broadway")
+              ? "123 Broadway"
+              : "Eberly Street",
+            coordinate: { latitude: 38.72, longitude: -9.1 },
+          },
+        ],
+      });
+    }),
+  );
+  await t.action(internal.placePins.locateItem, { itemId });
+  expect(await pins()).toEqual([
+    { name: "123 Broadway", city: "Lisbon", lat: 38.72, lng: -9.1 },
+  ]);
+});
+
+describe("venue lookups", () => {
+  it("matches a venue as a point of interest instead of a similarly named street address", async () => {
+    await withMaps();
+    const { t, itemId, pins } = await setup([], { read: ["Eberly"] });
+    await t.run((ctx) => ctx.db.patch(itemId, { cities: ["Austin"] }));
+    const filters: (string | null)[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string) => {
+        const url = new URL(input);
+        if (url.pathname === "/v1/token")
+          return Response.json({ accessToken: "maps" });
+        const filter = url.searchParams.get("resultTypeFilter");
+        filters.push(filter);
+        return Response.json({
+          results:
+            filter === "Poi"
+              ? [
+                  {
+                    name: "Eberly",
+                    id: "eberly-south-lamar",
+                    poiCategory: "Restaurant",
+                    coordinate: {
+                      latitude: 30.2585588,
+                      longitude: -97.7589059,
+                    },
+                  },
+                ]
+              : [
+                  {
+                    name: "Eberly Street",
+                    coordinate: {
+                      latitude: 30.298424351230945,
+                      longitude: -97.69657681722597,
+                    },
+                  },
+                ],
+        });
+      }),
+    );
+    await t.action(internal.placePins.locateItem, { itemId });
+    expect(await pins()).toEqual([
+      {
+        name: "Eberly",
+        city: "Austin",
+        lat: 30.2585588,
+        lng: -97.7589059,
+        appleId: "eberly-south-lamar",
+        category: "Restaurant",
+      },
     ]);
   });
 });

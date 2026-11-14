@@ -15,6 +15,7 @@ import {
   type DateKind,
   type DatePlanResult,
   type DateSlot,
+  type DateStart,
   type DateStop,
   swapStop,
 } from "@convex/model/datePlan";
@@ -141,12 +142,13 @@ export function emptyMessage(
 type DatePlanState =
   | { status: "picking"; problem: "rate_limited" | "error" | null }
   | { status: "planning"; ask: DateAsk }
-  | { status: "empty"; result: DatePlanResult }
+  | { status: "empty"; result: DatePlanResult; firstLocked: boolean }
   | {
       status: "ready";
       result: DatePlanResult;
       /** The best evening, after any changes. */
       evening: DateEvening;
+      firstLocked: boolean;
       /** Per slot, the stops already shown against the other slot's current stop. */
       tried: Record<DateSlot, number[]>;
     };
@@ -173,7 +175,7 @@ export function useDatePlan(
   }, []);
 
   const plan = useCallback(
-    async (ask: DateAsk) => {
+    async (ask: DateAsk, firstSpot?: DateStart) => {
       if (busy.current) return;
       busy.current = true;
       setState({ status: "planning", ask });
@@ -185,6 +187,7 @@ export function useDatePlan(
           kind: ask,
           locale,
           ...(listId !== undefined ? { listId } : {}),
+          ...(firstSpot !== undefined ? { firstSpot } : {}),
         });
         analytics.capture("date_plan_made", {
           kind: result.kind,
@@ -201,9 +204,10 @@ export function useDatePlan(
                 status: "ready",
                 result,
                 evening: result.evenings[0],
+                firstLocked: firstSpot !== undefined,
                 tried: { first: [], second: [] },
               }
-            : { status: "empty", result },
+            : { status: "empty", result, firstLocked: firstSpot !== undefined },
         );
       } catch (error) {
         const reason = tripPlanFailure(error);
@@ -229,7 +233,8 @@ export function useDatePlan(
   /** Changes one stop; the screen offers it only when `canChange` says something fits. */
   const swap = useCallback(
     (slot: DateSlot) => {
-      if (state.status !== "ready") return;
+      if (state.status !== "ready" || (slot === "first" && state.firstLocked))
+        return;
       const shown = [...state.tried[slot], state.evening[slot]];
       const evening = swapStop(state.result.stops, state.evening, slot, shown);
       analytics.capture("date_plan_swapped", {

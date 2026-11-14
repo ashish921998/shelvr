@@ -201,6 +201,25 @@ describe("makeDatePlan", () => {
     expect(fetchMock).toHaveBeenCalled();
   });
 
+  it("keeps the chosen saved place first and looks for a second stop near it", async () => {
+    await stubMaps();
+    vi.stubGlobal("fetch", fakeApple());
+    const { t, itemIds } = await setup([DINNER, BAR]);
+    const result = await t.action(api.datePlans.makeDatePlan, {
+      city: "Lisbon",
+      kind: "surprise",
+      firstSpot: { name: "Red Frog", ...near(4) },
+    });
+    expect(result.status).toBe("ready");
+    expect(result.stops.filter((stop) => stop.slot === "first")).toEqual([
+      expect.objectContaining({ name: "Red Frog", itemId: itemIds[1] }),
+    ]);
+    expect(evenings(result)[0]).toEqual([
+      "Red Frog",
+      expect.stringMatching(/^Near Nightlife/),
+    ]);
+  });
+
   it("fills a missing stop near a saved one from Apple Maps, without chains or far places", async () => {
     await stubMaps();
     vi.stubGlobal("fetch", fakeApple());
