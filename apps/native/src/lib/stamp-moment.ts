@@ -31,7 +31,7 @@ export type StampPlace = {
   cover: string | null;
   cityVisited: number;
   cityTotal?: number;
-  cityStamps?: number;
+  cityStamps?: number | null;
 };
 
 type CityCount = { stamped: number; total: number };

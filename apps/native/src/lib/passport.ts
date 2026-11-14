@@ -113,11 +113,14 @@ export function stampId(stamp: Stamp): string {
   return `${stamp.key}:${stamp.lat ?? ""}:${stamp.lng ?? ""}`;
 }
 
-export function wentInCity(stamps: readonly Stamp[] | undefined, city: string) {
+export function wentInCity(
+  stamps: readonly Stamp[] | undefined,
+  city: string,
+): number | null {
+  if (stamps === undefined) return null;
   const key = cityKey(city);
-  return (stamps ?? []).filter(
-    (stamp) => stamp.city && cityKey(stamp.city) === key,
-  ).length;
+  return stamps.filter((stamp) => stamp.city && cityKey(stamp.city) === key)
+    .length;
 }
 
 export const CARD_PLACES = 6;

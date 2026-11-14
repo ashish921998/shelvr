@@ -76,6 +76,13 @@ describe("placeStampMoment", () => {
     expect(
       placeStampMoment("Tigre", { ...lisbon, cityVisited: 0, cityStamps: 1 }),
     ).toMatchObject({ firstInCity: false });
+    expect(
+      placeStampMoment("Tigre", {
+        ...lisbon,
+        cityVisited: 0,
+        cityStamps: null,
+      }),
+    ).toMatchObject({ firstInCity: false });
     expect(placeStampMoment("Tigre")).toEqual({
       kind: "place",
       name: "Tigre",
