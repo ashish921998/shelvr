@@ -106,6 +106,14 @@ describe("listBadgeStamps", () => {
     expect(rows.every((row) => row.city === "Lisbon")).toBe(true);
   });
 
+  it("takes the kinds of the pin with the stamp's Apple ID when two share a spot", async () => {
+    const { save, stamp, list } = await setup();
+    const sameBuilding: Pin = { ...CAFE, lat: BAR.lat, lng: BAR.lng };
+    const itemId = await save([{ ...sameBuilding, appleId: "I-cafe" }, BAR]);
+    await stamp(itemId, BAR);
+    expect(await list()).toEqual([{ city: "Lisbon", kinds: ["drinks"] }]);
+  });
+
   it("falls back to the save's tags for a pin with no category", async () => {
     const { save, stamp, list } = await setup();
     const itemId = await save([VIEWPOINT], ["sightseeing"]);
