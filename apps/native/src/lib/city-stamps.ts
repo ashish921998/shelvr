@@ -63,7 +63,7 @@ function useCityStampMutations() {
   }, [add, remove]);
 }
 
-export function stampCountWith(
+function stampCountWith(
   stamps: readonly string[],
   changes: ReadonlyMap<string, boolean>,
 ): number {
