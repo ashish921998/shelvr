@@ -9,6 +9,7 @@ import {
   isPlacePage,
   parseImageClaim,
   parseSummary,
+  plainThumbnail,
   summaryTitle,
   widenedThumbnail,
 } from "./model/cityPhoto";
@@ -42,7 +43,11 @@ async function fetchJson(
   }
 }
 
-async function isImage(url: string): Promise<boolean> {
+type ImageCheck = "image" | "gone" | "unreachable";
+
+const GONE_STATUSES = new Set([400, 403, 404, 410]);
+
+async function checkImage(url: string): Promise<ImageCheck> {
   const result = await safeFetch(url, {
     timeoutMs: 10000,
     maxBytes: 4096,
@@ -50,14 +55,22 @@ async function isImage(url: string): Promise<boolean> {
     allowContentType: (type) => type.startsWith("image/"),
     headers: { "User-Agent": SHELVR_USER_AGENT },
   });
-  return result.ok;
+  if (result.ok) return "image";
+  if (result.code === "unsupported_content_type") return "gone";
+  return result.status !== undefined && GONE_STATUSES.has(result.status)
+    ? "gone"
+    : "unreachable";
 }
 
-async function commonsFile(item: string): Promise<string | undefined> {
+async function commonsFile(
+  item: string | undefined,
+): Promise<{ file?: string; unreachable: boolean }> {
+  if (item === undefined) return { unreachable: false };
   const claims = await fetchJson(
     `https://www.wikidata.org/w/api.php?action=wbgetclaims&format=json&property=P18&entity=${encodeURIComponent(item)}`,
   );
-  return claims.ok ? parseImageClaim(claims.body) : undefined;
+  if (!claims.ok) return { unreachable: true };
+  return { file: parseImageClaim(claims.body), unreachable: false };
 }
 
 function md5(text: string): string {
@@ -73,10 +86,9 @@ async function findPhoto(city: string): Promise<Lookup> {
   }
   const summary = parseSummary(page.body);
   if (summary === null || !isPlacePage(summary)) return { status: "missing" };
-  const file =
-    summary.wikibaseItem === undefined
-      ? undefined
-      : await commonsFile(summary.wikibaseItem);
+  const { file, unreachable: claimsUnreachable } = await commonsFile(
+    summary.wikibaseItem,
+  );
   const candidates: { url: string; file?: string }[] = [];
   if (file !== undefined) {
     const name = file.replace(/ /g, "_");
@@ -84,18 +96,15 @@ async function findPhoto(city: string): Promise<Lookup> {
   }
   const lead = widenedThumbnail(summary.thumbnail);
   if (lead !== undefined) candidates.push({ url: lead });
-  if (
-    summary.thumbnail !== undefined &&
-    widenedThumbnail(summary.thumbnail) !== undefined
-  ) {
-    candidates.push({ url: summary.thumbnail });
-  }
+  const plain = plainThumbnail(summary.thumbnail);
+  if (plain !== undefined) candidates.push({ url: plain });
+  let unreachable = claimsUnreachable;
   for (const candidate of candidates) {
-    if (await isImage(candidate.url)) {
-      return { status: "found", ...candidate };
-    }
+    const check = await checkImage(candidate.url);
+    if (check === "image") return { status: "found", ...candidate };
+    if (check === "unreachable") unreachable = true;
   }
-  return { status: "missing" };
+  return { status: unreachable ? "failed" : "missing" };
 }
 
 function photoSource(outcome: Lookup): string {

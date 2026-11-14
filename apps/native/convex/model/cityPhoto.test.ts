@@ -114,6 +114,16 @@ describe("widenedThumbnail", () => {
     );
   });
 
+  it("drops Wikipedia's tracking query before reading the file name", () => {
+    expect(
+      widenedThumbnail(
+        "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Texas_medical_center.jpg/330px-Texas_medical_center.jpg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail",
+      ),
+    ).toBe(
+      "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/ab/Texas_medical_center.jpg/960px-Texas_medical_center.jpg",
+    );
+  });
+
   it("skips a lead image that is a map or not a thumbnail", () => {
     expect(
       widenedThumbnail(

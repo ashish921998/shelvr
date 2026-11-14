@@ -75,11 +75,35 @@ export function commonsThumbUrl(file: string, md5Hex: string): string {
 
 export function widenedThumbnail(url: string | undefined): string | undefined {
   if (url === undefined) return undefined;
-  const match = /\/(\d+)px-([^/]+)$/.exec(url);
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return undefined;
+  }
+  const match = /\/\d+px-([^/]+)$/.exec(parsed.pathname);
   if (match === null) return undefined;
-  const file = decodeURIComponent(match[2]);
+  let file: string;
+  try {
+    file = decodeURIComponent(match[1]);
+  } catch {
+    return undefined;
+  }
   if (!isPhotoFile(file)) return undefined;
-  return url.replace(/\/\d+px-([^/]+)$/, `/${CITY_PHOTO_WIDTH}px-$1`);
+  parsed.pathname = parsed.pathname.replace(
+    /\/\d+px-([^/]+)$/,
+    `/${CITY_PHOTO_WIDTH}px-$1`,
+  );
+  parsed.search = "";
+  return parsed.toString();
+}
+
+export function plainThumbnail(url: string | undefined): string | undefined {
+  if (url === undefined || widenedThumbnail(url) === undefined)
+    return undefined;
+  const parsed = new URL(url);
+  parsed.search = "";
+  return parsed.toString();
 }
 
 export type CityPhotoRow = {

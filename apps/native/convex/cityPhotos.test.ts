@@ -182,7 +182,7 @@ describe("lookUp", () => {
     const backend = newConvexTest();
     await pending(backend, "Tbilisi");
     const lead =
-      "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Old_Tbilisi.jpg/320px-Old_Tbilisi.jpg";
+      "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Old_Tbilisi.jpg/320px-Old_Tbilisi.jpg?utm_source=en.wikipedia.org";
     safeFetch.mockImplementation(async (url: string) => {
       if (url.includes("/page/summary/")) {
         return json({
@@ -209,7 +209,7 @@ describe("lookUp", () => {
     const [row] = await photoRows(backend);
     expect(row).toMatchObject({
       status: "found",
-      url: lead.replace("320px-", "960px-"),
+      url: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Old_Tbilisi.jpg/960px-Old_Tbilisi.jpg",
     });
     expect(row.file).toBeUndefined();
   });
@@ -225,6 +225,35 @@ describe("lookUp", () => {
     const [row] = await photoRows(backend);
     expect(row).toMatchObject({ status: "missing" });
     expect(row.url).toBeUndefined();
+  });
+
+  it("stores a failure, not a miss, when the photo host refuses for now", async () => {
+    const backend = newConvexTest();
+    await pending(backend, "Chicago");
+    safeFetch.mockImplementation(async (url: string) => {
+      if (url.includes("/page/summary/")) {
+        return json({
+          type: "standard",
+          description: "City in Illinois",
+          wikibase_item: "Q1297",
+        });
+      }
+      if (url.includes("wbgetclaims")) {
+        return json({
+          claims: {
+            P18: [
+              { mainsnak: { datavalue: { value: "Chicago skyline.jpg" } } },
+            ],
+          },
+        });
+      }
+      return { ok: false, code: "http_error", status: 429 };
+    });
+    await backend.action(internal.cityPhotoLookup.lookUp, {
+      key: "chicago",
+      city: "Chicago",
+    });
+    expect((await photoRows(backend))[0]).toMatchObject({ status: "failed" });
   });
 
   it("stores a failure to retry when Wikipedia is down", async () => {
