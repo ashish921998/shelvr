@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { badgeTotals, earnedBadges } from "./badges";
-import { cityStampKeys, isCityStampId, knownCityStamps } from "./cityStamps";
+import {
+  CITY_STAMP_CITIES,
+  cityStampKeys,
+  isCityStampId,
+  knownCityStamps,
+} from "./cityStamps";
 import { passportCounts } from "./passport";
 
 const LISBON = { city: "lisbon", country: "PT" };
@@ -43,6 +48,12 @@ describe("passportCounts with city stamps", () => {
     ).toEqual({ places: 2, cities: 2, countries: 1 });
   });
 
+  it("keeps a same-named city in another country apart from the stamp", () => {
+    expect(
+      passportCounts([{ city: "Paris", countryCode: "US" }], [PARIS]),
+    ).toEqual({ places: 1, cities: 2, countries: 2 });
+  });
+
   it("shows countries once a city stamp brings one, even before place countries arrive", () => {
     expect(passportCounts([{ city: "Porto" }], [PARIS])).toEqual({
       places: 1,
@@ -53,10 +64,9 @@ describe("passportCounts with city stamps", () => {
 });
 
 describe("badges with city stamps", () => {
-  const five = ["tokyo", "lisbon", "paris", "rome", "seoul"].map((city) => ({
-    city,
-    country: city.toUpperCase().slice(0, 2),
-  }));
+  const five = (["tokyo", "lisbon", "paris", "rome", "seoul"] as const).map(
+    (city) => ({ city, country: CITY_STAMP_CITIES[city].country }),
+  );
 
   it("earn City hopper and Passport holder with no place stamped", () => {
     const totals = badgeTotals([], [], five);

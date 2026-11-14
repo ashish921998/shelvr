@@ -23,7 +23,8 @@ function readQueued(): QueuedCities | null {
       cities,
       owner: typeof value?.owner === "string" ? value.owner : null,
     };
-  } catch {
+  } catch (error) {
+    analytics.captureError("read_city_stamps_failed", error);
     return null;
   }
 }

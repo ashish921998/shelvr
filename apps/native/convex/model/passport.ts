@@ -132,11 +132,7 @@ export function passportCounts(
   places: readonly { city?: string; countryCode?: string }[],
   cityStamps: readonly CityStampEntry[] = [],
 ) {
-  const { cities, countries } = cityStampCounts(
-    places.flatMap((place) => (place.city ? [place.city] : [])),
-    places.flatMap((place) => (place.countryCode ? [place.countryCode] : [])),
-    cityStamps,
-  );
+  const { cities, countries } = cityStampCounts(places, cityStamps);
   return {
     places: places.length,
     cities,

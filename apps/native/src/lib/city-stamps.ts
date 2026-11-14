@@ -63,20 +63,33 @@ function useCityStampMutations() {
   }, [add, remove]);
 }
 
+export function stampCountWith(
+  stamps: readonly string[],
+  changes: ReadonlyMap<string, boolean>,
+): number {
+  const next = new Set(stamps);
+  for (const [city, stamped] of changes) {
+    if (stamped) next.add(city);
+    else next.delete(city);
+  }
+  return next.size;
+}
+
 export function useCityStampToggle(): (
   city: SampleCityId,
   stamped: boolean,
-  count: number,
+  stamps: readonly string[],
 ) => Promise<boolean> {
   const router = useRouter();
   const navigation = useNavigation();
   const mutations = useCityStampMutations();
   const { play } = useStampMoment();
-  const working = useRef(new Set<string>());
+  const working = useRef(new Map<string, boolean>());
   return useCallback(
-    async (city: SampleCityId, stamped: boolean, count: number) => {
+    async (city: SampleCityId, stamped: boolean, stamps: readonly string[]) => {
       if (working.current.has(city)) return false;
-      working.current.add(city);
+      working.current.set(city, stamped);
+      const count = stampCountWith(stamps, working.current);
       try {
         if (!stamped) {
           await mutations.remove(city);

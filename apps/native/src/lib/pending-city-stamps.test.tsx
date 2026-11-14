@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mock = vi.hoisted(() => ({
   store: new Map<string, string>(),
   keychainFailing: false,
+  readFailing: false,
   authenticated: true,
   onboarded: true,
   user: { _id: "user-1" } as { _id: string } | null,
@@ -14,7 +15,10 @@ const mock = vi.hoisted(() => ({
 }));
 
 vi.mock("expo-secure-store", () => ({
-  getItem: (key: string) => mock.store.get(key) ?? null,
+  getItem: (key: string) => {
+    if (mock.readFailing) throw new Error("keychain locked");
+    return mock.store.get(key) ?? null;
+  },
   setItem: (key: string, value: string) => {
     if (mock.keychainFailing) throw new Error("keychain unavailable");
     mock.store.set(key, value);
@@ -57,6 +61,7 @@ async function mount() {
 beforeEach(() => {
   mock.store.clear();
   mock.keychainFailing = false;
+  mock.readFailing = false;
   mock.authenticated = true;
   mock.onboarded = true;
   mock.user = { _id: "user-1" };
@@ -180,6 +185,17 @@ describe("the cities picked in onboarding, before sign-in", () => {
     await mount();
     expect(mock.captureError).toHaveBeenCalledWith(
       "claim_city_stamps_failed",
+      expect.any(Error),
+    );
+    expect(mock.update).not.toHaveBeenCalled();
+  });
+
+  it("report a keychain that cannot be read, and send nothing", async () => {
+    queueCityStamps(["lisbon"]);
+    mock.readFailing = true;
+    await mount();
+    expect(mock.captureError).toHaveBeenCalledWith(
+      "read_city_stamps_failed",
       expect.any(Error),
     );
     expect(mock.update).not.toHaveBeenCalled();
