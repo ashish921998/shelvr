@@ -365,6 +365,16 @@ describe("useStampMomentPlayer", () => {
     expect(result.current.shown).toBeNull();
   });
 
+  it("lets a held badge play once its queued stamp is cancelled", () => {
+    const { result } = renderHook(() => useStampMomentPlayer(false));
+    act(() => result.current.controls.queue(batch, "already_been"));
+    act(() => result.current.unlock(["passportHolder"]));
+    act(() => result.current.controls.cancel());
+    act(() => vi.advanceTimersByTime(BADGE_TIMING.grace));
+    expect(result.current.shown).toBeNull();
+    expect(result.current.badge?.badge).toBe("passportHolder");
+  });
+
   it("forgets a queued moment when it unmounts", () => {
     const { result, unmount } = renderHook(() => useStampMomentPlayer(false));
     act(() => result.current.controls.queue(batch, "already_been"));

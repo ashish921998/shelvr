@@ -75,7 +75,10 @@ export function useShareBadge(surface: ShareSurface) {
           token ??
           (await convex
             .query(api.passportShares.myPassportShare, {})
-            .catch(() => null));
+            .catch((error: unknown) => {
+              analytics.captureError("passport_badge_link_failed", error);
+              return null;
+            }));
         const result = await Share.share(
           shareContent(message, link === null ? null : passportUrl(link)),
         );

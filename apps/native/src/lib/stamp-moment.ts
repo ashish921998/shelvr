@@ -405,8 +405,8 @@ export function useStampMomentPlayer(reduced: boolean): {
   }, [dropPending, play]);
 
   const controls = useMemo(
-    () => ({ play, queue, release, cancel: clearPending }),
-    [play, queue, release, clearPending],
+    () => ({ play, queue, release, cancel: dropPending }),
+    [play, queue, release, dropPending],
   );
   return { shown, controls, dismiss, badge, dismissBadge, unlock };
 }
