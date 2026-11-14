@@ -19,6 +19,7 @@ import { haptics } from "@/lib/haptics";
 import { filterPlaces, mapFilters } from "@/lib/map-filters";
 import type { PlaceKind } from "@convex/model/placeKinds";
 import { t, useAppLocale } from "@/lib/i18n";
+import { usePassport, wentInCity } from "@/lib/passport";
 import { usePlaceRemoval } from "@/lib/place-removal";
 import { usePlaceCardFocus } from "@/lib/use-place-opener";
 import { usePlaceVisit, usePlaceVisits } from "@/lib/use-place-visit";
@@ -40,6 +41,7 @@ export default function CityScreen() {
   const placeVisits = usePlaceVisits();
   const { visits } = placeVisits;
   const visit = usePlaceVisit();
+  const { stamps } = usePassport();
   const items = useQuery(convexQuery(api.items.listCityItems, { city }));
   const { busy, start } = useCityPlan();
   const [selected, setSelected] = useState<string | null>(null);
@@ -188,6 +190,7 @@ export default function CityScreen() {
                         cover: item.imageUrl ?? item.heroImageUrl ?? null,
                         cityVisited: progress.visited,
                         cityTotal: progress.total,
+                        cityStamps: wentInCity(stamps, city),
                       })
                   : placeVisits.offerRetry
             }

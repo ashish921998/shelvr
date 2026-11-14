@@ -26,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   announce: vi.fn(),
   share: vi.fn(),
   unlock: (_ids: string[]) => {},
+  revoke: (_ids: string[]) => {},
 }));
 
 type Props = {
@@ -94,8 +95,12 @@ vi.mock("react-native-unistyles", () => ({
 }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 vi.mock("@/lib/badges", () => ({
-  useBadgeUnlocks: (unlock: (ids: string[]) => void) => {
+  useBadgeUnlocks: (
+    unlock: (ids: string[]) => void,
+    revoke: (ids: string[]) => void,
+  ) => {
     mocks.unlock = unlock;
+    mocks.revoke = revoke;
   },
   useShareBadge: () => mocks.share,
 }));
@@ -226,6 +231,7 @@ const lisbon: StampMoment = {
 };
 
 const unlock = (ids: string[]) => act(() => mocks.unlock(ids));
+const revoke = (ids: string[]) => act(() => mocks.revoke(ids));
 const wait = (ms: number) => act(() => vi.advanceTimersByTime(ms));
 const badgeShown = () => screen.queryByTestId("badge-moment") !== null;
 
@@ -256,6 +262,33 @@ describe("badge unlock moment", () => {
     expect(mocks.success).toHaveBeenCalledTimes(1);
 
     wait(BADGE_TIMING.shown);
+    expect(badgeShown()).toBe(false);
+  });
+
+  it("drops a badge whose stamp is undone before the stamp moment ends", () => {
+    mount(lisbon, "city");
+    stamp();
+    unlock(["explorer"]);
+    wait(BADGE_TIMING.grace);
+    revoke(["explorer"]);
+    wait(STAMP_TIMING.shown);
+    expect(badgeShown()).toBe(false);
+    expect(mocks.capture).not.toHaveBeenCalledWith("passport_badge_unlocked", {
+      badge: "explorer",
+    });
+  });
+
+  it("takes down a shown badge the person no longer has, and trims the count", () => {
+    mount(lisbon, "city");
+    stamp();
+    unlock(["firstStamp", "explorer"]);
+    wait(STAMP_TIMING.shown);
+    expect(screen.getByText("badges.firstStamp")).toBeTruthy();
+    expect(screen.getByText(/badges\.moreEarned/)).toBeTruthy();
+    revoke(["explorer"]);
+    expect(screen.getByText("badges.firstStamp")).toBeTruthy();
+    expect(screen.queryByText(/badges\.moreEarned/)).toBeNull();
+    revoke(["firstStamp"]);
     expect(badgeShown()).toBe(false);
   });
 
