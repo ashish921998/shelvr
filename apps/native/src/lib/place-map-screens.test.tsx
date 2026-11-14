@@ -452,7 +452,7 @@ vi.mock("react-native", () => ({
 const CITY_ITEMS = "items:listCityItems";
 const VOTES = "planShares:cityPlanVotes";
 const LIST = "sharedLists:getSharedList";
-const PASSPORT = "placeVisits:getPassport";
+const PASSPORT = "placeVisits:listPassportStamps";
 
 const taco = {
   name: "Taco Spot",

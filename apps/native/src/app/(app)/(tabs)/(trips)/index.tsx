@@ -1,4 +1,5 @@
 import { AccountGoneBoundary } from "@/components/account-gone-boundary";
+import { TogetherSection } from "@/components/shared-list/together-section";
 import { AppSymbolIcon } from "@/components/symbol";
 import { TripCard } from "@/components/trip-planner/trip-card";
 import { Button } from "@/components/ui/button";
@@ -100,6 +101,9 @@ function TripsList({ signedIn }: { signedIn: boolean }) {
         if (trips.status === "CanLoadMore") trips.loadMore(PAGE_SIZE);
       }}
       onEndReachedThreshold={0.5}
+      ListHeaderComponent={
+        <TogetherSection showTripsHeading={sorted.length > 0} />
+      }
       ListEmptyComponent={<NoTrips onPlan={plan} />}
       ListFooterComponent={
         sorted.length > 0 ? (
@@ -123,8 +127,10 @@ const styles = StyleSheet.create((theme, rt) => ({
     paddingTop: theme.gap(1),
     paddingBottom: rt.insets.bottom + theme.gap(12),
   },
-  contentEmpty: { flexGrow: 1, justifyContent: "center" },
+  contentEmpty: { flexGrow: 1 },
   empty: {
+    flexGrow: 1,
+    justifyContent: "center",
     alignItems: "center",
     gap: theme.gap(1.5),
     paddingHorizontal: theme.gap(2),
