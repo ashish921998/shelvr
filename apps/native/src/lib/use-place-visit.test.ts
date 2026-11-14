@@ -3,6 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import { ConvexError } from "convex/values";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { StampPlace } from "@/lib/stamp-moment";
 import { usePlaceVisit } from "@/lib/use-place-visit";
 import type { Id } from "@convex/_generated/dataModel";
 
@@ -12,17 +13,28 @@ const mocks = vi.hoisted(() => ({
   alert: vi.fn(),
   capture: vi.fn(),
   captureError: vi.fn(),
+  play: vi.fn(),
+  success: vi.fn(),
+  selection: vi.fn(),
   router: { push: vi.fn() },
+  focused: true,
 }));
 
 vi.mock("convex/react", () => ({ useMutation: () => mocks.setVisited }));
-vi.mock("expo-router", () => ({ useRouter: () => mocks.router }));
+vi.mock("expo-router", () => ({
+  useRouter: () => mocks.router,
+  useNavigation: () => ({ isFocused: () => mocks.focused }),
+}));
 vi.mock("@/lib/entitlement", () => ({ openPaywall: mocks.openPaywall }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mocks.capture, captureError: mocks.captureError },
 }));
 vi.mock("@/lib/haptics", () => ({
-  haptics: { success: vi.fn(), selection: vi.fn() },
+  haptics: { success: mocks.success, selection: mocks.selection },
+}));
+vi.mock("@/lib/stamp-moment", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/stamp-moment")>()),
+  useStampMoment: () => ({ play: mocks.play, queue: vi.fn() }),
 }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
 vi.mock("react-native", () => ({ Alert: { alert: mocks.alert } }));
@@ -32,14 +44,20 @@ vi.mock("@convex-dev/react-query", () => ({ convexQuery: vi.fn() }));
 const itemId = "item-1" as Id<"items">;
 const taco = { name: "Taco Spot", lat: 30.1, lng: -97.1, appleId: "taco" };
 
-async function toggle(pin: typeof taco | Omit<typeof taco, "appleId">) {
+const austin = { city: "Austin", cover: "https://img/taco.jpg" };
+
+function toggle(
+  pin: typeof taco | Omit<typeof taco, "appleId">,
+  stamp?: StampPlace,
+) {
   const { result } = renderHook(() => usePlaceVisit());
-  await act(() => result.current.toggle(itemId, pin, true));
+  return act(() => result.current.toggle(itemId, pin, true, stamp));
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.setVisited.mockResolvedValue(null);
+  mocks.focused = true;
 });
 
 describe("usePlaceVisit", () => {
@@ -79,6 +97,7 @@ describe("usePlaceVisit", () => {
       "mark_visited",
     );
     expect(mocks.alert).not.toHaveBeenCalled();
+    expect(mocks.play).not.toHaveBeenCalled();
   });
 
   it("says to wait a few minutes when too many places were marked", async () => {
@@ -93,6 +112,7 @@ describe("usePlaceVisit", () => {
     expect(mocks.alert).toHaveBeenCalledWith("cityProgress.rateLimited");
     expect(mocks.captureError).not.toHaveBeenCalled();
     expect(mocks.openPaywall).not.toHaveBeenCalled();
+    expect(mocks.play).not.toHaveBeenCalled();
   });
 
   it("reports any other failure and asks to try again", async () => {
@@ -108,6 +128,72 @@ describe("usePlaceVisit", () => {
       "errors.unexpectedTitle",
       "errors.retrySoon",
     );
+    expect(mocks.play).not.toHaveBeenCalled();
+  });
+
+  it("plays one stamp moment, first in the city when nothing there was stamped", async () => {
+    expect(await toggle(taco, { ...austin, cityVisited: 0 })).toBe(true);
+    await toggle(taco, { ...austin, cityVisited: 3 });
+    expect(mocks.play.mock.calls).toEqual([
+      [
+        {
+          kind: "place",
+          name: "Taco Spot",
+          city: "Austin",
+          cover: "https://img/taco.jpg",
+          firstInCity: true,
+        },
+        "city",
+      ],
+      [
+        {
+          kind: "place",
+          name: "Taco Spot",
+          city: "Austin",
+          cover: "https://img/taco.jpg",
+          firstInCity: false,
+        },
+        "city",
+      ],
+    ]);
+    expect(mocks.success).not.toHaveBeenCalled();
+    expect(mocks.selection).not.toHaveBeenCalled();
+  });
+
+  it("still plays the moment for a stamp with no city context", async () => {
+    await toggle(taco);
+    expect(mocks.play).toHaveBeenCalledTimes(1);
+    expect(mocks.play.mock.calls[0][0]).toMatchObject({
+      name: "Taco Spot",
+      firstInCity: false,
+    });
+  });
+
+  it("skips the moment when the city page was left before the stamp landed", async () => {
+    let land: (value: null) => void = () => {};
+    mocks.setVisited.mockReturnValue(
+      new Promise<null>((resolve) => {
+        land = resolve;
+      }),
+    );
+    const done = toggle(taco, { ...austin, cityVisited: 0 });
+    mocks.focused = false;
+    land(null);
+    await expect(done).resolves.toBe(true);
+    expect(mocks.play).not.toHaveBeenCalled();
+    expect(mocks.capture).toHaveBeenCalledWith("city_place_visited", {
+      visited: true,
+    });
+  });
+
+  it("only ticks when a stamp is taken back", async () => {
+    const { result } = renderHook(() => usePlaceVisit());
+    await act(() => result.current.toggle(itemId, taco, false));
+    expect(mocks.play).not.toHaveBeenCalled();
+    expect(mocks.selection).toHaveBeenCalledTimes(1);
+    expect(mocks.capture).toHaveBeenCalledWith("city_place_visited", {
+      visited: false,
+    });
   });
 
   it("takes back a passport stamp by its spot, or by name when it has none", async () => {
@@ -129,6 +215,7 @@ describe("usePlaceVisit", () => {
     expect(mocks.capture).toHaveBeenCalledWith("place_unstamped", {
       surface: "passport",
     });
+    expect(mocks.play).not.toHaveBeenCalled();
   });
 
   it("answers false and names the passport when taking a stamp back fails", async () => {

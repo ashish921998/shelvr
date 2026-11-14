@@ -1016,6 +1016,9 @@ type MessageParams = {
   "passport.stampInk": { city: string; date: string };
   "passport.coverCredit": undefined;
   "passport.removeStamp": undefined;
+  "passport.momentStamped": { name: string };
+  "passport.momentFirstInCity": { city: string };
+  "passport.momentBulk": { count: number };
   "passport.wantToGo": undefined;
   "passport.title": undefined;
   "passport.yourPassport": undefined;

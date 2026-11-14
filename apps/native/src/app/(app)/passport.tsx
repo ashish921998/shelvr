@@ -17,6 +17,7 @@ import {
 } from "@/lib/passport";
 import { useSharePassport } from "@/lib/passport-share";
 import { groupByCity, passportCounts } from "@convex/model/passport";
+import { useStampMomentLanding } from "@/lib/stamp-moment";
 import { usePlaceVisit } from "@/lib/use-place-visit";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -67,6 +68,7 @@ export default function PassportScreen() {
   const { theme } = useUnistyles();
   const { stamps, failed, error } = usePassport();
   const visit = usePlaceVisit("passport");
+  useStampMomentLanding();
   const sharing = useSharePassport(stamps?.length ?? 0);
   const [open, setOpen] = useState<OpenStamp | null>(null);
   const remove = async () => {
