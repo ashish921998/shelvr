@@ -146,13 +146,14 @@ describe("useBadgeTotals", () => {
 describe("useBadgeUnlocks", () => {
   it("reports City hopper when a city stamp brings the fifth city", () => {
     const unlock = vi.fn();
+    const revoke = vi.fn();
     mocks.stamps = [cafe("Porto")];
     mocks.cityStamps = ["lisbon", "tokyo", "paris"].map((city) => ({
       city,
       country: "XX",
       stampedAt: 1,
     }));
-    const { rerender } = renderHook(() => useBadgeUnlocks(unlock));
+    const { rerender } = renderHook(() => useBadgeUnlocks(unlock, revoke));
     mocks.cityStamps = [
       ...mocks.cityStamps,
       { city: "rome", country: "IT", stampedAt: 2 },
