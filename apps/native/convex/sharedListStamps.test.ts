@@ -4,7 +4,12 @@ import { describe, expect, it } from "vitest";
 
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { joiner, listWithOwner } from "./sharedLists.test.helpers";
+import {
+  joiner,
+  listWithOwner,
+  near,
+  seedSave,
+} from "./sharedLists.test.helpers";
 import { setTestConsent, type TestBackend } from "./test.setup";
 
 async function visitRows(base: TestBackend, userId: Id<"users">) {
@@ -300,5 +305,84 @@ describe("Went on a shared list", () => {
     });
     const [badge] = await bo.t.query(api.placeVisits.listBadgeStamps, {});
     expect(badge?.kinds.length).toBeGreaterThan(0);
+  });
+
+  it("removes one branch's stamp from Passport and keeps the other", async () => {
+    const { base, owner, bo, listId, place } = await friendPlace();
+    const porto = await portoBranch(base, listId, owner.userId);
+    for (const placeId of [place._id, porto]) {
+      await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+        placeId,
+        visited: true,
+        stamp: true,
+      });
+    }
+    await bo.t.mutation(api.placeVisits.removeListStamp, {
+      name: "Manteigaria",
+      spot: { lat: 41.1496, lng: -8.611 },
+    });
+    const [row] = await visitRows(base, bo.userId);
+    expect(row?.spots).toEqual([
+      expect.objectContaining({ appleId: "A-mant" }),
+    ]);
+    expect(row?.stampPlaces?.map((entry) => entry.city)).toEqual(["Lisbon"]);
+  });
+
+  it("undoes a list stamp on a branch the member's save holds but they never marked", async () => {
+    const { base, owner, listId } = await friendPlace();
+    const itemId = await seedSave(base, owner.userId, {
+      cities: ["Lisbon", "Porto"],
+      pins: [
+        { name: "Manteigaria", ...near(2), appleId: "A-mant", city: "Lisbon" },
+        {
+          name: "Manteigaria",
+          lat: 41.1496,
+          lng: -8.611,
+          appleId: "A-mant-porto",
+          city: "Porto",
+        },
+      ],
+    });
+    await owner.t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Manteigaria",
+      visited: true,
+      spot: { ...near(2), appleId: "A-mant" },
+    });
+    const porto = await portoBranch(base, listId, owner.userId);
+    for (const visited of [true, false]) {
+      await owner.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+        placeId: porto,
+        visited,
+        stamp: true,
+      });
+    }
+    const [row] = await visitRows(base, owner.userId);
+    expect(row?.spots?.map((spot) => spot.appleId)).toEqual(["A-mant"]);
+  });
+
+  it("checks a list adder only for the stamp place their list added", async () => {
+    const { base, owner, bo, place } = await friendPlace();
+    await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: place._id,
+      visited: true,
+      stamp: true,
+    });
+    await base.run((ctx) => setTestConsent(ctx, owner.userId, "declined"));
+    const [row] = await visitRows(base, bo.userId);
+    if (row === undefined) throw new Error("stamp missing");
+    const own = { lat: 41.1496, lng: -8.611 };
+    await base.run((ctx) =>
+      ctx.db.patch(row._id, {
+        stampPlaces: [...(row.stampPlaces ?? []), { ...own, city: "Porto" }],
+      }),
+    );
+    const claim = (point: { lat: number; lng: number }) =>
+      base.mutation(internal.placeVisits.claimCountryLookup, {
+        visitId: row._id,
+        ...point,
+      });
+    expect(await claim(own)).not.toBeNull();
+    expect(await claim({ lat: place.lat, lng: place.lng })).toBeNull();
   });
 });

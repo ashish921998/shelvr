@@ -295,15 +295,8 @@ async function unstampListPlace(
   place: Doc<"sharedListPlaces">,
 ): Promise<void> {
   const fromList = (entry: StampPlace) => entry.listPlaceId === place._id;
-  if (row.listPlaceId !== place._id && !row.stampPlaces?.some(fromList)) {
-    return;
-  }
+  if (!row.stampPlaces?.some(fromList)) return;
   const spot = listSpot(place);
-  const saved =
-    row.itemId === undefined
-      ? null
-      : await ownedSave(ctx, row.userId, row.itemId);
-  if (knowsSpot(spotsOnItem(saved, row.name) ?? [], spot)) return;
   const remaining = ((await rowSpots(ctx, row)) ?? []).filter(
     (kept) => !matchesVisitSpot(kept, spot, true),
   );
@@ -376,8 +369,31 @@ export async function stampListPlace(
   }
 }
 
+async function removeListSpot(
+  ctx: MutationCtx,
+  row: Doc<"placeVisits">,
+  spot: Point,
+): Promise<void> {
+  const remaining = ((await rowSpots(ctx, row)) ?? []).filter(
+    (kept) => !matchesVisitSpot(kept, spot, true),
+  );
+  if (remaining.length === 0) {
+    await ctx.db.delete(row._id);
+    return;
+  }
+  await ctx.db.patch(row._id, {
+    spots: remaining,
+    stampPlaces: row.stampPlaces?.filter(
+      (entry) => entry.lat !== spot.lat || entry.lng !== spot.lng,
+    ),
+  });
+}
+
 export const removeListStamp = authedMutation({
-  args: { name: v.string() },
+  args: {
+    name: v.string(),
+    spot: v.optional(v.object({ lat: v.number(), lng: v.number() })),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     const row = await findVisit(ctx, ctx.userId, args.name);
@@ -386,7 +402,8 @@ export const removeListStamp = authedMutation({
       key: ctx.userId,
       throws: true,
     });
-    await ctx.db.delete(row._id);
+    if (args.spot === undefined) await ctx.db.delete(row._id);
+    else await removeListSpot(ctx, row, args.spot);
     return null;
   },
 });
@@ -963,7 +980,7 @@ async function listAdderAllows(
   visit: Doc<"placeVisits">,
   stamped: StampPlace,
 ): Promise<boolean> {
-  const listPlaceId = stamped.listPlaceId ?? visit.listPlaceId;
+  const listPlaceId = stamped.listPlaceId;
   if (listPlaceId === undefined) return true;
   const place = await ctx.db.get(listPlaceId);
   if (place === null) return false;

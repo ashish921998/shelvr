@@ -30,6 +30,13 @@ describe("useRemoveListStamp", () => {
     });
     expect(removed).toBe(true);
     expect(mocks.remove).toHaveBeenCalledWith({ name: "Manteigaria" });
+    await act(async () => {
+      await result.current.remove("Manteigaria", { lat: 1, lng: 2 });
+    });
+    expect(mocks.remove).toHaveBeenLastCalledWith({
+      name: "Manteigaria",
+      spot: { lat: 1, lng: 2 },
+    });
     expect(mocks.alert).not.toHaveBeenCalled();
   });
 

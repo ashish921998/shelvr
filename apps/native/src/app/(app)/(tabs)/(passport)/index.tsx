@@ -147,7 +147,7 @@ export default function PassportScreen() {
     const { itemId, name, spot } = open;
     const removed =
       itemId === undefined
-        ? await removeListStamp.remove(name)
+        ? await removeListStamp.remove(name, spot)
         : await visit.toggle(itemId, { name, ...spot }, false);
     if (removed) {
       setOpen((current) => (current === open ? null : current));

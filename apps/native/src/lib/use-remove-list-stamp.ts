@@ -6,19 +6,22 @@ import { useCallback, useRef, useState } from "react";
 import { Alert } from "react-native";
 
 export function useRemoveListStamp(): {
-  remove: (name: string) => Promise<boolean>;
+  remove: (
+    name: string,
+    spot?: { lat: number; lng: number },
+  ) => Promise<boolean>;
   busy: boolean;
 } {
   const mutate = useMutation(api.placeVisits.removeListStamp);
   const pending = useRef(false);
   const [busy, setBusy] = useState(false);
   const remove = useCallback(
-    async (name: string) => {
+    async (name: string, spot?: { lat: number; lng: number }) => {
       if (pending.current) return false;
       pending.current = true;
       setBusy(true);
       try {
-        await mutate({ name });
+        await mutate(spot === undefined ? { name } : { name, spot });
         return true;
       } catch (error) {
         analytics.captureError("list_stamp_remove_failed", error);
