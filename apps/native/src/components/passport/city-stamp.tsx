@@ -40,7 +40,7 @@ export function CityStampArt({
       >
         <Text
           style={[styles.name, small && styles.nameSmall]}
-          numberOfLines={2}
+          numberOfLines={name.includes(" ") ? 2 : 1}
           adjustsFontSizeToFit
           minimumFontScale={0.6}
           maxFontSizeMultiplier={1}
