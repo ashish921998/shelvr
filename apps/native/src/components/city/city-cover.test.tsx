@@ -91,6 +91,19 @@ it("falls back from a failed curated photo to the server's cover", () => {
   expect(screen.getByTestId("mappin")).toBeTruthy();
 });
 
+it("shows a cover the person picked over the curated photo", () => {
+  images.length = 0;
+  render(
+    <CityCover
+      entry={{ ...city("Paris", "https://x/mine.jpg"), coverItemId: "s1" }}
+      layout="pair"
+    />,
+  );
+  expect(images.at(-1)?.source).toEqual({ uri: "https://x/mine.jpg" });
+  act(() => images.at(-1)?.onError?.());
+  expect(images.at(-1)?.source).toBe(42);
+});
+
 it("draws the pin card for a city with no photo", () => {
   render(<CityCover entry={city("Kyoto", null)} layout="only" />);
   expect(screen.queryByTestId("photo")).toBeNull();

@@ -18,6 +18,7 @@ import type * as appleProfile from "../appleProfile.js";
 import type * as appleRevoke from "../appleRevoke.js";
 import type * as auth from "../auth.js";
 import type * as cancelSurvey from "../cancelSurvey.js";
+import type * as cityCovers from "../cityCovers.js";
 import type * as cityPhotoLookup from "../cityPhotoLookup.js";
 import type * as cityPhotos from "../cityPhotos.js";
 import type * as cityStamps from "../cityStamps.js";
@@ -163,6 +164,7 @@ declare const fullApi: ApiFromModules<{
   appleRevoke: typeof appleRevoke;
   auth: typeof auth;
   cancelSurvey: typeof cancelSurvey;
+  cityCovers: typeof cityCovers;
   cityPhotoLookup: typeof cityPhotoLookup;
   cityPhotos: typeof cityPhotos;
   cityStamps: typeof cityStamps;
