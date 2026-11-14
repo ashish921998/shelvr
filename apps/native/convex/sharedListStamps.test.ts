@@ -2,7 +2,7 @@
 /// <reference types="vite/client" />
 import { describe, expect, it } from "vitest";
 
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { joiner, listWithOwner } from "./sharedLists.test.helpers";
 import { setTestConsent, type TestBackend } from "./test.setup";
@@ -160,5 +160,22 @@ describe("Went on a shared list", () => {
       [],
     );
     expect(await visitRows(base, bo.userId)).toHaveLength(1);
+  });
+
+  it("never looks up a declined member's place later, even on a country retry", async () => {
+    const { base, owner, bo, place } = await friendPlace();
+    await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: place._id,
+      visited: true,
+      stamp: true,
+    });
+    await base.run((ctx) => setTestConsent(ctx, owner.userId, "declined"));
+    const [row] = await visitRows(base, bo.userId);
+    const claim = await base.mutation(internal.placeVisits.claimCountryLookup, {
+      visitId: row._id,
+      lat: place.lat,
+      lng: place.lng,
+    });
+    expect(claim).toBeNull();
   });
 });

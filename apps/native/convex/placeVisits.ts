@@ -882,6 +882,20 @@ const countryLookupArgs = {
   lng: v.number(),
 };
 
+async function listAdderAllows(
+  ctx: QueryCtx,
+  visit: Doc<"placeVisits">,
+): Promise<boolean> {
+  if (visit.listPlaceId === undefined || visit.itemId !== undefined) {
+    return true;
+  }
+  const place = await ctx.db.get(visit.listPlaceId);
+  if (place === null) return false;
+  return (
+    place.addedBy === visit.userId || (await aiAllowed(ctx, place.addedBy))
+  );
+}
+
 export const claimCountryLookup = internalMutation({
   args: countryLookupArgs,
   returns: v.union(
@@ -895,6 +909,7 @@ export const claimCountryLookup = internalMutation({
     if (visit === null || place === undefined) return null;
     if (place.countryCode !== undefined) return null;
     if (!(await aiAllowed(ctx, visit.userId))) return null;
+    if (!(await listAdderAllows(ctx, visit))) return null;
     const budget = await rateLimiter.limit(ctx, "visitCountryGlobal");
     return budget.ok ? { ready: true as const } : { busyMs: budget.retryAfter };
   },
