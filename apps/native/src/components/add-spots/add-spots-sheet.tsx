@@ -8,7 +8,7 @@ import { sheetIn } from "@/lib/motion";
 import { usePlanPicker } from "@/lib/plan-picker";
 import { useSiriShortcuts } from "@/lib/siri-phrases";
 import { useRouter } from "expo-router";
-import { Pressable, Text, View } from "react-native";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -112,76 +112,87 @@ export function AddSpotsSheet() {
         entering={sheetIn(reduced)}
         style={[
           styles.sheet,
-          { paddingBottom: closeBottom + 64 + 7 - SHEET_BOTTOM },
+          {
+            maxHeight: rt.screen.height - rt.insets.top - SHEET_BOTTOM * 2,
+          },
         ]}
       >
-        <ThemedText
-          variant="sheetTitle"
-          accessibilityRole="header"
-          style={styles.title}
+        <ScrollView
+          alwaysBounceVertical={false}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: closeBottom + 64 + 7 - SHEET_BOTTOM },
+          ]}
         >
-          {t("addSheet.title")}
-        </ThemedText>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${t("addSheet.pasteLink")}, ${t("addSheet.pasteLinkHint")}`}
-          onPress={addLink}
-          style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-        >
-          <Text style={styles.cardEmoji} allowFontScaling={false}>
-            🔗
-          </Text>
-          <View style={styles.cardText}>
-            <Text style={styles.cardTitle} numberOfLines={1}>
-              {t("addSheet.pasteLink")}
-            </Text>
-            <Text style={styles.cardHint} numberOfLines={2}>
-              {t("addSheet.pasteLinkHint")}
-            </Text>
-          </View>
-          <Chevron />
-        </Pressable>
-        <View style={styles.tiles}>
-          <Tile
-            emoji="🎬"
-            label={t("addSheet.howToShare")}
-            onPress={() => {
-              router.back();
-              router.push("/how-to-share");
-            }}
-          />
-          <Tile
-            emoji="📁"
-            label={t("addSheet.googleMapsList")}
+          <ThemedText
+            variant="sheetTitle"
+            accessibilityRole="header"
+            style={styles.title}
+          >
+            {t("addSheet.title")}
+          </ThemedText>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${t("addSheet.pasteLink")}, ${t("addSheet.pasteLinkHint")}`}
             onPress={addLink}
-          />
-          {siri.length > 0 ? (
+            style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+          >
+            <Text style={styles.cardEmoji} allowFontScaling={false}>
+              🔗
+            </Text>
+            <View style={styles.cardText}>
+              <Text style={styles.cardTitle} numberOfLines={1}>
+                {t("addSheet.pasteLink")}
+              </Text>
+              <Text style={styles.cardHint} numberOfLines={2}>
+                {t("addSheet.pasteLinkHint")}
+              </Text>
+            </View>
+            <Chevron />
+          </Pressable>
+          <View style={styles.tiles}>
             <Tile
-              emoji="🎙️"
-              label={t("addSheet.saveWithSiri")}
+              emoji="🎬"
+              label={t("addSheet.howToShare")}
               onPress={() => {
                 router.back();
-                router.push("/save-with-siri");
+                router.push("/how-to-share");
               }}
             />
-          ) : null}
-        </View>
-        <View style={styles.rows}>
-          <Row
-            emoji="👥"
-            label={t("sharedLists.newTitle")}
-            onPress={() => {
-              router.back();
-              router.push("/new-shared-list");
-            }}
-          />
-          <Row
-            emoji="🧳"
-            label={t("homePlaces.planTrip")}
-            last
-            onPress={() => planner.plan("trip")}
-          />
-        </View>
+            <Tile
+              emoji="📁"
+              label={t("addSheet.googleMapsList")}
+              onPress={addLink}
+            />
+            {siri.length > 0 ? (
+              <Tile
+                emoji="🎙️"
+                label={t("addSheet.saveWithSiri")}
+                onPress={() => {
+                  router.back();
+                  router.push("/save-with-siri");
+                }}
+              />
+            ) : null}
+          </View>
+          <View style={styles.rows}>
+            <Row
+              emoji="👥"
+              label={t("sharedLists.newTitle")}
+              onPress={() => {
+                router.back();
+                router.push("/new-shared-list");
+              }}
+            />
+            <Row
+              emoji="🧳"
+              label={t("homePlaces.planTrip")}
+              last
+              onPress={() => planner.plan("trip")}
+            />
+          </View>
+        </ScrollView>
       </Animated.View>
       <View style={[styles.close, { bottom: closeBottom }]}>
         <AddButton
@@ -206,13 +217,12 @@ const styles = StyleSheet.create((theme) => ({
   sheet: {
     marginHorizontal: 12,
     marginBottom: SHEET_BOTTOM,
-    paddingTop: 31,
-    paddingHorizontal: 18.5,
     borderRadius: 33,
     borderCurve: "continuous",
     backgroundColor: theme.colors.background,
     boxShadow: "0 -2px 30px rgba(0, 0, 0, 0.18)",
   },
+  content: { paddingTop: 31, paddingHorizontal: 18.5 },
   title: { textAlign: "center", lineHeight: 30, marginBottom: 22 },
   card: {
     height: 96,
@@ -267,7 +277,6 @@ const styles = StyleSheet.create((theme) => ({
     marginTop: theme.gap(2),
     borderRadius: 17,
     borderCurve: "continuous",
-    overflow: "hidden",
     backgroundColor: theme.colors.surface,
     boxShadow: shadow,
   },

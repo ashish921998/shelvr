@@ -60,11 +60,14 @@ vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}), absoluteFillObject: {} },
   useUnistyles: () => ({
     theme: { colors: { muted: "#6f6455" } },
-    rt: { insets: { bottom: 34 } },
+    rt: { insets: { top: 47, bottom: 34 }, screen: { height: 568 } },
   }),
 }));
 vi.mock("react-native", () => ({
   Platform: { OS: "ios" },
+  ScrollView: vi.fn(({ children }: { children?: ReactNode }) => (
+    <div>{children}</div>
+  )),
   View: vi.fn(({ children }: { children?: ReactNode }) => (
     <div>{children}</div>
   )),
