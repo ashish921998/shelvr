@@ -317,6 +317,19 @@ describe("badge unlock moment", () => {
     expect(screen.getByText("badges.passportHolder")).toBeTruthy();
   });
 
+  it("lets a showing badge finish before a late one takes its place", () => {
+    mount(bulk, "already_been");
+    stamp();
+    unlock(["firstStamp"]);
+    wait(STAMP_TIMING.shown + BADGE_TIMING.grace);
+    expect(screen.getByText("badges.firstStamp")).toBeTruthy();
+    unlock(["passportHolder"]);
+    wait(BADGE_TIMING.grace);
+    expect(screen.getByText("badges.firstStamp")).toBeTruthy();
+    wait(BADGE_TIMING.shown);
+    expect(screen.getByText("badges.passportHolder")).toBeTruthy();
+  });
+
   it("holds a late country badge while a stamp moment plays", () => {
     mount(lisbon, "city");
     stamp();

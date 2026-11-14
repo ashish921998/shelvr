@@ -108,11 +108,13 @@ function useBadgeQueue(reduced: boolean) {
   const stampBusy = useRef(false);
   const showing = useRef<Timer | null>(null);
   const later = useTimers();
+  const flushNext = useRef<() => void>(() => {});
 
   const dismissBadge = useCallback(() => {
     if (showing.current !== null) clearTimeout(showing.current);
     showing.current = null;
     setBadge(null);
+    flushNext.current();
   }, []);
 
   const show = useCallback(
@@ -138,9 +140,13 @@ function useBadgeQueue(reduced: boolean) {
   const flush = useCallback(() => {
     const next = waiting.current;
     if (next === null || !next.matched || stampBusy.current) return;
+    if (showing.current !== null) return;
     waiting.current = null;
     show(next.ids);
   }, [show]);
+  useEffect(() => {
+    flushNext.current = flush;
+  }, [flush]);
 
   const unlock = useCallback(
     (ids: readonly BadgeId[]) => {
