@@ -26,7 +26,7 @@ describe("useRemoveListStamp", () => {
     const { result } = renderHook(() => useRemoveListStamp());
     let removed = false;
     await act(async () => {
-      removed = await result.current("Manteigaria");
+      removed = await result.current.remove("Manteigaria");
     });
     expect(removed).toBe(true);
     expect(mocks.remove).toHaveBeenCalledWith({ name: "Manteigaria" });
@@ -38,7 +38,7 @@ describe("useRemoveListStamp", () => {
     const { result } = renderHook(() => useRemoveListStamp());
     let removed = true;
     await act(async () => {
-      removed = await result.current("Manteigaria");
+      removed = await result.current.remove("Manteigaria");
     });
     expect(removed).toBe(false);
     expect(mocks.captureError).toHaveBeenCalledWith(
@@ -46,5 +46,29 @@ describe("useRemoveListStamp", () => {
       expect.any(Error),
     );
     expect(mocks.alert).toHaveBeenCalled();
+  });
+
+  it("ignores a second tap while the first removal is running", async () => {
+    let finish: (value: null) => void = () => undefined;
+    mocks.remove.mockReturnValue(
+      new Promise<null>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useRemoveListStamp());
+    let first: Promise<boolean> = Promise.resolve(false);
+    let second = true;
+    await act(async () => {
+      first = result.current.remove("Manteigaria");
+      second = await result.current.remove("Manteigaria");
+    });
+    expect(second).toBe(false);
+    expect(result.current.busy).toBe(true);
+    await act(async () => {
+      finish(null);
+      await first;
+    });
+    expect(mocks.remove).toHaveBeenCalledTimes(1);
+    expect(result.current.busy).toBe(false);
   });
 });

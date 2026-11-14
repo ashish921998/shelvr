@@ -147,7 +147,7 @@ export default function PassportScreen() {
     const { itemId, name, spot } = open;
     const removed =
       itemId === undefined
-        ? await removeListStamp(name)
+        ? await removeListStamp.remove(name)
         : await visit.toggle(itemId, { name, ...spot }, false);
     if (removed) {
       setOpen((current) => (current === open ? null : current));
@@ -301,7 +301,7 @@ export default function PassportScreen() {
         <StampSheet
           stamp={open}
           count={stamps.length}
-          busy={visit.busy}
+          busy={visit.busy || removeListStamp.busy}
           onClose={() => setOpen(null)}
           onRemove={() => void remove()}
           onShare={(city) => {

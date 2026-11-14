@@ -895,7 +895,7 @@
   "tripPlanner.deleteBody": "Only the plan goes. Your saves stay where they are.",
   "tripPlanner.deleteFailed": "Couldn't delete the trip. Try again.",
   "tripPlanner.goneTitle": "This trip is gone",
-  "tripPlanner.goneBody": "It may have been deleted. Plan a new one from the Trips tab.",
+  "tripPlanner.goneBody": "It may have been deleted. Plan a new one from the Plans tab.",
   "tripPlanner.badgeYours": "Yours",
   "tripPlanner.badgeSuggested": "Suggested",
   "tripPlanner.unplanned": "Unplanned",

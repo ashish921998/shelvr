@@ -923,7 +923,7 @@
   "tripPlanner.deleteBody": "Seul le plan est supprimé. Vos enregistrements restent là où ils sont.",
   "tripPlanner.deleteFailed": "Impossible de supprimer le voyage. Réessayez.",
   "tripPlanner.goneTitle": "Ce voyage n’existe plus",
-  "tripPlanner.goneBody": "Il a peut-être été supprimé. Planifiez-en un nouveau depuis l’onglet Voyages.",
+  "tripPlanner.goneBody": "Il a peut-être été supprimé. Planifiez-en un nouveau depuis l’onglet Plans.",
   "tripPlanner.badgeYours": "À vous",
   "tripPlanner.badgeSuggested": "Suggéré",
   "tripPlanner.unplanned": "Non planifié",

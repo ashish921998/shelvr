@@ -895,7 +895,7 @@
   "tripPlanner.deleteBody": "Nur der Plan wird gelöscht. Deine gespeicherten Inhalte bleiben, wo sie sind.",
   "tripPlanner.deleteFailed": "Die Reise konnte nicht gelöscht werden. Versuch es noch einmal.",
   "tripPlanner.goneTitle": "Diese Reise gibt es nicht mehr",
-  "tripPlanner.goneBody": "Sie wurde vielleicht gelöscht. Plane im Tab „Reisen“ eine neue.",
+  "tripPlanner.goneBody": "Sie wurde vielleicht gelöscht. Plane im Tab „Pläne“ eine neue.",
   "tripPlanner.badgeYours": "Deins",
   "tripPlanner.badgeSuggested": "Vorschlag",
   "tripPlanner.unplanned": "Ungeplant",

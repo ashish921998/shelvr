@@ -867,7 +867,7 @@
   "tripPlanner.deleteBody": "계획만 삭제돼요. 저장한 항목은 그대로 남아요.",
   "tripPlanner.deleteFailed": "여행을 삭제하지 못했어요. 다시 시도해 주세요.",
   "tripPlanner.goneTitle": "이 여행을 찾을 수 없어요",
-  "tripPlanner.goneBody": "삭제되었을 수 있어요. 여행 탭에서 새로 계획해 보세요.",
+  "tripPlanner.goneBody": "삭제되었을 수 있어요. 플랜 탭에서 새로 계획해 보세요.",
   "tripPlanner.badgeYours": "내 저장",
   "tripPlanner.badgeSuggested": "추천",
   "tripPlanner.unplanned": "미정",

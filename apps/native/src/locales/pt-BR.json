@@ -923,7 +923,7 @@
   "tripPlanner.deleteBody": "Só o plano é excluído. Seus itens salvos continuam onde estão.",
   "tripPlanner.deleteFailed": "Não foi possível excluir a viagem. Tente de novo.",
   "tripPlanner.goneTitle": "Esta viagem não existe mais",
-  "tripPlanner.goneBody": "Talvez ela tenha sido excluída. Planeje uma nova na aba Viagens.",
+  "tripPlanner.goneBody": "Talvez ela tenha sido excluída. Planeje uma nova na aba Planos.",
   "tripPlanner.badgeYours": "Seu",
   "tripPlanner.badgeSuggested": "Sugerido",
   "tripPlanner.unplanned": "Sem dia",

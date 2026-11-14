@@ -923,7 +923,7 @@
   "tripPlanner.deleteBody": "Solo se elimina el plan. Tus guardados se quedan donde están.",
   "tripPlanner.deleteFailed": "No se pudo eliminar el viaje. Inténtalo de nuevo.",
   "tripPlanner.goneTitle": "Este viaje ya no existe",
-  "tripPlanner.goneBody": "Puede que se haya eliminado. Planea uno nuevo desde la pestaña Viajes.",
+  "tripPlanner.goneBody": "Puede que se haya eliminado. Planea uno nuevo desde la pestaña Planes.",
   "tripPlanner.badgeYours": "Tuyo",
   "tripPlanner.badgeSuggested": "Sugerido",
   "tripPlanner.unplanned": "Sin planificar",

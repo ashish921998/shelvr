@@ -281,38 +281,93 @@ export const setVisited = authedMutation({
   },
 });
 
+function listSpot(place: Doc<"sharedListPlaces">): VisitSpot {
+  return tidySpot({
+    lat: place.lat,
+    lng: place.lng,
+    ...(place.appleId === undefined ? {} : { appleId: place.appleId }),
+  });
+}
+
+async function unstampListPlace(
+  ctx: MutationCtx,
+  row: Doc<"placeVisits">,
+  place: Doc<"sharedListPlaces">,
+): Promise<void> {
+  const fromList = (entry: StampPlace) => entry.listPlaceId === place._id;
+  if (row.listPlaceId !== place._id && !row.stampPlaces?.some(fromList)) {
+    return;
+  }
+  const spot = listSpot(place);
+  const saved =
+    row.itemId === undefined
+      ? null
+      : await ownedSave(ctx, row.userId, row.itemId);
+  if (knowsSpot(spotsOnItem(saved, row.name) ?? [], spot)) return;
+  const remaining = ((await rowSpots(ctx, row)) ?? []).filter(
+    (kept) => !matchesVisitSpot(kept, spot, true),
+  );
+  if (remaining.length === 0 && row.itemId === undefined) {
+    await ctx.db.delete(row._id);
+    return;
+  }
+  await ctx.db.patch(row._id, {
+    spots: remaining.length === 0 ? undefined : remaining,
+    stampPlaces: row.stampPlaces?.filter((entry) => !fromList(entry)),
+  });
+}
+
+async function addListSpot(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  existing: Doc<"placeVisits"> | null,
+  place: Doc<"sharedListPlaces">,
+): Promise<Id<"placeVisits"> | null> {
+  const spot = listSpot(place);
+  const entry = {
+    lat: spot.lat,
+    lng: spot.lng,
+    city: place.city,
+    listPlaceId: place._id,
+  };
+  const spots =
+    existing === null ? [] : ((await rowSpots(ctx, existing)) ?? []);
+  if (knowsSpot(spots, spot) || spots.length >= MAX_VISIT_SPOTS) return null;
+  await rateLimiter.limit(ctx, "placeVisit", { key: userId, throws: true });
+  if (existing !== null) {
+    await ctx.db.patch(existing._id, {
+      spots: [...spots, spot],
+      stampPlaces: [...(existing.stampPlaces ?? []), entry],
+    });
+    return existing._id;
+  }
+  return await ctx.db.insert("placeVisits", {
+    userId,
+    key: placeKey(place.name),
+    name: place.name.replace(/\s+/g, " ").trim().slice(0, MAX_PLACE_NAME_CHARS),
+    listPlaceId: place._id,
+    visitedAt: Date.now(),
+    spots: [spot],
+    stampPlaces: [entry],
+  });
+}
+
 export async function stampListPlace(
   ctx: MutationCtx,
   userId: Id<"users">,
   place: Doc<"sharedListPlaces">,
   visited: boolean,
 ): Promise<void> {
-  const key = placeKey(place.name);
-  if (key === "") return;
+  if (placeKey(place.name) === "") return;
   const existing = await findVisit(ctx, userId, place.name);
   if (!visited) {
-    if (existing?.listPlaceId === place._id && existing.itemId === undefined) {
-      await ctx.db.delete(existing._id);
-    }
+    if (existing !== null) await unstampListPlace(ctx, existing, place);
     return;
   }
-  if (existing !== null) return;
-  await rateLimiter.limit(ctx, "placeVisit", { key: userId, throws: true });
-  const spot = tidySpot({
-    lat: place.lat,
-    lng: place.lng,
-    ...(place.appleId === undefined ? {} : { appleId: place.appleId }),
-  });
-  const visitId = await ctx.db.insert("placeVisits", {
-    userId,
-    key,
-    name: place.name.replace(/\s+/g, " ").trim().slice(0, MAX_PLACE_NAME_CHARS),
-    listPlaceId: place._id,
-    visitedAt: Date.now(),
-    spots: [spot],
-    stampPlaces: [{ lat: spot.lat, lng: spot.lng, city: place.city }],
-  });
+  const visitId = await addListSpot(ctx, userId, existing, place);
+  if (visitId === null) return;
   if (place.addedBy === userId || (await aiAllowed(ctx, place.addedBy))) {
+    const spot = listSpot(place);
     await ctx.scheduler.runAfter(0, internal.placeVisits.locateCountry, {
       visitId,
       lat: spot.lat,
@@ -656,6 +711,7 @@ async function stampRows(
         ...(spot.appleId === undefined ? {} : { appleId: spot.appleId }),
         ...(city ? { city } : {}),
         ...(place?.countryCode ? { countryCode: place.countryCode } : {}),
+        ...(place?.listPlaceId ? { listPlaceId: place.listPlaceId } : {}),
       });
     }
   }
@@ -745,14 +801,31 @@ export const listBadgeStamps = authedQuery({
   returns: v.array(badgeStampValidator),
   handler: async (ctx) => {
     const { stamps, saves } = await stampRows(ctx, ctx.userId);
-    return stamps.map((stamp) => ({
-      ...(stamp.city ? { city: stamp.city } : {}),
-      ...(stamp.countryCode ? { countryCode: stamp.countryCode } : {}),
-      kinds: stampKinds(
+    const listPlaces = new Map<
+      Id<"sharedListPlaces">,
+      Doc<"sharedListPlaces"> | null
+    >();
+    const listKinds = async (id: Id<"sharedListPlaces">) => {
+      if (!listPlaces.has(id)) listPlaces.set(id, await ctx.db.get(id));
+      const place = listPlaces.get(id);
+      return place ? placeKinds(place.category, place.tags ?? []) : [];
+    };
+    const badges = [];
+    for (const stamp of stamps) {
+      const fromSave = stampKinds(
         stamp.itemId === undefined ? null : (saves.get(stamp.itemId) ?? null),
         stamp,
-      ),
-    }));
+      );
+      badges.push({
+        ...(stamp.city ? { city: stamp.city } : {}),
+        ...(stamp.countryCode ? { countryCode: stamp.countryCode } : {}),
+        kinds:
+          fromSave.length > 0 || stamp.listPlaceId === undefined
+            ? fromSave
+            : await listKinds(stamp.listPlaceId),
+      });
+    }
+    return badges;
   },
 });
 
@@ -888,9 +961,11 @@ const countryLookupArgs = {
 async function listAdderAllows(
   ctx: QueryCtx,
   visit: Doc<"placeVisits">,
+  stamped: StampPlace,
 ): Promise<boolean> {
-  if (visit.listPlaceId === undefined) return true;
-  const place = await ctx.db.get(visit.listPlaceId);
+  const listPlaceId = stamped.listPlaceId ?? visit.listPlaceId;
+  if (listPlaceId === undefined) return true;
+  const place = await ctx.db.get(listPlaceId);
   if (place === null) return false;
   return (
     place.addedBy === visit.userId || (await aiAllowed(ctx, place.addedBy))
@@ -910,7 +985,7 @@ export const claimCountryLookup = internalMutation({
     if (visit === null || place === undefined) return null;
     if (place.countryCode !== undefined) return null;
     if (!(await aiAllowed(ctx, visit.userId))) return null;
-    if (!(await listAdderAllows(ctx, visit))) return null;
+    if (!(await listAdderAllows(ctx, visit, place))) return null;
     const budget = await rateLimiter.limit(ctx, "visitCountryGlobal");
     return budget.ok ? { ready: true as const } : { busyMs: budget.retryAfter };
   },
