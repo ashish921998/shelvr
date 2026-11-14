@@ -83,6 +83,7 @@ import {
 import { saveError } from "./model/saveErrors";
 import { MAX_DEMO_RETRIES } from "./model/demoErrors";
 import { aiAllowed } from "./aiConsent";
+import { cityPhotoUrls, requestCityPhotos } from "./cityPhotos";
 import { aiConsentRequiredError } from "./model/aiConsent";
 import { nextUpKind } from "./model/nextUp";
 import { openedTooRecently, reminderSubject } from "./model/saveReminders";
@@ -463,15 +464,20 @@ export const listCities = authedQuery({
       .sort(
         (a, b) => b.placeCount - a.placeCount || (a.city < b.city ? -1 : 1),
       );
+    const names = cities.map(({ city }) => city);
+    const photos = await cityPhotoUrls(ctx, names);
     const covers = await cityCovers(
       ctx,
       items,
-      cities.map(({ city }) => city),
+      names.filter((city) => !photos.has(cityKey(city))),
     );
-    return cities.map((entry) => ({
-      ...entry,
-      cover: covers.get(cityKey(entry.city)) ?? null,
-    }));
+    return cities.map((entry) => {
+      const key = cityKey(entry.city);
+      return {
+        ...entry,
+        cover: photos.get(key) ?? covers.get(key) ?? null,
+      };
+    });
   },
 });
 
@@ -2247,6 +2253,9 @@ export const finalizeItem = internalMutation({
     const patch = completionPatch(item, args, allowed);
     await ctx.db.patch(args.itemId, patch);
     await settleFreeSave(ctx, args.itemId);
+    if (allowed) {
+      await requestCityPhotos(ctx, patch.cities ?? item.cities ?? []);
+    }
     if (
       allowed &&
       ((patch.places?.length ?? 0) > 0 ||

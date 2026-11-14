@@ -345,6 +345,20 @@ export default defineSchema({
     stampedAt: v.number(),
   }).index("by_user_and_city", ["userId", "city"]),
 
+  cityPhotos: defineTable({
+    key: v.string(),
+    city: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("found"),
+      v.literal("missing"),
+      v.literal("failed"),
+    ),
+    url: v.optional(v.string()),
+    file: v.optional(v.string()),
+    checkedAt: v.number(),
+  }).index("by_key", ["key"]),
+
   passportShares: defineTable({
     token: v.string(),
     userId: v.string(),

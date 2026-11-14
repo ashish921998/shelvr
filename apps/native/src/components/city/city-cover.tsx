@@ -1,7 +1,9 @@
 import { AppSymbolIcon } from "@/components/symbol";
+import { curatedCityPicture } from "@/lib/city-picture";
 import { type City, cityCountLine } from "@/lib/home-places";
 import { t } from "@/lib/i18n";
 import { Image } from "expo-image";
+import { useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -9,12 +11,17 @@ export type CoverLayout = "pair" | "wide" | "only";
 
 function CoverArt({ entry }: { entry: City }) {
   const { theme } = useUnistyles();
-  if (entry.cover) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const source = curatedCityPicture(entry.city) ?? entry.cover;
+  if (source && source !== failed) {
     return (
       <Image
-        source={{ uri: entry.cover }}
+        testID="city-cover-photo"
+        source={typeof source === "number" ? source : { uri: source }}
         style={[StyleSheet.absoluteFill, styles.tintMuted]}
         contentFit="cover"
+        recyclingKey={entry.city}
+        onError={() => setFailed(typeof source === "string" ? source : null)}
       />
     );
   }
