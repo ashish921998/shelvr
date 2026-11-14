@@ -1,10 +1,17 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 
 import AppStoreButton from "@/components/AppStoreButton";
 import SharePageView from "@/components/SharePageView";
 import Logo from "@/components/common/Logo";
+import AndroidWaitlist from "@/components/home/AndroidWaitlist";
+import { platform } from "@/lib/bioLink";
 import { SUPPORT_EMAIL } from "@/lib/support";
-import { fetchSharePreview, loadSharePreview } from "@/lib/sharePreview";
+import {
+  fetchSharePreview,
+  loadSharePreview,
+  missingNote,
+} from "@/lib/sharePreview";
 
 type PageProps = { params: Promise<{ token: string }> };
 
@@ -65,6 +72,8 @@ export default async function SharedItemPage({ params }: PageProps) {
   const { token } = await params;
   const { outcome, preview } = await loadSharePreview(token);
   const summary = previewSummary(preview);
+  const android =
+    platform((await headers()).get("user-agent") ?? "") === "android";
 
   return (
     <main className="min-h-screen bg-paper">
@@ -95,7 +104,11 @@ export default async function SharedItemPage({ params }: PageProps) {
             )}
 
             <div className="mt-6 flex flex-wrap items-center gap-3">
-              <AppStoreButton source="share" compact shareToken={token} />
+              {android ? (
+                <AndroidWaitlist source="share" tone="light" />
+              ) : (
+                <AppStoreButton source="share" compact shareToken={token} />
+              )}
               {preview?.sourceUrl && (
                 <a
                   href={preview.sourceUrl}
@@ -112,7 +125,7 @@ export default async function SharedItemPage({ params }: PageProps) {
 
         <p className="mt-8 text-sm text-muted">
           Shelvr is a save-it-for-later app for links, images, and notes.
-          {!preview && " This save may have moved or is no longer shared."}
+          {!preview && missingNote(outcome)}
         </p>
         <p className="mt-3 text-xs text-muted">
           <a
