@@ -199,24 +199,28 @@ export default function PassportScreen() {
       {sections.stamped.map((section) => (
         <View key={section.key} style={styles.city}>
           {head(section)}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.stamps}
-          >
-            {section.stamps.map((stamp, index) => (
-              <StampTile
-                key={stampId(stamp)}
-                stamp={stamp}
-                index={index}
-                solid={
-                  section.completion !== null &&
-                  ringComplete(section.completion)
-                }
-                onPress={() => setOpen(openStampOf(stamp, section.city ?? ""))}
-              />
-            ))}
-          </ScrollView>
+          {section.stamps.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.stamps}
+            >
+              {section.stamps.map((stamp, index) => (
+                <StampTile
+                  key={stampId(stamp)}
+                  stamp={stamp}
+                  index={index}
+                  solid={
+                    section.completion !== null &&
+                    ringComplete(section.completion)
+                  }
+                  onPress={() =>
+                    setOpen(openStampOf(stamp, section.city ?? ""))
+                  }
+                />
+              ))}
+            </ScrollView>
+          ) : null}
         </View>
       ))}
       {sections.waiting.length > 0 ? (
