@@ -33,6 +33,7 @@ export type StampPlace = {
   cover: string | null;
   cityVisited: number;
   cityTotal?: number;
+  cityStamps?: number;
 };
 
 type CityCount = { stamped: number; total: number };
@@ -236,14 +237,14 @@ export function cityStampPlace(
 
 export function placeStampMoment(
   name: string,
-  { city, cover, cityVisited, cityTotal }: StampPlace = NO_CITY,
+  { city, cover, cityVisited, cityTotal, cityStamps = 0 }: StampPlace = NO_CITY,
 ): StampMoment {
   return {
     kind: "place",
     name,
     city,
     cover,
-    firstInCity: cityVisited === 0,
+    firstInCity: cityVisited === 0 && cityStamps === 0,
     completedTotal: city && cityVisited + 1 === cityTotal ? cityTotal : null,
   };
 }
