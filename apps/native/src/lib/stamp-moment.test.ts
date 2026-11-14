@@ -334,6 +334,14 @@ describe("useStampMomentPlayer", () => {
     expect(mocks.capture).toHaveBeenCalledTimes(1);
   });
 
+  it("forgets a queued moment once it is cancelled", () => {
+    const { result } = renderHook(() => useStampMomentPlayer(false));
+    act(() => result.current.controls.queue(batch, "already_been"));
+    act(() => result.current.controls.cancel());
+    act(() => result.current.controls.release());
+    expect(result.current.shown).toBeNull();
+  });
+
   it("forgets a queued moment when it unmounts", () => {
     const { result, unmount } = renderHook(() => useStampMomentPlayer(false));
     act(() => result.current.controls.queue(batch, "already_been"));
@@ -382,6 +390,7 @@ describe("useStampMomentLanding", () => {
     play: vi.fn(),
     queue: vi.fn(),
     release: vi.fn(),
+    cancel: vi.fn(),
   };
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(StampMomentPlayContext, { value: controls }, children);
@@ -409,5 +418,6 @@ describe("useStampMomentLanding", () => {
     expect(mocks.off).toHaveBeenCalledTimes(1);
     vi.advanceTimersByTime(STAMP_TIMING.sheetSettle);
     expect(controls.release).not.toHaveBeenCalled();
+    expect(controls.cancel).toHaveBeenCalledTimes(1);
   });
 });
