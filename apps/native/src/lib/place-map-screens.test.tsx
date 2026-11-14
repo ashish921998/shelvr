@@ -122,7 +122,7 @@ vi.mock("convex/react", async () => {
   const { getFunctionName } = await import("convex/server");
   const byName: Record<string, unknown> = {
     "sharedLists:markSharedListSeen": mocks.markSeen,
-    "sharedLists:setSharedListPlaceVisited": mocks.setVisited,
+    "sharedLists:setSharedListPlaceWent": mocks.setVisited,
     "sharedLists:removeSharedListPlace": mocks.removeListPlace,
   };
   return {
@@ -1202,8 +1202,7 @@ describe("list page", () => {
     });
     expect(mocks.setVisited).toHaveBeenCalledWith({
       placeId: "p1",
-      visited: true,
-      stamp: true,
+      went: true,
     });
     expect(mocks.success).toHaveBeenCalledOnce();
     await act(async () => {
@@ -1211,8 +1210,7 @@ describe("list page", () => {
     });
     expect(mocks.setVisited).toHaveBeenLastCalledWith({
       placeId: "p1",
-      visited: false,
-      stamp: true,
+      went: false,
     });
     expect(mocks.success).toHaveBeenCalledOnce();
     await act(async () => {

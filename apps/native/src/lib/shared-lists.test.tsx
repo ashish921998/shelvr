@@ -16,6 +16,8 @@ import {
   useAlsoAddTo,
   useNameGate,
   useTypedCity,
+  wentLine,
+  wentYou,
   withLine,
 } from "./shared-lists";
 
@@ -271,6 +273,39 @@ describe("savedByLine", () => {
     expect(savedByLine(place({ addedByYou: true }))).toBe(
       "sharedLists.youSaved",
     );
+  });
+});
+
+describe("wentLine", () => {
+  const you = { isYou: true };
+  const maya = { isYou: false, firstName: "Maya" };
+  const bo = { isYou: false, firstName: "Bo" };
+
+  it("says nothing until someone went, and keeps an old shared mark", () => {
+    expect(wentLine(place())).toBeNull();
+    expect(wentLine(place({ visitedAt: 1 }))).toBe("plan.weWent");
+    expect(wentYou(place({ visitedAt: 1 }))).toBe(false);
+  });
+
+  it("names who went, you first", () => {
+    expect(wentLine(place({ wentBy: [you] }))).toBe("sharedLists.wentYou");
+    expect(wentLine(place({ wentBy: [maya] }))).toBe(
+      'sharedLists.wentOne:{"name":"Maya"}',
+    );
+    expect(wentLine(place({ wentBy: [you, maya] }))).toBe(
+      'sharedLists.wentYouAnd:{"name":"Maya"}',
+    );
+    expect(wentLine(place({ wentBy: [maya, { isYou: false }] }))).toBe(
+      'sharedLists.wentTwo:{"first":"Maya","second":"sharedLists.someone"}',
+    );
+    expect(wentLine(place({ wentBy: [you, maya, bo] }))).toBe(
+      'sharedLists.wentYouAndMany:{"count":2}',
+    );
+    expect(wentLine(place({ wentBy: [maya, bo, { isYou: false }] }))).toBe(
+      'sharedLists.wentMany:{"name":"Maya","count":2}',
+    );
+    expect(wentYou(place({ wentBy: [you, maya] }))).toBe(true);
+    expect(wentYou(place({ wentBy: [maya] }))).toBe(false);
   });
 });
 

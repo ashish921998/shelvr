@@ -496,6 +496,9 @@ export default defineSchema({
     tags: v.optional(v.array(v.string())),
     addedAt: v.number(),
     visitedAt: v.optional(v.number()),
+    went: v.optional(
+      v.array(v.object({ userId: v.id("users"), at: v.number() })),
+    ),
   })
     .index("by_list_and_added", ["listId", "addedAt"])
     .index("by_added_by", ["addedBy"])

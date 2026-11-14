@@ -1112,6 +1112,21 @@
   "sharedLists.pastMemberSaved": "Alguém que saiu salvou",
   "sharedLists.someoneSaved": "Alguém salvou",
   "sharedLists.notYet": "Ainda não",
+  "sharedLists.iWent": "Eu fui",
+  "sharedLists.wentYou": "Você foi",
+  "sharedLists.wentOne": "%{name} foi",
+  "sharedLists.wentYouAnd": "Você e %{name} foram",
+  "sharedLists.wentTwo": "%{first} e %{second} foram",
+  "sharedLists.wentYouAndMany": {
+    "one": "Você e mais %{formattedCount} pessoa foram",
+    "many": "Você e mais %{formattedCount} pessoas foram",
+    "other": "Você e mais %{formattedCount} pessoas foram"
+  },
+  "sharedLists.wentMany": {
+    "one": "%{name} e mais %{formattedCount} pessoa foram",
+    "many": "%{name} e mais %{formattedCount} pessoas foram",
+    "other": "%{name} e mais %{formattedCount} pessoas foram"
+  },
   "sharedLists.removeFromList": "Remover da lista",
   "sharedLists.placeActions": "Ações do lugar",
   "sharedLists.listActions": "Ações da lista",

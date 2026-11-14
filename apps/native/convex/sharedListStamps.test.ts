@@ -154,7 +154,7 @@ describe("Went on a shared list", () => {
     expect(rows[0]?.spots).toEqual([]);
   });
 
-  it("can be taken out of the Passport without touching the list", async () => {
+  it("can be taken out of the Passport, which also undoes the member's Went", async () => {
     const { base, bo, place } = await friendPlace();
     await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
       placeId: place._id,
@@ -165,9 +165,9 @@ describe("Went on a shared list", () => {
       name: "Manteigaria",
     });
     expect(await visitRows(base, bo.userId)).toEqual([]);
-    expect((await base.run((ctx) => ctx.db.get(place._id)))?.visitedAt).toEqual(
-      expect.any(Number),
-    );
+    const stored = await base.run((ctx) => ctx.db.get(place._id));
+    expect(stored?.went).toEqual([]);
+    expect(stored?.visitedAt).toBeUndefined();
   });
 
   it("leaves the Passport alone for an installed app that sends no stamp flag", async () => {

@@ -21,6 +21,7 @@ import {
   appleMapsCountry,
 } from "./model/appleMaps";
 import { authedMutation, authedQuery, liveOwner } from "./model/auth";
+import { wentWithout } from "./model/sharedLists";
 import {
   cityCompletionValidator,
   completionByCity,
@@ -552,6 +553,32 @@ async function removeListSpot(
   });
 }
 
+async function forgetListWent(
+  ctx: MutationCtx,
+  row: Doc<"placeVisits">,
+  spot: Point | undefined,
+): Promise<void> {
+  const removed = (row.stampPlaces ?? []).filter(
+    (entry) =>
+      spot === undefined || (entry.lat === spot.lat && entry.lng === spot.lng),
+  );
+  const ids = new Set(
+    removed.flatMap((entry) =>
+      entry.listPlaceId === undefined ? [] : [entry.listPlaceId],
+    ),
+  );
+  for (const id of ids) {
+    const place = await ctx.db.get(id);
+    if (place === null) continue;
+    const went = wentWithout(place, row.userId);
+    if (went === place.went) continue;
+    await ctx.db.patch(place._id, {
+      went,
+      ...((went ?? []).length === 0 ? { visitedAt: undefined } : {}),
+    });
+  }
+}
+
 export const removeListStamp = authedMutation({
   args: {
     name: v.string(),
@@ -567,6 +594,7 @@ export const removeListStamp = authedMutation({
     });
     if (args.spot === undefined) await ctx.db.delete(row._id);
     else await removeListSpot(ctx, row, args.spot);
+    await forgetListWent(ctx, row, args.spot);
     return null;
   },
 });
