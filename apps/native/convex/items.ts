@@ -83,6 +83,7 @@ import {
 import { saveError } from "./model/saveErrors";
 import { MAX_DEMO_RETRIES } from "./model/demoErrors";
 import { aiAllowed } from "./aiConsent";
+import { cityPhotoUrls, requestCityPhotos } from "./cityPhotos";
 import { aiConsentRequiredError } from "./model/aiConsent";
 import { nextUpKind } from "./model/nextUp";
 import { openedTooRecently, reminderSubject } from "./model/saveReminders";
@@ -247,9 +248,11 @@ function withoutServerFields(
   | "placeLocations"
   | "placeCuisines"
   | "placesEdited"
+  | "coverFor"
 > {
   const {
     placesEdited: _placesEdited,
+    coverFor: _coverFor,
     places: _places,
     placesHeard: _placesHeard,
     placeLocations: _placeLocations,
@@ -424,6 +427,36 @@ async function cityCovers(
   return covers;
 }
 
+async function pickedCovers(
+  ctx: QueryCtx,
+  items: Doc<"items">[],
+  cities: string[],
+): Promise<Map<string, { url: string; itemId: Id<"items"> }>> {
+  const picked = new Map<string, { url: string; itemId: Id<"items"> }>();
+  for (const city of cities) {
+    const key = cityKey(city);
+    let item: Doc<"items"> | undefined;
+    let latest = -Infinity;
+    for (const save of items) {
+      const at = save.coverFor?.find((pick) => pick.key === key)?.at;
+      if (
+        at !== undefined &&
+        at > latest &&
+        (save.cities ?? []).some((name) => cityKey(name) === key)
+      ) {
+        item = save;
+        latest = at;
+      }
+    }
+    if (item === undefined || picked.has(key)) continue;
+    const url = item.storageId
+      ? await ctx.storage.getUrl(item.storageId)
+      : (item.heroImageUrl ?? null);
+    if (url !== null) picked.set(key, { url, itemId: item._id });
+  }
+  return picked;
+}
+
 export const listCities = authedQuery({
   args: {},
   returns: v.array(
@@ -433,6 +466,7 @@ export const listCities = authedQuery({
       placeCount: v.optional(v.number()),
       visitedCount: v.optional(v.number()),
       cover: v.union(v.string(), v.null()),
+      coverItemId: v.optional(v.id("items")),
     }),
   ),
   handler: async (ctx) => {
@@ -463,15 +497,23 @@ export const listCities = authedQuery({
       .sort(
         (a, b) => b.placeCount - a.placeCount || (a.city < b.city ? -1 : 1),
       );
+    const names = cities.map(({ city }) => city);
+    const picked = await pickedCovers(ctx, items, names);
+    const photos = await cityPhotoUrls(ctx, names);
     const covers = await cityCovers(
       ctx,
       items,
-      cities.map(({ city }) => city),
+      names.filter(
+        (city) => !photos.has(cityKey(city)) && !picked.has(cityKey(city)),
+      ),
     );
-    return cities.map((entry) => ({
-      ...entry,
-      cover: covers.get(cityKey(entry.city)) ?? null,
-    }));
+    return cities.map((entry) => {
+      const key = cityKey(entry.city);
+      const pick = picked.get(key);
+      return pick
+        ? { ...entry, cover: pick.url, coverItemId: pick.itemId }
+        : { ...entry, cover: photos.get(key) ?? covers.get(key) ?? null };
+    });
   },
 });
 
@@ -1576,6 +1618,7 @@ export async function createReadyPlaceSave(
   await ctx.scheduler.runAfter(locateAfterMs, internal.placePins.locateItem, {
     itemId,
   });
+  if (await aiAllowed(ctx, userId)) await requestCityPhotos(ctx, cities);
   return itemId;
 }
 
@@ -2247,6 +2290,9 @@ export const finalizeItem = internalMutation({
     const patch = completionPatch(item, args, allowed);
     await ctx.db.patch(args.itemId, patch);
     await settleFreeSave(ctx, args.itemId);
+    if (allowed) {
+      await requestCityPhotos(ctx, patch.cities ?? item.cities ?? []);
+    }
     if (
       allowed &&
       ((patch.places?.length ?? 0) > 0 ||
@@ -2429,6 +2475,10 @@ export const addPlaceListParts = internalMutation({
       }
       added++;
     }
+    await requestCityPhotos(
+      ctx,
+      fresh.flatMap((part) => normalizeCities(part.cities)),
+    );
     return added;
   },
 });

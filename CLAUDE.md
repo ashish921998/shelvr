@@ -73,7 +73,7 @@ read [localization](docs/architecture/localization.md); before simulator QA read
 - **Run-by-hand backfills** after deploying the change that needs them, from `apps/native`:
   `pnpm exec convex run --prod <fn> '{"cursor":null}'` with `items:backfillPlaceSearch`
   (finish it before releasing the search UI),
-  `placePins:backfillPage` or `placeVisits:backfillCountries` (old "We went" marks get a city
+  `placePins:backfillPage`, `cityPhotos:backfillPage` (looks up a photo for every city already saved, spaced 1.5 s apart; run it once after the deploy that adds `cityPhotos`) or `placeVisits:backfillCountries` (old "We went" marks get a city
   and country; run it before the Passport client ships). Each schedules its remaining pages and is safe to restart.
 - **Privacy rules the code enforces on purpose:** a shared list's place search sends Apple only
   the city name, never a member's pin; a plan from a shared list needs every contributor's AI

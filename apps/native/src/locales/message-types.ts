@@ -252,6 +252,9 @@ type MessageParams = {
   "item.goneTitle": undefined;
   "item.goneBody": undefined;
   "item.copyLink": undefined;
+  "item.useAsCityCover": { city: string };
+  "item.stopCityCover": { city: string };
+  "item.coverFailed": undefined;
   "products.findLinks": undefined;
   "common.dismiss": undefined;
   "spaces.undoAdd": undefined;

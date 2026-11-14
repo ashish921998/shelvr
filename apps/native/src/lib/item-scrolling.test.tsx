@@ -146,6 +146,7 @@ vi.mock("@/lib/home-feed", () => ({
 }));
 vi.mock("@/lib/use-item-open", () => ({ useItemOpen: vi.fn() }));
 vi.mock("@/lib/use-item-share", () => ({ useItemShare: () => mock.mutation }));
+vi.mock("@/lib/city-cover-pick", () => ({ useCityCoverActions: () => [] }));
 vi.mock("@/lib/share/share-store", () => ({
   forgetDeletedSharedItem: mock.forget,
 }));

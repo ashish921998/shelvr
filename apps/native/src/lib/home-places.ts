@@ -11,6 +11,7 @@ export type City = {
   placeCount?: number;
   visitedCount?: number;
   cover: string | null;
+  coverItemId?: string;
 };
 
 /** The cities to draw now, and how many the "+ n more" tile stands for. */

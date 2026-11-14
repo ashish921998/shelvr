@@ -51,6 +51,7 @@ import { useHomeFeed } from "@/lib/home-feed";
 import { pagerResyncIndex } from "@/lib/item-pager";
 import { useItemOpen } from "@/lib/use-item-open";
 import { useItemShare } from "@/lib/use-item-share";
+import { useCityCoverActions } from "@/lib/city-cover-pick";
 import { isMediaSave, MEDIA_CANVAS } from "@/lib/media-viewer";
 
 function pagerEndReached(
@@ -343,6 +344,7 @@ function ItemScreenContent() {
   useItemOpen(activeItem, from ?? "direct", markOpened);
 
   const shareActive = useItemShare(activeFull ?? activeItem);
+  const coverActions = useCityCoverActions(activeItem);
 
   const copyLink = useCallback(async () => {
     if (!activeItem?.url) return;
@@ -423,6 +425,7 @@ function ItemScreenContent() {
                       ...(activeItem?.url
                         ? [{ label: t("item.copyLink"), onPress: copyLink }]
                         : []),
+                      ...coverActions,
                       {
                         label: t("common.delete"),
                         destructive: true,
@@ -452,6 +455,15 @@ function ItemScreenContent() {
                 {t("item.copyLink")}
               </Stack.Toolbar.MenuAction>
             ) : null}
+            {coverActions.map((action) => (
+              <Stack.Toolbar.MenuAction
+                key={action.id}
+                icon="photo"
+                onPress={action.onPress}
+              >
+                {action.label}
+              </Stack.Toolbar.MenuAction>
+            ))}
             <Stack.Toolbar.MenuAction
               icon="trash"
               destructive

@@ -1,7 +1,10 @@
 import { AppSymbolIcon } from "@/components/symbol";
+import { analytics } from "@/lib/analytics";
+import { curatedCityPicture } from "@/lib/city-picture";
 import { type City, cityCountLine } from "@/lib/home-places";
 import { t } from "@/lib/i18n";
 import { Image } from "expo-image";
+import { useState } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -9,12 +12,32 @@ export type CoverLayout = "pair" | "wide" | "only";
 
 function CoverArt({ entry }: { entry: City }) {
   const { theme } = useUnistyles();
-  if (entry.cover) {
+  const [failed, setFailed] = useState<readonly (string | number)[]>([]);
+  const curated = curatedCityPicture(entry.city);
+  const order =
+    entry.coverItemId === undefined
+      ? [curated, entry.cover]
+      : [entry.cover, curated];
+  const source = order.find(
+    (candidate): candidate is string | number =>
+      !!candidate && !failed.includes(candidate),
+  );
+  if (source !== undefined) {
     return (
       <Image
-        source={{ uri: entry.cover }}
+        testID="city-cover-photo"
+        source={typeof source === "number" ? source : { uri: source }}
         style={[StyleSheet.absoluteFill, styles.tintMuted]}
         contentFit="cover"
+        recyclingKey={entry.city}
+        onError={() => {
+          analytics.captureError(
+            "city_cover_image_failed",
+            new Error("image_load_failed"),
+            { curated: typeof source === "number" },
+          );
+          setFailed((seen) => [...seen, source]);
+        }}
       />
     );
   }

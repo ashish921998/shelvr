@@ -4,6 +4,7 @@ import { internal } from "./_generated/api";
 import { internalMutation } from "./_generated/server";
 import { authedMutation, authedQuery, requireUserId } from "./model/auth";
 import { aiAllowed } from "./aiConsent";
+import { requestCityPhotos } from "./cityPhotos";
 import {
   MAX_ITEM_PLACES,
   normalizeCities,
@@ -166,6 +167,7 @@ export const savePlaces = authedMutation({
       await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
         itemId: item._id,
       });
+    if (await aiAllowed(ctx, ctx.userId)) await requestCityPhotos(ctx, cities);
     return null;
   },
 });

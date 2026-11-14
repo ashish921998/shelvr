@@ -121,6 +121,9 @@ export default defineSchema({
     longitude: v.optional(v.number()),
     placePins: v.optional(placePinsValidator),
     placesEdited: v.optional(v.boolean()),
+    coverFor: v.optional(
+      v.array(v.object({ key: v.string(), at: v.number() })),
+    ),
     isSticker: v.optional(v.boolean()),
     tags: v.array(v.string()),
     content: v.optional(v.string()),
@@ -344,6 +347,22 @@ export default defineSchema({
     country: v.string(),
     stampedAt: v.number(),
   }).index("by_user_and_city", ["userId", "city"]),
+
+  cityPhotos: defineTable({
+    key: v.string(),
+    city: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("found"),
+      v.literal("missing"),
+      v.literal("failed"),
+    ),
+    url: v.optional(v.string()),
+    file: v.optional(v.string()),
+    checkedAt: v.number(),
+  })
+    .index("by_key", ["key"])
+    .index("by_status_and_checkedAt", ["status", "checkedAt"]),
 
   passportShares: defineTable({
     token: v.string(),
