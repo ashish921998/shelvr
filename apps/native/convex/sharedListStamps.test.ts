@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { api } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { joiner, listWithOwner } from "./sharedLists.test.helpers";
-import type { TestBackend } from "./test.setup";
+import { setTestConsent, type TestBackend } from "./test.setup";
 
 async function visitRows(base: TestBackend, userId: Id<"users">) {
   return await base.run((ctx) =>
@@ -31,6 +31,7 @@ describe("Went on a shared list", () => {
     await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
       placeId: place._id,
       visited: true,
+      stamp: true,
     });
     const [row] = await visitRows(base, bo.userId);
     expect(row).toMatchObject({
@@ -62,6 +63,7 @@ describe("Went on a shared list", () => {
     await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
       placeId: place._id,
       visited: true,
+      stamp: true,
     });
     await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
       placeId: place._id,
@@ -86,6 +88,7 @@ describe("Went on a shared list", () => {
     await owner.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
       placeId: place._id,
       visited: true,
+      stamp: true,
     });
     await owner.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
       placeId: place._id,
@@ -102,6 +105,7 @@ describe("Went on a shared list", () => {
     await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
       placeId: place._id,
       visited: true,
+      stamp: true,
     });
     await bo.t.mutation(api.placeVisits.removeListStamp, {
       name: "Manteigaria",
@@ -110,5 +114,51 @@ describe("Went on a shared list", () => {
     expect((await base.run((ctx) => ctx.db.get(place._id)))?.visitedAt).toEqual(
       expect.any(Number),
     );
+  });
+
+  it("leaves the Passport alone for an installed app that sends no stamp flag", async () => {
+    const { base, bo, place } = await friendPlace();
+    await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: place._id,
+      visited: true,
+    });
+    expect(await visitRows(base, bo.userId)).toEqual([]);
+  });
+
+  it("removes its stamp when the member unmarks a place they added", async () => {
+    const { base, owner, listId } = await friendPlace();
+    const list = await owner.t.query(api.sharedLists.getSharedList, {
+      listId,
+    });
+    const place = list?.places.find((p) => p.name === "Manteigaria");
+    if (place === undefined) throw new Error("seed place missing");
+    await owner.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: place._id,
+      visited: true,
+      stamp: true,
+    });
+    expect(await visitRows(base, owner.userId)).toHaveLength(1);
+    await owner.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: place._id,
+      visited: false,
+    });
+    expect(await visitRows(base, owner.userId)).toEqual([]);
+  });
+
+  it("sends no member's place to Apple when that member declined AI", async () => {
+    const { base, owner, bo, place } = await friendPlace();
+    await base.run((ctx) => setTestConsent(ctx, owner.userId, "declined"));
+    await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: place._id,
+      visited: true,
+      stamp: true,
+    });
+    const jobs = await base.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    expect(jobs.filter((job) => job.name.includes("locateCountry"))).toEqual(
+      [],
+    );
+    expect(await visitRows(base, bo.userId)).toHaveLength(1);
   });
 });

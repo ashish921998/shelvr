@@ -300,21 +300,16 @@ export async function stampListPlace(
     lng: place.lng,
     ...(place.appleId === undefined ? {} : { appleId: place.appleId }),
   });
-  const own =
-    place.addedBy === userId && place.itemId !== undefined
-      ? await ownedSave(ctx, userId, place.itemId)
-      : null;
   const visitId = await ctx.db.insert("placeVisits", {
     userId,
     key,
     name: place.name.replace(/\s+/g, " ").trim().slice(0, MAX_PLACE_NAME_CHARS),
-    ...(own === null ? {} : { itemId: own._id }),
     listPlaceId: place._id,
     visitedAt: Date.now(),
     spots: [spot],
     stampPlaces: [{ lat: spot.lat, lng: spot.lng, city: place.city }],
   });
-  if (place.addedBy === userId || place.appleId !== undefined) {
+  if (place.addedBy === userId || (await aiAllowed(ctx, place.addedBy))) {
     await ctx.scheduler.runAfter(0, internal.placeVisits.locateCountry, {
       visitId,
       lat: spot.lat,
