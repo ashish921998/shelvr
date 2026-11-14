@@ -100,6 +100,23 @@ describe("goalPaywallVariables", () => {
     );
   });
 
+  it("opens on the passport's real city count once cities were picked", () => {
+    const picked = (beenCities: Progress["beenCities"]) =>
+      values({ ...progress("date"), beenCities });
+    expect(picked(["lisbon"]).goal_headline).toBe("Your passport has 1 city");
+    expect(
+      picked(["lisbon", "madrid", "paris", "rome", "tokyo", "seoul"])
+        .goal_headline,
+    ).toBe("Your passport has 6 cities");
+    expect(picked([]).goal_headline).toBe("Make date night easy.");
+    expect(picked(["lisbon"]).goal_subline).toBe(
+      values(progress("date")).goal_subline,
+    );
+    expect(
+      values({ goals: [], travelCity: null, beenCities: ["lisbon"] }),
+    ).toEqual({});
+  });
+
   it("keeps the goal id unlocalized for every goal", () => {
     for (const goal of GOALS) {
       expect(goalPaywallVariables(progress(goal)).goal).toEqual({

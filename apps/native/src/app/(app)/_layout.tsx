@@ -14,6 +14,7 @@ import { usePlanGate } from "@/lib/plan-gate";
 import { canSave } from "@/lib/access";
 import { useAccess } from "@/lib/free-plan";
 import { useReplayOnboarding } from "@/lib/replay-onboarding";
+import { useSyncPendingCityStamps } from "@/lib/pending-city-stamps";
 import { useQueuedFirstSave } from "@/lib/queued-first-save";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
 import { useTrialReminder } from "@/lib/trial-reminder";
@@ -57,6 +58,7 @@ export default function AppLayout() {
     loading: access.kind === "loading",
   });
   useQueuedFirstSave();
+  useSyncPendingCityStamps();
   useResumePendingShare(!canSave(access));
   useTrialReminder();
   useWelcomeSaveTracker();

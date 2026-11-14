@@ -197,6 +197,7 @@ export type AnalyticsEventProperties = {
   passport_paywall_opened: { surface: "ring" | "badge" | "city_stamp" };
   passport_city_stamps_opened: { count: number };
   passport_city_stamp_changed: { stamped: boolean; count: number };
+  passport_city_stamps_claimed: { picked: number; stamped: number };
   passport_badge_unlocked: { badge: string };
   passport_badge_shared: {
     badge: string;
@@ -289,6 +290,7 @@ export type AnalyticsEventProperties = {
     goal: Goal | null;
     goals: Goal[];
     saved_count: SavedCount | null;
+    been_count: number;
     space_count: number;
     space_names: string[];
     custom_space_count: number;
