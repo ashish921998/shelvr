@@ -58,7 +58,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   (`plan-votes-row.tsx`, `ask-votes-sheet.tsx`) with their logic in `src/lib/plan-votes.ts`;
   backend `convex/planShares.ts` (`cityPlanVotes`, `recordPlanVote`) with rules in
   `convex/model/planVote.ts`; the web vote page `apps/web/src/app/p/[token]/page.tsx` with
-  `apps/web/src/components/PlanVote.tsx`.
+  `apps/web/src/components/PlanVote.tsx`. The first-vote push is `sendPlanVote` in
+  `convex/notificationDelivery.ts`, with its rules in `convex/model/planVote.ts`.
 - **Map tab:** route `src/app/(app)/(tabs)/(map)/index.tsx`, map, search and filter chips in
   `src/components/map`, filter rules in `src/lib/map-filters.ts` and
   `convex/model/placeKinds.ts`, each pin's emoji in `src/lib/map-pin-emoji.ts`, data from

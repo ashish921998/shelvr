@@ -69,7 +69,7 @@ read [localization](docs/architecture/localization.md); before simulator QA read
 - **Declared because rows carry them.** Keep these in the schema through any rollback:
   `users.deleting`, `items.placeLocations`, `tripPlans.listId`, `planVotes.name` and
   `planVotes.last`, the `placeVisits` `stampPlaces` and `backfilled` fields, and the
-  `placeRemovals` and `tripEveReminders` tables.
+  `placeRemovals`, `tripEveReminders` and `planVoteNotices` tables.
 - **Run-by-hand backfills** after deploying the change that needs them, from `apps/native`:
   `pnpm exec convex run --prod <fn> '{"cursor":null}'` with `items:backfillPlaceSearch`
   (finish it before releasing the search UI),
@@ -105,8 +105,9 @@ The variables are listed in code, not here:
   them up
 
 For the app, copy `apps/native/.example.env` to `.env.local`. To see what a variable does,
-read the code that reads it. Feature switches such as `FREE_SAVES_ENABLED`, `SAVE_REMINDERS_ENABLED` and
-`VIDEO_TRANSCRIPTS_ENABLED` stay off until set to `"true"`, so a deploy never turns one on.
+read the code that reads it. Feature switches such as `FREE_SAVES_ENABLED`, `SAVE_REMINDERS_ENABLED`,
+`PLAN_VOTE_PUSH_ENABLED` and `VIDEO_TRANSCRIPTS_ENABLED` stay off until set to `"true"`, so a deploy
+never turns one on.
 `E2E_FAKE_AI` swaps Gemini for `model/fakeAi.ts` only on the local e2e backend, and is refused
 anywhere else.
 

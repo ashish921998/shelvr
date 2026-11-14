@@ -12,12 +12,20 @@ import {
   recipientValidator,
   DIGEST_WINDOW_MS,
   digestCopy,
+  planVoteCopy,
   reachedDevice,
   recipientError,
   reminderCopy,
   tripEveCopy,
   type Recipient,
 } from "./model/notificationFields";
+import {
+  PLAN_VOTE_KIND,
+  PLAN_VOTE_MAX_AGE_MS,
+  planVotePushLive,
+  planVoteRefusal,
+  pushSubject,
+} from "./model/planVote";
 import {
   openedTooRecently,
   placeToVisit,
@@ -29,6 +37,7 @@ import {
 import { TRIP_EVE_MAX_AGE_MS, tripSavedStopCount } from "./model/tripEve";
 import { visibleSave } from "./model/placeRemovals";
 import { userVisits, visitedKeysOnItem } from "./model/placeVisits";
+import { liveSharePlaces, newestCityShare, shareVotes } from "./planShares";
 
 const NOTIFICATION_KIND = "weekly_shelf";
 const reminderNotificationKind = (kind: ReminderKind) => `${kind}_reminder`;
@@ -104,6 +113,19 @@ export const recover = internalMutation({
         0,
         internal.notificationDelivery.sendTripEve,
         { reminderId: tripEve._id },
+      );
+    }
+    const planVotes = await ctx.db
+      .query("planVoteNotices")
+      .withIndex("by_delivery_status_and_attempt", (q) =>
+        q.eq("deliveryStatus", "pending").lte("deliveryNextAttemptAt", now),
+      )
+      .take(50);
+    for (const notice of planVotes) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.notificationDelivery.sendPlanVote,
+        { noticeId: notice._id },
       );
     }
     return null;
@@ -882,6 +904,202 @@ export const sendTripEve = internalAction({
       attempt: delivery.attempt,
       recipients,
       count: delivery.count,
+    });
+    return null;
+  },
+});
+
+export const claimPlanVote = internalMutation({
+  args: { noticeId: v.id("planVoteNotices") },
+  returns: v.union(
+    v.null(),
+    v.object({
+      attempt: v.number(),
+      recipients: v.array(recipientValidator),
+      city: v.string(),
+      subject: v.object({
+        name: v.optional(v.string()),
+        place: v.string(),
+        choice: v.union(v.literal("pick"), v.literal("pass")),
+      }),
+      voters: v.number(),
+    }),
+  ),
+  handler: async (ctx, { noticeId }) => {
+    const notice = await ctx.db.get(noticeId);
+    const now = Date.now();
+    if (
+      !notice ||
+      notice.deliveryStatus !== "pending" ||
+      (notice.deliveryNextAttemptAt ?? 0) > now
+    )
+      return null;
+    const share = await ctx.db.get(notice.shareId);
+    const linkGone = () =>
+      ctx.db.patch(noticeId, {
+        deliveryStatus: "failed",
+        deliveryNextAttemptAt: undefined,
+        deliveryError: "link_gone",
+      });
+    if (share === null) {
+      await linkGone();
+      return null;
+    }
+    if ((await liveOwner(ctx, share.userId)) === null) {
+      await ctx.db.patch(noticeId, OWNER_UNAVAILABLE);
+      return null;
+    }
+    const space = await ctx.db.get(share.spaceId);
+    if (space === null || space.userId !== share.userId) {
+      await linkGone();
+      return null;
+    }
+    const preferences = await ctx.db
+      .query("notificationPreferences")
+      .withIndex("by_user", (q) => q.eq("userId", share.userId))
+      .unique();
+    const live = await liveSharePlaces(ctx, share);
+    const votes = await shareVotes(ctx, share._id);
+    const newest =
+      share.city === undefined
+        ? null
+        : await newestCityShare(ctx, share.userId, share.city);
+    const subject = pushSubject(
+      votes,
+      notice.voterId,
+      live.map(({ place }) => place),
+    );
+    const fail = (deliveryError: string) =>
+      closeBetweenAttempts(
+        ctx,
+        (fields) => ctx.db.patch(noticeId, fields),
+        notice.deliveryRecipients,
+        deliveryError,
+        {
+          userId: share.userId,
+          notificationId: noticeId,
+          kind: PLAN_VOTE_KIND,
+          itemCount: votes.length,
+          sentAt: notice.deliverySentAt,
+        },
+      );
+    const reason = planVoteRefusal({
+      live: planVotePushLive(),
+      disabled: preferences !== null && !remindersOn(preferences),
+      exhausted: (notice.deliveryAttempts ?? 0) >= MAX_ATTEMPTS,
+      expired:
+        now - notice.createdAt >= PLAN_VOTE_MAX_AGE_MS ||
+        share.expiresAt <= now,
+      newest: newest?._id === share._id,
+      subject: subject !== null,
+    });
+    if (reason !== null || share.city === undefined || subject === null) {
+      await fail(reason ?? "superseded");
+      return null;
+    }
+    const recipients = await liveRecipients(
+      ctx,
+      share.userId,
+      notice.deliveryRecipients,
+    );
+    if (recipients.length === 0) {
+      await fail("no_devices");
+      return null;
+    }
+    const attempt = (notice.deliveryAttempts ?? 0) + 1;
+    await ctx.db.patch(noticeId, {
+      deliveryAttempts: attempt,
+      deliveryRecipients: recipients,
+      deliveryNextAttemptAt: now + LEASE_MS,
+    });
+    return {
+      attempt,
+      recipients,
+      city: share.city,
+      subject,
+      voters: votes.length,
+    };
+  },
+});
+
+export const finishPlanVote = internalMutation({
+  args: {
+    noticeId: v.id("planVoteNotices"),
+    attempt: v.number(),
+    recipients: v.array(recipientValidator),
+    voters: v.number(),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const notice = await ctx.db.get(args.noticeId);
+    if (
+      !notice ||
+      notice.deliveryStatus !== "pending" ||
+      notice.deliveryAttempts !== args.attempt
+    )
+      return null;
+    const share = await ctx.db.get(notice.shareId);
+    if (share !== null) {
+      await releaseUnregistered(ctx, share.userId, args.recipients);
+    }
+    const now = Date.now();
+    const { status, fields } = settle(
+      args.recipients,
+      args.attempt,
+      now - notice.createdAt,
+      PLAN_VOTE_MAX_AGE_MS,
+      now,
+    );
+    const sentAt = firstSendAt(notice.deliverySentAt, args.recipients, now);
+    await ctx.db.patch(notice._id, {
+      ...fields,
+      ...(sentAt !== undefined && { deliverySentAt: sentAt }),
+    });
+    if (
+      status !== "pending" &&
+      share !== null &&
+      (await liveOwner(ctx, share.userId)) !== null
+    )
+      await ctx.scheduler.runAfter(0, internal.analytics.captureNotification, {
+        userId: share.userId,
+        notificationId: notice._id,
+        kind: PLAN_VOTE_KIND,
+        itemCount: args.voters,
+        delivered: status === "complete",
+        sentAt: sentAt ?? now,
+      });
+    return null;
+  },
+});
+
+export const sendPlanVote = internalAction({
+  args: { noticeId: v.id("planVoteNotices") },
+  returns: v.null(),
+  handler: async (ctx, { noticeId }) => {
+    const delivery = await ctx.runMutation(
+      internal.notificationDelivery.claimPlanVote,
+      { noticeId },
+    );
+    if (!delivery) return null;
+    const recipients = await exchange(
+      delivery.recipients,
+      noticeId,
+      (recipient) => ({
+        ...planVoteCopy(recipient.locale, delivery.city, delivery.subject),
+        data: {
+          url: `/city/${encodeURIComponent(delivery.city)}`,
+          kind: PLAN_VOTE_KIND,
+          notificationId: noticeId,
+        },
+        sound: "default",
+        channelId: "plan-votes",
+      }),
+    );
+    await ctx.runMutation(internal.notificationDelivery.finishPlanVote, {
+      noticeId,
+      attempt: delivery.attempt,
+      recipients,
+      voters: delivery.voters,
     });
     return null;
   },

@@ -41,6 +41,7 @@ type Env = {
   readonly FREE_SAVES_ENABLED: string | undefined;
   readonly GOOGLE_GENERATIVE_AI_API_KEY: string;
   readonly OBSERVABILITY_ENV: string | undefined;
+  readonly PLAN_VOTE_PUSH_ENABLED: string | undefined;
   readonly POSTHOG_HOST: string | undefined;
   readonly POSTHOG_PROJECT_TOKEN: string | undefined;
   readonly RESEND_ANDROID_SEGMENT_ID: string | undefined;

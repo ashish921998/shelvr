@@ -21,7 +21,12 @@ import {
   PLAN_SHARE_TTL_MS,
   placeKey,
 } from "./model/plan";
-import { latestVote, voterFields } from "./model/planVote";
+import {
+  latestVote,
+  PLAN_VOTE_PUSH_DELAY_MS,
+  planVotePushLive,
+  voterFields,
+} from "./model/planVote";
 import { userVisits, visitedKeysOnItem } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import { cityKey } from "./model/trip";
@@ -74,7 +79,7 @@ async function liveShare(
   return share;
 }
 
-async function newestCityShare(
+export async function newestCityShare(
   ctx: QueryCtx,
   userId: string,
   city: string,
@@ -93,7 +98,7 @@ async function newestCityShare(
   );
 }
 
-async function liveSharePlaces(
+export async function liveSharePlaces(
   ctx: QueryCtx,
   share: Doc<"planShares">,
 ): Promise<{ place: SharePlace; item: Doc<"items"> }[]> {
@@ -107,7 +112,7 @@ async function liveSharePlaces(
   return live;
 }
 
-async function shareVotes(
+export async function shareVotes(
   ctx: QueryCtx,
   shareId: Id<"planShares">,
 ): Promise<Doc<"planVotes">[]> {
@@ -384,9 +389,9 @@ export const recordPlanVote = internalMutation({
       ) {
         return "recorded";
       }
+      const firstChoice = !empty && !hasVote(existing);
       if (
-        !empty &&
-        !hasVote(existing) &&
+        firstChoice &&
         (await shareVotes(ctx, share._id)).length >= MAX_PLAN_VOTERS
       ) {
         return "full";
@@ -399,6 +404,7 @@ export const recordPlanVote = internalMutation({
         name: fields.name,
         last: fields.last,
       });
+      await queueVoteNotice(ctx, share, voterId, firstChoice);
       return "recorded";
     }
     if (empty && args.revision === undefined) return "recorded";
@@ -424,9 +430,49 @@ export const recordPlanVote = internalMutation({
       name: fields.name,
       last: fields.last,
     });
+    await queueVoteNotice(ctx, share, voterId, !empty);
     return "recorded";
   },
 });
+
+async function queueVoteNotice(
+  ctx: MutationCtx,
+  share: Doc<"planShares">,
+  voterId: string,
+  firstChoice: boolean,
+) {
+  if (!firstChoice || share.city === undefined) return;
+  const queued = await ctx.db
+    .query("planVoteNotices")
+    .withIndex("by_share", (q) => q.eq("shareId", share._id))
+    .first();
+  if (queued !== null) return;
+  const votes = await shareVotes(ctx, share._id);
+  if (votes.some((vote) => vote.voterId !== voterId)) return;
+  const now = Date.now();
+  if (!planVotePushLive()) {
+    await ctx.db.insert("planVoteNotices", {
+      shareId: share._id,
+      voterId,
+      createdAt: now,
+      deliveryStatus: "failed",
+      deliveryError: "push_off",
+    });
+    return;
+  }
+  const noticeId = await ctx.db.insert("planVoteNotices", {
+    shareId: share._id,
+    voterId,
+    createdAt: now,
+    deliveryStatus: "pending",
+    deliveryNextAttemptAt: now + PLAN_VOTE_PUSH_DELAY_MS,
+  });
+  await ctx.scheduler.runAfter(
+    PLAN_VOTE_PUSH_DELAY_MS,
+    internal.notificationDelivery.sendPlanVote,
+    { noticeId },
+  );
+}
 
 function hasVote(vote: Doc<"planVotes">): boolean {
   return vote.picks.length + vote.passes.length > 0;
@@ -439,6 +485,13 @@ async function deleteShare(ctx: MutationCtx, share: Doc<"planShares">) {
     .take(MAX_VOTE_ROWS);
   for (const vote of votes) {
     await ctx.db.delete(vote._id);
+  }
+  const notices = await ctx.db
+    .query("planVoteNotices")
+    .withIndex("by_share", (q) => q.eq("shareId", share._id))
+    .take(MAX_VOTE_ROWS);
+  for (const notice of notices) {
+    await ctx.db.delete(notice._id);
   }
   await ctx.db.delete(share._id);
 }

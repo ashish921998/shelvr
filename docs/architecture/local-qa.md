@@ -111,6 +111,12 @@ changes.
 - **Vote pages:** vote links need `WAITLIST_SHARED_SECRET` on the backend,
   `apps/web/.env.local` with `CONVEX_SITE_URL` and the same secret, and
   `EXPO_PUBLIC_WEB_URL` (the local web server) for the share text.
+- **First-vote push:** needs `PLAN_VOTE_PUSH_ENABLED=true` on the backend. The
+  fixture link already has a sent notice, so only a link made during QA
+  pushes. A simulator cannot receive the real push; simulate the banner with
+  `xcrun simctl push booted app.shelvr.save.dev <payload.json>`, putting the
+  data (`url`, `kind`, `notificationId`) under `body`, where expo-notifications
+  on iOS reads it.
 - **Fixture shared list:** the reset also makes "Date night spots" with a
   partner, Priya, whose three places are new to the account. It leaves any real
   shared list the account is on, the way Leave list does, so Home after a reset

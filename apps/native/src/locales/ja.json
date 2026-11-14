@@ -184,6 +184,7 @@
   "notifications.remindersHelp": "保存した場所、未読の記事、試したいレシピを、1日1回まで",
   "notifications.remindersToggle": "保存アイテムのリマインダー通知",
   "notifications.remindersChannel": "保存アイテムのリマインダー",
+  "notifications.planVotesChannel": "プランへの投票",
   "notifications.remindersDisabledBody": "保存アイテムのリマインダーを受け取るには、端末の設定でShelvrの通知を許可してください。",
   "feedback.open": "フィードバックを送る",
   "support.contact": "サポートに問い合わせる",
@@ -304,6 +305,7 @@
     "other": "残り%{formattedCount}日。"
   },
   "plan.tally": "行きたい%{picks}、パス%{passes}",
+  "plan.votePushTitle": "%{city}の候補リストに最初の投票が届きました",
   "plan.wouldGo": "%{name}さんは%{place}に行きたいそうです。",
   "plan.wouldPass": "%{name}さんは%{place}をパスしました。",
   "plan.someoneWouldGo": "誰かが%{place}に行きたいそうです。",

@@ -880,6 +880,69 @@ const RECIPES: Record<string, Recipe> = {
         passes: [],
       }),
   },
+  "planShares.ts#queueVoteNotice": {
+    fence:
+      "recordPlanVote reaches it only through liveShare, which calls liveOwner",
+    table: "planVoteNotices",
+    padding: DELETE_BATCH + 1,
+    fillers: { spaceItems: DELETE_BATCH + 1 },
+    env: { PLAN_VOTE_PUSH_ENABLED: "true" },
+    seed: async (backend, userId, now) => {
+      await backend.run(async (ctx) => {
+        const spaceId = await ctx.db.insert("spaces", {
+          userId,
+          name: "Austin",
+        });
+        const itemId = await ctx.db.insert("items", {
+          userId,
+          type: "note",
+          status: "ready",
+          tags: [],
+          searchText: "a place",
+          note: "a place",
+        });
+        await ctx.db.insert("planShares", {
+          token: "notice-token",
+          userId,
+          spaceId,
+          city: "Austin",
+          places: [{ key: "a", name: "A", why: "", itemId }],
+          expiresAt: now + 7 * DAY_MS,
+        });
+        await ctx.db.insert("notificationDevices", {
+          userId,
+          token: `ExponentPushToken[${userId}]`,
+          platform: "ios",
+          enabled: true,
+          lastSeenAt: now,
+        });
+      });
+    },
+    call: (backend) =>
+      backend.mutation(internal.planShares.recordPlanVote, {
+        token: "notice-token",
+        voterId: "visitor",
+        picks: ["a"],
+        passes: [],
+      }),
+    claim: async (backend) => {
+      const noticeId = await backend.run(async (ctx) => {
+        const notice = await ctx.db
+          .query("planVoteNotices")
+          .order("desc")
+          .first();
+        await ctx.db.patch(notice!._id, {
+          createdAt: Date.now(),
+          deliveryNextAttemptAt: Date.now(),
+        });
+        return notice!._id;
+      });
+      return await backend.mutation(
+        internal.notificationDelivery.claimPlanVote,
+        { noticeId },
+      );
+    },
+  },
 };
 
 type Outcome = {
