@@ -4,6 +4,7 @@ import { ThemedText } from "@/components/ui/themed-text";
 import { ahaSample } from "@/lib/aha-sample";
 import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
+import { backOrHome } from "@/lib/screen-dismiss";
 import { useRouter } from "expo-router";
 import { useRef } from "react";
 import { View } from "react-native";
@@ -17,7 +18,7 @@ export function HowToShare() {
     if (left.current) return;
     left.current = true;
     void haptics.success();
-    router.back();
+    backOrHome(router);
   };
   return (
     <View style={styles.screen}>

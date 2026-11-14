@@ -7,6 +7,8 @@ import { HowToShare } from "@/components/add-spots/how-to-share";
 
 const mocks = vi.hoisted(() => ({
   back: vi.fn(),
+  canGoBack: vi.fn(() => true),
+  replace: vi.fn(),
   success: vi.fn(async () => {}),
 }));
 
@@ -25,7 +27,13 @@ vi.mock("@/components/ui/themed-text", () => ({
     <p>{children}</p>
   )),
 }));
-vi.mock("expo-router", () => ({ useRouter: () => ({ back: mocks.back }) }));
+vi.mock("expo-router", () => ({
+  useRouter: () => ({
+    back: mocks.back,
+    canGoBack: mocks.canGoBack,
+    replace: mocks.replace,
+  }),
+}));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
 }));
@@ -37,6 +45,8 @@ vi.mock("react-native", () => ({
 
 beforeEach(() => {
   mocks.back.mockReset();
+  mocks.canGoBack.mockReturnValue(true);
+  mocks.replace.mockReset();
   mocks.success.mockClear();
 });
 
@@ -53,4 +63,12 @@ it("goes back once, with the success tap, when Shelvr is picked", () => {
   fireEvent.click(shelvr);
   expect(mocks.success).toHaveBeenCalledOnce();
   expect(mocks.back).toHaveBeenCalledOnce();
+});
+
+it("opens Home when Shelvr is picked on a screen opened by link", () => {
+  mocks.canGoBack.mockReturnValue(false);
+  render(<HowToShare />);
+  fireEvent.click(screen.getByRole("button", { name: "Shelvr" }));
+  expect(mocks.back).not.toHaveBeenCalled();
+  expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
 });

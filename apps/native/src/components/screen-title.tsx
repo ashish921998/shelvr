@@ -1,6 +1,7 @@
 import { BackCircle } from "@/components/back-circle";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t, useAppLocale } from "@/lib/i18n";
+import { backOrHome } from "@/lib/screen-dismiss";
 import { useRouter } from "expo-router";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
@@ -10,7 +11,7 @@ export function ScreenTitle({ title }: { title: string }) {
   const router = useRouter();
   return (
     <View style={styles.row}>
-      <BackCircle label={t("common.back")} onPress={() => router.back()} />
+      <BackCircle label={t("common.back")} onPress={() => backOrHome(router)} />
       <ThemedText
         variant="displayTitle"
         accessibilityRole="header"
