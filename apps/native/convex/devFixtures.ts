@@ -12,6 +12,7 @@ import {
   liveOwner,
   authedMutation,
 } from "./model/auth";
+import { CITY_STAMP_CITIES } from "./model/cityStamps";
 import { fakeAiLocks } from "./model/fakeAi";
 import { insertMembership } from "./model/memberships";
 import { buildTrip, type TripCandidate } from "./model/trip";
@@ -106,6 +107,7 @@ async function seedFixtures(
     spaces,
     subscriptions,
     removals,
+    cityStamps,
     visits,
   ] = await Promise.all([
     ctx.db
@@ -133,6 +135,10 @@ async function seedFixtures(
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .take(RESET_LIMIT + 1),
     ctx.db
+      .query("cityStamps")
+      .withIndex("by_user_and_city", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
       .query("placeVisits")
       .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
       .take(RESET_LIMIT + 1),
@@ -144,6 +150,7 @@ async function seedFixtures(
     ["items", items.length],
     ["spaces", spaces.length],
     ["removals", removals.length],
+    ["city stamps", cityStamps.length],
     ["visits", visits.length],
   ] as const) {
     if (count > RESET_LIMIT) {
@@ -167,6 +174,7 @@ async function seedFixtures(
   }
 
   for (const row of removals) await ctx.db.delete(row._id);
+  for (const row of cityStamps) await ctx.db.delete(row._id);
   for (const row of visits) await ctx.db.delete(row._id);
   for (const row of memberships) await ctx.db.delete(row._id);
   for (const row of operations) await ctx.db.delete(row._id);
@@ -364,6 +372,14 @@ async function seedFixtures(
     productId: "dev.flow-fixtures",
     updatedAt: Date.now(),
   });
+  for (const city of ["austin", "lisbon", "madrid"] as const) {
+    await ctx.db.insert("cityStamps", {
+      userId,
+      city,
+      country: CITY_STAMP_CITIES[city].country,
+      stampedAt: Date.now(),
+    });
+  }
 
   return { items: 7, spaces: 3, memberships: 4 };
 }

@@ -7,6 +7,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useCurrentUser } from "@/lib/current-user";
 import { analytics } from "@/lib/analytics";
 import { getOnboardingProgress } from "@/lib/pending-onboarding";
+import { goalProgressFor } from "@/lib/paywall-goal";
 import {
   activeProductId,
   forgetPaywallFunnel,
@@ -381,7 +382,7 @@ async function presentPaywallImpl(
       trial,
       offering?.availablePackages.map((pkg) => pkg.product) ?? [],
       enriched.trial_eligible,
-      getOnboardingProgress(),
+      goalProgressFor(getOnboardingProgress(), placement),
     );
     // A sign-out during those reads must not open a paywall that cannot close.
     if (!rcReadyFor(anonymous)) {

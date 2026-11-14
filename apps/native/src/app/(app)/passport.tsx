@@ -1,22 +1,39 @@
 import { EmptyState } from "@/components/empty-state";
+import {
+  PassportCityHead,
+  useRingAccess,
+} from "@/components/passport/passport-city-head";
+import {
+  MilestonesRow,
+  useBadgeAccess,
+} from "@/components/passport/milestones-row";
+import { CityStampsSection } from "@/components/passport/city-stamps-section";
 import { PassportCounts } from "@/components/passport/passport-counts";
 import { StampArt, StampSheet } from "@/components/passport/stamp-sheet";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
+import { useBadgeTotals, useShareBadge } from "@/lib/badges";
+import { useCityStamps } from "@/lib/city-stamp-data";
+import { useRemoveCityStamp } from "@/lib/city-stamps";
 import { formatRecentDate } from "@/lib/date";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
   type Stamp,
   openStampOf,
+  type PassportSection,
+  passportSections,
   stampId,
   shareCardHref,
   stampDate,
   type OpenStamp,
+  useCityCompletion,
   usePassport,
 } from "@/lib/passport";
 import { useSharePassport } from "@/lib/passport-share";
-import { groupByCity, passportCounts } from "@convex/model/passport";
+import { ringComplete } from "@/components/passport/city-ring";
+import { passportCounts } from "@convex/model/passport";
+import { useStampMomentLanding } from "@/lib/stamp-moment";
 import { usePlaceVisit } from "@/lib/use-place-visit";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -29,10 +46,12 @@ const TILTS = ["-4deg", "3deg", "-2deg", "4deg"];
 function StampTile({
   stamp,
   index,
+  solid,
   onPress,
 }: {
   stamp: Stamp;
   index: number;
+  solid: boolean;
   onPress: () => void;
 }) {
   const at = stampDate(stamp);
@@ -52,6 +71,7 @@ function StampTile({
               : formatRecentDate(at)
           }
           size={STAMP_SIZE}
+          solid={solid}
         />
       </View>
       <Text style={styles.tileName} numberOfLines={1}>
@@ -67,7 +87,15 @@ export default function PassportScreen() {
   const { theme } = useUnistyles();
   const { stamps, failed, error } = usePassport();
   const visit = usePlaceVisit("passport");
+  useStampMomentLanding();
   const sharing = useSharePassport(stamps?.length ?? 0);
+  const completion = useCityCompletion();
+  const cityStamps = useCityStamps();
+  const removeCityStamp = useRemoveCityStamp();
+  const ring = useRingAccess();
+  const badges = useBadgeTotals();
+  const badgeAccess = useBadgeAccess();
+  const shareBadge = useShareBadge("milestones");
   const [open, setOpen] = useState<OpenStamp | null>(null);
   const remove = async () => {
     if (open === null) return;
@@ -80,6 +108,24 @@ export default function PassportScreen() {
   useEffect(() => {
     if (error) analytics.captureError("passport_load_failed", error);
   }, [error]);
+  useEffect(() => {
+    if (completion.error) {
+      analytics.captureError("passport_rings_load_failed", completion.error);
+    }
+  }, [completion.error]);
+  useEffect(() => {
+    if (cityStamps.error) {
+      analytics.captureError(
+        "passport_city_stamps_load_failed",
+        cityStamps.error,
+      );
+    }
+  }, [cityStamps.error]);
+  useEffect(() => {
+    if (badges.error) {
+      analytics.captureError("passport_badges_load_failed", badges.error);
+    }
+  }, [badges.error]);
 
   const opened = useRef(false);
   useEffect(() => {
@@ -97,6 +143,24 @@ export default function PassportScreen() {
     );
   }
   if (stamps === undefined) return <ScreenLoader />;
+  const stampedCities = cityStamps.stamps ?? [];
+  const sections = passportSections(
+    stamps,
+    completion.rows ?? [],
+    stampedCities,
+  );
+  const head = (section: PassportSection) => (
+    <PassportCityHead
+      section={section}
+      locked={ring.locked}
+      onOpen={(city) =>
+        router.push({ pathname: "/next-to-stamp", params: { city } })
+      }
+      onUnlock={ring.unlock}
+      onShare={(city) => router.push(shareCardHref(city, "passport"))}
+      onCityStamp={(city) => removeCityStamp(city, stampedCities.length - 1)}
+    />
+  );
 
   return (
     <ScrollView
@@ -105,7 +169,7 @@ export default function PassportScreen() {
       contentContainerStyle={styles.content}
     >
       <Text style={styles.title}>{t("passport.title")}</Text>
-      <PassportCounts {...passportCounts(stamps)} />
+      <PassportCounts {...passportCounts(stamps, stampedCities)} />
       {stamps.length > 0 ? (
         <Pressable
           testID="passport-share"
@@ -143,56 +207,53 @@ export default function PassportScreen() {
       {stamps.length === 0 ? (
         <Text style={styles.muted}>{t("passport.beenBody")}</Text>
       ) : null}
-      {groupByCity(stamps).map((group) => (
-        <View key={group.city ?? ""} style={styles.city}>
-          <View style={styles.cityHead}>
-            <Text style={styles.cityName} numberOfLines={1}>
-              {group.city ?? t("passport.elsewhere")}
-            </Text>
-            <Text style={styles.cityCount}>
-              {t("passport.placesCount", { count: group.items.length })}
-            </Text>
-            {group.city ? (
-              <Pressable
-                testID="passport-city-share"
-                accessibilityRole="button"
-                accessibilityLabel={t("passport.shareCity", {
-                  city: group.city,
-                })}
-                hitSlop={12}
-                onPress={() =>
-                  router.push(shareCardHref(group.city ?? "", "passport"))
-                }
-                style={({ pressed }) => [
-                  styles.cityShare,
-                  pressed && styles.pressed,
-                ]}
-              >
-                <AppSymbolIcon
-                  name="square.and.arrow.up"
-                  size={14}
-                  tintColor={theme.colors.primaryText}
+      <CityStampsSection
+        cities={sections.cities}
+        total={stampedCities.length}
+      />
+      {badges.totals ? (
+        <MilestonesRow
+          totals={badges.totals}
+          locked={badgeAccess.locked}
+          onUnlock={badgeAccess.unlock}
+          onShare={(badge) => void shareBadge(badge)}
+        />
+      ) : null}
+      {sections.stamped.map((section) => (
+        <View key={section.key} style={styles.city}>
+          {head(section)}
+          {section.stamps.length > 0 ? (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.stamps}
+            >
+              {section.stamps.map((stamp, index) => (
+                <StampTile
+                  key={stampId(stamp)}
+                  stamp={stamp}
+                  index={index}
+                  solid={
+                    section.completion !== null &&
+                    ringComplete(section.completion)
+                  }
+                  onPress={() =>
+                    setOpen(openStampOf(stamp, section.city ?? ""))
+                  }
                 />
-                <Text style={styles.cityShareText}>{t("common.share")}</Text>
-              </Pressable>
-            ) : null}
-          </View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.stamps}
-          >
-            {group.items.map((stamp, index) => (
-              <StampTile
-                key={stampId(stamp)}
-                stamp={stamp}
-                index={index}
-                onPress={() => setOpen(openStampOf(stamp, group.city ?? ""))}
-              />
-            ))}
-          </ScrollView>
+              ))}
+            </ScrollView>
+          ) : null}
         </View>
       ))}
+      {sections.waiting.length > 0 ? (
+        <View style={styles.city}>
+          <Text style={styles.waitingTitle}>{t("passport.notStampedYet")}</Text>
+          {sections.waiting.map((section) => (
+            <View key={section.key}>{head(section)}</View>
+          ))}
+        </View>
+      ) : null}
       {stamps.some((stamp) => stamp.cover) ? (
         <Text style={styles.credit}>{t("passport.coversCredit")}</Text>
       ) : null}
@@ -251,27 +312,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   muted: { ...theme.type.subhead, color: theme.colors.muted },
   city: { gap: theme.gap(1) },
-  cityHead: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: theme.gap(1),
-  },
-  cityName: {
-    flexShrink: 1,
-    ...theme.type.title,
-    color: theme.colors.foreground,
-  },
-  cityCount: { ...theme.type.footnote, color: theme.colors.muted },
-  cityShare: {
-    marginLeft: "auto",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(0.5),
-  },
-  cityShareText: {
-    ...theme.type.subheadStrong,
-    color: theme.colors.primaryText,
-  },
+  waitingTitle: { ...theme.type.headline, color: theme.colors.muted },
   stamps: { gap: theme.gap(2), paddingVertical: theme.gap(1) },
   tile: { width: STAMP_SIZE + 8, alignItems: "center", gap: theme.gap(1) },
   tileName: {

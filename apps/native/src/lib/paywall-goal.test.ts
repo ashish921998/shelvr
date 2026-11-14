@@ -9,7 +9,7 @@ import ja from "@/locales/ja.json";
 import ko from "@/locales/ko.json";
 import ptBR from "@/locales/pt-BR.json";
 import { GOALS, type Goal } from "@/lib/onboarding-goals";
-import { goalPaywallVariables } from "@/lib/paywall-goal";
+import { goalPaywallVariables, goalProgressFor } from "@/lib/paywall-goal";
 import { paywallVariables } from "@/lib/paywall-funnel";
 import { SAMPLE_CITY_IDS } from "@/lib/sample-cities";
 
@@ -98,6 +98,35 @@ describe("goalPaywallVariables", () => {
     expect(values({ goals: ["food", "travel"], travelCity: null }).goal).toBe(
       "travel",
     );
+  });
+
+  it("opens on the passport's real city count once cities were picked", () => {
+    const picked = (beenCities: Progress["beenCities"]) =>
+      values({ ...progress("date"), beenCities });
+    expect(picked(["lisbon"]).goal_headline).toBe("Your passport has 1 city");
+    expect(
+      picked(["lisbon", "madrid", "paris", "rome", "tokyo", "seoul"])
+        .goal_headline,
+    ).toBe("Your passport has 6 cities");
+    expect(picked([]).goal_headline).toBe("Make date night easy.");
+    expect(picked(["lisbon"]).goal_subline).toBe(
+      values(progress("date")).goal_subline,
+    );
+    expect(
+      values({ goals: [], travelCity: null, beenCities: ["lisbon"] }),
+    ).toEqual({});
+  });
+
+  it("counts picked cities only on the onboarding paywall", () => {
+    const picked = { ...progress("date"), beenCities: ["lisbon" as const] };
+    expect(
+      goalPaywallVariables(goalProgressFor(picked, "onboarding")).goal_headline
+        .value,
+    ).toBe("Your passport has 1 city");
+    expect(
+      goalPaywallVariables(goalProgressFor(picked, "passport")).goal_headline
+        .value,
+    ).toBe("Make date night easy.");
   });
 
   it("keeps the goal id unlocalized for every goal", () => {
