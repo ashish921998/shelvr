@@ -428,6 +428,7 @@ vi.mock("react-native", () => ({
 
 const CITY_ITEMS = "items:listCityItems";
 const LIST = "sharedLists:getSharedList";
+const PASSPORT = "placeVisits:getPassport";
 
 const taco = {
   name: "Taco Spot",
@@ -563,7 +564,7 @@ describe("city page", () => {
       "item-1",
       expect.objectContaining({ name: "BBQ Pit", lat: 30.2, lng: -97.2 }),
       true,
-      { city: "Austin", cover: null, cityVisited: 1 },
+      { city: "Austin", cover: null, cityVisited: 1, cityStamps: 0 },
     );
   });
 
@@ -578,7 +579,29 @@ describe("city page", () => {
       "item-1",
       expect.objectContaining({ name: "BBQ Pit" }),
       true,
-      { city: "Austin", cover: "https://img/reel.jpg", cityVisited: 0 },
+      {
+        city: "Austin",
+        cover: "https://img/reel.jpg",
+        cityVisited: 0,
+        cityStamps: 0,
+      },
+    );
+  });
+
+  it("counts the city's Passport stamps, including ones whose save is gone", () => {
+    mocks.queries[CITY_ITEMS] = [save];
+    mocks.queries[PASSPORT] = [
+      { city: "Austin", name: "Gone Diner" },
+      { city: "Lisbon", name: "Tigre" },
+    ];
+    render(<CityScreen />);
+    fireEvent.click(screen.getByText("🍖 BBQ Pit"));
+    fireEvent.click(screen.getByText("went BBQ Pit"));
+    expect(mocks.toggleVisit).toHaveBeenCalledWith(
+      "item-1",
+      expect.objectContaining({ name: "BBQ Pit" }),
+      true,
+      { city: "Austin", cover: null, cityVisited: 0, cityStamps: 1 },
     );
   });
 
@@ -641,7 +664,7 @@ describe("city page", () => {
         appleId: "taco",
       }),
       false,
-      { city: "Austin", cover: null, cityVisited: 1 },
+      { city: "Austin", cover: null, cityVisited: 1, cityStamps: 0 },
     );
   });
 

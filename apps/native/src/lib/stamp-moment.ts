@@ -29,6 +29,7 @@ export type StampPlace = {
   city: string;
   cover: string | null;
   cityVisited: number;
+  cityStamps?: number;
 };
 
 export type ShownStamp = {
@@ -52,9 +53,15 @@ const NO_CITY: StampPlace = { city: "", cover: null, cityVisited: 1 };
 
 export function placeStampMoment(
   name: string,
-  { city, cover, cityVisited }: StampPlace = NO_CITY,
+  { city, cover, cityVisited, cityStamps = 0 }: StampPlace = NO_CITY,
 ): StampMoment {
-  return { kind: "place", name, city, cover, firstInCity: cityVisited === 0 };
+  return {
+    kind: "place",
+    name,
+    city,
+    cover,
+    firstInCity: cityVisited === 0 && cityStamps === 0,
+  };
 }
 
 export function bulkStampMoment(
