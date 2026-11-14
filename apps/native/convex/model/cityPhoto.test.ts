@@ -92,6 +92,16 @@ describe("isPhotoFile", () => {
     expect(isPhotoFile("Coat of arms of Rome.svg.png")).toBe(false);
     expect(isPhotoFile("Rome.tif")).toBe(false);
     expect(isPhotoFile("Paris collage.jpg")).toBe(false);
+    expect(isPhotoFile("Ostrava skyline.svg.png")).toBe(false);
+  });
+
+  it("refuses maps, flags and banners only as whole words", () => {
+    expect(isPhotoFile("Flagstaff downtown.jpg")).toBe(true);
+    expect(isPhotoFile("Bannerman Castle.jpg")).toBe(true);
+    expect(isPhotoFile("Maplewood main street.jpg")).toBe(true);
+    expect(isPhotoFile("Flag of Peru.png")).toBe(false);
+    expect(isPhotoFile("Lima_map.png")).toBe(false);
+    expect(isPhotoFile("Map of Lima.png")).toBe(false);
   });
 });
 

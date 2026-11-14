@@ -37,6 +37,8 @@ vi.mock("@/components/symbol", () => ({
 vi.mock("@/lib/city-picture", () => ({
   curatedCityPicture: (city: string) => (city === "Paris" ? 42 : undefined),
 }));
+const captureError = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/analytics", () => ({ analytics: { captureError } }));
 vi.mock("@/lib/home-places", () => ({ cityCountLine: () => null }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
 
@@ -70,6 +72,22 @@ it("falls back to the pin card when the photo fails to load", () => {
   );
   act(() => images.at(-1)?.onError?.());
   expect(screen.queryByTestId("photo")).toBeNull();
+  expect(screen.getByTestId("mappin")).toBeTruthy();
+  expect(captureError).toHaveBeenCalledWith(
+    "city_cover_image_failed",
+    expect.any(Error),
+    { curated: false },
+  );
+});
+
+it("falls back from a failed curated photo to the server's cover", () => {
+  images.length = 0;
+  render(
+    <CityCover entry={city("Paris", "https://x/paris.jpg")} layout="pair" />,
+  );
+  act(() => images.at(-1)?.onError?.());
+  expect(images.at(-1)?.source).toEqual({ uri: "https://x/paris.jpg" });
+  act(() => images.at(-1)?.onError?.());
   expect(screen.getByTestId("mappin")).toBeTruthy();
 });
 

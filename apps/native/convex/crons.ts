@@ -101,4 +101,11 @@ crons.interval(
   {},
 );
 
+crons.interval(
+  "retry failed city photos",
+  { hours: 24 },
+  internal.cityPhotos.recoverStale,
+  {},
+);
+
 export default crons;

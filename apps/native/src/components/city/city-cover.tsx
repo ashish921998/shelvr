@@ -1,4 +1,5 @@
 import { AppSymbolIcon } from "@/components/symbol";
+import { analytics } from "@/lib/analytics";
 import { curatedCityPicture } from "@/lib/city-picture";
 import { type City, cityCountLine } from "@/lib/home-places";
 import { t } from "@/lib/i18n";
@@ -11,9 +12,12 @@ export type CoverLayout = "pair" | "wide" | "only";
 
 function CoverArt({ entry }: { entry: City }) {
   const { theme } = useUnistyles();
-  const [failed, setFailed] = useState<string | null>(null);
-  const source = curatedCityPicture(entry.city) ?? entry.cover;
-  if (source && source !== failed) {
+  const [failed, setFailed] = useState<readonly (string | number)[]>([]);
+  const source = [curatedCityPicture(entry.city), entry.cover].find(
+    (candidate): candidate is string | number =>
+      !!candidate && !failed.includes(candidate),
+  );
+  if (source !== undefined) {
     return (
       <Image
         testID="city-cover-photo"
@@ -21,7 +25,14 @@ function CoverArt({ entry }: { entry: City }) {
         style={[StyleSheet.absoluteFill, styles.tintMuted]}
         contentFit="cover"
         recyclingKey={entry.city}
-        onError={() => setFailed(typeof source === "string" ? source : null)}
+        onError={() => {
+          analytics.captureError(
+            "city_cover_image_failed",
+            new Error("image_load_failed"),
+            { curated: typeof source === "number" },
+          );
+          setFailed((seen) => [...seen, source]);
+        }}
       />
     );
   }

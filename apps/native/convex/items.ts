@@ -2439,6 +2439,10 @@ export const addPlaceListParts = internalMutation({
       }
       added++;
     }
+    await requestCityPhotos(
+      ctx,
+      fresh.flatMap((part) => normalizeCities(part.cities)),
+    );
     return added;
   },
 });

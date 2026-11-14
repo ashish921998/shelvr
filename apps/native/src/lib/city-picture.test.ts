@@ -20,6 +20,7 @@ it("matches the common other names of a curated city", () => {
   expect(curatedCityId("NYC")).toBe("new-york");
   expect(curatedCityId("Lisboa")).toBe("lisbon");
   expect(curatedCityId("København")).toBe("copenhagen");
+  expect(curatedCityId("KØBENHAVN")).toBe("copenhagen");
 });
 
 it("does not stretch a curated photo over a different city", () => {
@@ -27,6 +28,8 @@ it("does not stretch a curated photo over a different city", () => {
   expect(curatedCityId("Kyoto")).toBeUndefined();
   expect(curatedCityId("York")).toBeUndefined();
   expect(curatedCityId("")).toBeUndefined();
+  expect(curatedCityId("constructor")).toBeUndefined();
+  expect(curatedCityId("toString")).toBeUndefined();
 });
 
 it("gives the curated city's view photo", () => {

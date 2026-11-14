@@ -6,7 +6,11 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { aiAllowed } from "./aiConsent";
-import { shouldLookUp } from "./model/cityPhoto";
+import {
+  CITY_PHOTO_RECOVER_BATCH,
+  CITY_PHOTO_RETRY_MS,
+  shouldLookUp,
+} from "./model/cityPhoto";
 import { cityKey, MAX_CITY_CHARS, tidyCity } from "./model/trip";
 
 const CITIES_PER_REQUEST = 10;
@@ -35,10 +39,12 @@ async function scheduleLookUps(
   ctx: MutationCtx,
   wanted: Map<string, string>,
   spacingMs: number,
+  limit = Infinity,
 ): Promise<number> {
   const now = Date.now();
   let scheduled = 0;
   for (const [key, city] of wanted) {
+    if (scheduled >= limit) break;
     const row = await photoRow(ctx, key);
     if (!shouldLookUp(row, now)) continue;
     if (row === null) {
@@ -65,10 +71,7 @@ export async function requestCityPhotos(
   ctx: MutationCtx,
   cities: readonly string[],
 ): Promise<void> {
-  const wanted = new Map(
-    [...uniqueCities(cities)].slice(0, CITIES_PER_REQUEST),
-  );
-  await scheduleLookUps(ctx, wanted, 0);
+  await scheduleLookUps(ctx, uniqueCities(cities), 0, CITIES_PER_REQUEST);
 }
 
 export async function cityPhotoUrls(
@@ -140,6 +143,29 @@ export const backfillPage = internalMutation({
         { cursor: page.continueCursor },
       );
     }
+    return null;
+  },
+});
+
+export const recoverStale = internalMutation({
+  args: {},
+  returns: v.null(),
+  handler: async (ctx) => {
+    const cutoff = Date.now() - CITY_PHOTO_RETRY_MS;
+    const wanted = new Map<string, string>();
+    for (const status of ["failed", "pending"] as const) {
+      const rows = await ctx.db
+        .query("cityPhotos")
+        .withIndex("by_status_and_checkedAt", (q) =>
+          q.eq("status", status).lt("checkedAt", cutoff),
+        )
+        .take(CITY_PHOTO_RECOVER_BATCH);
+      for (const row of rows) {
+        if (wanted.size < CITY_PHOTO_RECOVER_BATCH)
+          wanted.set(row.key, row.city);
+      }
+    }
+    await scheduleLookUps(ctx, wanted, BACKFILL_SPACING_MS);
     return null;
   },
 });

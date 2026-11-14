@@ -3,12 +3,13 @@ import { tidyCity } from "./trip";
 export const CITY_PHOTO_WIDTH = 960;
 export const CITY_PHOTO_RETRY_MS = 24 * 60 * 60 * 1000;
 export const CITY_PHOTO_MISSING_RETRY_MS = 30 * 24 * 60 * 60 * 1000;
+export const CITY_PHOTO_RECOVER_BATCH = 50;
 
 const NOT_A_PLACE =
   /\b(film|movie|album|song|band|novel|television|tv series|video game|surname|given name|company|software|musical|magazine|newspaper|character)\b/i;
 
 const NOT_A_VIEW =
-  /(\.svg|montage|collage|composite|mosaic|flag|coat[ _]of[ _]arms|seal[ _]of|emblem|logo|locator|location[ _]map|map[ _]of|_map\b|\bmap_|signature|banner)/i;
+  /(\.svg(?![a-z])|(?<![a-z])(montage|collage|composite|mosaic|flags?|coat[ _]of[ _]arms|seal[ _]of|emblem|logos?|locator|location[ _]map|maps?|signature|banner)(?![a-z]))/i;
 
 const PHOTO_FILE = /\.(jpe?g|png)$/i;
 

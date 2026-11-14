@@ -309,3 +309,72 @@ describe("backfillPage", () => {
     ]);
   });
 });
+
+describe("the ten-city limit", () => {
+  it("counts only cities that still need a photo", async () => {
+    const backend = newConvexTest();
+    const { userId } = await signedInUser(backend);
+    const cities = Array.from({ length: 12 }, (_, i) => `City ${i}`);
+    await backend.run(async (ctx) => {
+      for (const city of cities.slice(0, 2)) {
+        await ctx.db.insert("cityPhotos", {
+          key: city.toLowerCase(),
+          city,
+          status: "found",
+          url: "https://x/photo.jpg",
+          checkedAt: Date.now(),
+        });
+      }
+    });
+    const itemId = await backend.run((ctx) =>
+      ctx.db.insert("items", {
+        userId,
+        type: "link",
+        status: "processing",
+        title: "Reel",
+        tags: [],
+        searchText: "Reel",
+      }),
+    );
+    await backend.mutation(internal.items.finalizeItem, {
+      itemId,
+      reading: {},
+      classification: {
+        title: "Tour",
+        description: "Tour.",
+        tags: [],
+        cities,
+      },
+    });
+    expect((await lookups(backend)).map((job) => job.city)).toEqual(
+      cities.slice(2),
+    );
+  });
+});
+
+describe("recoverStale", () => {
+  it("looks up again a failed or stuck city a day later, and nothing else", async () => {
+    const backend = newConvexTest();
+    const old = Date.now() - 2 * 24 * 60 * 60 * 1000;
+    await backend.run(async (ctx) => {
+      const rows = [
+        { city: "Houston", status: "failed" as const, checkedAt: old },
+        { city: "Austin", status: "pending" as const, checkedAt: old },
+        { city: "Chicago", status: "failed" as const, checkedAt: Date.now() },
+        { city: "Hana", status: "missing" as const, checkedAt: old },
+        { city: "Maui", status: "found" as const, checkedAt: old },
+      ];
+      for (const row of rows) {
+        await ctx.db.insert("cityPhotos", {
+          key: row.city.toLowerCase(),
+          ...row,
+        });
+      }
+    });
+    await backend.mutation(internal.cityPhotos.recoverStale, {});
+    expect((await lookups(backend)).map((job) => job.key).sort()).toEqual([
+      "austin",
+      "houston",
+    ]);
+  });
+});

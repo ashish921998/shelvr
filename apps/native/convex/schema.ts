@@ -357,7 +357,9 @@ export default defineSchema({
     url: v.optional(v.string()),
     file: v.optional(v.string()),
     checkedAt: v.number(),
-  }).index("by_key", ["key"]),
+  })
+    .index("by_key", ["key"])
+    .index("by_status_and_checkedAt", ["status", "checkedAt"]),
 
   passportShares: defineTable({
     token: v.string(),
