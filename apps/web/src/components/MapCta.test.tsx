@@ -26,6 +26,7 @@ describe("MapCta", () => {
     window.localStorage.clear();
     window.sessionStorage.clear();
     window.localStorage.setItem("shelvr_web_distinct_id", "browser-123");
+    document.documentElement.removeAttribute("data-cta");
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN", "test-token");
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://us.i.posthog.com/");
     vi.stubEnv("NEXT_PUBLIC_APP_STORE_PROVIDER_TOKEN", "000000");
@@ -46,8 +47,20 @@ describe("MapCta", () => {
     ["place_tool", "Save these to Shelvr"],
   ] as const)("labels the %s button %s, on the App Store", (source, label) => {
     const link = mount(source);
-    expect(link.textContent).toBe(label);
+    const text = link.querySelector("span");
+    expect(text?.parentElement).toBe(link);
+    expect(text?.firstChild?.textContent).toBe(label);
     expect(link.getAttribute("aria-label")).toBe(`${label}, on the App Store`);
+  });
+
+  it("ends the label with a pin that screen readers skip", () => {
+    for (const source of ["header", "hero", "footer", "place_tool"] as const) {
+      const link = mount(source);
+      const emoji = link.querySelector(".cta-emoji");
+      expect(emoji?.parentElement).toBe(link.querySelector("span"));
+      expect(emoji?.getAttribute("aria-hidden")).toBe("true");
+      expect(emoji?.textContent).toBe("\u00a0📍");
+    }
   });
 
   it("shows the Apple logo on the header pill only", () => {
@@ -82,5 +95,38 @@ describe("MapCta", () => {
         campaign: "web_hero",
       },
     });
+  });
+
+  it("reports the browser's button variant with a click", () => {
+    window.localStorage.setItem("shelvr_cta_variant", "emoji");
+    const link = mount("hero");
+    link.addEventListener("click", (event) => event.preventDefault());
+
+    act(() => link.click());
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      event: "app_store_clicked",
+      properties: {
+        source: "hero",
+        campaign: "web_hero",
+        cta_variant: "emoji",
+      },
+    });
+  });
+
+  it("puts the stored variant back on the page when it mounts", () => {
+    window.localStorage.setItem("shelvr_cta_variant", "emoji");
+
+    mount("header");
+
+    expect(document.documentElement.getAttribute("data-cta")).toBe("emoji");
+  });
+
+  it("leaves a browser with no variant unassigned", () => {
+    mount("header");
+
+    expect(document.documentElement.hasAttribute("data-cta")).toBe(false);
+    expect(window.localStorage.getItem("shelvr_cta_variant")).toBeNull();
   });
 });

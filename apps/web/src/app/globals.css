@@ -142,6 +142,14 @@
   background-position: 7px 7px;
 }
 
+.cta-emoji {
+  display: none;
+}
+
+:root[data-cta="emoji"] .cta-emoji {
+  display: inline;
+}
+
 .display {
   font-family: var(--font-display);
   font-weight: 400;
