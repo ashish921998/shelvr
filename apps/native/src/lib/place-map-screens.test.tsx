@@ -577,7 +577,7 @@ describe("city page", () => {
         cover: null,
         cityVisited: 1,
         cityTotal: 2,
-        cityStamps: 0,
+        cityStamps: null,
       },
     );
   });
@@ -598,7 +598,7 @@ describe("city page", () => {
         cover: "https://img/reel.jpg",
         cityVisited: 0,
         cityTotal: 2,
-        cityStamps: 0,
+        cityStamps: null,
       },
     );
   });
@@ -690,7 +690,7 @@ describe("city page", () => {
         cover: null,
         cityVisited: 1,
         cityTotal: 2,
-        cityStamps: 0,
+        cityStamps: null,
       },
     );
   });
