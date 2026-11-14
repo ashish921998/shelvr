@@ -129,6 +129,15 @@ describe("PassportHero", () => {
     expect(screen.getByTestId("city-Austin")).toBeTruthy();
   });
 
+  it("piles the newest city stamp, not the first by name", () => {
+    hero(AUSTIN, [
+      { city: "Austin", country: "US", stampedAt: 1 },
+      { city: "Tokyo", country: "JP", stampedAt: 2 },
+    ]);
+    expect(screen.getByTestId("city-Tokyo")).toBeTruthy();
+    expect(screen.queryByTestId("city-Austin")).toBeNull();
+  });
+
   it("starts an empty passport at zero with the first badge next", () => {
     hero([]);
     expect(screen.getByText("0")).toBeTruthy();

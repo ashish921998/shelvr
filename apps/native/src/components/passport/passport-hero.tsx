@@ -139,6 +139,18 @@ function NextBadge({
   );
 }
 
+function newestCityStamp(
+  cityStamps: readonly CityStamp[],
+): CityStamp | undefined {
+  return cityStamps.reduce<CityStamp | undefined>(
+    (newest, stamp) =>
+      newest === undefined || stamp.stampedAt > newest.stampedAt
+        ? stamp
+        : newest,
+    undefined,
+  );
+}
+
 export function PassportHero({
   stamps,
   cityStamps,
@@ -174,7 +186,7 @@ export function PassportHero({
           <Text style={styles.label}>{t("passport.heroStamped")}</Text>
           <Text style={styles.where}>{where}</Text>
         </View>
-        <StampPile stamps={stamps} city={cityStamps[0]} />
+        <StampPile stamps={stamps} city={newestCityStamp(cityStamps)} />
       </View>
       {totals ? (
         <NextBadge totals={totals} locked={locked} onUnlock={onUnlock} />
