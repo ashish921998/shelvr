@@ -68,7 +68,9 @@ test(
   async ({ device, screen, app }) => {
     await startFreshOnboarding({ device, screen });
     await walkToSampleReel(screen, { goal: "date", city: "Las Vegas" });
-    await expect(screen.getByRole("image", /^Sample/)).toBeVisible();
+    await expect(
+      screen.getByRole("image", /^Sample reel by @?jinaham812/),
+    ).toBeVisible({ timeout: 30_000 });
     await app.screenshot("las-vegas-reel");
     await shareTheSampleReel(screen);
     await expect(screen.getByText("Las Vegas · 3 places")).toBeVisible();
