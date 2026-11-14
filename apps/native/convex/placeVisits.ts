@@ -9,17 +9,28 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { aiAllowed } from "./aiConsent";
-import { readySavesNewestFirst } from "./items";
+import {
+  CITY_ITEMS_MAX,
+  citySaves,
+  rawReadySavesNewestFirst,
+  readySavesNewestFirst,
+} from "./items";
 import {
   appleMapsAccessToken,
   appleMapsConfig,
   appleMapsCountry,
 } from "./model/appleMaps";
 import { authedMutation, authedQuery, liveOwner } from "./model/auth";
+import {
+  cityCompletionValidator,
+  completionByCity,
+} from "./model/cityCompletion";
 import { linkSource } from "./model/externalUrl";
 import { logEvent } from "./model/log";
 import { normalizeCities, normalizePlaceName } from "./model/itemFields";
 import { type PassportPlace, soleCity } from "./model/passport";
+import { placeKinds } from "./model/placeKinds";
+import { userRemovals, visibleCitySave } from "./model/placeRemovals";
 import { approximateDocBytes } from "./model/readBudget";
 import { MAX_PLACE_NAME_CHARS, placeKey } from "./model/plan";
 import {
@@ -43,7 +54,14 @@ import {
 } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import { MAX_APPLE_ID_CHARS, tidyText, validPoint } from "./model/tripPlace";
-import { distanceKm, SAME_PLACE_KM, uniquePlacePins } from "./model/trip";
+import {
+  cityKey,
+  distanceKm,
+  pinsForCity,
+  SAME_PLACE_KM,
+  tidyCity,
+  uniquePlacePins,
+} from "./model/trip";
 import { requireProEntitlement } from "./subscriptions";
 
 type Visit = { name: string; itemId: Id<"items">; visitedAt: number };
@@ -517,22 +535,24 @@ async function coverOf(
 }
 
 type PassportStamp = Infer<typeof stampValidator>;
-type StampRow = Omit<PassportStamp, "cover">;
+type StampRow = Omit<PassportStamp, "cover"> & { appleId?: string };
 
 async function stampRows(
   ctx: QueryCtx,
   userId: string,
+  readSaves: readonly Doc<"items">[] = [],
 ): Promise<{
   stamps: StampRow[];
   saves: Map<Id<"items">, Doc<"items"> | null>;
 }> {
   const rows = (await visitRows(ctx, userId)).slice(0, MAX_PASSPORT_STAMPS);
+  const known = new Map(readSaves.map((save) => [save._id, save]));
   const saves = new Map<Id<"items">, Doc<"items"> | null>();
   let bytes = 0;
   for (const { itemId } of rows) {
     if (saves.has(itemId)) continue;
     if (bytes >= PASSPORT_SAVE_BYTES) break;
-    const owned = await ownedSave(ctx, userId, itemId);
+    const owned = known.get(itemId) ?? (await ownedSave(ctx, userId, itemId));
     bytes += approximateDocBytes(owned);
     saves.set(itemId, owned);
   }
@@ -561,6 +581,7 @@ async function stampRows(
         ...base,
         lat: spot.lat,
         lng: spot.lng,
+        ...(spot.appleId === undefined ? {} : { appleId: spot.appleId }),
         ...(city ? { city } : {}),
         ...(place?.countryCode ? { countryCode: place.countryCode } : {}),
       });
@@ -595,9 +616,47 @@ export const getPassport = authedQuery({
     for (const [itemId, owned] of saves) {
       covers.set(itemId, await coverOf(ctx, owned));
     }
-    return stamps.map((stamp) => ({
+    return stamps.map(({ appleId: _appleId, ...stamp }) => ({
       ...stamp,
       cover: covers.get(stamp.itemId) ?? null,
+    }));
+  },
+});
+
+const badgeStampValidator = v.object({
+  city: v.optional(v.string()),
+  countryCode: v.optional(v.string()),
+  kinds: v.array(v.string()),
+});
+
+function stampKinds(save: Doc<"items"> | null, stamp: StampRow) {
+  if (save === null) return [];
+  const pins = save.placePins ?? [];
+  const pin =
+    pins.find(
+      (candidate) =>
+        stamp.appleId !== undefined && candidate.appleId === stamp.appleId,
+    ) ??
+    pins.find(
+      (candidate) =>
+        candidate.lat === stamp.lat &&
+        candidate.lng === stamp.lng &&
+        (stamp.appleId === undefined ||
+          candidate.appleId === undefined ||
+          candidate.appleId === stamp.appleId),
+    );
+  return placeKinds(pin?.category, save.tags, pin?.cuisine);
+}
+
+export const listBadgeStamps = authedQuery({
+  args: {},
+  returns: v.array(badgeStampValidator),
+  handler: async (ctx) => {
+    const { stamps, saves } = await stampRows(ctx, ctx.userId);
+    return stamps.map((stamp) => ({
+      ...(stamp.city ? { city: stamp.city } : {}),
+      ...(stamp.countryCode ? { countryCode: stamp.countryCode } : {}),
+      kinds: stampKinds(saves.get(stamp.itemId) ?? null, stamp),
     }));
   },
 });
@@ -614,6 +673,43 @@ async function unstampedPins(ctx: QueryCtx, userId: Id<"users">) {
   return pins.filter((pin) => !visited(pin));
 }
 
+const unstampedPlaceValidator = v.object({
+  itemId: v.id("items"),
+  name: v.string(),
+  city: v.string(),
+  spot: visitSpotValidator,
+  title: v.optional(v.string()),
+  cover: v.union(v.string(), v.null()),
+});
+
+type UnstampedPin = Point & {
+  name: string;
+  appleId?: string;
+  city: string;
+  item: Doc<"items">;
+};
+
+async function unstampedRows(ctx: QueryCtx, places: readonly UnstampedPin[]) {
+  const covers = new Map<Id<"items">, Promise<string | null>>();
+  return await Promise.all(
+    places.map(async ({ name, city, item, lat, lng, appleId }) => {
+      let cover = covers.get(item._id);
+      if (cover === undefined) {
+        cover = coverOf(ctx, item);
+        covers.set(item._id, cover);
+      }
+      return {
+        itemId: item._id,
+        name,
+        city,
+        spot: { lat, lng, ...(appleId === undefined ? {} : { appleId }) },
+        ...(item.title ? { title: item.title } : {}),
+        cover: await cover,
+      };
+    }),
+  );
+}
+
 export const listUnstampedPlaces = authedQuery({
   args: {},
   returns: v.array(
@@ -626,29 +722,65 @@ export const listUnstampedPlaces = authedQuery({
       cover: v.union(v.string(), v.null()),
     }),
   ),
+  handler: async (ctx) =>
+    await unstampedRows(
+      ctx,
+      uniquePlacePins(await unstampedPins(ctx, ctx.userId)).slice(
+        0,
+        MAX_UNSTAMPED_PLACES,
+      ),
+    ),
+});
+
+async function unstampedPinsInCity(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  city: string,
+): Promise<UnstampedPin[]> {
+  if (cityKey(city) === "") return [];
+  const saves = await rawReadySavesNewestFirst(ctx, userId);
+  const removals = await userRemovals(ctx, userId);
+  const visible = saves.map((item) => visibleCitySave(item, removals));
+  const pins = uniquePlacePins(
+    citySaves(visible, city).flatMap((item) =>
+      pinsForCity(item, city).map((pin) => ({
+        ...pin,
+        city: pinCity(item, pin) ?? tidyCity(city),
+        item,
+      })),
+    ),
+  );
+  const visited = visitMatcher(await userVisits(ctx, userId, saves), pins);
+  return pins.filter((pin) => !visited(pin));
+}
+
+export const listUnstampedPlacesInCity = authedQuery({
+  args: { city: v.string() },
+  returns: v.array(unstampedPlaceValidator),
+  handler: async (ctx, { city }) =>
+    await unstampedRows(
+      ctx,
+      (await unstampedPinsInCity(ctx, ctx.userId, city)).slice(
+        0,
+        MAX_UNSTAMPED_PLACES,
+      ),
+    ),
+});
+
+export const cityCompletion = authedQuery({
+  args: {},
+  returns: v.array(cityCompletionValidator),
   handler: async (ctx) => {
-    const places = uniquePlacePins(await unstampedPins(ctx, ctx.userId)).slice(
-      0,
-      MAX_UNSTAMPED_PLACES,
-    );
-    const covers = new Map<Id<"items">, Promise<string | null>>();
-    return await Promise.all(
-      places.map(async ({ name, city, item, lat, lng, appleId }) => {
-        let cover = covers.get(item._id);
-        if (cover === undefined) {
-          cover = coverOf(ctx, item);
-          covers.set(item._id, cover);
-        }
-        return {
-          itemId: item._id,
-          name,
-          city,
-          spot: { lat, lng, ...(appleId === undefined ? {} : { appleId }) },
-          ...(item.title ? { title: item.title } : {}),
-          cover: await cover,
-        };
-      }),
-    );
+    const { userId } = ctx;
+    const saves = await rawReadySavesNewestFirst(ctx, userId);
+    const removals = await userRemovals(ctx, userId);
+    const { stamps } = await stampRows(ctx, userId, saves);
+    return completionByCity({
+      saves: saves.map((item) => visibleCitySave(item, removals)),
+      stamps,
+      visits: await userVisits(ctx, userId, saves),
+      savesPerCity: CITY_ITEMS_MAX,
+    });
   },
 });
 

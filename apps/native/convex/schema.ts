@@ -42,6 +42,7 @@ export default defineSchema({
     ...authTables.users.validator.fields,
     appleRefreshToken: v.optional(v.string()),
     deleting: v.optional(v.boolean()),
+    cityStampsClaimedAt: v.optional(v.number()),
   })
     .index("email", ["email"])
     .index("phone", ["phone"]),
@@ -336,6 +337,13 @@ export default defineSchema({
   })
     .index("by_user_and_key", ["userId", "key"])
     .index("by_user_and_visited", ["userId", "visitedAt"]),
+
+  cityStamps: defineTable({
+    userId: v.id("users"),
+    city: v.string(),
+    country: v.string(),
+    stampedAt: v.number(),
+  }).index("by_user_and_city", ["userId", "city"]),
 
   passportShares: defineTable({
     token: v.string(),

@@ -48,10 +48,12 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   Retired routes redirect to Home through `src/lib/home-href.ts`.
 - **Shared lists:** route `src/app/(app)/shared-list/[id].tsx`, the form
   `new-shared-list.tsx`, `add-list-place.tsx`, the root Join screen
-  `src/app/list-invite/[token].tsx`; rows and cards in `src/components/shared-list`;
-  hooks and helpers in `src/lib/shared-lists.ts`, the join coordinator in
-  `src/lib/invite-join.ts` with its SecureStore slot `pending-invite.ts`, gating in
-  `list-gate.ts`; backend `convex/sharedLists.ts` and `convex/model/sharedLists.ts`.
+  `src/app/list-invite/[token].tsx`; rows and cards in `src/components/shared-list`,
+  with the "Priya added 3 places" line in `list-activity.tsx`; hooks and helpers in
+  `src/lib/shared-lists.ts`, the pin drop for new places in `src/lib/fresh-pins.ts`,
+  the join coordinator in `src/lib/invite-join.ts` with its SecureStore slot
+  `pending-invite.ts`, gating in `list-gate.ts`; backend `convex/sharedLists.ts` and
+  `convex/model/sharedLists.ts`.
 - **Vote links:** the city page's votes row and ask sheet in `src/components/city`
   (`plan-votes-row.tsx`, `ask-votes-sheet.tsx`) with their logic in `src/lib/plan-votes.ts`;
   backend `convex/planShares.ts` (`cityPlanVotes`, `recordPlanVote`) with rules in

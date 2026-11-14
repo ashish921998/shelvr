@@ -758,7 +758,7 @@
   "onboardingQ.goalFood": "食事の場所",
   "onboardingQ.goalFoodBody": "近くで、今週",
   "onboardingQ.goalEverything": "ぜんぶ少しずつ",
-  "onboardingQ.cityBody": "そこの実際のリールがあればそれで、なければリールのある街で練習します。",
+  "onboardingQ.cityBody": "その街の穴場を紹介する実際のリールで練習します。",
   "onboardingNotify.title": "保存した場所を見逃さないように。",
   "onboardingNotify.sub": "旅行の前や、まだ行けるうちに、Shelvrがお知らせします。",
   "onboardingNotify.allow": "リマインダーをオンにする",
@@ -1016,8 +1016,14 @@
   "sharedLists.with": "%{names}と",
   "sharedLists.onlyYou": "今はあなただけ",
   "sharedLists.someone": "誰か",
-  "sharedLists.newCount": {
-    "other": "新着%{formattedCount}件"
+  "sharedLists.activityOne": {
+    "other": "%{name}が%{formattedCount}か所を追加しました"
+  },
+  "sharedLists.activitySomeone": {
+    "other": "誰かが%{formattedCount}か所を追加しました"
+  },
+  "sharedLists.activityMany": {
+    "other": "%{names}から新着%{formattedCount}か所"
   },
   "sharedLists.alsoAddTo": "こちらにも追加",
   "sharedLists.alsoAddFull": "%{name}はいっぱいです。さらに追加するには、場所を削除してください。",
@@ -1098,19 +1104,28 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "保存した投稿の画像",
   "passport.removeStamp": "スタンプを削除",
+  "passport.momentStamped": "%{name}にスタンプ",
+  "passport.momentFirstInCity": "%{city}で最初のスタンプ",
+  "passport.momentBulk": {
+    "other": "%{formattedCount}か所にスタンプ完了"
+  },
   "passport.wantToGo": "行きたい",
   "passport.title": "パスポート",
-  "passport.yourPassport": "あなたのパスポート",
   "passport.beenTitle": "行ったことのある場所は？",
   "passport.beenBody": "もう行った場所にスタンプを押しましょう",
   "passport.beenSomewhere": "もう行った場所がある？",
-  "passport.rowCities": "%{places} · %{cities}",
   "passport.placesCount": {
     "other": "%{formattedCount}か所"
   },
   "passport.citiesCount": {
     "other": "%{formattedCount}都市"
   },
+  "passport.countriesCount": {
+    "other": "%{formattedCount}か国"
+  },
+  "passport.heroStamped": "スタンプした場所",
+  "passport.heroWhere": "%{cities} · %{countries}",
+  "passport.heroNext": "次のバッジ：%{badge}",
   "passport.places": "場所",
   "passport.cities": "都市",
   "passport.countries": "国",
@@ -1136,6 +1151,100 @@
   "passport.cardSavedElsewhere": "あとで行く用に保存。",
   "passport.cardWent": "Shelvrで行った。",
   "passport.shareCity": "%{city}を共有",
+  "passport.momentCityComplete": "%{city}コンプリート",
+  "passport.ringCount": "%{visited}/%{total}",
+  "passport.ringLabel": {
+    "other": "%{city}で%{formattedCount}か所中%{visited}か所にスタンプ"
+  },
+  "passport.ringLocked": {
+    "other": "%{city}に%{formattedCount}か所保存済み"
+  },
+  "passport.ringHint": "まだスタンプしていない場所を表示",
+  "passport.ringLockedHint": "Shelvr Proで場所にスタンプ",
+  "passport.notStampedYet": "保存済み・まだスタンプなし",
+  "passport.nextTitle": "次にスタンプする場所",
+  "passport.nextBody": {
+    "other": "%{city}でスタンプしていない場所が%{formattedCount}か所あります"
+  },
+  "passport.cityAllStamped": "%{city}で保存した場所はすべてスタンプ済みです。",
+  "passport.nextEmpty": "%{city}で表示できる場所は今はありません。",
+  "passport.stampPlace": "スタンプ",
+  "passport.stampPlaceLabel": "%{name}にスタンプ",
+  "badges.title": "マイルストーン",
+  "badges.earned": "バッジ獲得",
+  "badges.unlocked": "「%{badge}」バッジを獲得",
+  "badges.moreEarned": {
+    "other": "ほかに%{formattedCount}個のバッジ"
+  },
+  "badges.shareMessage": "Shelvrのパスポートで「%{badge}」バッジを獲得しました。",
+  "badges.shareHint": "このバッジを共有",
+  "badges.lockedHint": "Shelvr Proでバッジを獲得",
+  "badges.firstStamp": "最初のスタンプ",
+  "badges.explorer": "探検家",
+  "badges.wanderer": "放浪者",
+  "badges.globetrotter": "世界旅行者",
+  "badges.cityHopper": "街めぐり",
+  "badges.passportHolder": "パスポート所持者",
+  "badges.completionist": "コンプリート達成",
+  "badges.coffeeCrawler": "カフェめぐり",
+  "badges.foodie": "グルメ",
+  "badges.sweetTooth": "甘党",
+  "badges.nightOwl": "夜ふかし",
+  "badges.outAndAbout": "おでかけ上手",
+  "badges.goalPlaces": {
+    "other": "%{formattedCount}か所にスタンプ"
+  },
+  "badges.goalCities": {
+    "other": "%{formattedCount}都市にスタンプ"
+  },
+  "badges.goalCountries": {
+    "other": "%{formattedCount}か国にスタンプ"
+  },
+  "badges.goalCompleteCities": {
+    "other": "%{formattedCount}都市をコンプリート"
+  },
+  "badges.goalCoffee": {
+    "other": "カフェ%{formattedCount}軒にスタンプ"
+  },
+  "badges.goalFood": {
+    "other": "飲食店%{formattedCount}軒にスタンプ"
+  },
+  "badges.goalDessert": {
+    "other": "スイーツ店%{formattedCount}軒にスタンプ"
+  },
+  "badges.goalDrinks": {
+    "other": "バー%{formattedCount}軒にスタンプ"
+  },
+  "badges.goalActivities": {
+    "other": "アクティビティ%{formattedCount}件にスタンプ"
+  },
+  "badges.progressPlaces": {
+    "other": "%{formattedCount}か所中%{visited}か所"
+  },
+  "badges.progressCities": {
+    "other": "%{formattedCount}都市中%{visited}都市"
+  },
+  "badges.progressCountries": {
+    "other": "%{formattedCount}か国中%{visited}か国"
+  },
+  "badges.progressCompleteCities": {
+    "other": "%{formattedCount}都市中%{visited}都市コンプリート"
+  },
+  "badges.progressCoffee": {
+    "other": "カフェ%{formattedCount}軒中%{visited}軒"
+  },
+  "badges.progressFood": {
+    "other": "飲食店%{formattedCount}軒中%{visited}軒"
+  },
+  "badges.progressDessert": {
+    "other": "スイーツ店%{formattedCount}軒中%{visited}軒"
+  },
+  "badges.progressDrinks": {
+    "other": "バー%{formattedCount}軒中%{visited}軒"
+  },
+  "badges.progressActivities": {
+    "other": "アクティビティ%{formattedCount}件中%{visited}件"
+  },
   "passportShare.share": "パスポートを共有",
   "passportShare.stopSetting": "パスポートの共有をやめる",
   "passportShare.stopTitle": "パスポートの共有をやめますか？",
@@ -1193,12 +1302,28 @@
   "onboardingChart.whenTrip": "次の旅行",
   "onboardingChart.chartLabel": "今の%{lost}から%{goal}へのカーブ。%{when}",
   "onboardingStatement.cityPicked": "%{city}。いい選択です。\n\n%{city}で最初の場所を保存しましょう。",
-  "onboardingStatement.cityFirst": "%{picked}。いい選択です。\n\nまずは%{city}の実際のリールで試してみましょう。",
   "onboardingStatement.cityStart": "%{city}で最初の場所を保存しましょう。",
   "onboardingStatement.firstSave": "最初の保存、できました！\nセンスありますね。\n\n次は地図で見てみましょう 🗺️",
   "onboardingCarousel.together": "大切な人たちと\n一緒に計画しよう。",
   "onboardingCarousel.eat": "「どこで食べる？」は\nもう終わり。",
   "onboardingCarousel.map": "保存した場所すべてを、\nひとつの地図に。",
   "onboardingCarousel.next": "次のスライド",
-  "sharedLists.nameBodyWelcome": "共有リストの相手に表示されます。あなたが共有した項目のリンク、あなたが所有するリストのリンク、あなたが送った候補リストのリンクを持つ人にも表示されます。"
+  "sharedLists.nameBodyWelcome": "共有リストの相手に表示されます。あなたが共有した項目のリンク、あなたが所有するリストのリンク、あなたが送った候補リストのリンクを持つ人にも表示されます。",
+  "cityStamps.add": "行ったことのある都市…",
+  "cityStamps.title": "行ったことのある都市",
+  "cityStamps.body": "行ったことのある都市をタップすると、パスポートにスタンプが押されます。もう一度タップするとスタンプを外します。",
+  "cityStamps.noMatch": "その都市はまだありません。",
+  "cityStamps.label": "%{city}、都市スタンプ",
+  "cityStamps.removeHint": "パスポートからスタンプを外します",
+  "cityStamps.removeTitle": "%{city}をパスポートから外しますか？",
+  "cityStamps.remove": "スタンプを外す",
+  "cityStamps.lockedHint": "Shelvr Proで都市にスタンプ",
+  "cityStamps.saveFailed": "都市を更新できませんでした",
+  "cityStamps.rateLimited": "都市の変更が多すぎます。数分後にもう一度お試しください。",
+  "cityStamps.onboardingTitle": "行ったことのある都市は？",
+  "cityStamps.onboardingBody": "行ったことのある都市をタップしてください。それぞれがパスポートのスタンプになります。",
+  "passport.momentCityStamp": "%{city}に行きました",
+  "passport.paywallHeadline": {
+    "other": "パスポートに%{formattedCount}都市"
+  }
 }

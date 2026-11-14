@@ -785,7 +785,7 @@
   "onboardingQ.goalFood": "Essen gehen",
   "onboardingQ.goalFoodBody": "In meiner Nähe, diese Woche",
   "onboardingQ.goalEverything": "Ein bisschen von allem",
-  "onboardingQ.cityBody": "Wir üben mit einem echten Reel von dort, wenn wir eins haben, sonst mit einer Stadt, für die wir eins haben.",
+  "onboardingQ.cityBody": "Wir üben mit einem echten Reel über ihre Geheimtipps.",
   "onboardingNotify.title": "Verpasse keine gespeicherten Orte.",
   "onboardingNotify.sub": "Shelvr erinnert dich vor einer Reise daran und solange du noch hingehen kannst.",
   "onboardingNotify.allow": "Erinnerungen aktivieren",
@@ -1046,9 +1046,17 @@
   "sharedLists.with": "Mit %{names}",
   "sharedLists.onlyYou": "Bisher nur du",
   "sharedLists.someone": "Jemand",
-  "sharedLists.newCount": {
-    "one": "%{formattedCount} neu",
-    "other": "%{formattedCount} neu"
+  "sharedLists.activityOne": {
+    "one": "%{name} hat %{formattedCount} Ort hinzugefügt",
+    "other": "%{name} hat %{formattedCount} Orte hinzugefügt"
+  },
+  "sharedLists.activitySomeone": {
+    "one": "Jemand hat %{formattedCount} Ort hinzugefügt",
+    "other": "Jemand hat %{formattedCount} Orte hinzugefügt"
+  },
+  "sharedLists.activityMany": {
+    "one": "%{formattedCount} neuer Ort von %{names}",
+    "other": "%{formattedCount} neue Orte von %{names}"
   },
   "sharedLists.alsoAddTo": "Auch hinzufügen zu",
   "sharedLists.alsoAddFull": "%{name} ist voll. Entferne einen Ort, um mehr hinzuzufügen.",
@@ -1132,13 +1140,17 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "Bild aus dem gespeicherten Beitrag",
   "passport.removeStamp": "Stempel entfernen",
+  "passport.momentStamped": "%{name} gestempelt",
+  "passport.momentFirstInCity": "Erster Stempel in %{city}",
+  "passport.momentBulk": {
+    "one": "%{formattedCount} Ort gestempelt",
+    "other": "%{formattedCount} Orte gestempelt"
+  },
   "passport.wantToGo": "Will hin",
   "passport.title": "Pass",
-  "passport.yourPassport": "Dein Pass",
   "passport.beenTitle": "Schon mal dort gewesen?",
   "passport.beenBody": "Stemple Orte, an denen du schon warst",
   "passport.beenSomewhere": "Schon irgendwo gewesen?",
-  "passport.rowCities": "%{places} · %{cities}",
   "passport.placesCount": {
     "one": "%{formattedCount} Ort",
     "other": "%{formattedCount} Orte"
@@ -1147,6 +1159,13 @@
     "one": "%{formattedCount} Stadt",
     "other": "%{formattedCount} Städte"
   },
+  "passport.countriesCount": {
+    "one": "%{formattedCount} Land",
+    "other": "%{formattedCount} Länder"
+  },
+  "passport.heroStamped": "Orte gestempelt",
+  "passport.heroWhere": "%{cities} · %{countries}",
+  "passport.heroNext": "Nächstes Abzeichen: %{badge}",
   "passport.places": "Orte",
   "passport.cities": "Städte",
   "passport.countries": "Länder",
@@ -1175,6 +1194,122 @@
   "passport.cardSavedElsewhere": "Für später gespeichert.",
   "passport.cardWent": "Mit Shelvr dort gewesen.",
   "passport.shareCity": "%{city} teilen",
+  "passport.momentCityComplete": "%{city} komplett",
+  "passport.ringCount": "%{visited} von %{total}",
+  "passport.ringLabel": {
+    "one": "%{visited} von %{formattedCount} Ort in %{city} gestempelt",
+    "other": "%{visited} von %{formattedCount} Orten in %{city} gestempelt"
+  },
+  "passport.ringLocked": {
+    "one": "%{formattedCount} Ort in %{city} gespeichert",
+    "other": "%{formattedCount} Orte in %{city} gespeichert"
+  },
+  "passport.ringHint": "Zeigt die Orte, die noch fehlen",
+  "passport.ringLockedHint": "Mit Shelvr Pro Orte stempeln",
+  "passport.notStampedYet": "Gespeichert, noch nicht gestempelt",
+  "passport.nextTitle": "Als Nächstes stempeln",
+  "passport.nextBody": {
+    "one": "Noch %{formattedCount} Ort in %{city} zu stempeln",
+    "other": "Noch %{formattedCount} Orte in %{city} zu stempeln"
+  },
+  "passport.cityAllStamped": "Alle gespeicherten Orte in %{city} sind gestempelt.",
+  "passport.nextEmpty": "Für %{city} gibt es gerade keine Orte zum Anzeigen.",
+  "passport.stampPlace": "Stempeln",
+  "passport.stampPlaceLabel": "%{name} stempeln",
+  "badges.title": "Meilensteine",
+  "badges.earned": "Abzeichen erhalten",
+  "badges.unlocked": "Abzeichen „%{badge}“ erhalten",
+  "badges.moreEarned": {
+    "one": "Und %{formattedCount} weiteres Abzeichen",
+    "other": "Und %{formattedCount} weitere Abzeichen"
+  },
+  "badges.shareMessage": "Ich habe in meinem Shelvr-Pass das Abzeichen „%{badge}“ bekommen.",
+  "badges.shareHint": "Teilt dieses Abzeichen",
+  "badges.lockedHint": "Abzeichen mit Shelvr Pro sammeln",
+  "badges.firstStamp": "Erster Stempel",
+  "badges.explorer": "Entdecker",
+  "badges.wanderer": "Wandervogel",
+  "badges.globetrotter": "Globetrotter",
+  "badges.cityHopper": "Städtehopper",
+  "badges.passportHolder": "Passinhaber",
+  "badges.completionist": "Perfektionist",
+  "badges.coffeeCrawler": "Kaffeetour",
+  "badges.foodie": "Feinschmecker",
+  "badges.sweetTooth": "Naschkatze",
+  "badges.nightOwl": "Nachteule",
+  "badges.outAndAbout": "Immer unterwegs",
+  "badges.goalPlaces": {
+    "one": "%{formattedCount} Ort gestempelt",
+    "other": "%{formattedCount} Orte gestempelt"
+  },
+  "badges.goalCities": {
+    "one": "%{formattedCount} Stadt gestempelt",
+    "other": "%{formattedCount} Städte gestempelt"
+  },
+  "badges.goalCountries": {
+    "one": "%{formattedCount} Land gestempelt",
+    "other": "%{formattedCount} Länder gestempelt"
+  },
+  "badges.goalCompleteCities": {
+    "one": "%{formattedCount} Stadt komplett",
+    "other": "%{formattedCount} Städte komplett"
+  },
+  "badges.goalCoffee": {
+    "one": "%{formattedCount} Café gestempelt",
+    "other": "%{formattedCount} Cafés gestempelt"
+  },
+  "badges.goalFood": {
+    "one": "%{formattedCount} Restaurant gestempelt",
+    "other": "%{formattedCount} Restaurants gestempelt"
+  },
+  "badges.goalDessert": {
+    "one": "%{formattedCount} Dessertladen gestempelt",
+    "other": "%{formattedCount} Dessertläden gestempelt"
+  },
+  "badges.goalDrinks": {
+    "one": "%{formattedCount} Bar gestempelt",
+    "other": "%{formattedCount} Bars gestempelt"
+  },
+  "badges.goalActivities": {
+    "one": "%{formattedCount} Aktivität gestempelt",
+    "other": "%{formattedCount} Aktivitäten gestempelt"
+  },
+  "badges.progressPlaces": {
+    "one": "%{visited} von %{formattedCount} Ort",
+    "other": "%{visited} von %{formattedCount} Orten"
+  },
+  "badges.progressCities": {
+    "one": "%{visited} von %{formattedCount} Stadt",
+    "other": "%{visited} von %{formattedCount} Städten"
+  },
+  "badges.progressCountries": {
+    "one": "%{visited} von %{formattedCount} Land",
+    "other": "%{visited} von %{formattedCount} Ländern"
+  },
+  "badges.progressCompleteCities": {
+    "one": "%{visited} von %{formattedCount} Stadt komplett",
+    "other": "%{visited} von %{formattedCount} Städten komplett"
+  },
+  "badges.progressCoffee": {
+    "one": "%{visited} von %{formattedCount} Café",
+    "other": "%{visited} von %{formattedCount} Cafés"
+  },
+  "badges.progressFood": {
+    "one": "%{visited} von %{formattedCount} Restaurant",
+    "other": "%{visited} von %{formattedCount} Restaurants"
+  },
+  "badges.progressDessert": {
+    "one": "%{visited} von %{formattedCount} Dessertladen",
+    "other": "%{visited} von %{formattedCount} Dessertläden"
+  },
+  "badges.progressDrinks": {
+    "one": "%{visited} von %{formattedCount} Bar",
+    "other": "%{visited} von %{formattedCount} Bars"
+  },
+  "badges.progressActivities": {
+    "one": "%{visited} von %{formattedCount} Aktivität",
+    "other": "%{visited} von %{formattedCount} Aktivitäten"
+  },
   "passportShare.share": "Pass teilen",
   "passportShare.stopSetting": "Meinen Pass nicht mehr teilen",
   "passportShare.stopTitle": "Deinen Pass nicht mehr teilen?",
@@ -1236,12 +1371,29 @@
   "onboardingChart.whenTrip": "Deine nächste Reise",
   "onboardingChart.chartLabel": "Eine Kurve, die jetzt bei %{lost} beginnt und bis %{goal} ansteigt. %{when}",
   "onboardingStatement.cityPicked": "%{city}. Gute Wahl.\n\nSpeichern wir deine ersten Orte in %{city}.",
-  "onboardingStatement.cityFirst": "%{picked}. Gute Wahl.\n\nProbieren wir es zuerst mit einem echten Reel aus %{city}.",
   "onboardingStatement.cityStart": "Speichern wir deine ersten Orte in %{city}.",
   "onboardingStatement.firstSave": "Dein erster gespeicherter Ort!\nEin echtes Naturtalent.\n\nJetzt sehen wir ihn auf deiner Karte 🗺️",
   "onboardingCarousel.together": "Plane gemeinsam\nmit deinen Leuten.",
   "onboardingCarousel.eat": "Nie wieder „Wo\nsollen wir essen?“",
   "onboardingCarousel.map": "Jeder gespeicherte Ort,\nauf einer Karte.",
   "onboardingCarousel.next": "Nächste Folie",
-  "sharedLists.nameBodyWelcome": "Leute auf deinen geteilten Listen sehen ihn, ebenso alle mit einem Link zu einem Inhalt, den du teilst, zu einer Liste, die dir gehört, oder zu einer Auswahl, die du verschickst."
+  "sharedLists.nameBodyWelcome": "Leute auf deinen geteilten Listen sehen ihn, ebenso alle mit einem Link zu einem Inhalt, den du teilst, zu einer Liste, die dir gehört, oder zu einer Auswahl, die du verschickst.",
+  "cityStamps.add": "Ich war schon in …",
+  "cityStamps.title": "Städte, in denen du warst",
+  "cityStamps.body": "Tippe auf eine Stadt, in der du warst, und sie bekommt einen Stempel in deinem Pass. Tippe noch einmal, um den Stempel zu entfernen.",
+  "cityStamps.noMatch": "Diese Stadt haben wir noch nicht.",
+  "cityStamps.label": "%{city}, Stadtstempel",
+  "cityStamps.removeHint": "Entfernt den Stempel aus deinem Pass",
+  "cityStamps.removeTitle": "%{city} aus deinem Pass entfernen?",
+  "cityStamps.remove": "Stempel entfernen",
+  "cityStamps.lockedHint": "Mit Shelvr Pro Städte stempeln",
+  "cityStamps.saveFailed": "Deine Städte konnten nicht aktualisiert werden",
+  "cityStamps.rateLimited": "Zu viele Änderungen an Städten. Versuch es in ein paar Minuten noch einmal.",
+  "cityStamps.onboardingTitle": "Wo warst du schon?",
+  "cityStamps.onboardingBody": "Tippe auf die Städte, in denen du warst. Jede wird ein Stempel in deinem Pass.",
+  "passport.momentCityStamp": "Du warst schon in %{city}",
+  "passport.paywallHeadline": {
+    "one": "Dein Pass hat %{formattedCount} Stadt",
+    "other": "Dein Pass hat %{formattedCount} Städte"
+  }
 }

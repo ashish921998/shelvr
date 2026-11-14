@@ -785,7 +785,7 @@
   "onboardingQ.goalFood": "Places to eat",
   "onboardingQ.goalFoodBody": "Near me, this week",
   "onboardingQ.goalEverything": "A bit of everything",
-  "onboardingQ.cityBody": "We’ll practice with a real reel from there if we have one, or from a city we do.",
+  "onboardingQ.cityBody": "We’ll practice with a real reel about its hidden gems.",
   "onboardingNotify.title": "Don’t miss the places you saved.",
   "onboardingNotify.sub": "Shelvr brings them back before a trip, and when you can still go.",
   "onboardingNotify.allow": "Turn on reminders",
@@ -1046,9 +1046,17 @@
   "sharedLists.with": "With %{names}",
   "sharedLists.onlyYou": "Only you so far",
   "sharedLists.someone": "Someone",
-  "sharedLists.newCount": {
-    "one": "%{formattedCount} new",
-    "other": "%{formattedCount} new"
+  "sharedLists.activityOne": {
+    "one": "%{name} added %{formattedCount} place",
+    "other": "%{name} added %{formattedCount} places"
+  },
+  "sharedLists.activitySomeone": {
+    "one": "Someone added %{formattedCount} place",
+    "other": "Someone added %{formattedCount} places"
+  },
+  "sharedLists.activityMany": {
+    "one": "%{formattedCount} new place from %{names}",
+    "other": "%{formattedCount} new places from %{names}"
   },
   "sharedLists.alsoAddTo": "Also add to",
   "sharedLists.alsoAddFull": "%{name} is full. Remove a place from it to add more.",
@@ -1132,13 +1140,17 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "Picture from the post you saved",
   "passport.removeStamp": "Remove stamp",
+  "passport.momentStamped": "%{name} stamped",
+  "passport.momentFirstInCity": "First stamp in %{city}",
+  "passport.momentBulk": {
+    "one": "%{formattedCount} place stamped",
+    "other": "%{formattedCount} places stamped"
+  },
   "passport.wantToGo": "Want to go",
   "passport.title": "Passport",
-  "passport.yourPassport": "Your passport",
   "passport.beenTitle": "Been to any of these?",
   "passport.beenBody": "Stamp places you already went",
   "passport.beenSomewhere": "Already been somewhere?",
-  "passport.rowCities": "%{places} · %{cities}",
   "passport.placesCount": {
     "one": "%{formattedCount} place",
     "other": "%{formattedCount} places"
@@ -1147,6 +1159,13 @@
     "one": "%{formattedCount} city",
     "other": "%{formattedCount} cities"
   },
+  "passport.countriesCount": {
+    "one": "%{formattedCount} country",
+    "other": "%{formattedCount} countries"
+  },
+  "passport.heroStamped": "Places stamped",
+  "passport.heroWhere": "%{cities} · %{countries}",
+  "passport.heroNext": "Next badge: %{badge}",
   "passport.places": "Places",
   "passport.cities": "Cities",
   "passport.countries": "Countries",
@@ -1175,6 +1194,122 @@
   "passport.cardSavedElsewhere": "Saved for later.",
   "passport.cardWent": "Went with Shelvr.",
   "passport.shareCity": "Share %{city}",
+  "passport.momentCityComplete": "%{city} complete",
+  "passport.ringCount": "%{visited} of %{total}",
+  "passport.ringLabel": {
+    "one": "%{visited} of %{formattedCount} place stamped in %{city}",
+    "other": "%{visited} of %{formattedCount} places stamped in %{city}"
+  },
+  "passport.ringLocked": {
+    "one": "%{formattedCount} place saved in %{city}",
+    "other": "%{formattedCount} places saved in %{city}"
+  },
+  "passport.ringHint": "Shows the places left to stamp",
+  "passport.ringLockedHint": "Stamp places with Shelvr Pro",
+  "passport.notStampedYet": "Saved, not stamped yet",
+  "passport.nextTitle": "Next to stamp",
+  "passport.nextBody": {
+    "one": "%{formattedCount} place in %{city} left to stamp",
+    "other": "%{formattedCount} places in %{city} left to stamp"
+  },
+  "passport.cityAllStamped": "Every place you saved in %{city} is stamped.",
+  "passport.nextEmpty": "No places to show for %{city} right now.",
+  "passport.stampPlace": "Stamp",
+  "passport.stampPlaceLabel": "Stamp %{name}",
+  "badges.title": "Milestones",
+  "badges.earned": "Badge earned",
+  "badges.unlocked": "%{badge} badge earned",
+  "badges.moreEarned": {
+    "one": "And %{formattedCount} more badge",
+    "other": "And %{formattedCount} more badges"
+  },
+  "badges.shareMessage": "I earned the %{badge} badge on my Shelvr passport.",
+  "badges.shareHint": "Shares this badge",
+  "badges.lockedHint": "Earn badges with Shelvr Pro",
+  "badges.firstStamp": "First stamp",
+  "badges.explorer": "Explorer",
+  "badges.wanderer": "Wanderer",
+  "badges.globetrotter": "Globetrotter",
+  "badges.cityHopper": "City hopper",
+  "badges.passportHolder": "Passport holder",
+  "badges.completionist": "Completionist",
+  "badges.coffeeCrawler": "Coffee crawler",
+  "badges.foodie": "Foodie",
+  "badges.sweetTooth": "Sweet tooth",
+  "badges.nightOwl": "Night owl",
+  "badges.outAndAbout": "Out and about",
+  "badges.goalPlaces": {
+    "one": "%{formattedCount} place stamped",
+    "other": "%{formattedCount} places stamped"
+  },
+  "badges.goalCities": {
+    "one": "%{formattedCount} city stamped",
+    "other": "%{formattedCount} cities stamped"
+  },
+  "badges.goalCountries": {
+    "one": "%{formattedCount} country stamped",
+    "other": "%{formattedCount} countries stamped"
+  },
+  "badges.goalCompleteCities": {
+    "one": "%{formattedCount} city complete",
+    "other": "%{formattedCount} cities complete"
+  },
+  "badges.goalCoffee": {
+    "one": "%{formattedCount} café stamped",
+    "other": "%{formattedCount} cafés stamped"
+  },
+  "badges.goalFood": {
+    "one": "%{formattedCount} food spot stamped",
+    "other": "%{formattedCount} food spots stamped"
+  },
+  "badges.goalDessert": {
+    "one": "%{formattedCount} dessert spot stamped",
+    "other": "%{formattedCount} dessert spots stamped"
+  },
+  "badges.goalDrinks": {
+    "one": "%{formattedCount} bar stamped",
+    "other": "%{formattedCount} bars stamped"
+  },
+  "badges.goalActivities": {
+    "one": "%{formattedCount} activity stamped",
+    "other": "%{formattedCount} activities stamped"
+  },
+  "badges.progressPlaces": {
+    "one": "%{visited} of %{formattedCount} place",
+    "other": "%{visited} of %{formattedCount} places"
+  },
+  "badges.progressCities": {
+    "one": "%{visited} of %{formattedCount} city",
+    "other": "%{visited} of %{formattedCount} cities"
+  },
+  "badges.progressCountries": {
+    "one": "%{visited} of %{formattedCount} country",
+    "other": "%{visited} of %{formattedCount} countries"
+  },
+  "badges.progressCompleteCities": {
+    "one": "%{visited} of %{formattedCount} city complete",
+    "other": "%{visited} of %{formattedCount} cities complete"
+  },
+  "badges.progressCoffee": {
+    "one": "%{visited} of %{formattedCount} café",
+    "other": "%{visited} of %{formattedCount} cafés"
+  },
+  "badges.progressFood": {
+    "one": "%{visited} of %{formattedCount} food spot",
+    "other": "%{visited} of %{formattedCount} food spots"
+  },
+  "badges.progressDessert": {
+    "one": "%{visited} of %{formattedCount} dessert spot",
+    "other": "%{visited} of %{formattedCount} dessert spots"
+  },
+  "badges.progressDrinks": {
+    "one": "%{visited} of %{formattedCount} bar",
+    "other": "%{visited} of %{formattedCount} bars"
+  },
+  "badges.progressActivities": {
+    "one": "%{visited} of %{formattedCount} activity",
+    "other": "%{visited} of %{formattedCount} activities"
+  },
   "passportShare.share": "Share passport",
   "passportShare.stopSetting": "Stop sharing my passport",
   "passportShare.stopTitle": "Stop sharing your passport?",
@@ -1236,12 +1371,29 @@
   "onboardingChart.whenTrip": "Your next trip",
   "onboardingChart.chartLabel": "A curve from %{lost} now to %{goal}. %{when}",
   "onboardingStatement.cityPicked": "%{city}. Great pick.\n\nLet’s save your first %{city} spots.",
-  "onboardingStatement.cityFirst": "%{picked}. Great pick.\n\nLet’s try it first with a real reel from %{city}.",
   "onboardingStatement.cityStart": "Let’s save your first %{city} spots.",
   "onboardingStatement.firstSave": "Your first save!\nWhat a natural.\n\nNow let’s see it on your map 🗺️",
   "onboardingCarousel.together": "Plan it together\nwith your people.",
   "onboardingCarousel.eat": "No more “where\nshould we eat?”",
   "onboardingCarousel.map": "Every place you saved,\non one map.",
   "onboardingCarousel.next": "Next slide",
-  "sharedLists.nameBodyWelcome": "People on your shared lists see it, and so does anyone with a link to a save you share, a list you own or a shortlist you send."
+  "sharedLists.nameBodyWelcome": "People on your shared lists see it, and so does anyone with a link to a save you share, a list you own or a shortlist you send.",
+  "cityStamps.add": "I’ve been to…",
+  "cityStamps.title": "Cities you’ve been to",
+  "cityStamps.body": "Tap a city you’ve been to and it gets a stamp in your passport. Tap it again to take the stamp off.",
+  "cityStamps.noMatch": "We don’t have that city yet.",
+  "cityStamps.label": "%{city}, city stamp",
+  "cityStamps.removeHint": "Takes the stamp off your passport",
+  "cityStamps.removeTitle": "Take %{city} off your passport?",
+  "cityStamps.remove": "Remove stamp",
+  "cityStamps.lockedHint": "Stamp cities with Shelvr Pro",
+  "cityStamps.saveFailed": "Couldn’t update your cities",
+  "cityStamps.rateLimited": "Too many city changes. Try again in a few minutes.",
+  "cityStamps.onboardingTitle": "Where have you been?",
+  "cityStamps.onboardingBody": "Tap the cities you’ve visited. Each one becomes a stamp in your passport.",
+  "passport.momentCityStamp": "You’ve been to %{city}",
+  "passport.paywallHeadline": {
+    "one": "Your passport has %{formattedCount} city",
+    "other": "Your passport has %{formattedCount} cities"
+  }
 }

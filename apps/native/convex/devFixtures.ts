@@ -1,6 +1,6 @@
 import { getAuthUserId } from "@convex-dev/auth/server";
 import { v } from "convex/values";
-import type { Id } from "./_generated/dataModel";
+import type { Doc, Id } from "./_generated/dataModel";
 import {
   env,
   internalMutation,
@@ -13,9 +13,16 @@ import {
   liveOwner,
   authedMutation,
 } from "./model/auth";
+import { CITY_STAMP_CITIES } from "./model/cityStamps";
 import { fakeAiLocks } from "./model/fakeAi";
 import { insertMembership } from "./model/memberships";
-import { inviteToken } from "./model/sharedLists";
+import {
+  departMember,
+  inviteToken,
+  listMembers,
+  listPlaces,
+  MAX_LISTS_PER_USER,
+} from "./model/sharedLists";
 import { buildTrip, type TripCandidate } from "./model/trip";
 import { safeDeleteStorage } from "./model/storage";
 import { deletePlanSharesForUser } from "./planShares";
@@ -25,6 +32,7 @@ const RESET_LIMIT = 200;
 const MINUTE_MS = 60 * 1000;
 const HOUR_MS = 60 * MINUTE_MS;
 const DAY_MS = 24 * HOUR_MS;
+const FIXTURE_PARTNER = "Priya Sharma";
 const FIXTURE_CITY = "Austin";
 
 const COFFEE_PIN = {
@@ -39,6 +47,46 @@ const BAKERY_PIN = {
   lng: -97.7432,
   city: FIXTURE_CITY,
 };
+
+const PARTNER_PLACES = [
+  {
+    name: "Franklin Barbecue",
+    lat: 30.2701,
+    lng: -97.7313,
+    category: "Restaurant",
+    hoursAgo: 3,
+  },
+  {
+    name: "Barton Springs Pool",
+    lat: 30.264,
+    lng: -97.7713,
+    category: "Park",
+    hoursAgo: 2,
+  },
+  {
+    name: "Uchi",
+    lat: 30.2577,
+    lng: -97.7612,
+    category: "Restaurant",
+    hoursAgo: 1,
+  },
+];
+
+const LIVE_PARTNER_PLACES = [
+  {
+    name: "Veracruz All Natural",
+    lat: 30.2563,
+    lng: -97.7234,
+    category: "Restaurant",
+  },
+  { name: "Zilker Park", lat: 30.2669, lng: -97.7729, category: "Park" },
+  {
+    name: "Torchy's Tacos",
+    lat: 30.2466,
+    lng: -97.7509,
+    category: "Restaurant",
+  },
+];
 
 const resetResultValidator = v.object({
   items: v.number(),
@@ -126,6 +174,7 @@ async function seedFixtures(
     spaces,
     subscriptions,
     removals,
+    cityStamps,
     visits,
   ] = await Promise.all([
     ctx.db
@@ -153,6 +202,10 @@ async function seedFixtures(
       .withIndex("by_user", (q) => q.eq("userId", userId))
       .take(RESET_LIMIT + 1),
     ctx.db
+      .query("cityStamps")
+      .withIndex("by_user_and_city", (q) => q.eq("userId", userId))
+      .take(RESET_LIMIT + 1),
+    ctx.db
       .query("placeVisits")
       .withIndex("by_user_and_visited", (q) => q.eq("userId", userId))
       .take(RESET_LIMIT + 1),
@@ -164,6 +217,7 @@ async function seedFixtures(
     ["items", items.length],
     ["spaces", spaces.length],
     ["removals", removals.length],
+    ["city stamps", cityStamps.length],
     ["visits", visits.length],
   ] as const) {
     if (count > RESET_LIMIT) {
@@ -178,6 +232,7 @@ async function seedFixtures(
     );
   }
   await clearFixtureLinks(ctx, userId);
+  await clearFixtureLists(ctx, userId);
 
   const storageIds = new Set<Id<"_storage">>();
   for (const item of items) {
@@ -188,6 +243,7 @@ async function seedFixtures(
   }
 
   for (const row of removals) await ctx.db.delete(row._id);
+  for (const row of cityStamps) await ctx.db.delete(row._id);
   for (const row of visits) await ctx.db.delete(row._id);
   for (const row of memberships) await ctx.db.delete(row._id);
   for (const row of operations) await ctx.db.delete(row._id);
@@ -367,6 +423,7 @@ async function seedFixtures(
     status: "suggested",
   });
   await seedFixtureLink(ctx, userId, tripsId);
+  await seedFixtureList(ctx, userId);
   await ctx.db.insert("subscriptions", {
     userId,
     status: "lifetime",
@@ -374,6 +431,14 @@ async function seedFixtures(
     productId: "dev.flow-fixtures",
     updatedAt: Date.now(),
   });
+  for (const city of ["austin", "lisbon", "madrid"] as const) {
+    await ctx.db.insert("cityStamps", {
+      userId,
+      city,
+      country: CITY_STAMP_CITIES[city].country,
+      stampedAt: Date.now(),
+    });
+  }
 
   return { items: 7, spaces: 3, memberships: 4 };
 }
@@ -443,6 +508,147 @@ async function seedFixtureLink(
     updatedAt: now - 30 * MINUTE_MS,
   });
 }
+
+async function isFixturePartner(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+): Promise<boolean> {
+  const user = await ctx.db.get(userId);
+  if (user === null || user.name !== FIXTURE_PARTNER) return false;
+  const account = await ctx.db
+    .query("authAccounts")
+    .withIndex("userIdAndProvider", (q) => q.eq("userId", userId))
+    .first();
+  return account === null;
+}
+
+async function fixturePartnerOf(
+  ctx: QueryCtx,
+  listId: Id<"sharedLists">,
+): Promise<Id<"users"> | null> {
+  for (const member of await listMembers(ctx, listId)) {
+    if (await isFixturePartner(ctx, member.userId)) return member.userId;
+  }
+  return null;
+}
+
+async function clearFixtureLists(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+): Promise<void> {
+  const memberships = await ctx.db
+    .query("sharedListMembers")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .take(MAX_LISTS_PER_USER + 1);
+  if (memberships.length > MAX_LISTS_PER_USER) {
+    throw new Error(
+      `Development fixture reset refused: shared lists exceed ${MAX_LISTS_PER_USER} rows`,
+    );
+  }
+  for (const membership of memberships) {
+    const list = await ctx.db.get(membership.listId);
+    if (list === null) await ctx.db.delete(membership._id);
+    else await leaveOrDeleteFixtureList(ctx, list, userId);
+  }
+}
+
+async function leaveOrDeleteFixtureList(
+  ctx: MutationCtx,
+  list: Doc<"sharedLists">,
+  userId: Id<"users">,
+): Promise<void> {
+  const members = await listMembers(ctx, list._id);
+  const partners: Id<"users">[] = [];
+  for (const member of members) {
+    if (member.userId === userId) continue;
+    if (!(await isFixturePartner(ctx, member.userId))) {
+      await departMember(ctx, list, userId);
+      return;
+    }
+    partners.push(member.userId);
+  }
+  for (const place of await listPlaces(ctx, list._id)) {
+    await ctx.db.delete(place._id);
+  }
+  for (const member of members) await ctx.db.delete(member._id);
+  await ctx.db.delete(list._id);
+  for (const partner of partners) await ctx.db.delete(partner);
+}
+
+async function seedFixtureList(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+): Promise<void> {
+  const now = Date.now();
+  const itemId = await fixtureItem(ctx, userId, "austin-coffee");
+  const partnerId = await ctx.db.insert("users", { name: FIXTURE_PARTNER });
+  const ownPins = [COFFEE_PIN, BAKERY_PIN];
+  const listId = await ctx.db.insert("sharedLists", {
+    ownerId: userId,
+    name: "Date night spots",
+    cities: [FIXTURE_CITY],
+    inviteToken: inviteToken(),
+    placeCount: ownPins.length + PARTNER_PLACES.length,
+    createdAt: now - 2 * DAY_MS,
+  });
+  await ctx.db.insert("sharedListMembers", {
+    listId,
+    userId,
+    joinedAt: now - 2 * DAY_MS,
+    seenAt: now - DAY_MS,
+  });
+  await ctx.db.insert("sharedListMembers", {
+    listId,
+    userId: partnerId,
+    joinedAt: now - 2 * DAY_MS + MINUTE_MS,
+    seenAt: now,
+  });
+  for (const pin of ownPins) {
+    await ctx.db.insert("sharedListPlaces", {
+      listId,
+      addedBy: userId,
+      itemId,
+      ...pin,
+      addedAt: now - 2 * DAY_MS,
+    });
+  }
+  for (const { hoursAgo, ...place } of PARTNER_PLACES) {
+    await ctx.db.insert("sharedListPlaces", {
+      listId,
+      addedBy: partnerId,
+      ...place,
+      city: FIXTURE_CITY,
+      addedAt: now - hoursAgo * HOUR_MS,
+    });
+  }
+}
+
+export const simulateSharedListActivity = internalMutation({
+  args: { listId: v.id("sharedLists") },
+  returns: v.union(v.null(), v.string()),
+  handler: async (ctx, args) => {
+    const list = await ctx.db.get(args.listId);
+    if (list === null) return null;
+    if ((await liveOwner(ctx, list.ownerId)) === null) return null;
+    if (!(await isDevelopmentAnonymousUser(ctx, list.ownerId))) return null;
+    const partnerId = await fixturePartnerOf(ctx, list._id);
+    if (partnerId === null) return null;
+    const onList = new Set(
+      (await listPlaces(ctx, list._id)).map((place) => place.name),
+    );
+    const next = LIVE_PARTNER_PLACES.find((place) => !onList.has(place.name));
+    if (next === undefined) return null;
+    await ctx.db.insert("sharedListPlaces", {
+      listId: list._id,
+      addedBy: partnerId,
+      ...next,
+      city: FIXTURE_CITY,
+      addedAt: Date.now(),
+    });
+    await ctx.db.patch(list._id, { placeCount: list.placeCount + 1 });
+    return next.name;
+  },
+});
 
 export const locateTripStops = internalMutation({
   args: {

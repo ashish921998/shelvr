@@ -63,21 +63,28 @@ test(
 );
 
 test(
-  "uses a real Austin trip reel for a city without one",
+  "plays the picked city's own reel",
   { retries: 0, timeout: 600_000 },
   async ({ device, screen, app }) => {
     await startFreshOnboarding({ device, screen });
-    await walkToSampleReel(screen, { goal: "travel", city: "Lisbon" });
-    await expect(screen.getByRole("image", /^Sample/)).toBeVisible();
-    await app.screenshot("austin-fallback-reel");
+    await walkToSampleReel(screen, { goal: "date", city: "Las Vegas" });
+    await expect(
+      screen.getByRole("image", /^Sample reel by @?jinaham812/),
+    ).toBeVisible({ timeout: 30_000 });
+    await app.screenshot("las-vegas-reel");
     await shareTheSampleReel(screen);
-    await expect(screen.getByText("Austin · 3 places")).toBeVisible();
-    for (const place of ["Austin Motel", "Heritage Boot Co.", "Jo's Coffee"]) {
+    await expect(screen.getByText("Las Vegas · 3 places")).toBeVisible();
+    for (const place of [
+      "The Barbershop Cuts & Cocktails",
+      "Ghost Donkey",
+      "Secret Pizza",
+    ]) {
       await expect(screen.getByText(place).first()).toBeVisible();
     }
+    await app.screenshot("las-vegas-spots");
     await walkToCarouselEnd(screen);
     await expect(paywallTitle(screen)).toBeHidden();
-    await app.screenshot("austin-carousel");
+    await app.screenshot("las-vegas-carousel");
   },
 );
 
@@ -92,15 +99,16 @@ test(
     await app.screenshot("austin-date-reel");
 
     await shareTheSampleReel(screen);
-    // The skipped city uses a real Austin reel. Each name is both a map pin's title and a row.
+    // The skipped city uses Austin's reel. Each name is both a map pin's title and a row.
     await expect(screen.getByText("Austin · 3 places")).toBeVisible({
       timeout: 30_000,
     });
-    for (const place of ["Eberly", "The Guest House", "Jupiter Supper Club"]) {
+    for (const place of ["Austin Motel", "Heritage Boot", "Jo's Coffee"]) {
       await expect(screen.getByText(place).first()).toBeVisible({
         timeout: 10_000,
       });
     }
+    await app.screenshot("austin-spots");
     const last = await walkToCarouselEnd(screen);
     await expect(paywallTitle(screen)).toBeHidden();
     await app.screenshot("carousel-before");

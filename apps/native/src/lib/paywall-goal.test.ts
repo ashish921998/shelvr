@@ -9,9 +9,9 @@ import ja from "@/locales/ja.json";
 import ko from "@/locales/ko.json";
 import ptBR from "@/locales/pt-BR.json";
 import { GOALS, type Goal } from "@/lib/onboarding-goals";
-import { goalPaywallVariables } from "@/lib/paywall-goal";
+import { goalPaywallVariables, goalProgressFor } from "@/lib/paywall-goal";
 import { paywallVariables } from "@/lib/paywall-funnel";
-import { planCities } from "@/lib/sample-plans";
+import { SAMPLE_CITY_IDS } from "@/lib/sample-cities";
 
 vi.mock("expo-localization", () => ({
   getLocales: () => [{ languageTag: "en-US" }],
@@ -100,6 +100,35 @@ describe("goalPaywallVariables", () => {
     );
   });
 
+  it("opens on the passport's real city count once cities were picked", () => {
+    const picked = (beenCities: Progress["beenCities"]) =>
+      values({ ...progress("date"), beenCities });
+    expect(picked(["lisbon"]).goal_headline).toBe("Your passport has 1 city");
+    expect(
+      picked(["lisbon", "madrid", "paris", "rome", "tokyo", "seoul"])
+        .goal_headline,
+    ).toBe("Your passport has 6 cities");
+    expect(picked([]).goal_headline).toBe("Make date night easy.");
+    expect(picked(["lisbon"]).goal_subline).toBe(
+      values(progress("date")).goal_subline,
+    );
+    expect(
+      values({ goals: [], travelCity: null, beenCities: ["lisbon"] }),
+    ).toEqual({});
+  });
+
+  it("counts picked cities only on the onboarding paywall", () => {
+    const picked = { ...progress("date"), beenCities: ["lisbon" as const] };
+    expect(
+      goalPaywallVariables(goalProgressFor(picked, "onboarding")).goal_headline
+        .value,
+    ).toBe("Your passport has 1 city");
+    expect(
+      goalPaywallVariables(goalProgressFor(picked, "passport")).goal_headline
+        .value,
+    ).toBe("Make date night easy.");
+  });
+
   it("keeps the goal id unlocalized for every goal", () => {
     for (const goal of GOALS) {
       expect(goalPaywallVariables(progress(goal)).goal).toEqual({
@@ -109,10 +138,10 @@ describe("goalPaywallVariables", () => {
     }
   });
 
-  it("offers only trip cities the goal paywall has a photo for", () => {
+  it("offers only cities the goal paywall has a travel photo for", () => {
     expect(
-      planCities("trip"),
-      "A new trip city needs its own 'Goal photo travel <City>' layer in the RevenueCat goal paywall's Travel photos group, or travel users who pick it see Prague",
+      [...SAMPLE_CITY_IDS].sort(),
+      "A new city needs its own 'Goal photo travel <City>' layer in the RevenueCat goal paywall's Travel photos group, or travel users who pick it see Prague",
     ).toEqual([
       "amsterdam",
       "austin",
@@ -134,6 +163,7 @@ describe("goalPaywallVariables", () => {
       "prague",
       "rome",
       "san-francisco",
+      "seattle",
       "seoul",
       "tokyo",
       "toronto",
