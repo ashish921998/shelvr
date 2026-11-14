@@ -44,6 +44,7 @@ import type * as model_auth from "../model/auth.js";
 import type * as model_cancelSurveyFields from "../model/cancelSurveyFields.js";
 import type * as model_captureRequest from "../model/captureRequest.js";
 import type * as model_captureTokens from "../model/captureTokens.js";
+import type * as model_cityCompletion from "../model/cityCompletion.js";
 import type * as model_clientIp from "../model/clientIp.js";
 import type * as model_datePlan from "../model/datePlan.js";
 import type * as model_dateRank from "../model/dateRank.js";
@@ -182,6 +183,7 @@ declare const fullApi: ApiFromModules<{
   "model/cancelSurveyFields": typeof model_cancelSurveyFields;
   "model/captureRequest": typeof model_captureRequest;
   "model/captureTokens": typeof model_captureTokens;
+  "model/cityCompletion": typeof model_cityCompletion;
   "model/clientIp": typeof model_clientIp;
   "model/datePlan": typeof model_datePlan;
   "model/dateRank": typeof model_dateRank;
