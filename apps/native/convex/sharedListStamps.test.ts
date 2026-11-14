@@ -413,4 +413,34 @@ describe("Went on a shared list", () => {
     expect(row?.spots?.map((spot) => spot.appleId)).toEqual(["A-mant"]);
     expect(row?.stampPlaces?.[0]?.listPlaceId).toBeUndefined();
   });
+
+  it("keeps a spot the member marks as visited before after the list stamped it", async () => {
+    const { base, owner, listId } = await friendPlace();
+    const list = await owner.t.query(api.sharedLists.getSharedList, {
+      listId,
+    });
+    const place = list?.places.find((p) => p.name === "Manteigaria");
+    if (place?.itemId === undefined) throw new Error("own save missing");
+    await owner.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: place._id,
+      visited: true,
+      stamp: true,
+    });
+    await owner.t.mutation(api.placeVisits.markVisitedBefore, {
+      places: [
+        {
+          itemId: place.itemId,
+          name: "Manteigaria",
+          spot: { lat: place.lat, lng: place.lng, appleId: "A-mant" },
+        },
+      ],
+    });
+    await owner.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: place._id,
+      visited: false,
+    });
+    const [row] = await visitRows(base, owner.userId);
+    expect(row?.spots?.map((spot) => spot.appleId)).toEqual(["A-mant"]);
+    expect(row?.stampPlaces?.[0]?.listPlaceId).toBeUndefined();
+  });
 });

@@ -640,17 +640,20 @@ export const markVisitedBefore = authedMutation({
               itemId: existing.itemId ?? item._id,
               visitedAt: existing.visitedAt,
             };
+      const spots = spot ? [spot] : spotsOnItem(item, name);
       await markVisit(ctx, {
         userId,
         key,
         existing,
         visit,
-        spots: spot ? [spot] : spotsOnItem(item, name),
+        spots,
         explicit: spot !== undefined,
       });
-      const row = await findVisit(ctx, userId, name);
-      if (row === null) continue;
-      if (existing === null) await ctx.db.patch(row._id, { backfilled: true });
+      const found = await findVisit(ctx, userId, name);
+      if (found === null) continue;
+      if (existing === null)
+        await ctx.db.patch(found._id, { backfilled: true });
+      const row = await claimMarkedSpots(ctx, found, spots);
       queued += await syncStampPlaces(ctx, row, item, {
         delayMs: queued * COUNTRY_SPACING_MS,
       });
