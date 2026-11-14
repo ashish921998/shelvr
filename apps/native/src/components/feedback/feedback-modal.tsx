@@ -2,6 +2,7 @@ import { t, useAppLocale } from "@/lib/i18n";
 import Constants from "expo-constants";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -26,6 +27,12 @@ import {
   type FeedbackSurface,
 } from "@/lib/feedback";
 import { SUPPORT_URL } from "@/lib/legal";
+import { motion, motionCSS } from "@/lib/motion";
+import Animated, {
+  FadeIn,
+  ReduceMotion,
+  useReducedMotion,
+} from "react-native-reanimated";
 
 function submissionContext() {
   const version = Constants.expoConfig?.version;
@@ -51,6 +58,10 @@ export function FeedbackModal({
   onClose: () => void;
 }) {
   useAppLocale();
+  const reduced = useReducedMotion();
+  const fadeDuration = reduced
+    ? motion.duration.feedback
+    : motion.duration.state;
   const { theme } = useUnistyles();
   const { data: user } = useCurrentUser();
   const submitFeedback = useMutation(api.feedback.submitFeedback);
@@ -69,7 +80,11 @@ export function FeedbackModal({
     feedbackAnalytics.feedbackOpened(surface);
   }, [surface]);
 
-  const canSend = flow !== "sending" && !!user && message.trim().length > 0;
+  const canSend =
+    flow !== "sending" &&
+    flow !== "sent" &&
+    !!user &&
+    message.trim().length > 0;
 
   const sendFeedback = useCallback(
     async (rawMessage: string): Promise<"accepted" | "failed"> => {
@@ -103,6 +118,7 @@ export function FeedbackModal({
     const trimmed = message.trim();
     if (trimmed.length === 0) return;
     sendingRef.current = true;
+    Keyboard.dismiss();
     setFlow("sending");
     const result = await sendFeedback(trimmed);
     sendingRef.current = false;
@@ -141,95 +157,123 @@ export function FeedbackModal({
               {t("feedback.open")}
             </Text>
 
-            {flow === "sent" ? (
-              <>
-                <Text style={styles.body}>{t("feedback.thanks")}</Text>
-                <View style={styles.buttonRow}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t("common.done")}
-                    style={({ pressed }) => [
-                      styles.primaryButton,
-                      pressed && { opacity: 0.7 },
-                    ]}
-                    onPress={onClose}
-                  >
-                    <Text style={styles.primaryButtonText}>
-                      {t("common.done")}
-                    </Text>
-                  </Pressable>
-                </View>
-              </>
-            ) : !available ? (
-              <>
-                <Text style={styles.body}>
-                  {t("feedback.unavailableContact")}
-                </Text>
-                <SupportLink />
-              </>
-            ) : (
-              <>
-                {flow === "failed" ? (
+            <View>
+              <Animated.View
+                pointerEvents={flow === "sent" ? "none" : "auto"}
+                accessibilityElementsHidden={flow === "sent"}
+                importantForAccessibility={
+                  flow === "sent" ? "no-hide-descendants" : "auto"
+                }
+                style={[
+                  styles.fields,
+                  {
+                    opacity: flow === "sent" ? 0 : 1,
+                    transitionProperty: "opacity",
+                    transitionDuration: fadeDuration,
+                    transitionTimingFunction: motionCSS.out,
+                  },
+                ]}
+              >
+                {!available ? (
                   <>
                     <Text style={styles.body}>
-                      {t("feedback.sendFailedContact")}
+                      {t("feedback.unavailableContact")}
                     </Text>
                     <SupportLink />
                   </>
-                ) : null}
-                <Text style={styles.body}>{t("feedback.prompt")}</Text>
-                <Text style={styles.notice}>{t("feedback.replyNotice")}</Text>
-                <TextInput
-                  accessibilityLabel={t("feedback.messageLabel")}
-                  style={styles.input}
-                  value={message}
-                  onChangeText={setMessage}
-                  placeholder={t("feedback.placeholder")}
-                  placeholderTextColor={theme.colors.faint}
-                  multiline
-                  maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
-                  autoCapitalize="sentences"
-                  autoCorrect
-                />
-                <Text style={styles.counter}>
-                  {message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}
-                </Text>
-                <View style={styles.buttonRow}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t("feedback.cancel")}
-                    style={({ pressed }) => [
-                      styles.secondaryButton,
-                      pressed && { opacity: 0.7 },
-                    ]}
-                    disabled={flow === "sending"}
-                    onPress={onClose}
-                  >
-                    <Text style={styles.secondaryButtonText}>
-                      {t("common.cancel")}
+                ) : (
+                  <>
+                    {flow === "failed" ? (
+                      <>
+                        <Text style={styles.body}>
+                          {t("feedback.sendFailedContact")}
+                        </Text>
+                        <SupportLink />
+                      </>
+                    ) : null}
+                    <Text style={styles.body}>{t("feedback.prompt")}</Text>
+                    <Text style={styles.notice}>
+                      {t("feedback.replyNotice")}
                     </Text>
-                  </Pressable>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={t("feedback.open")}
-                    accessibilityState={{ disabled: !canSend }}
-                    style={({ pressed }) => [
-                      styles.primaryButton,
-                      pressed && { opacity: 0.7 },
-                      !canSend && { opacity: 0.4 },
-                    ]}
-                    disabled={!canSend}
-                    onPress={() => void send()}
-                  >
-                    <Text style={styles.primaryButtonText}>
-                      {flow === "sending"
-                        ? t("feedback.sending")
-                        : t("feedback.send")}
+                    <TextInput
+                      accessibilityLabel={t("feedback.messageLabel")}
+                      style={styles.input}
+                      value={message}
+                      onChangeText={setMessage}
+                      placeholder={t("feedback.placeholder")}
+                      placeholderTextColor={theme.colors.faint}
+                      editable={flow !== "sent"}
+                      multiline
+                      maxLength={FEEDBACK_MESSAGE_MAX_LENGTH}
+                      autoCapitalize="sentences"
+                      autoCorrect
+                    />
+                    <Text style={styles.counter}>
+                      {message.length}/{FEEDBACK_MESSAGE_MAX_LENGTH}
                     </Text>
-                  </Pressable>
-                </View>
-              </>
-            )}
+                    <View style={styles.buttonRow}>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t("feedback.cancel")}
+                        style={({ pressed }) => [
+                          styles.secondaryButton,
+                          pressed && { opacity: 0.7 },
+                        ]}
+                        disabled={flow === "sending"}
+                        onPress={onClose}
+                      >
+                        <Text style={styles.secondaryButtonText}>
+                          {t("common.cancel")}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={t("feedback.open")}
+                        accessibilityState={{ disabled: !canSend }}
+                        style={({ pressed }) => [
+                          styles.primaryButton,
+                          pressed && { opacity: 0.7 },
+                          !canSend && { opacity: 0.4 },
+                        ]}
+                        disabled={!canSend}
+                        onPress={() => void send()}
+                      >
+                        <Text style={styles.primaryButtonText}>
+                          {flow === "sending"
+                            ? t("feedback.sending")
+                            : t("feedback.send")}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </>
+                )}
+              </Animated.View>
+              {flow === "sent" ? (
+                <Animated.View
+                  style={styles.confirmation}
+                  entering={FadeIn.duration(fadeDuration)
+                    .easing(motion.easing.out)
+                    .reduceMotion(ReduceMotion.Never)}
+                >
+                  <Text style={styles.body}>{t("feedback.thanks")}</Text>
+                  <View style={styles.buttonRow}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t("common.done")}
+                      style={({ pressed }) => [
+                        styles.primaryButton,
+                        pressed && { opacity: 0.7 },
+                      ]}
+                      onPress={onClose}
+                    >
+                      <Text style={styles.primaryButtonText}>
+                        {t("common.done")}
+                      </Text>
+                    </Pressable>
+                  </View>
+                </Animated.View>
+              ) : null}
+            </View>
           </ScrollView>
         </View>
       </KeyboardAvoidingView>
@@ -277,6 +321,12 @@ const styles = StyleSheet.create((theme) => ({
   },
   scrollContent: {
     padding: theme.gap(3),
+    gap: theme.gap(1.5),
+  },
+  fields: { gap: theme.gap(1.5) },
+  confirmation: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "space-between",
     gap: theme.gap(1.5),
   },
   title: {

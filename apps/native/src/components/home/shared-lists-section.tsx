@@ -5,6 +5,7 @@ import { withAlpha } from "@/lib/color";
 import { type City, sharedListCover } from "@/lib/home-places";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
+  activityLine,
   type SharedListSummary,
   useSharedLists,
   withLine,
@@ -44,6 +45,7 @@ export function ListTile({
       accessibilityRole="button"
       accessibilityLabel={[
         list.name,
+        activityLine(list.newFrom),
         `${withLine(list.members)} · ${places}`,
         fresh,
       ]

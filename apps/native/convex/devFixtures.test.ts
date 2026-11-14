@@ -3,7 +3,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { api, internal } from "./_generated/api";
-import { newConvexTest } from "./test.setup";
+import type { Id } from "./_generated/dataModel";
+import { newConvexTest, type TestBackend } from "./test.setup";
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -368,6 +369,369 @@ describe("resetCurrentUser", () => {
     await expect(
       client.mutation(api.devFixtures.resetCurrentUser, {}),
     ).resolves.toEqual({ items: 7, spaces: 3, memberships: 4 });
+  });
+});
+
+describe("the vote link fixture", () => {
+  async function linkRows(backend: TestBackend, userId: Id<"users">) {
+    return await backend.run(async (ctx) => {
+      const shares = await ctx.db
+        .query("planShares")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+      const votes = await ctx.db.query("planVotes").collect();
+      return { shares, votes };
+    });
+  }
+
+  it("seeds an Austin link with Sam's vote newest", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { client } = await anonymousFixtureUser();
+    await client.mutation(api.devFixtures.resetCurrentUser, {});
+
+    const votes = await client.query(api.planShares.cityPlanVotes, {
+      city: "Austin",
+    });
+    expect(votes).toMatchObject({
+      voters: 2,
+      latest: { name: "Sam", place: "Jo's Coffee", choice: "pick" },
+      places: [
+        { key: "p0", name: "Jo's Coffee", picks: 1, passes: 0 },
+        { key: "p1", name: "Houndstooth Coffee", picks: 1, passes: 1 },
+      ],
+    });
+    expect(votes!.expiresAt - Date.now()).toBeGreaterThan(
+      4 * 24 * 60 * 60 * 1000,
+    );
+  });
+
+  it("leaves one link for the account after a second reset", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { backend, userId, client } = await anonymousFixtureUser();
+    await client.mutation(api.devFixtures.resetCurrentUser, {});
+    await client.mutation(api.devFixtures.resetCurrentUser, {});
+
+    const { shares, votes } = await linkRows(backend, userId);
+    expect(shares).toHaveLength(1);
+    expect(votes.map((vote) => vote.shareId)).toEqual([
+      shares[0]._id,
+      shares[0]._id,
+    ]);
+  });
+
+  it("has already pushed, so a vote on it pushes nothing", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    vi.stubEnv("PLAN_VOTE_PUSH_ENABLED", "true");
+    const { backend, userId, client } = await anonymousFixtureUser();
+    await client.mutation(api.devFixtures.resetCurrentUser, {});
+    const [share] = (await linkRows(backend, userId)).shares;
+
+    await backend.mutation(internal.planShares.recordPlanVote, {
+      token: share.token,
+      voterId: "qa-voter",
+      picks: ["p1"],
+      passes: [],
+      ip: "203.0.113.7",
+    });
+
+    const notices = await backend.run((ctx) =>
+      ctx.db.query("planVoteNotices").collect(),
+    );
+    expect(notices).toEqual([
+      expect.objectContaining({
+        shareId: share._id,
+        voterId: "fixture-guest",
+        deliveryStatus: "complete",
+      }),
+    ]);
+  });
+
+  it("refuses an account with 50 links without deleting anything", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { backend, userId, client } = await anonymousFixtureUser();
+    await backend.run(async (ctx) => {
+      const spaceId = await ctx.db.insert("spaces", { userId, name: "Goa" });
+      const itemId = await ctx.db.insert("items", {
+        userId,
+        type: "note",
+        status: "ready",
+        note: "Thalassa",
+        tags: [],
+        searchText: "thalassa",
+      });
+      for (let index = 0; index < 50; index += 1) {
+        await ctx.db.insert("planShares", {
+          token: `link-${index}`,
+          userId,
+          spaceId,
+          places: [{ key: "p0", name: "Thalassa", why: "", itemId }],
+          expiresAt: Date.now(),
+        });
+      }
+    });
+
+    await expect(
+      client.mutation(api.devFixtures.resetCurrentUser, {}),
+    ).rejects.toThrow(/plan shares reach 50 rows/);
+    expect((await linkRows(backend, userId)).shares).toHaveLength(50);
+  });
+});
+
+describe("the shared list fixture", () => {
+  async function fixtureLists(backend: TestBackend, userId: Id<"users">) {
+    return await backend.run(async (ctx) => {
+      const memberships = await ctx.db
+        .query("sharedListMembers")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+      return memberships.map((membership) => membership.listId);
+    });
+  }
+
+  async function partnerUsers(backend: TestBackend) {
+    return await backend.run(async (ctx) =>
+      (await ctx.db.query("users").collect()).filter(
+        (user) => user.name === "Priya Sharma",
+      ),
+    );
+  }
+
+  async function realUser(backend: TestBackend, name: string) {
+    return await backend.run(async (ctx) => {
+      const id = await ctx.db.insert("users", { name });
+      await ctx.db.insert("authAccounts", {
+        userId: id,
+        provider: "google",
+        providerAccountId: `google-${id}`,
+      });
+      return id;
+    });
+  }
+
+  async function insertList(
+    backend: TestBackend,
+    ownerId: Id<"users">,
+    memberIds: Id<"users">[],
+  ) {
+    return await backend.run(async (ctx) => {
+      const listId = await ctx.db.insert("sharedLists", {
+        ownerId,
+        name: "Weekend",
+        cities: ["Lisbon"],
+        inviteToken: `token-${ownerId}`,
+        placeCount: 1,
+        createdAt: Date.now(),
+      });
+      for (const userId of [ownerId, ...memberIds]) {
+        await ctx.db.insert("sharedListMembers", {
+          listId,
+          userId,
+          joinedAt: Date.now(),
+          seenAt: Date.now(),
+        });
+      }
+      await ctx.db.insert("sharedListPlaces", {
+        listId,
+        addedBy: ownerId,
+        name: "Time Out Market",
+        lat: 38.7069,
+        lng: -9.1458,
+        city: "Lisbon",
+        addedAt: Date.now(),
+      });
+      return listId;
+    });
+  }
+
+  it("seeds Date night spots with three places new from Priya", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { client } = await anonymousFixtureUser();
+
+    await expect(
+      client.mutation(api.devFixtures.resetCurrentUser, {}),
+    ).resolves.toEqual({ items: 7, spaces: 3, memberships: 4 });
+
+    const lists = await client.query(api.sharedLists.listSharedLists, {});
+    expect(lists).toHaveLength(1);
+    expect(lists[0]).toMatchObject({
+      name: "Date night spots",
+      placeCount: 5,
+      newCount: 3,
+      newFrom: [{ firstName: "Priya", count: 3 }],
+      isOwner: true,
+    });
+    const detail = await client.query(api.sharedLists.getSharedList, {
+      listId: lists[0]._id,
+    });
+    expect(detail?.cities).toEqual(["Austin"]);
+    expect(
+      detail?.places.map((place) => [place.name, place.isNew, place.category]),
+    ).toEqual([
+      ["Uchi", true, "Restaurant"],
+      ["Barton Springs Pool", true, "Park"],
+      ["Franklin Barbecue", true, "Restaurant"],
+      ["Houndstooth Coffee", false, undefined],
+      ["Jo's Coffee", false, undefined],
+    ]);
+    expect(
+      detail?.places.filter((place) => place.itemId !== undefined),
+    ).toHaveLength(2);
+  });
+
+  it("leaves one fixture list and one Priya after a second reset", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { backend, userId, client } = await anonymousFixtureUser();
+
+    await client.mutation(api.devFixtures.resetCurrentUser, {});
+    const [first] = await fixtureLists(backend, userId);
+    await client.mutation(api.devFixtures.resetCurrentUser, {});
+
+    const lists = await fixtureLists(backend, userId);
+    expect(lists).toHaveLength(1);
+    expect(lists[0]).not.toBe(first);
+    expect(await partnerUsers(backend)).toHaveLength(1);
+    await backend.run(async (ctx) => {
+      expect(await ctx.db.get(first)).toBeNull();
+      expect(
+        await ctx.db
+          .query("sharedListPlaces")
+          .withIndex("by_list_and_added", (q) => q.eq("listId", first))
+          .collect(),
+      ).toEqual([]);
+      expect(await ctx.db.query("sharedLists").collect()).toHaveLength(1);
+    });
+  });
+
+  it("leaves a real list the way Leave list does", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { backend, userId, client } = await anonymousFixtureUser();
+    const boId = await realUser(backend, "Bo Costa");
+    const listId = await insertList(backend, userId, [boId]);
+
+    await client.mutation(api.devFixtures.resetCurrentUser, {});
+
+    await backend.run(async (ctx) => {
+      expect(await ctx.db.get(listId)).toMatchObject({
+        ownerId: boId,
+        placeCount: 1,
+      });
+      const members = await ctx.db
+        .query("sharedListMembers")
+        .withIndex("by_list_and_user", (q) => q.eq("listId", listId))
+        .collect();
+      expect(members.map((member) => member.userId)).toEqual([boId]);
+      expect(
+        await ctx.db
+          .query("sharedListPlaces")
+          .withIndex("by_list_and_added", (q) => q.eq("listId", listId))
+          .collect(),
+      ).toHaveLength(1);
+    });
+    const lists = await client.query(api.sharedLists.listSharedLists, {});
+    expect(lists.map((list) => list.name)).toEqual(["Date night spots"]);
+  });
+
+  it("refuses an account on more than 20 lists without deleting anything", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { backend, userId, client } = await anonymousFixtureUser();
+    await backend.run(async (ctx) => {
+      await ctx.db.insert("items", {
+        userId,
+        type: "note",
+        status: "ready",
+        note: "Keep me",
+        tags: [],
+        searchText: "keep me",
+      });
+    });
+    for (let index = 0; index < 21; index += 1) {
+      await insertList(backend, userId, []);
+    }
+
+    await expect(
+      client.mutation(api.devFixtures.resetCurrentUser, {}),
+    ).rejects.toThrow(/shared lists exceed 20 rows/);
+    expect(await fixtureLists(backend, userId)).toHaveLength(21);
+    await backend.run(async (ctx) => {
+      expect(
+        await ctx.db
+          .query("items")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
+          .collect(),
+      ).toHaveLength(1);
+    });
+  });
+
+  it("adds Priya's next place each run until the pool is used up", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { backend, userId, client } = await anonymousFixtureUser();
+    await client.mutation(api.devFixtures.resetCurrentUser, {});
+    const [listId] = await fixtureLists(backend, userId);
+
+    const added = [];
+    const counts = [];
+    for (let run = 0; run < 4; run += 1) {
+      added.push(
+        await backend.mutation(
+          internal.devFixtures.simulateSharedListActivity,
+          { listId },
+        ),
+      );
+      counts.push(
+        await backend.run(
+          async (ctx) => (await ctx.db.get(listId))?.placeCount,
+        ),
+      );
+    }
+
+    expect(added).toEqual([
+      "Veracruz All Natural",
+      "Zilker Park",
+      "Torchy's Tacos",
+      null,
+    ]);
+    expect(counts).toEqual([6, 7, 8, 8]);
+    const lists = await client.query(api.sharedLists.listSharedLists, {});
+    expect(lists[0]?.newFrom).toEqual([{ firstName: "Priya", count: 6 }]);
+  });
+
+  it("adds nothing to a list that is not a fixture", async () => {
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", "true");
+    const { backend, userId, client } = await anonymousFixtureUser();
+    const oauthId = await realUser(backend, "Ana Silva");
+    const boId = await realUser(backend, "Bo Costa");
+    const partnerId = await backend.run(async (ctx) =>
+      ctx.db.insert("users", { name: "Priya Sharma" }),
+    );
+    await client.mutation(api.devFixtures.resetCurrentUser, {});
+    const [fixture] = await fixtureLists(backend, userId);
+    const notAnonymous = await insertList(backend, oauthId, [partnerId]);
+    const noPartner = await insertList(backend, userId, [boId]);
+
+    for (const listId of [notAnonymous, noPartner]) {
+      await expect(
+        backend.mutation(internal.devFixtures.simulateSharedListActivity, {
+          listId,
+        }),
+      ).resolves.toBeNull();
+    }
+    vi.stubEnv("AUTH_ENABLE_ANONYMOUS", undefined);
+    await expect(
+      backend.mutation(internal.devFixtures.simulateSharedListActivity, {
+        listId: fixture,
+      }),
+    ).resolves.toBeNull();
+    await backend.run(async (ctx) => {
+      for (const listId of [notAnonymous, noPartner, fixture]) {
+        const places = await ctx.db
+          .query("sharedListPlaces")
+          .withIndex("by_list_and_added", (q) => q.eq("listId", listId))
+          .collect();
+        expect(places.map((place) => place.name)).not.toContain(
+          "Veracruz All Natural",
+        );
+      }
+    });
   });
 });
 

@@ -4,11 +4,12 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
   SAMPLE_CITIES,
+  SAMPLE_CITY_IDS,
   cityMatches,
   type SampleCityId,
 } from "@/lib/sample-cities";
 import type { CityQuestion } from "@/lib/onboarding-goals";
-import { planCities, type PlanKind } from "@/lib/sample-plans";
+import type { PlanKind } from "@/lib/sample-plans";
 import type { TextMessageKey } from "@/locales/message-types";
 import { Image } from "expo-image";
 import { useState } from "react";
@@ -69,9 +70,10 @@ export function CityStep({
   useAppLocale();
   const { theme } = useUnistyles();
   const [query, setQuery] = useState("");
-  const all = planCities(kind)
-    .map((id) => ({ id, name: t(SAMPLE_CITIES[id].name) }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+  const all = SAMPLE_CITY_IDS.map((id) => ({
+    id,
+    name: t(SAMPLE_CITIES[id].name),
+  })).sort((a, b) => a.name.localeCompare(b.name));
   const cities = all.filter(({ id, name }) => cityMatches(id, name, query));
   return (
     <View style={styles.wrap}>

@@ -62,6 +62,8 @@ vi.mock("@/components/ui/themed-text", () => ({
 vi.mock("@/lib/shared-lists", () => ({
   useSharedLists: () => mocks.lists,
   withLine: () => "Only you so far",
+  activityLine: (newFrom: unknown[]) =>
+    newFrom.length > 0 ? "Priya added 2 places" : null,
 }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock("react-native-unistyles", () => ({
@@ -106,11 +108,13 @@ const list = (
   placeCount: number,
   newCount: number,
   cities: string[] = [],
+  newFrom: unknown[] = [],
 ) => ({
   _id: id,
   name,
   placeCount,
   newCount,
+  newFrom,
   cities,
   members: [],
 });
@@ -143,6 +147,18 @@ it("shows a list's name and new badge, and opens it", () => {
     pathname: "/shared-list/[id]",
     params: { id: "l1" },
   });
+});
+
+it("reads who added the new places with the list's name", () => {
+  mocks.lists = loaded([
+    list("l1", "Date nights", 3, 2, [], [{ firstName: "Priya", count: 2 }]),
+  ]);
+  render(<SharedListsSection />);
+  expect(
+    screen.getByRole("button", {
+      name: "Date nights, Priya added 2 places, Only you so far · 3 places, 2 new",
+    }),
+  ).toBeTruthy();
 });
 
 it("omits the new badge when nothing is new", () => {

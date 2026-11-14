@@ -3,6 +3,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import type { Id } from "@convex/_generated/dataModel";
 import type { ReactNode } from "react";
 import { beforeEach, expect, it, vi } from "vitest";
+import { saveSource } from "@/lib/city-pins";
 import { SaveRow } from "./save-row";
 
 const themes = vi.hoisted(() => {
@@ -59,15 +60,18 @@ vi.mock("react-native", () => ({
       children,
       onPress,
       accessibilityLabel,
+      accessibilityValue,
       disabled,
     }: {
       children: ReactNode;
       onPress: () => void;
       accessibilityLabel: string;
+      accessibilityValue?: { text: string };
       disabled?: boolean;
     }) => (
       <button
         aria-label={accessibilityLabel}
+        data-value={accessibilityValue?.text}
         disabled={disabled}
         onClick={onPress}
       >
@@ -79,7 +83,9 @@ vi.mock("react-native", () => ({
 vi.mock("expo-image", () => ({ Image: vi.fn(() => <img alt="" />) }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
-vi.mock("@/lib/city-pins", () => ({ saveSource: () => "example.com" }));
+vi.mock("@/lib/city-pins", () => ({
+  saveSource: vi.fn(() => "example.com"),
+}));
 vi.mock("@/components/symbol", () => ({
   AppSymbolIcon: vi.fn(
     ({ name, tintColor }: { name: string; tintColor?: string }) => (
@@ -103,6 +109,7 @@ function tint(container: HTMLElement, symbol: string) {
 beforeEach(() => {
   themes.listeners.clear();
   themes.use(themes.light);
+  vi.mocked(saveSource).mockReturnValue("example.com");
 });
 
 it("names an unvisited place exactly, and a visited one as We went", () => {
@@ -159,4 +166,43 @@ it("draws a row's buttons in the appearance picked before it is first selected",
   expect(tint(container, "checkmark")).toBe("dark-ink");
   expect(tint(container, "minus")).toBe("dark-ink");
   expect(tint(container, "info.circle")).toBe("dark-ink");
+});
+
+it("shows the tally beside the source and reads it as the row's value", () => {
+  render(
+    <SaveRow
+      item={save}
+      placeName="Jo's Coffee"
+      emoji="☕"
+      onPress={vi.fn()}
+      tally={{ picks: 1, passes: 0 }}
+    />,
+  );
+  const tally = screen.getByText("✓ 1 · ✕ 0");
+  expect(tally.parentElement).toBe(
+    screen.getByText("Austin favorites").parentElement,
+  );
+  const row = screen.getByRole("button", { name: "Jo's Coffee" });
+  expect(row.dataset.value).toBe("plan.tally");
+});
+
+it("shows a tally on a row with no source", () => {
+  vi.mocked(saveSource).mockReturnValue("");
+  render(
+    <SaveRow
+      item={{ _id: save._id, imageUrl: null }}
+      placeName="Houndstooth Coffee"
+      onPress={vi.fn()}
+      tally={{ picks: 1, passes: 1 }}
+    />,
+  );
+  expect(screen.getByText("✓ 1 · ✕ 1")).toBeTruthy();
+});
+
+it("has no tally and no value without votes", () => {
+  render(<SaveRow item={save} placeName="Jo's Coffee" onPress={vi.fn()} />);
+  expect(screen.queryByText(/✓/)).toBeNull();
+  expect(screen.getByText("Austin favorites")).toBeTruthy();
+  const row = screen.getByRole("button", { name: "Jo's Coffee" });
+  expect(row.dataset.value).toBeUndefined();
 });

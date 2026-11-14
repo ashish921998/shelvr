@@ -16,6 +16,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="(home)" options={{ title: t("navigation.library") }} />
       <Tabs.Screen name="(map)" options={{ title: t("navigation.map") }} />
       <Tabs.Screen name="(trips)" options={{ title: t("navigation.trips") }} />
+      <Tabs.Screen name="(passport)" options={{ title: t("passport.title") }} />
     </Tabs>
   );
 }

@@ -105,6 +105,28 @@ changes.
   deployment must set `AUTH_ENABLE_ANONYMOUS=true`.
 - **Fixtures:** `devFixtures.resetCurrentUser` seeds items, spaces and a Pro
   subscription. Home cards carry `fixture-item-*` test ids.
+- **Fixture vote link:** the reset also makes an Austin vote link with two
+  votes, Sam's and a guest's. Its owner has no first name until one is set:
+  `npx convex run users:setMyName '{"name":"Ashish"}' --identity '{"subject":"<userId>|cli","issuer":"cli","tokenIdentifier":"cli"}'`.
+- **Vote pages:** vote links need `WAITLIST_SHARED_SECRET` on the backend,
+  `apps/web/.env.local` with `CONVEX_SITE_URL` and the same secret, and
+  `EXPO_PUBLIC_WEB_URL` (the local web server) for the share text.
+- **First-vote push:** needs `PLAN_VOTE_PUSH_ENABLED=true` on the backend. The
+  fixture link already has a sent notice, so only a link made during QA
+  pushes. A simulator cannot receive the real push; simulate the banner with
+  `xcrun simctl push booted app.shelvr.save.dev <payload.json>`, putting the
+  data (`url`, `kind`, `notificationId`) under `body`, where expo-notifications
+  on iOS reads it.
+- **Fixture shared list:** the reset also makes "Date night spots" with a
+  partner, Priya, whose three places are new to the account. It leaves any real
+  shared list the account is on, the way Leave list does, so Home after a reset
+  shows only the fixture list.
+- **A place arriving live:** with the list open,
+  `npx convex run devFixtures:simulateSharedListActivity '{"listId":"<id>"}'`
+  adds Priya's next place: Veracruz All Natural, then Zilker Park, then
+  Torchy's Tacos, then `null`. `npx convex data sharedLists` gives the id. Open
+  the list with `shelvr-dev://shared-list/<id>`, because Home cards are not in
+  the accessibility tree.
 - **Saved flows:** `apps/native/.argent/flows`.
 
 ## Getting into a specific state

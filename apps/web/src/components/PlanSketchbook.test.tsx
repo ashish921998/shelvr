@@ -119,6 +119,24 @@ describe("PlanSketchbook", () => {
     delete (HTMLElement.prototype as { scrollTo?: unknown }).scrollTo;
   });
 
+  it("leaves out the note for a place sent without one", () => {
+    act(() =>
+      root.render(
+        <PlanSketchbook
+          places={[
+            { key: "p0", name: "Jo's Coffee", why: "" },
+            { key: "p1", name: "Masque", why: "Tasting menu" },
+          ]}
+          choices={{}}
+          onChoose={() => undefined}
+        />,
+      ),
+    );
+    const paragraphs = Array.from(container.querySelectorAll("p"));
+    expect(paragraphs.filter((p) => p.textContent === "")).toHaveLength(0);
+    expect(paragraphs.map((p) => p.textContent)).toContain("Tasting menu");
+  });
+
   it("draws a whole emoji, not half of it, as a place's initial", () => {
     act(() =>
       root.render(

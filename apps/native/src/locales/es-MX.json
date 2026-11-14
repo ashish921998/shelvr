@@ -216,6 +216,7 @@
   "notifications.remindersHelp": "Un lugar guardado, un artículo sin leer o una receta para probar, máximo una vez al día",
   "notifications.remindersToggle": "Notificaciones de recordatorios de guardados",
   "notifications.remindersChannel": "Recordatorios de guardados",
+  "notifications.planVotesChannel": "Votos de planes",
   "notifications.remindersDisabledBody": "Permite las notificaciones de Shelvr en la configuración de tu dispositivo para recibir recordatorios de tus guardados.",
   "feedback.open": "Enviar comentarios",
   "support.contact": "Contactar con soporte",
@@ -350,6 +351,26 @@
     "other": "Quedan %{formattedCount} días."
   },
   "plan.tally": "%{picks} irían, %{passes} pasan",
+  "plan.votePushTitle": "Primer voto en tu selección para %{city}",
+  "plan.wouldGo": "%{name} iría a %{place}.",
+  "plan.wouldPass": "%{name} no iría a %{place}.",
+  "plan.someoneWouldGo": "Alguien iría a %{place}.",
+  "plan.someoneWouldPass": "Alguien no iría a %{place}.",
+  "plan.askHint": "Envía un enlace. Eligen los lugares a los que irían.",
+  "plan.askBody": "Elige hasta %{limit} lugares. Tocan ✓ en los que irían y los votos aparecen aquí.",
+  "plan.askSend": "Enviar enlace de votación",
+  "plan.newLinkHint": "Cambiar los lugares crea un enlace nuevo. Los votos del anterior dejan de mostrarse aquí.",
+  "plan.shareLink": "Compartir enlace de votación",
+  "plan.noVotesYet": "Aún no hay votos",
+  "plan.votedPick": "%{name} votó ✓ en %{place}",
+  "plan.votedPass": "%{name} votó ✕ en %{place}",
+  "plan.someoneVotedPick": "Alguien votó ✓ en %{place}",
+  "plan.someoneVotedPass": "Alguien votó ✕ en %{place}",
+  "plan.votingClosed": {
+    "one": "Votación cerrada. Votó %{formattedCount} persona.",
+    "many": "Votación cerrada. Votaron %{formattedCount} personas.",
+    "other": "Votación cerrada. Votaron %{formattedCount} personas."
+  },
   "trip.make": "Planear mi viaje",
   "trip.pickTitle": "Un viaje",
   "trip.pickBody": "Convierte tus lugares guardados en días",
@@ -827,7 +848,7 @@
   "onboardingQ.goalFood": "Lugares para comer",
   "onboardingQ.goalFoodBody": "Cerca de mí, esta semana",
   "onboardingQ.goalEverything": "Un poco de todo",
-  "onboardingQ.cityBody": "Practicaremos con un reel real de allí si tenemos uno, o de una ciudad que sí tengamos.",
+  "onboardingQ.cityBody": "Practicaremos con un reel real sobre sus joyas escondidas.",
   "onboardingNotify.title": "No te pierdas los lugares que guardaste.",
   "onboardingNotify.sub": "Shelvr te los recuerda antes de un viaje y cuando todavía puedes ir.",
   "onboardingNotify.allow": "Activar recordatorios",
@@ -1095,6 +1116,21 @@
     "many": "%{formattedCount} nuevos",
     "other": "%{formattedCount} nuevos"
   },
+  "sharedLists.activityOne": {
+    "one": "%{name} agregó %{formattedCount} lugar",
+    "many": "%{name} agregó %{formattedCount} lugares",
+    "other": "%{name} agregó %{formattedCount} lugares"
+  },
+  "sharedLists.activitySomeone": {
+    "one": "Alguien agregó %{formattedCount} lugar",
+    "many": "Alguien agregó %{formattedCount} lugares",
+    "other": "Alguien agregó %{formattedCount} lugares"
+  },
+  "sharedLists.activityMany": {
+    "one": "%{formattedCount} lugar nuevo de %{names}",
+    "many": "%{formattedCount} lugares nuevos de %{names}",
+    "other": "%{formattedCount} lugares nuevos de %{names}"
+  },
   "sharedLists.alsoAddTo": "Agregar también a",
   "sharedLists.alsoAddFull": "%{name} está llena. Quita un lugar para agregar más.",
   "sharedLists.alsoAddAlready": "Estos lugares ya están en %{name}.",
@@ -1189,11 +1225,9 @@
   },
   "passport.wantToGo": "Quiero ir",
   "passport.title": "Pasaporte",
-  "passport.yourPassport": "Tu pasaporte",
   "passport.beenTitle": "¿Ya fuiste a alguno?",
   "passport.beenBody": "Sella los lugares a los que ya fuiste",
   "passport.beenSomewhere": "¿Ya fuiste a algún lugar?",
-  "passport.rowCities": "%{places} · %{cities}",
   "passport.placesCount": {
     "one": "%{formattedCount} lugar",
     "many": "%{formattedCount} lugares",
@@ -1204,6 +1238,14 @@
     "many": "%{formattedCount} ciudades",
     "other": "%{formattedCount} ciudades"
   },
+  "passport.countriesCount": {
+    "one": "%{formattedCount} país",
+    "many": "%{formattedCount} países",
+    "other": "%{formattedCount} países"
+  },
+  "passport.heroStamped": "Lugares sellados",
+  "passport.heroWhere": "%{cities} · %{countries}",
+  "passport.heroNext": "Próxima insignia: %{badge}",
   "passport.places": "Lugares",
   "passport.cities": "Ciudades",
   "passport.countries": "Países",
@@ -1437,14 +1479,13 @@
   "onboardingChart.whenTrip": "Tu próximo viaje",
   "onboardingChart.chartLabel": "Una curva desde %{lost} ahora hasta %{goal}. %{when}",
   "onboardingStatement.cityPicked": "%{city}. Buena elección.\n\nGuardemos tus primeros lugares en %{city}.",
-  "onboardingStatement.cityFirst": "%{picked}. Buena elección.\n\nPrimero, probemos con un reel real de %{city}.",
   "onboardingStatement.cityStart": "Guardemos tus primeros lugares en %{city}.",
   "onboardingStatement.firstSave": "¡Tu primer guardado!\nTodo un talento natural.\n\nAhora veámoslo en tu mapa 🗺️",
   "onboardingCarousel.together": "Planea en conjunto\ncon tu gente.",
   "onboardingCarousel.eat": "Se acabó el «¿dónde\ncomemos?»",
   "onboardingCarousel.map": "Cada lugar que guardaste,\nen un solo mapa.",
   "onboardingCarousel.next": "Siguiente diapositiva",
-  "sharedLists.nameBodyWelcome": "Las personas de tus listas compartidas lo ven, y también cualquiera con un enlace a un contenido que compartas o a una lista que te pertenezca.",
+  "sharedLists.nameBodyWelcome": "Las personas de tus listas compartidas lo ven, y también cualquiera con un enlace a un contenido que compartas, a una lista que te pertenezca o a una selección que envíes.",
   "tripSetup.title": "Planea tu próxima aventura",
   "tripSetup.cover": "Agregar foto de portada",
   "tripSetup.coverFailed": "No se pudo agregar la foto de portada.",

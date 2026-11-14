@@ -27,6 +27,8 @@ import { rateLimiter } from "./model/rateLimiter";
 import {
   departMember,
   foundPlace,
+  freshAdders,
+  freshPlaces,
   inviteToken,
   invitePreviewValidator,
   isNewPlace,
@@ -39,7 +41,6 @@ import {
   MAX_LIST_MEMBERS,
   MAX_LISTS_PER_USER,
   memberOf,
-  newPlaceCount,
   previewNames,
   savePlaces,
   sharedListDetailValidator,
@@ -217,12 +218,14 @@ export const listSharedLists = authedQuery({
       if (list === null) continue;
       const members = await listMembers(ctx, list._id);
       const names = await memberNames(ctx, members);
+      const fresh = await freshPlaces(ctx, membership);
       lists.push({
         _id: list._id,
         name: list.name,
         placeCount: list.placeCount,
-        newCount: await newPlaceCount(ctx, membership),
         cities: list.cities,
+        newCount: fresh.length,
+        newFrom: freshAdders(fresh, names),
         isOwner: list.ownerId === userId,
         members: members.map((member) => {
           const firstName = names.get(member.userId);
@@ -300,6 +303,10 @@ export const getSharedList = authedQuery({
               : {}),
           };
         }),
+      ),
+      newFrom: freshAdders(
+        places.filter((place) => isNewPlace(place, membership)),
+        names,
       ),
       trips: trips.map(tripSummary),
     };

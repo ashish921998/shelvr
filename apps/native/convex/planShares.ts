@@ -18,18 +18,26 @@ import {
   MAX_PLACE_NAME_CHARS,
   MAX_PLAN_PLACES,
   MAX_WHY_CHARS,
+  PLAN_SHARE_TTL_MS,
   placeKey,
 } from "./model/plan";
+import {
+  latestVote,
+  PLAN_VOTE_PUSH_DELAY_MS,
+  planVotePushLive,
+  voterFields,
+} from "./model/planVote";
 import { userVisits, visitedKeysOnItem } from "./model/placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
+import { cityKey } from "./model/trip";
 import { requireProEntitlement } from "./subscriptions";
 import { ipKey, ipNetwork } from "./model/clientIp";
 
-export const PLAN_SHARE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const MAX_PLAN_VOTERS = 20;
 const MAX_VOTE_ROWS = MAX_PLAN_VOTERS * 2;
 const MAX_CITY_CHARS = 60;
 const DELETE_BATCH = 50;
+const CITY_SHARE_SCAN = 50;
 
 const sharedPlaceValidator = v.object({
   name: v.string(),
@@ -43,6 +51,8 @@ const voteOutcomeValidator = v.union(
   v.literal("missing"),
   v.literal("full"),
 );
+
+type SharePlace = Doc<"planShares">["places"][number];
 
 function clean(text: string, max: number): string {
   return text.replace(/\s+/g, " ").trim().slice(0, max);
@@ -67,6 +77,50 @@ async function liveShare(
   const space = await ctx.db.get(share.spaceId);
   if (space === null || space.userId !== share.userId) return null;
   return share;
+}
+
+export async function newestCityShare(
+  ctx: QueryCtx,
+  userId: string,
+  city: string,
+): Promise<Doc<"planShares"> | null> {
+  const key = cityKey(city);
+  if (key === "") return null;
+  const shares = await ctx.db
+    .query("planShares")
+    .withIndex("by_user", (q) => q.eq("userId", userId))
+    .order("desc")
+    .take(CITY_SHARE_SCAN);
+  return (
+    shares.find(
+      (share) => share.city !== undefined && cityKey(share.city) === key,
+    ) ?? null
+  );
+}
+
+export async function liveSharePlaces(
+  ctx: QueryCtx,
+  share: Doc<"planShares">,
+): Promise<{ place: SharePlace; item: Doc<"items"> }[]> {
+  const live = [];
+  for (const place of share.places) {
+    const item = await ctx.db.get(place.itemId);
+    if (item !== null && item.userId === share.userId) {
+      live.push({ place, item });
+    }
+  }
+  return live;
+}
+
+export async function shareVotes(
+  ctx: QueryCtx,
+  shareId: Id<"planShares">,
+): Promise<Doc<"planVotes">[]> {
+  const rows = await ctx.db
+    .query("planVotes")
+    .withIndex("by_share_and_voter", (q) => q.eq("shareId", shareId))
+    .take(MAX_VOTE_ROWS);
+  return rows.filter(hasVote);
 }
 
 export const createPlanShare = authedMutation({
@@ -191,6 +245,58 @@ export const latestPlanShare = authedQuery({
   },
 });
 
+export const cityPlanVotes = authedQuery({
+  args: { city: v.string() },
+  returns: v.union(
+    v.null(),
+    v.object({
+      token: v.string(),
+      expiresAt: v.number(),
+      voters: v.number(),
+      places: v.array(
+        v.object({
+          key: v.string(),
+          name: v.string(),
+          itemId: v.id("items"),
+          picks: v.number(),
+          passes: v.number(),
+        }),
+      ),
+      latest: v.optional(
+        v.object({
+          name: v.optional(v.string()),
+          place: v.string(),
+          choice: v.union(v.literal("pick"), v.literal("pass")),
+        }),
+      ),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const share = await newestCityShare(ctx, ctx.userId, args.city);
+    if (share === null) return null;
+    const space = await ctx.db.get(share.spaceId);
+    if (space === null || space.userId !== share.userId) return null;
+    const live = await liveSharePlaces(ctx, share);
+    if (live.length === 0) return null;
+    const votes = await shareVotes(ctx, share._id);
+    const places = live.map(({ place }) => ({
+      key: place.key,
+      name: place.name,
+      itemId: place.itemId,
+      picks: votes.filter((vote) => vote.picks.includes(place.key)).length,
+      passes: votes.filter((vote) => vote.passes.includes(place.key)).length,
+    }));
+    const latest = latestVote(votes, places);
+    return {
+      token: share.token,
+      expiresAt: share.expiresAt,
+      voters: votes.length,
+      places,
+      ...(latest !== undefined ? { latest } : {}),
+    };
+  },
+});
+
 export const getPublicPlanShare = internalQuery({
   args: { token: v.string() },
   returns: v.union(
@@ -214,9 +320,7 @@ export const getPublicPlanShare = internalQuery({
     const share = await liveShare(ctx, args.token);
     if (share === null) return null;
     const places = [];
-    for (const place of share.places) {
-      const item = await ctx.db.get(place.itemId);
-      if (item === null || item.userId !== share.userId) continue;
+    for (const { place, item } of await liveSharePlaces(ctx, share)) {
       const imageUrl =
         item.type === "image" || item.storageId === undefined
           ? null
@@ -246,6 +350,7 @@ export const recordPlanVote = internalMutation({
     picks: v.array(v.string()),
     passes: v.array(v.string()),
     revision: v.optional(v.number()),
+    name: v.optional(v.string()),
     ip: v.optional(v.string()),
   },
   returns: voteOutcomeValidator,
@@ -269,6 +374,12 @@ export const recordPlanVote = internalMutation({
         q.eq("shareId", share._id).eq("voterId", voterId),
       )
       .unique();
+    const fields = voterFields(
+      existing,
+      { name: args.name, picks, passes },
+      share.places.map((place) => place.key),
+      Date.now(),
+    );
     const empty = picks.length === 0 && passes.length === 0;
     if (existing !== null) {
       if (
@@ -278,10 +389,10 @@ export const recordPlanVote = internalMutation({
       ) {
         return "recorded";
       }
+      const firstChoice = !empty && !hasVote(existing);
       if (
-        !empty &&
-        !hasVote(existing) &&
-        (await activeVoters(ctx, share._id)) >= MAX_PLAN_VOTERS
+        firstChoice &&
+        (await shareVotes(ctx, share._id)).length >= MAX_PLAN_VOTERS
       ) {
         return "full";
       }
@@ -290,7 +401,10 @@ export const recordPlanVote = internalMutation({
         passes,
         revision: args.revision,
         updatedAt: Date.now(),
+        name: fields.name,
+        last: fields.last,
       });
+      await queueVoteNotice(ctx, share, voterId, firstChoice);
       return "recorded";
     }
     if (empty && args.revision === undefined) return "recorded";
@@ -313,24 +427,55 @@ export const recordPlanVote = internalMutation({
       passes,
       revision: args.revision,
       updatedAt: Date.now(),
+      name: fields.name,
+      last: fields.last,
     });
+    await queueVoteNotice(ctx, share, voterId, !empty);
     return "recorded";
   },
 });
 
-function hasVote(vote: Doc<"planVotes">): boolean {
-  return vote.picks.length + vote.passes.length > 0;
+async function queueVoteNotice(
+  ctx: MutationCtx,
+  share: Doc<"planShares">,
+  voterId: string,
+  firstChoice: boolean,
+) {
+  if (!firstChoice || share.city === undefined) return;
+  const queued = await ctx.db
+    .query("planVoteNotices")
+    .withIndex("by_share", (q) => q.eq("shareId", share._id))
+    .first();
+  if (queued !== null) return;
+  const votes = await shareVotes(ctx, share._id);
+  if (votes.some((vote) => vote.voterId !== voterId)) return;
+  const now = Date.now();
+  if (!planVotePushLive()) {
+    await ctx.db.insert("planVoteNotices", {
+      shareId: share._id,
+      voterId,
+      createdAt: now,
+      deliveryStatus: "failed",
+      deliveryError: "push_off",
+    });
+    return;
+  }
+  const noticeId = await ctx.db.insert("planVoteNotices", {
+    shareId: share._id,
+    voterId,
+    createdAt: now,
+    deliveryStatus: "pending",
+    deliveryNextAttemptAt: now + PLAN_VOTE_PUSH_DELAY_MS,
+  });
+  await ctx.scheduler.runAfter(
+    PLAN_VOTE_PUSH_DELAY_MS,
+    internal.notificationDelivery.sendPlanVote,
+    { noticeId },
+  );
 }
 
-async function activeVoters(
-  ctx: QueryCtx,
-  shareId: Id<"planShares">,
-): Promise<number> {
-  const rows = await ctx.db
-    .query("planVotes")
-    .withIndex("by_share_and_voter", (q) => q.eq("shareId", shareId))
-    .take(MAX_VOTE_ROWS);
-  return rows.filter(hasVote).length;
+function hasVote(vote: Doc<"planVotes">): boolean {
+  return vote.picks.length + vote.passes.length > 0;
 }
 
 async function deleteShare(ctx: MutationCtx, share: Doc<"planShares">) {
@@ -340,6 +485,13 @@ async function deleteShare(ctx: MutationCtx, share: Doc<"planShares">) {
     .take(MAX_VOTE_ROWS);
   for (const vote of votes) {
     await ctx.db.delete(vote._id);
+  }
+  const notices = await ctx.db
+    .query("planVoteNotices")
+    .withIndex("by_share", (q) => q.eq("shareId", share._id))
+    .take(MAX_VOTE_ROWS);
+  for (const notice of notices) {
+    await ctx.db.delete(notice._id);
   }
   await ctx.db.delete(share._id);
 }

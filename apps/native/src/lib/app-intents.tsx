@@ -3,6 +3,7 @@ import {
   drainInvocations,
   isSaveInvocation,
 } from "@/lib/app-intent-invocations";
+import { revokeFailureReason, revokeWithRetry } from "@/lib/capture-revoke";
 import { useCurrentUser } from "@/lib/current-user";
 import { useEntitlement } from "@/lib/entitlement";
 import { canSave } from "@/lib/access";
@@ -232,9 +233,11 @@ export async function revokeSiriCapture(
 ): Promise<void> {
   try {
     const token = await setup?.captureToken();
-    if (token) await revoke({ token });
+    if (token) await revokeWithRetry(() => revoke({ token }));
   } catch (error) {
-    analytics.captureError("app_intents_revoke_failed", error);
+    analytics.captureError("app_intents_revoke_failed", error, {
+      reason: revokeFailureReason(error),
+    });
   }
 }
 

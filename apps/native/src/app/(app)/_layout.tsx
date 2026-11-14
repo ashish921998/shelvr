@@ -128,10 +128,6 @@ export default function AppLayout() {
               options={{ headerShown: false }}
             />
             <Stack.Screen
-              name="passport"
-              options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
-            />
-            <Stack.Screen
               name="city-stamps"
               options={{ headerBackButtonDisplayMode: "minimal" }}
             />

@@ -35,6 +35,17 @@
         "one": "Du hast %{formattedCount} Ort zum Besuchen gespeichert.",
         "other": "Du hast %{formattedCount} Orte zum Besuchen gespeichert."
       }
+    },
+    "planVote": {
+      "title": "Erste Stimme zu deiner Auswahl für %{city}",
+      "pick": {
+        "named": "%{name} wäre bei %{place} dabei.",
+        "someone": "Jemand wäre bei %{place} dabei."
+      },
+      "pass": {
+        "named": "%{name} würde %{place} auslassen.",
+        "someone": "Jemand würde %{place} auslassen."
+      }
     }
   },
   "en": {
@@ -72,6 +83,17 @@
       "body": {
         "one": "You saved %{formattedCount} place to go.",
         "other": "You saved %{formattedCount} places to go."
+      }
+    },
+    "planVote": {
+      "title": "First vote on your %{city} shortlist",
+      "pick": {
+        "named": "%{name} would go to %{place}.",
+        "someone": "Someone would go to %{place}."
+      },
+      "pass": {
+        "named": "%{name} would pass on %{place}.",
+        "someone": "Someone would pass on %{place}."
       }
     }
   },
@@ -115,6 +137,17 @@
         "many": "Guardaste %{formattedCount} de lugares para visitar.",
         "other": "Guardaste %{formattedCount} lugares para visitar."
       }
+    },
+    "planVote": {
+      "title": "Primer voto en tu selección para %{city}",
+      "pick": {
+        "named": "%{name} iría a %{place}.",
+        "someone": "Alguien iría a %{place}."
+      },
+      "pass": {
+        "named": "%{name} no iría a %{place}.",
+        "someone": "Alguien no iría a %{place}."
+      }
     }
   },
   "es-MX": {
@@ -156,6 +189,17 @@
         "one": "Guardaste %{formattedCount} lugar para visitar.",
         "many": "Guardaste %{formattedCount} de lugares para visitar.",
         "other": "Guardaste %{formattedCount} lugares para visitar."
+      }
+    },
+    "planVote": {
+      "title": "Primer voto en tu selección para %{city}",
+      "pick": {
+        "named": "%{name} iría a %{place}.",
+        "someone": "Alguien iría a %{place}."
+      },
+      "pass": {
+        "named": "%{name} no iría a %{place}.",
+        "someone": "Alguien no iría a %{place}."
       }
     }
   },
@@ -199,6 +243,17 @@
         "many": "Vous avez enregistré %{formattedCount} de lieux à visiter.",
         "other": "Vous avez enregistré %{formattedCount} lieux à visiter."
       }
+    },
+    "planVote": {
+      "title": "Premier vote sur votre sélection pour %{city}",
+      "pick": {
+        "named": "%{name} irait à %{place}.",
+        "someone": "Quelqu’un irait à %{place}."
+      },
+      "pass": {
+        "named": "%{name} n’irait pas à %{place}.",
+        "someone": "Quelqu’un n’irait pas à %{place}."
+      }
     }
   },
   "fr-CA": {
@@ -241,6 +296,17 @@
         "many": "Vous avez enregistré %{formattedCount} de lieux à visiter.",
         "other": "Vous avez enregistré %{formattedCount} lieux à visiter."
       }
+    },
+    "planVote": {
+      "title": "Premier vote sur votre sélection pour %{city}",
+      "pick": {
+        "named": "%{name} irait à %{place}.",
+        "someone": "Quelqu’un irait à %{place}."
+      },
+      "pass": {
+        "named": "%{name} n’irait pas à %{place}.",
+        "someone": "Quelqu’un n’irait pas à %{place}."
+      }
     }
   },
   "ja": {
@@ -275,6 +341,17 @@
       "body": {
         "other": "行きたい場所を%{formattedCount}件保存しています。"
       }
+    },
+    "planVote": {
+      "title": "%{city}の候補リストに最初の投票が届きました",
+      "pick": {
+        "named": "%{name}さんは%{place}に行きたいそうです。",
+        "someone": "誰かが%{place}に行きたいそうです。"
+      },
+      "pass": {
+        "named": "%{name}さんは%{place}をパスしました。",
+        "someone": "誰かが%{place}をパスしました。"
+      }
     }
   },
   "ko": {
@@ -308,6 +385,17 @@
       "title": "%{city} 여행이 내일이에요",
       "body": {
         "other": "가 볼 장소를 %{formattedCount}곳 저장했어요."
+      }
+    },
+    "planVote": {
+      "title": "%{city} 추천 목록에 첫 투표가 들어왔어요",
+      "pick": {
+        "named": "%{name}님은 %{place}에 가고 싶어 해요.",
+        "someone": "누군가 %{place}에 가고 싶어 해요."
+      },
+      "pass": {
+        "named": "%{name}님은 %{place}에는 안 간대요.",
+        "someone": "누군가 %{place}에는 안 간대요."
       }
     }
   },
@@ -350,6 +438,17 @@
         "one": "Você salvou %{formattedCount} lugar para visitar.",
         "many": "Você salvou %{formattedCount} de lugares para visitar.",
         "other": "Você salvou %{formattedCount} lugares para visitar."
+      }
+    },
+    "planVote": {
+      "title": "Primeiro voto na sua seleção de %{city}",
+      "pick": {
+        "named": "%{name} toparia ir a %{place}.",
+        "someone": "Alguém toparia ir a %{place}."
+      },
+      "pass": {
+        "named": "%{name} não toparia ir a %{place}.",
+        "someone": "Alguém não toparia ir a %{place}."
       }
     }
   }

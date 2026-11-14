@@ -30,11 +30,6 @@ vi.mock("@/components/ui/themed-text", () => ({
     <span>{children}</span>
   )),
 }));
-vi.mock("@/components/passport/passport-row", () => ({
-  PassportRow: vi.fn(({ hideEmpty }: { hideEmpty?: boolean }) => (
-    <span>{hideEmpty ? "passport if stamped" : "passport"}</span>
-  )),
-}));
 vi.mock("@/components/ui/button", () => ({
   Button: vi.fn(
     ({ title, onPress }: { title: string; onPress: () => void }) => (
@@ -138,16 +133,4 @@ it("does not open Add when the guard refuses", () => {
   render(<HomePlacesEmptyCard />);
   fireEvent.click(screen.getByRole("button", { name: "Add a spot" }));
   expect(mocks.push).not.toHaveBeenCalled();
-});
-
-it("shows the passport under the rows once a city loads", () => {
-  render(<HomePlaces saves={[]} />);
-  expect(screen.getByText("passport")).toBeTruthy();
-});
-
-it("keeps only the stamped passport on Home once the last city is gone", () => {
-  mocks.cities = [];
-  render(<HomePlaces saves={[]} />);
-  expect(screen.getByText("passport if stamped")).toBeTruthy();
-  expect(screen.queryByText("passport")).toBeNull();
 });

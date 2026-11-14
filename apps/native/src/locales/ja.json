@@ -214,6 +214,7 @@
   "notifications.remindersHelp": "保存した場所、未読の記事、試したいレシピを、1日1回まで",
   "notifications.remindersToggle": "保存アイテムのリマインダー通知",
   "notifications.remindersChannel": "保存アイテムのリマインダー",
+  "notifications.planVotesChannel": "プランへの投票",
   "notifications.remindersDisabledBody": "保存アイテムのリマインダーを受け取るには、端末の設定でShelvrの通知を許可してください。",
   "feedback.open": "フィードバックを送る",
   "support.contact": "サポートに問い合わせる",
@@ -346,6 +347,24 @@
     "other": "残り%{formattedCount}日。"
   },
   "plan.tally": "行きたい%{picks}、パス%{passes}",
+  "plan.votePushTitle": "%{city}の候補リストに最初の投票が届きました",
+  "plan.wouldGo": "%{name}さんは%{place}に行きたいそうです。",
+  "plan.wouldPass": "%{name}さんは%{place}をパスしました。",
+  "plan.someoneWouldGo": "誰かが%{place}に行きたいそうです。",
+  "plan.someoneWouldPass": "誰かが%{place}をパスしました。",
+  "plan.askHint": "リンクを送ると、相手が行きたい場所を選びます。",
+  "plan.askBody": "最大%{limit}か所まで選んでください。相手が行きたい場所に✓を付けると、ここに投票が表示されます。",
+  "plan.askSend": "投票リンクを送る",
+  "plan.newLinkHint": "場所を変えると新しいリンクになります。前のリンクの投票はここに表示されなくなります。",
+  "plan.shareLink": "投票リンクを共有",
+  "plan.noVotesYet": "まだ投票はありません",
+  "plan.votedPick": "%{name}さんが%{place}に✓を付けました",
+  "plan.votedPass": "%{name}さんが%{place}に✕を付けました",
+  "plan.someoneVotedPick": "誰かが%{place}に✓を付けました",
+  "plan.someoneVotedPass": "誰かが%{place}に✕を付けました",
+  "plan.votingClosed": {
+    "other": "投票は終了しました。%{formattedCount}人が投票しました。"
+  },
   "trip.make": "旅行を計画",
   "trip.pickTitle": "旅行",
   "trip.pickBody": "保存した場所を日ごとのプランに",
@@ -779,7 +798,7 @@
   "onboardingQ.goalFood": "食事の場所",
   "onboardingQ.goalFoodBody": "近くで、今週",
   "onboardingQ.goalEverything": "ぜんぶ少しずつ",
-  "onboardingQ.cityBody": "そこの実際のリールがあればそれで、なければリールのある街で練習します。",
+  "onboardingQ.cityBody": "その街の穴場を紹介する実際のリールで練習します。",
   "onboardingNotify.title": "保存した場所を見逃さないように。",
   "onboardingNotify.sub": "旅行の前や、まだ行けるうちに、Shelvrがお知らせします。",
   "onboardingNotify.allow": "リマインダーをオンにする",
@@ -1039,6 +1058,15 @@
   "sharedLists.newCount": {
     "other": "新着%{formattedCount}件"
   },
+  "sharedLists.activityOne": {
+    "other": "%{name}が%{formattedCount}か所を追加しました"
+  },
+  "sharedLists.activitySomeone": {
+    "other": "誰かが%{formattedCount}か所を追加しました"
+  },
+  "sharedLists.activityMany": {
+    "other": "%{names}から新着%{formattedCount}か所"
+  },
   "sharedLists.alsoAddTo": "こちらにも追加",
   "sharedLists.alsoAddFull": "%{name}はいっぱいです。さらに追加するには、場所を削除してください。",
   "sharedLists.alsoAddAlready": "これらの場所はすでに%{name}にあります。",
@@ -1125,17 +1153,21 @@
   },
   "passport.wantToGo": "行きたい",
   "passport.title": "パスポート",
-  "passport.yourPassport": "あなたのパスポート",
   "passport.beenTitle": "行ったことのある場所は？",
   "passport.beenBody": "もう行った場所にスタンプを押しましょう",
   "passport.beenSomewhere": "もう行った場所がある？",
-  "passport.rowCities": "%{places} · %{cities}",
   "passport.placesCount": {
     "other": "%{formattedCount}か所"
   },
   "passport.citiesCount": {
     "other": "%{formattedCount}都市"
   },
+  "passport.countriesCount": {
+    "other": "%{formattedCount}か国"
+  },
+  "passport.heroStamped": "スタンプした場所",
+  "passport.heroWhere": "%{cities} · %{countries}",
+  "passport.heroNext": "次のバッジ：%{badge}",
   "passport.places": "場所",
   "passport.cities": "都市",
   "passport.countries": "国",
@@ -1311,14 +1343,13 @@
   "onboardingChart.whenTrip": "次の旅行",
   "onboardingChart.chartLabel": "今の%{lost}から%{goal}へのカーブ。%{when}",
   "onboardingStatement.cityPicked": "%{city}。いい選択です。\n\n%{city}で最初の場所を保存しましょう。",
-  "onboardingStatement.cityFirst": "%{picked}。いい選択です。\n\nまずは%{city}の実際のリールで試してみましょう。",
   "onboardingStatement.cityStart": "%{city}で最初の場所を保存しましょう。",
   "onboardingStatement.firstSave": "最初の保存、できました！\nセンスありますね。\n\n次は地図で見てみましょう 🗺️",
   "onboardingCarousel.together": "大切な人たちと\n一緒に計画しよう。",
   "onboardingCarousel.eat": "「どこで食べる？」は\nもう終わり。",
   "onboardingCarousel.map": "保存した場所すべてを、\nひとつの地図に。",
   "onboardingCarousel.next": "次のスライド",
-  "sharedLists.nameBodyWelcome": "共有リストの相手に表示されます。あなたが共有した項目のリンクや、あなたが所有するリストのリンクを持つ人にも表示されます。",
+  "sharedLists.nameBodyWelcome": "共有リストの相手に表示されます。あなたが共有した項目のリンク、あなたが所有するリストのリンク、あなたが送った候補リストのリンクを持つ人にも表示されます。",
   "tripSetup.title": "次の旅を計画しましょう",
   "tripSetup.cover": "カバー写真を追加",
   "tripSetup.coverFailed": "カバー写真を追加できませんでした。",

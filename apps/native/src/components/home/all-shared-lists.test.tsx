@@ -52,7 +52,11 @@ vi.mock("@/components/home/shared-lists-section", () => ({
     ),
   ),
 }));
-vi.mock("@/lib/shared-lists", () => ({ useSharedLists: () => mocks.lists }));
+vi.mock("@/lib/shared-lists", () => ({
+  useSharedLists: () => mocks.lists,
+  activityLine: (newFrom: unknown[]) =>
+    newFrom.length > 0 ? "Priya added 2 places" : null,
+}));
 vi.mock("@/lib/free-plan", () => ({ useAccess: () => mocks.access }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: mocks.cities }),

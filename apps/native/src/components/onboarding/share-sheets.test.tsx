@@ -100,7 +100,7 @@ it("offers Shelvr immediately after More, without a pinning interaction", () => 
 });
 
 it.each(["date", "trip", "weekend"] as const)(
-  "shows a saveable %s reel with matching map data when the selected city has no reel",
+  "shows a saveable %s reel with matching map data for the selected city",
   (kind) => {
     const sample = ahaSample(kind, "lisbon");
     render(<AhaReel sample={sample} onShare={vi.fn()} />);

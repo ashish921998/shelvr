@@ -89,6 +89,7 @@ const SF_TO_MATERIAL = {
   "map.fill": "map",
   "bookmark.fill": "bookmark",
   "books.vertical.fill": "library_books",
+  "book.closed.fill": "menu_book",
   "dice.fill": "casino",
 } as const satisfies Partial<Record<SFSymbol, AndroidSymbol>>;
 

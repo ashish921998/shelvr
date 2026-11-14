@@ -57,6 +57,7 @@ it("counts every save and trip once all of them are loaded", () => {
   render(<LibraryRows />);
   expect(screen.getAllByRole("button").map((row) => row.textContent)).toEqual([
     "Trips, 3",
+    "Passport",
     "All saves, 23",
   ]);
 });
@@ -86,6 +87,7 @@ it("puts Cities between Trips and All saves, and hides it without cities", () =>
   const { unmount } = render(<LibraryRows cityCount={4} />);
   expect(screen.getAllByRole("button").map((row) => row.textContent)).toEqual([
     "Trips, 3",
+    "Passport",
     "Cities, 4",
     "All saves, 23",
   ]);
@@ -94,7 +96,7 @@ it("puts Cities between Trips and All saves, and hides it without cities", () =>
   expect(screen.queryByText(/Cities/)).toBeNull();
 });
 
-it("opens Cities, All saves and the Trips tab", () => {
+it("opens Cities, All saves and the Trips and Passport tabs", () => {
   render(<LibraryRows cityCount={4} />);
   fireEvent.click(screen.getByText("Cities, 4"));
   expect(mocks.push).toHaveBeenCalledWith("/cities");
@@ -102,6 +104,8 @@ it("opens Cities, All saves and the Trips tab", () => {
   expect(mocks.push).toHaveBeenCalledWith("/saves");
   fireEvent.click(screen.getByText("Trips, 3"));
   expect(mocks.navigate).toHaveBeenCalledWith("/(app)/(tabs)/(trips)");
+  fireEvent.click(screen.getByText("Passport"));
+  expect(mocks.navigate).toHaveBeenCalledWith("/(app)/(tabs)/(passport)");
 });
 
 it("keeps Trips and leaves out All saves when there are no saves", () => {
@@ -109,6 +113,7 @@ it("keeps Trips and leaves out All saves when there are no saves", () => {
   render(<LibraryRows />);
   expect(screen.getAllByRole("button").map((row) => row.textContent)).toEqual([
     "Trips, 3",
+    "Passport",
   ]);
   fireEvent.click(screen.getByText("Trips, 3"));
   expect(mocks.navigate).toHaveBeenCalledWith("/(app)/(tabs)/(trips)");

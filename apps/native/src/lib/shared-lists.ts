@@ -186,10 +186,41 @@ export function partnerName(members: NamedMember[]): string {
   return otherNames(members)[0] ?? t("sharedLists.someone");
 }
 
+export function activityLine(
+  newFrom: SharedListDetail["newFrom"],
+): string | null {
+  const [first] = newFrom;
+  if (first === undefined) return null;
+  if (newFrom.length === 1) {
+    return first.firstName === undefined
+      ? t("sharedLists.activitySomeone", { count: first.count })
+      : t("sharedLists.activityOne", {
+          name: first.firstName,
+          count: first.count,
+        });
+  }
+  return t("sharedLists.activityMany", {
+    count: newFrom.reduce((sum, group) => sum + group.count, 0),
+    names: newFrom
+      .map((group) => group.firstName ?? t("sharedLists.someone"))
+      .join(", "),
+  });
+}
+
 export type ListRow = { place: SharedListPlace; pin: CityPin };
 
 export function inCity(place: { city?: string }, city: string): boolean {
   return place.city !== undefined && cityKey(place.city) === cityKey(city);
+}
+
+export function freshCity(
+  detail: Pick<SharedListDetail, "cities" | "places">,
+): string | null {
+  return (
+    detail.cities.find((city) =>
+      detail.places.some((place) => place.isNew && inCity(place, city)),
+    ) ?? null
+  );
 }
 
 export function listRows(places: SharedListPlace[], city: string): ListRow[] {
@@ -225,10 +256,14 @@ type ListSectionRow =
   | { kind: "heading"; id: string; label: string; fresh: boolean }
   | { kind: "place"; id: string; row: ListRow };
 
-export function listSectionRows(
-  rows: ListRow[],
-  partner: string,
-): ListSectionRow[] {
+function addersOf(rows: ListRow[]): string {
+  const names = rows.map(
+    (row) => row.place.addedByName ?? t("sharedLists.someone"),
+  );
+  return [...new Set(names)].join(", ");
+}
+
+export function listSectionRows(rows: ListRow[]): ListSectionRow[] {
   const place = (row: ListRow): ListSectionRow => ({
     kind: "place",
     id: cityPinId(row.pin),
@@ -241,7 +276,7 @@ export function listSectionRows(
     {
       kind: "heading",
       id: "fresh",
-      label: t("sharedLists.newFrom", { name: partner }),
+      label: t("sharedLists.newFrom", { name: addersOf(fresh) }),
       fresh: true,
     },
     ...fresh.map(place),

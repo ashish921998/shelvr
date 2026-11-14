@@ -145,7 +145,7 @@ export default function AlreadyBeenScreen() {
       if (!active.current) return;
       const moment = bulkStampMoment(count, picked);
       if (moment) queueStamp(moment, "already_been");
-      router.dismissTo("/passport");
+      router.dismissTo("/(app)/(tabs)/(passport)");
     } catch (error) {
       analytics.captureError("passport_backfill_failed", error);
       if (!active.current) return;

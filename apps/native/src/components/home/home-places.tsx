@@ -1,7 +1,6 @@
 import { LibraryRows } from "@/components/home/library-rows";
 import { ReviewSaves, type ReviewSave } from "@/components/home/review-saves";
 import { SharedListsSection } from "@/components/home/shared-lists-section";
-import { PassportRow } from "@/components/passport/passport-row";
 import { AppSymbolIcon } from "@/components/symbol";
 import { Button } from "@/components/ui/button";
 import { ThemedText } from "@/components/ui/themed-text";
@@ -21,29 +20,26 @@ export function HomePlacesEmptyCard() {
   const { theme } = useUnistyles();
   const { guard } = useSaveGuard("home");
   return (
-    <>
-      <PassportRow hideEmpty />
-      <View style={styles.card}>
-        <View style={styles.cardIcon}>
-          <AppSymbolIcon
-            name="mappin"
-            size={26}
-            tintColor={theme.colors.primaryText}
-          />
-        </View>
-        <ThemedText variant="title" style={styles.centered}>
-          {t("homePlaces.emptyTitle")}
-        </ThemedText>
-        <ThemedText variant="subhead" style={[styles.centered, styles.muted]}>
-          {t("homePlaces.emptyBody")}
-        </ThemedText>
-        <Button
-          title={t("homePlaces.addSpot")}
-          onPress={() => void guard(() => router.push("/add"))}
-          style={styles.cardButton}
+    <View style={styles.card}>
+      <View style={styles.cardIcon}>
+        <AppSymbolIcon
+          name="mappin"
+          size={26}
+          tintColor={theme.colors.primaryText}
         />
       </View>
-    </>
+      <ThemedText variant="title" style={styles.centered}>
+        {t("homePlaces.emptyTitle")}
+      </ThemedText>
+      <ThemedText variant="subhead" style={[styles.centered, styles.muted]}>
+        {t("homePlaces.emptyBody")}
+      </ThemedText>
+      <Button
+        title={t("homePlaces.addSpot")}
+        onPress={() => void guard(() => router.push("/add"))}
+        style={styles.cardButton}
+      />
+    </View>
   );
 }
 
@@ -60,7 +56,6 @@ export function HomePlaces({ saves }: { saves: ReviewSave[] }) {
         <LibraryRows cityCount={loaded?.length} />
         <ReviewSaves saves={saves} />
       </View>
-      {loaded && loaded.length > 0 ? <PassportRow /> : null}
       <SharedListsSection cities={loaded} />
       {loaded?.length === 0 ? (
         <View style={styles.emptyCities}>

@@ -18,12 +18,12 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 3. **What would you like to plan?:** any of **Date nights**, **Trips** and **Places to eat**, or **A bit of everything** for all three. Each starts the shelf with one space (Date nights, Travel, Restaurants to try). **Continue** waits for at least one; **Skip** picks all three.
 4. **Where have you been?:** photo tiles of 25 cities with a "Search cities" field; any number can be picked. **Continue** waits for at least one; **Skip** moves on with none. The picks stay on the device until sign-in, then are saved to the account as city stamps in the Passport, on the free plan too; when cities were picked, the paywall's first headline counts them. Adding more cities later, from **I’ve been to…** in the Passport, needs Pro. No location is read.
 5. **Chart:** the headline "Let’s put your saves to use.", and a curve that draws itself from "Lost in your saves" (Now) to "Date night planned", "Trip planned" or "Weekend planned", following the goals. It is drawn already with Reduce Motion on. **Continue** moves on.
-6. **City:** photo tiles of cities, plus "Not sure yet" (when Trips is picked without Date nights) or "Somewhere else". The title is "Where’s your next trip?" when Trips is picked without Date nights, and "Where do you go out?" otherwise. One tap picks a city and moves on. The answer is retained; when that city has no sample reel, the demonstration uses Austin for the same goal instead.
-7. **Echo of the city:** a statement screen names the city whose reel the demonstration plays. When a city was picked, it praises that city too, even when the demonstration plays another city's reel. One button, **Continue**.
-8. **Sample reel:** "Try saving this reel." shows a real public Instagram reel labelled a sample, muted, credited to its creator. Austin, New York, Los Angeles, Chicago and San Francisco have reels for each goal; other city choices and a skipped city use Austin's reel for that goal. The app loads the reel's public embed page out of sight and plays its video in its own player, over the sample city's photo, which stays when the reel cannot load. The map and carousel use that reel's city and first three places. The video cannot be tapped. Everything after it is drawn inside the app (not the system share sheet), one tap per screen, with a pill naming the tap:
+6. **City:** photo tiles of the 25 cities, plus "Not sure yet" (when Trips is picked without Date nights) or "Somewhere else". The title is "Where’s your next trip?" when Trips is picked without Date nights, and "Where do you go out?" otherwise. One tap picks a city and moves on. The answer is retained, and the demonstration plays that city's reel.
+7. **Echo of the city:** a statement screen names the city whose reel the demonstration plays, and praises it when the person picked it. One button, **Continue**.
+8. **Sample reel:** "Try saving this reel." shows a real public Instagram reel labelled a sample, muted, credited to its creator. Each of the 25 cities has its own reel about the city's hidden gems, used for every goal; a skipped city uses Austin's reel. The app loads the reel's public embed page out of sight and plays its video in its own player, over the sample city's photo, which stays when the reel cannot load. The map and carousel use that reel's city and three of its places. The video cannot be tapped. Everything after it is drawn inside the app (not the system share sheet), one tap per screen, with a pill naming the tap:
    - **Share** on the post opens a drawn Instagram share panel; **Share to…** opens a drawn iOS share sheet; **More** opens a drawn Apps list with **Shelvr** selectable immediately. Tapping it shows "Finding the spots…" for about a second and moves on. The demo has no pinning or Favorites-editing steps and does not change the real share sheet. Nothing is shared or saved, and no save or place lookup is sent to Shelvr's servers. The reel's embed page and video load from Instagram, and product analytics record the step, as on every onboarding screen.
    - **First save:** a centered statement screen congratulates the first save, with light confetti (none with Reduce Motion) and **Continue**.
-   - **Spots:** a preview of the city page the save lands on. A full-width map, labelled "Added to" the city, drops a pin for each of the reel's first three places in video order. A sheet under it names the city with the count of places, credits the reel's creator, and lists the place names. **Continue** opens the next screen.
+   - **Spots:** a preview of the city page the save lands on. A full-width map, labelled "Added to" the city, drops a pin for each of three places the reel names, in its order. A sheet under it names the city with the count of places, credits the reel's creator, and lists the place names. **Continue** opens the next screen.
    - **Carousel:** three slides, "Plan it together with your people.", a second slide retiring the where-should-we-eat question, and "Every place you saved, on one map.", each over a drawn card built from the sample. Tapping a card or swiping moves to the next slide; **Continue** advances a slide, and on the last moves on.
    - **Notifications:** "Don’t miss the places you saved." shows two sample reminders built from the same sample: the evening before a trip, and a saved place the user has not been to. **Turn on reminders** shows the iOS notification permission, and either answer opens the paywall. **Not now** and **Skip** open the paywall without asking. The screen is skipped when iOS already has an answer, whichever it was. Reminders are optional: nothing in the app depends on them.
    - Every screen after the opener has a back button to the screen before.
@@ -47,12 +47,22 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 - With Shelvr installed, the link opens the Join screen, which says "Free to join. You don’t need Pro." and has "Join list". Without the app, the web page shows the invite. A person who isn't signed in joins after sign-in, finishing onboarding first if they need to.
 - Joining, opening the list, marking a place "We went" and leaving need no Pro. While the owner has Pro, a member without it can also add places and plan a date or a trip from the list. Everywhere else they still see the plan screen.
 - Members see the list's name, its places with their pins and cities, the first name of whoever added each place, and "We went" marks. They don't see each other's saves, titles or captions. A place's source save opens only for the person who saved it.
+- When another member adds places, Home's list card and the top of the list say who added how many, those places head the list, and their pins drop onto the map one by one. Once the list has been opened, those places are no longer new.
 - The owner can "Remove" a member. That member loses the list, the old invite link stops working, and the places they added stay. Anyone can "Leave list". When the owner leaves, the oldest member whose account isn't being deleted becomes the owner. When no such member is left, the list is deleted.
 - There is no report or block control. A list name is free text, and anyone holding a live link can join until the list is full. Removing a member is the only control, and it also replaces the link.
 
+## Vote links
+
+- A city page with places shows "Ask someone" under the place count. Making a vote link needs Pro, and without Pro the row opens the paywall.
+- The sheet lists the city's places, and up to 5 can be picked. "Send vote link" opens the share sheet with a link to `https://shelvr-web.vercel.app/p/<token>`.
+- Voters need no app or account. They tap ✓ or ✕ on each place and may type a first name. The page shows the sender's first name, the city and the places, with a saved link's cover image but never a photo save.
+- Votes appear on the city page as they land, with the newest vote, how many people voted, the days left, and a tally on each place. While the link is open, "Share" sends it again.
+- A link closes after 7 days and is deleted a week later with its votes and names.
+- The first vote on a link sends the sender one notification, at most once per link. Android files it under "Plan votes", and turning off "Save reminder notifications" in Profile → Settings stops it too.
+
 ## Pro / subscriptions (RevenueCat sandbox)
 
-- Shelvr Pro gates saves past the 10 free ones, Plan a date, Plan a trip, editing or removing a save's places, and starting a shared list. For free accounts, Go out opens the paywall from the tab bar or a city page, and Plan a trip opens it from the "Add spots" sheet or a city page. From the tab bar or the "Add spots" sheet, each needs a saved place pinned in a city first; without one, it shows "No places yet" instead of the paywall.
+- Shelvr Pro gates saves past the 10 free ones, Plan a date, Plan a trip, editing or removing a save's places, starting a shared list, and making a vote link. For free accounts, Go out opens the paywall from the tab bar or a city page, and Plan a trip opens it from the "Add spots" sheet or a city page. From the tab bar or the "Add spots" sheet, each needs a saved place pinned in a city first; without one, it shows "No places yet" instead of the paywall.
 - Plans: **Annual** (labelled Yearly on the paywall; 7-day trial, then the yearly price) and **Weekly** (no trial). Both auto-renew until canceled.
 - Lapsed subscribers are on the free plan: their existing saves stay open, and saves made while they had Pro do not count toward the 10.
 - Present paywall from any gated action or Profile → View Pro plans.
@@ -83,11 +93,11 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Permissions
 
-| Permission    | When requested                                                 | Why                                               |
-| ------------- | -------------------------------------------------------------- | ------------------------------------------------- |
-| Calendar      | User adds an event from an item intent                         | Create calendar event from saved content          |
-| Location      | The Map tab opens for the first time                           | Center the map on the user; Map works without it  |
-| Notifications | "Turn on reminders" in onboarding, or the trial reminder sheet | Reminders about saved places, trips and the trial |
+| Permission    | When requested                                                 | Why                                                                                  |
+| ------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Calendar      | User adds an event from an item intent                         | Create calendar event from saved content                                             |
+| Location      | The Map tab opens for the first time                           | Center the map on the user; Map works without it                                     |
+| Notifications | "Turn on reminders" in onboarding, or the trial reminder sheet | Reminders about saved places, trips and the trial, and the first vote on a vote link |
 
 Shelvr does **not** record microphone audio and does not request microphone access in production.
 
@@ -97,6 +107,7 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 - Saved URLs, extracted page content and spoken words, and the places Gemini finds in them (AI runs automatically unless the account has a previously recorded opt-out).
 - Place names sent to Apple Maps to pin a trip's stops (no live location tracking).
 - Shared list members see the list's places and each other's first names.
+- Voters on a vote link: their choices and an optional first name, seen only by the person who sent the link and deleted with the link.
 - Cities the user marks as visited, from a fixed list of 25, stored with the account as Passport city stamps and shown only to that user.
 - RevenueCat subscription status.
 - PostHog product analytics (not ads).

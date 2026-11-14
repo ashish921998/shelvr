@@ -21,6 +21,7 @@ const MAP_SHARE = 0.4;
 
 export function PlaceMapScreen<Row extends { id: string }>({
   pins,
+  visible,
   hasMap,
   rows,
   rowGap,
@@ -35,6 +36,7 @@ export function PlaceMapScreen<Row extends { id: string }>({
   visited,
 }: {
   pins: CityPin[];
+  visible?: number;
   hasMap: boolean;
   rows: Row[];
   rowGap: number;
@@ -94,6 +96,7 @@ export function PlaceMapScreen<Row extends { id: string }>({
         <Animated.View style={[styles.map, mapStyle]}>
           <CityMap
             pins={pins}
+            visible={visible}
             selected={selected}
             height={snaps.middle}
             coveredBottom={0}

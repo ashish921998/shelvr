@@ -33,6 +33,11 @@ export function LibraryRows({ cityCount }: { cityCount?: number }) {
         count={tripCount}
         onPress={() => router.navigate("/(app)/(tabs)/(trips)")}
       />
+      <HomeRow
+        icon="book.closed.fill"
+        name={t("passport.title")}
+        onPress={() => router.navigate("/(app)/(tabs)/(passport)")}
+      />
       {cityCount ? (
         <HomeRow
           icon="map.fill"

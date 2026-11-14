@@ -27,6 +27,8 @@ import { usePlaceOpener } from "@/lib/use-place-opener";
 import { useCallback, useMemo } from "react";
 import { Linking, Pressable, ScrollView, Share, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import Animated, { useReducedMotion } from "react-native-reanimated";
+import { fadeIn, REDUCED_FADE_IN } from "@/lib/motion";
 
 const MAP_SHARE = 0.38;
 
@@ -65,6 +67,7 @@ export function DateEvening({
   onRestart: () => void;
 }) {
   const { rt, theme } = useUnistyles();
+  const reduced = useReducedMotion();
   const openInfo = useInfoOpener();
   const first = result.stops[evening.first];
   const second = result.stops[evening.second];
@@ -113,7 +116,10 @@ export function DateEvening({
         height={rt.screen.height * MAP_SHARE}
         onSelectDay={() => undefined}
       />
-      <View style={styles.content}>
+      <Animated.View
+        entering={reduced ? REDUCED_FADE_IN : fadeIn}
+        style={styles.content}
+      >
         <View style={styles.heading}>
           <ThemedText variant="largeTitle" accessibilityRole="header">
             {t("datePlan.eveningTitle", { city: result.city })}
@@ -190,7 +196,7 @@ export function DateEvening({
             </ThemedText>
           </Pressable>
         </View>
-      </View>
+      </Animated.View>
     </ScrollView>
   );
 }

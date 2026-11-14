@@ -59,10 +59,18 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Shared lists:** route `src/app/(app)/shared-list/[id].tsx`, the form
   `new-shared-list.tsx`, `add-list-place.tsx`, the See all grid
   `src/app/(app)/shared-lists.tsx` (`src/components/home/all-shared-lists.tsx`), the root Join screen
-  `src/app/list-invite/[token].tsx`; rows and cards in `src/components/shared-list`;
-  hooks and helpers in `src/lib/shared-lists.ts`, the join coordinator in
-  `src/lib/invite-join.ts` with its SecureStore slot `pending-invite.ts`, gating in
-  `list-gate.ts`; backend `convex/sharedLists.ts` and `convex/model/sharedLists.ts`.
+  `src/app/list-invite/[token].tsx`; rows and cards in `src/components/shared-list`,
+  with the "Priya added 3 places" line in `list-activity.tsx`; hooks and helpers in
+  `src/lib/shared-lists.ts`, the pin drop for new places in `src/lib/fresh-pins.ts`,
+  the join coordinator in `src/lib/invite-join.ts` with its SecureStore slot
+  `pending-invite.ts`, gating in `list-gate.ts`; backend `convex/sharedLists.ts` and
+  `convex/model/sharedLists.ts`.
+- **Vote links:** the city page's votes row and ask sheet in `src/components/city`
+  (`plan-votes-row.tsx`, `ask-votes-sheet.tsx`) with their logic in `src/lib/plan-votes.ts`;
+  backend `convex/planShares.ts` (`cityPlanVotes`, `recordPlanVote`) with rules in
+  `convex/model/planVote.ts`; the web vote page `apps/web/src/app/p/[token]/page.tsx` with
+  `apps/web/src/components/PlanVote.tsx`. The first-vote push is `sendPlanVote` in
+  `convex/notificationDelivery.ts`, with its rules in `convex/model/planVote.ts`.
 - **Map tab:** route `src/app/(app)/(tabs)/(map)/index.tsx`, map, search and filter chips in
   `src/components/map` (`map-header.tsx` is the city title, search field and Cancel, with
   `map-round-button.tsx` behind the search, profile and locate buttons; `map-empty.tsx` is the
@@ -85,6 +93,15 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Analytics:** `src/lib/analytics.ts` holds the typed client event map
   (`AnalyticsEventProperties`); server capture is `convex/analytics.ts`. Read
   those rather than grepping call sites.
+- **Marketing site buttons and samples:** the App Store buttons in the site
+  header, on the landing page and on the reel place finder's results are
+  `apps/web/src/components/MapCta.tsx`. The hero's Lisbon map and the strip's
+  evening card are drawn from `apps/web/src/lib/sampleCity.ts`, and the
+  finder's sketch from `apps/web/src/lib/placeSketch.ts`. Their click-through
+  queries are in `docs/analytics/growth-funnel.md`. Their emoji test is
+  assigned before paint by the inline script from
+  `apps/web/src/lib/ctaVariant.ts` in `apps/web/src/app/layout.tsx`, and sent
+  as `cta_variant` on every web event (`apps/web/src/lib/analytics.ts`).
 - **Link reading:** `convex/model/pageRead.ts` (`readPage`, host dispatcher),
   shared extraction and recipe helpers in `convex/model/pageReadCore.ts`, and
   per-host readers in `convex/model/readers/` (Google Maps lists split by city in

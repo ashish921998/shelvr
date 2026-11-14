@@ -214,6 +214,7 @@
   "notifications.remindersHelp": "저장한 장소, 읽지 않은 글, 해 볼 만한 레시피를 하루 최대 한 번",
   "notifications.remindersToggle": "저장 항목 리마인더 알림",
   "notifications.remindersChannel": "저장 항목 리마인더",
+  "notifications.planVotesChannel": "플랜 투표",
   "notifications.remindersDisabledBody": "저장 항목 리마인더를 받으려면 기기 설정에서 Shelvr 알림을 허용하세요.",
   "feedback.open": "의견 보내기",
   "support.contact": "고객 지원 문의",
@@ -346,6 +347,24 @@
     "other": "%{formattedCount}일 남았어요."
   },
   "plan.tally": "가고 싶음 %{picks}, 패스 %{passes}",
+  "plan.votePushTitle": "%{city} 추천 목록에 첫 투표가 들어왔어요",
+  "plan.wouldGo": "%{name}님은 %{place}에 가고 싶어 해요.",
+  "plan.wouldPass": "%{name}님은 %{place}에는 안 간대요.",
+  "plan.someoneWouldGo": "누군가 %{place}에 가고 싶어 해요.",
+  "plan.someoneWouldPass": "누군가 %{place}에는 안 간대요.",
+  "plan.askHint": "링크를 보내면 상대가 가고 싶은 곳을 골라요.",
+  "plan.askBody": "최대 %{limit}곳까지 고르세요. 상대가 가고 싶은 곳에 ✓를 누르면 여기에 투표가 표시돼요.",
+  "plan.askSend": "투표 링크 보내기",
+  "plan.newLinkHint": "장소를 바꾸면 새 링크가 만들어져요. 이전 링크의 투표는 더 이상 여기에 표시되지 않아요.",
+  "plan.shareLink": "투표 링크 공유",
+  "plan.noVotesYet": "아직 투표가 없어요",
+  "plan.votedPick": "%{name}님이 %{place}에 ✓를 눌렀어요",
+  "plan.votedPass": "%{name}님이 %{place}에 ✕를 눌렀어요",
+  "plan.someoneVotedPick": "누군가 %{place}에 ✓를 눌렀어요",
+  "plan.someoneVotedPass": "누군가 %{place}에 ✕를 눌렀어요",
+  "plan.votingClosed": {
+    "other": "투표가 끝났어요. %{formattedCount}명이 투표했어요."
+  },
   "trip.make": "여행 계획하기",
   "trip.pickTitle": "여행",
   "trip.pickBody": "저장한 장소를 하루하루 일정으로",
@@ -779,7 +798,7 @@
   "onboardingQ.goalFood": "맛집",
   "onboardingQ.goalFoodBody": "내 주변, 이번 주",
   "onboardingQ.goalEverything": "조금씩 전부",
-  "onboardingQ.cityBody": "그곳의 실제 릴이 있으면 그걸로, 없으면 릴이 있는 도시로 연습해 볼게요.",
+  "onboardingQ.cityBody": "그 도시의 숨은 명소를 담은 실제 릴로 연습해 볼게요.",
   "onboardingNotify.title": "저장한 장소를 놓치지 마세요.",
   "onboardingNotify.sub": "여행 전에, 그리고 아직 갈 수 있을 때 Shelvr가 알려 드려요.",
   "onboardingNotify.allow": "리마인더 켜기",
@@ -1039,6 +1058,15 @@
   "sharedLists.newCount": {
     "other": "새 장소 %{formattedCount}곳"
   },
+  "sharedLists.activityOne": {
+    "other": "%{name}이(가) 장소 %{formattedCount}곳을 추가했어요"
+  },
+  "sharedLists.activitySomeone": {
+    "other": "누군가 장소 %{formattedCount}곳을 추가했어요"
+  },
+  "sharedLists.activityMany": {
+    "other": "%{names}의 새 장소 %{formattedCount}곳"
+  },
   "sharedLists.alsoAddTo": "여기에도 추가",
   "sharedLists.alsoAddFull": "%{name} 목록이 가득 찼어요. 더 추가하려면 장소를 하나 삭제하세요.",
   "sharedLists.alsoAddAlready": "이 장소들은 이미 %{name} 목록에 있어요.",
@@ -1125,17 +1153,21 @@
   },
   "passport.wantToGo": "가고 싶어요",
   "passport.title": "여권",
-  "passport.yourPassport": "내 여권",
   "passport.beenTitle": "이미 가본 곳이 있나요?",
   "passport.beenBody": "이미 가본 곳에 스탬프를 찍어요",
   "passport.beenSomewhere": "이미 가본 곳이 있나요?",
-  "passport.rowCities": "%{places} · %{cities}",
   "passport.placesCount": {
     "other": "%{formattedCount}곳"
   },
   "passport.citiesCount": {
     "other": "도시 %{formattedCount}곳"
   },
+  "passport.countriesCount": {
+    "other": "%{formattedCount}개국"
+  },
+  "passport.heroStamped": "스탬프 찍은 장소",
+  "passport.heroWhere": "%{cities} · %{countries}",
+  "passport.heroNext": "다음 배지: %{badge}",
   "passport.places": "장소",
   "passport.cities": "도시",
   "passport.countries": "나라",
@@ -1311,14 +1343,13 @@
   "onboardingChart.whenTrip": "다음 여행",
   "onboardingChart.chartLabel": "지금의 %{lost}에서 %{goal}까지의 곡선. %{when}",
   "onboardingStatement.cityPicked": "%{city}, 좋은 선택이에요.\n\n%{city}의 첫 장소를 저장해 봐요.",
-  "onboardingStatement.cityFirst": "%{picked}, 좋은 선택이에요.\n\n먼저 %{city}의 실제 릴로 해 봐요.",
   "onboardingStatement.cityStart": "%{city}의 첫 장소를 저장해 봐요.",
   "onboardingStatement.firstSave": "첫 저장 완료!\n타고났네요.\n\n이제 지도에서 확인해 볼까요? 🗺️",
   "onboardingCarousel.together": "함께하는 사람들과\n같이 계획해요.",
   "onboardingCarousel.eat": "‘어디서 먹지?’\n이제 그만.",
   "onboardingCarousel.map": "저장한 모든 장소를\n지도 하나에.",
   "onboardingCarousel.next": "다음 슬라이드",
-  "sharedLists.nameBodyWelcome": "공유 목록에 있는 사람들에게 보이고, 내가 공유한 항목이나 내가 소유한 목록의 링크가 있는 사람에게도 보여요.",
+  "sharedLists.nameBodyWelcome": "공유 목록에 있는 사람들에게 보이고, 내가 공유한 항목이나 내가 소유한 목록, 내가 보낸 추천 목록의 링크가 있는 사람에게도 보여요.",
   "tripSetup.title": "다음 여행을 계획해 보세요",
   "tripSetup.cover": "커버 사진 추가",
   "tripSetup.coverFailed": "커버 사진을 추가할 수 없어요.",

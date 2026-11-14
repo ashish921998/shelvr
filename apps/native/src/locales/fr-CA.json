@@ -216,6 +216,7 @@
   "notifications.remindersHelp": "Un lieu enregistré, un article non lu ou une recette à essayer, au plus une fois par jour",
   "notifications.remindersToggle": "Notifications des rappels de contenus",
   "notifications.remindersChannel": "Rappels de contenus",
+  "notifications.planVotesChannel": "Votes sur les plans",
   "notifications.remindersDisabledBody": "Autorisez les notifications de Shelvr dans les réglages de votre appareil pour recevoir des rappels sur vos contenus enregistrés.",
   "feedback.open": "Envoyer des commentaires",
   "support.contact": "Contacter le soutien",
@@ -350,6 +351,26 @@
     "other": "Il reste %{formattedCount} jours."
   },
   "plan.tally": "%{picks} pour, %{passes} contre",
+  "plan.votePushTitle": "Premier vote sur votre sélection pour %{city}",
+  "plan.wouldGo": "%{name} irait à %{place}.",
+  "plan.wouldPass": "%{name} n’irait pas à %{place}.",
+  "plan.someoneWouldGo": "Quelqu’un irait à %{place}.",
+  "plan.someoneWouldPass": "Quelqu’un n’irait pas à %{place}.",
+  "plan.askHint": "Envoyez un lien. Ils choisissent les lieux où ils iraient.",
+  "plan.askBody": "Choisissez jusqu’à %{limit} lieux. Ils touchent ✓ sur ceux où ils iraient, et les votes s’affichent ici.",
+  "plan.askSend": "Envoyer le lien de vote",
+  "plan.newLinkHint": "Changer les lieux crée un nouveau lien. Les votes sur l’ancien ne s’affichent plus ici.",
+  "plan.shareLink": "Partager le lien de vote",
+  "plan.noVotesYet": "Pas encore de vote",
+  "plan.votedPick": "%{name} a mis ✓ à %{place}",
+  "plan.votedPass": "%{name} a mis ✕ à %{place}",
+  "plan.someoneVotedPick": "Quelqu’un a mis ✓ à %{place}",
+  "plan.someoneVotedPass": "Quelqu’un a mis ✕ à %{place}",
+  "plan.votingClosed": {
+    "one": "Vote terminé. %{formattedCount} personne a voté.",
+    "many": "Vote terminé. %{formattedCount} personnes ont voté.",
+    "other": "Vote terminé. %{formattedCount} personnes ont voté."
+  },
   "trip.make": "Planifier mon voyage",
   "trip.pickTitle": "Un voyage",
   "trip.pickBody": "Transformez vos lieux enregistrés en journées",
@@ -827,7 +848,7 @@
   "onboardingQ.goalFood": "Où manger",
   "onboardingQ.goalFoodBody": "Proche de chez moi, cette semaine",
   "onboardingQ.goalEverything": "Un peu de tout",
-  "onboardingQ.cityBody": "Nous nous entraînerons avec un vrai reel de là-bas si nous en avons un, sinon avec une ville pour laquelle nous en avons.",
+  "onboardingQ.cityBody": "Nous nous entraînerons avec un vrai reel sur ses pépites cachées.",
   "onboardingNotify.title": "Ne manquez pas les lieux que vous avez enregistrés.",
   "onboardingNotify.sub": "Shelvr vous les rappelle avant un voyage, et quand vous pouvez encore y aller.",
   "onboardingNotify.allow": "Activer les rappels",
@@ -1095,6 +1116,21 @@
     "many": "%{formattedCount} nouveaux",
     "other": "%{formattedCount} nouveaux"
   },
+  "sharedLists.activityOne": {
+    "one": "%{name} a ajouté %{formattedCount} lieu",
+    "many": "%{name} a ajouté %{formattedCount} lieux",
+    "other": "%{name} a ajouté %{formattedCount} lieux"
+  },
+  "sharedLists.activitySomeone": {
+    "one": "Quelqu’un a ajouté %{formattedCount} lieu",
+    "many": "Quelqu’un a ajouté %{formattedCount} lieux",
+    "other": "Quelqu’un a ajouté %{formattedCount} lieux"
+  },
+  "sharedLists.activityMany": {
+    "one": "%{formattedCount} nouveau lieu ajouté par %{names}",
+    "many": "%{formattedCount} nouveaux lieux ajoutés par %{names}",
+    "other": "%{formattedCount} nouveaux lieux ajoutés par %{names}"
+  },
   "sharedLists.alsoAddTo": "Ajouter aussi à",
   "sharedLists.alsoAddFull": "%{name} est pleine. Retirez un lieu pour en ajouter d’autres.",
   "sharedLists.alsoAddAlready": "Ces lieux sont déjà sur %{name}.",
@@ -1189,11 +1225,9 @@
   },
   "passport.wantToGo": "À visiter",
   "passport.title": "Passeport",
-  "passport.yourPassport": "Votre passeport",
   "passport.beenTitle": "Déjà visité l'un d'eux ?",
   "passport.beenBody": "Tamponnez les lieux que vous avez déjà visités",
   "passport.beenSomewhere": "Déjà visité un lieu ?",
-  "passport.rowCities": "%{places} · %{cities}",
   "passport.placesCount": {
     "one": "%{formattedCount} lieu",
     "many": "%{formattedCount} lieux",
@@ -1204,6 +1238,14 @@
     "many": "%{formattedCount} villes",
     "other": "%{formattedCount} villes"
   },
+  "passport.countriesCount": {
+    "one": "%{formattedCount} pays",
+    "many": "%{formattedCount} pays",
+    "other": "%{formattedCount} pays"
+  },
+  "passport.heroStamped": "Lieux tamponnés",
+  "passport.heroWhere": "%{cities} · %{countries}",
+  "passport.heroNext": "Prochain badge : %{badge}",
   "passport.places": "Lieux",
   "passport.cities": "Villes",
   "passport.countries": "Pays",
@@ -1437,14 +1479,13 @@
   "onboardingChart.whenTrip": "Votre prochain voyage",
   "onboardingChart.chartLabel": "Une courbe allant de %{lost}, maintenant, à %{goal}. %{when}",
   "onboardingStatement.cityPicked": "%{city}. Excellent choix.\n\nEnregistrons vos premiers lieux à %{city}.",
-  "onboardingStatement.cityFirst": "%{picked}. Excellent choix.\n\nEssayons d’abord avec un vrai reel de %{city}.",
   "onboardingStatement.cityStart": "Enregistrons vos premiers lieux à %{city}.",
   "onboardingStatement.firstSave": "Votre premier enregistrement !\nUn vrai talent naturel.\n\nVoyons-le maintenant sur votre carte 🗺️",
   "onboardingCarousel.together": "Planifiez à plusieurs\navec vos proches.",
   "onboardingCarousel.eat": "Fini le « on mange\noù ? »",
   "onboardingCarousel.map": "Chaque lieu enregistré,\nsur une seule carte.",
   "onboardingCarousel.next": "Diapositive suivante",
-  "sharedLists.nameBodyWelcome": "Les personnes de vos listes partagées le voient, ainsi que toute personne ayant un lien vers un contenu que vous partagez ou vers une liste qui vous appartient.",
+  "sharedLists.nameBodyWelcome": "Les personnes de vos listes partagées le voient, ainsi que toute personne ayant un lien vers un contenu que vous partagez, vers une liste qui vous appartient ou vers une sélection que vous envoyez.",
   "tripSetup.title": "Planifiez votre prochaine aventure",
   "tripSetup.cover": "Ajouter une photo de couverture",
   "tripSetup.coverFailed": "Impossible d’ajouter la photo de couverture.",

@@ -30,6 +30,7 @@ type Props = {
   onPlaceDetails?: () => void;
   onRemove?: () => void;
   removing?: boolean;
+  tally?: { picks: number; passes: number };
   visited?: boolean;
   onToggleVisited?: () => void;
   visiting?: boolean;
@@ -45,6 +46,7 @@ export function SaveRow({
   onPlaceDetails,
   onRemove,
   removing,
+  tally,
   visited,
   onToggleVisited,
   visiting,
@@ -61,6 +63,16 @@ export function SaveRow({
         accessibilityRole="button"
         accessibilityLabel={visited ? `${title}, ${t("plan.weWent")}` : title}
         accessibilityState={{ selected: selected === true }}
+        accessibilityValue={
+          tally
+            ? {
+                text: t("plan.tally", {
+                  picks: String(tally.picks),
+                  passes: String(tally.passes),
+                }),
+              }
+            : undefined
+        }
         onPress={
           onPress ??
           (() =>
@@ -93,10 +105,19 @@ export function SaveRow({
           <Text style={styles.title} numberOfLines={2}>
             {title}
           </Text>
-          {source ? (
-            <Text style={styles.source} numberOfLines={1}>
-              {source}
-            </Text>
+          {source || tally ? (
+            <View style={styles.meta}>
+              {source ? (
+                <Text style={styles.source} numberOfLines={1}>
+                  {source}
+                </Text>
+              ) : null}
+              {tally ? (
+                <Text style={styles.tally}>
+                  {`✓ ${tally.picks} · ✕ ${tally.passes}`}
+                </Text>
+              ) : null}
+            </View>
           ) : null}
         </View>
       </Pressable>
@@ -201,5 +222,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   text: { flex: 1, gap: theme.gap(0.25) },
   title: { ...theme.type.subheadStrong, color: theme.colors.foreground },
-  source: { ...theme.type.footnote, color: theme.colors.muted },
+  meta: { flexDirection: "row", alignItems: "center", gap: theme.gap(1) },
+  source: { ...theme.type.footnote, color: theme.colors.muted, flexShrink: 1 },
+  tally: { ...theme.type.captionStrong, color: theme.colors.primaryText },
 }));
