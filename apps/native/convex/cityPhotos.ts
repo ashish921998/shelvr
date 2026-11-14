@@ -152,19 +152,17 @@ export const recoverStale = internalMutation({
   returns: v.null(),
   handler: async (ctx) => {
     const cutoff = Date.now() - CITY_PHOTO_RETRY_MS;
-    const wanted = new Map<string, string>();
-    for (const status of ["failed", "pending"] as const) {
-      const rows = await ctx.db
+    const stale = async (status: "failed" | "pending") =>
+      await ctx.db
         .query("cityPhotos")
         .withIndex("by_status_and_checkedAt", (q) =>
           q.eq("status", status).lt("checkedAt", cutoff),
         )
         .take(CITY_PHOTO_RECOVER_BATCH);
-      for (const row of rows) {
-        if (wanted.size < CITY_PHOTO_RECOVER_BATCH)
-          wanted.set(row.key, row.city);
-      }
-    }
+    const oldest = [...(await stale("failed")), ...(await stale("pending"))]
+      .sort((a, b) => a.checkedAt - b.checkedAt)
+      .slice(0, CITY_PHOTO_RECOVER_BATCH);
+    const wanted = new Map(oldest.map((row) => [row.key, row.city]));
     await scheduleLookUps(ctx, wanted, BACKFILL_SPACING_MS);
     return null;
   },
