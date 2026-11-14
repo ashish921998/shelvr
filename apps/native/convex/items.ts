@@ -1582,6 +1582,7 @@ export async function createReadyPlaceSave(
   await ctx.scheduler.runAfter(locateAfterMs, internal.placePins.locateItem, {
     itemId,
   });
+  if (await aiAllowed(ctx, userId)) await requestCityPhotos(ctx, cities);
   return itemId;
 }
 
