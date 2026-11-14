@@ -55,7 +55,10 @@ describe("redirectSystemPath", () => {
       }),
     ).toBe("/passport-invite/tok123");
     expect(
-      redirectSystemPath({ path: "shelvr://passport-invite/tok123", initial: true }),
+      redirectSystemPath({
+        path: "shelvr://passport-invite/tok123",
+        initial: true,
+      }),
     ).toBe("shelvr://passport-invite/tok123");
   });
 

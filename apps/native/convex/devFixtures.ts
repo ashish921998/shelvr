@@ -25,6 +25,7 @@ import {
 } from "./model/sharedLists";
 import { buildTrip, type TripCandidate } from "./model/trip";
 import { safeDeleteStorage } from "./model/storage";
+import { deletePlanSharesForUser } from "./planShares";
 import { deleteTripsForSpace } from "./tripData";
 
 const RESET_LIMIT = 200;
@@ -230,6 +231,7 @@ async function seedFixtures(
       "Development fixture reset refused: duplicate subscription rows",
     );
   }
+  await clearFixtureLinks(ctx, userId);
   await clearFixtureLists(ctx, userId);
 
   const storageIds = new Set<Id<"_storage">>();
@@ -420,6 +422,7 @@ async function seedFixtures(
     itemId: craftId,
     status: "suggested",
   });
+  await seedFixtureLink(ctx, userId, tripsId);
   await seedFixtureList(ctx, userId);
   await ctx.db.insert("subscriptions", {
     userId,
@@ -454,6 +457,56 @@ async function fixtureItem(
     throw new Error(`Development fixture item missing: ${fixtureKey}`);
   }
   return item._id;
+}
+
+async function clearFixtureLinks(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+): Promise<void> {
+  if (!(await deletePlanSharesForUser(ctx, userId))) {
+    throw new Error(
+      "Development fixture reset refused: plan shares reach 50 rows",
+    );
+  }
+}
+
+async function seedFixtureLink(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  spaceId: Id<"spaces">,
+): Promise<void> {
+  const now = Date.now();
+  const itemId = await fixtureItem(ctx, userId, "austin-coffee");
+  const shareId = await ctx.db.insert("planShares", {
+    token: inviteToken(),
+    userId,
+    spaceId,
+    city: FIXTURE_CITY,
+    places: [COFFEE_PIN, BAKERY_PIN].map((pin, index) => ({
+      key: `p${index}`,
+      name: pin.name,
+      why: "",
+      itemId,
+    })),
+    expiresAt: now + 5 * DAY_MS,
+  });
+  await ctx.db.insert("planVotes", {
+    shareId,
+    voterId: "fixture-sam",
+    name: "Sam",
+    picks: ["p0"],
+    passes: ["p1"],
+    last: { key: "p0", choice: "pick", at: now - 10 * MINUTE_MS },
+    updatedAt: now - 10 * MINUTE_MS,
+  });
+  await ctx.db.insert("planVotes", {
+    shareId,
+    voterId: "fixture-guest",
+    picks: ["p1"],
+    passes: [],
+    last: { key: "p1", choice: "pick", at: now - 30 * MINUTE_MS },
+    updatedAt: now - 30 * MINUTE_MS,
+  });
 }
 
 async function isFixturePartner(

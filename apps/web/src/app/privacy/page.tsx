@@ -220,9 +220,11 @@ export default function PrivacyPage() {
           A plan can also be shared as an unlisted vote link, which shows your
           first name, if we have one, and the plan’s city and places, with the
           cover image of a saved link but never a photo you saved. Anyone with
-          the link can vote, up to 20 people at a time, and we store each
-          voter’s choices with a random browser identifier. The link closes
-          after a week, and we delete it and its votes about a week after that.
+          the link can vote, up to 20 people at a time. We store each voter’s
+          choices with a random browser identifier and, if they type one on the
+          vote page, their first name. Only you see that name, in the app. The
+          link closes after a week, and we delete it, its votes and those names
+          about a week after that.
         </p>
       </section>
 

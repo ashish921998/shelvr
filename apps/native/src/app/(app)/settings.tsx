@@ -12,10 +12,7 @@ import { freeSavesTitle } from "@/lib/free-saves-title";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS, SUPPORT_EMAIL, SUPPORT_URL } from "@/lib/legal";
 import { manageSubscription } from "@/lib/manage-subscription";
-import {
-  usePassportShare,
-  useStopSharingPassport,
-} from "@/lib/passport-share";
+import { usePassportShare, useStopSharingPassport } from "@/lib/passport-share";
 import {
   backOrHome,
   closeScreen,

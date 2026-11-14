@@ -105,6 +105,12 @@ changes.
   deployment must set `AUTH_ENABLE_ANONYMOUS=true`.
 - **Fixtures:** `devFixtures.resetCurrentUser` seeds items, spaces and a Pro
   subscription. Home cards carry `fixture-item-*` test ids.
+- **Fixture vote link:** the reset also makes an Austin vote link with two
+  votes, Sam's and a guest's. Its owner has no first name until one is set:
+  `npx convex run users:setMyName '{"name":"Ashish"}' --identity '{"subject":"<userId>|cli","issuer":"cli","tokenIdentifier":"cli"}'`.
+- **Vote pages:** vote links need `WAITLIST_SHARED_SECRET` on the backend,
+  `apps/web/.env.local` with `CONVEX_SITE_URL` and the same secret, and
+  `EXPO_PUBLIC_WEB_URL` (the local web server) for the share text.
 - **Fixture shared list:** the reset also makes "Date night spots" with a
   partner, Priya, whose three places are new to the account. It leaves any real
   shared list the account is on, the way Leave list does, so Home after a reset

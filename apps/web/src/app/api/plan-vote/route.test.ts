@@ -46,6 +46,13 @@ describe("POST /api/plan-vote", () => {
     expect(init.body).toBe(JSON.stringify(vote));
   });
 
+  it("forwards a voter's name exactly as sent", async () => {
+    mocks.fetch.mockResolvedValue(new Response("{}", { status: 200 }));
+    const raw = JSON.stringify({ ...vote, revision: 3, name: " Maya Lopez" });
+    expect((await POST(request(raw))).status).toBe(200);
+    expect(mocks.fetch.mock.calls[0][1].body).toBe(raw);
+  });
+
   it("bounds the body here and leaves its shape to Convex", async () => {
     expect(
       (await POST(request({ ...vote, voterId: "x".repeat(4096) }))).status,

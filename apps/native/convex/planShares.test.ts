@@ -5,7 +5,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { WAITLIST_CLIENT_IP_HEADER, WAITLIST_SECRET_HEADER } from "./http";
-import { MAX_PLAN_VOTERS, PLAN_SHARE_TTL_MS } from "./planShares";
+import { PLAN_SHARE_TTL_MS } from "./model/plan";
+import { MAX_PLAN_VOTERS } from "./planShares";
 import { newConvexTest, signedInUser } from "./test.setup";
 
 const SECRET = "plan-vote-test-secret";
@@ -480,6 +481,246 @@ describe("votes", () => {
   });
 });
 
+describe("voter names and newest choices", () => {
+  async function linkFor(city?: string) {
+    const fixture = await setup();
+    const token = await fixture.t.mutation(api.planShares.createPlanShare, {
+      spaceId: fixture.spaceId,
+      ...(city === undefined ? {} : { city }),
+      places: fixture.places,
+    });
+    return { ...fixture, token };
+  }
+
+  async function voterRow(
+    backend: ReturnType<typeof newConvexTest>,
+    voterId: string,
+  ) {
+    return await backend.run(async (ctx) =>
+      (await ctx.db.query("planVotes").collect()).find(
+        (row) => row.voterId === voterId,
+      ),
+    );
+  }
+
+  it("keeps a clean first name until the voter changes it", async () => {
+    const { backend, token } = await linkFor();
+    const ballot = (voterId: string, picks: string[], name?: string) =>
+      backend.mutation(internal.planShares.recordPlanVote, {
+        token,
+        voterId,
+        picks,
+        passes: [],
+        ...(name === undefined ? {} : { name }),
+        ip: "203.0.113.7",
+      });
+
+    await ballot("maya", ["p0"], "  Maya   Lopez ");
+    expect((await voterRow(backend, "maya"))?.name).toBe("Maya");
+    await ballot("maya", ["p1"]);
+    expect((await voterRow(backend, "maya"))?.name).toBe("Maya");
+    await ballot("maya", ["p1"], "");
+    expect(await voterRow(backend, "maya")).not.toHaveProperty("name");
+
+    await ballot("site", ["p0"], "evil.com");
+    expect(await voterRow(backend, "site")).not.toHaveProperty("name");
+  });
+
+  it("stores the newest choice, on the first ballot and on later ones", async () => {
+    vi.useFakeTimers();
+    const { backend, token } = await linkFor();
+    const ballot = (revision: number, picks: string[], passes: string[]) =>
+      backend.mutation(internal.planShares.recordPlanVote, {
+        token,
+        voterId: "a",
+        picks,
+        passes,
+        revision,
+        ip: "203.0.113.7",
+      });
+    const last = async () => (await voterRow(backend, "a"))?.last;
+
+    const before = Date.now();
+    await ballot(1, ["p1", "p0"], []);
+    const first = await last();
+    expect(first).toMatchObject({ key: "p1", choice: "pick" });
+    expect(first!.at).toBeGreaterThanOrEqual(before);
+
+    vi.advanceTimersByTime(1000);
+    await ballot(2, ["p1"], []);
+    expect(await last()).toEqual(first);
+
+    vi.advanceTimersByTime(1000);
+    const beforeThird = Date.now();
+    await ballot(3, ["p1"], ["p0"]);
+    const third = await last();
+    expect(third).toMatchObject({ key: "p0", choice: "pass" });
+    expect(third!.at).toBeGreaterThanOrEqual(beforeThird);
+
+    vi.advanceTimersByTime(1000);
+    await ballot(2, ["p0"], []);
+    expect(await last()).toEqual(third);
+
+    await ballot(4, ["p1"], []);
+    expect(await last()).toBeUndefined();
+  });
+});
+
+describe("cityPlanVotes", () => {
+  async function cityLink(
+    fixture: Awaited<ReturnType<typeof setup>>,
+    city: string,
+  ) {
+    return await fixture.t.mutation(api.planShares.createPlanShare, {
+      spaceId: fixture.spaceId,
+      city,
+      places: fixture.places,
+    });
+  }
+
+  it("answers null with no link, for another account, and for a blank city", async () => {
+    const fixture = await setup();
+    const { backend, t, userId, spaceId, places } = fixture;
+    expect(
+      await t.query(api.planShares.cityPlanVotes, { city: "Austin" }),
+    ).toBeNull();
+
+    await cityLink(fixture, "Austin");
+    await t.run((ctx) =>
+      ctx.db.insert("planShares", {
+        token: "blank-city",
+        userId,
+        spaceId,
+        city: " ",
+        places: places.map((place, index) => ({ ...place, key: `p${index}` })),
+        expiresAt: Date.now() + PLAN_SHARE_TTL_MS,
+      }),
+    );
+    const other = await signedInUser(backend, { pro: true });
+    expect(
+      await other.t.query(api.planShares.cityPlanVotes, { city: "Austin" }),
+    ).toBeNull();
+    expect(
+      await t.query(api.planShares.cityPlanVotes, { city: "   " }),
+    ).toBeNull();
+  });
+
+  it("follows the newest link for the city, whatever its spelling", async () => {
+    const fixture = await setup();
+    await cityLink(fixture, "Austin");
+    const newest = await cityLink(fixture, "AUSTIN ");
+    await cityLink(fixture, "Goa");
+
+    expect(
+      await fixture.t.query(api.planShares.cityPlanVotes, { city: "austin" }),
+    ).toMatchObject({ token: newest });
+  });
+
+  it("tallies the ballots with a choice and names the newest vote", async () => {
+    vi.useFakeTimers();
+    const fixture = await setup();
+    const { backend, t, itemIds, places } = fixture;
+    const token = await cityLink(fixture, "Austin");
+    const named = (voterId: string, picks: string[], passes: string[]) =>
+      backend.mutation(internal.planShares.recordPlanVote, {
+        token,
+        voterId,
+        picks,
+        passes,
+        revision: 1,
+        name: voterId,
+        ip: "203.0.113.7",
+      });
+
+    await named("Maya", ["p0"], ["p1"]);
+    vi.advanceTimersByTime(1000);
+    await named("Sam", ["p1"], []);
+    vi.advanceTimersByTime(1000);
+    await named("Empty", [], []);
+
+    expect(
+      await t.query(api.planShares.cityPlanVotes, { city: "Austin" }),
+    ).toEqual({
+      token,
+      expiresAt: expect.any(Number),
+      voters: 2,
+      places: [
+        {
+          key: "p0",
+          name: "Thalassa",
+          itemId: places[0].itemId,
+          picks: 1,
+          passes: 0,
+        },
+        {
+          key: "p1",
+          name: "Gunpowder",
+          itemId: places[1].itemId,
+          picks: 1,
+          passes: 1,
+        },
+      ],
+      latest: { name: "Sam", place: "Gunpowder", choice: "pick" },
+    });
+
+    await t.run((ctx) => ctx.db.delete(itemIds[1]));
+    expect(
+      await t.query(api.planShares.cityPlanVotes, { city: "Austin" }),
+    ).toMatchObject({
+      voters: 2,
+      places: [{ key: "p0", picks: 1, passes: 0 }],
+      latest: { name: "Maya", place: "Thalassa", choice: "pick" },
+    });
+
+    await t.run((ctx) => ctx.db.delete(itemIds[0]));
+    expect(
+      await t.query(api.planShares.cityPlanVotes, { city: "Austin" }),
+    ).toBeNull();
+  });
+
+  it("leaves latest out when no vote has a newest choice", async () => {
+    const fixture = await setup();
+    const token = await cityLink(fixture, "Austin");
+    await fixture.t.run(async (ctx) => {
+      const share = await ctx.db
+        .query("planShares")
+        .withIndex("by_token", (q) => q.eq("token", token))
+        .unique();
+      await ctx.db.insert("planVotes", {
+        shareId: share!._id,
+        voterId: "before-names",
+        picks: ["p0"],
+        passes: [],
+        updatedAt: Date.now(),
+      });
+    });
+
+    const votes = await fixture.t.query(api.planShares.cityPlanVotes, {
+      city: "Austin",
+    });
+    expect(votes).toMatchObject({ voters: 1 });
+    expect(votes).not.toHaveProperty("latest");
+  });
+
+  it("still shows a closed link, but not one whose space is gone", async () => {
+    vi.useFakeTimers();
+    const fixture = await setup();
+    const token = await cityLink(fixture, "Austin");
+    vi.advanceTimersByTime(PLAN_SHARE_TTL_MS + 60_000);
+
+    const closed = await fixture.t.query(api.planShares.cityPlanVotes, {
+      city: "Austin",
+    });
+    expect(closed).toMatchObject({ token, voters: 0 });
+    expect(closed!.expiresAt).toBeLessThan(Date.now());
+
+    await fixture.t.run((ctx) => ctx.db.delete(fixture.spaceId));
+    expect(
+      await fixture.t.query(api.planShares.cityPlanVotes, { city: "Austin" }),
+    ).toBeNull();
+  });
+});
+
 describe("deletion", () => {
   async function countRows(backend: ReturnType<typeof newConvexTest>) {
     return backend.run(async (ctx) => ({
@@ -590,5 +831,25 @@ describe("HTTP routes", () => {
     const ok = await postVote(backend, body);
     expect(ok.status).toBe(200);
     expect(await ok.json()).toEqual({ outcome: "recorded" });
+  });
+
+  it("takes an optional name of up to 64 characters", async () => {
+    vi.stubEnv("WAITLIST_SHARED_SECRET", SECRET);
+    const { backend, t, spaceId, places } = await setup();
+    const token = await t.mutation(api.planShares.createPlanShare, {
+      spaceId,
+      places,
+    });
+    const body = { token, voterId: "a", picks: ["p0"], passes: [] };
+
+    for (const name of ["x".repeat(65), 7, null]) {
+      expect((await postVote(backend, { ...body, name })).status).toBe(400);
+    }
+    const longest = `Maya ${"x".repeat(59)}`;
+    expect(longest).toHaveLength(64);
+    const ok = await postVote(backend, { ...body, name: longest });
+    expect(ok.status).toBe(200);
+    const row = await backend.run((ctx) => ctx.db.query("planVotes").first());
+    expect(row?.name).toBe("Maya");
   });
 });

@@ -12,10 +12,7 @@ type RevokeFailureReason =
 export function revokeFailureReason(error: unknown): RevokeFailureReason {
   if (error instanceof ConvexError) return "convex_error";
   if (!(error instanceof Error)) return "unknown";
-  if (
-    error.name === "AbortError" ||
-    error.message === "Network request failed"
-  )
+  if (error.name === "AbortError" || error.message === "Network request failed")
     return "network";
   if (error.message.includes("Not authenticated")) return "not_authenticated";
   if (error.message.includes("Server Error")) return "server_error";

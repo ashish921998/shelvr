@@ -54,6 +54,11 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   the join coordinator in `src/lib/invite-join.ts` with its SecureStore slot
   `pending-invite.ts`, gating in `list-gate.ts`; backend `convex/sharedLists.ts` and
   `convex/model/sharedLists.ts`.
+- **Vote links:** the city page's votes row and ask sheet in `src/components/city`
+  (`plan-votes-row.tsx`, `ask-votes-sheet.tsx`) with their logic in `src/lib/plan-votes.ts`;
+  backend `convex/planShares.ts` (`cityPlanVotes`, `recordPlanVote`) with rules in
+  `convex/model/planVote.ts`; the web vote page `apps/web/src/app/p/[token]/page.tsx` with
+  `apps/web/src/components/PlanVote.tsx`.
 - **Map tab:** route `src/app/(app)/(tabs)/(map)/index.tsx`, map, search and filter chips in
   `src/components/map`, filter rules in `src/lib/map-filters.ts` and
   `convex/model/placeKinds.ts`, each pin's emoji in `src/lib/map-pin-emoji.ts`, data from

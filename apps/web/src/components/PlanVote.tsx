@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 
 import PlanSketchbook, { type Choice } from "@/components/PlanSketchbook";
+import { captureWebAnalyticsEvent } from "@/lib/analytics";
+import { useBrowserValue } from "@/lib/browserValue";
 import type { PlanSharePlace } from "@/lib/planShare";
 
 type Choices = Record<string, Choice>;
@@ -10,12 +12,14 @@ type Status = "idle" | "saving" | "saved" | "error";
 
 const VOTER_KEY = "shelvr.planVoter";
 const VOTE_SETTLE_MS = 600;
+const NAME_SETTLE_MS = 800;
 
 function ballot(
   token: string,
   voterId: string,
   choices: Choices,
   revision: number,
+  name: string | undefined,
 ): string {
   const keys = Object.keys(choices);
   return JSON.stringify({
@@ -24,6 +28,7 @@ function ballot(
     picks: keys.filter((key) => choices[key] === "pick"),
     passes: keys.filter((key) => choices[key] === "pass"),
     revision,
+    ...(name === undefined ? {} : { name: name.trim() }),
   });
 }
 
@@ -54,6 +59,12 @@ function isChoices(value: unknown): value is Choices {
 
 const savedKey = (token: string) => `shelvr.planVote.${token}`;
 const pendingKey = (token: string) => `shelvr.planVotePending.${token}`;
+const nameKey = (token: string) => `shelvr.planVoterName.${token}`;
+
+function storedName(token: string): string | undefined {
+  const value = load(nameKey(token));
+  return typeof value === "string" ? value : undefined;
+}
 
 type Ballot = { choices: Choices; revision: number };
 
@@ -71,6 +82,17 @@ function storeIfNewer(key: string, ballot: Ballot) {
   const current = storedBallot(key);
   if (current && current.revision > ballot.revision) return;
   storeQuietly(key, ballot);
+}
+
+function newestChoices(
+  own: Ballot,
+  stored: readonly (Ballot | undefined)[],
+): Choices {
+  let newest = own;
+  for (const ballot of stored) {
+    if (ballot && ballot.revision > newest.revision) newest = ballot;
+  }
+  return newest.choices;
 }
 
 function nextRevision(last: { current: number }): number {
@@ -110,10 +132,17 @@ export default function PlanVote({
   const pending = useRef<Ballot | undefined>(undefined);
   const queued = useRef<Ballot | undefined>(undefined);
   const sentOnLeave = useRef(0);
+  const remembered = useBrowserValue(() => storedName(token), undefined);
+  const [typed, setTyped] = useState<string>();
+  const nameRef = useRef<string | undefined>(undefined);
+  const named = useRef(false);
+  useEffect(() => {
+    nameRef.current = typed ?? remembered;
+  });
 
-  const send = (next: Choices, revision: number) => {
+  const send = (next: Choices, revision: number, name: string | undefined) => {
     voter.current ??= voterId();
-    const body = ballot(token, voter.current, next, revision);
+    const body = ballot(token, voter.current, next, revision, name);
     storeIfNewer(pendingKey(token), { choices: next, revision });
     queued.current = { choices: next, revision };
     queue.current = queue.current.then(async () => {
@@ -169,7 +198,7 @@ export default function PlanVote({
     setChoices(resend?.choices ?? saved?.choices ?? {});
     if (resend) {
       setStatus("saving");
-      sendRef.current(resend.choices, resend.revision);
+      sendRef.current(resend.choices, resend.revision, storedName(token));
     }
   }, [token]);
 
@@ -186,7 +215,13 @@ export default function PlanVote({
       void fetch("/api/plan-vote", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: ballot(token, voter.current, next.choices, next.revision),
+        body: ballot(
+          token,
+          voter.current,
+          next.choices,
+          next.revision,
+          nameRef.current,
+        ),
         keepalive: true,
       }).catch(() => undefined);
     };
@@ -208,8 +243,49 @@ export default function PlanVote({
     pending.current = { choices: next, revision };
     timer.current = setTimeout(() => {
       pending.current = undefined;
-      send(next, revision);
+      send(next, revision, nameRef.current);
     }, VOTE_SETTLE_MS);
+  };
+
+  const onName = (value: string) => {
+    const stored = [
+      storedBallot(savedKey(token)),
+      storedBallot(pendingKey(token)),
+    ];
+    const current = newestChoices(
+      pending.current ?? { choices, revision: lastRevision.current },
+      stored,
+    );
+    if (current !== (pending.current?.choices ?? choices)) setChoices(current);
+    const withVotes = Object.keys(current).length > 0;
+    setTyped(value);
+    nameRef.current = value;
+    storeQuietly(nameKey(token), value);
+    if (!named.current && value.trim() !== "") {
+      named.current = true;
+      captureWebAnalyticsEvent("plan_vote_named", { with_votes: withVotes });
+    }
+    if (!withVotes) return;
+    lastRevision.current = Math.max(
+      lastRevision.current,
+      ...stored.map((ballot) => ballot?.revision ?? 0),
+    );
+    clearTimeout(timer.current);
+    const revision = nextRevision(lastRevision);
+    pending.current = { choices: current, revision };
+    setStatus("saving");
+    timer.current = setTimeout(() => {
+      pending.current = undefined;
+      send(current, revision, nameRef.current);
+    }, NAME_SETTLE_MS);
+  };
+
+  const flushName = () => {
+    const next = pending.current;
+    if (!next) return;
+    clearTimeout(timer.current);
+    pending.current = undefined;
+    send(next.choices, next.revision, nameRef.current);
   };
 
   const who = senderName ?? "They";
@@ -223,6 +299,29 @@ export default function PlanVote({
   return (
     <div>
       <PlanSketchbook places={places} choices={choices} onChoose={choose} />
+      <div className="mt-5">
+        <label
+          htmlFor="plan-voter-name"
+          className="text-sm font-semibold text-ink"
+        >
+          Your first name (optional)
+        </label>
+        <input
+          id="plan-voter-name"
+          aria-describedby="plan-voter-name-help"
+          value={typed ?? remembered ?? ""}
+          onChange={(event) => onName(event.target.value)}
+          onBlur={flushName}
+          placeholder="First name"
+          autoComplete="given-name"
+          autoCapitalize="words"
+          maxLength={40}
+          className="mt-1.5 h-11 w-full rounded-[11px] border border-line-strong bg-cream px-3.5 text-base font-medium text-ink outline-none placeholder:text-muted-soft focus:border-ember"
+        />
+        <p id="plan-voter-name-help" className="mt-1 text-xs text-muted">
+          Shown to {senderName ?? "them"} next to your votes.
+        </p>
+      </div>
       <p
         role="status"
         className={`mt-5 text-center text-sm ${
