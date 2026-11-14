@@ -15,7 +15,7 @@ import { saveErrorCode } from "@convex/model/saveErrors";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { Alert } from "react-native";
 
@@ -58,6 +58,7 @@ export function usePlaceVisit(
   surface: "city" | "passport" | "next_to_stamp" = "city",
 ) {
   const router = useRouter();
+  const navigation = useNavigation();
   const setVisited = useMutation(api.placeVisits.setVisited);
   const { play: playStamp, queue: queueStamp } = useStampMoment();
   const working = useRef(false);
@@ -88,9 +89,11 @@ export function usePlaceVisit(
             }),
       });
       if (!visited) void haptics.selection();
-      else if (surface === "next_to_stamp") {
-        queueStamp(placeStampMoment(name, stamp), surface);
-      } else playStamp(placeStampMoment(name, stamp), "city");
+      else if (navigation.isFocused()) {
+        const moment = placeStampMoment(name, stamp);
+        if (surface === "next_to_stamp") queueStamp(moment, surface);
+        else playStamp(moment, "city");
+      }
       if (surface === "passport") {
         analytics.capture("place_unstamped", { surface });
       } else if (surface === "city") {
