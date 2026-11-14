@@ -255,24 +255,22 @@ export function FeedbackModal({
                     .easing(motion.easing.out)
                     .reduceMotion(ReduceMotion.Never)}
                 >
-                  <>
-                    <Text style={styles.body}>{t("feedback.thanks")}</Text>
-                    <View style={styles.buttonRow}>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={t("common.done")}
-                        style={({ pressed }) => [
-                          styles.primaryButton,
-                          pressed && { opacity: 0.7 },
-                        ]}
-                        onPress={onClose}
-                      >
-                        <Text style={styles.primaryButtonText}>
-                          {t("common.done")}
-                        </Text>
-                      </Pressable>
-                    </View>
-                  </>
+                  <Text style={styles.body}>{t("feedback.thanks")}</Text>
+                  <View style={styles.buttonRow}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={t("common.done")}
+                      style={({ pressed }) => [
+                        styles.primaryButton,
+                        pressed && { opacity: 0.7 },
+                      ]}
+                      onPress={onClose}
+                    >
+                      <Text style={styles.primaryButtonText}>
+                        {t("common.done")}
+                      </Text>
+                    </Pressable>
+                  </View>
                 </Animated.View>
               ) : null}
             </View>
