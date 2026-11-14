@@ -98,7 +98,6 @@ function addSaves(
 }
 
 function addTo(index: Map<string, CityPin[]>, key: string, pin: CityPin) {
-  if (key === "") return;
   const group = index.get(key);
   if (group === undefined) index.set(key, [pin]);
   else if (!group.includes(pin)) group.push(pin);
@@ -120,15 +119,15 @@ function pinIndex(tallies: Iterable<CityTally>): Map<string, CityPin[]> {
   return index;
 }
 
-function stampMark(stamp: CompletionStamp): VisitMark {
-  if (stamp.lat === undefined || stamp.lng === undefined) {
-    return { key: stamp.key, name: stamp.name };
-  }
-  const spot =
-    stamp.appleId === undefined
-      ? { lat: stamp.lat, lng: stamp.lng }
-      : { lat: stamp.lat, lng: stamp.lng, appleId: stamp.appleId };
-  return { key: stamp.key, name: stamp.name, spots: [spot] };
+function stampMark({
+  key,
+  name,
+  lat,
+  lng,
+  appleId,
+}: CompletionStamp): VisitMark {
+  if (lat === undefined || lng === undefined) return { key, name };
+  return { key, name, spots: [{ lat, lng, appleId }] };
 }
 
 function tickedCities(
@@ -161,9 +160,7 @@ function addStamps(
     const tally = stamp.city ? tallyFor(tallies, stamp.city) : undefined;
     if (tally === undefined) continue;
     const { name, lat, lng, appleId } = stamp;
-    tally.strays.push(
-      appleId === undefined ? { name, lat, lng } : { name, lat, lng, appleId },
-    );
+    tally.strays.push({ name, lat, lng, appleId });
     noteDate(tally, stamp);
   }
 }
@@ -196,7 +193,7 @@ function byRecentStamp(a: Row, b: Row): number {
 
 function rowOf(tally: CityTally, visits: readonly VisitMark[]): Row[] {
   const visited = visitMatcher(visits, tally.pins);
-  const ticked = tally.pins.filter((pin) => visited(pin)).length;
+  const ticked = tally.pins.filter(visited).length;
   const strays = uniquePlacePins(tally.strays).length;
   const total = tally.pins.length + strays;
   if (total === 0) return [];

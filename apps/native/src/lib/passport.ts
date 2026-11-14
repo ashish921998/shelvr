@@ -91,7 +91,7 @@ export function passportSections(
   const used = new Set<string>();
   const stamped = groupByCity(stamps).map((group): PassportSection => {
     const key = group.city === null ? "" : cityKey(group.city);
-    const row = key === "" ? undefined : rows.get(key);
+    const row = rows.get(key);
     if (row) used.add(key);
     return {
       key: key === "" ? "~elsewhere" : key,

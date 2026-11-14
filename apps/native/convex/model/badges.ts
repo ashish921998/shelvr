@@ -49,7 +49,7 @@ export type BadgeTotals = Record<BadgeMeasure, number>;
 
 export type BadgeState = { badge: Badge; have: number; earned: boolean };
 
-export function cityComplete({ stamped, total }: BadgeCity): boolean {
+function cityComplete({ stamped, total }: BadgeCity): boolean {
   return total > 0 && stamped >= total;
 }
 

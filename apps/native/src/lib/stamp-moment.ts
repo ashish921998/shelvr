@@ -40,7 +40,7 @@ export type StampPlace = {
   cityTotal?: number;
 };
 
-export type CityCount = { stamped: number; total: number };
+type CityCount = { stamped: number; total: number };
 
 export type ShownStamp = {
   id: number;
@@ -117,7 +117,7 @@ function useBadgeQueue(reduced: boolean) {
 
   const show = useCallback(
     (ids: readonly BadgeId[]) => {
-      const [first, ...rest] = inTableOrder(ids);
+      const [first, ...rest] = ids;
       if (first === undefined) return;
       nextId.current += 1;
       setBadge({ id: nextId.current, badge: first, more: rest.length });
@@ -192,27 +192,17 @@ export function cityStampPlace(
     : { city, cover, cityVisited: count.stamped, cityTotal: count.total };
 }
 
-export function completesCity(before: CityCount, after: CityCount): boolean {
-  return (
-    after.total > 0 &&
-    before.stamped < before.total &&
-    after.stamped >= after.total
-  );
-}
-
 export function placeStampMoment(
   name: string,
   { city, cover, cityVisited, cityTotal }: StampPlace = NO_CITY,
 ): StampMoment {
-  const before = { stamped: cityVisited, total: cityTotal ?? 0 };
-  const after = { stamped: cityVisited + 1, total: before.total };
   return {
     kind: "place",
     name,
     city,
     cover,
     firstInCity: cityVisited === 0,
-    completedTotal: city && completesCity(before, after) ? after.total : null,
+    completedTotal: city && cityVisited + 1 === cityTotal ? cityTotal : null,
   };
 }
 

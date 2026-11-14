@@ -7,7 +7,6 @@ import {
   bulkStampMoment,
   cityStampMoment,
   cityStampPlace,
-  completesCity,
   placeStampMoment,
   STAMP_TIMING,
   type StampMoment,
@@ -102,6 +101,9 @@ describe("placeStampMoment", () => {
       placeStampMoment("Tigre", { ...lisbon, cityVisited: 2 }),
     ).toMatchObject({ completedTotal: null });
     expect(
+      placeStampMoment("Tigre", { ...lisbon, cityVisited: 0, cityTotal: 0 }),
+    ).toMatchObject({ completedTotal: null });
+    expect(
       placeStampMoment("Tigre", {
         city: "",
         cover: null,
@@ -132,23 +134,6 @@ describe("cityStampPlace", () => {
       firstInCity: false,
       completedTotal: null,
     });
-  });
-});
-
-describe("completesCity", () => {
-  it("is true only when the stamp moves the city from short of full to full", () => {
-    expect(
-      completesCity({ stamped: 6, total: 7 }, { stamped: 7, total: 7 }),
-    ).toBe(true);
-    expect(
-      completesCity({ stamped: 5, total: 7 }, { stamped: 6, total: 7 }),
-    ).toBe(false);
-    expect(
-      completesCity({ stamped: 7, total: 7 }, { stamped: 7, total: 7 }),
-    ).toBe(false);
-    expect(
-      completesCity({ stamped: 0, total: 0 }, { stamped: 1, total: 0 }),
-    ).toBe(false);
   });
 });
 

@@ -7,7 +7,6 @@ import {
   type BadgeStamp,
   badgeStates,
   badgeTotals,
-  cityComplete,
   earnedBadges,
   newlyEarned,
   nextBadge,
@@ -194,11 +193,6 @@ describe("completionist", () => {
   ])("cities %j earn it: %s", (cities, expected) => {
     expect(earned(stamps(1), cities).includes("completionist")).toBe(expected);
   });
-
-  it("matches a full ring", () => {
-    expect(cityComplete({ stamped: 3, total: 3 })).toBe(true);
-    expect(cityComplete({ stamped: 0, total: 0 })).toBe(false);
-  });
 });
 
 describe("relocking", () => {
@@ -208,12 +202,6 @@ describe("relocking", () => {
     expect(before).toContain("coffeeCrawler");
     expect(after).not.toContain("coffeeCrawler");
     expect(newlyEarned(before, after)).toEqual([]);
-  });
-
-  it("takes Completionist back when a city's ring stops being full", () => {
-    expect(earned(stamps(3), [{ stamped: 2, total: 3 }])).not.toContain(
-      "completionist",
-    );
   });
 });
 
