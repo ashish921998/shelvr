@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   cityStampsError: null as Error | null,
   queryArgs: [] as unknown[],
   token: null as string | null,
+  fetchShare: vi.fn(),
   os: "ios",
   share: vi.fn(),
   alert: vi.fn(),
@@ -25,6 +26,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: mocks.authenticated }),
+  useConvex: () => ({ query: mocks.fetchShare }),
 }));
 vi.mock("@convex-dev/react-query", () => ({
   convexQuery: (_fn: unknown, args: unknown) => args,
@@ -86,6 +88,7 @@ beforeEach(() => {
   mocks.token = null;
   mocks.os = "ios";
   mocks.share.mockResolvedValue({ action: "sharedAction" });
+  mocks.fetchShare.mockResolvedValue(null);
 });
 
 describe("useBadgeTotals", () => {
@@ -218,6 +221,25 @@ describe("useShareBadge", () => {
     expect(mocks.share).toHaveBeenLastCalledWith({
       message:
         "I earned the Foodie badge on my Shelvr passport.\nhttps://shelvr.test/passport/abc",
+    });
+  });
+
+  it("reads the passport link at tap time when it has not loaded yet", async () => {
+    mocks.fetchShare.mockResolvedValue("late");
+    const { result } = renderHook(() => useShareBadge("moment"));
+    await act(() => result.current("explorer"));
+    expect(mocks.share).toHaveBeenCalledWith({
+      message: "I earned the Explorer badge on my Shelvr passport.",
+      url: "https://shelvr.test/passport/late",
+    });
+  });
+
+  it("shares the badge on its own when the link cannot be read", async () => {
+    mocks.fetchShare.mockRejectedValue(new Error("offline"));
+    const { result } = renderHook(() => useShareBadge("moment"));
+    await act(() => result.current("explorer"));
+    expect(mocks.share).toHaveBeenCalledWith({
+      message: "I earned the Explorer badge on my Shelvr passport.",
     });
   });
 

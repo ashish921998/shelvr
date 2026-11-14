@@ -4,6 +4,7 @@ import { createElement, type ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  BADGE_TIMING,
   bulkStampMoment,
   cityStampMoment,
   cityStampPlace,
@@ -334,6 +335,28 @@ describe("useStampMomentPlayer", () => {
 
     act(() => result.current.controls.release());
     expect(mocks.capture).toHaveBeenCalledTimes(1);
+  });
+
+  it("holds a badge that lands while a stamp waits, then plays it after the stamp", () => {
+    const { result } = renderHook(() => useStampMomentPlayer(false));
+    act(() => result.current.controls.queue(batch, "already_been"));
+    act(() => result.current.unlock(["passportHolder"]));
+    act(() => vi.advanceTimersByTime(BADGE_TIMING.grace));
+    expect(result.current.badge).toBeNull();
+    act(() => result.current.controls.release());
+    expect(result.current.shown?.moment).toEqual(batch);
+    expect(result.current.badge).toBeNull();
+    act(() => vi.advanceTimersByTime(STAMP_TIMING.shown));
+    expect(result.current.badge?.badge).toBe("passportHolder");
+  });
+
+  it("lets a held badge play once its queued stamp expires unreleased", () => {
+    const { result } = renderHook(() => useStampMomentPlayer(false));
+    act(() => result.current.controls.queue(batch, "already_been"));
+    act(() => result.current.unlock(["passportHolder"]));
+    act(() => vi.advanceTimersByTime(STAMP_TIMING.queueLimit));
+    expect(result.current.shown).toBeNull();
+    expect(result.current.badge?.badge).toBe("passportHolder");
   });
 
   it("drops a queued moment that is never released in time", () => {

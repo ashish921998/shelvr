@@ -631,11 +631,20 @@ const badgeStampValidator = v.object({
 
 function stampKinds(save: Doc<"items"> | null, stamp: StampRow) {
   if (save === null) return [];
-  const pin = save.placePins?.find(
-    (candidate) =>
-      (stamp.appleId !== undefined && candidate.appleId === stamp.appleId) ||
-      (candidate.lat === stamp.lat && candidate.lng === stamp.lng),
-  );
+  const pins = save.placePins ?? [];
+  const pin =
+    pins.find(
+      (candidate) =>
+        stamp.appleId !== undefined && candidate.appleId === stamp.appleId,
+    ) ??
+    pins.find(
+      (candidate) =>
+        candidate.lat === stamp.lat &&
+        candidate.lng === stamp.lng &&
+        (stamp.appleId === undefined ||
+          candidate.appleId === undefined ||
+          candidate.appleId === stamp.appleId),
+    );
   return placeKinds(pin?.category, save.tags, pin?.cuisine);
 }
 

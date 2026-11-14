@@ -106,6 +106,7 @@ function useBadgeQueue(reduced: boolean) {
   const waiting = useRef<WaitingBadges | null>(null);
   const lastStampAt = useRef<number | null>(null);
   const stampBusy = useRef(false);
+  const stampHeld = useRef(false);
   const showing = useRef<Timer | null>(null);
   const later = useTimers();
   const flushNext = useRef<() => void>(() => {});
@@ -139,7 +140,8 @@ function useBadgeQueue(reduced: boolean) {
 
   const flush = useCallback(() => {
     const next = waiting.current;
-    if (next === null || !next.matched || stampBusy.current) return;
+    if (next === null || !next.matched) return;
+    if (stampBusy.current || stampHeld.current) return;
     if (showing.current !== null) return;
     waiting.current = null;
     show(next.ids);
@@ -183,7 +185,22 @@ function useBadgeQueue(reduced: boolean) {
     flush();
   }, [flush]);
 
-  return { badge, unlock, dismissBadge, stampStarted, stampEnded };
+  const holdForStamp = useCallback(
+    (held: boolean) => {
+      stampHeld.current = held;
+      if (!held) flush();
+    },
+    [flush],
+  );
+
+  return {
+    badge,
+    unlock,
+    dismissBadge,
+    stampStarted,
+    stampEnded,
+    holdForStamp,
+  };
 }
 
 const NO_CITY: StampPlace = { city: "", cover: null, cityVisited: 1 };
@@ -299,8 +316,14 @@ export function useStampMomentPlayer(reduced: boolean): {
   unlock: (ids: readonly BadgeId[]) => void;
 } {
   const [shown, setShown] = useState<ShownStamp | null>(null);
-  const { badge, unlock, dismissBadge, stampStarted, stampEnded } =
-    useBadgeQueue(reduced);
+  const {
+    badge,
+    unlock,
+    dismissBadge,
+    stampStarted,
+    stampEnded,
+    holdForStamp,
+  } = useBadgeQueue(reduced);
   const nextId = useRef(0);
   const showing = useRef<ReturnType<typeof setTimeout> | null>(null);
   const landing = useRef(new Set<ReturnType<typeof setTimeout>>());
@@ -368,21 +391,27 @@ export function useStampMomentPlayer(reduced: boolean): {
     [clearShowing, dismiss, reduced, stampStarted],
   );
 
+  const dropPending = useCallback(() => {
+    clearPending();
+    holdForStamp(false);
+  }, [clearPending, holdForStamp]);
+
   const queue = useCallback<Play>(
     (moment, surface) => {
+      holdForStamp(true);
       clearPending();
       pending.current = { moment, surface };
-      expiry.current = setTimeout(clearPending, STAMP_TIMING.queueLimit);
+      expiry.current = setTimeout(dropPending, STAMP_TIMING.queueLimit);
     },
-    [clearPending],
+    [clearPending, dropPending, holdForStamp],
   );
 
   const release = useCallback(() => {
     const next = pending.current;
     if (next === null) return;
-    clearPending();
     play(next.moment, next.surface);
-  }, [clearPending, play]);
+    dropPending();
+  }, [dropPending, play]);
 
   const controls = useMemo(
     () => ({ play, queue, release }),
