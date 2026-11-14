@@ -28,6 +28,8 @@ type Props = {
   onPress?: () => void;
   accessibilityLabel?: string;
   accessibilityHint?: string;
+  numberOfLines?: number;
+  maxFontSizeMultiplier?: number;
 };
 
 vi.mock("react-native", () => ({
@@ -49,7 +51,11 @@ vi.mock("react-native", () => ({
       </button>
     ),
   ),
-  Text: vi.fn(({ children }: Props) => <span>{children}</span>),
+  Text: vi.fn(({ children, numberOfLines, maxFontSizeMultiplier }: Props) => (
+    <span data-lines={numberOfLines} data-max-scale={maxFontSizeMultiplier}>
+      {children}
+    </span>
+  )),
   View: vi.fn(({ children }: Props) => <div>{children}</div>),
 }));
 vi.mock("react-native-unistyles", () => ({
@@ -82,6 +88,7 @@ vi.mock("@/lib/entitlement", () => ({
     loading: false,
   }),
 }));
+vi.mock("@/lib/use-large-text", () => ({ LARGE_TEXT_SCALE: 1.4 }));
 vi.mock("@/lib/analytics", () => ({ analytics: { capture: mocks.capture } }));
 vi.mock("@/lib/i18n", () => ({
   useAppLocale: () => "en",
@@ -156,6 +163,17 @@ describe("PassportCityHead", () => {
     cleanup();
     head(lisbon, false);
     expect(screen.queryByTestId("passport-city-share")).toBeNull();
+  });
+
+  it("wraps a long city name and caps the Share label at large text", () => {
+    head(
+      { ...lisbon, stamps: [{} as PassportSection["stamps"][number]] },
+      false,
+    );
+    expect(screen.getByText("Lisbon").getAttribute("data-lines")).toBe("2");
+    expect(
+      screen.getByText("common.share").getAttribute("data-max-scale"),
+    ).toBe("1.4");
   });
 
   it("keeps the plain count for stamps with no ring", () => {

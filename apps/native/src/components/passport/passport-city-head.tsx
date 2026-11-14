@@ -5,6 +5,7 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { analytics } from "@/lib/analytics";
 import { useEntitlement, usePaywallGuard } from "@/lib/entitlement";
 import { t, useAppLocale } from "@/lib/i18n";
+import { LARGE_TEXT_SCALE } from "@/lib/use-large-text";
 import type { PassportSection } from "@/lib/passport";
 import type { CityCompletion } from "@convex/model/cityCompletion";
 import { useCallback } from "react";
@@ -49,7 +50,7 @@ function RingButton({
     >
       <CityRing stamped={stamped} total={total} city={city} locked={locked} />
       <View style={styles.names}>
-        <Text style={styles.cityName} numberOfLines={1}>
+        <Text style={styles.cityName} numberOfLines={2}>
           {city}
         </Text>
         <Text style={styles.cityCount} numberOfLines={1}>
@@ -112,7 +113,7 @@ export function PassportCityHead({
         />
       ) : (
         <View style={styles.names}>
-          <Text style={styles.cityName} numberOfLines={1}>
+          <Text style={styles.cityName} numberOfLines={2}>
             {city ?? t("passport.elsewhere")}
           </Text>
           <Text style={styles.cityCount}>
@@ -134,7 +135,12 @@ export function PassportCityHead({
             size={14}
             tintColor={theme.colors.primaryText}
           />
-          <Text style={styles.cityShareText}>{t("common.share")}</Text>
+          <Text
+            style={styles.cityShareText}
+            maxFontSizeMultiplier={LARGE_TEXT_SCALE}
+          >
+            {t("common.share")}
+          </Text>
         </Pressable>
       ) : null}
     </View>
