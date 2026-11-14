@@ -119,6 +119,9 @@ async function markVisit(
     await ctx.db.patch(existing._id, {
       name: visit.name,
       visitedAt: visit.visitedAt,
+      ...(existing.itemId === undefined && visit.itemId !== undefined
+        ? { itemId: visit.itemId }
+        : {}),
     });
     return;
   }
@@ -886,9 +889,7 @@ async function listAdderAllows(
   ctx: QueryCtx,
   visit: Doc<"placeVisits">,
 ): Promise<boolean> {
-  if (visit.listPlaceId === undefined || visit.itemId !== undefined) {
-    return true;
-  }
+  if (visit.listPlaceId === undefined) return true;
   const place = await ctx.db.get(visit.listPlaceId);
   if (place === null) return false;
   return (

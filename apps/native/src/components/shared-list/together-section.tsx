@@ -31,6 +31,7 @@ export function TogetherSection({
 }) {
   useAppLocale();
   const lists = useSharedLists();
+  const loading = lists.data === undefined;
   const rows = lists.data ?? [];
   return (
     <View style={styles.container} testID="plans-together">
@@ -43,9 +44,13 @@ export function TogetherSection({
             {t("sharedLists.hint")}
           </ThemedText>
         </View>
-        <NewListLink
-          label={rows.length > 0 ? t("plans.newList") : t("sharedLists.start")}
-        />
+        {loading ? null : (
+          <NewListLink
+            label={
+              rows.length > 0 ? t("plans.newList") : t("sharedLists.start")
+            }
+          />
+        )}
       </View>
       {rows.map((list) => (
         <SharedListCard key={list._id} list={list} />

@@ -8,7 +8,7 @@ import { TogetherSection } from "./together-section";
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
-  lists: [] as unknown[],
+  lists: [] as unknown[] | undefined,
 }));
 
 vi.mock("@/lib/analytics", () => ({
@@ -82,6 +82,13 @@ describe("TogetherSection", () => {
       screen.getByRole("button", { name: "Start a shared list" }),
     );
     expect(mocks.push).toHaveBeenCalledWith("/new-shared-list");
+  });
+
+  it("waits for the lists before offering to start one", () => {
+    mocks.lists = undefined;
+    render(<TogetherSection showTripsHeading={false} />);
+    expect(screen.getByText("Together")).toBeTruthy();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("lists shared lists above the trips heading", () => {

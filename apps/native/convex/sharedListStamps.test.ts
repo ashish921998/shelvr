@@ -100,6 +100,34 @@ describe("Went on a shared list", () => {
     );
   });
 
+  it("keeps the stamp once the member also marks their own save", async () => {
+    const { base, owner, listId } = await friendPlace();
+    const list = await owner.t.query(api.sharedLists.getSharedList, {
+      listId,
+    });
+    const place = list?.places.find((p) => p.name === "Manteigaria");
+    if (place?.itemId === undefined) throw new Error("own save missing");
+    await owner.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: place._id,
+      visited: true,
+      stamp: true,
+    });
+    const itemId = place.itemId;
+    await base.run((ctx) => ctx.db.patch(itemId, { placePins: [] }));
+    await owner.t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Manteigaria",
+      visited: true,
+    });
+    await owner.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: place._id,
+      visited: false,
+    });
+    const rows = await visitRows(base, owner.userId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.itemId).toBe(place.itemId);
+  });
+
   it("can be taken out of the Passport without touching the list", async () => {
     const { base, bo, place } = await friendPlace();
     await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
