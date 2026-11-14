@@ -1118,6 +1118,11 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "저장한 게시물의 이미지",
   "passport.removeStamp": "스탬프 삭제",
+  "passport.momentStamped": "%{name}에 스탬프",
+  "passport.momentFirstInCity": "%{city} 첫 스탬프",
+  "passport.momentBulk": {
+    "other": "%{formattedCount}곳에 스탬프 완료"
+  },
   "passport.wantToGo": "가고 싶어요",
   "passport.title": "여권",
   "passport.yourPassport": "내 여권",

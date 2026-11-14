@@ -185,6 +185,11 @@ export type AnalyticsEventProperties = {
   place_unstamped: { surface: "passport" };
   passport_opened: { places: number };
   passport_backfilled: { places: number };
+  passport_stamp_landed: {
+    surface: "city" | "already_been";
+    first_in_city: boolean;
+    count: number;
+  };
   passport_card_share_opened: { places: number; surface: "stamp" | "passport" };
   passport_shared: { places: number; shared: boolean };
   passport_sharing_stopped: Record<string, never>;

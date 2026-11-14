@@ -1180,6 +1180,13 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "Image de la publication enregistrée",
   "passport.removeStamp": "Retirer le tampon",
+  "passport.momentStamped": "%{name} tamponné",
+  "passport.momentFirstInCity": "Premier tampon à %{city}",
+  "passport.momentBulk": {
+    "one": "%{formattedCount} lieu tamponné",
+    "many": "%{formattedCount} lieux tamponnés",
+    "other": "%{formattedCount} lieux tamponnés"
+  },
   "passport.wantToGo": "À visiter",
   "passport.title": "Passeport",
   "passport.yourPassport": "Votre passeport",

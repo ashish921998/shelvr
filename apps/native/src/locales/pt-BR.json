@@ -1180,6 +1180,13 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "Imagem do post que você salvou",
   "passport.removeStamp": "Remover carimbo",
+  "passport.momentStamped": "%{name} carimbado",
+  "passport.momentFirstInCity": "Primeiro carimbo em %{city}",
+  "passport.momentBulk": {
+    "one": "%{formattedCount} lugar carimbado",
+    "many": "%{formattedCount} lugares carimbados",
+    "other": "%{formattedCount} lugares carimbados"
+  },
   "passport.wantToGo": "Quero ir",
   "passport.title": "Passaporte",
   "passport.yourPassport": "Seu passaporte",

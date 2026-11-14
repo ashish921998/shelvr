@@ -50,7 +50,7 @@ describe("grouping by city", () => {
       stamp({ key: "c", city: "Porto" }),
     ];
     expect(wentInCity(stamps, "Lisbon")).toBe(2);
-    expect(wentInCity(undefined, "Lisbon")).toBe(0);
+    expect(wentInCity(undefined, "Lisbon")).toBeNull();
   });
 });
 

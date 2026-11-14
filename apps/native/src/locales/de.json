@@ -1149,6 +1149,12 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "Bild aus dem gespeicherten Beitrag",
   "passport.removeStamp": "Stempel entfernen",
+  "passport.momentStamped": "%{name} gestempelt",
+  "passport.momentFirstInCity": "Erster Stempel in %{city}",
+  "passport.momentBulk": {
+    "one": "%{formattedCount} Ort gestempelt",
+    "other": "%{formattedCount} Orte gestempelt"
+  },
   "passport.wantToGo": "Will hin",
   "passport.title": "Pass",
   "passport.yourPassport": "Dein Pass",
