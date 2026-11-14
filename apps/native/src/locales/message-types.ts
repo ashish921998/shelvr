@@ -1154,7 +1154,6 @@ type MessageParams = {
   "onboardingChart.whenTrip": undefined;
   "onboardingChart.chartLabel": { lost: string; goal: string; when: string };
   "onboardingStatement.cityPicked": { city: string };
-  "onboardingStatement.cityFirst": { picked: string; city: string };
   "onboardingStatement.cityStart": { city: string };
   "onboardingStatement.firstSave": undefined;
   "onboardingCarousel.together": undefined;

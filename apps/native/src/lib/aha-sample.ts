@@ -22,40 +22,41 @@ export type AhaSample = {
   spots: { name: string }[];
 };
 
-const REEL_TRIPS = new Map<AhaReel, SampleTrip>();
+const REEL_TRIPS = new Map<string, SampleTrip>();
 
-/** The real reel's first places on the city's map, in its video's order. */
-function reelTrip(plan: SampleTrip, reel: AhaReel): SampleTrip {
-  let trip = REEL_TRIPS.get(reel);
+/** The real reel's places on its city's map, in the order it names them. */
+function reelTrip(
+  kind: PlanKind,
+  city: SampleCityId,
+  reel: AhaReel,
+): SampleTrip {
+  const key = `${kind}:${city}`;
+  let trip = REEL_TRIPS.get(key);
   if (trip === undefined) {
     trip = stopsTrip(
-      plan.kind,
-      plan.city,
-      plan.days[0].title,
+      kind,
+      city,
+      samplePlan(kind, city).days[0].title,
       reel.places
         .slice(0, AHA_SPOTS)
         .map(([slot, name, lat, lng]) => ({ name, slot, at: { lat, lng } })),
     );
-    REEL_TRIPS.set(reel, trip);
+    REEL_TRIPS.set(key, trip);
   }
   return trip;
 }
 
-/** Always demonstrate a saveable reel; cities without one use the Austin reel for the same goal. */
+/** Always demonstrate the picked city's reel, or Austin's when no city was picked. */
 export function ahaSample(
   kind: PlanKind,
-  city: SampleCityId | null,
+  picked: SampleCityId | null,
 ): AhaSample {
-  const selected = samplePlan(kind, city);
-  const plan = ahaReel(kind, selected.city)
-    ? selected
-    : samplePlan(kind, FALLBACK_REEL_CITY);
-  const reel = ahaReel(kind, plan.city);
-  if (reel === null) throw new Error("Missing onboarding fallback reel");
-  const trip = reelTrip(plan, reel);
+  const city = picked ?? FALLBACK_REEL_CITY;
+  const reel = ahaReel(city);
+  const trip = reelTrip(kind, city, reel);
   return {
     kind,
-    city: plan.city,
+    city,
     trip,
     creator: `@${reel.handle}`,
     videoCode: reel.code,
