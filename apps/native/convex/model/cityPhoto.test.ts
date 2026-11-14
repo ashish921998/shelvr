@@ -21,7 +21,12 @@ describe("summaryTitle", () => {
 
 describe("isPlacePage", () => {
   const page = (type: string, description?: string) =>
-    parseSummary({ type, description, title: "X" })!;
+    parseSummary({
+      type,
+      description,
+      title: "X",
+      coordinates: { lat: 35, lon: 135.7 },
+    })!;
 
   it("accepts an ordinary article about a city", () => {
     expect(
@@ -31,6 +36,15 @@ describe("isPlacePage", () => {
 
   it("refuses a disambiguation page or an article about a namesake", () => {
     expect(isPlacePage(page("disambiguation"))).toBe(false);
+    expect(
+      isPlacePage(
+        parseSummary({
+          type: "standard",
+          title: "Reading",
+          description: "Process of taking in the sense or meaning of symbols",
+        })!,
+      ),
+    ).toBe(false);
     expect(isPlacePage(page("standard", "2011 film by Woody Allen"))).toBe(
       false,
     );
@@ -49,6 +63,7 @@ describe("parseSummary", () => {
         description: "City in Japan",
         wikibase_item: "Q34600",
         thumbnail: { source: "https://upload.wikimedia.org/a/320px-K.jpg" },
+        coordinates: { lat: 35, lon: 135.7 },
       }),
     ).toEqual({
       type: "standard",
@@ -56,6 +71,7 @@ describe("parseSummary", () => {
       description: "City in Japan",
       wikibaseItem: "Q34600",
       thumbnail: "https://upload.wikimedia.org/a/320px-K.jpg",
+      located: true,
     });
     expect(parseSummary("nope")).toBeNull();
   });

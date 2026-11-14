@@ -155,6 +155,7 @@ describe("lookUp", () => {
           type: "standard",
           description: "City in Japan",
           wikibase_item: "Q34600",
+          coordinates: { lat: 1, lon: 1 },
         });
       }
       if (url.includes("wbgetclaims")) {
@@ -189,6 +190,7 @@ describe("lookUp", () => {
           type: "standard",
           description: "Capital of Georgia",
           wikibase_item: "Q994",
+          coordinates: { lat: 1, lon: 1 },
           thumbnail: { source: lead },
         });
       }
@@ -236,6 +238,7 @@ describe("lookUp", () => {
           type: "standard",
           description: "City in Illinois",
           wikibase_item: "Q1297",
+          coordinates: { lat: 1, lon: 1 },
         });
       }
       if (url.includes("wbgetclaims")) {

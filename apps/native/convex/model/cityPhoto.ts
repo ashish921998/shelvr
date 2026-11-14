@@ -19,6 +19,7 @@ export type WikiSummary = {
   description?: string;
   wikibaseItem?: string;
   thumbnail?: string;
+  located: boolean;
 };
 
 function str(value: unknown): string | undefined {
@@ -44,11 +45,12 @@ export function parseSummary(body: unknown): WikiSummary | null {
     description: str(data.description),
     wikibaseItem: str(data.wikibase_item),
     thumbnail: str(record(data.thumbnail)?.source),
+    located: record(data.coordinates) !== undefined,
   };
 }
 
 export function isPlacePage(summary: WikiSummary): boolean {
-  if (summary.type !== "standard") return false;
+  if (summary.type !== "standard" || !summary.located) return false;
   return !NOT_A_PLACE.test(summary.description ?? "");
 }
 
