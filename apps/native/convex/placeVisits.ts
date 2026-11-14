@@ -277,7 +277,8 @@ export const setVisited = authedMutation({
     });
     const row = await findVisit(ctx, userId, args.name);
     if (row === null) return null;
-    await syncStampPlaces(ctx, await claimMarkedSpots(ctx, row, spots), owned);
+    const claim = await claimMarkedSpots(ctx, row, spots);
+    await syncStampPlaces(ctx, claim.row, owned, { released: claim.released });
     return null;
   },
 });
@@ -286,18 +287,20 @@ async function claimMarkedSpots(
   ctx: MutationCtx,
   row: Doc<"placeVisits">,
   marked: VisitSpot[] | undefined,
-): Promise<Doc<"placeVisits">> {
+): Promise<{ row: Doc<"placeVisits">; released: StampPlace[] }> {
   const spots = marked ?? [];
   const claimed = (entry: StampPlace) =>
     entry.listPlaceId !== undefined && knowsSpot(spots, entry);
-  if (!row.stampPlaces?.some(claimed)) return row;
+  if (!row.stampPlaces?.some(claimed)) return { row, released: [] };
+  const released: StampPlace[] = [];
   const stampPlaces = row.stampPlaces.map((entry) => {
     if (!claimed(entry)) return entry;
     const { listPlaceId: _listPlaceId, ...own } = entry;
+    released.push(own);
     return own;
   });
   await ctx.db.patch(row._id, { stampPlaces });
-  return { ...row, stampPlaces };
+  return { row: { ...row, stampPlaces }, released };
 }
 
 function listSpot(place: Doc<"sharedListPlaces">): VisitSpot {
@@ -534,6 +537,19 @@ async function ownedSave(
   return item !== null && item.userId === userId ? item : null;
 }
 
+function unlocated(
+  places: StampPlace[],
+  released: StampPlace[] | undefined,
+): StampPlace[] {
+  return places.filter(
+    (place) =>
+      place.countryCode === undefined &&
+      released?.some(
+        (entry) => entry.lat === place.lat && entry.lng === place.lng,
+      ) === true,
+  );
+}
+
 async function syncStampPlaces(
   ctx: MutationCtx,
   row: Doc<"placeVisits">,
@@ -542,6 +558,7 @@ async function syncStampPlaces(
     delayMs?: number;
     spacingMs?: number;
     retryMissing?: boolean;
+    released?: StampPlace[];
   } = {},
 ): Promise<number> {
   const saved =
@@ -574,7 +591,7 @@ async function syncStampPlaces(
   }
   const lookups = options.retryMissing
     ? places.filter((place) => place.countryCode === undefined)
-    : fresh;
+    : [...fresh, ...unlocated(places, options.released)];
   for (const [index, { lat, lng }] of lookups.entries()) {
     await ctx.scheduler.runAfter(
       (options.delayMs ?? 0) +
@@ -653,8 +670,9 @@ export const markVisitedBefore = authedMutation({
       if (found === null) continue;
       if (existing === null)
         await ctx.db.patch(found._id, { backfilled: true });
-      const row = await claimMarkedSpots(ctx, found, spots);
-      queued += await syncStampPlaces(ctx, row, item, {
+      const claim = await claimMarkedSpots(ctx, found, spots);
+      queued += await syncStampPlaces(ctx, claim.row, item, {
+        released: claim.released,
         delayMs: queued * COUNTRY_SPACING_MS,
       });
     }

@@ -443,4 +443,40 @@ describe("Went on a shared list", () => {
     expect(row?.spots?.map((spot) => spot.appleId)).toEqual(["A-mant"]);
     expect(row?.stampPlaces?.[0]?.listPlaceId).toBeUndefined();
   });
+
+  it("looks up the country once the member claims a list stamp from their own save", async () => {
+    const { base, owner, bo, listId, place } = await friendPlace();
+    if (place.itemId !== undefined)
+      throw new Error("expected a friend's place");
+    const porto = await portoBranch(base, listId, bo.userId);
+    await base.run((ctx) => setTestConsent(ctx, bo.userId, "declined"));
+    await owner.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: porto,
+      visited: true,
+      stamp: true,
+    });
+    const portoLookups = async () =>
+      (
+        await base.run((ctx) =>
+          ctx.db.system.query("_scheduled_functions").collect(),
+        )
+      ).filter(
+        (job) =>
+          job.name.includes("locateCountry") &&
+          (job.args[0] as { lat: number }).lat === 41.1496,
+      );
+    expect(await portoLookups()).toEqual([]);
+    const ownList = await owner.t.query(api.sharedLists.getSharedList, {
+      listId,
+    });
+    const own = ownList?.places.find((p) => p._id === place._id);
+    if (own?.itemId === undefined) throw new Error("own save missing");
+    await owner.t.mutation(api.placeVisits.setVisited, {
+      itemId: own.itemId,
+      name: "Manteigaria",
+      visited: true,
+      spot: { lat: 41.1496, lng: -8.611, appleId: "A-mant-porto" },
+    });
+    expect(await portoLookups()).toHaveLength(1);
+  });
 });
