@@ -21,15 +21,20 @@ const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   captureError: vi.fn(),
   play: vi.fn(),
+  optimistic: vi.fn(),
   router: { push: vi.fn() },
 }));
 
 vi.mock("convex/react", () => ({
   useMutation: (ref: Parameters<typeof getFunctionName>[0]) => {
-    const run = getFunctionName(ref).endsWith("addCityStamp")
-      ? mocks.add
-      : mocks.remove;
-    return { withOptimisticUpdate: () => run };
+    const name = getFunctionName(ref);
+    const run = name.endsWith("addCityStamp") ? mocks.add : mocks.remove;
+    return Object.assign((args: unknown) => run(args), {
+      withOptimisticUpdate: (update: unknown) => {
+        mocks.optimistic(name, update);
+        return run;
+      },
+    });
   },
 }));
 vi.mock("expo-router", () => ({ useRouter: () => mocks.router }));
@@ -79,6 +84,30 @@ describe("useCityStampToggle", () => {
       stamped: true,
       count: 3,
     });
+  });
+
+  it("waits for the server before the stamp moves any count", async () => {
+    let finish: (added: boolean) => void = () => {};
+    mocks.add.mockReturnValue(
+      new Promise<boolean>((resolve) => {
+        finish = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useCityStampToggle());
+    let pending: Promise<boolean> = Promise.resolve(false);
+    act(() => {
+      pending = result.current("tokyo", true, 3);
+    });
+    expect(mocks.optimistic).not.toHaveBeenCalledWith(
+      expect.stringContaining("addCityStamp"),
+      expect.anything(),
+    );
+    expect(mocks.play).not.toHaveBeenCalled();
+    await act(async () => {
+      finish(true);
+      await pending;
+    });
+    expect(mocks.play).toHaveBeenCalledTimes(1);
   });
 
   it("plays nothing when the city was already stamped", async () => {

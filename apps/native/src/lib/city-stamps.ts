@@ -56,8 +56,7 @@ function useCityStampMutations() {
         );
       };
     return {
-      add: (city: string) =>
-        add.withOptimisticUpdate(optimistic(city, true))({ city }),
+      add: (city: string) => add({ city }),
       remove: (city: string) =>
         remove.withOptimisticUpdate(optimistic(city, false))({ city }),
     };
