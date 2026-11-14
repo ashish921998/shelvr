@@ -278,6 +278,22 @@ describe("badge unlock moment", () => {
     });
   });
 
+  it("shows the next badge when the shown one is lost, without a second unlock", () => {
+    mount(lisbon, "city");
+    stamp();
+    unlock(["firstStamp", "explorer"]);
+    wait(STAMP_TIMING.shown);
+    expect(screen.getByText("badges.firstStamp")).toBeTruthy();
+    revoke(["firstStamp"]);
+    expect(screen.getByText("badges.explorer")).toBeTruthy();
+    expect(screen.queryByText(/badges\.moreEarned/)).toBeNull();
+    expect(
+      mocks.capture.mock.calls.filter(
+        ([event]) => event === "passport_badge_unlocked",
+      ),
+    ).toHaveLength(2);
+  });
+
   it("takes down a shown badge the person no longer has, and trims the count", () => {
     mount(lisbon, "city");
     stamp();
