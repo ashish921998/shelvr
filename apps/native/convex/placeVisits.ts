@@ -276,10 +276,29 @@ export const setVisited = authedMutation({
       explicit: args.spot !== undefined,
     });
     const row = await findVisit(ctx, userId, args.name);
-    if (row !== null) await syncStampPlaces(ctx, row, owned);
+    if (row === null) return null;
+    await syncStampPlaces(ctx, await claimMarkedSpots(ctx, row, spots), owned);
     return null;
   },
 });
+
+async function claimMarkedSpots(
+  ctx: MutationCtx,
+  row: Doc<"placeVisits">,
+  marked: VisitSpot[] | undefined,
+): Promise<Doc<"placeVisits">> {
+  const spots = marked ?? [];
+  const claimed = (entry: StampPlace) =>
+    entry.listPlaceId !== undefined && knowsSpot(spots, entry);
+  if (!row.stampPlaces?.some(claimed)) return row;
+  const stampPlaces = row.stampPlaces.map((entry) => {
+    if (!claimed(entry)) return entry;
+    const { listPlaceId: _listPlaceId, ...own } = entry;
+    return own;
+  });
+  await ctx.db.patch(row._id, { stampPlaces });
+  return { ...row, stampPlaces };
+}
 
 function listSpot(place: Doc<"sharedListPlaces">): VisitSpot {
   return tidySpot({
