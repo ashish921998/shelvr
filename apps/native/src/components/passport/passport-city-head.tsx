@@ -9,8 +9,6 @@ import { useCallback } from "react";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-const RING_SIZE = 40;
-
 export function useRingAccess(): { locked: boolean; unlock: () => void } {
   const { entitled, loading } = useEntitlement();
   const { guard } = usePaywallGuard("passport");
@@ -45,13 +43,7 @@ function RingButton({
       onPress={locked ? onUnlock : () => onOpen(city)}
       style={({ pressed }) => [styles.ringButton, pressed && styles.pressed]}
     >
-      <CityRing
-        stamped={stamped}
-        total={total}
-        city={city}
-        size={RING_SIZE}
-        locked={locked}
-      />
+      <CityRing stamped={stamped} total={total} city={city} locked={locked} />
       <View style={styles.names}>
         <Text style={styles.cityName} numberOfLines={1}>
           {city}
