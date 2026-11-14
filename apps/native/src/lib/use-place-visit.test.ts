@@ -213,10 +213,16 @@ describe("usePlaceVisit", () => {
   });
 
   it("skips the moment when the city page was left before the stamp landed", async () => {
-    mocks.focused = false;
-    await expect(toggle(taco, { ...austin, cityVisited: 0 })).resolves.toBe(
-      true,
+    let land: (value: null) => void = () => {};
+    mocks.setVisited.mockReturnValue(
+      new Promise<null>((resolve) => {
+        land = resolve;
+      }),
     );
+    const done = toggle(taco, { ...austin, cityVisited: 0 });
+    mocks.focused = false;
+    land(null);
+    await expect(done).resolves.toBe(true);
     expect(mocks.play).not.toHaveBeenCalled();
     expect(mocks.capture).toHaveBeenCalledWith("city_place_visited", {
       visited: true,
