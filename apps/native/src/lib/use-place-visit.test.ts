@@ -3,6 +3,7 @@ import { act, renderHook } from "@testing-library/react";
 import { ConvexError } from "convex/values";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { StampPlace } from "@/lib/stamp-moment";
 import { usePlaceVisit } from "@/lib/use-place-visit";
 import type { Id } from "@convex/_generated/dataModel";
 
@@ -41,19 +42,12 @@ const taco = { name: "Taco Spot", lat: 30.1, lng: -97.1, appleId: "taco" };
 
 const austin = { city: "Austin", cover: "https://img/taco.jpg" };
 
-async function toggle(
+function toggle(
   pin: typeof taco | Omit<typeof taco, "appleId">,
-  stamp: Parameters<ReturnType<typeof usePlaceVisit>["toggle"]>[3] = {
-    ...austin,
-    cityVisited: 2,
-  },
+  stamp?: StampPlace,
 ) {
   const { result } = renderHook(() => usePlaceVisit());
-  let done = false;
-  await act(async () => {
-    done = await result.current.toggle(itemId, pin, true, stamp);
-  });
-  return done;
+  return act(() => result.current.toggle(itemId, pin, true, stamp));
 }
 
 beforeEach(() => {
@@ -162,7 +156,7 @@ describe("usePlaceVisit", () => {
   });
 
   it("still plays the moment for a stamp with no city context", async () => {
-    await toggle(taco, undefined);
+    await toggle(taco);
     expect(mocks.play).toHaveBeenCalledTimes(1);
     expect(mocks.play.mock.calls[0][0]).toMatchObject({
       name: "Taco Spot",
