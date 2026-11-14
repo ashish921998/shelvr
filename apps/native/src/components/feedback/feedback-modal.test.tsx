@@ -9,6 +9,38 @@ import {
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { FeedbackModal } from "./feedback-modal";
 
+vi.mock("react-native-reanimated", () => ({
+  default: {
+    View: vi.fn(
+      ({
+        children,
+        accessibilityElementsHidden,
+        pointerEvents,
+      }: {
+        children: React.ReactNode;
+        accessibilityElementsHidden?: boolean;
+        pointerEvents?: string;
+      }) => (
+        <div
+          aria-hidden={accessibilityElementsHidden}
+          data-pointer-events={pointerEvents}
+        >
+          {children}
+        </div>
+      ),
+    ),
+  },
+  useReducedMotion: () => false,
+  ReduceMotion: { Never: "never" },
+  FadeIn: {
+    duration: () => ({ easing: () => ({ reduceMotion: () => undefined }) }),
+  },
+}));
+vi.mock("@/lib/motion", () => ({
+  motion: { duration: { state: 180, feedback: 120 }, easing: { out: "out" } },
+  motionCSS: { out: "out" },
+}));
+
 const mocks = vi.hoisted(() => ({
   submit: vi.fn(),
   user: { _id: "user-1" } as { _id: string } | null,
@@ -16,6 +48,7 @@ const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   captureError: vi.fn(),
   openURL: vi.fn(),
+  dismissKeyboard: vi.fn(),
 }));
 
 vi.mock("convex/react", () => ({
@@ -58,6 +91,7 @@ vi.mock("@/components/symbol", () => ({
   AppSymbolIcon: vi.fn(() => <span data-testid="symbol" />),
 }));
 vi.mock("react-native", () => ({
+  Keyboard: { dismiss: mocks.dismissKeyboard },
   KeyboardAvoidingView: vi.fn(({ children }: { children: React.ReactNode }) => (
     <div>{children}</div>
   )),
@@ -128,11 +162,17 @@ describe("FeedbackModal", () => {
     });
     render(<FeedbackModal surface="home" onClose={() => {}} />);
     typeDraft("Love the app");
+    const draft = screen.getByRole("textbox");
     fireEvent.click(screen.getByLabelText("feedback.open"));
     await waitFor(() =>
       expect(screen.getByText("feedback.thanks")).toBeTruthy(),
     );
     expect(mocks.markSubmitted).toHaveBeenCalledWith("user-1");
+    expect(mocks.dismissKeyboard).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.getByLabelText("feedback.messageLabel")).toBe(draft);
+    expect(draft.parentElement?.dataset.pointerEvents).toBe("none");
+    expect(screen.getByRole("button", { name: "common.done" })).toBeTruthy();
     expect(mocks.submit).toHaveBeenCalledOnce();
     expect(mocks.capture).toHaveBeenCalledWith("feedback_submitted", {
       surface: "home",
