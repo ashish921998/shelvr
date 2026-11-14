@@ -22,17 +22,24 @@ export const setCityCover = authedMutation({
     ) {
       throw new Error("Save has no photo");
     }
-    for (const other of await rawReadySavesNewestFirst(ctx, ctx.userId)) {
-      if (
-        other._id === item._id ||
-        !other.coverFor?.some((pick) => pick.key === key)
-      ) {
-        continue;
+    const own = item.coverFor?.find((pick) => pick.key === key)?.at;
+    const others = (await rawReadySavesNewestFirst(ctx, ctx.userId)).filter(
+      (other) =>
+        other._id !== item._id &&
+        other.coverFor?.some((pick) => pick.key === key),
+    );
+    const newer = others.some((other) =>
+      other.coverFor?.some(
+        (pick) => pick.key === key && (own === undefined || pick.at > own),
+      ),
+    );
+    if (args.on || !newer) {
+      for (const other of others) {
+        const kept = (other.coverFor ?? []).filter((pick) => pick.key !== key);
+        await ctx.db.patch(other._id, {
+          coverFor: kept.length > 0 ? kept : undefined,
+        });
       }
-      const kept = other.coverFor.filter((pick) => pick.key !== key);
-      await ctx.db.patch(other._id, {
-        coverFor: kept.length > 0 ? kept : undefined,
-      });
     }
     const rest = (item.coverFor ?? []).filter((pick) => pick.key !== key);
     const next = args.on ? [...rest, { key, at: Date.now() }] : rest;

@@ -96,6 +96,38 @@ describe("setCityCover", () => {
     expect(kyoto).not.toHaveProperty("coverItemId");
   });
 
+  it("leaves a newer pick in place when an older save is turned off", async () => {
+    const backend = newConvexTest();
+    const { userId, t } = await signedInUser(backend);
+    await kyotoPhoto(backend);
+    const temple = await readySave(
+      backend,
+      userId,
+      ["Kyoto"],
+      "https://cdn/temple.jpg",
+    );
+    const tea = await readySave(
+      backend,
+      userId,
+      ["Kyoto"],
+      "https://cdn/tea.jpg",
+    );
+    await backend.run(async (ctx) => {
+      await ctx.db.patch(temple, { coverFor: [{ key: "kyoto", at: 1 }] });
+      await ctx.db.patch(tea, { coverFor: [{ key: "kyoto", at: 2 }] });
+    });
+    await t.mutation(api.cityCovers.setCityCover, {
+      itemId: temple,
+      city: "Kyoto",
+      on: false,
+    });
+    const [kyoto] = await t.query(api.items.listCities, {});
+    expect(kyoto).toMatchObject({
+      cover: "https://cdn/tea.jpg",
+      coverItemId: tea,
+    });
+  });
+
   it("puts the picked save's photo on the city card over the city photo", async () => {
     const backend = newConvexTest();
     const { userId, t } = await signedInUser(backend);
