@@ -14,7 +14,7 @@ import {
 } from "@convex/model/badges";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useConvexAuth } from "convex/react";
+import { useConvex, useConvexAuth } from "convex/react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Alert, Platform, Share } from "react-native";
 
@@ -66,12 +66,18 @@ function shareContent(message: string, link: string | null) {
 
 export function useShareBadge(surface: ShareSurface) {
   const token = usePassportShare();
+  const convex = useConvex();
   return useCallback(
     async (badge: BadgeId) => {
       const message = t("badges.shareMessage", { badge: badgeName(badge) });
       try {
+        const link =
+          token ??
+          (await convex
+            .query(api.passportShares.myPassportShare, {})
+            .catch(() => null));
         const result = await Share.share(
-          shareContent(message, token === null ? null : passportUrl(token)),
+          shareContent(message, link === null ? null : passportUrl(link)),
         );
         analytics.capture("passport_badge_shared", {
           badge,
@@ -83,6 +89,6 @@ export function useShareBadge(surface: ShareSurface) {
         Alert.alert(t("errors.unexpectedTitle"), t("errors.retrySoon"));
       }
     },
-    [surface, token],
+    [convex, surface, token],
   );
 }
