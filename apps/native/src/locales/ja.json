@@ -1282,5 +1282,22 @@
   "onboardingCarousel.eat": "「どこで食べる？」は\nもう終わり。",
   "onboardingCarousel.map": "保存した場所すべてを、\nひとつの地図に。",
   "onboardingCarousel.next": "次のスライド",
-  "sharedLists.nameBodyWelcome": "共有リストの相手に表示されます。あなたが共有した項目のリンクや、あなたが所有するリストのリンクを持つ人にも表示されます。"
+  "sharedLists.nameBodyWelcome": "共有リストの相手に表示されます。あなたが共有した項目のリンクや、あなたが所有するリストのリンクを持つ人にも表示されます。",
+  "cityStamps.add": "行ったことのある都市…",
+  "cityStamps.title": "行ったことのある都市",
+  "cityStamps.body": "行ったことのある都市をタップすると、パスポートにスタンプが押されます。もう一度タップするとスタンプを外します。",
+  "cityStamps.noMatch": "その都市はまだありません。",
+  "cityStamps.label": "%{city}、都市スタンプ",
+  "cityStamps.removeHint": "パスポートからスタンプを外します",
+  "cityStamps.removeTitle": "%{city}をパスポートから外しますか？",
+  "cityStamps.remove": "スタンプを外す",
+  "cityStamps.lockedHint": "Shelvr Proで都市にスタンプ",
+  "cityStamps.saveFailed": "都市を更新できませんでした",
+  "cityStamps.rateLimited": "都市の変更が多すぎます。数分後にもう一度お試しください。",
+  "cityStamps.onboardingTitle": "行ったことのある都市は？",
+  "cityStamps.onboardingBody": "行ったことのある都市をタップしてください。それぞれがパスポートのスタンプになります。",
+  "passport.momentCityStamp": "%{city}に行きました",
+  "passport.paywallHeadline": {
+    "other": "パスポートに%{formattedCount}都市"
+  }
 }

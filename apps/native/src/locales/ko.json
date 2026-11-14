@@ -1282,5 +1282,22 @@
   "onboardingCarousel.eat": "‘어디서 먹지?’\n이제 그만.",
   "onboardingCarousel.map": "저장한 모든 장소를\n지도 하나에.",
   "onboardingCarousel.next": "다음 슬라이드",
-  "sharedLists.nameBodyWelcome": "공유 목록에 있는 사람들에게 보이고, 내가 공유한 항목이나 내가 소유한 목록의 링크가 있는 사람에게도 보여요."
+  "sharedLists.nameBodyWelcome": "공유 목록에 있는 사람들에게 보이고, 내가 공유한 항목이나 내가 소유한 목록의 링크가 있는 사람에게도 보여요.",
+  "cityStamps.add": "가 본 도시…",
+  "cityStamps.title": "가 본 도시",
+  "cityStamps.body": "가 본 도시를 탭하면 여권에 스탬프가 찍혀요. 다시 탭하면 스탬프를 지워요.",
+  "cityStamps.noMatch": "아직 없는 도시예요.",
+  "cityStamps.label": "%{city}, 도시 스탬프",
+  "cityStamps.removeHint": "여권에서 스탬프를 지워요",
+  "cityStamps.removeTitle": "여권에서 %{city}을(를) 지울까요?",
+  "cityStamps.remove": "스탬프 지우기",
+  "cityStamps.lockedHint": "Shelvr Pro로 도시에 스탬프",
+  "cityStamps.saveFailed": "도시를 업데이트하지 못했어요",
+  "cityStamps.rateLimited": "도시 변경이 너무 많아요. 몇 분 후에 다시 시도하세요.",
+  "cityStamps.onboardingTitle": "어디에 가 봤나요?",
+  "cityStamps.onboardingBody": "가 본 도시를 탭하세요. 하나하나가 여권의 스탬프가 돼요.",
+  "passport.momentCityStamp": "%{city}에 가 봤어요",
+  "passport.paywallHeadline": {
+    "other": "여권에 도시 %{formattedCount}곳"
+  }
 }

@@ -1,4 +1,5 @@
 import { AppSymbolIcon } from "@/components/symbol";
+import { useCityStamps } from "@/lib/city-stamp-data";
 import { t, useAppLocale } from "@/lib/i18n";
 import { stampId, usePassport } from "@/lib/passport";
 import { passportCounts } from "@convex/model/passport";
@@ -14,19 +15,22 @@ export function PassportRow({ hideEmpty = false }: { hideEmpty?: boolean }) {
   const router = useRouter();
   const { theme } = useUnistyles();
   const { stamps } = usePassport();
+  const cities = useCityStamps().stamps ?? [];
   if (stamps === undefined) return null;
-  const empty = stamps.length === 0;
+  const empty = stamps.length === 0 && cities.length === 0;
   if (empty && hideEmpty) return null;
-  const counts = passportCounts(stamps);
+  const counts = passportCounts(stamps, cities);
   const title = empty ? t("passport.beenTitle") : t("passport.yourPassport");
   const subtitle = empty
     ? t("passport.beenBody")
-    : counts.cities > 1
-      ? t("passport.rowCities", {
-          places: t("passport.placesCount", { count: counts.places }),
-          cities: t("passport.citiesCount", { count: counts.cities }),
-        })
-      : t("passport.placesCount", { count: counts.places });
+    : counts.places === 0
+      ? t("passport.citiesCount", { count: counts.cities })
+      : counts.cities > 1
+        ? t("passport.rowCities", {
+            places: t("passport.placesCount", { count: counts.places }),
+            cities: t("passport.citiesCount", { count: counts.cities }),
+          })
+        : t("passport.placesCount", { count: counts.places });
   return (
     <Pressable
       testID="home-passport"
@@ -39,7 +43,7 @@ export function PassportRow({ hideEmpty = false }: { hideEmpty?: boolean }) {
         pressed && styles.pressed,
       ]}
     >
-      {empty ? (
+      {stamps.length === 0 ? (
         <View style={styles.icon}>
           <AppSymbolIcon
             name="checkmark"

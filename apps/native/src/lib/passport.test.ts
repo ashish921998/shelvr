@@ -170,6 +170,48 @@ describe("passportSections", () => {
     const { stamped } = passportSections([stamp({ city: "Lisbon" })], []);
     expect(stamped).toMatchObject([{ city: "Lisbon", completion: null }]);
   });
+
+  it("shows a city stamp alone until a place there is stamped", () => {
+    const cityStamps = [
+      { city: "lisbon", country: "PT", stampedAt: 1 },
+      { city: "tokyo", country: "JP", stampedAt: 2 },
+    ];
+    const { stamped, waiting, cities } = passportSections(
+      [stamp({ city: "Lisboa" })],
+      [row("Lisboa", 1, 3), row("Tokyo", 0, 4)],
+      cityStamps,
+    );
+    expect(
+      stamped.map((section) => [section.city, section.cityStamp?.city]),
+    ).toEqual([["Lisboa", "lisbon"]]);
+    expect(cities).toEqual([cityStamps[1]]);
+    expect(waiting.map((section) => section.city)).toEqual(["Tokyo"]);
+  });
+
+  it("keeps a city stamp off a same-named city in another country", () => {
+    const paris = { city: "paris", country: "FR", stampedAt: 1 };
+    const { stamped, cities } = passportSections(
+      [stamp({ city: "Paris", countryCode: "US" })],
+      [],
+      [paris],
+    );
+    expect(stamped[0].cityStamp).toBeUndefined();
+    expect(cities).toEqual([paris]);
+  });
+
+  it("keeps a city stamp off the stamps with no city and drops one no longer in the list", () => {
+    const { stamped, cities } = passportSections(
+      [stamp({ key: "x", city: undefined })],
+      [],
+      [
+        { city: "paris", country: "FR", stampedAt: 1 },
+        { city: "atlantis", country: "XX", stampedAt: 2 },
+      ],
+    );
+    expect(stamped).toHaveLength(1);
+    expect(stamped[0].cityStamp).toBeUndefined();
+    expect(cities.map((city) => city.city)).toEqual(["paris"]);
+  });
 });
 
 describe("next to stamp", () => {

@@ -24,9 +24,14 @@ export type StampMoment =
       firstInCity: boolean;
       completedTotal: number | null;
     }
-  | { kind: "bulk"; count: number; cover: string | null };
+  | { kind: "bulk"; count: number; cover: string | null }
+  | { kind: "city"; city: string };
 
-export type StampSurface = "city" | "already_been" | "next_to_stamp";
+export type StampSurface =
+  | "city"
+  | "already_been"
+  | "next_to_stamp"
+  | "city_stamps";
 
 export type StampPlace = {
   city: string;
@@ -261,7 +266,14 @@ export function bulkStampMoment(
   return { kind: "bulk", count, cover };
 }
 
+export function cityStampMoment(city: string): StampMoment {
+  return { kind: "city", city };
+}
+
 export function stampLine(moment: StampMoment): string {
+  if (moment.kind === "city") {
+    return t("passport.momentCityStamp", { city: moment.city });
+  }
   if (moment.kind === "bulk") {
     return t("passport.momentBulk", { count: moment.count });
   }
@@ -274,7 +286,7 @@ export function stampLine(moment: StampMoment): string {
 }
 
 function stampInk(moment: StampMoment): string {
-  return moment.kind === "place" && moment.city
+  return moment.kind !== "bulk" && moment.city
     ? moment.city
     : t("passport.wentNoDate");
 }

@@ -1347,5 +1347,23 @@
   "onboardingCarousel.eat": "Nie wieder „Wo\nsollen wir essen?“",
   "onboardingCarousel.map": "Jeder gespeicherte Ort,\nauf einer Karte.",
   "onboardingCarousel.next": "Nächste Folie",
-  "sharedLists.nameBodyWelcome": "Leute auf deinen geteilten Listen sehen ihn, ebenso alle mit einem Link zu einem Inhalt, den du teilst, oder zu einer Liste, die dir gehört."
+  "sharedLists.nameBodyWelcome": "Leute auf deinen geteilten Listen sehen ihn, ebenso alle mit einem Link zu einem Inhalt, den du teilst, oder zu einer Liste, die dir gehört.",
+  "cityStamps.add": "Ich war schon in …",
+  "cityStamps.title": "Städte, in denen du warst",
+  "cityStamps.body": "Tippe auf eine Stadt, in der du warst, und sie bekommt einen Stempel in deinem Pass. Tippe noch einmal, um den Stempel zu entfernen.",
+  "cityStamps.noMatch": "Diese Stadt haben wir noch nicht.",
+  "cityStamps.label": "%{city}, Stadtstempel",
+  "cityStamps.removeHint": "Entfernt den Stempel aus deinem Pass",
+  "cityStamps.removeTitle": "%{city} aus deinem Pass entfernen?",
+  "cityStamps.remove": "Stempel entfernen",
+  "cityStamps.lockedHint": "Mit Shelvr Pro Städte stempeln",
+  "cityStamps.saveFailed": "Deine Städte konnten nicht aktualisiert werden",
+  "cityStamps.rateLimited": "Zu viele Änderungen an Städten. Versuch es in ein paar Minuten noch einmal.",
+  "cityStamps.onboardingTitle": "Wo warst du schon?",
+  "cityStamps.onboardingBody": "Tippe auf die Städte, in denen du warst. Jede wird ein Stempel in deinem Pass.",
+  "passport.momentCityStamp": "Du warst schon in %{city}",
+  "passport.paywallHeadline": {
+    "one": "Dein Pass hat %{formattedCount} Stadt",
+    "other": "Dein Pass hat %{formattedCount} Städte"
+  }
 }

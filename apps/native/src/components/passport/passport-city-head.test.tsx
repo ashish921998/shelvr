@@ -104,7 +104,12 @@ const lisbon: PassportSection = {
 };
 
 function head(section: PassportSection, locked: boolean) {
-  const handlers = { onOpen: vi.fn(), onUnlock: vi.fn(), onShare: vi.fn() };
+  const handlers = {
+    onOpen: vi.fn(),
+    onUnlock: vi.fn(),
+    onShare: vi.fn(),
+    onCityStamp: vi.fn(),
+  };
   render(<PassportCityHead section={section} locked={locked} {...handlers} />);
   return handlers;
 }

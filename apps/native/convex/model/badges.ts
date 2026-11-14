@@ -1,3 +1,4 @@
+import type { CityStampEntry } from "./cityStamps";
 import { passportCounts } from "./passport";
 import type { PlaceKind } from "./placeKinds";
 
@@ -55,8 +56,9 @@ function cityComplete({ stamped, total }: BadgeCity): boolean {
 export function badgeTotals(
   stamps: readonly BadgeStamp[],
   cities: readonly BadgeCity[],
+  cityStamps: readonly CityStampEntry[] = [],
 ): BadgeTotals {
-  const counts = passportCounts(stamps);
+  const counts = passportCounts(stamps, cityStamps);
   const ofKind = (kind: CategoryMeasure) =>
     stamps.filter((stamp) => stamp.kinds.includes(kind)).length;
   return {

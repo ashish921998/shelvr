@@ -102,6 +102,12 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     capacity: 100,
   },
   placeRemoval: { kind: "token bucket", rate: 60, period: HOUR, capacity: 20 },
+  cityStampEdit: {
+    kind: "token bucket",
+    rate: 240,
+    period: HOUR,
+    capacity: 60,
+  },
   purchaseSync: { kind: "token bucket", rate: 10, period: HOUR, capacity: 5 },
   planShare: { kind: "token bucket", rate: 20, period: HOUR, capacity: 8 },
   passportShare: { kind: "token bucket", rate: 10, period: HOUR, capacity: 5 },

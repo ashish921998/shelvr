@@ -1,3 +1,4 @@
+import { type CityStampEntry, cityStampCounts } from "./cityStamps";
 import { normalizePlaceName } from "./itemFields";
 import { samePlace } from "./placeIdentity";
 import { placeKey } from "./plan";
@@ -129,16 +130,12 @@ export function groupByCity<T extends { city?: string }>(
 
 export function passportCounts(
   places: readonly { city?: string; countryCode?: string }[],
+  cityStamps: readonly CityStampEntry[] = [],
 ) {
-  const cities = new Set(
-    places.flatMap((place) => (place.city ? [cityKey(place.city)] : [])),
-  );
-  const countries = new Set(
-    places.flatMap((place) => (place.countryCode ? [place.countryCode] : [])),
-  );
+  const { cities, countries } = cityStampCounts(places, cityStamps);
   return {
     places: places.length,
-    cities: cities.size,
+    cities,
     countries: countries.size > 0 ? countries.size : null,
   };
 }

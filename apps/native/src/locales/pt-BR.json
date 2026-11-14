@@ -1412,5 +1412,24 @@
   "onboardingCarousel.eat": "Chega de “onde\nvamos comer?”",
   "onboardingCarousel.map": "Cada lugar que você salvou,\nem um só mapa.",
   "onboardingCarousel.next": "Próximo slide",
-  "sharedLists.nameBodyWelcome": "As pessoas das suas listas compartilhadas veem seu nome, assim como qualquer pessoa com um link para um conteúdo que você compartilha ou para uma lista que pertence a você."
+  "sharedLists.nameBodyWelcome": "As pessoas das suas listas compartilhadas veem seu nome, assim como qualquer pessoa com um link para um conteúdo que você compartilha ou para uma lista que pertence a você.",
+  "cityStamps.add": "Já estive em…",
+  "cityStamps.title": "Cidades onde você já esteve",
+  "cityStamps.body": "Toque em uma cidade onde você já esteve para carimbá-la no seu passaporte. Toque de novo para tirar o carimbo.",
+  "cityStamps.noMatch": "Ainda não temos essa cidade.",
+  "cityStamps.label": "%{city}, carimbo de cidade",
+  "cityStamps.removeHint": "Tira o carimbo do seu passaporte",
+  "cityStamps.removeTitle": "Tirar %{city} do seu passaporte?",
+  "cityStamps.remove": "Tirar carimbo",
+  "cityStamps.lockedHint": "Carimbe cidades com o Shelvr Pro",
+  "cityStamps.saveFailed": "Não foi possível atualizar suas cidades",
+  "cityStamps.rateLimited": "Muitas mudanças de cidades. Tente de novo em alguns minutos.",
+  "cityStamps.onboardingTitle": "Onde você já esteve?",
+  "cityStamps.onboardingBody": "Toque nas cidades que você já visitou. Cada uma vira um carimbo no seu passaporte.",
+  "passport.momentCityStamp": "Você já esteve em %{city}",
+  "passport.paywallHeadline": {
+    "one": "Seu passaporte tem %{formattedCount} cidade",
+    "many": "Seu passaporte tem %{formattedCount} cidades",
+    "other": "Seu passaporte tem %{formattedCount} cidades"
+  }
 }

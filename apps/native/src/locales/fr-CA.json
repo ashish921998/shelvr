@@ -1412,5 +1412,24 @@
   "onboardingCarousel.eat": "Fini le « on mange\noù ? »",
   "onboardingCarousel.map": "Chaque lieu enregistré,\nsur une seule carte.",
   "onboardingCarousel.next": "Diapositive suivante",
-  "sharedLists.nameBodyWelcome": "Les personnes de vos listes partagées le voient, ainsi que toute personne ayant un lien vers un contenu que vous partagez ou vers une liste qui vous appartient."
+  "sharedLists.nameBodyWelcome": "Les personnes de vos listes partagées le voient, ainsi que toute personne ayant un lien vers un contenu que vous partagez ou vers une liste qui vous appartient.",
+  "cityStamps.add": "J’ai visité…",
+  "cityStamps.title": "Villes visitées",
+  "cityStamps.body": "Touchez une ville que vous avez visitée pour la tamponner dans votre passeport. Touchez-la de nouveau pour retirer le tampon.",
+  "cityStamps.noMatch": "Nous n’avons pas encore cette ville.",
+  "cityStamps.label": "%{city}, tampon de ville",
+  "cityStamps.removeHint": "Retire le tampon de votre passeport",
+  "cityStamps.removeTitle": "Retirer %{city} de votre passeport ?",
+  "cityStamps.remove": "Retirer le tampon",
+  "cityStamps.lockedHint": "Tamponnez des villes avec Shelvr Pro",
+  "cityStamps.saveFailed": "Impossible de mettre à jour vos villes",
+  "cityStamps.rateLimited": "Trop de changements de villes. Réessayez dans quelques minutes.",
+  "cityStamps.onboardingTitle": "Quelles villes avez-vous visitées ?",
+  "cityStamps.onboardingBody": "Touchez les villes que vous avez visitées. Chacune devient un tampon dans votre passeport.",
+  "passport.momentCityStamp": "Vous avez visité %{city}",
+  "passport.paywallHeadline": {
+    "one": "Votre passeport compte %{formattedCount} ville",
+    "many": "Votre passeport compte %{formattedCount} villes",
+    "other": "Votre passeport compte %{formattedCount} villes"
+  }
 }

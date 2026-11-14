@@ -1,6 +1,8 @@
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import type { CityStamp } from "@/lib/city-stamp-data";
 import type { CityCompletion } from "@convex/model/cityCompletion";
+import { cityStampFits, knownCityStamps } from "@convex/model/cityStamps";
 import { groupByCity } from "@convex/model/passport";
 import { cityKey } from "@convex/model/trip";
 import { convexQuery } from "@convex-dev/react-query";
@@ -53,12 +55,45 @@ export type PassportSection = {
   city: string | null;
   stamps: Stamp[];
   completion: CityCompletion | null;
+  cityStamp?: CityStamp;
 };
+
+function sectionFits(cityStamp: CityStamp, section: PassportSection): boolean {
+  const city = section.city ?? undefined;
+  if (section.stamps.length === 0) return cityStampFits(cityStamp, { city });
+  return section.stamps.some((stamp) =>
+    cityStampFits(cityStamp, { city, countryCode: stamp.countryCode }),
+  );
+}
+
+function withCityStamps(
+  stamped: PassportSection[],
+  cityStamps: readonly CityStamp[],
+): { stamped: PassportSection[]; cities: CityStamp[] } {
+  const cities: CityStamp[] = [];
+  const headed = [...stamped];
+  for (const cityStamp of knownCityStamps(cityStamps)) {
+    const index = headed.findIndex(
+      (section) =>
+        section.city !== null &&
+        section.cityStamp === undefined &&
+        sectionFits(cityStamp, section),
+    );
+    if (index === -1) cities.push(cityStamp);
+    else headed[index] = { ...headed[index], cityStamp };
+  }
+  return { stamped: headed, cities };
+}
 
 export function passportSections(
   stamps: readonly Stamp[],
   completion: readonly CityCompletion[],
-): { stamped: PassportSection[]; waiting: PassportSection[] } {
+  cityStamps: readonly CityStamp[] = [],
+): {
+  stamped: PassportSection[];
+  waiting: PassportSection[];
+  cities: CityStamp[];
+} {
   const rows = new Map(completion.map((row) => [cityKey(row.city), row]));
   const used = new Set<string>();
   const stamped = groupByCity(stamps).map((group): PassportSection => {
@@ -84,7 +119,7 @@ export function passportSections(
   if (elsewhere === -1) stamped.push(...withStamps);
   else stamped.splice(elsewhere, 0, ...withStamps);
   return {
-    stamped,
+    ...withCityStamps(stamped, cityStamps),
     waiting: rest.filter((row) => row.stamped === 0).map(toSection),
   };
 }
