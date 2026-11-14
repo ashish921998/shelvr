@@ -98,6 +98,11 @@ vi.mock("@/lib/home-feed", () => ({
 vi.mock("@/components/home/unplaced-toast", () => ({
   UnplacedToast: vi.fn(() => null),
 }));
+vi.mock("@/components/passport/stamp-moment", () => ({
+  StampMomentProvider: vi.fn(
+    ({ children }: { children: ReactNode }) => children,
+  ),
+}));
 vi.mock("@/components/plan-loading-cover", () => ({
   PlanLoadingCover: vi.fn(() => <div>plan-loading-cover</div>),
 }));

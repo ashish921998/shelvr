@@ -1114,6 +1114,12 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "Picture from the post you saved",
   "passport.removeStamp": "Remove stamp",
+  "passport.momentStamped": "%{name} stamped",
+  "passport.momentFirstInCity": "First stamp in %{city}",
+  "passport.momentBulk": {
+    "one": "%{formattedCount} place stamped",
+    "other": "%{formattedCount} places stamped"
+  },
   "passport.wantToGo": "Want to go",
   "passport.title": "Passport",
   "passport.yourPassport": "Your passport",
