@@ -760,7 +760,7 @@
   "onboardingQ.goalFood": "맛집",
   "onboardingQ.goalFoodBody": "내 주변, 이번 주",
   "onboardingQ.goalEverything": "조금씩 전부",
-  "onboardingQ.cityBody": "그곳의 실제 릴이 있으면 그걸로, 없으면 릴이 있는 도시로 연습해 볼게요.",
+  "onboardingQ.cityBody": "그 도시의 숨은 명소를 담은 실제 릴로 연습해 볼게요.",
   "onboardingNotify.title": "저장한 장소를 놓치지 마세요.",
   "onboardingNotify.sub": "여행 전에, 그리고 아직 갈 수 있을 때 Shelvr가 알려 드려요.",
   "onboardingNotify.allow": "리마인더 켜기",
@@ -1018,8 +1018,14 @@
   "sharedLists.with": "%{names}와 함께",
   "sharedLists.onlyYou": "아직 나만",
   "sharedLists.someone": "누군가",
-  "sharedLists.newCount": {
-    "other": "새 장소 %{formattedCount}곳"
+  "sharedLists.activityOne": {
+    "other": "%{name}이(가) 장소 %{formattedCount}곳을 추가했어요"
+  },
+  "sharedLists.activitySomeone": {
+    "other": "누군가 장소 %{formattedCount}곳을 추가했어요"
+  },
+  "sharedLists.activityMany": {
+    "other": "%{names}의 새 장소 %{formattedCount}곳"
   },
   "sharedLists.alsoAddTo": "여기에도 추가",
   "sharedLists.alsoAddFull": "%{name} 목록이 가득 찼어요. 더 추가하려면 장소를 하나 삭제하세요.",
@@ -1100,19 +1106,28 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "저장한 게시물의 이미지",
   "passport.removeStamp": "스탬프 삭제",
+  "passport.momentStamped": "%{name}에 스탬프",
+  "passport.momentFirstInCity": "%{city} 첫 스탬프",
+  "passport.momentBulk": {
+    "other": "%{formattedCount}곳에 스탬프 완료"
+  },
   "passport.wantToGo": "가고 싶어요",
   "passport.title": "여권",
-  "passport.yourPassport": "내 여권",
   "passport.beenTitle": "이미 가본 곳이 있나요?",
   "passport.beenBody": "이미 가본 곳에 스탬프를 찍어요",
   "passport.beenSomewhere": "이미 가본 곳이 있나요?",
-  "passport.rowCities": "%{places} · %{cities}",
   "passport.placesCount": {
     "other": "%{formattedCount}곳"
   },
   "passport.citiesCount": {
     "other": "도시 %{formattedCount}곳"
   },
+  "passport.countriesCount": {
+    "other": "%{formattedCount}개국"
+  },
+  "passport.heroStamped": "스탬프 찍은 장소",
+  "passport.heroWhere": "%{cities} · %{countries}",
+  "passport.heroNext": "다음 배지: %{badge}",
   "passport.places": "장소",
   "passport.cities": "도시",
   "passport.countries": "나라",
@@ -1138,6 +1153,100 @@
   "passport.cardSavedElsewhere": "나중을 위해 저장.",
   "passport.cardWent": "Shelvr로 다녀옴.",
   "passport.shareCity": "%{city} 공유",
+  "passport.momentCityComplete": "%{city} 완성",
+  "passport.ringCount": "%{visited}/%{total}",
+  "passport.ringLabel": {
+    "other": "%{city}에서 %{formattedCount}곳 중 %{visited}곳 스탬프"
+  },
+  "passport.ringLocked": {
+    "other": "%{city}에 저장한 장소 %{formattedCount}곳"
+  },
+  "passport.ringHint": "아직 스탬프하지 않은 장소를 보여줘요",
+  "passport.ringLockedHint": "Shelvr Pro로 장소에 스탬프",
+  "passport.notStampedYet": "저장했지만 아직 스탬프 없음",
+  "passport.nextTitle": "다음 스탬프",
+  "passport.nextBody": {
+    "other": "%{city}에 스탬프할 곳이 %{formattedCount}곳 남았어요"
+  },
+  "passport.cityAllStamped": "%{city}에 저장한 장소에 모두 스탬프를 찍었어요.",
+  "passport.nextEmpty": "지금은 %{city}에서 보여 줄 장소가 없어요.",
+  "passport.stampPlace": "스탬프",
+  "passport.stampPlaceLabel": "%{name}에 스탬프",
+  "badges.title": "마일스톤",
+  "badges.earned": "배지 획득",
+  "badges.unlocked": "'%{badge}' 배지 획득",
+  "badges.moreEarned": {
+    "other": "배지 %{formattedCount}개 더"
+  },
+  "badges.shareMessage": "Shelvr 여권에서 '%{badge}' 배지를 받았어요.",
+  "badges.shareHint": "이 배지를 공유해요",
+  "badges.lockedHint": "Shelvr Pro로 배지 받기",
+  "badges.firstStamp": "첫 스탬프",
+  "badges.explorer": "탐험가",
+  "badges.wanderer": "방랑자",
+  "badges.globetrotter": "세계 여행자",
+  "badges.cityHopper": "도시 탐방가",
+  "badges.passportHolder": "여권 소지자",
+  "badges.completionist": "컴플리트",
+  "badges.coffeeCrawler": "카페 투어",
+  "badges.foodie": "미식가",
+  "badges.sweetTooth": "디저트 러버",
+  "badges.nightOwl": "올빼미",
+  "badges.outAndAbout": "나들이꾼",
+  "badges.goalPlaces": {
+    "other": "%{formattedCount}곳 스탬프"
+  },
+  "badges.goalCities": {
+    "other": "도시 %{formattedCount}곳 스탬프"
+  },
+  "badges.goalCountries": {
+    "other": "%{formattedCount}개국 스탬프"
+  },
+  "badges.goalCompleteCities": {
+    "other": "도시 %{formattedCount}곳 완성"
+  },
+  "badges.goalCoffee": {
+    "other": "카페 %{formattedCount}곳 스탬프"
+  },
+  "badges.goalFood": {
+    "other": "맛집 %{formattedCount}곳 스탬프"
+  },
+  "badges.goalDessert": {
+    "other": "디저트 가게 %{formattedCount}곳 스탬프"
+  },
+  "badges.goalDrinks": {
+    "other": "바 %{formattedCount}곳 스탬프"
+  },
+  "badges.goalActivities": {
+    "other": "액티비티 %{formattedCount}개 스탬프"
+  },
+  "badges.progressPlaces": {
+    "other": "%{formattedCount}곳 중 %{visited}곳"
+  },
+  "badges.progressCities": {
+    "other": "도시 %{formattedCount}곳 중 %{visited}곳"
+  },
+  "badges.progressCountries": {
+    "other": "%{formattedCount}개국 중 %{visited}개국"
+  },
+  "badges.progressCompleteCities": {
+    "other": "도시 %{formattedCount}곳 중 %{visited}곳 완성"
+  },
+  "badges.progressCoffee": {
+    "other": "카페 %{formattedCount}곳 중 %{visited}곳"
+  },
+  "badges.progressFood": {
+    "other": "맛집 %{formattedCount}곳 중 %{visited}곳"
+  },
+  "badges.progressDessert": {
+    "other": "디저트 가게 %{formattedCount}곳 중 %{visited}곳"
+  },
+  "badges.progressDrinks": {
+    "other": "바 %{formattedCount}곳 중 %{visited}곳"
+  },
+  "badges.progressActivities": {
+    "other": "액티비티 %{formattedCount}개 중 %{visited}개"
+  },
   "passportShare.share": "여권 공유",
   "passportShare.stopSetting": "내 여권 공유 중지",
   "passportShare.stopTitle": "여권 공유를 중지할까요?",
@@ -1195,12 +1304,28 @@
   "onboardingChart.whenTrip": "다음 여행",
   "onboardingChart.chartLabel": "지금의 %{lost}에서 %{goal}까지의 곡선. %{when}",
   "onboardingStatement.cityPicked": "%{city}, 좋은 선택이에요.\n\n%{city}의 첫 장소를 저장해 봐요.",
-  "onboardingStatement.cityFirst": "%{picked}, 좋은 선택이에요.\n\n먼저 %{city}의 실제 릴로 해 봐요.",
   "onboardingStatement.cityStart": "%{city}의 첫 장소를 저장해 봐요.",
   "onboardingStatement.firstSave": "첫 저장 완료!\n타고났네요.\n\n이제 지도에서 확인해 볼까요? 🗺️",
   "onboardingCarousel.together": "함께하는 사람들과\n같이 계획해요.",
   "onboardingCarousel.eat": "‘어디서 먹지?’\n이제 그만.",
   "onboardingCarousel.map": "저장한 모든 장소를\n지도 하나에.",
   "onboardingCarousel.next": "다음 슬라이드",
-  "sharedLists.nameBodyWelcome": "공유 목록에 있는 사람들에게 보이고, 내가 공유한 항목이나 내가 소유한 목록, 내가 보낸 추천 목록의 링크가 있는 사람에게도 보여요."
+  "sharedLists.nameBodyWelcome": "공유 목록에 있는 사람들에게 보이고, 내가 공유한 항목이나 내가 소유한 목록, 내가 보낸 추천 목록의 링크가 있는 사람에게도 보여요.",
+  "cityStamps.add": "가 본 도시…",
+  "cityStamps.title": "가 본 도시",
+  "cityStamps.body": "가 본 도시를 탭하면 여권에 스탬프가 찍혀요. 다시 탭하면 스탬프를 지워요.",
+  "cityStamps.noMatch": "아직 없는 도시예요.",
+  "cityStamps.label": "%{city}, 도시 스탬프",
+  "cityStamps.removeHint": "여권에서 스탬프를 지워요",
+  "cityStamps.removeTitle": "여권에서 %{city}을(를) 지울까요?",
+  "cityStamps.remove": "스탬프 지우기",
+  "cityStamps.lockedHint": "Shelvr Pro로 도시에 스탬프",
+  "cityStamps.saveFailed": "도시를 업데이트하지 못했어요",
+  "cityStamps.rateLimited": "도시 변경이 너무 많아요. 몇 분 후에 다시 시도하세요.",
+  "cityStamps.onboardingTitle": "어디에 가 봤나요?",
+  "cityStamps.onboardingBody": "가 본 도시를 탭하세요. 하나하나가 여권의 스탬프가 돼요.",
+  "passport.momentCityStamp": "%{city}에 가 봤어요",
+  "passport.paywallHeadline": {
+    "other": "여권에 도시 %{formattedCount}곳"
+  }
 }

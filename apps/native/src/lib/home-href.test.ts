@@ -47,6 +47,20 @@ describe("resolveRootHref", () => {
     );
     expect(resolveRootHref("/maple")).toBe("/maple");
   });
+
+  it("opens the Passport tab for the old Passport screen's links", () => {
+    for (const path of [
+      "/passport",
+      "/(passport)",
+      "/(app)/(tabs)/(passport)",
+    ]) {
+      expect(resolveRootHref(path)).toBe("/(app)/(tabs)/(passport)");
+    }
+    expect(resolveRootHref("/passport-card?city=Austin")).toBe(
+      "/passport-card?city=Austin",
+    );
+    expect(resolveRootHref("/passport/abc")).toBe("/passport/abc");
+  });
 });
 
 describe("appSchemeRoute", () => {

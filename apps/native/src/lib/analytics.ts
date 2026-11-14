@@ -185,6 +185,25 @@ export type AnalyticsEventProperties = {
   place_unstamped: { surface: "passport" };
   passport_opened: { places: number };
   passport_backfilled: { places: number };
+  passport_stamp_landed: {
+    surface: "city" | "already_been" | "next_to_stamp" | "city_stamps";
+    first_in_city: boolean;
+    count: number;
+  };
+  passport_city_completed: {
+    surface: "city" | "already_been" | "next_to_stamp" | "city_stamps";
+    total: number;
+  };
+  passport_paywall_opened: { surface: "ring" | "badge" | "city_stamp" };
+  passport_city_stamps_opened: { count: number };
+  passport_city_stamp_changed: { stamped: boolean; count: number };
+  passport_city_stamps_claimed: { picked: number; stamped: number };
+  passport_badge_unlocked: { badge: string };
+  passport_badge_shared: {
+    badge: string;
+    surface: "moment" | "milestones";
+    shared: boolean;
+  };
   passport_card_share_opened: { places: number; surface: "stamp" | "passport" };
   passport_shared: { places: number; shared: boolean };
   passport_sharing_stopped: Record<string, never>;
@@ -274,6 +293,7 @@ export type AnalyticsEventProperties = {
     goal: Goal | null;
     goals: Goal[];
     saved_count: SavedCount | null;
+    been_count: number;
     space_count: number;
     space_names: string[];
     custom_space_count: number;

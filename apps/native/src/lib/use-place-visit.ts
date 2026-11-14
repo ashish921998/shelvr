@@ -2,6 +2,11 @@ import { analytics } from "@/lib/analytics";
 import { openPaywall } from "@/lib/entitlement";
 import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
+import {
+  placeStampMoment,
+  type StampPlace,
+  useStampMoment,
+} from "@/lib/stamp-moment";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { isRateLimitedError } from "@convex/model/demoErrors";
@@ -10,7 +15,7 @@ import { saveErrorCode } from "@convex/model/saveErrors";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
-import { useRouter } from "expo-router";
+import { useNavigation, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { Alert } from "react-native";
 
@@ -49,15 +54,20 @@ type VisitPlace = {
   appleId?: string;
 };
 
-export function usePlaceVisit(surface: "city" | "passport" = "city") {
+export function usePlaceVisit(
+  surface: "city" | "passport" | "next_to_stamp" = "city",
+) {
   const router = useRouter();
+  const navigation = useNavigation();
   const setVisited = useMutation(api.placeVisits.setVisited);
+  const { play: playStamp, queue: queueStamp } = useStampMoment();
   const working = useRef(false);
   const [busy, setBusy] = useState(false);
   const toggle = async (
     itemId: Id<"items">,
     place: VisitPlace,
     visited: boolean,
+    stamp?: StampPlace,
   ): Promise<boolean> => {
     if (working.current) return false;
     working.current = true;
@@ -78,10 +88,15 @@ export function usePlaceVisit(surface: "city" | "passport" = "city") {
               },
             }),
       });
-      void (visited ? haptics.success() : haptics.selection());
+      if (!visited) void haptics.selection();
+      else if (navigation.isFocused()) {
+        const moment = placeStampMoment(name, stamp);
+        if (surface === "next_to_stamp") queueStamp(moment, surface);
+        else playStamp(moment, "city");
+      }
       if (surface === "passport") {
         analytics.capture("place_unstamped", { surface });
-      } else {
+      } else if (surface === "city") {
         analytics.capture("city_place_visited", { visited });
       }
       return true;

@@ -61,12 +61,27 @@ describe("REEL_PLAYER_SCRIPT", () => {
     expect(posted).toEqual(["playing"]);
   });
 
-  it("says failed once when play is refused or the video errors", async () => {
-    play = () => Promise.reject(new Error("NotAllowedError"));
+  it("says failed once, with the refusal's name, when play is refused or the video errors", async () => {
+    play = () => Promise.reject(new DOMException("", "NotAllowedError"));
     const video = await run(`<script>{"video_url":"${MP4}"}</script>`);
     await Promise.resolve();
     video!.dispatchEvent(new Event("error"));
-    expect(posted).toEqual(["failed"]);
+    expect(posted).toEqual(["failed:NotAllowedError"]);
+  });
+
+  it("says failed with the media error code when the video cannot load", async () => {
+    play = () => new Promise(() => {});
+    const video = await run(`<script>{"video_url":"${MP4}"}</script>`);
+    Object.defineProperty(video!, "error", { value: { code: 4 } });
+    video!.dispatchEvent(new Event("error"));
+    expect(posted).toEqual(["failed:media_4"]);
+  });
+
+  it("says failed unknown when play is refused without a name", async () => {
+    play = () => Promise.reject(undefined);
+    await run(`<script>{"video_url":"${MP4}"}</script>`);
+    await Promise.resolve();
+    expect(posted).toEqual(["failed:unknown"]);
   });
 
   it("ignores a late error once the video has played", async () => {

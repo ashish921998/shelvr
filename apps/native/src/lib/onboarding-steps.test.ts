@@ -30,7 +30,8 @@ describe("previousOnboardingStep", () => {
   it.each([
     ["savedCount", "opener"],
     ["goal", "savedCount"],
-    ["chart", "goal"],
+    ["been", "goal"],
+    ["chart", "been"],
     ["city", "chart"],
     ["cityEcho", "city"],
     ["ahaShare", "cityEcho"],
@@ -56,8 +57,9 @@ describe("nextOnboardingStep", () => {
     expect(nextOnboardingStep("notifications")).toBe("notifications");
   });
 
-  it("goes from the goals straight to the chart", () => {
-    expect(nextOnboardingStep("goal")).toBe("chart");
+  it("goes from the goals to the been step, then the chart", () => {
+    expect(nextOnboardingStep("goal")).toBe("been");
+    expect(nextOnboardingStep("been")).toBe("chart");
   });
 });
 
@@ -65,6 +67,10 @@ describe("ONBOARDING_STEP_IDS", () => {
   it("names every step once, so funnels can split on it", () => {
     const ids = ONBOARDING_STEPS.map((step) => ONBOARDING_STEP_IDS[step]);
     expect(new Set(ids).size).toBe(ONBOARDING_STEPS.length);
+  });
+
+  it("names the been step been_cities", () => {
+    expect(ONBOARDING_STEP_IDS.been).toBe("been_cities");
   });
 });
 

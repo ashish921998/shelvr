@@ -814,7 +814,7 @@
   "onboardingQ.goalFood": "Lugares para comer",
   "onboardingQ.goalFoodBody": "Perto de mim, esta semana",
   "onboardingQ.goalEverything": "Um pouco de tudo",
-  "onboardingQ.cityBody": "Vamos praticar com um reel real de lá, se tivermos um, ou de uma cidade que tenhamos.",
+  "onboardingQ.cityBody": "Vamos praticar com um reel real sobre as joias escondidas de lá.",
   "onboardingNotify.title": "Não perca os lugares que você salvou.",
   "onboardingNotify.sub": "O Shelvr lembra você antes de uma viagem e enquanto ainda dá para ir.",
   "onboardingNotify.allow": "Ativar lembretes",
@@ -1078,10 +1078,20 @@
   "sharedLists.with": "Com %{names}",
   "sharedLists.onlyYou": "Só você por enquanto",
   "sharedLists.someone": "Alguém",
-  "sharedLists.newCount": {
-    "one": "%{formattedCount} novo",
-    "many": "%{formattedCount} novos",
-    "other": "%{formattedCount} novos"
+  "sharedLists.activityOne": {
+    "one": "%{name} adicionou %{formattedCount} lugar",
+    "many": "%{name} adicionou %{formattedCount} lugares",
+    "other": "%{name} adicionou %{formattedCount} lugares"
+  },
+  "sharedLists.activitySomeone": {
+    "one": "Alguém adicionou %{formattedCount} lugar",
+    "many": "Alguém adicionou %{formattedCount} lugares",
+    "other": "Alguém adicionou %{formattedCount} lugares"
+  },
+  "sharedLists.activityMany": {
+    "one": "%{formattedCount} lugar novo de %{names}",
+    "many": "%{formattedCount} lugares novos de %{names}",
+    "other": "%{formattedCount} lugares novos de %{names}"
   },
   "sharedLists.alsoAddTo": "Adicionar também a",
   "sharedLists.alsoAddFull": "%{name} está cheia. Remova um lugar para adicionar mais.",
@@ -1168,13 +1178,18 @@
   "passport.stampInk": "%{city} · %{date}",
   "passport.coverCredit": "Imagem do post que você salvou",
   "passport.removeStamp": "Remover carimbo",
+  "passport.momentStamped": "%{name} carimbado",
+  "passport.momentFirstInCity": "Primeiro carimbo em %{city}",
+  "passport.momentBulk": {
+    "one": "%{formattedCount} lugar carimbado",
+    "many": "%{formattedCount} lugares carimbados",
+    "other": "%{formattedCount} lugares carimbados"
+  },
   "passport.wantToGo": "Quero ir",
   "passport.title": "Passaporte",
-  "passport.yourPassport": "Seu passaporte",
   "passport.beenTitle": "Já foi a algum destes?",
   "passport.beenBody": "Carimbe os lugares aonde você já foi",
   "passport.beenSomewhere": "Já foi a algum lugar?",
-  "passport.rowCities": "%{places} · %{cities}",
   "passport.placesCount": {
     "one": "%{formattedCount} lugar",
     "many": "%{formattedCount} lugares",
@@ -1185,6 +1200,14 @@
     "many": "%{formattedCount} cidades",
     "other": "%{formattedCount} cidades"
   },
+  "passport.countriesCount": {
+    "one": "%{formattedCount} país",
+    "many": "%{formattedCount} países",
+    "other": "%{formattedCount} países"
+  },
+  "passport.heroStamped": "Lugares carimbados",
+  "passport.heroWhere": "%{cities} · %{countries}",
+  "passport.heroNext": "Próxima insígnia: %{badge}",
   "passport.places": "Lugares",
   "passport.cities": "Cidades",
   "passport.countries": "Países",
@@ -1216,6 +1239,144 @@
   "passport.cardSavedElsewhere": "Salvo para depois.",
   "passport.cardWent": "Fomos com o Shelvr.",
   "passport.shareCity": "Compartilhar %{city}",
+  "passport.momentCityComplete": "Você completou %{city}",
+  "passport.ringCount": "%{visited} de %{total}",
+  "passport.ringLabel": {
+    "one": "%{visited} de %{formattedCount} lugar carimbado em %{city}",
+    "many": "%{visited} de %{formattedCount} lugares carimbados em %{city}",
+    "other": "%{visited} de %{formattedCount} lugares carimbados em %{city}"
+  },
+  "passport.ringLocked": {
+    "one": "%{formattedCount} lugar salvo em %{city}",
+    "many": "%{formattedCount} lugares salvos em %{city}",
+    "other": "%{formattedCount} lugares salvos em %{city}"
+  },
+  "passport.ringHint": "Mostra os lugares que faltam carimbar",
+  "passport.ringLockedHint": "Carimbe lugares com o Shelvr Pro",
+  "passport.notStampedYet": "Salvos, ainda sem carimbo",
+  "passport.nextTitle": "Para carimbar",
+  "passport.nextBody": {
+    "one": "Falta carimbar %{formattedCount} lugar em %{city}",
+    "many": "Faltam carimbar %{formattedCount} lugares em %{city}",
+    "other": "Faltam carimbar %{formattedCount} lugares em %{city}"
+  },
+  "passport.cityAllStamped": "Todos os lugares que você salvou em %{city} estão carimbados.",
+  "passport.nextEmpty": "Nenhum lugar para mostrar em %{city} no momento.",
+  "passport.stampPlace": "Carimbar",
+  "passport.stampPlaceLabel": "Carimbar %{name}",
+  "badges.title": "Conquistas",
+  "badges.earned": "Insígnia conquistada",
+  "badges.unlocked": "Insígnia %{badge} conquistada",
+  "badges.moreEarned": {
+    "one": "E mais %{formattedCount} insígnia",
+    "many": "E mais %{formattedCount} insígnias",
+    "other": "E mais %{formattedCount} insígnias"
+  },
+  "badges.shareMessage": "Ganhei a insígnia %{badge} no meu passaporte do Shelvr.",
+  "badges.shareHint": "Compartilha esta insígnia",
+  "badges.lockedHint": "Ganhe insígnias com o Shelvr Pro",
+  "badges.firstStamp": "Primeiro carimbo",
+  "badges.explorer": "Explorador",
+  "badges.wanderer": "Andarilho",
+  "badges.globetrotter": "Viajante do mundo",
+  "badges.cityHopper": "De cidade em cidade",
+  "badges.passportHolder": "Passaporte na mão",
+  "badges.completionist": "Completista",
+  "badges.coffeeCrawler": "Rota do café",
+  "badges.foodie": "Bom de garfo",
+  "badges.sweetTooth": "Formiguinha",
+  "badges.nightOwl": "Notívago",
+  "badges.outAndAbout": "Bate-perna",
+  "badges.goalPlaces": {
+    "one": "%{formattedCount} lugar carimbado",
+    "many": "%{formattedCount} lugares carimbados",
+    "other": "%{formattedCount} lugares carimbados"
+  },
+  "badges.goalCities": {
+    "one": "%{formattedCount} cidade carimbada",
+    "many": "%{formattedCount} cidades carimbadas",
+    "other": "%{formattedCount} cidades carimbadas"
+  },
+  "badges.goalCountries": {
+    "one": "%{formattedCount} país carimbado",
+    "many": "%{formattedCount} países carimbados",
+    "other": "%{formattedCount} países carimbados"
+  },
+  "badges.goalCompleteCities": {
+    "one": "%{formattedCount} cidade completa",
+    "many": "%{formattedCount} cidades completas",
+    "other": "%{formattedCount} cidades completas"
+  },
+  "badges.goalCoffee": {
+    "one": "%{formattedCount} café carimbado",
+    "many": "%{formattedCount} cafés carimbados",
+    "other": "%{formattedCount} cafés carimbados"
+  },
+  "badges.goalFood": {
+    "one": "%{formattedCount} restaurante carimbado",
+    "many": "%{formattedCount} restaurantes carimbados",
+    "other": "%{formattedCount} restaurantes carimbados"
+  },
+  "badges.goalDessert": {
+    "one": "%{formattedCount} doceria carimbada",
+    "many": "%{formattedCount} docerias carimbadas",
+    "other": "%{formattedCount} docerias carimbadas"
+  },
+  "badges.goalDrinks": {
+    "one": "%{formattedCount} bar carimbado",
+    "many": "%{formattedCount} bares carimbados",
+    "other": "%{formattedCount} bares carimbados"
+  },
+  "badges.goalActivities": {
+    "one": "%{formattedCount} atividade carimbada",
+    "many": "%{formattedCount} atividades carimbadas",
+    "other": "%{formattedCount} atividades carimbadas"
+  },
+  "badges.progressPlaces": {
+    "one": "%{visited} de %{formattedCount} lugar",
+    "many": "%{visited} de %{formattedCount} lugares",
+    "other": "%{visited} de %{formattedCount} lugares"
+  },
+  "badges.progressCities": {
+    "one": "%{visited} de %{formattedCount} cidade",
+    "many": "%{visited} de %{formattedCount} cidades",
+    "other": "%{visited} de %{formattedCount} cidades"
+  },
+  "badges.progressCountries": {
+    "one": "%{visited} de %{formattedCount} país",
+    "many": "%{visited} de %{formattedCount} países",
+    "other": "%{visited} de %{formattedCount} países"
+  },
+  "badges.progressCompleteCities": {
+    "one": "%{visited} de %{formattedCount} cidade completa",
+    "many": "%{visited} de %{formattedCount} cidades completas",
+    "other": "%{visited} de %{formattedCount} cidades completas"
+  },
+  "badges.progressCoffee": {
+    "one": "%{visited} de %{formattedCount} café",
+    "many": "%{visited} de %{formattedCount} cafés",
+    "other": "%{visited} de %{formattedCount} cafés"
+  },
+  "badges.progressFood": {
+    "one": "%{visited} de %{formattedCount} restaurante",
+    "many": "%{visited} de %{formattedCount} restaurantes",
+    "other": "%{visited} de %{formattedCount} restaurantes"
+  },
+  "badges.progressDessert": {
+    "one": "%{visited} de %{formattedCount} doceria",
+    "many": "%{visited} de %{formattedCount} docerias",
+    "other": "%{visited} de %{formattedCount} docerias"
+  },
+  "badges.progressDrinks": {
+    "one": "%{visited} de %{formattedCount} bar",
+    "many": "%{visited} de %{formattedCount} bares",
+    "other": "%{visited} de %{formattedCount} bares"
+  },
+  "badges.progressActivities": {
+    "one": "%{visited} de %{formattedCount} atividade",
+    "many": "%{visited} de %{formattedCount} atividades",
+    "other": "%{visited} de %{formattedCount} atividades"
+  },
   "passportShare.share": "Compartilhar passaporte",
   "passportShare.stopSetting": "Parar de compartilhar meu passaporte",
   "passportShare.stopTitle": "Parar de compartilhar seu passaporte?",
@@ -1281,12 +1442,30 @@
   "onboardingChart.whenTrip": "Sua próxima viagem",
   "onboardingChart.chartLabel": "Uma curva de %{lost} agora até %{goal}. %{when}",
   "onboardingStatement.cityPicked": "%{city}. Ótima escolha.\n\nVamos salvar seus primeiros lugares em %{city}.",
-  "onboardingStatement.cityFirst": "%{picked}. Ótima escolha.\n\nPrimeiro, vamos testar com um reel real de %{city}.",
   "onboardingStatement.cityStart": "Vamos salvar seus primeiros lugares em %{city}.",
   "onboardingStatement.firstSave": "Seu primeiro salvamento!\nQue talento natural.\n\nAgora vamos ver no seu mapa 🗺️",
   "onboardingCarousel.together": "Planeje junto\ncom quem você curte.",
   "onboardingCarousel.eat": "Chega de “onde\nvamos comer?”",
   "onboardingCarousel.map": "Cada lugar que você salvou,\nem um só mapa.",
   "onboardingCarousel.next": "Próximo slide",
-  "sharedLists.nameBodyWelcome": "As pessoas das suas listas compartilhadas veem seu nome, assim como qualquer pessoa com um link para um conteúdo que você compartilha, para uma lista que pertence a você ou para uma seleção que você envia."
+  "sharedLists.nameBodyWelcome": "As pessoas das suas listas compartilhadas veem seu nome, assim como qualquer pessoa com um link para um conteúdo que você compartilha, para uma lista que pertence a você ou para uma seleção que você envia.",
+  "cityStamps.add": "Já estive em…",
+  "cityStamps.title": "Cidades onde você já esteve",
+  "cityStamps.body": "Toque em uma cidade onde você já esteve para carimbá-la no seu passaporte. Toque de novo para tirar o carimbo.",
+  "cityStamps.noMatch": "Ainda não temos essa cidade.",
+  "cityStamps.label": "%{city}, carimbo de cidade",
+  "cityStamps.removeHint": "Tira o carimbo do seu passaporte",
+  "cityStamps.removeTitle": "Tirar %{city} do seu passaporte?",
+  "cityStamps.remove": "Tirar carimbo",
+  "cityStamps.lockedHint": "Carimbe cidades com o Shelvr Pro",
+  "cityStamps.saveFailed": "Não foi possível atualizar suas cidades",
+  "cityStamps.rateLimited": "Muitas mudanças de cidades. Tente de novo em alguns minutos.",
+  "cityStamps.onboardingTitle": "Onde você já esteve?",
+  "cityStamps.onboardingBody": "Toque nas cidades que você já visitou. Cada uma vira um carimbo no seu passaporte.",
+  "passport.momentCityStamp": "Você já esteve em %{city}",
+  "passport.paywallHeadline": {
+    "one": "Seu passaporte tem %{formattedCount} cidade",
+    "many": "Seu passaporte tem %{formattedCount} cidades",
+    "other": "Seu passaporte tem %{formattedCount} cidades"
+  }
 }
