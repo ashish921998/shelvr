@@ -83,6 +83,7 @@ import {
 import { saveError } from "./model/saveErrors";
 import { MAX_DEMO_RETRIES } from "./model/demoErrors";
 import { aiAllowed } from "./aiConsent";
+import { cityPhotoUrls, requestCityPhotos } from "./cityPhotos";
 import { aiConsentRequiredError } from "./model/aiConsent";
 import { nextUpKind } from "./model/nextUp";
 import { openedTooRecently, reminderSubject } from "./model/saveReminders";
@@ -433,6 +434,7 @@ export const listCities = authedQuery({
       placeCount: v.optional(v.number()),
       visitedCount: v.optional(v.number()),
       cover: v.union(v.string(), v.null()),
+      photo: v.optional(v.string()),
     }),
   ),
   handler: async (ctx) => {
@@ -463,15 +465,18 @@ export const listCities = authedQuery({
       .sort(
         (a, b) => b.placeCount - a.placeCount || (a.city < b.city ? -1 : 1),
       );
-    const covers = await cityCovers(
-      ctx,
-      items,
-      cities.map(({ city }) => city),
-    );
-    return cities.map((entry) => ({
-      ...entry,
-      cover: covers.get(cityKey(entry.city)) ?? null,
-    }));
+    const names = cities.map(({ city }) => city);
+    const photos = await cityPhotoUrls(ctx, names);
+    const covers = await cityCovers(ctx, items, names);
+    return cities.map((entry) => {
+      const key = cityKey(entry.city);
+      const photo = photos.get(key);
+      return {
+        ...entry,
+        cover: covers.get(key) ?? photo ?? null,
+        ...(photo === undefined ? {} : { photo }),
+      };
+    });
   },
 });
 
@@ -1576,6 +1581,7 @@ export async function createReadyPlaceSave(
   await ctx.scheduler.runAfter(locateAfterMs, internal.placePins.locateItem, {
     itemId,
   });
+  if (await aiAllowed(ctx, userId)) await requestCityPhotos(ctx, cities);
   return itemId;
 }
 
@@ -2247,6 +2253,9 @@ export const finalizeItem = internalMutation({
     const patch = completionPatch(item, args, allowed);
     await ctx.db.patch(args.itemId, patch);
     await settleFreeSave(ctx, args.itemId);
+    if (allowed) {
+      await requestCityPhotos(ctx, patch.cities ?? item.cities ?? []);
+    }
     if (
       allowed &&
       ((patch.places?.length ?? 0) > 0 ||
@@ -2429,6 +2438,10 @@ export const addPlaceListParts = internalMutation({
       }
       added++;
     }
+    await requestCityPhotos(
+      ctx,
+      fresh.flatMap((part) => normalizeCities(part.cities)),
+    );
     return added;
   },
 });

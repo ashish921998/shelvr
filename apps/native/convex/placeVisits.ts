@@ -26,6 +26,7 @@ import {
   completionByCity,
 } from "./model/cityCompletion";
 import { linkSource } from "./model/externalUrl";
+import { memberOf } from "./model/sharedLists";
 import { logEvent } from "./model/log";
 import { normalizeCities, normalizePlaceName } from "./model/itemFields";
 import { type PassportPlace, soleCity } from "./model/passport";
@@ -64,7 +65,7 @@ import {
 } from "./model/trip";
 import { requireProEntitlement } from "./subscriptions";
 
-type Visit = { name: string; itemId: Id<"items">; visitedAt: number };
+type Visit = { name: string; itemId?: Id<"items">; visitedAt: number };
 
 function tidySpot(spot: VisitSpot): VisitSpot {
   if (!validPoint(spot.lat, spot.lng)) {
@@ -119,6 +120,9 @@ async function markVisit(
     await ctx.db.patch(existing._id, {
       name: visit.name,
       visitedAt: visit.visitedAt,
+      ...(existing.itemId === undefined && visit.itemId !== undefined
+        ? { itemId: visit.itemId }
+        : {}),
     });
     return;
   }
@@ -167,8 +171,12 @@ async function clearVisit(
     if (
       existing !== null &&
       existing.spots === undefined &&
-      spotsOnItem(await ctx.db.get(existing.itemId), existing.name) ===
-        undefined
+      spotsOnItem(
+        existing.itemId === undefined
+          ? null
+          : await ctx.db.get(existing.itemId),
+        existing.name,
+      ) === undefined
     ) {
       await ctx.db.delete(existing._id);
     }
@@ -269,7 +277,296 @@ export const setVisited = authedMutation({
       explicit: args.spot !== undefined,
     });
     const row = await findVisit(ctx, userId, args.name);
-    if (row !== null) await syncStampPlaces(ctx, row, owned);
+    if (row === null) return null;
+    const claim = await claimMarkedSpots(ctx, row, spots);
+    await syncStampPlaces(ctx, claim.row, owned, { released: claim.released });
+    return null;
+  },
+});
+
+async function claimMarkedSpots(
+  ctx: MutationCtx,
+  row: Doc<"placeVisits">,
+  marked: VisitSpot[] | undefined,
+): Promise<{ row: Doc<"placeVisits">; released: StampPlace[] }> {
+  const spots = marked ?? [];
+  const claimed = (entry: StampPlace) =>
+    entry.listPlaceId !== undefined &&
+    knowsSpot(
+      spots,
+      row.spots?.find(
+        (kept) => kept.lat === entry.lat && kept.lng === entry.lng,
+      ) ?? entry,
+    );
+  if (!row.stampPlaces?.some(claimed)) return { row, released: [] };
+  const released: StampPlace[] = [];
+  const stampPlaces = row.stampPlaces.map((entry) => {
+    if (!claimed(entry)) return entry;
+    const {
+      listPlaceId: _listPlaceId,
+      alsoListPlaceIds: _alsoListPlaceIds,
+      ...own
+    } = entry;
+    released.push(own);
+    return own;
+  });
+  await ctx.db.patch(row._id, { stampPlaces });
+  return { row: { ...row, stampPlaces }, released };
+}
+
+function listSpot(place: Doc<"sharedListPlaces">): VisitSpot {
+  return tidySpot({
+    lat: place.lat,
+    lng: place.lng,
+    ...(place.appleId === undefined ? {} : { appleId: place.appleId }),
+  });
+}
+
+async function unstampListPlace(
+  ctx: MutationCtx,
+  row: Doc<"placeVisits">,
+  place: Doc<"sharedListPlaces">,
+): Promise<void> {
+  if (await dropSharedClaim(ctx, row, place._id)) return;
+  const fromList = (entry: StampPlace) => entry.listPlaceId === place._id;
+  if (!row.stampPlaces?.some(fromList)) return;
+  const spot = listSpot(place);
+  const remaining = ((await rowSpots(ctx, row)) ?? []).filter(
+    (kept) => !matchesVisitSpot(kept, spot, true),
+  );
+  if (remaining.length === 0 && row.itemId === undefined) {
+    await ctx.db.delete(row._id);
+    return;
+  }
+  await ctx.db.patch(row._id, {
+    spots: remaining,
+    stampPlaces: row.stampPlaces?.filter((entry) => !fromList(entry)),
+  });
+}
+
+const MAX_SHARED_CLAIMS = 20;
+
+async function liveClaims(
+  ctx: MutationCtx,
+  ids: readonly Id<"sharedListPlaces">[] | undefined,
+): Promise<Id<"sharedListPlaces">[]> {
+  const live: Id<"sharedListPlaces">[] = [];
+  for (const id of ids ?? []) {
+    if ((await ctx.db.get(id)) !== null) live.push(id);
+  }
+  return live;
+}
+
+async function withoutClaim(
+  ctx: MutationCtx,
+  entry: StampPlace,
+  listPlaceId: Id<"sharedListPlaces">,
+): Promise<StampPlace> {
+  const others = (await liveClaims(ctx, entry.alsoListPlaceIds)).filter(
+    (id) => id !== listPlaceId,
+  );
+  if (entry.listPlaceId !== listPlaceId) {
+    return { ...entry, alsoListPlaceIds: others };
+  }
+  const [next, ...rest] = others;
+  if (next === undefined) return { ...entry, alsoListPlaceIds: [] };
+  return { ...entry, listPlaceId: next, alsoListPlaceIds: rest };
+}
+
+async function dropSharedClaim(
+  ctx: MutationCtx,
+  row: Doc<"placeVisits">,
+  listPlaceId: Id<"sharedListPlaces">,
+): Promise<boolean> {
+  const shared = (entry: StampPlace) =>
+    (entry.alsoListPlaceIds?.length ?? 0) > 0 &&
+    (entry.listPlaceId === listPlaceId ||
+      entry.alsoListPlaceIds?.includes(listPlaceId) === true);
+  const entry = row.stampPlaces?.find(shared);
+  if (entry === undefined) return false;
+  const next = await withoutClaim(ctx, entry, listPlaceId);
+  await ctx.db.patch(row._id, {
+    stampPlaces: (row.stampPlaces ?? []).map((other) =>
+      other === entry ? next : other,
+    ),
+  });
+  if (next.listPlaceId !== entry.listPlaceId) {
+    await locatePromotedStamp(ctx, row, next);
+  }
+  return next.listPlaceId !== listPlaceId;
+}
+
+async function locatePromotedStamp(
+  ctx: MutationCtx,
+  row: Doc<"placeVisits">,
+  entry: StampPlace,
+): Promise<void> {
+  if (entry.countryCode !== undefined || entry.listPlaceId === undefined) {
+    return;
+  }
+  const place = await ctx.db.get(entry.listPlaceId);
+  if (place === null) return;
+  if (place.addedBy !== row.userId && !(await aiAllowed(ctx, place.addedBy))) {
+    return;
+  }
+  await ctx.scheduler.runAfter(0, internal.placeVisits.locateCountry, {
+    visitId: row._id,
+    lat: entry.lat,
+    lng: entry.lng,
+  });
+}
+
+async function shareClaim(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  row: Doc<"placeVisits">,
+  spots: VisitSpot[],
+  place: Doc<"sharedListPlaces">,
+): Promise<void> {
+  const spot = listSpot(place);
+  const kept = spots.find((other) => matchesVisitSpot(other, spot, true));
+  const entry = kept && placeAt(row.stampPlaces, kept);
+  if (
+    entry?.listPlaceId === undefined ||
+    entry.listPlaceId === place._id ||
+    entry.alsoListPlaceIds?.includes(place._id) === true
+  ) {
+    return;
+  }
+  let live = await liveClaims(ctx, entry.alsoListPlaceIds);
+  if (live.length >= MAX_SHARED_CLAIMS) {
+    live = await joinedClaims(ctx, userId, live);
+  }
+  if (live.length >= MAX_SHARED_CLAIMS) {
+    throw new Error("Place is on too many of your lists");
+  }
+  await ctx.db.patch(row._id, {
+    stampPlaces: (row.stampPlaces ?? []).map((other) =>
+      other === entry
+        ? { ...other, alsoListPlaceIds: [...live, place._id] }
+        : other,
+    ),
+  });
+}
+
+async function joinedClaims(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  ids: readonly Id<"sharedListPlaces">[],
+): Promise<Id<"sharedListPlaces">[]> {
+  const joined: Id<"sharedListPlaces">[] = [];
+  for (const id of ids) {
+    const claim = await ctx.db.get(id);
+    if (
+      claim !== null &&
+      (await memberOf(ctx, claim.listId, userId)) !== null
+    ) {
+      joined.push(id);
+    }
+  }
+  return joined;
+}
+
+async function addListSpot(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  existing: Doc<"placeVisits"> | null,
+  place: Doc<"sharedListPlaces">,
+): Promise<Id<"placeVisits"> | null> {
+  const spot = listSpot(place);
+  const entry = {
+    lat: spot.lat,
+    lng: spot.lng,
+    city: place.city,
+    listPlaceId: place._id,
+  };
+  const spots =
+    existing === null ? [] : ((await rowSpots(ctx, existing)) ?? []);
+  if (existing !== null && knowsSpot(spots, spot)) {
+    await shareClaim(ctx, userId, existing, spots, place);
+    return null;
+  }
+  if (spots.length >= MAX_VISIT_SPOTS) {
+    throw new Error("Place has too many visited spots");
+  }
+  await rateLimiter.limit(ctx, "placeVisit", { key: userId, throws: true });
+  if (existing !== null) {
+    await ctx.db.patch(existing._id, {
+      spots: [...spots, spot],
+      stampPlaces: [...(existing.stampPlaces ?? []), entry],
+    });
+    return existing._id;
+  }
+  return await ctx.db.insert("placeVisits", {
+    userId,
+    key: placeKey(place.name),
+    name: place.name.replace(/\s+/g, " ").trim().slice(0, MAX_PLACE_NAME_CHARS),
+    listPlaceId: place._id,
+    visitedAt: Date.now(),
+    spots: [spot],
+    stampPlaces: [entry],
+  });
+}
+
+export async function stampListPlace(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  place: Doc<"sharedListPlaces">,
+  visited: boolean,
+): Promise<void> {
+  if (placeKey(place.name) === "") return;
+  const existing = await findVisit(ctx, userId, place.name);
+  if (!visited) {
+    if (existing !== null) await unstampListPlace(ctx, existing, place);
+    return;
+  }
+  const visitId = await addListSpot(ctx, userId, existing, place);
+  if (visitId === null) return;
+  if (place.addedBy === userId || (await aiAllowed(ctx, place.addedBy))) {
+    const spot = listSpot(place);
+    await ctx.scheduler.runAfter(0, internal.placeVisits.locateCountry, {
+      visitId,
+      lat: spot.lat,
+      lng: spot.lng,
+    });
+  }
+}
+
+async function removeListSpot(
+  ctx: MutationCtx,
+  row: Doc<"placeVisits">,
+  spot: Point,
+): Promise<void> {
+  const remaining = ((await rowSpots(ctx, row)) ?? []).filter(
+    (kept) => !matchesVisitSpot(kept, spot, true),
+  );
+  if (remaining.length === 0) {
+    await ctx.db.delete(row._id);
+    return;
+  }
+  await ctx.db.patch(row._id, {
+    spots: remaining,
+    stampPlaces: row.stampPlaces?.filter(
+      (entry) => entry.lat !== spot.lat || entry.lng !== spot.lng,
+    ),
+  });
+}
+
+export const removeListStamp = authedMutation({
+  args: {
+    name: v.string(),
+    spot: v.optional(v.object({ lat: v.number(), lng: v.number() })),
+  },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const row = await findVisit(ctx, ctx.userId, args.name);
+    if (row === null || row.itemId !== undefined) return null;
+    await rateLimiter.limit(ctx, "placeVisitClear", {
+      key: ctx.userId,
+      throws: true,
+    });
+    if (args.spot === undefined) await ctx.db.delete(row._id);
+    else await removeListSpot(ctx, row, args.spot);
     return null;
   },
 });
@@ -381,6 +678,19 @@ async function ownedSave(
   return item !== null && item.userId === userId ? item : null;
 }
 
+function unlocated(
+  places: StampPlace[],
+  released: StampPlace[] | undefined,
+): StampPlace[] {
+  return places.filter(
+    (place) =>
+      place.countryCode === undefined &&
+      released?.some(
+        (entry) => entry.lat === place.lat && entry.lng === place.lng,
+      ) === true,
+  );
+}
+
 async function syncStampPlaces(
   ctx: MutationCtx,
   row: Doc<"placeVisits">,
@@ -389,12 +699,15 @@ async function syncStampPlaces(
     delayMs?: number;
     spacingMs?: number;
     retryMissing?: boolean;
+    released?: StampPlace[];
   } = {},
 ): Promise<number> {
   const saved =
-    marked?._id === row.itemId
-      ? marked
-      : await ownedSave(ctx, row.userId, row.itemId);
+    row.itemId === undefined
+      ? null
+      : marked?._id === row.itemId
+        ? marked
+        : await ownedSave(ctx, row.userId, row.itemId);
   const spots = stampSpots(row, saved) ?? [];
   const fresh: StampPlace[] = [];
   const stored = stampPlacesFor(row.stampPlaces, spots);
@@ -419,7 +732,7 @@ async function syncStampPlaces(
   }
   const lookups = options.retryMissing
     ? places.filter((place) => place.countryCode === undefined)
-    : fresh;
+    : [...fresh, ...unlocated(places, options.released)];
   for (const [index, { lat, lng }] of lookups.entries()) {
     await ctx.scheduler.runAfter(
       (options.delayMs ?? 0) +
@@ -482,21 +795,25 @@ export const markVisitedBefore = authedMutation({
             }
           : {
               name: existing.name,
-              itemId: existing.itemId,
+              itemId: existing.itemId ?? item._id,
               visitedAt: existing.visitedAt,
             };
+      const spots = spot ? [spot] : spotsOnItem(item, name);
       await markVisit(ctx, {
         userId,
         key,
         existing,
         visit,
-        spots: spot ? [spot] : spotsOnItem(item, name),
+        spots,
         explicit: spot !== undefined,
       });
-      const row = await findVisit(ctx, userId, name);
-      if (row === null) continue;
-      if (existing === null) await ctx.db.patch(row._id, { backfilled: true });
-      queued += await syncStampPlaces(ctx, row, item, {
+      const found = await findVisit(ctx, userId, name);
+      if (found === null) continue;
+      if (existing === null)
+        await ctx.db.patch(found._id, { backfilled: true });
+      const claim = await claimMarkedSpots(ctx, found, spots);
+      queued += await syncStampPlaces(ctx, claim.row, item, {
+        released: claim.released,
         delayMs: queued * COUNTRY_SPACING_MS,
       });
     }
@@ -535,7 +852,11 @@ async function coverOf(
 }
 
 type PassportStamp = Infer<typeof stampValidator>;
-type StampRow = Omit<PassportStamp, "cover"> & { appleId?: string };
+type StampRow = Omit<PassportStamp, "cover" | "itemId"> & {
+  itemId?: Id<"items">;
+  listPlaceId?: Id<"sharedListPlaces">;
+  appleId?: string;
+};
 
 async function stampRows(
   ctx: QueryCtx,
@@ -550,7 +871,7 @@ async function stampRows(
   const saves = new Map<Id<"items">, Doc<"items"> | null>();
   let bytes = 0;
   for (const { itemId } of rows) {
-    if (saves.has(itemId)) continue;
+    if (itemId === undefined || saves.has(itemId)) continue;
     if (bytes >= PASSPORT_SAVE_BYTES) break;
     const owned = known.get(itemId) ?? (await ownedSave(ctx, userId, itemId));
     bytes += approximateDocBytes(owned);
@@ -558,19 +879,24 @@ async function stampRows(
   }
   const stamps: StampRow[] = [];
   for (const row of rows) {
-    const owned = saves.get(row.itemId) ?? null;
+    const owned =
+      row.itemId === undefined ? null : (saves.get(row.itemId) ?? null);
     const source = reelSource(owned);
     const base = {
       key: row.key,
       name: row.name,
-      itemId: row.itemId,
+      ...(row.itemId === undefined ? {} : { itemId: row.itemId }),
       visitedAt: row.visitedAt,
       ...(row.backfilled ? { backfilled: true } : {}),
       ...(source ? { source } : {}),
     };
     const spots = stampSpots(row, owned);
     if (spots === undefined) {
-      stamps.push(base);
+      stamps.push(
+        row.listPlaceId === undefined
+          ? base
+          : { ...base, listPlaceId: row.listPlaceId },
+      );
       continue;
     }
     const stored = stampPlacesFor(row.stampPlaces, spots);
@@ -584,6 +910,7 @@ async function stampRows(
         ...(spot.appleId === undefined ? {} : { appleId: spot.appleId }),
         ...(city ? { city } : {}),
         ...(place?.countryCode ? { countryCode: place.countryCode } : {}),
+        ...(place?.listPlaceId ? { listPlaceId: place.listPlaceId } : {}),
       });
     }
   }
@@ -607,19 +934,39 @@ export async function passportPlaces(
   });
 }
 
+async function stampsWithCovers(ctx: QueryCtx, userId: string) {
+  const { stamps, saves } = await stampRows(ctx, userId);
+  const covers = new Map<Id<"items">, string | null>();
+  for (const [itemId, owned] of saves) {
+    covers.set(itemId, await coverOf(ctx, owned));
+  }
+  return stamps.map(({ appleId: _appleId, ...stamp }) => ({
+    ...stamp,
+    cover:
+      stamp.itemId === undefined ? null : (covers.get(stamp.itemId) ?? null),
+  }));
+}
+
+const listedStampValidator = v.object({
+  ...stampValidator.fields,
+  itemId: v.optional(v.id("items")),
+  listPlaceId: v.optional(v.id("sharedListPlaces")),
+});
+
+export const listPassportStamps = authedQuery({
+  args: {},
+  returns: v.array(listedStampValidator),
+  handler: async (ctx) => await stampsWithCovers(ctx, ctx.userId),
+});
+
 export const getPassport = authedQuery({
   args: {},
   returns: v.array(stampValidator),
   handler: async (ctx) => {
-    const { stamps, saves } = await stampRows(ctx, ctx.userId);
-    const covers = new Map<Id<"items">, string | null>();
-    for (const [itemId, owned] of saves) {
-      covers.set(itemId, await coverOf(ctx, owned));
-    }
-    return stamps.map(({ appleId: _appleId, ...stamp }) => ({
-      ...stamp,
-      cover: covers.get(stamp.itemId) ?? null,
-    }));
+    const stamps = await stampsWithCovers(ctx, ctx.userId);
+    return stamps.flatMap(({ itemId, listPlaceId: _listPlaceId, ...stamp }) =>
+      itemId === undefined ? [] : [{ ...stamp, itemId }],
+    );
   },
 });
 
@@ -653,11 +1000,31 @@ export const listBadgeStamps = authedQuery({
   returns: v.array(badgeStampValidator),
   handler: async (ctx) => {
     const { stamps, saves } = await stampRows(ctx, ctx.userId);
-    return stamps.map((stamp) => ({
-      ...(stamp.city ? { city: stamp.city } : {}),
-      ...(stamp.countryCode ? { countryCode: stamp.countryCode } : {}),
-      kinds: stampKinds(saves.get(stamp.itemId) ?? null, stamp),
-    }));
+    const listPlaces = new Map<
+      Id<"sharedListPlaces">,
+      Doc<"sharedListPlaces"> | null
+    >();
+    const listKinds = async (id: Id<"sharedListPlaces">) => {
+      if (!listPlaces.has(id)) listPlaces.set(id, await ctx.db.get(id));
+      const place = listPlaces.get(id);
+      return place ? placeKinds(place.category, place.tags ?? []) : [];
+    };
+    const badges = [];
+    for (const stamp of stamps) {
+      const fromSave = stampKinds(
+        stamp.itemId === undefined ? null : (saves.get(stamp.itemId) ?? null),
+        stamp,
+      );
+      badges.push({
+        ...(stamp.city ? { city: stamp.city } : {}),
+        ...(stamp.countryCode ? { countryCode: stamp.countryCode } : {}),
+        kinds:
+          fromSave.length > 0 || stamp.listPlaceId === undefined
+            ? fromSave
+            : await listKinds(stamp.listPlaceId),
+      });
+    }
+    return badges;
   },
 });
 
@@ -790,6 +1157,20 @@ const countryLookupArgs = {
   lng: v.number(),
 };
 
+async function listAdderAllows(
+  ctx: QueryCtx,
+  visit: Doc<"placeVisits">,
+  stamped: StampPlace,
+): Promise<boolean> {
+  const listPlaceId = stamped.listPlaceId;
+  if (listPlaceId === undefined) return true;
+  const place = await ctx.db.get(listPlaceId);
+  if (place === null) return false;
+  return (
+    place.addedBy === visit.userId || (await aiAllowed(ctx, place.addedBy))
+  );
+}
+
 export const claimCountryLookup = internalMutation({
   args: countryLookupArgs,
   returns: v.union(
@@ -803,6 +1184,7 @@ export const claimCountryLookup = internalMutation({
     if (visit === null || place === undefined) return null;
     if (place.countryCode !== undefined) return null;
     if (!(await aiAllowed(ctx, visit.userId))) return null;
+    if (!(await listAdderAllows(ctx, visit, place))) return null;
     const budget = await rateLimiter.limit(ctx, "visitCountryGlobal");
     return budget.ok ? { ready: true as const } : { busyMs: budget.retryAfter };
   },

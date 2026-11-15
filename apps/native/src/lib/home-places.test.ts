@@ -6,7 +6,6 @@ import {
   newlyUnplaced,
   plannableCities,
   savesToReview,
-  sharedListCover,
   unplacedSaves,
 } from "@/lib/home-places";
 
@@ -92,30 +91,6 @@ describe("plannableCities", () => {
       "Lisbon",
       "Oslo",
     ]);
-  });
-});
-
-describe("sharedListCover", () => {
-  const mine = [
-    { ...city("Lisbon"), cover: "lisbon.jpg" },
-    { ...city("Paris"), cover: null },
-    { ...city("Tokyo"), cover: "tokyo.jpg" },
-  ];
-
-  it("matches the viewer's own city cover ignoring case", () => {
-    expect(sharedListCover(["lisbon"], mine)).toBe("lisbon.jpg");
-  });
-
-  it("skips cities without a cover and takes the next one", () => {
-    expect(sharedListCover(["Paris", "TOKYO"], mine)).toBe("tokyo.jpg");
-  });
-
-  it("has no cover when the viewer saved none of the cities", () => {
-    expect(sharedListCover(["Oslo"], mine)).toBeNull();
-    expect(sharedListCover(["Lisbon"], undefined)).toBeNull();
-  });
-  it("keeps lists from an older backend visible before city summaries have deployed", () => {
-    expect(sharedListCover(undefined, mine)).toBeNull();
   });
 });
 

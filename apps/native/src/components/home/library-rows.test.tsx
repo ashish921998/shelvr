@@ -56,7 +56,7 @@ beforeEach(() => {
 it("counts every save and trip once all of them are loaded", () => {
   render(<LibraryRows />);
   expect(screen.getAllByRole("button").map((row) => row.textContent)).toEqual([
-    "Trips, 3",
+    "Plans, 3",
     "Passport",
     "All saves, 23",
   ]);
@@ -74,19 +74,19 @@ it.each([
 it("shows the trips count as a floor while more trips remain", () => {
   mocks.trips = { results: rows(50), status: "CanLoadMore" };
   render(<LibraryRows />);
-  expect(screen.getByText("Trips, 50+")).toBeTruthy();
+  expect(screen.getByText("Plans, 50+")).toBeTruthy();
 });
 
 it("shows no trips count before the first page arrives", () => {
   mocks.trips = { results: [], status: "LoadingFirstPage" };
   render(<LibraryRows />);
-  expect(screen.getByText("Trips")).toBeTruthy();
+  expect(screen.getByText("Plans")).toBeTruthy();
 });
 
-it("puts Cities between Trips and All saves, and hides it without cities", () => {
+it("puts Cities between Plans and All saves, and hides it without cities", () => {
   const { unmount } = render(<LibraryRows cityCount={4} />);
   expect(screen.getAllByRole("button").map((row) => row.textContent)).toEqual([
-    "Trips, 3",
+    "Plans, 3",
     "Passport",
     "Cities, 4",
     "All saves, 23",
@@ -96,26 +96,26 @@ it("puts Cities between Trips and All saves, and hides it without cities", () =>
   expect(screen.queryByText(/Cities/)).toBeNull();
 });
 
-it("opens Cities, All saves and the Trips and Passport tabs", () => {
+it("opens Cities, All saves and the Plans and Passport tabs", () => {
   render(<LibraryRows cityCount={4} />);
   fireEvent.click(screen.getByText("Cities, 4"));
   expect(mocks.push).toHaveBeenCalledWith("/cities");
   fireEvent.click(screen.getByText("All saves, 23"));
   expect(mocks.push).toHaveBeenCalledWith("/saves");
-  fireEvent.click(screen.getByText("Trips, 3"));
+  fireEvent.click(screen.getByText("Plans, 3"));
   expect(mocks.navigate).toHaveBeenCalledWith("/(app)/(tabs)/(trips)");
   fireEvent.click(screen.getByText("Passport"));
   expect(mocks.navigate).toHaveBeenCalledWith("/(app)/(tabs)/(passport)");
 });
 
-it("keeps Trips and leaves out All saves when there are no saves", () => {
+it("keeps Plans and leaves out All saves when there are no saves", () => {
   mocks.feed = { items: [], canLoadMore: false, loadingMore: false };
   render(<LibraryRows />);
   expect(screen.getAllByRole("button").map((row) => row.textContent)).toEqual([
-    "Trips, 3",
+    "Plans, 3",
     "Passport",
   ]);
-  fireEvent.click(screen.getByText("Trips, 3"));
+  fireEvent.click(screen.getByText("Plans, 3"));
   expect(mocks.navigate).toHaveBeenCalledWith("/(app)/(tabs)/(trips)");
 });
 

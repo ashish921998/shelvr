@@ -25,6 +25,8 @@ const UNOWNED_TABLES: Record<string, string> = {
   detachedAppleTokens:
     "a web sign-in's Apple token that landed on an account already deleting; no owner key by design, removed by revokeDetachedToken or forgetDetachedAppleToken",
   paymentAnalyticsReceipts: "event ids only, no reference to an account",
+  cityPhotos:
+    "a cache shared by every account of one public photo per city name, with no reference to an account or a save",
   waitlistSignups:
     "the marketing waitlist, keyed by email and consented to apart from any account",
   authVerifiers:

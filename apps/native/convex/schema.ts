@@ -320,7 +320,8 @@ export default defineSchema({
     userId: v.string(),
     key: v.string(),
     name: v.string(),
-    itemId: v.id("items"),
+    itemId: v.optional(v.id("items")),
+    listPlaceId: v.optional(v.id("sharedListPlaces")),
     visitedAt: v.number(),
     city: v.optional(v.string()),
     countryCode: v.optional(v.string()),
@@ -334,6 +335,8 @@ export default defineSchema({
           lng: v.number(),
           city: v.optional(v.string()),
           countryCode: v.optional(v.string()),
+          listPlaceId: v.optional(v.id("sharedListPlaces")),
+          alsoListPlaceIds: v.optional(v.array(v.id("sharedListPlaces"))),
         }),
       ),
     ),
@@ -348,6 +351,22 @@ export default defineSchema({
     country: v.string(),
     stampedAt: v.number(),
   }).index("by_user_and_city", ["userId", "city"]),
+
+  cityPhotos: defineTable({
+    key: v.string(),
+    city: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("found"),
+      v.literal("missing"),
+      v.literal("failed"),
+    ),
+    url: v.optional(v.string()),
+    file: v.optional(v.string()),
+    checkedAt: v.number(),
+  })
+    .index("by_key", ["key"])
+    .index("by_status_and_checkedAt", ["status", "checkedAt"]),
 
   passportShares: defineTable({
     token: v.string(),

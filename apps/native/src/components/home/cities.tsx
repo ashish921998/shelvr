@@ -3,6 +3,8 @@ import { ScreenTitle } from "@/components/screen-title";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ThemedText } from "@/components/ui/themed-text";
 import { canBrowse } from "@/lib/access";
+import { analytics } from "@/lib/analytics";
+import { curatedCityPicture } from "@/lib/city-picture";
 import { useAccess } from "@/lib/free-plan";
 import { type City, cityCountLine } from "@/lib/home-places";
 import { t, useAppLocale } from "@/lib/i18n";
@@ -12,11 +14,43 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
+import { useState } from "react";
 import { Pressable, ScrollView, View, useWindowDimensions } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 const SIDE = 20;
 const GAP = 12;
+
+function CityPhoto({ entry }: { entry: City }) {
+  const [failed, setFailed] = useState<readonly (string | number)[]>([]);
+  const savePhoto = entry.cover === entry.photo ? null : entry.cover;
+  const source = [
+    savePhoto,
+    curatedCityPicture(entry.city),
+    entry.photo ?? entry.cover,
+  ].find(
+    (candidate): candidate is string | number =>
+      !!candidate && !failed.includes(candidate),
+  );
+  if (source === undefined) return <View style={styles.photo} />;
+  return (
+    <Image
+      testID="city-cover-photo"
+      source={typeof source === "number" ? source : { uri: source }}
+      style={styles.photo}
+      contentFit="cover"
+      recyclingKey={entry.city}
+      onError={() => {
+        analytics.captureError(
+          "city_cover_image_failed",
+          new Error("image_load_failed"),
+          { curated: typeof source === "number" },
+        );
+        setFailed((seen) => [...seen, source]);
+      }}
+    />
+  );
+}
 
 function CityTile({ entry, width }: { entry: City; width: number }) {
   const router = useRouter();
@@ -34,15 +68,7 @@ function CityTile({ entry, width }: { entry: City; width: number }) {
         pressed && styles.pressed,
       ]}
     >
-      {entry.cover ? (
-        <Image
-          source={{ uri: entry.cover }}
-          style={styles.photo}
-          contentFit="cover"
-        />
-      ) : (
-        <View style={styles.photo} />
-      )}
+      <CityPhoto entry={entry} />
       <View style={styles.text}>
         <ThemedText variant="bodyLabel" style={styles.name} numberOfLines={1}>
           {entry.city}

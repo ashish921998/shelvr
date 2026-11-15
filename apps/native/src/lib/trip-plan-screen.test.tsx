@@ -95,6 +95,9 @@ vi.mock("@/components/trip-planner/trip-edit-list", async (importActual) => ({
     <div>{header}</div>
   )),
 }));
+vi.mock("@/components/shared-list/together-section", () => ({
+  TogetherSection: vi.fn(() => null),
+}));
 vi.mock("@/components/account-gone-boundary", () => ({
   AccountGoneBoundary: vi.fn(({ children }: { children: ReactNode }) => (
     <>{children}</>

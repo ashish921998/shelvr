@@ -47,11 +47,6 @@ vi.mock("@/components/home/library-rows", () => ({
     <span>{`Library rows, cities ${cityCount}`}</span>
   )),
 }));
-vi.mock("@/components/home/shared-lists-section", () => ({
-  SharedListsSection: vi.fn(({ cities }: { cities?: { city: string }[] }) => (
-    <span>{`Shared lists, ${cities?.map((c) => c.city).join("+")}`}</span>
-  )),
-}));
 vi.mock("@/lib/free-plan", () => ({
   useAccess: () => mocks.access,
   useSaveGuard: () => ({ guard: mocks.guard, loading: false }),
@@ -86,11 +81,10 @@ beforeEach(() => {
   mocks.cities = [lisbon];
 });
 
-it("gives the library rows the city count and the shared lists the cities", () => {
+it("gives the library rows the city count", () => {
   render(<HomePlaces saves={[failed]} />);
   expect(screen.getByText("Library rows, cities 1")).toBeTruthy();
   expect(screen.getByText("Review row")).toBeTruthy();
-  expect(screen.getByText("Shared lists, Lisbon")).toBeTruthy();
 });
 
 it("has no plan rows or city grid any more", () => {
@@ -100,12 +94,11 @@ it("has no plan rows or city grid any more", () => {
   expect(screen.queryByText("Lisbon")).toBeNull();
 });
 
-it("still shows the rows and shared lists before the cities load", () => {
+it("still shows the rows before the cities load", () => {
   mocks.cities = undefined;
   render(<HomePlaces saves={[failed]} />);
   expect(screen.getByText("Library rows, cities undefined")).toBeTruthy();
   expect(screen.getByText("Review row")).toBeTruthy();
-  expect(screen.getByText("Shared lists, undefined")).toBeTruthy();
 });
 
 it("hides the cities while the account's access is still loading", () => {

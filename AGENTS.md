@@ -40,7 +40,7 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Home:** the Library tab, `src/lib/home-feed.tsx` (`HomeFeedProvider`,
   `useHomeFeed`); its rows and sections are in `src/components/home`
   (`home-places.tsx`, Recents in `recent-saves.tsx`); failed and placeless saves
-  are in `review-saves.tsx` and `unplaced-toast.tsx`. The Trips, Cities and All
+  are in `review-saves.tsx` and `unplaced-toast.tsx`. The Plans, Cities and All
   saves rows are `library-rows.tsx`; the Cities screen is
   `src/app/(app)/cities.tsx` (`cities.tsx`) and the All saves screen is
   `src/app/(app)/saves.tsx` (`all-saves.tsx`), and saves are grouped by day in
@@ -57,8 +57,7 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `convex/datePlans.ts` (rules in `convex/model/dateRank.ts`).
   Retired routes redirect to Home through `src/lib/home-href.ts`.
 - **Shared lists:** route `src/app/(app)/shared-list/[id].tsx`, the form
-  `new-shared-list.tsx`, `add-list-place.tsx`, the See all grid
-  `src/app/(app)/shared-lists.tsx` (`src/components/home/all-shared-lists.tsx`), the root Join screen
+  `new-shared-list.tsx`, `add-list-place.tsx`, the root Join screen
   `src/app/list-invite/[token].tsx`; rows and cards in `src/components/shared-list`,
   with the "Priya added 3 places" line in `list-activity.tsx`; hooks and helpers in
   `src/lib/shared-lists.ts`, the pin drop for new places in `src/lib/fresh-pins.ts`,

@@ -836,7 +836,10 @@ type MessageParams = {
   "map.showMyLocation": undefined;
   "map.showAllCities": undefined;
   "navigation.trips": undefined;
-  "tripPlanner.listTitle": undefined;
+  "plans.title": undefined;
+  "plans.together": undefined;
+  "plans.newList": undefined;
+  "plans.trips": undefined;
   "tripPlanner.loading": undefined;
   "tripPlanner.planTrip": undefined;
   "tripPlanner.emptyTitle": undefined;
@@ -995,6 +998,7 @@ type MessageParams = {
   "sharedLists.noAnchorClassic": { city: string };
   "sharedLists.noAnchorLowkey": { city: string };
   "sharedLists.noPairBody": { city: string };
+  "sharedLists.hint": undefined;
   "sharedLists.start": undefined;
   "sharedLists.newList": undefined;
   "sharedLists.with": { names: string };

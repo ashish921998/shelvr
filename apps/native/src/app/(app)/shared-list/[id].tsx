@@ -70,7 +70,7 @@ function usePlaceEdits() {
   };
   return {
     visited: (placeId: Id<"sharedListPlaces">, visited: boolean) =>
-      setVisited({ placeId, visited })
+      setVisited({ placeId, visited, stamp: true })
         .then(() => {
           if (visited) void haptics.success();
         })

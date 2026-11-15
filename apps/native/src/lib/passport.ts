@@ -11,7 +11,7 @@ import { useConvexAuth } from "convex/react";
 import type { FunctionReturnType } from "convex/server";
 
 export type Stamp = FunctionReturnType<
-  typeof api.placeVisits.getPassport
+  typeof api.placeVisits.listPassportStamps
 >[number];
 
 export type UnstampedPlace = FunctionReturnType<
@@ -19,7 +19,7 @@ export type UnstampedPlace = FunctionReturnType<
 >[number];
 
 export type OpenStamp = {
-  itemId: Id<"items">;
+  itemId?: Id<"items">;
   name: string;
   city: string;
   cover: string | null;
@@ -30,7 +30,10 @@ export type OpenStamp = {
 export function usePassport() {
   const { isAuthenticated } = useConvexAuth();
   const passport = useQuery(
-    convexQuery(api.placeVisits.getPassport, isAuthenticated ? {} : "skip"),
+    convexQuery(
+      api.placeVisits.listPassportStamps,
+      isAuthenticated ? {} : "skip",
+    ),
   );
   return {
     stamps: passport.data,
@@ -210,7 +213,7 @@ export function shareCardHref(city: string, surface: CardSurface) {
 
 export function openStampOf(stamp: Stamp, city: string): OpenStamp {
   return {
-    itemId: stamp.itemId,
+    ...(stamp.itemId === undefined ? {} : { itemId: stamp.itemId }),
     name: stamp.name,
     city: stamp.city ?? city,
     cover: stamp.cover,

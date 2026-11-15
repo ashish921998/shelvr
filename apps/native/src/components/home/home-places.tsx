@@ -1,6 +1,5 @@
 import { LibraryRows } from "@/components/home/library-rows";
 import { ReviewSaves, type ReviewSave } from "@/components/home/review-saves";
-import { SharedListsSection } from "@/components/home/shared-lists-section";
 import { AppSymbolIcon } from "@/components/symbol";
 import { Button } from "@/components/ui/button";
 import { ThemedText } from "@/components/ui/themed-text";
@@ -56,7 +55,6 @@ export function HomePlaces({ saves }: { saves: ReviewSave[] }) {
         <LibraryRows cityCount={loaded?.length} />
         <ReviewSaves saves={saves} />
       </View>
-      <SharedListsSection cities={loaded} />
       {loaded?.length === 0 ? (
         <View style={styles.emptyCities}>
           <HomePlacesEmptyCard />

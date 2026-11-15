@@ -1,4 +1,5 @@
 import { AccountGoneBoundary } from "@/components/account-gone-boundary";
+import { TogetherSection } from "@/components/shared-list/together-section";
 import { AppSymbolIcon } from "@/components/symbol";
 import { TripCard } from "@/components/trip-planner/trip-card";
 import { Button } from "@/components/ui/button";
@@ -63,7 +64,7 @@ function TripsHeader() {
         <ThemedText variant="bodyLabel">{t("navigation.library")}</ThemedText>
       </Pressable>
       <ThemedText variant="displayTitle" accessibilityRole="header">
-        {t("tripPlanner.listTitle")}
+        {t("plans.title")}
       </ThemedText>
     </View>
   );
@@ -175,6 +176,11 @@ function TripsList({ signedIn }: { signedIn: boolean }) {
           if (trips.status === "CanLoadMore") trips.loadMore(PAGE_SIZE);
         }}
         onEndReachedThreshold={0.5}
+        ListHeaderComponent={
+          <View style={styles.together}>
+            <TogetherSection showTripsHeading={trips.results.length > 0} />
+          </View>
+        }
         ListEmptyComponent={<NoTrips onPlan={planTrip} />}
       />
     </View>
@@ -220,13 +226,16 @@ const styles = StyleSheet.create((theme, rt) => ({
   accent: { color: theme.colors.primaryText, textAlign: "center" },
   pressed: { opacity: theme.opacity.pressed },
   columns: { gap: theme.gap(GRID_GAP) },
+  together: { paddingTop: theme.gap(1) },
   content: {
     gap: theme.gap(2.5),
     paddingHorizontal: theme.gap(SCREEN_INSET),
     paddingBottom: rt.insets.bottom + theme.gap(2),
   },
-  contentEmpty: { flexGrow: 1, justifyContent: "center" },
+  contentEmpty: { flexGrow: 1 },
   empty: {
+    flexGrow: 1,
+    justifyContent: "center",
     alignItems: "center",
     gap: theme.gap(1.5),
     paddingHorizontal: theme.gap(2),

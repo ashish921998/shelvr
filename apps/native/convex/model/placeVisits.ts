@@ -236,7 +236,13 @@ export async function rowSpots(
   ctx: QueryCtx,
   row: Doc<"placeVisits">,
 ): Promise<VisitSpot[] | undefined> {
-  return row.spots ?? spotsOfRow(row, await ctx.db.get(row.itemId));
+  return (
+    row.spots ??
+    spotsOfRow(
+      row,
+      row.itemId === undefined ? null : await ctx.db.get(row.itemId),
+    )
+  );
 }
 
 function spotsOfRow(
@@ -271,9 +277,13 @@ export async function userVisits(
   );
   const missing = [
     ...new Set(
-      rows
-        .filter((row) => row.spots === undefined && !items.has(row.itemId))
-        .map((row) => row.itemId),
+      rows.flatMap((row) =>
+        row.spots === undefined &&
+        row.itemId !== undefined &&
+        !items.has(row.itemId)
+          ? [row.itemId]
+          : [],
+      ),
     ),
   ];
   for (const [id, item] of await Promise.all(
@@ -282,7 +292,9 @@ export async function userVisits(
     items.set(id, item);
   }
   return rows.map((row) => {
-    const spots = spotsOfRow(row, items.get(row.itemId) ?? null);
+    const item =
+      row.itemId === undefined ? null : (items.get(row.itemId) ?? null);
+    const spots = spotsOfRow(row, item);
     return spots === undefined
       ? { key: row.key, name: row.name }
       : { key: row.key, name: row.name, spots };

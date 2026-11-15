@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 
 import { Cities } from "@/components/home/cities";
@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
         count: number;
         placeCount?: number;
         cover: string | null;
+        photo?: string;
       }[]
     | undefined,
   access: { kind: "pro" } as Record<string, unknown>,
@@ -20,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   failed: false,
   failure: new Error("listCities failed"),
   captureError: vi.fn(),
+  images: [] as { source: unknown; onError?: () => void }[],
 }));
 
 vi.mock("@/lib/analytics", () => ({
@@ -54,9 +56,13 @@ vi.mock("@convex-dev/react-query", () => ({
   },
 }));
 vi.mock("expo-image", () => ({
-  Image: vi.fn(({ source }: { source: { uri: string } }) => (
-    <img alt="" src={source.uri} />
-  )),
+  Image: vi.fn((props: { source: unknown; onError?: () => void }) => {
+    mocks.images.push(props);
+    return <img alt="" />;
+  }),
+}));
+vi.mock("@/lib/city-picture", () => ({
+  curatedCityPicture: (city: string) => (city === "Paris" ? 42 : undefined),
 }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock("react-native-unistyles", () => ({
@@ -92,6 +98,7 @@ beforeEach(() => {
   mocks.queryArgs = [];
   mocks.failed = false;
   mocks.captureError.mockReset();
+  mocks.images = [];
   mocks.access = { kind: "pro" };
   mocks.cities = [
     { city: "Lisbon", count: 3, placeCount: 8, cover: "lisbon.jpg" },
@@ -153,4 +160,46 @@ it("asks for no cities while the account cannot browse", () => {
   mocks.access = { kind: "loading" };
   render(<Cities />);
   expect(mocks.queryArgs).toEqual(["skip"]);
+});
+
+it("shows the curated photo of a known city over its looked-up photo", () => {
+  mocks.cities = [
+    {
+      city: "Paris",
+      count: 1,
+      cover: "https://x/paris.jpg",
+      photo: "https://x/paris.jpg",
+    },
+  ];
+  render(<Cities />);
+  expect(mocks.images.at(-1)?.source).toBe(42);
+});
+
+it("shows a save's photo first, then the curated and city photos", () => {
+  mocks.cities = [
+    {
+      city: "Paris",
+      count: 1,
+      cover: "https://x/reel.jpg",
+      photo: "https://x/paris.jpg",
+    },
+  ];
+  render(<Cities />);
+  expect(mocks.images.at(-1)?.source).toEqual({ uri: "https://x/reel.jpg" });
+  act(() => mocks.images.at(-1)?.onError?.());
+  expect(mocks.images.at(-1)?.source).toBe(42);
+  act(() => mocks.images.at(-1)?.onError?.());
+  expect(mocks.images.at(-1)?.source).toEqual({ uri: "https://x/paris.jpg" });
+});
+
+it("falls back to a blank tile and reports it when the photo fails to load", () => {
+  mocks.cities = [{ city: "Kyoto", count: 1, cover: "https://x/gone.jpg" }];
+  const { container } = render(<Cities />);
+  act(() => mocks.images.at(-1)?.onError?.());
+  expect(container.querySelector("img")).toBeNull();
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "city_cover_image_failed",
+    expect.any(Error),
+    { curated: false },
+  );
 });

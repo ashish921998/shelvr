@@ -35,6 +35,7 @@ import { useSharePassport } from "@/lib/passport-share";
 import { ringComplete } from "@/components/passport/city-ring";
 import { useStampMomentLanding } from "@/lib/stamp-moment";
 import { usePlaceVisit } from "@/lib/use-place-visit";
+import { useRemoveListStamp } from "@/lib/use-remove-list-stamp";
 import { Stack, useRouter } from "expo-router";
 import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useEffect, useRef, useState } from "react";
@@ -132,6 +133,7 @@ export default function PassportScreen() {
   const barHeight = useBottomTabBarHeight();
   const { stamps, failed, error } = usePassport();
   const visit = usePlaceVisit("passport");
+  const removeListStamp = useRemoveListStamp();
   useStampMomentLanding();
   const sharing = useSharePassport(stamps?.length ?? 0);
   const completion = useCityCompletion();
@@ -145,7 +147,11 @@ export default function PassportScreen() {
   const remove = async () => {
     if (open === null) return;
     const { itemId, name, spot } = open;
-    if (await visit.toggle(itemId, { name, ...spot }, false)) {
+    const removed =
+      itemId === undefined
+        ? await removeListStamp.remove(name, spot)
+        : await visit.toggle(itemId, { name, ...spot }, false);
+    if (removed) {
       setOpen((current) => (current === open ? null : current));
     }
   };
@@ -300,7 +306,7 @@ export default function PassportScreen() {
         <StampSheet
           stamp={open}
           count={stamps.length}
-          busy={visit.busy}
+          busy={visit.busy || removeListStamp.busy}
           onClose={() => setOpen(null)}
           onRemove={() => void remove()}
           onShare={(city) => {

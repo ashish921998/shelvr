@@ -2,7 +2,6 @@ import { progressLine } from "@/lib/city-progress";
 import { t } from "@/lib/i18n";
 import { isTerminalFailure } from "@convex/model/itemFields";
 import { displayHost } from "@/lib/url";
-import { cityKey } from "@convex/model/trip";
 
 export type City = {
   city: string;
@@ -10,6 +9,7 @@ export type City = {
   placeCount?: number;
   visitedCount?: number;
   cover: string | null;
+  photo?: string;
 };
 
 type PlaceableSave = {
@@ -77,17 +77,4 @@ export function cityCountLine(entry: City): string | null {
       total: entry.placeCount,
     }) ?? t("homePlaces.spotCount", { count: entry.placeCount })
   );
-}
-
-export function sharedListCover(
-  listCities: readonly string[] | undefined,
-  mine: readonly City[] | undefined,
-): string | null {
-  for (const name of listCities ?? []) {
-    const cover = mine?.find(
-      (entry) => cityKey(entry.city) === cityKey(name),
-    )?.cover;
-    if (cover) return cover;
-  }
-  return null;
 }
