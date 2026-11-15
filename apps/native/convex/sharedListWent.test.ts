@@ -101,6 +101,7 @@ describe("Went for each member of a shared list", () => {
     });
     const stored = await base.run((ctx) => ctx.db.get(place._id));
     expect(stored?.went).toEqual([]);
+    expect(stored?.visitedAt).toBeUndefined();
   });
 
   it("records the member's own Went when an installed app marks the shared row", async () => {
@@ -123,6 +124,7 @@ describe("Went for each member of a shared list", () => {
     });
     const after = await placeAs(bo, listId);
     expect(after.wentBy).toEqual([{ firstName: "Ana", isYou: false }]);
+    expect(after.visitedAt).toEqual(expect.any(Number));
   });
 
   it("refuses someone outside the list", async () => {

@@ -609,9 +609,14 @@ export const setSharedListPlaceVisited = authedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const { place } = await memberPlace(ctx, args.placeId, ctx.userId);
+    const went = wentWith(place, ctx.userId, args.visited);
     await ctx.db.patch(place._id, {
-      visitedAt: args.visited ? Date.now() : undefined,
-      went: wentWith(place, ctx.userId, args.visited),
+      visitedAt: args.visited
+        ? Date.now()
+        : (went ?? []).length > 0
+          ? (place.visitedAt ?? Date.now())
+          : undefined,
+      went,
     });
     if (args.stamp === true || !args.visited) {
       await stampListPlace(ctx, ctx.userId, place, args.visited);

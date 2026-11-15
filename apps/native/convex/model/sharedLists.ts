@@ -330,6 +330,10 @@ export async function forgetWent(
 ): Promise<void> {
   for (const place of await listPlaces(ctx, listId)) {
     const went = wentWithout(place, userId);
-    if (went !== place.went) await ctx.db.patch(place._id, { went });
+    if (went === place.went) continue;
+    await ctx.db.patch(place._id, {
+      went,
+      ...((went ?? []).length === 0 ? { visitedAt: undefined } : {}),
+    });
   }
 }
