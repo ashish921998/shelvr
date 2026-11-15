@@ -19,6 +19,7 @@ import {
   wentLine,
   wentYou,
   withLine,
+  youWent,
 } from "./shared-lists";
 
 const mocks = vi.hoisted(() => ({
@@ -306,6 +307,13 @@ describe("wentLine", () => {
     );
     expect(wentYou(place({ wentBy: [you, maya] }))).toBe(true);
     expect(wentYou(place({ wentBy: [maya] }))).toBe(false);
+  });
+
+  it("counts a place as yours to skip when you went or an old app marked it", () => {
+    expect(youWent(place())).toBe(false);
+    expect(youWent(place({ visitedAt: 1 }))).toBe(true);
+    expect(youWent(place({ visitedAt: 1, wentBy: [maya] }))).toBe(false);
+    expect(youWent(place({ visitedAt: 1, wentBy: [maya, you] }))).toBe(true);
   });
 });
 

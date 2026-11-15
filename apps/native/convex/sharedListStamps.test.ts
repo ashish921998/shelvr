@@ -729,6 +729,40 @@ describe("Went on a shared list", () => {
     expect(own?.listPlaceId).toBeUndefined();
   });
 
+  it("takes your Went off the list when Passport removes its stamp from a row your save shares", async () => {
+    const { base, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token, { pro: true });
+    const list = await bo.t.query(api.sharedLists.getSharedList, { listId });
+    const place = list?.places.find((p) => p.name === "Manteigaria");
+    if (place === undefined) throw new Error("seed place missing");
+    await bo.t.mutation(api.sharedLists.setSharedListPlaceWent, {
+      placeId: place._id,
+      went: true,
+    });
+    const far = near(40);
+    const itemId = await seedSave(base, bo.userId, {
+      pins: [{ name: "Manteigaria", ...far, category: "Cafe" }],
+    });
+    await bo.t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Manteigaria",
+      visited: true,
+      spot: far,
+    });
+    await bo.t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Manteigaria",
+      visited: false,
+      spot: { lat: place.lat, lng: place.lng },
+    });
+    const after = await bo.t.query(api.sharedLists.getSharedList, { listId });
+    const row = after?.places.find((p) => p._id === place._id);
+    expect(row?.wentBy).toBeUndefined();
+    expect(row?.visitedAt).toBeUndefined();
+    const stamps = await bo.t.query(api.placeVisits.listPassportStamps, {});
+    expect(stamps.map((stamp) => stamp.lat)).toEqual([far.lat]);
+  });
+
   it("refuses a Went whose stamp would not fit", async () => {
     const { base, bo, place } = await friendPlace();
     await base.run((ctx) =>

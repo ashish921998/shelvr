@@ -179,6 +179,7 @@ async function clearVisit(
       ) === undefined
     ) {
       await ctx.db.delete(existing._id);
+      await forgetStampsWent(ctx, userId, existing.stampPlaces ?? []);
     }
     return;
   }
@@ -207,19 +208,21 @@ async function clearVisit(
   for (const { row, sameName, original, remaining } of rows) {
     if (remaining?.length === 0 || (original === undefined && sameName)) {
       await ctx.db.delete(row._id);
+      await forgetStampsWent(ctx, userId, row.stampPlaces ?? []);
     } else if (remaining !== original) {
+      const kept =
+        row.stampPlaces === undefined
+          ? undefined
+          : keptStampPlaces(row.stampPlaces, original ?? [], remaining ?? []);
       await ctx.db.patch(row._id, {
         spots: remaining,
-        ...(row.stampPlaces === undefined
-          ? {}
-          : {
-              stampPlaces: keptStampPlaces(
-                row.stampPlaces,
-                original ?? [],
-                remaining ?? [],
-              ),
-            }),
+        ...(kept === undefined ? {} : { stampPlaces: kept }),
       });
+      await forgetStampsWent(
+        ctx,
+        userId,
+        (row.stampPlaces ?? []).filter((entry) => !kept?.includes(entry)),
+      );
     }
   }
 }
@@ -557,10 +560,22 @@ async function forgetListWent(
   row: Doc<"placeVisits">,
   spot: Point | undefined,
 ): Promise<void> {
-  const removed = (row.stampPlaces ?? []).filter(
-    (entry) =>
-      spot === undefined || (entry.lat === spot.lat && entry.lng === spot.lng),
+  await forgetStampsWent(
+    ctx,
+    row.userId,
+    (row.stampPlaces ?? []).filter(
+      (entry) =>
+        spot === undefined ||
+        (entry.lat === spot.lat && entry.lng === spot.lng),
+    ),
   );
+}
+
+async function forgetStampsWent(
+  ctx: MutationCtx,
+  userId: string,
+  removed: readonly StampPlace[],
+): Promise<void> {
   const ids = new Set(
     removed.flatMap((entry) => [
       ...(entry.listPlaceId === undefined ? [] : [entry.listPlaceId]),
@@ -570,7 +585,7 @@ async function forgetListWent(
   for (const id of ids) {
     const place = await ctx.db.get(id);
     if (place === null) continue;
-    const went = wentWithout(place, row.userId);
+    const went = wentWithout(place, userId);
     if (went === place.went) continue;
     await ctx.db.patch(place._id, {
       went,

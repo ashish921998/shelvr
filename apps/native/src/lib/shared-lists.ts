@@ -299,6 +299,12 @@ export function wentYou(place: SharedListPlace): boolean {
   return place.wentBy?.some((member) => member.isYou) ?? false;
 }
 
+export function youWent(place: SharedListPlace): boolean {
+  return place.wentBy === undefined
+    ? place.visitedAt !== undefined
+    : wentYou(place);
+}
+
 export function wentLine(place: SharedListPlace): string | null {
   const wentBy = place.wentBy ?? [];
   const [first, second] = wentBy;

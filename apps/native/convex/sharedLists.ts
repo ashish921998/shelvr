@@ -711,6 +711,12 @@ async function ownSaveId(
   return item !== null && item.userId === userId ? item._id : undefined;
 }
 
+function youWent(row: Doc<"sharedListPlaces">, userId: Id<"users">): boolean {
+  const went = row.went ?? [];
+  if (went.length === 0) return row.visitedAt !== undefined;
+  return went.some((entry) => entry.userId === userId);
+}
+
 export async function claimListPlan(
   ctx: MutationCtx,
   listId: Id<"sharedLists">,
@@ -725,9 +731,7 @@ export async function claimListPlan(
   );
   const visits = await userVisits(ctx, userId);
   const visited = visitMatcher(visits, inCity);
-  const rows = inCity.filter(
-    (row) => row.visitedAt === undefined && !visited(row),
-  );
+  const rows = inCity.filter((row) => !youWent(row, userId) && !visited(row));
   if (options.needsPlaces && rows.length === 0) {
     throw new Error("No places in this city");
   }
@@ -751,9 +755,7 @@ export async function claimListPlan(
     been: [
       ...new Set([
         ...unscopedVisitNames(visits),
-        ...inCity
-          .filter((row) => row.visitedAt !== undefined)
-          .map((row) => row.name),
+        ...inCity.filter((row) => youWent(row, userId)).map((row) => row.name),
       ]),
     ],
     visitMarks: visits,
