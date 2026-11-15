@@ -75,6 +75,22 @@ describe("passportStoryOf", () => {
       { name: "Madrid", country: "ES" },
     ]);
   });
+
+  it("does not repeat a city stamp whose label is translated", () => {
+    const cityStamps = [
+      { city: "lisbon", country: "PORTUGAL", stampedAt: 2 },
+    ] as CityStamp[];
+    const stamps = [
+      stamp("A", { city: "Lisbon" }),
+      stamp("B", { city: "Lisbon" }),
+      stamp("C", { city: "Porto" }),
+    ];
+    const story = passportStoryOf(stamps, cityStamps, () => "Lisbonne");
+    expect(story.cityStamps.map((city) => city.name)).toEqual([
+      "Lisbonne",
+      "Porto",
+    ]);
+  });
 });
 
 describe("qrModules", () => {

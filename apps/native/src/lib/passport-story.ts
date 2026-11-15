@@ -34,11 +34,19 @@ function storyCities(
   cityStamps: readonly CityStamp[],
   label: (city: string) => string,
 ): StoryCity[] {
-  const picked: StoryCity[] = [...cityStamps]
+  const newest = [...cityStamps]
     .sort((a, b) => b.stampedAt - a.stampedAt)
-    .slice(0, STORY_CITIES)
-    .map((stamp) => ({ name: label(stamp.city), country: stamp.country }));
-  const seen = new Set(picked.map((city) => cityKey(city.name)));
+    .slice(0, STORY_CITIES);
+  const picked: StoryCity[] = newest.map((stamp) => ({
+    name: label(stamp.city),
+    country: stamp.country,
+  }));
+  const seen = new Set(
+    newest.flatMap((stamp) => [
+      cityKey(stamp.city),
+      cityKey(label(stamp.city)),
+    ]),
+  );
   const counts = new Map<
     string,
     { name: string; count: number; country: string | null }

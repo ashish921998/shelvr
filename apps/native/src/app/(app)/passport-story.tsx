@@ -19,6 +19,7 @@ import { api } from "@convex/_generated/api";
 import { Skia } from "@shopify/react-native-skia";
 import { useMutation } from "convex/react";
 import { File, Paths } from "expo-file-system";
+import { Image } from "expo-image";
 import { Stack, useRouter } from "expo-router";
 import * as Sharing from "expo-sharing";
 import {
@@ -42,6 +43,7 @@ import { ScopedTheme, StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const PREVIEW_CHROME = 300;
 const EXPORT_PIXELS = 1080;
+const MIN_PREVIEW_WIDTH = 180;
 
 function nextFrame(): Promise<void> {
   return new Promise((resolve) => {
@@ -118,6 +120,14 @@ export default function PassportStoryScreen() {
   useEffect(() => {
     if (error) analytics.captureError("passport_story_load_failed", error);
   }, [error]);
+  useEffect(() => {
+    if (cityStamps.error) {
+      analytics.captureError(
+        "passport_story_city_stamps_failed",
+        cityStamps.error,
+      );
+    }
+  }, [cityStamps.error]);
 
   const live = token ?? existing;
   const link = live === null ? webUrl("/") : passportUrl(live);
@@ -128,6 +138,13 @@ export default function PassportStoryScreen() {
     try {
       if (live === null) {
         setToken(await mint({}));
+        await nextFrame();
+      }
+      const covers = passportStoryOf(stamps, []).photos.flatMap((stamp) =>
+        stamp.cover === null ? [] : [stamp.cover],
+      );
+      if (covers.length > 0) {
+        await Image.prefetch(covers, "memory-disk");
         await nextFrame();
       }
       const tag = findNodeHandle(card.current);
@@ -173,10 +190,13 @@ export default function PassportStoryScreen() {
   );
   const fitHeight =
     rt.screen.height - rt.insets.top - rt.insets.bottom - PREVIEW_CHROME;
-  const width = Math.min(
-    rt.screen.width - theme.gap(4),
-    400,
-    Math.floor((fitHeight * 9) / 16),
+  const width = Math.max(
+    MIN_PREVIEW_WIDTH,
+    Math.min(
+      rt.screen.width - theme.gap(4),
+      400,
+      Math.floor((fitHeight * 9) / 16),
+    ),
   );
   const exportWidth = Math.min(
     rt.screen.width,

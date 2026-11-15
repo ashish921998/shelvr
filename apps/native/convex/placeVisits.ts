@@ -1039,8 +1039,10 @@ async function wentWithFriend(
     }
     return known;
   };
+  const went = place.went ?? [];
+  if (!went.some((entry) => entry.userId === userId)) return false;
   if (!(await isMember(userId))) return false;
-  for (const entry of place.went ?? []) {
+  for (const entry of went) {
     if (entry.userId !== userId && (await isMember(entry.userId))) return true;
   }
   return false;
