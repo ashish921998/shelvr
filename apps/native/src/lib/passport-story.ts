@@ -111,7 +111,10 @@ export function darkRuns(row: readonly boolean[]): [number, number][] {
   return runs;
 }
 
-export function usePassportTogether(): number | undefined {
+export function usePassportTogether(): {
+  together: number | undefined;
+  failed: boolean;
+} {
   const { isAuthenticated } = useConvexAuth();
   const together = useQuery(
     convexQuery(
@@ -124,5 +127,5 @@ export function usePassportTogether(): number | undefined {
       analytics.captureError("passport_together_load_failed", together.error);
     }
   }, [together.error]);
-  return together.data;
+  return { together: together.data, failed: together.error != null };
 }

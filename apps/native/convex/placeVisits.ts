@@ -1013,14 +1013,15 @@ export const getPassport = authedQuery({
   },
 });
 
-function listPlaceIdsOf(row: Doc<"placeVisits">): Id<"sharedListPlaces">[] {
-  const ids = new Set<Id<"sharedListPlaces">>();
-  if (row.listPlaceId !== undefined) ids.add(row.listPlaceId);
-  for (const place of row.stampPlaces ?? []) {
-    if (place.listPlaceId !== undefined) ids.add(place.listPlaceId);
-    for (const id of place.alsoListPlaceIds ?? []) ids.add(id);
-  }
-  return [...ids];
+function stampListPlaceIds(
+  row: Doc<"placeVisits">,
+): Id<"sharedListPlaces">[][] {
+  const groups = (row.stampPlaces ?? []).map((place) => [
+    ...(place.listPlaceId === undefined ? [] : [place.listPlaceId]),
+    ...(place.alsoListPlaceIds ?? []),
+  ]);
+  if (groups.length > 0) return groups;
+  return row.listPlaceId === undefined ? [] : [[row.listPlaceId]];
 }
 
 async function wentWithFriend(
@@ -1059,8 +1060,8 @@ export const passportTogether = authedQuery({
     >();
     const members = new Map<string, boolean>();
     let together = 0;
-    for (const row of rows) {
-      for (const id of listPlaceIdsOf(row)) {
+    for (const ids of rows.flatMap(stampListPlaceIds)) {
+      for (const id of ids) {
         if (!places.has(id)) places.set(id, await ctx.db.get(id));
         const place = places.get(id);
         if (place && (await wentWithFriend(ctx, ctx.userId, place, members))) {

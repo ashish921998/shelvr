@@ -103,7 +103,11 @@ export default function PassportStoryScreen() {
   const { theme, rt } = useUnistyles();
   const { stamps, failed, error } = usePassport();
   const cityStamps = useCityStamps();
-  const together = usePassportTogether() ?? 0;
+  const togetherQuery = usePassportTogether();
+  const together = togetherQuery.together ?? 0;
+  const extrasReady =
+    (cityStamps.stamps !== undefined || cityStamps.error !== null) &&
+    (togetherQuery.together !== undefined || togetherQuery.failed);
   const existing = usePassportShare();
   const mint = useMutation(api.passportShares.sharePassport);
   const linkShare = useSharePassport(stamps?.length ?? 0);
@@ -119,7 +123,7 @@ export default function PassportStoryScreen() {
   const link = live === null ? webUrl("/") : passportUrl(live);
 
   const share = async () => {
-    if (busy || !stamps) return;
+    if (busy || !stamps || !extrasReady) return;
     setBusy(true);
     try {
       if (live === null) {
@@ -212,7 +216,7 @@ export default function PassportStoryScreen() {
         <Button
           testID="passport-story-share"
           title={t("common.share")}
-          disabled={story.places === 0}
+          disabled={story.places === 0 || !extrasReady}
           loading={busy}
           onPress={() => void share()}
         />
