@@ -559,6 +559,7 @@ type MessageParams = {
   "widget.title": undefined;
   "widget.description": undefined;
   "permissions.photosUsage": undefined;
+  "permissions.photosAddUsage": undefined;
   "permissions.calendarUsage": undefined;
   "permissions.locationUsage": undefined;
   "share.savedCount": { saved: number; total: number };
