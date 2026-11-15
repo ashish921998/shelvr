@@ -24,24 +24,30 @@ function stamp(name: string, extra: Partial<Stamp> = {}): Stamp {
 }
 
 describe("passportStoryOf", () => {
-  it("leads with photos, newest first, and counts the rest as more", () => {
+  it("shows only stamps with a photo, newest first, and counts the rest as more", () => {
     const stamps = [
       stamp("Old photo", { cover: "a.jpg", visitedAt: 1 }),
       stamp("No photo", { visitedAt: 9 }),
       stamp("New photo", { cover: "b.jpg", visitedAt: 5 }),
       ...Array.from({ length: 4 }, (_, i) =>
-        stamp(`Extra ${i}`, { visitedAt: 0 }),
+        stamp(`Photo ${i}`, { cover: `${i}.jpg`, visitedAt: 0 }),
       ),
     ];
     const story = passportStoryOf(stamps, []);
     expect(story.photos).toHaveLength(STORY_PHOTOS);
-    expect(story.photos.slice(0, 3).map((s) => s.name)).toEqual([
+    expect(story.photos.slice(0, 2).map((s) => s.name)).toEqual([
       "New photo",
       "Old photo",
-      "No photo",
     ]);
+    expect(story.photos.some((s) => s.cover === null)).toBe(false);
     expect(story.places).toBe(7);
     expect(story.more).toBe(3);
+  });
+
+  it("leaves photo slots empty when no stamp has a photo", () => {
+    const story = passportStoryOf([stamp("A"), stamp("B")], []);
+    expect(story.photos).toEqual([]);
+    expect(story.more).toBe(2);
   });
 
   it("says reels only when a stamp came from Instagram or TikTok", () => {

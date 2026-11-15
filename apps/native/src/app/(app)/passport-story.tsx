@@ -39,6 +39,8 @@ import {
 } from "react-native";
 import { ScopedTheme, StyleSheet, useUnistyles } from "react-native-unistyles";
 
+const PREVIEW_CHROME = 250;
+
 function nextFrame(): Promise<void> {
   return new Promise((resolve) => {
     requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
@@ -163,7 +165,13 @@ export default function PassportStoryScreen() {
     cityStamps.stamps ?? [],
     cityStampLabel,
   );
-  const width = Math.min(rt.screen.width - theme.gap(4), 400);
+  const fitHeight =
+    rt.screen.height - rt.insets.top - rt.insets.bottom - PREVIEW_CHROME;
+  const width = Math.min(
+    rt.screen.width - theme.gap(4),
+    400,
+    Math.floor((fitHeight * 9) / 16),
+  );
 
   return (
     <View style={styles.screen}>

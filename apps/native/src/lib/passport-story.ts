@@ -63,10 +63,9 @@ export function passportStoryOf(
 ): PassportStory {
   const counts = passportCounts(stamps, cityStamps);
   const sorted = newestFirst(stamps);
-  const photos = [
-    ...sorted.filter((stamp) => stamp.cover !== null),
-    ...sorted.filter((stamp) => stamp.cover === null),
-  ].slice(0, STORY_PHOTOS);
+  const photos = sorted
+    .filter((stamp) => stamp.cover !== null)
+    .slice(0, STORY_PHOTOS);
   return {
     places: counts.places,
     cities: counts.cities,
