@@ -90,6 +90,7 @@ const catalogs = locales.map((locale) => {
 });
 
 const photos = "permissions.photosUsage";
+const photosAdd = "permissions.photosAddUsage";
 const calendar = "permissions.calendarUsage";
 const location = "permissions.locationUsage";
 mkdirSync(resolve(native, "locales"), { recursive: true });
@@ -97,6 +98,7 @@ for (const { locale, messages } of catalogs) {
   const nativeStrings = {
     ios: {
       NSPhotoLibraryUsageDescription: messages[photos],
+      NSPhotoLibraryAddUsageDescription: messages[photosAdd],
       NSCalendarsUsageDescription: messages[calendar],
       NSCalendarsFullAccessUsageDescription: messages[calendar],
       NSLocationWhenInUseUsageDescription: messages[location],
