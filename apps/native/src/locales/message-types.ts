@@ -977,6 +977,13 @@ type MessageParams = {
   "sharedLists.pastMemberSaved": undefined;
   "sharedLists.someoneSaved": undefined;
   "sharedLists.notYet": undefined;
+  "sharedLists.iWent": undefined;
+  "sharedLists.wentYou": undefined;
+  "sharedLists.wentOne": { name: string };
+  "sharedLists.wentYouAnd": { name: string };
+  "sharedLists.wentTwo": { first: string; second: string };
+  "sharedLists.wentYouAndMany": { count: number };
+  "sharedLists.wentMany": { name: string; count: number };
   "sharedLists.removeFromList": undefined;
   "sharedLists.placeActions": undefined;
   "sharedLists.listActions": undefined;

@@ -295,6 +295,40 @@ export function listSectionRows(rows: ListRow[]): ListSectionRow[] {
   ];
 }
 
+export function wentYou(place: SharedListPlace): boolean {
+  return place.wentBy?.some((member) => member.isYou) ?? false;
+}
+
+export function youWent(place: SharedListPlace): boolean {
+  return place.wentBy === undefined
+    ? place.visitedAt !== undefined
+    : wentYou(place);
+}
+
+export function wentLine(place: SharedListPlace): string | null {
+  const wentBy = place.wentBy ?? [];
+  const [first, second] = wentBy;
+  if (first === undefined) {
+    return place.visitedAt === undefined ? null : t("plan.weWent");
+  }
+  const name = (member: { firstName?: string }) =>
+    member.firstName ?? t("sharedLists.someone");
+  if (second === undefined) {
+    return first.isYou
+      ? t("sharedLists.wentYou")
+      : t("sharedLists.wentOne", { name: name(first) });
+  }
+  if (wentBy.length === 2) {
+    return first.isYou
+      ? t("sharedLists.wentYouAnd", { name: name(second) })
+      : t("sharedLists.wentTwo", { first: name(first), second: name(second) });
+  }
+  const count = wentBy.length - 1;
+  return first.isYou
+    ? t("sharedLists.wentYouAndMany", { count })
+    : t("sharedLists.wentMany", { name: name(first), count });
+}
+
 export function savedByLine(place: SharedListPlace): string {
   if (place.addedByYou) return t("sharedLists.youSaved");
   if (place.addedByPastMember === true) {

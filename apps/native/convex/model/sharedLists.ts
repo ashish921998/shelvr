@@ -51,6 +51,11 @@ export const sharedListPlaceValidator = v.object({
   addedAt: v.number(),
   isNew: v.boolean(),
   visitedAt: v.optional(v.number()),
+  wentBy: v.optional(
+    v.array(
+      v.object({ firstName: v.optional(v.string()), isYou: v.boolean() }),
+    ),
+  ),
 });
 
 export const newFromValidator = v.array(
@@ -305,5 +310,30 @@ export async function departMember(
   }
   for (const member of members) {
     if (member.userId === userId) await ctx.db.delete(member._id);
+  }
+  await forgetWent(ctx, list._id, userId);
+}
+
+export function wentWithout(
+  place: Pick<Doc<"sharedListPlaces">, "went">,
+  userId: string,
+): Doc<"sharedListPlaces">["went"] {
+  const went = place.went ?? [];
+  const kept = went.filter((entry) => entry.userId !== userId);
+  return kept.length === went.length ? place.went : kept;
+}
+
+export async function forgetWent(
+  ctx: MutationCtx,
+  listId: Id<"sharedLists">,
+  userId: Id<"users">,
+): Promise<void> {
+  for (const place of await listPlaces(ctx, listId)) {
+    const went = wentWithout(place, userId);
+    if (went === place.went) continue;
+    await ctx.db.patch(place._id, {
+      went,
+      ...((went ?? []).length === 0 ? { visitedAt: undefined } : {}),
+    });
   }
 }

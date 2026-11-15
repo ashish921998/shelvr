@@ -68,7 +68,7 @@ read [localization](docs/architecture/localization.md); before simulator QA read
   delete or narrow them (see the contract rule under Working conventions).
 - **Declared because rows carry them.** Keep these in the schema through any rollback:
   `users.deleting`, `items.placeLocations`, `tripPlans.listId`, `planVotes.name` and
-  `planVotes.last`, the `placeVisits` `stampPlaces` (and their `listPlaceId` and `alsoListPlaceIds`), `backfilled` and `listPlaceId` fields
+  `planVotes.last`, `sharedListPlaces.went`, the `placeVisits` `stampPlaces` (and their `listPlaceId` and `alsoListPlaceIds`), `backfilled` and `listPlaceId` fields
   (with `itemId` optional, since a stamp from a shared list has no save), and the
   `placeRemovals`, `tripEveReminders` and `planVoteNotices` tables.
 - **Run-by-hand backfills** after deploying the change that needs them, from `apps/native`:
