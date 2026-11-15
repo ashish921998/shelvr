@@ -22,6 +22,7 @@ import {
   visitMatcher,
 } from "./model/placeVisits";
 import { userRemovals, visibleSave } from "./model/placeRemovals";
+import { stampListPlace } from "./placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   departMember,
@@ -562,13 +563,20 @@ export const removeSharedListPlace = authedMutation({
 });
 
 export const setSharedListPlaceVisited = authedMutation({
-  args: { placeId: v.id("sharedListPlaces"), visited: v.boolean() },
+  args: {
+    placeId: v.id("sharedListPlaces"),
+    visited: v.boolean(),
+    stamp: v.optional(v.boolean()),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
     const { place } = await memberPlace(ctx, args.placeId, ctx.userId);
     await ctx.db.patch(place._id, {
       visitedAt: args.visited ? Date.now() : undefined,
     });
+    if (args.stamp === true || !args.visited) {
+      await stampListPlace(ctx, ctx.userId, place, args.visited);
+    }
     return null;
   },
 });

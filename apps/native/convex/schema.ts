@@ -320,7 +320,8 @@ export default defineSchema({
     userId: v.string(),
     key: v.string(),
     name: v.string(),
-    itemId: v.id("items"),
+    itemId: v.optional(v.id("items")),
+    listPlaceId: v.optional(v.id("sharedListPlaces")),
     visitedAt: v.number(),
     spots: v.optional(v.array(visitSpotValidator)),
     stampPlaces: v.optional(
@@ -330,6 +331,8 @@ export default defineSchema({
           lng: v.number(),
           city: v.optional(v.string()),
           countryCode: v.optional(v.string()),
+          listPlaceId: v.optional(v.id("sharedListPlaces")),
+          alsoListPlaceIds: v.optional(v.array(v.id("sharedListPlaces"))),
         }),
       ),
     ),

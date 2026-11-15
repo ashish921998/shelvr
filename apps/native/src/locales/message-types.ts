@@ -792,7 +792,10 @@ type MessageParams = {
   "map.searchNoResults": { query: string };
   "map.searchMore": { count: number; total: number };
   "navigation.trips": undefined;
-  "tripPlanner.listTitle": undefined;
+  "plans.title": undefined;
+  "plans.together": undefined;
+  "plans.newList": undefined;
+  "plans.trips": undefined;
   "tripPlanner.loading": undefined;
   "tripPlanner.planTrip": undefined;
   "tripPlanner.emptyTitle": undefined;

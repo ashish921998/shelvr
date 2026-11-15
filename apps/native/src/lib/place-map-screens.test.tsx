@@ -452,7 +452,7 @@ vi.mock("react-native", () => ({
 const CITY_ITEMS = "items:listCityItems";
 const VOTES = "planShares:cityPlanVotes";
 const LIST = "sharedLists:getSharedList";
-const PASSPORT = "placeVisits:getPassport";
+const PASSPORT = "placeVisits:listPassportStamps";
 
 const taco = {
   name: "Taco Spot",
@@ -1203,6 +1203,7 @@ describe("list page", () => {
     expect(mocks.setVisited).toHaveBeenCalledWith({
       placeId: "p1",
       visited: true,
+      stamp: true,
     });
     expect(mocks.success).toHaveBeenCalledOnce();
     await act(async () => {
@@ -1211,6 +1212,7 @@ describe("list page", () => {
     expect(mocks.setVisited).toHaveBeenLastCalledWith({
       placeId: "p1",
       visited: false,
+      stamp: true,
     });
     expect(mocks.success).toHaveBeenCalledOnce();
     await act(async () => {
