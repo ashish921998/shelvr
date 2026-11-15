@@ -63,7 +63,7 @@ describe("passportStoryOf", () => {
     ] as CityStamp[];
     const stamps = [
       stamp("A", { city: "Porto" }),
-      stamp("B", { city: "Madrid" }),
+      stamp("B", { city: "Madrid", countryCode: "ES" }),
       stamp("C", { city: "Madrid" }),
       stamp("D", { city: "Lisbon" }),
     ];
@@ -72,7 +72,7 @@ describe("passportStoryOf", () => {
     );
     expect(story.cityStamps).toEqual([
       { name: "Lisbon", country: "PORTUGAL" },
-      { name: "Madrid", country: null },
+      { name: "Madrid", country: "ES" },
     ]);
   });
 });

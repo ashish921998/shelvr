@@ -39,19 +39,27 @@ function storyCities(
     .slice(0, STORY_CITIES)
     .map((stamp) => ({ name: label(stamp.city), country: stamp.country }));
   const seen = new Set(picked.map((city) => cityKey(city.name)));
-  const counts = new Map<string, { name: string; count: number }>();
+  const counts = new Map<
+    string,
+    { name: string; count: number; country: string | null }
+  >();
   for (const stamp of stamps) {
     if (!stamp.city) continue;
     const key = cityKey(stamp.city);
     if (seen.has(key)) continue;
-    const entry = counts.get(key) ?? { name: stamp.city, count: 0 };
+    const entry = counts.get(key) ?? {
+      name: stamp.city,
+      count: 0,
+      country: null,
+    };
     entry.count += 1;
+    entry.country ??= stamp.countryCode ?? null;
     counts.set(key, entry);
   }
   const busiest = [...counts.values()].sort((a, b) => b.count - a.count);
   for (const city of busiest) {
     if (picked.length >= STORY_CITIES) break;
-    picked.push({ name: city.name, country: null });
+    picked.push({ name: city.name, country: city.country });
   }
   return picked;
 }

@@ -31,6 +31,7 @@ import {
 import {
   Alert,
   findNodeHandle,
+  PixelRatio,
   Platform,
   Pressable,
   ScrollView,
@@ -39,7 +40,8 @@ import {
 } from "react-native";
 import { ScopedTheme, StyleSheet, useUnistyles } from "react-native-unistyles";
 
-const PREVIEW_CHROME = 250;
+const PREVIEW_CHROME = 300;
+const EXPORT_PIXELS = 1080;
 
 function nextFrame(): Promise<void> {
   return new Promise((resolve) => {
@@ -172,23 +174,37 @@ export default function PassportStoryScreen() {
     400,
     Math.floor((fitHeight * 9) / 16),
   );
+  const exportWidth = Math.min(
+    rt.screen.width,
+    EXPORT_PIXELS / PixelRatio.get(),
+  );
+  const cardProps = {
+    story,
+    together,
+    link,
+    year: String(new Date().getFullYear()),
+  };
 
   return (
     <View style={styles.screen}>
       <Header onClose={close} />
+      <View
+        style={styles.capture}
+        pointerEvents="none"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        <ScopedTheme name="light">
+          <PassportStoryCard ref={card} {...cardProps} width={exportWidth} />
+        </ScopedTheme>
+      </View>
       <ScrollView
+        style={styles.scroll}
         contentInsetAdjustmentBehavior="automatic"
         contentContainerStyle={styles.content}
       >
         <ScopedTheme name="light">
-          <PassportStoryCard
-            ref={card}
-            story={story}
-            together={together}
-            link={link}
-            year={String(new Date().getFullYear())}
-            width={width}
-          />
+          <PassportStoryCard {...cardProps} width={width} />
         </ScopedTheme>
         <Text style={styles.note}>{t("passportStory.linkNote")}</Text>
       </ScrollView>
@@ -219,6 +235,8 @@ export default function PassportStoryScreen() {
 
 const styles = StyleSheet.create((theme, rt) => ({
   screen: { flex: 1, backgroundColor: theme.colors.surfaceMuted },
+  capture: { position: "absolute", top: 0, left: 0 },
+  scroll: { flex: 1, backgroundColor: theme.colors.surfaceMuted },
   content: {
     alignItems: "center",
     gap: theme.gap(1.5),

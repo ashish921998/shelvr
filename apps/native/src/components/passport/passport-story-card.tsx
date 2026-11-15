@@ -125,6 +125,9 @@ function Count({
       </Text>
       <Text
         allowFontScaling={false}
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.7}
         style={[styles.countLabel, { fontSize: 10 * s }]}
       >
         {label}
@@ -269,6 +272,9 @@ export function PassportStoryCard({
           </Text>
           <Text
             allowFontScaling={false}
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.7}
             style={[styles.scan, { fontSize: 10 * s, marginTop: 6 * s }]}
           >
             {t("passportStory.scan")}
