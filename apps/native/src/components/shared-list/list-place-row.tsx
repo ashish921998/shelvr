@@ -2,7 +2,12 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t } from "@/lib/i18n";
-import { savedByLine, type SharedListPlace } from "@/lib/shared-lists";
+import {
+  savedByLine,
+  wentLine,
+  wentYou,
+  type SharedListPlace,
+} from "@/lib/shared-lists";
 import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import Animated, { useReducedMotion } from "react-native-reanimated";
@@ -30,7 +35,9 @@ export function ListPlaceRow({
   const { theme } = useUnistyles();
   const reduced = useReducedMotion();
   const by = savedByLine(place);
-  const went = place.visitedAt !== undefined;
+  const line = wentLine(place);
+  const went = line !== null;
+  const mine = wentYou(place);
   return (
     <View
       style={[
@@ -41,9 +48,7 @@ export function ListPlaceRow({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={[place.name, by, went ? t("plan.weWent") : null]
-          .filter(Boolean)
-          .join(", ")}
+        accessibilityLabel={[place.name, by, line].filter(Boolean).join(", ")}
         accessibilityState={{ selected }}
         onPress={onPress}
         style={({ pressed }) => [styles.body, pressed && styles.pressed]}
@@ -81,7 +86,7 @@ export function ListPlaceRow({
             ]}
           >
             <ThemedText variant="captionStrong" style={styles.muted}>
-              {t("plan.weWent")}
+              {line}
             </ThemedText>
           </Animated.View>
         </View>
@@ -106,8 +111,8 @@ export function ListPlaceRow({
         actions={[
           {
             id: "visited",
-            label: went ? t("sharedLists.notYet") : t("plan.weWent"),
-            onPress: () => onVisited(!went),
+            label: mine ? t("sharedLists.notYet") : t("sharedLists.iWent"),
+            onPress: () => onVisited(!mine),
           },
           {
             id: "remove",

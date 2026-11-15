@@ -27,6 +27,7 @@ import { stampListPlace } from "./placeVisits";
 import { rateLimiter } from "./model/rateLimiter";
 import {
   departMember,
+  forgetWent,
   foundPlace,
   freshAdders,
   freshPlaces,
@@ -241,6 +242,41 @@ export const listSharedLists = authedQuery({
   },
 });
 
+function wentByOf(
+  place: Doc<"sharedListPlaces">,
+  members: Doc<"sharedListMembers">[],
+  names: Map<Id<"users">, string | undefined>,
+  userId: Id<"users">,
+) {
+  const current = new Set(members.map((member) => member.userId));
+  const went = (place.went ?? [])
+    .filter((entry) => current.has(entry.userId))
+    .sort(
+      (a, b) =>
+        Number(b.userId === userId) - Number(a.userId === userId) ||
+        a.at - b.at,
+    );
+  if (went.length === 0) return {};
+  return {
+    wentBy: went.map((entry) => {
+      const firstName = names.get(entry.userId);
+      return {
+        ...(firstName !== undefined ? { firstName } : {}),
+        isYou: entry.userId === userId,
+      };
+    }),
+  };
+}
+
+function wentWith(
+  place: Doc<"sharedListPlaces">,
+  userId: Id<"users">,
+  went: boolean,
+): Doc<"sharedListPlaces">["went"] {
+  const others = (place.went ?? []).filter((entry) => entry.userId !== userId);
+  return went ? [...others, { userId, at: Date.now() }] : others;
+}
+
 export const getSharedList = authedQuery({
   args: { listId: v.id("sharedLists") },
   returns: v.union(v.null(), sharedListDetailValidator),
@@ -302,6 +338,7 @@ export const getSharedList = authedQuery({
             ...(place.visitedAt !== undefined
               ? { visitedAt: place.visitedAt }
               : {}),
+            ...wentByOf(place, members, names, userId),
           };
         }),
       ),
@@ -422,6 +459,7 @@ export const removeSharedListMember = authedMutation({
     if (args.memberId === userId) throw new Error("Leave the list instead");
     const membership = await memberOf(ctx, list._id, args.memberId);
     if (membership !== null) await ctx.db.delete(membership._id);
+    await forgetWent(ctx, list._id, args.memberId);
     await ctx.db.patch(list._id, { inviteToken: inviteToken() });
     return null;
   },
@@ -573,12 +611,39 @@ export const setSharedListPlaceVisited = authedMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const { place } = await memberPlace(ctx, args.placeId, ctx.userId);
+    const went = wentWith(place, ctx.userId, args.visited);
     await ctx.db.patch(place._id, {
-      visitedAt: args.visited ? Date.now() : undefined,
+      visitedAt: args.visited
+        ? Date.now()
+        : (went ?? []).length > 0
+          ? (place.visitedAt ?? Date.now())
+          : undefined,
+      went,
     });
     if (args.stamp === true || !args.visited) {
       await stampListPlace(ctx, ctx.userId, place, args.visited);
     }
+    return null;
+  },
+});
+
+export const setSharedListPlaceWent = authedMutation({
+  args: { placeId: v.id("sharedListPlaces"), went: v.boolean() },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { place } = await memberPlace(ctx, args.placeId, ctx.userId);
+    const mine = (place.went ?? []).some(
+      (entry) => entry.userId === ctx.userId,
+    );
+    if (mine !== args.went) {
+      const went = wentWith(place, ctx.userId, args.went);
+      const anyone = (went ?? []).length > 0;
+      await ctx.db.patch(place._id, {
+        went,
+        visitedAt: anyone ? (place.visitedAt ?? Date.now()) : undefined,
+      });
+    }
+    await stampListPlace(ctx, ctx.userId, place, args.went);
     return null;
   },
 });
@@ -648,6 +713,12 @@ async function ownSaveId(
   return item !== null && item.userId === userId ? item._id : undefined;
 }
 
+function youWent(row: Doc<"sharedListPlaces">, userId: Id<"users">): boolean {
+  const went = row.went ?? [];
+  if (went.length === 0) return row.visitedAt !== undefined;
+  return went.some((entry) => entry.userId === userId);
+}
+
 async function listPlanRows(
   ctx: QueryCtx,
   listId: Id<"sharedLists">,
@@ -660,9 +731,7 @@ async function listPlanRows(
   );
   const visits = await userVisits(ctx, userId);
   const visited = visitMatcher(visits, inCity);
-  const rows = inCity.filter(
-    (row) => row.visitedAt === undefined && !visited(row),
-  );
+  const rows = inCity.filter((row) => !youWent(row, userId) && !visited(row));
   return { inCity, rows, visits };
 }
 
@@ -718,9 +787,7 @@ export async function claimListPlan(
     been: [
       ...new Set([
         ...unscopedVisitNames(visits),
-        ...inCity
-          .filter((row) => row.visitedAt !== undefined)
-          .map((row) => row.name),
+        ...inCity.filter((row) => youWent(row, userId)).map((row) => row.name),
       ]),
     ],
     visitMarks: visits,

@@ -1085,6 +1085,17 @@
   "sharedLists.pastMemberSaved": "退出した人が保存",
   "sharedLists.someoneSaved": "誰かが保存",
   "sharedLists.notYet": "まだ",
+  "sharedLists.iWent": "行った",
+  "sharedLists.wentYou": "あなたが行きました",
+  "sharedLists.wentOne": "%{name}が行きました",
+  "sharedLists.wentYouAnd": "あなたと%{name}が行きました",
+  "sharedLists.wentTwo": "%{first}と%{second}が行きました",
+  "sharedLists.wentYouAndMany": {
+    "other": "あなたとほか%{formattedCount}人が行きました"
+  },
+  "sharedLists.wentMany": {
+    "other": "%{name}とほか%{formattedCount}人が行きました"
+  },
   "sharedLists.removeFromList": "リストから削除",
   "sharedLists.placeActions": "場所の操作",
   "sharedLists.listActions": "リストの操作",

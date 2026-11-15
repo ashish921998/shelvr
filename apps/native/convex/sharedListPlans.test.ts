@@ -101,7 +101,7 @@ describe("makeDatePlan from a shared list", () => {
     ).toBeUndefined();
   });
 
-  it("leaves out places the list marked visited", async () => {
+  it("leaves out places you went, and keeps ones only another member went", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const { base, owner, token, listId } = await listWithOwner();
     const bo = await joiner(base, token);
@@ -109,10 +109,31 @@ describe("makeDatePlan from a shared list", () => {
       listId,
       place: RED_FROG,
     });
-    await owner.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+    await owner.t.mutation(api.sharedLists.setSharedListPlaceWent, {
       placeId: frog,
-      visited: true,
+      went: true,
     });
+    const plan = async (member: { t: typeof bo.t }) =>
+      stopNames(
+        await member.t.action(api.datePlans.makeDatePlan, {
+          city: "Lisbon",
+          kind: "classic",
+          listId,
+        }),
+      );
+    expect(await plan(owner)).not.toContain("Red Frog");
+    expect(await plan(bo)).toContain("Red Frog");
+  });
+
+  it("leaves out a place an older app marked visited for the whole list", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const { base, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token);
+    const frog = await bo.t.mutation(api.sharedLists.addSharedListPlace, {
+      listId,
+      place: RED_FROG,
+    });
+    await base.run((ctx) => ctx.db.patch(frog, { visitedAt: Date.now() }));
     const result = await bo.t.action(api.datePlans.makeDatePlan, {
       city: "Lisbon",
       kind: "classic",
@@ -230,7 +251,7 @@ describe("a save's tags on a shared list", () => {
   });
 });
 
-describe("a place the list marked visited", () => {
+describe("a place you went", () => {
   it("is not suggested back on a date", async () => {
     await stubMaps();
     vi.stubGlobal("fetch", appleOffering(["Red Frog", "Blue Frog"]));
@@ -240,7 +261,7 @@ describe("a place the list marked visited", () => {
       listId,
       place: RED_FROG,
     });
-    await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+    await owner.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
       placeId: frog,
       visited: true,
     });
@@ -262,7 +283,7 @@ describe("a place the list marked visited", () => {
       listId,
       place: RED_FROG,
     });
-    await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+    await owner.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
       placeId: frog,
       visited: true,
     });
@@ -296,7 +317,7 @@ describe("a place the list marked visited", () => {
       listId,
       place: { ...RED_FROG, ...near(40) },
     });
-    await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+    await owner.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
       placeId: frog,
       visited: true,
     });

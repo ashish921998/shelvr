@@ -28,6 +28,7 @@ import {
   useAskNameOnce,
   useListPlan,
   withLine,
+  youWent,
 } from "@/lib/shared-lists";
 import { usePlaceOpener } from "@/lib/use-place-opener";
 import { api } from "@convex/_generated/api";
@@ -62,7 +63,7 @@ function useSeenOnLeave(listId: Id<"sharedLists">, loaded: boolean) {
 }
 
 function usePlaceEdits() {
-  const setVisited = useMutation(api.sharedLists.setSharedListPlaceVisited);
+  const setWent = useMutation(api.sharedLists.setSharedListPlaceWent);
   const remove = useMutation(api.sharedLists.removeSharedListPlace);
   const report = (error: unknown) => {
     analytics.captureError("shared_list_edit_failed", error);
@@ -70,7 +71,7 @@ function usePlaceEdits() {
   };
   return {
     visited: (placeId: Id<"sharedListPlaces">, visited: boolean) =>
-      setVisited({ placeId, visited, stamp: true })
+      setWent({ placeId, went: visited })
         .then(() => {
           if (visited) void haptics.success();
         })
@@ -186,7 +187,7 @@ function SharedList({ detail }: { detail: SharedListDetail }) {
   const rows = listSectionRows(places);
   const [selected, setSelected] = useState<string | null>(null);
   const { pins, visible } = useFreshPinDrop(places, city, selected);
-  const canTrip = places.some((row) => row.place.visitedAt === undefined);
+  const canTrip = places.some((row) => !youWent(row.place));
   const edits = usePlaceEdits();
   const plan = useListPlan(detail._id, city);
   const hasMap = pins.length > 0;

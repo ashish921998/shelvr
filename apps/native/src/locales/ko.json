@@ -1085,6 +1085,17 @@
   "sharedLists.pastMemberSaved": "나간 사람이 저장함",
   "sharedLists.someoneSaved": "누군가 저장함",
   "sharedLists.notYet": "아직",
+  "sharedLists.iWent": "다녀왔어요",
+  "sharedLists.wentYou": "내가 다녀왔어요",
+  "sharedLists.wentOne": "%{name} 님이 다녀왔어요",
+  "sharedLists.wentYouAnd": "나와 %{name} 님이 다녀왔어요",
+  "sharedLists.wentTwo": "%{first} 님과 %{second} 님이 다녀왔어요",
+  "sharedLists.wentYouAndMany": {
+    "other": "나와 다른 %{formattedCount}명이 다녀왔어요"
+  },
+  "sharedLists.wentMany": {
+    "other": "%{name} 님과 다른 %{formattedCount}명이 다녀왔어요"
+  },
   "sharedLists.removeFromList": "목록에서 제거",
   "sharedLists.placeActions": "장소 작업",
   "sharedLists.listActions": "목록 작업",

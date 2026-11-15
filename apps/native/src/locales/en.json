@@ -1118,6 +1118,19 @@
   "sharedLists.pastMemberSaved": "Someone who left saved this",
   "sharedLists.someoneSaved": "Someone saved this",
   "sharedLists.notYet": "Not yet",
+  "sharedLists.iWent": "I went",
+  "sharedLists.wentYou": "You went",
+  "sharedLists.wentOne": "%{name} went",
+  "sharedLists.wentYouAnd": "You and %{name} went",
+  "sharedLists.wentTwo": "%{first} and %{second} went",
+  "sharedLists.wentYouAndMany": {
+    "one": "You and %{formattedCount} other went",
+    "other": "You and %{formattedCount} others went"
+  },
+  "sharedLists.wentMany": {
+    "one": "%{name} and %{formattedCount} other went",
+    "other": "%{name} and %{formattedCount} others went"
+  },
   "sharedLists.removeFromList": "Remove from list",
   "sharedLists.placeActions": "Place actions",
   "sharedLists.listActions": "List actions",

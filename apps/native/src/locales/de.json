@@ -1118,6 +1118,19 @@
   "sharedLists.pastMemberSaved": "Von jemandem gespeichert, der die Liste verlassen hat",
   "sharedLists.someoneSaved": "Von jemandem gespeichert",
   "sharedLists.notYet": "Noch nicht",
+  "sharedLists.iWent": "Ich war da",
+  "sharedLists.wentYou": "Du warst da",
+  "sharedLists.wentOne": "%{name} war da",
+  "sharedLists.wentYouAnd": "Du und %{name} wart da",
+  "sharedLists.wentTwo": "%{first} und %{second} waren da",
+  "sharedLists.wentYouAndMany": {
+    "one": "Du und %{formattedCount} weitere Person wart da",
+    "other": "Du und %{formattedCount} weitere wart da"
+  },
+  "sharedLists.wentMany": {
+    "one": "%{name} und %{formattedCount} weitere Person waren da",
+    "other": "%{name} und %{formattedCount} weitere waren da"
+  },
   "sharedLists.removeFromList": "Von der Liste entfernen",
   "sharedLists.placeActions": "Aktionen für den Ort",
   "sharedLists.listActions": "Aktionen für die Liste",

@@ -1151,6 +1151,21 @@
   "sharedLists.pastMemberSaved": "Enregistré par quelqu’un qui a quitté la liste",
   "sharedLists.someoneSaved": "Enregistré par quelqu’un",
   "sharedLists.notYet": "Pas encore",
+  "sharedLists.iWent": "Marquer comme visité",
+  "sharedLists.wentYou": "Visité par vous",
+  "sharedLists.wentOne": "Visité par %{name}",
+  "sharedLists.wentYouAnd": "Visité par vous et %{name}",
+  "sharedLists.wentTwo": "Visité par %{first} et %{second}",
+  "sharedLists.wentYouAndMany": {
+    "one": "Visité par vous et %{formattedCount} autre personne",
+    "many": "Visité par vous et %{formattedCount} autres personnes",
+    "other": "Visité par vous et %{formattedCount} autres personnes"
+  },
+  "sharedLists.wentMany": {
+    "one": "Visité par %{name} et %{formattedCount} autre personne",
+    "many": "Visité par %{name} et %{formattedCount} autres personnes",
+    "other": "Visité par %{name} et %{formattedCount} autres personnes"
+  },
   "sharedLists.removeFromList": "Retirer de la liste",
   "sharedLists.placeActions": "Actions du lieu",
   "sharedLists.listActions": "Actions de la liste",
