@@ -479,4 +479,37 @@ describe("Went on a shared list", () => {
     });
     expect(await portoLookups()).toHaveLength(1);
   });
+
+  it("keeps a stamp two lists gave until both are undone", async () => {
+    const { base, owner, bo, listId, place } = await friendPlace();
+    const second = await owner.t.mutation(api.sharedLists.createSharedList, {
+      name: "Pastries",
+      cities: ["Lisbon"],
+    });
+    await bo.t.mutation(api.sharedLists.joinSharedList, {
+      token: second.inviteToken,
+    });
+    const other = (
+      await bo.t.query(api.sharedLists.getSharedList, {
+        listId: second.listId,
+      })
+    )?.places.find((p) => p.name === "Manteigaria");
+    if (other === undefined || second.listId === listId) {
+      throw new Error("second list place missing");
+    }
+    const went = (placeId: typeof place._id, visited: boolean) =>
+      bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+        placeId,
+        visited,
+        stamp: true,
+      });
+    await went(place._id, true);
+    await went(other._id, true);
+    await went(place._id, false);
+    const [kept] = await visitRows(base, bo.userId);
+    expect(kept?.spots).toHaveLength(1);
+    expect(kept?.stampPlaces?.[0]?.listPlaceId).toBe(other._id);
+    await went(other._id, false);
+    expect(await visitRows(base, bo.userId)).toEqual([]);
+  });
 });

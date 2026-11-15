@@ -295,7 +295,11 @@ async function claimMarkedSpots(
   const released: StampPlace[] = [];
   const stampPlaces = row.stampPlaces.map((entry) => {
     if (!claimed(entry)) return entry;
-    const { listPlaceId: _listPlaceId, ...own } = entry;
+    const {
+      listPlaceId: _listPlaceId,
+      alsoListPlaceIds: _alsoListPlaceIds,
+      ...own
+    } = entry;
     released.push(own);
     return own;
   });
@@ -316,6 +320,7 @@ async function unstampListPlace(
   row: Doc<"placeVisits">,
   place: Doc<"sharedListPlaces">,
 ): Promise<void> {
+  if (await dropSharedClaim(ctx, row, place._id)) return;
   const fromList = (entry: StampPlace) => entry.listPlaceId === place._id;
   if (!row.stampPlaces?.some(fromList)) return;
   const spot = listSpot(place);
@@ -329,6 +334,66 @@ async function unstampListPlace(
   await ctx.db.patch(row._id, {
     spots: remaining,
     stampPlaces: row.stampPlaces?.filter((entry) => !fromList(entry)),
+  });
+}
+
+function withoutClaim(
+  entry: StampPlace,
+  listPlaceId: Id<"sharedListPlaces">,
+): StampPlace {
+  const others = (entry.alsoListPlaceIds ?? []).filter(
+    (id) => id !== listPlaceId,
+  );
+  if (entry.listPlaceId !== listPlaceId) {
+    return { ...entry, alsoListPlaceIds: others };
+  }
+  const [next, ...rest] = others;
+  return { ...entry, listPlaceId: next, alsoListPlaceIds: rest };
+}
+
+async function dropSharedClaim(
+  ctx: MutationCtx,
+  row: Doc<"placeVisits">,
+  listPlaceId: Id<"sharedListPlaces">,
+): Promise<boolean> {
+  const shared = (entry: StampPlace) =>
+    (entry.alsoListPlaceIds?.length ?? 0) > 0 &&
+    (entry.listPlaceId === listPlaceId ||
+      entry.alsoListPlaceIds?.includes(listPlaceId) === true);
+  if (!row.stampPlaces?.some(shared)) return false;
+  await ctx.db.patch(row._id, {
+    stampPlaces: row.stampPlaces.map((entry) =>
+      shared(entry) ? withoutClaim(entry, listPlaceId) : entry,
+    ),
+  });
+  return true;
+}
+
+async function shareClaim(
+  ctx: MutationCtx,
+  row: Doc<"placeVisits">,
+  spots: VisitSpot[],
+  place: Doc<"sharedListPlaces">,
+): Promise<void> {
+  const spot = listSpot(place);
+  const kept = spots.find((other) => matchesVisitSpot(other, spot, true));
+  const entry = kept && placeAt(row.stampPlaces, kept);
+  if (
+    entry?.listPlaceId === undefined ||
+    entry.listPlaceId === place._id ||
+    entry.alsoListPlaceIds?.includes(place._id) === true
+  ) {
+    return;
+  }
+  await ctx.db.patch(row._id, {
+    stampPlaces: (row.stampPlaces ?? []).map((other) =>
+      other === entry
+        ? {
+            ...other,
+            alsoListPlaceIds: [...(other.alsoListPlaceIds ?? []), place._id],
+          }
+        : other,
+    ),
   });
 }
 
@@ -347,7 +412,11 @@ async function addListSpot(
   };
   const spots =
     existing === null ? [] : ((await rowSpots(ctx, existing)) ?? []);
-  if (knowsSpot(spots, spot) || spots.length >= MAX_VISIT_SPOTS) return null;
+  if (existing !== null && knowsSpot(spots, spot)) {
+    await shareClaim(ctx, existing, spots, place);
+    return null;
+  }
+  if (spots.length >= MAX_VISIT_SPOTS) return null;
   await rateLimiter.limit(ctx, "placeVisit", { key: userId, throws: true });
   if (existing !== null) {
     await ctx.db.patch(existing._id, {

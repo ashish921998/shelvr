@@ -332,6 +332,7 @@ export default defineSchema({
           city: v.optional(v.string()),
           countryCode: v.optional(v.string()),
           listPlaceId: v.optional(v.id("sharedListPlaces")),
+          alsoListPlaceIds: v.optional(v.array(v.id("sharedListPlaces"))),
         }),
       ),
     ),
