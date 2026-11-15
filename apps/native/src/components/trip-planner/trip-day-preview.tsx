@@ -36,7 +36,13 @@ function PreviewPlace({ place }: { place: TripSavePlace }) {
             source={cover}
             style={styles.photo}
             contentFit="cover"
-            onError={() => setFailed(true)}
+            onError={() => {
+              analytics.captureError(
+                "trip_preview_image_failed",
+                new Error("image_load_failed"),
+              );
+              setFailed(true);
+            }}
           />
         ) : (
           <View style={styles.placeBadge} accessibilityElementsHidden>

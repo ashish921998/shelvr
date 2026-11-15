@@ -1,5 +1,11 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
@@ -8,6 +14,8 @@ import { TripDayPreview } from "@/components/trip-planner/trip-day-preview";
 const mocks = vi.hoisted(() => ({
   apply: vi.fn(),
   captureError: vi.fn(),
+  item: undefined as { imageUrl?: string } | undefined,
+  images: [] as { onError?: () => void }[],
 }));
 
 vi.mock("@/lib/i18n", () => ({
@@ -22,9 +30,14 @@ vi.mock("@/lib/analytics", () => ({
 vi.mock("@/lib/map-pin-emoji", () => ({ categoryEmoji: () => "x" }));
 vi.mock("convex/react", () => ({
   useMutation: () => mocks.apply,
-  useQuery: () => undefined,
+  useQuery: () => mocks.item,
 }));
-vi.mock("expo-image", () => ({ Image: vi.fn(() => null) }));
+vi.mock("expo-image", () => ({
+  Image: vi.fn((props: { onError?: () => void }) => {
+    mocks.images.push(props);
+    return <img alt="" />;
+  }),
+}));
 vi.mock("react-native-safe-area-context", () => ({
   SafeAreaView: vi.fn(({ children }: { children: ReactNode }) => (
     <div>{children}</div>
@@ -119,6 +132,8 @@ const press = (name: string) =>
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.item = undefined;
+  mocks.images = [];
 });
 
 describe("Fill a day from saves", () => {
@@ -182,5 +197,26 @@ describe("Fill a day from saves", () => {
     expect(await screen.findByText("tripDay.suggestionsChanged")).toBeTruthy();
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: "common.done" })).toBeTruthy();
+  });
+
+  it("reports a photo that fails to load and shows the place badge instead", () => {
+    mocks.item = { imageUrl: "https://x/gone.jpg" };
+    const { container } = render(
+      <TripDayPreview
+        tripId={tripId}
+        day={2}
+        label="Day 2"
+        limit={2}
+        places={places}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(container.querySelector("img")).toBeTruthy();
+    act(() => mocks.images.at(-1)?.onError?.());
+    expect(container.querySelector("img")).toBeNull();
+    expect(mocks.captureError).toHaveBeenCalledWith(
+      "trip_preview_image_failed",
+      expect.any(Error),
+    );
   });
 });
