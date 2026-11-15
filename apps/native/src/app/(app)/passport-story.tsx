@@ -106,7 +106,7 @@ export default function PassportStoryScreen() {
   const { stamps, failed, error } = usePassport();
   const cityStamps = useCityStamps();
   const togetherQuery = usePassportTogether();
-  const together = togetherQuery.together ?? 0;
+  const together = Math.min(togetherQuery.together ?? 0, stamps?.length ?? 0);
   const extrasReady =
     (cityStamps.stamps !== undefined || cityStamps.error !== null) &&
     (togetherQuery.together !== undefined || togetherQuery.failed);
