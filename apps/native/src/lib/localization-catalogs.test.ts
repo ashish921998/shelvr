@@ -247,6 +247,9 @@ describe("shipped localization resources", () => {
       expect(native.ios.NSPhotoLibraryUsageDescription).toBe(
         messages["permissions.photosUsage"],
       );
+      expect(native.ios.NSPhotoLibraryAddUsageDescription).toBe(
+        messages["permissions.photosAddUsage"],
+      );
       expect(native.ios.NSCalendarsFullAccessUsageDescription).toBe(
         messages["permissions.calendarUsage"],
       );

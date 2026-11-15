@@ -598,6 +598,7 @@
   "widget.title": "最近の保存",
   "widget.description": "最近保存したものをひと目で確認。",
   "permissions.photosUsage": "Shelvrでは、ライブラリの写真やスクリーンショットをハブに保存したり、写真ライブラリを整理したりできます。",
+  "permissions.photosAddUsage": "Shelvrは、パスポートのストーリーなど、シェアした画像を写真に保存します。",
   "permissions.calendarUsage": "Shelvrは保存した内容からカレンダーに予定を追加します。",
   "permissions.locationUsage": "保存した場所を近くで見つけられるよう、Shelvrは地図に現在地を表示します。",
   "share.savedCount": "%{total}件中%{saved}件を保存しました",
