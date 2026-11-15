@@ -290,7 +290,13 @@ async function claimMarkedSpots(
 ): Promise<{ row: Doc<"placeVisits">; released: StampPlace[] }> {
   const spots = marked ?? [];
   const claimed = (entry: StampPlace) =>
-    entry.listPlaceId !== undefined && knowsSpot(spots, entry);
+    entry.listPlaceId !== undefined &&
+    knowsSpot(
+      spots,
+      row.spots?.find(
+        (kept) => kept.lat === entry.lat && kept.lng === entry.lng,
+      ) ?? entry,
+    );
   if (!row.stampPlaces?.some(claimed)) return { row, released: [] };
   const released: StampPlace[] = [];
   const stampPlaces = row.stampPlaces.map((entry) => {
@@ -383,7 +389,30 @@ async function dropSharedClaim(
       other === entry ? next : other,
     ),
   });
+  if (next.listPlaceId !== entry.listPlaceId) {
+    await locatePromotedStamp(ctx, row, next);
+  }
   return next.listPlaceId !== listPlaceId;
+}
+
+async function locatePromotedStamp(
+  ctx: MutationCtx,
+  row: Doc<"placeVisits">,
+  entry: StampPlace,
+): Promise<void> {
+  if (entry.countryCode !== undefined || entry.listPlaceId === undefined) {
+    return;
+  }
+  const place = await ctx.db.get(entry.listPlaceId);
+  if (place === null) return;
+  if (place.addedBy !== row.userId && !(await aiAllowed(ctx, place.addedBy))) {
+    return;
+  }
+  await ctx.scheduler.runAfter(0, internal.placeVisits.locateCountry, {
+    visitId: row._id,
+    lat: entry.lat,
+    lng: entry.lng,
+  });
 }
 
 async function shareClaim(
