@@ -11,7 +11,9 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const BASE_WIDTH = 360;
 const COLLAGE = { width: 270, height: 190 };
-const WITH_TOGETHER = 0.8;
+const COLLAGE_SCALE = 0.9;
+const WITH_TOGETHER = 0.72;
+const SAFE_BOTTOM = 118;
 
 type Slot = { left: number; top: number; size: number; tilt: string };
 
@@ -171,7 +173,7 @@ export function PassportStoryCard({
           height,
           paddingTop: 66 * s,
           paddingHorizontal: 24 * s,
-          paddingBottom: 86 * s,
+          paddingBottom: SAFE_BOTTOM * s,
         },
       ]}
     >
@@ -219,7 +221,10 @@ export function PassportStoryCard({
           />
         ) : null}
       </View>
-      <Collage story={story} s={together > 0 ? s * WITH_TOGETHER : s} />
+      <Collage
+        story={story}
+        s={s * (together > 0 ? WITH_TOGETHER : COLLAGE_SCALE)}
+      />
       {together > 0 ? (
         <View
           testID="passport-story-together"
