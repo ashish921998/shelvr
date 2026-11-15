@@ -1211,6 +1211,25 @@
   "passport.cardSavedBoth": "Saved on Instagram and TikTok.",
   "passport.cardSavedElsewhere": "Saved for later.",
   "passport.cardWent": "Went with Shelvr.",
+  "passportStory.screenTitle": "Your passport",
+  "passportStory.kicker": "Passport · %{year}",
+  "passportStory.titleReels": {
+    "one": "I went to %{formattedCount} place I saved from reels.",
+    "other": "I went to %{formattedCount} places I saved from reels."
+  },
+  "passportStory.titleSaved": {
+    "one": "I went to %{formattedCount} place I saved.",
+    "other": "I went to %{formattedCount} places I saved."
+  },
+  "passportStory.together": {
+    "one": "%{formattedCount} stamped together with friends",
+    "other": "%{formattedCount} stamped together with friends"
+  },
+  "passportStory.more": "+%{more}",
+  "passportStory.tagline": "Save it now.\nActually go.",
+  "passportStory.scan": "Scan to compare passports",
+  "passportStory.shareLink": "Share as a link instead",
+  "passportStory.linkNote": "Sharing turns on your passport link so the code opens it. You can stop sharing anytime in Settings.",
   "passport.shareCity": "Share %{city}",
   "passport.momentCityComplete": "%{city} complete",
   "passport.ringCount": "%{visited} of %{total}",

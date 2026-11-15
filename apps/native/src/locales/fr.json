@@ -1256,6 +1256,28 @@
   "passport.cardSavedBoth": "Enregistré sur Instagram et TikTok.",
   "passport.cardSavedElsewhere": "Gardé pour plus tard.",
   "passport.cardWent": "Visité avec Shelvr.",
+  "passportStory.screenTitle": "Votre passeport",
+  "passportStory.kicker": "Passeport · %{year}",
+  "passportStory.titleReels": {
+    "one": "J’ai visité %{formattedCount} lieu repéré dans des reels.",
+    "many": "J’ai visité %{formattedCount} lieux repérés dans des reels.",
+    "other": "J’ai visité %{formattedCount} lieux repérés dans des reels."
+  },
+  "passportStory.titleSaved": {
+    "one": "J’ai visité %{formattedCount} lieu enregistré.",
+    "many": "J’ai visité %{formattedCount} lieux enregistrés.",
+    "other": "J’ai visité %{formattedCount} lieux enregistrés."
+  },
+  "passportStory.together": {
+    "one": "%{formattedCount} tamponné avec des amis",
+    "many": "%{formattedCount} tamponnés avec des amis",
+    "other": "%{formattedCount} tamponnés avec des amis"
+  },
+  "passportStory.more": "+%{more}",
+  "passportStory.tagline": "Enregistrez maintenant.\nAllez-y vraiment.",
+  "passportStory.scan": "Scannez pour comparer vos passeports",
+  "passportStory.shareLink": "Partager plutôt un lien",
+  "passportStory.linkNote": "Partager active le lien de votre passeport pour que le code l’ouvre. Vous pouvez arrêter à tout moment dans les Réglages.",
   "passport.shareCity": "Partager %{city}",
   "passport.momentCityComplete": "%{city} au complet",
   "passport.ringCount": "%{visited} sur %{total}",

@@ -1211,6 +1211,25 @@
   "passport.cardSavedBoth": "Auf Instagram und TikTok gespeichert.",
   "passport.cardSavedElsewhere": "Für später gespeichert.",
   "passport.cardWent": "Mit Shelvr dort gewesen.",
+  "passportStory.screenTitle": "Dein Pass",
+  "passportStory.kicker": "Pass · %{year}",
+  "passportStory.titleReels": {
+    "one": "Ich war an %{formattedCount} Ort, den ich aus Reels gespeichert habe.",
+    "other": "Ich war an %{formattedCount} Orten, die ich aus Reels gespeichert habe."
+  },
+  "passportStory.titleSaved": {
+    "one": "Ich war an %{formattedCount} Ort, den ich gespeichert habe.",
+    "other": "Ich war an %{formattedCount} Orten, die ich gespeichert habe."
+  },
+  "passportStory.together": {
+    "one": "%{formattedCount} gemeinsam mit Freunden gestempelt",
+    "other": "%{formattedCount} gemeinsam mit Freunden gestempelt"
+  },
+  "passportStory.more": "+%{more}",
+  "passportStory.tagline": "Jetzt speichern.\nWirklich hingehen.",
+  "passportStory.scan": "Scannen, um Pässe zu vergleichen",
+  "passportStory.shareLink": "Lieber als Link teilen",
+  "passportStory.linkNote": "Beim Teilen wird der Link zu deinem Pass aktiviert, damit der Code ihn öffnet. Du kannst das Teilen jederzeit in den Einstellungen beenden.",
   "passport.shareCity": "%{city} teilen",
   "passport.momentCityComplete": "%{city} komplett",
   "passport.ringCount": "%{visited} von %{total}",

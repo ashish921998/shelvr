@@ -1256,6 +1256,28 @@
   "passport.cardSavedBoth": "Guardado en Instagram y TikTok.",
   "passport.cardSavedElsewhere": "Guardado para luego.",
   "passport.cardWent": "Fuimos con Shelvr.",
+  "passportStory.screenTitle": "Tu pasaporte",
+  "passportStory.kicker": "Pasaporte · %{year}",
+  "passportStory.titleReels": {
+    "one": "Fui a %{formattedCount} sitio que guardé de reels.",
+    "many": "Fui a %{formattedCount} sitios que guardé de reels.",
+    "other": "Fui a %{formattedCount} sitios que guardé de reels."
+  },
+  "passportStory.titleSaved": {
+    "one": "Fui a %{formattedCount} sitio que guardé.",
+    "many": "Fui a %{formattedCount} sitios que guardé.",
+    "other": "Fui a %{formattedCount} sitios que guardé."
+  },
+  "passportStory.together": {
+    "one": "%{formattedCount} sellado con amigos",
+    "many": "%{formattedCount} sellados con amigos",
+    "other": "%{formattedCount} sellados con amigos"
+  },
+  "passportStory.more": "+%{more}",
+  "passportStory.tagline": "Guárdalo ahora.\nY ve de verdad.",
+  "passportStory.scan": "Escanea para comparar pasaportes",
+  "passportStory.shareLink": "Compartir como enlace",
+  "passportStory.linkNote": "Al compartir se activa el enlace de tu pasaporte para que el código lo abra. Puedes dejar de compartir cuando quieras en Ajustes.",
   "passport.shareCity": "Compartir %{city}",
   "passport.momentCityComplete": "Has completado %{city}",
   "passport.ringCount": "%{visited} de %{total}",

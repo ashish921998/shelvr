@@ -1013,6 +1013,66 @@ export const getPassport = authedQuery({
   },
 });
 
+function listPlaceIdsOf(row: Doc<"placeVisits">): Id<"sharedListPlaces">[] {
+  const ids = new Set<Id<"sharedListPlaces">>();
+  if (row.listPlaceId !== undefined) ids.add(row.listPlaceId);
+  for (const place of row.stampPlaces ?? []) {
+    if (place.listPlaceId !== undefined) ids.add(place.listPlaceId);
+    for (const id of place.alsoListPlaceIds ?? []) ids.add(id);
+  }
+  return [...ids];
+}
+
+async function wentWithFriend(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  place: Doc<"sharedListPlaces">,
+  members: Map<string, boolean>,
+): Promise<boolean> {
+  const isMember = async (memberId: Id<"users">) => {
+    const key = `${place.listId}:${memberId}`;
+    let known = members.get(key);
+    if (known === undefined) {
+      known = (await memberOf(ctx, place.listId, memberId)) !== null;
+      members.set(key, known);
+    }
+    return known;
+  };
+  if (!(await isMember(userId))) return false;
+  for (const entry of place.went ?? []) {
+    if (entry.userId !== userId && (await isMember(entry.userId))) return true;
+  }
+  return false;
+}
+
+export const passportTogether = authedQuery({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    const rows = (await visitRows(ctx, ctx.userId)).slice(
+      0,
+      MAX_PASSPORT_STAMPS,
+    );
+    const places = new Map<
+      Id<"sharedListPlaces">,
+      Doc<"sharedListPlaces"> | null
+    >();
+    const members = new Map<string, boolean>();
+    let together = 0;
+    for (const row of rows) {
+      for (const id of listPlaceIdsOf(row)) {
+        if (!places.has(id)) places.set(id, await ctx.db.get(id));
+        const place = places.get(id);
+        if (place && (await wentWithFriend(ctx, ctx.userId, place, members))) {
+          together += 1;
+          break;
+        }
+      }
+    }
+    return together;
+  },
+});
+
 const badgeStampValidator = v.object({
   city: v.optional(v.string()),
   countryCode: v.optional(v.string()),
