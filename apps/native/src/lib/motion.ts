@@ -14,6 +14,7 @@ import {
 } from "react-native-reanimated";
 
 const curves = {
+  in: [0.55, 0.055, 0.675, 0.19],
   out: [0.23, 1, 0.32, 1],
   inOut: [0.77, 0, 0.175, 1],
 } as const;
@@ -29,6 +30,7 @@ const duration = {
   stagger: 300,
 } as const;
 const easing = {
+  in: Easing.bezier(...curves.in),
   out: Easing.bezier(...curves.out),
   inOut: Easing.bezier(...curves.inOut),
 };

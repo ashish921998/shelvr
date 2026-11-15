@@ -36,6 +36,10 @@ request (`gh pr create --label no-ui-change`). Any visible change still needs a 
 Paywall changes live in RevenueCat, so CI cannot see them: they still need screenshots.
 -->
 
+### Review
+
+<!-- A REVIEW.md review run in a fresh context (a subagent, a new session or Codex), not the session that wrote the code. Give its first line ("Nothing to fix." or the count) and what happened to each Important finding: fixed in which commit, or why not. -->
+
 ### Not verified
 
 <!-- What was NOT checked, so nobody assumes it was. For example: real iPhone, Android, TikTok (blocked in India), production data. Write "Nothing" only if that is true. -->

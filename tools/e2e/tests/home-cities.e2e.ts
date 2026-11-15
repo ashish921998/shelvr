@@ -22,21 +22,27 @@ test("searches saved places from Home and clears back to cities", async ({
   app,
   screen,
 }) => {
-  const search = screen.getByLabel("Search your saves");
+  const search = screen.getByTestId("home-search-input");
+  const clear = screen.getByRole("button", "Clear search");
   await expect(search).toBeVisible();
   await app.screenshot("home-search-field");
+  await search.tap();
   await search.fill("Lisbon");
   const result = screen.getByRole("button", /^Belém Tower/);
   await expect(result).toBeVisible();
   await expect(screen.getByRole("button", /^Lisbon/)).toBeHidden();
   await app.screenshot("home-search-results");
+  await clear.tap();
+  await expect(clear).toBeHidden();
+  await search.tap();
   await search.fill("NoSuchSavedPlace");
   await expect(
     screen.getByText("No saves match “NoSuchSavedPlace”."),
   ).toBeVisible();
   await app.screenshot("home-search-no-results");
-  await screen.getByRole("button", "Clear search").tap();
+  await clear.tap();
   await expect(screen.getByRole("button", /^Lisbon/)).toBeVisible();
+  await search.tap();
   await search.fill("Belém");
   await expect(result).toBeVisible();
   await result.tap();

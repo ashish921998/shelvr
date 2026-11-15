@@ -7,6 +7,37 @@ machine stay out of this file.
 Each "seen" date is when the behaviour was last observed. Re-check an old one
 before relying on it.
 
+## Local simulator defaults
+
+Machine-specific device choices live in the gitignored
+`tools/e2e/.env.local`:
+
+```dotenv
+E2E_DEVICE=<development-simulator-udid>
+E2E_QA_DEVICE=<stock-final-qa-simulator-udid>
+```
+
+The shared E2E launch module loads this file before capturing settings for
+the runner or workers. It follows the runner's CI semantics: unset, empty,
+`0` and `false` mean local mode (ignoring case and surrounding whitespace).
+Explicit environment values win, including `E2E_DEVICE` and
+`E2E_METRO_PORT`. Agents use the development device for
+routine development, builds and testing; pass its id explicitly with
+`expo run:ios --device <udid>`. For final QA, pass the stock device explicitly:
+`E2E_DEVICE=<E2E_QA_DEVICE value> pnpm exec e2e run ...` from `tools/e2e`.
+The runner does not automatically expand `E2E_QA_DEVICE` or change a device's
+service profile.
+
+Keep the QA device stock. Use SimSlim only on the separate development device,
+with its local `.argent/simslim-development.json` profile. Verify that profile
+before relying on its slim state, and reapply it after recreating the device.
+Do not run a global `simslim watch`, which could also slim the QA simulator.
+When no local file exists, device selection follows the runner's normal
+behavior. A configured device that is missing must be resolved explicitly;
+do not substitute the final-QA device. A new worktree needs its own copy of
+`tools/e2e/.env.local`; use the main checkout's local profile path for any
+SimSlim verification from that worktree.
+
 ## A worktree needs three things
 
 1. **Dependencies.** `pnpm install --frozen-lockfile --prefer-offline` from the
@@ -74,6 +105,28 @@ changes.
   deployment must set `AUTH_ENABLE_ANONYMOUS=true`.
 - **Fixtures:** `devFixtures.resetCurrentUser` seeds items, spaces and a Pro
   subscription. Home cards carry `fixture-item-*` test ids.
+- **Fixture vote link:** the reset also makes an Austin vote link with two
+  votes, Sam's and a guest's. Its owner has no first name until one is set:
+  `npx convex run users:setMyName '{"name":"Ashish"}' --identity '{"subject":"<userId>|cli","issuer":"cli","tokenIdentifier":"cli"}'`.
+- **Vote pages:** vote links need `WAITLIST_SHARED_SECRET` on the backend,
+  `apps/web/.env.local` with `CONVEX_SITE_URL` and the same secret, and
+  `EXPO_PUBLIC_WEB_URL` (the local web server) for the share text.
+- **First-vote push:** needs `PLAN_VOTE_PUSH_ENABLED=true` on the backend. The
+  fixture link already has a sent notice, so only a link made during QA
+  pushes. A simulator cannot receive the real push; simulate the banner with
+  `xcrun simctl push booted app.shelvr.save.dev <payload.json>`, putting the
+  data (`url`, `kind`, `notificationId`) under `body`, where expo-notifications
+  on iOS reads it.
+- **Fixture shared list:** the reset also makes "Date night spots" with a
+  partner, Priya, whose three places are new to the account. It leaves any real
+  shared list the account is on, the way Leave list does, so Home after a reset
+  shows only the fixture list.
+- **A place arriving live:** with the list open,
+  `npx convex run devFixtures:simulateSharedListActivity '{"listId":"<id>"}'`
+  adds Priya's next place: Veracruz All Natural, then Zilker Park, then
+  Torchy's Tacos, then `null`. `npx convex data sharedLists` gives the id. Open
+  the list with `shelvr-dev://shared-list/<id>`, because Home cards are not in
+  the accessibility tree.
 - **Saved flows:** `apps/native/.argent/flows`.
 
 ## Getting into a specific state

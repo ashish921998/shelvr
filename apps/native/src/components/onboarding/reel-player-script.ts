@@ -1,6 +1,6 @@
 // Runs inside Instagram's embed page, which only builds its player on a tap: it reads the reel's video
 // address from the page data, plays it muted and full-bleed, and says "playing" once frames are on screen,
-// "missing" when the page has no video address, and "failed" (once) when the video cannot play.
+// "missing" when the page has no video address, and "failed:<cause>" (once) when the video cannot play.
 // Kept as source text, not a function's toString(): Hermes compiles functions to bytecode and drops their text.
 export const REEL_PLAYER_SCRIPT = String.raw`(function () {
   var post = function (message) {
@@ -15,10 +15,11 @@ export const REEL_PLAYER_SCRIPT = String.raw`(function () {
   var src = found[1].replace(/\\/g, "").replace(/u0026/g, "&");
   var started = false;
   var failed = false;
-  var fail = function () {
+  var fail = function (error) {
     if (started || failed) return;
     failed = true;
-    post("failed");
+    var code = video.error && video.error.code;
+    post("failed:" + (code ? "media_" + code : (error && error.name) || "unknown"));
   };
   var video = document.createElement("video");
   video.src = src;

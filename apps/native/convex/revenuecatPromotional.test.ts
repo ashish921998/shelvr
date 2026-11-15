@@ -1,6 +1,6 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import {
   newConvexTest,
   revenuecatSnapshot,
@@ -71,7 +71,17 @@ async function fixture(previous?: { expiresAt: number }) {
     t
       .withIdentity({ subject: `${userId}|session-1` })
       .mutation(api.items.createNoteItem, { text: "Synthetic grant test" });
-  return { grant, save };
+  const subscribe = (row: { status: "pro"; productId: string }) =>
+    t.mutation(internal.subscriptions.upsertSubscription, {
+      userId,
+      ...row,
+      expiresAt: Date.now() + 60_000,
+      eventTimestampMs: 2,
+      authoritative: true,
+    });
+  const row = () =>
+    t.run(async (ctx) => await ctx.db.query("subscriptions").unique());
+  return { grant, save, subscribe, row };
 }
 
 describe("promotional grant webhook", () => {
@@ -143,6 +153,81 @@ describe("promotional grant webhook", () => {
       ).status,
     ).toBe(200);
     await expect(f.save()).rejects.toThrow(/Pro required/);
+  });
+
+  it("keeps Pro from a dated grant when a store subscription expires", async () => {
+    const f = await fixture();
+    const grantEnds = Date.now() + 30 * 86_400_000;
+    stubRevenueCatFetch(
+      revenuecatSnapshot({
+        productId: "rc_promo_Shelvr_Pro_monthly",
+        expiresAt: grantEnds,
+      }),
+    );
+    expect((await f.grant({ expiration_at_ms: grantEnds })).status).toBe(200);
+
+    expect(
+      (
+        await f.grant({
+          id: "store-expiry",
+          type: "EXPIRATION",
+          period_type: "NORMAL",
+          product_id: "monthly_499",
+          expiration_reason: "UNSUBSCRIBE",
+          expiration_at_ms: Date.now() - 1,
+          event_timestamp_ms: 3,
+        })
+      ).status,
+    ).toBe(200);
+    await expect(f.save()).resolves.toBeDefined();
+    expect(await f.row()).toMatchObject({
+      status: "pro",
+      productId: "rc_promo_Shelvr_Pro_monthly",
+      expiresAt: grantEnds,
+    });
+  });
+
+  it("takes Pro back when a store subscription expires with nothing else active", async () => {
+    const f = await fixture();
+    await f.subscribe({ status: "pro", productId: "monthly_499" });
+    stubRevenueCatFetch(revenuecatSnapshot());
+    expect(
+      (
+        await f.grant({
+          id: "store-expiry",
+          type: "EXPIRATION",
+          period_type: "NORMAL",
+          product_id: "monthly_499",
+          expiration_reason: "UNSUBSCRIBE",
+          expiration_at_ms: Date.now() - 1,
+          event_timestamp_ms: 3,
+        })
+      ).status,
+    ).toBe(200);
+    await expect(f.save()).rejects.toThrow(/Pro required/);
+    expect(await f.row()).toMatchObject({ status: "lapsed" });
+  });
+
+  it("takes Pro back when a dated grant expires with nothing else active", async () => {
+    const f = await fixture();
+    await f.subscribe({
+      status: "pro",
+      productId: "rc_promo_Shelvr_Pro_monthly",
+    });
+    stubRevenueCatFetch(revenuecatSnapshot());
+    expect(
+      (
+        await f.grant({
+          id: "grant-expiry",
+          type: "EXPIRATION",
+          expiration_reason: "UNKNOWN",
+          expiration_at_ms: Date.now() - 1,
+          event_timestamp_ms: 3,
+        })
+      ).status,
+    ).toBe(200);
+    await expect(f.save()).rejects.toThrow(/Pro required/);
+    expect(await f.row()).toMatchObject({ status: "lapsed" });
   });
 
   it("asks RevenueCat to retry when the lookup fails", async () => {

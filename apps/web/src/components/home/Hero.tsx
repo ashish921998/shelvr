@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import { type CSSProperties, useEffect, useRef } from "react";
-import AppStoreButton from "@/components/AppStoreButton";
+import MapCta from "@/components/MapCta";
 import styles from "./Landing.module.css";
+import SampleCity from "./SampleCity";
 
 const reels = [
   {
@@ -87,9 +88,9 @@ export default function Hero() {
             their city, ready for a date night or a trip.
           </p>
           <div className={styles.ctaRow}>
-            <AppStoreButton source="hero" />
+            <MapCta source="hero" />
             <span className={styles.ctaNote}>
-              For iPhone. <a href="#android">Android soon.</a>
+              On the App Store, for iPhone. <a href="#android">Android soon.</a>
             </span>
           </div>
         </div>
@@ -117,14 +118,7 @@ export default function Hero() {
             </div>
           ))}
           <div className={styles.phone}>
-            <Image
-              src="/images/landing/app-reel.jpg"
-              alt="Shelvr finding the places in a reel about Lisbon"
-              width={640}
-              height={1391}
-              sizes="300px"
-              priority
-            />
+            <SampleCity />
           </div>
         </div>
       </section>

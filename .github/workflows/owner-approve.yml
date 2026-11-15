@@ -1,0 +1,33 @@
+name: Owner approve
+
+# Ashish approves an owner-only pull request by commenting "/approve <commit>".
+# A comment does not re-run the PR evidence check, so this re-runs its latest
+# run for the head commit, which then reads the comment. Nothing is checked out.
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  actions: write
+  pull-requests: read
+
+jobs:
+  rerun:
+    name: re-run the evidence check
+    if: >-
+      github.event.issue.pull_request &&
+      github.event.comment.user.login == github.repository_owner &&
+      startsWith(github.event.comment.body, '/approve ')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Re-run the latest evidence run for the head commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          head=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq .head.sha)
+          id=$(gh run list -R "$REPO" --workflow pr-evidence.yml --commit "$head" --limit 1 --json databaseId --jq '.[0].databaseId')
+          if [ -z "$id" ]; then echo "No evidence run for $head yet; its first run will read the comment."; exit 0; fi
+          gh run watch -R "$REPO" "$id" > /dev/null || true
+          gh run rerun -R "$REPO" "$id"

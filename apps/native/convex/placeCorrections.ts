@@ -4,6 +4,7 @@ import { internal } from "./_generated/api";
 import { internalMutation } from "./_generated/server";
 import { authedMutation, authedQuery, requireUserId } from "./model/auth";
 import { aiAllowed } from "./aiConsent";
+import { requestCityPhotos } from "./cityPhotos";
 import {
   MAX_ITEM_PLACES,
   normalizeCities,
@@ -33,7 +34,7 @@ function currentPlaces(item: Doc<"items">): EditablePlace[] {
   const pins = item.placePins ?? [];
   const names = new Set(pins.map((pin) => pin.name.toLowerCase()));
   return [
-    ...pins.map((pin) => ({
+    ...pins.map(({ cuisine: _cuisine, ...pin }) => ({
       ...pin,
       ...(pin.city === undefined && item.cities?.length === 1
         ? { city: item.cities[0] }
@@ -152,6 +153,7 @@ export const savePlaces = authedMutation({
         unpinned.map(({ name }) => name),
         cities,
       ),
+      placeCuisines: undefined,
       intents: item.intents?.filter((intent) => intent.kind !== "open_maps"),
     };
     await ctx.db.patch(item._id, {
@@ -165,6 +167,7 @@ export const savePlaces = authedMutation({
       await ctx.scheduler.runAfter(0, internal.placePins.locateItem, {
         itemId: item._id,
       });
+    if (await aiAllowed(ctx, ctx.userId)) await requestCityPhotos(ctx, cities);
     return null;
   },
 });

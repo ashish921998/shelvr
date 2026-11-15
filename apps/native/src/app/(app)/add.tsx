@@ -6,6 +6,8 @@ import {
   type BottomSheetMethods,
 } from "@expo/ui/community/bottom-sheet";
 import { openPaywall } from "@/lib/entitlement";
+import { useAccess } from "@/lib/free-plan";
+import { freeSavesTitle } from "@/lib/free-saves-title";
 import { backOrHome } from "@/lib/screen-dismiss";
 import { saveErrorCode, saveFailureStage } from "@convex/model/saveErrors";
 import { api } from "@convex/_generated/api";
@@ -84,6 +86,7 @@ function AddContent({ close }: { close: () => void }) {
   const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const createLinkItem = useMutation(api.items.createLinkItem);
+  const access = useAccess();
 
   const trimmed = value.trim();
   const canSave = trimmed.length > 0 && !saving;
@@ -198,6 +201,11 @@ function AddContent({ close }: { close: () => void }) {
         editable={!saving}
       />
       <Text style={styles.hint}>{t("capture.linkHint")}</Text>
+      {access.kind === "free" ? (
+        <Text style={styles.hint}>
+          {`${freeSavesTitle(access)} · ${t("freePlan.photosNeedPro")}`}
+        </Text>
+      ) : null}
     </View>
   );
 }

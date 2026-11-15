@@ -5,12 +5,16 @@ import type { Id } from "@convex/_generated/dataModel";
 import {
   inviteJoinOutcome,
   inviteJoinStep,
+  listResolution,
+  passportResolution,
   useInviteJoinCoordinator,
 } from "./invite-join";
 
 const mocks = vi.hoisted(() => ({
   onboarded: true,
+  pending: "abc" as string | null,
   join: vi.fn(),
+  query: vi.fn(),
   alert: vi.fn(),
   capture: vi.fn(),
   captureError: vi.fn(),
@@ -40,13 +44,21 @@ vi.mock("@/lib/pending-onboarding", () => ({
 }));
 vi.mock("@/lib/pending-invite", () => ({
   clearPendingInvite: mocks.clearPendingInvite,
-  getPendingInvite: () => "abc",
+  getPendingInvite: () => mocks.pending,
+  pendingInviteOf: (raw: string) =>
+    raw.startsWith("passport:")
+      ? { kind: "passport", token: raw.slice(9) }
+      : { kind: "list", token: raw },
   subscribePendingInvite: () => () => {},
 }));
 vi.mock("@convex/_generated/api", () => ({
-  api: { sharedLists: { joinSharedList: "joinSharedList" } },
+  api: {
+    sharedLists: { joinSharedList: "joinSharedList" },
+    passportShares: { passportPreview: "passportPreview" },
+  },
 }));
 vi.mock("convex/react", () => ({
+  useConvex: () => ({ query: mocks.query }),
   useConvexAuth: () => ({ isLoading: false, isAuthenticated: true }),
   useMutation: () => mocks.join,
 }));
@@ -65,6 +77,72 @@ describe("useInviteJoinCoordinator", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.pending = "abc";
+  });
+
+  async function resumeWith(onboarded: boolean, found: boolean | Error) {
+    mocks.pending = "passport:tok1";
+    if (found instanceof Error) mocks.query.mockRejectedValue(found);
+    else mocks.query.mockResolvedValue(found ? { places: 1 } : null);
+    await joinWith(onboarded, "list1");
+  }
+
+  it("opens the comparison for a live passport link, finishing onboarding for a new person", async () => {
+    await resumeWith(false, true);
+    expect(mocks.join).not.toHaveBeenCalled();
+    expect(mocks.query).toHaveBeenCalledWith("passportPreview", {
+      token: "tok1",
+    });
+    expect(mocks.clearPendingInvite).toHaveBeenCalled();
+    expect(mocks.completeOnboarding).toHaveBeenCalled();
+    expect(mocks.router.replace).toHaveBeenCalledWith(
+      "/passport-invite/tok1?compare=1",
+    );
+  });
+
+  it("opens the comparison without touching onboarding for an onboarded person", async () => {
+    await resumeWith(true, true);
+    expect(mocks.completeOnboarding).not.toHaveBeenCalled();
+    expect(mocks.clearPending).not.toHaveBeenCalled();
+    expect(mocks.router.replace).toHaveBeenCalledWith(
+      "/passport-invite/tok1?compare=1",
+    );
+  });
+
+  it("keeps onboarding when the passport link died during sign-in", async () => {
+    await resumeWith(false, false);
+    expect(mocks.completeOnboarding).not.toHaveBeenCalled();
+    expect(mocks.clearPending).not.toHaveBeenCalled();
+    expect(mocks.clearPendingInvite).toHaveBeenCalled();
+    expect(mocks.router.replace).toHaveBeenCalledWith("/passport-invite/tok1");
+  });
+
+  it("keeps onboarding and reports it when the passport check fails", async () => {
+    await resumeWith(false, new Error("offline"));
+    expect(mocks.completeOnboarding).not.toHaveBeenCalled();
+    expect(mocks.captureError).toHaveBeenCalledWith(
+      "passport_resume_failed",
+      expect.any(Error),
+    );
+  });
+
+  it("ignores a passport check that finishes after the person left the invite", async () => {
+    mocks.onboarded = false;
+    mocks.pending = "passport:tok1";
+    let answer: (value: unknown) => void = () => {};
+    mocks.query.mockReturnValue(
+      new Promise((resolve) => {
+        answer = resolve;
+      }),
+    );
+    renderHook(() => useInviteJoinCoordinator());
+    mocks.pending = null;
+    await act(async () => {
+      answer({ places: 1 });
+    });
+    expect(mocks.clearPendingInvite).not.toHaveBeenCalled();
+    expect(mocks.completeOnboarding).not.toHaveBeenCalled();
+    expect(mocks.router.replace).not.toHaveBeenCalled();
   });
 
   it("keeps a queued reel when an onboarded person joins from the paywall", async () => {
@@ -111,10 +189,16 @@ describe("inviteJoinStep", () => {
     ).toEqual({ kind: "wait" });
   });
 
-  it("joins once signed in", () => {
+  it("decodes the held invite once signed in", () => {
     expect(inviteJoinStep({ ...settled, token: "abc" })).toEqual({
-      kind: "join",
+      kind: "list",
       token: "abc",
+      raw: "abc",
+    });
+    expect(inviteJoinStep({ ...settled, token: "passport:p1" })).toEqual({
+      kind: "passport",
+      token: "p1",
+      raw: "passport:p1",
     });
   });
 
@@ -124,7 +208,7 @@ describe("inviteJoinStep", () => {
     ).toEqual({ kind: "wait" });
     expect(
       inviteJoinStep({ ...settled, token: "other", inFlight: "abc" }),
-    ).toEqual({ kind: "join", token: "other" });
+    ).toEqual({ kind: "list", token: "other", raw: "other" });
   });
 });
 
@@ -132,28 +216,38 @@ describe("inviteJoinOutcome", () => {
   const listId = "list1" as Id<"sharedLists">;
 
   it("opens the list and spends the token", () => {
-    expect(inviteJoinOutcome(listId, "abc", true)).toEqual({
+    expect(inviteJoinOutcome(listResolution(listId, "abc"), true)).toEqual({
       completeOnboarding: false,
       href: "/shared-list/list1?joined=1",
     });
   });
 
-  it("completes onboarding for a person who joined before finishing it", () => {
-    expect(inviteJoinOutcome(listId, "abc", false).completeOnboarding).toBe(
-      true,
-    );
+  it("completes onboarding only for a live invite", () => {
+    expect(
+      inviteJoinOutcome(listResolution(listId, "abc"), false)
+        .completeOnboarding,
+    ).toBe(true);
+    expect(
+      inviteJoinOutcome(passportResolution(true, "abc"), false)
+        .completeOnboarding,
+    ).toBe(true);
+    expect(
+      inviteJoinOutcome(listResolution(null, "abc"), false).completeOnboarding,
+    ).toBe(false);
+    expect(
+      inviteJoinOutcome(passportResolution(false, "abc"), false)
+        .completeOnboarding,
+    ).toBe(false);
   });
 
   it("shows the dead state for an invite that no longer works", () => {
-    expect(inviteJoinOutcome(null, "a b", true)).toEqual({
+    expect(inviteJoinOutcome(listResolution(null, "a b"), true)).toEqual({
       completeOnboarding: false,
       href: "/list-invite/a%20b",
     });
-  });
-
-  it("leaves onboarding open when the invite died before the join", () => {
-    expect(inviteJoinOutcome(null, "abc", false).completeOnboarding).toBe(
-      false,
-    );
+    expect(inviteJoinOutcome(passportResolution(false, "a b"), true)).toEqual({
+      completeOnboarding: false,
+      href: "/passport-invite/a%20b",
+    });
   });
 });

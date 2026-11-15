@@ -8,6 +8,7 @@ import {
 } from "@/lib/city-pins";
 import { moveCamera, sameCamera } from "@/lib/map-camera";
 import { fitCamera } from "@/lib/trip";
+import { useImage } from "expo-image";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -22,6 +23,7 @@ type Props = {
   coveredBottom: number;
   onSelect: (id: string) => void;
   visible?: number;
+  visited?: ReadonlySet<string>;
 };
 
 export function CityMap({
@@ -31,6 +33,7 @@ export function CityMap({
   coveredBottom,
   onSelect,
   visible = Infinity,
+  visited,
 }: Props) {
   const { theme, rt } = useUnistyles();
   const ref = useRef<AppleMaps.MapView>(null);
@@ -101,18 +104,29 @@ export function CityMap({
     );
   }, [steady, firstCamera]);
 
+  const bubble = useImage(require("../../../assets/map/place-bubble.png"));
+  const selectedBubble = useImage(
+    require("../../../assets/map/place-bubble-selected.png"),
+  );
+  const visitedBubble = useImage(
+    require("../../../assets/map/place-bubble-visited.png"),
+  );
   const annotations = pins.slice(0, visible).map((pin) => {
     const id = cityPinId(pin);
     const isSelected = id === selected;
+    const went = visited?.has(id) ?? false;
     return {
       id,
       coordinates: { latitude: pin.lat, longitude: pin.lng },
       title: pin.name,
-      text: String(pin.number),
-      backgroundColor: isSelected
-        ? theme.colors.foreground
-        : theme.colors.primary,
-      textColor: isSelected ? theme.colors.primary : theme.colors.onTint,
+      text: pin.emoji ?? "📍",
+      icon:
+        (isSelected ? selectedBubble : went ? visitedBubble : bubble) ??
+        undefined,
+      went,
+      anchor: { x: 0.5, y: 0.5 },
+      backgroundColor: theme.colors.surface,
+      textColor: theme.colors.foreground,
     };
   });
   const select = (id: string | undefined) => {
@@ -143,7 +157,7 @@ export function CityMap({
       markers={annotations.map((pin) => ({
         id: pin.id,
         coordinates: pin.coordinates,
-        title: `${pin.text}. ${pin.title}`,
+        title: `${pin.went ? "✓ " : ""}${pin.text} ${pin.title}`,
       }))}
       onMarkerClick={(marker) => select(marker.id)}
     />

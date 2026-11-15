@@ -23,7 +23,7 @@ export async function closePaywallTo(
 export function paywallTitle(screen: Screen) {
   return screen
     .getByText(
-      /^(Make plans from your saves\.|Make date night easy\.|Plan .+ from your saves\.|Know where to eat next\.)$/,
+      /^(Make plans from your saves\.|Make date night easy\.|Plan .+ from your saves\.|Know where to eat next\.|Your passport has \d+ cit(y|ies))$/,
     )
     .first();
 }

@@ -32,6 +32,10 @@ export function AhaShareStep({
   useAppLocale();
   const [stage, setStage] = useState<Stage>("post");
   const sharedRef = useRef(false);
+  const onSharedRef = useRef(onShared);
+  useEffect(() => {
+    onSharedRef.current = onShared;
+  }, [onShared]);
   const go = (next: Stage) => () => {
     tick();
     setStage(next);
@@ -46,10 +50,10 @@ export function AhaShareStep({
     const timer = setTimeout(() => {
       if (sharedRef.current) return;
       sharedRef.current = true;
-      onShared();
+      onSharedRef.current();
     }, READING_MS);
     return () => clearTimeout(timer);
-  }, [stage, onShared]);
+  }, [stage]);
 
   return (
     <View style={styles.wrap}>

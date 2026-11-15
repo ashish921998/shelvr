@@ -8,11 +8,13 @@ import {
   getPendingDemoSpace,
   getPendingDemoUrl,
   getPendingSpaces,
+  getPendingOperationId,
   hasPending,
+  noteReplayDeclined,
   queueDemoUrl,
+  replayDeclined,
   setOnboardingProgress,
   setPendingSpaces,
-  updatePendingSpaces,
 } from "./pending-onboarding";
 
 const storage = vi.hoisted(() => new Map<string, string>());
@@ -23,6 +25,29 @@ vi.mock("expo-secure-store", () => ({
 vi.mock("expo-crypto", () => ({ randomUUID: () => "new-operation-id" }));
 
 beforeEach(() => storage.clear());
+
+describe("a no to the replay's paywall", () => {
+  it("is kept for the work it was asked about, through the record's rewrites", () => {
+    queueDemoUrl("https://example.com/reel");
+    noteReplayDeclined(getPendingOperationId());
+    expect(replayDeclined()).toBe(true);
+    setPendingSpaces(["Recipes"]);
+    setOnboardingProgress({ spaces: ["Recipes"], step: 2 });
+    clearLegacyDemoUrl();
+    expect(replayDeclined()).toBe(true);
+    clearPending();
+    expect(replayDeclined()).toBe(false);
+  });
+
+  it("is ignored for other work, or when nothing is queued", () => {
+    noteReplayDeclined("onboarding:gone");
+    expect(replayDeclined()).toBe(false);
+    queueDemoUrl("https://example.com/reel");
+    noteReplayDeclined("onboarding:gone");
+    noteReplayDeclined(null);
+    expect(replayDeclined()).toBe(false);
+  });
+});
 
 describe("onboarding recovery", () => {
   it("does not request a replay or paywall when storage is absent, cleared, or corrupt", () => {
@@ -35,7 +60,7 @@ describe("onboarding recovery", () => {
     expect(hasPending()).toBe(false);
   });
 
-  it("retains an older queued link and its operation id through partial replay", () => {
+  it("retains an older queued link and its operation id when onboarding finishes again", () => {
     storage.set(
       "shelvr.pending.onboarding",
       JSON.stringify({
@@ -45,7 +70,6 @@ describe("onboarding recovery", () => {
       }),
     );
     setPendingSpaces(["Recipes", "Inspiration"]);
-    updatePendingSpaces([]);
     expect(getPendingDemoUrl()).toBe("https://example.com");
     expect(getOrCreatePendingOperationId()).toBe("legacy-operation");
     expect(hasPending()).toBe(true);
@@ -56,11 +80,43 @@ describe("onboarding recovery", () => {
     expect(getOnboardingProgress()).toEqual({
       spaces: ["Travel"],
       step: 2,
+      viewed: [],
       travelCity: null,
+      beenCities: [],
       goals: [],
       savedCount: null,
-      planner: null,
+      skippedShare: false,
     });
+  });
+});
+
+describe("the steps already viewed", () => {
+  it("are kept with the progress through a relaunch and the hand-off to the replay", () => {
+    setOnboardingProgress({
+      spaces: [],
+      step: 10,
+      viewed: ["opener", "goal", "carousel"],
+    });
+    setPendingSpaces(["Date nights"]);
+    expect(getOnboardingProgress().viewed).toEqual([
+      "opener",
+      "goal",
+      "carousel",
+    ]);
+  });
+
+  it("read back as only the steps this flow has", () => {
+    setOnboardingProgress({ spaces: [], step: 2 });
+    const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");
+    const storeViewed = (viewed: unknown) =>
+      storage.set(
+        "shelvr.pending.onboarding",
+        JSON.stringify({ ...stored, viewed }),
+      );
+    storeViewed(["commitment", 3, "goal"]);
+    expect(getOnboardingProgress().viewed).toEqual(["goal"]);
+    storeViewed("goal");
+    expect(getOnboardingProgress().viewed).toEqual([]);
   });
 });
 
@@ -71,13 +127,13 @@ describe("the survey answers", () => {
       step: 5,
       goals: ["date", "food"],
       savedCount: "hundreds",
-      planner: "explorer",
+      skippedShare: true,
     });
     setPendingSpaces(["Date nights"]);
     expect(getOnboardingProgress()).toMatchObject({
       goals: ["date", "food"],
       savedCount: "hundreds",
-      planner: "explorer",
+      skippedShare: true,
     });
   });
 
@@ -90,14 +146,24 @@ describe("the survey answers", () => {
         ...stored,
         goals: ["shopping", "travel"],
         savedCount: "millions",
-        planner: "chaotic",
+        skippedShare: "yes",
       }),
     );
     expect(getOnboardingProgress()).toMatchObject({
       goals: ["travel"],
       savedCount: null,
-      planner: null,
+      skippedShare: false,
     });
+  });
+
+  it("drop the step of an earlier flow, whose indexes mean other screens", () => {
+    setOnboardingProgress({ spaces: [], step: 9, goals: ["travel"] });
+    const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({ ...stored, progressVersion: 11 }),
+    );
+    expect(getOnboardingProgress()).toMatchObject({ step: null, goals: [] });
   });
 });
 
@@ -120,6 +186,40 @@ describe("the sample trip's city", () => {
       JSON.stringify({ ...stored, travelCity: "atlantis" }),
     );
     expect(getOnboardingProgress().travelCity).toBeNull();
+  });
+});
+
+describe("the cities they have been to", () => {
+  it("are kept with the progress beside the steps viewed", () => {
+    setOnboardingProgress({
+      spaces: [],
+      step: 5,
+      beenCities: ["lisbon", "madrid"],
+      viewed: ["opener", "been"],
+    });
+    expect(getOnboardingProgress()).toMatchObject({
+      beenCities: ["lisbon", "madrid"],
+      viewed: ["opener", "been"],
+    });
+  });
+
+  it("read back once each, in the list's order, without unknown cities", () => {
+    setOnboardingProgress({ spaces: [], step: 5 });
+    const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");
+    storage.set(
+      "shelvr.pending.onboarding",
+      JSON.stringify({
+        ...stored,
+        beenCities: ["madrid", "lisbon", "atlantis", "lisbon"],
+      }),
+    );
+    expect(getOnboardingProgress().beenCities).toEqual(["lisbon", "madrid"]);
+  });
+
+  it("survive the hand-off to the replay", () => {
+    setOnboardingProgress({ spaces: [], step: 5, beenCities: ["tokyo"] });
+    setPendingSpaces(["Date nights"]);
+    expect(getOnboardingProgress().beenCities).toEqual(["tokyo"]);
   });
 });
 
@@ -159,10 +259,12 @@ describe("progress written by an older onboarding flow", () => {
   const fresh = {
     spaces: [],
     step: null,
+    viewed: [],
     travelCity: null,
+    beenCities: [],
     goals: [],
     savedCount: null,
-    planner: null,
+    skippedShare: false,
   };
 
   it.each([0, 1, 2, 3, 4, 5, 6, 7])(
@@ -196,6 +298,9 @@ describe("progress written by an older onboarding flow", () => {
     ["the flow that asked one goal", { progressVersion: 8 }],
     ["the flow without the chart step", { progressVersion: 9 }],
     ["the flow that had the sample plan step", { progressVersion: 10 }],
+    ["the flow with the chart and commitment", { progressVersion: 11 }],
+    ["the flow with the trip and planner questions", { progressVersion: 12 }],
+    ["the flow before the been step", { progressVersion: 13 }],
     ["a non-numeric version", { progressVersion: "2" }],
   ])("restarts a record with %s", (_name, version) => {
     storage.set(
@@ -206,6 +311,7 @@ describe("progress written by an older onboarding flow", () => {
         demoUrl: null,
         saveKinds: ["Travel"],
         step: 2,
+        viewed: ["opener", "goal"],
         ...version,
       }),
     );
@@ -219,7 +325,7 @@ describe("progress written by an older onboarding flow", () => {
         operationId: "op",
         spaces: ["Travel"],
         demoUrl: null,
-        progressVersion: 11,
+        progressVersion: 14,
         step: 2,
         spaceNames: {},
       }),
@@ -227,10 +333,12 @@ describe("progress written by an older onboarding flow", () => {
     expect(getOnboardingProgress()).toEqual({
       spaces: ["Travel"],
       step: 2,
+      viewed: [],
       travelCity: null,
+      beenCities: [],
       goals: [],
       savedCount: null,
-      planner: null,
+      skippedShare: false,
     });
   });
 
@@ -249,10 +357,12 @@ describe("progress written by an older onboarding flow", () => {
     expect(getOnboardingProgress()).toEqual({
       spaces: [],
       step: 0,
+      viewed: [],
       travelCity: null,
+      beenCities: [],
       goals: [],
       savedCount: null,
-      planner: null,
+      skippedShare: false,
     });
     expect(getPendingDemoUrl()).toBe("https://example.com/queued");
     expect(getOrCreatePendingOperationId()).toBe("legacy-operation");

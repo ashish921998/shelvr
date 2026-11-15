@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from "vitest";
+import { ConvexError } from "convex/values";
 import { useFixSave } from "./fix-save";
 
 const mock = vi.hoisted(() => ({
@@ -7,6 +8,7 @@ const mock = vi.hoisted(() => ({
   impact: vi.fn(),
   success: vi.fn(),
   alert: vi.fn(),
+  guard: vi.fn(async () => false),
 }));
 
 vi.mock("convex/react", () => ({
@@ -22,7 +24,7 @@ vi.mock("@/lib/confirm-item-delete", () => ({
   confirmItemDelete: (onConfirm: () => Promise<void>) => onConfirm(),
 }));
 vi.mock("@/lib/entitlement", () => ({
-  usePaywallGuard: () => ({ guard: vi.fn(async () => true) }),
+  usePaywallGuard: () => ({ guard: mock.guard }),
 }));
 vi.mock("@/lib/haptics", () => ({
   haptics: { impact: mock.impact, success: mock.success },
@@ -50,6 +52,15 @@ it("stays quiet and explains when a retry is not scheduled or fails", async () =
   await useFixSave().retry(save);
   expect(mock.impact).not.toHaveBeenCalled();
   expect(mock.alert).toHaveBeenCalledTimes(2);
+});
+
+it("opens the paywall instead of an error when a retry has no free save left", async () => {
+  mock.reprocess.mockRejectedValueOnce(
+    new ConvexError({ code: "pro_required" }),
+  );
+  await useFixSave().retry(save);
+  expect(mock.guard).toHaveBeenCalledOnce();
+  expect(mock.alert).not.toHaveBeenCalled();
 });
 
 it("confirms a delete only after it succeeds", async () => {

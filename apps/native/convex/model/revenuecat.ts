@@ -70,7 +70,7 @@ function isTestStore(store: unknown): boolean {
 const ANONYMOUS_PREFIX = "$RCAnonymousID:";
 
 /** RevenueCat's `logIn` makes the anonymous id of a pre-sign-in purchase an alias of the account's own. */
-function eventOwner(
+export function eventOwner(
   appUserId: string | undefined,
   aliases: string[] | undefined,
 ): string | undefined {
@@ -82,14 +82,12 @@ function eventOwner(
 export function mapRevenueCatStatus(
   type: string,
   periodType?: string,
-): "trialing" | "pro" | "lapsed" | undefined {
+): "trialing" | "pro" | undefined {
   switch (type) {
     case "INITIAL_PURCHASE":
     case "RENEWAL":
     case "UNCANCELLATION":
       return periodType === "TRIAL" ? "trialing" : "pro";
-    case "EXPIRATION":
-      return "lapsed";
     case "NON_RENEWING_PURCHASE":
       return periodType === "PROMOTIONAL" ? "pro" : undefined;
     default:
@@ -119,15 +117,13 @@ export function requiresAuthoritativeReconciliation(
         isDashboardGrant(event)
       );
     case "EXPIRATION":
-      return (
-        event.expirationReason === "CUSTOMER_SUPPORT" || isDashboardGrant(event)
-      );
+      return true;
     default:
       return false;
   }
 }
 
-function readStringArray(value: unknown): string[] | undefined {
+export function readStringArray(value: unknown): string[] | undefined {
   if (!Array.isArray(value) || value.length > 100) return undefined;
   if (
     !value.every(

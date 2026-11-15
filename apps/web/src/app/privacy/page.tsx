@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMetadata(
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="November 2, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="November 14, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
@@ -48,6 +48,16 @@ export default function PrivacyPage() {
             the video itself. If you share a photo or text to Shelvr, including
             through Siri or Shortcuts, we store that too. Photos and notes stay
             in your account until you delete them.
+          </li>
+          <li>
+            <strong>Cities you’ve been to.</strong> If you pick cities you have
+            visited, during onboarding or from your passport, we store which of
+            our listed cities you picked, its country and when you added it, so
+            it shows as a city stamp in your passport and counts toward your
+            cities and countries. We do not use your location for this. Cities
+            you pick during onboarding stay on your device until you sign in.
+            You can remove a city stamp in the app, and deleting your account
+            deletes them.
           </li>
           <li>
             <strong>Photo metadata.</strong> When you send a photo to Shelvr
@@ -94,9 +104,12 @@ export default function PrivacyPage() {
             random anonymous identifier in your browser’s local storage and send
             basic usage events (such as page views, store button clicks,
             waitlist form interactions, and the page URL) to PostHog before you
-            have an account. Website identifiers are not linked to your account
-            or to your saved content, and the website does not record sessions.
-            No analytics data is used for advertising.
+            have an account. We also keep a note in local storage of which
+            version of the site’s buttons your browser was shown, so it keeps
+            seeing the same one, and send it with those events to compare the
+            versions. Website identifiers are not linked to your account or to
+            your saved content, and the website does not record sessions. No
+            analytics data is used for advertising.
           </li>
           <li>
             <strong>On your device only.</strong> Widget data and Spotlight and
@@ -118,7 +131,7 @@ export default function PrivacyPage() {
           To find the places in your saves, Shelvr sends content from its server
           to Google’s Gemini API. What is sent: a link’s address and what we
           read from it, such as its title, creator, description, and up to about
-          6,000 characters of page text; a reel’s or TikTok’s caption and what
+          30,000 characters of page text; a reel’s or TikTok’s caption and what
           is said in the video; the places in a shared Google Maps list, with
           their addresses, map points, and notes; a note’s title and up to about
           8,000 characters of its text; and photos you save, with any text you
@@ -205,10 +218,13 @@ export default function PrivacyPage() {
         </p>
         <p className="mt-2">
           A plan can also be shared as an unlisted vote link, which shows your
-          first name, if we have one, and the plan’s city and places. Anyone
-          with the link can vote, up to 20 people at a time, and we store each
-          voter’s choices with a random browser identifier. The link closes
-          after a week, and we delete it and its votes about a week after that.
+          first name, if we have one, and the plan’s city and places, with the
+          cover image of a saved link but never a photo you saved. Anyone with
+          the link can vote, up to 20 people at a time. We store each voter’s
+          choices with a random browser identifier and, if they type one on the
+          vote page, their first name. Only you see that name, in the app and in
+          one notification about the first vote. The link closes after a week,
+          and we delete it, its votes and those names about a week after that.
         </p>
       </section>
 
@@ -321,10 +337,10 @@ export default function PrivacyPage() {
           <strong>{SUPPORT_EMAIL}</strong> to request deletion of that data.
           Waitlist email addresses are kept until you ask us to remove them.
           Clearing your browser’s local storage only discards this browser’s
-          anonymous identifier: events already recorded remain, and the next
-          event starts a new identifier. Deleting your Shelvr account does not
-          cancel an App Store subscription; manage that in your Apple ID
-          settings.
+          anonymous identifier and button version: events already recorded
+          remain, and the next visit starts new ones. Deleting your Shelvr
+          account does not cancel an App Store subscription; manage that in your
+          Apple ID settings.
         </p>
         <p className="mt-3">
           Account deletion also requests that refund data sharing stop. A

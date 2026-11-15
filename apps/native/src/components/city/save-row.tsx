@@ -20,8 +20,8 @@ type SaveRowItem = {
 type Props = {
   item: SaveRowItem;
   placeName?: string;
-  /** The matching map number when this row represents a located place. */
-  number?: number;
+  /** The place's map emoji when this row represents a located place. */
+  emoji?: string;
   selected?: boolean;
   /** Replaces opening the save, so the city page can select its pin first. */
   onPress?: () => void;
@@ -29,20 +29,28 @@ type Props = {
   onPlaceDetails?: () => void;
   onRemove?: () => void;
   removing?: boolean;
+  tally?: { picks: number; passes: number };
+  visited?: boolean;
+  onToggleVisited?: () => void;
+  visiting?: boolean;
 };
 
 export function SaveRow({
   item,
   placeName,
-  number,
+  emoji,
   selected,
   onPress,
   onPlaceDetails,
   onRemove,
   removing,
+  tally,
+  visited,
+  onToggleVisited,
+  visiting,
 }: Props) {
   const router = useRouter();
-  const { theme } = useUnistyles();
+  const { foreground, keep, onKeep } = useUnistyles().theme.colors;
   const image = item.imageUrl ?? item.heroImageUrl;
   const source = placeName
     ? (item.title ?? saveSource(item))
@@ -52,8 +60,18 @@ export function SaveRow({
     <View style={[styles.row, selected && styles.selected]}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={title}
+        accessibilityLabel={visited ? `${title}, ${t("plan.weWent")}` : title}
         accessibilityState={{ selected: selected === true }}
+        accessibilityValue={
+          tally
+            ? {
+                text: t("plan.tally", {
+                  picks: String(tally.picks),
+                  passes: String(tally.passes),
+                }),
+              }
+            : undefined
+        }
         onPress={
           onPress ??
           (() =>
@@ -61,9 +79,14 @@ export function SaveRow({
         }
         style={({ pressed }) => [styles.body, pressed && styles.pressed]}
       >
-        {number !== undefined ? (
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{number}</Text>
+        {emoji !== undefined ? (
+          <View style={styles.bubble}>
+            <Text style={styles.bubbleText}>{emoji}</Text>
+            {visited ? (
+              <View style={styles.visitedBadge}>
+                <AppSymbolIcon name="checkmark" size={10} tintColor={onKeep} />
+              </View>
+            ) : null}
           </View>
         ) : null}
         {!placeName ? (
@@ -81,13 +104,41 @@ export function SaveRow({
           <Text style={styles.title} numberOfLines={2}>
             {title}
           </Text>
-          {source ? (
-            <Text style={styles.source} numberOfLines={1}>
-              {source}
-            </Text>
+          {source || tally ? (
+            <View style={styles.meta}>
+              {source ? (
+                <Text style={styles.source} numberOfLines={1}>
+                  {source}
+                </Text>
+              ) : null}
+              {tally ? (
+                <Text style={styles.tally}>
+                  {`✓ ${tally.picks} · ✕ ${tally.passes}`}
+                </Text>
+              ) : null}
+            </View>
           ) : null}
         </View>
       </Pressable>
+      {selected && onToggleVisited ? (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t(
+            visited ? "cityProgress.unmarkVisited" : "cityProgress.markVisited",
+            { name: title },
+          )}
+          accessibilityState={{ checked: visited === true }}
+          disabled={visiting}
+          onPress={onToggleVisited}
+          style={({ pressed }) => [styles.details, pressed && styles.pressed]}
+        >
+          <AppSymbolIcon
+            name={visited ? "checkmark.circle.fill" : "checkmark"}
+            size={22}
+            tintColor={visited ? keep : foreground}
+          />
+        </Pressable>
+      ) : null}
       {selected && onRemove ? (
         <Pressable
           accessibilityRole="button"
@@ -96,11 +147,7 @@ export function SaveRow({
           onPress={onRemove}
           style={styles.details}
         >
-          <AppSymbolIcon
-            name="minus"
-            size={22}
-            tintColor={theme.colors.foreground}
-          />
+          <AppSymbolIcon name="minus" size={22} tintColor={foreground} />
         </Pressable>
       ) : null}
       {selected && onPlaceDetails ? (
@@ -110,11 +157,7 @@ export function SaveRow({
           onPress={onPlaceDetails}
           style={({ pressed }) => [styles.details, pressed && styles.pressed]}
         >
-          <AppSymbolIcon
-            name="info.circle"
-            size={22}
-            tintColor={theme.colors.foreground}
-          />
+          <AppSymbolIcon name="info.circle" size={22} tintColor={foreground} />
         </Pressable>
       ) : null}
     </View>
@@ -146,15 +189,29 @@ const styles = StyleSheet.create((theme) => ({
   },
   selected: { backgroundColor: theme.colors.primarySoft },
   pressed: { opacity: theme.opacity.pressed },
-  badge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  bubble: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.surface,
+    boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
   },
-  badgeText: { ...theme.type.badge, color: theme.colors.onTint },
+  bubbleText: { fontSize: 20 },
+  visitedBadge: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 2,
+    borderColor: theme.colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.keep,
+  },
   thumb: {
     width: 56,
     height: 56,
@@ -164,5 +221,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   text: { flex: 1, gap: theme.gap(0.25) },
   title: { ...theme.type.subheadStrong, color: theme.colors.foreground },
-  source: { ...theme.type.footnote, color: theme.colors.muted },
+  meta: { flexDirection: "row", alignItems: "center", gap: theme.gap(1) },
+  source: { ...theme.type.footnote, color: theme.colors.muted, flexShrink: 1 },
+  tally: { ...theme.type.captionStrong, color: theme.colors.primaryText },
 }));

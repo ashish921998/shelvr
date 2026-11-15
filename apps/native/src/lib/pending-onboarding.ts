@@ -2,18 +2,21 @@ import * as Crypto from "expo-crypto";
 import * as SecureStore from "expo-secure-store";
 import { onboardingLabel } from "@/lib/onboarding-labels";
 import {
-  isPlanner,
   isSavedCount,
   readGoals,
   type Goal,
-  type Planner,
   type SavedCount,
 } from "@/lib/onboarding-goals";
-import { isSampleCity, type SampleCityId } from "@/lib/sample-cities";
+import { ONBOARDING_STEPS, type OnboardingStep } from "@/lib/onboarding-steps";
+import {
+  isSampleCity,
+  readSampleCities,
+  type SampleCityId,
+} from "@/lib/sample-cities";
 
 const PENDING_KEY = "shelvr.pending.onboarding";
 
-const PROGRESS_VERSION = 11;
+const PROGRESS_VERSION = 14;
 
 export type PendingDemo = {
   url: string;
@@ -23,44 +26,51 @@ export type PendingDemo = {
 
 type PendingRecord = {
   operationId: string;
+  declinedOperationId?: string | null;
   spaces: string[];
   demoUrl: string | null;
   demoSpace: string | null;
   demoOwner: string | null;
   progressVersion: number | null;
   step: number | null;
+  viewed: OnboardingStep[];
   spaceNames: Record<string, string>;
   travelCity?: SampleCityId | null;
+  beenCities?: SampleCityId[];
   goals?: Goal[];
   savedCount?: SavedCount | null;
-  planner?: Planner | null;
+  skippedShare?: boolean;
 };
 
 type OnboardingAnswers = {
   travelCity: SampleCityId | null;
+  beenCities: SampleCityId[];
   goals: Goal[];
   savedCount: SavedCount | null;
-  planner: Planner | null;
+  skippedShare: boolean;
 };
 
 type OnboardingProgress = OnboardingAnswers & {
   spaces: string[];
   step: number | null;
+  viewed: OnboardingStep[];
 };
 
 const NO_ANSWERS: OnboardingAnswers = {
   travelCity: null,
+  beenCities: [],
   goals: [],
   savedCount: null,
-  planner: null,
+  skippedShare: false,
 };
 
 function answersOf(record: Partial<OnboardingAnswers>): OnboardingAnswers {
   return {
     travelCity: isSampleCity(record.travelCity) ? record.travelCity : null,
+    beenCities: readSampleCities(record.beenCities),
     goals: readGoals(record.goals),
     savedCount: isSavedCount(record.savedCount) ? record.savedCount : null,
-    planner: isPlanner(record.planner) ? record.planner : null,
+    skippedShare: record.skippedShare === true,
   };
 }
 
@@ -109,6 +119,10 @@ function readPendingRecord(): PendingRecord | null {
     }
     return {
       operationId: record.operationId,
+      declinedOperationId:
+        typeof record.declinedOperationId === "string"
+          ? record.declinedOperationId
+          : null,
       spaces,
       demoUrl: record.demoUrl === "" ? null : record.demoUrl,
       demoSpace:
@@ -124,12 +138,19 @@ function readPendingRecord(): PendingRecord | null {
           ? record.progressVersion
           : null,
       step,
+      viewed: readViewed(record.viewed),
       spaceNames: readSpaceNames(record.spaceNames),
       ...answersOf(record),
     };
   } catch {
     return null;
   }
+}
+
+function readViewed(value: unknown): OnboardingStep[] {
+  return Array.isArray(value)
+    ? ONBOARDING_STEPS.filter((step) => value.includes(step))
+    : [];
 }
 
 function readSpaceNames(value: unknown): Record<string, string> {
@@ -162,38 +183,33 @@ export function getOrCreatePendingOperationId(): string {
     demoOwner: null,
     progressVersion: null,
     step: null,
+    viewed: [],
     spaceNames: {},
   });
   return operationId;
 }
 
-function writePendingSpaces(spaces: string[], refreshOperationId: boolean) {
+/** Onboarding finished: hands the spaces to the replay hook. */
+export function setPendingSpaces(spaces: string[]) {
   const existing = readPendingRecord();
   const operationId =
-    spaces.length > 0 && refreshOperationId && !existing?.demoUrl
+    spaces.length > 0 && !existing?.demoUrl
       ? createOperationId()
       : (existing?.operationId ?? createOperationId());
   writePendingRecord({
     operationId,
+    declinedOperationId: existing?.declinedOperationId ?? null,
     spaces,
     demoUrl: existing?.demoUrl ?? null,
     demoSpace: existing?.demoSpace ?? null,
     demoOwner: existing?.demoOwner ?? null,
     progressVersion: existing?.progressVersion ?? null,
     step: existing?.step ?? null,
+    viewed: existing?.viewed ?? [],
     spaceNames: existing?.spaceNames ?? {},
     ...answersOf(existing ?? {}),
   });
   notifyChanged();
-}
-
-/** Onboarding finished: hands the spaces to the replay hook. */
-export function setPendingSpaces(spaces: string[]) {
-  writePendingSpaces(spaces, true);
-}
-
-export function updatePendingSpaces(spaces: string[]) {
-  writePendingSpaces(spaces, false);
 }
 
 export function getPendingSpaces(): string[] {
@@ -227,6 +243,12 @@ export function queueDemoUrl(
   if (existing === null) return;
   writePendingRecord({
     ...existing,
+    operationId:
+      existing.demoUrl === url &&
+      existing.demoSpace === space &&
+      existing.demoOwner === owner
+        ? existing.operationId
+        : createOperationId(),
     demoUrl: url,
     demoSpace: space,
     demoOwner: owner,
@@ -253,28 +275,50 @@ function isCurrentProgress(record: PendingRecord | null): boolean {
 export function getOnboardingProgress(): OnboardingProgress {
   const record = readPendingRecord();
   if (record === null || !isCurrentProgress(record)) {
-    return { ...NO_ANSWERS, spaces: [], step: null };
+    return { ...NO_ANSWERS, spaces: [], step: null, viewed: [] };
   }
-  return { ...answersOf(record), spaces: record.spaces, step: record.step };
+  return {
+    ...answersOf(record),
+    spaces: record.spaces,
+    step: record.step,
+    viewed: record.viewed,
+  };
 }
 
 export function setOnboardingProgress(
-  progress: Partial<OnboardingAnswers> & { spaces: string[]; step: number },
+  progress: Partial<OnboardingAnswers> & {
+    spaces: string[];
+    step: number;
+    viewed?: OnboardingStep[];
+  },
 ) {
   const existing = readPendingRecord();
   const operationId = existing?.operationId ?? createOperationId();
   writePendingRecord({
     operationId,
+    declinedOperationId: existing?.declinedOperationId ?? null,
     spaces: progress.spaces,
     demoUrl: existing?.demoUrl ?? null,
     demoSpace: existing?.demoSpace ?? null,
     demoOwner: existing?.demoOwner ?? null,
     progressVersion: PROGRESS_VERSION,
     step: progress.step,
+    viewed: progress.viewed ?? [],
     spaceNames: existing?.spaceNames ?? {},
     ...answersOf(progress),
   });
   notifyChanged();
+}
+
+export function noteReplayDeclined(operationId: string | null) {
+  const record = readPendingRecord();
+  if (record === null || record.operationId !== operationId) return;
+  writePendingRecord({ ...record, declinedOperationId: operationId });
+}
+
+export function replayDeclined(): boolean {
+  const record = readPendingRecord();
+  return record !== null && record.declinedOperationId === record.operationId;
 }
 
 export function hasPending(): boolean {

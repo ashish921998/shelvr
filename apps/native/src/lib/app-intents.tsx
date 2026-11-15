@@ -1,6 +1,13 @@
 import { analytics } from "@/lib/analytics";
+import {
+  drainInvocations,
+  isSaveInvocation,
+} from "@/lib/app-intent-invocations";
+import { revokeFailureReason, revokeWithRetry } from "@/lib/capture-revoke";
 import { useCurrentUser } from "@/lib/current-user";
 import { useEntitlement } from "@/lib/entitlement";
+import { canSave } from "@/lib/access";
+import { useAccess } from "@/lib/free-plan";
 import { useHomeFeed } from "@/lib/home-feed";
 import { t } from "@/lib/i18n";
 import { displayHost } from "@/lib/url";
@@ -8,7 +15,7 @@ import { useSaveImages } from "@/lib/use-save-image";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { MAX_URL_LENGTH } from "@convex/model/externalUrl";
-import { saveErrorCode } from "@convex/model/saveErrors";
+import { saveError } from "@convex/model/saveErrors";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useAction, useConvexAuth, useMutation } from "convex/react";
@@ -18,6 +25,7 @@ import { Directory, File, Paths } from "expo-file-system";
 import { requireOptionalNativeModule } from "expo-modules-core";
 import { useNavigationContainerRef, useRouter } from "expo-router";
 import { useEffect, useRef } from "react";
+import { AppState } from "react-native";
 import { createMMKV } from "react-native-mmkv";
 import { Images } from "react-native-nitro-image";
 
@@ -170,35 +178,54 @@ async function writeThumbnails(
 let publishChain: Promise<void> = Promise.resolve();
 let publishGeneration = 0;
 
-function publish(work: (isCurrent: () => boolean) => Promise<void>) {
+function publish(
+  work: (isCurrent: () => boolean) => Promise<void>,
+  always = false,
+) {
   const generation = ++publishGeneration;
   const isCurrent = () => generation === publishGeneration;
   publishChain = publishChain
-    .then(() => (isCurrent() ? work(isCurrent) : undefined))
+    .then(() => (always || isCurrent() ? work(isCurrent) : undefined))
     .catch((error) =>
       analytics.captureError("app_intents_publish_failed", error),
     );
   return publishChain;
 }
 
-function clearCatalogs() {
+function clearCatalogs(): Promise<boolean> {
+  let cleared = false;
   return publish(async () => {
-    await AppIntents.setEntityCatalogAsync(ITEM_KIND, []);
-    await AppIntents.setEntityCatalogAsync(SPACE_KIND, []);
-    await setup?.clearSpotlight();
-    const dir = thumbDirectory();
-    if (dir.exists) dir.delete();
-  });
+    const steps = [
+      () => AppIntents.setEntityCatalogAsync(ITEM_KIND, []),
+      () => AppIntents.setEntityCatalogAsync(SPACE_KIND, []),
+      async () => setup?.clearSpotlight(),
+      async () => {
+        const dir = thumbDirectory();
+        if (dir.exists) dir.delete();
+      },
+    ];
+    const failures: unknown[] = [];
+    for (const step of steps) {
+      try {
+        await step();
+      } catch (error) {
+        failures.push(error);
+      }
+    }
+    if (failures.length > 0) throw failures[0];
+    cleared = true;
+  }, true).then(() => cleared);
 }
 
-async function resetAppIntents(): Promise<void> {
-  if (!AppIntents.isAvailable()) return;
+async function resetAppIntents(clearInvocations: boolean): Promise<boolean> {
+  if (!AppIntents.isAvailable()) return true;
   store.remove(CAPTURE_OWNER_KEY);
-  await Promise.all([
+  const [, , cleared] = await Promise.all([
     setup?.clearCaptureCredentials(),
-    AppIntents.clearPendingInvocationsAsync(),
+    clearInvocations ? AppIntents.clearPendingInvocationsAsync() : undefined,
     clearCatalogs(),
   ]);
+  return cleared;
 }
 
 export async function revokeSiriCapture(
@@ -206,9 +233,11 @@ export async function revokeSiriCapture(
 ): Promise<void> {
   try {
     const token = await setup?.captureToken();
-    if (token) await revoke({ token });
+    if (token) await revokeWithRetry(() => revoke({ token }));
   } catch (error) {
-    analytics.captureError("app_intents_revoke_failed", error);
+    analytics.captureError("app_intents_revoke_failed", error, {
+      reason: revokeFailureReason(error),
+    });
   }
 }
 
@@ -221,11 +250,23 @@ export function useAppIntentsSignOutReset(): void {
       reset.current = false;
       return;
     }
-    if (reset.current) return;
-    reset.current = true;
-    void resetAppIntents().catch((error) =>
-      analytics.captureError("app_intents_reset_failed", error),
-    );
+    const run = (clearInvocations: boolean) => {
+      if (reset.current) return;
+      reset.current = true;
+      void resetAppIntents(clearInvocations)
+        .then((cleared) => {
+          if (!cleared) reset.current = false;
+        })
+        .catch((error) => {
+          reset.current = false;
+          analytics.captureError("app_intents_reset_failed", error);
+        });
+    };
+    run(true);
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") run(false);
+    });
+    return () => subscription.remove();
   }, [isAuthenticated, isLoading]);
 }
 
@@ -321,7 +362,7 @@ function spaceParam(
   return param(invocation, "spaceId") as Id<"spaces"> | undefined;
 }
 
-function useInvocationHandler() {
+function useInvocationHandler(entitled: boolean, photosAllowed: boolean) {
   const router = useRouter();
   const navigation = useNavigationContainerRef();
   const createNoteItem = useMutation(api.items.createNoteItem);
@@ -412,36 +453,46 @@ function useInvocationHandler() {
           })),
           { spaceId: spaceParam(invocation), saveSource: "siri" },
         );
-        const retry = results.find(
-          (result) => result.status === "failed" && result.code === undefined,
+        const failed = results.flatMap((result) =>
+          result.status === "failed" ? [result.code] : [],
         );
-        if (retry) throw new Error("app_intents_image_save_failed");
+        if (failed.includes("pro_required")) throw saveError("pro_required");
+        if (failed.includes(undefined))
+          throw new Error("app_intents_image_save_failed");
         for (const file of files) file.delete();
         return;
       }
     }
   }
 
-  AppIntents.useAppIntents(async (pending) => {
-    for (const invocation of pending) {
-      if (inFlight.current.has(invocation.id)) continue;
-      inFlight.current.add(invocation.id);
-      try {
-        await handle(invocation);
-        await AppIntents.removePendingInvocationAsync(invocation.id);
-      } catch (error) {
-        if (saveErrorCode(error) !== null) {
-          await AppIntents.removePendingInvocationAsync(invocation.id);
-        } else {
-          analytics.captureError("app_intents_invocation_failed", error, {
-            invocation: invocation.name,
-          });
-        }
-      } finally {
-        inFlight.current.delete(invocation.id);
-      }
-    }
+  const drain = (pending: AppIntents.AppIntentInvocation[]) =>
+    drainInvocations(pending, {
+      entitled,
+      photosAllowed,
+      inFlight: inFlight.current,
+      handle,
+      remove: AppIntents.removePendingInvocationAsync,
+      report: (invocation, error) =>
+        analytics.captureError("app_intents_invocation_failed", error, {
+          invocation: invocation.name,
+        }),
+    });
+
+  AppIntents.useAppIntents(drain);
+
+  const drainRef = useRef(drain);
+  useEffect(() => {
+    drainRef.current = drain;
   });
+
+  useEffect(() => {
+    if (!entitled) return;
+    AppIntents.getPendingInvocationsAsync()
+      .then((pending) => drainRef.current(pending.filter(isSaveInvocation)))
+      .catch((error: unknown) =>
+        analytics.captureError("app_intents_pending_read_failed", error),
+      );
+  }, [entitled, photosAllowed]);
 }
 
 export function AppIntentsBridge() {
@@ -453,7 +504,8 @@ function SignedInAppIntents() {
   const { isAuthenticated } = useConvexAuth();
   const { data: user } = useCurrentUser();
   const { entitled, loading } = useEntitlement();
-  useInvocationHandler();
+  const access = useAccess();
+  useInvocationHandler(canSave(access), access.kind === "pro");
   useCaptureCredentials(isAuthenticated ? user?._id : undefined);
   useCatalogSync(isAuthenticated && entitled, loading);
   return null;

@@ -58,6 +58,19 @@ describe("page view properties", () => {
     expect(JSON.stringify(properties)).not.toContain("plan_secret456");
   });
 
+  it.each([
+    ["l", "list_secret789"],
+    ["m", "0123456789abcdef0123456789abcdef"],
+  ])("never sends a /%s/ list invite or map page token", (prefix, token) => {
+    const properties = pageViewProperties(
+      { origin, pathname: `/${prefix}/${token}`, search: "" },
+      "",
+    );
+    expect(properties.$current_url).toBe(`${origin}/${prefix}/[token]`);
+    expect(properties.$pathname).toBe(`/${prefix}/[token]`);
+    expect(JSON.stringify(properties)).not.toContain(token);
+  });
+
   it("omits the campaign when the visitor brought none", () => {
     expect(
       pageViewProperties({ origin, pathname: "/", search: "" }, ""),

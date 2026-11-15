@@ -112,7 +112,7 @@ function Spots({
   const router = useRouter();
   const { rt, theme } = useUnistyles();
   const reduced = useReducedMotion();
-  const pins = cityPins([{ _id: save._id, placePins: found }]);
+  const pins = cityPins([{ _id: save._id, tags: save.tags, placePins: found }]);
   const dropped = useDroppedPins(pins.length);
   useLandingHaptics(dropped, pins.length);
   const mapHeight = rt.screen.height * MAP_SHARE;
@@ -169,10 +169,14 @@ function Spots({
 }
 
 function useLandingHaptics(dropped: number, total: number) {
+  const focused = useIsFocused();
+  const previous = useRef(0);
   useEffect(() => {
-    if (process.env.EXPO_OS !== "ios" || dropped === 0) return;
-    void (dropped >= total ? haptics.success() : haptics.impact());
-  }, [dropped, total]);
+    const landed = dropped > previous.current;
+    previous.current = dropped;
+    if (!focused || !landed) return;
+    void (dropped >= total ? haptics.success() : haptics.landing());
+  }, [dropped, total, focused]);
 }
 
 function SpotRow({

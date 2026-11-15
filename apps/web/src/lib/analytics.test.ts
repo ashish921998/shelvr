@@ -1,10 +1,28 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readdirSync } from "node:fs";
+import { dirname, join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { captureWebAnalyticsEvent, captureWebException } from "./analytics";
+import { pageViewProperties } from "./pageView";
+import { maskTokenPath } from "./tokenPath";
 
 const fetchMock = vi.fn();
+
+const APP = join(dirname(fileURLToPath(import.meta.url)), "../app");
+
+function tokenRoutes(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .flatMap((entry) =>
+      entry.name === "[token]"
+        ? [relative(APP, dir)]
+        : tokenRoutes(join(dir, entry.name)),
+    );
+}
 
 describe("web analytics", () => {
   beforeEach(() => {
@@ -22,6 +40,7 @@ describe("web analytics", () => {
     vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://us.i.posthog.com/");
     window.localStorage.clear();
     window.localStorage.setItem("shelvr_web_distinct_id", "browser-123");
+    document.documentElement.removeAttribute("data-cta");
     fetchMock.mockReset();
     fetchMock.mockResolvedValue(new Response(null, { status: 200 }));
   });
@@ -45,6 +64,28 @@ describe("web analytics", () => {
         source: "hero",
       },
     });
+  });
+
+  it("sends the browser's button variant with every event", () => {
+    window.localStorage.setItem("shelvr_cta_variant", "emoji");
+
+    captureWebAnalyticsEvent("app_store_clicked", { source: "hero" });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).properties).toMatchObject({
+      distinct_id: "browser-123",
+      source: "hero",
+      cta_variant: "emoji",
+    });
+  });
+
+  it("sends no button variant when the browser has none", () => {
+    captureWebAnalyticsEvent("app_store_clicked", { source: "hero" });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body)).properties).not.toHaveProperty(
+      "cta_variant",
+    );
   });
 
   it("sanitizes email addresses and URLs in exception events", () => {
@@ -72,6 +113,44 @@ describe("web analytics", () => {
     captureWebAnalyticsEvent("page_viewed");
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  describe("pages with a token in the path", () => {
+    const routes = tokenRoutes(APP);
+    const token = "route-secret-4821";
+
+    afterEach(() => {
+      window.history.replaceState({}, "", "/");
+    });
+
+    it("finds the site's [token] pages", () => {
+      expect(routes.length).toBeGreaterThan(0);
+    });
+
+    it.each(routes)(
+      "keeps a /%s/[token] page's token out of page views and events",
+      (route) => {
+        window.history.replaceState({}, "", `/${route}/${token}`);
+
+        expect(pageViewProperties(window.location, "")).toMatchObject({
+          $current_url: `${window.location.origin}/${route}/[token]`,
+          $pathname: `/${route}/[token]`,
+        });
+
+        captureWebAnalyticsEvent("app_store_clicked", { source: "share" });
+        const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+        expect(JSON.parse(String(init.body)).properties.$current_url).toBe(
+          `${window.location.origin}/${route}/[token]`,
+        );
+        expect(String(init.body)).not.toContain(token);
+      },
+    );
+
+    it("masks the whole path under a token route and nothing else", () => {
+      expect(maskTokenPath(`/l/${token}/more`)).toBe("/l/[token]");
+      expect(maskTokenPath(`/lists/${token}`)).toBe(`/lists/${token}`);
+      expect(maskTokenPath("/privacy")).toBe("/privacy");
+    });
   });
 });
 
@@ -104,3 +183,23 @@ it("redacts plan vote links too", () => {
   );
   window.history.replaceState({}, "", "/");
 });
+
+it.each(["l", "m"])(
+  "redacts /%s/ list invite and map page links too",
+  (prefix) => {
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN", "test-token");
+    vi.stubEnv("NEXT_PUBLIC_POSTHOG_HOST", "https://example.com");
+    window.history.replaceState({}, "", `/${prefix}/private-capability123`);
+    const spy = vi.fn().mockResolvedValue(new Response());
+    vi.stubGlobal("fetch", spy);
+    captureWebAnalyticsEvent("map_page_viewed", {
+      $current_url: `https://example.com/${prefix}/private-capability123`,
+    });
+    const body = JSON.parse(spy.mock.calls[0][1].body);
+    expect(body.properties.$current_url).toBe(
+      `${window.location.origin}/${prefix}/[token]`,
+    );
+    expect(spy.mock.calls[0][1].body).not.toContain("private-capability123");
+    window.history.replaceState({}, "", "/");
+  },
+);

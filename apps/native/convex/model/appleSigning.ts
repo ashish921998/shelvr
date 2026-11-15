@@ -9,10 +9,9 @@ function encodeJson(value: unknown): string {
   return base64Url(new TextEncoder().encode(JSON.stringify(value)));
 }
 
-export async function signEs256Jwt(
+export async function signEs256(
   privateKey: string,
-  header: Record<string, unknown>,
-  payload: Record<string, unknown>,
+  text: string,
 ): Promise<string> {
   const der = Uint8Array.from(
     atob(
@@ -31,11 +30,19 @@ export async function signEs256Jwt(
     false,
     ["sign"],
   );
-  const signed = `${encodeJson({ alg: "ES256", ...header })}.${encodeJson(payload)}`;
   const signature = await crypto.subtle.sign(
     { name: "ECDSA", hash: "SHA-256" },
     key,
-    new TextEncoder().encode(signed),
+    new TextEncoder().encode(text),
   );
-  return `${signed}.${base64Url(new Uint8Array(signature))}`;
+  return base64Url(new Uint8Array(signature));
+}
+
+export async function signEs256Jwt(
+  privateKey: string,
+  header: Record<string, unknown>,
+  payload: Record<string, unknown>,
+): Promise<string> {
+  const signed = `${encodeJson({ alg: "ES256", ...header })}.${encodeJson(payload)}`;
+  return `${signed}.${await signEs256(privateKey, signed)}`;
 }

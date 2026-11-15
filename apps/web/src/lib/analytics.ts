@@ -1,3 +1,6 @@
+import { maskTokenPath } from "@/lib/tokenPath";
+import { ctaVariant } from "@/lib/ctaVariant";
+
 type AnalyticsProperties = Record<
   string,
   boolean | number | string | unknown[]
@@ -40,6 +43,7 @@ export function captureWebAnalyticsEvent(
 
     if (!token || !host || typeof window === "undefined") return;
 
+    const variant = ctaVariant();
     const distinctIdKey = "shelvr_web_distinct_id";
     const distinctId =
       window.localStorage.getItem(distinctIdKey) ?? window.crypto.randomUUID();
@@ -54,8 +58,9 @@ export function captureWebAnalyticsEvent(
         event,
         properties: {
           distinct_id: distinctId,
+          ...(variant ? { cta_variant: variant } : {}),
           ...properties,
-          $current_url: `${window.location.origin}${window.location.pathname.replace(/^\/(i|p)\/[^/]+/, "/$1/[token]")}`,
+          $current_url: `${window.location.origin}${maskTokenPath(window.location.pathname)}`,
         },
       }),
       keepalive: true,

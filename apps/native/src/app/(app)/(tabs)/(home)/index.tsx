@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { t, useAppLocale } from "@/lib/i18n";
-import { ProCard } from "@/components/home/pro-card";
+import { FreeSavesCard, ProCard } from "@/components/home/pro-card";
 import { HomeSearch } from "@/components/home/home-search";
-import { SharedListsSection } from "@/components/home/shared-lists-section";
+import { SharedListsNudge } from "@/components/home/shared-lists-nudge";
 import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
@@ -17,6 +17,8 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 import { HeaderScrim } from "@/components/ui/header-scrim";
 import { useCurrentUser } from "@/lib/current-user";
 import { type Entitlement, useEntitlement } from "@/lib/entitlement";
+import { FREE_SAVES_NUDGE_AT, saveWaiting } from "@/lib/access";
+import { useAccess } from "@/lib/free-plan";
 import { useHomeFeed } from "@/lib/home-feed";
 import { unplacedSaves } from "@/lib/home-places";
 import {
@@ -25,7 +27,13 @@ import {
 } from "@/lib/feedback-invitation";
 import { useCancelSurvey } from "@/lib/use-cancel-survey";
 import { useReviewPrompt } from "@/lib/review-prompt";
-import { welcomeSave } from "@/lib/welcome-save";
+import { NameSheet } from "@/components/shared-list/name-sheet";
+import {
+  useHoldSheetTurns,
+  useSheetTurnUp,
+  useSheetTurnsBusy,
+} from "@/lib/one-time-sheets";
+import { useWelcomeName } from "@/lib/welcome-name";
 import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -68,12 +76,28 @@ export default function HomeScreen() {
   ]);
   const cancelSurvey = useCancelSurvey();
   const entitlement = useEntitlement();
-  const locked = !entitlement.loading && !entitlement.entitled;
+  const access = useAccess();
+  const locked = access.kind === "locked";
+  const nearLimit =
+    access.kind === "free" && access.left <= FREE_SAVES_NUDGE_AT;
   const { data: user } = useCurrentUser();
-  const welcomePending = welcomeSave.usePending(user?._id);
+  const welcomeName = useWelcomeName(
+    user?._id,
+    items !== undefined &&
+      !cancelSurvey.visible &&
+      !entitlement.loading &&
+      !saveWaiting(access),
+  );
+  const sheetsBusy = useSheetTurnsBusy();
+  const sheetUp = useSheetTurnUp();
   const deferPrompts =
-    cancelSurvey.visible || entitlement.loading || locked || welcomePending;
+    cancelSurvey.visible ||
+    entitlement.loading ||
+    locked ||
+    sheetsBusy ||
+    welcomeName.pending;
   const feedback = useFeedbackInvitation(items, { defer: deferPrompts });
+  useHoldSheetTurns(feedback.modalOpen);
   useReviewPrompt(items, {
     defer: deferPrompts || feedback.invitationVisible || feedback.modalOpen,
   });
@@ -93,7 +117,9 @@ export default function HomeScreen() {
     />
   ) : locked ? (
     <ProCard lapsed={entitlement.status === "lapsed"} />
-  ) : feedback.invitationVisible && !busySaving ? (
+  ) : nearLimit ? (
+    <FreeSavesCard left={access.left} limit={access.limit} open={access.open} />
+  ) : feedback.invitationVisible && !busySaving && !sheetUp ? (
     <FeedbackInvitation
       onSendFeedback={feedback.openFeedbackFromInvitation}
       onDismiss={feedback.dismissInvitation}
@@ -123,7 +149,7 @@ export default function HomeScreen() {
         {topCard ? <View style={styles.topCard}>{topCard}</View> : null}
         {locked ? null : (
           <HomeSearch>
-            <SharedListsSection />
+            <SharedListsNudge />
             {items.length > 0 ? (
               <>
                 <HomePlaces />
@@ -146,6 +172,12 @@ export default function HomeScreen() {
           trialEndsAt={trialEnd(entitlement)}
         />
       ) : null}
+      <NameSheet
+        visible={welcomeName.open}
+        kind="welcome"
+        onDone={welcomeName.close}
+        onCancel={welcomeName.close}
+      />
       {feedback.modalOpen ? (
         <FeedbackModal surface="home" onClose={feedback.closeFeedback} />
       ) : null}
@@ -166,6 +198,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingBottom: theme.gap(1.5),
   },
   empty: {
+    gap: theme.gap(1.5),
     paddingHorizontal: theme.gap(2),
     paddingTop: theme.gap(4),
   },

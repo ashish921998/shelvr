@@ -4,11 +4,11 @@ import styles from "./Landing.module.css";
 const modes = [
   {
     name: "Plan a date",
-    body: "One evening, a few of your places close together. Send it to them and let them vote.",
+    body: "One evening, two stops a short walk apart, built around your saves. Send it to your date.",
   },
   {
     name: "Plan a trip",
-    body: "One area a day, morning to evening, every stop from your saves.",
+    body: "One area a day, morning to evening: your saves, plus suggested spots nearby.",
   },
 ];
 
@@ -28,8 +28,7 @@ export default function Plans() {
         <div>
           <h2 className={styles.heading}>when you’re going, ask for a plan.</h2>
           <p className={`${styles.text} ${styles.intro}`}>
-            Open a city and Shelvr plans it from what you saved. It never adds a
-            place you didn’t.
+            Open a city and Shelvr plans it around what you saved.
           </p>
           <dl className={styles.modes}>
             {modes.map((mode) => (

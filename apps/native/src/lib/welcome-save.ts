@@ -1,20 +1,17 @@
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
-import {
-  type EntitlementStatus,
-  useEntitlement,
-  whenSheetSettled,
-} from "@/lib/entitlement";
+import { type EntitlementStatus, useEntitlement } from "@/lib/entitlement";
 import { oncePerAccount } from "@/lib/once-per-account";
-import { whenTrialPrimerDone } from "@/lib/trial-reminder";
+import { useSheetTurn } from "@/lib/one-time-sheets";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import * as SecureStore from "expo-secure-store";
-import { useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useIsFocused } from "expo-router";
+import { useEffect, useRef } from "react";
 
 export const welcomeSave = oncePerAccount("welcomeSave");
+export const welcomeName = oncePerAccount("welcomeName");
 
 const ONBOARDED_HERE_KEY = "shelvr.welcomeAfterOnboarding";
 
@@ -35,6 +32,7 @@ export function noteOnboardingFinished(): void {
 function claimOnboardingWelcome(userId: string, priorSaves: number): void {
   if (SecureStore.getItem(ONBOARDED_HERE_KEY) !== "true") return;
   SecureStore.setItem(ONBOARDED_HERE_KEY, "");
+  welcomeName.mark(userId);
   if (priorSaves === 0) welcomeSave.mark(userId);
 }
 
@@ -92,27 +90,6 @@ export function useWelcomeSheetVisible(
   ready: boolean,
 ): boolean {
   const pending = welcomeSave.usePending(userId);
-  const focusCount = useRef(0);
-  const [focus, setFocus] = useState<number | null>(null);
-  useFocusEffect(
-    useCallback(() => {
-      focusCount.current += 1;
-      setFocus(focusCount.current);
-      return () => setFocus(null);
-    }, []),
-  );
-  const [settledFor, setSettledFor] = useState<number | null>(null);
-  useEffect(() => {
-    if (!pending || focus === null) return;
-    let live = true;
-    void whenSheetSettled()
-      .then(whenTrialPrimerDone)
-      .then(() => {
-        if (live) setSettledFor(focus);
-      });
-    return () => {
-      live = false;
-    };
-  }, [pending, focus]);
-  return pending && ready && focus !== null && settledFor === focus;
+  const focused = useIsFocused();
+  return useSheetTurn("letter", pending && ready && focused);
 }

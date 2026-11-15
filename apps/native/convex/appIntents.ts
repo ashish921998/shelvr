@@ -20,7 +20,6 @@ import {
   createItemWithOperation,
   finalizeImageImportForUser,
 } from "./items";
-import { requireProEntitlement } from "./subscriptions";
 import { rateLimiter } from "./model/rateLimiter";
 
 export const authorizeCaptureBody = internalMutation({
@@ -239,7 +238,6 @@ export const captureLinkOrNote = internalMutation({
     const token = await claimCaptureToken(ctx, args.tokenHash);
     if (token === null) return { kind: "unauthorized" as const };
     const userId = token.userId;
-    await requireProEntitlement(ctx, userId);
     const options = {
       operationId: args.operationId,
       spaceId: await ownedSpaceId(ctx, userId, args.spaceId),

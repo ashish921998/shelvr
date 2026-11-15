@@ -233,7 +233,7 @@ describe("deleteCurrentUserAccount", () => {
       expect(await remaining()).toBeGreaterThan(0);
       expect(await remaining()).toBeLessThan(count);
 
-      await backend.finishAllScheduledFunctions(vi.runAllTimers);
+      await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
       expect(await remaining()).toBe(0);
       expect(await backend.run((ctx) => ctx.db.get(userId))).toBeNull();
     } finally {
@@ -253,7 +253,7 @@ describe("deleteCurrentUserAccount", () => {
       await seedNotes(backend, userId, DELETE_BATCH + 1);
 
       await t.mutation(api.users.deleteCurrentUserAccount, {});
-      await backend.finishAllScheduledFunctions(vi.runAllTimers);
+      await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
       await backend.run(async (ctx) => {
         expect(
@@ -392,7 +392,7 @@ describe("deleteCurrentUserAccount", () => {
       });
 
       await t.mutation(api.users.deleteCurrentUserAccount, {});
-      await backend.finishAllScheduledFunctions(vi.runAllTimers);
+      await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
 
       await backend.run(async (ctx) => {
         expect(
@@ -495,7 +495,7 @@ describe("account deletion fence", () => {
         deleting: true,
       });
 
-      await backend.finishAllScheduledFunctions(vi.runAllTimers);
+      await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
       expect(await remainingItems(backend, userId)).toBe(0);
       expect(await backend.run((ctx) => ctx.db.get(userId))).toBeNull();
     } finally {
@@ -530,7 +530,7 @@ describe("account deletion fence", () => {
       );
       expect(revokes).toHaveLength(1);
 
-      await backend.finishAllScheduledFunctions(vi.runAllTimers);
+      await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
       expect(await backend.run((ctx) => ctx.db.get(userId))).toBeNull();
     } finally {
       vi.useRealTimers();
@@ -568,7 +568,7 @@ describe("account deletion fence", () => {
       await expectRetainedIdentityRejected(t);
       expect(await remainingItems(backend, userId)).toBe(1);
 
-      await backend.finishAllScheduledFunctions(vi.runAllTimers);
+      await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
       expect(await backend.run((ctx) => ctx.db.get(userId))).toBeNull();
       await expectRetainedIdentityRejected(t);
       expect(
@@ -592,7 +592,7 @@ describe("account deletion fence", () => {
       await t.mutation(api.users.deleteCurrentUserAccount, {});
       await expect(t.query(api.users.getCurrentUser, {})).resolves.toBeNull();
 
-      await backend.finishAllScheduledFunctions(vi.runAllTimers);
+      await backend.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
       await expect(t.query(api.users.getCurrentUser, {})).resolves.toBeNull();
     } finally {
       vi.useRealTimers();

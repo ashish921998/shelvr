@@ -1,10 +1,11 @@
+import { namedVisitMarkValidator } from "./placeVisits";
 import { type Infer, v } from "convex/values";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 import { liveOwner } from "./auth";
 import { namesOneVenue } from "./dateRank";
 import { removalValidator } from "./placeRemovals";
-import { MAX_LIST_NAME_CHARS } from "./sharedListLimits";
+import { MAX_LIST_NAME_CHARS, MAX_LIST_PLACES } from "./sharedListLimits";
 import {
   cityKey,
   countCities,
@@ -19,7 +20,6 @@ import {
   type TripPlace,
 } from "./tripPlan";
 
-export const MAX_LIST_PLACES = 200;
 export const MAX_LIST_MEMBERS = 8;
 export const MAX_LISTS_PER_USER = 20;
 export const LIST_DRAIN_BATCH = 100;
@@ -51,13 +51,24 @@ export const sharedListPlaceValidator = v.object({
   addedAt: v.number(),
   isNew: v.boolean(),
   visitedAt: v.optional(v.number()),
+  wentBy: v.optional(
+    v.array(
+      v.object({ firstName: v.optional(v.string()), isYou: v.boolean() }),
+    ),
+  ),
 });
+
+export const newFromValidator = v.array(
+  v.object({ firstName: v.optional(v.string()), count: v.number() }),
+);
+type NewFrom = Infer<typeof newFromValidator>;
 
 export const sharedListSummaryValidator = v.object({
   _id: v.id("sharedLists"),
   name: v.string(),
   placeCount: v.number(),
   newCount: v.number(),
+  newFrom: newFromValidator,
   isOwner: v.boolean(),
   members: v.array(
     v.object({ firstName: v.optional(v.string()), isYou: v.boolean() }),
@@ -74,6 +85,7 @@ export const sharedListDetailValidator = v.object({
   cities: v.array(v.string()),
   members: v.array(sharedListMemberValidator),
   places: v.array(sharedListPlaceValidator),
+  newFrom: newFromValidator,
   trips: v.array(tripPlanSummaryValidator),
 });
 
@@ -104,6 +116,7 @@ const listPlanPlaceValidator = v.object({
 export const listPlanClaimValidator = v.object({
   places: v.array(listPlanPlaceValidator),
   been: v.array(v.string()),
+  visitMarks: v.array(namedVisitMarkValidator),
   removed: v.array(removalValidator),
   aiAllowed: v.boolean(),
 });
@@ -216,17 +229,39 @@ export async function listPlaces(
     .take(MAX_LIST_PLACES);
 }
 
-export async function newPlaceCount(
+export async function freshPlaces(
   ctx: QueryCtx,
   member: Doc<"sharedListMembers">,
-): Promise<number> {
-  const fresh = await ctx.db
+): Promise<Doc<"sharedListPlaces">[]> {
+  const rows = await ctx.db
     .query("sharedListPlaces")
     .withIndex("by_list_and_added", (q) =>
       q.eq("listId", member.listId).gt("addedAt", member.seenAt),
     )
     .take(MAX_LIST_PLACES);
-  return fresh.filter((place) => isNewPlace(place, member)).length;
+  return rows.filter((place) => isNewPlace(place, member));
+}
+
+export function freshAdders(
+  fresh: Pick<Doc<"sharedListPlaces">, "addedBy">[],
+  names: Map<Id<"users">, string | undefined>,
+): NewFrom {
+  const named = new Map<Id<"users">, { firstName: string; count: number }>();
+  let unnamed = 0;
+  for (const { addedBy } of fresh) {
+    const firstName = names.get(addedBy);
+    if (firstName === undefined) {
+      unnamed += 1;
+      continue;
+    }
+    const group = named.get(addedBy) ?? { firstName, count: 0 };
+    group.count += 1;
+    named.set(addedBy, group);
+  }
+  const groups: NewFrom = [...named.values()].sort(
+    (a, b) => b.count - a.count || a.firstName.localeCompare(b.firstName),
+  );
+  return unnamed > 0 ? [...groups, { count: unnamed }] : groups;
 }
 
 export async function listCovered(
@@ -275,5 +310,30 @@ export async function departMember(
   }
   for (const member of members) {
     if (member.userId === userId) await ctx.db.delete(member._id);
+  }
+  await forgetWent(ctx, list._id, userId);
+}
+
+export function wentWithout(
+  place: Pick<Doc<"sharedListPlaces">, "went">,
+  userId: string,
+): Doc<"sharedListPlaces">["went"] {
+  const went = place.went ?? [];
+  const kept = went.filter((entry) => entry.userId !== userId);
+  return kept.length === went.length ? place.went : kept;
+}
+
+export async function forgetWent(
+  ctx: MutationCtx,
+  listId: Id<"sharedLists">,
+  userId: Id<"users">,
+): Promise<void> {
+  for (const place of await listPlaces(ctx, listId)) {
+    const went = wentWithout(place, userId);
+    if (went === place.went) continue;
+    await ctx.db.patch(place._id, {
+      went,
+      ...((went ?? []).length === 0 ? { visitedAt: undefined } : {}),
+    });
   }
 }

@@ -4,8 +4,27 @@ import {
   MAX_ITEM_PLACES,
   normalizeCities,
   normalizePlaces,
+  normalizePlaceCuisines,
   normalizePlaceLocations,
 } from "./itemFields";
+
+describe("normalizePlaceCuisines", () => {
+  it("keeps the first known cuisine of each named place, under its normalized name", () => {
+    expect(
+      normalizePlaceCuisines(
+        [
+          { name: " lucy's, Houston ", cuisine: "burger" },
+          { name: "Lucy's", cuisine: "pizza" },
+          { name: "Invented", cuisine: "sushi" },
+          { name: "Marlowe's", cuisine: "emoji" as "wine" },
+        ],
+        ["Lucy's", "Marlowe's"],
+        ["Houston"],
+      ),
+    ).toEqual([{ name: "Lucy's", cuisine: "burger" }]);
+    expect(normalizePlaceCuisines(undefined, ["Lucy's"])).toEqual([]);
+  });
+});
 
 describe("normalizePlaceLocations", () => {
   it("keeps only bounded clues for named places, matching normalized names", () => {

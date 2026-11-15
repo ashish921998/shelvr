@@ -1,17 +1,9 @@
-import { useEntitlement } from "@/lib/entitlement";
-import { useAwaitingOnboardingPurchase } from "@/lib/replay-onboarding";
-import { useConvexAuth } from "convex/react";
+import { useAccess } from "@/lib/free-plan";
 
 export function usePlanGate(): { gated: boolean; planUnknown: boolean } {
-  const { isAuthenticated } = useConvexAuth();
-  const entitlement = useEntitlement();
-  const awaitingPurchase = useAwaitingOnboardingPurchase(entitlement.entitled);
+  const access = useAccess();
   return {
-    planUnknown: isAuthenticated && entitlement.loading && !awaitingPurchase,
-    gated:
-      isAuthenticated &&
-      !entitlement.loading &&
-      !entitlement.entitled &&
-      !awaitingPurchase,
+    planUnknown: access.kind === "loading",
+    gated: access.kind === "locked",
   };
 }

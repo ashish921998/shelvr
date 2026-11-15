@@ -59,6 +59,20 @@ jobs:
         uses: ./.secure-review-tooling/.github/actions/secure-review
         with:
           provider: claude
+      - name: Download pinned Bun through the release API
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for attempt in 1 2 3; do
+            if gh release download bun-v1.3.14 --repo oven-sh/bun --pattern bun-linux-x64.zip \
+              --output "$RUNNER_TEMP/review-bun.zip" --clobber &&
+              echo "951ee2aee855f08595aeec6225226a298d3fea83a3dcd6465c09cbccdf7e848f  $RUNNER_TEMP/review-bun.zip" | sha256sum --check --status; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep "$((attempt * 2))"
+          done
+          unzip -q "$RUNNER_TEMP/review-bun.zip" -d "$RUNNER_TEMP/review-bun"
       - name: Run Claude Code Review
         id: claude-review
         uses: ./.secure-review-tooling/runtime/claude
@@ -66,6 +80,7 @@ jobs:
           DISABLE_AUTOUPDATER: "1"
         with:
           github_token: ${{ github.token }}
+          path_to_bun_executable: ${{ runner.temp }}/review-bun/bun-linux-x64/bun
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: "Review ${{ github.repository }}/pull/${{ github.event.pull_request.number }} for actionable correctness and security regressions. Read REVIEW.md first and follow it. Inspect the diff and relevant source. Report only verified issues with precise file and line references using inline comments."
           claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment"'

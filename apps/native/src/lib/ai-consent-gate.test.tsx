@@ -10,7 +10,16 @@ const mocks = vi.hoisted(() => ({
   entitlement: { entitled: true, loading: false },
   replay: vi.fn(),
   resumeShare: vi.fn(),
+  syncCityStamps: vi.fn(),
   awaitingPurchase: false,
+  authLoading: false,
+  freeSaves: null as null | {
+    limit: number;
+    used: number;
+    left: number;
+    pending: number;
+    open: boolean;
+  },
   push: vi.fn(),
 }));
 const nothing = vi.hoisted(() => () => null);
@@ -25,18 +34,34 @@ vi.mock("@/lib/replay-onboarding", () => ({
 vi.mock("@/lib/queued-first-save", () => ({
   useQueuedFirstSave: vi.fn(),
 }));
+vi.mock("@/lib/pending-city-stamps", () => ({
+  useSyncPendingCityStamps: mocks.syncCityStamps,
+}));
 vi.mock("@/lib/share/use-resume-pending-share", () => ({
   useResumePendingShare: mocks.resumeShare,
 }));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({
-    isLoading: false,
-    isAuthenticated: mocks.status !== "signed-out",
+    isLoading: mocks.authLoading,
+    isAuthenticated: !mocks.authLoading && mocks.status !== "signed-out",
   }),
 }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => mocks.entitlement,
 }));
+vi.mock("@/lib/free-plan", async () => {
+  const { accessOf } =
+    await vi.importActual<typeof import("@/lib/access")>("@/lib/access");
+  return {
+    useAccess: () =>
+      accessOf({
+        signedIn: mocks.status !== "signed-out",
+        entitlement: mocks.entitlement,
+        awaitingPurchase: mocks.awaitingPurchase,
+        freeSaves: mocks.freeSaves,
+      }),
+  };
+});
 vi.mock("expo-router", () => {
   const screen = ({ name }: { name: string }) => (
     <span>{`screen:${name}`}</span>
@@ -77,6 +102,11 @@ vi.mock("@/lib/home-feed", () => ({
 vi.mock("@/components/home/unplaced-toast", () => ({
   UnplacedToast: vi.fn(() => null),
 }));
+vi.mock("@/components/passport/stamp-moment", () => ({
+  StampMomentProvider: vi.fn(
+    ({ children }: { children: ReactNode }) => children,
+  ),
+}));
 vi.mock("@/components/plan-loading-cover", () => ({
   PlanLoadingCover: vi.fn(() => <div>plan-loading-cover</div>),
 }));
@@ -109,6 +139,8 @@ beforeEach(() => {
   mocks.onboarded = true;
   mocks.status = "unset";
   mocks.entitlement = { entitled: true, loading: false };
+  mocks.freeSaves = null;
+  mocks.authLoading = false;
 });
 
 it.each(["unset", "loading", "granted", "declined"])(
@@ -121,6 +153,7 @@ it.each(["unset", "loading", "granted", "declined"])(
     expect(shows("consent-card")).toBe(false);
     expect(mocks.replay).toHaveBeenCalled();
     expect(mocks.resumeShare).toHaveBeenCalled();
+    expect(mocks.syncCityStamps).toHaveBeenCalled();
   },
 );
 
@@ -136,9 +169,26 @@ describe("plan gate", () => {
     expect(shows("screen:(tabs)")).toBe(false);
     expect(shows("screen:add")).toBe(false);
     expect(shows("screen:item/[id]")).toBe(false);
+    expect(shows("screen:city-stamps")).toBe(false);
     expect(shows("screen:profile")).toBe(true);
     expect(shows("screen:settings")).toBe(true);
     expect(shows("screen:paywall")).toBe(true);
+  });
+
+  it("opens the app to a free account, and holds shares only once its saves run out", () => {
+    mocks.entitlement = { entitled: false, loading: false };
+    mocks.freeSaves = { limit: 10, used: 3, left: 7, pending: 0, open: true };
+    const view = render(<AppLayout />);
+    expect(shows("screen:(tabs)")).toBe(true);
+    expect(shows("screen:add")).toBe(true);
+    expect(shows("screen:city-stamps")).toBe(true);
+    expect(shows("screen:plan-gate")).toBe(false);
+    expect(mocks.resumeShare).toHaveBeenLastCalledWith(false);
+
+    mocks.freeSaves = { limit: 10, used: 10, left: 0, pending: 0, open: true };
+    view.rerender(<AppLayout />);
+    expect(shows("screen:(tabs)")).toBe(true);
+    expect(mocks.resumeShare).toHaveBeenLastCalledWith(true);
   });
 
   it("opens the app with a plan", () => {
@@ -195,6 +245,20 @@ describe("plan gate", () => {
     expect(mocks.push).not.toHaveBeenCalled();
 
     mocks.entitlement = { entitled: true, loading: false };
+    rerender(<AppLayout />);
+    expect(mocks.push).toHaveBeenCalledWith("/add?mode=note");
+  });
+
+  it("keeps a sheet deep link while sign-in is still loading", async () => {
+    const { releaseSheetLink, rememberSheetLink } =
+      await import("@/lib/deferred-sheet-link");
+    releaseSheetLink(true);
+    rememberSheetLink("shelvr://add?mode=note");
+    mocks.authLoading = true;
+    const { rerender } = render(<AppLayout />);
+    expect(mocks.push).not.toHaveBeenCalled();
+
+    mocks.authLoading = false;
     rerender(<AppLayout />);
     expect(mocks.push).toHaveBeenCalledWith("/add?mode=note");
   });

@@ -26,6 +26,7 @@ import {
 } from "./model/appleTokens";
 import { takeWithinBytes } from "./model/readBudget";
 import { logEvent } from "./model/log";
+import { deletePassportSharesForUser } from "./passportShares";
 import { deletePlanSharesForUser } from "./planShares";
 import { deleteSharedListsBatch } from "./sharedLists";
 
@@ -261,6 +262,8 @@ async function deleteUserOwnedDataBatch(
   }
   if (demos.length === DELETE_BATCH) return false;
 
+  if (!(await deleteFreeSavesBatch(ctx, userId))) return false;
+
   const reads = await ctx.db
     .query("itemReads")
     .withIndex("by_user", (q) => q.eq("userId", userId))
@@ -392,10 +395,12 @@ async function deleteSharingAndPlansBatch(
   return (
     (await deleteShareLinksBatch(ctx, userId)) &&
     (await deletePlaceVisitsBatch(ctx, userId)) &&
+    (await deleteCityStampsBatch(ctx, userId)) &&
     (await deletePlaceRemovalsBatch(ctx, userId)) &&
     (await deleteTripsBatch(ctx, userId)) &&
     (await deleteTripPlansBatch(ctx, userId)) &&
     (await deletePlanSharesForUser(ctx, userId)) &&
+    (await deletePassportSharesForUser(ctx, userId)) &&
     (await deleteSharedListsBatch(ctx, userId))
   );
 }
@@ -412,6 +417,23 @@ async function deleteShareLinksBatch(
     await ctx.db.delete(link._id);
   }
   return links.length !== DELETE_BATCH;
+}
+
+async function deleteFreeSavesBatch(
+  ctx: MutationCtx,
+  userId: string,
+): Promise<boolean> {
+  for (const status of ["pending", "placed", "released"] as const) {
+    const rows = await ctx.db
+      .query("freeSaves")
+      .withIndex("by_user_and_status", (q) =>
+        q.eq("userId", userId).eq("status", status),
+      )
+      .take(DELETE_BATCH);
+    for (const row of rows) await ctx.db.delete(row._id);
+    if (rows.length === DELETE_BATCH) return false;
+  }
+  return true;
 }
 
 async function deletePlaceRemovalsBatch(
@@ -438,6 +460,18 @@ async function deletePlaceVisitsBatch(
     await ctx.db.delete(visit._id);
   }
   return visits.length !== DELETE_BATCH;
+}
+
+async function deleteCityStampsBatch(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+): Promise<boolean> {
+  const rows = await ctx.db
+    .query("cityStamps")
+    .withIndex("by_user_and_city", (q) => q.eq("userId", userId))
+    .take(DELETE_BATCH);
+  for (const row of rows) await ctx.db.delete(row._id);
+  return rows.length !== DELETE_BATCH;
 }
 
 async function deleteTripsBatch(

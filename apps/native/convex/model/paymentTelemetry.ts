@@ -1,6 +1,12 @@
 import { v } from "convex/values";
 
-import { readPositiveNumber, readRecord, readString } from "./revenuecat";
+import {
+  eventOwner,
+  readPositiveNumber,
+  readRecord,
+  readString,
+  readStringArray,
+} from "./revenuecat";
 
 export const paymentTelemetryValidator = v.object({
   eventId: v.string(),
@@ -139,7 +145,10 @@ export function parsePaymentTelemetry(body: unknown) {
   if (!payload || !event) return;
   const data: Record<string, unknown> = { ...event };
   const eventId = readString(data.id);
-  const userId = readString(data.app_user_id);
+  const userId = eventOwner(
+    readString(data.app_user_id),
+    readStringArray(data.aliases),
+  );
   const productId = readString(data.product_id);
   const environment = parseEnvironment(data.environment);
   if (!eventId || !userId || !productId || !environment) return;

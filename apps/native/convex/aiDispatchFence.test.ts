@@ -9,7 +9,6 @@ import { internal } from "./_generated/api";
 import type { ActionCtx } from "./_generated/server";
 import { findProductLinks, processItem, steerItemForSpace } from "./ai";
 import { recommendForSpace } from "./aiRecommendForSpace";
-import { EMBEDDING_DIMENSIONS } from "./model/embedding";
 import {
   newConvexTest,
   insertConsentingUser,
@@ -18,14 +17,12 @@ import {
 import { aiAllowed } from "./aiConsent";
 
 const generateObject = vi.hoisted(() => vi.fn());
-const embedMany = vi.hoisted(() => vi.fn());
 const readPage = vi.hoisted(() => vi.fn());
 const readStoredImage = vi.hoisted(() => vi.fn());
 const safeFetch = vi.hoisted(() => vi.fn());
 vi.mock("ai", async (original) => ({
   ...(await original<typeof import("ai")>()),
   generateObject,
-  embedMany,
 }));
 vi.mock("./model/pageRead", async (original) => ({
   ...(await original<typeof import("./model/pageRead")>()),
@@ -40,9 +37,6 @@ vi.mock("./model/safeFetch", async (original) => ({
   safeFetch,
 }));
 
-const vector = Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) =>
-  i === 0 ? 1 : 0,
-);
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   vi.stubEnv("POSTHOG_PROJECT_TOKEN", "");
@@ -58,11 +52,6 @@ beforeEach(() => {
       query: "synthetic product",
     },
   });
-  embedMany
-    .mockReset()
-    .mockImplementation(async ({ values }: { values: string[] }) => ({
-      embeddings: values.map(() => vector),
-    }));
   readPage.mockReset().mockResolvedValue({
     status: "ok",
     page: { title: "Synthetic page", content: "Synthetic body" },
@@ -206,13 +195,9 @@ async function paused(
 }
 
 describe("AI dispatch uses fresh live ownership", () => {
-  it("reads recommendation context once before embedding and survivors once after hydration", async () => {
+  it("reads recommendation context once and survivors once after hydration", async () => {
     const f = await fixture();
     const calls: string[] = [];
-    embedMany.mockImplementation(async ({ values }: { values: string[] }) => {
-      expect(calls).toEqual(["spaces:recommendationContext"]);
-      return { embeddings: values.map(() => vector) };
-    });
     generateObject.mockImplementation(async () => {
       expect(
         calls.filter((name) => name === "spaces:survivingCandidates"),
@@ -333,7 +318,6 @@ describe("AI dispatch uses fresh live ownership", () => {
       true,
     );
     expect(generateObject).not.toHaveBeenCalled();
-    expect(embedMany).not.toHaveBeenCalled();
   });
 
   it.each(["note", "image", "link"] as const)(
@@ -371,7 +355,6 @@ describe("AI dispatch uses fresh live ownership", () => {
     resume.resolve();
     await running;
     expect(generateObject).not.toHaveBeenCalled();
-    expect(embedMany).not.toHaveBeenCalled();
   });
 
   it("blocks a hydrated text product query before its single consent check", async () => {
@@ -451,7 +434,6 @@ describe("AI dispatch uses fresh live ownership", () => {
         () => invalidate(f, kind),
       );
       expect(generateObject).not.toHaveBeenCalled();
-      expect(embedMany).not.toHaveBeenCalled();
     },
   );
 
@@ -514,7 +496,7 @@ describe("AI dispatch uses fresh live ownership", () => {
   });
 
   it.each(["removed owner", "deleting owner", "space removed"] as const)(
-    "does not embed a cached space after %s",
+    "does not ask the model for a cached space after %s",
     async (kind) => {
       const f = await fixture();
       await paused(
@@ -529,7 +511,6 @@ describe("AI dispatch uses fresh live ownership", () => {
         1,
         true,
       );
-      expect(embedMany).not.toHaveBeenCalled();
       expect(generateObject).not.toHaveBeenCalled();
     },
   );

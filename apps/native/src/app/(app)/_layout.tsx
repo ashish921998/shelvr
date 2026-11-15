@@ -1,17 +1,20 @@
 import { UnplacedToast } from "@/components/home/unplaced-toast";
+import { StampMomentProvider } from "@/components/passport/stamp-moment";
 import { AppIntentsBridge } from "@/lib/app-intents";
 import { releaseSheetLink } from "@/lib/deferred-sheet-link";
 import { useForgetExitOffer } from "@/lib/forget-exit-offer";
 import { endPurchaseLandingSession } from "@/lib/purchase-landing";
 import { t, useAppLocale } from "@/lib/i18n";
-import { useEntitlement } from "@/lib/entitlement";
 import { useOnboarding } from "@/lib/onboarding";
 import { HomeFeedProvider } from "@/lib/home-feed";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { PlanLoadingCover } from "@/components/plan-loading-cover";
 import { TrialReminderPrimerSheet } from "@/components/trial-reminder-sheet";
 import { usePlanGate } from "@/lib/plan-gate";
+import { canSave } from "@/lib/access";
+import { useAccess } from "@/lib/free-plan";
 import { useReplayOnboarding } from "@/lib/replay-onboarding";
+import { useSyncPendingCityStamps } from "@/lib/pending-city-stamps";
 import { useQueuedFirstSave } from "@/lib/queued-first-save";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
 import { useTrialReminder } from "@/lib/trial-reminder";
@@ -34,8 +37,8 @@ export default function AppLayout() {
   const { theme } = useUnistyles();
   const reducedMotion = useReducedMotion();
 
-  const entitlement = useEntitlement();
   const { gated, planUnknown } = usePlanGate();
+  const access = useAccess();
   useEffect(() => {
     if (!isAuthenticated && !isLoading) endPurchaseLandingSession();
   }, [isAuthenticated, isLoading]);
@@ -43,17 +46,20 @@ export default function AppLayout() {
   const lists = useSharedLists(isAuthenticated && onboarded);
   const listRoutes = listRouteAllowed({ onboarded, gated, lists: lists.data });
 
-  const planLoading = entitlement.loading;
-  const entitled = entitlement.entitled;
   useEffect(() => {
-    const link = releaseSheetLink(planLoading);
-    if (!link || (link.sheet && !(onboarded && entitled))) return;
+    const link = releaseSheetLink(isLoading || planUnknown);
+    if (!link || (link.sheet && !(isAuthenticated && onboarded && !gated)))
+      return;
     router.push(link.route as never);
-  }, [planLoading, entitled, onboarded, router]);
+  }, [isLoading, planUnknown, gated, onboarded, isAuthenticated, router]);
 
-  useReplayOnboarding();
+  useReplayOnboarding({
+    left: access.kind === "free" && canSave(access),
+    loading: access.kind === "loading",
+  });
   useQueuedFirstSave();
-  useResumePendingShare(gated || planUnknown);
+  useSyncPendingCityStamps();
+  useResumePendingShare(!canSave(access));
   useTrialReminder();
   useWelcomeSaveTracker();
   useForgetExitOffer();
@@ -82,146 +88,155 @@ export default function AppLayout() {
 
   return (
     <HomeFeedProvider>
-      <RecentSavesWidgetSync />
-      <AppIntentsBridge />
-      <TrialReminderPrimerSheet />
-      <Stack
-        screenOptions={{
-          animation: reducedMotion ? "fade" : "default",
-          headerTransparent: true,
-          headerShadowVisible: false,
-          headerTintColor: theme.colors.primary,
-        }}
-      >
-        <Stack.Protected
-          guard={onboarded && !gated}
-          redirectTo={onboarded ? "/plan-gate" : "/onboarding"}
-        >
-          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="share" options={{ headerShown: false }} />
-          <Stack.Screen
-            name="item/[id]"
-            options={{
-              title: "",
-              headerBackButtonDisplayMode: "minimal",
-            }}
-          />
-          <Stack.Screen
-            name="plan/[id]"
-            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
-          />
-          <Stack.Screen
-            name="city/[name]"
-            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
-          />
-          <Stack.Screen
-            name="spots/[id]"
-            options={{ headerShown: false, gestureEnabled: false }}
-          />
-        </Stack.Protected>
-        <Stack.Protected
-          guard={listRoutes}
-          redirectTo={onboarded ? "/plan-gate" : "/onboarding"}
-        >
-          <Stack.Screen
-            name="trip-plan/[id]"
-            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
-          />
-          <Stack.Screen
-            name="date-plan"
-            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
-          />
-          <Stack.Screen
-            name="shared-list/[id]"
-            options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
-          />
-        </Stack.Protected>
-        {/* Native sheets and modals present above the loading cover, so they wait for the plan. */}
-        <Stack.Protected
-          guard={listRoutes && !planUnknown}
-          redirectTo={waitingRedirect}
-        >
-          <Stack.Screen name="new-trip" options={modal} />
-          <Stack.Screen name="add-list-place" options={modal} />
-          <Stack.Screen name="add-trip-stop" options={modal} />
-        </Stack.Protected>
-        <Stack.Protected
-          guard={onboarded && !gated && !planUnknown}
-          redirectTo={waitingRedirect}
-        >
-          <Stack.Screen
-            name="add"
-            options={
-              Platform.OS === "android"
-                ? {
-                    presentation: "transparentModal",
-                    animation: "none",
-                    headerShown: false,
-                    gestureEnabled: false,
-                    contentStyle: { backgroundColor: "transparent" },
-                  }
-                : {
-                    presentation: "formSheet",
-                    headerShown: true,
-                    headerTransparent: false,
-                    headerStyle: { backgroundColor: theme.colors.background },
-                    sheetGrabberVisible: true,
-                    sheetAllowedDetents: "fitToContents",
-                    contentStyle: { backgroundColor: theme.colors.background },
-                  }
-            }
-          />
-          <Stack.Screen name="new-shared-list" options={modal} />
-          <Stack.Screen
-            name="edit-save-places"
-            options={{ headerShown: true, headerTransparent: false }}
-          />
-        </Stack.Protected>
-        <Stack.Protected guard={onboarded} redirectTo="/onboarding">
-          <Stack.Screen
-            name="profile"
-            options={{
-              presentation: "formSheet",
-              headerShown: false,
-              sheetGrabberVisible: true,
-              sheetAllowedDetents: "fitToContents",
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          />
-          <Stack.Screen
-            name="settings"
-            options={{
-              presentation: "formSheet",
-              headerShown: false,
-              sheetGrabberVisible: true,
-              sheetAllowedDetents: "fitToContents",
-              contentStyle: { backgroundColor: theme.colors.background },
-            }}
-          />
-        </Stack.Protected>
-        <Stack.Protected
-          guard={onboarded && gated}
-          redirectTo="/(app)/(tabs)/(home)"
-        >
-          <Stack.Screen name="plan-gate" options={{ headerShown: false }} />
-        </Stack.Protected>
-        <Stack.Protected guard={!onboarded} redirectTo="/(app)/(tabs)/(home)">
-          <Stack.Screen name="onboarding" options={{ headerShown: false }} />
-        </Stack.Protected>
-        {/* Without a redirectTo, Expo Router falls back to the shortest unguarded route name: `paywall`. */}
-        <Stack.Screen
-          name="paywall"
-          options={{
-            presentation: "formSheet",
-            headerShown: false,
-            sheetGrabberVisible: true,
-            sheetAllowedDetents: "fitToContents",
-            contentStyle: { backgroundColor: theme.colors.background },
+      <StampMomentProvider>
+        <RecentSavesWidgetSync />
+        <AppIntentsBridge />
+        <TrialReminderPrimerSheet />
+        <Stack
+          screenOptions={{
+            animation: reducedMotion ? "fade" : "default",
+            headerTransparent: true,
+            headerShadowVisible: false,
+            headerTintColor: theme.colors.primary,
           }}
-        />
-      </Stack>
-      {onboarded && planUnknown ? <PlanLoadingCover /> : null}
-      {onboarded && !gated ? <UnplacedToast /> : null}
+        >
+          <Stack.Protected
+            guard={onboarded && !gated}
+            redirectTo={onboarded ? "/plan-gate" : "/onboarding"}
+          >
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="share" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="item/[id]"
+              options={{
+                title: "",
+                headerBackButtonDisplayMode: "minimal",
+              }}
+            />
+            <Stack.Screen
+              name="city/[name]"
+              options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+            />
+            <Stack.Screen
+              name="city-stamps"
+              options={{ headerBackButtonDisplayMode: "minimal" }}
+            />
+            <Stack.Screen
+              name="spots/[id]"
+              options={{ headerShown: false, gestureEnabled: false }}
+            />
+          </Stack.Protected>
+          <Stack.Protected
+            guard={listRoutes}
+            redirectTo={onboarded ? "/plan-gate" : "/onboarding"}
+          >
+            <Stack.Screen
+              name="trip-plan/[id]"
+              options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+            />
+            <Stack.Screen
+              name="date-plan"
+              options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+            />
+            <Stack.Screen
+              name="shared-list/[id]"
+              options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+            />
+          </Stack.Protected>
+          {/* Native sheets and modals present above the loading cover, so they wait for the plan. */}
+          <Stack.Protected
+            guard={listRoutes && !planUnknown}
+            redirectTo={waitingRedirect}
+          >
+            <Stack.Screen name="new-trip" options={modal} />
+            <Stack.Screen name="add-list-place" options={modal} />
+            <Stack.Screen name="add-trip-stop" options={modal} />
+          </Stack.Protected>
+          <Stack.Protected
+            guard={onboarded && !gated && !planUnknown}
+            redirectTo={waitingRedirect}
+          >
+            <Stack.Screen
+              name="add"
+              options={
+                Platform.OS === "android"
+                  ? {
+                      presentation: "transparentModal",
+                      animation: "none",
+                      headerShown: false,
+                      gestureEnabled: false,
+                      contentStyle: { backgroundColor: "transparent" },
+                    }
+                  : {
+                      presentation: "formSheet",
+                      headerShown: true,
+                      headerTransparent: false,
+                      headerStyle: { backgroundColor: theme.colors.background },
+                      sheetGrabberVisible: true,
+                      sheetAllowedDetents: "fitToContents",
+                      contentStyle: {
+                        backgroundColor: theme.colors.background,
+                      },
+                    }
+              }
+            />
+            <Stack.Screen name="new-shared-list" options={modal} />
+            <Stack.Screen name="already-been" options={modal} />
+            <Stack.Screen name="next-to-stamp" options={modal} />
+            <Stack.Screen name="passport-card" options={modal} />
+            <Stack.Screen name="passport-story" options={modal} />
+            <Stack.Screen name="city-card" options={modal} />
+            <Stack.Screen
+              name="edit-save-places"
+              options={{ headerShown: true, headerTransparent: false }}
+            />
+          </Stack.Protected>
+          <Stack.Protected guard={onboarded} redirectTo="/onboarding">
+            <Stack.Screen
+              name="profile"
+              options={{
+                presentation: "formSheet",
+                headerShown: false,
+                sheetGrabberVisible: true,
+                sheetAllowedDetents: "fitToContents",
+                contentStyle: { backgroundColor: theme.colors.background },
+              }}
+            />
+            <Stack.Screen
+              name="settings"
+              options={{
+                presentation: "formSheet",
+                headerShown: false,
+                sheetGrabberVisible: true,
+                sheetAllowedDetents: "fitToContents",
+                contentStyle: { backgroundColor: theme.colors.background },
+              }}
+            />
+          </Stack.Protected>
+          <Stack.Protected
+            guard={onboarded && gated}
+            redirectTo="/(app)/(tabs)/(home)"
+          >
+            <Stack.Screen name="plan-gate" options={{ headerShown: false }} />
+          </Stack.Protected>
+          <Stack.Protected guard={!onboarded} redirectTo="/(app)/(tabs)/(home)">
+            <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+          </Stack.Protected>
+          {/* Without a redirectTo, Expo Router falls back to the shortest unguarded route name: `paywall`. */}
+          <Stack.Screen
+            name="paywall"
+            options={{
+              presentation: "formSheet",
+              headerShown: false,
+              sheetGrabberVisible: true,
+              sheetAllowedDetents: "fitToContents",
+              contentStyle: { backgroundColor: theme.colors.background },
+            }}
+          />
+        </Stack>
+        {onboarded && planUnknown ? <PlanLoadingCover /> : null}
+        {onboarded && !gated ? <UnplacedToast /> : null}
+      </StampMomentProvider>
     </HomeFeedProvider>
   );
 }

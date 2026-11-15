@@ -17,7 +17,8 @@ import {
   hasPending,
   subscribePendingOnboarding,
   getPendingOnboardingRevision,
-  updatePendingSpaces,
+  noteReplayDeclined,
+  replayDeclined,
 } from "@/lib/pending-onboarding";
 import {
   getPurchaseBeforeSignInRevision,
@@ -25,10 +26,15 @@ import {
   subscribePurchaseBeforeSignIn,
 } from "@/lib/purchase-before-sign-in";
 import {
-  openPaywall,
+  openPaywallAnswer,
   useEntitlement,
   waitForSheetTransition,
 } from "@/lib/entitlement";
+import {
+  finishReplay,
+  initialReplay,
+  observeReplay,
+} from "@/lib/replay-onboarding-machine";
 import {
   readPurchaseLanding,
   settlePurchaseLanding,
@@ -74,23 +80,40 @@ function pendingWorkKey(): string {
   ]);
 }
 
-/** Mount once: after onboarding and sign-in, creates the deferred spaces and shows the paywall. */
-export function useReplayOnboarding() {
+function pendingDemo(): {
+  url: string;
+  space: string | null;
+  operationId: string;
+} | null {
+  const url = getPendingDemoUrl();
+  return url === null
+    ? null
+    : {
+        url,
+        space: getPendingDemoSpace(),
+        operationId: getOrCreatePendingOperationId(),
+      };
+}
+
+/** Mount once: after onboarding and sign-in, shows the paywall and saves the queued sample reel. */
+export function useReplayOnboarding(
+  freeSaves: { left: boolean; loading: boolean } = {
+    left: false,
+    loading: false,
+  },
+) {
   const { isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
   const { data: user } = useCurrentUser();
   const accountLoaded = user != null;
   const userId = user?._id ?? null;
   const router = useRouter();
-  const { entitled, loading: entitlementLoading } = useEntitlement();
+  const entitlement = useEntitlement();
+  const entitled = entitlement.entitled || freeSaves.left;
+  const entitlementLoading = entitlement.loading || freeSaves.loading;
   const createSpace = useMutation(api.spaces.createSpace);
   const createLinkItem = useMutation(api.items.createLinkItem);
-  const runningRef = useRef(false);
-  const startedEntitledRef = useRef(false);
-  const rerunRef = useRef(false);
-  const awaitingEntitlementRef = useRef(false);
-  const settledWorkRef = useRef<string | null>(null);
-  const settledEntitledRef = useRef(entitled);
+  const machine = useRef(initialReplay(entitled));
   const [retryNonce, setRetryNonce] = useState(0);
   const accountRef = useRef<string | null>(null);
   useEffect(() => {
@@ -111,40 +134,27 @@ export function useReplayOnboarding() {
   );
 
   useEffect(() => {
-    if (entitled !== settledEntitledRef.current) {
-      settledEntitledRef.current = entitled;
-      settledWorkRef.current = null;
-    }
-    if (!isAuthenticated) return;
-    if (!accountLoaded) return;
-    if (!onboarded) return;
-    if (entitlementLoading) return;
-    if (runningRef.current) {
-      if (entitled !== startedEntitledRef.current) {
-        rerunRef.current = true;
-      }
-      return;
-    }
-    const demoOwner = getPendingDemoOwner();
-    if (demoOwner !== null && demoOwner !== userId) clearLegacyDemoUrl();
-    if (!hasPending()) return;
-    if (pendingWorkKey() === settledWorkRef.current) return;
-    if (
-      !entitled &&
-      (awaitingEntitlementRef.current ||
+    const step = observeReplay(machine.current, {
+      ready:
+        isAuthenticated && accountLoaded && onboarded && !entitlementLoading,
+      entitled,
+      paywallBlocked:
         onboardingPaywall !== "unseen" ||
-        hasPurchaseBeforeSignIn())
-    )
-      return;
+        hasPurchaseBeforeSignIn() ||
+        replayDeclined(),
+      readPending: () => {
+        const demoOwner = getPendingDemoOwner();
+        if (demoOwner !== null && demoOwner !== userId) clearLegacyDemoUrl();
+        return { has: hasPending(), key: pendingWorkKey() };
+      },
+    });
+    machine.current = step.state;
+    if (step.action === "none") return;
+    if (step.action === "save") onboardingPaywall = "unseen";
 
-    const spaces = getPendingSpaces();
+    const demo = pendingDemo();
 
-    const legacyDemoUrl = getPendingDemoUrl();
-    const legacyDemoSpace = getPendingDemoSpace();
-
-    runningRef.current = true;
-    startedEntitledRef.current = entitled;
-
+    let purchased = false;
     let remainderKey: string | null = null;
     let lateDemoUrl = false;
     const runAccount = userId;
@@ -156,47 +166,41 @@ export function useReplayOnboarding() {
     };
     const run = async () => {
       try {
-        if (!entitled) {
+        if (step.action === "sell") {
+          const askedFor = getPendingOperationId();
           await waitForSheetTransition();
-          const purchased = await openPaywall(router, "onboarding");
-          if (purchased) {
-            awaitingEntitlementRef.current = true;
-          }
+          const { outcome, answered } = await openPaywallAnswer(
+            router,
+            "onboarding",
+            { fallback: true },
+          );
+          purchased = outcome === "success";
+          if (outcome === "cancelled" && answered) noteReplayDeclined(askedFor);
           return;
         }
 
-        awaitingEntitlementRef.current = false;
-        onboardingPaywall = "unseen";
         if (!sameAccount()) return;
 
-        const spaceResults = await Promise.allSettled(
-          spaces.map((name) => createSpace({ name, dynamic: true })),
-        );
-        const failedSpaces = spaceResults
-          .map((result, index) =>
-            result.status === "rejected" ? spaces[index] : null,
-          )
-          .filter((name): name is string => name !== null);
-        updatePendingSpaces(failedSpaces);
         remainderKey = pendingWorkKey();
-        const allSpacesOk = failedSpaces.length === 0;
 
-        if (legacyDemoUrl) {
+        if (demo) {
           if (!sameAccount()) return;
           try {
             const spaceId =
-              legacyDemoSpace === null
+              demo.space === null
                 ? undefined
-                : await createSpace({ name: legacyDemoSpace, dynamic: true });
+                : await createSpace({ name: demo.space, dynamic: true });
             if (!sameAccount()) return;
             await createLinkItem({
-              url: legacyDemoUrl,
+              url: demo.url,
               spaceId,
-              operationId: getOrCreatePendingOperationId(),
+              operationId: demo.operationId,
               analyticsSessionId: analytics.sessionId(),
               saveSource: "onboarding_demo",
             });
-            if (getPendingDemoUrl() === legacyDemoUrl) clearLegacyDemoUrl();
+            if (getPendingOperationId() === demo.operationId)
+              clearLegacyDemoUrl();
+            if (!sameAccount()) return;
             remainderKey = pendingWorkKey();
           } catch (error) {
             analytics.captureError("onboarding_demo_save_failed", error);
@@ -204,7 +208,6 @@ export function useReplayOnboarding() {
           }
         }
 
-        if (!allSpacesOk) return;
         if (!sameAccount()) return;
 
         if (getPendingDemoUrl() !== null) {
@@ -214,21 +217,15 @@ export function useReplayOnboarding() {
 
         clearPending();
       } finally {
-        const entitlementRerun =
-          rerunRef.current || lateDemoUrl || accountChanged;
-        if (remainderKey !== null && !entitlementRerun) {
-          settledWorkRef.current = remainderKey;
-        }
-        const newWork =
-          remainderKey !== null &&
-          hasPending() &&
-          pendingWorkKey() !== remainderKey;
-        const shouldRerun = entitlementRerun || newWork;
-        rerunRef.current = false;
-        runningRef.current = false;
-        if (shouldRerun) {
-          setRetryNonce((nonce) => nonce + 1);
-        }
+        const done = finishReplay(machine.current, {
+          purchased,
+          remainderKey,
+          lateDemoUrl,
+          accountChanged,
+          pending: { has: hasPending(), key: pendingWorkKey() },
+        });
+        machine.current = done.state;
+        if (done.rerun) setRetryNonce((nonce) => nonce + 1);
       }
     };
 

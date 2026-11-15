@@ -5,6 +5,7 @@ import ClosingPanel from "@/components/home/ClosingPanel";
 import Footer from "@/components/home/Footer";
 import Hero from "@/components/home/Hero";
 import Plans from "@/components/home/Plans";
+import ProblemProof from "@/components/home/ProblemProof";
 import Story from "@/components/home/Story";
 import { pageMetadata, SITE_DESCRIPTION, SITE_TITLE } from "@/lib/siteMetadata";
 
@@ -20,6 +21,7 @@ export default function Home() {
       <Header />
       <main>
         <Hero />
+        <ProblemProof />
         <Story />
         <Plans />
         <ClosingPanel />

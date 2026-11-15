@@ -7,22 +7,16 @@ import type { TestConvexForDataModel } from "convex-test";
 import type { DataModel, Id } from "./_generated/dataModel";
 import { AI_CONSENT_VERSION, isAiConsentRequired } from "./model/aiConsent";
 import {
-  CURRENT_EMBEDDING_VERSION,
-  EMBEDDING_DIMENSIONS,
-} from "./model/embedding";
-import {
   insertConsentingUser,
   newConvexTest,
   signedInUser,
 } from "./test.setup";
 import { aiAllowed } from "./aiConsent";
 
-const embedMany = vi.hoisted(() => vi.fn());
 const generateObject = vi.hoisted(() => vi.fn());
 const safeFetch = vi.hoisted(() => vi.fn());
 
 vi.mock("ai", () => ({
-  embedMany,
   generateObject,
   wrapLanguageModel: vi.fn(() => ({})),
 }));
@@ -33,9 +27,6 @@ vi.mock("./model/safeFetch", async (original) => ({
 }));
 
 let USER: string;
-const VECTOR = Array.from({ length: EMBEDDING_DIMENSIONS }, (_, i) =>
-  i === 0 ? 1 : 0,
-);
 
 type T = TestConvexForDataModel<DataModel>;
 
@@ -50,7 +41,6 @@ async function signedIn(
 
 async function expectNoThirdPartyCall() {
   expect(generateObject).not.toHaveBeenCalled();
-  expect(embedMany).not.toHaveBeenCalled();
   const hosts = safeFetch.mock.calls.map(([url]) => new URL(url).hostname);
   expect(hosts).not.toContain("serpapi.com");
 }
@@ -83,7 +73,7 @@ async function processing(
   );
 }
 
-async function ready(t: T, fields: { embedding?: number[] } = {}) {
+async function ready(t: T) {
   return await t.run((ctx) =>
     ctx.db.insert("items", {
       userId: USER,
@@ -94,12 +84,6 @@ async function ready(t: T, fields: { embedding?: number[] } = {}) {
       note: "Lentils, stock, lemon",
       tags: ["food"],
       searchText: "lentil soup",
-      ...(fields.embedding
-        ? {
-            embedding: fields.embedding,
-            embeddingVersion: CURRENT_EMBEDDING_VERSION,
-          }
-        : {}),
     }),
   );
 }
@@ -108,10 +92,6 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
   vi.stubEnv("POSTHOG_PROJECT_TOKEN", "");
   vi.stubEnv("SERPAPI_KEY", "unit-test-only");
-  embedMany.mockReset();
-  embedMany.mockImplementation(async ({ values }: { values: string[] }) => ({
-    embeddings: values.map(() => VECTOR),
-  }));
   generateObject.mockReset();
   generateObject.mockResolvedValue({
     object: {
@@ -207,15 +187,14 @@ describe("a user who has not answered", () => {
   });
 });
 
-describe("an unanswered account that then taps Not now", () => {
-  it("has vectors stored before answering removed", async () => {
+describe("an old build that taps Not now", () => {
+  it("leaves the user's saves untouched", async () => {
     const t = await signedIn(newConvexTest(), "unset");
-    const itemId = await ready(t, { embedding: VECTOR });
+    const itemId = await ready(t);
+    const before = await t.run((ctx) => ctx.db.get(itemId));
     await t.mutation(api.aiConsent.setConsent, { granted: false });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
-    expect(
-      (await t.run((ctx) => ctx.db.get(itemId)))?.embedding,
-    ).toBeUndefined();
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
+    expect(await t.run((ctx) => ctx.db.get(itemId))).toEqual(before);
   });
 });
 
@@ -277,7 +256,6 @@ describe("a user who declined", () => {
       intents: [],
     });
     expect(item?.content).toContain("Simmer the lentils.");
-    expect(item?.embedding).toBeUndefined();
     const memberships = await t.run((ctx) =>
       ctx.db
         .query("spaceItems")
@@ -441,25 +419,6 @@ describe("a user who declined", () => {
     );
     await expectNoThirdPartyCall();
   });
-
-  it("has stored vectors removed, and the sweep leaves the items alone", async () => {
-    const t = await signedIn();
-    const embedded = await ready(t, { embedding: VECTOR });
-    const neverEmbedded = await ready(t);
-
-    await t.mutation(api.aiConsent.setConsent, { granted: false });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
-
-    for (const id of [embedded, neverEmbedded]) {
-      const item = await t.run((ctx) => ctx.db.get(id));
-      expect(item?.embedding).toBeUndefined();
-    }
-    expect(await t.action(internal.ai.sweepItemEmbeddings, {})).toEqual({
-      scanned: 0,
-      written: 0,
-    });
-    await expectNoThirdPartyCall();
-  });
 });
 
 describe("the onboarding demo save", () => {
@@ -469,7 +428,7 @@ describe("the onboarding demo save", () => {
     const { itemId } = await t.mutation(api.demo.createDemoItem, {
       url: "https://example.com/blocked",
     });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect((await t.run((ctx) => ctx.db.get(itemId)))?.status).toBe("ready");
     await expectNoThirdPartyCall();
   });
@@ -521,7 +480,7 @@ describe("a decline that lands while a run is still out", () => {
     );
   });
 
-  it("discards the model's answer and skips the embedding when AI goes off mid-save", async () => {
+  it("discards the model's answer when AI goes off mid-save", async () => {
     const t = await signedIn();
     const itemId = await processing(t, { type: "note", note: "Buy lentils" });
     generateObject.mockImplementationOnce(async () => {
@@ -539,7 +498,6 @@ describe("a decline that lands while a run is still out", () => {
 
     await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
 
-    expect(embedMany).not.toHaveBeenCalled();
     const item = await t.run((ctx) => ctx.db.get(itemId));
     expect(item).toMatchObject({
       status: "ready",
@@ -547,7 +505,6 @@ describe("a decline that lands while a run is still out", () => {
       description: "",
       tags: [],
     });
-    expect(item?.embedding).toBeUndefined();
     expect(await t.run((ctx) => ctx.db.query("spaceItems").collect())).toEqual(
       [],
     );

@@ -13,7 +13,6 @@ import type { Id } from "./_generated/dataModel";
 const generateObject = vi.hoisted(() => vi.fn());
 
 vi.mock("ai", () => ({
-  embedMany: vi.fn(),
   generateObject,
   wrapLanguageModel: vi.fn(() => ({})),
 }));

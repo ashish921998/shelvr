@@ -2,7 +2,6 @@ import type { AnalyticsEventProperties } from "@/lib/analytics";
 import {
   primaryGoal,
   type Goal,
-  type Planner,
   type SavedCount,
 } from "@/lib/onboarding-goals";
 import { isInterest } from "@/lib/onboarding-interests";
@@ -12,9 +11,9 @@ import { isTravelVibe } from "@/lib/travel-vibes";
 
 type Answers = {
   travelCity?: SampleCityId | null;
+  beenCities?: readonly SampleCityId[];
   goals?: readonly Goal[];
   savedCount?: SavedCount | null;
-  planner?: Planner | null;
 };
 
 /** Topics and travel vibes count as spaces; only preset identities are named, typed names are user content, and the sample city is one of a fixed list. */
@@ -31,7 +30,7 @@ export function onboardingCompletedProperties(
     goal: primaryGoal(goals),
     goals,
     saved_count: answers.savedCount ?? null,
-    planner: answers.planner ?? null,
+    been_count: answers.beenCities?.length ?? 0,
     space_count: spaces.length,
     space_names: spaces.filter(isPresetSpace),
     custom_space_count: spaces.filter((name) => !isPresetSpace(name)).length,

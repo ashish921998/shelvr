@@ -29,7 +29,7 @@ describe("onboardingCompletedProperties", () => {
       goal: null,
       goals: [],
       saved_count: null,
-      planner: null,
+      been_count: 0,
       $set: { save_pileup: [] },
     });
   });
@@ -50,14 +50,20 @@ describe("onboardingCompletedProperties", () => {
         travelCity: "paris",
         goals: ["date", "travel"],
         savedCount: "fiftyToTwoHundred",
-        planner: "spontaneous",
       }),
     ).toMatchObject({
       goal: "date",
       goals: ["date", "travel"],
       saved_count: "fiftyToTwoHundred",
-      planner: "spontaneous",
       sample_city: "paris",
     });
+  });
+
+  it("counts the cities they have been to without naming them", () => {
+    const properties = onboardingCompletedProperties([], {
+      beenCities: ["lisbon", "madrid"],
+    });
+    expect(properties.been_count).toBe(2);
+    expect(JSON.stringify(properties)).not.toContain("lisbon");
   });
 });

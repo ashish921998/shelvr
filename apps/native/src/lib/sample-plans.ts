@@ -1566,7 +1566,7 @@ export function planAsCity(
   return { ...city, saves: plan.saves, days: plan.days };
 }
 
-/** The cities a plan is written for, so the city step offers only those. */
+/** The cities a plan is written for. */
 export function planCities(kind: PlanKind): readonly SampleCityId[] {
   if (kind === "trip")
     return SAMPLE_CITY_IDS.filter((id) => SAMPLE_CITIES[id].days.length > 0);

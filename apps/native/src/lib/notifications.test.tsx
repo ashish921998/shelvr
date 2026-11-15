@@ -77,9 +77,14 @@ vi.mock("@convex-dev/auth/react", () => ({
   useAuthActions: () => ({ signOut: mock.signOut }),
 }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: mock.push }) }));
+vi.mock("expo-crypto", () => ({ randomUUID: () => "install-secret-1" }));
 vi.mock("expo-secure-store", () => ({
-  getItemAsync: async () => "[]",
-  setItemAsync: vi.fn(),
+  getItemAsync: async (key: string) =>
+    mock.secure.get(key) ??
+    (key.startsWith("notification-tokens") ? "[]" : null),
+  setItemAsync: async (key: string, value: string) => {
+    mock.secure.set(key, value);
+  },
   getItem: (key: string) => mock.secure.get(key) ?? null,
   setItem: (key: string, value: string) => mock.secure.set(key, value),
 }));
@@ -241,6 +246,16 @@ describe("notification session lifecycle", () => {
     expect(mock.clearWidget).toHaveBeenCalledOnce();
     expect(mock.signOut).toHaveBeenCalledOnce();
   });
+  it("sends the same install secret on every registration", async () => {
+    renderSession();
+    await waitFor(() => expect(mock.register).toHaveBeenCalledTimes(1));
+    expect(mock.register.mock.calls[0]?.[0]).toMatchObject({
+      installSecret: "install-secret-1",
+    });
+    expect(mock.secure.get("notification-install-secret")).toBe(
+      "install-secret-1",
+    );
+  });
   it("does not repeat token requests or server mutations on foreground after ownership rejection", async () => {
     mock.register.mockRejectedValueOnce(
       new ConvexError({ code: "notification_token_owned_by_another_account" }),
@@ -378,6 +393,20 @@ describe("notification opens", () => {
       notification_id: "abc",
     });
     expect(mock.push).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
+  });
+
+  it("opens the city page from the first vote on a link", () => {
+    mock.lastResponse = opened({
+      url: "/city/Austin",
+      kind: "plan_vote",
+      notificationId: "notice-1",
+    });
+    renderHook(() => useNotificationObserver());
+    expect(mock.capture).toHaveBeenCalledWith("notification_opened", {
+      notification_kind: "plan_vote",
+      notification_id: "notice-1",
+    });
+    expect(mock.push).toHaveBeenCalledWith("/city/Austin");
   });
 
   it("holds a tap while the plan loads, in the queue deep links share", () => {

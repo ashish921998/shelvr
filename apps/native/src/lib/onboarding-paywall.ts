@@ -11,13 +11,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const ENTITLEMENT_WAIT_MS = 5000;
 
-/** Closing re-arms `ask` on the screen that opened it, without completing onboarding. */
+/** Closing runs `onClosed` when given, else re-arms `ask` on the screen that opened it, without completing onboarding. */
 export function useOnboardingPaywall({
   onPro,
   onUnavailable,
+  onClosed,
 }: {
   onPro: () => void;
   onUnavailable: () => void;
+  onClosed?: () => void;
 }): { ask: () => void; asked: boolean } {
   const router = useRouter();
   const { isAuthenticated } = useConvexAuth();
@@ -30,9 +32,9 @@ export function useOnboardingPaywall({
     return () => clearTimeout(id);
   }, [asked, loading]);
   const started = useRef(false);
-  const handlers = useRef({ onPro, onUnavailable });
+  const handlers = useRef({ onPro, onUnavailable, onClosed });
   useEffect(() => {
-    handlers.current = { onPro, onUnavailable };
+    handlers.current = { onPro, onUnavailable, onClosed };
   });
 
   useEffect(() => {
@@ -47,6 +49,7 @@ export function useOnboardingPaywall({
         if (outcome === "unavailable") return handlers.current.onUnavailable();
         if (outcome === "cancelled") {
           if (isAuthenticated) noteDeclinedDuringOnboarding();
+          if (handlers.current.onClosed) return handlers.current.onClosed();
           started.current = false;
           setWaitedOut(false);
           setAsked(false);

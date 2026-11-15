@@ -6,6 +6,7 @@ import { clearRecentSavesWidget } from "@/lib/widget-sync";
 import { api } from "@convex/_generated/api";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { useConvexAuth, useMutation } from "convex/react";
+import * as Crypto from "expo-crypto";
 import * as Localization from "expo-localization";
 import * as Notifications from "expo-notifications";
 import * as SecureStore from "expo-secure-store";
@@ -45,6 +46,20 @@ const tokenStore = {
   write: (tokens: string[]) =>
     SecureStore.setItemAsync(tokenStorageKey, JSON.stringify(tokens)),
 };
+
+const installSecretKey = "notification-install-secret";
+
+async function readInstallSecret(): Promise<string | undefined> {
+  try {
+    const stored = await SecureStore.getItemAsync(installSecretKey);
+    if (stored) return stored;
+    const created = Crypto.randomUUID();
+    await SecureStore.setItemAsync(installSecretKey, created);
+    return created;
+  } catch {
+    return undefined;
+  }
+}
 
 const NotificationSessionContext =
   createContext<NotificationDeviceSession | null>(null);
@@ -88,13 +103,16 @@ export function NotificationSessionProvider({
         getToken: getExpoPushToken,
         getLocale: currentLocale,
         getTimezone: getNotificationTimezone,
-        saveToken: (token, locale, timezone) =>
-          registerDevice({
+        saveToken: async (token, locale, timezone) => {
+          const installSecret = await readInstallSecret();
+          await registerDevice({
             token,
             locale,
             platform: Platform.OS === "ios" ? "ios" : "android",
             timezone,
-          }),
+            ...(installSecret === undefined ? {} : { installSecret }),
+          });
+        },
         revokeToken: (token) => unregisterDevice({ token }),
         setWeeklyShelf: (enabled) =>
           setPreferences({

@@ -56,6 +56,20 @@ describe("notification token registration", () => {
     expect(mock.request).toHaveBeenCalledBefore(mock.token);
   });
 
+  it("files plan votes in a channel of their own, after save reminders", async () => {
+    await requestNotificationPermission();
+    expect(mock.channel.mock.calls.map(([id]) => id)).toEqual([
+      "weekly-shelf",
+      "save-reminders",
+      "plan-votes",
+    ]);
+    expect(mock.channel).toHaveBeenLastCalledWith("plan-votes", {
+      name: "notifications.planVotesChannel",
+      importance: 3,
+      vibrationPattern: [0, 150],
+    });
+  });
+
   it.each([2, 3, 4])(
     "accepts iOS authorization status %s without prompting",
     async (status) => {

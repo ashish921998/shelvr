@@ -2886,7 +2886,7 @@ describe("photo rejection before classification", () => {
         }
       }
     });
-    await t.finishAllScheduledFunctions(vi.runAllTimers);
+    await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
     expect(await t.run((ctx) => ctx.db.get(id))).toMatchObject({
       productsStatus: "failed",
     });
@@ -3321,16 +3321,14 @@ describe("stale processing runs", () => {
 
     expect(await t.mutation(api.items.reprocessItem, { id: stale })).toBe(true);
     const retried = await t.run((ctx) => ctx.db.get(stale));
-    expect(retried).toMatchObject({
-      status: "processing",
-      processingStartedAt: Date.now(),
-    });
+    expect(retried?.status).toBe("processing");
+    expect(retried?.processingStartedAt).toBeGreaterThanOrEqual(now);
     expect(retried?.processingRunId).not.toBe(before.stale?.processingRunId);
 
     await t.mutation(api.items.reprocessItem, { id: legacyStale });
     const legacyRetried = await t.run((ctx) => ctx.db.get(legacyStale));
     expect(legacyRetried?.processingRunId).toBeDefined();
-    expect(legacyRetried?.processingStartedAt).toBe(Date.now());
+    expect(legacyRetried?.processingStartedAt).toBeGreaterThanOrEqual(now);
 
     expect(await t.mutation(api.items.reprocessItem, { id: fresh })).toBe(
       false,

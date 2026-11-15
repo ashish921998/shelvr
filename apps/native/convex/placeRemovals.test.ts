@@ -5,6 +5,7 @@ import { cityPins } from "../src/lib/city-pins";
 import { api, internal } from "./_generated/api";
 import { newConvexTest, signedInUser } from "./test.setup";
 import { visibleSave, type Removal } from "./model/placeRemovals";
+import { rateLimiter } from "./model/rateLimiter";
 import { toPlanSource } from "./tripData";
 import { keepSuggestion } from "./model/tripSuggest";
 import { keepDateSuggestion } from "./model/dateRank";
@@ -374,6 +375,14 @@ describe("place removals", () => {
     expect(
       await t.run((ctx) => ctx.db.query("placeRemovals").collect()),
     ).toHaveLength(20);
+  });
+
+  it("still removes a place after a whole city was marked visited", async () => {
+    const { t, userId, remove } = await setup();
+    await t.run((ctx) =>
+      rateLimiter.limit(ctx, "placeVisit", { key: userId, count: 200 }),
+    );
+    await expect(remove()).resolves.toEqual(expect.any(String));
   });
 
   it("hides a removed place in search, keeps the save findable, and Undo restores it", async () => {

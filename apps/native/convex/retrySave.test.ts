@@ -84,7 +84,7 @@ function modelNames(title: string) {
 
 async function retried(
   url = PAGE,
-  save: Partial<typeof GOOD_SAVE> = GOOD_SAVE,
+  save: Partial<typeof GOOD_SAVE> & { stepFailed?: boolean } = GOOD_SAVE,
 ) {
   const { t, userId } = await signedInUser(newConvexTest(), { pro: true });
   const itemId: Id<"items"> = await t.run((ctx) =>
@@ -100,7 +100,7 @@ async function retried(
     }),
   );
   expect(await t.mutation(api.items.reprocessItem, { id: itemId })).toBe(true);
-  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  await t.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
   return await t.run((ctx) => ctx.db.get(itemId));
 }
 
@@ -191,6 +191,14 @@ it("still reaches the speech read for a caption-less video with no places", asyn
     title: "A TikTok",
     description: "A TikTok video by cook.",
   });
+
+  expect(generateObject).toHaveBeenCalled();
+});
+
+it("redoes a failed step on Retry even when the read finds no caption", async () => {
+  servesTikTokWithoutCaption();
+
+  await retried(TIKTOK, { ...GOOD_SAVE, stepFailed: true });
 
   expect(generateObject).toHaveBeenCalled();
 });

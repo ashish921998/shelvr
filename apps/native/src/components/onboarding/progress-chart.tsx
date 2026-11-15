@@ -12,7 +12,7 @@ import {
   Skia,
 } from "@shopify/react-native-skia";
 import { useEffect, useMemo, useState } from "react";
-import { Text, View } from "react-native";
+import { ScrollView, Text, View } from "react-native";
 import Animated, {
   Easing,
   FadeIn,
@@ -55,18 +55,6 @@ function chartPoints(width: number) {
     start: { x: width * 0.14, y: BASELINE * 0.71 },
     end: { x: width * 0.84, y: BASELINE * 0.25 },
   };
-}
-
-function ChartTitle() {
-  return (
-    <Text
-      style={styles.title}
-      maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
-      accessibilityRole="header"
-    >
-      {t("onboardingChart.title")}
-    </Text>
-  );
 }
 
 /** A curve from saves lost in the camera roll to the plan the person picked, drawn once on arrival. */
@@ -223,10 +211,20 @@ export function ProgressChartStep({
   useAppLocale();
   return (
     <View style={styles.wrap}>
-      <View style={styles.body}>
-        <ChartTitle />
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.body}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text
+          style={styles.title}
+          maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
+          accessibilityRole="header"
+        >
+          {t("onboardingChart.title")}
+        </Text>
         <Chart kind={kind} />
-      </View>
+      </ScrollView>
       <PillButton
         label={t("common.continue")}
         onPress={onContinue}
@@ -241,21 +239,18 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     gap: theme.gap(1.5),
   },
+  scroll: { flex: 1 },
   body: {
-    flex: 1,
-    justifyContent: "center",
-    gap: theme.gap(3),
+    flexGrow: 1,
+    justifyContent: "space-evenly",
+    gap: theme.gap(4),
   },
   title: {
-    fontFamily: theme.fonts.bold,
-    fontSize: 30,
-    lineHeight: 36,
-    letterSpacing: -0.6,
-    textAlign: "center",
+    ...theme.type.hero,
+    fontSize: 34,
+    lineHeight: 40,
+    letterSpacing: -0.4,
     color: theme.colors.foreground,
-  },
-  accent: {
-    color: theme.colors.primaryText,
   },
   chart: {
     height: HEIGHT,

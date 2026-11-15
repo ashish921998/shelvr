@@ -1,5 +1,12 @@
 import { linkSource, type LinkSource } from "@convex/model/externalUrl";
+import {
+  mergeVenueKinds,
+  placeKinds,
+  type Cuisine,
+  type PlaceKind,
+} from "@convex/model/placeKinds";
 import { distanceKm, middleOf, uniquePlacePins } from "@convex/model/trip";
+import { placeEmoji } from "@/lib/map-pin-emoji";
 
 export type CityPin = {
   itemId: string;
@@ -8,10 +15,15 @@ export type CityPin = {
   lng: number;
   appleId?: string;
   category?: string;
+  cuisine?: Cuisine;
+  emoji?: string;
+  kinds: PlaceKind[];
   number: number;
 };
 
-export function cityPinId(pin: Omit<CityPin, "number">): string {
+export function cityPinId(
+  pin: Omit<CityPin, "number" | "emoji" | "kinds">,
+): string {
   return `${pin.itemId}:${pin.name}:${pin.lat}:${pin.lng}`;
 }
 
@@ -19,20 +31,31 @@ export function cityPinId(pin: Omit<CityPin, "number">): string {
 export function cityPins(
   saves: {
     _id: string;
+    tags?: string[];
     placePins?: {
       name: string;
       lat: number;
       lng: number;
       appleId?: string;
       category?: string;
+      cuisine?: Cuisine;
     }[];
   }[],
 ): CityPin[] {
   return uniquePlacePins(
     saves.flatMap((save) =>
-      (save.placePins ?? []).map((pin) => ({ itemId: save._id, ...pin })),
+      (save.placePins ?? []).map((pin) => ({
+        itemId: save._id,
+        ...pin,
+        kinds: placeKinds(pin.category, save.tags ?? [], pin.cuisine),
+      })),
     ),
-  ).map((pin, index) => ({ ...pin, number: index + 1 }));
+    mergeVenueKinds,
+  ).map((pin, index) => ({
+    ...pin,
+    emoji: placeEmoji(pin),
+    number: index + 1,
+  }));
 }
 
 const FRAME_SPREAD = 3;

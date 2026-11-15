@@ -8,7 +8,6 @@ on:
         description: Build profile of the installed binary
         options:
           [
-            production,
             internal-test,
             preview,
             development,
@@ -35,6 +34,11 @@ jobs:
       platform: ${{ inputs.platform }}
     hooks:
       before_update:
+        - name: Send production updates through release.yml
+          if: ${{ inputs.profile == 'production' }}
+          run: |
+            echo "Production updates ship from the GitHub release workflow (mode ota), which deploys the backend first."
+            exit 1
         - name: Check backend configuration
           run: |
             test -n "$EXPO_PUBLIC_CONVEX_URL" && test -n "$EXPO_PUBLIC_CONVEX_SITE_URL" || {

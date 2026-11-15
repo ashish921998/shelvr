@@ -5,6 +5,8 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Id } from "@convex/_generated/dataModel";
 import {
+  activityLine,
+  freshCity,
   inviteUrl,
   listRows,
   listSectionRows,
@@ -13,7 +15,11 @@ import {
   type SharedListPlace,
   useAlsoAddTo,
   useNameGate,
+  useTypedCity,
+  wentLine,
+  wentYou,
   withLine,
+  youWent,
 } from "./shared-lists";
 
 const mocks = vi.hoisted(() => ({
@@ -22,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   captureError: vi.fn(),
   query: vi.fn((): { data?: unknown } => ({})),
+  alert: vi.fn(),
 }));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: true }),
@@ -34,6 +41,7 @@ vi.mock("@convex/_generated/api", () => ({
       listSharedLists: { name: "list" },
       addSavePlaces: { name: "add" },
       removeSavePlaces: { name: "remove" },
+      listsWithSave: { name: "listsWithSave" },
     },
     users: { getMyFirstName: { name: "firstName" } },
   },
@@ -52,14 +60,19 @@ vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
 vi.mock("react-native", () => ({
   Platform: { OS: "ios" },
   Share: { share: vi.fn(), sharedAction: "sharedAction" },
+  Alert: { alert: mocks.alert },
 }));
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   mocks.add.mockReset();
   mocks.remove.mockReset();
   mocks.capture.mockReset();
   mocks.captureError.mockReset();
+  mocks.alert.mockReset();
+  mocks.query.mockReset();
+  mocks.query.mockImplementation(() => ({}));
 });
 
 const ITEM = "item1" as Id<"items">;
@@ -124,9 +137,7 @@ describe("listSectionRows", () => {
       [place({ name: "Old" }), place({ name: "New", isNew: true })],
       "Lisbon",
     );
-    const places = listSectionRows(rows, "Maya").filter(
-      (row) => row.kind === "place",
-    );
+    const places = listSectionRows(rows).filter((row) => row.kind === "place");
     expect(places.map((row) => row.id)).toEqual(
       rows.map((row) => cityPinId(row.pin)),
     );
@@ -134,19 +145,120 @@ describe("listSectionRows", () => {
 
   it("heads the sections only when something is new", () => {
     const old = listRows([place({ name: "Old" })], "Lisbon");
-    expect(listSectionRows(old, "Maya").map((row) => row.kind)).toEqual([
-      "place",
-    ]);
+    expect(listSectionRows(old).map((row) => row.kind)).toEqual(["place"]);
     const both = listRows(
       [place({ name: "Old" }), place({ name: "New", isNew: true })],
       "Lisbon",
     );
-    expect(listSectionRows(both, "Maya").map((row) => row.kind)).toEqual([
+    expect(listSectionRows(both).map((row) => row.kind)).toEqual([
       "heading",
       "place",
       "heading",
       "place",
     ]);
+  });
+
+  const freshHeading = (places: SharedListPlace[]) =>
+    listSectionRows(listRows(places, "Lisbon")).find(
+      (row) => row.kind === "heading" && row.fresh,
+    );
+
+  it("names the one person who added the new places", () => {
+    expect(
+      freshHeading([
+        place({ name: "A", isNew: true, addedByName: "Priya" }),
+        place({ name: "B", isNew: true, addedByName: "Priya" }),
+        place({ name: "Old", addedByName: "Sam" }),
+      ]),
+    ).toMatchObject({ label: 'sharedLists.newFrom:{"name":"Priya"}' });
+  });
+
+  it("names everyone who added a new place, in row order, once each", () => {
+    expect(
+      freshHeading([
+        place({ name: "A", isNew: true, addedByName: "Priya" }),
+        place({ name: "B", isNew: true, addedByName: "Sam" }),
+        place({ name: "C", isNew: true, addedByName: "Priya" }),
+      ]),
+    ).toMatchObject({ label: 'sharedLists.newFrom:{"name":"Priya, Sam"}' });
+  });
+
+  it("calls a past member Someone", () => {
+    expect(
+      freshHeading([
+        place({ name: "A", isNew: true, addedByPastMember: true }),
+        place({ name: "B", isNew: true, addedByName: "Sam" }),
+      ]),
+    ).toMatchObject({
+      label: 'sharedLists.newFrom:{"name":"sharedLists.someone, Sam"}',
+    });
+  });
+
+  it("names only the adders of the city shown", () => {
+    expect(
+      freshHeading([
+        place({ name: "A", isNew: true, addedByName: "Priya" }),
+        place({
+          name: "B",
+          isNew: true,
+          addedByName: "Sam",
+          city: "Porto",
+        }),
+      ]),
+    ).toMatchObject({ label: 'sharedLists.newFrom:{"name":"Priya"}' });
+  });
+});
+
+describe("activityLine", () => {
+  it("says nothing when nothing is new", () => {
+    expect(activityLine([])).toBeNull();
+  });
+
+  it("names one adder with their count", () => {
+    expect(activityLine([{ firstName: "Priya", count: 3 }])).toBe(
+      'sharedLists.activityOne:{"name":"Priya","count":3}',
+    );
+  });
+
+  it("says someone for one adder with no name", () => {
+    expect(activityLine([{ count: 1 }])).toBe(
+      'sharedLists.activitySomeone:{"count":1}',
+    );
+  });
+
+  it("adds the counts up and names every group for two or more", () => {
+    expect(
+      activityLine([
+        { firstName: "Priya", count: 3 },
+        { firstName: "Sam", count: 1 },
+        { count: 2 },
+      ]),
+    ).toBe(
+      'sharedLists.activityMany:{"count":6,"names":"Priya, Sam, sharedLists.someone"}',
+    );
+  });
+});
+
+describe("freshCity", () => {
+  const cities = ["Lisbon", "Porto", "Faro"];
+
+  it("opens on the first city that has something new", () => {
+    expect(
+      freshCity({
+        cities,
+        places: [
+          place({ name: "Old", city: "Lisbon" }),
+          place({ name: "Faro new", city: "Faro", isNew: true }),
+          place({ name: "Porto new", city: "Porto", isNew: true }),
+        ],
+      }),
+    ).toBe("Porto");
+  });
+
+  it("has no city when nothing is new", () => {
+    expect(
+      freshCity({ cities, places: [place({ name: "Old", city: "Porto" })] }),
+    ).toBeNull();
   });
 });
 
@@ -162,6 +274,46 @@ describe("savedByLine", () => {
     expect(savedByLine(place({ addedByYou: true }))).toBe(
       "sharedLists.youSaved",
     );
+  });
+});
+
+describe("wentLine", () => {
+  const you = { isYou: true };
+  const maya = { isYou: false, firstName: "Maya" };
+  const bo = { isYou: false, firstName: "Bo" };
+
+  it("says nothing until someone went, and keeps an old shared mark", () => {
+    expect(wentLine(place())).toBeNull();
+    expect(wentLine(place({ visitedAt: 1 }))).toBe("plan.weWent");
+    expect(wentYou(place({ visitedAt: 1 }))).toBe(false);
+  });
+
+  it("names who went, you first", () => {
+    expect(wentLine(place({ wentBy: [you] }))).toBe("sharedLists.wentYou");
+    expect(wentLine(place({ wentBy: [maya] }))).toBe(
+      'sharedLists.wentOne:{"name":"Maya"}',
+    );
+    expect(wentLine(place({ wentBy: [you, maya] }))).toBe(
+      'sharedLists.wentYouAnd:{"name":"Maya"}',
+    );
+    expect(wentLine(place({ wentBy: [maya, { isYou: false }] }))).toBe(
+      'sharedLists.wentTwo:{"first":"Maya","second":"sharedLists.someone"}',
+    );
+    expect(wentLine(place({ wentBy: [you, maya, bo] }))).toBe(
+      'sharedLists.wentYouAndMany:{"count":2}',
+    );
+    expect(wentLine(place({ wentBy: [maya, bo, { isYou: false }] }))).toBe(
+      'sharedLists.wentMany:{"name":"Maya","count":2}',
+    );
+    expect(wentYou(place({ wentBy: [you, maya] }))).toBe(true);
+    expect(wentYou(place({ wentBy: [maya] }))).toBe(false);
+  });
+
+  it("counts a place as yours to skip when you went or an old app marked it", () => {
+    expect(youWent(place())).toBe(false);
+    expect(youWent(place({ visitedAt: 1 }))).toBe(true);
+    expect(youWent(place({ visitedAt: 1, wentBy: [maya] }))).toBe(false);
+    expect(youWent(place({ visitedAt: 1, wentBy: [maya, you] }))).toBe(true);
   });
 });
 
@@ -182,13 +334,35 @@ describe("withLine and inviteUrl", () => {
 });
 
 describe("useAlsoAddTo", () => {
-  it("is off by default, adds on the first tap and removes on the second", async () => {
-    mocks.add.mockResolvedValue(3);
-    mocks.remove.mockResolvedValue(3);
+  const SUMMARY = {
+    _id: LIST,
+    name: "Ours",
+    placeCount: 4,
+    newCount: 0,
+    isOwner: true,
+    newFrom: [],
+    members: [],
+  };
+  let savedOn: Id<"sharedLists">[] = [];
+  function serverLists() {
+    savedOn = [];
+    mocks.query.mockImplementation(() => ({ data: savedOn }));
+  }
+
+  it("follows the server: adds on the first tap and removes on the second", async () => {
+    serverLists();
+    mocks.add.mockImplementation(() => {
+      savedOn = [LIST];
+      return Promise.resolve(3);
+    });
+    mocks.remove.mockImplementation(() => {
+      savedOn = [];
+      return Promise.resolve(3);
+    });
     const { result } = renderHook(() => useAlsoAddTo(ITEM, "Lisbon"));
     expect(nextAlsoAddState(result.current.state[LIST])).toBe("add");
 
-    await act(() => result.current.toggle(LIST));
+    await act(() => result.current.toggle(SUMMARY));
     expect(mocks.add).toHaveBeenCalledWith({
       listId: LIST,
       itemId: ITEM,
@@ -199,22 +373,83 @@ describe("useAlsoAddTo", () => {
       from: "spots",
     });
 
-    await act(() => result.current.toggle(LIST));
+    await act(() => result.current.toggle(SUMMARY));
     expect(mocks.remove).toHaveBeenCalledWith({ listId: LIST, itemId: ITEM });
-    await waitFor(() => expect(result.current.state[LIST]).toBe("off"));
+    await waitFor(() => expect(result.current.state[LIST]).toBeUndefined());
+  });
+
+  it("opens on for a list the save is already on, so the first tap removes it", async () => {
+    serverLists();
+    savedOn = [LIST];
+    mocks.remove.mockResolvedValue(2);
+    const { result } = renderHook(() => useAlsoAddTo(ITEM, "Lisbon"));
+    expect(result.current.state[LIST]).toBe("on");
+    await act(() => result.current.toggle(SUMMARY));
+    expect(mocks.remove).toHaveBeenCalledWith({ listId: LIST, itemId: ITEM });
+    expect(mocks.add).not.toHaveBeenCalled();
+  });
+
+  it("stays off and says why when nothing was added", async () => {
+    serverLists();
+    mocks.add.mockResolvedValue(0);
+    const { result } = renderHook(() => useAlsoAddTo(ITEM, "Lisbon"));
+    await act(() => result.current.toggle(SUMMARY));
+    expect(result.current.state[LIST]).toBeUndefined();
+    expect(mocks.alert).toHaveBeenCalledWith(
+      'sharedLists.alsoAddAlready:{"name":"Ours"}',
+    );
+    await act(() => result.current.toggle({ ...SUMMARY, placeCount: 200 }));
+    expect(mocks.alert).toHaveBeenLastCalledWith(
+      'sharedLists.alsoAddFull:{"name":"Ours"}',
+    );
+    expect(mocks.capture).not.toHaveBeenCalled();
+  });
+
+  it("waits for the server before acting", async () => {
+    const { result } = renderHook(() => useAlsoAddTo(ITEM, "Lisbon"));
+    await act(() => result.current.toggle(SUMMARY));
+    expect(mocks.add).not.toHaveBeenCalled();
   });
 
   it("goes back to off when adding fails, and reports it", async () => {
+    serverLists();
     mocks.add.mockRejectedValue(new Error("offline"));
     const { result } = renderHook(() => useAlsoAddTo(ITEM, "Lisbon"));
-    await act(() => result.current.toggle(LIST));
-    await waitFor(() => expect(result.current.state[LIST]).toBe("off"));
+    await act(() => result.current.toggle(SUMMARY));
+    await waitFor(() => expect(result.current.state[LIST]).toBeUndefined());
     expect(mocks.captureError).toHaveBeenCalled();
   });
 
   it("ignores a tap while a call is running", () => {
     expect(nextAlsoAddState("adding")).toBeNull();
     expect(nextAlsoAddState("removing")).toBeNull();
+  });
+});
+
+describe("useTypedCity", () => {
+  it("adds the whole city once when return and blur land with the last letter", () => {
+    const add = vi.fn();
+    const { result } = renderHook(() => useTypedCity(add));
+    act(() => result.current.change("Lisbo"));
+    act(() => {
+      result.current.change("Lisbon");
+      result.current.commit();
+      result.current.commit();
+    });
+    expect(add.mock.calls).toEqual([["Lisbon"]]);
+    expect(result.current.typed).toBe("");
+  });
+
+  it("tidies spaces and ignores a blank field", () => {
+    const add = vi.fn();
+    const { result } = renderHook(() => useTypedCity(add));
+    act(() => {
+      result.current.change("   ");
+      result.current.commit();
+      result.current.change("  New   York ");
+      result.current.commit();
+    });
+    expect(add.mock.calls).toEqual([["New York"]]);
   });
 });
 
@@ -228,11 +463,64 @@ describe("useNameGate", () => {
     expect(result.current.asking).toBe(false);
   });
 
-  it("asks a nameless person once, then carries on whatever they chose", () => {
-    mocks.query.mockReturnValue({ data: null });
+  it("waits for the name to load before deciding", () => {
+    mocks.query.mockReturnValue({});
+    const action = vi.fn();
+    const { result, rerender } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    expect(action).not.toHaveBeenCalled();
+    expect(result.current.asking).toBe(false);
+
+    mocks.query.mockReturnValue({ data: "Maya" });
+    rerender();
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(result.current.asking).toBe(false);
+  });
+
+  it("goes on without asking if the name never loads", () => {
+    vi.useFakeTimers();
+    mocks.query.mockReturnValue({});
     const action = vi.fn();
     const { result } = renderHook(() => useNameGate());
     act(() => result.current.gate(action));
+    expect(action).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(3000));
+    expect(action).toHaveBeenCalledTimes(1);
+    expect(result.current.asking).toBe(false);
+  });
+
+  it("drops a parked action when the screen goes away", () => {
+    vi.useFakeTimers();
+    mocks.query.mockReturnValue({});
+    const action = vi.fn();
+    const { result, unmount } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    unmount();
+    act(() => vi.advanceTimersByTime(3000));
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("drops a parked action when the person cancels", () => {
+    vi.useFakeTimers();
+    mocks.query.mockReturnValue({});
+    const action = vi.fn();
+    const { result } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    act(() => result.current.cancel());
+    act(() => vi.advanceTimersByTime(3000));
+    expect(action).not.toHaveBeenCalled();
+  });
+
+  it("asks a nameless person once, then carries on whatever they chose", () => {
+    vi.useFakeTimers();
+    mocks.query.mockReturnValue({});
+    const action = vi.fn();
+    const { result, rerender } = renderHook(() => useNameGate());
+    act(() => result.current.gate(action));
+    expect(result.current.asking).toBe(false);
+    mocks.query.mockReturnValue({ data: null });
+    rerender();
+    act(() => vi.advanceTimersByTime(3000));
     expect(result.current.asking).toBe(true);
     expect(action).not.toHaveBeenCalled();
 

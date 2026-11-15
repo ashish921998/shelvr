@@ -22,8 +22,10 @@ Without it, links stay plain and nothing is attributed.
   landing URL, kept for the browser session. Give each creator, ad set or post
   its own link, for example `https://shelvr-web.vercel.app/?ct=tiktok_jane`.
 - A visitor with no campaign gets `web_<button>` (`web_hero`, `web_header`,
-  `web_footer`, `web_footer-nav`, `web_oracle`). The share preview page uses
-  `share`.
+  `web_footer`, `web_footer-nav`, `web_oracle`, `web_place_tool` for the reel
+  place finder's results card, `web_place_banner` for the finder's phone
+  banner, `web_bio` for the bio page and `web_plan` for the plan vote page).
+  The share preview page uses `share`.
 - Campaigns are lowercased and reduced to `a-z 0-9 _ -`, at most 40 characters.
 
 **Installs, first opens and paying users per campaign** are in App Store
@@ -243,6 +245,181 @@ ORDER BY started DESC
 ```
 
 Store clicks from the page are `app_store_clicked` with `source = 'oracle'`.
+
+## 6. The landing page and the finder: who clicks through
+
+The landing page's buttons (`source` `header`, `hero` and `footer`) and the
+reel place finder's results card (`source = place_tool`) are read per browser:
+`distinct_id`, the site's `shelvr_web_distinct_id`. Clicks per page view would
+mislead. One view can send several clicks (the header, hero and footer
+buttons, or a second click after a return from the App Store), and the views
+of one browser are not independent trials.
+
+`$pageview` carries `$pathname`, but a click carries only `$current_url`, so
+the root is matched with a regex. Match the URL as well as the source: `/apple`
+also sends `header` and `hero`.
+
+**Landing click-through per browser**: of the browsers with a `$pageview` on
+`/`, the share that clicked a store button there. Replace the two bounds with
+the window's start and end.
+
+```sql
+SELECT count() AS browsers,
+  countIf(clicked) AS clicked_browsers,
+  round(clicked_browsers / browsers, 4) AS click_through
+FROM (
+  SELECT distinct_id,
+    countIf(event = '$pageview') > 0 AS landed,
+    countIf(event = 'app_store_clicked') > 0 AS clicked
+  FROM events
+  WHERE timestamp >= toDateTime('<window start>')
+    AND timestamp < toDateTime('<window end>')
+    AND (
+      (event = '$pageview' AND properties.$pathname = '/')
+      OR (event = 'app_store_clicked'
+        AND properties.source IN ('header', 'hero', 'footer')
+        AND match(properties.$current_url, '^https?://[^/]+/$'))
+    )
+  GROUP BY distinct_id
+)
+WHERE landed
+```
+
+**Finder click-through per browser**: of the browsers that saw a result with
+places (`place_tool_result` with `count > 0`) or the sample
+(`place_tool_sample_opened`), the share that clicked the results card. Same
+bounds.
+
+```sql
+SELECT count() AS browsers,
+  countIf(clicked) AS clicked_browsers,
+  round(clicked_browsers / browsers, 4) AS click_through
+FROM (
+  SELECT distinct_id,
+    countIf(event != 'app_store_clicked') > 0 AS shown,
+    countIf(event = 'app_store_clicked') > 0 AS clicked
+  FROM events
+  WHERE timestamp >= toDateTime('<window start>')
+    AND timestamp < toDateTime('<window end>')
+    AND (
+      (event = 'place_tool_result' AND toFloat(properties.count) > 0)
+      OR event = 'place_tool_sample_opened'
+      OR (event = 'app_store_clicked' AND properties.source = 'place_tool')
+    )
+  GROUP BY distinct_id
+)
+WHERE shown
+```
+
+To read a change to either page, compare whole weeks before and after its
+deploy (four on each side), and report the difference as a direction, not an
+effect: the season and the campaigns move too.
+
+### The button emoji test
+
+The four buttons in `MapCta` (`header`, `hero`, `footer` and `place_tool`)
+test their label 50/50: `plain` ("Map my saves", "Save these to Shelvr") or
+`emoji` (the same label, then a no-break space and 📍). The badges on the share
+pages, `/apple` and the bio page are not in the test.
+
+- **Assignment.** The inline script from `apps/web/src/lib/ctaVariant.ts` runs
+  in the root layout's `<head>`. On a page load with no valid stored value it
+  draws a variant and stores it in `localStorage` as `shelvr_cta_variant`, and
+  on every load it sets `data-cta` on `<html>` before the first paint. The page
+  shows the 📍 only under `data-cta="emoji"`.
+- **Events.** Every web event from that browser carries `cta_variant`:
+  `$pageview`, `app_store_clicked` and the finder's events among them. A
+  browser whose storage is blocked or throws has no variant: it sees the plain
+  label, sends no `cta_variant`, and falls out of the comparison.
+- **Safari.** Tracking prevention deletes a site's script-writable storage
+  after 7 days of Safari use without interaction with the site. That clears
+  `shelvr_cta_variant` and `shelvr_web_distinct_id` together, so a visitor who
+  comes back later counts as a new browser with a fresh draw. Counting browsers
+  handles that; nothing promises one person the same label for ever.
+- **Before and after reads.** For a window after the test went live, add
+  `AND coalesce(properties.cta_variant, 'plain') = 'plain'` to the inner
+  `WHERE` of the two queries above, so the emoji arm stays out of them.
+
+**Landing click-through per variant**: each browser's variant is the one on its
+first `$pageview` of `/`. No date bounds are needed: only events after the
+test's deploy carry a variant.
+
+```sql
+SELECT variant,
+  count() AS browsers,
+  countIf(clicked) AS clicked_browsers,
+  round(clicked_browsers / browsers, 4) AS click_through
+FROM (
+  SELECT distinct_id,
+    argMinIf(properties.cta_variant, timestamp, event = '$pageview') AS variant,
+    countIf(event = 'app_store_clicked') > 0 AS clicked
+  FROM events
+  WHERE properties.cta_variant IN ('plain', 'emoji')
+    AND (
+      (event = '$pageview' AND properties.$pathname = '/')
+      OR (event = 'app_store_clicked'
+        AND properties.source IN ('header', 'hero', 'footer')
+        AND match(properties.$current_url, '^https?://[^/]+/$'))
+    )
+  GROUP BY distinct_id
+)
+WHERE variant IN ('plain', 'emoji')
+GROUP BY variant
+```
+
+**Finder click-through per variant**: the same events as the finder query.
+Each browser's variant is the one on the first result with places, or the
+sample, that it saw.
+
+```sql
+SELECT variant,
+  count() AS browsers,
+  countIf(clicked) AS clicked_browsers,
+  round(clicked_browsers / browsers, 4) AS click_through
+FROM (
+  SELECT distinct_id,
+    argMinIf(properties.cta_variant, timestamp, event != 'app_store_clicked') AS variant,
+    countIf(event = 'app_store_clicked') > 0 AS clicked
+  FROM events
+  WHERE properties.cta_variant IN ('plain', 'emoji')
+    AND (
+      (event = 'place_tool_result' AND toFloat(properties.count) > 0)
+      OR event = 'place_tool_sample_opened'
+      OR (event = 'app_store_clicked' AND properties.source = 'place_tool')
+    )
+  GROUP BY distinct_id
+)
+WHERE variant IN ('plain', 'emoji')
+GROUP BY variant
+```
+
+**Significance**: the pooled two-proportion z-test on browsers,
+z = (pₑ − pₚ) / √(p̂ (1 − p̂) (1/nₑ + 1/nₚ)), where pₑ and pₚ are the two
+click-through rates, nₑ and nₚ the browsers, and
+p̂ = (clickedₑ + clickedₚ) / (nₑ + nₚ).
+
+The read rule was fixed before launch:
+
+- **What decides.** The landing click-through per browser. Report the finder's
+  too, but it does not decide, because its traffic is smaller.
+- **Size.** The test is sized for a 20% relative lift in landing click-through.
+  Per arm, n = 7.84 × (p(1 − p) + q(1 − q)) / (q − p)², where p is the landing
+  click-through per browser over the 4 weeks before the test went live (the
+  landing query above) and q = 1.2 p. That gives 80% power at a two-sided α of
+  0.05. For example, p = 10% needs about 3,800 browsers per arm, and p = 5%
+  about 8,100.
+- **Duration.** Whole weeks, until both arms reach n, but at least 2 weeks and
+  at most 8. Read the result once, at the end, not while it runs.
+- **Decision.** Keep the emoji only if z > 1.96 (its landing click-through is
+  higher at p < 0.05). Otherwise keep the plain label.
+- **Short of n.** If 8 weeks do not reach n, stop and apply the same rule. Then
+  report the smallest relative lift the run could detect, about
+  2.8 × √(2(1 − p) / (n p)) for the n reached, and say that the test only rules
+  out large effects.
+- **Afterwards.** Remove the test: keep the winning label, and delete
+  `ctaVariant.ts` with the head script, the `.cta-emoji` rules with the
+  button's layout effect, the `cta_variant` property, the privacy policy's
+  sentences about it, and this subsection.
 
 ## Not measured yet
 

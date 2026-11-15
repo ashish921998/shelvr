@@ -69,7 +69,7 @@ const CLUES_READ_OFF_LIST_LINES = [
   { name: "Savoy Azabujuban", location: "Azabujuban, Tokyo" },
 ];
 
-function model(cityCall: () => Promise<unknown>) {
+function model(cityCall: () => Promise<unknown>, extra: object = {}) {
   generateObject.mockImplementation(async (call: { system?: string }) =>
     call.system === PLACE_LIST_CITIES_SYSTEM
       ? await cityCall()
@@ -86,6 +86,7 @@ function model(cityCall: () => Promise<unknown>) {
             cities: ["Tokyo"],
             places: ["Marcy Land"],
             placeLocations: CLUES_READ_OFF_LIST_LINES,
+            ...extra,
           },
         },
   );
@@ -214,6 +215,38 @@ describe("processItem on a shared Google Maps list", () => {
     ]);
   });
 
+  it("puts each listed place's cuisine on the save of its own city", async () => {
+    model(NAMED, {
+      placeCuisines: [
+        { name: "Marcy Land", cuisine: "noodles" },
+        { name: "Mori Mori Tei", cuisine: "burger" },
+        { name: "Savoy Azabujuban", cuisine: "pizza" },
+      ],
+    });
+    const t = newConvexTest();
+    const { userId, itemId } = await saveList(t);
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+
+    expect(
+      (await savesOf(t, userId)).map(({ title, placeCuisines }) => ({
+        title,
+        placeCuisines,
+      })),
+    ).toEqual([
+      {
+        title: "Tokyo",
+        placeCuisines: [
+          { name: "Marcy Land", cuisine: "noodles" },
+          { name: "Savoy Azabujuban", cuisine: "pizza" },
+        ],
+      },
+      {
+        title: "Karuizawa · Tokyo",
+        placeCuisines: [{ name: "Mori Mori Tei", cuisine: "burger" }],
+      },
+    ]);
+  });
+
   it("leaves a list place pinned at the list's point when Apple's lookup runs", async () => {
     model(NAMED);
     const t = newConvexTest();
@@ -256,7 +289,32 @@ describe("processItem on a shared Google Maps list", () => {
       status: "ready",
       title: "Tokyo food",
       places: ["Marcy Land"],
+      enrichment: "partial",
+      stepFailed: true,
     });
+  });
+
+  it("splits the list on a Retry after the city call failed", async () => {
+    model(async () => {
+      throw new Error("model down");
+    });
+    const t = newConvexTest();
+    const { userId, itemId } = await saveList(t);
+    await t.action(internal.ai.processItem, { itemId, runId: "run-1" });
+
+    model(NAMED);
+    await t.run((ctx) =>
+      ctx.db.patch(itemId, { status: "processing", processingRunId: "run-2" }),
+    );
+    await t.action(internal.ai.processItem, { itemId, runId: "run-2" });
+
+    const saves = await savesOf(t, userId);
+    expect(saves).toHaveLength(2);
+    for (const save of saves) {
+      expect(save.status).toBe("ready");
+      expect(save.enrichment).toBeUndefined();
+      expect(save.stepFailed).toBeUndefined();
+    }
   });
 });
 

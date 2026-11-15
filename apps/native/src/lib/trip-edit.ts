@@ -235,6 +235,7 @@ export function useTripEditor(trip: TripPlanDetail) {
       const name = stopName(stopId);
       const edit = ++latest.current;
       offerUndo(null);
+      if (method === "drag") void haptics.landing();
       try {
         const before = await optimistic.move({ stopId, ...to });
         if (method === "menu") void haptics.selection();

@@ -82,6 +82,7 @@ export function PillButton({
   return (
     <ScalePressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ disabled: !!inactive, busy: !!busy }}
       testID={testID}
       disabled={inactive}

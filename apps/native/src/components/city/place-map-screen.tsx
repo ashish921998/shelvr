@@ -18,6 +18,7 @@ const MAP_SHARE = 0.4;
 
 export function PlaceMapScreen<Row extends { id: string }>({
   pins,
+  visible,
   hasMap,
   rows,
   rowGap,
@@ -29,8 +30,10 @@ export function PlaceMapScreen<Row extends { id: string }>({
   footer,
   plans,
   children,
+  visited,
 }: {
   pins: CityPin[];
+  visible?: number;
   hasMap: boolean;
   rows: Row[];
   rowGap: number;
@@ -42,6 +45,7 @@ export function PlaceMapScreen<Row extends { id: string }>({
   footer?: ReactElement;
   plans: ReactNode;
   children?: ReactNode;
+  visited?: ReadonlySet<string>;
 }) {
   const { theme, rt } = useUnistyles();
   const list = useRef<FlatList<Row>>(null);
@@ -87,10 +91,12 @@ export function PlaceMapScreen<Row extends { id: string }>({
         <View style={styles.map}>
           <CityMap
             pins={pins}
+            visible={visible}
             selected={selected}
             height={screenHeight}
             coveredBottom={screenHeight - snaps.middle}
             onSelect={select}
+            visited={visited}
           />
         </View>
       ) : null}

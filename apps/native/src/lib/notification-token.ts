@@ -42,6 +42,11 @@ async function ensureChannels(): Promise<void> {
     importance: AndroidImportance.DEFAULT,
     vibrationPattern: [0, 150],
   });
+  await Notifications.setNotificationChannelAsync("plan-votes", {
+    name: t("notifications.planVotesChannel"),
+    importance: AndroidImportance.DEFAULT,
+    vibrationPattern: [0, 150],
+  });
 }
 
 async function askForPermission(

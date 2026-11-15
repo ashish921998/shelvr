@@ -206,6 +206,56 @@ describe("choosing a save reminder", () => {
     expect(sent).toMatchObject({ kind: "visit", itemId: ids[1] });
   });
 
+  it("still offers and claims a reminder for a second nearby branch", async () => {
+    const name = reel.places[0];
+    const visited = { lat: 38.71, lng: -9.14 };
+    const neighbour = { lat: 38.711, lng: -9.14 };
+    const { t, userId, ids, prepare, reminders } = await setup({
+      saves: [
+        [
+          5,
+          {
+            ...reel,
+            places: [name],
+            placePins: [{ name, ...visited, appleId: "A" }],
+          },
+        ],
+        [
+          4,
+          {
+            ...reel,
+            places: [name],
+            placePins: [{ name, ...neighbour, appleId: "B" }],
+          },
+        ],
+      ],
+    });
+    await t.run((ctx) =>
+      ctx.db.insert("placeVisits", {
+        userId,
+        key: placeKey(name),
+        name,
+        itemId: ids[0],
+        visitedAt: NOW - DAY,
+        spots: [visited],
+      }),
+    );
+    await prepare();
+    const [reminder] = await reminders();
+    expect(reminder).toMatchObject({ kind: "visit", itemId: ids[1] });
+    const claim = await t.mutation(
+      internal.notificationDelivery.claimReminder,
+      {
+        reminderId: reminder._id,
+      },
+    );
+    expect(claim).toMatchObject({
+      kind: "visit",
+      itemId: ids[1],
+      subject: name,
+    });
+  });
+
   it("leaves a place alone once the user has been to all it names", async () => {
     const { t, userId, ids, prepare, reminders } = await setup({
       saves: [[5, reel]],
@@ -772,6 +822,8 @@ describe("delivering a save reminder", () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual([
       {
         to: "token-a",
+        collapseId: reminder._id,
+        tag: reminder._id,
         title: "Saved for later",
         body: "“Why bread rises” is ready when you are.",
         data: {

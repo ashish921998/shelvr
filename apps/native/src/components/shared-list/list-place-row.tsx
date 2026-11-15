@@ -2,13 +2,20 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t } from "@/lib/i18n";
-import { savedByLine, type SharedListPlace } from "@/lib/shared-lists";
-import { Pressable, View } from "react-native";
+import {
+  savedByLine,
+  wentLine,
+  wentYou,
+  type SharedListPlace,
+} from "@/lib/shared-lists";
+import { Pressable, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
+import Animated, { useReducedMotion } from "react-native-reanimated";
+import { motion, motionCSS } from "@/lib/motion";
 
 type Props = {
   place: SharedListPlace;
-  number: number;
+  emoji: string;
   selected: boolean;
   onPress: () => void;
   onPlaceDetails?: () => void;
@@ -18,7 +25,7 @@ type Props = {
 
 export function ListPlaceRow({
   place,
-  number,
+  emoji,
   selected,
   onPress,
   onPlaceDetails,
@@ -26,8 +33,11 @@ export function ListPlaceRow({
   onRemove,
 }: Props) {
   const { theme } = useUnistyles();
+  const reduced = useReducedMotion();
   const by = savedByLine(place);
-  const went = place.visitedAt !== undefined;
+  const line = wentLine(place);
+  const went = line !== null;
+  const mine = wentYou(place);
   return (
     <View
       style={[
@@ -38,33 +48,48 @@ export function ListPlaceRow({
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={[place.name, by, went ? t("plan.weWent") : null]
-          .filter(Boolean)
-          .join(", ")}
+        accessibilityLabel={[place.name, by, line].filter(Boolean).join(", ")}
         accessibilityState={{ selected }}
         onPress={onPress}
         style={({ pressed }) => [styles.body, pressed && styles.pressed]}
       >
-        <View style={styles.badge}>
-          <ThemedText variant="badge" style={styles.badgeText}>
-            {number}
-          </ThemedText>
+        <View style={styles.bubble}>
+          <Text style={styles.bubbleText}>{emoji}</Text>
         </View>
         <View style={styles.text}>
-          <ThemedText variant="subheadStrong" numberOfLines={2}>
-            {place.name}
-          </ThemedText>
-          <ThemedText variant="footnote" style={styles.muted} numberOfLines={1}>
-            {by}
-          </ThemedText>
-        </View>
-        {went ? (
-          <View style={styles.went}>
-            <ThemedText variant="captionStrong" style={styles.muted}>
-              {t("plan.weWent")}
+          <View style={styles.labels}>
+            <ThemedText variant="subheadStrong" numberOfLines={2}>
+              {place.name}
+            </ThemedText>
+            <ThemedText
+              variant="footnote"
+              style={styles.muted}
+              numberOfLines={1}
+            >
+              {by}
             </ThemedText>
           </View>
-        ) : null}
+          <Animated.View
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            style={[
+              styles.went,
+              {
+                opacity: went ? 1 : 0,
+                transitionProperty: "opacity",
+                transitionDuration:
+                  went && !reduced
+                    ? motion.duration.state
+                    : motion.duration.feedback,
+                transitionTimingFunction: motionCSS.out,
+              },
+            ]}
+          >
+            <ThemedText variant="captionStrong" style={styles.muted}>
+              {line}
+            </ThemedText>
+          </Animated.View>
+        </View>
       </Pressable>
       {selected && onPlaceDetails ? (
         <Pressable
@@ -86,8 +111,8 @@ export function ListPlaceRow({
         actions={[
           {
             id: "visited",
-            label: went ? t("sharedLists.notYet") : t("plan.weWent"),
-            onPress: () => onVisited(!went),
+            label: mine ? t("sharedLists.notYet") : t("sharedLists.iWent"),
+            onPress: () => onVisited(!mine),
           },
           {
             id: "remove",
@@ -128,18 +153,28 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(1.5),
     padding: theme.gap(0.75),
   },
-  badge: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  bubble: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.primary,
+    backgroundColor: theme.colors.surface,
+    boxShadow: "0 2px 6px rgba(0,0,0,0.12)",
   },
-  badgeText: { color: theme.colors.onTint },
-  text: { flex: 1, gap: theme.gap(0.25) },
+  bubbleText: { fontSize: 20 },
+  text: {
+    flex: 1,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    columnGap: theme.gap(1.5),
+    rowGap: theme.gap(0.5),
+  },
+  labels: { flexGrow: 1, flexBasis: "60%", minWidth: 0, gap: theme.gap(0.25) },
   muted: { color: theme.colors.muted },
   went: {
+    maxWidth: "100%",
     paddingVertical: theme.gap(0.5),
     paddingHorizontal: theme.gap(1.25),
     borderRadius: theme.radius.md,

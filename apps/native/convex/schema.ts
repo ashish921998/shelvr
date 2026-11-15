@@ -8,6 +8,7 @@ import {
   failureReasonValidator,
   intentValidator,
   placePinsValidator,
+  placeCuisinesValidator,
   placeLocationsValidator,
   postMediaValidator,
   recipeValidator,
@@ -32,6 +33,7 @@ import {
   tripStayValidator,
   tripStopSourceValidator,
 } from "./model/tripPlan";
+import { visitSpotValidator } from "./model/placeVisits";
 
 export default defineSchema({
   ...authTables,
@@ -40,6 +42,7 @@ export default defineSchema({
     ...authTables.users.validator.fields,
     appleRefreshToken: v.optional(v.string()),
     deleting: v.optional(v.boolean()),
+    cityStampsClaimedAt: v.optional(v.number()),
   })
     .index("email", ["email"])
     .index("phone", ["phone"]),
@@ -132,6 +135,7 @@ export default defineSchema({
     cities: v.optional(v.array(v.string())),
     places: v.optional(v.array(v.string())),
     placeLocations: v.optional(placeLocationsValidator),
+    placeCuisines: v.optional(placeCuisinesValidator),
     /** True once a run has read the video's speech for places; a rerun then reads it no more. */
     placesHeard: v.optional(v.boolean()),
     products: v.optional(
@@ -156,14 +160,10 @@ export default defineSchema({
     productsSearchStartedAt: v.optional(v.number()),
     failureReason: v.optional(failureReasonValidator),
     enrichment: v.optional(enrichmentValidator),
+    stepFailed: v.optional(v.boolean()),
     processingRunId: v.optional(v.string()),
     processingStartedAt: v.optional(v.number()),
     searchText: v.string(),
-    // Retired: nothing reads it, and `items:clearEmbeddings` removes it. Stays declared
-    // until no row carries it (one-way door).
-    embedding: v.optional(v.array(v.float64())),
-    embeddingVersion: v.optional(v.number()),
-    embeddingAttempts: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_user_and_type", ["userId", "type"])
@@ -174,7 +174,6 @@ export default defineSchema({
       "processingStartedAt",
     ])
     .index("by_storage", ["storageId"])
-    .index("by_status_and_embeddingVersion", ["status", "embeddingVersion"])
     .searchIndex("search_text", {
       searchField: "searchText",
       filterFields: ["userId"],
@@ -270,6 +269,10 @@ export default defineSchema({
     attempts: v.number(),
     deliveryError: v.optional(v.string()),
     deliveredAt: v.optional(v.number()),
+    deliveryLeaseUntil: v.optional(v.number()),
+    deliveryRequest: v.optional(
+      v.object({ key: v.string(), body: v.string(), startedAt: v.number() }),
+    ),
   })
     .index("by_user", ["userId"])
     .index("by_status_attempts", ["status", "attempts"]),
@@ -279,6 +282,7 @@ export default defineSchema({
     locale: v.optional(v.string()),
     token: v.string(),
     platform: v.union(v.literal("ios"), v.literal("android")),
+    installSecretHash: v.optional(v.string()),
     enabled: v.boolean(),
     lastSeenAt: v.number(),
   })
@@ -316,11 +320,56 @@ export default defineSchema({
     userId: v.string(),
     key: v.string(),
     name: v.string(),
-    itemId: v.id("items"),
+    itemId: v.optional(v.id("items")),
+    listPlaceId: v.optional(v.id("sharedListPlaces")),
     visitedAt: v.number(),
+    spots: v.optional(v.array(visitSpotValidator)),
+    stampPlaces: v.optional(
+      v.array(
+        v.object({
+          lat: v.number(),
+          lng: v.number(),
+          city: v.optional(v.string()),
+          countryCode: v.optional(v.string()),
+          listPlaceId: v.optional(v.id("sharedListPlaces")),
+          alsoListPlaceIds: v.optional(v.array(v.id("sharedListPlaces"))),
+        }),
+      ),
+    ),
+    backfilled: v.optional(v.boolean()),
   })
     .index("by_user_and_key", ["userId", "key"])
     .index("by_user_and_visited", ["userId", "visitedAt"]),
+
+  cityStamps: defineTable({
+    userId: v.id("users"),
+    city: v.string(),
+    country: v.string(),
+    stampedAt: v.number(),
+  }).index("by_user_and_city", ["userId", "city"]),
+
+  cityPhotos: defineTable({
+    key: v.string(),
+    city: v.string(),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("found"),
+      v.literal("missing"),
+      v.literal("failed"),
+    ),
+    url: v.optional(v.string()),
+    file: v.optional(v.string()),
+    checkedAt: v.number(),
+  })
+    .index("by_key", ["key"])
+    .index("by_status_and_checkedAt", ["status", "checkedAt"]),
+
+  passportShares: defineTable({
+    token: v.string(),
+    userId: v.string(),
+  })
+    .index("by_token", ["token"])
+    .index("by_user", ["userId"]),
 
   planShares: defineTable({
     token: v.string(),
@@ -350,7 +399,37 @@ export default defineSchema({
     passes: v.array(v.string()),
     revision: v.optional(v.number()),
     updatedAt: v.number(),
+    name: v.optional(v.string()),
+    last: v.optional(
+      v.object({
+        key: v.string(),
+        choice: v.union(v.literal("pick"), v.literal("pass")),
+        at: v.number(),
+      }),
+    ),
   }).index("by_share_and_voter", ["shareId", "voterId"]),
+
+  planVoteNotices: defineTable({
+    shareId: v.id("planShares"),
+    voterId: v.string(),
+    createdAt: v.number(),
+    deliveredAt: v.optional(v.number()),
+    deliveryStatus: v.union(
+      v.literal("pending"),
+      v.literal("complete"),
+      v.literal("failed"),
+    ),
+    deliveryNextAttemptAt: v.optional(v.number()),
+    deliveryAttempts: v.optional(v.number()),
+    deliveryRecipients: v.optional(v.array(recipientValidator)),
+    deliveryError: v.optional(v.string()),
+    deliverySentAt: v.optional(v.number()),
+  })
+    .index("by_share", ["shareId"])
+    .index("by_delivery_status_and_attempt", [
+      "deliveryStatus",
+      "deliveryNextAttemptAt",
+    ]),
 
   trips: defineTable({
     userId: v.string(),
@@ -433,9 +512,13 @@ export default defineSchema({
     tags: v.optional(v.array(v.string())),
     addedAt: v.number(),
     visitedAt: v.optional(v.number()),
+    went: v.optional(
+      v.array(v.object({ userId: v.id("users"), at: v.number() })),
+    ),
   })
     .index("by_list_and_added", ["listId", "addedAt"])
-    .index("by_added_by", ["addedBy"]),
+    .index("by_added_by", ["addedBy"])
+    .index("by_item_and_added_by", ["itemId", "addedBy"]),
 
   captureTokens: defineTable({
     userId: v.id("users"),
@@ -528,6 +611,18 @@ export default defineSchema({
       "deliveryStatus",
       "deliveryNextAttemptAt",
     ]),
+
+  freeSaves: defineTable({
+    userId: v.string(),
+    itemId: v.id("items"),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("placed"),
+      v.literal("released"),
+    ),
+  })
+    .index("by_user_and_status", ["userId", "status"])
+    .index("by_item", ["itemId"]),
 
   onboardingDemos: defineTable({
     userId: v.string(),

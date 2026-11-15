@@ -10,6 +10,7 @@ import {
   noteOnboardingFinished,
   useWelcomeSaveTracker,
   useWelcomeSheetVisible,
+  welcomeName,
   welcomeSave,
 } from "./welcome-save";
 
@@ -47,22 +48,17 @@ vi.mock("@/lib/entitlement", () => ({
       mock.settle.push(resolve);
     }),
 }));
-vi.mock("@/lib/trial-reminder", () => ({
-  whenTrialPrimerDone: () => Promise.resolve(),
-}));
 vi.mock("expo-router", async () => {
-  const { useEffect, useSyncExternalStore } = await import("react");
+  const { useSyncExternalStore } = await import("react");
   return {
-    useFocusEffect: (callback: () => void | (() => void)) => {
-      const focused = useSyncExternalStore(
+    useIsFocused: () =>
+      useSyncExternalStore(
         (listener) => {
           mock.focusListeners.add(listener);
           return () => mock.focusListeners.delete(listener);
         },
         () => mock.focused,
-      );
-      useEffect(() => (focused ? callback() : undefined), [focused, callback]);
-    },
+      ),
   };
 });
 
@@ -118,6 +114,7 @@ describe("useWelcomeSaveTracker", () => {
     signIn("u1", "trialing");
     renderHook(() => useWelcomeSaveTracker());
     expect(welcomeSave.isPending("u1")).toBe(true);
+    expect(welcomeName.isPending("u1")).toBe(true);
 
     signIn("u2", "trialing");
     renderHook(() => useWelcomeSaveTracker());
@@ -133,6 +130,7 @@ describe("useWelcomeSaveTracker", () => {
     mock.priorSaves = 2;
     rerender();
     expect(welcomeSave.isPending("u4")).toBe(false);
+    expect(welcomeName.isPending("u4")).toBe(true);
     expect(mock.store.get("shelvr.welcomeAfterOnboarding")).toBe("");
   });
 
@@ -140,13 +138,14 @@ describe("useWelcomeSaveTracker", () => {
     signIn("u3", "pro");
     renderHook(() => useWelcomeSaveTracker());
     expect(welcomeSave.isPending("u3")).toBe(false);
+    expect(welcomeName.isPending("u3")).toBe(false);
   });
 });
 
 describe("useWelcomeSheetVisible", () => {
   beforeEach(() => {
     mock.store.clear();
-    mock.settle.length = 0;
+    for (const resolve of mock.settle.splice(0)) resolve();
     mock.focused = true;
   });
 
@@ -160,7 +159,7 @@ describe("useWelcomeSheetVisible", () => {
     expect(result.current).toBe(true);
   });
 
-  it("waits while Home is not ready", async () => {
+  it("waits while Home is not ready, then for other sheets to settle", async () => {
     welcomeSave.mark("user_a");
     const { result, rerender } = renderHook(
       ({ ready }) => useWelcomeSheetVisible("user_a", ready),
@@ -169,6 +168,8 @@ describe("useWelcomeSheetVisible", () => {
     await settleSheets();
     expect(result.current).toBe(false);
     rerender({ ready: true });
+    expect(result.current).toBe(false);
+    await settleSheets();
     expect(result.current).toBe(true);
   });
 

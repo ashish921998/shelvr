@@ -36,6 +36,25 @@ export function filterPlaces<T extends Kinded>(
     : places.filter((place) => place.kinds.includes(kind));
 }
 
+export type WentFilter = "all" | "want" | "went";
+
+export function wentView<T>(
+  places: readonly T[],
+  filter: WentFilter,
+  went: (place: T) => boolean,
+): { places: T[]; selected: WentFilter; showSwitch: boolean } {
+  const showSwitch = places.some(went);
+  const selected = showSwitch ? filter : "all";
+  return {
+    places:
+      selected === "all"
+        ? [...places]
+        : places.filter((place) => went(place) === (selected === "went")),
+    selected,
+    showSwitch,
+  };
+}
+
 /** Without your location, the map opens on the city you saved the most places in. */
 export function busiestCityPlaces<T extends { city?: string }>(
   places: readonly T[],

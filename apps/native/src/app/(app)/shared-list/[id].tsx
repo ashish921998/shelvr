@@ -1,6 +1,7 @@
 import { PlaceMapScreen } from "@/components/city/place-map-screen";
 import { PlanButton } from "@/components/city/plan-button";
 import { EmptyState } from "@/components/empty-state";
+import { ListActivity } from "@/components/shared-list/list-activity";
 import { ListPlaceRow } from "@/components/shared-list/list-place-row";
 import { ListFooter } from "@/components/shared-list/list-footer";
 import { ListHeaderRight } from "@/components/shared-list/list-header-right";
@@ -12,19 +13,22 @@ import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
 import { canOpenPlaceCard } from "@/lib/apple-place-card";
+import { useFreshPinDrop } from "@/lib/fresh-pins";
+import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
 import { stopAction } from "@/lib/trip-planner";
 import {
+  freshCity,
   type ListRow,
   listRows,
   listSectionRows,
-  partnerName,
   type SharedListDetail,
   type SharedListPlace,
   useAskNameOnce,
   useListPlan,
   withLine,
+  youWent,
 } from "@/lib/shared-lists";
 import { usePlaceOpener } from "@/lib/use-place-opener";
 import { api } from "@convex/_generated/api";
@@ -59,7 +63,7 @@ function useSeenOnLeave(listId: Id<"sharedLists">, loaded: boolean) {
 }
 
 function usePlaceEdits() {
-  const setVisited = useMutation(api.sharedLists.setSharedListPlaceVisited);
+  const setWent = useMutation(api.sharedLists.setSharedListPlaceWent);
   const remove = useMutation(api.sharedLists.removeSharedListPlace);
   const report = (error: unknown) => {
     analytics.captureError("shared_list_edit_failed", error);
@@ -67,7 +71,11 @@ function usePlaceEdits() {
   };
   return {
     visited: (placeId: Id<"sharedListPlaces">, visited: boolean) =>
-      setVisited({ placeId, visited }).catch(report),
+      setWent({ placeId, went: visited })
+        .then(() => {
+          if (visited) void haptics.success();
+        })
+        .catch(report),
     remove: (placeId: Id<"sharedListPlaces">) =>
       remove({ placeId }).catch(report),
   };
@@ -166,25 +174,22 @@ function SharedList({ detail }: { detail: SharedListDetail }) {
   const askName = useAskNameOnce(joined === "1");
   const inviter = detail.members.find((member) => !member.isYou)?.firstName;
   const firstPlace = detail.places[0]?.name;
-  const [picked, setPicked] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string | null>(() => freshCity(detail));
   const city =
     picked !== null && detail.cities.includes(picked)
       ? picked
       : (detail.cities[0] ?? "");
-  const partner = partnerName(detail.members);
   const places = useMemo(
     () => listRows(detail.places, city),
     [detail.places, city],
   );
-  const rows = useMemo(
-    () => listSectionRows(places, partner),
-    [places, partner],
-  );
-  const pins = useMemo(() => places.map((row) => row.pin), [places]);
-  const canTrip = places.some((row) => row.place.visitedAt === undefined);
+  useAppLocale();
+  const rows = listSectionRows(places);
+  const [selected, setSelected] = useState<string | null>(null);
+  const { pins, visible } = useFreshPinDrop(places, city, selected);
+  const canTrip = places.some((row) => !youWent(row.place));
   const edits = usePlaceEdits();
   const plan = useListPlan(detail._id, city);
-  const [selected, setSelected] = useState<string | null>(null);
   const hasMap = pins.length > 0;
   const opener = usePlaceOpener<SharedListPlace>(
     stopAction,
@@ -214,6 +219,7 @@ function SharedList({ detail }: { detail: SharedListDetail }) {
       <ListHeaderRight detail={detail} />
       <PlaceMapScreen
         pins={pins}
+        visible={visible}
         hasMap={hasMap}
         rows={rows}
         rowGap={1}
@@ -238,6 +244,7 @@ function SharedList({ detail }: { detail: SharedListDetail }) {
                 .filter(Boolean)
                 .join(" · ")}
             </ThemedText>
+            <ListActivity newFrom={detail.newFrom} />
             {detail.cities.length > 1 ? (
               <ScrollView
                 horizontal
@@ -275,7 +282,7 @@ function SharedList({ detail }: { detail: SharedListDetail }) {
           ) : (
             <ListPlaceRow
               place={item.row.place}
-              number={item.row.pin.number}
+              emoji={item.row.pin.emoji ?? "📍"}
               selected={selected === item.id}
               onPress={() =>
                 selected === item.id ? open(item.row) : select(item.id)

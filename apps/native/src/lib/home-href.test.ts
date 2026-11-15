@@ -22,11 +22,19 @@ describe("resolveRootHref", () => {
       "/manage-spaces?itemId=1",
       "/camera",
       "/trip/abc?city=Lisbon",
+      "/plan/abc",
+      "/plan/abc?city=Lisbon",
+      "/(app)/plan/abc",
     ]) {
       expect(resolveRootHref(path)).toBe("/(app)/(tabs)/(home)");
     }
     expect(resolveRootHref("/spaceship")).toBe("/spaceship");
     expect(resolveRootHref("/trip-plan/abc")).toBe("/trip-plan/abc");
+    expect(resolveRootHref("/plan-gate")).toBe("/plan-gate");
+    expect(resolveRootHref("/date-plan?city=Lisbon")).toBe(
+      "/date-plan?city=Lisbon",
+    );
+    expect(resolveRootHref("/planner")).toBe("/planner");
     expect(resolveRootHref("/(trips)")).toBe("/(trips)");
   });
 
@@ -38,6 +46,20 @@ describe("resolveRootHref", () => {
       "/(app)/(tabs)/(map)?from=push",
     );
     expect(resolveRootHref("/maple")).toBe("/maple");
+  });
+
+  it("opens the Passport tab for the old Passport screen's links", () => {
+    for (const path of [
+      "/passport",
+      "/(passport)",
+      "/(app)/(tabs)/(passport)",
+    ]) {
+      expect(resolveRootHref(path)).toBe("/(app)/(tabs)/(passport)");
+    }
+    expect(resolveRootHref("/passport-card?city=Austin")).toBe(
+      "/passport-card?city=Austin",
+    );
+    expect(resolveRootHref("/passport/abc")).toBe("/passport/abc");
   });
 });
 

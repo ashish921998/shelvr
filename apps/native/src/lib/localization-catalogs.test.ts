@@ -121,6 +121,11 @@ describe("shipped localization resources", () => {
           { title: string; body: string }
         >;
         tripEve: { title: string; body: Record<string, string> };
+        planVote: {
+          title: string;
+          pick: { named: string; someone: string };
+          pass: { named: string; someone: string };
+        };
       }
     > = notificationTranslations;
     expect(notificationCopy[locale]).toEqual({
@@ -147,6 +152,17 @@ describe("shipped localization resources", () => {
       tripEve: {
         title: messages["reminder.tripEveTitle"],
         body: messages["reminder.tripEveBody"],
+      },
+      planVote: {
+        title: messages["plan.votePushTitle"],
+        pick: {
+          named: messages["plan.wouldGo"],
+          someone: messages["plan.someoneWouldGo"],
+        },
+        pass: {
+          named: messages["plan.wouldPass"],
+          someone: messages["plan.someoneWouldPass"],
+        },
       },
     });
     const navigation = [

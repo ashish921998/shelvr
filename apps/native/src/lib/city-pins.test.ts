@@ -86,8 +86,25 @@ describe("cityPins", () => {
         { _id: "newer", placePins: [pin] },
         { _id: "older", placePins: [pin] },
       ]),
-    ).toEqual([{ ...pin, itemId: "newer", number: 1 }]);
+    ).toEqual([{ ...pin, itemId: "newer", kinds: [], number: 1 }]);
   });
+  it("keeps every kind and the first category across a venue's saves", () => {
+    const pin = { name: "Micho", lat: 48.8660723, lng: 2.3371738 };
+    const [merged] = cityPins([
+      { _id: "newer", tags: ["dinner"], placePins: [pin] },
+      {
+        _id: "older",
+        tags: ["date night"],
+        placePins: [{ ...pin, category: "Nightlife" }],
+      },
+    ]);
+    expect(merged.itemId).toBe("newer");
+    expect(merged.category).toBe("Nightlife");
+    expect(merged.kinds).toContain("dateNight");
+    expect(merged.kinds).toContain("food");
+    expect(merged.emoji).toBe("🍸");
+  });
+
   it("shows a place once when two lookups land it a few doors apart", () => {
     expect(
       cityPins([
@@ -204,7 +221,14 @@ describe("cityPins", () => {
       { _id: "b" },
     ];
     expect(cityPins(saves)).toEqual([
-      { itemId: "a", name: "Time Out Market", lat: 38.7, lng: -9.1, number: 1 },
+      {
+        itemId: "a",
+        name: "Time Out Market",
+        lat: 38.7,
+        lng: -9.1,
+        kinds: [],
+        number: 1,
+      },
     ]);
   });
 });
@@ -256,5 +280,77 @@ describe("framedPins", () => {
   it("frames every pin when there are too few to tell a stray", () => {
     const two = [downtown[0], { lat: 41.6, lng: -87.6 }];
     expect(framedPins(two)).toEqual(two);
+  });
+});
+
+describe("cuisine", () => {
+  it("leaves a museum's emoji and kinds alone", () => {
+    const [pin] = cityPins([
+      {
+        _id: "a",
+        tags: ["coffee"],
+        placePins: [
+          {
+            name: "Menil Collection",
+            lat: 29.74,
+            lng: -95.4,
+            category: "Museum",
+            cuisine: "coffee",
+          },
+        ],
+      },
+    ]);
+    expect(pin).toMatchObject({ emoji: "🏛️", kinds: ["activities"] });
+  });
+
+  it("picks a city pin's emoji and kind", () => {
+    const [pin] = cityPins([
+      {
+        _id: "a",
+        tags: ["food"],
+        placePins: [
+          {
+            name: "Lucy's",
+            lat: 29.75,
+            lng: -95.36,
+            category: "Restaurant",
+            cuisine: "coffee",
+          },
+        ],
+      },
+    ]);
+    expect(pin).toMatchObject({
+      cuisine: "coffee",
+      emoji: "☕",
+      kinds: ["coffee"],
+    });
+  });
+
+  it("fills a venue's cuisine from an older save when the newer has none", () => {
+    const pin = { name: "Lucy's", lat: 29.75, lng: -95.36 };
+    const [merged] = cityPins([
+      { _id: "newer", placePins: [pin] },
+      { _id: "older", placePins: [{ ...pin, cuisine: "burger" as const }] },
+    ]);
+    expect(merged).toMatchObject({
+      itemId: "newer",
+      cuisine: "burger",
+      emoji: "🍔",
+      kinds: ["food"],
+    });
+  });
+
+  it("keeps the newer save's cuisine when two saves disagree", () => {
+    const pin = { name: "Lucy's", lat: 29.75, lng: -95.36 };
+    const [merged] = cityPins([
+      { _id: "newer", placePins: [{ ...pin, cuisine: "tacos" as const }] },
+      { _id: "older", placePins: [{ ...pin, cuisine: "coffee" as const }] },
+    ]);
+    expect(merged).toMatchObject({
+      itemId: "newer",
+      cuisine: "tacos",
+      emoji: "🌮",
+      kinds: ["food", "coffee"],
+    });
   });
 });

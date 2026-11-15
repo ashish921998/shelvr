@@ -355,6 +355,8 @@ describe("delivering the trip eve push", () => {
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual([
       {
         to: "token-a",
+        collapseId: reminder._id,
+        tag: reminder._id,
         title: "Your Lisbon trip is tomorrow",
         body: "You saved 6 places to go.",
         data: {

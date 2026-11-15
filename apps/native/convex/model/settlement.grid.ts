@@ -1,20 +1,13 @@
 import type { WithoutSystemFields } from "convex/server";
 import type { Doc, Id } from "../_generated/dataModel";
-import { CURRENT_EMBEDDING_VERSION, EMBEDDING_DIMENSIONS } from "./embedding";
 import type { ArticleMedia, PostMedia, Recipe } from "./itemFields";
 import type { PageData } from "./pageRead";
-import {
-  embeddingText,
-  type Classification,
-  type Reading,
-  type Settlement,
-} from "./settlement";
+import type { Classification, Reading, Settlement } from "./settlement";
 
 const MODES = {
   allowed: { asked: "granted", committed: "granted" },
   late: { asked: "granted", committed: "declined" },
   early: { asked: "declined", committed: "declined" },
-  regranted: { asked: "declined", committed: "granted" },
 } as const;
 
 type Mode = keyof typeof MODES;
@@ -29,10 +22,8 @@ export type Scenario = {
   mode: Mode;
   page: Shape;
   model: Shape;
-  embed: "none" | "valid" | "badWidth" | "zeros" | "notFinite" | "otherText";
   title: "model" | "blank";
   cities: "sent" | "omitted";
-  prior: "none" | "stamped";
   poster: "none" | "same" | "replaced";
   hadPoster: boolean;
   enrichment: Reading["enrichment"];
@@ -47,16 +38,6 @@ export type GridIds = {
 const RUN_ID = "run-1";
 const NOTE_FIRST_LINE = "First line";
 const NOTE_TEXT = `${NOTE_FIRST_LINE}\nSecond line`;
-const OLD_FILL = 0.5;
-const NEW_FILL = 0.25;
-
-function vectorOf(fill: number): number[] {
-  return Array.from({ length: EMBEDDING_DIMENSIONS }, () => fill);
-}
-
-const OLD_VECTOR = vectorOf(OLD_FILL);
-const NEW_VECTOR = vectorOf(NEW_FILL);
-
 const PAGE_RECIPE: Recipe = {
   name: "Page recipe",
   ingredients: ["page ingredient"],
@@ -152,10 +133,8 @@ const BASE: Omit<Scenario, "id"> = {
   mode: "allowed",
   page: "rich",
   model: "rich",
-  embed: "valid",
   title: "model",
   cities: "sent",
-  prior: "none",
   poster: "none",
   hadPoster: false,
   enrichment: undefined,
@@ -164,7 +143,6 @@ const BASE: Omit<Scenario, "id"> = {
 const KINDS = ["link", "note", "image"] as const;
 const BEFORES = ["fresh", "retried"] as const;
 const LOCKS = ["none", "typed", "refresh"] as const;
-const PRIORS = ["none", "stamped"] as const;
 const RUN_MODES = ["allowed", "late", "early"] as const;
 
 function scenario(
@@ -186,10 +164,6 @@ function product<A extends Record<string, readonly unknown[]>>(
   return rows as { [K in keyof A]: A[K][number] }[];
 }
 
-function embedFor(mode: Mode): Scenario["embed"] {
-  return MODES[mode].asked === "declined" ? "none" : "valid";
-}
-
 const core = product({
   kind: KINDS,
   before: BEFORES,
@@ -199,23 +173,7 @@ const core = product({
 }).map(({ shape, ...axes }) =>
   scenario(
     `core/${axes.kind}/${axes.before}/${axes.lock}/${axes.mode}/${shape}`,
-    { ...axes, page: shape, model: shape, embed: embedFor(axes.mode) },
-  ),
-);
-
-const EMBEDS_BY_MODE = [
-  ["allowed", ["valid", "none", "badWidth"]],
-  ["late", ["valid", "none"]],
-  ["early", ["none"]],
-  ["regranted", ["none"]],
-] as const;
-
-const embedding = EMBEDS_BY_MODE.flatMap(([mode, embeds]) =>
-  product({ embed: embeds, prior: PRIORS, before: BEFORES }).map((axes) =>
-    scenario(`embedding/${mode}/${axes.embed}/${axes.prior}/${axes.before}`, {
-      ...axes,
-      mode,
-    }),
+    { ...axes, page: shape, model: shape },
   ),
 );
 
@@ -233,7 +191,6 @@ const posters = (["allowed", "early"] as const).flatMap((mode) =>
       mode,
       hadPoster,
       poster,
-      embed: embedFor(mode),
     }),
   ),
 );
@@ -263,7 +220,6 @@ const recipes = product({
     ...axes,
     page,
     model,
-    embed: embedFor(axes.mode),
   }),
 );
 
@@ -288,26 +244,13 @@ const blankTitles = product({
   }),
 );
 
-const unusableEmbeddings = product({
-  embed: ["zeros", "notFinite", "otherText"] as const,
-  prior: PRIORS,
-  before: BEFORES,
-}).map((axes) =>
-  scenario(`embedding/allowed/${axes.embed}/${axes.prior}/${axes.before}`, {
-    ...axes,
-    mode: "allowed",
-  }),
-);
-
 export const SCENARIOS: Scenario[] = [
   ...core,
-  ...embedding,
   ...posters,
   ...enrichments,
   ...recipes,
   ...omittedCities,
   ...blankTitles,
-  ...unusableEmbeddings,
 ];
 
 export function consentOf(mode: Mode): "granted" | "declined" {
@@ -334,27 +277,9 @@ export function itemFields(
     ...(s.lock === "typed"
       ? { title: "Typed title", titleSource: "user" as const }
       : {}),
-    ...(s.prior === "stamped"
-      ? {
-          embedding: OLD_VECTOR,
-          embeddingVersion: CURRENT_EMBEDDING_VERSION,
-          embeddingAttempts: 2,
-        }
-      : {}),
     ...(s.hadPoster ? { storageId: ids.poster } : {}),
   };
 }
-
-const EMBEDDINGS = {
-  none: undefined,
-  valid: NEW_VECTOR,
-  badWidth: [1, 2, 3],
-  zeros: vectorOf(0),
-  notFinite: [...NEW_VECTOR.slice(0, -1), Number.NaN],
-  otherText: NEW_VECTOR,
-};
-
-const OTHER_TEXT = "the text of another version of this save";
 
 function posterId(
   poster: Scenario["poster"],
@@ -390,15 +315,6 @@ function classificationFor(s: Scenario): Classification {
   };
 }
 
-function embeddingFor(
-  s: Scenario,
-  settledText: string,
-): Classification["embedding"] {
-  const vector = EMBEDDINGS[s.embed];
-  if (vector === undefined) return undefined;
-  return { text: s.embed === "otherText" ? OTHER_TEXT : settledText, vector };
-}
-
 export function gridArgs(
   s: Scenario,
   item: Doc<"items">,
@@ -409,17 +325,11 @@ export function gridArgs(
   if (MODES[s.mode].asked === "declined") {
     return { runId: RUN_ID, keepTitle, reading };
   }
-  const words = classificationFor(s);
-  const settledText = embeddingText(item, {
-    keepTitle,
-    reading,
-    classification: words,
-  });
   return {
     runId: RUN_ID,
     keepTitle,
     reading,
-    classification: { ...words, embedding: embeddingFor(s, settledText) },
+    classification: classificationFor(s),
   };
 }
 
@@ -442,15 +352,7 @@ const TRACKED = [
   "enrichment",
   "failureReason",
   "searchText",
-  "embedding",
-  "embeddingVersion",
-  "embeddingAttempts",
 ] as const;
-
-function vectorLabel(vector: readonly number[]): string {
-  if (vector.every((n) => n === OLD_FILL)) return "old vector";
-  return vector.every((n) => n === NEW_FILL) ? "new vector" : "other vector";
-}
 
 export function snapshotRow(
   item: Doc<"items">,
@@ -468,8 +370,6 @@ export function snapshotRow(
       row[key] = null;
     } else if (key === "storageId") {
       row[key] = storage.get(value as string) ?? "other storage";
-    } else if (key === "embedding") {
-      row[key] = vectorLabel(value as number[]);
     } else {
       row[key] = value;
     }

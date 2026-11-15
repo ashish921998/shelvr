@@ -6,7 +6,8 @@ import { SAMPLE_CITIES } from "@/lib/sample-cities";
 export type GoalProgress = Pick<
   ReturnType<typeof getOnboardingProgress>,
   "goals" | "travelCity"
->;
+> &
+  Partial<Pick<ReturnType<typeof getOnboardingProgress>, "beenCities">>;
 
 /** What a slot's copy can depend on: the city the user picked (null for "not sure"). */
 type Answers = { city: string | null };
@@ -88,6 +89,20 @@ const GOAL_COPY: Record<Goal, GoalCopy> = {
 
 const string = (value: string) => ({ type: "string" as const, value });
 
+export function goalProgressFor<P extends GoalProgress>(
+  progress: P,
+  placement: string,
+): P {
+  if (placement === "onboarding") return progress;
+  const { beenCities: _beenCities, ...rest } = progress;
+  return rest as P;
+}
+
+function headline(progress: GoalProgress, goalHeadline: string): string {
+  const count = progress.beenCities?.length ?? 0;
+  return count > 0 ? t("passport.paywallHeadline", { count }) : goalHeadline;
+}
+
 /**
  * Custom variables that let the paywall echo the onboarding answers, worded for
  * the goal that leads (date night, then trips, then places to eat). A skipped
@@ -107,7 +122,7 @@ export function goalPaywallVariables(
   return {
     goal: string(goal),
     goal_city: string(city ?? ""),
-    goal_headline: string(copy.headline(answers)),
+    goal_headline: string(headline(progress, copy.headline(answers))),
     goal_subline: string(copy.subline(answers)),
     goal_photo_tag: string(copy.photoTag(answers)),
     goal_answer_1: string(copy.answer1(answers)),

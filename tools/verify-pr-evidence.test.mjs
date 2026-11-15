@@ -6,7 +6,9 @@ import {
   evidenceProblems,
   hasContent,
   hasVisualEvidence,
+  isOwnerFile,
   isUiFile,
+  ownerApproved,
   section,
   WAIVER_LABEL,
 } from "./verify-pr-evidence.mjs";
@@ -36,17 +38,131 @@ Before: x. After: y.
 
 ${evidence}
 
+### Review
+
+Nothing to fix.
+
 ### Not verified
 
 - Real iPhone
 ${tail}`;
 
-test("the bare template fails on all three subsections", () => {
+test("the bare template fails on all four subsections", () => {
   const problems = evidenceProblems(template, []);
-  assert.equal(problems.length, 3);
+  assert.equal(problems.length, 4);
   assert.match(problems[0], /What I ran/);
   assert.match(problems[1], /Evidence/);
-  assert.match(problems[2], /Not verified/);
+  assert.match(problems[2], /Review/);
+  assert.match(problems[3], /Not verified/);
+});
+
+test("an empty Review section fails", () => {
+  const body = filled().replace("Nothing to fix.", "<!-- later -->");
+  const problems = evidenceProblems(body, []);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /"### Review" is empty/);
+});
+
+test("owner files fail until approved; other files do not", () => {
+  const files = ["apps/native/convex/subscriptions.ts"];
+  assert.match(evidenceProblems(filled(), files)[0], /\/approve/);
+  assert.deepEqual(
+    evidenceProblems(filled(), files, [], { approved: true }),
+    [],
+  );
+  assert.deepEqual(
+    evidenceProblems(filled(), ["apps/native/convex/items.ts"]),
+    [],
+  );
+});
+
+test("a dependency bot skips the description but not the owner gate", () => {
+  const bot = { author: "renovate[bot]" };
+  assert.deepEqual(evidenceProblems("", ["package.json"], [], bot), []);
+  const problems = evidenceProblems("", [".github/workflows/ci.yml"], [], bot);
+  assert.equal(problems.length, 1);
+  assert.match(problems[0], /\/approve/);
+});
+
+test("an approval counts only from the owner and only for the commit it names", () => {
+  const head = "34b374cf0a1b2c3d4e5f60718293a4b5c6d7e8f9";
+  const said = (login, body) => ({ user: { login }, body });
+  assert.equal(
+    ownerApproved([said("ash", "/approve 34b374cf")], "ash", head),
+    true,
+  );
+  assert.equal(
+    ownerApproved([said("ash", "  /APPROVE 34B374CF0A1B ")], "ash", head),
+    true,
+  );
+  assert.equal(
+    ownerApproved([said("ash", "/approve ee774599")], "ash", head),
+    false,
+  );
+  assert.equal(
+    ownerApproved([said("bot", "/approve 34b374cf")], "ash", head),
+    false,
+  );
+  assert.equal(
+    ownerApproved([said("ash", "/approve 34b37")], "ash", head),
+    false,
+  );
+  assert.equal(
+    ownerApproved([said("ash", "looks good, /approve 34b374cf")], "ash", head),
+    false,
+  );
+  assert.equal(
+    ownerApproved(
+      [said("ash", "/approve ee774599"), said("ash", "/approve 34b374cf")],
+      "ash",
+      head,
+    ),
+    true,
+  );
+  assert.equal(ownerApproved([], "ash", head), false);
+});
+
+test("the owner paths cover billing, auth, release and CI", () => {
+  for (const path of [
+    "apps/native/convex/subscriptions.ts",
+    "apps/native/convex/http.ts",
+    "apps/native/convex/users.ts",
+    "apps/native/convex/auth.config.ts",
+    "apps/native/convex/model/auth.ts",
+    "apps/native/convex/model/publicFunctions.ts",
+    "apps/native/src/lib/entitlement.ts",
+    "apps/native/src/lib/revenuecat-sync.ts",
+    "apps/native/src/lib/paywall-funnel.ts",
+    "apps/native/src/lib/onboarding-paywall.ts",
+    "apps/native/src/lib/plan-gate.ts",
+    "apps/native/src/lib/trial-reminder.ts",
+    "apps/native/src/app/(app)/paywall.tsx",
+    "apps/native/src/app/(app)/plan-gate.tsx",
+    "apps/native/src/lib/purchase-before-sign-in.ts",
+    "apps/native/src/lib/manage-subscription.ts",
+    "apps/native/src/lib/list-gate.ts",
+    "apps/native/convex/freeSaves.ts",
+    "apps/native/eas.json",
+    "apps/native/app.config.js",
+    "apps/native/released-builds.json",
+    ".github/workflows/ci.yml",
+    ".github/actions/secure-review/action.yml",
+    ".github/CODEOWNERS",
+    "tools/verify-pr-evidence.mjs",
+  ]) {
+    assert.equal(isOwnerFile(path), true, path);
+  }
+  for (const path of [
+    "apps/native/convex/items.ts",
+    "apps/native/convex/model/authHelpers.ts",
+    "apps/native/convex/subscriptions.test.ts",
+    "apps/native/src/lib/entitlement-copy.ts",
+    "apps/native/src/lib/paywall-funnel.test.ts",
+    "apps/native/src/app/(app)/settings.tsx",
+    "docs/architecture/local-qa.md",
+  ]) {
+    assert.equal(isOwnerFile(path), false, path);
+  }
 });
 
 test("a body with no Verification section fails", () => {

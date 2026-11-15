@@ -7,7 +7,7 @@ import type { FunctionReturnType, GenericActionCtx } from "convex/server";
 import type { DataModel, Doc, Id } from "./_generated/dataModel";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { RECOMMEND_CANDIDATES } from "./model/embedding";
+import { RECOMMEND_CANDIDATES } from "./model/recommend";
 import { logEvent } from "./model/log";
 import { MODEL, modelCallOptions } from "./model/aiProvider";
 import { summarizeError } from "./ai";

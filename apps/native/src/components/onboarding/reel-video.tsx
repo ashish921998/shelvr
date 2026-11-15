@@ -10,9 +10,27 @@ const ANSWER_MS = 15_000;
 
 type Reason = "missing" | "failed" | "timeout";
 
-function reportUnavailable(reason: Reason) {
+const FAILURE_CAUSES = new Set([
+  "NotAllowedError",
+  "NotSupportedError",
+  "AbortError",
+  "media_1",
+  "media_2",
+  "media_3",
+  "media_4",
+]);
+
+let reported = false;
+
+function reportUnavailable(reason: Reason, reelCode: string, cause = "") {
+  if (reported) return;
+  reported = true;
   analytics.captureError("onboarding_reel_unavailable", new Error(reason), {
     reason,
+    reel_code: reelCode,
+    ...(reason === "failed" && {
+      failure_cause: FAILURE_CAUSES.has(cause) ? cause : "unknown",
+    }),
   });
 }
 
@@ -32,10 +50,10 @@ export function ReelVideo({
   };
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (!answered.current) reportUnavailable("timeout");
+      if (!answered.current) reportUnavailable("timeout", reelCode);
     }, ANSWER_MS);
     return () => clearTimeout(timer);
-  }, []);
+  }, [reelCode]);
   return (
     <View
       pointerEvents="none"
@@ -55,10 +73,11 @@ export function ReelVideo({
             answered.current = true;
             return show(true);
           }
-          if (message !== "missing" && message !== "failed") return;
+          const [reason, cause] = message.split(":", 2);
+          if (reason !== "missing" && reason !== "failed") return;
           answered.current = true;
           show(false);
-          reportUnavailable(message);
+          reportUnavailable(reason, reelCode, cause);
         }}
       />
     </View>

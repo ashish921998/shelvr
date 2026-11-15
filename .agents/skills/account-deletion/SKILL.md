@@ -67,7 +67,7 @@ A failure is a finding about the code until you can show the test's model is wro
 ## When a change is intended
 
 1. Make the code change. Run the check.
-2. New table with personal data: add its drain step to `deleteUserOwnedDataBatch`, and mention the table and its step in the `CLAUDE.md` schema list as `tools/verify-agent-docs.mjs` requires. If the step uses `.unique()`, add the table to `ONE_ROW_PER_ACCOUNT`. If it must outlive deletion, add it to `RETAINED_ROWS` with the job that removes it, and schedule that job in the deletion transaction.
+2. New table with personal data: add its drain step to `deleteUserOwnedDataBatch`. If the step uses `.unique()`, add the table to `ONE_ROW_PER_ACCOUNT`. If it must outlive deletion, add it to `RETAINED_ROWS` with the job that removes it, and schedule that job in the deletion transaction.
 3. New table without personal data: `UNOWNED_TABLES`, with the reason.
 4. New function that inserts into an owned table: give it an owner check. If a cron, webhook or scheduled job reaches it with a raw `userId`, also add a recipe to `RECIPES`: a `fence` sentence saying what refuses a draining account, the `table` it writes, a `seed` that makes a live account write, a `call`, and the `padding` (saves) and `fillers` (rows per table) that keep the account draining across several passes while the writer's own inputs still exist. If it prepares something for delivery, add a `claim` that hands it out, and the claim tests pick it up.
 5. Re-run. Then prove the edited check can still fail (next section).

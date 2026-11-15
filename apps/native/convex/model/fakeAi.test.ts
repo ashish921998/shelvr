@@ -142,6 +142,9 @@ const noteSchema = z.object({
   placeLocations: z
     .array(z.object({ name: z.string(), location: z.string() }))
     .optional(),
+  placeCuisines: z
+    .array(z.object({ name: z.string(), cuisine: z.string() }))
+    .optional(),
 });
 
 describe("FAKE_MODEL", () => {

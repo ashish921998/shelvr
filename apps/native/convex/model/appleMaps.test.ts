@@ -1,9 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   appleMapsAccessToken,
   appleMapsConfig,
+  appleMapsFind,
   appleMapsLookup,
+  UNAVAILABLE,
   appleMapsSearchPlaces,
   firstPlace,
   placesOf,
@@ -148,6 +150,89 @@ describe("firstPlace", () => {
 });
 
 describe("appleMapsLookup", () => {
+  it("leaves an address miss unplaced when the mixed result is an unrelated venue", async () => {
+    const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+      const filter = new URL(String(input)).searchParams.get(
+        "resultTypeFilter",
+      );
+      return Response.json({
+        results:
+          filter === "Poi,Address"
+            ? [
+                {
+                  name: "Broadway Cafe",
+                  poiCategory: "Cafe",
+                  coordinate: { latitude: 40.75, longitude: -73.98 },
+                },
+              ]
+            : [],
+      });
+    });
+    expect(
+      await appleMapsLookup(
+        "tok",
+        { target: "address", name: "123 West Broadway" },
+        "123 West Broadway, New York",
+        undefined,
+        fetchImpl,
+      ),
+    ).toBeNull();
+  });
+
+  it.each(["Poi,Address", "Poi"])(
+    "prefers a named match in %s over an anonymous mixed result",
+    async (matchingFilter) => {
+      const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+        const filter = new URL(String(input)).searchParams.get(
+          "resultTypeFilter",
+        );
+        const anonymous = {
+          coordinate: { latitude: 30.29, longitude: -97.69 },
+        };
+        const named = {
+          name: "Eberly",
+          id: "restaurant",
+          coordinate: { latitude: 30.2586, longitude: -97.7589 },
+        };
+        return Response.json({
+          results: [
+            ...(filter === "Poi,Address" ? [anonymous] : []),
+            ...(filter === matchingFilter ? [named] : []),
+          ],
+        });
+      });
+      expect(
+        await appleMapsLookup(
+          "tok",
+          { target: "place", name: "Eberly" },
+          "Eberly, Austin",
+          undefined,
+          fetchImpl,
+        ),
+      ).toMatchObject({ appleId: "restaurant" });
+    },
+  );
+
+  it("leaves an unmatched save unplaced after the mixed search and venue fallback", async () => {
+    const fetchImpl = vi.fn(async (_input: Parameters<typeof fetch>[0]) =>
+      Response.json({ results: [] }),
+    );
+    expect(
+      await appleMapsLookup(
+        "tok",
+        { target: "place", name: "Unknown venue" },
+        "Unknown venue, Austin",
+        undefined,
+        fetchImpl,
+      ),
+    ).toBeNull();
+    expect(
+      fetchImpl.mock.calls.map(([url]) =>
+        new URL(String(url)).searchParams.get("resultTypeFilter"),
+      ),
+    ).toEqual(["Poi,Address", "Poi"]);
+  });
+
   it("preserves a street address instead of substituting a similarly named business", async () => {
     const fetchImpl = vi.fn(async () =>
       Response.json({
@@ -265,6 +350,243 @@ describe("appleMapsLookup", () => {
         down as unknown as typeof fetch,
       ),
     ).toBeNull();
+  });
+});
+
+describe("appleMapsFind", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("keeps Apple's first matching venue when a saved branch clue is present", async () => {
+    const fetchImpl = vi.fn(async () =>
+      Response.json({
+        results: [
+          {
+            name: "Carette Trocadéro",
+            id: "troc",
+            poiCategory: "Bakery",
+            coordinate: { latitude: 48.863, longitude: 2.287 },
+          },
+          {
+            name: "Carette",
+            id: "vosges",
+            poiCategory: "Bakery",
+            coordinate: { latitude: 48.855, longitude: 2.365 },
+          },
+        ],
+      }),
+    );
+    const lookup = {
+      target: "place" as const,
+      name: "Carette",
+      hasBranchClue: true,
+    };
+    expect(
+      await appleMapsFind(
+        "t",
+        lookup,
+        "Carette, Place du Trocadéro, Paris",
+        undefined,
+        fetchImpl,
+      ),
+    ).toMatchObject({ appleId: "troc" });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not accept a physical feature as an extended branch venue", async () => {
+    const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+      const filter = new URL(String(input)).searchParams.get(
+        "resultTypeFilter",
+      );
+      return Response.json({
+        results:
+          filter === "Poi"
+            ? [
+                {
+                  name: "Cedar Creek",
+                  coordinate: { latitude: 30.25, longitude: -97.72 },
+                },
+              ]
+            : [],
+      });
+    });
+    const lookup = {
+      target: "place" as const,
+      name: "Cedar",
+      hasBranchClue: true,
+    };
+    expect(
+      await appleMapsFind(
+        "t",
+        lookup,
+        "Cedar, Main Street, Austin",
+        undefined,
+        fetchImpl,
+      ),
+    ).toBeNull();
+  });
+
+  it("matches an extended venue name across apostrophe variants and only at a word boundary", async () => {
+    const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+      const filter = new URL(String(input)).searchParams.get(
+        "resultTypeFilter",
+      );
+      return Response.json({
+        results:
+          filter === "Poi"
+            ? [
+                {
+                  name: "Joe’s 240 Diner",
+                  id: "different-number",
+                  poiCategory: "Restaurant",
+                  coordinate: { latitude: 40.74, longitude: -73.99 },
+                },
+                {
+                  name: "Joe’s 24 Diner",
+                  id: "diner",
+                  poiCategory: "Restaurant",
+                  coordinate: { latitude: 40.73, longitude: -73.99 },
+                },
+              ]
+            : [],
+      });
+    });
+    expect(
+      await appleMapsFind(
+        "t",
+        { target: "address", name: "Joe's 24" },
+        "Joe's 24, New York",
+        undefined,
+        fetchImpl,
+      ),
+    ).toMatchObject({ appleId: "diner" });
+  });
+
+  it.each([
+    ["503", async () => new Response("", { status: 503 })],
+    ["429", async () => new Response("", { status: 429 })],
+    [
+      "timeout",
+      async () => {
+        throw new DOMException("slow", "TimeoutError");
+      },
+    ],
+    [
+      "thrown fetch",
+      async () => {
+        throw new TypeError("fetch failed");
+      },
+    ],
+  ])(
+    "keeps an exact geographic match when the later POI request fails with %s",
+    async (_label, fail) => {
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) =>
+        new URL(String(input)).searchParams.get("resultTypeFilter") === "Poi"
+          ? fail()
+          : Response.json({
+              results: [
+                {
+                  name: "Pink Street",
+                  structuredAddress: { thoroughfare: "Pink Street" },
+                  coordinate: { latitude: 38.7073, longitude: -9.1439 },
+                },
+              ],
+            }),
+      );
+      expect(
+        await appleMapsFind(
+          "t",
+          { target: "place", name: "Pink Street" },
+          "Pink Street, Lisbon",
+          undefined,
+          fetchImpl,
+        ),
+      ).toEqual({ lat: 38.7073, lng: -9.1439 });
+      expect(fetchImpl).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("still reports unavailable when the failed fallback only has an unchecked venue", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) =>
+      new URL(String(input)).searchParams.get("resultTypeFilter") === "Poi"
+        ? new Response("", { status: 503 })
+        : Response.json({
+            results: [
+              {
+                name: "Different Bar",
+                id: "unchecked",
+                poiCategory: "Bar",
+                coordinate: { latitude: 38.7073, longitude: -9.1439 },
+              },
+            ],
+          }),
+    );
+    expect(
+      await appleMapsFind(
+        "t",
+        { target: "place", name: "Pink Street" },
+        "Pink Street, Lisbon",
+        undefined,
+        fetchImpl,
+      ),
+    ).toBe(UNAVAILABLE);
+  });
+
+  const find = (fetchImpl: () => Promise<Response>) =>
+    appleMapsFind(
+      "tok",
+      "search",
+      "Secret Bar, Lisbon",
+      undefined,
+      fetchImpl as unknown as typeof fetch,
+    );
+
+  it.each([
+    ["rate_limited", 429, async () => new Response("", { status: 429 })],
+    ["server_error", 503, async () => new Response("", { status: 503 })],
+    [
+      "network",
+      null,
+      async () => {
+        throw new TypeError("fetch failed");
+      },
+    ],
+    [
+      "timeout",
+      null,
+      async () => {
+        throw new DOMException("slow", "TimeoutError");
+      },
+    ],
+  ])(
+    "tells a %s failure apart from no match and logs it without the query",
+    async (category, status, answer) => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      const fetchImpl = vi.fn(answer);
+      expect(await find(fetchImpl)).toBe(UNAVAILABLE);
+      expect(fetchImpl).toHaveBeenCalledTimes(1);
+      expect(warn).toHaveBeenCalledTimes(1);
+      const line = String(warn.mock.calls[0][0]);
+      expect(JSON.parse(line)).toMatchObject({
+        event: "apple_maps_unavailable",
+        path: "search",
+        category,
+        status,
+      });
+      expect(line).not.toContain("Secret");
+    },
+  );
+
+  it("is no match, without a log line, when Apple refuses the request or finds nothing", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(await find(async () => new Response("", { status: 404 }))).toBe(
+      null,
+    );
+    expect(await find(async () => Response.json({ results: [] }))).toBe(null);
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 

@@ -108,7 +108,7 @@ export function reminderCandidates(
   now: number,
   previousKind: ReminderKind | undefined,
   tripStops: ReadonlySet<string>,
-  visited: ReadonlySet<string> = new Set(),
+  visitedOn: (item: Doc<"items">) => ReadonlySet<string> = () => new Set(),
 ): ReminderCandidate[] {
   const byKind: Record<ReminderKind, ReminderCandidate[]> = {
     visit: [],
@@ -117,7 +117,7 @@ export function reminderCandidates(
   };
   for (const item of newestFirst) {
     const age = now - item._creationTime;
-    const place = placeToVisit(item, visited);
+    const place = placeToVisit(item, visitedOn(item));
     if (place !== undefined) {
       if (age >= VISIT_MIN_AGE_MS && !tripStops.has(item._id))
         byKind.visit.push({ item, kind: "visit", subject: place });

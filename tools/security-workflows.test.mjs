@@ -23,6 +23,21 @@ test("workflows execute immutable action revisions and an exact EAS version", ()
   }
 });
 
+test("Claude review verifies the published Bun checksum inside its download retry loop", () => {
+  const source = readFileSync(
+    ".github/workflows/claude-code-review.yml",
+    "utf8",
+  );
+  const retryLoop = source.match(
+    /for attempt in 1 2 3; do([\s\S]*?)\n\s+done/,
+  )?.[1];
+  assert.ok(retryLoop);
+  assert.match(
+    retryLoop,
+    /--clobber &&\s+echo "951ee2aee855f08595aeec6225226a298d3fea83a3dcd6465c09cbccdf7e848f  \$RUNNER_TEMP\/review-bun\.zip" \| sha256sum --check --status; then\s+break/,
+  );
+});
+
 test("review preparations pin every upstream checkout and run before secrets are supplied", () => {
   const wrapper = readFileSync(
     ".github/actions/secure-review/action.yml",
@@ -33,11 +48,7 @@ test("review preparations pin every upstream checkout and run before secrets are
   assert.equal(repositories.length, 3);
   for (const [, repository, ref] of repositories)
     assert.match(ref, /^[a-f0-9]{40}$/, repository);
-  for (const name of [
-    "droid",
-    "claude",
-    "claude-code-review",
-  ]) {
+  for (const name of ["droid", "claude", "claude-code-review"]) {
     const source = readFileSync(`.github/workflows/${name}.yml`, "utf8");
     const preparation = source.indexOf(
       "uses: ./.secure-review-tooling/.github/actions/secure-review",
