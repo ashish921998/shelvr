@@ -170,4 +170,27 @@ describe("Went for each member of a shared list", () => {
     expect(after.wentBy).toEqual([{ firstName: "Ana", isYou: false }]);
     expect(after.visitedAt).toEqual(expect.any(Number));
   });
+
+  it("takes your Went off every list that gave the stamp you remove", async () => {
+    const { owner, bo, listId, place } = await twoMembers();
+    const second = await owner.t.mutation(api.sharedLists.createSharedList, {
+      name: "Pastries",
+      cities: ["Lisbon"],
+    });
+    await bo.t.mutation(api.sharedLists.joinSharedList, {
+      token: second.inviteToken,
+    });
+    const other = await placeAs(bo, second.listId);
+    for (const placeId of [place._id, other._id]) {
+      await bo.t.mutation(api.sharedLists.setSharedListPlaceWent, {
+        placeId,
+        went: true,
+      });
+    }
+    await bo.t.mutation(api.placeVisits.removeListStamp, {
+      name: "Manteigaria",
+    });
+    expect((await placeAs(bo, listId)).wentBy).toBeUndefined();
+    expect((await placeAs(bo, second.listId)).wentBy).toBeUndefined();
+  });
 });

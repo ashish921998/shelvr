@@ -21,13 +21,12 @@ import {
   appleMapsCountry,
 } from "./model/appleMaps";
 import { authedMutation, authedQuery, liveOwner } from "./model/auth";
-import { wentWithout } from "./model/sharedLists";
 import {
   cityCompletionValidator,
   completionByCity,
 } from "./model/cityCompletion";
 import { linkSource } from "./model/externalUrl";
-import { memberOf } from "./model/sharedLists";
+import { memberOf, wentWithout } from "./model/sharedLists";
 import { logEvent } from "./model/log";
 import { normalizeCities, normalizePlaceName } from "./model/itemFields";
 import { type PassportPlace, soleCity } from "./model/passport";
@@ -563,9 +562,10 @@ async function forgetListWent(
       spot === undefined || (entry.lat === spot.lat && entry.lng === spot.lng),
   );
   const ids = new Set(
-    removed.flatMap((entry) =>
-      entry.listPlaceId === undefined ? [] : [entry.listPlaceId],
-    ),
+    removed.flatMap((entry) => [
+      ...(entry.listPlaceId === undefined ? [] : [entry.listPlaceId]),
+      ...(entry.alsoListPlaceIds ?? []),
+    ]),
   );
   for (const id of ids) {
     const place = await ctx.db.get(id);
