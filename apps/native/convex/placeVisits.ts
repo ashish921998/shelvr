@@ -486,7 +486,9 @@ async function addListSpot(
     await shareClaim(ctx, userId, existing, spots, place);
     return null;
   }
-  if (spots.length >= MAX_VISIT_SPOTS) return null;
+  if (spots.length >= MAX_VISIT_SPOTS) {
+    throw new Error("Place has too many visited spots");
+  }
   await rateLimiter.limit(ctx, "placeVisit", { key: userId, throws: true });
   if (existing !== null) {
     await ctx.db.patch(existing._id, {
@@ -884,16 +886,17 @@ async function stampRows(
       key: row.key,
       name: row.name,
       ...(row.itemId === undefined ? {} : { itemId: row.itemId }),
-      ...(row.listPlaceId === undefined
-        ? {}
-        : { listPlaceId: row.listPlaceId }),
       visitedAt: row.visitedAt,
       ...(row.backfilled ? { backfilled: true } : {}),
       ...(source ? { source } : {}),
     };
     const spots = stampSpots(row, owned);
     if (spots === undefined) {
-      stamps.push(base);
+      stamps.push(
+        row.listPlaceId === undefined
+          ? base
+          : { ...base, listPlaceId: row.listPlaceId },
+      );
       continue;
     }
     const stored = stampPlacesFor(row.stampPlaces, spots);

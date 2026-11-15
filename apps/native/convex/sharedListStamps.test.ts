@@ -699,4 +699,55 @@ describe("Went on a shared list", () => {
     const unmarked = await base.run((ctx) => ctx.db.get(other._id));
     expect(unmarked?.visitedAt).toBeUndefined();
   });
+
+  it("gives a list's place only to the stamp that list made", async () => {
+    const { base, token, listId } = await listWithOwner();
+    const bo = await joiner(base, token, { pro: true });
+    const list = await bo.t.query(api.sharedLists.getSharedList, { listId });
+    const place = list?.places.find((p) => p.name === "Manteigaria");
+    if (place === undefined) throw new Error("seed place missing");
+    await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: place._id,
+      visited: true,
+      stamp: true,
+    });
+    const far = near(40);
+    const itemId = await seedSave(base, bo.userId, {
+      pins: [{ name: "Manteigaria", ...far, category: "Cafe" }],
+    });
+    await bo.t.mutation(api.placeVisits.setVisited, {
+      itemId,
+      name: "Manteigaria",
+      visited: true,
+      spot: far,
+    });
+    const stamps = await bo.t.query(api.placeVisits.listPassportStamps, {});
+    const own = stamps.find((stamp) => stamp.lat === far.lat);
+    const fromList = stamps.find((stamp) => stamp.lat === place.lat);
+    expect(fromList?.listPlaceId).toBe(place._id);
+    expect(own).toBeDefined();
+    expect(own?.listPlaceId).toBeUndefined();
+  });
+
+  it("refuses a Went whose stamp would not fit", async () => {
+    const { base, bo, place } = await friendPlace();
+    await base.run((ctx) =>
+      ctx.db.insert("placeVisits", {
+        userId: bo.userId,
+        key: "manteigaria",
+        name: "Manteigaria",
+        visitedAt: Date.now(),
+        spots: Array.from({ length: 20 }, (_, i) => near(100 + i * 10)),
+      }),
+    );
+    await expect(
+      bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+        placeId: place._id,
+        visited: true,
+        stamp: true,
+      }),
+    ).rejects.toThrow(/too many visited spots/);
+    const unmarked = await base.run((ctx) => ctx.db.get(place._id));
+    expect(unmarked?.visitedAt).toBeUndefined();
+  });
 });
