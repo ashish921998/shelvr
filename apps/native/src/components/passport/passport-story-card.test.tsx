@@ -30,6 +30,10 @@ vi.mock("@/components/passport/city-stamp", () => ({
   )),
 }));
 
+vi.mock("@/lib/analytics", () => ({
+  analytics: { captureError: vi.fn() },
+}));
+
 afterEach(cleanup);
 
 const story: PassportStory = {

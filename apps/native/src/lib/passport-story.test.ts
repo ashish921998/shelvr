@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { CityStamp } from "@/lib/city-stamp-data";
 import type { Stamp } from "@/lib/passport";
@@ -8,6 +8,10 @@ import {
   passportStoryOf,
   qrModules,
 } from "@/lib/passport-story";
+
+vi.mock("@/lib/analytics", () => ({
+  analytics: { captureError: vi.fn() },
+}));
 
 function stamp(name: string, extra: Partial<Stamp> = {}): Stamp {
   return {

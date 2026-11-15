@@ -5,6 +5,8 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth } from "convex/react";
 import qrcode from "qrcode-generator";
+import { useEffect } from "react";
+import { analytics } from "@/lib/analytics";
 import type { CityStamp } from "@/lib/city-stamp-data";
 import { type Stamp, stampDate } from "@/lib/passport";
 
@@ -110,5 +112,10 @@ export function usePassportTogether(): number | undefined {
       isAuthenticated ? {} : "skip",
     ),
   );
+  useEffect(() => {
+    if (together.error) {
+      analytics.captureError("passport_together_load_failed", together.error);
+    }
+  }, [together.error]);
   return together.data;
 }
