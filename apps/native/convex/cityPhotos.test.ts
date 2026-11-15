@@ -271,26 +271,41 @@ describe("lookUp", () => {
 });
 
 describe("listCities", () => {
-  it("covers a city with its stored photo before any save's thumbnail", async () => {
+  it("covers a city with a save's photo first and its stored photo after", async () => {
     const backend = newConvexTest();
     const { userId, t } = await signedInUser(backend);
     await readySave(backend, userId, ["Kyoto"], "https://cdn/reel.jpg");
     await readySave(backend, userId, ["Osaka"], "https://cdn/osaka-reel.jpg");
-    await backend.run((ctx) =>
-      ctx.db.insert("cityPhotos", {
-        key: "kyoto",
-        city: "Kyoto",
-        status: "found",
-        url: "https://upload.wikimedia.org/kyoto.jpg",
-        checkedAt: Date.now(),
-      }),
-    );
+    await readySave(backend, userId, ["Nara"]);
+    for (const [key, city] of [
+      ["kyoto", "Kyoto"],
+      ["nara", "Nara"],
+    ]) {
+      await backend.run((ctx) =>
+        ctx.db.insert("cityPhotos", {
+          key,
+          city,
+          status: "found",
+          url: `https://upload.wikimedia.org/${key}.jpg`,
+          checkedAt: Date.now(),
+        }),
+      );
+    }
     const cities = await t.query(api.items.listCities, {});
     expect(
-      Object.fromEntries(cities.map((entry) => [entry.city, entry.cover])),
+      Object.fromEntries(
+        cities.map(({ city, cover, photo }) => [city, { cover, photo }]),
+      ),
     ).toEqual({
-      Kyoto: "https://upload.wikimedia.org/kyoto.jpg",
-      Osaka: "https://cdn/osaka-reel.jpg",
+      Kyoto: {
+        cover: "https://cdn/reel.jpg",
+        photo: "https://upload.wikimedia.org/kyoto.jpg",
+      },
+      Osaka: { cover: "https://cdn/osaka-reel.jpg", photo: undefined },
+      Nara: {
+        cover: "https://upload.wikimedia.org/nara.jpg",
+        photo: "https://upload.wikimedia.org/nara.jpg",
+      },
     });
   });
 });

@@ -13,12 +13,12 @@ export type CoverLayout = "pair" | "wide" | "only";
 function CoverArt({ entry }: { entry: City }) {
   const { theme } = useUnistyles();
   const [failed, setFailed] = useState<readonly (string | number)[]>([]);
-  const curated = curatedCityPicture(entry.city);
-  const order =
-    entry.coverItemId === undefined
-      ? [curated, entry.cover]
-      : [entry.cover, curated];
-  const source = order.find(
+  const savePhoto = entry.cover === entry.photo ? null : entry.cover;
+  const source = [
+    savePhoto,
+    curatedCityPicture(entry.city),
+    entry.photo ?? entry.cover,
+  ].find(
     (candidate): candidate is string | number =>
       !!candidate && !failed.includes(candidate),
   );

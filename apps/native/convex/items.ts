@@ -248,11 +248,9 @@ function withoutServerFields(
   | "placeLocations"
   | "placeCuisines"
   | "placesEdited"
-  | "coverFor"
 > {
   const {
     placesEdited: _placesEdited,
-    coverFor: _coverFor,
     places: _places,
     placesHeard: _placesHeard,
     placeLocations: _placeLocations,
@@ -427,36 +425,6 @@ async function cityCovers(
   return covers;
 }
 
-async function pickedCovers(
-  ctx: QueryCtx,
-  items: Doc<"items">[],
-  cities: string[],
-): Promise<Map<string, { url: string; itemId: Id<"items"> }>> {
-  const picked = new Map<string, { url: string; itemId: Id<"items"> }>();
-  for (const city of cities) {
-    const key = cityKey(city);
-    let item: Doc<"items"> | undefined;
-    let latest = -Infinity;
-    for (const save of items) {
-      const at = save.coverFor?.find((pick) => pick.key === key)?.at;
-      if (
-        at !== undefined &&
-        at > latest &&
-        (save.cities ?? []).some((name) => cityKey(name) === key)
-      ) {
-        item = save;
-        latest = at;
-      }
-    }
-    if (item === undefined || picked.has(key)) continue;
-    const url = item.storageId
-      ? await ctx.storage.getUrl(item.storageId)
-      : (item.heroImageUrl ?? null);
-    if (url !== null) picked.set(key, { url, itemId: item._id });
-  }
-  return picked;
-}
-
 export const listCities = authedQuery({
   args: {},
   returns: v.array(
@@ -466,7 +434,7 @@ export const listCities = authedQuery({
       placeCount: v.optional(v.number()),
       visitedCount: v.optional(v.number()),
       cover: v.union(v.string(), v.null()),
-      coverItemId: v.optional(v.id("items")),
+      photo: v.optional(v.string()),
     }),
   ),
   handler: async (ctx) => {
@@ -498,21 +466,16 @@ export const listCities = authedQuery({
         (a, b) => b.placeCount - a.placeCount || (a.city < b.city ? -1 : 1),
       );
     const names = cities.map(({ city }) => city);
-    const picked = await pickedCovers(ctx, items, names);
     const photos = await cityPhotoUrls(ctx, names);
-    const covers = await cityCovers(
-      ctx,
-      items,
-      names.filter(
-        (city) => !photos.has(cityKey(city)) && !picked.has(cityKey(city)),
-      ),
-    );
+    const covers = await cityCovers(ctx, items, names);
     return cities.map((entry) => {
       const key = cityKey(entry.city);
-      const pick = picked.get(key);
-      return pick
-        ? { ...entry, cover: pick.url, coverItemId: pick.itemId }
-        : { ...entry, cover: photos.get(key) ?? covers.get(key) ?? null };
+      const photo = photos.get(key);
+      return {
+        ...entry,
+        cover: covers.get(key) ?? photo ?? null,
+        ...(photo === undefined ? {} : { photo }),
+      };
     });
   },
 });

@@ -49,10 +49,16 @@ const city = (name: string, cover: string | null) => ({
   cover,
 });
 
-it("shows the curated photo of a known city over the server's cover", () => {
+it("shows the curated photo of a known city over its looked-up photo", () => {
   images.length = 0;
   render(
-    <CityCover entry={city("Paris", "https://x/save.jpg")} layout="pair" />,
+    <CityCover
+      entry={{
+        ...city("Paris", "https://x/paris.jpg"),
+        photo: "https://x/paris.jpg",
+      }}
+      layout="pair"
+    />,
   );
   expect(images.at(-1)?.source).toBe(42);
 });
@@ -80,10 +86,16 @@ it("falls back to the pin card when the photo fails to load", () => {
   );
 });
 
-it("falls back from a failed curated photo to the server's cover", () => {
+it("falls back from a failed curated photo to the server's city photo", () => {
   images.length = 0;
   render(
-    <CityCover entry={city("Paris", "https://x/paris.jpg")} layout="pair" />,
+    <CityCover
+      entry={{
+        ...city("Paris", "https://x/paris.jpg"),
+        photo: "https://x/paris.jpg",
+      }}
+      layout="pair"
+    />,
   );
   act(() => images.at(-1)?.onError?.());
   expect(images.at(-1)?.source).toEqual({ uri: "https://x/paris.jpg" });
@@ -91,17 +103,37 @@ it("falls back from a failed curated photo to the server's cover", () => {
   expect(screen.getByTestId("mappin")).toBeTruthy();
 });
 
-it("shows a cover the person picked over the curated photo", () => {
+it("shows a save's photo first, then the curated and city photos", () => {
   images.length = 0;
   render(
     <CityCover
-      entry={{ ...city("Paris", "https://x/mine.jpg"), coverItemId: "s1" }}
+      entry={{
+        ...city("Paris", "https://x/reel.jpg"),
+        photo: "https://x/paris.jpg",
+      }}
       layout="pair"
     />,
   );
-  expect(images.at(-1)?.source).toEqual({ uri: "https://x/mine.jpg" });
+  expect(images.at(-1)?.source).toEqual({ uri: "https://x/reel.jpg" });
   act(() => images.at(-1)?.onError?.());
   expect(images.at(-1)?.source).toBe(42);
+  act(() => images.at(-1)?.onError?.());
+  expect(images.at(-1)?.source).toEqual({ uri: "https://x/paris.jpg" });
+});
+
+it("falls back from a broken save photo to the city photo", () => {
+  images.length = 0;
+  render(
+    <CityCover
+      entry={{
+        ...city("Kyoto", "https://x/expired.jpg"),
+        photo: "https://x/kyoto.jpg",
+      }}
+      layout="wide"
+    />,
+  );
+  act(() => images.at(-1)?.onError?.());
+  expect(images.at(-1)?.source).toEqual({ uri: "https://x/kyoto.jpg" });
 });
 
 it("draws the pin card for a city with no photo", () => {
