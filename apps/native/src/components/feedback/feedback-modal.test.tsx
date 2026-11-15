@@ -16,14 +16,17 @@ vi.mock("react-native-reanimated", () => ({
         children,
         accessibilityElementsHidden,
         pointerEvents,
+        style,
       }: {
         children: React.ReactNode;
         accessibilityElementsHidden?: boolean;
         pointerEvents?: string;
+        style?: unknown;
       }) => (
         <div
           aria-hidden={accessibilityElementsHidden}
           data-pointer-events={pointerEvents}
+          data-style={[style].flat().filter(Boolean).join(" ")}
         >
           {children}
         </div>
@@ -49,6 +52,11 @@ const mocks = vi.hoisted(() => ({
   captureError: vi.fn(),
   openURL: vi.fn(),
   dismissKeyboard: vi.fn(),
+  scrollTo: vi.fn(),
+  scrollView: {} as {
+    onLayout?: (event: { nativeEvent: { layout: { height: number } } }) => void;
+    onContentSizeChange?: (width: number, height: number) => void;
+  },
 }));
 
 vi.mock("convex/react", () => ({
@@ -82,7 +90,9 @@ vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
 }));
 vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}) },
+  StyleSheet: {
+    create: () => new Proxy({}, { get: (_target, name) => String(name) }),
+  },
   useUnistyles: () => ({
     theme: { colors: { muted: "gray", faint: "#999" } },
   }),
@@ -115,9 +125,24 @@ vi.mock("react-native", () => ({
       </button>
     ),
   ),
-  ScrollView: vi.fn(({ children }: { children: React.ReactNode }) => (
-    <div>{children}</div>
-  )),
+  ScrollView: vi.fn(
+    ({
+      children,
+      ref,
+      onLayout,
+      onContentSizeChange,
+    }: {
+      children: React.ReactNode;
+      ref?: { current: unknown };
+      onLayout?: (typeof mocks.scrollView)["onLayout"];
+      onContentSizeChange?: (typeof mocks.scrollView)["onContentSizeChange"];
+    }) => {
+      if (ref) ref.current = { scrollTo: mocks.scrollTo };
+      mocks.scrollView.onLayout = onLayout;
+      mocks.scrollView.onContentSizeChange = onContentSizeChange;
+      return <div>{children}</div>;
+    },
+  ),
   Text: vi.fn(({ children }: { children: React.ReactNode }) => (
     <p>{children}</p>
   )),
@@ -183,6 +208,45 @@ describe("FeedbackModal", () => {
       "feedback_submitted",
       expect.objectContaining({ message: expect.anything() }),
     );
+  });
+
+  it("brings the thanks and Done to the top when a large text size made the form scroll", async () => {
+    mocks.submit.mockResolvedValue({
+      submissionId: "s-1",
+      deliveryState: "scheduled",
+    });
+    render(<FeedbackModal surface="home" onClose={() => {}} />);
+    act(() => {
+      mocks.scrollView.onLayout?.({ nativeEvent: { layout: { height: 500 } } });
+      mocks.scrollView.onContentSizeChange?.(390, 900);
+    });
+    typeDraft("Love the app");
+    fireEvent.click(screen.getByLabelText("feedback.open"));
+    await waitFor(() =>
+      expect(screen.getByText("feedback.thanks")).toBeTruthy(),
+    );
+    expect(mocks.scrollTo).toHaveBeenCalledWith({ y: 0, animated: true });
+    const confirmation = screen.getByText("feedback.thanks").parentElement;
+    expect(confirmation?.dataset.style).toBe("confirmation confirmationTop");
+  });
+
+  it("keeps the confirmation's usual layout when the form fits", async () => {
+    mocks.submit.mockResolvedValue({
+      submissionId: "s-1",
+      deliveryState: "scheduled",
+    });
+    render(<FeedbackModal surface="home" onClose={() => {}} />);
+    act(() => {
+      mocks.scrollView.onLayout?.({ nativeEvent: { layout: { height: 500 } } });
+      mocks.scrollView.onContentSizeChange?.(390, 500);
+    });
+    typeDraft("Love the app");
+    fireEvent.click(screen.getByLabelText("feedback.open"));
+    await waitFor(() =>
+      expect(screen.getByText("feedback.thanks")).toBeTruthy(),
+    );
+    const confirmation = screen.getByText("feedback.thanks").parentElement;
+    expect(confirmation?.dataset.style).toBe("confirmation");
   });
 
   it("keeps the draft on screen with the support fallback when persistence fails", async () => {
