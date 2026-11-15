@@ -1013,6 +1013,69 @@ export const getPassport = authedQuery({
   },
 });
 
+function stampListPlaceIds(
+  row: Doc<"placeVisits">,
+): Id<"sharedListPlaces">[][] {
+  const groups = (row.stampPlaces ?? []).map((place) => [
+    ...(place.listPlaceId === undefined ? [] : [place.listPlaceId]),
+    ...(place.alsoListPlaceIds ?? []),
+  ]);
+  if (groups.length > 0) return groups;
+  return row.listPlaceId === undefined ? [] : [[row.listPlaceId]];
+}
+
+async function wentWithFriend(
+  ctx: QueryCtx,
+  userId: Id<"users">,
+  place: Doc<"sharedListPlaces">,
+  members: Map<string, boolean>,
+): Promise<boolean> {
+  const isMember = async (memberId: Id<"users">) => {
+    const key = `${place.listId}:${memberId}`;
+    let known = members.get(key);
+    if (known === undefined) {
+      known = (await memberOf(ctx, place.listId, memberId)) !== null;
+      members.set(key, known);
+    }
+    return known;
+  };
+  const went = place.went ?? [];
+  if (!went.some((entry) => entry.userId === userId)) return false;
+  if (!(await isMember(userId))) return false;
+  for (const entry of went) {
+    if (entry.userId !== userId && (await isMember(entry.userId))) return true;
+  }
+  return false;
+}
+
+export const passportTogether = authedQuery({
+  args: {},
+  returns: v.number(),
+  handler: async (ctx) => {
+    const rows = (await visitRows(ctx, ctx.userId)).slice(
+      0,
+      MAX_PASSPORT_STAMPS,
+    );
+    const places = new Map<
+      Id<"sharedListPlaces">,
+      Doc<"sharedListPlaces"> | null
+    >();
+    const members = new Map<string, boolean>();
+    let together = 0;
+    for (const ids of rows.flatMap(stampListPlaceIds)) {
+      for (const id of ids) {
+        if (!places.has(id)) places.set(id, await ctx.db.get(id));
+        const place = places.get(id);
+        if (place && (await wentWithFriend(ctx, ctx.userId, place, members))) {
+          together += 1;
+          break;
+        }
+      }
+    }
+    return together;
+  },
+});
+
 const badgeStampValidator = v.object({
   city: v.optional(v.string()),
   countryCode: v.optional(v.string()),

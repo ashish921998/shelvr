@@ -1166,6 +1166,22 @@
   "passport.cardSavedBoth": "Instagram과 TikTok에 저장.",
   "passport.cardSavedElsewhere": "나중을 위해 저장.",
   "passport.cardWent": "Shelvr로 다녀옴.",
+  "passportStory.screenTitle": "내 여권",
+  "passportStory.kicker": "여권 · %{year}",
+  "passportStory.titleReels": {
+    "other": "릴스에서 저장한 %{formattedCount}곳에 다녀왔어요."
+  },
+  "passportStory.titleSaved": {
+    "other": "저장한 %{formattedCount}곳에 다녀왔어요."
+  },
+  "passportStory.together": {
+    "other": "친구와 함께 찍은 스탬프 %{formattedCount}곳"
+  },
+  "passportStory.more": "+%{more}",
+  "passportStory.tagline": "지금 저장하고,\n진짜로 가 보세요.",
+  "passportStory.scan": "스캔해서 여권을 비교해 보세요",
+  "passportStory.shareLink": "링크로 공유하기",
+  "passportStory.linkNote": "공유하면 여권 링크가 켜져서 코드로 열 수 있어요. 공유는 설정에서 언제든 중지할 수 있어요.",
   "passport.shareCity": "%{city} 공유",
   "passport.momentCityComplete": "%{city} 완성",
   "passport.ringCount": "%{visited}/%{total}",

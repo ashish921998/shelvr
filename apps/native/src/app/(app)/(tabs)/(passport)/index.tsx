@@ -31,7 +31,6 @@ import {
   useCityCompletion,
   usePassport,
 } from "@/lib/passport";
-import { useSharePassport } from "@/lib/passport-share";
 import { ringComplete } from "@/components/passport/city-ring";
 import { useStampMomentLanding } from "@/lib/stamp-moment";
 import { usePlaceVisit } from "@/lib/use-place-visit";
@@ -84,11 +83,9 @@ function StampTile({
 
 function ShareButton({
   visible,
-  busy,
   onPress,
 }: {
   visible: boolean;
-  busy: boolean;
   onPress: () => void;
 }) {
   const { theme } = useUnistyles();
@@ -101,7 +98,6 @@ function ShareButton({
                 <HeaderIconButton
                   icon="square.and.arrow.up"
                   label={t("passportShare.share")}
-                  disabled={busy}
                   onPress={onPress}
                 />
               )
@@ -116,7 +112,6 @@ function ShareButton({
       <Stack.Toolbar.Button
         icon="square.and.arrow.up"
         tintColor={theme.colors.foreground}
-        disabled={busy}
         onPress={onPress}
       >
         {t("passportShare.share")}
@@ -133,7 +128,6 @@ export default function PassportScreen() {
   const visit = usePlaceVisit("passport");
   const removeListStamp = useRemoveListStamp();
   useStampMomentLanding();
-  const sharing = useSharePassport(stamps?.length ?? 0);
   const completion = useCityCompletion();
   const cityStamps = useCityStamps();
   const removeCityStamp = useRemoveCityStamp();
@@ -215,8 +209,7 @@ export default function PassportScreen() {
     <>
       <ShareButton
         visible={stamps.length > 0}
-        busy={sharing.busy}
-        onPress={() => void sharing.share()}
+        onPress={() => router.push("/passport-story")}
       />
       <ScrollView
         style={styles.screen}
