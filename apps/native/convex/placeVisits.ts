@@ -337,17 +337,32 @@ async function unstampListPlace(
   });
 }
 
-function withoutClaim(
+const MAX_SHARED_CLAIMS = 20;
+
+async function liveClaims(
+  ctx: MutationCtx,
+  ids: readonly Id<"sharedListPlaces">[] | undefined,
+): Promise<Id<"sharedListPlaces">[]> {
+  const live: Id<"sharedListPlaces">[] = [];
+  for (const id of ids ?? []) {
+    if ((await ctx.db.get(id)) !== null) live.push(id);
+  }
+  return live;
+}
+
+async function withoutClaim(
+  ctx: MutationCtx,
   entry: StampPlace,
   listPlaceId: Id<"sharedListPlaces">,
-): StampPlace {
-  const others = (entry.alsoListPlaceIds ?? []).filter(
+): Promise<StampPlace> {
+  const others = (await liveClaims(ctx, entry.alsoListPlaceIds)).filter(
     (id) => id !== listPlaceId,
   );
   if (entry.listPlaceId !== listPlaceId) {
     return { ...entry, alsoListPlaceIds: others };
   }
   const [next, ...rest] = others;
+  if (next === undefined) return { ...entry, alsoListPlaceIds: [] };
   return { ...entry, listPlaceId: next, alsoListPlaceIds: rest };
 }
 
@@ -360,13 +375,15 @@ async function dropSharedClaim(
     (entry.alsoListPlaceIds?.length ?? 0) > 0 &&
     (entry.listPlaceId === listPlaceId ||
       entry.alsoListPlaceIds?.includes(listPlaceId) === true);
-  if (!row.stampPlaces?.some(shared)) return false;
+  const entry = row.stampPlaces?.find(shared);
+  if (entry === undefined) return false;
+  const next = await withoutClaim(ctx, entry, listPlaceId);
   await ctx.db.patch(row._id, {
-    stampPlaces: row.stampPlaces.map((entry) =>
-      shared(entry) ? withoutClaim(entry, listPlaceId) : entry,
+    stampPlaces: (row.stampPlaces ?? []).map((other) =>
+      other === entry ? next : other,
     ),
   });
-  return true;
+  return next.listPlaceId !== listPlaceId;
 }
 
 async function shareClaim(
@@ -385,14 +402,11 @@ async function shareClaim(
   ) {
     return;
   }
+  const live = await liveClaims(ctx, entry.alsoListPlaceIds);
+  const claims = live.length < MAX_SHARED_CLAIMS ? [...live, place._id] : live;
   await ctx.db.patch(row._id, {
     stampPlaces: (row.stampPlaces ?? []).map((other) =>
-      other === entry
-        ? {
-            ...other,
-            alsoListPlaceIds: [...(other.alsoListPlaceIds ?? []), place._id],
-          }
-        : other,
+      other === entry ? { ...other, alsoListPlaceIds: claims } : other,
     ),
   });
 }

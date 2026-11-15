@@ -512,4 +512,57 @@ describe("Went on a shared list", () => {
     await went(other._id, false);
     expect(await visitRows(base, bo.userId)).toEqual([]);
   });
+
+  it("drops claims from deleted list places before adding a new one", async () => {
+    const { base, owner, bo, listId, place } = await friendPlace();
+    const second = await owner.t.mutation(api.sharedLists.createSharedList, {
+      name: "Pastries",
+      cities: ["Lisbon"],
+    });
+    await bo.t.mutation(api.sharedLists.joinSharedList, {
+      token: second.inviteToken,
+    });
+    const other = (
+      await bo.t.query(api.sharedLists.getSharedList, {
+        listId: second.listId,
+      })
+    )?.places.find((p) => p.name === "Manteigaria");
+    if (other === undefined) throw new Error("second list place missing");
+    await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: place._id,
+      visited: true,
+      stamp: true,
+    });
+    const gone = await base.run(async (ctx) => {
+      const ids = [];
+      for (let i = 0; i < 25; i++) {
+        const id = await ctx.db.insert("sharedListPlaces", {
+          listId,
+          addedBy: owner.userId,
+          name: "Manteigaria",
+          lat: place.lat,
+          lng: place.lng,
+          city: "Lisbon",
+          addedAt: Date.now(),
+        });
+        await ctx.db.delete(id);
+        ids.push(id);
+      }
+      return ids;
+    });
+    const [row] = await visitRows(base, bo.userId);
+    if (row?.stampPlaces?.[0] === undefined) throw new Error("stamp missing");
+    await base.run((ctx) =>
+      ctx.db.patch(row._id, {
+        stampPlaces: [{ ...row.stampPlaces![0]!, alsoListPlaceIds: gone }],
+      }),
+    );
+    await bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+      placeId: other._id,
+      visited: true,
+      stamp: true,
+    });
+    const [after] = await visitRows(base, bo.userId);
+    expect(after?.stampPlaces?.[0]?.alsoListPlaceIds).toEqual([other._id]);
+  });
 });
