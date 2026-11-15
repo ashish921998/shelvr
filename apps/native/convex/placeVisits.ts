@@ -26,6 +26,7 @@ import {
   completionByCity,
 } from "./model/cityCompletion";
 import { linkSource } from "./model/externalUrl";
+import { memberOf } from "./model/sharedLists";
 import { logEvent } from "./model/log";
 import { normalizeCities, normalizePlaceName } from "./model/itemFields";
 import { type PassportPlace, soleCity } from "./model/passport";
@@ -417,6 +418,7 @@ async function locatePromotedStamp(
 
 async function shareClaim(
   ctx: MutationCtx,
+  userId: Id<"users">,
   row: Doc<"placeVisits">,
   spots: VisitSpot[],
   place: Doc<"sharedListPlaces">,
@@ -431,13 +433,38 @@ async function shareClaim(
   ) {
     return;
   }
-  const live = await liveClaims(ctx, entry.alsoListPlaceIds);
-  const claims = live.length < MAX_SHARED_CLAIMS ? [...live, place._id] : live;
+  let live = await liveClaims(ctx, entry.alsoListPlaceIds);
+  if (live.length >= MAX_SHARED_CLAIMS) {
+    live = await joinedClaims(ctx, userId, live);
+  }
+  if (live.length >= MAX_SHARED_CLAIMS) {
+    throw new Error("Place is on too many of your lists");
+  }
   await ctx.db.patch(row._id, {
     stampPlaces: (row.stampPlaces ?? []).map((other) =>
-      other === entry ? { ...other, alsoListPlaceIds: claims } : other,
+      other === entry
+        ? { ...other, alsoListPlaceIds: [...live, place._id] }
+        : other,
     ),
   });
+}
+
+async function joinedClaims(
+  ctx: MutationCtx,
+  userId: Id<"users">,
+  ids: readonly Id<"sharedListPlaces">[],
+): Promise<Id<"sharedListPlaces">[]> {
+  const joined: Id<"sharedListPlaces">[] = [];
+  for (const id of ids) {
+    const claim = await ctx.db.get(id);
+    if (
+      claim !== null &&
+      (await memberOf(ctx, claim.listId, userId)) !== null
+    ) {
+      joined.push(id);
+    }
+  }
+  return joined;
 }
 
 async function addListSpot(
@@ -456,7 +483,7 @@ async function addListSpot(
   const spots =
     existing === null ? [] : ((await rowSpots(ctx, existing)) ?? []);
   if (existing !== null && knowsSpot(spots, spot)) {
-    await shareClaim(ctx, existing, spots, place);
+    await shareClaim(ctx, userId, existing, spots, place);
     return null;
   }
   if (spots.length >= MAX_VISIT_SPOTS) return null;

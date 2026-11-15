@@ -635,4 +635,68 @@ describe("Went on a shared list", () => {
     const [after] = await visitRows(base, bo.userId);
     expect(after?.stampPlaces?.[0]?.alsoListPlaceIds).toEqual([other._id]);
   });
+
+  it("drops claims from lists the member left, and refuses a Went that would lose one", async () => {
+    const { base, owner, bo, listId, place } = await friendPlace();
+    const second = await owner.t.mutation(api.sharedLists.createSharedList, {
+      name: "Pastries",
+      cities: ["Lisbon"],
+    });
+    await bo.t.mutation(api.sharedLists.joinSharedList, {
+      token: second.inviteToken,
+    });
+    const other = (
+      await bo.t.query(api.sharedLists.getSharedList, {
+        listId: second.listId,
+      })
+    )?.places.find((p) => p.name === "Manteigaria");
+    if (other === undefined) throw new Error("second list place missing");
+    const left = await owner.t.mutation(api.sharedLists.createSharedList, {
+      name: "Old crew",
+      cities: ["Lisbon"],
+    });
+    const claimsOn = (onList: typeof listId) =>
+      base.run(async (ctx) => {
+        const ids = [];
+        for (let i = 0; i < 20; i++) {
+          ids.push(
+            await ctx.db.insert("sharedListPlaces", {
+              listId: onList,
+              addedBy: owner.userId,
+              name: "Manteigaria",
+              lat: place.lat,
+              lng: place.lng,
+              city: "Lisbon",
+              addedAt: Date.now(),
+            }),
+          );
+        }
+        return ids;
+      });
+    const went = (placeId: typeof place._id) =>
+      bo.t.mutation(api.sharedLists.setSharedListPlaceVisited, {
+        placeId,
+        visited: true,
+        stamp: true,
+      });
+    const fill = async (ids: (typeof place._id)[]) => {
+      const [row] = await visitRows(base, bo.userId);
+      if (row?.stampPlaces?.[0] === undefined) throw new Error("stamp missing");
+      await base.run((ctx) =>
+        ctx.db.patch(row._id, {
+          stampPlaces: [{ ...row.stampPlaces![0]!, alsoListPlaceIds: ids }],
+        }),
+      );
+    };
+    await went(place._id);
+    await fill(await claimsOn(left.listId));
+    await went(other._id);
+    const [after] = await visitRows(base, bo.userId);
+    expect(after?.stampPlaces?.[0]?.alsoListPlaceIds).toEqual([other._id]);
+    await fill(await claimsOn(listId));
+    await base.run((ctx) => ctx.db.patch(other._id, { visitedAt: undefined }));
+    await expect(went(other._id)).rejects.toThrow(/too many of your lists/);
+    const unmarked = await base.run((ctx) => ctx.db.get(other._id));
+    expect(unmarked?.visitedAt).toBeUndefined();
+  });
 });
