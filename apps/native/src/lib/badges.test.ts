@@ -259,6 +259,31 @@ describe("useBadgeUnlocks", () => {
     expect(through).toBe(true);
   });
 
+  it("holds the first stamp of someone who just became Pro until their first reading", async () => {
+    const unlock = vi.fn();
+    mocks.entitled = false;
+    mocks.stamps = undefined;
+    const { result, rerender } = renderHook(() =>
+      useBadgeUnlocks(unlock, vi.fn()),
+    );
+    mocks.entitled = true;
+    rerender();
+    let through = false;
+    void result.current().then(() => {
+      through = true;
+    });
+    await act(() => Promise.resolve());
+    expect(through).toBe(false);
+
+    mocks.stamps = [];
+    rerender();
+    await act(() => Promise.resolve());
+    expect(through).toBe(true);
+    mocks.stamps = [cafe("Lisbon")];
+    rerender();
+    expect(unlock).toHaveBeenCalledWith(["firstStamp"]);
+  });
+
   it("stops holding a stamp when the first reading takes too long", async () => {
     vi.useFakeTimers();
     try {

@@ -64,6 +64,7 @@ function useBaselineGate(open: boolean): {
   }, []);
   useEffect(() => {
     if (open) wake();
+    else isOpen.current = false;
   }, [open, wake]);
   const ready = useCallback(() => {
     if (isOpen.current) return Promise.resolve();
