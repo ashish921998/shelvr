@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   captureError: vi.fn(),
   play: vi.fn(),
   queue: vi.fn(),
+  badgesReady: vi.fn(),
   success: vi.fn(),
   selection: vi.fn(),
   router: { push: vi.fn() },
@@ -35,7 +36,11 @@ vi.mock("@/lib/haptics", () => ({
 }));
 vi.mock("@/lib/stamp-moment", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/stamp-moment")>()),
-  useStampMoment: () => ({ play: mocks.play, queue: mocks.queue }),
+  useStampMoment: () => ({
+    play: mocks.play,
+    queue: mocks.queue,
+    badgesReady: mocks.badgesReady,
+  }),
 }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
 vi.mock("react-native", () => ({ Alert: { alert: mocks.alert } }));
@@ -58,10 +63,41 @@ function toggle(
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.setVisited.mockResolvedValue(null);
+  mocks.badgesReady.mockResolvedValue(undefined);
   mocks.focused = true;
 });
 
 describe("usePlaceVisit", () => {
+  it("sends a stamp only once the badge watcher has its first reading", async () => {
+    let settle: () => void = () => {};
+    mocks.badgesReady.mockReturnValue(
+      new Promise<void>((resolve) => {
+        settle = resolve;
+      }),
+    );
+    const { result } = renderHook(() => usePlaceVisit());
+    let done: Promise<boolean> = Promise.resolve(false);
+    act(() => {
+      done = result.current.toggle(itemId, taco, true);
+    });
+    await act(() => Promise.resolve());
+    expect(mocks.setVisited).not.toHaveBeenCalled();
+    await act(async () => {
+      settle();
+      await done;
+    });
+    expect(mocks.setVisited).toHaveBeenCalledTimes(1);
+    expect(mocks.play).toHaveBeenCalledTimes(1);
+  });
+
+  it("removes a stamp without waiting for the badge watcher", async () => {
+    mocks.badgesReady.mockReturnValue(new Promise<void>(() => {}));
+    const { result } = renderHook(() => usePlaceVisit("passport"));
+    await act(() => result.current.toggle(itemId, taco, false));
+    expect(mocks.setVisited).toHaveBeenCalledTimes(1);
+    expect(mocks.badgesReady).not.toHaveBeenCalled();
+  });
+
   it("sends where the place is with the mark", async () => {
     await toggle(taco);
     await toggle({ name: "BBQ Pit", lat: 30.2, lng: -97.2 });
