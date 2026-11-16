@@ -3,6 +3,7 @@ import { TogetherSection } from "@/components/shared-list/together-section";
 import { AppSymbolIcon } from "@/components/symbol";
 import { TripCard } from "@/components/trip-planner/trip-card";
 import { Button } from "@/components/ui/button";
+import { HeaderScrim } from "@/components/ui/header-scrim";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ThemedText } from "@/components/ui/themed-text";
 import { useDeleteTripPlan } from "@/lib/delete-trip-plan";
@@ -74,48 +75,51 @@ function TripsList({ signedIn }: { signedIn: boolean }) {
   }
 
   return (
-    <FlatList
-      style={styles.screen}
-      accessibilityElementsHidden={!focused}
-      importantForAccessibility={focused ? "auto" : "no-hide-descendants"}
-      data={sorted}
-      keyExtractor={(trip) => trip._id}
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={[
-        styles.content,
-        sorted.length === 0 && styles.contentEmpty,
-      ]}
-      renderItem={({ item: trip }) => (
-        <TripCard
-          trip={trip}
-          onOpen={() =>
-            router.push({
-              pathname: "/trip-plan/[id]",
-              params: { id: trip._id },
-            })
-          }
-          onDelete={() => deleteTrip(trip._id)}
-        />
-      )}
-      onEndReached={() => {
-        if (trips.status === "CanLoadMore") trips.loadMore(PAGE_SIZE);
-      }}
-      onEndReachedThreshold={0.5}
-      ListHeaderComponent={
-        <TogetherSection showTripsHeading={sorted.length > 0} />
-      }
-      ListEmptyComponent={<NoTrips onPlan={plan} />}
-      ListFooterComponent={
-        sorted.length > 0 ? (
-          <Button
-            testID="trips-plan-another"
-            title={t("tripPlanner.planTrip")}
-            onPress={plan}
-            style={styles.footerButton}
+    <>
+      <FlatList
+        style={styles.screen}
+        accessibilityElementsHidden={!focused}
+        importantForAccessibility={focused ? "auto" : "no-hide-descendants"}
+        data={sorted}
+        keyExtractor={(trip) => trip._id}
+        contentInsetAdjustmentBehavior="automatic"
+        contentContainerStyle={[
+          styles.content,
+          sorted.length === 0 && styles.contentEmpty,
+        ]}
+        renderItem={({ item: trip }) => (
+          <TripCard
+            trip={trip}
+            onOpen={() =>
+              router.push({
+                pathname: "/trip-plan/[id]",
+                params: { id: trip._id },
+              })
+            }
+            onDelete={() => deleteTrip(trip._id)}
           />
-        ) : undefined
-      }
-    />
+        )}
+        onEndReached={() => {
+          if (trips.status === "CanLoadMore") trips.loadMore(PAGE_SIZE);
+        }}
+        onEndReachedThreshold={0.5}
+        ListHeaderComponent={
+          <TogetherSection showTripsHeading={sorted.length > 0} />
+        }
+        ListEmptyComponent={<NoTrips onPlan={plan} />}
+        ListFooterComponent={
+          sorted.length > 0 ? (
+            <Button
+              testID="trips-plan-another"
+              title={t("tripPlanner.planTrip")}
+              onPress={plan}
+              style={styles.footerButton}
+            />
+          ) : undefined
+        }
+      />
+      <HeaderScrim />
+    </>
   );
 }
 

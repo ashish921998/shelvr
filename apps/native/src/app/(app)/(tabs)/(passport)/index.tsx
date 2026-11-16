@@ -32,7 +32,9 @@ import {
   usePassport,
 } from "@/lib/passport";
 import { ringComplete } from "@/components/passport/city-ring";
+import { HeaderScrim } from "@/components/ui/header-scrim";
 import { useStampMomentLanding } from "@/lib/stamp-moment";
+import { useHasPlacesToStamp } from "@/lib/places-to-stamp";
 import { usePlaceVisit } from "@/lib/use-place-visit";
 import { useRemoveListStamp } from "@/lib/use-remove-list-stamp";
 import { Stack, useRouter } from "expo-router";
@@ -135,6 +137,7 @@ export default function PassportScreen() {
   const badges = useBadgeTotals();
   const badgeAccess = useBadgeAccess();
   const shareBadge = useShareBadge("milestones");
+  const canBackfill = useHasPlacesToStamp();
   const [open, setOpen] = useState<OpenStamp | null>(null);
   const remove = async () => {
     if (open === null) return;
@@ -223,20 +226,27 @@ export default function PassportScreen() {
           locked={badgeAccess.locked}
           onUnlock={badgeAccess.unlock}
         />
-        <Pressable
-          testID="passport-backfill"
-          accessibilityRole="button"
-          onPress={() => router.push("/already-been")}
-          style={({ pressed }) => [styles.backfill, pressed && styles.pressed]}
-        >
-          <AppSymbolIcon
-            name="plus"
-            size={14}
-            tintColor={theme.colors.primaryText}
-          />
-          <Text style={styles.backfillText}>{t("passport.beenSomewhere")}</Text>
-        </Pressable>
-        {stamps.length === 0 ? (
+        {canBackfill ? (
+          <Pressable
+            testID="passport-backfill"
+            accessibilityRole="button"
+            onPress={() => router.push("/already-been")}
+            style={({ pressed }) => [
+              styles.backfill,
+              pressed && styles.pressed,
+            ]}
+          >
+            <AppSymbolIcon
+              name="plus"
+              size={14}
+              tintColor={theme.colors.primaryText}
+            />
+            <Text style={styles.backfillText}>
+              {t("passport.beenSomewhere")}
+            </Text>
+          </Pressable>
+        ) : null}
+        {canBackfill && stamps.length === 0 ? (
           <Text style={styles.muted}>{t("passport.beenBody")}</Text>
         ) : null}
         <CityStampsSection
@@ -302,6 +312,7 @@ export default function PassportScreen() {
           }}
         />
       </ScrollView>
+      <HeaderScrim />
     </>
   );
 }
