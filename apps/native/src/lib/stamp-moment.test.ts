@@ -458,6 +458,7 @@ describe("useStampMomentLanding", () => {
     queue: vi.fn(),
     release: vi.fn(),
     cancel: vi.fn(),
+    badgesReady: vi.fn(),
   };
   const wrapper = ({ children }: { children: ReactNode }) =>
     createElement(StampMomentPlayContext, { value: controls }, children);

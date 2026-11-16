@@ -8,6 +8,7 @@ import type { BadgeCity, BadgeStamp } from "@convex/model/badges";
 const mocks = vi.hoisted(() => ({
   authenticated: true,
   entitled: true,
+  entitlementLoading: false,
   stamps: undefined as BadgeStamp[] | undefined,
   rows: undefined as BadgeCity[] | undefined,
   completionEnabled: [] as boolean[],
@@ -53,7 +54,10 @@ vi.mock("@/lib/city-stamp-data", () => ({
   },
 }));
 vi.mock("@/lib/entitlement", () => ({
-  useEntitlement: () => ({ entitled: mocks.entitled, loading: false }),
+  useEntitlement: () => ({
+    entitled: mocks.entitled,
+    loading: mocks.entitlementLoading,
+  }),
 }));
 vi.mock("@/lib/passport-share", () => ({
   usePassportShare: () => mocks.token,
@@ -78,6 +82,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.authenticated = true;
   mocks.entitled = true;
+  mocks.entitlementLoading = false;
   mocks.stamps = [];
   mocks.rows = [];
   mocks.completionEnabled = [];
@@ -205,6 +210,71 @@ describe("useBadgeUnlocks", () => {
     rerender();
     expect(revoke).not.toHaveBeenCalled();
     expect(unlock).not.toHaveBeenCalled();
+  });
+
+  it("holds a stamp until the first reading, so the badge it earns still plays", async () => {
+    const unlock = vi.fn();
+    const revoke = vi.fn();
+    mocks.stamps = undefined;
+    const { result, rerender } = renderHook(() =>
+      useBadgeUnlocks(unlock, revoke),
+    );
+    let through = false;
+    void result.current().then(() => {
+      through = true;
+    });
+    await act(() => Promise.resolve());
+    expect(through).toBe(false);
+
+    mocks.stamps = [];
+    rerender();
+    await act(() => Promise.resolve());
+    expect(through).toBe(true);
+
+    mocks.stamps = [cafe("Lisbon")];
+    rerender();
+    expect(unlock).toHaveBeenCalledWith(["firstStamp"]);
+  });
+
+  it("lets a stamp through at once when the first reading is in", async () => {
+    const { result } = renderHook(() => useBadgeUnlocks(vi.fn(), vi.fn()));
+    await expect(result.current()).resolves.toBeUndefined();
+  });
+
+  it("lets a free user's stamp through at once, and holds it while Pro is still loading", async () => {
+    mocks.entitled = false;
+    mocks.entitlementLoading = true;
+    const { result, rerender } = renderHook(() =>
+      useBadgeUnlocks(vi.fn(), vi.fn()),
+    );
+    let through = false;
+    void result.current().then(() => {
+      through = true;
+    });
+    await act(() => Promise.resolve());
+    expect(through).toBe(false);
+    mocks.entitlementLoading = false;
+    rerender();
+    await act(() => Promise.resolve());
+    expect(through).toBe(true);
+  });
+
+  it("stops holding a stamp when the first reading takes too long", async () => {
+    vi.useFakeTimers();
+    try {
+      mocks.stamps = undefined;
+      const { result } = renderHook(() => useBadgeUnlocks(vi.fn(), vi.fn()));
+      let through = false;
+      void result.current().then(() => {
+        through = true;
+      });
+      await act(() => vi.advanceTimersByTimeAsync(1499));
+      expect(through).toBe(false);
+      await act(() => vi.advanceTimersByTimeAsync(1));
+      expect(through).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("watches nothing for a free user", () => {

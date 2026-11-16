@@ -83,7 +83,7 @@ export function useCityStampToggle(): (
   const router = useRouter();
   const navigation = useNavigation();
   const mutations = useCityStampMutations();
-  const { play } = useStampMoment();
+  const { play, badgesReady } = useStampMoment();
   const working = useRef(new Map<string, boolean>());
   return useCallback(
     async (city: SampleCityId, stamped: boolean, stamps: readonly string[]) => {
@@ -93,8 +93,11 @@ export function useCityStampToggle(): (
       try {
         if (!stamped) {
           await mutations.remove(city);
-        } else if ((await mutations.add(city)) && navigation.isFocused()) {
-          play(cityStampMoment(cityStampLabel(city)), "city_stamps");
+        } else {
+          await badgesReady();
+          if ((await mutations.add(city)) && navigation.isFocused()) {
+            play(cityStampMoment(cityStampLabel(city)), "city_stamps");
+          }
         }
         analytics.capture("passport_city_stamp_changed", { stamped, count });
         return true;
@@ -109,7 +112,7 @@ export function useCityStampToggle(): (
         working.current.delete(city);
       }
     },
-    [mutations, navigation, play, router],
+    [badgesReady, mutations, navigation, play, router],
   );
 }
 

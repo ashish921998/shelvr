@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   captureError: vi.fn(),
   play: vi.fn(),
+  badgesReady: vi.fn(),
   optimistic: vi.fn(),
   router: { push: vi.fn() },
   focused: true,
@@ -52,7 +53,10 @@ vi.mock("@/lib/analytics", () => ({
 }));
 vi.mock("@/lib/stamp-moment", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/stamp-moment")>()),
-  useStampMoment: () => ({ play: mocks.play }),
+  useStampMoment: () => ({
+    play: mocks.play,
+    badgesReady: mocks.badgesReady,
+  }),
 }));
 vi.mock("@/lib/city-stamp-data", () => ({
   cityStampLabel: (city: string) => `label:${city}`,
@@ -75,11 +79,33 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.add.mockResolvedValue(true);
   mocks.remove.mockResolvedValue(true);
+  mocks.badgesReady.mockResolvedValue(undefined);
   mocks.entitlement = { entitled: false, loading: false };
   mocks.focused = true;
 });
 
 describe("useCityStampToggle", () => {
+  it("adds a city stamp only once the badge watcher has its first reading", async () => {
+    let settle: () => void = () => {};
+    mocks.badgesReady.mockReturnValue(
+      new Promise<void>((resolve) => {
+        settle = resolve;
+      }),
+    );
+    const { result } = renderHook(() => useCityStampToggle());
+    let done: Promise<boolean> = Promise.resolve(false);
+    act(() => {
+      done = result.current("lisbon", true, ["paris", "rome"]);
+    });
+    await act(() => Promise.resolve());
+    expect(mocks.add).not.toHaveBeenCalled();
+    await act(async () => {
+      settle();
+      await done;
+    });
+    expect(mocks.add).toHaveBeenCalledWith({ city: "lisbon" });
+  });
+
   it("plays the stamp moment when a city is stamped", async () => {
     expect(await toggle("lisbon", true)).toBe(true);
     expect(mocks.add).toHaveBeenCalledWith({ city: "lisbon" });
@@ -132,6 +158,8 @@ describe("useCityStampToggle", () => {
       first = result.current("lisbon", true, []);
       second = result.current("tokyo", true, []);
     });
+    await act(() => Promise.resolve());
+    expect(finishes).toHaveLength(2);
     await act(async () => {
       for (const finish of finishes) finish(true);
       await Promise.all([first, second]);

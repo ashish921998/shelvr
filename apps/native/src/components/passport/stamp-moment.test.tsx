@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => ({
   share: vi.fn(),
   unlock: (_ids: string[]) => {},
   revoke: (_ids: string[]) => {},
+  badgesReady: () => Promise.resolve(),
 }));
 
 type Props = {
@@ -101,6 +102,7 @@ vi.mock("@/lib/badges", () => ({
   ) => {
     mocks.unlock = unlock;
     mocks.revoke = revoke;
+    return mocks.badgesReady;
   },
   useShareBadge: () => mocks.share,
 }));
@@ -195,6 +197,20 @@ it("shows the stamp and its line over the screen without hiding it", () => {
 
   act(() => vi.advanceTimersByTime(STAMP_TIMING.shown));
   expect(screen.queryByTestId("stamp-moment")).toBeNull();
+});
+
+it("hands every stamping screen the badge watcher's wait", () => {
+  const seen = vi.fn();
+  function Reader() {
+    seen(useStampMoment().badgesReady);
+    return null;
+  }
+  render(
+    <StampMomentProvider>
+      <Reader />
+    </StampMomentProvider>,
+  );
+  expect(seen).toHaveBeenLastCalledWith(mocks.badgesReady);
 });
 
 it("goes away on a tap", () => {
