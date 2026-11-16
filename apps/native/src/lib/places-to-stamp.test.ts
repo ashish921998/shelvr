@@ -6,8 +6,17 @@ import { useHasPlacesToStamp } from "@/lib/places-to-stamp";
 
 const mocks = vi.hoisted(() => ({
   authenticated: true,
-  result: { data: undefined as unknown[] | undefined, isError: false },
+  result: {
+    data: undefined as unknown[] | undefined,
+    isError: false,
+    error: null as Error | null,
+  },
   args: [] as unknown[],
+  captureError: vi.fn(),
+}));
+
+vi.mock("@/lib/analytics", () => ({
+  analytics: { captureError: mocks.captureError },
 }));
 
 vi.mock("convex/react", () => ({
@@ -27,18 +36,19 @@ const has = () => renderHook(() => useHasPlacesToStamp()).result.current;
 
 beforeEach(() => {
   mocks.authenticated = true;
-  mocks.result = { data: undefined, isError: false };
+  mocks.result = { data: undefined, isError: false, error: null };
   mocks.args = [];
+  mocks.captureError.mockReset();
 });
 
 describe("useHasPlacesToStamp", () => {
   it("offers Already been only when a saved place is still unstamped", () => {
-    mocks.result = { data: [{ name: "Tigre" }], isError: false };
+    mocks.result = { data: [{ name: "Tigre" }], isError: false, error: null };
     expect(has()).toBe(true);
   });
 
   it("hides it when every saved place is stamped or nothing is saved", () => {
-    mocks.result = { data: [], isError: false };
+    mocks.result = { data: [], isError: false, error: null };
     expect(has()).toBe(false);
   });
 
@@ -47,8 +57,19 @@ describe("useHasPlacesToStamp", () => {
   });
 
   it("keeps it when the places fail to load, so the sheet can say so", () => {
-    mocks.result = { data: undefined, isError: true };
+    const error = new Error("load failed");
+    mocks.result = { data: undefined, isError: true, error };
     expect(has()).toBe(true);
+    expect(mocks.captureError).toHaveBeenCalledWith(
+      "passport_unstamped_load_failed",
+      error,
+    );
+  });
+
+  it("reports nothing when the places load", () => {
+    mocks.result = { data: [], isError: false, error: null };
+    has();
+    expect(mocks.captureError).not.toHaveBeenCalled();
   });
 
   it("asks for nothing while signed out", () => {
