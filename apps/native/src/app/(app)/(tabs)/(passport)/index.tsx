@@ -32,6 +32,7 @@ import {
   usePassport,
 } from "@/lib/passport";
 import { ringComplete } from "@/components/passport/city-ring";
+import { HeaderScrim } from "@/components/ui/header-scrim";
 import { useStampMomentLanding } from "@/lib/stamp-moment";
 import { useHasPlacesToStamp } from "@/lib/places-to-stamp";
 import { usePlaceVisit } from "@/lib/use-place-visit";
@@ -311,6 +312,7 @@ export default function PassportScreen() {
           }}
         />
       </ScrollView>
+      <HeaderScrim />
     </>
   );
 }
