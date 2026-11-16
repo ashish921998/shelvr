@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
+import { saveError } from "@convex/model/saveErrors";
 import { beforeEach, expect, it, vi } from "vitest";
 
 import { useTripShare } from "@/lib/trip-share";
@@ -13,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   shareUrl: vi.fn(),
   alert: vi.fn(),
   captureError: vi.fn(),
+  openPaywall: vi.fn(),
 }));
 
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
@@ -23,6 +25,8 @@ vi.mock("@/lib/convex-url", () => ({
   readConvexUrl: () => "https://shelvr-test.convex.cloud",
 }));
 vi.mock("@/lib/share-link", () => ({ shareUrl: mocks.shareUrl }));
+vi.mock("@/lib/entitlement", () => ({ openPaywall: mocks.openPaywall }));
+vi.mock("expo-router", () => ({ useRouter: () => "router" }));
 vi.mock("@convex/_generated/api", () => ({
   api: {
     tripShares: {
@@ -128,4 +132,29 @@ it("reports a failed share and lets the next try through", async () => {
   result.current.open();
   press("common.share");
   await waitFor(() => expect(mocks.shareUrl).toHaveBeenCalledTimes(1));
+});
+
+it("shares an active link again without asking the server for one", async () => {
+  mocks.token = "live1";
+  const { result } = renderHook(() => useTripShare(tripId));
+  result.current.open();
+  press("common.share");
+  await waitFor(() =>
+    expect(mocks.shareUrl).toHaveBeenCalledWith(
+      "https://shelvr-test.convex.site/trip/shared/live1",
+    ),
+  );
+  expect(mocks.create).not.toHaveBeenCalled();
+});
+
+it("opens the paywall instead of a retry when a new link needs Pro", async () => {
+  mocks.create.mockRejectedValue(saveError("pro_required"));
+  const { result } = renderHook(() => useTripShare(tripId));
+  result.current.open();
+  press("common.share");
+  await waitFor(() =>
+    expect(mocks.openPaywall).toHaveBeenCalledWith("router", "trip_share"),
+  );
+  expect(mocks.alert).toHaveBeenCalledTimes(1);
+  expect(mocks.captureError).not.toHaveBeenCalled();
 });

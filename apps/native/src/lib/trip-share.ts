@@ -1,10 +1,13 @@
 import { t } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
+import { openPaywall } from "@/lib/entitlement";
 import { readConvexUrl } from "@/lib/convex-url";
 import { shareUrl } from "@/lib/share-link";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import { saveErrorCode } from "@convex/model/saveErrors";
 import { useMutation, useQuery } from "convex/react";
+import { useRouter } from "expo-router";
 import { useRef } from "react";
 import { Alert } from "react-native";
 
@@ -13,6 +16,7 @@ export function useTripShare(tripId: Id<"tripPlans">) {
   const create = useMutation(api.tripShares.createShare);
   const revoke = useMutation(api.tripShares.revokeShare);
   const busy = useRef(false);
+  const router = useRouter();
 
   const run = async (action: () => Promise<unknown>) => {
     if (busy.current) return;
@@ -20,6 +24,10 @@ export function useTripShare(tripId: Id<"tripPlans">) {
     try {
       await action();
     } catch (error) {
+      if (saveErrorCode(error) === "pro_required") {
+        await openPaywall(router, "trip_share");
+        return;
+      }
       analytics.captureError("trip_share_failed", error);
       Alert.alert(t("errors.unexpectedTitle"), t("errors.retrySoon"));
     } finally {
@@ -32,7 +40,7 @@ export function useTripShare(tripId: Id<"tripPlans">) {
       const site =
         process.env.EXPO_PUBLIC_CONVEX_SITE_URL ??
         readConvexUrl().replace(".convex.cloud", ".convex.site");
-      const linkToken = await create({ tripId });
+      const linkToken = token || (await create({ tripId }));
       await shareUrl(new URL(`/trip/shared/${linkToken}`, site).href);
     });
 
