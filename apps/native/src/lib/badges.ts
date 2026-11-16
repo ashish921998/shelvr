@@ -50,24 +50,60 @@ export function useBadgeTotals(enabled = true): {
   };
 }
 
+const BASELINE_WAIT_MS = 1500;
+
+function useBaselineGate(open: boolean): {
+  ready: () => Promise<void>;
+  wake: () => void;
+} {
+  const isOpen = useRef(open);
+  const waiters = useRef(new Set<() => void>());
+  const wake = useCallback(() => {
+    isOpen.current = true;
+    for (const done of waiters.current) done();
+  }, []);
+  useEffect(() => {
+    if (open) wake();
+    else isOpen.current = false;
+  }, [open, wake]);
+  const ready = useCallback(() => {
+    if (isOpen.current) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        waiters.current.delete(done);
+        resolve();
+      };
+      const timer = setTimeout(done, BASELINE_WAIT_MS);
+      waiters.current.add(done);
+    });
+  }, []);
+  return { ready, wake };
+}
+
 export function useBadgeUnlocks(
   unlock: (ids: BadgeId[]) => void,
   revoke: (ids: BadgeId[]) => void,
-): void {
-  const { entitled } = useEntitlement();
+): () => Promise<void> {
+  const { entitled, loading } = useEntitlement();
   const { totals, error } = useBadgeTotals(entitled);
   const known = useRef<BadgeId[] | null>(null);
+  const { ready, wake } = useBaselineGate(
+    (!entitled && !loading) || error !== null,
+  );
   useEffect(() => {
     if (totals === undefined || error !== null) return;
     const earned = earnedBadges(totals);
     const before = known.current;
     known.current = earned;
+    wake();
     if (before === null) return;
     const lost = newlyEarned(earned, before);
     if (lost.length > 0) revoke(lost);
     const fresh = newlyEarned(before, earned);
     if (fresh.length > 0) unlock(fresh);
-  }, [totals, error, unlock, revoke]);
+  }, [totals, error, unlock, revoke, wake]);
+  return ready;
 }
 
 type ShareSurface = "moment" | "milestones";

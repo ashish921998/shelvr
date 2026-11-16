@@ -3,7 +3,7 @@
     "name": "Shelvr",
     "slug": "shelvr",
     "scheme": "shelvr",
-    "version": "1.0.13",
+    "version": "1.0.14",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -27,6 +27,7 @@
       "infoPlist": {
         "CADisableMinimumFrameDurationOnPhone": true,
         "NSPhotoLibraryUsageDescription": "Shelvr lets you save photos and screenshots from your library into your hub, and tidy your photo library.",
+        "NSPhotoLibraryAddUsageDescription": "Shelvr saves images you share, like your Passport story, to your photos.",
         "NSLocationWhenInUseUsageDescription": "Shelvr shows where you are on the map so you can find the places you saved nearby.",
         "ITSAppUsesNonExemptEncryption": false,
         "CFBundleAllowMixedLocalizations": true,
@@ -199,15 +200,6 @@
         {
           "calendarPermission": "Shelvr adds events to your calendar from things you've saved.",
           "remindersPermission": false
-        }
-      ],
-      [
-        "expo-media-library",
-        {
-          "photosPermission": "Shelvr lets you tidy your photo library \u2014 keep, delete, or save photos into your hub.",
-          "savePhotosPermission": false,
-          "isAccessMediaLocationEnabled": true,
-          "granularPermissions": ["photo"]
         }
       ],
       [

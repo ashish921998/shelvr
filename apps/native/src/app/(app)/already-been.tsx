@@ -101,7 +101,7 @@ export default function AlreadyBeenScreen() {
     pickedIds.has(pickId(place)),
   );
   const [busy, setBusy] = useState(false);
-  const { queue: queueStamp } = useStampMoment();
+  const { queue: queueStamp, badgesReady } = useStampMoment();
   useEffect(() => {
     if (places.error) {
       analytics.captureError("passport_picker_load_failed", places.error);
@@ -134,6 +134,7 @@ export default function AlreadyBeenScreen() {
     if (busy || picked.length === 0) return;
     setBusy(true);
     try {
+      await badgesReady();
       const count = await markVisitedBefore({
         places: picked.map(({ itemId, name, spot }) => ({
           itemId,

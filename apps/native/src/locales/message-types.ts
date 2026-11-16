@@ -601,6 +601,7 @@ type MessageParams = {
   "widget.title": undefined;
   "widget.description": undefined;
   "permissions.photosUsage": undefined;
+  "permissions.photosAddUsage": undefined;
   "permissions.calendarUsage": undefined;
   "permissions.locationUsage": undefined;
   "share.savedCount": { saved: number; total: number };
@@ -1120,6 +1121,16 @@ type MessageParams = {
   "passport.cardSavedBoth": undefined;
   "passport.cardSavedElsewhere": undefined;
   "passport.cardWent": undefined;
+  "passportStory.screenTitle": undefined;
+  "passportStory.kicker": { year: string };
+  "passportStory.titleReels": { count: number };
+  "passportStory.titleSaved": { count: number };
+  "passportStory.together": { count: number };
+  "passportStory.more": { more: string };
+  "passportStory.tagline": undefined;
+  "passportStory.scan": undefined;
+  "passportStory.shareLink": undefined;
+  "passportStory.linkNote": undefined;
   "passport.shareCity": { city: string };
   "passport.momentCityComplete": { city: string };
   "passport.ringCount": { visited: number; total: number };

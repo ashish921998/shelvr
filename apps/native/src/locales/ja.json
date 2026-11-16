@@ -640,6 +640,7 @@
   "widget.title": "最近の保存",
   "widget.description": "最近保存したものをひと目で確認。",
   "permissions.photosUsage": "Shelvrでは、ライブラリの写真やスクリーンショットをハブに保存したり、写真ライブラリを整理したりできます。",
+  "permissions.photosAddUsage": "Shelvrは、パスポートのストーリーなど、シェアした画像を写真に保存します。",
   "permissions.calendarUsage": "Shelvrは保存した内容からカレンダーに予定を追加します。",
   "permissions.locationUsage": "保存した場所を近くで見つけられるよう、Shelvrは地図に現在地を表示します。",
   "share.savedCount": "%{total}件中%{saved}件を保存しました",
@@ -1207,6 +1208,22 @@
   "passport.cardSavedBoth": "InstagramとTikTokで保存。",
   "passport.cardSavedElsewhere": "あとで行く用に保存。",
   "passport.cardWent": "Shelvrで行った。",
+  "passportStory.screenTitle": "あなたのパスポート",
+  "passportStory.kicker": "パスポート · %{year}",
+  "passportStory.titleReels": {
+    "other": "リールで保存した%{formattedCount}か所に行きました。"
+  },
+  "passportStory.titleSaved": {
+    "other": "保存した%{formattedCount}か所に行きました。"
+  },
+  "passportStory.together": {
+    "other": "友だちと一緒にスタンプ %{formattedCount}か所"
+  },
+  "passportStory.more": "+%{more}",
+  "passportStory.tagline": "今すぐ保存。\n本当に行こう。",
+  "passportStory.scan": "スキャンしてパスポートを比べよう",
+  "passportStory.shareLink": "リンクで共有する",
+  "passportStory.linkNote": "共有するとパスポートのリンクが有効になり、コードから開けます。共有は設定からいつでも停止できます。",
   "passport.shareCity": "%{city}を共有",
   "passport.momentCityComplete": "%{city}コンプリート",
   "passport.ringCount": "%{visited}/%{total}",

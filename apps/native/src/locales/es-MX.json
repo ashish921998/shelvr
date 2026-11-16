@@ -676,6 +676,7 @@
   "widget.title": "Guardados recientes",
   "widget.description": "Tus últimos contenidos de un vistazo.",
   "permissions.photosUsage": "Shelvr permite guardar fotos y capturas de tu fototeca en tu biblioteca y ordenar tus fotos.",
+  "permissions.photosAddUsage": "Shelvr guarda en tus fotos las imágenes que compartes, como tu historia del Pasaporte.",
   "permissions.calendarUsage": "Shelvr agrega eventos a tu calendario a partir de contenidos que has guardado.",
   "permissions.locationUsage": "Shelvr muestra dónde estás en el mapa para que encuentres los lugares guardados cerca de ti.",
   "share.savedCount": "Guardados %{saved} de %{total}",
@@ -1295,6 +1296,28 @@
   "passport.cardSavedBoth": "Guardado en Instagram y TikTok.",
   "passport.cardSavedElsewhere": "Guardado para después.",
   "passport.cardWent": "Fuimos con Shelvr.",
+  "passportStory.screenTitle": "Tu pasaporte",
+  "passportStory.kicker": "Pasaporte · %{year}",
+  "passportStory.titleReels": {
+    "one": "Fui a %{formattedCount} sitio que guardé de reels.",
+    "many": "Fui a %{formattedCount} sitios que guardé de reels.",
+    "other": "Fui a %{formattedCount} sitios que guardé de reels."
+  },
+  "passportStory.titleSaved": {
+    "one": "Fui a %{formattedCount} sitio que guardé.",
+    "many": "Fui a %{formattedCount} sitios que guardé.",
+    "other": "Fui a %{formattedCount} sitios que guardé."
+  },
+  "passportStory.together": {
+    "one": "%{formattedCount} sellado con amigos",
+    "many": "%{formattedCount} sellados con amigos",
+    "other": "%{formattedCount} sellados con amigos"
+  },
+  "passportStory.more": "+%{more}",
+  "passportStory.tagline": "Guárdalo ahora.\nY ve de verdad.",
+  "passportStory.scan": "Escanea para comparar pasaportes",
+  "passportStory.shareLink": "Compartir como enlace",
+  "passportStory.linkNote": "Al compartir se activa el enlace de tu pasaporte para que el código lo abra. Puedes dejar de compartir cuando quieras en Ajustes.",
   "passport.shareCity": "Compartir %{city}",
   "passport.momentCityComplete": "Completaste %{city}",
   "passport.ringCount": "%{visited} de %{total}",

@@ -31,9 +31,10 @@ import {
   useCityCompletion,
   usePassport,
 } from "@/lib/passport";
-import { useSharePassport } from "@/lib/passport-share";
 import { ringComplete } from "@/components/passport/city-ring";
+import { HeaderScrim } from "@/components/ui/header-scrim";
 import { useStampMomentLanding } from "@/lib/stamp-moment";
+import { useHasPlacesToStamp } from "@/lib/places-to-stamp";
 import { usePlaceVisit } from "@/lib/use-place-visit";
 import { useRemoveListStamp } from "@/lib/use-remove-list-stamp";
 import { Stack, useRouter } from "expo-router";
@@ -85,11 +86,9 @@ function StampTile({
 
 function ShareButton({
   visible,
-  busy,
   onPress,
 }: {
   visible: boolean;
-  busy: boolean;
   onPress: () => void;
 }) {
   const { theme } = useUnistyles();
@@ -102,7 +101,6 @@ function ShareButton({
                 <HeaderIconButton
                   icon="square.and.arrow.up"
                   label={t("passportShare.share")}
-                  disabled={busy}
                   onPress={onPress}
                 />
               )
@@ -117,7 +115,6 @@ function ShareButton({
       <Stack.Toolbar.Button
         icon="square.and.arrow.up"
         tintColor={theme.colors.foreground}
-        disabled={busy}
         onPress={onPress}
       >
         {t("passportShare.share")}
@@ -135,7 +132,6 @@ export default function PassportScreen() {
   const visit = usePlaceVisit("passport");
   const removeListStamp = useRemoveListStamp();
   useStampMomentLanding();
-  const sharing = useSharePassport(stamps?.length ?? 0);
   const completion = useCityCompletion();
   const cityStamps = useCityStamps();
   const removeCityStamp = useRemoveCityStamp();
@@ -143,6 +139,7 @@ export default function PassportScreen() {
   const badges = useBadgeTotals();
   const badgeAccess = useBadgeAccess();
   const shareBadge = useShareBadge("milestones");
+  const canBackfill = useHasPlacesToStamp();
   const [open, setOpen] = useState<OpenStamp | null>(null);
   const remove = async () => {
     if (open === null) return;
@@ -217,8 +214,7 @@ export default function PassportScreen() {
     <>
       <ShareButton
         visible={stamps.length > 0}
-        busy={sharing.busy}
-        onPress={() => void sharing.share()}
+        onPress={() => router.push("/passport-story")}
       />
       <ScrollView
         style={styles.screen}
@@ -235,20 +231,27 @@ export default function PassportScreen() {
           locked={badgeAccess.locked}
           onUnlock={badgeAccess.unlock}
         />
-        <Pressable
-          testID="passport-backfill"
-          accessibilityRole="button"
-          onPress={() => router.push("/already-been")}
-          style={({ pressed }) => [styles.backfill, pressed && styles.pressed]}
-        >
-          <AppSymbolIcon
-            name="plus"
-            size={14}
-            tintColor={theme.colors.primaryText}
-          />
-          <Text style={styles.backfillText}>{t("passport.beenSomewhere")}</Text>
-        </Pressable>
-        {stamps.length === 0 ? (
+        {canBackfill ? (
+          <Pressable
+            testID="passport-backfill"
+            accessibilityRole="button"
+            onPress={() => router.push("/already-been")}
+            style={({ pressed }) => [
+              styles.backfill,
+              pressed && styles.pressed,
+            ]}
+          >
+            <AppSymbolIcon
+              name="plus"
+              size={14}
+              tintColor={theme.colors.primaryText}
+            />
+            <Text style={styles.backfillText}>
+              {t("passport.beenSomewhere")}
+            </Text>
+          </Pressable>
+        ) : null}
+        {canBackfill && stamps.length === 0 ? (
           <Text style={styles.muted}>{t("passport.beenBody")}</Text>
         ) : null}
         <CityStampsSection
@@ -314,6 +317,7 @@ export default function PassportScreen() {
           }}
         />
       </ScrollView>
+      <HeaderScrim />
     </>
   );
 }

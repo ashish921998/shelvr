@@ -206,6 +206,7 @@ export type AnalyticsEventProperties = {
   };
   passport_card_share_opened: { places: number; surface: "stamp" | "passport" };
   passport_shared: { places: number; shared: boolean };
+  passport_story_share_opened: { places: number; together: number };
   passport_sharing_stopped: Record<string, never>;
   passport_invite_opened: { found: boolean; signed_in: boolean };
   passport_compare_tapped: { signed_in: boolean };

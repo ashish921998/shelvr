@@ -676,6 +676,7 @@
   "widget.title": "Salvos recentes",
   "widget.description": "Seus últimos conteúdos em um relance.",
   "permissions.photosUsage": "O Shelvr permite salvar fotos e capturas de tela da fototeca na sua biblioteca e organizar suas fotos.",
+  "permissions.photosAddUsage": "O Shelvr salva nas suas fotos as imagens que você compartilha, como o story do seu Passaporte.",
   "permissions.calendarUsage": "O Shelvr adiciona eventos ao calendário a partir dos conteúdos que você salvou.",
   "permissions.locationUsage": "O Shelvr mostra onde você está no mapa para você encontrar os lugares salvos por perto.",
   "share.savedCount": "Salvos %{saved} de %{total}",
@@ -1295,6 +1296,28 @@
   "passport.cardSavedBoth": "Salvo no Instagram e no TikTok.",
   "passport.cardSavedElsewhere": "Salvo para depois.",
   "passport.cardWent": "Fomos com o Shelvr.",
+  "passportStory.screenTitle": "Seu passaporte",
+  "passportStory.kicker": "Passaporte · %{year}",
+  "passportStory.titleReels": {
+    "one": "Fui a %{formattedCount} lugar que salvei de reels.",
+    "many": "Fui a %{formattedCount} lugares que salvei de reels.",
+    "other": "Fui a %{formattedCount} lugares que salvei de reels."
+  },
+  "passportStory.titleSaved": {
+    "one": "Fui a %{formattedCount} lugar que salvei.",
+    "many": "Fui a %{formattedCount} lugares que salvei.",
+    "other": "Fui a %{formattedCount} lugares que salvei."
+  },
+  "passportStory.together": {
+    "one": "%{formattedCount} carimbado com amigos",
+    "many": "%{formattedCount} carimbados com amigos",
+    "other": "%{formattedCount} carimbados com amigos"
+  },
+  "passportStory.more": "+%{more}",
+  "passportStory.tagline": "Salve agora.\nE vá de verdade.",
+  "passportStory.scan": "Escaneie para comparar passaportes",
+  "passportStory.shareLink": "Compartilhar como link",
+  "passportStory.linkNote": "Compartilhar ativa o link do seu passaporte para que o código o abra. Você pode parar de compartilhar quando quiser nos Ajustes.",
   "passport.shareCity": "Compartilhar %{city}",
   "passport.momentCityComplete": "Você completou %{city}",
   "passport.ringCount": "%{visited} de %{total}",

@@ -293,11 +293,15 @@ function stampInk(moment: StampMoment): string {
 
 type Play = (moment: StampMoment, surface: StampSurface) => void;
 
-export type StampMomentControls = {
+type PlayerControls = {
   play: Play;
   queue: Play;
   release: () => void;
   cancel: () => void;
+};
+
+export type StampMomentControls = PlayerControls & {
+  badgesReady: () => Promise<void>;
 };
 
 const StampMomentContext = createContext<StampMomentControls>({
@@ -305,11 +309,15 @@ const StampMomentContext = createContext<StampMomentControls>({
   queue: () => {},
   release: () => {},
   cancel: () => {},
+  badgesReady: () => Promise.resolve(),
 });
 
 export const StampMomentPlayContext = StampMomentContext.Provider;
 
-export function useStampMoment(): Pick<StampMomentControls, "play" | "queue"> {
+export function useStampMoment(): Pick<
+  StampMomentControls,
+  "play" | "queue" | "badgesReady"
+> {
   return useContext(StampMomentContext);
 }
 
@@ -340,7 +348,7 @@ export function useStampMomentLanding(): void {
 
 export function useStampMomentPlayer(reduced: boolean): {
   shown: ShownStamp | null;
-  controls: StampMomentControls;
+  controls: PlayerControls;
   dismiss: () => void;
   badge: ShownBadge | null;
   dismissBadge: () => void;

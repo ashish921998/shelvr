@@ -60,7 +60,7 @@ export function usePlaceVisit(
   const router = useRouter();
   const navigation = useNavigation();
   const setVisited = useMutation(api.placeVisits.setVisited);
-  const { play: playStamp, queue: queueStamp } = useStampMoment();
+  const { play: playStamp, queue: queueStamp, badgesReady } = useStampMoment();
   const working = useRef(false);
   const [busy, setBusy] = useState(false);
   const toggle = async (
@@ -74,6 +74,7 @@ export function usePlaceVisit(
     setBusy(true);
     try {
       const { name, lat, lng, appleId } = place;
+      if (visited) await badgesReady();
       await setVisited({
         itemId,
         name,

@@ -9,7 +9,7 @@ import {
   StampMomentPlayContext,
   useStampMomentPlayer,
 } from "@/lib/stamp-moment";
-import { type ReactNode, useEffect } from "react";
+import { type ReactNode, useEffect, useMemo } from "react";
 import { Pressable, Text, View } from "react-native";
 import Animated, {
   ReduceMotion,
@@ -177,9 +177,13 @@ export function StampMomentProvider({ children }: { children: ReactNode }) {
   const reduced = useReducedMotion();
   const { shown, controls, dismiss, badge, dismissBadge, unlock, revoke } =
     useStampMomentPlayer(reduced);
-  useBadgeUnlocks(unlock, revoke);
+  const badgesReady = useBadgeUnlocks(unlock, revoke);
+  const value = useMemo(
+    () => ({ ...controls, badgesReady }),
+    [controls, badgesReady],
+  );
   return (
-    <StampMomentPlayContext value={controls}>
+    <StampMomentPlayContext value={value}>
       {children}
       {shown ? (
         <StampMomentView key={shown.id} shown={shown} onDismiss={dismiss} />

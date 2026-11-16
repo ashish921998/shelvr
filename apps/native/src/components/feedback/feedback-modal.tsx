@@ -9,6 +9,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  type ScrollViewInstance,
   Text,
   TextInput,
   View,
@@ -71,6 +72,10 @@ export function FeedbackModal({
   );
   const sendingRef = useRef(false);
   const openedRef = useRef(false);
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const [viewportHeight, setViewportHeight] = useState(0);
+  const [contentHeight, setContentHeight] = useState(0);
+  const overflowing = contentHeight > viewportHeight;
 
   const available = user !== null;
 
@@ -124,6 +129,7 @@ export function FeedbackModal({
     sendingRef.current = false;
     if (result === "accepted") {
       markFeedbackSubmitted(user._id);
+      scrollRef.current?.scrollTo({ y: 0, animated: !reduced });
       setFlow("sent");
     } else {
       setFlow("failed");
@@ -149,6 +155,11 @@ export function FeedbackModal({
         />
         <View style={styles.sheet}>
           <ScrollView
+            ref={scrollRef}
+            onLayout={(event) =>
+              setViewportHeight(event.nativeEvent.layout.height)
+            }
+            onContentSizeChange={(_width, height) => setContentHeight(height)}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
             contentContainerStyle={styles.scrollContent}
@@ -250,7 +261,10 @@ export function FeedbackModal({
               </Animated.View>
               {flow === "sent" ? (
                 <Animated.View
-                  style={styles.confirmation}
+                  style={[
+                    styles.confirmation,
+                    overflowing && styles.confirmationTop,
+                  ]}
                   entering={FadeIn.duration(fadeDuration)
                     .easing(motion.easing.out)
                     .reduceMotion(ReduceMotion.Never)}
@@ -329,6 +343,7 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "space-between",
     gap: theme.gap(1.5),
   },
+  confirmationTop: { justifyContent: "flex-start" },
   title: {
     fontFamily: theme.fonts.bold,
     fontSize: 18,
