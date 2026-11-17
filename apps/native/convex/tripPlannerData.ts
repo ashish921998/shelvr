@@ -879,21 +879,21 @@ export const addTripStop = authedMutation({
 export const updateTripStopDetails = authedMutation({
   args: {
     stopId: v.id("tripStops"),
-    time: v.union(v.string(), v.null()),
-    note: v.union(v.string(), v.null()),
+    time: v.optional(v.union(v.string(), v.null())),
+    note: v.optional(v.union(v.string(), v.null())),
   },
   returns: v.null(),
   handler: async (ctx, { stopId, time, note }) => {
     await ownedStop(ctx, stopId, ctx.userId);
-    if (time !== null && !TRIP_STOP_TIME.test(time)) {
+    if (typeof time === "string" && !TRIP_STOP_TIME.test(time)) {
       throw new Error("Invalid stop time");
     }
-    if (note !== null && note.length > MAX_TRIP_STOP_NOTE_CHARS) {
+    if (typeof note === "string" && note.length > MAX_TRIP_STOP_NOTE_CHARS) {
       throw new Error("Stop note is too long");
     }
     await ctx.db.patch(stopId, {
-      time: time ?? undefined,
-      note: note?.trim() || undefined,
+      ...(time === undefined ? {} : { time: time ?? undefined }),
+      ...(note === undefined ? {} : { note: note?.trim() || undefined }),
     });
     return null;
   },

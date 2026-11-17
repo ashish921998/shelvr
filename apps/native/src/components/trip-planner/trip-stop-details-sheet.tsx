@@ -23,19 +23,30 @@ export function TripStopDetailsSheet({
 }) {
   const { theme } = useUnistyles();
   const update = useMutation(api.tripPlannerData.updateTripStopDetails);
-  const [time, setTime] = useState(stop.time ?? "");
-  const [note, setNote] = useState(stop.note ?? "");
+  const [initial] = useState(() => ({
+    time: stop.time ?? "",
+    note: stop.note?.trim() ?? "",
+  }));
+  const [time, setTime] = useState(initial.time);
+  const [note, setNote] = useState(initial.note);
   const [saving, setSaving] = useState(false);
   const validTime = time === "" || TRIP_STOP_TIME.test(time);
 
   const save = async () => {
     if (saving || !validTime) return;
+    const newNote = note.trim();
+    const timeChanged = time !== initial.time;
+    const noteChanged = newNote !== initial.note;
+    if (!timeChanged && !noteChanged) {
+      onClose();
+      return;
+    }
     setSaving(true);
     try {
       await update({
         stopId: stop._id,
-        time: time || null,
-        note: note.trim() || null,
+        ...(timeChanged ? { time: time || null } : {}),
+        ...(noteChanged ? { note: newNote || null } : {}),
       });
       onClose();
     } catch (error) {

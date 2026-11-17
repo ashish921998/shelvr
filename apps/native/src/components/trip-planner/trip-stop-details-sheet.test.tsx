@@ -113,6 +113,23 @@ it("saves the edited time and trimmed note, then closes", async () => {
   });
 });
 
+it("sends only changed fields so a stale note cannot overwrite a newer one", async () => {
+  const onClose = renderSheet();
+  fireEvent.change(field("tripPlanner.stopTime"), {
+    target: { value: "18:30" },
+  });
+  fireEvent.click(save());
+  await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+  expect(mocks.update).toHaveBeenCalledWith({ stopId: "stop1", time: "18:30" });
+});
+
+it("closes without writing when nothing changed", () => {
+  const onClose = renderSheet();
+  fireEvent.click(save());
+  expect(onClose).toHaveBeenCalledOnce();
+  expect(mocks.update).not.toHaveBeenCalled();
+});
+
 it("sends null for cleared fields", async () => {
   const onClose = renderSheet();
   fireEvent.change(field("tripPlanner.stopTime"), { target: { value: "" } });
@@ -142,6 +159,9 @@ it("stays open and reports a failed save", async () => {
   const failure = new Error("updateTripStopDetails failed");
   mocks.update.mockRejectedValue(failure);
   const onClose = renderSheet();
+  fireEvent.change(field("tripPlanner.stopNote"), {
+    target: { value: "New note" },
+  });
   fireEvent.click(save());
   await waitFor(() =>
     expect(mocks.alert).toHaveBeenCalledWith("tripPlanner.editFailed"),

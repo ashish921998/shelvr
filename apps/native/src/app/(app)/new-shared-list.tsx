@@ -22,7 +22,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Platform,
@@ -113,7 +113,17 @@ export default function NewSharedListScreen() {
   );
   const [busy, setBusy] = useState(false);
   const nameGate = useNameGate();
-  const close = useCallback(() => backOrHome(router), [router]);
+  const active = useRef(true);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
+  const close = useCallback(() => {
+    active.current = false;
+    backOrHome(router);
+  }, [router]);
   const known = (cities.data ?? []).slice(0, MAX_LIST_CITIES);
   const custom = picked.filter(
     (city) => !known.some((choice) => choice.city === city),
@@ -136,20 +146,26 @@ export default function NewSharedListScreen() {
     if (busy || loading || name.trim() === "" || picked.length === 0) return;
     setBusy(true);
     try {
-      if (!(await guard())) return;
+      if (!(await guard()) || !active.current) return;
       const { listId, inviteToken } = await create({
         name: name.trim(),
         cities: picked,
       });
       analytics.capture("shared_list_created", { cities: picked.length });
+      if (!active.current) return;
       void haptics.success();
       if (!fromCollections) await shareInvite(inviteToken, "new");
-      router.replace({ pathname: "/shared-list/[id]", params: { id: listId } });
+      if (active.current) {
+        router.replace({
+          pathname: "/shared-list/[id]",
+          params: { id: listId },
+        });
+      }
     } catch (error) {
       analytics.captureError("shared_list_create_failed", error);
-      Alert.alert(t("sharedLists.createFailed"));
+      if (active.current) Alert.alert(t("sharedLists.createFailed"));
     } finally {
-      setBusy(false);
+      if (active.current) setBusy(false);
     }
   };
 

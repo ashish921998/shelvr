@@ -264,6 +264,19 @@ describe("applying day suggestions", () => {
 });
 
 describe("stop details", () => {
+  it("preserves the other field across independent edits and clears", async () => {
+    const { t, tripId, ids } = await setup(TRIP);
+    const update = api.tripPlannerData.updateTripStopDetails;
+    await t.mutation(update, { stopId: ids.A, note: "Window seat" });
+    await t.mutation(update, { stopId: ids.A, time: "18:30" });
+    const stop = async () =>
+      (await t.query(api.tripPlannerData.getTripPlan, { tripId }))?.days[0][0];
+    expect(await stop()).toMatchObject({ time: "18:30", note: "Window seat" });
+    await t.mutation(update, { stopId: ids.A, time: null });
+    expect(await stop()).not.toHaveProperty("time");
+    expect(await stop()).toMatchObject({ note: "Window seat" });
+  });
+
   it("persists optional time and note through a move and allows clearing both", async () => {
     const { base, t, tripId, ids } = await setup(TRIP);
     const update = api.tripPlannerData.updateTripStopDetails;
