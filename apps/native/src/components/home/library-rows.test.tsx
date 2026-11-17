@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   feed: { items: [] as unknown[], canLoadMore: false, loadingMore: false },
   trips: undefined as { count: number; more: boolean } | undefined,
   tripsArgs: [] as unknown[],
+  tripError: null as Error | null,
 }));
 
 vi.mock("@/components/home/home-row", () => ({
@@ -33,10 +34,18 @@ vi.mock("@/components/home/home-row", () => ({
 vi.mock("@/lib/home-feed", () => ({ useHomeFeed: () => mocks.feed }));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: mocks.signedIn }),
-  useQuery: (_query: unknown, args: unknown) => {
+}));
+vi.mock("@convex-dev/react-query", () => ({
+  convexQuery: (_query: unknown, args: unknown) => {
     mocks.tripsArgs.push(args);
-    return mocks.trips;
+    return {};
   },
+}));
+vi.mock("@tanstack/react-query", () => ({
+  useQuery: () => ({ data: mocks.trips, error: mocks.tripError }),
+}));
+vi.mock("@/lib/use-report-load-failure", () => ({
+  useReportLoadFailure: vi.fn(),
 }));
 vi.mock("expo-router", () => ({
   useRouter: () => ({ push: mocks.push, navigate: mocks.navigate }),
@@ -51,6 +60,7 @@ beforeEach(() => {
   mocks.feed = { items: rows(23), canLoadMore: false, loadingMore: false };
   mocks.trips = { count: 3, more: false };
   mocks.tripsArgs = [];
+  mocks.tripError = null;
 });
 
 it("counts every save and trip once all of them are loaded", () => {
@@ -128,4 +138,14 @@ it("asks for no trips while signed out", () => {
   mocks.signedIn = false;
   render(<LibraryRows />);
   expect(mocks.tripsArgs).toEqual(["skip"]);
+});
+
+it("keeps Trips and Collections usable if the trip count fails", () => {
+  mocks.trips = undefined;
+  mocks.tripError = new Error("Trip count unavailable");
+  render(<LibraryRows />);
+  fireEvent.click(screen.getByRole("button", { name: "Trips" }));
+  expect(mocks.navigate).toHaveBeenCalledWith("/(app)/(tabs)/(trips)");
+  fireEvent.click(screen.getByRole("button", { name: "Collections" }));
+  expect(mocks.push).toHaveBeenCalledWith("/collections");
 });

@@ -2,18 +2,26 @@ import { HomeRow } from "@/components/home/home-row";
 import { useHomeFeed } from "@/lib/home-feed";
 import { t } from "@/lib/i18n";
 import { countLabel } from "@/lib/save-list";
+import { useReportLoadFailure } from "@/lib/use-report-load-failure";
 import { api } from "@convex/_generated/api";
-import { useConvexAuth, useQuery } from "convex/react";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useConvexAuth } from "convex/react";
 import { useRouter } from "expo-router";
 
 export function LibraryRows({ cityCount }: { cityCount?: number }) {
   const router = useRouter();
   const { isAuthenticated } = useConvexAuth();
   const { items, canLoadMore, loadingMore } = useHomeFeed();
-  const trips = useQuery(
-    api.tripPlannerData.countTripPlans,
-    isAuthenticated ? {} : "skip",
-  );
+  const tripTotal = useQuery({
+    ...convexQuery(
+      api.tripPlannerData.countTripPlans,
+      isAuthenticated ? {} : "skip",
+    ),
+    retry: false,
+  });
+  useReportLoadFailure("library_trip_count_failed", tripTotal);
+  const trips = tripTotal.data;
   const tripsTitle = t("navigation.trips");
   const tripCount = trips && countLabel(trips.count, trips.more);
   const citiesTitle = t("homePlaces.cities");
