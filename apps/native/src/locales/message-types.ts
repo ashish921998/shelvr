@@ -693,6 +693,9 @@ type MessageParams = {
   "cityCard.legendVisited": undefined;
   "cityCard.mapLabel": { city: string };
   "opener.tagline": undefined;
+  "opener.yourCities": undefined;
+  "opener.datePreviewDescription": undefined;
+  "opener.tripPreviewDescription": undefined;
   "onboardingQ.skip": undefined;
   "onboardingQ.savedTitle": undefined;
   "onboardingQ.savedFew": undefined;
