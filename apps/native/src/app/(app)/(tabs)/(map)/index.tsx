@@ -131,6 +131,7 @@ export default function MapScreen() {
               tintColor: isDarkThemeName(rt.themeName)
                 ? theme.colors.primarySoft
                 : theme.colors.primaryText,
+              title: `✓ ${place.name}`,
             }
           : {}),
       })),
