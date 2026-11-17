@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import type { ReactNode } from "react";
+import type { ComponentProps, ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type Children = { children?: ReactNode };
@@ -217,9 +217,14 @@ beforeEach(() => {
   vi.useRealTimers();
 });
 
-const renderOpener = () =>
+const renderOpener = (props: Partial<ComponentProps<typeof OpenerStep>> = {}) =>
   render(
-    <OpenerStep onStart={vi.fn()} onSignIn={vi.fn()} viewedPages={new Set()} />,
+    <OpenerStep
+      onStart={vi.fn()}
+      onSignIn={vi.fn()}
+      viewedPages={new Set()}
+      {...props}
+    />,
   );
 
 const wait = (ms: number) =>
@@ -259,13 +264,7 @@ describe("OpenerStep", () => {
   });
 
   it("lights the dot of the page in view", () => {
-    render(
-      <OpenerStep
-        onStart={vi.fn()}
-        onSignIn={vi.fn()}
-        viewedPages={new Set()}
-      />,
-    );
+    renderOpener();
     expect(dot(0)).toContain("dotOn");
     expect(dot(1)).not.toContain("dotOn");
     swipeTo(1);
@@ -282,38 +281,18 @@ describe("OpenerStep", () => {
     expect(dot(1)).not.toContain("dotOn");
   });
 
-  it("starts from any page", () => {
-    const onStart = vi.fn();
-    render(
-      <OpenerStep
-        onStart={onStart}
-        onSignIn={vi.fn()}
-        viewedPages={new Set()}
-      />,
-    );
-    fireEvent.click(screen.getByText("opener.getStarted"));
-    swipeTo(1);
-    fireEvent.click(screen.getByText("opener.getStarted"));
-    swipeTo(2);
-    fireEvent.click(screen.getByText("opener.getStarted"));
-    expect(onStart).toHaveBeenCalledTimes(3);
-  });
+  it.each([
+    { button: "opener.getStarted", callback: "onStart" },
+    { button: "onboarding.signIn", callback: "onSignIn" },
+  ] as const)("calls $callback from every preview", ({ button, callback }) => {
+    const onPress = vi.fn();
+    renderOpener({ [callback]: onPress });
 
-  it("offers sign-in on every page", () => {
-    const onSignIn = vi.fn();
-    render(
-      <OpenerStep
-        onStart={vi.fn()}
-        onSignIn={onSignIn}
-        viewedPages={new Set()}
-      />,
-    );
-    fireEvent.click(screen.getByText("onboarding.signIn"));
-    swipeTo(1);
-    fireEvent.click(screen.getByText("onboarding.signIn"));
-    swipeTo(2);
-    fireEvent.click(screen.getByText("onboarding.signIn"));
-    expect(onSignIn).toHaveBeenCalledTimes(3);
+    for (const page of [0, 1, 2, 3]) {
+      swipeTo(page);
+      fireEvent.click(screen.getByText(button));
+      expect(onPress).toHaveBeenCalledTimes(page + 1);
+    }
   });
 
   it("wraps a swipe in either direction and recenters on the matching preview", () => {
@@ -369,20 +348,17 @@ describe("OpenerStep", () => {
   });
 
   it("reports each page the first time it is shown", () => {
-    render(
-      <OpenerStep
-        onStart={vi.fn()}
-        onSignIn={vi.fn()}
-        viewedPages={new Set()}
-      />,
-    );
+    renderOpener();
     expect(pageViews()).toEqual([0]);
     swipeTo(1);
     swipeTo(2);
     swipeTo(1);
     swipeTo(0);
     swipeTo(2);
-    expect(pageViews()).toEqual([0, 1, 2]);
+    swipeTo(3);
+    swipeTo(2);
+    swipeTo(3);
+    expect(pageViews()).toEqual([0, 1, 2, 3]);
     expect(mock.capture).toHaveBeenCalledWith("onboarding_opener_page_viewed", {
       page_index: 1,
     });
@@ -390,22 +366,10 @@ describe("OpenerStep", () => {
 
   it("reports nothing again when the opener comes back in the same onboarding", () => {
     const viewedPages = new Set<number>();
-    const first = render(
-      <OpenerStep
-        onStart={vi.fn()}
-        onSignIn={vi.fn()}
-        viewedPages={viewedPages}
-      />,
-    );
+    const first = renderOpener({ viewedPages });
     swipeTo(1);
     first.unmount();
-    render(
-      <OpenerStep
-        onStart={vi.fn()}
-        onSignIn={vi.fn()}
-        viewedPages={viewedPages}
-      />,
-    );
+    renderOpener({ viewedPages });
     swipeTo(1);
     swipeTo(2);
     expect(pageViews()).toEqual([0, 1, 2]);
@@ -414,13 +378,7 @@ describe("OpenerStep", () => {
   it("keeps both actions available and pauses rotation at large text sizes", () => {
     vi.useFakeTimers();
     mock.largeText = true;
-    render(
-      <OpenerStep
-        onStart={vi.fn()}
-        onSignIn={vi.fn()}
-        viewedPages={new Set()}
-      />,
-    );
+    renderOpener();
     expect(screen.getByText("onboarding.haveAccount")).toBeTruthy();
     expect(screen.getByText("opener.getStarted")).toBeTruthy();
     wait(20000);
@@ -507,7 +465,7 @@ describe("OpenerStep", () => {
     spy.mockRestore();
   });
 
-  it("stops advancing once the person scrolls a page's copy", () => {
+  it("pauses autoplay when the screen is scrolled vertically", () => {
     vi.useFakeTimers();
     renderOpener();
     act(() => mock.pageDrag?.());
