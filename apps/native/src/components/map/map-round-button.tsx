@@ -18,7 +18,7 @@ export function MapRoundButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
-      hitSlop={5}
+      hitSlop={7}
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}
     >
       <AppSymbolIcon
@@ -43,6 +43,7 @@ export function MapAvatarButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
+      hitSlop={1}
       style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}
     >
       <AppSymbolIcon
