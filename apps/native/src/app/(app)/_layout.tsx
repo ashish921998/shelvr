@@ -149,13 +149,6 @@ export default function AppLayout() {
               name="shared-list/[id]"
               options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
             />
-            <Stack.Screen
-              name="shared-lists"
-              options={{
-                title: t("sharedLists.title"),
-                headerBackButtonDisplayMode: "minimal",
-              }}
-            />
           </Stack.Protected>
           {/* Native sheets and modals present above the loading cover, so they wait for the plan. */}
           <Stack.Protected

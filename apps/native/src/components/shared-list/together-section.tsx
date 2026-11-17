@@ -38,7 +38,7 @@ export function TogetherSection({
       <View style={styles.headingRow}>
         <View style={styles.headingText}>
           <ThemedText variant="title" accessibilityRole="header">
-            {t("plans.together")}
+            {t("sharedLists.title")}
           </ThemedText>
           <ThemedText variant="footnote" style={styles.muted}>
             {t("sharedLists.hint")}

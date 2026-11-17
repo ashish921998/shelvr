@@ -153,9 +153,6 @@ vi.mock("@/components/home/pro-card", () => ({
 vi.mock("@/components/home/home-search", () => ({
   HomeSearch: fakes.passThrough,
 }));
-vi.mock("@/components/home/shared-lists-section", () => ({
-  SharedListsSection: fakes.nothing,
-}));
 vi.mock("@/components/cancel-survey/cancel-survey-card", () => ({
   CancelSurveyCard: fakes.nothing,
 }));

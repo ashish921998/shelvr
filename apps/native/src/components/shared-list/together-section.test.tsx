@@ -79,7 +79,7 @@ beforeEach(() => {
 describe("TogetherSection", () => {
   it("offers to start a list when there is none", () => {
     render(<TogetherSection showTripsHeading={false} />);
-    expect(screen.getByText("Together")).toBeTruthy();
+    expect(screen.getByText("Shared lists")).toBeTruthy();
     expect(screen.queryByText("Trips")).toBeNull();
     expect(screen.queryByLabelText("Loading")).toBeNull();
     fireEvent.click(
@@ -91,7 +91,7 @@ describe("TogetherSection", () => {
   it("waits for the lists before offering to start one", () => {
     mocks.lists = undefined;
     render(<TogetherSection showTripsHeading={false} />);
-    expect(screen.getByText("Together")).toBeTruthy();
+    expect(screen.getByText("Shared lists")).toBeTruthy();
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.getByLabelText("Loading")).toBeTruthy();
   });

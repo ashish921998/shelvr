@@ -15,7 +15,6 @@ vi.mock("@/lib/share-link", () => ({ shareUrl: vi.fn() }));
 vi.mock("@/components/shared-list/member-avatars", () => ({
   MemberAvatars: vi.fn(() => null),
 }));
-vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 vi.mock("@/components/ui/themed-text", () => ({
   ThemedText: vi.fn(({ children }: { children: ReactNode }) => (
     <span>{children}</span>
@@ -24,7 +23,6 @@ vi.mock("@/components/ui/themed-text", () => ({
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { colors: {} } }),
 }));
 vi.mock("react-native", () => ({
   View: vi.fn(({ children }: { children: ReactNode }) => (
