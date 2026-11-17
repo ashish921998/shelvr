@@ -99,8 +99,10 @@ const styles = StyleSheet.create((theme) => ({
   inline: { paddingHorizontal: 0, paddingVertical: 0 },
   flush: { paddingHorizontal: 0, paddingVertical: theme.gap(0.5) },
   target: {
+    minWidth: theme.control.minHeight,
     minHeight: theme.control.minHeight,
     justifyContent: "center",
+    alignItems: "center",
   },
   chip: {
     flexDirection: "row",
