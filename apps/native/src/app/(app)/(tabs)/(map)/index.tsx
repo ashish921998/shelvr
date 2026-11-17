@@ -77,6 +77,7 @@ export default function MapScreen() {
   const places = useQuery(convexQuery(api.mapPlaces.listMapPlaces, {}));
   const location = useMapLocation(opened);
   const [kinds, setKinds] = useState<PlaceKind[]>([]);
+  const [filterRevision, setFilterRevision] = useState(0);
   const [searchText, setSearchText] = useState("");
   // Closed once a result is picked, so the map and place card get the room; typing opens it again.
   const [listOpen, setListOpen] = useState(true);
@@ -150,7 +151,6 @@ export default function MapScreen() {
   const framed = useMemo(
     () =>
       // As on the city page, a pin far out of town stays on the map but does not set the zoom.
-      // Framed from the filter's places, so a filter with none in view can bring them in.
       framedPins(busiestCityPlaces(shown)).map((place) => ({
         ...place,
         id: placeId(place),
@@ -209,6 +209,7 @@ export default function MapScreen() {
     select(id);
   };
   const choose = (next: PlaceKind | null) => {
+    setFilterRevision((revision) => revision + 1);
     if (next === null) {
       setKinds([]);
       return;
@@ -250,6 +251,7 @@ export default function MapScreen() {
           locate={locate}
           overview={overview}
           zoomOut={zoomOut}
+          filterRevision={filterRevision}
           onCentreChange={onCentreChange}
           onSelect={select}
         />
@@ -320,7 +322,10 @@ export default function MapScreen() {
               {showWent ? (
                 <MapWentSwitch
                   selected={went.selected}
-                  onSelect={setWentFilter}
+                  onSelect={(value) => {
+                    setWentFilter(value);
+                    setFilterRevision((revision) => revision + 1);
+                  }}
                 />
               ) : null}
               {filters.length > 0 ? (

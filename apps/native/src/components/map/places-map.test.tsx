@@ -114,7 +114,11 @@ it.each([false, true])(
     const sanFrancisco = [{ id: "sf", name: "Park", lat: 37.77, lng: -122.43 }];
     const all = [...sanFrancisco, ...AUSTIN];
     const onSelect = vi.fn();
-    const renderMap = (pins: typeof all, framed: typeof all) => (
+    const renderMap = (
+      pins: typeof all,
+      framed: typeof all,
+      filterRevision = 0,
+    ) => (
       <PlacesMap
         pins={pins}
         framed={framed}
@@ -123,6 +127,7 @@ it.each([false, true])(
         topInset={100}
         bottomInset={120}
         onSelect={onSelect}
+        filterRevision={filterRevision}
       />
     );
     const { rerender } = render(renderMap(all, sanFrancisco));
@@ -136,16 +141,42 @@ it.each([false, true])(
     const before = mock.moves.length;
     const initialCamera = mock.props.cameraPosition;
 
-    rerender(renderMap(AUSTIN, AUSTIN));
+    rerender(renderMap(AUSTIN, AUSTIN, 1));
     await act(() => vi.advanceTimersByTimeAsync(2000));
     expect(mock.moves.slice(before)).toEqual([]);
     expect(mock.props.cameraPosition).toBe(initialCamera);
 
-    rerender(renderMap(all, sanFrancisco));
+    rerender(renderMap(all, sanFrancisco, 2));
     await act(() => vi.advanceTimersByTimeAsync(2000));
     expect(mock.moves.slice(before)).toEqual([]);
   },
 );
+
+it("keeps initial saved-city positioning when loaded visits refresh the places", async () => {
+  const { rerender } = render(map());
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  const refreshed = AUSTIN.map((pin) => ({ ...pin }));
+  rerender(
+    <PlacesMap
+      pins={refreshed}
+      framed={refreshed}
+      showsUser
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={vi.fn()}
+    />,
+  );
+  await act(() => vi.advanceTimersByTimeAsync(2000));
+  expect(mock.moves.filter((move) => move !== "person")).toEqual([
+    expect.objectContaining({
+      coordinates: {
+        latitude: expect.closeTo(30.27, 2),
+        longitude: expect.closeTo(-97.73, 2),
+      },
+    }),
+  ]);
+});
 
 it.each([
   ["ask for their location", { locate: 1 }, "person"],

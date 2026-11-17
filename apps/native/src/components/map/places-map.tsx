@@ -46,6 +46,7 @@ type Props = {
   locate?: number;
   overview?: MapPin[];
   zoomOut?: number;
+  filterRevision?: number;
   onCentreChange?: (centre: LatLng, zoom: number) => void;
   onSelect: (id: string) => void;
 };
@@ -61,6 +62,7 @@ export function PlacesMap({
   locate,
   overview,
   zoomOut,
+  filterRevision = 0,
   onCentreChange,
   onSelect,
 }: Props) {
@@ -125,7 +127,7 @@ export function PlacesMap({
     settle.current = setTimeout(() => checkNearby.current?.(), SETTLE_MS);
   };
   useEffect(() => {
-    if (!showsUser || centredOnUser.current) return;
+    if (!showsUser || centredOnUser.current || filterRevision > 0) return;
     centredOnUser.current = true;
     const showCity = () => {
       const { fit } = latest.current;
@@ -161,7 +163,7 @@ export function PlacesMap({
       checkNearby.current = undefined;
       centredOnUser.current = false;
     };
-  }, [showsUser]);
+  }, [showsUser, filterRevision]);
   useEffect(() => () => clearTimeout(settle.current), []);
   useEffect(() => {
     if (!focus) return;
@@ -199,14 +201,6 @@ export function PlacesMap({
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
   }, [locate]);
-
-  const fitted = useRef(framed);
-  useEffect(() => {
-    if (framed === fitted.current) return;
-    fitted.current = framed;
-    checkNearby.current = undefined;
-    cancelOpening.current?.();
-  }, [framed]);
 
   const trackCamera = (event: {
     coordinates: { latitude?: number; longitude?: number };
