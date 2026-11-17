@@ -105,7 +105,6 @@ export function PlacesMap({
 
   // expo-maps applies a cameraPosition prop without animation, so it only ever holds the first camera.
   const [firstCamera] = useState(showsUser ? undefined : fit);
-  // The opening check reads these when it fires, so a filter picked while it waits is the one it frames.
   const overviewCamera = useMemo(
     () => (overview ? cameraFor(overview) : undefined),
     [cameraFor, overview],
@@ -201,27 +200,12 @@ export function PlacesMap({
     );
   }, [locate]);
 
-  // A new filter whose places are all out of reach brings them into view. While the opening move is
-  // still deciding where to go, its check frames the new filter instead. Search does not refit:
-  // picking a result flies to it. Keyed on the places, so a layout change (the keyboard) never moves
-  // the camera, and an empty map (a search with no match) stays where it is.
   const fitted = useRef(framed);
   useEffect(() => {
     if (framed === fitted.current) return;
     fitted.current = framed;
-    if (
-      !fit ||
-      pins.length === 0 ||
-      checkNearby.current ||
-      hasPlaceNear(centre.current, pins)
-    )
-      return;
-    map()
-      ?.setCameraPosition(fit)
-      .catch((error: unknown) =>
-        analytics.captureError("places_map_camera_failed", error),
-      );
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a new framing moves the camera; search narrowing pins must not
+    checkNearby.current = undefined;
+    cancelOpening.current?.();
   }, [framed]);
 
   const trackCamera = (event: {

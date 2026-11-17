@@ -45,6 +45,19 @@ describe("filterPlaces", () => {
     expect(filterPlaces(places, null)).toEqual(places);
     expect(filterPlaces(places, "coffee")).toEqual([places[1]]);
   });
+
+  it("combines category tags without duplicating places and clears to All", () => {
+    const places = [
+      place(["food", "coffee"]),
+      place(["coffee"]),
+      place(["drinks"]),
+      place(["shopping"]),
+    ];
+    expect(filterPlaces(places, ["coffee", "drinks"])).toEqual(
+      places.slice(0, 3),
+    );
+    expect(filterPlaces(places, [])).toEqual(places);
+  });
 });
 
 describe("busiestCityPlaces", () => {

@@ -108,6 +108,45 @@ it("shows the busiest city when it cannot find the person", async () => {
   ]);
 });
 
+it.each([false, true])(
+  "keeps the current area when a filter matches another city, with opening location=%s",
+  async (showsUser) => {
+    const sanFrancisco = [{ id: "sf", name: "Park", lat: 37.77, lng: -122.43 }];
+    const all = [...sanFrancisco, ...AUSTIN];
+    const onSelect = vi.fn();
+    const renderMap = (pins: typeof all, framed: typeof all) => (
+      <PlacesMap
+        pins={pins}
+        framed={framed}
+        showsUser={showsUser}
+        height={800}
+        topInset={100}
+        bottomInset={120}
+        onSelect={onSelect}
+      />
+    );
+    const { rerender } = render(renderMap(all, sanFrancisco));
+    await act(() => vi.advanceTimersByTimeAsync(200));
+    act(() =>
+      mock.props.onCameraMove({
+        coordinates: { latitude: 37.77, longitude: -122.43 },
+        zoom: 14,
+      }),
+    );
+    const before = mock.moves.length;
+    const initialCamera = mock.props.cameraPosition;
+
+    rerender(renderMap(AUSTIN, AUSTIN));
+    await act(() => vi.advanceTimersByTimeAsync(2000));
+    expect(mock.moves.slice(before)).toEqual([]);
+    expect(mock.props.cameraPosition).toBe(initialCamera);
+
+    rerender(renderMap(all, sanFrancisco));
+    await act(() => vi.advanceTimersByTimeAsync(2000));
+    expect(mock.moves.slice(before)).toEqual([]);
+  },
+);
+
 it.each([
   ["ask for their location", { locate: 1 }, "person"],
   [

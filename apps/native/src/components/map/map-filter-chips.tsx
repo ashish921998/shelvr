@@ -59,22 +59,28 @@ export function MapFilterChips({
   inset?: boolean;
   inline?: boolean;
   kinds: PlaceKind[];
-  selected: PlaceKind | null;
+  selected: PlaceKind | readonly PlaceKind[] | null;
   onSelect: (kind: PlaceKind | null) => void;
 }) {
   const choose = (kind: PlaceKind | null) => {
     if (kind !== selected) void haptics.selection();
     onSelect(kind);
   };
-  const chips = kinds.map((kind) => (
-    <MapFilterChip
-      key={kind}
-      label={t(KIND_LABELS[kind])}
-      icon={KIND_ICONS[kind]}
-      selected={selected === kind}
-      onPress={() => choose(selected === kind ? null : kind)}
-    />
-  ));
+  const multiple = Array.isArray(selected);
+  const selection =
+    typeof selected === "string" ? [selected] : (selected ?? []);
+  const chips = kinds.map((kind) => {
+    const picked = selection.includes(kind);
+    return (
+      <MapFilterChip
+        key={kind}
+        label={t(KIND_LABELS[kind])}
+        icon={KIND_ICONS[kind]}
+        selected={picked}
+        onPress={() => choose(picked && !multiple ? null : kind)}
+      />
+    );
+  });
   if (inline) return <View style={[styles.row, styles.inline]}>{chips}</View>;
   return (
     <ScrollView

@@ -76,7 +76,7 @@ export default function MapScreen() {
   );
   const places = useQuery(convexQuery(api.mapPlaces.listMapPlaces, {}));
   const location = useMapLocation(opened);
-  const [kind, setKind] = useState<PlaceKind | null>(null);
+  const [kinds, setKinds] = useState<PlaceKind[]>([]);
   const [searchText, setSearchText] = useState("");
   // Closed once a result is picked, so the map and place card get the room; typing opens it again.
   const [listOpen, setListOpen] = useState(true);
@@ -106,9 +106,12 @@ export default function MapScreen() {
     [all, wentFilter, visited],
   );
   const { city, onCentreChange } = useMapCity(all ?? NO_PLACES);
-  const filters = useMemo(() => mapFilters(went.places), [went.places]);
-  // A filter that no longer has enough places (a save was deleted) falls back to All.
-  const active = filters.some((filter) => filter.kind === kind) ? kind : null;
+  const filters = useMemo(() => mapFilters(all ?? NO_PLACES), [all]);
+  const active = useMemo(
+    () =>
+      kinds.filter((kind) => filters.some((filter) => filter.kind === kind)),
+    [kinds, filters],
+  );
   const shown = useMemo(
     () => filterPlaces(went.places, active),
     [went.places, active],
@@ -206,8 +209,17 @@ export default function MapScreen() {
     select(id);
   };
   const choose = (next: PlaceKind | null) => {
-    setKind(next);
-    if (next !== null) analytics.capture("map_filter_selected", { kind: next });
+    if (next === null) {
+      setKinds([]);
+      return;
+    }
+    setKinds((previous) =>
+      previous.includes(next)
+        ? previous.filter((kind) => kind !== next)
+        : [...previous, next],
+    );
+    if (!kinds.includes(next))
+      analytics.capture("map_filter_selected", { kind: next });
   };
 
   const cancelSearch = () => {

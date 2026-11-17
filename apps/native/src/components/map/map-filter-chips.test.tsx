@@ -93,3 +93,30 @@ it.each([
   expect(selection).toHaveBeenCalledTimes(ticks);
   selection.mockRestore();
 });
+
+it("keeps several category tags selected and toggles one without clearing the others", () => {
+  const onSelect = vi.fn();
+  const { rerender } = render(
+    <MapFilterChips
+      inline
+      kinds={["coffee", "drinks"]}
+      selected={["coffee", "drinks"]}
+      onSelect={onSelect}
+    />,
+  );
+  expect(screen.getByLabelText("map.kindCoffee").ariaPressed).toBe("true");
+  expect(screen.getByLabelText("map.kindDrinks").ariaPressed).toBe("true");
+  fireEvent.click(screen.getByLabelText("map.kindCoffee"));
+  expect(onSelect).toHaveBeenLastCalledWith("coffee");
+
+  rerender(
+    <MapFilterChips
+      inline
+      kinds={["coffee", "drinks"]}
+      selected={["drinks"]}
+      onSelect={onSelect}
+    />,
+  );
+  expect(screen.getByLabelText("map.kindCoffee").ariaPressed).toBe("false");
+  expect(screen.getByLabelText("map.kindDrinks").ariaPressed).toBe("true");
+});

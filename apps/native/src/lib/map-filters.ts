@@ -53,11 +53,12 @@ export function mapFilters(
 
 export function filterPlaces<T extends Kinded>(
   places: readonly T[],
-  kind: PlaceKind | null,
+  selection: PlaceKind | readonly PlaceKind[] | null,
 ): T[] {
-  return kind === null
-    ? [...places]
-    : places.filter((place) => place.kinds.includes(kind));
+  const kinds = typeof selection === "string" ? [selection] : selection;
+  return kinds?.length
+    ? places.filter((place) => kinds.some((kind) => place.kinds.includes(kind)))
+    : [...places];
 }
 
 export type WentFilter = "all" | "want" | "went";
