@@ -796,6 +796,9 @@ type MessageParams = {
   "map.searchPlaceholder": undefined;
   "map.searchNoResults": { query: string };
   "map.searchMore": { count: number; total: number };
+  "navigation.saved": undefined;
+  "saved.places": undefined;
+  "saved.lists": undefined;
   "navigation.trips": undefined;
   "plans.title": undefined;
   "plans.together": undefined;

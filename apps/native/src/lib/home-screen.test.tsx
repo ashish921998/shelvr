@@ -151,8 +151,22 @@ vi.mock("@/components/home/pro-card", () => ({
   ProCard: fakes.nothing,
 }));
 vi.mock("@/components/home/home-search", () => ({
-  HomeSearch: fakes.passThrough,
+  HomeSearch: vi.fn(({ children }: { children: ReactNode }) => (
+    <div>
+      <span>saved places search</span>
+      {children}
+    </div>
+  )),
 }));
+vi.mock("@/components/shared-list/saved-lists", () => ({
+  SavedLists: vi.fn(() => <div>saved shared lists</div>),
+}));
+vi.mock("@/components/ui/themed-text", () => ({
+  ThemedText: vi.fn(({ children }: { children: ReactNode }) => (
+    <span>{children}</span>
+  )),
+}));
+vi.mock("@/lib/haptics", () => ({ haptics: { selection: vi.fn() } }));
 vi.mock("@/components/cancel-survey/cancel-survey-card", () => ({
   CancelSurveyCard: fakes.nothing,
 }));
@@ -196,6 +210,28 @@ vi.mock("react-native", () => ({
   Platform: { OS: "ios" },
   ScrollView: fakes.passThrough,
   View: fakes.passThrough,
+  Pressable: vi.fn(
+    ({
+      children,
+      accessibilityRole,
+      accessibilityState,
+      onPress,
+    }: {
+      children: ReactNode;
+      accessibilityRole: string;
+      accessibilityState?: { selected?: boolean };
+      onPress: () => void;
+    }) => (
+      <button
+        type="button"
+        role={accessibilityRole}
+        aria-selected={accessibilityState?.selected}
+        onClick={onPress}
+      >
+        {children}
+      </button>
+    ),
+  ),
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
@@ -409,4 +445,19 @@ it("hides the feedback invitation while the trial primer holds its turn but has 
   openGate();
   await settle();
   expect(sheets().primer).toBe(true);
+});
+
+it("switches between saved places and shared lists", () => {
+  mocks.access = FREE;
+  render(<App />);
+  expect(screen.getByText("saved places search")).toBeTruthy();
+  expect(screen.queryByText("saved shared lists")).toBeNull();
+  fireEvent.click(screen.getByRole("tab", { name: "saved.lists" }));
+  expect(screen.queryByText("saved places search")).toBeNull();
+  expect(screen.getByText("saved shared lists")).toBeTruthy();
+  expect(
+    screen.getByRole("tab", { name: "saved.lists", selected: true }),
+  ).toBeTruthy();
+  fireEvent.click(screen.getByRole("tab", { name: "saved.places" }));
+  expect(screen.getByText("saved places search")).toBeTruthy();
 });

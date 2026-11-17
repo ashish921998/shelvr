@@ -2,6 +2,11 @@ import { useEffect, useState } from "react";
 import { t, useAppLocale } from "@/lib/i18n";
 import { FreeSavesCard, ProCard } from "@/components/home/pro-card";
 import { HomeSearch } from "@/components/home/home-search";
+import {
+  SavedSectionControl,
+  type SavedSection,
+} from "@/components/home/saved-section-control";
+import { SavedLists } from "@/components/shared-list/saved-lists";
 import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
@@ -51,13 +56,39 @@ function trialEnd(entitlement: Entitlement): number | undefined {
   return entitlement.status === "trialing" ? entitlement.expiresAt : undefined;
 }
 
+function SavedPlaces({
+  items,
+}: {
+  items: NonNullable<ReturnType<typeof useHomeFeed>["items"]>;
+}) {
+  return (
+    <HomeSearch>
+      {items.length > 0 ? (
+        <>
+          <HomePlaces />
+          <UnplacedSaves saves={items} />
+          <ReviewSaves saves={items} />
+        </>
+      ) : (
+        <View style={styles.empty}>
+          <HomePlacesEmptyCard />
+        </View>
+      )}
+    </HomeSearch>
+  );
+}
+
 export default function HomeScreen() {
   useAppLocale();
   const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
+  const [section, setSection] = useState<SavedSection>("places");
+  const showingPlaces = section === "places";
   const [viewportHeight, setViewportHeight] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
   const shortOfScreen =
-    viewportHeight > 0 && contentHeight < viewportHeight + LOAD_MORE_DISTANCE;
+    showingPlaces &&
+    viewportHeight > 0 &&
+    contentHeight < viewportHeight + LOAD_MORE_DISTANCE;
   const wantsMore =
     items !== undefined &&
     items.length < AUTO_LOAD_SAVES &&
@@ -139,27 +170,19 @@ export default function HomeScreen() {
           const { layoutMeasurement, contentOffset, contentSize } =
             e.nativeEvent;
           if (
+            showingPlaces &&
             layoutMeasurement.height + contentOffset.y >=
-            contentSize.height - LOAD_MORE_DISTANCE
+              contentSize.height - LOAD_MORE_DISTANCE
           )
             loadMore();
         }}
       >
         {topCard ? <View style={styles.topCard}>{topCard}</View> : null}
         {locked ? null : (
-          <HomeSearch>
-            {items.length > 0 ? (
-              <>
-                <HomePlaces />
-                <UnplacedSaves saves={items} />
-                <ReviewSaves saves={items} />
-              </>
-            ) : (
-              <View style={styles.empty}>
-                <HomePlacesEmptyCard />
-              </View>
-            )}
-          </HomeSearch>
+          <>
+            <SavedSectionControl selected={section} onSelect={setSection} />
+            {showingPlaces ? <SavedPlaces items={items} /> : <SavedLists />}
+          </>
         )}
       </ScrollView>
       <HeaderScrim />

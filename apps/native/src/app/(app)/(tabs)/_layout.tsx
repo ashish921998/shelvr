@@ -16,11 +16,11 @@ export default function TabsLayout() {
     >
       <NativeTabs.Trigger name="(home)">
         <NativeTabs.Trigger.Icon
-          sf={{ default: "house", selected: "house.fill" }}
-          md="home"
+          sf={{ default: "bookmark", selected: "bookmark.fill" }}
+          md="bookmark"
         />
         <NativeTabs.Trigger.Label>
-          {t("navigation.home")}
+          {t("navigation.saved")}
         </NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="(map)">
