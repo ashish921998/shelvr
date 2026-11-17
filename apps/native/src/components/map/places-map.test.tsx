@@ -310,3 +310,22 @@ it("frames the first saved places once when the map opened empty without locatio
   await act(() => vi.advanceTimersByTimeAsync(200));
   expect(mock.moves).toHaveLength(1);
 });
+
+it("keeps the chosen area when location access is turned off later", async () => {
+  const { rerender } = render(map());
+  await act(() => vi.advanceTimersByTimeAsync(5000));
+  const before = mock.moves.length;
+  rerender(
+    <PlacesMap
+      pins={AUSTIN}
+      framed={AUSTIN}
+      showsUser={false}
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={vi.fn()}
+    />,
+  );
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  expect(mock.moves.slice(before)).toEqual([]);
+});

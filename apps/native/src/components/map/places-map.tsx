@@ -202,7 +202,7 @@ export function PlacesMap({
     );
   }, [locate]);
 
-  const framedOnce = useRef(firstCamera !== undefined);
+  const framedOnce = useRef(showsUser || firstCamera !== undefined);
   useEffect(() => {
     if (showsUser || framedOnce.current || !fit) return;
     framedOnce.current = true;
