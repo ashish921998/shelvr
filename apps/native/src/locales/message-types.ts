@@ -665,6 +665,7 @@ type MessageParams = {
   "homePlaces.spotCount": { count: number };
   "homePlaces.moreCities": { n: string };
   "homePlaces.yourSpaces": undefined;
+  "homePlaces.yourCities": undefined;
   "homePlaces.seeAll": undefined;
   "homePlaces.emptyTitle": undefined;
   "homePlaces.emptyBody": undefined;

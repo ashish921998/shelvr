@@ -4,7 +4,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SharedListSummary } from "@/lib/shared-lists";
 import type { Id } from "@convex/_generated/dataModel";
-import { SharedListsNudge } from "./shared-lists-nudge";
+import { SharedListsSection } from "./shared-lists-section";
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
@@ -69,14 +69,28 @@ beforeEach(() => {
   mocks.lists = [];
 });
 
-describe("SharedListsNudge", () => {
-  it("shows nothing when no list has news", () => {
-    mocks.lists = [summary()];
-    const { container } = render(<SharedListsNudge />);
+describe("SharedListsSection", () => {
+  it("shows nothing until there is a shared list", () => {
+    const { container } = render(<SharedListsSection />);
     expect(container.textContent).toBe("");
   });
 
-  it("shows the first list with news in one line and opens it", () => {
+  it("shows a quiet list without a See all action when it is the only list", () => {
+    mocks.lists = [summary()];
+    render(<SharedListsSection />);
+    expect(screen.getByRole("button", { name: /^Date spots/ })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "See all" })).toBeNull();
+  });
+
+  it("opens the full collection when there is more than one list", () => {
+    mocks.lists = [summary(), summary({ name: "Another list" })];
+    render(<SharedListsSection />);
+    expect(screen.queryByText("Another list")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "See all" }));
+    expect(mocks.push).toHaveBeenCalledWith("/shared-lists");
+  });
+
+  it("shows the first list with news in one row and opens it", () => {
     mocks.lists = [
       summary({ _id: "quiet" as Id<"sharedLists">, name: "Quiet" }),
       summary({
@@ -86,9 +100,9 @@ describe("SharedListsNudge", () => {
         newFrom: [{ firstName: "Priya", count: 3 }],
       }),
     ];
-    render(<SharedListsNudge />);
+    render(<SharedListsSection />);
     const nudge = screen.getByRole("button", {
-      name: "Priya added 3 places, Date spots",
+      name: /^Date spots, Priya added 3 places/,
     });
     expect(screen.queryByText("Quiet")).toBeNull();
     fireEvent.click(nudge);

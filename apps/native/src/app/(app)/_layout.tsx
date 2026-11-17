@@ -118,6 +118,13 @@ export default function AppLayout() {
               options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
             />
             <Stack.Screen
+              name="cities"
+              options={{
+                title: t("homePlaces.yourCities"),
+                headerBackButtonDisplayMode: "minimal",
+              }}
+            />
+            <Stack.Screen
               name="city-stamps"
               options={{ headerBackButtonDisplayMode: "minimal" }}
             />
@@ -141,6 +148,13 @@ export default function AppLayout() {
             <Stack.Screen
               name="shared-list/[id]"
               options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+            />
+            <Stack.Screen
+              name="shared-lists"
+              options={{
+                title: t("sharedLists.title"),
+                headerBackButtonDisplayMode: "minimal",
+              }}
             />
           </Stack.Protected>
           {/* Native sheets and modals present above the loading cover, so they wait for the plan. */}

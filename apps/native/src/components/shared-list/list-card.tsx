@@ -1,3 +1,4 @@
+import { AppSymbolIcon } from "@/components/symbol";
 import { MemberAvatars } from "@/components/shared-list/member-avatars";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t } from "@/lib/i18n";
@@ -8,12 +9,19 @@ import {
 } from "@/lib/shared-lists";
 import { useRouter } from "expo-router";
 import { Pressable, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-export function SharedListCard({ list }: { list: SharedListSummary }) {
+export function SharedListCard({
+  list,
+  compact = false,
+}: {
+  list: SharedListSummary;
+  compact?: boolean;
+}) {
   const router = useRouter();
+  const { theme } = useUnistyles();
   const detail = `${withLine(list.members)} · ${t("homePlaces.spotCount", { count: list.placeCount })}`;
-  const activity = activityLine(list.newFrom);
+  const activity = activityLine(list.newFrom ?? []);
   return (
     <Pressable
       accessibilityRole="button"
@@ -23,9 +31,13 @@ export function SharedListCard({ list }: { list: SharedListSummary }) {
       onPress={() =>
         router.push({ pathname: "/shared-list/[id]", params: { id: list._id } })
       }
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.card,
+        compact && styles.compact,
+        pressed && styles.pressed,
+      ]}
     >
-      <MemberAvatars members={list.members} />
+      <MemberAvatars members={list.members} size={compact ? 28 : undefined} />
       <View style={styles.text}>
         <ThemedText variant="header" numberOfLines={1}>
           {list.name}
@@ -44,6 +56,13 @@ export function SharedListCard({ list }: { list: SharedListSummary }) {
           </ThemedText>
         )}
       </View>
+      {compact ? (
+        <AppSymbolIcon
+          name="chevron.right"
+          size={14}
+          tintColor={theme.colors.muted}
+        />
+      ) : null}
     </Pressable>
   );
 }
@@ -61,6 +80,7 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
   },
+  compact: { paddingVertical: theme.gap(1), gap: theme.gap(1) },
   text: { flex: 1, gap: theme.gap(0.25) },
   muted: { color: theme.colors.muted },
   activity: { color: theme.colors.primaryText },

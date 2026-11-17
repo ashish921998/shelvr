@@ -1,4 +1,3 @@
-import { progressLine } from "@/lib/city-progress";
 import { t } from "@/lib/i18n";
 import { isTerminalFailure } from "@convex/model/itemFields";
 import { displayHost } from "@/lib/url";
@@ -14,17 +13,13 @@ export type City = {
   photo?: string;
 };
 
-/** The cities to draw now, and how many the "+ n more" tile stands for. */
-export function visibleCities(
-  cities: City[],
-  expanded: boolean,
-): { shown: City[]; hidden: number } {
-  if (expanded || cities.length <= VISIBLE_CITIES) {
-    return { shown: cities, hidden: 0 };
-  }
+export function visibleCities(cities: City[]): {
+  shown: City[];
+  hidden: number;
+} {
   return {
     shown: cities.slice(0, VISIBLE_CITIES),
-    hidden: cities.length - VISIBLE_CITIES,
+    hidden: Math.max(0, cities.length - VISIBLE_CITIES),
   };
 }
 
@@ -78,10 +73,6 @@ export function saveSource(save: { siteName?: string; url?: string }): string {
   return save.siteName?.trim() || displayHost(save.url);
 }
 
-export function plannableCities(cities: City[]): City[] {
-  return cities.filter((entry) => entry.placeCount !== 0);
-}
-
 type CityRow =
   | { kind: "pair"; cities: [City, City] }
   | { kind: "wide"; city: City };
@@ -101,10 +92,5 @@ export function cityCountLine(entry: City): string | null {
     return t("homePlaces.noPlaceYet", { count: entry.count });
   }
   if (!entry.placeCount) return null;
-  return (
-    progressLine({
-      visited: entry.visitedCount ?? 0,
-      total: entry.placeCount,
-    }) ?? t("homePlaces.spotCount", { count: entry.placeCount })
-  );
+  return t("homePlaces.spotCount", { count: entry.placeCount });
 }
