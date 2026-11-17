@@ -125,6 +125,9 @@ vi.mock("react-native-unistyles", () => ({
 }));
 vi.mock("react-native", () => ({
   Keyboard: { dismiss: vi.fn() },
+  ScrollView: vi.fn(({ children }: { children: ReactNode }) => (
+    <div>{children}</div>
+  )),
   View: vi.fn(
     ({
       children,

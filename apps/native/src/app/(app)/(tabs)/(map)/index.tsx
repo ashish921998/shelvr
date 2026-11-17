@@ -43,7 +43,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Keyboard, View } from "react-native";
+import { Keyboard, ScrollView, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const NO_PLACES: never[] = [];
@@ -299,19 +299,27 @@ export default function MapScreen() {
               setStripHeight(event.nativeEvent.layout.height)
             }
           >
-            {showWent ? (
-              <MapWentSwitch
-                selected={went.selected}
-                onSelect={setWentFilter}
-              />
-            ) : null}
-            {filters.length > 0 ? (
-              <MapFilterChips
-                kinds={filters.map((filter) => filter.kind)}
-                selected={active}
-                onSelect={choose}
-              />
-            ) : null}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              accessibilityLabel={t("map.filters")}
+              contentContainerStyle={styles.filters}
+            >
+              {showWent ? (
+                <MapWentSwitch
+                  selected={went.selected}
+                  onSelect={setWentFilter}
+                />
+              ) : null}
+              {filters.length > 0 ? (
+                <MapFilterChips
+                  inline
+                  kinds={filters.map((filter) => filter.kind)}
+                  selected={active}
+                  onSelect={choose}
+                />
+              ) : null}
+            </ScrollView>
           </View>
         ) : null}
       </View>
@@ -329,8 +337,13 @@ const styles = StyleSheet.create((theme) => ({
     marginBottom: 10,
   },
   strip: {
-    gap: theme.gap(1),
     paddingTop: theme.gap(1),
     paddingBottom: theme.gap(1.5),
+  },
+  filters: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1),
+    paddingHorizontal: theme.gap(2.5),
   },
 }));

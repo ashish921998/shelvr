@@ -44,33 +44,38 @@ vi.mock("react-native", () => ({
   ),
 }));
 
-it("lists only the filters, and a second tap on the selected one turns it off", () => {
-  const onSelect = vi.fn();
-  const { rerender } = render(
-    <MapFilterChips
-      kinds={["dessert", "dateNight"]}
-      selected={null}
-      onSelect={onSelect}
-    />,
-  );
-  expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
-    "map.kindDessert",
-    "map.kindDateNight",
-  ]);
+it.each([false, true])(
+  "lists and toggles the filters with inline=%s",
+  (inline) => {
+    const onSelect = vi.fn();
+    const { rerender } = render(
+      <MapFilterChips
+        inline={inline}
+        kinds={["dessert", "dateNight"]}
+        selected={null}
+        onSelect={onSelect}
+      />,
+    );
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "map.kindDessert",
+      "map.kindDateNight",
+    ]);
 
-  fireEvent.click(screen.getByLabelText("map.kindDateNight"));
-  expect(onSelect).toHaveBeenLastCalledWith("dateNight");
+    fireEvent.click(screen.getByLabelText("map.kindDateNight"));
+    expect(onSelect).toHaveBeenLastCalledWith("dateNight");
 
-  rerender(
-    <MapFilterChips
-      kinds={["dessert", "dateNight"]}
-      selected="dateNight"
-      onSelect={onSelect}
-    />,
-  );
-  fireEvent.click(screen.getByLabelText("map.kindDateNight"));
-  expect(onSelect).toHaveBeenLastCalledWith(null);
-});
+    rerender(
+      <MapFilterChips
+        inline={inline}
+        kinds={["dessert", "dateNight"]}
+        selected="dateNight"
+        onSelect={onSelect}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("map.kindDateNight"));
+    expect(onSelect).toHaveBeenLastCalledWith(null);
+  },
+);
 
 it.each([
   ["a new filter", null, 1],
