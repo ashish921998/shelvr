@@ -1,4 +1,4 @@
-import { AppSymbolIcon } from "@/components/symbol";
+import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { AddButton, addButtonBottom } from "@/components/tab-bar";
 import { ThemedText } from "@/components/ui/themed-text";
 import { withAlpha } from "@/lib/color";
@@ -28,14 +28,15 @@ function Chevron() {
 }
 
 function Tile({
-  emoji,
+  icon,
   label,
   onPress,
 }: {
-  emoji: string;
+  icon: AppSymbolName;
   label: string;
   onPress: () => void;
 }) {
+  const { theme } = useUnistyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -43,9 +44,11 @@ function Tile({
       onPress={onPress}
       style={({ pressed }) => [styles.tile, pressed && styles.pressed]}
     >
-      <Text style={styles.tileEmoji} allowFontScaling={false}>
-        {emoji}
-      </Text>
+      <AppSymbolIcon
+        name={icon}
+        size={34}
+        tintColor={theme.colors.primaryText}
+      />
       <Text style={styles.tileLabel} numberOfLines={2}>
         {label}
       </Text>
@@ -54,16 +57,17 @@ function Tile({
 }
 
 function Row({
-  emoji,
+  icon,
   label,
   last,
   onPress,
 }: {
-  emoji: string;
+  icon: AppSymbolName;
   label: string;
   last?: boolean;
   onPress: () => void;
 }) {
+  const { theme } = useUnistyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -75,9 +79,11 @@ function Row({
         pressed && styles.pressed,
       ]}
     >
-      <Text style={styles.rowEmoji} allowFontScaling={false}>
-        {emoji}
-      </Text>
+      <AppSymbolIcon
+        name={icon}
+        size={23}
+        tintColor={theme.colors.primaryText}
+      />
       <Text style={styles.rowLabel} numberOfLines={1}>
         {label}
       </Text>
@@ -89,7 +95,7 @@ function Row({
 export function AddSpotsSheet() {
   useAppLocale();
   const router = useRouter();
-  const { rt } = useUnistyles();
+  const { theme, rt } = useUnistyles();
   const reduced = useReducedMotion();
   const { guard, loading } = useSaveGuard("tab_bar");
   const planner = usePlanPicker({ onLeave: () => backOrHome(router) });
@@ -139,9 +145,13 @@ export function AddSpotsSheet() {
             onPress={addLink}
             style={({ pressed }) => [styles.card, pressed && styles.pressed]}
           >
-            <Text style={styles.cardEmoji} allowFontScaling={false}>
-              🔗
-            </Text>
+            <View style={styles.cardIcon}>
+              <AppSymbolIcon
+                name="link"
+                size={32}
+                tintColor={theme.colors.primaryText}
+              />
+            </View>
             <View style={styles.cardText}>
               <Text style={styles.cardTitle} numberOfLines={1}>
                 {t("addSheet.pasteLink")}
@@ -154,7 +164,7 @@ export function AddSpotsSheet() {
           </Pressable>
           <View style={styles.tiles}>
             <Tile
-              emoji="🎬"
+              icon="play.rectangle"
               label={t("addSheet.howToShare")}
               onPress={() => {
                 router.back();
@@ -162,13 +172,13 @@ export function AddSpotsSheet() {
               }}
             />
             <Tile
-              emoji="📁"
+              icon="map"
               label={t("addSheet.googleMapsList")}
               onPress={addLink}
             />
             {siri.length > 0 ? (
               <Tile
-                emoji="🎙️"
+                icon="mic"
                 label={t("addSheet.saveWithSiri")}
                 onPress={() => {
                   router.back();
@@ -179,7 +189,7 @@ export function AddSpotsSheet() {
           </View>
           <View style={styles.rows}>
             <Row
-              emoji="👥"
+              icon="users"
               label={t("sharedLists.newTitle")}
               onPress={() => {
                 router.back();
@@ -187,7 +197,7 @@ export function AddSpotsSheet() {
               }}
             />
             <Row
-              emoji="🧳"
+              icon="suitcase.fill"
               label={t("homePlaces.planTrip")}
               last
               onPress={() => planner.plan("trip")}
@@ -237,7 +247,12 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface,
     boxShadow: shadow,
   },
-  cardEmoji: { width: 52, fontSize: 46, lineHeight: 52, textAlign: "center" },
+  cardIcon: {
+    width: 52,
+    height: 52,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   cardText: { flex: 1, minWidth: 0, gap: 2 },
   cardTitle: {
     fontFamily: theme.fonts.medium,
@@ -266,7 +281,6 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface,
     boxShadow: shadow,
   },
-  tileEmoji: { fontSize: 33, lineHeight: 36 },
   tileLabel: {
     fontFamily: theme.fonts.regular,
     fontSize: 14.6,
@@ -293,7 +307,6 @@ const styles = StyleSheet.create((theme) => ({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
-  rowEmoji: { width: 23, fontSize: 21, lineHeight: 24, textAlign: "center" },
   rowLabel: {
     flex: 1,
     minWidth: 0,

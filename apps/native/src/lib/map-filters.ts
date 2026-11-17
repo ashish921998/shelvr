@@ -1,6 +1,18 @@
 import { PLACE_KINDS, type PlaceKind } from "@convex/model/placeKinds";
 import { cityKey, distanceKm, type LatLng } from "@convex/model/trip";
 import type { TextMessageKey } from "@/locales/message-types";
+import type { AppSymbolName } from "@/components/symbol";
+
+export const KIND_ICONS = {
+  food: "fork.knife",
+  coffee: "cup.and.saucer.fill",
+  dessert: "dessert",
+  drinks: "drinks",
+  dateNight: "heart.fill",
+  activities: "activities",
+  shopping: "shopping",
+  stay: "stay",
+} as const satisfies Record<PlaceKind, AppSymbolName>;
 
 export const KIND_LABELS: Record<PlaceKind, TextMessageKey> = {
   food: "map.kindFood",

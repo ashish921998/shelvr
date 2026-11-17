@@ -6,8 +6,12 @@ import { haptics } from "@/lib/haptics";
 import { MapFilterChips } from "./map-filter-chips";
 
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
+vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}), hairlineWidth: 1 },
+  useUnistyles: () => ({
+    theme: { colors: { foreground: "#000", onTint: "#000" } },
+  }),
 }));
 vi.mock("react-native", () => ({
   ScrollView: vi.fn(({ children }: { children: ReactNode }) => (
@@ -50,8 +54,8 @@ it("lists only the filters, and a second tap on the selected one turns it off", 
     />,
   );
   expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
-    "🍰 map.kindDessert",
-    "💕 map.kindDateNight",
+    "map.kindDessert",
+    "map.kindDateNight",
   ]);
 
   fireEvent.click(screen.getByLabelText("map.kindDateNight"));

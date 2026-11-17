@@ -50,7 +50,7 @@ export function LibraryRows({ cityCount }: { cityCount?: number }) {
       />
       {cityCount ? (
         <HomeRow
-          icon="map.fill"
+          icon="cities"
           name={citiesTitle}
           count={cityCount}
           onPress={() => router.push("/cities")}
@@ -65,7 +65,7 @@ export function LibraryRows({ cityCount }: { cityCount?: number }) {
         />
       ) : null}
       <HomeRow
-        icon="rectangle.stack"
+        icon="collections"
         name={t("homePlaces.collections")}
         onPress={() => router.push("/collections")}
       />

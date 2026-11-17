@@ -30,7 +30,11 @@ export function HomeRow({
       onPress={onPress}
       style={({ pressed }) => [styles.row, pressed && styles.pressed]}
     >
-      <AppSymbolIcon name={icon} size={20} tintColor={theme.colors.primary} />
+      <AppSymbolIcon
+        name={icon}
+        size={20}
+        tintColor={theme.colors.primaryText}
+      />
       <ThemedText style={styles.title} numberOfLines={1}>
         {title}
       </ThemedText>

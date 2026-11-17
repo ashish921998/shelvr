@@ -1,6 +1,6 @@
 import { GoOutDice } from "@/components/go-out-art";
 import { Button } from "@/components/ui/button";
-import { AppSymbolIcon } from "@/components/symbol";
+import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
 import { directionsUrl } from "@/lib/date-plan";
@@ -13,8 +13,7 @@ import {
 } from "@/lib/go-out";
 import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
-import { KIND_LABELS } from "@/lib/map-filters";
-import { KIND_EMOJI } from "@/lib/map-pin-emoji";
+import { KIND_ICONS, KIND_LABELS } from "@/lib/map-filters";
 import { motion } from "@/lib/motion";
 import { useState } from "react";
 import {
@@ -35,15 +34,18 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 function CategoryChip({
   label,
+  icon,
   count,
   selected,
   onPress,
 }: {
   label: string;
+  icon?: AppSymbolName;
   count: number;
   selected: boolean;
   onPress: () => void;
 }) {
+  const { theme } = useUnistyles();
   return (
     <Pressable
       accessibilityRole="radio"
@@ -62,6 +64,13 @@ function CategoryChip({
         pressed && styles.pressed,
       ]}
     >
+      {icon ? (
+        <AppSymbolIcon
+          name={icon}
+          size={16}
+          tintColor={selected ? theme.colors.onTint : theme.colors.foreground}
+        />
+      ) : null}
       <ThemedText
         variant="subheadLabel"
         style={selected && styles.selectedText}
@@ -79,6 +88,7 @@ function CategoryChip({
 }
 
 function PickResult({ place }: { place: GoOutPlace }) {
+  const { theme } = useUnistyles();
   const open = () => {
     void Linking.openURL(directionsUrl(place)).catch((error: unknown) =>
       analytics.captureError("go_out_directions_failed", error),
@@ -97,9 +107,12 @@ function PickResult({ place }: { place: GoOutPlace }) {
         onPress={open}
         style={styles.directions}
       >
-        <ThemedText variant="secondaryLabel">
-          ↗ {t("trip.directions")}
-        </ThemedText>
+        <AppSymbolIcon
+          name="arrow.up.right"
+          size={15}
+          tintColor={theme.colors.foreground}
+        />
+        <ThemedText variant="secondaryLabel">{t("trip.directions")}</ThemedText>
       </Pressable>
     </View>
   );
@@ -224,7 +237,8 @@ export function GoOutPicker({
             {GO_OUT_CATEGORIES.map((kind) => (
               <CategoryChip
                 key={kind}
-                label={`${KIND_EMOJI[kind]} ${t(KIND_LABELS[kind])}`}
+                label={t(KIND_LABELS[kind])}
+                icon={KIND_ICONS[kind]}
                 count={
                   places.filter((place) => goOutMatches(place, kind)).length
                 }
@@ -330,7 +344,9 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   directions: {
     minHeight: 44,
-    justifyContent: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(0.5),
     alignSelf: "flex-start",
   },
   footer: {
