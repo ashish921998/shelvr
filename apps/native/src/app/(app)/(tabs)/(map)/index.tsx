@@ -131,7 +131,6 @@ export default function MapScreen() {
               tintColor: isDarkThemeName(rt.themeName)
                 ? theme.colors.primarySoft
                 : theme.colors.primaryText,
-              title: `✓ ${place.name}`,
             }
           : {}),
       })),
@@ -232,7 +231,8 @@ export default function MapScreen() {
           bottomInset={
             barHeight +
             (filters.length > 0 || showWent ? stripHeight : 0) +
-            theme.gap(1)
+            theme.gap(6) +
+            (located ? theme.control.minHeight + theme.gap(1.5) : 0)
           }
           focus={focus}
           locate={locate}

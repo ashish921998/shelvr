@@ -1,0 +1,143 @@
+diff --git a/build/apple/AppleMaps.types.d.ts b/build/apple/AppleMaps.types.d.ts
+index 7bfb3041a6022c4bb5c36c64a4f45faae48348cd..09b4a46c6014b4149611a3bc6e37fac559ae2808 100644
+--- a/build/apple/AppleMaps.types.d.ts
++++ b/build/apple/AppleMaps.types.d.ts
+@@ -247,6 +247,9 @@ export type AppleMapsPointOfInterestCategories = {
+  * @platform ios
+  */
+ export type AppleMapsProperties = {
++    compactMarkers?: boolean;
++    markerLabelColor?: string;
++    markerLabelBackground?: string;
+     /**
+      * Whether the user location is shown on the map.
+      * @default false
+diff --git a/ios/AppleMapsViewiOS17.swift b/ios/AppleMapsViewiOS17.swift
+index 64fccc3c67d87d717d01424d54519ab7bb204cee..87a07ed68314df26d531543c0714a3384c6d494f 100644
+--- a/ios/AppleMapsViewiOS17.swift
++++ b/ios/AppleMapsViewiOS17.swift
+@@ -42,7 +42,17 @@ struct AppleMapsViewiOS17: View, AppleMapsViewProtocol {
+     MapReader { reader in
+       Map(position: $state.mapCameraPosition) {
+         ForEach(props.markers) { marker in
+-          if marker.hasMonogram {
++          if properties.compactMarkers {
++            Annotation("", coordinate: marker.clLocationCoordinate2D, anchor: .top) {
++              CompactMapMarker(
++                marker: marker,
++                foreground: properties.markerLabelColor,
++                background: properties.markerLabelBackground
++              )
++              .offset(y: -16)
++            }
++            .annotationTitles(.hidden)
++          } else if marker.hasMonogram {
+             Marker(
+               marker.title,
+               monogram: Text(marker.monogram),
+diff --git a/ios/AppleMapsViewiOS18.swift b/ios/AppleMapsViewiOS18.swift
+index 031713e0326bcf7c5e75883114c54f959dacdf12..86d8e541d960d593f7ac8ba32047762565f00387 100644
+--- a/ios/AppleMapsViewiOS18.swift
++++ b/ios/AppleMapsViewiOS18.swift
+@@ -125,7 +125,18 @@ struct AppleMapsViewiOS18: View, AppleMapsViewProtocol {
+       // swiftlint:disable:next closure_body_length
+       Map(position: $state.mapCameraPosition, selection: $state.selection) {
+         ForEach(props.markers) { marker in
+-          if marker.hasMonogram {
++          if properties.compactMarkers {
++            Annotation("", coordinate: marker.clLocationCoordinate2D, anchor: .top) {
++              CompactMapMarker(
++                marker: marker,
++                foreground: properties.markerLabelColor,
++                background: properties.markerLabelBackground
++              )
++              .offset(y: -16)
++            }
++            .annotationTitles(.hidden)
++            .tag(MapSelection(marker.mapItem))
++          } else if marker.hasMonogram {
+             Marker(
+               marker.title,
+               monogram: Text(marker.monogram),
+diff --git a/ios/MapRecords.swift b/ios/MapRecords.swift
+index 5089ee79974544e6d8370520a87eb3a55e16c7d9..597627f712032e99f3971433ee18a87be1db08cf 100644
+--- a/ios/MapRecords.swift
++++ b/ios/MapRecords.swift
+@@ -225,6 +225,9 @@ struct MapUISettings: Record {
+ }
+ 
+ struct MapProperties: Record {
++  @Field var compactMarkers: Bool = false
++  @Field var markerLabelColor: Color = .primary
++  @Field var markerLabelBackground: Color = Color(.systemBackground)
+   @Field var isMyLocationEnabled: Bool = false
+   @Field var mapType: MapType = .standard
+   @Field var isTrafficEnabled: Bool = false
+@@ -235,6 +238,53 @@ struct MapProperties: Record {
+   @Field var pointsOfInterest: MapPointOfInterestCategories = MapPointOfInterestCategories()
+ }
+ 
++@available(iOS 17.0, *)
++struct CompactMapMarker: View {
++  let marker: MapMarker
++  let foreground: Color
++  let background: Color
++
++  private var isCluster: Bool {
++    Int(marker.monogram).map { $0 > 1 } ?? false
++  }
++
++  var body: some View {
++    VStack(spacing: 4) {
++      ZStack {
++        SwiftUI.Circle().fill(background)
++        SwiftUI.Circle().strokeBorder(marker.tintColor, lineWidth: 1.5)
++        if marker.hasMonogram {
++          Text(marker.monogram)
++            .font(.system(size: isCluster ? 14 : 18, weight: .semibold))
++            .lineLimit(1)
++            .minimumScaleFactor(0.5)
++            .foregroundStyle(foreground)
++        } else {
++          Image(systemName: marker.systemImage)
++            .font(.system(size: 16, weight: .medium))
++            .foregroundStyle(foreground)
++        }
++      }
++      .frame(width: 32, height: 32)
++      if !isCluster {
++        Text(marker.title)
++          .font(.custom("Satoshi-Medium", size: 13, relativeTo: .caption))
++          .foregroundStyle(foreground)
++          .lineLimit(1)
++          .truncationMode(.tail)
++          .padding(.horizontal, 8)
++          .padding(.vertical, 4)
++          .background(background, in: Capsule())
++          .frame(maxWidth: 136)
++      }
++    }
++    .fixedSize(horizontal: false, vertical: true)
++    .shadow(color: .black.opacity(0.12), radius: 3, x: 0, y: 1)
++    .accessibilityElement(children: .ignore)
++    .accessibilityLabel(marker.title)
++  }
++}
++
+ enum MapContourStyle: String, Enumerable {
+   case straight = "STRAIGHT"
+   case geodesic = "GEODESIC"
+diff --git a/src/apple/AppleMaps.types.ts b/src/apple/AppleMaps.types.ts
+index e54f39561f90129a0f637848c7782bba0b263e94..0bc0482c254c4cc72bac9ec74061d0cbb185aa20 100644
+--- a/src/apple/AppleMaps.types.ts
++++ b/src/apple/AppleMaps.types.ts
+@@ -290,6 +290,9 @@ export type AppleMapsPointOfInterestCategories = {
+  * @platform ios
+  */
+ export type AppleMapsProperties = {
++  compactMarkers?: boolean;
++  markerLabelColor?: string;
++  markerLabelBackground?: string;
+   /**
+    * Whether the user location is shown on the map.
+    * @default false

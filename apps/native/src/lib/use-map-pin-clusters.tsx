@@ -11,6 +11,7 @@ export function useMapPinClusters(
     selectedId?: string | null;
     clearSelection?: () => void;
     clusterText?: (count: number) => string;
+    spacing?: number;
   } = {},
 ) {
   useAppLocale();
@@ -25,8 +26,9 @@ export function useMapPinClusters(
       clusterMapPins(
         pins,
         (process.env.EXPO_OS === "ios" ? rt.screen.width : 256) * 2 ** zoom,
+        options.spacing,
       ),
-    [pins, rt.screen.width, zoom],
+    [pins, rt.screen.width, zoom, options.spacing],
   );
   const choose = (id: string) => {
     setPicked(id);

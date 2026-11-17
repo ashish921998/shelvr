@@ -1,5 +1,4 @@
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
-import { withAlpha } from "@/lib/color";
 import { Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -18,12 +17,11 @@ export function MapRoundButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
-      hitSlop={5}
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}
     >
       <AppSymbolIcon
         name={icon}
-        size={16}
+        size={20}
         tintColor={theme.colors.foreground}
       />
     </Pressable>
@@ -47,8 +45,8 @@ export function MapAvatarButton({
     >
       <AppSymbolIcon
         name="person.fill"
-        size={17}
-        tintColor={theme.colors.muted}
+        size={20}
+        tintColor={theme.colors.foreground}
       />
     </Pressable>
   );
@@ -56,23 +54,26 @@ export function MapAvatarButton({
 
 const styles = StyleSheet.create((theme) => ({
   button: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: theme.control.minHeight,
+    height: theme.control.minHeight,
+    borderRadius: theme.radius.xl,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: theme.colors.surface,
-    boxShadow: "0 2px 6px rgba(43, 36, 24, 0.2)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    boxShadow: "0 2px 6px rgba(43, 36, 24, 0.10)",
   },
   avatar: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: theme.control.minHeight,
+    height: theme.control.minHeight,
+    borderRadius: theme.radius.xl,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: theme.colors.surfaceMuted,
-    borderWidth: 2.5,
-    borderColor: withAlpha(theme.colors.primary, 0.45),
+    backgroundColor: theme.colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
+    boxShadow: "0 2px 6px rgba(43, 36, 24, 0.10)",
   },
   pressed: { opacity: theme.opacity.pressed },
 }));
