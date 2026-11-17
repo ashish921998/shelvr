@@ -6,17 +6,31 @@ import { shareUrl } from "@/lib/share-link";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { saveErrorCode } from "@convex/model/saveErrors";
-import { useMutation, useQuery } from "convex/react";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useMutation } from "convex/react";
 import { useRouter } from "expo-router";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { Alert } from "react-native";
 
 export function useTripShare(tripId: Id<"tripPlans">) {
-  const token = useQuery(api.tripShares.getShareToken, { tripId });
+  const {
+    data: token,
+    error,
+    isError,
+    refetch,
+  } = useQuery({
+    ...convexQuery(api.tripShares.getShareToken, { tripId }),
+    retry: false,
+  });
+  const loading = token === undefined && !isError;
   const create = useMutation(api.tripShares.createShare);
   const revoke = useMutation(api.tripShares.revokeShare);
   const busy = useRef(false);
   const router = useRouter();
+  useEffect(() => {
+    if (error) analytics.captureError("trip_share_status_failed", error);
+  }, [error]);
 
   const run = async (action: () => Promise<unknown>) => {
     if (busy.current) return;
@@ -55,7 +69,12 @@ export function useTripShare(tripId: Id<"tripPlans">) {
     ]);
 
   const open = () => {
-    if (token === undefined || busy.current) return;
+    if (loading || busy.current) return;
+    if (token === undefined) {
+      Alert.alert(t("errors.unexpectedTitle"), t("errors.retrySoon"));
+      void refetch();
+      return;
+    }
     const cancel = { text: t("common.cancel"), style: "cancel" as const };
     const send = { text: t("common.share"), onPress: () => void share() };
     Alert.alert(
@@ -77,7 +96,7 @@ export function useTripShare(tripId: Id<"tripPlans">) {
 
   return {
     open,
-    loading: token === undefined,
+    loading,
     revokeActive: token ? () => stopSharing(token) : null,
   };
 }

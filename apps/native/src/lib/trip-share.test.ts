@@ -9,6 +9,8 @@ type Button = { text: string; onPress?: () => void };
 
 const mocks = vi.hoisted(() => ({
   token: undefined as string | null | undefined,
+  statusError: null as Error | null,
+  refetch: vi.fn(),
   create: vi.fn(),
   revoke: vi.fn(),
   shareUrl: vi.fn(),
@@ -36,8 +38,16 @@ vi.mock("@convex/_generated/api", () => ({
     },
   },
 }));
+vi.mock("@convex-dev/react-query", () => ({ convexQuery: vi.fn(() => ({})) }));
+vi.mock("@tanstack/react-query", () => ({
+  useQuery: () => ({
+    data: mocks.token,
+    error: mocks.statusError,
+    isError: mocks.statusError !== null,
+    refetch: mocks.refetch,
+  }),
+}));
 vi.mock("convex/react", () => ({
-  useQuery: () => mocks.token,
   useMutation: (name: string) =>
     name === "createShare" ? mocks.create : mocks.revoke,
 }));
@@ -56,6 +66,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   delete process.env.EXPO_PUBLIC_CONVEX_SITE_URL;
   mocks.token = null;
+  mocks.statusError = null;
   mocks.create.mockResolvedValue("tok1");
   mocks.revoke.mockResolvedValue(null);
   mocks.shareUrl.mockResolvedValue(undefined);
@@ -67,6 +78,25 @@ it("waits for the token before offering anything", () => {
   expect(result.current.loading).toBe(true);
   result.current.open();
   expect(mocks.alert).not.toHaveBeenCalled();
+});
+
+it("keeps the trip usable when sharing status fails", () => {
+  mocks.token = undefined;
+  mocks.statusError = new Error("sharing status unavailable");
+  const { result } = renderHook(() => useTripShare(tripId));
+  expect(result.current.loading).toBe(false);
+  expect(result.current.revokeActive).toBeNull();
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "trip_share_status_failed",
+    mocks.statusError,
+  );
+  result.current.open();
+  expect(mocks.alert).toHaveBeenLastCalledWith(
+    "errors.unexpectedTitle",
+    "errors.retrySoon",
+  );
+  expect(mocks.refetch).toHaveBeenCalledOnce();
+  expect(mocks.create).not.toHaveBeenCalled();
 });
 
 it("creates a link for an unshared trip and shares it on the site URL", async () => {
