@@ -202,6 +202,16 @@ export function PlacesMap({
     );
   }, [locate]);
 
+  const framedOnce = useRef(firstCamera !== undefined);
+  useEffect(() => {
+    if (showsUser || framedOnce.current || !fit) return;
+    framedOnce.current = true;
+    return moveCamera(
+      () => map()?.setCameraPosition(fit),
+      (error) => analytics.captureError("places_map_camera_failed", error),
+    );
+  }, [showsUser, fit]);
+
   const trackCamera = (event: {
     coordinates: { latitude?: number; longitude?: number };
     zoom?: number;

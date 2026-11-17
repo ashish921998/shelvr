@@ -288,3 +288,25 @@ it("flies out to frame every place when asked to zoom out", async () => {
   expect(centre.longitude).toBeGreaterThan(-97.74);
   expect(centre.longitude).toBeLessThan(-96.8);
 });
+
+it("frames the first saved places once when the map opened empty without location", async () => {
+  const noLocation = (pins: typeof AUSTIN) => (
+    <PlacesMap
+      pins={pins}
+      framed={pins}
+      showsUser={false}
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={vi.fn()}
+    />
+  );
+  const { rerender } = render(noLocation([]));
+  expect(mock.props.cameraPosition).toBeUndefined();
+  rerender(noLocation(AUSTIN));
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  expect(mock.moves).toHaveLength(1);
+  rerender(noLocation(AUSTIN.slice(0, 1)));
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  expect(mock.moves).toHaveLength(1);
+});
