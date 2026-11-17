@@ -13,6 +13,8 @@ import { Image } from "expo-image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AccessibilityInfo,
+  PixelRatio,
+  Platform,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -162,6 +164,12 @@ function OpenerCarousel({
   const deckIndex = useRef(LEADING_PREVIEWS);
   const position = useSharedValue(LEADING_PREVIEWS);
   const stride = Math.max(1, Math.round(width * 0.68));
+  const android = Platform.OS === "android";
+  const snapOffsets = useMemo(
+    () => (android ? DECK.map((_, index) => index * stride) : undefined),
+    [android, stride],
+  );
+  const snapTolerance = android ? Math.max(1, 1 / PixelRatio.get()) : 1;
   const scale = Math.min(
     (width * 0.64) / FULL_PHONE_WIDTH,
     (trackHeight * 0.98) / FULL_PHONE_HEIGHT,
@@ -204,7 +212,8 @@ function OpenerCarousel({
     if (targetContentOffset && Math.abs(targetContentOffset.x - x) > 1) return;
     const index = Math.round(x / stride);
     const canonical = logicalPage(index) + LEADING_PREVIEWS;
-    if (Math.abs(x - index * stride) > 1 || index === canonical) return;
+    if (Math.abs(x - index * stride) > snapTolerance || index === canonical)
+      return;
     const offset = canonical * stride;
     pager.current?.scrollTo({ x: offset, animated: false });
     updatePosition(offset);
@@ -243,7 +252,8 @@ function OpenerCarousel({
             contentInsetAdjustmentBehavior="never"
             contentOffset={initialOffset}
             contentContainerStyle={{ paddingHorizontal: (width - stride) / 2 }}
-            snapToInterval={stride}
+            snapToInterval={android ? undefined : stride}
+            snapToOffsets={snapOffsets}
             decelerationRate="fast"
             disableIntervalMomentum
             showsHorizontalScrollIndicator={false}
@@ -255,7 +265,7 @@ function OpenerCarousel({
               updatePosition(nativeEvent.contentOffset.x)
             }
             onScrollBeginDrag={onInteract}
-            onScrollEndDrag={settle}
+            onScrollEndDrag={android ? undefined : settle}
             onMomentumScrollEnd={settle}
           >
             {DECK.map((item, index) => (

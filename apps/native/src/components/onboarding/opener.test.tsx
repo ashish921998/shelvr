@@ -35,6 +35,10 @@ const mock = vi.hoisted(() => {
     reducedMotion: false,
     reduceMotionAtMount: false,
     screenReader: false,
+    platform: "ios",
+    pixelRatio: 1,
+    snapToInterval: undefined as number | undefined,
+    snapToOffsets: undefined as readonly number[] | undefined,
     scrollTo: vi.fn(),
     pager: null as null | ((event: ScrollEvent) => void),
     settle: null as null | ((event: ScrollEvent) => void),
@@ -95,6 +99,8 @@ vi.mock("react-native", async () => {
     ref,
     children,
     horizontal,
+    snapToInterval,
+    snapToOffsets,
     onScroll,
     onScrollBeginDrag,
     onScrollEndDrag,
@@ -104,14 +110,20 @@ vi.mock("react-native", async () => {
       scrollTo: (to: { x: number; animated: boolean }) => void;
     }>;
     horizontal?: boolean;
+    snapToInterval?: number;
+    snapToOffsets?: readonly number[];
     onScroll?: (event: ScrollEvent) => void;
     onScrollBeginDrag?: () => void;
     onScrollEndDrag?: (event: ScrollEvent) => void;
     onMomentumScrollEnd?: (event: ScrollEvent) => void;
   }) => {
-    if (horizontal && onScroll) mock.pager = onScroll;
+    if (horizontal) {
+      mock.snapToInterval = snapToInterval;
+      mock.snapToOffsets = snapToOffsets;
+      mock.pager = onScroll ?? null;
+      mock.endDrag = onScrollEndDrag ?? null;
+    }
     if (horizontal && onMomentumScrollEnd) mock.settle = onMomentumScrollEnd;
-    if (horizontal && onScrollEndDrag) mock.endDrag = onScrollEndDrag;
     if (horizontal && onScrollBeginDrag) mock.beginDrag = onScrollBeginDrag;
     if (!horizontal && onScrollBeginDrag) mock.pageDrag = onScrollBeginDrag;
     useImperativeHandle(ref, () => ({
@@ -131,6 +143,12 @@ vi.mock("react-native", async () => {
   };
   return {
     View,
+    Platform: {
+      get OS() {
+        return mock.platform;
+      },
+    },
+    PixelRatio: { get: () => mock.pixelRatio },
     Text: mock.text,
     Pressable: mock.pressable,
     ScrollView,
@@ -207,6 +225,10 @@ beforeEach(() => {
   mock.reducedMotion = false;
   mock.reduceMotionAtMount = false;
   mock.screenReader = false;
+  mock.platform = "ios";
+  mock.pixelRatio = 1;
+  mock.snapToInterval = undefined;
+  mock.snapToOffsets = undefined;
   mock.pager = null;
   mock.settle = null;
   mock.endDrag = null;
@@ -334,6 +356,51 @@ describe("OpenerStep", () => {
       animated: false,
     });
   });
+
+  it("waits for Android momentum end before recentering", () => {
+    mock.platform = "android";
+    renderOpener();
+    act(() => {
+      mock.beginDrag?.();
+      const event = {
+        nativeEvent: { contentOffset: { x: PAGE_STRIDE - 0.5 } },
+      };
+      mock.pager?.(event);
+      mock.endDrag?.(event);
+    });
+    expect(mock.scrollTo).not.toHaveBeenCalled();
+    swipeTo(-2);
+    expect(mock.scrollTo).toHaveBeenLastCalledWith({
+      x: 4 * PAGE_STRIDE,
+      animated: false,
+    });
+  });
+
+  it.each([6, 7])(
+    "recenters Android preview %i when the native snap offset is rounded",
+    (index) => {
+      mock.platform = "android";
+      mock.pixelRatio = 2.625;
+      renderOpener();
+      act(() => {
+        mock.beginDrag?.();
+        const offset = mock.snapToOffsets?.[index];
+        const pixels =
+          offset === undefined
+            ? index * Math.floor((mock.snapToInterval ?? 0) * mock.pixelRatio)
+            : Math.floor(offset * mock.pixelRatio);
+        const event = {
+          nativeEvent: { contentOffset: { x: pixels / mock.pixelRatio } },
+        };
+        mock.pager?.(event);
+        mock.settle?.(event);
+      });
+      expect(mock.scrollTo).toHaveBeenLastCalledWith({
+        x: (index - 4) * PAGE_STRIDE,
+        animated: false,
+      });
+    },
+  );
 
   it("wraps accessibility adjustments in both directions and pauses autoplay", () => {
     vi.useFakeTimers();
