@@ -746,6 +746,7 @@
   "cityCard.legendVisited": "行った",
   "cityCard.mapLabel": "%{city}のマップカード",
   "opener.tagline": "スポットを保存しよう。デートも旅行もプランはおまかせ。",
+  "opener.yourCities": "保存した街",
   "onboardingQ.skip": "スキップ",
   "onboardingQ.savedTitle": "いくつの場所を保存しましたか？",
   "onboardingQ.savedFew": "ほんの少し",

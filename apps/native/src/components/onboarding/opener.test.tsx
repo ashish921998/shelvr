@@ -11,7 +11,9 @@ type ScrollEvent = {
   };
 };
 
-const PAGE_WIDTH = 390;
+const VIEWPORT_WIDTH = 390;
+const PAGE_STRIDE = 265;
+const FIRST_PAGE_INDEX = 2;
 
 const mock = vi.hoisted(() => {
   const styleNames = (style: unknown): string =>
@@ -28,94 +30,104 @@ const mock = vi.hoisted(() => {
     largeText: false,
     reducedMotion: false,
     reduceMotionAtMount: false,
+    screenReader: false,
+    scrollTo: vi.fn(),
     pager: null as null | ((event: ScrollEvent) => void),
+    settle: null as null | ((event: ScrollEvent) => void),
     beginDrag: null as null | (() => void),
     pageDrag: null as null | (() => void),
     reduceMotionChanged: null as null | ((enabled: boolean) => void),
-    view: ({
-      children,
-      testID,
-      style,
-    }: Children & { testID?: string; style?: unknown }) => (
-      <div data-testid={testID} data-style={styleNames(style)}>
-        {children}
-      </div>
-    ),
+    image: () => null,
+    wordmark: () => <span>shelvr</span>,
+    styleNames,
     text: ({ children }: Children) => <span>{children}</span>,
     pressable: ({ children, onPress }: Children & { onPress?: () => void }) => (
       <button type="button" onClick={onPress}>
         {children}
       </button>
     ),
-    button: ({ label, onPress }: { label: string; onPress: () => void }) => (
-      <button type="button" onClick={onPress}>
-        {label}
-      </button>
-    ),
-    phone: ({ children, overlay }: Children & { overlay?: ReactNode }) => (
-      <div>
-        {children}
-        {overlay}
-      </div>
-    ),
-    shareScene: ({ shown }: { shown: boolean }) => (
-      <div>{shown ? "share-scene-shown" : "share-scene-waiting"}</div>
-    ),
-    fileScene: () => <div>file-scene</div>,
-    planScene: () => <div>plan-scene</div>,
-    filedToast: () => <div>filed-toast</div>,
+    phone: ({ children }: Children) => <div>{children}</div>,
   };
 });
 
 vi.mock("react-native", async () => {
   const { useEffect, useImperativeHandle, useRef } = await import("react");
+  const View = ({
+    children,
+    testID,
+    style,
+    onLayout,
+    accessibilityLabel,
+  }: Children & {
+    testID?: string;
+    style?: unknown;
+    onLayout?: (event: unknown) => void;
+    accessibilityLabel?: string;
+  }) => {
+    const laidOut = useRef(false);
+    useEffect(() => {
+      if (!onLayout || laidOut.current) return;
+      laidOut.current = true;
+      onLayout({
+        nativeEvent: { layout: { width: VIEWPORT_WIDTH, height: 530 } },
+      });
+    }, [onLayout]);
+    return (
+      <div
+        aria-label={accessibilityLabel}
+        data-testid={testID}
+        data-style={mock.styleNames(style)}
+      >
+        {children}
+      </div>
+    );
+  };
   const ScrollView = ({
     ref,
     children,
     horizontal,
-    onLayout,
     onScroll,
     onScrollBeginDrag,
+    onMomentumScrollEnd,
   }: Children & {
-    ref?: React.Ref<{ scrollTo: (to: { x: number }) => void }>;
+    ref?: React.Ref<{
+      scrollTo: (to: { x: number; animated: boolean }) => void;
+    }>;
     horizontal?: boolean;
-    onLayout?: (event: unknown) => void;
     onScroll?: (event: ScrollEvent) => void;
     onScrollBeginDrag?: () => void;
+    onMomentumScrollEnd?: (event: ScrollEvent) => void;
   }) => {
     if (horizontal && onScroll) mock.pager = onScroll;
+    if (horizontal && onMomentumScrollEnd) mock.settle = onMomentumScrollEnd;
     if (horizontal && onScrollBeginDrag) mock.beginDrag = onScrollBeginDrag;
     if (!horizontal && onScrollBeginDrag) mock.pageDrag = onScrollBeginDrag;
     useImperativeHandle(ref, () => ({
-      scrollTo: ({ x }: { x: number }) =>
-        onScroll?.({
+      scrollTo: (options: { x: number; animated: boolean }) => {
+        mock.scrollTo(options);
+        const { x } = options;
+        const event = {
           nativeEvent: {
             contentOffset: { x },
-            layoutMeasurement: { width: PAGE_WIDTH },
+            layoutMeasurement: { width: VIEWPORT_WIDTH },
           },
-        }),
+        };
+        onScroll?.(event);
+      },
     }));
-    const laidOut = useRef(false);
-    useEffect(() => {
-      if (!horizontal || laidOut.current) return;
-      laidOut.current = true;
-      onLayout?.({
-        nativeEvent: {
-          layout: { x: 0, y: 0, width: PAGE_WIDTH, height: 600 },
-        },
-      });
-    }, [horizontal, onLayout]);
     return <div>{children}</div>;
   };
   return {
-    View: mock.view,
+    View,
     Text: mock.text,
     Pressable: mock.pressable,
     ScrollView,
     AccessibilityInfo: {
       isReduceMotionEnabled: () => Promise.resolve(mock.reduceMotionAtMount),
-      addEventListener: (_event: string, listener: (on: boolean) => void) => {
-        mock.reduceMotionChanged = listener;
+      isScreenReaderEnabled: () => Promise.resolve(mock.screenReader),
+      addEventListener: (event: string, listener: (on: boolean) => void) => {
+        if (event === "reduceMotionChanged")
+          mock.reduceMotionChanged = listener;
         return { remove: () => (mock.reduceMotionChanged = null) };
       },
     },
@@ -127,48 +139,47 @@ vi.mock("react-native-unistyles", () => ({
       new Proxy({}, { get: (_target, key) => ({ __name: String(key) }) }),
   },
 }));
-vi.mock("react-native-reanimated", () => ({
-  default: { View: mock.view },
-  useReducedMotion: () => mock.reducedMotion,
-}));
-vi.mock("@/lib/motion", () => ({
-  fadeIn: {},
-  fadeOut: {},
-  motion: { duration: { state: 180 } },
-  motionCSS: { out: {} },
+vi.mock("react-native-reanimated", async () => {
+  const { View } = await import("react-native");
+  return {
+    default: { View },
+    useAnimatedStyle: () => ({}),
+    useSharedValue: () => ({ set: vi.fn() }),
+    useReducedMotion: () => mock.reducedMotion,
+  };
+});
+vi.mock("expo-image", () => ({ Image: mock.image }));
+vi.mock("@/components/wordmark", () => ({
+  Wordmark: mock.wordmark,
 }));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
   useAppLocale: () => "en",
 }));
 vi.mock("@/lib/use-large-text", () => ({
-  HEADLINE_MAX_SCALE: 2,
   useLargeText: () => mock.largeText,
 }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mock.capture },
 }));
-vi.mock("@/components/onboarding/parts", () => ({ CtaButton: mock.button }));
 vi.mock("@/components/onboarding/opener-phone", () => ({
   PhoneFrame: mock.phone,
-}));
-vi.mock("@/components/onboarding/opener-scenes", () => ({
-  ShareScene: mock.shareScene,
-  FileScene: mock.fileScene,
-  PlanScene: mock.planScene,
-  FiledToast: mock.filedToast,
+  FULL_PHONE_HEIGHT: 490,
+  FULL_PHONE_WIDTH: 236,
 }));
 
 const { OpenerStep } = await import("@/components/onboarding/opener");
 
 const swipeTo = (index: number) =>
   act(() => {
-    mock.pager?.({
+    const event = {
       nativeEvent: {
-        contentOffset: { x: index * PAGE_WIDTH },
-        layoutMeasurement: { width: PAGE_WIDTH },
+        contentOffset: { x: (index + FIRST_PAGE_INDEX) * PAGE_STRIDE },
+        layoutMeasurement: { width: VIEWPORT_WIDTH },
       },
-    });
+    };
+    mock.pager?.(event);
+    mock.settle?.(event);
   });
 
 const dot = (index: number) =>
@@ -184,7 +195,9 @@ beforeEach(() => {
   mock.largeText = false;
   mock.reducedMotion = false;
   mock.reduceMotionAtMount = false;
+  mock.screenReader = false;
   mock.pager = null;
+  mock.settle = null;
   mock.beginDrag = null;
   mock.pageDrag = null;
   mock.reduceMotionChanged = null;
@@ -202,21 +215,28 @@ const wait = (ms: number) =>
   });
 
 describe("OpenerStep", () => {
-  it("shows the three pages, each with its headline and body", () => {
-    render(
-      <OpenerStep
-        onStart={vi.fn()}
-        onSignIn={vi.fn()}
-        viewedPages={new Set()}
-      />,
-    );
-    for (const page of ["Save", "File", "Plan"]) {
-      expect(screen.getByText(`onboarding.opener${page}Title`)).toBeTruthy();
-      expect(screen.getByText(`onboarding.opener${page}Accent`)).toBeTruthy();
-      expect(screen.getByText(`onboarding.opener${page}Body`)).toBeTruthy();
-    }
-    expect(screen.getByText("file-scene")).toBeTruthy();
-    expect(screen.getByText("plan-scene")).toBeTruthy();
+  it("shows a stable tagline and labels the four previews for assistive technology", () => {
+    renderOpener();
+    expect(screen.getByText("opener.tagline")).toBeTruthy();
+    expect(screen.getByText("opener.yourCities")).toBeTruthy();
+    expect(screen.getByLabelText("opener.yourCities")).toBeTruthy();
+    swipeTo(1);
+    expect(
+      screen.getByText(
+        "onboarding.openerFileTitle onboarding.openerFileAccent",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByText("opener.yourCities")).toBeNull();
+    expect(
+      screen.getByLabelText(/openerFileTitle.*openerFileBody/),
+    ).toBeTruthy();
+    swipeTo(2);
+    expect(screen.getByText("plan.dateNight")).toBeTruthy();
+    expect(screen.getByLabelText("plan.dateNight")).toBeTruthy();
+    swipeTo(3);
+    expect(screen.getByText("trip.yourTripNoCity")).toBeTruthy();
+    expect(screen.getByLabelText("trip.yourTripNoCity")).toBeTruthy();
+    expect(screen.getByText("opener.tagline")).toBeTruthy();
   });
 
   it("lights the dot of the page in view", () => {
@@ -235,8 +255,8 @@ describe("OpenerStep", () => {
     act(() => {
       mock.pager?.({
         nativeEvent: {
-          contentOffset: { x: 2 * PAGE_WIDTH - 40 },
-          layoutMeasurement: { width: PAGE_WIDTH },
+          contentOffset: { x: (2 + FIRST_PAGE_INDEX) * PAGE_STRIDE - 40 },
+          layoutMeasurement: { width: VIEWPORT_WIDTH },
         },
       });
     });
@@ -278,20 +298,22 @@ describe("OpenerStep", () => {
     expect(onSignIn).toHaveBeenCalledTimes(3);
   });
 
-  it("plays a page's entrance once the page is reached, and keeps it", () => {
-    render(
-      <OpenerStep
-        onStart={vi.fn()}
-        onSignIn={vi.fn()}
-        viewedPages={new Set()}
-      />,
-    );
-    expect(screen.getByText("share-scene-shown")).toBeTruthy();
-    expect(screen.queryByText("filed-toast")).toBeNull();
-    swipeTo(1);
-    expect(screen.getByText("filed-toast")).toBeTruthy();
-    swipeTo(0);
-    expect(screen.getByText("filed-toast")).toBeTruthy();
+  it("wraps a swipe in either direction and recenters on the matching preview", () => {
+    renderOpener();
+    act(() => mock.beginDrag?.());
+    swipeTo(-1);
+    expect(dot(3)).toContain("dotOn");
+    expect(mock.scrollTo).toHaveBeenLastCalledWith({
+      x: 5 * PAGE_STRIDE,
+      animated: false,
+    });
+    swipeTo(4);
+    expect(dot(0)).toContain("dotOn");
+    expect(mock.scrollTo).toHaveBeenLastCalledWith({
+      x: 2 * PAGE_STRIDE,
+      animated: false,
+    });
+    expect(pageViews()).toEqual([0, 3]);
   });
 
   it("reports each page the first time it is shown", () => {
@@ -337,7 +359,8 @@ describe("OpenerStep", () => {
     expect(pageViews()).toEqual([0, 1, 2]);
   });
 
-  it("keeps sign-in with each page's copy at the large text sizes", () => {
+  it("keeps both actions available and pauses rotation at large text sizes", () => {
+    vi.useFakeTimers();
     mock.largeText = true;
     render(
       <OpenerStep
@@ -346,21 +369,28 @@ describe("OpenerStep", () => {
         viewedPages={new Set()}
       />,
     );
-    expect(screen.getAllByText("onboarding.haveAccount")).toHaveLength(3);
+    expect(screen.getByText("onboarding.haveAccount")).toBeTruthy();
     expect(screen.getByText("opener.getStarted")).toBeTruthy();
+    wait(20000);
+    expect(dot(0)).toContain("dotOn");
   });
 
-  it("advances a page every four seconds and stops on the last", () => {
+  it("advances every three seconds and loops continuously", () => {
     vi.useFakeTimers();
     renderOpener();
-    wait(3999);
+    wait(2999);
     expect(dot(0)).toContain("dotOn");
     wait(1);
     expect(dot(1)).toContain("dotOn");
-    wait(4000);
+    wait(3000);
     expect(dot(2)).toContain("dotOn");
-    wait(20000);
-    expect(dot(2)).toContain("dotOn");
+    wait(3000);
+    expect(dot(3)).toContain("dotOn");
+    wait(3000);
+    expect(dot(0)).toContain("dotOn");
+    wait(3000);
+    expect(dot(1)).toContain("dotOn");
+    expect(pageViews()).toEqual([0, 1, 2, 3]);
   });
 
   it("stops advancing for good once the person swipes", () => {
@@ -381,10 +411,19 @@ describe("OpenerStep", () => {
     expect(dot(0)).toContain("dotOn");
   });
 
+  it("pauses while a screen reader is enabled", async () => {
+    vi.useFakeTimers();
+    mock.screenReader = true;
+    renderOpener();
+    await act(async () => {});
+    wait(20000);
+    expect(dot(0)).toContain("dotOn");
+  });
+
   it("stops advancing when Reduce Motion is turned on mid-way", () => {
     vi.useFakeTimers();
     renderOpener();
-    wait(4000);
+    wait(3000);
     expect(dot(1)).toContain("dotOn");
     act(() => mock.reduceMotionChanged?.(true));
     wait(20000);

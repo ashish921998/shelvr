@@ -800,6 +800,7 @@
   "cityCard.legendVisited": "Déjà visité",
   "cityCard.mapLabel": "Image de la carte de %{city}",
   "opener.tagline": "Enregistrez les adresses. On planifie le rendez-vous ou le voyage.",
+  "opener.yourCities": "Vos villes",
   "onboardingQ.skip": "Passer",
   "onboardingQ.savedTitle": "Combien de lieux avez-vous enregistrés ?",
   "onboardingQ.savedFew": "Juste quelques-unes",

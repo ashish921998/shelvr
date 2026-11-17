@@ -746,6 +746,7 @@
   "cityCard.legendVisited": "가본 곳",
   "cityCard.mapLabel": "%{city} 지도 카드",
   "opener.tagline": "장소를 저장하세요. 데이트도 여행도 계획은 저희가 할게요.",
+  "opener.yourCities": "내 도시",
   "onboardingQ.skip": "건너뛰기",
   "onboardingQ.savedTitle": "장소를 얼마나 저장했나요?",
   "onboardingQ.savedFew": "몇 개뿐",
