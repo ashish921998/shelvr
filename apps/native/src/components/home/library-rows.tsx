@@ -55,7 +55,7 @@ export function LibraryRows({ cityCount }: { cityCount?: number }) {
         />
       ) : null}
       <HomeRow
-        icon="bookmark"
+        icon="rectangle.stack"
         name={t("homePlaces.collections")}
         onPress={() => router.push("/collections")}
       />
