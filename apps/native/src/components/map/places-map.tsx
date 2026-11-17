@@ -203,14 +203,22 @@ export function PlacesMap({
   }, [locate]);
 
   const framedOnce = useRef(showsUser || firstCamera !== undefined);
+  const canFrameLatePlaces =
+    !showsUser &&
+    filterRevision === 0 &&
+    !focus &&
+    !locate &&
+    !zoomOut &&
+    !!fit;
   useEffect(() => {
-    if (showsUser || framedOnce.current || !fit) return;
+    const initialFit = latest.current.fit;
+    if (framedOnce.current || !canFrameLatePlaces || !initialFit) return;
     framedOnce.current = true;
     return moveCamera(
-      () => map()?.setCameraPosition(fit),
+      () => map()?.setCameraPosition(initialFit),
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
-  }, [showsUser, fit]);
+  }, [canFrameLatePlaces]);
 
   const trackCamera = (event: {
     coordinates: { latitude?: number; longitude?: number };

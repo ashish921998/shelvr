@@ -8,6 +8,7 @@ import { type MapFocus, PlacesMap } from "./places-map";
 type Camera = { coordinates: object; zoom: number };
 
 const mock = vi.hoisted(() => ({
+  moveToPlace: vi.fn(() => Promise.resolve()),
   moves: [] as (Camera | "person")[],
   props: {} as Record<string, any>,
   cluster: {} as Record<string, any>,
@@ -38,7 +39,7 @@ vi.mock("expo-maps", () => ({
         setCameraPosition: (camera?: Camera) => {
           mock.moves.push(camera ?? "person");
           return camera
-            ? Promise.resolve()
+            ? mock.moveToPlace()
             : Promise.reject(new Error("no location yet"));
         },
       }));
@@ -290,25 +291,28 @@ it("flies out to frame every place when asked to zoom out", async () => {
 });
 
 it("frames the first saved places once when the map opened empty without location", async () => {
-  const noLocation = (pins: typeof AUSTIN) => (
+  const noLocation = (pins: typeof AUSTIN, bottomInset = 120) => (
     <PlacesMap
       pins={pins}
       framed={pins}
       showsUser={false}
       height={800}
       topInset={100}
-      bottomInset={120}
+      bottomInset={bottomInset}
       onSelect={vi.fn()}
     />
   );
   const { rerender } = render(noLocation([]));
   expect(mock.props.cameraPosition).toBeUndefined();
+  mock.moveToPlace.mockRejectedValueOnce(new Error("map is mounting"));
   rerender(noLocation(AUSTIN));
+  await act(() => vi.advanceTimersByTimeAsync(10));
+  rerender(noLocation(AUSTIN, 170));
   await act(() => vi.advanceTimersByTimeAsync(200));
-  expect(mock.moves).toHaveLength(1);
+  expect(mock.moves).toHaveLength(2);
   rerender(noLocation(AUSTIN.slice(0, 1)));
   await act(() => vi.advanceTimersByTimeAsync(200));
-  expect(mock.moves).toHaveLength(1);
+  expect(mock.moves).toHaveLength(2);
 });
 
 it("keeps the chosen area when location access is turned off later", async () => {
