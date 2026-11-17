@@ -20,7 +20,15 @@ export function LibraryRows({ cityCount }: { cityCount?: number }) {
     ),
     retry: false,
   });
-  useReportLoadFailure("library_trip_count_failed", tripTotal);
+  const countUnavailableInDev =
+    __DEV__ &&
+    tripTotal.error?.message.includes(
+      "Could not find public function for 'tripPlannerData:countTripPlans'",
+    );
+  useReportLoadFailure("library_trip_count_failed", {
+    error: countUnavailableInDev ? null : tripTotal.error,
+    isSuccess: tripTotal.isSuccess,
+  });
   const trips = tripTotal.data;
   const tripsTitle = t("navigation.trips");
   const tripCount = trips && countLabel(trips.count, trips.more);

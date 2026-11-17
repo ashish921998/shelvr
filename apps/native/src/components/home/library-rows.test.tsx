@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen } from "@testing-library/react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { LibraryRows } from "@/components/home/library-rows";
 
@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   trips: undefined as { count: number; more: boolean } | undefined,
   tripsArgs: [] as unknown[],
   tripError: null as Error | null,
+  report: vi.fn(),
 }));
 
 vi.mock("@/components/home/home-row", () => ({
@@ -45,7 +46,7 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: mocks.trips, error: mocks.tripError }),
 }));
 vi.mock("@/lib/use-report-load-failure", () => ({
-  useReportLoadFailure: vi.fn(),
+  useReportLoadFailure: mocks.report,
 }));
 vi.mock("expo-router", () => ({
   useRouter: () => ({ push: mocks.push, navigate: mocks.navigate }),
@@ -54,6 +55,8 @@ vi.mock("expo-router", () => ({
 const rows = (count: number) => Array.from({ length: count }, () => ({}));
 
 beforeEach(() => {
+  vi.stubGlobal("__DEV__", true);
+  mocks.report.mockClear();
   mocks.push.mockReset();
   mocks.navigate.mockReset();
   mocks.signedIn = true;
@@ -62,6 +65,8 @@ beforeEach(() => {
   mocks.tripsArgs = [];
   mocks.tripError = null;
 });
+
+afterEach(() => vi.unstubAllGlobals());
 
 it("counts every save and trip once all of them are loaded", () => {
   render(<LibraryRows />);
@@ -144,8 +149,29 @@ it("keeps Trips and Collections usable if the trip count fails", () => {
   mocks.trips = undefined;
   mocks.tripError = new Error("Trip count unavailable");
   render(<LibraryRows />);
+  expect(mocks.report).toHaveBeenCalledWith(
+    "library_trip_count_failed",
+    expect.objectContaining({ error: mocks.tripError }),
+  );
   fireEvent.click(screen.getByRole("button", { name: "Trips" }));
   expect(mocks.navigate).toHaveBeenCalledWith("/(app)/(tabs)/(trips)");
   fireEvent.click(screen.getByRole("button", { name: "Collections" }));
   expect(mocks.push).toHaveBeenCalledWith("/collections");
 });
+
+it.each([true, false])(
+  "reports the undeployed count query only outside dev (dev: %s)",
+  (dev) => {
+    vi.stubGlobal("__DEV__", dev);
+    mocks.trips = undefined;
+    mocks.tripError = new Error(
+      "Could not find public function for 'tripPlannerData:countTripPlans'.",
+    );
+    render(<LibraryRows />);
+    expect(screen.getByRole("button", { name: "Trips" })).toBeTruthy();
+    expect(mocks.report).toHaveBeenCalledWith(
+      "library_trip_count_failed",
+      expect.objectContaining({ error: dev ? null : mocks.tripError }),
+    );
+  },
+);
