@@ -68,7 +68,9 @@ function CategoryChip({
         <AppSymbolIcon
           name={icon}
           size={16}
-          tintColor={selected ? theme.colors.onTint : theme.colors.foreground}
+          tintColor={
+            selected ? theme.colors.primaryText : theme.colors.foreground
+          }
         />
       ) : null}
       <ThemedText
