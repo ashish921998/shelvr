@@ -4,7 +4,6 @@ import { FreeSavesCard, ProCard } from "@/components/home/pro-card";
 import { HomeHeader } from "@/components/home/home-header";
 import { HomeSearch } from "@/components/home/home-search";
 import { RecentSaves } from "@/components/home/recent-saves";
-import { SharedListsNudge } from "@/components/home/shared-lists-nudge";
 import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
@@ -153,7 +152,6 @@ export default function HomeScreen() {
           </>
         ) : (
           <HomeSearch top={top}>
-            <SharedListsNudge />
             {items.length > 0 ? (
               <>
                 <HomePlaces saves={items} />

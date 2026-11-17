@@ -702,6 +702,9 @@ type MessageParams = {
   "homePlaces.spotCount": { count: number };
   "homePlaces.yourSpaces": undefined;
   "homePlaces.recents": undefined;
+  "homePlaces.collections": undefined;
+  "homePlaces.createCollection": undefined;
+  "homePlaces.newCollection": undefined;
   "homePlaces.allSaves": undefined;
   "homePlaces.cities": undefined;
   "homePlaces.withoutPlace": undefined;

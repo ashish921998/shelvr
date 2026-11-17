@@ -96,7 +96,11 @@ export default function NewSharedListScreen() {
   const create = useMutation(api.sharedLists.createSharedList);
   const { guard, loading } = usePaywallGuard("shared_list");
   const [name, setName] = useState("");
-  const { city: cityParam } = useLocalSearchParams<{ city?: string }>();
+  const { city: cityParam, from } = useLocalSearchParams<{
+    city?: string;
+    from?: string;
+  }>();
+  const fromCollections = from === "collections";
   const [picked, setPicked] = useState<string[]>(() =>
     cityParam ? [cityParam.slice(0, MAX_CITY_CHARS)] : [],
   );
@@ -139,7 +143,7 @@ export default function NewSharedListScreen() {
       });
       analytics.capture("shared_list_created", { cities: picked.length });
       void haptics.success();
-      await shareInvite(inviteToken, "new");
+      if (!fromCollections) await shareInvite(inviteToken, "new");
       router.replace({ pathname: "/shared-list/[id]", params: { id: listId } });
     } catch (error) {
       analytics.captureError("shared_list_create_failed", error);
@@ -153,7 +157,11 @@ export default function NewSharedListScreen() {
     <View style={styles.screen} accessibilityViewIsModal>
       <Stack.Screen
         options={{
-          title: t("sharedLists.newTitle"),
+          title: t(
+            fromCollections
+              ? "homePlaces.newCollection"
+              : "sharedLists.newTitle",
+          ),
           headerTitleStyle: {
             ...theme.type.title,
             color: theme.colors.foreground,
@@ -263,15 +271,24 @@ export default function NewSharedListScreen() {
         </FormSection>
       </ScrollView>
       <View style={styles.footer}>
-        <ThemedText variant="footnote" style={[styles.muted, styles.hint]}>
-          {t("sharedLists.inviteHint")}
-        </ThemedText>
+        {!fromCollections ? (
+          <ThemedText variant="footnote" style={[styles.muted, styles.hint]}>
+            {t("sharedLists.inviteHint")}
+          </ThemedText>
+        ) : null}
         <Button
           testID="new-shared-list-submit"
-          title={t("sharedLists.sendInvite")}
+          title={t(
+            fromCollections
+              ? "homePlaces.createCollection"
+              : "sharedLists.sendInvite",
+          )}
           disabled={name.trim() === "" || picked.length === 0}
           loading={busy || loading}
-          onPress={() => nameGate.gate(() => void submit())}
+          onPress={() => {
+            if (fromCollections) void submit();
+            else nameGate.gate(() => void submit());
+          }}
         />
       </View>
       <NameSheet

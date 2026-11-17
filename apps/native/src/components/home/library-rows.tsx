@@ -54,6 +54,11 @@ export function LibraryRows({ cityCount }: { cityCount?: number }) {
           onPress={() => router.push("/saves")}
         />
       ) : null}
+      <HomeRow
+        icon="bookmark"
+        name={t("homePlaces.collections")}
+        onPress={() => router.push("/collections")}
+      />
     </>
   );
 }

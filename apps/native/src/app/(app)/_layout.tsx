@@ -119,6 +119,7 @@ export default function AppLayout() {
             />
             <Stack.Screen name="saves" options={{ headerShown: false }} />
             <Stack.Screen name="cities" options={{ headerShown: false }} />
+            <Stack.Screen name="collections" options={{ headerShown: false }} />
             <Stack.Screen
               name="how-to-share"
               options={{ headerShown: false }}
