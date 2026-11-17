@@ -23,7 +23,6 @@ function project(pin: Pin, worldWidth: number) {
 export function clusterMapPins<T extends Pin>(
   pins: readonly T[],
   worldWidth: number,
-  spacing = MARKER_SPACING,
 ) {
   const groups: { x: number; y: number; pins: T[] }[] = [];
   for (const pin of [...pins].sort((a, b) => a.id.localeCompare(b.id))) {
@@ -35,7 +34,7 @@ export function clusterMapPins<T extends Pin>(
           group.x -
           next.x -
           Math.round((group.x - next.x) / worldWidth) * worldWidth;
-        return Math.hypot(dx, group.y - next.y) < spacing;
+        return Math.hypot(dx, group.y - next.y) < MARKER_SPACING;
       })) !== -1
     ) {
       const previous = groups.splice(index, 1)[0]!;

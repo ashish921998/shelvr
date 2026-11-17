@@ -105,14 +105,5 @@
     "vite": "^8.2.4",
     "vitest": "^4.1.11"
   },
-  "expo": {
-    "autolinking": {
-      "ios": {
-        "buildFromSource": [
-          "expo-maps"
-        ]
-      }
-    }
-  },
   "private": true
 }

@@ -232,8 +232,7 @@ export default function MapScreen() {
           bottomInset={
             barHeight +
             (filters.length > 0 || showWent ? stripHeight : 0) +
-            theme.gap(6) +
-            (located ? theme.control.minHeight + theme.gap(1.5) : 0)
+            theme.gap(1)
           }
           focus={focus}
           locate={locate}

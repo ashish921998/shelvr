@@ -12,6 +12,14 @@ import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+const LANDMARKS = [
+  AppleMaps.PointOfInterestCategory.LANDMARK,
+  AppleMaps.PointOfInterestCategory.MUSEUM,
+  AppleMaps.PointOfInterestCategory.CASTLE,
+  AppleMaps.PointOfInterestCategory.FORTRESS,
+  AppleMaps.PointOfInterestCategory.PARK,
+];
+
 /** How long the camera must rest after moving to the person before the map checks what is near. */
 const SETTLE_MS = 600;
 /** After this, the opening check is dropped so it never pulls back a camera the person moved. */
@@ -56,14 +64,13 @@ export function PlacesMap({
   onCentreChange,
   onSelect,
 }: Props) {
-  const { theme, rt } = useUnistyles();
+  const { rt } = useUnistyles();
   const appleRef = useRef<AppleMaps.MapView>(null);
   const googleRef = useRef<GoogleMaps.MapView>(null);
   // Whichever map this platform rendered.
   const map = () => appleRef.current ?? googleRef.current;
   const { width } = rt.screen;
   const clustered = useMapPinClusters(pins, onSelect, {
-    spacing: 112,
     clearSelection: () => appleRef.current?.selectMarker(undefined),
   });
 
@@ -246,10 +253,7 @@ export function PlacesMap({
         properties={{
           isMyLocationEnabled: showsUser,
           emphasis: "MUTED" as AppleMaps.MapProperties["emphasis"],
-          pointsOfInterest: { including: [] },
-          compactMarkers: true,
-          markerLabelColor: theme.colors.foreground,
-          markerLabelBackground: theme.colors.surface,
+          pointsOfInterest: { including: LANDMARKS },
         }}
         uiSettings={{
           compassEnabled: false,

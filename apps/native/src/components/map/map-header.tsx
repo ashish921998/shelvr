@@ -1,4 +1,4 @@
-import { AppSymbolIcon } from "@/components/symbol";
+import { BackCircle } from "@/components/back-circle";
 import {
   MapAvatarButton,
   MapRoundButton,
@@ -15,7 +15,6 @@ export const MAP_HEADER_HEIGHT = 50;
 
 function CityTitle({ city }: { city: string }) {
   const router = useRouter();
-  const { theme } = useUnistyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -23,22 +22,17 @@ function CityTitle({ city }: { city: string }) {
       onPress={() =>
         router.push({ pathname: "/city/[name]", params: { name: city } })
       }
-      style={({ pressed }) => [styles.cityButton, pressed && styles.pressed]}
+      style={({ pressed }) => [styles.title, pressed && styles.pressed]}
     >
       <ThemedText
-        variant="title"
+        variant="displayTitle"
         numberOfLines={1}
         adjustsFontSizeToFit
-        minimumFontScale={0.8}
+        minimumFontScale={0.6}
         style={styles.city}
       >
         {city}
       </ThemedText>
-      <AppSymbolIcon
-        name="chevron.right"
-        size={14}
-        tintColor={theme.colors.muted}
-      />
     </Pressable>
   );
 }
@@ -76,11 +70,7 @@ export function MapHeader({
   }
   const back =
     city && !searchOpen && onShowAllCities ? (
-      <MapRoundButton
-        icon="map"
-        label={t("map.showAllCities")}
-        onPress={onShowAllCities}
-      />
+      <BackCircle label={t("map.showAllCities")} onPress={onShowAllCities} />
     ) : null;
   let right = null;
   if (searchOpen) {
@@ -127,43 +117,22 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.gap(2.5),
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.gap(1),
+    gap: 7,
   },
-  actions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1),
-  },
+  actions: { flexDirection: "row", alignItems: "center", gap: 14 },
   title: {
     flex: 1,
     minWidth: 0,
     flexDirection: "row",
     alignItems: "center",
-    minHeight: theme.control.minHeight,
-    paddingHorizontal: theme.gap(1.5),
-    borderRadius: theme.radius.xl,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  cityButton: {
-    flex: 1,
-    minWidth: 0,
-    minHeight: theme.control.minHeight,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: theme.gap(0.75),
-    paddingHorizontal: theme.gap(1.5),
-    borderRadius: theme.radius.xl,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-    boxShadow: "0 2px 6px rgba(43, 36, 24, 0.10)",
   },
   city: {
-    flex: 1,
     flexShrink: 1,
+    fontSize: 32,
+    lineHeight: 44,
+    textShadowColor: theme.colors.frame,
+    textShadowRadius: 5,
+    textShadowOffset: { width: 0, height: 0 },
   },
   cancel: {
     height: 48,

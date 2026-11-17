@@ -29,13 +29,13 @@ function Chip({
       accessibilityLabel={label}
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={({ pressed }) => pressed && styles.pressed}
+      style={({ pressed }) => [styles.target, pressed && styles.pressed]}
     >
       {/* Solid, not glass: a see-through chip is unreadable over busy map labels. */}
       <View style={[styles.chip, selected ? styles.selected : styles.plain]}>
         <AppSymbolIcon
           name={icon}
-          size={16}
+          size={14}
           tintColor={
             selected ? theme.colors.primaryText : theme.colors.foreground
           }
@@ -88,14 +88,18 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: theme.gap(0.5),
   },
   flush: { paddingHorizontal: 0, paddingVertical: theme.gap(0.5) },
+  target: {
+    minHeight: theme.control.minHeight,
+    justifyContent: "center",
+  },
   chip: {
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(0.75),
-    boxShadow: "0 1px 3px rgba(43, 36, 24, 0.16)",
-    minHeight: theme.control.minHeight,
+    boxShadow: "0 1px 3px rgba(43, 36, 24, 0.08)",
+    minHeight: theme.gap(4.5),
     justifyContent: "center",
-    paddingHorizontal: theme.gap(1.75),
+    paddingHorizontal: theme.gap(1.5),
     borderRadius: theme.radius.xl,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.border,
@@ -107,7 +111,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   plain: { backgroundColor: theme.colors.frame },
   label: {
-    ...theme.type.secondaryLabel,
+    ...theme.type.label,
     color: theme.colors.foreground,
   },
   labelSelected: { color: theme.colors.primaryText },

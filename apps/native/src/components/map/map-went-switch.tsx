@@ -35,11 +35,13 @@ export function MapWentSwitch({
                 void haptics.selection();
                 onSelect(value);
               }}
-              style={[styles.segment, on && styles.segmentOn]}
+              style={styles.segment}
             >
-              <Text style={[styles.label, on && styles.labelOn]}>
-                {t(label)}
-              </Text>
+              <View style={[styles.pill, on && styles.pillOn]}>
+                <Text style={[styles.label, on && styles.labelOn]}>
+                  {t(label)}
+                </Text>
+              </View>
             </Pressable>
           );
         })}
@@ -54,12 +56,12 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     padding: theme.gap(0.5),
     gap: theme.gap(0.5),
-    borderRadius: 999,
+    borderRadius: theme.radius.xl,
     borderCurve: "continuous",
     backgroundColor: theme.colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.border,
-    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.10)",
+    boxShadow: "0 1px 4px rgba(43, 36, 24, 0.08)",
   },
   segment: {
     flex: 1,
@@ -68,16 +70,24 @@ const styles = StyleSheet.create((theme) => ({
     minHeight: theme.control.minHeight,
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: theme.gap(1),
+  },
+  pill: {
+    alignSelf: "stretch",
+    minHeight: theme.gap(4.5),
+    justifyContent: "center",
+    paddingVertical: theme.gap(0.75),
     paddingHorizontal: theme.gap(1),
-    borderRadius: 999,
+    borderRadius: theme.radius.xl,
     borderCurve: "continuous",
   },
-  segmentOn: { backgroundColor: theme.colors.foreground },
+  pillOn: { backgroundColor: theme.colors.primarySoft },
   label: {
-    ...theme.type.secondaryLabel,
+    ...theme.type.label,
     textAlign: "center",
-    color: theme.colors.foreground,
+    color: theme.colors.muted,
   },
-  labelOn: { color: theme.colors.background },
+  labelOn: {
+    fontFamily: theme.fonts.bold,
+    color: theme.colors.primaryText,
+  },
 }));

@@ -30,13 +30,6 @@ it("combines nearby pins at overview scale and separates them when zoomed in", (
   );
 });
 
-it("leaves room for map labels without changing the default marker spacing", () => {
-  const pins = [pin("a", 0), pin("b", 7)];
-  expect(clusterMapPins(pins, 3600)).toHaveLength(2);
-  expect(clusterMapPins(pins, 3600, 112)).toHaveLength(1);
-  expect(clusterMapPins(pins, 36000, 112)).toHaveLength(2);
-});
-
 it("preserves every place at identical coordinates and is independent of input order", () => {
   const pins = [pin("a", 0), pin("b", 0), pin("c", 0)];
   const groups = clusterMapPins(pins, 36000);
