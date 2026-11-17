@@ -8,7 +8,7 @@ import { afterEach, vi } from "vitest";
 // Components load bundled photos with Metro's `require("x.jpg")`, which Node
 // would parse as JavaScript. Resolve them to an asset id like Metro does.
 const requireExtensions = createRequire(import.meta.url).extensions;
-for (const ext of [".jpg", ".jpeg", ".png"]) {
+for (const ext of [".jpg", ".jpeg", ".png", ".webp"]) {
   requireExtensions[ext] = (module) => {
     module.exports = 1;
   };

@@ -747,6 +747,8 @@
   "cityCard.mapLabel": "%{city} 지도 카드",
   "opener.tagline": "장소를 저장하세요. 데이트도 여행도 계획은 저희가 할게요.",
   "opener.yourCities": "내 도시",
+  "opener.datePreviewDescription": "두 곳을 잇는 도보 11분 코스와 공유할 수 있는 계획.",
+  "opener.tripPreviewDescription": "저장한 장소가 포함된 3일 여행 일정.",
   "onboardingQ.skip": "건너뛰기",
   "onboardingQ.savedTitle": "장소를 얼마나 저장했나요?",
   "onboardingQ.savedFew": "몇 개뿐",

@@ -33,7 +33,6 @@ import { StyleSheet } from "react-native-unistyles";
 const APP_ICON = require("../../../assets/icon.png");
 
 type Page = {
-  key: "cities" | "file" | "plan" | "date";
   title: TextMessageKey;
   accent?: TextMessageKey;
   body?: TextMessageKey;
@@ -42,25 +41,23 @@ type Page = {
 
 const PAGES: Page[] = [
   {
-    key: "cities",
     title: "opener.yourCities",
     source: require("../../../assets/onboarding/your-cities.webp"),
   },
   {
-    key: "file",
     title: "onboarding.openerFileTitle",
     accent: "onboarding.openerFileAccent",
     body: "onboarding.openerFileBody",
     source: require("../../../assets/onboarding/san-francisco-places.webp"),
   },
   {
-    key: "date",
     title: "plan.dateNight",
+    body: "opener.datePreviewDescription",
     source: require("../../../assets/onboarding/san-francisco-date.webp"),
   },
   {
-    key: "plan",
     title: "trip.yourTripNoCity",
+    body: "opener.tripPreviewDescription",
     source: require("../../../assets/onboarding/san-francisco-trip.webp"),
   },
 ];
@@ -128,7 +125,7 @@ function PhonePreview({
       transform: [
         { perspective: 900 },
         { rotateY: `${angle}deg` },
-        { scale: 1 - proximity * 0.04 },
+        { scale: scale * (1 - proximity * 0.04) },
       ],
     };
   });
@@ -136,15 +133,13 @@ function PhonePreview({
   return (
     <View style={[styles.slot, { width: stride, height }]}>
       <Animated.View style={emphasis}>
-        <View style={{ transform: [{ scale }] }}>
-          <PhoneFrame full>
-            <Image
-              source={item.source}
-              style={styles.previewImage}
-              contentFit="cover"
-            />
-          </PhoneFrame>
-        </View>
+        <PhoneFrame full>
+          <Image
+            source={item.source}
+            style={styles.previewImage}
+            contentFit="cover"
+          />
+        </PhoneFrame>
       </Animated.View>
     </View>
   );
@@ -165,7 +160,6 @@ function OpenerCarousel({
   const [trackHeight, setTrackHeight] = useState(0);
   const pager = useRef<ScrollViewInstance>(null);
   const deckIndex = useRef(LEADING_PREVIEWS);
-  const autoTarget = useRef<number | null>(null);
   const position = useSharedValue(LEADING_PREVIEWS);
   const stride = Math.max(1, Math.round(width * 0.68));
   const scale = Math.min(
@@ -187,9 +181,10 @@ function OpenerCarousel({
   useEffect(() => {
     if (paused || trackHeight === 0) return;
     const timer = setTimeout(() => {
-      const target = (deckIndex.current + 1) * stride;
-      autoTarget.current = target;
-      pager.current?.scrollTo({ x: target, animated: true });
+      pager.current?.scrollTo({
+        x: (deckIndex.current + 1) * stride,
+        animated: true,
+      });
     }, AUTO_ADVANCE_MS);
     return () => clearTimeout(timer);
   }, [page, paused, stride, trackHeight]);
@@ -203,32 +198,16 @@ function OpenerCarousel({
     setPage(logicalPage(index));
   };
 
-  const recenter = (x: number) => {
+  const settle = ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { x } = nativeEvent.contentOffset;
+    const { targetContentOffset } = nativeEvent;
+    if (targetContentOffset && Math.abs(targetContentOffset.x - x) > 1) return;
     const index = Math.round(x / stride);
     const canonical = logicalPage(index) + LEADING_PREVIEWS;
     if (Math.abs(x - index * stride) > 1 || index === canonical) return;
-    pager.current?.scrollTo({ x: canonical * stride, animated: false });
-    updatePosition(canonical * stride);
-  };
-
-  const settle = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    recenter(event.nativeEvent.contentOffset.x);
-  };
-
-  const stopAutoplay = () => {
-    autoTarget.current = null;
-    onInteract();
-  };
-
-  const onScroll = ({
-    nativeEvent,
-  }: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const { x } = nativeEvent.contentOffset;
-    updatePosition(x);
-    if (autoTarget.current === null || Math.abs(x - autoTarget.current) > 1)
-      return;
-    autoTarget.current = null;
-    recenter(x);
+    const offset = canonical * stride;
+    pager.current?.scrollTo({ x: offset, animated: false });
+    updatePosition(offset);
   };
 
   const title = active.accent
@@ -248,7 +227,7 @@ function OpenerCarousel({
           const next = page + (nativeEvent.actionName === "increment" ? 1 : -1);
           const index =
             ((next + PAGES.length) % PAGES.length) + LEADING_PREVIEWS;
-          stopAutoplay();
+          onInteract();
           pager.current?.scrollTo({ x: index * stride, animated: false });
           updatePosition(index * stride);
         }}
@@ -272,14 +251,16 @@ function OpenerCarousel({
             bounces={false}
             accessibilityElementsHidden
             importantForAccessibility="no-hide-descendants"
-            onScroll={onScroll}
-            onScrollBeginDrag={stopAutoplay}
+            onScroll={({ nativeEvent }) =>
+              updatePosition(nativeEvent.contentOffset.x)
+            }
+            onScrollBeginDrag={onInteract}
             onScrollEndDrag={settle}
             onMomentumScrollEnd={settle}
           >
             {DECK.map((item, index) => (
               <PhonePreview
-                key={`${item.key}-${index}`}
+                key={`${item.title}-${index}`}
                 item={item}
                 index={index}
                 stride={stride}
@@ -306,7 +287,7 @@ function OpenerCarousel({
         <View style={styles.dots}>
           {PAGES.map((item, index) => (
             <View
-              key={item.key}
+              key={item.title}
               testID={`opener-dot-${index}`}
               style={[styles.dot, page === index && styles.dotOn]}
             />

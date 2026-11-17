@@ -774,6 +774,8 @@
   "cityCard.mapLabel": "Map card for %{city}",
   "opener.tagline": "Save the spots. We'll plan the date or the trip.",
   "opener.yourCities": "Your cities",
+  "opener.datePreviewDescription": "Two stops, an 11-minute walk, and a plan to share.",
+  "opener.tripPreviewDescription": "A three-day itinerary with places from your saves.",
   "onboardingQ.skip": "Skip",
   "onboardingQ.savedTitle": "How many places have you saved?",
   "onboardingQ.savedFew": "Just a few",

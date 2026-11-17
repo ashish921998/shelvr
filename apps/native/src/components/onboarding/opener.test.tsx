@@ -7,8 +7,12 @@ type Children = { children?: ReactNode };
 type ScrollEvent = {
   nativeEvent: {
     contentOffset: { x: number };
-    layoutMeasurement: { width: number };
+    targetContentOffset?: { x: number };
   };
+};
+
+type AdjustmentEvent = {
+  nativeEvent: { actionName: "increment" | "decrement" };
 };
 
 const VIEWPORT_WIDTH = 390;
@@ -34,6 +38,8 @@ const mock = vi.hoisted(() => {
     scrollTo: vi.fn(),
     pager: null as null | ((event: ScrollEvent) => void),
     settle: null as null | ((event: ScrollEvent) => void),
+    endDrag: null as null | ((event: ScrollEvent) => void),
+    adjust: null as null | ((event: AdjustmentEvent) => void),
     beginDrag: null as null | (() => void),
     pageDrag: null as null | (() => void),
     reduceMotionChanged: null as null | ((enabled: boolean) => void),
@@ -58,12 +64,15 @@ vi.mock("react-native", async () => {
     style,
     onLayout,
     accessibilityLabel,
+    onAccessibilityAction,
   }: Children & {
     testID?: string;
     style?: unknown;
     onLayout?: (event: unknown) => void;
     accessibilityLabel?: string;
+    onAccessibilityAction?: (event: AdjustmentEvent) => void;
   }) => {
+    if (onAccessibilityAction) mock.adjust = onAccessibilityAction;
     const laidOut = useRef(false);
     useEffect(() => {
       if (!onLayout || laidOut.current) return;
@@ -88,6 +97,7 @@ vi.mock("react-native", async () => {
     horizontal,
     onScroll,
     onScrollBeginDrag,
+    onScrollEndDrag,
     onMomentumScrollEnd,
   }: Children & {
     ref?: React.Ref<{
@@ -96,10 +106,12 @@ vi.mock("react-native", async () => {
     horizontal?: boolean;
     onScroll?: (event: ScrollEvent) => void;
     onScrollBeginDrag?: () => void;
+    onScrollEndDrag?: (event: ScrollEvent) => void;
     onMomentumScrollEnd?: (event: ScrollEvent) => void;
   }) => {
     if (horizontal && onScroll) mock.pager = onScroll;
     if (horizontal && onMomentumScrollEnd) mock.settle = onMomentumScrollEnd;
+    if (horizontal && onScrollEndDrag) mock.endDrag = onScrollEndDrag;
     if (horizontal && onScrollBeginDrag) mock.beginDrag = onScrollBeginDrag;
     if (!horizontal && onScrollBeginDrag) mock.pageDrag = onScrollBeginDrag;
     useImperativeHandle(ref, () => ({
@@ -109,10 +121,10 @@ vi.mock("react-native", async () => {
         const event = {
           nativeEvent: {
             contentOffset: { x },
-            layoutMeasurement: { width: VIEWPORT_WIDTH },
           },
         };
         onScroll?.(event);
+        if (options.animated) onMomentumScrollEnd?.(event);
       },
     }));
     return <div>{children}</div>;
@@ -175,7 +187,6 @@ const swipeTo = (index: number) =>
     const event = {
       nativeEvent: {
         contentOffset: { x: (index + FIRST_PAGE_INDEX) * PAGE_STRIDE },
-        layoutMeasurement: { width: VIEWPORT_WIDTH },
       },
     };
     mock.pager?.(event);
@@ -198,6 +209,8 @@ beforeEach(() => {
   mock.screenReader = false;
   mock.pager = null;
   mock.settle = null;
+  mock.endDrag = null;
+  mock.adjust = null;
   mock.beginDrag = null;
   mock.pageDrag = null;
   mock.reduceMotionChanged = null;
@@ -232,10 +245,16 @@ describe("OpenerStep", () => {
     ).toBeTruthy();
     swipeTo(2);
     expect(screen.getByText("plan.dateNight")).toBeTruthy();
-    expect(screen.getByLabelText("plan.dateNight")).toBeTruthy();
+    expect(
+      screen.getByLabelText("plan.dateNight opener.datePreviewDescription"),
+    ).toBeTruthy();
     swipeTo(3);
     expect(screen.getByText("trip.yourTripNoCity")).toBeTruthy();
-    expect(screen.getByLabelText("trip.yourTripNoCity")).toBeTruthy();
+    expect(
+      screen.getByLabelText(
+        "trip.yourTripNoCity opener.tripPreviewDescription",
+      ),
+    ).toBeTruthy();
     expect(screen.getByText("opener.tagline")).toBeTruthy();
   });
 
@@ -256,7 +275,6 @@ describe("OpenerStep", () => {
       mock.pager?.({
         nativeEvent: {
           contentOffset: { x: (2 + FIRST_PAGE_INDEX) * PAGE_STRIDE - 40 },
-          layoutMeasurement: { width: VIEWPORT_WIDTH },
         },
       });
     });
@@ -314,6 +332,40 @@ describe("OpenerStep", () => {
       animated: false,
     });
     expect(pageViews()).toEqual([0, 3]);
+  });
+
+  it("waits for the native snap when a drag ends near a cloned preview", () => {
+    renderOpener();
+    act(() => {
+      mock.beginDrag?.();
+      const event = {
+        nativeEvent: {
+          contentOffset: { x: PAGE_STRIDE - 0.5 },
+          targetContentOffset: { x: 0 },
+        },
+      };
+      mock.pager?.(event);
+      mock.endDrag?.(event);
+    });
+    expect(mock.scrollTo).not.toHaveBeenCalled();
+    swipeTo(-2);
+    expect(dot(2)).toContain("dotOn");
+    expect(mock.scrollTo).toHaveBeenLastCalledWith({
+      x: 4 * PAGE_STRIDE,
+      animated: false,
+    });
+  });
+
+  it("wraps accessibility adjustments in both directions and pauses autoplay", () => {
+    vi.useFakeTimers();
+    renderOpener();
+    act(() => mock.adjust?.({ nativeEvent: { actionName: "decrement" } }));
+    expect(dot(3)).toContain("dotOn");
+    act(() => mock.adjust?.({ nativeEvent: { actionName: "increment" } }));
+    expect(dot(0)).toContain("dotOn");
+    wait(9000);
+    expect(dot(0)).toContain("dotOn");
+    expect(mock.scrollTo).toHaveBeenCalledTimes(2);
   });
 
   it("reports each page the first time it is shown", () => {
