@@ -29,15 +29,16 @@ function Chip({
       accessibilityLabel={label}
       accessibilityState={{ selected }}
       onPress={onPress}
-      hitSlop={{ top: 10, bottom: 10 }}
       style={({ pressed }) => pressed && styles.pressed}
     >
       {/* Solid, not glass: a see-through chip is unreadable over busy map labels. */}
       <View style={[styles.chip, selected ? styles.selected : styles.plain]}>
         <AppSymbolIcon
           name={icon}
-          size={13}
-          tintColor={selected ? theme.colors.onTint : theme.colors.foreground}
+          size={16}
+          tintColor={
+            selected ? theme.colors.primaryText : theme.colors.foreground
+          }
         />
         {text}
       </View>
@@ -81,27 +82,34 @@ export function MapFilterChips({
 }
 
 const styles = StyleSheet.create((theme) => ({
-  row: { gap: theme.gap(1), paddingHorizontal: theme.gap(2.5) },
+  row: {
+    gap: theme.gap(1),
+    paddingHorizontal: theme.gap(2.5),
+    paddingVertical: theme.gap(0.5),
+  },
   flush: { paddingHorizontal: 0, paddingVertical: theme.gap(0.5) },
   chip: {
     flexDirection: "row",
     alignItems: "center",
-    gap: theme.gap(0.5),
+    gap: theme.gap(0.75),
     boxShadow: "0 1px 3px rgba(43, 36, 24, 0.16)",
-    height: 24,
+    minHeight: theme.control.minHeight,
     justifyContent: "center",
-    paddingHorizontal: 10,
-    borderRadius: 12,
+    paddingHorizontal: theme.gap(1.75),
+    borderRadius: theme.radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: theme.colors.border,
     borderCurve: "continuous",
   },
-  selected: { backgroundColor: theme.colors.primary },
+  selected: {
+    backgroundColor: theme.colors.primarySoft,
+    borderColor: theme.colors.primaryText,
+  },
   plain: { backgroundColor: theme.colors.frame },
   label: {
     ...theme.type.secondaryLabel,
-    fontSize: 13.3,
-    lineHeight: 17,
     color: theme.colors.foreground,
   },
-  labelSelected: { color: theme.colors.onTint },
+  labelSelected: { color: theme.colors.primaryText },
   pressed: { opacity: theme.opacity.pressed },
 }));

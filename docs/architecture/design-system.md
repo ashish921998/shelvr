@@ -61,8 +61,8 @@ the amber fill is 2.19:1), `onKeep` on `keep`, `onOverlay` on `overlay`.
 `tabTint` is the tint color for the plus icon on the tab bar's Add button
 (`src/components/tab-bar.tsx`).
 The button is `surface`, where the light theme's value is 5.82:1, and it still
-clears 5.03:1 on `surfaceMuted`. The tab bar floats without a background or
-fade. Library, Map and Go out use Lucide icons on small `frame`
+clears 5.03:1 on `surfaceMuted`. Library reserves a solid bottom bar below its
+scrolling content. Map controls float above the map. Library, Map and Go out use Lucide icons on small `frame`
 tiles with `primaryText` icons. Each has a `muted`
 label. The controls leave space below for the map's attribution and Legal link. The
 light theme's text colors are deliberately darkened to clear WCAG AA (`muted`

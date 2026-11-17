@@ -328,5 +328,9 @@ const styles = StyleSheet.create((theme) => ({
     marginRight: theme.gap(2.5),
     marginBottom: 10,
   },
-  strip: { paddingTop: theme.gap(1), paddingBottom: 13 },
+  strip: {
+    gap: theme.gap(1),
+    paddingTop: theme.gap(1),
+    paddingBottom: theme.gap(1.5),
+  },
 }));

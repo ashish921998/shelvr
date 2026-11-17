@@ -30,7 +30,6 @@ import {
   useSheetTurnsBusy,
 } from "@/lib/one-time-sheets";
 import { useWelcomeName } from "@/lib/welcome-name";
-import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -52,7 +51,6 @@ function trialEnd(entitlement: Entitlement): number | undefined {
 export default function HomeScreen() {
   useAppLocale();
   const { theme } = useUnistyles();
-  const barHeight = useBottomTabBarHeight();
   const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
   const [viewportHeight, setViewportHeight] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
@@ -131,7 +129,7 @@ export default function HomeScreen() {
       <ScrollView
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        contentContainerStyle={{ paddingBottom: barHeight + theme.gap(2) }}
+        contentContainerStyle={{ paddingBottom: theme.gap(2) }}
         scrollEventThrottle={200}
         onLayout={(e) => setViewportHeight(e.nativeEvent.layout.height)}
         onContentSizeChange={(_, height) => setContentHeight(height)}

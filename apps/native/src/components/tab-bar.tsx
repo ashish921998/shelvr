@@ -119,7 +119,7 @@ export function TabBar({
     <View
       pointerEvents="box-none"
       onLayout={(event) => onHeightChange?.(event.nativeEvent.layout.height)}
-      style={styles.bar}
+      style={[styles.bar, current?.name === LIBRARY && styles.libraryBar]}
     >
       {other ? (
         <TabItem
@@ -158,6 +158,13 @@ const styles = StyleSheet.create((theme, rt) => ({
     alignItems: "flex-end",
     paddingTop: theme.gap(2),
     paddingBottom: Math.max(rt.insets.bottom, 12) + ATTRIBUTION_CLEARANCE,
+  },
+  libraryBar: {
+    position: "relative",
+    flexShrink: 0,
+    backgroundColor: theme.colors.background,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: theme.colors.border,
   },
   item: {
     width: 100,

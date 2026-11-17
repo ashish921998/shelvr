@@ -35,7 +35,6 @@ export function MapWentSwitch({
                 void haptics.selection();
                 onSelect(value);
               }}
-              hitSlop={{ top: 8, bottom: 8 }}
               style={[styles.segment, on && styles.segmentOn]}
             >
               <Text style={[styles.label, on && styles.labelOn]}>
@@ -50,25 +49,35 @@ export function MapWentSwitch({
 }
 
 const styles = StyleSheet.create((theme) => ({
-  wrap: { paddingHorizontal: theme.gap(2), alignItems: "flex-start" },
+  wrap: { paddingHorizontal: theme.gap(2.5) },
   track: {
     flexDirection: "row",
-    padding: theme.gap(0.375),
-    gap: theme.gap(0.25),
+    padding: theme.gap(0.5),
+    gap: theme.gap(0.5),
     borderRadius: 999,
     borderCurve: "continuous",
     backgroundColor: theme.colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.border,
-    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.16)",
+    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.10)",
   },
   segment: {
-    paddingVertical: theme.gap(0.75),
-    paddingHorizontal: theme.gap(1.75),
+    flex: 1,
+    flexBasis: 0,
+    minWidth: 0,
+    minHeight: theme.control.minHeight,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: theme.gap(1),
+    paddingHorizontal: theme.gap(1),
     borderRadius: 999,
     borderCurve: "continuous",
   },
   segmentOn: { backgroundColor: theme.colors.foreground },
-  label: { ...theme.type.secondaryLabel, color: theme.colors.foreground },
+  label: {
+    ...theme.type.secondaryLabel,
+    textAlign: "center",
+    color: theme.colors.foreground,
+  },
   labelOn: { color: theme.colors.background },
 }));
