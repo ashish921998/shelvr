@@ -4,6 +4,7 @@ import { goOutPlaces } from "@/lib/go-out";
 import { useAppLocale } from "@/lib/i18n";
 import { personalPlanAllowed } from "@/lib/list-gate";
 import { usePlanGate } from "@/lib/plan-gate";
+import { backOrHome } from "@/lib/screen-dismiss";
 import { sameCity } from "@/lib/trip-planner";
 import { useReportLoadFailure } from "@/lib/use-report-load-failure";
 import { api } from "@convex/_generated/api";
@@ -55,7 +56,7 @@ export default function GoOutScreen() {
     return (
       <GoOutHub
         city={city}
-        onClose={() => router.back()}
+        onClose={() => backOrHome(router)}
         onPlan={openPlan}
         onPickSpot={() => setPicking(true)}
       />
@@ -67,7 +68,7 @@ export default function GoOutScreen() {
       loading={query.isPending}
       failed={query.isError}
       onRetry={() => void query.refetch()}
-      onClose={() => router.back()}
+      onClose={() => backOrHome(router)}
       onBack={() => setPicking(false)}
     />
   );

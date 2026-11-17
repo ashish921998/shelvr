@@ -979,3 +979,30 @@ describe("searching a new blank trip", () => {
     });
   });
 });
+
+describe("countTripPlans", () => {
+  it("counts the person's trips up to a page, and says when there are more", async () => {
+    const { t, userId } = await setup(TRIP);
+    expect(await t.query(api.tripPlannerData.countTripPlans, {})).toEqual({
+      count: 1,
+      more: false,
+    });
+    await t.run(async (ctx) => {
+      for (let index = 0; index < 50; index += 1) {
+        await ctx.db.insert("tripPlans", {
+          userId,
+          city: "Porto",
+          dayCount: 1,
+          pace: "balanced",
+          interests: [],
+          stopCount: 0,
+          savedCount: 0,
+        });
+      }
+    });
+    expect(await t.query(api.tripPlannerData.countTripPlans, {})).toEqual({
+      count: 50,
+      more: true,
+    });
+  });
+});

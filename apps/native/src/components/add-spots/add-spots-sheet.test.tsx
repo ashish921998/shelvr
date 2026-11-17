@@ -7,6 +7,7 @@ import { AddSpotsSheet } from "@/components/add-spots/add-spots-sheet";
 
 const mocks = vi.hoisted(() => ({
   calls: [] as string[],
+  canGoBack: true,
   plan: vi.fn(),
   loading: false,
   siri: [] as unknown[],
@@ -39,7 +40,9 @@ vi.mock("@/lib/use-keyboard-visible", () => ({
 }));
 vi.mock("expo-router", () => ({
   useRouter: () => ({
+    canGoBack: () => mocks.canGoBack,
     back: () => mocks.calls.push("back"),
+    replace: (href: string) => mocks.calls.push(`replace ${href}`),
     push: (href: string) => mocks.calls.push(href),
   }),
 }));
@@ -99,6 +102,7 @@ vi.mock("react-native", () => ({
 
 beforeEach(() => {
   mocks.calls = [];
+  mocks.canGoBack = true;
   mocks.plan.mockReset();
   mocks.guard.mockClear();
   mocks.loading = false;
@@ -151,6 +155,12 @@ it("plans a trip through the city picker", () => {
 it("closes from the X", () => {
   press("Close");
   expect(mocks.calls).toEqual(["back"]);
+});
+
+it("goes Home from the X when a link opened the sheet with nothing beneath it", () => {
+  mocks.canGoBack = false;
+  press("Close");
+  expect(mocks.calls).toEqual(["replace /(app)/(tabs)/(home)"]);
 });
 
 it("opens How to share after closing the sheet", () => {

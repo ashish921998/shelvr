@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   gated: false,
   replace: vi.fn(),
   back: vi.fn(),
+  canGoBack: true,
   refetch: vi.fn(),
   queries: [] as unknown[],
   personal: {} as Record<string, unknown>,
@@ -53,18 +54,25 @@ vi.mock("expo-router", () => ({
     <span>{`redirect ${href}`}</span>
   )),
   useLocalSearchParams: () => mocks.params,
-  useRouter: () => ({ replace: mocks.replace, back: mocks.back }),
+  useRouter: () => ({
+    replace: mocks.replace,
+    back: mocks.back,
+    canGoBack: () => mocks.canGoBack,
+  }),
 }));
 vi.mock("@/components/go-out-hub", () => ({
   GoOutHub: vi.fn(
     ({
       onPlan,
       onPickSpot,
+      onClose,
     }: {
       onPlan: (kind: "date" | "trip") => void;
       onPickSpot: () => void;
+      onClose: () => void;
     }) => (
       <div>
+        <button onClick={onClose}>close</button>
         <button onClick={() => onPlan("date")}>date</button>
         <button onClick={() => onPlan("trip")}>trip</button>
         <button onClick={onPickSpot}>pick</button>
@@ -98,6 +106,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.params = { city: "Austin" };
   mocks.gated = false;
+  mocks.canGoBack = true;
   mocks.queries = [];
   mocks.picker = undefined;
   mocks.personal = loaded([
@@ -162,4 +171,13 @@ it("sends a locked account without a list to the plan gate", () => {
   render(<GoOutScreen />);
   expect(screen.getByText("redirect /plan-gate")).toBeTruthy();
   expect(mocks.queries).toContainEqual({ fn: "listMapPlaces", args: "skip" });
+});
+
+it("closes back, or Home when a link opened it with nothing beneath", () => {
+  render(<GoOutScreen />);
+  fireEvent.click(screen.getByRole("button", { name: "close" }));
+  expect(mocks.back).toHaveBeenCalledOnce();
+  mocks.canGoBack = false;
+  fireEvent.click(screen.getByRole("button", { name: "close" }));
+  expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
 });

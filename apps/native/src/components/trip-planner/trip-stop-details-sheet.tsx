@@ -2,14 +2,17 @@ import { Button } from "@/components/ui/button";
 import { PromptSheet } from "@/components/ui/prompt-sheet";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
+import { openPaywall } from "@/lib/entitlement";
 import { t } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
+import { saveErrorCode } from "@convex/model/saveErrors";
 import {
   MAX_TRIP_STOP_NOTE_CHARS,
   TRIP_STOP_TIME,
   type TripPlanStop,
 } from "@convex/model/tripPlan";
 import { useMutation } from "convex/react";
+import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Alert, TextInput } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -22,6 +25,7 @@ export function TripStopDetailsSheet({
   onClose: () => void;
 }) {
   const { theme } = useUnistyles();
+  const router = useRouter();
   const update = useMutation(api.tripPlannerData.updateTripStopDetails);
   const [initial] = useState(() => ({
     time: stop.time ?? "",
@@ -50,6 +54,11 @@ export function TripStopDetailsSheet({
       });
       onClose();
     } catch (error) {
+      if (saveErrorCode(error) === "pro_required") {
+        onClose();
+        await openPaywall(router, "trip_stop_details");
+        return;
+      }
       analytics.captureError("trip_stop_details_failed", error);
       Alert.alert(t("tripPlanner.editFailed"));
       setSaving(false);

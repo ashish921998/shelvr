@@ -396,6 +396,21 @@ export const listTripPlans = authedQuery({
   },
 });
 
+export const countTripPlans = authedQuery({
+  args: {},
+  returns: v.object({ count: v.number(), more: v.boolean() }),
+  handler: async (ctx) => {
+    const plans = await ctx.db
+      .query("tripPlans")
+      .withIndex("by_user", (q) => q.eq("userId", ctx.userId))
+      .take(LIST_PAGE_MAX + 1);
+    return {
+      count: Math.min(plans.length, LIST_PAGE_MAX),
+      more: plans.length > LIST_PAGE_MAX,
+    };
+  },
+});
+
 async function ownedPlan(
   ctx: QueryCtx,
   tripId: Id<"tripPlans">,

@@ -6,6 +6,7 @@ import { useSaveGuard } from "@/lib/free-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { sheetIn } from "@/lib/motion";
 import { usePlanPicker } from "@/lib/plan-picker";
+import { backOrHome } from "@/lib/screen-dismiss";
 import { useSiriShortcuts } from "@/lib/siri-phrases";
 import { useRouter } from "expo-router";
 import { Pressable, ScrollView, Text, View } from "react-native";
@@ -91,7 +92,7 @@ export function AddSpotsSheet() {
   const { rt } = useUnistyles();
   const reduced = useReducedMotion();
   const { guard, loading } = useSaveGuard("tab_bar");
-  const planner = usePlanPicker({ onLeave: () => router.back() });
+  const planner = usePlanPicker({ onLeave: () => backOrHome(router) });
   const siri = useSiriShortcuts();
   const closeBottom = addButtonBottom(rt.insets.bottom);
   const addLink = () => {
@@ -105,7 +106,7 @@ export function AddSpotsSheet() {
     <View style={styles.screen} accessibilityViewIsModal>
       <Pressable
         accessible={false}
-        onPress={() => router.back()}
+        onPress={() => backOrHome(router)}
         style={styles.backdrop}
       />
       <Animated.View
@@ -198,7 +199,7 @@ export function AddSpotsSheet() {
         <AddButton
           label={t("common.close")}
           icon="xmark"
-          onPress={() => router.back()}
+          onPress={() => backOrHome(router)}
         />
       </View>
       {planner.sheet}

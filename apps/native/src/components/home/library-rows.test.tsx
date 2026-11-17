@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   navigate: vi.fn(),
   signedIn: true,
   feed: { items: [] as unknown[], canLoadMore: false, loadingMore: false },
-  trips: { results: [] as unknown[], status: "Exhausted" },
+  trips: undefined as { count: number; more: boolean } | undefined,
   tripsArgs: [] as unknown[],
 }));
 
@@ -33,7 +33,7 @@ vi.mock("@/components/home/home-row", () => ({
 vi.mock("@/lib/home-feed", () => ({ useHomeFeed: () => mocks.feed }));
 vi.mock("convex/react", () => ({
   useConvexAuth: () => ({ isAuthenticated: mocks.signedIn }),
-  usePaginatedQuery: (_query: unknown, args: unknown) => {
+  useQuery: (_query: unknown, args: unknown) => {
     mocks.tripsArgs.push(args);
     return mocks.trips;
   },
@@ -49,7 +49,7 @@ beforeEach(() => {
   mocks.navigate.mockReset();
   mocks.signedIn = true;
   mocks.feed = { items: rows(23), canLoadMore: false, loadingMore: false };
-  mocks.trips = { results: rows(3), status: "Exhausted" };
+  mocks.trips = { count: 3, more: false };
   mocks.tripsArgs = [];
 });
 
@@ -73,13 +73,13 @@ it.each([
 });
 
 it("shows the trips count as a floor while more trips remain", () => {
-  mocks.trips = { results: rows(50), status: "CanLoadMore" };
+  mocks.trips = { count: 50, more: true };
   render(<LibraryRows />);
   expect(screen.getByText("Trips, 50+")).toBeTruthy();
 });
 
 it("shows no trips count before the first page arrives", () => {
-  mocks.trips = { results: [], status: "LoadingFirstPage" };
+  mocks.trips = undefined;
   render(<LibraryRows />);
   expect(screen.getByText("Trips")).toBeTruthy();
 });

@@ -4,12 +4,17 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 
 import { TripStopDetailsSheet } from "@/components/trip-planner/trip-stop-details-sheet";
+import { saveError } from "@convex/model/saveErrors";
 
 const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   alert: vi.fn(),
   captureError: vi.fn(),
+  openPaywall: vi.fn(),
 }));
+
+vi.mock("@/lib/entitlement", () => ({ openPaywall: mocks.openPaywall }));
+vi.mock("expo-router", () => ({ useRouter: () => "router" }));
 
 vi.mock("@/lib/analytics", () => ({
   analytics: { captureError: mocks.captureError },
@@ -171,4 +176,22 @@ it("stays open and reports a failed save", async () => {
     failure,
   );
   expect(onClose).not.toHaveBeenCalled();
+});
+
+it("closes and opens the paywall when the trip needs Pro", async () => {
+  mocks.update.mockRejectedValue(saveError("pro_required"));
+  const onClose = renderSheet();
+  fireEvent.change(field("tripPlanner.stopNote"), {
+    target: { value: "New note" },
+  });
+  fireEvent.click(save());
+  await waitFor(() =>
+    expect(mocks.openPaywall).toHaveBeenCalledWith(
+      "router",
+      "trip_stop_details",
+    ),
+  );
+  expect(onClose).toHaveBeenCalledOnce();
+  expect(mocks.alert).not.toHaveBeenCalled();
+  expect(mocks.captureError).not.toHaveBeenCalled();
 });
