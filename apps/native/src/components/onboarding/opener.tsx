@@ -1,20 +1,20 @@
+import {
+  FULL_PHONE_HEIGHT,
+  FULL_PHONE_WIDTH,
+  PhoneFrame,
+} from "@/components/onboarding/opener-phone";
+import { Wordmark } from "@/components/wordmark";
 import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
-import { motion, motionCSS } from "@/lib/motion";
-import { HEADLINE_MAX_SCALE, useLargeText } from "@/lib/use-large-text";
+import { useLargeText } from "@/lib/use-large-text";
 import { useLiveReducedMotion } from "@/lib/use-live-reduced-motion";
 import type { TextMessageKey } from "@/locales/message-types";
-import { PhoneFrame } from "@/components/onboarding/opener-phone";
+import { Image } from "expo-image";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  FiledToast,
-  FileScene,
-  PlanScene,
-  ShareScene,
-  type SceneProps,
-} from "@/components/onboarding/opener-scenes";
-import { CtaButton } from "@/components/onboarding/parts";
-import { useEffect, useRef, useState, type ComponentType } from "react";
-import {
+  AccessibilityInfo,
+  PixelRatio,
+  Platform,
   type LayoutChangeEvent,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -24,45 +24,289 @@ import {
   Text,
   View,
 } from "react-native";
-import Animated from "react-native-reanimated";
+import Animated, {
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  type SharedValue,
+} from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
+const APP_ICON = require("../../../assets/icon.png");
+
 type Page = {
-  key: "save" | "file" | "plan";
   title: TextMessageKey;
-  accent: TextMessageKey;
-  body: TextMessageKey;
-  Scene: ComponentType<SceneProps>;
-  Overlay?: ComponentType;
+  accent?: TextMessageKey;
+  body?: TextMessageKey;
+  source: number;
 };
 
 const PAGES: Page[] = [
   {
-    key: "save",
-    title: "onboarding.openerSaveTitle",
-    accent: "onboarding.openerSaveAccent",
-    body: "onboarding.openerSaveBody",
-    Scene: ShareScene,
+    title: "opener.yourCities",
+    source: require("../../../assets/onboarding/your-cities.webp"),
   },
   {
-    key: "file",
     title: "onboarding.openerFileTitle",
     accent: "onboarding.openerFileAccent",
     body: "onboarding.openerFileBody",
-    Scene: FileScene,
-    Overlay: FiledToast,
+    source: require("../../../assets/onboarding/san-francisco-places.webp"),
   },
   {
-    key: "plan",
-    title: "onboarding.openerPlanTitle",
-    accent: "onboarding.openerPlanAccent",
-    body: "onboarding.openerPlanBody",
-    Scene: PlanScene,
+    title: "plan.dateNight",
+    body: "opener.datePreviewDescription",
+    source: require("../../../assets/onboarding/san-francisco-date.webp"),
+  },
+  {
+    title: "trip.yourTripNoCity",
+    body: "opener.tripPreviewDescription",
+    source: require("../../../assets/onboarding/san-francisco-trip.webp"),
   },
 ];
 
-const COPY_MIN_HEIGHT = 150;
-const AUTO_ADVANCE_MS = 4000;
+const AUTO_ADVANCE_MS = 3000;
+const LEADING_PREVIEWS = 2;
+const DECK = [
+  ...PAGES.slice(-LEADING_PREVIEWS),
+  ...PAGES,
+  ...PAGES.slice(0, LEADING_PREVIEWS),
+];
+
+function logicalPage(index: number) {
+  return (index - LEADING_PREVIEWS + PAGES.length) % PAGES.length;
+}
+
+function useScreenReader() {
+  const [enabled, setEnabled] = useState(false);
+  useEffect(() => {
+    let mounted = true;
+    let changed = false;
+    const subscription = AccessibilityInfo.addEventListener(
+      "screenReaderChanged",
+      (active) => {
+        changed = true;
+        setEnabled(active);
+      },
+    );
+    void AccessibilityInfo.isScreenReaderEnabled()
+      .then((active) => {
+        if (mounted && !changed) setEnabled(active);
+      })
+      .catch((error: unknown) =>
+        analytics.captureError("screen_reader_read_failed", error),
+      );
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, []);
+  return enabled;
+}
+
+function PhonePreview({
+  item,
+  index,
+  position,
+  stride,
+  height,
+  scale,
+}: {
+  item: Page;
+  index: number;
+  position: SharedValue<number>;
+  stride: number;
+  height: number;
+  scale: number;
+}) {
+  const emphasis = useAnimatedStyle(() => {
+    const distance = position.get() - index;
+    const angle = interpolate(distance, [-1, 1], [-18, 18], "clamp");
+    const proximity = Math.min(1, Math.abs(distance));
+    return {
+      opacity: 1 - proximity * 0.84,
+      transform: [
+        { perspective: 900 },
+        { rotateY: `${angle}deg` },
+        { scale: scale * (1 - proximity * 0.04) },
+      ],
+    };
+  });
+
+  return (
+    <View style={[styles.slot, { width: stride, height }]}>
+      <Animated.View style={emphasis}>
+        <PhoneFrame full>
+          <Image
+            source={item.source}
+            style={styles.previewImage}
+            contentFit="cover"
+          />
+        </PhoneFrame>
+      </Animated.View>
+    </View>
+  );
+}
+
+function OpenerCarousel({
+  width,
+  paused,
+  onInteract,
+  viewedPages,
+}: {
+  width: number;
+  paused: boolean;
+  onInteract: () => void;
+  viewedPages: Set<number>;
+}) {
+  const [page, setPage] = useState(0);
+  const [trackHeight, setTrackHeight] = useState(0);
+  const pager = useRef<ScrollViewInstance>(null);
+  const deckIndex = useRef(LEADING_PREVIEWS);
+  const position = useSharedValue(LEADING_PREVIEWS);
+  const stride = Math.max(1, Math.round(width * 0.68));
+  const android = Platform.OS === "android";
+  const snapOffsets = useMemo(
+    () => (android ? DECK.map((_, index) => index * stride) : undefined),
+    [android, stride],
+  );
+  const snapTolerance = android ? Math.max(1, 1 / PixelRatio.get()) : 1;
+  const scale = Math.min(
+    (width * 0.64) / FULL_PHONE_WIDTH,
+    (trackHeight * 0.98) / FULL_PHONE_HEIGHT,
+  );
+  const initialOffset = useMemo(
+    () => ({ x: LEADING_PREVIEWS * stride, y: 0 }),
+    [stride],
+  );
+  const active = PAGES[page];
+
+  useEffect(() => {
+    if (viewedPages.has(page)) return;
+    viewedPages.add(page);
+    analytics.capture("onboarding_opener_page_viewed", { page_index: page });
+  }, [page, viewedPages]);
+
+  useEffect(() => {
+    if (paused || trackHeight === 0) return;
+    const timer = setTimeout(() => {
+      pager.current?.scrollTo({
+        x: (deckIndex.current + 1) * stride,
+        animated: true,
+      });
+    }, AUTO_ADVANCE_MS);
+    return () => clearTimeout(timer);
+  }, [page, paused, stride, trackHeight]);
+
+  const updatePosition = (offset: number) => {
+    const next = Math.max(0, Math.min(DECK.length - 1, offset / stride));
+    position.set(next);
+    const index = Math.round(next);
+    if (index === deckIndex.current) return;
+    deckIndex.current = index;
+    setPage(logicalPage(index));
+  };
+
+  const settle = ({ nativeEvent }: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { x } = nativeEvent.contentOffset;
+    const { targetContentOffset } = nativeEvent;
+    if (targetContentOffset && Math.abs(targetContentOffset.x - x) > 1) return;
+    const index = Math.round(x / stride);
+    const canonical = logicalPage(index) + LEADING_PREVIEWS;
+    if (Math.abs(x - index * stride) > snapTolerance || index === canonical)
+      return;
+    const offset = canonical * stride;
+    pager.current?.scrollTo({ x: offset, animated: false });
+    updatePosition(offset);
+  };
+
+  const title = active.accent
+    ? `${t(active.title)} ${t(active.accent)}`
+    : t(active.title);
+  const pageLabel = active.body ? `${title} ${t(active.body)}` : title;
+
+  return (
+    <>
+      <View
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel={pageLabel}
+        accessibilityValue={{ min: 0, max: PAGES.length - 1, now: page }}
+        accessibilityActions={[{ name: "increment" }, { name: "decrement" }]}
+        onAccessibilityAction={({ nativeEvent }) => {
+          const next = page + (nativeEvent.actionName === "increment" ? 1 : -1);
+          const index =
+            ((next + PAGES.length) % PAGES.length) + LEADING_PREVIEWS;
+          onInteract();
+          pager.current?.scrollTo({ x: index * stride, animated: false });
+          updatePosition(index * stride);
+        }}
+        onLayout={({ nativeEvent }) =>
+          setTrackHeight(nativeEvent.layout.height)
+        }
+        style={styles.track}
+      >
+        {trackHeight > 0 ? (
+          <ScrollView
+            ref={pager}
+            horizontal
+            contentInsetAdjustmentBehavior="never"
+            contentOffset={initialOffset}
+            contentContainerStyle={{ paddingHorizontal: (width - stride) / 2 }}
+            snapToInterval={android ? undefined : stride}
+            snapToOffsets={snapOffsets}
+            decelerationRate="fast"
+            disableIntervalMomentum
+            showsHorizontalScrollIndicator={false}
+            scrollEventThrottle={16}
+            bounces={false}
+            accessibilityElementsHidden
+            importantForAccessibility="no-hide-descendants"
+            onScroll={({ nativeEvent }) =>
+              updatePosition(nativeEvent.contentOffset.x)
+            }
+            onScrollBeginDrag={onInteract}
+            onScrollEndDrag={android ? undefined : settle}
+            onMomentumScrollEnd={settle}
+          >
+            {DECK.map((item, index) => (
+              <PhonePreview
+                key={`${item.title}-${index}`}
+                item={item}
+                index={index}
+                stride={stride}
+                height={trackHeight}
+                scale={scale}
+                position={position}
+              />
+            ))}
+          </ScrollView>
+        ) : null}
+      </View>
+      <View
+        style={styles.slideInfo}
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        <Text
+          style={styles.slideTitle}
+          numberOfLines={2}
+          maxFontSizeMultiplier={1.5}
+        >
+          {title}
+        </Text>
+        <View style={styles.dots}>
+          {PAGES.map((item, index) => (
+            <View
+              key={item.title}
+              testID={`opener-dot-${index}`}
+              style={[styles.dot, page === index && styles.dotOn]}
+            />
+          ))}
+        </View>
+      </View>
+    </>
+  );
+}
 
 export function OpenerStep({
   onStart,
@@ -75,130 +319,66 @@ export function OpenerStep({
 }) {
   useAppLocale();
   const largeText = useLargeText();
-  const [size, setSize] = useState({ width: 0, height: 0 });
-  const [page, setPage] = useState(0);
-  const [reached, setReached] = useState(0);
-  const [swiped, setSwiped] = useState(false);
   const reducedMotion = useLiveReducedMotion();
-  const pager = useRef<ScrollViewInstance>(null);
+  const screenReader = useScreenReader();
+  const [interacted, setInteracted] = useState(false);
+  const [width, setWidth] = useState(0);
+  const pause = () => setInteracted(true);
 
-  useEffect(() => {
-    if (viewedPages.has(page)) return;
-    viewedPages.add(page);
-    analytics.capture("onboarding_opener_page_viewed", { page_index: page });
-  }, [page, viewedPages]);
-
-  useEffect(() => {
-    if (swiped || reducedMotion || size.width <= 0) return;
-    if (page >= PAGES.length - 1) return;
-    const timer = setTimeout(() => {
-      pager.current?.scrollTo({ x: (page + 1) * size.width, animated: true });
-    }, AUTO_ADVANCE_MS);
-    return () => clearTimeout(timer);
-  }, [page, swiped, reducedMotion, size.width]);
-
-  const onLayout = (event: LayoutChangeEvent) => {
-    const { width, height } = event.nativeEvent.layout;
-    setSize((current) =>
-      current.width === width && current.height === height
-        ? current
-        : { width, height },
-    );
+  const onLayout = ({ nativeEvent }: LayoutChangeEvent) => {
+    setWidth(nativeEvent.layout.width);
   };
-
-  const onScroll = (event: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const { contentOffset, layoutMeasurement } = event.nativeEvent;
-    if (layoutMeasurement.width <= 0) return;
-    const nearest = Math.round(contentOffset.x / layoutMeasurement.width);
-    const next = Math.min(PAGES.length - 1, Math.max(0, nearest));
-    setPage(next);
-    setReached((current) => Math.max(current, next));
-  };
-
-  const signIn = (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onSignIn}
-      style={({ pressed }) => [styles.signIn, pressed && styles.pressed]}
-    >
-      <Text style={styles.signInText}>
-        {t("onboarding.haveAccount")}{" "}
-        <Text style={styles.signInLink}>{t("onboarding.signIn")}</Text>
-      </Text>
-    </Pressable>
-  );
 
   return (
     <View style={styles.wrap}>
       <ScrollView
-        ref={pager}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        scrollEventThrottle={16}
-        onScroll={onScroll}
-        onScrollBeginDrag={() => setSwiped(true)}
-        onLayout={onLayout}
-        style={styles.pager}
+        style={styles.body}
+        contentContainerStyle={styles.bodyContent}
+        alwaysBounceVertical={false}
+        showsVerticalScrollIndicator={false}
+        onScrollBeginDrag={pause}
       >
-        {size.width > 0
-          ? PAGES.map((item, index) => (
-              <ScrollView
-                key={item.key}
-                style={{ width: size.width, height: size.height }}
-                contentContainerStyle={styles.page}
-                alwaysBounceVertical={false}
-                showsVerticalScrollIndicator={false}
-                onScrollBeginDrag={() => setSwiped(true)}
-              >
-                <PhoneFrame
-                  overlay={
-                    item.Overlay && index <= reached ? <item.Overlay /> : null
-                  }
-                >
-                  <item.Scene shown={index <= reached} />
-                </PhoneFrame>
-                <View style={styles.copy}>
-                  <Text
-                    style={styles.headline}
-                    maxFontSizeMultiplier={HEADLINE_MAX_SCALE}
-                  >
-                    {t(item.title)}{" "}
-                    <Text style={styles.headlineAccent}>{t(item.accent)}</Text>
-                  </Text>
-                  <Text style={styles.support}>{t(item.body)}</Text>
-                </View>
-                {largeText ? signIn : null}
-              </ScrollView>
-            ))
-          : null}
+        <View style={styles.intro}>
+          <View style={styles.brand} accessibilityRole="header">
+            <Image source={APP_ICON} style={styles.icon} />
+            <Wordmark size={32} />
+          </View>
+          <Text style={styles.tagline}>{t("opener.tagline")}</Text>
+        </View>
+        <View
+          style={styles.carousel}
+          onLayout={onLayout}
+          testID="opener-carousel"
+        >
+          {width > 0 ? (
+            <OpenerCarousel
+              key={width}
+              width={width}
+              paused={interacted || reducedMotion || screenReader || largeText}
+              onInteract={pause}
+              viewedPages={viewedPages}
+            />
+          ) : null}
+        </View>
       </ScrollView>
-
-      <View
-        style={styles.dots}
-        accessibilityElementsHidden
-        importantForAccessibility="no-hide-descendants"
-      >
-        {PAGES.map((item, index) => (
-          <Animated.View
-            key={item.key}
-            testID={`opener-dot-${index}`}
-            style={[
-              styles.dot,
-              index === page && styles.dotOn,
-              {
-                transitionProperty: ["width", "backgroundColor"],
-                transitionDuration: motion.duration.state,
-                transitionTimingFunction: motionCSS.out,
-              },
-            ]}
-          />
-        ))}
-      </View>
-
       <View style={styles.foot}>
-        <CtaButton label={t("opener.getStarted")} onPress={onStart} />
-        {largeText ? null : signIn}
+        <Pressable
+          accessibilityRole="button"
+          onPress={onStart}
+          style={({ pressed }) => [styles.start, pressed && styles.pressed]}
+        >
+          <Text style={styles.startText}>{t("opener.getStarted")}</Text>
+        </Pressable>
+        <Pressable
+          accessibilityRole="button"
+          onPress={onSignIn}
+          style={({ pressed }) => [styles.signIn, pressed && styles.pressed]}
+        >
+          <Text style={styles.signInText}>
+            {t("onboarding.haveAccount")}{" "}
+            <Text style={styles.signInLink}>{t("onboarding.signIn")}</Text>
+          </Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -207,56 +387,102 @@ export function OpenerStep({
 const styles = StyleSheet.create((theme) => ({
   wrap: {
     flex: 1,
-    gap: theme.gap(2),
   },
-  pager: {
+  body: {
     flex: 1,
     marginHorizontal: -theme.gap(3),
   },
-  page: {
+  bodyContent: {
     flexGrow: 1,
-    gap: theme.gap(2),
-    paddingHorizontal: theme.gap(3),
-  },
-  copy: {
-    minHeight: COPY_MIN_HEIGHT,
     gap: theme.gap(1),
   },
-  headline: {
-    fontFamily: theme.fonts.display,
-    fontSize: 32,
-    lineHeight: 38,
-    color: theme.colors.foreground,
+  intro: {
+    alignItems: "center",
+    paddingHorizontal: theme.gap(3),
+    gap: theme.gap(0.75),
   },
-  headlineAccent: {
-    color: theme.colors.primaryText,
+  brand: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(0.75),
   },
-  support: {
-    ...theme.type.body,
-    lineHeight: 22,
+  icon: {
+    width: theme.gap(3),
+    height: theme.gap(3),
+    borderRadius: theme.radius.sm,
+  },
+  tagline: {
+    ...theme.type.footnote,
     color: theme.colors.muted,
+    textAlign: "center",
+    maxWidth: 280,
+  },
+  carousel: {
+    flex: 1,
+    minHeight: 304,
+  },
+  track: {
+    flex: 1,
+    overflow: "hidden",
+  },
+  slot: {
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  previewImage: {
+    flex: 1,
+  },
+  slideInfo: {
+    alignItems: "center",
+    gap: theme.gap(0.75),
+    paddingHorizontal: theme.gap(3),
+    paddingTop: theme.gap(1),
+    paddingBottom: theme.gap(1.5),
+  },
+  slideTitle: {
+    ...theme.type.title,
+    color: theme.colors.foreground,
+    textAlign: "center",
   },
   dots: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: theme.gap(0.75),
+    gap: theme.gap(0.625),
   },
   dot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: theme.colors.border,
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: theme.colors.muted,
+    opacity: 0.28,
   },
   dotOn: {
-    width: 20,
-    backgroundColor: theme.colors.primary,
+    width: 14,
+    backgroundColor: theme.colors.primaryText,
+    opacity: 1,
   },
   foot: {
-    gap: theme.gap(1.5),
+    paddingTop: theme.gap(0.5),
+    marginHorizontal: -theme.gap(1),
+  },
+  start: {
+    minHeight: 52,
+    paddingVertical: theme.gap(1.5),
+    paddingHorizontal: theme.gap(2),
+    borderRadius: 999,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.foreground,
+  },
+  startText: {
+    ...theme.type.button,
+    textAlign: "center",
+    color: theme.colors.background,
   },
   signIn: {
     minHeight: 44,
+    paddingVertical: theme.gap(0.5),
     alignItems: "center",
     justifyContent: "center",
   },
@@ -264,11 +490,12 @@ const styles = StyleSheet.create((theme) => ({
     opacity: theme.opacity.pressed,
   },
   signInText: {
-    ...theme.type.subhead,
+    ...theme.type.footnote,
     color: theme.colors.muted,
+    textAlign: "center",
   },
   signInLink: {
     fontFamily: theme.fonts.bold,
-    color: theme.colors.primaryText,
+    color: theme.colors.foreground,
   },
 }));
