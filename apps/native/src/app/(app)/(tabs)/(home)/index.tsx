@@ -2,10 +2,8 @@ import { useEffect, useState } from "react";
 import { t, useAppLocale } from "@/lib/i18n";
 import { FreeSavesCard, ProCard } from "@/components/home/pro-card";
 import { HomeSearch } from "@/components/home/home-search";
-import {
-  SavedSectionControl,
-  type SavedSection,
-} from "@/components/home/saved-section-control";
+import { SavedSectionControl } from "@/components/home/saved-section-control";
+import { useSavedSection } from "@/lib/saved-section";
 import { SavedLists } from "@/components/shared-list/saved-lists";
 import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
@@ -81,7 +79,7 @@ function SavedPlaces({
 export default function HomeScreen() {
   useAppLocale();
   const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
-  const [section, setSection] = useState<SavedSection>("places");
+  const { section, selectSection } = useSavedSection();
   const showingPlaces = section === "places";
   const [viewportHeight, setViewportHeight] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
@@ -180,7 +178,7 @@ export default function HomeScreen() {
         {topCard ? <View style={styles.topCard}>{topCard}</View> : null}
         {locked ? null : (
           <>
-            <SavedSectionControl selected={section} onSelect={setSection} />
+            <SavedSectionControl selected={section} onSelect={selectSection} />
             {showingPlaces ? <SavedPlaces items={items} /> : <SavedLists />}
           </>
         )}

@@ -2,21 +2,34 @@ import { t, useAppLocale } from "@/lib/i18n";
 import { Wordmark } from "@/components/wordmark";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { useSaveGuard } from "@/lib/free-plan";
+import { SavedSectionProvider, useSavedSection } from "@/lib/saved-section";
 import { Stack, useRouter } from "expo-router";
 import { Platform } from "react-native";
 import { useTabStackChrome } from "@/lib/tab-stack-chrome";
 
 export default function HomeStackLayout() {
+  return (
+    <SavedSectionProvider>
+      <SavedStack />
+    </SavedSectionProvider>
+  );
+}
+
+function SavedStack() {
   useAppLocale();
+  const { selectSection } = useSavedSection();
   const router = useRouter();
   const { labelColor, screenOptions, tap } = useTabStackChrome({
     softScrollEdge: true,
   });
   const { guard, loading: entitlementLoading } = useSaveGuard("home");
 
-  const guardedTap = (href: "/add") => () => {
+  const openAdd = () => {
     if (entitlementLoading) return;
-    void guard(() => router.push(href));
+    void guard(() => {
+      selectSection("places");
+      router.push("/add");
+    });
   };
 
   return (
@@ -37,7 +50,7 @@ export default function HomeStackLayout() {
                   <HeaderIconButton
                     icon="plus"
                     label={t("capture.add")}
-                    onPress={guardedTap("/add")}
+                    onPress={openAdd}
                   />
                 ),
               }
@@ -63,7 +76,7 @@ export default function HomeStackLayout() {
             <Stack.Toolbar.Button
               icon="plus"
               tintColor={labelColor}
-              onPress={guardedTap("/add")}
+              onPress={openAdd}
             >
               {t("common.add")}
             </Stack.Toolbar.Button>

@@ -1,6 +1,7 @@
 import { ThemedText } from "@/components/ui/themed-text";
 import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
+import type { SavedSection } from "@/lib/saved-section";
 import { Pressable, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
@@ -8,8 +9,6 @@ const options = [
   { value: "places", label: "saved.places" },
   { value: "lists", label: "saved.lists" },
 ] as const;
-
-export type SavedSection = (typeof options)[number]["value"];
 
 export function SavedSectionControl({
   selected,

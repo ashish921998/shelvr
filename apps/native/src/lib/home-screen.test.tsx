@@ -18,6 +18,7 @@ import {
   useTrialReminder,
   useTrialReminderPrimerOpen,
 } from "@/lib/trial-reminder";
+import { SavedSectionProvider } from "@/lib/saved-section";
 import { welcomeName, welcomeSave } from "@/lib/welcome-save";
 
 const USER = "user_a";
@@ -250,7 +251,9 @@ function App() {
   const primerOpen = useTrialReminderPrimerOpen();
   return (
     <>
-      <HomeScreen />
+      <SavedSectionProvider>
+        <HomeScreen />
+      </SavedSectionProvider>
       {primerOpen ? <div>trial primer</div> : null}
     </>
   );
