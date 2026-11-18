@@ -1,3 +1,4 @@
+import { haptics } from "@/lib/haptics";
 import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
@@ -37,6 +38,8 @@ export function SignInView({
   const { theme } = useUnistyles();
 
   const handleOAuth = async (provider: OAuthProvider) => {
+    if (pending !== null) return;
+    if (provider !== "anonymous") void haptics.impact();
     if ((await signInWith(provider)) === "completed") onCompleted?.();
   };
 
@@ -50,7 +53,10 @@ export function SignInView({
     >
       {onBack ? (
         <Pressable
-          onPress={onBack}
+          onPress={() => {
+            void haptics.impact();
+            onBack();
+          }}
           accessibilityRole="button"
           accessibilityLabel={t("common.back")}
           hitSlop={12}

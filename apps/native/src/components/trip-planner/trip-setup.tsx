@@ -1,3 +1,4 @@
+import { haptics } from "@/lib/haptics";
 import { AddPlaceSearch } from "@/components/add-place-sheet";
 import { AppSymbolIcon } from "@/components/symbol";
 import {
@@ -172,7 +173,10 @@ function TripBasics({
     setCoverError(false);
     try {
       const cover = await selectCover();
-      if (cover) update({ cover });
+      if (cover) {
+        update({ cover });
+        void haptics.impact();
+      }
     } catch (error) {
       analytics.captureError("trip_cover_pick_failed", error);
       setCoverError(true);

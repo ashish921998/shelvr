@@ -1,3 +1,4 @@
+import { haptics } from "@/lib/haptics";
 import { NotificationPreview } from "@/components/notification-preview";
 import { GhostButton, PillButton } from "@/components/onboarding/parts";
 import type { AhaSample } from "@/lib/aha-sample";
@@ -54,6 +55,7 @@ export function NotificationsStep({
   const allow = async () => {
     if (inFlight.current) return;
     inFlight.current = true;
+    void haptics.impact("medium");
     setAsking(true);
     let granted = false;
     try {

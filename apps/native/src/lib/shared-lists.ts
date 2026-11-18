@@ -1,3 +1,4 @@
+import { haptics } from "@/lib/haptics";
 import { analytics } from "@/lib/analytics";
 import { type CityPin, cityPinId } from "@/lib/city-pins";
 import type { CityPlanKind } from "@/lib/city-plan";
@@ -160,6 +161,7 @@ export async function shareInvite(
   try {
     const result = await shareUrl(inviteUrl(token));
     const shared = result.action === Share.sharedAction;
+    if (shared) void haptics.success();
     analytics.capture("shared_list_invite_sent", { shared, surface });
     return shared;
   } catch (error) {

@@ -4,7 +4,6 @@ import {
   AppPanel,
   AppsSheet,
   IosSheet,
-  tick,
 } from "@/components/onboarding/share-sheets";
 import type { AhaSample } from "@/lib/aha-sample";
 import { t, useAppLocale } from "@/lib/i18n";
@@ -33,7 +32,7 @@ export function AhaSharePractice({
   useAppLocale();
   const [stage, setStage] = useState<Stage>("post");
   const go = (next: Stage) => () => {
-    tick();
+    void haptics.impact();
     setStage(next);
   };
   return (

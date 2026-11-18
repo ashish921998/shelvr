@@ -1,3 +1,4 @@
+import { haptics } from "@/lib/haptics";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ActionMenu } from "@/components/ui/action-menu";
 import { ThemedText } from "@/components/ui/themed-text";
@@ -92,7 +93,10 @@ export function TripCard({ trip, onOpen, onEdit, onDelete }: Props) {
             {
               id: "edit",
               label: t("tripPlanner.edit"),
-              onPress: onEdit,
+              onPress: () => {
+                void haptics.impact("medium");
+                onEdit();
+              },
             },
             {
               id: "delete",

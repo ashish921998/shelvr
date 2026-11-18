@@ -17,7 +17,7 @@ export function HowToShare() {
   const pick = () => {
     if (left.current) return;
     left.current = true;
-    void haptics.success();
+    void haptics.impact("medium");
     backOrHome(router);
   };
   return (

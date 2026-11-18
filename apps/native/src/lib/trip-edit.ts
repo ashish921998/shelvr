@@ -269,7 +269,7 @@ export function useTripEditor(trip: TripPlanDetail) {
       offerUndo(null);
       try {
         const before = await optimistic.remove({ stopId: stop._id });
-        void haptics.selection();
+        void haptics.impact("medium");
         analytics.capture("trip_plan_stop_removed", { source: stop.source });
         if (edit !== latest.current) return;
         offerUndo({

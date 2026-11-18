@@ -1,3 +1,4 @@
+import { haptics } from "@/lib/haptics";
 import { HomeHeader } from "@/components/home/home-header";
 import { AppSymbolIcon } from "@/components/symbol";
 import { analytics } from "@/lib/analytics";
@@ -61,6 +62,7 @@ export function HomeSearch({
               accessibilityLabel={t("search.clear")}
               hitSlop={8}
               onPress={() => {
+                void haptics.impact();
                 setText("");
                 setQuery("");
               }}

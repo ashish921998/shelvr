@@ -27,7 +27,7 @@ vi.mock("@/lib/i18n", () => ({
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: vi.fn(), captureError: vi.fn() },
 }));
-vi.mock("@/lib/haptics", () => ({ haptics: {} }));
+vi.mock("@/lib/haptics", () => ({ haptics: { impact: vi.fn() } }));
 vi.mock("@/lib/motion", () => ({ fadeIn: {}, motion: {} }));
 vi.mock("@/lib/free-plan", () => ({ useAccess: () => mocks.access }));
 vi.mock("@/lib/delete-trip-plan", () => ({ useDeleteTripPlan: () => vi.fn() }));

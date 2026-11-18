@@ -113,7 +113,7 @@ it.each(["date", "trip", "weekend"] as const)(
   },
 );
 
-it("gives the Shelvr pick the medium impact, the only one in the practice share", () => {
+it("plays light impacts through the share steps and a medium impact on the Shelvr pick", () => {
   const impact = vi.spyOn(haptics, "impact");
   render(
     <AhaShareStep sample={ahaSample("trip", "lisbon")} onShared={vi.fn()} />,
@@ -121,9 +121,9 @@ it("gives the Shelvr pick the medium impact, the only one in the practice share"
   for (const label of ["common.share", "aha.sheetShareTo", "aha.sheetMore"]) {
     fireEvent.click(screen.getByRole("button", { name: label }));
   }
-  expect(impact).not.toHaveBeenCalled();
+  expect(impact.mock.calls).toEqual([[], [], []]);
   fireEvent.click(screen.getByRole("button", { name: "Shelvr" }));
-  expect(impact.mock.calls).toEqual([["medium"]]);
+  expect(impact.mock.calls).toEqual([[], [], [], ["medium"]]);
   impact.mockRestore();
 });
 

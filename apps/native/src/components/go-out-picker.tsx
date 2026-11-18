@@ -15,7 +15,7 @@ import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
 import { KIND_ICONS, KIND_LABELS } from "@/lib/map-filters";
 import { motion } from "@/lib/motion";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Linking,
@@ -145,9 +145,12 @@ export function GoOutPicker({
   const diceStyle = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.get()}deg` }],
   }));
+  const stopRoll = useRef<(() => void) | undefined>(undefined);
+  useEffect(() => () => stopRoll.current?.(), []);
   const matches = places.filter((place) => goOutMatches(place, category));
   const shown = picked && matches.includes(picked) ? picked : undefined;
   const choose = (value: GoOutCategory | null) => {
+    stopRoll.current?.();
     setCategory(value);
     setPicked(undefined);
     void haptics.selection();
@@ -155,7 +158,8 @@ export function GoOutPicker({
   const roll = () => {
     if (matches.length === 0) return;
     setPicked(rollPlace(matches, shown));
-    void haptics.impact();
+    stopRoll.current?.();
+    stopRoll.current = haptics.rollDice();
     if (!reduced)
       rotation.set(
         withSequence(

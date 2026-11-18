@@ -111,6 +111,7 @@ function AddContent({ close }: { close: () => void }) {
       Alert.alert(t("errors.saveTitle"), t("errors.notALink"));
       return;
     }
+    void haptics.impact();
     setSaving(true);
     const operationId = `link:${Crypto.randomUUID()}`;
     analytics.capture("save_attempt_started", {
@@ -126,7 +127,6 @@ function AddContent({ close }: { close: () => void }) {
         saveSource: "manual_link",
       });
       analytics.capture("article_saved");
-      void haptics.success();
       dismiss();
     } catch (error) {
       analytics.capture("save_failed", {

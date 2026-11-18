@@ -1,3 +1,4 @@
+import { haptics } from "@/lib/haptics";
 import { AppSymbolIcon } from "@/components/symbol";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { t } from "@/lib/i18n";
@@ -39,7 +40,10 @@ export function MapSearchField({
         <HeaderIconButton
           icon="xmark"
           label={t("search.clear")}
-          onPress={() => onChangeText("")}
+          onPress={() => {
+            void haptics.impact();
+            onChangeText("");
+          }}
         />
       ) : null}
     </View>

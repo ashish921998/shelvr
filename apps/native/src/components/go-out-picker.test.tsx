@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({ openURL: vi.fn() }));
 
 vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
 vi.mock("@/lib/haptics", () => ({
-  haptics: { selection: vi.fn(), impact: vi.fn() },
+  haptics: { selection: vi.fn(), rollDice: vi.fn(() => vi.fn()) },
 }));
 vi.mock("@/lib/date-plan", () => ({
   directionsUrl: (place: { name: string }) => `maps:${place.name}`,

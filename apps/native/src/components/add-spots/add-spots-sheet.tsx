@@ -1,3 +1,4 @@
+import { haptics } from "@/lib/haptics";
 import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { AddButton, addButtonBottom } from "@/components/tab-bar";
 import { ThemedText } from "@/components/ui/themed-text";
@@ -167,6 +168,7 @@ export function AddSpotsSheet() {
               icon="play.rectangle"
               label={t("addSheet.howToShare")}
               onPress={() => {
+                void haptics.impact();
                 router.back();
                 router.push("/how-to-share");
               }}

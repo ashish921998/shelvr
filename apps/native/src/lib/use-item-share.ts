@@ -1,3 +1,4 @@
+import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
 import {
@@ -43,6 +44,7 @@ export function useItemShare(
         branded = await shareLink(activeItem._id);
         const url = branded ?? activeItem.url;
         if (!url) return;
+        void haptics.impact();
         const result = await shareUrl(url);
         shared = result.action !== Share.dismissedAction;
       } else if (!activeItem.imageUrl || !(await Sharing.isAvailableAsync())) {

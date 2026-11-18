@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   back: vi.fn(),
   canGoBack: vi.fn(() => true),
   replace: vi.fn(),
-  success: vi.fn(async () => {}),
+  impact: vi.fn(async () => {}),
 }));
 
 vi.mock("@/components/onboarding/aha-share", () => ({
@@ -18,7 +18,7 @@ vi.mock("@/components/onboarding/aha-share", () => ({
   )),
 }));
 vi.mock("@/lib/aha-sample", () => ({ ahaSample: () => ({}) }));
-vi.mock("@/lib/haptics", () => ({ haptics: { success: mocks.success } }));
+vi.mock("@/lib/haptics", () => ({ haptics: { impact: mocks.impact } }));
 vi.mock("@/components/screen-title", () => ({
   ScreenTitle: vi.fn(({ title }: { title: string }) => <h1>{title}</h1>),
 }));
@@ -47,7 +47,7 @@ beforeEach(() => {
   mocks.back.mockReset();
   mocks.canGoBack.mockReturnValue(true);
   mocks.replace.mockReset();
-  mocks.success.mockClear();
+  mocks.impact.mockClear();
 });
 
 it("titles the practice share and asks to save the sample reel", () => {
@@ -56,12 +56,12 @@ it("titles the practice share and asks to save the sample reel", () => {
   expect(screen.getByText("Try saving this reel.")).toBeTruthy();
 });
 
-it("goes back once, with the success tap, when Shelvr is picked", () => {
+it("goes back once, with the impact tap, when Shelvr is picked", () => {
   render(<HowToShare />);
   const shelvr = screen.getByRole("button", { name: "Shelvr" });
   fireEvent.click(shelvr);
   fireEvent.click(shelvr);
-  expect(mocks.success).toHaveBeenCalledOnce();
+  expect(mocks.impact).toHaveBeenCalledWith("medium");
   expect(mocks.back).toHaveBeenCalledOnce();
 });
 

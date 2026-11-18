@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   captureError: vi.fn(),
   selection: vi.fn(),
+  impact: vi.fn(),
   success: vi.fn(),
   moveSheet: vi.fn(),
   scrollToIndex: vi.fn(),
@@ -60,7 +61,11 @@ vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mocks.capture, captureError: mocks.captureError },
 }));
 vi.mock("@/lib/haptics", () => ({
-  haptics: { selection: mocks.selection, success: mocks.success },
+  haptics: {
+    impact: mocks.impact,
+    selection: mocks.selection,
+    success: mocks.success,
+  },
 }));
 vi.mock("@/lib/motion", () => ({
   motion: { duration: { stagger: 300 } },
@@ -1240,7 +1245,7 @@ describe("list page", () => {
       placeId: "p1",
       went: true,
     });
-    expect(mocks.success).toHaveBeenCalledOnce();
+    expect(mocks.impact.mock.calls).toEqual([["medium"]]);
     await act(async () => {
       fireEvent.click(screen.getByText("not yet Taco Spot"));
     });
@@ -1248,7 +1253,7 @@ describe("list page", () => {
       placeId: "p1",
       went: false,
     });
-    expect(mocks.success).toHaveBeenCalledOnce();
+    expect(mocks.impact.mock.calls).toEqual([["medium"], ["medium"]]);
     await act(async () => {
       fireEvent.click(screen.getByText("remove Taco Spot"));
     });
@@ -1343,7 +1348,7 @@ describe("list page", () => {
       beat();
       expect(lastMap().visible).toBe(5);
       expect(mocks.selection).not.toHaveBeenCalled();
-      expect(mocks.success).not.toHaveBeenCalled();
+      expect(mocks.impact).not.toHaveBeenCalled();
     });
 
     it("shows every pin at once under Reduce Motion", () => {
@@ -1397,6 +1402,6 @@ describe("list page", () => {
       failure,
     );
     expect(mocks.alert).toHaveBeenCalledWith("sharedLists.failed");
-    expect(mocks.success).not.toHaveBeenCalled();
+    expect(mocks.impact).not.toHaveBeenCalled();
   });
 });
