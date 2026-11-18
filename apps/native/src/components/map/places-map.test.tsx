@@ -358,6 +358,36 @@ it.each([
   },
 );
 
+it("keeps the area the person panned to when their first places arrive", async () => {
+  mock.findsPerson = true;
+  const located = (pins: typeof AUSTIN) => (
+    <PlacesMap
+      pins={pins}
+      framed={pins}
+      showsUser
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={vi.fn()}
+    />
+  );
+  const pan = (latitude: number, longitude: number) =>
+    act(() =>
+      mock.props.onCameraMove({
+        coordinates: { latitude, longitude },
+        zoom: 13,
+      }),
+    );
+  const { rerender } = render(located([]));
+  await act(() => vi.advanceTimersByTimeAsync(10));
+  pan(28.6, 77.2);
+  await act(() => vi.advanceTimersByTimeAsync(5000));
+  pan(19.07, 72.88);
+  rerender(located(AUSTIN));
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  expect(mock.moves).toEqual(["person"]);
+});
+
 it("keeps the chosen area when location access is turned off later", async () => {
   const { rerender } = render(map());
   await act(() => vi.advanceTimersByTimeAsync(5000));

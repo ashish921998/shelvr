@@ -230,6 +230,7 @@ export function PlacesMap({
     if (centre.current)
       onCentreChange?.(centre.current, event.zoom ?? CITY_ZOOM);
     if (checkNearby.current) waitForRest();
+    else if (showsUser) framedOnce.current = true;
   };
 
   const nativeMap =
