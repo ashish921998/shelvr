@@ -34,14 +34,6 @@ vi.mock("expo-router", () => ({
     replace: mocks.replace,
   }),
 }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}) },
-}));
-vi.mock("react-native", () => ({
-  View: vi.fn(({ children }: { children: ReactNode }) => (
-    <section>{children}</section>
-  )),
-}));
 
 beforeEach(() => {
   mocks.back.mockReset();

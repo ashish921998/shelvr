@@ -5,7 +5,6 @@ import { I18nManager } from "react-native";
 import { afterEach, expect, it, vi } from "vitest";
 import { AppSymbolIcon } from "./symbol";
 
-vi.mock("react-native", () => ({ I18nManager: { isRTL: false } }));
 vi.mock("react-native-svg", () => ({}));
 
 afterEach(() => {

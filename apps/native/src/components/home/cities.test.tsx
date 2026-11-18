@@ -65,33 +65,6 @@ vi.mock("@/lib/city-picture", () => ({
   curatedCityPicture: (city: string) => (city === "Paris" ? 42 : undefined),
 }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: mocks.push }) }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}) },
-}));
-vi.mock("react-native", () => ({
-  useWindowDimensions: () => ({ width: 402 }),
-  View: vi.fn(({ children }: { children: ReactNode }) => (
-    <section>{children}</section>
-  )),
-  ScrollView: vi.fn(({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  )),
-  Pressable: vi.fn(
-    ({
-      children,
-      onPress,
-      accessibilityLabel,
-    }: {
-      children: ReactNode;
-      onPress: () => void;
-      accessibilityLabel?: string;
-    }) => (
-      <button onClick={onPress} aria-label={accessibilityLabel}>
-        {children}
-      </button>
-    ),
-  ),
-}));
 
 beforeEach(() => {
   mocks.push.mockReset();

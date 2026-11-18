@@ -33,29 +33,9 @@ vi.mock("@/components/ui/themed-text", () => ({
     <span>{children}</span>
   )),
 }));
-vi.mock("react-native", () => ({
+vi.mock("react-native", async () => ({
+  ...(await import("@/test-native")).reactNative,
   Platform: mock.platform,
-  ScrollView: vi.fn(({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  )),
-  Pressable: vi.fn(
-    ({
-      children,
-      onPress,
-      accessibilityLabel,
-    }: {
-      children: ReactNode;
-      onPress: () => void;
-      accessibilityLabel: string;
-    }) => (
-      <button aria-label={accessibilityLabel} onClick={onPress}>
-        {children}
-      </button>
-    ),
-  ),
-}));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}) },
 }));
 
 const pins = [

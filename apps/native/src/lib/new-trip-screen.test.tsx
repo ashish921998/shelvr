@@ -129,59 +129,6 @@ vi.mock("@/components/ui/button", () => ({
     ),
   ),
 }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: {
-    create: () => new Proxy({}, { get: () => ({}) }),
-    hairlineWidth: 1,
-  },
-  useUnistyles: () => ({ theme: { colors: {} }, rt: { themeName: "light" } }),
-}));
-vi.mock("react-native", () => ({
-  Keyboard: { dismiss: vi.fn() },
-  Platform: { OS: "ios" },
-  ScrollView: vi.fn(({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  )),
-  View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
-  Pressable: vi.fn(
-    ({
-      children,
-      onPress,
-      disabled,
-      accessibilityLabel,
-    }: {
-      children: ReactNode;
-      onPress: () => void;
-      disabled?: boolean;
-      accessibilityLabel?: string;
-    }) => (
-      <button
-        aria-label={accessibilityLabel}
-        disabled={disabled}
-        onClick={onPress}
-      >
-        {children}
-      </button>
-    ),
-  ),
-  TextInput: vi.fn(
-    ({
-      testID,
-      value,
-      onChangeText,
-    }: {
-      testID: string;
-      value: string;
-      onChangeText: (text: string) => void;
-    }) => (
-      <input
-        data-testid={testID}
-        value={value}
-        onChange={(event) => onChangeText(event.target.value)}
-      />
-    ),
-  ),
-}));
 
 const press = (name: string) =>
   fireEvent.click(screen.getByRole("button", { name }));

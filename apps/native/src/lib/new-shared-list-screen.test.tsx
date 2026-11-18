@@ -92,38 +92,6 @@ vi.mock("expo-router", () => {
     useRouter: () => ({ replace: mocks.replace }),
   };
 });
-vi.mock("react-native", () => ({
-  Alert: { alert: vi.fn() },
-  Platform: { OS: "ios" },
-  View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
-  ScrollView: vi.fn(({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  )),
-  Pressable: vi.fn(({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  )),
-  TextInput: vi.fn(
-    ({
-      accessibilityLabel,
-      onChangeText,
-      value,
-    }: {
-      accessibilityLabel: string;
-      onChangeText: (text: string) => void;
-      value: string;
-    }) => (
-      <input
-        aria-label={accessibilityLabel}
-        value={value}
-        onChange={(event) => onChangeText(event.target.value)}
-      />
-    ),
-  ),
-}));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { colors: {}, type: {} } }),
-}));
 
 it("does not redirect or open sharing when a collection finishes after closing", async () => {
   const created = { listId: "my-list", inviteToken: "sample-token" };

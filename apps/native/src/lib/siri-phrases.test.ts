@@ -1,7 +1,5 @@
 import { readFileSync } from "node:fs";
-import { expect, it, vi } from "vitest";
-
-vi.mock("react-native", () => ({ Platform: { OS: "ios", Version: "18.0" } }));
+import { expect, it } from "vitest";
 
 const { SIRI_SHORTCUTS, siriShortcuts } = await import("./siri-phrases");
 

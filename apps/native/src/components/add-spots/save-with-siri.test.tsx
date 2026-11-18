@@ -29,18 +29,6 @@ vi.mock("@/components/ui/themed-text", () => ({
       accessibilityRole === "header" ? <h2>{children}</h2> : <p>{children}</p>,
   ),
 }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { colors: { onTint: "#2b2418" } } }),
-}));
-vi.mock("react-native", () => ({
-  View: vi.fn(({ children }: { children?: ReactNode }) => (
-    <div>{children}</div>
-  )),
-  ScrollView: vi.fn(({ children }: { children?: ReactNode }) => (
-    <div>{children}</div>
-  )),
-}));
 
 const { SIRI_SHORTCUTS } =
   await vi.importActual<typeof import("@/lib/siri-phrases")>(

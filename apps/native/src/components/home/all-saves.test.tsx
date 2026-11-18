@@ -42,9 +42,6 @@ vi.mock("@/components/ui/themed-text", () => ({
 vi.mock("@/lib/home-feed", () => ({
   useHomeFeed: () => ({ items: mocks.items, loadMore: mocks.loadMore }),
 }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}) },
-}));
 vi.mock("react-native", () => ({
   View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
   SectionList: vi.fn(

@@ -51,42 +51,6 @@ vi.mock("@convex/_generated/api", () => ({
 }));
 vi.mock("expo-router", () => ({ useIsFocused: () => true }));
 vi.mock("expo-image", () => ({ Image: vi.fn(() => null) }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => new Proxy({}, { get: () => ({}) }) },
-  useUnistyles: () => ({
-    theme: { colors: { tripDays: ["#a", "#b", "#c"] } },
-    rt: { screen: { height: 800 } },
-  }),
-}));
-vi.mock("react-native", () => ({
-  Platform: { OS: "ios" },
-  Alert: { alert: vi.fn() },
-  ScrollView: vi.fn(({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  )),
-  View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
-  Pressable: vi.fn(
-    ({
-      children,
-      accessibilityLabel,
-      onPress,
-      disabled,
-    }: {
-      children: ReactNode;
-      accessibilityLabel?: string;
-      onPress: () => void;
-      disabled?: boolean;
-    }) => (
-      <button
-        aria-label={accessibilityLabel}
-        disabled={disabled}
-        onClick={onPress}
-      >
-        {children}
-      </button>
-    ),
-  ),
-}));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 vi.mock("@/components/ui/themed-text", () => ({
   ThemedText: vi.fn(({ children }: { children: ReactNode }) => (

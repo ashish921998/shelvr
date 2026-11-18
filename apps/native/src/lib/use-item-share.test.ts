@@ -29,9 +29,6 @@ vi.mock("expo-sharing", () => ({
   isAvailableAsync: vi.fn(),
   shareAsync: vi.fn(),
 }));
-vi.mock("react-native", () => ({
-  Share: { share: vi.fn(), dismissedAction: "dismissedAction" },
-}));
 
 it("reports the surface a share came from", async () => {
   const link = {

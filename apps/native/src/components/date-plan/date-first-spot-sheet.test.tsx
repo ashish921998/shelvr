@@ -38,28 +38,6 @@ vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
 vi.mock("@convex/_generated/api", () => ({
   api: { datePlanData: {}, sharedLists: {} },
 }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { colors: { muted: "#999" } } }),
-}));
-vi.mock("react-native", () => ({
-  TextInput: vi.fn(() => <input />),
-  View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
-  Pressable: vi.fn(
-    ({ children, onPress }: { children: ReactNode; onPress: () => void }) => (
-      <button onClick={onPress}>{children}</button>
-    ),
-  ),
-  FlatList: vi.fn(
-    ({
-      data,
-      ListEmptyComponent: empty,
-    }: {
-      data: unknown[];
-      ListEmptyComponent: ReactNode;
-    }) => <div>{data.length ? null : empty}</div>,
-  ),
-}));
 
 beforeEach(() => {
   vi.clearAllMocks();

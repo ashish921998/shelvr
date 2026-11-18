@@ -11,27 +11,6 @@ vi.mock("@/components/ui/themed-text", () => ({
     <span>{children}</span>
   )),
 }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { colors: { muted: "#6f6455" } } }),
-}));
-vi.mock("react-native", () => ({
-  Pressable: vi.fn(
-    ({
-      children,
-      onPress,
-      accessibilityLabel,
-    }: {
-      children: ReactNode;
-      onPress: () => void;
-      accessibilityLabel?: string;
-    }) => (
-      <button onClick={onPress} aria-label={accessibilityLabel}>
-        {children}
-      </button>
-    ),
-  ),
-}));
 
 it("puts the count in the title and reads it aloud after a comma", () => {
   const onPress = vi.fn();

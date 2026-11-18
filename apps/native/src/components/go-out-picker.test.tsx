@@ -52,39 +52,6 @@ vi.mock("react-native-reanimated", () => ({
   withSequence: vi.fn(),
   withTiming: vi.fn(),
 }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { colors: { foreground: "#000" } } }),
-}));
-vi.mock("react-native", () => ({
-  ActivityIndicator: vi.fn(() => <span>loading</span>),
-  Linking: { openURL: mocks.openURL },
-  ScrollView: vi.fn(({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  )),
-  View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
-  Pressable: vi.fn(
-    ({
-      children,
-      onPress,
-      disabled,
-      accessibilityLabel,
-    }: {
-      children: ReactNode;
-      onPress: () => void;
-      disabled?: boolean;
-      accessibilityLabel?: string;
-    }) => (
-      <button
-        aria-label={accessibilityLabel}
-        disabled={disabled}
-        onClick={onPress}
-      >
-        {children}
-      </button>
-    ),
-  ),
-}));
 
 const places = [
   { name: "Franklin Barbecue", lat: 30.27, lng: -97.73, kinds: ["food"] },

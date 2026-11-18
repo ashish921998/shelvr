@@ -142,66 +142,6 @@ vi.mock("react-native-reanimated", () => ({
   default: { View: vi.fn(() => null), ScrollView: vi.fn(() => null) },
 }));
 vi.mock("react-native-worklets", () => ({ scheduleOnRN: vi.fn() }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: {
-    create: () => new Proxy({}, { get: () => ({}) }),
-    hairlineWidth: 1,
-  },
-  useUnistyles: () => ({ theme: { colors: {}, gap: () => 0 } }),
-}));
-vi.mock("react-native", () => ({
-  Alert: { alert: vi.fn() },
-  Platform: { OS: "ios" },
-  useWindowDimensions: () => ({ width: 400, height: 800 }),
-  View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
-  Pressable: vi.fn(
-    ({
-      children,
-      onPress,
-      accessibilityLabel,
-    }: {
-      children: ReactNode;
-      onPress: () => void;
-      accessibilityLabel?: string;
-    }) => (
-      <button aria-label={accessibilityLabel} onClick={onPress}>
-        {children}
-      </button>
-    ),
-  ),
-  FlatList: vi.fn(
-    ({
-      data,
-      renderItem,
-    }: {
-      data: unknown[];
-      renderItem: (row: { item: unknown }) => ReactNode;
-    }) => (
-      <div>
-        {data.map((item, index) => (
-          <div key={index}>{renderItem({ item })}</div>
-        ))}
-      </div>
-    ),
-  ),
-  TextInput: vi.fn(
-    ({
-      testID,
-      value,
-      onChangeText,
-    }: {
-      testID: string;
-      value: string;
-      onChangeText: (text: string) => void;
-    }) => (
-      <input
-        data-testid={testID}
-        value={value}
-        onChange={(event) => onChangeText(event.target.value)}
-      />
-    ),
-  ),
-}));
 
 const trip = {
   _id: "trip-1",
