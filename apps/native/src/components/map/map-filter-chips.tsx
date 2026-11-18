@@ -62,11 +62,11 @@ export function MapFilterChips({
   selected: PlaceKind | readonly PlaceKind[] | null;
   onSelect: (kind: PlaceKind | null) => void;
 }) {
+  const multiple = Array.isArray(selected);
   const choose = (kind: PlaceKind | null) => {
-    if (kind !== selected) void haptics.selection();
+    if (!multiple && kind !== selected) void haptics.selection();
     onSelect(kind);
   };
-  const multiple = Array.isArray(selected);
   const selection =
     typeof selected === "string" ? [selected] : (selected ?? []);
   const chips = kinds.map((kind) => {

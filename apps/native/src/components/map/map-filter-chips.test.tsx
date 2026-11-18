@@ -95,6 +95,7 @@ it.each([
 });
 
 it("keeps several category tags selected and toggles one without clearing the others", () => {
+  const selection = vi.spyOn(haptics, "selection");
   const onSelect = vi.fn();
   const { rerender } = render(
     <MapFilterChips
@@ -119,4 +120,8 @@ it("keeps several category tags selected and toggles one without clearing the ot
   );
   expect(screen.getByLabelText("map.kindCoffee").ariaPressed).toBe("false");
   expect(screen.getByLabelText("map.kindDrinks").ariaPressed).toBe("true");
+  fireEvent.click(screen.getByLabelText("map.kindCoffee"));
+  expect(onSelect).toHaveBeenCalledTimes(2);
+  expect(selection).not.toHaveBeenCalled();
+  selection.mockRestore();
 });
