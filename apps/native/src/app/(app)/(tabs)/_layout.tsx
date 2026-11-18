@@ -1,3 +1,4 @@
+import { OneTimePrompts } from "@/components/one-time-prompts";
 import { TabBar } from "@/components/tab-bar";
 import { ROOT_TAB } from "@/lib/home-href";
 import { t, useAppLocale } from "@/lib/i18n";
@@ -9,14 +10,25 @@ export const unstable_settings = { anchor: ROOT_TAB };
 export default function TabsLayout() {
   useAppLocale();
   return (
-    <Tabs
-      screenOptions={{ headerShown: false }}
-      tabBar={(props) => <TabBar {...props} />}
-    >
-      <Tabs.Screen name="(home)" options={{ title: t("navigation.library") }} />
-      <Tabs.Screen name="(map)" options={{ title: t("navigation.map") }} />
-      <Tabs.Screen name="(trips)" options={{ title: t("navigation.trips") }} />
-      <Tabs.Screen name="(passport)" options={{ title: t("passport.title") }} />
-    </Tabs>
+    <OneTimePrompts>
+      <Tabs
+        screenOptions={{ headerShown: false }}
+        tabBar={(props) => <TabBar {...props} />}
+      >
+        <Tabs.Screen
+          name="(home)"
+          options={{ title: t("navigation.library") }}
+        />
+        <Tabs.Screen name="(map)" options={{ title: t("navigation.map") }} />
+        <Tabs.Screen
+          name="(trips)"
+          options={{ title: t("navigation.trips") }}
+        />
+        <Tabs.Screen
+          name="(passport)"
+          options={{ title: t("passport.title") }}
+        />
+      </Tabs>
+    </OneTimePrompts>
   );
 }

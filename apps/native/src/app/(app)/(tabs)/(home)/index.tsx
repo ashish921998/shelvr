@@ -4,32 +4,19 @@ import { FreeSavesCard, ProCard } from "@/components/home/pro-card";
 import { HomeHeader } from "@/components/home/home-header";
 import { HomeSearch } from "@/components/home/home-search";
 import { RecentSaves } from "@/components/home/recent-saves";
-import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
-import { FeedbackModal } from "@/components/feedback/feedback-modal";
 import { HomePlaces, HomePlacesEmptyCard } from "@/components/home/home-places";
 import { LibraryRows } from "@/components/home/library-rows";
 import { ScreenLoader } from "@/components/ui/screen-loader";
-import { useCurrentUser } from "@/lib/current-user";
-import { type Entitlement, useEntitlement } from "@/lib/entitlement";
-import { FREE_SAVES_NUDGE_AT, saveWaiting } from "@/lib/access";
+import { useOneTimePrompts } from "@/components/one-time-prompts";
+import { useEntitlement } from "@/lib/entitlement";
+import { FREE_SAVES_NUDGE_AT } from "@/lib/access";
 import { useAccess } from "@/lib/free-plan";
 import { useHomeFeed } from "@/lib/home-feed";
 import { unplacedSaves } from "@/lib/home-places";
-import {
-  useBusySaving,
-  useFeedbackInvitation,
-} from "@/lib/feedback-invitation";
-import { useCancelSurvey } from "@/lib/use-cancel-survey";
-import { useReviewPrompt } from "@/lib/review-prompt";
-import { NameSheet } from "@/components/shared-list/name-sheet";
-import {
-  useHoldSheetTurns,
-  useSheetTurnUp,
-  useSheetTurnsBusy,
-} from "@/lib/one-time-sheets";
-import { useWelcomeName } from "@/lib/welcome-name";
+import { useBusySaving } from "@/lib/feedback-invitation";
+import { useSheetTurnUp } from "@/lib/one-time-sheets";
 import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
@@ -43,10 +30,6 @@ const LOAD_MORE_DISTANCE = 600;
 // Unasked, Home only pages until it has a screenful of unplaced saves, and never past this many saves; scrolling loads the rest.
 const AUTO_LOAD_SAVES = 200;
 const AUTO_LOAD_UNPLACED = 5;
-
-function trialEnd(entitlement: Entitlement): number | undefined {
-  return entitlement.status === "trialing" ? entitlement.expiresAt : undefined;
-}
 
 export default function HomeScreen() {
   useAppLocale();
@@ -71,33 +54,13 @@ export default function HomeScreen() {
     loadMore,
     items?.length,
   ]);
-  const cancelSurvey = useCancelSurvey();
+  const { cancelSurvey, feedback } = useOneTimePrompts();
   const entitlement = useEntitlement();
   const access = useAccess();
   const locked = access.kind === "locked";
   const nearLimit =
     access.kind === "free" && access.left <= FREE_SAVES_NUDGE_AT;
-  const { data: user } = useCurrentUser();
-  const welcomeName = useWelcomeName(
-    user?._id,
-    items !== undefined &&
-      !cancelSurvey.visible &&
-      !entitlement.loading &&
-      !saveWaiting(access),
-  );
-  const sheetsBusy = useSheetTurnsBusy();
   const sheetUp = useSheetTurnUp();
-  const deferPrompts =
-    cancelSurvey.visible ||
-    entitlement.loading ||
-    locked ||
-    sheetsBusy ||
-    welcomeName.pending;
-  const feedback = useFeedbackInvitation(items, { defer: deferPrompts });
-  useHoldSheetTurns(feedback.modalOpen);
-  useReviewPrompt(items, {
-    defer: deferPrompts || feedback.invitationVisible || feedback.modalOpen,
-  });
   const busySaving = useBusySaving(items);
 
   if (items === undefined) {
@@ -168,22 +131,6 @@ export default function HomeScreen() {
           </HomeSearch>
         )}
       </ScrollView>
-      {user ? (
-        <WelcomeSaveSheet
-          userId={user._id}
-          ready={entitlement.entitled && !cancelSurvey.visible}
-          trialEndsAt={trialEnd(entitlement)}
-        />
-      ) : null}
-      <NameSheet
-        visible={welcomeName.open}
-        kind="welcome"
-        onDone={welcomeName.close}
-        onCancel={welcomeName.close}
-      />
-      {feedback.modalOpen ? (
-        <FeedbackModal surface="home" onClose={feedback.closeFeedback} />
-      ) : null}
     </View>
   );
 }
