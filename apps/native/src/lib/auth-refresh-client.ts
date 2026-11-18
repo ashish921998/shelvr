@@ -1,3 +1,4 @@
+import { analytics } from "@/lib/analytics";
 import { ConvexReactClient } from "convex/react";
 
 type SetAuth = Parameters<ConvexReactClient["setAuth"]>;
@@ -25,6 +26,7 @@ export class AuthRefreshClient extends ConvexReactClient {
       async (options) => {
         const attempt = ++latest;
         let delay = 1000;
+        let reported = false;
         while (session === this.session && attempt === latest) {
           try {
             const token = await fetchToken(options);
@@ -34,6 +36,10 @@ export class AuthRefreshClient extends ConvexReactClient {
           } catch (error) {
             if (!options.forceRefreshToken || !lostConnection(error))
               throw error;
+            if (!reported) {
+              reported = true;
+              analytics.captureError("auth_refresh_offline", error);
+            }
             await new Promise<void>((resolve) => setTimeout(resolve, delay));
             delay = Math.min(delay * 2, 30_000);
           }

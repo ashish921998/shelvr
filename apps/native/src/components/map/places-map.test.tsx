@@ -310,6 +310,7 @@ it("frames the first saved places once when the map opened empty without locatio
   rerender(noLocation(AUSTIN, 170));
   await act(() => vi.advanceTimersByTimeAsync(200));
   expect(mock.moves).toHaveLength(2);
+  expect(mock.moves[1]).not.toEqual(mock.moves[0]);
   rerender(noLocation(AUSTIN.slice(0, 1)));
   await act(() => vi.advanceTimersByTimeAsync(200));
   expect(mock.moves).toHaveLength(2);

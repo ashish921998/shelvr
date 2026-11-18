@@ -13,7 +13,10 @@ const mocks = vi.hoisted(() => ({
   openPaywall: vi.fn(),
 }));
 
-vi.mock("@/lib/entitlement", () => ({ openPaywall: mocks.openPaywall }));
+vi.mock("@/lib/entitlement", () => ({
+  openPaywall: mocks.openPaywall,
+  waitForSheetTransition: () => Promise.resolve(),
+}));
 vi.mock("expo-router", () => ({ useRouter: () => "router" }));
 
 vi.mock("@/lib/analytics", () => ({

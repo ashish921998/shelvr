@@ -2,6 +2,9 @@ import { afterEach, expect, it, vi } from "vitest";
 import { ConvexReactClient } from "convex/react";
 import { AuthRefreshClient } from "./auth-refresh-client";
 
+const captureError = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/analytics", () => ({ analytics: { captureError } }));
+
 const disconnected = new Error(
   "fetch failed: The network connection was lost.",
 );
@@ -34,6 +37,11 @@ it("keeps a refresh pending through connection losses and returns the recovered 
   expect(fetchToken).toHaveBeenCalledTimes(2);
   await vi.advanceTimersByTimeAsync(1);
   await expect(pending).resolves.toBe("recovered");
+  expect(captureError).toHaveBeenCalledOnce();
+  expect(captureError).toHaveBeenCalledWith(
+    "auth_refresh_offline",
+    disconnected,
+  );
 });
 
 it("stops retrying when the session is replaced", async () => {

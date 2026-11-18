@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { PromptSheet } from "@/components/ui/prompt-sheet";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
-import { openPaywall } from "@/lib/entitlement";
+import { openPaywall, waitForSheetTransition } from "@/lib/entitlement";
 import { t } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import { saveErrorCode } from "@convex/model/saveErrors";
@@ -56,6 +56,7 @@ export function TripStopDetailsSheet({
     } catch (error) {
       if (saveErrorCode(error) === "pro_required") {
         onClose();
+        await waitForSheetTransition();
         await openPaywall(router, "trip_stop_details");
         return;
       }

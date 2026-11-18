@@ -215,7 +215,7 @@ export function PlacesMap({
     if (framedOnce.current || !canFrameLatePlaces || !initialFit) return;
     framedOnce.current = true;
     return moveCamera(
-      () => map()?.setCameraPosition(initialFit),
+      () => map()?.setCameraPosition(latest.current.fit ?? initialFit),
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
   }, [canFrameLatePlaces]);
