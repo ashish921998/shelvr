@@ -12,7 +12,7 @@ function Text({ children }: Box) {
 }
 
 function ActivityIndicator() {
-  return <span>loading</span>;
+  return <progress />;
 }
 
 function Pressable({
