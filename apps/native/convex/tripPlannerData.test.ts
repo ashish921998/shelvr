@@ -980,6 +980,37 @@ describe("searching a new blank trip", () => {
   });
 });
 
+describe("listTripsStarting", () => {
+  it("returns the person's trips starting in the range, without covers", async () => {
+    const { t, userId } = await setup(TRIP);
+    const trip = (startDate?: string) => ({
+      userId,
+      city: "Porto",
+      dayCount: 2,
+      pace: "balanced" as const,
+      interests: [],
+      stopCount: 0,
+      savedCount: 0,
+      cover: "photo",
+      ...(startDate ? { startDate } : {}),
+    });
+    const inside = await t.run(async (ctx) => {
+      await ctx.db.insert("tripPlans", trip("2026-11-01"));
+      await ctx.db.insert("tripPlans", trip("2026-12-01"));
+      await ctx.db.insert("tripPlans", trip());
+      return await ctx.db.insert("tripPlans", trip("2026-11-17"));
+    });
+    expect(
+      await t.query(api.tripPlannerData.listTripsStarting, {
+        from: "2026-11-04",
+        to: "2026-11-21",
+      }),
+    ).toEqual([
+      { _id: inside, city: "Porto", startDate: "2026-11-17", dayCount: 2 },
+    ]);
+  });
+});
+
 describe("countTripPlans", () => {
   it("counts the person's trips up to a page, and says when there are more", async () => {
     const { t, userId } = await setup(TRIP);

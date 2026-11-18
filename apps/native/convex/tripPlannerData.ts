@@ -396,6 +396,37 @@ export const listTripPlans = authedQuery({
   },
 });
 
+export const listTripsStarting = authedQuery({
+  args: { from: v.string(), to: v.string() },
+  returns: v.array(
+    v.object({
+      _id: v.id("tripPlans"),
+      name: v.optional(v.string()),
+      city: v.string(),
+      startDate: v.optional(v.string()),
+      dayCount: v.number(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const trips = await ctx.db
+      .query("tripPlans")
+      .withIndex("by_user_and_start_date", (q) =>
+        q
+          .eq("userId", ctx.userId)
+          .gte("startDate", args.from)
+          .lte("startDate", args.to),
+      )
+      .take(LIST_PAGE_MAX);
+    return trips.map(({ _id, name, city, startDate, dayCount }) => ({
+      _id,
+      ...(name === undefined ? {} : { name }),
+      city,
+      ...(startDate === undefined ? {} : { startDate }),
+      dayCount,
+    }));
+  },
+});
+
 export const countTripPlans = authedQuery({
   args: {},
   returns: v.object({ count: v.number(), more: v.boolean() }),

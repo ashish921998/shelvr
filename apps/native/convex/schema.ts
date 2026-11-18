@@ -467,7 +467,8 @@ export default defineSchema({
     .index("by_user_and_list", ["userId", "listId"])
     .index("by_share_token", ["shareToken"])
     .index("by_user_and_share_token", ["userId", "shareToken"])
-    .index("by_start_date", ["startDate"]),
+    .index("by_start_date", ["startDate"])
+    .index("by_user_and_start_date", ["userId", "startDate"]),
 
   tripStops: defineTable({
     tripId: v.id("tripPlans"),

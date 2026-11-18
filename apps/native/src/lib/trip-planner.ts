@@ -237,7 +237,7 @@ export function tripName(trip: { name?: string; city: string }): string {
   return trip.name?.trim() || tripTitle(trip.city);
 }
 
-const CONTINUE_LEAD_DAYS = 3;
+export const CONTINUE_LEAD_DAYS = 3;
 
 export function tripToContinue<
   T extends Pick<TripPlanSummary, "startDate" | "dayCount">,
