@@ -116,6 +116,7 @@ export function PlacesMap({
     latest.current = { pins, fit, overviewCamera };
   }, [pins, fit, overviewCamera]);
   const centredOnUser = useRef(false);
+  const framedOnce = useRef(showsUser || firstCamera !== undefined);
   const centre = useRef<LatLng | undefined>(undefined);
   const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Set while the camera travels to the person; once it rests, a map with none of their places in
@@ -131,7 +132,8 @@ export function PlacesMap({
     centredOnUser.current = true;
     const showCity = () => {
       const { fit } = latest.current;
-      if (fit)
+      if (!fit) framedOnce.current = false;
+      else
         map()
           ?.setCameraPosition(fit)
           .catch((error: unknown) =>
@@ -202,23 +204,18 @@ export function PlacesMap({
     );
   }, [locate]);
 
-  const framedOnce = useRef(showsUser || firstCamera !== undefined);
   const canFrameLatePlaces =
-    !showsUser &&
-    filterRevision === 0 &&
-    !focus &&
-    !locate &&
-    !zoomOut &&
-    !!fit;
+    filterRevision === 0 && !focus && !locate && !zoomOut && !!fit;
   useEffect(() => {
     const initialFit = latest.current.fit;
     if (framedOnce.current || !canFrameLatePlaces || !initialFit) return;
     framedOnce.current = true;
+    if (showsUser && hasPlaceNear(centre.current, latest.current.pins)) return;
     return moveCamera(
       () => map()?.setCameraPosition(latest.current.fit ?? initialFit),
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
-  }, [canFrameLatePlaces]);
+  }, [canFrameLatePlaces, showsUser]);
 
   const trackCamera = (event: {
     coordinates: { latitude?: number; longitude?: number };

@@ -13,6 +13,7 @@ const mock = vi.hoisted(() => ({
   props: {} as Record<string, any>,
   cluster: {} as Record<string, any>,
   clearSelection: vi.fn(),
+  findsPerson: false,
 }));
 
 vi.mock("./map-cluster-sheet", () => ({
@@ -38,8 +39,9 @@ vi.mock("expo-maps", () => ({
         selectMarker: mock.clearSelection,
         setCameraPosition: (camera?: Camera) => {
           mock.moves.push(camera ?? "person");
-          return camera
-            ? mock.moveToPlace()
+          if (camera) return mock.moveToPlace();
+          return mock.findsPerson
+            ? Promise.resolve()
             : Promise.reject(new Error("no location yet"));
         },
       }));
@@ -88,6 +90,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.stubEnv("EXPO_OS", "ios");
   mock.moves = [];
+  mock.findsPerson = false;
   mock.clearSelection.mockClear();
 });
 afterEach(() => {
@@ -315,6 +318,45 @@ it("frames the first saved places once when the map opened empty without locatio
   await act(() => vi.advanceTimersByTimeAsync(200));
   expect(mock.moves).toHaveLength(2);
 });
+
+it.each([
+  ["far from the person", AUSTIN, 1],
+  ["near the person", [{ id: "c", name: "Chai", lat: 28.61, lng: 77.21 }], 0],
+])(
+  "frames places that arrive %s after the map opened on them with none",
+  async (_name, arrived, framedMoves) => {
+    mock.findsPerson = true;
+    const located = (pins: typeof AUSTIN) => (
+      <PlacesMap
+        pins={pins}
+        framed={pins}
+        showsUser
+        height={800}
+        topInset={100}
+        bottomInset={120}
+        onSelect={vi.fn()}
+      />
+    );
+    const { rerender } = render(located([]));
+    await act(() => vi.advanceTimersByTimeAsync(10));
+    act(() =>
+      mock.props.onCameraMove({
+        coordinates: { latitude: 28.6, longitude: 77.2 },
+        zoom: 13,
+      }),
+    );
+    await act(() => vi.advanceTimersByTimeAsync(5000));
+    expect(mock.moves).toEqual(["person"]);
+    rerender(located(arrived));
+    await act(() => vi.advanceTimersByTimeAsync(200));
+    expect(
+      mock.moves.slice(1).filter((move) => move !== "person"),
+    ).toHaveLength(framedMoves);
+    rerender(located([...arrived, ...AUSTIN]));
+    await act(() => vi.advanceTimersByTimeAsync(200));
+    expect(mock.moves.slice(1)).toHaveLength(framedMoves);
+  },
+);
 
 it("keeps the chosen area when location access is turned off later", async () => {
   const { rerender } = render(map());
