@@ -168,7 +168,9 @@ a direct `expo-haptics` import. Onboarding is the reference for the feel.
 - `success`: something finished. Fire it after the server confirms, not on press.
 
 Stay quiet on taps that only open a page, on scrolling and panning, and on a
-failed action.
+failed action. An interaction Shelvr shares with Mio takes Mio's iOS feedback
+instead, even where it only opens a page: How to share and Edit trip give an
+`impact`.
 
 ## Primitives
 
