@@ -916,6 +916,7 @@
   "map.searchMore": "%{count} von %{total} angezeigt. Tippe weiter, um einzugrenzen.",
   "map.showMyLocation": "Meinen Standort zeigen",
   "map.showAllCities": "Alle deine Städte zeigen",
+  "map.continueTrip": "%{name} weiterplanen",
   "navigation.trips": "Reisen",
   "plans.title": "Pläne",
   "plans.together": "Gemeinsam",

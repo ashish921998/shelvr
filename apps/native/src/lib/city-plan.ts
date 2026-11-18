@@ -32,7 +32,8 @@ export function useCityPlan() {
     try {
       const allowed = await planGuard(() => undefined);
       if (!allowed) return;
-      analytics.capture("city_plan_started", { kind });
+      if (kind === "trip")
+        analytics.capture("city_plan_started", { kind, from: "direct" });
       onLeave?.();
       router.push({
         pathname: kind === "trip" ? "/new-trip" : "/go-out",

@@ -43,6 +43,10 @@ it("opens the trip form once for a double tap on Plan a trip", async () => {
   });
   expect(mocks.push).toHaveBeenCalledTimes(1);
   expect(mocks.push).toHaveBeenCalledWith(TRIP_FORM);
+  expect(mocks.capture).toHaveBeenCalledWith("city_plan_started", {
+    kind: "trip",
+    from: "direct",
+  });
   expect(result.current.busy).toBeNull();
 });
 
@@ -93,5 +97,6 @@ it("opens one picker for a double tap on Go out", async () => {
     pathname: "/go-out",
     params: { city: "Lisbon" },
   });
+  expect(mocks.capture).not.toHaveBeenCalled();
   expect(result.current.busy).toBeNull();
 });

@@ -237,6 +237,30 @@ export function tripName(trip: { name?: string; city: string }): string {
   return trip.name?.trim() || tripTitle(trip.city);
 }
 
+const CONTINUE_LEAD_DAYS = 3;
+
+export function tripToContinue<
+  T extends Pick<TripPlanSummary, "startDate" | "dayCount">,
+>(trips: T[], today: Date): { trip: T; inProgress: boolean } | null {
+  const day = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  let best: { trip: T; inProgress: boolean; start: number } | null = null;
+  for (const trip of trips) {
+    const start = tripDayDate(trip.startDate, 0);
+    const end = tripDayDate(trip.startDate, Math.max(trip.dayCount, 1) - 1);
+    if (!start || !end || day > end) continue;
+    const lead = tripDayDate(trip.startDate, -CONTINUE_LEAD_DAYS);
+    if (lead && day < lead) continue;
+    const inProgress = day >= start;
+    if (
+      !best ||
+      (inProgress && !best.inProgress) ||
+      (inProgress === best.inProgress && start.getTime() < best.start)
+    )
+      best = { trip, inProgress, start: start.getTime() };
+  }
+  return best && { trip: best.trip, inProgress: best.inProgress };
+}
+
 function shortDate(date: Date): string {
   return date.toLocaleDateString(formattingLocale(), {
     month: "short",

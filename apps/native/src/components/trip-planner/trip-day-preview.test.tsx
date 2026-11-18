@@ -14,6 +14,7 @@ import { TripDayPreview } from "@/components/trip-planner/trip-day-preview";
 const mocks = vi.hoisted(() => ({
   apply: vi.fn(),
   captureError: vi.fn(),
+  capture: vi.fn(),
   item: undefined as { imageUrl?: string } | undefined,
   images: [] as { onError?: () => void }[],
 }));
@@ -25,7 +26,7 @@ vi.mock("@/lib/i18n", () => ({
   formattingLocale: () => "en-US",
 }));
 vi.mock("@/lib/analytics", () => ({
-  analytics: { captureError: mocks.captureError },
+  analytics: { captureError: mocks.captureError, capture: mocks.capture },
 }));
 vi.mock("@/lib/map-pin-emoji", () => ({ categoryEmoji: () => "x" }));
 vi.mock("convex/react", () => ({
@@ -160,6 +161,11 @@ describe("Fill a day from saves", () => {
     press("tripDay.addSelected");
 
     await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(mocks.capture).toHaveBeenCalledWith("trip_day_suggestions_applied", {
+      day: 2,
+      kept: 1,
+      reviewed: 2,
+    });
     expect(mocks.apply).toHaveBeenCalledWith({
       tripId,
       day: 2,

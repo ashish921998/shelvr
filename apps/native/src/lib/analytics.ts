@@ -237,7 +237,12 @@ export type AnalyticsEventProperties = {
   map_filter_selected: { kind: string };
   map_place_opened: { card: boolean };
   map_search_result_opened: Record<string, never>;
-  city_plan_started: { kind: "date" | "trip" };
+  city_plan_started: { kind: "date" | "trip"; from: "go_out" | "direct" };
+  go_out_opened: { shared: boolean };
+  go_out_spot_opened: Record<string, never>;
+  trip_blank_created: { days: number; dated: boolean; has_stay: boolean };
+  trip_day_suggestions_applied: { day: number; kept: number; reviewed: number };
+  map_trip_continued: { in_progress: boolean };
   trip_stop_opened: { day: number; stop: number };
   trip_directions_opened: { located: boolean };
   trip_stop_swapped: { day: number };

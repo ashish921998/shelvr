@@ -4,6 +4,7 @@ import { MapEmpty } from "@/components/map/map-empty";
 import { MapHeader, MAP_HEADER_HEIGHT } from "@/components/map/map-header";
 import { MapRoundButton } from "@/components/map/map-round-button";
 import { MapSearchResults } from "@/components/map/map-search";
+import { MapTripPill } from "@/components/map/map-trip-pill";
 import { MapWentSwitch } from "@/components/map/map-went-switch";
 import {
   type MapFocus,
@@ -297,15 +298,18 @@ export default function MapScreen() {
             onLocate={() => setLocate((n) => n + 1)}
           />
         ) : null}
-        {all.length > 0 && located ? (
-          <View style={styles.locate}>
-            <MapRoundButton
-              icon="location"
-              label={t("map.showMyLocation")}
-              onPress={() => setLocate((n) => n + 1)}
-            />
-          </View>
-        ) : null}
+        <View pointerEvents="box-none" style={styles.controls}>
+          <MapTripPill />
+          {all.length > 0 && located ? (
+            <View style={styles.locate}>
+              <MapRoundButton
+                icon="location"
+                label={t("map.showMyLocation")}
+                onPress={() => setLocate((n) => n + 1)}
+              />
+            </View>
+          ) : null}
+        </View>
         {filters.length > 0 || showWent ? (
           <View
             style={styles.strip}
@@ -348,11 +352,14 @@ const styles = StyleSheet.create((theme) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
   results: { position: "absolute", left: theme.gap(2), right: theme.gap(2) },
   aboveBar: { ...StyleSheet.absoluteFillObject, justifyContent: "flex-end" },
-  locate: {
-    alignSelf: "flex-end",
-    marginRight: theme.gap(2.5),
-    marginBottom: 10,
+  controls: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.gap(1),
+    paddingHorizontal: theme.gap(2.5),
   },
+  locate: { marginLeft: "auto", marginBottom: 10 },
   strip: {
     paddingTop: theme.gap(1),
     paddingBottom: theme.gap(1.5),

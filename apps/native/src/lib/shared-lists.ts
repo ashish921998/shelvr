@@ -417,7 +417,8 @@ export function useListPlan(listId: Id<"sharedLists">, city: string) {
   const router = useRouter();
   return useCallback(
     (kind: CityPlanKind) => {
-      analytics.capture("city_plan_started", { kind });
+      if (kind === "trip")
+        analytics.capture("city_plan_started", { kind, from: "direct" });
       router.push({
         pathname: kind === "date" ? "/go-out" : "/new-trip",
         params: { city, listId },

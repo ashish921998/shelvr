@@ -582,6 +582,11 @@ export function TripSetup({
           ? { stay: { name: stay.name, lat: stay.lat, lng: stay.lng } }
           : {}),
       });
+      analytics.capture("trip_blank_created", {
+        days: dated ? duration(start, end) : days,
+        dated,
+        has_stay: !!stay,
+      });
       if (navigation.isFocused())
         router.replace({ pathname: "/trip-plan/[id]", params: { id } });
     } catch (error) {

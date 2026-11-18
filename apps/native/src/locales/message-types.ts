@@ -842,6 +842,7 @@ type MessageParams = {
   "map.searchMore": { count: number; total: number };
   "map.showMyLocation": undefined;
   "map.showAllCities": undefined;
+  "map.continueTrip": { name: string };
   "navigation.trips": undefined;
   "plans.title": undefined;
   "plans.together": undefined;

@@ -138,8 +138,14 @@ export function TripDayPreview({
         day,
         places: draft.kept.map(({ itemId, name }) => ({ itemId, name })),
       });
-      if (saved) onClose();
-      else setStatus("changed");
+      if (saved) {
+        analytics.capture("trip_day_suggestions_applied", {
+          day,
+          kept: draft.kept.length,
+          reviewed: draft.reviewed,
+        });
+        onClose();
+      } else setStatus("changed");
     } catch (error) {
       analytics.captureError("apply_trip_day_suggestions_failed", error);
       setStatus("failed");

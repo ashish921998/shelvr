@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   guard: vi.fn(),
   replace: vi.fn(),
+  capture: vi.fn(),
 }));
 
 vi.mock("@/lib/i18n", () => ({
@@ -17,7 +18,7 @@ vi.mock("@/lib/i18n", () => ({
   formattingLocale: () => "en-US",
 }));
 vi.mock("@/lib/analytics", () => ({
-  analytics: { capture: vi.fn(), captureError: vi.fn() },
+  analytics: { capture: mocks.capture, captureError: vi.fn() },
 }));
 vi.mock("@/lib/haptics", () => ({ haptics: { success: vi.fn() } }));
 vi.mock("@/lib/appearance", () => ({ isDarkThemeName: () => false }));
@@ -224,6 +225,11 @@ describe("Plan a trip from scratch", () => {
       city: "",
       dayCount: 4,
       startDate: "2026-11-20",
+    });
+    expect(mocks.capture).toHaveBeenCalledWith("trip_blank_created", {
+      days: 4,
+      dated: true,
+      has_stay: false,
     });
     expect(mocks.replace).toHaveBeenCalledWith({
       pathname: "/trip-plan/[id]",

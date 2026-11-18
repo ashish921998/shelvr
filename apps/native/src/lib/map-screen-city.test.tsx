@@ -43,6 +43,9 @@ vi.mock("@tanstack/react-query", () => ({
     data: [place("A", "Lisbon", 38.7), place("B", "Porto", 41.1)],
   }),
 }));
+vi.mock("@/components/map/map-trip-pill", () => ({
+  MapTripPill: vi.fn(() => null),
+}));
 vi.mock("expo-router", () => ({
   useRouter: () => ({ push: vi.fn() }),
   useFocusEffect: (cb: () => void) => void cb,

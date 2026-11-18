@@ -28,6 +28,7 @@ import {
   tripLengthLine,
   tripPlanFailure,
   tripPlanMessage,
+  tripToContinue,
   tripInterestsLine,
   tripStopsLine,
   tripTitle,
@@ -433,5 +434,51 @@ describe("revealDelay", () => {
   it("ticks through quickly once the trip is ready", () => {
     expect(revealDelay(0, true)).toBeLessThan(500);
     expect(revealDelay(REVEAL_STEPS.length, true)).toBeLessThan(500);
+  });
+});
+
+describe("tripToContinue", () => {
+  const today = new Date(2026, 10, 18, 15, 30);
+  const trip = (
+    id: string,
+    startDate: string | undefined,
+    dayCount: number,
+  ) => ({
+    id,
+    startDate,
+    dayCount,
+  });
+
+  it("picks the trip under way over one about to start", () => {
+    const soon = trip("soon", "2026-11-20", 2);
+    const now = trip("now", "2026-11-16", 3);
+    expect(tripToContinue([soon, now], today)).toEqual({
+      trip: now,
+      inProgress: true,
+    });
+  });
+
+  it("offers a trip starting within three days, the soonest first", () => {
+    const later = trip("later", "2026-11-21", 4);
+    const sooner = trip("sooner", "2026-11-19", 1);
+    expect(tripToContinue([later, sooner], today)).toEqual({
+      trip: sooner,
+      inProgress: false,
+    });
+  });
+
+  it("counts the last day and skips finished, far-off and undated trips", () => {
+    const lastDay = trip("last", "2026-11-16", 3);
+    expect(tripToContinue([lastDay], today)?.trip).toBe(lastDay);
+    expect(
+      tripToContinue(
+        [
+          trip("done", "2026-11-10", 3),
+          trip("far", "2026-11-22", 2),
+          trip("undated", undefined, 3),
+        ],
+        today,
+      ),
+    ).toBeNull();
   });
 });
