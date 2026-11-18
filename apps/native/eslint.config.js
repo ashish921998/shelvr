@@ -141,9 +141,9 @@ module.exports = defineConfig([
     },
   },
   {
-    files: ["convex/**/*.ts"],
+    files: ["convex/**/*.{ts,tsx}"],
     ignores: [
-      "convex/**/*.test.ts",
+      "convex/**/*.test.{ts,tsx}",
       "convex/test.setup.ts",
       ...PUBLIC_ON_PURPOSE_MODULES,
     ],
@@ -151,13 +151,13 @@ module.exports = defineConfig([
       "@typescript-eslint/no-restricted-imports": [
         "error",
         {
-          paths: [
-            CONVEX_TEST_IMPORT,
-            ...["./_generated/server", "../_generated/server"].map((name) => ({
-              name,
+          paths: [CONVEX_TEST_IMPORT],
+          patterns: [
+            {
+              regex: "(^|/)_generated/server(\\.js)?$",
               importNames: ["query", "mutation"],
               message: RAW_PUBLIC_BUILDER_MESSAGE,
-            })),
+            },
           ],
         },
       ],
