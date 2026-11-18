@@ -81,7 +81,7 @@ export const reactNative = {
   Platform: { OS: "ios", Version: "18.0" },
   Alert: { alert: vi.fn() },
   Keyboard: { dismiss: vi.fn() },
-  Linking: { openURL: vi.fn() },
+  Linking: { openURL: vi.fn(async () => {}) },
   I18nManager: { isRTL: false },
   Share: { share: vi.fn(), dismissedAction: "dismissedAction" },
   useWindowDimensions: () => ({ width: 402, height: 800 }),
@@ -101,7 +101,10 @@ export const unistyles = {
   StyleSheet: { create: anyStyle, absoluteFillObject: {}, hairlineWidth: 1 },
   useUnistyles: () => ({
     theme: {
-      colors: new Proxy({}, { get: () => "#000000" }),
+      colors: new Proxy(
+        { tripDays: ["#000001", "#000002", "#000003"] },
+        { get: (colors, key) => Reflect.get(colors, key) ?? "#000000" },
+      ),
       gap: (n: number) => n * 8,
       type: {},
     },

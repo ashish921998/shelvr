@@ -22,9 +22,12 @@ const mocks = vi.hoisted(() => ({
   personal: {} as Record<string, unknown>,
   shared: {} as Record<string, unknown>,
   picker: undefined as PickerProps | undefined,
+  capture: vi.fn(),
 }));
 
-vi.mock("@/lib/analytics", () => ({ analytics: { capture: vi.fn() } }));
+vi.mock("@/lib/analytics", () => ({
+  analytics: { capture: mocks.capture },
+}));
 
 vi.mock("@/lib/i18n", () => ({ useAppLocale: () => "en" }));
 vi.mock("@/lib/trip-planner", () => ({
@@ -182,4 +185,21 @@ it("closes back, or Home when a link opened it with nothing beneath", () => {
   mocks.canGoBack = false;
   fireEvent.click(screen.getByRole("button", { name: "close" }));
   expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
+});
+
+it("records the opened hub and each choice made there", () => {
+  mocks.params = { city: "Austin", listId: "list1" };
+  render(<GoOutScreen />);
+  expect(mocks.capture).toHaveBeenCalledWith("go_out_opened", { shared: true });
+  fireEvent.click(screen.getByRole("button", { name: "trip" }));
+  expect(mocks.capture).toHaveBeenCalledWith("city_plan_started", {
+    kind: "trip",
+    from: "go_out",
+  });
+  pick();
+  expect(mocks.capture).toHaveBeenCalledWith("go_out_spot_opened", {});
+  expect(mocks.capture).not.toHaveBeenCalledWith(
+    "city_plan_started",
+    expect.objectContaining({ kind: "date" }),
+  );
 });

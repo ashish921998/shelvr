@@ -5,8 +5,6 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { GoOutPicker } from "@/components/go-out-picker";
 
-const mocks = vi.hoisted(() => ({ openURL: vi.fn() }));
-
 vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
 vi.mock("@/lib/haptics", () => ({
   haptics: { selection: vi.fn(), rollDice: vi.fn(() => vi.fn()) },
@@ -73,7 +71,6 @@ const picker = (props: Partial<Parameters<typeof GoOutPicker>[0]> = {}) => (
 const roll = () => screen.getByRole("button", { name: /^goOut\.roll/ });
 
 beforeEach(() => {
-  mocks.openURL.mockResolvedValue(undefined);
   vi.spyOn(Math, "random").mockReturnValue(0);
 });
 afterEach(() => vi.restoreAllMocks());
