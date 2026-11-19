@@ -342,17 +342,17 @@ export async function appleMapsFind(
     : path === "search"
       ? ["Poi,Address", "Poi"]
       : [""];
-  let ranked: FoundPlace | null = null;
-  let named: FoundPlace | null = null;
+  let fallback: FoundPlace | null = null;
+  let geographic: FoundPlace | null = null;
   for (const filter of filters) {
     if (filter) params.set("resultTypeFilter", filter);
     let body: unknown;
     try {
       const response = await appleGet(accessToken, path, params, fetchImpl);
       if (!response.ok) {
-        if (!isTemporary(response.status)) return named ?? ranked;
+        if (!isTemporary(response.status)) return geographic ?? fallback;
         reportUnavailable(path, { status: response.status });
-        return named ?? UNAVAILABLE;
+        return geographic ?? UNAVAILABLE;
       }
       body = await response.json().catch((error: unknown) => {
         if (error instanceof SyntaxError) return null;
@@ -360,7 +360,7 @@ export async function appleMapsFind(
       });
     } catch (error) {
       reportUnavailable(path, { error });
-      return named ?? UNAVAILABLE;
+      return geographic ?? UNAVAILABLE;
     }
     const mixed = filter === "Poi,Address";
     const matches = saved
@@ -371,11 +371,11 @@ export async function appleMapsFind(
       ? firstSavedPlace(body, near, includeCity, saved, filter)
       : [firstPlace(body, near, path === "search", includeCity), null];
     if (found) return found;
-    named ??= branch;
+    fallback ??= branch;
     if (saved && mixed && !saved.strict) {
-      named = firstPlace(body, near, false, includeCity, matches);
+      geographic = firstPlace(body, near, false, includeCity, matches);
       if (saved.target === "place")
-        ranked = firstPlace(body, near, true, includeCity, isRankedPoi);
+        fallback = firstPlace(body, near, true, includeCity, isRankedPoi);
     }
     if (saved?.target === "address" && filter === "Poi") {
       const extended = firstPlace(
@@ -386,10 +386,10 @@ export async function appleMapsFind(
         (place) =>
           !!place.poiCategory && hasExtendedVenueName(place.name, saved.name),
       );
-      return named ?? extended;
+      return geographic ?? extended;
     }
   }
-  return named ?? ranked;
+  return geographic ?? fallback;
 }
 
 export async function appleMapsLookup(

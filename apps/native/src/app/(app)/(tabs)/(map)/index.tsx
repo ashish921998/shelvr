@@ -121,8 +121,8 @@ export default function MapScreen() {
   const withDiscover =
     went.selected === "all" && (discoverOn || !showDiscoverChip);
   const entries = useMemo(
-    () => mapEntries(went.places, withDiscover ? beside : []),
-    [went.places, withDiscover, beside],
+    () => mapEntries(went.places, withDiscover ? beside : [], visited),
+    [went.places, withDiscover, beside, visited],
   );
   const filters = useMemo(() => mapFilters(entries), [entries]);
   // A filter that no longer has enough places (a save was deleted) falls back to All.
@@ -142,7 +142,7 @@ export default function MapScreen() {
         emoji: placeEmoji(place),
         ...(place.source === "discover"
           ? { tint: theme.colors.muted }
-          : visited(place)
+          : place.visited
             ? {
                 tint: isDarkThemeName(rt.themeName)
                   ? theme.colors.primarySoft
@@ -151,7 +151,7 @@ export default function MapScreen() {
               }
             : {}),
       })),
-    [matches, visited, rt.themeName, theme],
+    [matches, rt.themeName, theme],
   );
   const anchorEntries = useMemo(() => {
     const own = shown.filter((place) => place.source === "own");

@@ -34,15 +34,20 @@ export function discoverBeside(
 }
 
 export type MapEntry<O extends object> =
-  | (O & { source: "own" })
+  | (O & { source: "own"; visited: boolean })
   | (DiscoverPlace & { source: "discover" });
 
 export function mapEntries<O extends object>(
   own: readonly O[],
   discover: readonly DiscoverPlace[],
+  visited: (place: O) => boolean,
 ): MapEntry<O>[] {
   return [
-    ...own.map((place) => ({ ...place, source: "own" as const })),
+    ...own.map((place) => ({
+      ...place,
+      source: "own" as const,
+      visited: visited(place),
+    })),
     ...discover.map((place) => ({ ...place, source: "discover" as const })),
   ];
 }

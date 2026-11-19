@@ -7,6 +7,7 @@ import {
   ownOnTop,
   searchEntries,
 } from "./map-discover";
+import { visitMatcher } from "@convex/model/placeVisits";
 import { topSearchResults } from "./map-filters";
 
 const discover = (
@@ -66,7 +67,12 @@ it("keeps everything with no own pins", () => {
 it("lists the person's own match first in search, even when Discover places fill the results", () => {
   const own = [{ name: "Cafe Mine", lat: 1, lng: 1 }];
   const many = Array.from({ length: 6 }, (_, i) => discover(`Cafe ${i}`, 2, 2));
-  const top = topSearchResults(searchEntries(mapEntries(own, many), "cafe"));
+  const top = topSearchResults(
+    searchEntries(
+      mapEntries(own, many, () => false),
+      "cafe",
+    ),
+  );
   expect(top).toHaveLength(5);
   expect(top[0]).toMatchObject({ name: "Cafe Mine", source: "own" });
 });
@@ -74,7 +80,12 @@ it("lists the person's own match first in search, even when Discover places fill
 it("lists the person's own match before Discover places whose names start with the search", () => {
   const own = [{ name: "Little Jo", lat: 1, lng: 1 }];
   const many = Array.from({ length: 6 }, (_, i) => discover(`Jo ${i}`, 2, 2));
-  const top = topSearchResults(searchEntries(mapEntries(own, many), "jo"));
+  const top = topSearchResults(
+    searchEntries(
+      mapEntries(own, many, () => false),
+      "jo",
+    ),
+  );
   expect(top[0]).toMatchObject({ name: "Little Jo", source: "own" });
   expect(top.slice(1).map((entry) => entry.name)).toEqual([
     "Jo 0",
@@ -84,10 +95,23 @@ it("lists the person's own match before Discover places whose names start with t
   ]);
 });
 
+it("keeps a pin visited when its visit was marked about 100 m away", () => {
+  const own = [{ name: "Little Jo", lat: 38.7009, lng: -9.1 }];
+  const visited = visitMatcher(
+    [{ key: "littlejo", spots: [{ lat: 38.7, lng: -9.1 }] }],
+    own,
+  );
+  expect(mapEntries(own, [], visited)[0]).toMatchObject({
+    source: "own",
+    visited: true,
+  });
+});
+
 it("draws Discover pins first, so the person's own pins sit on top", () => {
   const entries = mapEntries(
     [{ name: "Mine", lat: 1, lng: 1 }],
     [discover("A", 2, 2), discover("B", 3, 3)],
+    () => false,
   );
   expect(ownOnTop(entries).map((entry) => entry.name)).toEqual([
     "A",
