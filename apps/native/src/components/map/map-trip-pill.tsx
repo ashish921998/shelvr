@@ -2,17 +2,18 @@ import { AppSymbolIcon } from "@/components/symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
 import { t } from "@/lib/i18n";
-import { tripName } from "@/lib/trip-planner";
+import { sameCity, tripName } from "@/lib/trip-planner";
 import { useTripToContinue } from "@/lib/use-trip-to-continue";
 import { useRouter } from "expo-router";
 import { Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-export function MapTripPill() {
+export function MapTripPill({ city }: { city: string | undefined }) {
   const { theme } = useUnistyles();
   const router = useRouter();
   const next = useTripToContinue();
-  if (!next) return null;
+  if (!next || city === undefined || !sameCity(next.trip.city, city))
+    return null;
   const name = tripName(next.trip);
   const onPress = () => {
     analytics.capture("map_trip_continued", { in_progress: next.inProgress });

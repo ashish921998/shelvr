@@ -19,6 +19,7 @@ vi.mock("@/lib/use-trip-to-continue", () => ({
 vi.mock("@/lib/trip-planner", () => ({
   tripName: (trip: { name?: string; city: string }) =>
     trip.name ?? `${trip.city} trip`,
+  sameCity: (a: string, b: string) => a.toLowerCase() === b.toLowerCase(),
 }));
 vi.mock("@/lib/analytics", () => ({ analytics: { capture: mocks.capture } }));
 vi.mock("@/lib/i18n", () => ({
@@ -59,7 +60,19 @@ beforeEach(() => {
 });
 
 it("shows nothing without a trip under way or about to start", () => {
-  const { container } = render(<MapTripPill />);
+  const { container } = render(<MapTripPill city="Kyoto" />);
+  expect(container.innerHTML).toBe("");
+});
+
+it.each([
+  ["another city", "New York"],
+  ["no city", undefined],
+])("hides a trip while the map shows %s", (_name, city) => {
+  mocks.next = {
+    trip: { _id: "trip1", city: "Austin", name: "Austin weekend" },
+    inProgress: false,
+  };
+  const { container } = render(<MapTripPill city={city} />);
   expect(container.innerHTML).toBe("");
 });
 
@@ -68,7 +81,7 @@ it("opens the trip and records whether it is under way", () => {
     trip: { _id: "trip1", city: "Kyoto", name: "Autumn in Kyoto" },
     inProgress: false,
   };
-  render(<MapTripPill />);
+  render(<MapTripPill city="kyoto" />);
   fireEvent.click(
     screen.getByRole("button", { name: "map.continueTrip Autumn in Kyoto" }),
   );
