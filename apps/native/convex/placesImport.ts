@@ -32,7 +32,17 @@ export const importGoogleMapsList = internalAction({
           ? { lat: listed.lat, lng: listed.lng }
           : null;
       const at = hint
-        ? await appleMapsLookup(token, "search", listed.name, hint)
+        ? await appleMapsLookup(
+            token,
+            {
+              target: "place",
+              name: listed.name,
+              hasBranchClue: true,
+              strict: true,
+            },
+            listed.name,
+            hint,
+          )
         : null;
       if (
         hint === null ||

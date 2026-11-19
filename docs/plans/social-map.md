@@ -99,14 +99,16 @@ if it is not listed yet and the place has fewer than 3. Running an import twice 
   looked up on its own with a strict place lookup (`strict` in `appleMapsLookup`). Apple's result
   counts only when its name is the typed name or a branch of it ("Time Out Market Lisboa" for "Time
   Out Market"). When Apple offers only another venue, the name goes to `missed`, so a typo never
-  stores the wrong place. A save's pins (`lookUp` in `placePins.ts`) take Apple's nearest venue in
-  that case instead.
+  stores the wrong place. A save's pins (`lookUp` in `placePins.ts`) take Apple's first-ranked venue
+  in that case instead.
 - `placesImport:importGoogleMapsList({ city, url })`: build the list in the Google Maps app, then paste
   its share link. It sits in its own file because the list reader (`fetchGoogleMapsList`,
   `model/readers/googleMaps.ts`) runs in the Node runtime, which cannot hold queries or mutations.
-  Each place is searched in Apple by name near Google's point and kept only when Apple's match is
-  within 300 m of it (`SAME_SPOT_KM`), as a saved list's pins are matched today. Apple's point and id
-  are stored, never Google's. The list's link is stored as the source.
+  Each place is searched in Apple by name near Google's point, with the same strict lookup, and kept
+  only when Apple's result carries the list's name (or a branch of it) and sits within 300 m of
+  Google's point (`SAME_SPOT_KM`). A place Apple knows by another name, such as a renamed or closed
+  venue, goes to `missed`; add it with `addByName` under Apple's name. Apple's point and id are
+  stored, never Google's. The list's link is stored as the source.
 
 A row can also be edited or hidden in the Convex dashboard.
 

@@ -222,10 +222,11 @@ describe("places:importGoogleMapsList", () => {
     ).rejects.toThrow("not a Google Maps list");
   });
 
-  it("lists an Apple miss, a place without a point and a far match as missed", async () => {
+  it("lists an Apple miss, a place without a point, a far match and another venue as missed", async () => {
     await withApple({
       Found: { lat: 38.71, lng: -9.13 },
       Drifted: { lat: 38.75, lng: -9.13 },
+      Renamed: { lat: 38.7101, lng: -9.1301, label: "Other Bar" },
     });
     fetchGoogleMapsList.mockResolvedValue({
       placeList: [
@@ -233,6 +234,7 @@ describe("places:importGoogleMapsList", () => {
         { name: "Unknown", lat: 38.7, lng: -9.1 },
         { name: "No point" },
         { name: "Drifted", lat: 38.71, lng: -9.13 },
+        { name: "Renamed", lat: 38.71, lng: -9.13 },
       ],
     });
     const t = newConvexTest();
@@ -243,7 +245,7 @@ describe("places:importGoogleMapsList", () => {
     expect(report).toEqual({
       added: 1,
       existing: 0,
-      missed: ["Unknown", "No point", "Drifted"],
+      missed: ["Unknown", "No point", "Drifted", "Renamed"],
     });
     expect(await rows(t)).toMatchObject([
       { name: "Found", sources: [{ url: "https://maps.app.goo.gl/x" }] },
