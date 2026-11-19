@@ -238,7 +238,10 @@ export function PlacesMap({
     const { fit } = latest.current;
     if (!onFit.current || touched.current || filterRevision > 0 || !fit) return;
     return moveCamera(
-      () => map()?.setCameraPosition(fit),
+      () =>
+        onFit.current && !touched.current
+          ? map()?.setCameraPosition(fit)
+          : undefined,
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
   }, [bottomInset, filterRevision]);

@@ -370,6 +370,28 @@ it.each([
   },
 );
 
+it("drops a pending sheet refit once the person touches the map", async () => {
+  const opened = (bottomInset: number) => (
+    <PlacesMap
+      pins={AUSTIN}
+      framed={AUSTIN}
+      showsUser={false}
+      height={800}
+      topInset={100}
+      bottomInset={bottomInset}
+      onSelect={vi.fn()}
+    />
+  );
+  const { getByTestId, rerender } = render(opened(120));
+  mock.moveToPlace.mockRejectedValueOnce(new Error("map is mounting"));
+  rerender(opened(320));
+  await act(() => vi.advanceTimersByTimeAsync(10));
+  expect(mock.moves).toHaveLength(1);
+  fireEvent.touchStart(getByTestId("map-touch"));
+  await act(() => vi.advanceTimersByTimeAsync(1000));
+  expect(mock.moves).toHaveLength(1);
+});
+
 it.each([
   ["far from the person", AUSTIN, 1],
   ["near the person", [{ id: "c", name: "Chai", lat: 28.61, lng: 77.21 }], 0],

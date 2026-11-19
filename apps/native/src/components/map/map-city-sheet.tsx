@@ -119,6 +119,7 @@ function Section({
         accessibilityLabel={action}
         hitSlop={12}
         onPress={onAction}
+        style={styles.actionTarget}
       >
         <ThemedText variant="subheadStrong" style={styles.action}>
           {action}
@@ -191,14 +192,17 @@ const styles = StyleSheet.create((theme) => ({
   muted: { color: theme.colors.muted },
   pressed: { opacity: theme.opacity.pressed },
   section: {
-    height: 36,
+    minHeight: theme.control.minHeight,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: theme.gap(2.5),
-    marginTop: theme.gap(0.5),
   },
   action: { color: theme.colors.primaryText },
+  actionTarget: {
+    minHeight: theme.control.minHeight,
+    justifyContent: "center",
+  },
   row: {
     gap: theme.gap(1.5),
     paddingHorizontal: theme.gap(2.5),
