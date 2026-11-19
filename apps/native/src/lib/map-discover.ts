@@ -41,7 +41,16 @@ export function mapEntries<O extends object>(
   discover: readonly DiscoverPlace[],
 ): MapEntry<O>[] {
   return [
-    ...discover.map((place) => ({ ...place, source: "discover" as const })),
     ...own.map((place) => ({ ...place, source: "own" as const })),
+    ...discover.map((place) => ({ ...place, source: "discover" as const })),
+  ];
+}
+
+export function ownOnTop<T extends { source: "own" | "discover" }>(
+  entries: readonly T[],
+): T[] {
+  return [
+    ...entries.filter((entry) => entry.source === "discover"),
+    ...entries.filter((entry) => entry.source === "own"),
   ];
 }

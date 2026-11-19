@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation } from "./_generated/server";
 import { MAX_MAP_PLACES } from "./mapPlaces";
+import { appleMapsLookup } from "./model/appleMaps";
 import { authedQuery } from "./model/auth";
 import { cuisineValidator } from "./model/itemFields";
 import { logEvent } from "./model/log";
@@ -13,7 +14,6 @@ import {
   type StoredPlace,
 } from "./model/placeImport";
 import { placeKinds } from "./model/placeKinds";
-import { lookUp } from "./placePins";
 
 const MAX_SOURCES = 3;
 const MAX_NAMES = 100;
@@ -105,27 +105,38 @@ export const addByName = internalAction({
   },
   returns: reportValidator,
   handler: async (ctx, args) => {
-    if (args.names.length > MAX_NAMES)
+    const names = [
+      ...new Set(args.names.map((name) => name.trim()).filter(Boolean)),
+    ];
+    if (names.length > MAX_NAMES)
       throw new Error(`at most ${MAX_NAMES} names at a time`);
-    const { name: city, centre } = await cityCentre(args.city);
-    const { pins } = await lookUp(args.names, city, [city], centre, []);
-    const found = new Map<string, StoredPlace>();
-    for (const pin of pins) {
-      if (pin.appleId && inCity(pin, centre))
-        found.set(pin.name, {
-          name: pin.name,
-          lat: pin.lat,
-          lng: pin.lng,
-          appleId: pin.appleId,
-          ...(pin.category ? { category: pin.category } : {}),
-        });
+    const { name: city, token, centre } = await cityCentre(args.city);
+    const found: StoredPlace[] = [];
+    const missed: string[] = [];
+    for (const name of names) {
+      const at = await appleMapsLookup(
+        token,
+        { target: "place", name, hasBranchClue: true, strict: true },
+        `${name}, ${city}`,
+        centre,
+      );
+      if (!at?.appleId || !inCity(at, centre)) {
+        missed.push(name);
+        continue;
+      }
+      found.push({
+        name,
+        lat: at.lat,
+        lng: at.lng,
+        appleId: at.appleId,
+        ...(at.category ? { category: at.category } : {}),
+      });
     }
-    const missed = args.names.filter((name) => !found.has(name));
     const stored: { added: number; existing: number } = await ctx.runMutation(
       internal.places.store,
       {
         city,
-        places: [...found.values()],
+        places: found,
         ...(args.source ? { source: args.source } : {}),
       },
     );

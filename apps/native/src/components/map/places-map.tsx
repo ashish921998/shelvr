@@ -166,7 +166,7 @@ export function PlacesMap({
       !fit ||
       pins.length === 0 ||
       checkNearby.current ||
-      hasPlaceNear(centre.current, anchors)
+      hasPlaceNear(centre.current, pins)
     )
       return;
     map()

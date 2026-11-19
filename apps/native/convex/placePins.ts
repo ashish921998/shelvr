@@ -428,7 +428,7 @@ export const storePins = internalMutation({
   },
 });
 
-export async function lookUp(
+async function lookUp(
   names: string[],
   city: string | undefined,
   cities: string[],

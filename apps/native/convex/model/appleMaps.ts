@@ -127,6 +127,7 @@ type SavedLookup = {
   target: "place" | "address" | "locality";
   name: string;
   hasBranchClue?: boolean;
+  strict?: boolean;
 };
 
 const ADDRESS_ABBREVIATIONS = new Map([
@@ -358,7 +359,7 @@ export async function appleMapsFind(
       saved ? (place) => preferredSavedPlace(place, saved, filter) : undefined,
     );
     if (found) return found;
-    if (saved && mixed) {
+    if (saved && mixed && !saved.strict) {
       geographic = firstPlace(body, near, false, includeCity, matches);
       if (saved.target === "place")
         ranked = firstPlace(body, near, true, includeCity, isRankedPoi);

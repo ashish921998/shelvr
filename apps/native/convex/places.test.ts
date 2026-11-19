@@ -30,7 +30,9 @@ async function testKey(): Promise<string> {
 const LISBON = { lat: 38.72, lng: -9.14 };
 const PORTO = { lat: 41.15, lng: -8.61 };
 
-async function withApple(found: Record<string, { lat: number; lng: number }>) {
+async function withApple(
+  found: Record<string, { lat: number; lng: number; label?: string }>,
+) {
   vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
   vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
   vi.stubEnv("APPLE_MAPS_TEAM_ID", "TEAM1");
@@ -52,12 +54,13 @@ async function withApple(found: Record<string, { lat: number; lng: number }>) {
           ],
         });
       const at = found[name];
+      const label = at?.label ?? name;
       return Response.json({
         results: at
           ? [
               {
-                name,
-                id: `ID-${name}`,
+                name: label,
+                id: `ID-${label}`,
                 poiCategory: "Cafe",
                 coordinate: { latitude: at.lat, longitude: at.lng },
               },
@@ -169,6 +172,26 @@ describe("places:addByName", () => {
         appleId: "ID-Pastel Cafe",
         sources: [{ url: "https://example.com/reel" }],
       },
+    ]);
+  });
+
+  it("keeps a branch of the named venue, skips another venue Apple offers instead, and drops blank lines", async () => {
+    await withApple({
+      "Pastl Cafe": { lat: 38.71, lng: -9.13, label: "Other Bar" },
+      "Time Out Market": {
+        lat: 38.707,
+        lng: -9.146,
+        label: "Time Out Market Lisboa",
+      },
+    });
+    const t = newConvexTest();
+    const report = await t.action(internal.places.addByName, {
+      city: "Lisbon",
+      names: ["Pastl Cafe", "  ", " Time Out Market "],
+    });
+    expect(report).toEqual({ added: 1, existing: 0, missed: ["Pastl Cafe"] });
+    expect(await rows(t)).toMatchObject([
+      { name: "Time Out Market", appleId: "ID-Time Out Market Lisboa" },
     ]);
   });
 

@@ -394,6 +394,40 @@ describe("appleMapsFind", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
+  it("is no match for a strict lookup when Apple only offers another venue", async () => {
+    const fetchImpl = vi.fn(async () =>
+      Response.json({
+        results: [
+          {
+            name: "Other Bar",
+            id: "other",
+            poiCategory: "Bar",
+            coordinate: { latitude: 38.71, longitude: -9.13 },
+          },
+        ],
+      }),
+    );
+    const lookup = { target: "place" as const, name: "Pastl Cafe" };
+    expect(
+      await appleMapsFind(
+        "t",
+        lookup,
+        "Pastl Cafe, Lisbon",
+        undefined,
+        fetchImpl,
+      ),
+    ).toMatchObject({ appleId: "other" });
+    expect(
+      await appleMapsFind(
+        "t",
+        { ...lookup, strict: true },
+        "Pastl Cafe, Lisbon",
+        undefined,
+        fetchImpl,
+      ),
+    ).toBeNull();
+  });
+
   it("does not accept a physical feature as an extended branch venue", async () => {
     const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
       const filter = new URL(String(input)).searchParams.get(

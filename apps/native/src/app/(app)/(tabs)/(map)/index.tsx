@@ -27,7 +27,7 @@ import {
   type WentFilter,
   wentView,
 } from "@/lib/map-filters";
-import { type MapEntry, mapEntries } from "@/lib/map-discover";
+import { type MapEntry, mapEntries, ownOnTop } from "@/lib/map-discover";
 import { useMapLocation } from "@/lib/map-location";
 import { placeEmoji } from "@/lib/map-pin-emoji";
 import { useDiscoverPlaces } from "@/lib/use-discover-places";
@@ -90,7 +90,11 @@ export default function MapScreen() {
   const [focus, setFocus] = useState<MapFocus | undefined>(undefined);
 
   const all = places.data;
-  const { settled, beside } = useDiscoverPlaces(all ?? NO_PLACES);
+  const {
+    settled,
+    beside,
+    open: openDiscover,
+  } = useDiscoverPlaces(all ?? NO_PLACES);
   const [discoverOn, setDiscoverOn] = useState(true);
   const { visits, loaded, isError, error, offerRetry } = usePlaceVisits();
   const visitsFailed = isError && !loaded;
@@ -108,7 +112,8 @@ export default function MapScreen() {
     () => wentView(all ?? [], wentFilter, visited),
     [all, wentFilter, visited],
   );
-  const showDiscoverChip = (all?.length ?? 0) > 0 && beside.length > 0;
+  const showDiscoverChip =
+    went.selected === "all" && (all?.length ?? 0) > 0 && beside.length > 0;
   const withDiscover =
     went.selected === "all" && (discoverOn || !showDiscoverChip);
   const entries = useMemo(
@@ -127,7 +132,7 @@ export default function MapScreen() {
   );
   const pins: MapPin[] = useMemo(
     () =>
-      matches.map((place) => ({
+      ownOnTop(matches).map((place) => ({
         ...place,
         id: entryId(place),
         emoji: placeEmoji(place),
@@ -208,9 +213,7 @@ export default function MapScreen() {
     const place = shown.find((candidate) => entryId(candidate) === id);
     if (!place || !focused.current) return;
     if (place.source === "discover") {
-      const card = canOpenPlaceCard(place.appleId);
-      analytics.capture("map_place_opened", { card, source: "discover" });
-      if (card) void openPlaceDetails(place.appleId, () => {});
+      openDiscover(place);
       return;
     }
     const openSave = () => {

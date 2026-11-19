@@ -1,21 +1,27 @@
+import type { Id } from "@convex/_generated/dataModel";
 import { expect, it } from "vitest";
-import { type DiscoverPlace, discoverBeside } from "./map-discover";
+import {
+  type DiscoverPlace,
+  discoverBeside,
+  mapEntries,
+  ownOnTop,
+} from "./map-discover";
+import { searchPlaces, topSearchResults } from "./map-filters";
 
 const discover = (
   name: string,
   lat: number,
   lng: number,
   appleId = name,
-): DiscoverPlace =>
-  ({
-    _id: name,
-    name,
-    lat,
-    lng,
-    city: "Lisbon",
-    appleId,
-    kinds: [],
-  }) as unknown as DiscoverPlace;
+): DiscoverPlace => ({
+  _id: name as Id<"places">,
+  name,
+  lat,
+  lng,
+  city: "Lisbon",
+  appleId,
+  kinds: [],
+});
 
 const names = (places: DiscoverPlace[]) => places.map((p) => p.name);
 
@@ -54,4 +60,24 @@ it("keeps everything with no own pins", () => {
   expect(
     names(discoverBeside([], [discover("A", 1, 1), discover("B", 2, 2)])),
   ).toEqual(["A", "B"]);
+});
+
+it("lists the person's own match first in search, even when Discover places fill the results", () => {
+  const own = [{ name: "Cafe Mine", lat: 1, lng: 1 }];
+  const many = Array.from({ length: 6 }, (_, i) => discover(`Cafe ${i}`, 2, 2));
+  const top = topSearchResults(searchPlaces(mapEntries(own, many), "cafe"));
+  expect(top).toHaveLength(5);
+  expect(top[0]).toMatchObject({ name: "Cafe Mine", source: "own" });
+});
+
+it("draws Discover pins first, so the person's own pins sit on top", () => {
+  const entries = mapEntries(
+    [{ name: "Mine", lat: 1, lng: 1 }],
+    [discover("A", 2, 2), discover("B", 3, 3)],
+  );
+  expect(ownOnTop(entries).map((entry) => entry.name)).toEqual([
+    "A",
+    "B",
+    "Mine",
+  ]);
 });

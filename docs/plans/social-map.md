@@ -31,7 +31,9 @@ filled yet, and the Apple question at the end of this step is open.
 The Map tab shows every place in the table as a "Discover" pin, beside and under the person's own
 pins. A new user opens the Map and sees places in every city we have filled, not an empty state. A
 "Discover" chip hides them. Tapping one opens Apple's place card (`openPlaceDetails(appleId)`), as a
-saved pin does today. Search and the kind filters cover them too.
+saved pin does today. Where the card cannot open (before iOS 18, on Android, or when Apple has no card
+for the id), it opens the place in Apple Maps, or Google Maps on Android. Search and the kind filters
+cover them too, and search lists the person's own match before a Discover one.
 
 Who picked a place is not shown. The table is ours.
 
@@ -93,8 +95,12 @@ more than 80 km from that point (`keepNearby`), or no match, is skipped and list
 if it is not listed yet and the place has fewer than 3. Running an import twice adds nothing.
 
 - `places:addByName({ city, names: [...], source? })`: type or paste up to 100 names for one city,
-  with the reel they came from as `source`. Each name is looked up the way a save's pins are
-  (`lookUp` in `placePins.ts`).
+  with the reel they came from as `source`. Names are trimmed and blank lines dropped, then each is
+  looked up on its own with a strict place lookup (`strict` in `appleMapsLookup`). Apple's result
+  counts only when its name is the typed name or a branch of it ("Time Out Market Lisboa" for "Time
+  Out Market"). When Apple offers only another venue, the name goes to `missed`, so a typo never
+  stores the wrong place. A save's pins (`lookUp` in `placePins.ts`) take Apple's nearest venue in
+  that case instead.
 - `placesImport:importGoogleMapsList({ city, url })`: build the list in the Google Maps app, then paste
   its share link. It sits in its own file because the list reader (`fetchGoogleMapsList`,
   `model/readers/googleMaps.ts`) runs in the Node runtime, which cannot hold queries or mutations.
@@ -120,19 +126,24 @@ to 60 places each. With the Google Maps import, a city takes about an hour.
   drops a Discover place that is one of the person's own (same Apple id, or `samePlace`), so their
   pin wins.
 - `src/app/(app)/(tabs)/(map)/index.tsx`:
-  - `mapEntries` marks each entry `own` or `discover` and lists Discover first, so own pins are drawn
-    above
+  - `mapEntries` marks each entry `own` or `discover` and lists the person's own first, so search
+    puts their match ahead of a Discover one when both match equally. `ownOnTop` orders only the
+    pins, Discover first, so own pins are drawn above
   - Discover pins get the id `discover:<id>`, since `placeId` assumes an `itemId`, and a muted tint
-  - `select` opens Apple's place card for a Discover pin, never `/item/[id]`
+  - a tapped Discover pin goes through `useDiscoverPlaces`' `open`, which uses `stopAction` and
+    `usePlaceOpener` as shared lists do: Apple's place card when it can open, otherwise the place in
+    the maps app. Never `/item/[id]`
   - the empty state shows only when both lists are empty
   - kind filters and search cover Discover pins. The "went" switch covers only the person's own, so
     Discover pins hide while it is not on All
-  - the "Discover" chip shows only to someone with pins of their own. Without any, Discover pins are
-    all the map has
+  - the "Discover" chip shows only to someone with pins of their own, while the "went" switch is on
+    All and some Discover place is left beside their pins. Otherwise it would hide nothing. Without
+    pins of their own, Discover pins are all the map has
 - `src/components/map/places-map.tsx` takes `anchors`: the person's own pins when they have any,
   otherwise the Discover pins. With location on, the camera opens on the person and stays if an
   anchor is near. Otherwise, and without location, it frames the busiest city of the anchors, as it
-  did with own pins.
+  did with own pins. A later filter change moves the camera only when no pin it shows, own or
+  Discover, is in reach.
 - Copy in nine catalogs: the "Discover" chip, and the search field now reads "Search places".
 - Analytics: `map_opened` gains `discover` (Discover places shown), `map_place_opened` gains `source`,
   and `map_discover_toggled` is new.
