@@ -1517,7 +1517,5 @@
     "one": "Your passport has %{formattedCount} city",
     "other": "Your passport has %{formattedCount} cities"
   },
-  "mapSheet.summary": "%{saves} · %{places}",
-  "mapSheet.groupTitle": "%{name} +%{count}",
-  "mapSheet.recentlySaved": "Recently saved"
+  "mapSheet.groupTitle": "%{name} +%{count}"
 }

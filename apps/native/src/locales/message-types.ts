@@ -1300,9 +1300,7 @@ type MessageParams = {
   "cityStamps.onboardingBody": undefined;
   "passport.momentCityStamp": { city: string };
   "passport.paywallHeadline": { count: number };
-  "mapSheet.summary": { saves: string; places: string };
   "mapSheet.groupTitle": { name: string; count: number };
-  "mapSheet.recentlySaved": undefined;
 };
 export type MessageKey = keyof MessageParams;
 export type TextMessageKey = {

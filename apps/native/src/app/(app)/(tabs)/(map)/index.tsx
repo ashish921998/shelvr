@@ -20,8 +20,6 @@ import {
 } from "@/lib/apple-place-card";
 import { isDarkThemeName } from "@/lib/appearance";
 import { framedPins } from "@/lib/city-pins";
-import { useMapCitySheet } from "@/lib/use-map-city-sheet";
-import { MapCitySheet } from "@/components/map/map-city-sheet";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
   busiestCityPlaces,
@@ -47,7 +45,6 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, ScrollView, View } from "react-native";
-import Animated from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const NO_PLACES: never[] = [];
@@ -121,21 +118,12 @@ export default function MapScreen() {
     () => filterPlaces(went.places, active),
     [went.places, active],
   );
+  const searching = searchText.trim() !== "";
   const showWent = went.showSwitch && !searchOpen;
   // Search narrows whatever the filter shows; every match stays on the map, the first few are listed.
   const matches = useMemo(
-    () => (searchText.trim() !== "" ? searchPlaces(shown, searchText) : shown),
-    [shown, searchText],
-  );
-  const { saves, saveCount, placeCount, sheet } = useMapCitySheet(
-    city,
-    matches.length,
-    {
-      hidden: searchOpen,
-      mapHeight,
-      barHeight,
-      insetTop: rt.insets.top,
-    },
+    () => (searching ? searchPlaces(shown, searchText) : shown),
+    [searching, shown, searchText],
   );
   const pins: MapPin[] = useMemo(
     () =>
@@ -256,7 +244,7 @@ export default function MapScreen() {
           height={mapHeight}
           topInset={headerBottom + theme.gap(1)}
           bottomInset={
-            sheet.coveredBottom +
+            barHeight +
             (filters.length > 0 || showWent ? stripHeight : 0) +
             theme.gap(1)
           }
@@ -300,9 +288,9 @@ export default function MapScreen() {
           />
         </View>
       ) : null}
-      <Animated.View
+      <View
         pointerEvents="box-none"
-        style={[styles.aboveBar, sheet.aboveSheet]}
+        style={[styles.aboveBar, { bottom: barHeight }]}
       >
         {all.length === 0 ? (
           <MapEmpty
@@ -355,19 +343,7 @@ export default function MapScreen() {
             </ScrollView>
           </View>
         ) : null}
-      </Animated.View>
-      {sheet.show && city !== undefined ? (
-        <MapCitySheet
-          city={city}
-          saves={saves}
-          saveCount={saveCount}
-          places={placeCount}
-          snaps={sheet.snaps}
-          top={sheet.top}
-          bottomInset={barHeight}
-          onHeaderHeight={sheet.onHeaderHeight}
-        />
-      ) : null}
+      </View>
     </View>
   );
 }
@@ -375,13 +351,7 @@ export default function MapScreen() {
 const styles = StyleSheet.create((theme) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
   results: { position: "absolute", left: theme.gap(2), right: theme.gap(2) },
-  aboveBar: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    justifyContent: "flex-end",
-  },
+  aboveBar: { ...StyleSheet.absoluteFillObject, justifyContent: "flex-end" },
   controls: {
     flexDirection: "row",
     alignItems: "center",

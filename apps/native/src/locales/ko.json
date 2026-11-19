@@ -1443,7 +1443,5 @@
   "passport.paywallHeadline": {
     "other": "여권에 도시 %{formattedCount}곳"
   },
-  "mapSheet.summary": "%{saves} · %{places}",
-  "mapSheet.groupTitle": "%{name} +%{count}",
-  "mapSheet.recentlySaved": "최근 저장"
+  "mapSheet.groupTitle": "%{name} +%{count}"
 }
