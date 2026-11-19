@@ -79,7 +79,7 @@ export function MapCitySheet({
       header={
         <View style={styles.header}>
           <View style={styles.heading}>
-            <ThemedText style={styles.city} numberOfLines={1}>
+            <ThemedText variant="cityHeading" numberOfLines={1}>
               {city}
             </ThemedText>
             <ThemedText variant="footnote" style={styles.muted}>
@@ -277,15 +277,9 @@ const styles = StyleSheet.create((theme) => ({
     paddingBottom: theme.gap(1.5),
   },
   heading: { flex: 1, gap: theme.gap(0.25) },
-  city: {
-    fontFamily: theme.fonts.display,
-    fontSize: 30,
-    lineHeight: 36,
-    color: theme.colors.foreground,
-  },
   muted: { color: theme.colors.muted },
   goOut: {
-    minHeight: 44,
+    minHeight: theme.control.minHeight,
     justifyContent: "center",
     paddingHorizontal: theme.gap(2.5),
     borderRadius: theme.radius.xl,

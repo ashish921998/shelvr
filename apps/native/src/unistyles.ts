@@ -19,6 +19,7 @@ const shared = {
   type: {
     hero: { fontFamily: fonts.bold, fontSize: 48, letterSpacing: -1.2 },
     displayTitle: { fontFamily: fonts.bold, fontSize: 34, letterSpacing: -0.8 },
+    cityHeading: { fontFamily: fonts.display, fontSize: 30, lineHeight: 36 },
     largeTitle: { fontFamily: fonts.bold, fontSize: 26, letterSpacing: -0.5 },
     sheetTitle: { fontFamily: fonts.bold, fontSize: 24, letterSpacing: -0.4 },
     title: { fontFamily: fonts.bold, fontSize: 22, letterSpacing: -0.3 },
