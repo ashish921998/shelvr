@@ -4,8 +4,12 @@ import type { SheetSnaps } from "@/lib/city-sheet";
 import { useCityPlan } from "@/lib/city-plan";
 import { formatRecentDate } from "@/lib/date";
 import { t, useAppLocale } from "@/lib/i18n";
-import { citySummary, recentSaves } from "@/lib/map-city-sheet";
-import { saveCover, type StampSave } from "@/lib/map-stamps";
+import {
+  citySummary,
+  recentSaves,
+  saveCover,
+  type SheetSave,
+} from "@/lib/map-city-sheet";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import type { ReactNode } from "react";
@@ -19,7 +23,7 @@ import { StyleSheet } from "react-native-unistyles";
 
 type Props = {
   city: string;
-  saves: StampSave[];
+  saves: SheetSave[];
   places: number;
   snaps: SheetSnaps;
   top: SharedValue<number>;
@@ -148,7 +152,7 @@ function Cover({
   style,
   children,
 }: {
-  save: StampSave;
+  save: SheetSave;
   style: object;
   children?: ReactNode;
 }) {
@@ -172,7 +176,7 @@ function RecentCover({
   save,
   onPress,
 }: {
-  save: StampSave;
+  save: SheetSave;
   onPress: (id: string) => void;
 }) {
   const date = formatRecentDate(save._creationTime);

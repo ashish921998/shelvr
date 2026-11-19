@@ -1,15 +1,10 @@
 import { expect, it } from "vitest";
-import type { StampSave } from "./map-stamps";
-import { citySummary, recentSaves } from "./map-city-sheet";
+import { citySummary, recentSaves, type SheetSave } from "./map-city-sheet";
 
-const bar = { name: "Bar", lat: 40.7, lng: -74 };
-
-const save = (overrides: Partial<StampSave>): StampSave => ({
+const save = (overrides: Partial<SheetSave>): SheetSave => ({
   _id: "a",
   _creationTime: 1,
-  url: "https://www.instagram.com/reel/abc/",
   imageUrl: "https://cdn.example/a.jpg",
-  placePins: [bar],
   ...overrides,
 });
 

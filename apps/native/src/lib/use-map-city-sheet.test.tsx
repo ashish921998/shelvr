@@ -2,7 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 
-import { useCityStamps } from "./use-map-city-sheet";
+import { useMapCitySheet } from "./use-map-city-sheet";
 
 const mock = vi.hoisted(() => ({
   query: { data: undefined as unknown[] | undefined, isPending: true },
@@ -15,16 +15,13 @@ vi.mock("react-native-reanimated", () => ({
   useSharedValue: (value: number) => ({ get: () => value, set: vi.fn() }),
   useAnimatedStyle: (style: () => object) => style(),
 }));
-vi.mock("react-native-unistyles", () => ({
-  useUnistyles: () => ({ theme: { colors: {} } }),
-}));
 
 const layout = { hidden: false, mapHeight: 800, barHeight: 80, insetTop: 0 };
 
-const place = { name: "Tigre", lat: 40.7, lng: -74 };
-
-function covered(city: string | undefined, onMap = [place]) {
-  const { result } = renderHook(() => useCityStamps(city, onMap, layout));
+function covered(city: string | undefined, placesOnMap = 1) {
+  const { result } = renderHook(() =>
+    useMapCitySheet(city, placesOnMap, layout),
+  );
   return result.current.sheet;
 }
 
@@ -44,14 +41,12 @@ it("gives the room back when the city has no saves or the map has no places", ()
   mock.query = { data: [], isPending: false };
   expect(covered("New York").coveredBottom).toBe(layout.barHeight);
   mock.query = { data: undefined, isPending: true };
-  expect(covered(undefined, []).coveredBottom).toBe(layout.barHeight);
+  expect(covered(undefined, 0).coveredBottom).toBe(layout.barHeight);
 });
 
 it("keeps the sheet's rest point still when its header measures a sub-pixel apart", () => {
   mock.query = { data: [{ _id: "a" }], isPending: false };
-  const { result } = renderHook(() =>
-    useCityStamps("New York", [place], layout),
-  );
+  const { result } = renderHook(() => useMapCitySheet("New York", 1, layout));
   act(() => result.current.sheet.onHeaderHeight(89));
   const rest = result.current.sheet.snaps.middle;
   act(() => result.current.sheet.onHeaderHeight(88.99997));

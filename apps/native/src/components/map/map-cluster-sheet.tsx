@@ -7,12 +7,10 @@ import { Platform, Pressable, ScrollView } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 export function MapClusterSheet({
-  title,
   pins,
   onClose,
   onSelect,
 }: {
-  title?: string;
   pins: MapPin[];
   onClose: () => void;
   onSelect: (id: string) => void;
@@ -27,7 +25,7 @@ export function MapClusterSheet({
   return (
     <PromptSheet
       visible={pins.length > 1}
-      title={title ?? t("homePlaces.spotCount", { count: pins.length })}
+      title={t("homePlaces.spotCount", { count: pins.length })}
       body=""
       actions={null}
       onClose={onClose}

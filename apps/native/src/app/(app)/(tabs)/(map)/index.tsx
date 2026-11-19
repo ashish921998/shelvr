@@ -20,8 +20,7 @@ import {
 } from "@/lib/apple-place-card";
 import { isDarkThemeName } from "@/lib/appearance";
 import { framedPins } from "@/lib/city-pins";
-import { placeKey } from "@/lib/map-stamps";
-import { useCityStamps } from "@/lib/use-map-city-sheet";
+import { useMapCitySheet } from "@/lib/use-map-city-sheet";
 import { MapCitySheet } from "@/components/map/map-city-sheet";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
@@ -128,15 +127,7 @@ export default function MapScreen() {
     () => (searchText.trim() !== "" ? searchPlaces(shown, searchText) : shown),
     [shown, searchText],
   );
-  const {
-    saves,
-    placeCount,
-    stamps,
-    stampColors,
-    highlightedPlaces,
-    setHighlighted,
-    sheet,
-  } = useCityStamps(city, matches, {
+  const { saves, placeCount, sheet } = useMapCitySheet(city, matches.length, {
     hidden: searchOpen,
     mapHeight,
     barHeight,
@@ -148,9 +139,6 @@ export default function MapScreen() {
         ...place,
         id: placeId(place),
         emoji: placeEmoji(place),
-        ...(highlightedPlaces.has(placeKey(place))
-          ? { tintColor: theme.colors.primary }
-          : {}),
         ...(visited(place)
           ? {
               tintColor: isDarkThemeName(rt.themeName)
@@ -160,7 +148,7 @@ export default function MapScreen() {
             }
           : {}),
       })),
-    [matches, highlightedPlaces, visited, rt.themeName, theme],
+    [matches, visited, rt.themeName, theme],
   );
   const overview = useMemo(
     () => shown.map((place) => ({ ...place, id: placeId(place) })),
@@ -268,13 +256,6 @@ export default function MapScreen() {
             (filters.length > 0 || showWent ? stripHeight : 0) +
             theme.gap(1)
           }
-          stamps={stamps}
-          stampColors={stampColors}
-          onSelectStamp={(itemId) => {
-            setHighlighted(itemId);
-            analytics.capture("map_place_opened", { card: false });
-            router.push({ pathname: "/item/[id]", params: { id: itemId } });
-          }}
           focus={focus}
           locate={locate}
           overview={overview}

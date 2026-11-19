@@ -1,9 +1,20 @@
 import { t } from "@/lib/i18n";
-import { saveCover, type StampSave } from "@/lib/map-stamps";
+
+export type SheetSave = {
+  _id: string;
+  _creationTime: number;
+  title?: string;
+  imageUrl: string | null;
+  heroImageUrl?: string;
+};
 
 const RECENT_LIMIT = 12;
 
-export function recentSaves<T extends StampSave>(saves: readonly T[]): T[] {
+export function saveCover(save: SheetSave): string | undefined {
+  return save.imageUrl ?? save.heroImageUrl;
+}
+
+export function recentSaves<T extends SheetSave>(saves: readonly T[]): T[] {
   return saves
     .filter((save) => saveCover(save) !== undefined)
     .sort((a, b) => b._creationTime - a._creationTime)

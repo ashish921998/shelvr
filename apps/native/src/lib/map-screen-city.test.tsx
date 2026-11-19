@@ -120,14 +120,10 @@ vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: vi.fn(() => null),
 }));
 vi.mock("@/lib/use-map-city-sheet", () => ({
-  useCityStamps: () => ({
+  useMapCitySheet: () => ({
     sheet: { show: false, coveredBottom: 80, aboveSheet: {} },
     saves: [],
     placeCount: 0,
-    stamps: [],
-    stampColors: undefined,
-    highlightedPlaces: new Set(),
-    setHighlighted: vi.fn(),
   }),
 }));
 vi.mock("@/components/map/map-city-sheet", () => ({
