@@ -6,13 +6,13 @@ import { internalAction } from "./_generated/server";
 import { logEvent } from "./model/log";
 import {
   cityCentre,
+  findVenue,
   inCity,
   reportValidator,
   type StoredPlace,
 } from "./model/placeImport";
 import { SAME_SPOT_KM } from "./model/placeList";
 import { fetchGoogleMapsList } from "./model/readers/googleMaps";
-import { appleMapsLookup } from "./model/appleMaps";
 import { distanceKm } from "./model/trip";
 
 export const importGoogleMapsList = internalAction({
@@ -32,17 +32,7 @@ export const importGoogleMapsList = internalAction({
           ? { lat: listed.lat, lng: listed.lng }
           : null;
       const at = hint
-        ? await appleMapsLookup(
-            token,
-            {
-              target: "place",
-              name: listed.name,
-              hasBranchClue: true,
-              strict: true,
-            },
-            listed.name,
-            hint,
-          )
+        ? await findVenue(token, listed.name, listed.name, hint)
         : null;
       if (
         hint === null ||

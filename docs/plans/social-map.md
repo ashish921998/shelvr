@@ -96,9 +96,10 @@ if it is not listed yet and the place has fewer than 3. Running an import twice 
 
 - `places:addByName({ city, names: [...], source? })`: type or paste up to 100 names for one city,
   with the reel they came from as `source`. Names are trimmed and blank lines dropped, then each is
-  looked up on its own with a strict place lookup (`strict` in `appleMapsLookup`). Apple's result
-  counts only when its name is the typed name or a branch of it ("Time Out Market Lisboa" for "Time
-  Out Market"). When Apple offers only another venue, the name goes to `missed`, so a typo never
+  looked up on its own with a strict place lookup (`findVenue` in `model/placeImport.ts`). Apple's
+  result counts only when its name is the typed name or a branch of it ("Time Out Market Lisboa" for
+  "Time Out Market"), and the exact name wins over a branch when Apple offers both. When Apple offers
+  only another venue, the name goes to `missed`, so a typo never
   stores the wrong place. A save's pins (`lookUp` in `placePins.ts`) take Apple's first-ranked venue
   in that case instead.
 - `placesImport:importGoogleMapsList({ city, url })`: build the list in the Google Maps app, then paste
@@ -107,8 +108,13 @@ if it is not listed yet and the place has fewer than 3. Running an import twice 
   Each place is searched in Apple by name near Google's point, with the same strict lookup, and kept
   only when Apple's result carries the list's name (or a branch of it) and sits within 300 m of
   Google's point (`SAME_SPOT_KM`). A place Apple knows by another name, such as a renamed or closed
-  venue, goes to `missed`; add it with `addByName` under Apple's name. Apple's point and id are
-  stored, never Google's. The list's link is stored as the source.
+  venue, goes to `missed`; add it with `addByName` under Apple's name. So does a chain branch when
+  Apple ranks a farther branch first. Apple's point and id are stored, never Google's. The list's
+  link is stored as the source. The reader keeps the first 150 places of a list
+  (`MAX_LIST_PLACES`), and the rest are not reported, so build lists of at most 150 places.
+
+When Apple is rate-limited or down, both imports stop with "Apple Maps is unavailable" instead of
+reporting every name as missed. Nothing from that run is stored; run it again.
 
 A row can also be edited or hidden in the Convex dashboard.
 
@@ -126,7 +132,9 @@ to 60 places each. With the Google Maps import, a city takes about an hour.
 
 - `src/lib/use-discover-places.ts` loads `places:forMap`. `discoverBeside` (`src/lib/map-discover.ts`)
   drops a Discover place that is one of the person's own (same Apple id, or `samePlace`), so their
-  pin wins.
+  pin wins. `samePlace` also merges two Apple ids with nested names close together, such as a hotel
+  and its restaurant. That hides a few distinct Discover places, but an own pin's Apple id can come
+  from the loose lookup and name a neighbouring venue, so ids alone would show duplicates.
 - `src/app/(app)/(tabs)/(map)/index.tsx`:
   - `mapEntries` marks each entry `own` or `discover` and lists the person's own first, so search
     puts their match ahead of a Discover one when both match equally. `ownOnTop` orders only the
@@ -135,7 +143,8 @@ to 60 places each. With the Google Maps import, a city takes about an hour.
   - a tapped Discover pin goes through `useDiscoverPlaces`' `open`, which uses `stopAction` and
     `usePlaceOpener` as shared lists do: Apple's place card when it can open, otherwise the place in
     the maps app. Never `/item/[id]`
-  - the empty state shows only when both lists are empty
+  - the empty state shows only when both lists are empty. The map waits for Discover only when the
+    person has no pins of their own, since their pins frame the first camera
   - kind filters and search cover Discover pins. The "went" switch covers only the person's own, so
     Discover pins hide while it is not on All
   - the "Discover" chip shows only to someone with pins of their own, while the "went" switch is on

@@ -428,6 +428,41 @@ describe("appleMapsFind", () => {
     ).toBeNull();
   });
 
+  it("takes the exact venue over a longer name in a strict lookup", async () => {
+    const fetchImpl = vi.fn(async () =>
+      Response.json({
+        results: [
+          {
+            name: "Hotel Avenida Restaurant",
+            id: "restaurant",
+            poiCategory: "Restaurant",
+            coordinate: { latitude: 38.7201, longitude: -9.1401 },
+          },
+          {
+            name: "Hotel Avenida",
+            id: "hotel",
+            poiCategory: "Hotel",
+            coordinate: { latitude: 38.72, longitude: -9.14 },
+          },
+        ],
+      }),
+    );
+    expect(
+      await appleMapsFind(
+        "t",
+        {
+          target: "place",
+          name: "Hotel Avenida",
+          hasBranchClue: true,
+          strict: true,
+        },
+        "Hotel Avenida, Lisbon",
+        undefined,
+        fetchImpl,
+      ),
+    ).toMatchObject({ appleId: "hotel" });
+  });
+
   it("does not accept a physical feature as an extended branch venue", async () => {
     const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
       const filter = new URL(String(input)).searchParams.get(

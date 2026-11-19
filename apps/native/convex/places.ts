@@ -2,12 +2,12 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation } from "./_generated/server";
 import { MAX_MAP_PLACES } from "./mapPlaces";
-import { appleMapsLookup } from "./model/appleMaps";
 import { authedQuery } from "./model/auth";
 import { cuisineValidator } from "./model/itemFields";
 import { logEvent } from "./model/log";
 import {
   cityCentre,
+  findVenue,
   inCity,
   reportValidator,
   storedPlaceValidator,
@@ -114,12 +114,7 @@ export const addByName = internalAction({
     const found: StoredPlace[] = [];
     const missed: string[] = [];
     for (const name of names) {
-      const at = await appleMapsLookup(
-        token,
-        { target: "place", name, hasBranchClue: true, strict: true },
-        `${name}, ${city}`,
-        centre,
-      );
+      const at = await findVenue(token, name, `${name}, ${city}`, centre);
       if (!at?.appleId || !inCity(at, centre)) {
         missed.push(name);
         continue;

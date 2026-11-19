@@ -189,7 +189,11 @@ export default function MapScreen() {
       />
     );
   }
-  if (all === undefined || !settled || location === "asking")
+  if (
+    all === undefined ||
+    (all.length === 0 && !settled) ||
+    location === "asking"
+  )
     return <ScreenLoader />;
   if (all.length === 0 && beside.length === 0) {
     return (

@@ -31,7 +31,10 @@ const LISBON = { lat: 38.72, lng: -9.14 };
 const PORTO = { lat: 41.15, lng: -8.61 };
 
 async function withApple(
-  found: Record<string, { lat: number; lng: number; label?: string }>,
+  found: Record<
+    string,
+    { lat: number; lng: number; label?: string; status?: number }
+  >,
 ) {
   vi.stubEnv("APPLE_MAPS_PRIVATE_KEY", await testKey());
   vi.stubEnv("APPLE_MAPS_KEY_ID", "KEY1");
@@ -54,6 +57,7 @@ async function withApple(
           ],
         });
       const at = found[name];
+      if (at?.status) return new Response(null, { status: at.status });
       const label = at?.label ?? name;
       return Response.json({
         results: at
@@ -208,6 +212,15 @@ describe("places:addByName", () => {
       }),
     ).rejects.toThrow("at most 100");
   });
+
+  it("fails rather than reporting misses when Apple is unavailable", async () => {
+    await withApple({ Busy: { lat: 38.71, lng: -9.13, status: 429 } });
+    const t = newConvexTest();
+    await expect(
+      t.action(internal.places.addByName, { city: "Lisbon", names: ["Busy"] }),
+    ).rejects.toThrow("Apple Maps is unavailable");
+    expect(await rows(t)).toEqual([]);
+  });
 });
 
 describe("places:importGoogleMapsList", () => {
@@ -250,5 +263,18 @@ describe("places:importGoogleMapsList", () => {
     expect(await rows(t)).toMatchObject([
       { name: "Found", sources: [{ url: "https://maps.app.goo.gl/x" }] },
     ]);
+  });
+
+  it("fails rather than reporting misses when Apple is unavailable", async () => {
+    await withApple({ Busy: { lat: 38.71, lng: -9.13, status: 503 } });
+    fetchGoogleMapsList.mockResolvedValue({
+      placeList: [{ name: "Busy", lat: 38.71, lng: -9.13 }],
+    });
+    await expect(
+      newConvexTest().action(internal.placesImport.importGoogleMapsList, {
+        city: "Lisbon",
+        url: "https://maps.app.goo.gl/x",
+      }),
+    ).rejects.toThrow("Apple Maps is unavailable");
   });
 });

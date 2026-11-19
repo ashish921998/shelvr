@@ -3,7 +3,9 @@ import { env } from "../_generated/server";
 import {
   appleMapsAccessToken,
   appleMapsConfig,
+  appleMapsFind,
   appleMapsLookup,
+  UNAVAILABLE,
 } from "./appleMaps";
 import { keepNearby, type LatLng } from "./trip";
 
@@ -43,4 +45,21 @@ export async function cityCentre(city: string) {
 
 export function inCity(point: LatLng, centre: LatLng): boolean {
   return keepNearby([point], centre)[0] !== null;
+}
+
+export async function findVenue(
+  token: string,
+  name: string,
+  query: string,
+  near: LatLng,
+) {
+  const found = await appleMapsFind(
+    token,
+    { target: "place", name, hasBranchClue: true, strict: true },
+    query,
+    near,
+  );
+  if (found === UNAVAILABLE)
+    throw new Error("Apple Maps is unavailable; run the import again");
+  return found;
 }
