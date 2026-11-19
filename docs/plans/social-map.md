@@ -1,6 +1,6 @@
 # A useful Map before you have saved much
 
-Status: plan only, nothing built. Written 2026-11-19.
+Status: plan only, nothing built. Written 2026-11-19; step 0 added the same day.
 
 ## Problem
 
@@ -8,17 +8,116 @@ A save is private, and the Map tab shows only your own pins. `mapPlaces.listMapP
 caller's ready saves and nothing else, and `src/app/(app)/(tabs)/(map)/index.tsx` shows the
 `map.emptyTitle` empty state when that list is empty. A new user opens the Map and sees nothing.
 
-We agreed on an order:
+Decided order (2026-11-19):
 
-1. Aggregate counts ("Saved by 10+ people"). No profiles.
-2. Curated places for the top 10 to 20 cities, taken from public reels.
-3. Profiles and follows later, seeded from shared-list members.
+0. **Now: a `places` table we fill by hand, shown on everyone's Map.** This fills the map without
+   waiting for users. It is the next thing to build.
+1. Later, once there are enough users: aggregate counts ("Saved by 10+ people"). No profiles.
+2. Later: add places from public reels into the same `places` table, through the reading pipeline.
+3. Later: profiles and follows, seeded from shared-list members.
 
 No gender question, and no profile step in onboarding.
 
-**Step 1 does not fill an empty map.** It adds a count to pins you already have. Only step 2 puts pins
-on a new user's map. The metrics below are set so that each step is judged on what it can change, and
-the case for step 2 is measured before step 1 ships (see "Measure first").
+**Step 1 does not fill an empty map.** It adds a count to pins you already have, and with few users
+almost no place reaches the minimum. Step 0 is what fills the map.
+
+## Step 0 (now): a places table filled by hand
+
+### What the person sees
+
+The Map tab shows every place in the table as a "Discover" pin, beside and under the person's own
+pins. A new user opens the Map and sees places in every city we have filled, not an empty state. A
+"Discover" chip hides them. Tapping one opens Apple's place card (`openPlaceDetails(appleId)`), as a
+saved pin does today. Search and the kind filters cover them too.
+
+Who picked a place is not shown. The table is ours.
+
+### Data model
+
+```ts
+places: defineTable({
+  name: v.string(),
+  city: v.string(),
+  lat: v.number(),
+  lng: v.number(),
+  appleId: v.string(),          // required: every row is matched to an Apple place
+  category: v.optional(v.string()),
+  cuisine: v.optional(cuisineValidator),
+  status: v.union(v.literal("live"), v.literal("hidden")),
+  addedAt: v.number(),
+})
+  .index("by_status", ["status"])
+  .index("by_city_and_status", ["city", "status"])
+  .index("by_apple_id", ["appleId"]),
+```
+
+It holds no user id and nothing from anyone's save, so the account deletion drain, `liveOwner` and
+`aiAllowed` do not apply. Removing a place sets `hidden`.
+
+### Filling it by hand
+
+Two internal actions, run with `pnpm exec convex run --prod`, both matching each place against Apple
+Maps through `appleMapsLookup` (`model/appleMaps.ts`) with the city as the clue. A place Apple does not
+find inside that city is skipped and reported, not stored. A place whose `appleId` is already in the
+table is skipped, so running an import twice adds nothing.
+
+- `places:addByName({ city, names: [...] })`: type or paste a list of names for one city.
+- `places:importGoogleMapsList({ city, url })`: build the list in the Google Maps app, then paste its
+  share link. The list reader already exists (`model/readers/googleMaps.ts`, `fetchGoogleMapsList`).
+  Only the names are used: each place is looked up again in Apple, and Apple's point is stored, never
+  Google's.
+
+A row can also be edited or hidden in the Convex dashboard.
+
+**Which cities first:** the 10 to 20 cities where users' saves land most (`items.cities`), at about 30
+to 60 places each. With the Google Maps import, a city takes about an hour.
+
+### Public functions
+
+- `places:forMap`: `authedQuery`, `args: {}`, returns the `live` rows (name, point, city, Apple id,
+  category, cuisine and kinds). It takes up to 3,000 rows, the cap `listMapPlaces` uses, and gains a
+  `city` argument once the table outgrows that. It is a new function, so no `Convex-Api: changed`
+  trailer.
+
+### Client changes (OTA, no native change)
+
+- `src/app/(app)/(tabs)/(map)/index.tsx`:
+  - load `places:forMap` next to `listMapPlaces`
+  - drop a Discover pin that `samePlace` matches to one of the person's own (their pin wins)
+  - give Discover pins their own id, since `placeId` assumes an `itemId`
+  - in `select`, open the Apple place card, never `/item/[id]`
+  - show the empty state only when both lists are empty
+- `src/components/map/places-map.tsx`: a muted tint for Discover pins, with own pins drawn above.
+- `src/lib/map-filters.ts`: kind filters and search include Discover pins. The "went" switch covers
+  only the person's own pins.
+- `src/lib/city-pins.ts` / `framedPins`: frame on the person's own pins when they have any, otherwise
+  on their location, otherwise on the nearest filled city.
+- A "Discover" chip, copy in nine catalogs, and `map_opened` gains a `discover` count.
+
+### Not in the first version
+
+- **Saving a Discover place to your own saves.** The Add sheet takes only a link today. Options: a save
+  made from the place itself, or adding it to a shared list (which already takes a place). Decide once
+  people tap Discover pins.
+- **Discover pins on the city page map and on Home.** The Map tab first.
+
+### Metric
+
+New users' first-week retention, before and after, in filled cities against others; the share of
+`map_place_opened` taps on Discover pins; and the share of new users whose first `map_opened` showed
+no pins at all, which should fall toward zero in filled cities.
+
+### Size
+
+Backend about 1.5 days (table, two import actions, query, tests). Client about 3 days. Filling: about
+an hour per city. No owner-path files.
+
+### Open question for step 0
+
+Apple's developer agreement (Schedule 6) is reported to allow keeping Maps data only temporarily
+(`places.md`, "Open question"). This table keeps Apple's point and id for places we chose, for every
+user. Today the app keeps them only on a person's own saves. Check before launch. If it is not
+allowed, keep the name and city we typed and look the point up on the device when the Map opens.
 
 ## Constraints from earlier decisions
 
@@ -199,6 +298,11 @@ The decision on step 2 rests on the empty-map measure under "Measure first", not
 - Also: owner approval for `users.ts`, and a privacy policy update before release.
 
 ## Step 2: curated reel-sourced places
+
+Since step 0, this step no longer needs its own `editorialPlaces` table: reel places go into the
+`places` table, with an optional `sources` field for the reel links. The design below predates
+that decision, and the rest of it (reading reels through the pipeline, no hosted media, the terms
+questions) still applies.
 
 ### What the person sees
 
