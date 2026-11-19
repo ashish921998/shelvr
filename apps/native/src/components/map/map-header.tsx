@@ -1,8 +1,5 @@
 import { BackCircle } from "@/components/back-circle";
-import {
-  MapAvatarButton,
-  MapRoundButton,
-} from "@/components/map/map-round-button";
+import { MapRoundButton } from "@/components/map/map-round-button";
 import { MapSearchField } from "@/components/map/map-search";
 import { ThemedText } from "@/components/ui/themed-text";
 import { Wordmark } from "@/components/wordmark";
@@ -99,7 +96,8 @@ export function MapHeader({
       {left}
       <View style={styles.actions}>
         {right}
-        <MapAvatarButton
+        <MapRoundButton
+          icon="person.fill"
           label={t("navigation.profile")}
           onPress={() => router.push("/profile")}
         />
@@ -119,7 +117,7 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     gap: 7,
   },
-  actions: { flexDirection: "row", alignItems: "center", gap: 14 },
+  actions: { flexDirection: "row", alignItems: "center", gap: 10 },
   title: {
     flex: 1,
     minWidth: 0,
