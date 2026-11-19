@@ -87,8 +87,12 @@ vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
 vi.mock("@/lib/i18n", () => ({
   formattingLocale: () => "en",
   useAppLocale: () => "en",
-  t: (key: string, { count }: { count?: number } = {}) =>
-    key === "trip.revealSaves" ? `${count} saves` : `${count} places`,
+  t: (key: string, { count, name }: { count?: number; name?: string } = {}) =>
+    key === "trip.revealSaves"
+      ? `${count} saves`
+      : key === "mapSheet.groupTitle"
+        ? `${name} +${count}`
+        : `${count} places`,
 }));
 
 const AUSTIN = [
@@ -263,7 +267,7 @@ it("uses native markers to declutter nearby places, keeping their emoji, title a
   expect(mock.props.markers[1].tintColor).toBe("#ffffff");
 });
 
-it("keeps all nearby places reachable through the count marker's picker", () => {
+it("draws nearby places as one place pin named after the first and keeps them all reachable", () => {
   const onSelect = vi.fn();
   render(
     <PlacesMap
@@ -278,8 +282,8 @@ it("keeps all nearby places reachable through the count marker's picker", () => 
   );
   expect(mock.props.markers).toHaveLength(1);
   expect(mock.props.markers[0]).toMatchObject({
-    title: "2 places",
-    monogram: "2",
+    title: "Ramen +1",
+    tintColor: "#ffffff",
   });
   act(() => mock.props.onMarkerClick({ id: mock.props.markers[0].id }));
   expect(mock.clearSelection).toHaveBeenCalledWith(undefined);

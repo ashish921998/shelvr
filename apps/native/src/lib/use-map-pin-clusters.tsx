@@ -48,16 +48,21 @@ export function useMapPinClusters(
     return {
       id: group.id,
       coordinates: { latitude: group.lat, longitude: group.lng },
-      title: grouped
-        ? t("homePlaces.spotCount", { count: group.pins.length })
-        : (first.title ?? first.name),
-      monogram: grouped
-        ? (options.clusterText?.(group.pins.length) ??
-          String(group.pins.length))
-        : (first.text ?? first.emoji),
+      title: !grouped
+        ? (first.title ?? first.name)
+        : options.clusterText
+          ? t("homePlaces.spotCount", { count: group.pins.length })
+          : t("mapSheet.groupTitle", {
+              name: first.title ?? first.name,
+              count: group.pins.length - 1,
+            }),
+      monogram:
+        grouped && options.clusterText
+          ? options.clusterText(group.pins.length)
+          : (first.text ?? first.emoji),
       tintColor: group.pins.some((pin) => pin.id === selected)
         ? theme.colors.primary
-        : sameColor
+        : sameColor || !options.clusterText
           ? (first.tintColor ?? theme.colors.frame)
           : theme.colors.foreground,
     };

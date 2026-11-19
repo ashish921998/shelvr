@@ -1592,6 +1592,7 @@
     "other": "Votre passeport compte %{formattedCount} villes"
   },
   "mapSheet.summary": "%{saves} · %{places}",
+  "mapSheet.groupTitle": "%{name} +%{count}",
   "mapSheet.cardDetail": "%{places} · %{author}",
   "mapSheet.savedHere": "Enregistré ici",
   "mapSheet.recentlySaved": "Enregistré récemment"

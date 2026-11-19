@@ -1518,6 +1518,7 @@
     "other": "Dein Pass hat %{formattedCount} Städte"
   },
   "mapSheet.summary": "%{saves} · %{places}",
+  "mapSheet.groupTitle": "%{name} +%{count}",
   "mapSheet.cardDetail": "%{places} · %{author}",
   "mapSheet.savedHere": "Hier gespeichert",
   "mapSheet.recentlySaved": "Zuletzt gespeichert"

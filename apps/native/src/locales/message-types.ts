@@ -1301,6 +1301,7 @@ type MessageParams = {
   "passport.momentCityStamp": { city: string };
   "passport.paywallHeadline": { count: number };
   "mapSheet.summary": { saves: string; places: string };
+  "mapSheet.groupTitle": { name: string; count: number };
   "mapSheet.cardDetail": { places: string; author: string };
   "mapSheet.savedHere": undefined;
   "mapSheet.recentlySaved": undefined;
