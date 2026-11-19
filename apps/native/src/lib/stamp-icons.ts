@@ -61,7 +61,7 @@ function keep<T>(
   return next.get(key) === value ? next : new Map(next).set(key, value);
 }
 
-export function stampTilt(itemId: string): number {
+function stampTilt(itemId: string): number {
   let hash = 0;
   for (const char of itemId) hash = (hash * 31 + char.charCodeAt(0)) | 0;
   return (Math.abs(hash) % 11) - 5;
