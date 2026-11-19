@@ -96,8 +96,8 @@ vi.mock("@/components/map/map-search", () => ({
   MapSearchResults: vi.fn(() => null),
 }));
 vi.mock("@/components/map/map-empty", () => ({ MapEmpty: vi.fn(() => null) }));
-vi.mock("@/components/map/map-filter-chips", () => ({
-  MapFilterChips: vi.fn(() => null),
+vi.mock("@/components/map/map-kind-row", () => ({
+  MapKindRow: vi.fn(() => null),
 }));
 vi.mock("@/components/map/map-round-button", () => ({
   MapRoundButton: vi.fn(() => null),
