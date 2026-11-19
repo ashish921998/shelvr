@@ -42,16 +42,23 @@ function remember<T>(
   }
 }
 
+function prune<T>(
+  previous: ReadonlyMap<string, T>,
+  wanted: ReadonlySet<string>,
+): ReadonlyMap<string, T> {
+  return [...previous.keys()].every((known) => wanted.has(known))
+    ? previous
+    : new Map([...previous].filter(([known]) => wanted.has(known)));
+}
+
 function keep<T>(
   previous: ReadonlyMap<string, T>,
   wanted: ReadonlySet<string>,
   key: string,
   value: T,
 ): ReadonlyMap<string, T> {
-  const stale = [...previous.keys()].some((known) => !wanted.has(known));
-  if (!stale && previous.get(key) === value) return previous;
-  const next = new Map([...previous].filter(([known]) => wanted.has(known)));
-  return next.set(key, value);
+  const next = prune(previous, wanted);
+  return next.get(key) === value ? next : new Map(next).set(key, value);
 }
 
 export function stampTilt(itemId: string): number {
@@ -175,6 +182,13 @@ export function useStampCovers(stamps: readonly MapStamp[]) {
   const [covers, setCovers] = useState<ReadonlyMap<string, SkImage>>(
     () => new Map(),
   );
+  const [seen, setSeen] = useState(stamps);
+  if (seen !== stamps) {
+    setSeen(stamps);
+    setCovers((previous) =>
+      prune(previous, new Set(stamps.map((stamp) => stamp.cover))),
+    );
+  }
   useEffect(() => {
     let live = true;
     const uris = new Set(stamps.map((stamp) => stamp.cover));
@@ -238,6 +252,16 @@ export function useStampIcons(
   const [icons, setIcons] = useState<ReadonlyMap<string, ImageRef>>(
     () => new Map(),
   );
+  const [seen, setSeen] = useState({ groups, colors });
+  if (seen.groups !== groups || seen.colors !== colors) {
+    setSeen({ groups, colors });
+    setIcons((previous) =>
+      prune(
+        previous,
+        new Set(colors ? groups.map((group) => stampKey(group, colors)) : []),
+      ),
+    );
+  }
   useEffect(() => {
     let live = true;
     if (!colors) return;

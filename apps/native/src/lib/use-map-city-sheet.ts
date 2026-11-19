@@ -54,13 +54,11 @@ export function useCityStamps(
     }),
     [theme],
   );
+  const room = city !== undefined && !layout.hidden && layout.mapHeight > 0;
   const sheet = useMapSheetLayout({
     ...layout,
-    show:
-      city !== undefined &&
-      saves.length > 0 &&
-      !layout.hidden &&
-      layout.mapHeight > 0,
+    show: room && saves.length > 0,
+    reserve: room && (items.isPending || saves.length > 0),
   });
   return {
     sheet,
@@ -75,10 +73,11 @@ export function useCityStamps(
 
 function useMapSheetLayout({
   show,
+  reserve,
   mapHeight,
   barHeight,
   insetTop,
-}: Layout & { show: boolean }) {
+}: Layout & { show: boolean; reserve: boolean }) {
   const [header, setHeader] = useState(96);
   const [cards, setCards] = useState(232);
   const snaps = useMemo(
@@ -104,7 +103,7 @@ function useMapSheetLayout({
     snaps,
     top,
     aboveSheet,
-    coveredBottom: show ? mapHeight - snaps.middle : barHeight,
+    coveredBottom: reserve ? mapHeight - snaps.middle : barHeight,
     onHeaderHeight: setHeader,
     onCardsHeight: setCards,
   };
