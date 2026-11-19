@@ -21,8 +21,10 @@ vi.mock("react-native-unistyles", () => ({
 
 const layout = { hidden: false, mapHeight: 800, barHeight: 80, insetTop: 0 };
 
-function covered(city: string | undefined) {
-  const { result } = renderHook(() => useCityStamps(city, [], layout));
+const place = { name: "Tigre", lat: 40.7, lng: -74 };
+
+function covered(city: string | undefined, onMap = [place]) {
+  const { result } = renderHook(() => useCityStamps(city, onMap, layout));
   return result.current.sheet;
 }
 
@@ -33,9 +35,14 @@ it("keeps room for the sheet while the city's saves load, so the first fit clear
   expect(sheet.coveredBottom).toBeGreaterThan(layout.barHeight);
 });
 
-it("gives the room back when the city has no saves or no city is in view", () => {
+it("keeps room for the sheet before any city is in view, so framing the first city clears it", () => {
+  mock.query = { data: undefined, isPending: true };
+  expect(covered(undefined).coveredBottom).toBeGreaterThan(layout.barHeight);
+});
+
+it("gives the room back when the city has no saves or the map has no places", () => {
   mock.query = { data: [], isPending: false };
   expect(covered("New York").coveredBottom).toBe(layout.barHeight);
   mock.query = { data: undefined, isPending: true };
-  expect(covered(undefined).coveredBottom).toBe(layout.barHeight);
+  expect(covered(undefined, []).coveredBottom).toBe(layout.barHeight);
 });

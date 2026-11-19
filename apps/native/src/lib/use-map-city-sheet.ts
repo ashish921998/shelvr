@@ -54,11 +54,15 @@ export function useCityStamps(
     }),
     [theme],
   );
-  const room = city !== undefined && !layout.hidden && layout.mapHeight > 0;
+  const room = !layout.hidden && layout.mapHeight > 0;
   const sheet = useMapSheetLayout({
     ...layout,
-    show: room && saves.length > 0,
-    reserve: room && (items.isPending || saves.length > 0),
+    show: room && city !== undefined && saves.length > 0,
+    reserve:
+      room &&
+      (city === undefined
+        ? onMap.length > 0
+        : items.isPending || saves.length > 0),
   });
   return {
     sheet,
