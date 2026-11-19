@@ -31,6 +31,8 @@ vi.mock("expo-linking", () => ({
   createURL: () => "shelvr:///",
 }));
 
+vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
+
 describe("redirectSystemPath", () => {
   beforeEach(() => {
     markPendingShareOnDevice.mockClear();
