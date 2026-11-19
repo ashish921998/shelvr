@@ -25,7 +25,7 @@ import { t, useAppLocale } from "@/lib/i18n";
 import {
   busiestCityPlaces,
   filterPlaces,
-  mapFilters,
+  mapRowFilters,
   searchPlaces,
   topSearchResults,
   type WentFilter,
@@ -109,7 +109,7 @@ export default function MapScreen() {
     [all, wentFilter, visited],
   );
   const { city, onCentreChange } = useMapCity(all ?? NO_PLACES);
-  const filters = useMemo(() => mapFilters(all ?? NO_PLACES), [all]);
+  const filters = useMemo(() => mapRowFilters(all ?? NO_PLACES), [all]);
   const active = useMemo(
     () =>
       kinds.filter((kind) => filters.some((filter) => filter.kind === kind)),
