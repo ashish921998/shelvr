@@ -109,13 +109,16 @@ link from a count back to a save.
 
 1. If `liveOwner(ctx, userId)` is null, or `aiAllowed` is false, or the account fails the age and
    saves bar, delete the user's rows and stop.
-2. Read the user's ready saves (`readySavesNewestFirst`, the same reader `listMapPlaces` uses), apply
-   `visibleItemPlaces` for removals, and collect the set of Apple ids.
+2. Read the user's ready saves through `readySavesNewestFirst`, the same reader `listMapPlaces`
+   uses. It already applies place removals. Then collect the set of Apple ids. That reader stops at
+   `CITY_SCAN_ROWS` (1,000) saves or 4 MiB, so a heavy saver's oldest places do not count, just as
+   they do not show on their Map today.
 3. Compare that set with the user's rows `by_user`, then insert and delete the difference.
 
 Because it rebuilds from the saves, a missed trigger only delays a change. It cannot corrupt the
-count. Schedule it with `runAfter(0, ...)` (debounced per user, for example through a small
-`placeSaverSyncs` row with `dueAt`) from every path that changes which pins a user has:
+count. Schedule it with `runAfter(0, ...)` from every path that changes which pins a user has. No
+debounce table: a duplicate sync finds no difference and writes nothing, so it costs only reads.
+These are the paths:
 
 - settlement: `finalizeItem` and `failItem` (`model/settlement.ts`)
 - `placePins.storePins` (Apple lookups land here, possibly after a drain has started; the
@@ -124,16 +127,22 @@ count. Schedule it with `runAfter(0, ...)` (debounced per user, for example thro
 - `placeCorrections.savePlaces`
 - `placeRemovals.removePlace` and `undoRemovePlace`
 - `items.deleteItem`
-- `aiConsents.setConsent`
+- `aiConsent.setConsent`
 - `placePins:backfillPage`, which patches pins directly
 
-A daily sweep over users, which reschedules the sync for each, catches any path this list misses.
+A weekly sweep catches any path this list misses. It reschedules the sync only for users with a
+save updated since the last sweep, because a sync re-reads every ready save, and a link save can hold
+about 100k characters. A daily sweep over every user would re-read the whole items table every day.
 
 ### The daily rollup
 
-A cron runs once a day. It walks `placeSavers` `by_apple_id` in pages, counts rows per Apple id, and
-writes `placeSaveCounts` only where the count is at least `MIN_SAVERS` (5), deleting rows that fall
-below. It runs as a single chain of scheduled mutations, so no two writes contend for a popular row.
+A cron runs once a day. It walks `placeSavers` `by_apple_id` in pages and counts rows per Apple id.
+One Apple id's rows can span a page boundary, so the running count for the last Apple id on a page
+carries into the next page. Where the count is at least `MIN_SAVERS` (5), it writes `placeSaveCounts`
+stamped with the run's start time, and where it is below, it deletes the row. A last pass deletes every
+`placeSaveCounts` row with an older `rolledUpAt`. That catches an Apple id with no `placeSavers` rows
+left, which the walk never visits, for example after its last saver deletes their account. The rollup
+runs as a single chain of scheduled mutations, so no two writes contend for a popular row.
 The rows are small (two short strings), so a full walk stays cheap. At 10,000 users with 50 places
 each, that is 500,000 rows a day.
 
@@ -183,7 +192,7 @@ The decision on step 2 rests on the empty-map measure under "Measure first", not
 
 ### Size
 
-- Backend: about 3 days. That covers two tables, the sync helper and its 9 triggers, the daily sweep
+- Backend: about 3 days. That covers two tables, the sync helper and its triggers, the weekly sweep
   and rollup crons, the drain batch, and tests (one per trigger, plus the drain).
 - Client: about 1 day for the snippet, the city page row, copy in nine catalogs, and analytics
   properties.
