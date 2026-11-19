@@ -501,6 +501,7 @@ describe("appleMapsFind", () => {
     expect(await find([restaurant, hotel])).toMatchObject({ appleId: "hotel" });
     expect(await find([])).toMatchObject({ appleId: "restaurant" });
     expect(await find(503)).toBe(UNAVAILABLE);
+    expect(await find(401)).toBeNull();
   });
 
   it("does not accept a physical feature as an extended branch venue", async () => {

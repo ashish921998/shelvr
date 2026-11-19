@@ -342,7 +342,8 @@ export async function appleMapsFind(
     : path === "search"
       ? ["Poi,Address", "Poi"]
       : [""];
-  let fallback: FoundPlace | null = null;
+  let ranked: FoundPlace | null = null;
+  let branch: FoundPlace | null = null;
   let geographic: FoundPlace | null = null;
   for (const filter of filters) {
     if (filter) params.set("resultTypeFilter", filter);
@@ -350,7 +351,7 @@ export async function appleMapsFind(
     try {
       const response = await appleGet(accessToken, path, params, fetchImpl);
       if (!response.ok) {
-        if (!isTemporary(response.status)) return geographic ?? fallback;
+        if (!isTemporary(response.status)) return geographic ?? ranked;
         reportUnavailable(path, { status: response.status });
         return geographic ?? UNAVAILABLE;
       }
@@ -367,15 +368,15 @@ export async function appleMapsFind(
       ? (place: z.infer<typeof placeSchema>) =>
           matchesSavedPlace(place, saved, filter)
       : undefined;
-    const [found, branch] = saved
+    const [found, longerName] = saved
       ? firstSavedPlace(body, near, includeCity, saved, filter)
       : [firstPlace(body, near, path === "search", includeCity), null];
     if (found) return found;
-    fallback ??= branch;
+    branch ??= longerName;
     if (saved && mixed && !saved.strict) {
       geographic = firstPlace(body, near, false, includeCity, matches);
       if (saved.target === "place")
-        fallback = firstPlace(body, near, true, includeCity, isRankedPoi);
+        ranked = firstPlace(body, near, true, includeCity, isRankedPoi);
     }
     if (saved?.target === "address" && filter === "Poi") {
       const extended = firstPlace(
@@ -389,7 +390,7 @@ export async function appleMapsFind(
       return geographic ?? extended;
     }
   }
-  return geographic ?? fallback;
+  return geographic ?? ranked ?? branch;
 }
 
 export async function appleMapsLookup(
