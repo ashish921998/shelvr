@@ -123,6 +123,7 @@ vi.mock("@/lib/use-map-city-sheet", () => ({
   useMapCitySheet: () => ({
     sheet: { show: false, coveredBottom: 80, aboveSheet: {} },
     saves: [],
+    saveCount: 0,
     placeCount: 0,
   }),
 }));

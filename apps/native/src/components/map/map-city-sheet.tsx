@@ -23,6 +23,7 @@ import { StyleSheet } from "react-native-unistyles";
 type Props = {
   city: string;
   saves: SheetSave[];
+  saveCount: number;
   places: number;
   snaps: SheetSnaps;
   top: SharedValue<number>;
@@ -33,6 +34,7 @@ type Props = {
 export function MapCitySheet({
   city,
   saves,
+  saveCount,
   places,
   snaps,
   top,
@@ -65,7 +67,7 @@ export function MapCitySheet({
               {city}
             </ThemedText>
             <ThemedText variant="footnote" style={styles.muted}>
-              {citySummary(saves.length, places)}
+              {citySummary(saveCount, places)}
             </ThemedText>
           </View>
         </View>

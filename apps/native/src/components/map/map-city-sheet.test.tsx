@@ -89,6 +89,7 @@ function sheet() {
     <MapCitySheet
       city="New York"
       saves={[save("old", 1), save("new", 2, 0)]}
+      saveCount={240}
       places={14}
       snaps={{ expanded: 0, middle: 400, collapsed: 700 } as never}
       top={{ get: () => 400 } as never}
@@ -105,7 +106,7 @@ beforeEach(() => {
 it("names the city with its real save and place counts", () => {
   sheet();
   expect(screen.getByText("New York")).toBeTruthy();
-  expect(screen.getByText("2 saves · 14 places")).toBeTruthy();
+  expect(screen.getByText("240 saves · 14 places")).toBeTruthy();
 });
 
 it("leaves Go out to the tab bar", () => {

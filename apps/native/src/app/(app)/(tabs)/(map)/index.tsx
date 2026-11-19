@@ -127,12 +127,16 @@ export default function MapScreen() {
     () => (searchText.trim() !== "" ? searchPlaces(shown, searchText) : shown),
     [shown, searchText],
   );
-  const { saves, placeCount, sheet } = useMapCitySheet(city, matches.length, {
-    hidden: searchOpen,
-    mapHeight,
-    barHeight,
-    insetTop: rt.insets.top,
-  });
+  const { saves, saveCount, placeCount, sheet } = useMapCitySheet(
+    city,
+    matches.length,
+    {
+      hidden: searchOpen,
+      mapHeight,
+      barHeight,
+      insetTop: rt.insets.top,
+    },
+  );
   const pins: MapPin[] = useMemo(
     () =>
       matches.map((place) => ({
@@ -307,7 +311,7 @@ export default function MapScreen() {
           />
         ) : null}
         <View pointerEvents="box-none" style={styles.controls}>
-          <MapTripPill />
+          <MapTripPill city={city} />
           {all.length > 0 && located ? (
             <View style={styles.locate}>
               <MapRoundButton
@@ -356,6 +360,7 @@ export default function MapScreen() {
         <MapCitySheet
           city={city}
           saves={saves}
+          saveCount={saveCount}
           places={placeCount}
           snaps={sheet.snaps}
           top={sheet.top}
