@@ -119,10 +119,17 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.gap(1.25),
     borderRadius: theme.radius.xl,
     borderCurve: "continuous",
-    boxShadow: "0 1px 3px rgba(43, 36, 24, 0.10)",
+    borderWidth: StyleSheet.hairlineWidth,
+    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.12)",
   },
-  selected: { backgroundColor: theme.colors.foreground },
-  plain: { backgroundColor: theme.colors.surface },
+  selected: {
+    backgroundColor: theme.colors.foreground,
+    borderColor: theme.colors.foreground,
+  },
+  plain: {
+    backgroundColor: theme.colors.frame,
+    borderColor: theme.colors.border,
+  },
   label: {
     ...theme.type.labelStrong,
     color: theme.colors.foreground,
