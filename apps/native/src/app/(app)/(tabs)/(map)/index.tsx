@@ -136,7 +136,7 @@ export default function MapScreen() {
     highlightedPlaces,
     setHighlighted,
     sheet,
-  } = useCityStamps(city, all ?? NO_PLACES, matches, {
+  } = useCityStamps(city, matches, {
     hidden: searchOpen,
     mapHeight,
     barHeight,

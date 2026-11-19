@@ -22,7 +22,7 @@ vi.mock("react-native-unistyles", () => ({
 const layout = { hidden: false, mapHeight: 800, barHeight: 80, insetTop: 0 };
 
 function covered(city: string | undefined) {
-  const { result } = renderHook(() => useCityStamps(city, [], [], layout));
+  const { result } = renderHook(() => useCityStamps(city, [], layout));
   return result.current.sheet;
 }
 

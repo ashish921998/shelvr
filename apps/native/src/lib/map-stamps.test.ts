@@ -52,32 +52,30 @@ it("stamps only reels that have a cover and a place", () => {
   ).toEqual(["tiktok", "hero"]);
 });
 
+const stampsFor = (saves: StampSave[], shown: Set<string>) =>
+  shownStamps(reelStamps(saves), saves, shown);
+
 it("hides a stamp only when the filter hides every one of its places", () => {
-  const stamps = reelStamps([save({})]);
-  expect(shownStamps(stamps, [bar, park], on(park))).toHaveLength(1);
-  expect(shownStamps(stamps, [bar, park], on())).toHaveLength(0);
+  expect(stampsFor([save({})], on(park))).toHaveLength(1);
+  expect(stampsFor([save({})], on())).toHaveLength(0);
 });
 
 it("moves a stamp to its first place still shown when the filter hides the first", () => {
-  const [stamp] = shownStamps(reelStamps([save({})]), [bar, park], on(park));
-  expect(stamp).toMatchObject({
-    lat: park.lat,
-    lng: park.lng,
-    places: [placeKey(park)],
-  });
+  expect(stampsFor([save({})], on(park))).toMatchObject([
+    { lat: park.lat, lng: park.lng, places: [placeKey(park)] },
+  ]);
 });
 
-it("stamps each reel at the shown venue the map kept for a place they share", () => {
+it("stamps each reel at the venue the map kept for a place they share", () => {
   const kept = { ...bar, appleId: "apple-bar" };
-  const stamps = shownStamps(
-    reelStamps([
-      save({ _id: "a", placePins: [{ ...bar, appleId: "apple-bar" }] }),
+  const stamps = stampsFor(
+    [
+      save({ _id: "a", placePins: [kept] }),
       save({
         _id: "b",
         placePins: [{ ...bar, lat: bar.lat + 0.0001, appleId: "apple-bar" }],
       }),
-    ]),
-    [kept],
+    ],
     on(kept),
   );
   expect(
@@ -109,23 +107,37 @@ it("shows the newest reel for stamps grouped together and lists them newest firs
   ]);
 });
 
-it("finds a reel's place under another name a non-reel save linked to the shown venue", () => {
-  const kept = { name: "A", lat: 40.7, lng: -74, appleId: "x" };
-  const alias = { name: "B", lat: 40.7001, lng: -74, appleId: "x" };
-  const reel = save({ placePins: [{ name: "B", lat: 40.7002, lng: -74 }] });
-  expect(shownStamps(reelStamps([reel]), [kept], on(kept))).toHaveLength(0);
-  const [stamp] = shownStamps(reelStamps([reel]), [kept], on(kept), [alias]);
-  expect(stamp).toMatchObject({ lat: kept.lat, places: [placeKey(kept)] });
+const note = (_id: string, placePins: StampSave["placePins"]) =>
+  save({ _id, url: "https://example.com/note", placePins });
+
+it("follows the map when another save linked a reel's place name to a venue", () => {
+  const a = { name: "A", lat: 40.7, lng: -74, appleId: "x" };
+  const saves = [
+    note("n1", [a]),
+    note("n2", [{ name: "B", lat: 40.7001, lng: -74, appleId: "x" }]),
+    save({ _id: "reel", placePins: [{ name: "B", lat: 40.7002, lng: -74 }] }),
+    note("n3", [{ name: "B", lat: 40.7003, lng: -74, appleId: "y" }]),
+  ];
+  const other = saves[3]!.placePins![0]!;
+  expect(stampsFor(saves, on(a))).toMatchObject([
+    { itemId: "reel", lat: a.lat, places: [placeKey(a)] },
+  ]);
+  expect(stampsFor(saves, on(other))).toHaveLength(0);
 });
 
 it("keeps a reel on the venue the map gave it when a filter hides that venue", () => {
   const first = { name: "Cafe", lat: 40.7, lng: -74, appleId: "one" };
   const second = { name: "Cafe", lat: 40.7005, lng: -74, appleId: "two" };
-  const reel = save({ placePins: [{ name: "Cafe", lat: 40.7001, lng: -74 }] });
-  expect(
-    shownStamps(reelStamps([reel]), [first, second], on(second)),
-  ).toHaveLength(0);
-  expect(
-    shownStamps(reelStamps([reel]), [first, second], on(first, second)),
-  ).toMatchObject([{ lat: first.lat, places: [placeKey(first)] }]);
+  const saves = [
+    note("n1", [first]),
+    note("n2", [second]),
+    save({
+      _id: "reel",
+      placePins: [{ name: "Cafe", lat: 40.7001, lng: -74 }],
+    }),
+  ];
+  expect(stampsFor(saves, on(second))).toHaveLength(0);
+  expect(stampsFor(saves, on(first, second))).toMatchObject([
+    { lat: first.lat, places: [placeKey(first)] },
+  ]);
 });

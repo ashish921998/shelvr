@@ -62,35 +62,38 @@ export function reelStamps(saves: readonly StampSave[]): MapStamp[] {
   });
 }
 
-type Tagged = Place & { shown?: Place; stamp?: number; order?: number };
+type Venue = Place & { members: string[] };
+
+const member = (itemId: string, order: number) => `${itemId}#${order}`;
 
 export function shownStamps(
   stamps: readonly MapStamp[],
-  mapped: readonly Place[],
+  saves: readonly StampSave[],
   shown: ReadonlySet<string>,
-  known: readonly Place[] = [],
 ): MapStamp[] {
-  const matches = stamps.map(() => new Map<number, Place>());
-  uniquePlacePins<Tagged>(
-    [
-      ...mapped.map((place) => ({ ...place, shown: place })),
-      ...known,
-      ...stamps.flatMap((stamp, index) =>
-        stamp.pins.map((pin, order) => ({ ...pin, stamp: index, order })),
-      ),
-    ],
-    (kept, repeat) => {
-      if (kept.shown && repeat.stamp !== undefined) {
-        matches[repeat.stamp]!.set(repeat.order!, kept.shown);
-      }
-      return kept;
-    },
+  const venueOf = new Map<string, Place>();
+  const venues = uniquePlacePins<Venue>(
+    saves.flatMap((save) =>
+      (save.placePins ?? []).map((pin, order) => ({
+        ...pin,
+        members: [member(save._id, order)],
+      })),
+    ),
+    (kept, repeat) => ({
+      ...kept,
+      members: [...kept.members, ...repeat.members],
+    }),
   );
-  return stamps.flatMap((stamp, index) => {
-    const found = [...matches[index]!]
-      .sort(([a], [b]) => a - b)
-      .map(([, place]) => place)
-      .filter((place) => shown.has(placeKey(place)));
+  for (const venue of venues) {
+    for (const key of venue.members) venueOf.set(key, venue);
+  }
+  return stamps.flatMap((stamp) => {
+    const found = stamp.pins
+      .map((_, order) => venueOf.get(member(stamp.itemId, order)))
+      .filter(
+        (venue): venue is Place =>
+          venue !== undefined && shown.has(placeKey(venue)),
+      );
     const anchor = found[0];
     if (!anchor) return [];
     const places = [...new Set(found.map(placeKey))];
