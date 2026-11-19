@@ -517,7 +517,7 @@ export function TripSetup({
   const [draft, setDraft] = useState<TripDraft>(() => {
     const start = shiftDate(new Date(), 0);
     return {
-      name: "",
+      name: city ?? "",
       countries: [],
       city: city ?? "",
       dated: true,
