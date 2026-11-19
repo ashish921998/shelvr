@@ -1,7 +1,6 @@
 import { CitySheet } from "@/components/city/city-sheet";
 import { ThemedText } from "@/components/ui/themed-text";
 import type { SheetSnaps } from "@/lib/city-sheet";
-import { useCityPlan } from "@/lib/city-plan";
 import { formatRecentDate } from "@/lib/date";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
@@ -13,7 +12,7 @@ import {
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import type { ReactNode } from "react";
-import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import Animated, {
   interpolate,
   type SharedValue,
@@ -42,8 +41,6 @@ export function MapCitySheet({
 }: Props) {
   useAppLocale();
   const router = useRouter();
-  const plan = useCityPlan();
-  const goingOut = plan.busy !== null;
   const recent = recentSaves(saves);
   const recentShown = useAnimatedStyle(() => ({
     opacity: interpolate(
@@ -71,22 +68,6 @@ export function MapCitySheet({
               {citySummary(saves.length, places)}
             </ThemedText>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t("plan.goOut")}
-            accessibilityState={{ busy: goingOut, disabled: goingOut }}
-            disabled={goingOut}
-            onPress={() => void plan.start("date", city)}
-            style={({ pressed }) => [styles.goOut, pressed && styles.pressed]}
-          >
-            {goingOut ? (
-              <ActivityIndicator />
-            ) : (
-              <ThemedText variant="subheadStrong" style={styles.onTint}>
-                {t("plan.goOut")}
-              </ThemedText>
-            )}
-          </Pressable>
         </View>
       }
       list={(scroll) => (
@@ -208,15 +189,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   heading: { flex: 1, gap: theme.gap(0.25) },
   muted: { color: theme.colors.muted },
-  goOut: {
-    minHeight: theme.control.minHeight,
-    justifyContent: "center",
-    paddingHorizontal: theme.gap(2.5),
-    borderRadius: theme.radius.xl,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.primary,
-  },
-  onTint: { color: theme.colors.onTint },
   pressed: { opacity: theme.opacity.pressed },
   section: {
     height: 36,

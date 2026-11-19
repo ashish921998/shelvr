@@ -5,9 +5,7 @@ import { beforeEach, expect, it, vi } from "vitest";
 import { MapCitySheet } from "./map-city-sheet";
 
 const mock = vi.hoisted(() => ({
-  start: vi.fn(),
   push: vi.fn(),
-  busy: null as string | null,
 }));
 
 type Pressed = {
@@ -42,16 +40,12 @@ vi.mock("@/components/ui/themed-text", () => ({
     <span>{children}</span>
   )),
 }));
-vi.mock("@/lib/city-plan", () => ({
-  useCityPlan: () => ({ busy: mock.busy, start: mock.start }),
-}));
 vi.mock("@/lib/date", () => ({
   formatRecentDate: (time: number) => `day ${time}`,
 }));
 vi.mock("expo-image", () => ({ Image: vi.fn(() => null) }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: mock.push }) }));
 vi.mock("react-native", () => ({
-  ActivityIndicator: vi.fn(() => <span>busy</span>),
   ScrollView: box,
   View: box,
   Pressable: vi.fn(
@@ -105,9 +99,7 @@ function sheet() {
 }
 
 beforeEach(() => {
-  mock.start.mockClear();
   mock.push.mockClear();
-  mock.busy = null;
 });
 
 it("names the city with its real save and place counts", () => {
@@ -116,19 +108,9 @@ it("names the city with its real save and place counts", () => {
   expect(screen.getByText("2 saves · 14 places")).toBeTruthy();
 });
 
-it("starts the Go out flow for the city in view", () => {
+it("leaves Go out to the tab bar", () => {
   sheet();
-  fireEvent.click(screen.getByRole("button", { name: "Go out" }));
-  expect(mock.start).toHaveBeenCalledWith("date", "New York");
-});
-
-it("holds Go out while a plan is starting", () => {
-  mock.busy = "date";
-  sheet();
-  expect(
-    (screen.getByRole("button", { name: "Go out" }) as HTMLButtonElement)
-      .disabled,
-  ).toBe(true);
+  expect(screen.queryByRole("button", { name: "Go out" })).toBeNull();
 });
 
 it("opens a recent save from its cover", () => {
