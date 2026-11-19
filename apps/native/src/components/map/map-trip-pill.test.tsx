@@ -7,6 +7,7 @@ import { MapTripPill } from "./map-trip-pill";
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   capture: vi.fn(),
+  useTrip: vi.fn(),
   next: null as null | {
     trip: { _id: string; city: string; name?: string };
     inProgress: boolean;
@@ -14,12 +15,14 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/use-trip-to-continue", () => ({
-  useTripToContinue: () => mocks.next,
+  useTripToContinue: (city: string | undefined) => {
+    mocks.useTrip(city);
+    return mocks.next;
+  },
 }));
 vi.mock("@/lib/trip-planner", () => ({
   tripName: (trip: { name?: string; city: string }) =>
     trip.name ?? `${trip.city} trip`,
-  sameCity: (a: string, b: string) => a.toLowerCase() === b.toLowerCase(),
 }));
 vi.mock("@/lib/analytics", () => ({ analytics: { capture: mocks.capture } }));
 vi.mock("@/lib/i18n", () => ({
@@ -64,17 +67,13 @@ it("shows nothing without a trip under way or about to start", () => {
   expect(container.innerHTML).toBe("");
 });
 
-it.each([
-  ["another city", "New York"],
-  ["no city", undefined],
-])("hides a trip while the map shows %s", (_name, city) => {
-  mocks.next = {
-    trip: { _id: "trip1", city: "Austin", name: "Austin weekend" },
-    inProgress: false,
-  };
-  const { container } = render(<MapTripPill city={city} />);
-  expect(container.innerHTML).toBe("");
-});
+it.each([["New York"], [undefined]])(
+  "asks for a trip in the city the map shows: %s",
+  (city) => {
+    render(<MapTripPill city={city} />);
+    expect(mocks.useTrip).toHaveBeenCalledWith(city);
+  },
+);
 
 it("opens the trip and records whether it is under way", () => {
   mocks.next = {
