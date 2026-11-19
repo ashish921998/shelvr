@@ -119,6 +119,27 @@ vi.mock("@/components/empty-state", () => ({ EmptyState: vi.fn(() => null) }));
 vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: vi.fn(() => null),
 }));
+vi.mock("@/lib/use-map-city-sheet", () => ({
+  useCityStamps: () => ({
+    sheet: { show: false, coveredBottom: 80, aboveSheet: {} },
+    saves: [],
+    placeCount: 0,
+    stamps: [],
+    stampColors: undefined,
+    highlightedPlaces: new Set(),
+    setHighlighted: vi.fn(),
+  }),
+}));
+vi.mock("@/components/map/map-city-sheet", () => ({
+  MapCitySheet: vi.fn(() => null),
+}));
+vi.mock("react-native-reanimated", () => ({
+  default: {
+    View: vi.fn(({ children }: { children: ReactNode }) => (
+      <div>{children}</div>
+    )),
+  },
+}));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}), absoluteFillObject: {} },
   useUnistyles: () => ({

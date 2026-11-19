@@ -20,6 +20,9 @@ import {
 } from "@/lib/apple-place-card";
 import { isDarkThemeName } from "@/lib/appearance";
 import { framedPins } from "@/lib/city-pins";
+import { placeKey } from "@/lib/map-stamps";
+import { useCityStamps } from "@/lib/use-map-city-sheet";
+import { MapCitySheet } from "@/components/map/map-city-sheet";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
   busiestCityPlaces,
@@ -45,6 +48,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, ScrollView, View } from "react-native";
+import Animated from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const NO_PLACES: never[] = [];
@@ -118,19 +122,35 @@ export default function MapScreen() {
     () => filterPlaces(went.places, active),
     [went.places, active],
   );
-  const searching = searchText.trim() !== "";
   const showWent = went.showSwitch && !searchOpen;
   // Search narrows whatever the filter shows; every match stays on the map, the first few are listed.
   const matches = useMemo(
-    () => (searching ? searchPlaces(shown, searchText) : shown),
-    [searching, shown, searchText],
+    () => (searchText.trim() !== "" ? searchPlaces(shown, searchText) : shown),
+    [shown, searchText],
   );
+  const {
+    saves,
+    placeCount,
+    stamps,
+    stampColors,
+    highlightedPlaces,
+    setHighlighted,
+    sheet,
+  } = useCityStamps(city, matches, {
+    hidden: searchOpen,
+    mapHeight,
+    barHeight,
+    insetTop: rt.insets.top,
+  });
   const pins: MapPin[] = useMemo(
     () =>
       matches.map((place) => ({
         ...place,
         id: placeId(place),
         emoji: placeEmoji(place),
+        ...(highlightedPlaces.has(placeKey(place))
+          ? { tintColor: theme.colors.primary }
+          : {}),
         ...(visited(place)
           ? {
               tintColor: isDarkThemeName(rt.themeName)
@@ -140,7 +160,7 @@ export default function MapScreen() {
             }
           : {}),
       })),
-    [matches, visited, rt.themeName, theme],
+    [matches, highlightedPlaces, visited, rt.themeName, theme],
   );
   const overview = useMemo(
     () => shown.map((place) => ({ ...place, id: placeId(place) })),
@@ -244,10 +264,17 @@ export default function MapScreen() {
           height={mapHeight}
           topInset={headerBottom + theme.gap(1)}
           bottomInset={
-            barHeight +
+            sheet.coveredBottom +
             (filters.length > 0 || showWent ? stripHeight : 0) +
             theme.gap(1)
           }
+          stamps={stamps}
+          stampColors={stampColors}
+          onSelectStamp={(itemId) => {
+            setHighlighted(itemId);
+            analytics.capture("map_place_opened", { card: false });
+            router.push({ pathname: "/item/[id]", params: { id: itemId } });
+          }}
           focus={focus}
           locate={locate}
           overview={overview}
@@ -288,9 +315,9 @@ export default function MapScreen() {
           />
         </View>
       ) : null}
-      <View
+      <Animated.View
         pointerEvents="box-none"
-        style={[styles.aboveBar, { bottom: barHeight }]}
+        style={[styles.aboveBar, sheet.aboveSheet]}
       >
         {all.length === 0 ? (
           <MapEmpty
@@ -343,7 +370,19 @@ export default function MapScreen() {
             </ScrollView>
           </View>
         ) : null}
-      </View>
+      </Animated.View>
+      {sheet.show && city !== undefined ? (
+        <MapCitySheet
+          city={city}
+          saves={saves}
+          places={placeCount}
+          snaps={sheet.snaps}
+          top={sheet.top}
+          bottomInset={barHeight}
+          onHeaderHeight={sheet.onHeaderHeight}
+          onCardsHeight={sheet.onCardsHeight}
+        />
+      ) : null}
     </View>
   );
 }
@@ -351,7 +390,13 @@ export default function MapScreen() {
 const styles = StyleSheet.create((theme) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
   results: { position: "absolute", left: theme.gap(2), right: theme.gap(2) },
-  aboveBar: { ...StyleSheet.absoluteFillObject, justifyContent: "flex-end" },
+  aboveBar: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    justifyContent: "flex-end",
+  },
   controls: {
     flexDirection: "row",
     alignItems: "center",

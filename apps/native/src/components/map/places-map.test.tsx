@@ -12,15 +12,23 @@ const mock = vi.hoisted(() => ({
   moves: [] as (Camera | "person")[],
   props: {} as Record<string, any>,
   cluster: {} as Record<string, any>,
+  stampSheet: {} as Record<string, any>,
+  covers: new Map<string, string>(),
+  selectAnnotation: vi.fn(),
   clearSelection: vi.fn(),
   findsPerson: false,
 }));
 
 vi.mock("./map-cluster-sheet", () => ({
   MapClusterSheet: vi.fn((props: Record<string, any>) => {
-    mock.cluster = props;
+    if (props.title) mock.stampSheet = props;
+    else mock.cluster = props;
     return null;
   }),
+}));
+vi.mock("@/lib/stamp-icons", () => ({
+  useStampCovers: () => mock.covers,
+  useStampIcons: () => () => "stamp-icon",
 }));
 
 vi.mock("expo-maps", () => ({
@@ -37,6 +45,7 @@ vi.mock("expo-maps", () => ({
       mock.props = props;
       useImperativeHandle(ref, () => ({
         selectMarker: mock.clearSelection,
+        selectAnnotation: mock.selectAnnotation,
         setCameraPosition: (camera?: Camera) => {
           mock.moves.push(camera ?? "person");
           if (camera) return mock.moveToPlace();
@@ -77,7 +86,8 @@ vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
 vi.mock("@/lib/i18n", () => ({
   formattingLocale: () => "en",
   useAppLocale: () => "en",
-  t: (_key: string, { count }: { count: number }) => `${count} places`,
+  t: (key: string, { count }: { count?: number } = {}) =>
+    key === "trip.revealSaves" ? `${count} saves` : `${count} places`,
 }));
 
 const AUSTIN = [
@@ -107,6 +117,8 @@ beforeEach(() => {
   mock.moves = [];
   mock.findsPerson = false;
   mock.clearSelection.mockClear();
+  mock.selectAnnotation.mockClear();
+  mock.covers = new Map();
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -235,7 +247,7 @@ it("uses native markers to declutter nearby places, keeping their emoji, title a
       zoom: 14,
     }),
   );
-  expect(mock.props.annotations).toBeUndefined();
+  expect(mock.props.annotations).toEqual([]);
   expect(mock.props.markers[0]).toMatchObject({
     id: "a",
     title: "Ramen",
@@ -456,4 +468,102 @@ it("keeps the chosen area when location access is turned off later", async () =>
   );
   await act(() => vi.advanceTimersByTimeAsync(200));
   expect(mock.moves.slice(before)).toEqual([]);
+});
+
+const reel = (itemId: string, newest: number, lng = -97.74) => ({
+  id: `stamp:${itemId}`,
+  itemId,
+  lat: 30.26,
+  lng,
+  cover: `https://cdn.example/${itemId}.jpg`,
+  count: 2,
+  title: itemId,
+  places: [`${itemId}:30.26:${lng}`],
+  newest,
+});
+
+function loaded(...itemIds: string[]) {
+  mock.covers = new Map(
+    itemIds.map((itemId) => [`https://cdn.example/${itemId}.jpg`, itemId]),
+  );
+}
+
+it("opens a lone reel's save from its stamp", () => {
+  loaded("tacos");
+  const onSelectStamp = vi.fn();
+  render(
+    <PlacesMap
+      pins={AUSTIN}
+      framed={AUSTIN}
+      showsUser
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={vi.fn()}
+      stamps={[reel("tacos", 1)]}
+      stampColors={{ frame: "#fff", badge: "#000", onBadge: "#fff" }}
+      onSelectStamp={onSelectStamp}
+    />,
+  );
+  expect(mock.props.annotations).toEqual([
+    expect.objectContaining({ id: "stamp:tacos", icon: "stamp-icon" }),
+  ]);
+  act(() => mock.props.onAnnotationClick({ id: "stamp:tacos" }));
+  expect(onSelectStamp).toHaveBeenCalledWith("tacos");
+  expect(mock.selectAnnotation).toHaveBeenCalledWith(undefined);
+});
+
+it("keeps a reel's first place as a dot until its stamp cover loads", () => {
+  const place = { id: "p", name: "tacos", lat: 30.26, lng: -97.74 };
+  const renderMap = () => (
+    <PlacesMap
+      pins={[place]}
+      framed={[place]}
+      showsUser
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={vi.fn()}
+      stamps={[reel("tacos", 1)]}
+      stampColors={{ frame: "#fff", badge: "#000", onBadge: "#fff" }}
+    />
+  );
+  const { rerender } = render(renderMap());
+  expect(mock.props.annotations).toEqual([]);
+  expect(mock.props.markers.map((marker: { id: string }) => marker.id)).toEqual(
+    ["p"],
+  );
+  loaded("tacos");
+  rerender(renderMap());
+  expect(mock.props.annotations).toHaveLength(1);
+  expect(mock.props.markers).toEqual([]);
+});
+
+it("lists stamped reels too close to tell apart, newest first, and opens the one picked", () => {
+  loaded("old", "new");
+  const onSelectStamp = vi.fn();
+  render(
+    <PlacesMap
+      pins={AUSTIN}
+      framed={AUSTIN}
+      showsUser
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={vi.fn()}
+      stamps={[reel("old", 1), reel("new", 2, -97.7401)]}
+      stampColors={{ frame: "#fff", badge: "#000", onBadge: "#fff" }}
+      onSelectStamp={onSelectStamp}
+    />,
+  );
+  expect(mock.props.annotations).toHaveLength(1);
+  act(() => mock.props.onAnnotationClick({ id: mock.props.annotations[0].id }));
+  expect(onSelectStamp).not.toHaveBeenCalled();
+  expect(mock.stampSheet.title).toBe("2 saves");
+  expect(mock.stampSheet.pins.map((pin: { id: string }) => pin.id)).toEqual([
+    "new",
+    "old",
+  ]);
+  act(() => mock.stampSheet.onSelect("old"));
+  expect(onSelectStamp).toHaveBeenCalledWith("old");
 });

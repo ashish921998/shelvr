@@ -20,13 +20,11 @@ export function useMapPinClusters(
   const [picked, setPicked] = useState<string | null>(null);
   const selected =
     options.selectedId === undefined ? picked : options.selectedId;
+  const worldWidth =
+    (process.env.EXPO_OS === "ios" ? rt.screen.width : 256) * 2 ** zoom;
   const clusters = useMemo(
-    () =>
-      clusterMapPins(
-        pins,
-        (process.env.EXPO_OS === "ios" ? rt.screen.width : 256) * 2 ** zoom,
-      ),
-    [pins, rt.screen.width, zoom],
+    () => clusterMapPins(pins, worldWidth),
+    [pins, worldWidth],
   );
   const choose = (id: string) => {
     setPicked(id);
@@ -74,5 +72,5 @@ export function useMapPinClusters(
   const trackZoom = (zoom: number | undefined) => {
     if (zoom !== undefined) setZoom(Math.floor(zoom * 4) / 4);
   };
-  return { markers, select, trackZoom, sheet };
+  return { markers, select, trackZoom, sheet, worldWidth };
 }

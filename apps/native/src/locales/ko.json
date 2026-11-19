@@ -1442,5 +1442,9 @@
   "passport.momentCityStamp": "%{city}에 가 봤어요",
   "passport.paywallHeadline": {
     "other": "여권에 도시 %{formattedCount}곳"
-  }
+  },
+  "mapSheet.summary": "%{saves} · %{places}",
+  "mapSheet.cardDetail": "%{places} · %{author}",
+  "mapSheet.savedHere": "여기서 저장",
+  "mapSheet.recentlySaved": "최근 저장"
 }

@@ -1516,5 +1516,9 @@
   "passport.paywallHeadline": {
     "one": "Your passport has %{formattedCount} city",
     "other": "Your passport has %{formattedCount} cities"
-  }
+  },
+  "mapSheet.summary": "%{saves} · %{places}",
+  "mapSheet.cardDetail": "%{places} · %{author}",
+  "mapSheet.savedHere": "Saved here",
+  "mapSheet.recentlySaved": "Recently saved"
 }

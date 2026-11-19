@@ -1590,5 +1590,9 @@
     "one": "Tu pasaporte tiene %{formattedCount} ciudad",
     "many": "Tu pasaporte tiene %{formattedCount} ciudades",
     "other": "Tu pasaporte tiene %{formattedCount} ciudades"
-  }
+  },
+  "mapSheet.summary": "%{saves} · %{places}",
+  "mapSheet.cardDetail": "%{places} · %{author}",
+  "mapSheet.savedHere": "Guardado aquí",
+  "mapSheet.recentlySaved": "Guardado recientemente"
 }

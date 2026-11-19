@@ -1442,5 +1442,9 @@
   "passport.momentCityStamp": "%{city}に行きました",
   "passport.paywallHeadline": {
     "other": "パスポートに%{formattedCount}都市"
-  }
+  },
+  "mapSheet.summary": "%{saves} · %{places}",
+  "mapSheet.cardDetail": "%{places} · %{author}",
+  "mapSheet.savedHere": "ここで保存",
+  "mapSheet.recentlySaved": "最近の保存"
 }

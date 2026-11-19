@@ -1,4 +1,5 @@
 import { analytics } from "@/lib/analytics";
+import { t } from "@/lib/i18n";
 import { isDarkThemeName } from "@/lib/appearance";
 import { appleZoom } from "@/lib/city-pins";
 import { moveCamera } from "@/lib/map-camera";
@@ -6,6 +7,18 @@ import { CITY_ZOOM } from "@/lib/map-city-zoom";
 import { hasPlaceNear } from "@/lib/map-filters";
 import { type MapPin } from "@/lib/map-pin-clusters";
 import { useMapPinClusters } from "@/lib/use-map-pin-clusters";
+import { MapClusterSheet } from "@/components/map/map-cluster-sheet";
+import {
+  groupStamps,
+  type MapStamp,
+  placeKey,
+  stampedPlaces,
+} from "@/lib/map-stamps";
+import {
+  type StampColors,
+  useStampCovers,
+  useStampIcons,
+} from "@/lib/stamp-icons";
 import { fitCamera } from "@/lib/trip";
 import type { LatLng } from "@convex/model/trip";
 import { AppleMaps, GoogleMaps } from "expo-maps";
@@ -50,7 +63,12 @@ type Props = {
   filterRevision?: number;
   onCentreChange?: (centre: LatLng, zoom: number) => void;
   onSelect: (id: string) => void;
+  stamps?: MapStamp[];
+  stampColors?: StampColors;
+  onSelectStamp?: (itemId: string) => void;
 };
+
+const NO_STAMPS: MapStamp[] = [];
 
 export function PlacesMap({
   pins,
@@ -66,6 +84,9 @@ export function PlacesMap({
   filterRevision = 0,
   onCentreChange,
   onSelect,
+  stamps = NO_STAMPS,
+  stampColors,
+  onSelectStamp,
 }: Props) {
   const { rt } = useUnistyles();
   const appleRef = useRef<AppleMaps.MapView>(null);
@@ -73,9 +94,48 @@ export function PlacesMap({
   // Whichever map this platform rendered.
   const map = () => appleRef.current ?? googleRef.current;
   const { width } = rt.screen;
-  const clustered = useMapPinClusters(pins, onSelect, {
+  const covers = useStampCovers(stamps);
+  const drawable = useMemo(
+    () => stamps.filter((stamp) => covers.has(stamp.cover)),
+    [stamps, covers],
+  );
+  const dots = useMemo(() => {
+    const stamped = stampedPlaces(drawable);
+    return stamped.size === 0
+      ? pins
+      : pins.filter((pin) => !stamped.has(placeKey(pin)));
+  }, [pins, drawable]);
+  const clustered = useMapPinClusters(dots, onSelect, {
     clearSelection: () => appleRef.current?.selectMarker(undefined),
   });
+  const stampGroups = useMemo(
+    () => groupStamps(drawable, clustered.worldWidth),
+    [drawable, clustered.worldWidth],
+  );
+  const stampIcon = useStampIcons(stampGroups, covers, stampColors);
+  const [stampSaves, setStampSaves] = useState<MapStamp[]>([]);
+  const stampMarkers = stampGroups.flatMap((group) => {
+    const icon = stampIcon(group);
+    return icon
+      ? [
+          {
+            id: group.id,
+            coordinates: { latitude: group.lat, longitude: group.lng },
+            title: "",
+            icon,
+            anchor: { x: 0.5, y: 0.5 },
+          },
+        ]
+      : [];
+  });
+  const pickStamp = (id: string | undefined) => {
+    const group = stampGroups.find((candidate) => candidate.id === id);
+    if (!group) return false;
+    void appleRef.current?.selectAnnotation(undefined);
+    if (group.saves.length > 1) setStampSaves(group.saves);
+    else onSelectStamp?.(group.itemId);
+    return true;
+  };
 
   const cameraFor = useCallback(
     (points: MapPin[]) => {
@@ -257,7 +317,9 @@ export function PlacesMap({
           togglePitchEnabled: false,
         }}
         markers={clustered.markers}
+        annotations={stampMarkers}
         onMarkerClick={(marker) => clustered.select(marker.id)}
+        onAnnotationClick={(annotation) => pickStamp(annotation.id)}
         onCameraMove={trackCamera}
       />
     ) : (
@@ -265,8 +327,10 @@ export function PlacesMap({
         ref={googleRef}
         style={styles.map}
         cameraPosition={firstCamera}
-        markers={clustered.markers}
-        onMarkerClick={(marker) => clustered.select(marker.id)}
+        markers={[...clustered.markers, ...stampMarkers]}
+        onMarkerClick={(marker) => {
+          if (!pickStamp(marker.id)) clustered.select(marker.id);
+        }}
         onCameraMove={trackCamera}
       />
     );
@@ -281,6 +345,17 @@ export function PlacesMap({
         {nativeMap}
       </View>
       {clustered.sheet}
+      <MapClusterSheet
+        title={t("trip.revealSaves", { count: stampSaves.length })}
+        pins={stampSaves.map((save) => ({
+          id: save.itemId,
+          name: save.title ?? t("homePlaces.untitled"),
+          lat: save.lat,
+          lng: save.lng,
+        }))}
+        onClose={() => setStampSaves([])}
+        onSelect={(itemId) => onSelectStamp?.(itemId)}
+      />
     </>
   );
 }
