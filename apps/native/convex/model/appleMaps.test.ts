@@ -476,7 +476,7 @@ describe("appleMapsFind", () => {
       poiCategory: "Hotel",
       coordinate: { latitude: 38.72, longitude: -9.14 },
     };
-    const find = (poiOnly: object[] | number) =>
+    const find = (poiOnly: object[] | number | string) =>
       appleMapsFind(
         "t",
         {
@@ -493,6 +493,8 @@ describe("appleMapsFind", () => {
           );
           if (filter === "Poi" && typeof poiOnly === "number")
             return new Response(null, { status: poiOnly });
+          if (filter === "Poi" && typeof poiOnly === "string")
+            return new Response(poiOnly);
           return Response.json({
             results: filter === "Poi" ? poiOnly : [restaurant],
           });
@@ -502,6 +504,7 @@ describe("appleMapsFind", () => {
     expect(await find([])).toMatchObject({ appleId: "restaurant" });
     expect(await find(503)).toBe(UNAVAILABLE);
     expect(await find(401)).toBeNull();
+    expect(await find("{")).toBe(UNAVAILABLE);
   });
 
   it("does not accept a physical feature as an extended branch venue", async () => {

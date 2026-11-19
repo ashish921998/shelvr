@@ -356,7 +356,7 @@ export async function appleMapsFind(
         return geographic ?? UNAVAILABLE;
       }
       body = await response.json().catch((error: unknown) => {
-        if (error instanceof SyntaxError) return null;
+        if (error instanceof SyntaxError && !saved?.strict) return null;
         throw error;
       });
     } catch (error) {
