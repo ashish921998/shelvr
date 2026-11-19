@@ -11,6 +11,7 @@ import { MapClusterSheet } from "@/components/map/map-cluster-sheet";
 import {
   groupStamps,
   type MapStamp,
+  type StampGroup,
   placeKey,
   stampedPlaces,
 } from "@/lib/map-stamps";
@@ -95,9 +96,17 @@ export function PlacesMap({
   const map = () => appleRef.current ?? googleRef.current;
   const { width } = rt.screen;
   const covers = useStampCovers(stamps);
-  const drawable = useMemo(
-    () => stamps.filter((stamp) => covers.has(stamp.cover)),
+  const solos = useMemo(
+    () =>
+      stamps
+        .filter((stamp) => covers.has(stamp.cover))
+        .map((stamp) => ({ ...stamp, saves: [stamp] })),
     [stamps, covers],
+  );
+  const soloIcon = useStampIcons(solos, covers, stampColors);
+  const drawable = useMemo(
+    () => solos.filter((solo) => soloIcon(solo) !== undefined),
+    [solos, soloIcon],
   );
   const dots = useMemo(() => {
     const stamped = stampedPlaces(drawable);
@@ -112,7 +121,10 @@ export function PlacesMap({
     () => groupStamps(drawable, clustered.worldWidth),
     [drawable, clustered.worldWidth],
   );
-  const stampIcon = useStampIcons(stampGroups, covers, stampColors);
+  const groupIcon = useStampIcons(stampGroups, covers, stampColors);
+  const stampIcon = (group: StampGroup) =>
+    groupIcon(group) ??
+    soloIcon(solos.find((solo) => solo.itemId === group.itemId)!);
   const [stampSaves, setStampSaves] = useState<MapStamp[]>([]);
   const stampMarkers = stampGroups.flatMap((group) => {
     const icon = stampIcon(group);

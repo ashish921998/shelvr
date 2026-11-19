@@ -7,7 +7,7 @@ import {
   type SkImage,
 } from "@shopify/react-native-skia";
 import { Image, type ImageRef } from "expo-image";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export type StampColors = { frame: string; badge: string; onBadge: string };
 
@@ -204,6 +204,9 @@ export function useStampIcons(
       live = false;
     };
   }, [groups, covers, colors]);
-  return (group: StampGroup) =>
-    colors ? icons.get(stampKey(group, colors)) : undefined;
+  return useCallback(
+    (group: StampGroup) =>
+      colors ? icons.get(stampKey(group, colors)) : undefined,
+    [icons, colors],
+  );
 }

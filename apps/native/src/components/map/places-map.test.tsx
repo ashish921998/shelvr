@@ -14,6 +14,7 @@ const mock = vi.hoisted(() => ({
   cluster: {} as Record<string, any>,
   stampSheet: {} as Record<string, any>,
   covers: new Map<string, string>(),
+  painted: true,
   selectAnnotation: vi.fn(),
   clearSelection: vi.fn(),
   findsPerson: false,
@@ -28,7 +29,7 @@ vi.mock("./map-cluster-sheet", () => ({
 }));
 vi.mock("@/lib/stamp-icons", () => ({
   useStampCovers: () => mock.covers,
-  useStampIcons: () => () => "stamp-icon",
+  useStampIcons: () => () => (mock.painted ? "stamp-icon" : undefined),
 }));
 
 vi.mock("expo-maps", () => ({
@@ -119,6 +120,7 @@ beforeEach(() => {
   mock.clearSelection.mockClear();
   mock.selectAnnotation.mockClear();
   mock.covers = new Map();
+  mock.painted = true;
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -513,7 +515,7 @@ it("opens a lone reel's save from its stamp", () => {
   expect(mock.selectAnnotation).toHaveBeenCalledWith(undefined);
 });
 
-it("keeps a reel's first place as a dot until its stamp cover loads", () => {
+it("keeps a reel's first place as a dot until its stamp is drawn", () => {
   const place = { id: "p", name: "tacos", lat: 30.26, lng: -97.74 };
   const renderMap = () => (
     <PlacesMap
@@ -534,6 +536,13 @@ it("keeps a reel's first place as a dot until its stamp cover loads", () => {
     ["p"],
   );
   loaded("tacos");
+  mock.painted = false;
+  rerender(renderMap());
+  expect(mock.props.annotations).toEqual([]);
+  expect(mock.props.markers.map((marker: { id: string }) => marker.id)).toEqual(
+    ["p"],
+  );
+  mock.painted = true;
   rerender(renderMap());
   expect(mock.props.annotations).toHaveLength(1);
   expect(mock.props.markers).toEqual([]);
