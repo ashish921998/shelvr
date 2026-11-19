@@ -23,6 +23,9 @@ almost no place reaches the minimum. Step 0 is what fills the map.
 
 ## Step 0 (now): a places table filled by hand
 
+Status: built (the table, both imports, `places:forMap` and Discover pins on the Map tab). No city is
+filled yet, and the Apple question at the end of this step is open.
+
 ### What the person sees
 
 The Map tab shows every place in the table as a "Discover" pin, beside and under the person's own
@@ -48,7 +51,6 @@ places: defineTable({
   addedAt: v.number(),
 })
   .index("by_status", ["status"])
-  .index("by_city_and_status", ["city", "status"])
   .index("by_apple_id", ["appleId"]),
 ```
 
@@ -85,17 +87,20 @@ and where we found the place.
 ### Filling it by hand
 
 Two internal actions, run with `pnpm exec convex run --prod`, both matching each place against Apple
-Maps through `appleMapsLookup` (`model/appleMaps.ts`) with the city as the clue. A place Apple does not
-find inside that city is skipped and reported, not stored. A place whose `appleId` is already in the
-table only gains the import's source, if it is not listed yet and the place has fewer than 3. Running
-an import twice adds nothing.
+Maps through `appleMapsLookup` (`model/appleMaps.ts`). Each first asks Apple where the city is. A match
+more than 80 km from that point (`keepNearby`), or no match, is skipped and listed in the result's
+`missed`, not stored. A place whose `appleId` is already in the table only gains the import's source,
+if it is not listed yet and the place has fewer than 3. Running an import twice adds nothing.
 
-- `places:addByName({ city, names: [...], source? })`: type or paste a list of names for one city,
-  with the reel they came from as `source`.
-- `places:importGoogleMapsList({ city, url })`: build the list in the Google Maps app, then paste its
-  share link. The list reader already exists (`model/readers/googleMaps.ts`, `fetchGoogleMapsList`).
-  Only the names are used: each place is looked up again in Apple, and Apple's point is stored, never
-  Google's. The list's link is stored as the source.
+- `places:addByName({ city, names: [...], source? })`: type or paste up to 100 names for one city,
+  with the reel they came from as `source`. Each name is looked up the way a save's pins are
+  (`lookUp` in `placePins.ts`).
+- `placesImport:importGoogleMapsList({ city, url })`: build the list in the Google Maps app, then paste
+  its share link. It sits in its own file because the list reader (`fetchGoogleMapsList`,
+  `model/readers/googleMaps.ts`) runs in the Node runtime, which cannot hold queries or mutations.
+  Each place is searched in Apple by name near Google's point and kept only when Apple's match is
+  within 300 m of it (`SAME_SPOT_KM`), as a saved list's pins are matched today. Apple's point and id
+  are stored, never Google's. The list's link is stored as the source.
 
 A row can also be edited or hidden in the Convex dashboard.
 
@@ -104,25 +109,33 @@ to 60 places each. With the Google Maps import, a city takes about an hour.
 
 ### Public functions
 
-- `places:forMap`: `authedQuery`, `args: {}`, returns the `live` rows (name, point, city, Apple id,
-  category, cuisine and kinds). It takes up to 3,000 rows, the cap `listMapPlaces` uses, and gains a
+- `places:forMap`: `authedQuery`, `args: {}`, returns the `live` rows (id, name, point, city, Apple
+  id, category, cuisine and kinds). It takes up to 3,000 rows, the cap `listMapPlaces` uses, and gains a
   `city` argument once the table outgrows that. It is a new function, so no `Convex-Api: changed`
   trailer.
 
 ### Client changes (OTA, no native change)
 
+- `src/lib/use-discover-places.ts` loads `places:forMap`. `discoverBeside` (`src/lib/map-discover.ts`)
+  drops a Discover place that is one of the person's own (same Apple id, or `samePlace`), so their
+  pin wins.
 - `src/app/(app)/(tabs)/(map)/index.tsx`:
-  - load `places:forMap` next to `listMapPlaces`
-  - drop a Discover pin that `samePlace` matches to one of the person's own (their pin wins)
-  - give Discover pins their own id, since `placeId` assumes an `itemId`
-  - in `select`, open the Apple place card, never `/item/[id]`
-  - show the empty state only when both lists are empty
-- `src/components/map/places-map.tsx`: a muted tint for Discover pins, with own pins drawn above.
-- `src/lib/map-filters.ts`: kind filters and search include Discover pins. The "went" switch covers
-  only the person's own pins.
-- `src/lib/city-pins.ts` / `framedPins`: frame on the person's own pins when they have any, otherwise
-  on their location, otherwise on the nearest filled city.
-- A "Discover" chip, copy in nine catalogs, and `map_opened` gains a `discover` count.
+  - `mapEntries` marks each entry `own` or `discover` and lists Discover first, so own pins are drawn
+    above
+  - Discover pins get the id `discover:<id>`, since `placeId` assumes an `itemId`, and a muted tint
+  - `select` opens Apple's place card for a Discover pin, never `/item/[id]`
+  - the empty state shows only when both lists are empty
+  - kind filters and search cover Discover pins. The "went" switch covers only the person's own, so
+    Discover pins hide while it is not on All
+  - the "Discover" chip shows only to someone with pins of their own. Without any, Discover pins are
+    all the map has
+- `src/components/map/places-map.tsx` takes `anchors`: the person's own pins when they have any,
+  otherwise the Discover pins. With location on, the camera opens on the person and stays if an
+  anchor is near. Otherwise, and without location, it frames the busiest city of the anchors, as it
+  did with own pins.
+- Copy in nine catalogs: the "Discover" chip, and the search field now reads "Search places".
+- Analytics: `map_opened` gains `discover` (Discover places shown), `map_place_opened` gains `source`,
+  and `map_discover_toggled` is new.
 
 ### Not in the first version
 
@@ -130,6 +143,8 @@ to 60 places each. With the Google Maps import, a city takes about an hour.
   made from the place itself, or adding it to a shared list (which already takes a place). Decide once
   people tap Discover pins.
 - **Discover pins on the city page map and on Home.** The Map tab first.
+- **Opening on the nearest filled city.** A new user far from every filled city opens on the busiest
+  one.
 - **City guides.** If we make them, they are a `guides` table and a `guideEntries` table (guide,
   position, place id, our text) that point at `places`, as Corner's do. The `places` table does not
   change.
