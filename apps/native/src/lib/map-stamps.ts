@@ -66,13 +66,14 @@ type Tagged = Place & { shown?: Place; stamp?: number; order?: number };
 
 export function shownStamps(
   stamps: readonly MapStamp[],
-  shown: readonly Place[],
+  mapped: readonly Place[],
+  shown: ReadonlySet<string>,
   known: readonly Place[] = [],
 ): MapStamp[] {
   const matches = stamps.map(() => new Map<number, Place>());
   uniquePlacePins<Tagged>(
     [
-      ...shown.map((place) => ({ ...place, shown: place })),
+      ...mapped.map((place) => ({ ...place, shown: place })),
       ...known,
       ...stamps.flatMap((stamp, index) =>
         stamp.pins.map((pin, order) => ({ ...pin, stamp: index, order })),
@@ -88,7 +89,8 @@ export function shownStamps(
   return stamps.flatMap((stamp, index) => {
     const found = [...matches[index]!]
       .sort(([a], [b]) => a - b)
-      .map(([, place]) => place);
+      .map(([, place]) => place)
+      .filter((place) => shown.has(placeKey(place)));
     const anchor = found[0];
     if (!anchor) return [];
     const places = [...new Set(found.map(placeKey))];

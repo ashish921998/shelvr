@@ -21,6 +21,7 @@ type Layout = {
 
 export function useCityStamps(
   city: string | undefined,
+  mapped: Place[],
   onMap: Place[],
   layout: Layout,
 ) {
@@ -35,10 +36,11 @@ export function useCityStamps(
     () =>
       shownStamps(
         reelStamps(saves),
-        onMap,
+        mapped,
+        new Set(onMap.map(placeKey)),
         saves.flatMap((save) => save.placePins ?? []),
       ),
-    [saves, onMap],
+    [saves, mapped, onMap],
   );
   const highlightedPlaces = useMemo(
     () =>
