@@ -48,7 +48,6 @@ vi.mock("@/lib/city-plan", () => ({
 vi.mock("@/lib/date", () => ({
   formatRecentDate: (time: number) => `day ${time}`,
 }));
-vi.mock("@/lib/stamp-icons", () => ({ stampTilt: () => 0 }));
 vi.mock("expo-image", () => ({ Image: vi.fn(() => null) }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: mock.push }) }));
 vi.mock("react-native", () => ({
@@ -84,7 +83,6 @@ const save = (id: string, time: number, places = 2) => ({
   url: `https://www.instagram.com/reel/${id}/`,
   title: `Reel ${id}`,
   imageUrl: `https://cdn.example/${id}.jpg`,
-  author: "beli_eats",
   placePins: Array.from({ length: places }, (_, index) => ({
     name: `${id}${index}`,
     lat: 40.7,
@@ -102,7 +100,6 @@ function sheet() {
       top={{ get: () => 400 } as never}
       bottomInset={0}
       onHeaderHeight={vi.fn()}
-      onCardsHeight={vi.fn()}
     />,
   );
 }
@@ -134,18 +131,13 @@ it("holds Go out while a plan is starting", () => {
   ).toBe(true);
 });
 
-it("shows each save as a card that opens it", () => {
+it("opens a recent save from its cover", () => {
   sheet();
-  fireEvent.click(
-    screen.getByRole("button", { name: "Reel old, 2 places · @beli_eats" }),
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Reel old, day 1" }));
   expect(mock.push).toHaveBeenCalledWith({
     pathname: "/item/[id]",
     params: { id: "old" },
   });
-  expect(
-    screen.getByRole("button", { name: "Reel new, @beli_eats" }),
-  ).toBeTruthy();
 });
 
 it("lists recent saves newest first with their dates", () => {
@@ -157,11 +149,8 @@ it("lists recent saves newest first with their dates", () => {
   expect(dated).toEqual(["Reel new, day 2", "Reel old, day 1"]);
 });
 
-it("opens the city page from See all", () => {
+it("shows no save cards and no See all row", () => {
   sheet();
-  fireEvent.click(screen.getByRole("button", { name: "See all" }));
-  expect(mock.push).toHaveBeenCalledWith({
-    pathname: "/city/[name]",
-    params: { name: "New York" },
-  });
+  expect(screen.queryByRole("button", { name: "See all" })).toBeNull();
+  expect(screen.queryByText("Saved here")).toBeNull();
 });

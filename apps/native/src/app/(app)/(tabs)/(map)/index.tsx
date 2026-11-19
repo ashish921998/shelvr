@@ -380,7 +380,6 @@ export default function MapScreen() {
           top={sheet.top}
           bottomInset={barHeight}
           onHeaderHeight={sheet.onHeaderHeight}
-          onCardsHeight={sheet.onCardsHeight}
         />
       ) : null}
     </View>

@@ -83,17 +83,16 @@ function useMapSheetLayout({
   insetTop,
 }: Layout & { show: boolean; reserve: boolean }) {
   const [header, setHeader] = useState(96);
-  const [cards, setCards] = useState(232);
   const snaps = useMemo(
     () =>
       sheetSnaps({
         height: mapHeight,
         insetTop,
         insetBottom: barHeight,
-        middle: mapHeight - barHeight - header - cards,
+        middle: mapHeight - barHeight - header,
         collapsedVisible: header,
       }),
-    [mapHeight, barHeight, header, cards, insetTop],
+    [mapHeight, barHeight, header, insetTop],
   );
   const top = useSharedValue(snaps.middle);
   useEffect(() => {
@@ -108,7 +107,6 @@ function useMapSheetLayout({
     top,
     aboveSheet,
     coveredBottom: reserve ? mapHeight - snaps.middle : barHeight,
-    onHeaderHeight: setHeader,
-    onCardsHeight: setCards,
+    onHeaderHeight: (height: number) => setHeader(Math.round(height)),
   };
 }

@@ -1302,8 +1302,6 @@ type MessageParams = {
   "passport.paywallHeadline": { count: number };
   "mapSheet.summary": { saves: string; places: string };
   "mapSheet.groupTitle": { name: string; count: number };
-  "mapSheet.cardDetail": { places: string; author: string };
-  "mapSheet.savedHere": undefined;
   "mapSheet.recentlySaved": undefined;
 };
 export type MessageKey = keyof MessageParams;

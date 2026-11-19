@@ -4,14 +4,8 @@ import type { SheetSnaps } from "@/lib/city-sheet";
 import { useCityPlan } from "@/lib/city-plan";
 import { formatRecentDate } from "@/lib/date";
 import { t, useAppLocale } from "@/lib/i18n";
-import {
-  citySummary,
-  recentSaves,
-  saveCardDetail,
-  type SheetSave,
-} from "@/lib/map-city-sheet";
-import { saveCover } from "@/lib/map-stamps";
-import { stampTilt } from "@/lib/stamp-icons";
+import { citySummary, recentSaves } from "@/lib/map-city-sheet";
+import { saveCover, type StampSave } from "@/lib/map-stamps";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import type { ReactNode } from "react";
@@ -23,17 +17,14 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet } from "react-native-unistyles";
 
-const SECTION_HEIGHT = 36;
-
 type Props = {
   city: string;
-  saves: SheetSave[];
+  saves: StampSave[];
   places: number;
   snaps: SheetSnaps;
   top: SharedValue<number>;
   bottomInset: number;
   onHeaderHeight: (height: number) => void;
-  onCardsHeight: (height: number) => void;
 };
 
 export function MapCitySheet({
@@ -44,22 +35,12 @@ export function MapCitySheet({
   top,
   bottomInset,
   onHeaderHeight,
-  onCardsHeight,
 }: Props) {
   useAppLocale();
   const router = useRouter();
   const plan = useCityPlan();
   const goingOut = plan.busy !== null;
   const recent = recentSaves(saves);
-  const pulledUp = useAnimatedStyle(() => {
-    const shown = interpolate(
-      top.get(),
-      [snaps.expanded, snaps.middle],
-      [1, 0],
-      "clamp",
-    );
-    return { height: shown * SECTION_HEIGHT, opacity: shown };
-  });
   const recentShown = useAnimatedStyle(() => ({
     opacity: interpolate(
       top.get(),
@@ -112,28 +93,6 @@ export function MapCitySheet({
           bounces={scroll.bounces}
           contentContainerStyle={{ paddingBottom: bottomInset }}
         >
-          <Animated.View style={[styles.sectionClip, pulledUp]}>
-            <Section
-              title={t("mapSheet.savedHere")}
-              action={t("common.seeAll")}
-              onAction={() =>
-                router.push({
-                  pathname: "/city/[name]",
-                  params: { name: city },
-                })
-              }
-            />
-          </Animated.View>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.row}
-            onLayout={(event) => onCardsHeight(event.nativeEvent.layout.height)}
-          >
-            {saves.map((save) => (
-              <SaveCard key={save._id} save={save} onPress={openSave} />
-            ))}
-          </ScrollView>
           {recent.length > 0 ? (
             <Animated.View style={recentShown}>
               <Section
@@ -189,7 +148,7 @@ function Cover({
   style,
   children,
 }: {
-  save: SheetSave;
+  save: StampSave;
   style: object;
   children?: ReactNode;
 }) {
@@ -209,44 +168,11 @@ function Cover({
   );
 }
 
-function SaveCard({
-  save,
-  onPress,
-}: {
-  save: SheetSave;
-  onPress: (id: string) => void;
-}) {
-  const title = save.title ?? t("homePlaces.untitled");
-  const detail = saveCardDetail(save);
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${title}, ${detail}`}
-      onPress={() => onPress(save._id)}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-    >
-      <Cover
-        save={save}
-        style={[
-          styles.cardCover,
-          { transform: [{ rotate: `${stampTilt(save._id) * 0.4}deg` }] },
-        ]}
-      />
-      <ThemedText variant="subheadStrong" numberOfLines={2}>
-        {title}
-      </ThemedText>
-      <ThemedText variant="caption" style={styles.muted} numberOfLines={1}>
-        {detail}
-      </ThemedText>
-    </Pressable>
-  );
-}
-
 function RecentCover({
   save,
   onPress,
 }: {
-  save: SheetSave;
+  save: StampSave;
   onPress: (id: string) => void;
 }) {
   const date = formatRecentDate(save._creationTime);
@@ -288,9 +214,8 @@ const styles = StyleSheet.create((theme) => ({
   },
   onTint: { color: theme.colors.onTint },
   pressed: { opacity: theme.opacity.pressed },
-  sectionClip: { overflow: "hidden" },
   section: {
-    height: SECTION_HEIGHT,
+    height: 36,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -303,20 +228,11 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.gap(2.5),
     paddingVertical: theme.gap(1),
   },
-  card: { width: 120, gap: theme.gap(0.5) },
   cover: {
     overflow: "hidden",
     backgroundColor: theme.colors.surfaceMuted,
     borderRadius: theme.radius.sm,
     borderCurve: "continuous",
-  },
-  cardCover: {
-    width: 120,
-    height: 150,
-    borderWidth: 3,
-    borderColor: theme.colors.frame,
-    borderRadius: 4,
-    marginBottom: theme.gap(0.5),
   },
   recent: { width: 68, height: 92, justifyContent: "flex-end" },
   dateScrim: {

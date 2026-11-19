@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { renderHook } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 
 import { useCityStamps } from "./use-map-city-sheet";
@@ -45,4 +45,15 @@ it("gives the room back when the city has no saves or the map has no places", ()
   expect(covered("New York").coveredBottom).toBe(layout.barHeight);
   mock.query = { data: undefined, isPending: true };
   expect(covered(undefined, []).coveredBottom).toBe(layout.barHeight);
+});
+
+it("keeps the sheet's rest point still when its header measures a sub-pixel apart", () => {
+  mock.query = { data: [{ _id: "a" }], isPending: false };
+  const { result } = renderHook(() =>
+    useCityStamps("New York", [place], layout),
+  );
+  act(() => result.current.sheet.onHeaderHeight(89));
+  const rest = result.current.sheet.snaps.middle;
+  act(() => result.current.sheet.onHeaderHeight(88.99997));
+  expect(result.current.sheet.snaps.middle).toBe(rest);
 });
