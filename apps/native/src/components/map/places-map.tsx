@@ -119,6 +119,8 @@ export function PlacesMap({
   const centredOnUser = useRef(false);
   const framedOnce = useRef(showsUser || firstCamera !== undefined);
   const touched = useRef(false);
+  const onFit = useRef(firstCamera !== undefined);
+  const fittedInset = useRef(bottomInset);
   const centre = useRef<LatLng | undefined>(undefined);
   const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Set while the camera travels to the person; once it rests, a map with none of their places in
@@ -138,6 +140,9 @@ export function PlacesMap({
       else
         map()
           ?.setCameraPosition(fit)
+          .then(() => {
+            onFit.current = true;
+          })
           .catch((error: unknown) =>
             analytics.captureError("places_map_camera_failed", error),
           );
@@ -173,6 +178,7 @@ export function PlacesMap({
     if (!focus) return;
     // A place the person picked wins over the opening check.
     checkNearby.current = undefined;
+    onFit.current = false;
     cancelOpening.current?.();
     return moveCamera(
       () =>
@@ -187,6 +193,7 @@ export function PlacesMap({
   useEffect(() => {
     if (!zoomOut) return;
     checkNearby.current = undefined;
+    onFit.current = false;
     cancelOpening.current?.();
     const camera = latest.current.overviewCamera;
     if (!camera) return;
@@ -199,6 +206,7 @@ export function PlacesMap({
   useEffect(() => {
     if (!locate) return;
     checkNearby.current = undefined;
+    onFit.current = false;
     cancelOpening.current?.();
     return moveCamera(
       () => map()?.setCameraPosition(),
@@ -214,10 +222,26 @@ export function PlacesMap({
     framedOnce.current = true;
     if (showsUser && hasPlaceNear(centre.current, latest.current.pins)) return;
     return moveCamera(
-      () => map()?.setCameraPosition(latest.current.fit ?? initialFit),
+      () =>
+        map()
+          ?.setCameraPosition(latest.current.fit ?? initialFit)
+          .then(() => {
+            onFit.current = true;
+          }),
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
   }, [canFrameLatePlaces, showsUser]);
+
+  useEffect(() => {
+    if (fittedInset.current === bottomInset) return;
+    fittedInset.current = bottomInset;
+    const { fit } = latest.current;
+    if (!onFit.current || touched.current || filterRevision > 0 || !fit) return;
+    return moveCamera(
+      () => map()?.setCameraPosition(fit),
+      (error) => analytics.captureError("places_map_camera_failed", error),
+    );
+  }, [bottomInset, filterRevision]);
 
   const trackCamera = (event: {
     coordinates: { latitude?: number; longitude?: number };
@@ -276,6 +300,7 @@ export function PlacesMap({
         style={styles.map}
         onTouchStart={() => {
           touched.current = true;
+          onFit.current = false;
         }}
       >
         {nativeMap}

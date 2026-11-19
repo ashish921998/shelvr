@@ -330,10 +330,45 @@ it("frames the first saved places once when the map opened empty without locatio
   await act(() => vi.advanceTimersByTimeAsync(200));
   expect(mock.moves).toHaveLength(2);
   expect(mock.moves[1]).not.toEqual(mock.moves[0]);
-  rerender(noLocation(AUSTIN.slice(0, 1)));
+  rerender(noLocation(AUSTIN.slice(0, 1), 170));
   await act(() => vi.advanceTimersByTimeAsync(200));
   expect(mock.moves).toHaveLength(2);
 });
+
+it.each([
+  ["refits", false, 1],
+  ["keeps the area the person moved to", true, 0],
+])(
+  "%s when the sheet covers more of the map after the first framing",
+  async (_name, touchedFirst, refits) => {
+    const opened = (bottomInset: number) => (
+      <PlacesMap
+        pins={AUSTIN}
+        framed={AUSTIN}
+        showsUser={false}
+        height={800}
+        topInset={100}
+        bottomInset={bottomInset}
+        onSelect={vi.fn()}
+      />
+    );
+    const { getByTestId, rerender } = render(opened(120));
+    const first = mock.props.cameraPosition as Camera;
+    expect(first).toBeDefined();
+    if (touchedFirst) fireEvent.touchStart(getByTestId("map-touch"));
+    rerender(opened(320));
+    await act(() => vi.advanceTimersByTimeAsync(200));
+    expect(mock.moves).toHaveLength(refits);
+    if (refits) {
+      const refit = mock.moves[0] as Camera & {
+        coordinates: { latitude: number };
+      };
+      expect(refit.coordinates.latitude).toBeLessThan(
+        (first.coordinates as { latitude: number }).latitude,
+      );
+    }
+  },
+);
 
 it.each([
   ["far from the person", AUSTIN, 1],
