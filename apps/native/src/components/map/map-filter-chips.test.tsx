@@ -92,3 +92,25 @@ it.each([
     unmount();
   },
 );
+
+it("shows the Discover chip first and toggles it", () => {
+  const onToggle = vi.fn();
+  const { rerender } = render(
+    <MapFilterChips
+      kinds={[]}
+      selected={null}
+      onSelect={vi.fn()}
+      discover={{ on: true, onToggle }}
+    />,
+  );
+  expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+    "✨ map.discover",
+    "map.filterAll",
+  ]);
+  expect(screen.getByLabelText("map.discover").ariaPressed).toBe("true");
+  fireEvent.click(screen.getByLabelText("map.discover"));
+  expect(onToggle).toHaveBeenCalledTimes(1);
+
+  rerender(<MapFilterChips kinds={[]} selected={null} onSelect={vi.fn()} />);
+  expect(screen.queryByLabelText("map.discover")).toBeNull();
+});
