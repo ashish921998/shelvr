@@ -58,7 +58,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.gap(1.5),
   },
   tile: {
-    minWidth: 68,
+    minWidth: theme.gap(8.5),
     alignItems: "center",
     gap: theme.gap(0.25),
     paddingVertical: theme.gap(0.5),
@@ -66,12 +66,12 @@ const styles = StyleSheet.create((theme) => ({
   dimmed: { opacity: 0.55 },
   pressed: { opacity: theme.opacity.pressed },
   emoji: {
-    fontSize: 32,
-    lineHeight: 40,
+    ...theme.type.displayTitle,
+    lineHeight: theme.gap(5),
   },
   labelBox: {
     paddingHorizontal: theme.gap(0.75),
-    paddingVertical: 2,
+    paddingVertical: theme.gap(0.25),
     borderRadius: theme.radius.xl,
     borderCurve: "continuous",
   },
