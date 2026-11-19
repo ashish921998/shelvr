@@ -22,12 +22,16 @@ import {
   busiestCityPlaces,
   filterPlaces,
   mapFilters,
-  searchPlaces,
   topSearchResults,
   type WentFilter,
   wentView,
 } from "@/lib/map-filters";
-import { type MapEntry, mapEntries, ownOnTop } from "@/lib/map-discover";
+import {
+  type MapEntry,
+  mapEntries,
+  ownOnTop,
+  searchEntries,
+} from "@/lib/map-discover";
 import { useMapLocation } from "@/lib/map-location";
 import { placeEmoji } from "@/lib/map-pin-emoji";
 import { useDiscoverPlaces } from "@/lib/use-discover-places";
@@ -127,7 +131,7 @@ export default function MapScreen() {
   const searching = searchText.trim() !== "";
   // Search narrows whatever the filter shows; every match stays on the map, the first few are listed.
   const matches = useMemo(
-    () => (searching ? searchPlaces(shown, searchText) : shown),
+    () => (searching ? searchEntries(shown, searchText) : shown),
     [searching, shown, searchText],
   );
   const pins: MapPin[] = useMemo(

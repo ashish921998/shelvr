@@ -265,15 +265,14 @@ function firstSavedPlace(
   includeCity: boolean,
   saved: SavedLookup,
   filter: string,
-): FoundPlace | null {
+): [FoundPlace | null, FoundPlace | null] {
   const pick = (lookup: SavedLookup) =>
     firstPlace(body, near, false, includeCity, (place) =>
       preferredSavedPlace(place, lookup, filter),
     );
-  return (
-    (saved.strict ? pick({ ...saved, hasBranchClue: false }) : null) ??
-    pick(saved)
-  );
+  return saved.strict
+    ? [pick({ ...saved, hasBranchClue: false }), pick(saved)]
+    : [pick(saved), null];
 }
 
 const countrySchema = z.object({
@@ -344,16 +343,16 @@ export async function appleMapsFind(
       ? ["Poi,Address", "Poi"]
       : [""];
   let ranked: FoundPlace | null = null;
-  let geographic: FoundPlace | null = null;
+  let named: FoundPlace | null = null;
   for (const filter of filters) {
     if (filter) params.set("resultTypeFilter", filter);
     let body: unknown;
     try {
       const response = await appleGet(accessToken, path, params, fetchImpl);
       if (!response.ok) {
-        if (!isTemporary(response.status)) return geographic ?? ranked;
+        if (!isTemporary(response.status)) return named ?? ranked;
         reportUnavailable(path, { status: response.status });
-        return geographic ?? UNAVAILABLE;
+        return named ?? UNAVAILABLE;
       }
       body = await response.json().catch((error: unknown) => {
         if (error instanceof SyntaxError) return null;
@@ -361,19 +360,20 @@ export async function appleMapsFind(
       });
     } catch (error) {
       reportUnavailable(path, { error });
-      return geographic ?? UNAVAILABLE;
+      return named ?? UNAVAILABLE;
     }
     const mixed = filter === "Poi,Address";
     const matches = saved
       ? (place: z.infer<typeof placeSchema>) =>
           matchesSavedPlace(place, saved, filter)
       : undefined;
-    const found = saved
+    const [found, branch] = saved
       ? firstSavedPlace(body, near, includeCity, saved, filter)
-      : firstPlace(body, near, path === "search", includeCity);
+      : [firstPlace(body, near, path === "search", includeCity), null];
     if (found) return found;
+    named ??= branch;
     if (saved && mixed && !saved.strict) {
-      geographic = firstPlace(body, near, false, includeCity, matches);
+      named = firstPlace(body, near, false, includeCity, matches);
       if (saved.target === "place")
         ranked = firstPlace(body, near, true, includeCity, isRankedPoi);
     }
@@ -386,10 +386,10 @@ export async function appleMapsFind(
         (place) =>
           !!place.poiCategory && hasExtendedVenueName(place.name, saved.name),
       );
-      return geographic ?? extended;
+      return named ?? extended;
     }
   }
-  return geographic ?? ranked;
+  return named ?? ranked;
 }
 
 export async function appleMapsLookup(

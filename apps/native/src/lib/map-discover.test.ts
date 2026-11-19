@@ -5,8 +5,9 @@ import {
   discoverBeside,
   mapEntries,
   ownOnTop,
+  searchEntries,
 } from "./map-discover";
-import { searchPlaces, topSearchResults } from "./map-filters";
+import { topSearchResults } from "./map-filters";
 
 const discover = (
   name: string,
@@ -65,9 +66,22 @@ it("keeps everything with no own pins", () => {
 it("lists the person's own match first in search, even when Discover places fill the results", () => {
   const own = [{ name: "Cafe Mine", lat: 1, lng: 1 }];
   const many = Array.from({ length: 6 }, (_, i) => discover(`Cafe ${i}`, 2, 2));
-  const top = topSearchResults(searchPlaces(mapEntries(own, many), "cafe"));
+  const top = topSearchResults(searchEntries(mapEntries(own, many), "cafe"));
   expect(top).toHaveLength(5);
   expect(top[0]).toMatchObject({ name: "Cafe Mine", source: "own" });
+});
+
+it("lists the person's own match before Discover places whose names start with the search", () => {
+  const own = [{ name: "Little Jo", lat: 1, lng: 1 }];
+  const many = Array.from({ length: 6 }, (_, i) => discover(`Jo ${i}`, 2, 2));
+  const top = topSearchResults(searchEntries(mapEntries(own, many), "jo"));
+  expect(top[0]).toMatchObject({ name: "Little Jo", source: "own" });
+  expect(top.slice(1).map((entry) => entry.name)).toEqual([
+    "Jo 0",
+    "Jo 1",
+    "Jo 2",
+    "Jo 3",
+  ]);
 });
 
 it("draws Discover pins first, so the person's own pins sit on top", () => {

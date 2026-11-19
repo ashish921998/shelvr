@@ -1,6 +1,7 @@
 import type { api } from "@convex/_generated/api";
 import { samePlace } from "@convex/model/placeIdentity";
 import type { FunctionReturnType } from "convex/server";
+import { searchPlaces } from "./map-filters";
 
 export type DiscoverPlace = FunctionReturnType<
   typeof api.places.forMap
@@ -43,6 +44,16 @@ export function mapEntries<O extends object>(
   return [
     ...own.map((place) => ({ ...place, source: "own" as const })),
     ...discover.map((place) => ({ ...place, source: "discover" as const })),
+  ];
+}
+
+export function searchEntries<
+  T extends { source: "own" | "discover"; name: string; city?: string },
+>(entries: readonly T[], query: string): T[] {
+  const matches = searchPlaces(entries, query);
+  return [
+    ...matches.filter((entry) => entry.source === "own"),
+    ...matches.filter((entry) => entry.source === "discover"),
   ];
 }
 

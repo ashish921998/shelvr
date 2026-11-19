@@ -463,6 +463,43 @@ describe("appleMapsFind", () => {
     ).toMatchObject({ appleId: "hotel" });
   });
 
+  it("takes an exact venue from the venue-only search over a longer name from the first search", async () => {
+    const restaurant = {
+      name: "Hotel Avenida Restaurant",
+      id: "restaurant",
+      poiCategory: "Restaurant",
+      coordinate: { latitude: 38.7201, longitude: -9.1401 },
+    };
+    const hotel = {
+      name: "Hotel Avenida",
+      id: "hotel",
+      poiCategory: "Hotel",
+      coordinate: { latitude: 38.72, longitude: -9.14 },
+    };
+    const find = (poiOnly: object[]) =>
+      appleMapsFind(
+        "t",
+        {
+          target: "place",
+          name: "Hotel Avenida",
+          hasBranchClue: true,
+          strict: true,
+        },
+        "Hotel Avenida, Lisbon",
+        undefined,
+        vi.fn(async (input: Parameters<typeof fetch>[0]) => {
+          const filter = new URL(String(input)).searchParams.get(
+            "resultTypeFilter",
+          );
+          return Response.json({
+            results: filter === "Poi" ? poiOnly : [restaurant],
+          });
+        }),
+      );
+    expect(await find([restaurant, hotel])).toMatchObject({ appleId: "hotel" });
+    expect(await find([])).toMatchObject({ appleId: "restaurant" });
+  });
+
   it("does not accept a physical feature as an extended branch venue", async () => {
     const fetchImpl = vi.fn(async (input: Parameters<typeof fetch>[0]) => {
       const filter = new URL(String(input)).searchParams.get(
