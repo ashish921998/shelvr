@@ -1,7 +1,8 @@
 import { linkSource } from "@convex/model/externalUrl";
+import { uniquePlacePins } from "@convex/model/trip";
 import { clusterMapPins } from "@/lib/map-pin-clusters";
 
-type Place = { name: string; lat: number; lng: number };
+type Place = { name: string; lat: number; lng: number; appleId?: string };
 
 export type StampSave = {
   _id: string;
@@ -22,6 +23,7 @@ export type MapStamp = {
   count: number;
   title?: string;
   places: string[];
+  pins: Place[];
   newest: number;
 };
 
@@ -53,17 +55,43 @@ export function reelStamps(saves: readonly StampSave[]): MapStamp[] {
         count: save.placePins!.length,
         title: save.title,
         places: save.placePins!.map(placeKey),
+        pins: save.placePins!,
         newest: save._creationTime,
       },
     ];
   });
 }
 
+type Tagged = Place & { shown?: Place; stamp?: number; order?: number };
+
 export function shownStamps(
   stamps: readonly MapStamp[],
-  shown: ReadonlySet<string>,
+  shown: readonly Place[],
 ): MapStamp[] {
-  return stamps.filter((stamp) => stamp.places.some((key) => shown.has(key)));
+  const matches = stamps.map(() => new Map<number, Place>());
+  uniquePlacePins<Tagged>(
+    [
+      ...shown.map((place) => ({ ...place, shown: place })),
+      ...stamps.flatMap((stamp, index) =>
+        stamp.pins.map((pin, order) => ({ ...pin, stamp: index, order })),
+      ),
+    ],
+    (kept, repeat) => {
+      if (kept.shown && repeat.stamp !== undefined) {
+        matches[repeat.stamp]!.set(repeat.order!, kept.shown);
+      }
+      return kept;
+    },
+  );
+  return stamps.flatMap((stamp, index) => {
+    const found = [...matches[index]!]
+      .sort(([a], [b]) => a - b)
+      .map(([, place]) => place);
+    const anchor = found[0];
+    if (!anchor) return [];
+    const places = [...new Set(found.map(placeKey))];
+    return [{ ...stamp, lat: anchor.lat, lng: anchor.lng, places }];
+  });
 }
 
 export function stampedPlaces(stamps: readonly MapStamp[]): Set<string> {

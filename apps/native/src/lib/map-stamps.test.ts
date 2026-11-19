@@ -51,8 +51,37 @@ it("stamps only reels that have a cover and a place", () => {
 
 it("hides a stamp only when the filter hides every one of its places", () => {
   const stamps = reelStamps([save({})]);
-  expect(shownStamps(stamps, new Set([placeKey(park)]))).toHaveLength(1);
-  expect(shownStamps(stamps, new Set())).toHaveLength(0);
+  expect(shownStamps(stamps, [park])).toHaveLength(1);
+  expect(shownStamps(stamps, [])).toHaveLength(0);
+});
+
+it("moves a stamp to its first place still shown when the filter hides the first", () => {
+  const [stamp] = shownStamps(reelStamps([save({})]), [park]);
+  expect(stamp).toMatchObject({
+    lat: park.lat,
+    lng: park.lng,
+    places: [placeKey(park)],
+  });
+});
+
+it("stamps each reel at the shown venue the map kept for a place they share", () => {
+  const kept = { ...bar, appleId: "apple-bar" };
+  const stamps = shownStamps(
+    reelStamps([
+      save({ _id: "a", placePins: [{ ...bar, appleId: "apple-bar" }] }),
+      save({
+        _id: "b",
+        placePins: [{ ...bar, lat: bar.lat + 0.0001, appleId: "apple-bar" }],
+      }),
+    ]),
+    [kept],
+  );
+  expect(
+    stamps.map((stamp) => [stamp.itemId, stamp.lat, stamp.places]),
+  ).toEqual([
+    ["a", bar.lat, [placeKey(kept)]],
+    ["b", bar.lat, [placeKey(kept)]],
+  ]);
 });
 
 it("leaves only the stamped first place out of the dots", () => {

@@ -17,8 +17,42 @@ const FRAME = { x: 10, y: 3, width: 28, height: 38 };
 const BORDER = 2.5;
 const BADGE = { x: 39, y: 41, radius: 8 };
 
+const COVER = {
+  width: FRAME.width - BORDER * 2,
+  height: FRAME.height - BORDER * 2,
+};
+const MAX_COVERS = 60;
+const MAX_ICONS = 120;
+const COVER_TIMEOUT_MS = 15_000;
+
 const painted = new Map<string, Promise<ImageRef | null>>();
 const decoded = new Map<string, Promise<SkImage | null>>();
+
+function remember<T>(
+  cache: Map<string, T>,
+  key: string,
+  value: T,
+  max: number,
+) {
+  cache.delete(key);
+  cache.set(key, value);
+  for (const oldest of cache.keys()) {
+    if (cache.size <= max) break;
+    cache.delete(oldest);
+  }
+}
+
+function keep<T>(
+  previous: ReadonlyMap<string, T>,
+  wanted: ReadonlySet<string>,
+  key: string,
+  value: T,
+): ReadonlyMap<string, T> {
+  const stale = [...previous.keys()].some((known) => !wanted.has(known));
+  if (!stale && previous.get(key) === value) return previous;
+  const next = new Map([...previous].filter(([known]) => wanted.has(known)));
+  return next.set(key, value);
+}
 
 export function stampTilt(itemId: string): number {
   let hash = 0;
@@ -47,9 +81,14 @@ function drawFrame(canvas: SkCanvas, color: string) {
   );
 }
 
-function drawCover(canvas: SkCanvas, cover: SkImage) {
-  const width = FRAME.width - BORDER * 2;
-  const height = FRAME.height - BORDER * 2;
+function drawCover(
+  canvas: SkCanvas,
+  cover: SkImage,
+  x = FRAME.x + BORDER,
+  y = FRAME.y + BORDER,
+  width = COVER.width,
+  height = COVER.height,
+) {
   const scale = Math.min(cover.width() / width, cover.height() / height);
   const srcWidth = width * scale;
   const srcHeight = height * scale;
@@ -61,7 +100,7 @@ function drawCover(canvas: SkCanvas, cover: SkImage) {
       srcWidth,
       srcHeight,
     ),
-    Skia.XYWHRect(FRAME.x + BORDER, FRAME.y + BORDER, width, height),
+    Skia.XYWHRect(x, y, width, height),
     Skia.Paint(),
   );
 }
@@ -90,18 +129,45 @@ function drawBadge(canvas: SkCanvas, label: string, colors: StampColors) {
   );
 }
 
+function shrink(image: SkImage | null): SkImage | null {
+  const width = COVER.width * SCALE;
+  const height = COVER.height * SCALE;
+  const surface = image && Skia.Surface.Make(width, height);
+  if (!surface) return null;
+  drawCover(surface.getCanvas(), image, 0, 0, width, height);
+  surface.flush();
+  return surface.makeImageSnapshot().makeNonTextureImage();
+}
+
+function load(uri: string) {
+  return new Promise<SkImage | null>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error("cover timed out")),
+      COVER_TIMEOUT_MS,
+    );
+    Skia.Data.fromURI(uri)
+      .then((data) => resolve(shrink(Skia.Image.MakeImageFromEncoded(data))))
+      .catch(reject)
+      .finally(() => clearTimeout(timer));
+  });
+}
+
 function decode(uri: string): Promise<SkImage | null> {
-  let image = decoded.get(uri);
-  if (!image) {
-    image = Skia.Data.fromURI(uri)
-      .then((data) => Skia.Image.MakeImageFromEncoded(data))
-      .catch((error: unknown) => {
-        analytics.captureError("map_stamp_cover_failed", error);
-        decoded.delete(uri);
-        return null;
-      });
-    decoded.set(uri, image);
+  const cached = decoded.get(uri);
+  if (cached) {
+    remember(decoded, uri, cached, MAX_COVERS);
+    return cached;
   }
+  const image = load(uri)
+    .catch((error: unknown) => {
+      analytics.captureError("map_stamp_cover_failed", error);
+      return null;
+    })
+    .then((result) => {
+      if (!result) decoded.delete(uri);
+      return result;
+    });
+  remember(decoded, uri, image, MAX_COVERS);
   return image;
 }
 
@@ -111,14 +177,11 @@ export function useStampCovers(stamps: readonly MapStamp[]) {
   );
   useEffect(() => {
     let live = true;
-    for (const uri of new Set(stamps.map((stamp) => stamp.cover))) {
+    const uris = new Set(stamps.map((stamp) => stamp.cover));
+    for (const uri of uris) {
       void decode(uri).then((image) => {
         if (!live || !image) return;
-        setCovers((previous) =>
-          previous.get(uri) === image
-            ? previous
-            : new Map(previous).set(uri, image),
-        );
+        setCovers((previous) => keep(previous, uris, uri, image));
       });
     }
     return () => {
@@ -178,26 +241,26 @@ export function useStampIcons(
   useEffect(() => {
     let live = true;
     if (!colors) return;
+    const keys = new Set(groups.map((group) => stampKey(group, colors)));
     for (const group of groups) {
       const cover = covers.get(group.cover);
       if (!cover) continue;
       const key = stampKey(group, colors);
-      if (!painted.has(key))
-        painted.set(
-          key,
-          paint(group, cover, colors).catch((error: unknown) => {
+      const icon =
+        painted.get(key) ??
+        paint(group, cover, colors)
+          .catch((error: unknown) => {
             analytics.captureError("map_stamp_paint_failed", error);
-            painted.delete(key);
             return null;
-          }),
-        );
-      void painted.get(key)!.then((icon) => {
+          })
+          .then((result) => {
+            if (!result) painted.delete(key);
+            return result;
+          });
+      remember(painted, key, icon, MAX_ICONS);
+      void icon.then((icon) => {
         if (!live || !icon) return;
-        setIcons((previous) =>
-          previous.get(key) === icon
-            ? previous
-            : new Map(previous).set(key, icon),
-        );
+        setIcons((previous) => keep(previous, keys, key, icon));
       });
     }
     return () => {

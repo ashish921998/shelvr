@@ -31,18 +31,20 @@ export function useCityStamps(
   const saves = items.data ?? NO_SAVES;
   const placeCount = useMemo(() => cityPins(saves).length, [saves]);
   const [highlighted, setHighlighted] = useState<string | null>(null);
+  const stamps = useMemo(
+    () => shownStamps(reelStamps(saves), onMap),
+    [saves, onMap],
+  );
   const highlightedPlaces = useMemo(
     () =>
       new Set(
-        saves
-          .find((save) => save._id === highlighted)
-          ?.placePins?.map(placeKey) ?? [],
+        stamps.find((stamp) => stamp.itemId === highlighted)?.places ??
+          saves
+            .find((save) => save._id === highlighted)
+            ?.placePins?.map(placeKey) ??
+          [],
       ),
-    [saves, highlighted],
-  );
-  const stamps = useMemo(
-    () => shownStamps(reelStamps(saves), new Set(onMap.map(placeKey))),
-    [saves, onMap],
+    [stamps, saves, highlighted],
   );
   const stampColors = useMemo(
     () => ({

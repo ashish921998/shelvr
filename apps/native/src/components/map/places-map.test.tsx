@@ -481,6 +481,7 @@ const reel = (itemId: string, newest: number, lng = -97.74) => ({
   count: 2,
   title: itemId,
   places: [`${itemId}:30.26:${lng}`],
+  pins: [{ name: itemId, lat: 30.26, lng }],
   newest,
 });
 
