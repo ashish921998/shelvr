@@ -43,6 +43,7 @@ places: defineTable({
   appleId: v.string(),          // required: every row is matched to an Apple place
   category: v.optional(v.string()),
   cuisine: v.optional(cuisineValidator),
+  sources: v.optional(v.array(v.object({ url: v.string() }))), // capped at 3
   status: v.union(v.literal("live"), v.literal("hidden")),
   addedAt: v.number(),
 })
@@ -51,21 +52,50 @@ places: defineTable({
   .index("by_apple_id", ["appleId"]),
 ```
 
+`sources` holds the reels or Google Maps lists we took the place from. After 200 places typed in by
+hand, nobody remembers which reel each came from, so it is recorded at import. It is the shape step 2
+needs: step 2 adds optional `platform` and `creator` to each source. `places:forMap` does not return
+it.
+
 It holds no user id and nothing from anyone's save, so the account deletion drain, `liveOwner` and
 `aiAllowed` do not apply. Removing a place sets `hidden`.
+
+### Why the table is this small
+
+Corner, a social places app, keeps one row per place with its own id, Google's place id as a
+reference, and one row per person per place with a status (`want to try`, `visited`, `fav`, `okay`,
+`dislike`). Its city guides point at places by id. Its place rows also carry hours, phone, website,
+reservation links, photos, an address and several descriptions, because Corner draws its own place
+page. (From its public pages and a Codex inspection of a 456-place Lisbon list, 2026-11-19.)
+
+We open Apple's place card instead, which shows all of that and keeps it current. So `places` stores
+only what puts a pin on the map and what Apple cannot give us: our city, the kinds the filters use,
+and where we found the place.
+
+- **Other fields wait for the screen that shows them.** Adding an optional field later deploys
+  cleanly. Removing one that rows store is the one-way door in `CLAUDE.md`. Even Corner fills its
+  extras unevenly: a neighborhood on 35 of the 456 places, finer categories on 118.
+- **`appleId` stays required.** Every row comes from an Apple lookup, and a tap needs it to open the
+  card. Loosening it to optional when a second provider (Mapbox, Foursquare) arrives deploys cleanly.
+  Tightening it later would fail on the first row without one.
+- **Visits stay rows, not a list on the user.** `placeVisits` already keeps one row per person per
+  place (`by_user_and_key`), as Corner keeps one row per person per place. An opinion (okay,
+  favourite), if we ever add one, is a field on that row.
 
 ### Filling it by hand
 
 Two internal actions, run with `pnpm exec convex run --prod`, both matching each place against Apple
 Maps through `appleMapsLookup` (`model/appleMaps.ts`) with the city as the clue. A place Apple does not
 find inside that city is skipped and reported, not stored. A place whose `appleId` is already in the
-table is skipped, so running an import twice adds nothing.
+table only gains the import's source, if it is not listed yet and the place has fewer than 3. Running
+an import twice adds nothing.
 
-- `places:addByName({ city, names: [...] })`: type or paste a list of names for one city.
+- `places:addByName({ city, names: [...], source? })`: type or paste a list of names for one city,
+  with the reel they came from as `source`.
 - `places:importGoogleMapsList({ city, url })`: build the list in the Google Maps app, then paste its
   share link. The list reader already exists (`model/readers/googleMaps.ts`, `fetchGoogleMapsList`).
   Only the names are used: each place is looked up again in Apple, and Apple's point is stored, never
-  Google's.
+  Google's. The list's link is stored as the source.
 
 A row can also be edited or hidden in the Convex dashboard.
 
@@ -100,6 +130,9 @@ to 60 places each. With the Google Maps import, a city takes about an hour.
   made from the place itself, or adding it to a shared list (which already takes a place). Decide once
   people tap Discover pins.
 - **Discover pins on the city page map and on Home.** The Map tab first.
+- **City guides.** If we make them, they are a `guides` table and a `guideEntries` table (guide,
+  position, place id, our text) that point at `places`, as Corner's do. The `places` table does not
+  change.
 
 ### Metric
 
@@ -300,9 +333,9 @@ The decision on step 2 rests on the empty-map measure under "Measure first", not
 ## Step 2: curated reel-sourced places
 
 Since step 0, this step no longer needs its own `editorialPlaces` table: reel places go into the
-`places` table, with an optional `sources` field for the reel links. The design below predates
-that decision, and the rest of it (reading reels through the pipeline, no hosted media, the terms
-questions) still applies.
+`places` table, and step 2 adds optional `platform` and `creator` to each of its `sources`. The
+design below predates that decision, and the rest of it (reading reels through the pipeline, no
+hosted media, the terms questions) still applies.
 
 ### What the person sees
 
