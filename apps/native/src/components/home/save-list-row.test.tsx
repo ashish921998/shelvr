@@ -52,30 +52,6 @@ vi.mock("expo-image", () => ({
   )),
 }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: mocks.push }) }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { colors: {} } }),
-}));
-vi.mock("react-native", () => ({
-  View: vi.fn(({ children }: { children: ReactNode }) => (
-    <section>{children}</section>
-  )),
-  Pressable: vi.fn(
-    ({
-      children,
-      onPress,
-      accessibilityLabel,
-    }: {
-      children: ReactNode;
-      onPress: () => void;
-      accessibilityLabel?: string;
-    }) => (
-      <button onClick={onPress} aria-label={accessibilityLabel}>
-        {children}
-      </button>
-    ),
-  ),
-}));
 
 const save = (overrides: Record<string, unknown> = {}) =>
   ({

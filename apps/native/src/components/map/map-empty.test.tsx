@@ -11,28 +11,6 @@ vi.mock("@/components/ui/themed-text", () => ({
     <span>{children}</span>
   )),
 }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}), hairlineWidth: 1 },
-  useUnistyles: () => ({ theme: { colors: { foreground: "#000" } } }),
-}));
-vi.mock("react-native", () => ({
-  View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
-  Pressable: vi.fn(
-    ({
-      children,
-      onPress,
-      accessibilityLabel,
-    }: {
-      children: ReactNode;
-      onPress: () => void;
-      accessibilityLabel: string;
-    }) => (
-      <button aria-label={accessibilityLabel} onClick={onPress}>
-        {children}
-      </button>
-    ),
-  ),
-}));
 
 it("explains the empty map and offers the person's location when it is on", () => {
   const onLocate = vi.fn();

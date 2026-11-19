@@ -6,7 +6,7 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { type ReactNode, forwardRef, useImperativeHandle } from "react";
+import { forwardRef, useImperativeHandle } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { CityMap } from "@/components/city/city-map";
 import { TripPlannerMap } from "@/components/trip-planner/trip-planner-map";
@@ -69,13 +69,6 @@ vi.mock("react-native-unistyles", () => ({
     },
     rt: { themeName: "light", screen: { width: 390 }, insets: { top: 0 } },
   }),
-}));
-vi.mock("react-native", () => ({
-  Platform: { OS: "ios" },
-  View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
-  ScrollView: vi.fn(({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  )),
 }));
 
 const cityPins = [

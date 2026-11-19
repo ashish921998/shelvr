@@ -46,6 +46,15 @@ vi.mock("expo-localization", () => ({
   getCalendars: () => [{ timeZone: "UTC" }],
 }));
 
+vi.mock(
+  "react-native",
+  async () => (await import("./test-native")).reactNative,
+);
+vi.mock(
+  "react-native-unistyles",
+  async () => (await import("./test-native")).unistyles,
+);
+
 afterEach(async () => {
   if (typeof document === "undefined") return;
   const { cleanup } = await import("@testing-library/react");

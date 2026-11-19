@@ -59,29 +59,9 @@ vi.mock("@/components/ui/button", () => ({
     ),
   ),
 }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { colors: { muted: "#999" } } }),
-}));
-vi.mock("react-native", () => ({
+vi.mock("react-native", async () => ({
+  ...(await import("@/test-native")).reactNative,
   Alert: { alert: mocks.alert },
-  TextInput: vi.fn(
-    ({
-      accessibilityLabel,
-      value,
-      onChangeText,
-    }: {
-      accessibilityLabel: string;
-      value: string;
-      onChangeText: (text: string) => void;
-    }) => (
-      <input
-        aria-label={accessibilityLabel}
-        value={value}
-        onChange={(event) => onChangeText(event.target.value)}
-      />
-    ),
-  ),
 }));
 
 const stop = {

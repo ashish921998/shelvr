@@ -29,48 +29,6 @@ vi.mock("@/components/ui/header-icon-button", () => ({
     <button aria-label={label} />
   )),
 }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}), hairlineWidth: 1 },
-  useUnistyles: () => ({
-    theme: { colors: { foreground: "#000", muted: "#888" } },
-    rt: { insets: { top: 0 } },
-  }),
-}));
-vi.mock("react-native", () => ({
-  View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
-  TextInput: vi.fn(
-    ({
-      value,
-      onChangeText,
-      accessibilityLabel,
-    }: {
-      value: string;
-      onChangeText: (text: string) => void;
-      accessibilityLabel: string;
-    }) => (
-      <input
-        aria-label={accessibilityLabel}
-        value={value}
-        onChange={(event) => onChangeText(event.target.value)}
-      />
-    ),
-  ),
-  Pressable: vi.fn(
-    ({
-      children,
-      onPress,
-      accessibilityLabel,
-    }: {
-      children: ReactNode;
-      onPress: () => void;
-      accessibilityLabel: string;
-    }) => (
-      <button aria-label={accessibilityLabel} onClick={onPress}>
-        {children}
-      </button>
-    ),
-  ),
-}));
 
 function Harness({
   city,

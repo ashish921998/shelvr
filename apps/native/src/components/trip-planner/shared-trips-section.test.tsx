@@ -35,14 +35,6 @@ vi.mock("convex/react", () => ({
     return { results: [{ _id: "trip" }], status: "Exhausted" };
   },
 }));
-vi.mock("react-native", () => ({
-  View: vi.fn(({ children }: { children: ReactNode }) => (
-    <section>{children}</section>
-  )),
-}));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}) },
-}));
 
 it("isolates a shared trips failure and can retry from the plan gate", () => {
   render(

@@ -55,30 +55,13 @@ vi.mock("react-native", async () => {
     return <section>{children}</section>;
   }
   return {
+    ...(await import("@/test-native")).reactNative,
     Platform: {
       get OS() {
         return mocks.os;
       },
     },
     View,
-    Text: vi.fn(({ children }: { children: ReactNode }) => (
-      <span>{children}</span>
-    )),
-    Pressable: vi.fn(
-      ({
-        children,
-        onPress,
-        accessibilityLabel,
-      }: {
-        children: ReactNode;
-        onPress: () => void;
-        accessibilityLabel?: string;
-      }) => (
-        <button onClick={onPress} aria-label={accessibilityLabel}>
-          {children}
-        </button>
-      ),
-    ),
   };
 });
 
@@ -192,11 +175,14 @@ describe("go out", () => {
 });
 
 describe("keyboard", () => {
-  it("hides the bar on Android while the keyboard is up", () => {
+  it("hides the bar on Android while the keyboard is up, and takes no room", () => {
     mocks.os = "android";
     mocks.keyboard = true;
-    bar(0);
+    const onHeight = vi.fn();
+    bar(0, false, onHeight);
     expect(screen.queryByRole("button")).toBeNull();
+    expect(onHeight).toHaveBeenCalledWith(0);
+    expect(onHeight).not.toHaveBeenCalledWith(112);
   });
 
   it("keeps the bar on iOS with the keyboard up", () => {
@@ -211,14 +197,5 @@ describe("height", () => {
     const onHeight = vi.fn();
     bar(0, false, onHeight);
     expect(onHeight).toHaveBeenCalledWith(112);
-  });
-
-  it("tells them it takes no room while the keyboard hides it on Android", () => {
-    mocks.os = "android";
-    mocks.keyboard = true;
-    const onHeight = vi.fn();
-    bar(0, false, onHeight);
-    expect(onHeight).toHaveBeenCalledWith(0);
-    expect(onHeight).not.toHaveBeenCalledWith(112);
   });
 });

@@ -59,46 +59,6 @@ vi.mock("react-native-reanimated", () => ({
   useReducedMotion: () => false,
 }));
 vi.mock("@/lib/motion", () => ({ sheetIn: () => undefined }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}), absoluteFillObject: {} },
-  useUnistyles: () => ({
-    theme: { colors: { muted: "#6f6455" } },
-    rt: { insets: { top: 47, bottom: 34 }, screen: { height: 568 } },
-  }),
-}));
-vi.mock("react-native", () => ({
-  Platform: { OS: "ios" },
-  ScrollView: vi.fn(({ children }: { children?: ReactNode }) => (
-    <div>{children}</div>
-  )),
-  View: vi.fn(({ children }: { children?: ReactNode }) => (
-    <div>{children}</div>
-  )),
-  Text: vi.fn(({ children }: { children: ReactNode }) => (
-    <span>{children}</span>
-  )),
-  Pressable: vi.fn(
-    ({
-      children,
-      onPress,
-      disabled,
-      accessibilityLabel,
-    }: {
-      children?: ReactNode;
-      onPress?: () => void;
-      disabled?: boolean;
-      accessibilityLabel?: string;
-    }) => (
-      <button
-        onClick={onPress}
-        disabled={disabled}
-        aria-label={accessibilityLabel}
-      >
-        {children}
-      </button>
-    ),
-  ),
-}));
 
 beforeEach(() => {
   mocks.calls = [];

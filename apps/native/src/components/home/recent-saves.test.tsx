@@ -22,14 +22,6 @@ vi.mock("@/components/ui/themed-text", () => ({
     <h2>{children}</h2>
   )),
 }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}) },
-}));
-vi.mock("react-native", () => ({
-  View: vi.fn(({ children }: { children: ReactNode }) => (
-    <section>{children}</section>
-  )),
-}));
 
 type Props = Parameters<typeof RecentSaves>[0];
 const save = (

@@ -44,13 +44,6 @@ vi.mock("react-native-safe-area-context", () => ({
     <div>{children}</div>
   )),
 }));
-vi.mock("react-native-unistyles", () => ({
-  StyleSheet: {
-    create: () => new Proxy({}, { get: () => ({}) }),
-    absoluteFillObject: {},
-  },
-  useUnistyles: () => ({ theme: { colors: {} } }),
-}));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 vi.mock("@/components/ui/themed-text", () => ({
   ThemedText: vi.fn(({ children }: { children: ReactNode }) => (
@@ -78,30 +71,6 @@ vi.mock("@/components/ui/button", () => ({
   Button: vi.fn(
     ({ title, onPress }: { title: string; onPress: () => void }) => (
       <button onClick={onPress}>{title}</button>
-    ),
-  ),
-}));
-vi.mock("react-native", () => ({
-  Modal: vi.fn(({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  )),
-  ScrollView: vi.fn(({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  )),
-  View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
-  Pressable: vi.fn(
-    ({
-      children,
-      onPress,
-      disabled,
-    }: {
-      children: ReactNode;
-      onPress: () => void;
-      disabled?: boolean;
-    }) => (
-      <button disabled={disabled} onClick={onPress}>
-        {children}
-      </button>
     ),
   ),
 }));
