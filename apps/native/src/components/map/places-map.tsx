@@ -10,6 +10,7 @@ import { fitCamera } from "@/lib/trip";
 import type { LatLng } from "@convex/model/trip";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const LANDMARKS = [
@@ -117,6 +118,7 @@ export function PlacesMap({
   }, [pins, fit, overviewCamera]);
   const centredOnUser = useRef(false);
   const framedOnce = useRef(showsUser || firstCamera !== undefined);
+  const touched = useRef(false);
   const centre = useRef<LatLng | undefined>(undefined);
   const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // Set while the camera travels to the person; once it rests, a map with none of their places in
@@ -230,7 +232,7 @@ export function PlacesMap({
     if (centre.current)
       onCentreChange?.(centre.current, event.zoom ?? CITY_ZOOM);
     if (checkNearby.current) waitForRest();
-    else if (showsUser) framedOnce.current = true;
+    else if (showsUser && touched.current) framedOnce.current = true;
   };
 
   const nativeMap =
@@ -270,7 +272,14 @@ export function PlacesMap({
     );
   return (
     <>
-      {nativeMap}
+      <View
+        style={styles.map}
+        onTouchStart={() => {
+          touched.current = true;
+        }}
+      >
+        {nativeMap}
+      </View>
       {clustered.sheet}
     </>
   );

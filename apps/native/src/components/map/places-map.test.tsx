@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { act, render } from "@testing-library/react";
-import { forwardRef, useImperativeHandle } from "react";
+import { act, fireEvent, render } from "@testing-library/react";
+import { forwardRef, type ReactNode, useImperativeHandle } from "react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { type MapFocus, PlacesMap } from "./places-map";
@@ -49,6 +49,21 @@ vi.mock("expo-maps", () => ({
     }),
   },
   GoogleMaps: { View: vi.fn(() => null) },
+}));
+vi.mock("react-native", () => ({
+  View: vi.fn(
+    ({
+      children,
+      onTouchStart,
+    }: {
+      children: ReactNode;
+      onTouchStart?: () => void;
+    }) => (
+      <div data-testid="map-touch" onTouchStart={onTouchStart}>
+        {children}
+      </div>
+    ),
+  ),
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}), absoluteFillObject: {} },
@@ -378,14 +393,50 @@ it("keeps the area the person panned to when their first places arrive", async (
         zoom: 13,
       }),
     );
-  const { rerender } = render(located([]));
+  const { getByTestId, rerender } = render(located([]));
   await act(() => vi.advanceTimersByTimeAsync(10));
   pan(28.6, 77.2);
   await act(() => vi.advanceTimersByTimeAsync(5000));
+  fireEvent.touchStart(getByTestId("map-touch"));
   pan(19.07, 72.88);
   rerender(located(AUSTIN));
   await act(() => vi.advanceTimersByTimeAsync(200));
   expect(mock.moves).toEqual(["person"]);
+});
+
+it("frames the first places when the map moved without the person touching it", async () => {
+  mock.findsPerson = true;
+  const located = (pins: typeof AUSTIN) => (
+    <PlacesMap
+      pins={pins}
+      framed={pins}
+      showsUser
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={vi.fn()}
+    />
+  );
+  const { rerender } = render(located([]));
+  await act(() => vi.advanceTimersByTimeAsync(5000));
+  act(() =>
+    mock.props.onCameraMove({
+      coordinates: { latitude: 0.4, longitude: 0.2 },
+      zoom: 13,
+    }),
+  );
+  rerender(located(AUSTIN));
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  expect(mock.moves).toEqual([
+    "person",
+    {
+      coordinates: {
+        latitude: expect.closeTo(30.27, 2),
+        longitude: expect.closeTo(-97.73, 2),
+      },
+      zoom: expect.any(Number),
+    },
+  ]);
 });
 
 it("keeps the chosen area when location access is turned off later", async () => {
