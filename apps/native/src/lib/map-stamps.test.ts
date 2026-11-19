@@ -104,3 +104,12 @@ it("shows the newest reel for stamps grouped together and lists them newest firs
     "old",
   ]);
 });
+
+it("finds a reel's place under another name a non-reel save linked to the shown venue", () => {
+  const kept = { name: "A", lat: 40.7, lng: -74, appleId: "x" };
+  const alias = { name: "B", lat: 40.7001, lng: -74, appleId: "x" };
+  const reel = save({ placePins: [{ name: "B", lat: 40.7002, lng: -74 }] });
+  expect(shownStamps(reelStamps([reel]), [kept])).toHaveLength(0);
+  const [stamp] = shownStamps(reelStamps([reel]), [kept], [alias]);
+  expect(stamp).toMatchObject({ lat: kept.lat, places: [placeKey(kept)] });
+});

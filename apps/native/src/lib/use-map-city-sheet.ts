@@ -32,7 +32,12 @@ export function useCityStamps(
   const placeCount = useMemo(() => cityPins(saves).length, [saves]);
   const [highlighted, setHighlighted] = useState<string | null>(null);
   const stamps = useMemo(
-    () => shownStamps(reelStamps(saves), onMap),
+    () =>
+      shownStamps(
+        reelStamps(saves),
+        onMap,
+        saves.flatMap((save) => save.placePins ?? []),
+      ),
     [saves, onMap],
   );
   const highlightedPlaces = useMemo(
