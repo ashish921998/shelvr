@@ -7,7 +7,7 @@ import {
   type SkImage,
 } from "@shopify/react-native-skia";
 import { Image, type ImageRef } from "expo-image";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export type StampColors = { frame: string; badge: string; onBadge: string };
 
@@ -189,10 +189,15 @@ export function useStampCovers(stamps: readonly MapStamp[]) {
       prune(previous, new Set(stamps.map((stamp) => stamp.cover))),
     );
   }
+  const held = useRef(covers);
+  useEffect(() => {
+    held.current = covers;
+  }, [covers]);
   useEffect(() => {
     let live = true;
     const uris = new Set(stamps.map((stamp) => stamp.cover));
     for (const uri of uris) {
+      if (held.current.has(uri)) continue;
       void decode(uri).then((image) => {
         if (!live || !image) return;
         setCovers((previous) => keep(previous, uris, uri, image));
@@ -262,14 +267,18 @@ export function useStampIcons(
       ),
     );
   }
+  const held = useRef(icons);
+  useEffect(() => {
+    held.current = icons;
+  }, [icons]);
   useEffect(() => {
     let live = true;
     if (!colors) return;
     const keys = new Set(groups.map((group) => stampKey(group, colors)));
     for (const group of groups) {
       const cover = covers.get(group.cover);
-      if (!cover) continue;
       const key = stampKey(group, colors);
+      if (!cover || held.current.has(key)) continue;
       const icon =
         painted.get(key) ??
         paint(group, cover, colors)

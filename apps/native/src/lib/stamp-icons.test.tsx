@@ -3,6 +3,7 @@ import { renderHook, waitFor } from "@testing-library/react";
 import { expect, it, vi } from "vitest";
 
 import type { MapStamp } from "./map-stamps";
+import { Skia } from "@shopify/react-native-skia";
 import { useStampCovers } from "./stamp-icons";
 
 vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
@@ -17,15 +18,14 @@ vi.mock("@shopify/react-native-skia", () => {
     },
   });
   let last = "";
+  const fromURI = vi.fn((uri: string) => {
+    last = uri;
+    return Promise.resolve(uri);
+  });
   return {
     matchFont: vi.fn(),
     Skia: {
-      Data: {
-        fromURI: (uri: string) => {
-          last = uri;
-          return Promise.resolve(uri);
-        },
-      },
+      Data: { fromURI },
       Image: { MakeImageFromEncoded: vi.fn((uri: string) => image(uri)) },
       XYWHRect: vi.fn(() => ({})),
       Paint: vi.fn(() => ({})),
@@ -62,4 +62,16 @@ it("drops covers of stamps that leave the map", async () => {
   expect([...result.current.keys()]).toEqual(["b"]);
   rerender({ stamps: [] });
   expect(result.current.size).toBe(0);
+});
+
+it("reuses the covers it holds instead of loading them again", async () => {
+  const { result, rerender } = renderHook(
+    ({ stamps }) => useStampCovers(stamps),
+    { initialProps: { stamps: [stamp("c")] } },
+  );
+  await waitFor(() => expect(result.current.has("c")).toBe(true));
+  const loads = vi.mocked(Skia.Data.fromURI).mock.calls.length;
+  rerender({ stamps: [stamp("c"), stamp("d")] });
+  await waitFor(() => expect(result.current.has("d")).toBe(true));
+  expect(vi.mocked(Skia.Data.fromURI).mock.calls.slice(loads)).toEqual([["d"]]);
 });
