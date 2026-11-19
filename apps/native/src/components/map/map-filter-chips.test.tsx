@@ -97,7 +97,7 @@ it("shows the Discover chip first and toggles it", () => {
   const onToggle = vi.fn();
   const { rerender } = render(
     <MapFilterChips
-      kinds={[]}
+      kinds={["food"]}
       selected={null}
       onSelect={vi.fn()}
       discover={{ on: true, onToggle }}
@@ -106,11 +106,28 @@ it("shows the Discover chip first and toggles it", () => {
   expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
     "✨ map.discover",
     "map.filterAll",
+    "🍽️ map.kindFood",
   ]);
   expect(screen.getByLabelText("map.discover").ariaPressed).toBe("true");
   fireEvent.click(screen.getByLabelText("map.discover"));
   expect(onToggle).toHaveBeenCalledTimes(1);
 
-  rerender(<MapFilterChips kinds={[]} selected={null} onSelect={vi.fn()} />);
+  rerender(
+    <MapFilterChips kinds={["food"]} selected={null} onSelect={vi.fn()} />,
+  );
   expect(screen.queryByLabelText("map.discover")).toBeNull();
+});
+
+it("leaves out All when there is no filter to choose, so Discover stands alone", () => {
+  render(
+    <MapFilterChips
+      kinds={[]}
+      selected={null}
+      onSelect={vi.fn()}
+      discover={{ on: false, onToggle: vi.fn() }}
+    />,
+  );
+  expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+    "✨ map.discover",
+  ]);
 });
