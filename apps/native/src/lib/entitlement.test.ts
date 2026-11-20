@@ -910,6 +910,15 @@ describe("a purchase made while signed in", () => {
     expect(mock.customerInfoListeners.size).toBe(0);
   });
 
+  it("does not open the redeem sheet when it cannot read the account first", async () => {
+    const { presentRedeemCodeSheet } = await loadReady();
+    mock.getCustomerInfo.mockRejectedValueOnce(new Error("offline"));
+
+    await expect(presentRedeemCodeSheet()).rejects.toThrow("offline");
+    expect(mock.presentCodeRedemptionSheet).not.toHaveBeenCalled();
+    expect(mock.customerInfoListeners.size).toBe(0);
+  });
+
   it("stops watching when the redeem sheet fails to open", async () => {
     const { presentRedeemCodeSheet } = await loadReady();
     mock.presentCodeRedemptionSheet.mockRejectedValueOnce(new Error("no"));
