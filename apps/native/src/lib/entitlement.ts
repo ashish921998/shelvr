@@ -78,12 +78,14 @@ let _rcIdentitySync = Promise.resolve();
 let _rcAnonymousReady = false;
 let _rcSignedOut = false;
 let _rcRetryIdentity: (() => void) | null = null;
+let stopRedeemWatch: (() => void) | null = null;
 const ANONYMOUS_PLACEMENT = "onboarding";
 
 const SYNC_READY_TIMEOUT_MS = 5000;
 
 function setRcTargetUserId(userId: string | null) {
   if (_rcTargetUserId === userId) return;
+  stopRedeemWatch?.();
   _rcTargetUserId = userId;
   _rcSyncedUserId = null;
   _rcAnonymousReady = false;
@@ -621,7 +623,6 @@ export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
 }
 
 const REDEEM_WATCH_MS = 10 * 60_000;
-let stopRedeemWatch: (() => void) | null = null;
 
 export async function presentRedeemCodeSheet(): Promise<boolean> {
   const landing = reservePurchaseLanding();
@@ -629,10 +630,8 @@ export async function presentRedeemCodeSheet(): Promise<boolean> {
   const rc = getPurchases();
   if (!rc) return false;
   stopRedeemWatch?.();
-  const owner = _rcTargetUserId;
   let unrecorded = !hasActiveEntitlement();
   const listener = (info: { entitlements: { active: object } }) => {
-    if (_rcTargetUserId !== owner) return stop();
     if (!restoreFoundAccess(info)) return;
     if (unrecorded) recordAccess("redeem");
     unrecorded = false;

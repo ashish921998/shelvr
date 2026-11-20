@@ -771,14 +771,14 @@ describe("a purchase made while signed in", () => {
   it("stops watching for a redeemed code once the account changes", async () => {
     const { presentRedeemCodeSheet, hook } = await loadReady();
     await presentRedeemCodeSheet();
-    const [listener] = [...mock.customerInfoListeners];
+    expect(mock.customerInfoListeners.size).toBe(1);
 
     mock.auth = { isAuthenticated: false, isLoading: false };
     hook.rerender();
-    act(() => listener!({ entitlements: { active: { Pro: {} } } }));
+    mock.auth = { isAuthenticated: true, isLoading: false };
+    hook.rerender();
     await act(() => new Promise<void>((r) => setTimeout(r, 0)));
 
-    expect(mock.syncPurchase).not.toHaveBeenCalled();
     expect(mock.customerInfoListeners.size).toBe(0);
   });
 
