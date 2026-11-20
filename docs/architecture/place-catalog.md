@@ -84,7 +84,9 @@ A test on Lisbon (Overture release `2026-11-18.0`, 51,592 places) found:
   type, and some are wrong (a rooftop bar typed `professional_service`).
 - No type for a rooftop, a terrace or a view. Those are features.
 
-So the open type is a starting point, and a type we set by hand wins. Each type maps to one kind
+So the open type is a starting point, and a type we set by hand wins. A row keeps the two apart:
+`sourceType` holds Overture's type and `type` holds ours, so a refresh that changes `sourceType`
+never touches a type we set. Each type maps to one kind
 through the first two levels of its taxonomy path:
 
 | Overture path                                                              | Kind                                                                                            |
@@ -242,24 +244,36 @@ Mapbox's place search is "only available for temporary use"
 2. **Google's details show on a full-screen place page with no map on it.** Not in a sheet over the
    Mapbox map, and with no small map inside the page.
 3. **Google's block is labelled and set apart.** The Google Maps logo sits beside it, each photo
-   shows its author credit, and our own name and type stay visibly separate from it.
+   shows its author credit, the request asks for the place's `attributions` and the page shows
+   any it returns, and our own name and type stay visibly separate from it.
 4. **Only Google's place id is stored.** A row keeps an optional, indexed `googlePlaceId`. Photos,
    rating and hours are fetched when the page opens and never written to our database.
-5. **The id comes from a search.** An import finds each place's Google id with Text Search that
-   asks for ids only, which Google does not charge for.
+5. **The id comes from a checked search.** An import asks Text Search for each candidate's id, name
+   and point (the Pro tier: $32 per 1,000, 5,000 free a month). It keeps an id only when that
+   candidate's name matches ours and its point is within 100 m of our point; otherwise the row has
+   no `googlePlaceId` and its page shows only our own data. The name and point are used for the
+   check and never stored. Each place is checked once, so the cost stays small.
 
 Google's key stays on the server: a Convex action fetches the details and returns them to the page.
 For a place from a person's own save it checks `aiAllowed` first, like every other path that sends
-a person's place to a third party. Its
-field mask asks only for what the page shows, because a call is billed at its most expensive
+a person's place to a third party. Its field mask asks only for what the page shows, because a call is billed at its most expensive
 field. At list prices, one opened page costs about 2 to 3 cents after the free monthly amount:
 Place Details with rating and hours is $20 per 1,000 (1,000 free), and a photo $7 per 1,000
 (1,000 free) ([pricing](https://developers.google.com/maps/billing-and-pricing/pricing), read
 2026-11-20).
 
-A refresh reads each new Overture release and updates the rows whose name, point or type changed.
+A refresh reads each new Overture release and updates the rows whose name, point or `sourceType`
+changed. It never writes `type`, `kind` or `features`, which are ours.
 It patches a `places` row only when something changed, because a patch re-runs every query that
 read the row.
+
+**Points that came from Apple** may stay only until the open-data match runs (step 2 under
+"Order"). That pass replaces each `places` row's point with Overture's and hides a row with no
+match. The same pass re-points each saved place to its open-data match and drops the Apple point of
+one with no match, keeping its name and city; the place then shows in lists but not as a pin until
+the person sets a point. A point the person set themselves is theirs and stays. Today
+`items.placePins` and the `places` rows still hold Apple points, so this pass is the deadline for
+them, and it has to run before the Mapbox map ships.
 
 This reads the published terms; it is not legal advice. Before the place page ships, ask Google to
 confirm rules 1 and 2 in writing.
