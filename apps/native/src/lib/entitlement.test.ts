@@ -466,7 +466,20 @@ describe("selling before sign-in", () => {
     });
     await loadReady();
     await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
-    expect(mock.syncPurchasesForResult).not.toHaveBeenCalled();
+    await vi.waitFor(() =>
+      expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe(""),
+    );
+  });
+
+  it("keeps a taken-over purchase for the next launch when the read fails", async () => {
+    mock.logIn.mockResolvedValueOnce({
+      customerInfo: { entitlements: { active: { pro_under_test: {} } } },
+      created: true,
+    });
+    mock.syncPurchase.mockResolvedValue(false);
+    await loadReady();
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalled());
+    expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe("user:user_1");
   });
 
   it("leaves an existing account's Pro to the webhook at sign-in", async () => {

@@ -48,6 +48,7 @@ import {
   claimPurchaseBeforeSignIn,
   clearPurchaseBeforeSignIn,
   hasPurchaseBeforeSignIn,
+  notePurchaseBeforeSignIn,
 } from "@/lib/purchase-before-sign-in";
 import {
   notePurchaseLanding,
@@ -186,10 +187,11 @@ export function useEntitlementSync(): void {
     );
     if (claimed) notePurchaseLanding();
     let attach: ReturnType<typeof startRevenueCatIdentitySync> | null = null;
-    const startAttach = (sync: () => Promise<void>) => {
+    const attachPurchase = () => {
       attach?.dispose();
       attach = startRevenueCatIdentitySync({
-        sync,
+        sync: () =>
+          attachPurchaseToAccount(sub, () => syncPurchaseRef.current({})),
         onReady: () => {
           if (hasPurchaseBeforeSignIn()) clearPurchaseBeforeSignIn();
         },
@@ -197,10 +199,6 @@ export function useEntitlementSync(): void {
           analytics.captureError("purchase_sync_failed", error),
       });
     };
-    const attachPurchase = () =>
-      startAttach(() =>
-        attachPurchaseToAccount(sub, () => syncPurchaseRef.current({})),
-      );
     let mergedPro = false;
     const observer = startRevenueCatIdentitySync({
       sync: () => {
@@ -221,11 +219,11 @@ export function useEntitlementSync(): void {
       onReady: () => {
         markRcUserSynced(sub);
         if (cancelled) return;
-        if (claimed) attachPurchase();
-        else if (mergedPro)
-          startAttach(() =>
-            readMergedProIntoAccount(() => syncPurchaseRef.current({})),
-          );
+        if (!claimed && mergedPro) {
+          notePurchaseBeforeSignIn();
+          claimPurchaseBeforeSignIn(sub);
+        }
+        if (claimed || mergedPro) attachPurchase();
       },
       onError: reportRevenueCatIdentityError,
     });
@@ -269,12 +267,6 @@ async function attachPurchaseToAccount(
   });
   _rcIdentitySync = receipt.catch(() => {});
   await receipt;
-  if (!(await syncPurchase())) throw new Error("purchase_not_attached");
-}
-
-async function readMergedProIntoAccount(
-  syncPurchase: () => Promise<boolean>,
-): Promise<void> {
   if (!(await syncPurchase())) throw new Error("purchase_not_attached");
 }
 
