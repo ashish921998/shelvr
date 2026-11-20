@@ -768,6 +768,27 @@ describe("a purchase made while signed in", () => {
     expect(mock.customerInfoListeners.size).toBe(1);
   });
 
+  it("stops watching for a redeemed code once a paywall opens", async () => {
+    const { presentRedeemCodeSheet, openPaywall } = await loadReady();
+    await presentRedeemCodeSheet();
+    expect(mock.customerInfoListeners.size).toBe(1);
+
+    mock.presentPaywallIfNeeded.mockResolvedValue("CANCELLED");
+    await openPaywall(router, "plan_gate");
+
+    expect(mock.customerInfoListeners.size).toBe(0);
+  });
+
+  it("stops watching for a redeemed code once a restore starts", async () => {
+    const { presentRedeemCodeSheet, restorePurchases } = await loadReady();
+    await presentRedeemCodeSheet();
+    mock.restorePurchases.mockResolvedValue({ entitlements: { active: {} } });
+
+    await restorePurchases();
+
+    expect(mock.customerInfoListeners.size).toBe(0);
+  });
+
   it("stops watching for a redeemed code once the account changes", async () => {
     const { presentRedeemCodeSheet, hook } = await loadReady();
     await presentRedeemCodeSheet();

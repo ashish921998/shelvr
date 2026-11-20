@@ -134,9 +134,11 @@ export default function SettingsScreen() {
   };
 
   const redeemCode = async () => {
-    analytics.capture("redeem_code_opened", {});
     try {
-      if (await presentRedeemCodeSheet()) return;
+      if (await presentRedeemCodeSheet()) {
+        analytics.capture("redeem_code_opened", {});
+        return;
+      }
       analytics.captureError(
         "redeem_code_failed",
         new Error("revenuecat_not_ready"),

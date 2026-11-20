@@ -525,6 +525,7 @@ async function presentPaywall(placement = "pro_gate"): Promise<Presentation> {
     const outcome = live.paywall ? await live.paywall : "cancelled";
     return { outcome, owned: false, answered: false };
   }
+  stopRedeemWatch?.();
   const sheet: OpenSheet = { startedAt: Date.now(), paywall: null };
   let dropped = false;
   const abandoned = new Promise<PaywallOutcome>((resolve) => {
@@ -605,6 +606,7 @@ export async function presentCustomerCenter(): Promise<boolean> {
 type RestorePurchasesOutcome = "restored" | "none" | "unavailable";
 
 export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
+  stopRedeemWatch?.();
   const landing = reservePurchaseLanding();
   if (!(await awaitRcSyncReady())) return "unavailable";
 
