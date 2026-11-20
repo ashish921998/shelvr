@@ -27,7 +27,6 @@ import { observePaywallPresentation } from "@/lib/paywall-telemetry";
 import { randomUUID } from "expo-crypto";
 import {
   mapPaywallResult,
-  restoreFoundAccess,
   shouldOpenPaywallFallback,
   type PaywallOutcome,
 } from "@/lib/paywall-result";
@@ -187,11 +186,10 @@ export function useEntitlementSync(): void {
     );
     if (claimed) notePurchaseLanding();
     let attach: ReturnType<typeof startRevenueCatIdentitySync> | null = null;
-    const attachPurchase = () => {
+    const startAttach = (sync: () => Promise<void>) => {
       attach?.dispose();
       attach = startRevenueCatIdentitySync({
-        sync: () =>
-          attachPurchaseToAccount(sub, () => syncPurchaseRef.current({})),
+        sync,
         onReady: () => {
           if (hasPurchaseBeforeSignIn()) clearPurchaseBeforeSignIn();
         },
@@ -199,6 +197,11 @@ export function useEntitlementSync(): void {
           analytics.captureError("purchase_sync_failed", error),
       });
     };
+    const attachPurchase = () =>
+      startAttach(() =>
+        attachPurchaseToAccount(sub, () => syncPurchaseRef.current({})),
+      );
+    let mergedPro = false;
     const observer = startRevenueCatIdentitySync({
       sync: () => {
         const attempt = _rcIdentitySync.then(async () => {
@@ -207,15 +210,22 @@ export function useEntitlementSync(): void {
           if (cancelled || _rcTargetUserId !== sub) return;
           const rc = getPurchases();
           if (!rc) throw new Error("revenuecat_module_unavailable");
-          await rc.logIn(sub);
+          const { customerInfo, created } = await rc.logIn(sub);
+          mergedPro =
+            created &&
+            REVENUECAT_PRO_ENTITLEMENT in customerInfo.entitlements.active;
         });
         _rcIdentitySync = attempt.catch(() => {});
         return attempt;
       },
       onReady: () => {
         markRcUserSynced(sub);
-        if (cancelled || !claimed) return;
-        attachPurchase();
+        if (cancelled) return;
+        if (claimed) attachPurchase();
+        else if (mergedPro)
+          startAttach(() =>
+            readMergedProIntoAccount(() => syncPurchaseRef.current({})),
+          );
       },
       onError: reportRevenueCatIdentityError,
     });
@@ -259,6 +269,12 @@ async function attachPurchaseToAccount(
   });
   _rcIdentitySync = receipt.catch(() => {});
   await receipt;
+  if (!(await syncPurchase())) throw new Error("purchase_not_attached");
+}
+
+async function readMergedProIntoAccount(
+  syncPurchase: () => Promise<boolean>,
+): Promise<void> {
   if (!(await syncPurchase())) throw new Error("purchase_not_attached");
 }
 
@@ -643,11 +659,11 @@ export async function presentRedeemCodeSheet(): Promise<boolean> {
   const rc = getPurchases();
   if (!rc || restoresRunning > 0) return false;
   stopRedeemWatch?.();
-  let unrecorded = !hasActiveEntitlement();
+  const unrecorded = !hasActiveEntitlement();
   const listener = (info: { entitlements: { active: object } }) => {
-    if (!restoreFoundAccess(info)) return;
+    if (!(REVENUECAT_PRO_ENTITLEMENT in info.entitlements.active)) return;
+    stop();
     if (unrecorded) recordAccess("redeem");
-    unrecorded = false;
     landing();
   };
   const timer = setTimeout(() => stop(), REDEEM_WATCH_MS);

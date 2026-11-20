@@ -26,7 +26,10 @@ const mock = vi.hoisted(() => ({
   },
   auth: { isAuthenticated: true, isLoading: false },
   configure: vi.fn(async (_options: { appUserID?: string }) => {}),
-  logIn: vi.fn(async (_userId: string) => {}),
+  logIn: vi.fn(async (_userId: string) => ({
+    customerInfo: { entitlements: { active: {} as object } },
+    created: false,
+  })),
   logOut: vi.fn(async () => {}),
   isAnonymous: vi.fn(async () => true),
   syncPurchasesForResult: vi.fn(async () => ({})),
@@ -456,6 +459,25 @@ describe("selling before sign-in", () => {
     expect(mock.syncPurchase).not.toHaveBeenCalled();
   });
 
+  it("reads a purchase the new account took over from before sign-in", async () => {
+    mock.logIn.mockResolvedValueOnce({
+      customerInfo: { entitlements: { active: { pro_under_test: {} } } },
+      created: true,
+    });
+    await loadReady();
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
+    expect(mock.syncPurchasesForResult).not.toHaveBeenCalled();
+  });
+
+  it("leaves an existing account's Pro to the webhook at sign-in", async () => {
+    mock.logIn.mockResolvedValueOnce({
+      customerInfo: { entitlements: { active: { pro_under_test: {} } } },
+      created: false,
+    });
+    await loadReady();
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
+  });
+
   it("does not call the backend when nothing was bought before sign-in", async () => {
     await loadReady();
     expect(mock.syncPurchasesForResult).not.toHaveBeenCalled();
@@ -706,7 +728,7 @@ describe("paywall activation funnel", () => {
       hook.rerender();
       await Promise.resolve();
     });
-    act(() => listener!({ entitlements: { active: { Pro: {} } } }));
+    act(() => listener!({ entitlements: { active: { pro_under_test: {} } } }));
 
     expect(mock.capture).toHaveBeenCalledWith(
       "entitlement_activated",
@@ -763,9 +785,15 @@ describe("a purchase made while signed in", () => {
     expect(mock.syncPurchase).not.toHaveBeenCalled();
     expect(mock.customerInfoListeners.size).toBe(1);
 
-    act(() => listener!({ entitlements: { active: { Pro: {} } } }));
+    act(() =>
+      listener!({ entitlements: { active: { another_entitlement: {} } } }),
+    );
+    await act(() => new Promise<void>((r) => setTimeout(r, 0)));
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
+
+    act(() => listener!({ entitlements: { active: { pro_under_test: {} } } }));
     await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
-    expect(mock.customerInfoListeners.size).toBe(1);
+    expect(mock.customerInfoListeners.size).toBe(0);
   });
 
   it("stops watching for a redeemed code once a paywall opens", async () => {
