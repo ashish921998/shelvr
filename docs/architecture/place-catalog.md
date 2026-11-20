@@ -292,11 +292,14 @@ re-pointed to its open-data match; a copy with no match keeps its name and city 
 point, and a visit or removal then matches by name and city only. Every point stored today came from a provider,
 so the pass treats all of them alike and needs no rule to tell them apart: a pin has no origin
 field and `appleId` is optional, but no point was set by a person. Most come from Apple: the
-automatic lookups, and a correction, which searches Apple Maps (`placeCorrectionSearch`). The rest
-come from a Google Maps list, whose reader (`model/readers/googleMaps.ts`) copies each place's
-point into the save's pins (`pinListPlaces`) or, for `placesImport:importGoogleMapsList`, into a
-`places` row. Google's terms are stricter than Apple's, so those points get the same pass and the
-same 30-day limit, even when the pin also carries an `appleId`. Once the Mapbox map lets
+automatic lookups, and a correction, which searches Apple Maps (`placeCorrectionSearch`). The rest come
+from a Google Maps list: its reader (`model/readers/googleMaps.ts`) gives each place Google's
+point, and `pinListPlaces` copies that point into the save's pins, even when the pin also carries
+an `appleId`. `placesImport:importGoogleMapsList` is different: it uses Google's point only to find
+an Apple match and stores Apple's point in the `places` row. Those list pins get the same pass and
+the same 30-day limit. Google's 30-day allowance covers its API results, not points read from a
+list page, so whether list points may be kept at all is for the owner to confirm with Google or
+counsel before the first pass. Once the Mapbox map lets
 a person pick a point from open data or drop one, each pin records where its point came from, and a
 point the person set that way stays. Until the pass runs,
 these tables, `items.placePins` and the `places` rows still hold Apple points.
