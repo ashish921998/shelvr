@@ -116,7 +116,9 @@ if it is not listed yet and the place has fewer than 3. Running an import twice 
 When Apple is rate-limited or down, both imports stop with "Apple Maps is unavailable" instead of
 reporting every name as missed. Nothing from that run is stored; run it again.
 
-A row can also be edited or hidden in the Convex dashboard.
+A row can also be edited or hidden in the Convex dashboard. A dashboard write does not update the
+geospatial index, so after changing a row's `status`, `lat` or `lng`, run `places:reindexPage` from
+cursor `null` and wait for `done: true`.
 
 **Which cities first:** the 10 to 20 cities where users' saves land most (`items.cities`), at about 30
 to 60 places each. With the Google Maps import, a city takes about an hour.
