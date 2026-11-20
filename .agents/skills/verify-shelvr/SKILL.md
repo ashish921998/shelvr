@@ -88,7 +88,7 @@ the model writes the label (a link's title). Stable handles in this
 app: test ids `add-article-input`, `dev-login-button`, `reset-flow-fixtures`;
 the city cards on Home (buttons named `<City>` without pins, or `<City>, N places`
 once mapped; do not require the comma); the `Profile` and `Add`
-buttons on Home. The tabs are in `src/app/(app)/(tabs)/_layout.tsx`; a screen
+buttons on Home. The tabs are in `apps/native/src/app/(app)/(tabs)/_layout.tsx`; a screen
 with no test in [features/](features/README.md) gets a screenshot by hand.
 
 Live, over MCP: no `e2e mcp` server is registered in this repo. Add one for
