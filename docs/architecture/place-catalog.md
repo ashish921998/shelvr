@@ -63,6 +63,10 @@ labels of our own:
 The kind drives the Map's filter chips, as it does today. The type is the sub-category inside a
 kind. Features cut across kinds: a rooftop can be a bar, a restaurant or a hotel pool.
 
+Only the kind, the cuisine and four features exist today (PR #794). The type, the rest of the
+features and everything under "Who fills them" and "What the app shows" are planned; "Order" says
+when.
+
 ### Type
 
 The type is a category id from Overture's places taxonomy, which also covers Foursquare's open
@@ -93,13 +97,13 @@ through the first two levels of its taxonomy path:
 | `shopping`                                                                 | shopping                                                                                        |
 | `arts_and_entertainment`, `cultural_and_historic`, `sports_and_recreation` | activities                                                                                      |
 
-A type also gives the pin's emoji (`pizza_restaurant` 🍕, `wine_bar` 🍷), which replaces most of
+A type will also give the pin's emoji (`pizza_restaurant` 🍕, `wine_bar` 🍷), replacing most of
 today's guessing from the cuisine and the name.
 
-The type is stored as a plain string, not a fixed list, so a new or renamed Overture category never
-fails a deploy (see "A table field is a one-way door" in `CLAUDE.md`). Code keeps a list of the
-types we show, about 60, each with a label in every language. A type outside that list shows only
-its kind.
+The `places` schema has no type field yet. When it gets one, the type will be stored as a plain string, not a fixed list, so a new or renamed Overture category never
+fails a deploy (see "A table field is a one-way door" in `CLAUDE.md`). Code will keep a list of the
+types we show, about 60, each with a label in every language. A type outside that list will show
+only its kind.
 
 ### Features
 
