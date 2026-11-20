@@ -329,6 +329,7 @@ export default function SettingsScreen() {
           <SettingsRow
             testID="settings-redeem-code"
             label={t("pro.redeemCode")}
+            disabled={restoring}
             onPress={() => void redeemCode()}
           />
         ) : null}

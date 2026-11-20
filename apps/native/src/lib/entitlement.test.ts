@@ -789,6 +789,25 @@ describe("a purchase made while signed in", () => {
     expect(mock.customerInfoListeners.size).toBe(0);
   });
 
+  it("does not open the redeem sheet while a restore is running", async () => {
+    const { presentRedeemCodeSheet, restorePurchases } = await loadReady();
+    let finishRestore: (info: unknown) => void = () => {};
+    mock.restorePurchases.mockReturnValue(
+      new Promise((resolve) => {
+        finishRestore = resolve;
+      }),
+    );
+    const restoring = restorePurchases();
+
+    await expect(presentRedeemCodeSheet()).resolves.toBe(false);
+    expect(mock.presentCodeRedemptionSheet).not.toHaveBeenCalled();
+    expect(mock.customerInfoListeners.size).toBe(0);
+
+    finishRestore({ entitlements: { active: {} } });
+    await restoring;
+    await expect(presentRedeemCodeSheet()).resolves.toBe(true);
+  });
+
   it("stops watching for a redeemed code once the account changes", async () => {
     const { presentRedeemCodeSheet, hook } = await loadReady();
     await presentRedeemCodeSheet();

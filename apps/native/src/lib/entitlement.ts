@@ -605,8 +605,19 @@ export async function presentCustomerCenter(): Promise<boolean> {
 
 type RestorePurchasesOutcome = "restored" | "none" | "unavailable";
 
+let restoresRunning = 0;
+
 export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
   stopRedeemWatch?.();
+  restoresRunning += 1;
+  try {
+    return await runRestore();
+  } finally {
+    restoresRunning -= 1;
+  }
+}
+
+async function runRestore(): Promise<RestorePurchasesOutcome> {
   const landing = reservePurchaseLanding();
   if (!(await awaitRcSyncReady())) return "unavailable";
 
@@ -630,7 +641,7 @@ export async function presentRedeemCodeSheet(): Promise<boolean> {
   const landing = reservePurchaseLanding();
   if (!(await awaitRcSyncReady())) return false;
   const rc = getPurchases();
-  if (!rc) return false;
+  if (!rc || restoresRunning > 0) return false;
   stopRedeemWatch?.();
   let unrecorded = !hasActiveEntitlement();
   const listener = (info: { entitlements: { active: object } }) => {
