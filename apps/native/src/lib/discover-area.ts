@@ -28,6 +28,9 @@ const MAX_LATITUDE = 85;
 const MIN_HALF_SPAN = 1e-6;
 const WORLD_SPAN = 180;
 
+const clampLatitude = (degrees: number) =>
+  Math.max(-MAX_LATITUDE, Math.min(MAX_LATITUDE, degrees));
+
 function standardZoom(camera: CameraView, screen: ScreenView): number {
   if (!screen.apple) return camera.zoom;
   const cos = Math.cos((camera.latitude * Math.PI) / 180);
@@ -61,10 +64,7 @@ export function visibleBox(
     screen.height,
   ];
   if (!numbers.every(Number.isFinite) || screen.width <= 0) return undefined;
-  const latitude = Math.max(
-    -MAX_LATITUDE,
-    Math.min(MAX_LATITUDE, camera.latitude),
-  );
+  const latitude = clampLatitude(camera.latitude);
   const degreesPerPoint =
     360 / (WORLD_WIDTH * 2 ** standardZoom(camera, screen));
   const tilted = (camera.tilt ?? 0) > 0;
@@ -110,10 +110,7 @@ export function withReach(
   centre: { latitude: number; longitude: number },
   km: number,
 ): MapBox {
-  const latitude = Math.max(
-    -MAX_LATITUDE,
-    Math.min(MAX_LATITUDE, centre.latitude),
-  );
+  const latitude = clampLatitude(centre.latitude);
   const half = km / KM_PER_DEGREE;
   const [reachWest, reachEast] = snapped(
     centre.longitude,
