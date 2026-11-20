@@ -279,31 +279,32 @@ export default function MapScreen() {
           experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0.92)} 0%, ${withAlpha(theme.colors.background, 0.6)} 60%, ${withAlpha(theme.colors.background, 0)} 100%)`,
         }}
       />
-      <View
-        style={[
-          styles.overlay,
-          // Kept clear of MapKit's my-location button in the top right corner, which it would cover.
-          { top, right: location === "granted" ? LOCATE_BUTTON_CLEARANCE : 0 },
-        ]}
-      >
-        <MapSearch
-          text={searchText}
-          onChangeText={(text) => {
-            setSearchText(text);
-            setListOpen(true);
+      <View style={[styles.overlay, { top }]}>
+        <View
+          style={{
+            // Kept clear of MapKit's my-location button in the top right corner, which it would cover.
+            marginRight: location === "granted" ? LOCATE_BUTTON_CLEARANCE : 0,
           }}
-          total={matches.length}
-          results={
-            searching && listOpen
-              ? topSearchResults(matches).map((place) => ({
-                  id: entryId(place),
-                  name: place.name,
-                  city: place.city,
-                }))
-              : undefined
-          }
-          onSelect={pickResult}
-        />
+        >
+          <MapSearch
+            text={searchText}
+            onChangeText={(text) => {
+              setSearchText(text);
+              setListOpen(true);
+            }}
+            total={matches.length}
+            results={
+              searching && listOpen
+                ? topSearchResults(matches).map((place) => ({
+                    id: entryId(place),
+                    name: place.name,
+                    city: place.city,
+                  }))
+                : undefined
+            }
+            onSelect={pickResult}
+          />
+        </View>
         {went.showSwitch && !searching ? (
           <MapWentSwitch selected={went.selected} onSelect={setWentFilter} />
         ) : null}
@@ -318,5 +319,5 @@ export default function MapScreen() {
 const styles = StyleSheet.create((theme) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
   empty: { flex: 1, backgroundColor: theme.colors.background },
-  overlay: { position: "absolute", left: 0, gap: theme.gap(1) },
+  overlay: { position: "absolute", left: 0, right: 0, gap: theme.gap(1) },
 }));
