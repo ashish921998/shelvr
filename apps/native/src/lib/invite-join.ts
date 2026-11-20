@@ -62,6 +62,16 @@ export function inviteJoinOutcome(
   };
 }
 
+function finishOnboarding(completeOnboarding: () => void) {
+  holdIncomingShare();
+  try {
+    clearPending();
+    completeOnboarding();
+  } catch (error) {
+    analytics.captureError("invite_join_onboarding_failed", error);
+  }
+}
+
 export function useInviteJoinCoordinator() {
   const router = useRouter();
   const { isLoading, isAuthenticated } = useConvexAuth();
@@ -113,11 +123,7 @@ export function useInviteJoinCoordinator() {
         if (abandoned()) return;
         const outcome = inviteJoinOutcome(resolution, onboardedRef.current);
         clearPendingInvite();
-        if (outcome.completeOnboarding) {
-          holdIncomingShare();
-          clearPending();
-          completeOnboarding();
-        }
+        if (outcome.completeOnboarding) finishOnboarding(completeOnboarding);
         router.replace(outcome.href as never);
       })
       .catch((error: unknown) => {
