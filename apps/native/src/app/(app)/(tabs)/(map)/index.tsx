@@ -17,10 +17,12 @@ import {
 } from "@/lib/apple-place-card";
 import { isDarkThemeName } from "@/lib/appearance";
 import { framedPins } from "@/lib/city-pins";
+import type { MapBox } from "@/lib/discover-area";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
   busiestCityPlaces,
   filterPlaces,
+  keepSelected,
   mapFilters,
   topSearchResults,
   type WentFilter,
@@ -32,6 +34,7 @@ import {
   ownOnTop,
   searchEntries,
 } from "@/lib/map-discover";
+import { useAnchors, useHeldFraming } from "@/lib/map-framing";
 import { useMapLocation } from "@/lib/map-location";
 import { placeEmoji } from "@/lib/map-pin-emoji";
 import { useDiscoverPlaces } from "@/lib/use-discover-places";
@@ -92,13 +95,14 @@ export default function MapScreen() {
   // Closed once a result is picked, so the map and place card get the room; typing opens it again.
   const [listOpen, setListOpen] = useState(true);
   const [focus, setFocus] = useState<MapFocus | undefined>(undefined);
+  const [area, setArea] = useState<MapBox | undefined>(undefined);
 
   const all = places.data;
   const {
     settled,
     beside,
     open: openDiscover,
-  } = useDiscoverPlaces(all ?? NO_PLACES);
+  } = useDiscoverPlaces(all ?? NO_PLACES, area);
   const [discoverOn, setDiscoverOn] = useState(true);
   const { visits, loaded, isError, error, offerRetry } = usePlaceVisits();
   const visitsFailed = isError && !loaded;
@@ -124,10 +128,15 @@ export default function MapScreen() {
     () => mapEntries(went.places, withDiscover ? beside : [], visited),
     [went.places, withDiscover, beside, visited],
   );
-  const filters = useMemo(() => mapFilters(entries), [entries]);
-  // A filter that no longer has enough places (a save was deleted) falls back to All.
-  const active = filters.some((filter) => filter.kind === kind) ? kind : null;
-  const shown = useMemo(() => filterPlaces(entries, active), [entries, active]);
+  const kinds = useMemo(
+    () =>
+      keepSelected(
+        mapFilters(entries).map((filter) => filter.kind),
+        kind,
+      ),
+    [entries, kind],
+  );
+  const shown = useMemo(() => filterPlaces(entries, kind), [entries, kind]);
   const searching = searchText.trim() !== "";
   // Search narrows whatever the filter shows; every match stays on the map, the first few are listed.
   const matches = useMemo(
@@ -153,15 +162,8 @@ export default function MapScreen() {
       })),
     [matches, rt.themeName, theme],
   );
-  const anchorEntries = useMemo(() => {
-    const own = shown.filter((place) => place.source === "own");
-    return own.length > 0 ? own : shown;
-  }, [shown]);
-  const anchors = useMemo(
-    () => anchorEntries.map(({ lat, lng }) => ({ lat, lng })),
-    [anchorEntries],
-  );
-  const framed = useMemo(
+  const { anchorEntries, anchors } = useAnchors(shown);
+  const liveFraming = useMemo(
     () =>
       // As on the city page, a pin far out of town stays on the map but does not set the zoom.
       // Framed from the filter's places, so a filter with none in view can bring them in.
@@ -171,6 +173,7 @@ export default function MapScreen() {
       })),
     [anchorEntries],
   );
+  const framed = useHeldFraming(liveFraming, `${kind ?? ""}|${went.selected}`);
 
   const reported = useRef(false);
   useEffect(() => {
@@ -199,7 +202,7 @@ export default function MapScreen() {
     location === "asking"
   )
     return <ScreenLoader />;
-  if (all.length === 0 && beside.length === 0) {
+  if (all.length === 0 && beside.length === 0 && area === undefined) {
     return (
       <View style={styles.empty}>
         <EmptyState title={t("map.emptyTitle")} message={t("map.emptyBody")} />
@@ -207,7 +210,7 @@ export default function MapScreen() {
     );
   }
 
-  const showChips = filters.length > 0 || showDiscoverChip;
+  const showChips = kinds.length > 0 || showDiscoverChip;
   const top = rt.insets.top + theme.gap(1);
   const located = location === "granted";
   // The search field, then the chips under it.
@@ -268,6 +271,7 @@ export default function MapScreen() {
         topInset={top + overlayHeight}
         focus={focus}
         onSelect={select}
+        onArea={setArea}
       />
       <View
         pointerEvents="none"
@@ -316,8 +320,8 @@ export default function MapScreen() {
                 ? { on: discoverOn, onToggle: toggleDiscover }
                 : undefined
             }
-            kinds={filters.map((filter) => filter.kind)}
-            selected={active}
+            kinds={kinds}
+            selected={kind}
             onSelect={choose}
           />
         ) : null}

@@ -4,24 +4,25 @@ import { stopAction } from "@/lib/trip-planner";
 import { usePlaceOpener } from "@/lib/use-place-opener";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo } from "react";
+import { type MapBox, WORLD_BOX } from "./discover-area";
 import { type DiscoverPlace, discoverBeside } from "./map-discover";
 
 const NONE: DiscoverPlace[] = [];
 
 export function useDiscoverPlaces(
   own: readonly { name: string; lat: number; lng: number; appleId?: string }[],
+  box: MapBox | undefined,
 ): {
   settled: boolean;
   beside: DiscoverPlace[];
   open: (place: DiscoverPlace) => void;
 } {
-  const query = useQuery(
-    convexQuery(api.places.forMap, {
-      box: { west: -180, south: -85, east: 180, north: 85 },
-    }),
-  );
+  const query = useQuery({
+    ...convexQuery(api.places.forMap, { box: box ?? WORLD_BOX }),
+    placeholderData: keepPreviousData,
+  });
   const { open: openWith } = usePlaceOpener(
     stopAction,
     "map_discover_maps_failed",

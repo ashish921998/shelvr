@@ -27,6 +27,15 @@ export function mapFilters(
   }).sort((a, b) => b.count - a.count);
 }
 
+export function keepSelected(
+  kinds: PlaceKind[],
+  selected: PlaceKind | null,
+): PlaceKind[] {
+  return selected === null || kinds.includes(selected)
+    ? kinds
+    : [...kinds, selected];
+}
+
 export function filterPlaces<T extends Kinded>(
   places: readonly T[],
   kind: PlaceKind | null,

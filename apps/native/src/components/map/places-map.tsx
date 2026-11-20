@@ -1,16 +1,23 @@
 import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
 import { appleZoom } from "@/lib/city-pins";
+import {
+  type CameraView,
+  type MapBox,
+  sameBox,
+  visibleBox,
+} from "@/lib/discover-area";
 import { moveCamera } from "@/lib/map-camera";
 import { hasPlaceNear } from "@/lib/map-filters";
 import { fitCamera } from "@/lib/trip";
 import type { LatLng } from "@convex/model/trip";
 import { AppleMaps, GoogleMaps } from "expo-maps";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 /** How long the camera must rest after moving to the person before the map checks what is near. */
 const SETTLE_MS = 600;
+const AREA_REST_MS = 400;
 /** After this, the opening check is dropped so it never pulls back a camera the person moved. */
 const DISARM_MS = 3000;
 
@@ -42,6 +49,7 @@ type Props = {
   topInset: number;
   focus?: MapFocus;
   onSelect: (id: string) => void;
+  onArea: (box: MapBox) => void;
 };
 
 export function PlacesMap({
@@ -52,6 +60,7 @@ export function PlacesMap({
   topInset,
   focus,
   onSelect,
+  onArea,
 }: Props) {
   const { theme, rt } = useUnistyles();
   const appleRef = useRef<AppleMaps.MapView>(null);
@@ -139,7 +148,34 @@ export function PlacesMap({
       centredOnUser.current = false;
     };
   }, [showsUser]);
-  useEffect(() => () => clearTimeout(settle.current), []);
+  const areaTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const reportedArea = useRef<MapBox | undefined>(undefined);
+  const reportArea = useCallback(
+    (camera: CameraView) => {
+      const box = visibleBox(camera, {
+        width,
+        height,
+        apple: process.env.EXPO_OS === "ios",
+      });
+      if (!box || sameBox(box, reportedArea.current)) return;
+      reportedArea.current = box;
+      onArea(box);
+    },
+    [width, height, onArea],
+  );
+  useEffect(() => {
+    if (firstCamera)
+      reportArea({ ...firstCamera.coordinates, zoom: firstCamera.zoom });
+  }, [firstCamera, reportArea]);
+  useEffect(
+    () => () => {
+      clearTimeout(settle.current);
+      clearTimeout(areaTimer.current);
+    },
+    [],
+  );
   useEffect(() => {
     if (!focus) return;
     // A place the person picked wins over the opening check.
@@ -182,6 +218,7 @@ export function PlacesMap({
   };
   const trackCamera = (event: {
     coordinates: { latitude?: number; longitude?: number };
+    zoom: number;
   }) => {
     const { latitude, longitude } = event.coordinates;
     centre.current =
@@ -189,6 +226,12 @@ export function PlacesMap({
         ? { lat: latitude, lng: longitude }
         : undefined;
     if (checkNearby.current) waitForRest();
+    clearTimeout(areaTimer.current);
+    if (latitude !== undefined && longitude !== undefined)
+      areaTimer.current = setTimeout(
+        () => reportArea({ latitude, longitude, zoom: event.zoom }),
+        AREA_REST_MS,
+      );
   };
 
   if (process.env.EXPO_OS === "ios") {
