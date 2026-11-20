@@ -629,10 +629,13 @@ export async function presentRedeemCodeSheet(): Promise<boolean> {
   const rc = getPurchases();
   if (!rc) return false;
   stopRedeemWatch?.();
+  const owner = _rcTargetUserId;
+  let unrecorded = !hasActiveEntitlement();
   const listener = (info: { entitlements: { active: object } }) => {
+    if (_rcTargetUserId !== owner) return stop();
     if (!restoreFoundAccess(info)) return;
-    stop();
-    if (!hasActiveEntitlement()) recordAccess("redeem");
+    if (unrecorded) recordAccess("redeem");
+    unrecorded = false;
     landing();
   };
   const timer = setTimeout(() => stop(), REDEEM_WATCH_MS);

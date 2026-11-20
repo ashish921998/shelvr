@@ -693,6 +693,26 @@ describe("paywall activation funnel", () => {
       }),
     );
   });
+  it("reports a redeemed code even when the webhook lands first", async () => {
+    const { presentRedeemCodeSheet, hook } = await loadReady();
+    await presentRedeemCodeSheet();
+    const [listener] = [...mock.customerInfoListeners];
+
+    mock.useQuery.mockReturnValue({
+      data: { status: "pro", expiresAt: Date.now() + 60 * 60 * 1000 },
+    });
+    mock.isEntitled.mockReturnValue(true);
+    await act(async () => {
+      hook.rerender();
+      await Promise.resolve();
+    });
+    act(() => listener!({ entitlements: { active: { Pro: {} } } }));
+
+    expect(mock.capture).toHaveBeenCalledWith(
+      "entitlement_activated",
+      expect.objectContaining({ status: "pro", source: "redeem" }),
+    );
+  });
 });
 
 describe("a purchase made while signed in", () => {
@@ -745,6 +765,20 @@ describe("a purchase made while signed in", () => {
 
     act(() => listener!({ entitlements: { active: { Pro: {} } } }));
     await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
+    expect(mock.customerInfoListeners.size).toBe(1);
+  });
+
+  it("stops watching for a redeemed code once the account changes", async () => {
+    const { presentRedeemCodeSheet, hook } = await loadReady();
+    await presentRedeemCodeSheet();
+    const [listener] = [...mock.customerInfoListeners];
+
+    mock.auth = { isAuthenticated: false, isLoading: false };
+    hook.rerender();
+    act(() => listener!({ entitlements: { active: { Pro: {} } } }));
+    await act(() => new Promise<void>((r) => setTimeout(r, 0)));
+
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
     expect(mock.customerInfoListeners.size).toBe(0);
   });
 
