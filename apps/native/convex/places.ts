@@ -125,16 +125,17 @@ export const store = internalMutation({
 export const curate = internalMutation({
   args: {
     id: v.id("places"),
-    kind: v.optional(placeKindValidator),
-    cuisine: v.optional(cuisineValidator),
+    kind: v.optional(v.union(placeKindValidator, v.null())),
+    cuisine: v.optional(v.union(cuisineValidator, v.null())),
     features: v.optional(v.array(placeFeatureValidator)),
   },
   returns: v.null(),
-  handler: async (ctx, { id, ...fields }) => {
+  handler: async (ctx, { id, kind, cuisine, features }) => {
     if ((await ctx.db.get(id)) === null) throw new Error("no such place");
     await ctx.db.patch(id, {
-      ...fields,
-      ...(fields.features ? { features: [...new Set(fields.features)] } : {}),
+      ...(kind === undefined ? {} : { kind: kind ?? undefined }),
+      ...(cuisine === undefined ? {} : { cuisine: cuisine ?? undefined }),
+      ...(features ? { features: [...new Set(features)] } : {}),
     });
     return null;
   },

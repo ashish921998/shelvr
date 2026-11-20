@@ -446,6 +446,10 @@ describe("places:curate", () => {
     expect(place.kinds).toEqual(["drinks"]);
     expect(place.features).toEqual(["rooftop", "in hotel"]);
     expect((await rows(base))[0].category).toBe("Hotel");
+
+    await base.mutation(internal.places.curate, { id: row._id, kind: null });
+    const [restored] = await user.query(api.places.forMap, {});
+    expect(restored).toMatchObject({ category: "Hotel", kinds: ["stay"] });
   });
 
   it("leaves fields it is not given alone", async () => {

@@ -54,8 +54,9 @@ A provider's category says what the building is, not what a person goes there fo
 hotel's rooftop bar as a hotel. `places:curate` sets our own labels on a row, which a refresh never
 overwrites:
 
-- `kind` replaces the provider's category on the Map: the pin's emoji, its filter and its kinds come
-  from the kind, and the answer leaves the category out.
+- `kind` replaces the provider's category on the Map: the answer leaves the category out, and the
+  place's filter comes from the kind. Its pin shows the emoji of its cuisine, else of a cuisine word
+  in its name, else of the kind. `kind: null` goes back to the provider's category.
 - `features` lists what a place has (`rooftop`, `terrace`, `view`, `in hotel`). The Map's search
   matches them, in English only.
 - `cuisine` sets what it serves, for a restaurant or a bar.
