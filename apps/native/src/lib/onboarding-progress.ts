@@ -406,6 +406,14 @@ function writeProgress(saved: SavedProgress) {
 
 let progressEnds = 0;
 
+function saveProgress(saved: SavedProgress) {
+  try {
+    writeProgress(saved);
+  } catch (error) {
+    analytics.captureError("onboarding_progress_save_failed", error);
+  }
+}
+
 export function clearOnboardingProgress() {
   progressEnds += 1;
   try {
@@ -458,7 +466,7 @@ export function useOnboardingProgress() {
   useEffect(() => {
     if (started.current) return;
     started.current = true;
-    writeProgress(start.state);
+    saveProgress(start.state);
     for (const entry of start.analytics) {
       analytics.capture(entry.event, entry.properties);
     }
@@ -469,7 +477,7 @@ export function useOnboardingProgress() {
       if (era !== progressEnds) return null;
       const result = transitionProgress(current.current, event, Date.now());
       if (result.state !== current.current) {
-        if (!result.state.finished) writeProgress(result.state);
+        if (!result.state.finished) saveProgress(result.state);
         current.current = result.state;
         setState(result.state);
       }

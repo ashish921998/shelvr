@@ -5,16 +5,12 @@ import {
   cleanup,
   fireEvent,
   render,
-  renderHook,
   screen,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import OnboardingScreen from "@/app/(app)/onboarding";
 import { ahaReel, ahaReelUrl } from "@/lib/aha-reels";
-import {
-  clearOnboardingProgress,
-  useOnboardingProgress,
-} from "@/lib/onboarding-progress";
+import { clearOnboardingProgress } from "@/lib/onboarding-progress";
 import {
   ONBOARDING_FLOW_VERSION,
   ONBOARDING_STEP_IDS,
@@ -526,22 +522,22 @@ it("drops a permission answer that lands after onboarding progress ended", async
   expect(saved()).toBeNull();
 });
 
-it("keeps the step it could not save, so the next tap starts the permission check", () => {
+it("moves on and reports it when a step cannot be saved", async () => {
+  let answer: (value: "ask") => void = () => undefined;
+  mocks.permission.mockImplementation(
+    () => new Promise((resolve) => (answer = resolve)),
+  );
   startAt("carousel");
-  const { result } = renderHook(() => useOnboardingProgress());
+  render(<OnboardingScreen />);
   mocks.failingKeys.add(PROGRESS_KEY);
-  expect(() =>
-    act(() => {
-      result.current.dispatch({ type: "continue", from: "carousel" });
-    }),
-  ).toThrow();
-  expect(result.current.read().lock).toBeNull();
-  mocks.failingKeys.clear();
-  let command: ReturnType<typeof result.current.dispatch> = null;
-  act(() => {
-    command = result.current.dispatch({ type: "continue", from: "carousel" });
-  });
-  expect(command).toMatchObject({ kind: "checkPermission" });
+  tap("carousel:continue");
+  expect(mocks.permission).toHaveBeenCalledTimes(1);
+  await act(async () => answer("ask"));
+  expect(mocks.notifications).toHaveBeenCalled();
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "onboarding_progress_save_failed",
+    expect.any(Error),
+  );
 });
 it("opens the paywall when the permission cannot be read", async () => {
   mocks.permission.mockRejectedValue(new Error("no"));
