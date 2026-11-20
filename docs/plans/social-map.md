@@ -28,9 +28,10 @@ filled yet, and the Apple question at the end of this step is open.
 
 ### What the person sees
 
-The Map tab shows every place in the table as a "Discover" pin, beside and under the person's own
-pins. A new user opens the Map and sees places in every city we have filled, not an empty state. There
-is no switch to hide them. Tapping one opens Apple's place card (`openPlaceDetails(appleId)`), as a
+The Map tab shows the table's places in the area on screen as "Discover" pins, beside and under the
+person's own pins, up to 300 at a time (see Reading by area in
+[place-catalog.md](../architecture/place-catalog.md)). A new user opens the Map on the busiest city of
+the first answer, not an empty state. There is no switch to hide them. Tapping one opens Apple's place card (`openPlaceDetails(appleId)`), as a
 saved pin does today. Where the card cannot open (before iOS 18, on Android, or when Apple has no card
 for the id), it opens the place in Apple Maps, or Google Maps on Android. Search and the kind filters
 cover them too, and search lists the person's own match before a Discover one.
