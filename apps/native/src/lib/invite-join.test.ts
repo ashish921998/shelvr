@@ -78,6 +78,9 @@ describe("useInviteJoinCoordinator", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.pending = "abc";
+    mocks.clearPendingInvite.mockImplementation(() => {
+      mocks.pending = null;
+    });
   });
 
   async function resumeWith(onboarded: boolean, found: boolean | Error) {
@@ -171,6 +174,30 @@ describe("useInviteJoinCoordinator", () => {
     const [completed] = mocks.completeOnboarding.mock.invocationCallOrder;
     expect(cleared).toBeLessThan(completed!);
   });
+
+  it.each([
+    ["dropping onboarding's queue", mocks.clearPending, 0],
+    ["finishing onboarding", mocks.completeOnboarding, 1],
+  ])(
+    "still navigates and reports it when %s fails after the invite cleared",
+    async (_step, store, onboardingCalls) => {
+      const failure = new Error("keychain locked");
+      store.mockImplementationOnce(() => {
+        throw failure;
+      });
+      await joinWith(false, "list1");
+      expect(mocks.clearPendingInvite).toHaveBeenCalled();
+      expect(mocks.completeOnboarding).toHaveBeenCalledTimes(onboardingCalls);
+      expect(mocks.router.replace).toHaveBeenCalledWith(
+        "/shared-list/list1?joined=1",
+      );
+      expect(mocks.captureError).toHaveBeenCalledWith(
+        "invite_join_onboarding_failed",
+        failure,
+      );
+      expect(mocks.alert).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe("inviteJoinStep", () => {
