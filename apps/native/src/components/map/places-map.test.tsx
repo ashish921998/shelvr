@@ -23,6 +23,7 @@ type MapProps = {
 
 const mock = vi.hoisted(() => ({
   moves: [] as Camera[],
+  fails: 0,
   props: undefined as MapProps | undefined,
   screen: { width: 393, height: 852 },
 }));
@@ -35,7 +36,9 @@ vi.mock("expo-maps", () => ({
       useImperativeHandle(ref, () => ({
         setCameraPosition: (camera?: Camera) => {
           mock.moves.push(camera);
-          return Promise.resolve();
+          if (mock.fails === 0) return Promise.resolve();
+          mock.fails -= 1;
+          return Promise.reject(new Error("not ready"));
         },
       }));
       return null;
@@ -107,6 +110,7 @@ const latitudes = () =>
 
 beforeEach(() => {
   mock.moves = [];
+  mock.fails = 0;
   mock.props = undefined;
   mock.screen = { width: 393, height: 852 };
   vi.useFakeTimers();
@@ -173,6 +177,29 @@ describe("PlacesMap opening on the person", () => {
     view.rerender(<PlacesMap {...props} anchors={undefined} locate={2} />);
     view.rerender(<PlacesMap {...props} anchors={[]} locate={2} />);
     expect(latitudes()).toEqual([undefined, undefined, undefined]);
+  });
+
+  it("drops a still-retrying opening move once locate is pressed", async () => {
+    mock.fails = 1;
+    const props = {
+      pins: LISBON,
+      framed: LISBON,
+      anchors: undefined,
+      showsUser: true,
+      topInset: 100,
+      onSelect: () => {},
+      onArea: () => {},
+    };
+    const view = render(<PlacesMap {...props} />);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    view.rerender(<PlacesMap {...props} locate={1} />);
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+    expect(latitudes()).toEqual([undefined, undefined]);
   });
 });
 

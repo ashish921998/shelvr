@@ -108,6 +108,19 @@ export function PlacesMap({
   // map with none of them moves on to the busiest city.
   const checkNearby = useRef<(() => void) | undefined>(undefined);
   const rested = useRef(false);
+  const cameraCommand = useRef<(() => void) | undefined>(undefined);
+  const command = useCallback(
+    (
+      move: () => Promise<void> | undefined,
+      onFail: (error: unknown) => void,
+    ) => {
+      cameraCommand.current?.();
+      const cancel = moveCamera(move, onFail);
+      cameraCommand.current = cancel;
+      return cancel;
+    },
+    [],
+  );
   useEffect(() => {
     latest.current = { anchors, fit };
     if (anchors !== undefined && rested.current) checkNearby.current?.();
@@ -140,7 +153,7 @@ export function PlacesMap({
     };
     // No position means the person's own location. A map mounted moments ago can refuse its first
     // move, so it is retried; if every try fails, the map shows the busiest city instead.
-    const cancel = moveCamera(
+    const cancel = command(
       () => map()?.setCameraPosition().then(waitForRest),
       (error) => {
         checkNearby.current = undefined;
@@ -158,7 +171,7 @@ export function PlacesMap({
       checkNearby.current = undefined;
       centredOnUser.current = false;
     };
-  }, [showsUser]);
+  }, [showsUser, command]);
   const areaTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
@@ -197,7 +210,7 @@ export function PlacesMap({
     if (!focus) return;
     // A place the person picked wins over the opening check.
     checkNearby.current = undefined;
-    return moveCamera(
+    return command(
       () =>
         map()?.setCameraPosition({
           coordinates: { latitude: focus.lat, longitude: focus.lng },
@@ -205,15 +218,15 @@ export function PlacesMap({
         }),
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
-  }, [focus]);
+  }, [focus, command]);
   useEffect(() => {
     if (locate === undefined) return;
     checkNearby.current = undefined;
-    return moveCamera(
+    return command(
       () => map()?.setCameraPosition(),
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
-  }, [locate]);
+  }, [locate, command]);
 
   // A new filter whose places are all out of reach brings them into view. While the opening move is
   // still deciding where to go, its check frames the new filter instead. Search does not refit:

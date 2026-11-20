@@ -279,7 +279,7 @@ export default function MapScreen() {
           experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0.92)} 0%, ${withAlpha(theme.colors.background, 0.6)} 60%, ${withAlpha(theme.colors.background, 0)} 100%)`,
         }}
       />
-      <View style={[styles.overlay, { top }]}>
+      <View style={[styles.overlay, { top }]} pointerEvents="box-none">
         <View style={styles.searchRow}>
           <View style={styles.search}>
             <MapSearch
