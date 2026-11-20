@@ -473,6 +473,22 @@ describe("places:curate", () => {
       cuisine: "coffee",
       features: ["terrace"],
     });
+
+    await base.mutation(internal.places.curate, { id: row._id, features: [] });
+    expect((await rows(base))[0]).not.toHaveProperty("features");
+  });
+
+  it("rejects a place that no longer exists", async () => {
+    const { base } = await signedIn();
+    await base.mutation(internal.places.store, {
+      city: "Lisbon",
+      places: [cafe("G", "Gone Cafe")],
+    });
+    const [row] = await rows(base);
+    await base.run((ctx) => ctx.db.delete(row._id));
+    await expect(
+      base.mutation(internal.places.curate, { id: row._id, kind: "drinks" }),
+    ).rejects.toThrow();
   });
 });
 

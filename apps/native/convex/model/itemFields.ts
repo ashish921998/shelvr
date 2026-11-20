@@ -1,6 +1,6 @@
 import { type Infer, v } from "convex/values";
 
-import { CATEGORY_KINDS_LIST, CUISINES, PLACE_FEATURES } from "./placeKinds";
+import { CURATED_KINDS, CUISINES, PLACE_FEATURES } from "./placeKinds";
 import { placeKey } from "./plan";
 
 export const INTENT_KINDS = [
@@ -31,7 +31,7 @@ export const cuisineValidator = v.union(
 );
 
 export const placeKindValidator = v.union(
-  ...CATEGORY_KINDS_LIST.map((kind) => v.literal(kind)),
+  ...CURATED_KINDS.map((kind) => v.literal(kind)),
 );
 
 export const placeFeatureValidator = v.union(

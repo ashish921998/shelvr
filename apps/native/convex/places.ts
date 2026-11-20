@@ -38,18 +38,21 @@ const mapPlaceValidator = v.object({
   features: v.optional(v.array(placeFeatureValidator)),
 });
 
-const mapPlace = (row: Doc<"places">) => ({
-  _id: row._id,
-  name: row.name,
-  lat: row.lat,
-  lng: row.lng,
-  city: row.city,
-  appleId: row.appleId,
-  ...(row.category && !row.kind ? { category: row.category } : {}),
-  ...(row.cuisine ? { cuisine: row.cuisine } : {}),
-  kinds: row.kind ? [row.kind] : placeKinds(row.category, [], row.cuisine),
-  ...(row.features?.length ? { features: row.features } : {}),
-});
+const mapPlace = (row: Doc<"places">) => {
+  const category = row.kind ? undefined : row.category;
+  return {
+    _id: row._id,
+    name: row.name,
+    lat: row.lat,
+    lng: row.lng,
+    city: row.city,
+    appleId: row.appleId,
+    ...(category ? { category } : {}),
+    ...(row.cuisine ? { cuisine: row.cuisine } : {}),
+    kinds: row.kind ? [row.kind] : placeKinds(category, [], row.cuisine),
+    ...(row.features ? { features: row.features } : {}),
+  };
+};
 
 export const forMap = authedQuery({
   args: {},
@@ -131,11 +134,12 @@ export const curate = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, { id, kind, cuisine, features }) => {
-    if ((await ctx.db.get(id)) === null) throw new Error("no such place");
     await ctx.db.patch(id, {
       ...(kind === undefined ? {} : { kind: kind ?? undefined }),
       ...(cuisine === undefined ? {} : { cuisine: cuisine ?? undefined }),
-      ...(features ? { features: [...new Set(features)] } : {}),
+      ...(features === undefined
+        ? {}
+        : { features: features.length ? [...new Set(features)] : undefined }),
     });
     return null;
   },

@@ -48,7 +48,7 @@ export type Cuisine = (typeof CUISINES)[number];
 
 type CategoryKind = Exclude<PlaceKind, "dateNight">;
 
-export const CATEGORY_KINDS_LIST: readonly CategoryKind[] = PLACE_KINDS.filter(
+export const CURATED_KINDS: readonly CategoryKind[] = PLACE_KINDS.filter(
   (kind): kind is CategoryKind => kind !== "dateNight",
 );
 
