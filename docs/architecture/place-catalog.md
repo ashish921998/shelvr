@@ -48,18 +48,105 @@ row with a corrected point keeps that point, and it wins over the one in `places
 7. Account deletion removes the person's `savedPlaces`, visits and removals. `places` rows hold no
    personal data and stay. Every `savedPlaces` write checks `liveOwner` in the mutation that writes.
 
-## Our own labels
+## Labels: kind, type and features
 
-A provider's category says what the building is, not what a person goes there for: Apple files a
-hotel's rooftop bar as a hotel. `places:curate` sets our own labels on a row, which a refresh never
-overwrites:
+A provider's category says what the building is, not what a person goes there for. Apple files a
+hotel's rooftop bar as a hotel and most cafés as restaurants. Every place therefore carries three
+labels of our own:
 
-- `kind` replaces the provider's category on the Map: the answer leaves the category out, and the
-  place's filter comes from the kind. Its pin shows the emoji of its cuisine, else of a cuisine word
-  in its name, else of the kind. `kind: null` goes back to the provider's category.
-- `features` lists what a place has (`rooftop`, `terrace`, `view`, `in hotel`). The Map's search
-  matches them, in English only.
-- `cuisine` sets what it serves, for a restaurant or a bar.
+| Label        | Answers                   | Per place | Examples                                                           |
+| ------------ | ------------------------- | --------- | ------------------------------------------------------------------ |
+| **Kind**     | What do you go there for? | one       | food, drinks, coffee, dessert, activities, shopping, stay          |
+| **Type**     | What exactly is it?       | one       | `portuguese_restaurant`, `sushi_restaurant`, `cocktail_bar`, `pub` |
+| **Features** | What is it like?          | many      | rooftop, terrace, view, waterfront, live music, late night, hidden |
+
+The kind drives the Map's filter chips, as it does today. The type is the sub-category inside a
+kind. Features cut across kinds: a rooftop can be a bar, a restaurant or a hotel pool.
+
+### Type
+
+The type is a category id from Overture's places taxonomy, which also covers Foursquare's open
+places. We adopt their list instead of writing our own, so an imported place arrives with a type
+already set. Their data may be stored and shown on any map
+([Overture places](https://docs.overturemaps.org/guides/places/)). Apple's terms allow only
+temporary storage of its place data, so a stored point should come from an open-data match
+(DPLA Attachment 6, §2.5).
+
+A test on Lisbon (Overture release `2026-11-18.0`, 51,592 places) found:
+
+- 9,966 food and drink places across 137 types, including `cocktail_bar`, `wine_bar`, `pub`,
+  `lounge`, `hotel_bar`, `tapas_bar` and 70 national cuisines.
+- Gaps: 24% of the restaurants carry only the bare `restaurant` type, 3% of all places have no
+  type, and some are wrong (a rooftop bar typed `professional_service`).
+- No type for a rooftop, a terrace or a view. Those are features.
+
+So the open type is a starting point, and a type we set by hand wins. Each type maps to one kind
+through the first two levels of its taxonomy path:
+
+| Overture path                                                              | Kind                                                                                            |
+| -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `food_and_drink` > `restaurant`                                            | food                                                                                            |
+| `food_and_drink` > `alcoholic_beverage_venue`                              | drinks                                                                                          |
+| `food_and_drink` > `non_alcoholic_beverage_venue`                          | coffee                                                                                          |
+| `food_and_drink` > `casual_eatery`                                         | by type: `bakery`, `ice_cream_shop`, `dessert_shop` → dessert; `cafe` → coffee; the rest → food |
+| `lodging`                                                                  | stay                                                                                            |
+| `shopping`                                                                 | shopping                                                                                        |
+| `arts_and_entertainment`, `cultural_and_historic`, `sports_and_recreation` | activities                                                                                      |
+
+A type also gives the pin's emoji (`pizza_restaurant` 🍕, `wine_bar` 🍷), which replaces most of
+today's guessing from the cuisine and the name.
+
+The type is stored as a plain string, not a fixed list, so a new or renamed Overture category never
+fails a deploy (see "A table field is a one-way door" in `CLAUDE.md`). Code keeps a list of the
+types we show, about 60, each with a label in every language. A type outside that list shows only
+its kind.
+
+### Features
+
+A fixed starter list, as plain strings for the same reason:
+
+- **Setting:** rooftop, terrace, view, waterfront, garden, outdoor seating
+- **Where:** in hotel, hidden or speakeasy, food hall
+- **When and how:** late night, brunch, live music, date night, good for groups, counter seating
+
+PR #794 ships the first four (rooftop, terrace, view, in hotel) as a fixed list. Its schema fields
+move to plain strings before the list grows.
+
+### Who fills them
+
+- **Discover places.** An import matches each venue to Overture by name and point, and keeps the
+  Overture id and type. Features come from the source we import from: a guide titled "rooftop bars"
+  tags every place in it. Gemini reads the guide's text for the rest. `places:curate` fixes what is
+  still wrong. A Discover import holds no person's content, so it needs no AI permission check.
+- **A person's saves.** The classifier already returns a cuisine for each place it names
+  (`placeCuisines` in `convex/ai.ts`). It also returns a type, from the 60 we show, and features,
+  for each place. They stay on that person's save, and later on their `savedPlaces` row (rule 1).
+  A model's guess never writes to `places` (rule 7 of the earlier objections).
+- **By hand.** `places:curate` sets the kind, cuisine and features today; it gains the type.
+
+### What the app shows
+
+- The kind chips stay as they are.
+- Picking a kind shows a second row of chips: its common types and features in view, such as
+  Drinks → cocktail bar, wine bar, rooftop.
+- A place's detail lists its type and features.
+- Search matches type and feature labels in the person's language. Today it matches the English
+  feature words only.
+
+### Order
+
+1. PR #794: kind, cuisine and four features, set by hand.
+2. Store an Overture id and type on `places`, matched at import. Move the stored point to Overture.
+3. The type list, its labels in every language, and pin emoji from the type.
+4. Type and features from the classifier for saves.
+5. The second row of chips on the Map, and the type and features on a place's detail.
+
+### Open questions
+
+- **Overture attribution.** What the app must show when it uses Overture data.
+- **Matching** an Overture place to an Apple id for the same venue, and what to do when they
+  disagree on the point.
+- **Which 60 types.** The Lisbon counts above are a first cut; a second city should confirm them.
 
 ## Reading by area
 
@@ -133,10 +220,10 @@ changed to its new id ([Apple Maps Server API](https://developer.apple.com/docum
 Google exempts its place ids from its caching limits
 ([Places SDK policies](https://developers.google.com/maps/documentation/places/ios-sdk/policies)).
 
-Apple has not said how long an app may keep a place's name and point
-([developer forum](https://developer.apple.com/forums/thread/708672)). Keeping the id and refreshing
-the rest does not settle that question. It makes any answer cheap to adopt: shorten the refresh
-window, or move to a provider whose data we may keep.
+Apple's developer agreement allows only temporary storage of its place data and no database built
+from it (DPLA Attachment 6, §2.2 and §2.5). Keeping the id and refreshing the rest is not enough:
+the stored name and point should come from a provider whose data we may keep. Overture's open
+places can be kept; see "Labels" above.
 
 - The refresh job fetches stale rows by id. It refreshes only rows that people view, because saves,
   imports and refreshes share one daily Apple quota.
@@ -173,7 +260,7 @@ reasons. Each one is a constraint on this design:
   save of a venue is matched and another is not, a visit must not split in two, and a place that
   gains a match later must keep its visit. The plan is to keep today's matching and add the `places`
   link as one more match. The merge rule is not designed yet.
-- **Apple's terms** on keeping a place's name and point. See "Provider data".
+- **Apple's terms** on keeping a place's name and point: storage must be temporary. See "Provider data".
 - **Apple's daily quota.** Saves, imports and refreshes share it.
 
 ## Phases
