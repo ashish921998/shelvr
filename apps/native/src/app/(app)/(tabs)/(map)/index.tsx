@@ -55,7 +55,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Keyboard, View } from "react-native";
+import { Keyboard, ScrollView, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type OwnPlace = FunctionReturnType<typeof api.mapPlaces.listMapPlaces>[number];
@@ -413,7 +413,11 @@ export default function MapScreen() {
               ]}
             />
             {showWent || discover ? (
-              <View style={styles.went}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.went}
+              >
                 {showWent ? (
                   <MapWentSwitch
                     selected={went.selected}
@@ -434,7 +438,7 @@ export default function MapScreen() {
                     }}
                   />
                 ) : null}
-              </View>
+              </ScrollView>
             ) : null}
             {filters.length > 0 ? (
               <MapKindRow
