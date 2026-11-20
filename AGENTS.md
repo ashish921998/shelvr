@@ -65,7 +65,8 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `convex/model/placeKinds.ts`, each pin's emoji in `src/lib/map-pin-emoji.ts`, data from
   `convex/mapPlaces.ts`. Discover pins come from the hand-filled `places` table
   (`convex/places.ts`, filled by `places:addByName` and `placesImport:importGoogleMapsList`) and
-  join the person's own pins in `src/lib/map-discover.ts`. The plan is `docs/plans/social-map.md`.
+  join the person's own pins in `src/lib/map-discover.ts`. The plan is `docs/plans/social-map.md`;
+  the long-term place model is `docs/architecture/place-catalog.md`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;

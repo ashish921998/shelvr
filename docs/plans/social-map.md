@@ -191,6 +191,10 @@ allowed, keep the name and city we typed and look the point up on the device whe
 
 ## Constraints from earlier decisions
 
+The long-term place model is now [place-catalog.md](../architecture/place-catalog.md): one
+`places` row per venue and a `savedPlaces` row per place a save names. Its counts phase replaces
+step 1 below.
+
 `docs/architecture/places.md` ("The larger design, and why not now") rejected a shared place catalog
 for eight reasons. Its last paragraph names the conditions for revisiting it: admit only
 Apple-verified public places, keep a person's own names, points and cities on their own rows, and keep
