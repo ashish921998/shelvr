@@ -249,10 +249,11 @@ Mapbox's place search is "only available for temporary use"
 4. **Only Google's place id is stored.** A row keeps an optional, indexed `googlePlaceId`. Photos,
    rating and hours are fetched when the page opens and never written to our database.
 5. **The id comes from a checked search.** An import asks Text Search for each candidate's id, name
-   and point (the Pro tier: $32 per 1,000, 5,000 free a month). It keeps an id only when that
-   candidate's name matches ours and its point is within 100 m of our point; otherwise the row has
-   no `googlePlaceId` and its page shows only our own data. The name and point are used for the
-   check and never stored. Each place is checked once, so the cost stays small.
+   and point (the Pro tier: $32 per 1,000, 5,000 free a month). It keeps an id only when exactly
+   one candidate's name matches ours with its point within 100 m of our point. With none, or more
+   than one, the row has no `googlePlaceId` and its page shows only our own data. The name and
+   point are used for the check and never stored. A place is checked again only when its name or
+   point changes, so the cost stays small.
 
 Google's key stays on the server: a Convex action fetches the details and returns them to the page.
 For a place from a person's own save it checks `aiAllowed` first, like every other path that sends
@@ -263,8 +264,8 @@ Place Details with rating and hours is $20 per 1,000 (1,000 free), and a photo $
 2026-11-20).
 
 A refresh reads each new Overture release and updates the rows whose name, point or `sourceType`
-changed. It never writes `type`, `kind` or `features`, which are ours.
-It patches a `places` row only when something changed, because a patch re-runs every query that
+changed. It never writes `type`, `kind` or `features`, which are ours. A change to a row's name or
+point clears its `googlePlaceId` and runs the check above again. It patches a `places` row only when something changed, because a patch re-runs every query that
 read the row.
 
 **Points that came from Apple** may stay only until the open-data match runs (step 2 under
