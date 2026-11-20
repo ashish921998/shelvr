@@ -239,6 +239,11 @@ describe("places:forMap", () => {
     expect(result.places).toHaveLength(300);
     expect(new Set(result.places.map((place) => place._id)).size).toBe(300);
     expect(result.complete).toBe(false);
+    const narrow = await user.query(api.places.inArea, {
+      box: { west: -9.3, south: 38.6, east: -9.1, north: 38.8 },
+    });
+    expect(narrow.places).toHaveLength(300);
+    expect(narrow.complete).toBe(false);
   }, 60_000);
 
   it("says the answer is complete only when it read the whole area", async () => {

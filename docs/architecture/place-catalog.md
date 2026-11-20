@@ -100,9 +100,9 @@ change do.
 - **The opening check sees only what one answer holds.** It asks for 50 km around the person. The
   answer stops at 300 places or when a read budget runs out (two index calls of up to 1,024 rows, or
   2,000 rows for a wide box), before any distance test, so a nearer place can be left out. When the
-  answer is not `complete` and the person has no saved place in reach, the Map stays on them rather
-  than moving to the busiest city. A server query for the nearest Discover place within 50 km would
-  answer this directly.
+  answer is not `complete` and the person has no saved place of their own on the Map, it stays on
+  them rather than moving to the busiest city. A server query for the nearest Discover place within
+  50 km would answer this directly.
 - **Search covers only what is loaded.** The Map searches the person's own places and the Discover
   places of the area last in view. A name search over `places` on the server would find the rest.
 - **An empty box over dense cells is untested.** The component stops after reading 1,024 rows, but it
