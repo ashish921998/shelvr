@@ -17,7 +17,7 @@ export function BackCircle({
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
-      hitSlop={(44 - SIZE) / 2}
+      hitSlop={(theme.control.minHeight - SIZE) / 2}
       style={({ pressed }) => [styles.circle, pressed && styles.pressed]}
     >
       <AppSymbolIcon

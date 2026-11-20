@@ -54,7 +54,9 @@ vi.mock("react-native-reanimated", () => ({
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { colors: { foreground: "#000" } } }),
+  useUnistyles: () => ({
+    theme: { colors: { foreground: "#000" }, control: { minHeight: 48 } },
+  }),
 }));
 vi.mock("react-native", () => ({
   ActivityIndicator: vi.fn(() => <span>loading</span>),
