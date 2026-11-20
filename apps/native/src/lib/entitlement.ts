@@ -468,6 +468,7 @@ type OpenSheet = {
   emptyRestore?: boolean;
 };
 let openSheet: OpenSheet | null = null;
+let purchaseFlowsStarted = 0;
 let lastAppTouchAt = 0;
 
 /** Called by the app root on every touch; one after the native paywall should cover the app shows UIKit refused it. */
@@ -560,6 +561,7 @@ async function presentPaywall(placement = "pro_gate"): Promise<Presentation> {
     };
   });
   openSheet = sheet;
+  purchaseFlowsStarted += 1;
   const landing = reservePurchaseLanding();
   sheet.paywall = Promise.race([presentPaywallImpl(placement), abandoned])
     .then((outcome) => {
@@ -635,6 +637,7 @@ let restoresRunning = 0;
 export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
   stopRedeemWatch?.();
   restoresRunning += 1;
+  purchaseFlowsStarted += 1;
   try {
     return await runRestore();
   } finally {
@@ -682,9 +685,11 @@ export async function presentRedeemCodeSheet(): Promise<boolean> {
   const rc = getPurchases();
   if (!rc) return false;
   const account = _rcTargetUserId;
+  const flows = purchaseFlowsStarted;
   const before = proPurchase(await rc.getCustomerInfo());
   if (_rcTargetUserId !== account || !isRcSyncReady()) return false;
-  if (restoresRunning > 0 || liveSheet()) return false;
+  if (purchaseFlowsStarted !== flows || restoresRunning > 0 || liveSheet())
+    return false;
   stopRedeemWatch?.();
   const unrecorded = !hasActiveEntitlement();
   const listener = (info: ProCustomerInfo) => {

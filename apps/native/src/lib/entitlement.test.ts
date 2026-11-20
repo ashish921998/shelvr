@@ -868,6 +868,26 @@ describe("a purchase made while signed in", () => {
     expect(mock.customerInfoListeners.size).toBe(0);
   });
 
+  it("does not open the redeem sheet after a paywall opened and closed while it read the account", async () => {
+    const { presentRedeemCodeSheet, openPaywall } = await loadReady();
+    let finishRead: (info: unknown) => void = () => {};
+    mock.getCustomerInfo.mockReturnValueOnce(
+      new Promise((resolve) => {
+        finishRead = resolve;
+      }),
+    );
+    const redeeming = presentRedeemCodeSheet();
+    await act(() => new Promise<void>((r) => setTimeout(r, 0)));
+    mock.presentPaywallIfNeeded.mockResolvedValue("CANCELLED");
+    await openPaywall(router, "plan_gate");
+
+    finishRead({ entitlements: { active: {} } });
+
+    await expect(redeeming).resolves.toBe(false);
+    expect(mock.presentCodeRedemptionSheet).not.toHaveBeenCalled();
+    expect(mock.customerInfoListeners.size).toBe(0);
+  });
+
   it("stops watching for a redeemed code once a paywall opens", async () => {
     const { presentRedeemCodeSheet, openPaywall } = await loadReady();
     await presentRedeemCodeSheet();
