@@ -270,12 +270,13 @@ changed. It never writes `type`, `kind` or `features`, which are ours. A change 
 point clears its `googlePlaceId` and runs the check above again. It patches a `places` row only when something changed, because a patch re-runs every query that
 read the row.
 
-**Points that came from Apple** are kept at most 30 days. Apple's terms allow only temporary
-storage and name no number, so 30 days is our own limit, the same as Google's limit for a cached
-point. The open-data match (step 2 under "Order") enforces it. Points stored before it exists are
-already past 30 days, so its first run, by 31 December 2026 and before the Mapbox map ships either
-way, handles every Apple point at once. After that it runs daily on every Apple point 29 days old or
-more, so each one is replaced or dropped by day 30, since saves keep using Apple until the Mapbox
+**Points that came from Apple** are kept at most 30 days once the open-data match (step 2 under
+"Order") exists. Apple's terms allow only temporary storage and name no number, so 30 days is our
+own limit, the same as Google's limit for a cached point. Today nothing removes them, so every
+point stored before the match's first run is kept longer than that; the first run handles every
+Apple point at once and is due as soon as it is built, by 31 December 2026 at the latest and before
+the Mapbox map ships. After that it runs daily on every Apple point 29 days old or more, so a point
+missed by one run is at most 30 days old at the next, since saves keep using Apple until the Mapbox
 map ships. It replaces each `places` row's
 point with Overture's, and deletes a row with no match together with its index entry, so no Apple
 point stays behind. It also re-points each saved place to its open-data match and drops the Apple
