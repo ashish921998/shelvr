@@ -31,6 +31,10 @@ const mock = vi.hoisted(() => ({
   isAnonymous: vi.fn(async () => true),
   syncPurchasesForResult: vi.fn(async () => ({})),
   restorePurchases: vi.fn(),
+  presentCodeRedemptionSheet: vi.fn(async () => {}),
+  customerInfoListeners: new Set<
+    (info: { entitlements: { active: object } }) => void
+  >(),
   syncPurchase: vi.fn(async () => true),
   appStateListeners: [] as ((state: string) => void)[],
 }));
@@ -66,6 +70,13 @@ seedRequire("react-native-purchases", {
     isAnonymous: mock.isAnonymous,
     syncPurchasesForResult: mock.syncPurchasesForResult,
     restorePurchases: mock.restorePurchases,
+    presentCodeRedemptionSheet: mock.presentCodeRedemptionSheet,
+    addCustomerInfoUpdateListener: (
+      listener: (info: { entitlements: { active: object } }) => void,
+    ) => mock.customerInfoListeners.add(listener),
+    removeCustomerInfoUpdateListener: (
+      listener: (info: { entitlements: { active: object } }) => void,
+    ) => mock.customerInfoListeners.delete(listener),
     overridePreferredLocale: async () => {},
     getOfferings: mock.getOfferings,
     checkTrialOrIntroductoryPriceEligibility: mock.checkEligibility,
@@ -178,6 +189,8 @@ beforeEach(() => {
   mock.isAnonymous.mockReset().mockResolvedValue(true);
   mock.syncPurchasesForResult.mockReset().mockResolvedValue({});
   mock.syncPurchase.mockReset().mockResolvedValue(true);
+  mock.presentCodeRedemptionSheet.mockReset().mockResolvedValue(undefined);
+  mock.customerInfoListeners.clear();
   mock.appStateListeners = [];
   push.mockClear();
 });
@@ -715,6 +728,32 @@ describe("a purchase made while signed in", () => {
     await expect(restorePurchases()).resolves.toBe("restored");
 
     await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
+  });
+
+  it("reads a redeemed code into the account once RevenueCat reports Pro", async () => {
+    const { presentRedeemCodeSheet } = await loadReady();
+
+    await expect(presentRedeemCodeSheet()).resolves.toBe(true);
+    expect(mock.presentCodeRedemptionSheet).toHaveBeenCalledOnce();
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
+
+    const [listener] = [...mock.customerInfoListeners];
+    act(() => listener!({ entitlements: { active: {} } }));
+    await act(() => new Promise<void>((r) => setTimeout(r, 0)));
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
+    expect(mock.customerInfoListeners.size).toBe(1);
+
+    act(() => listener!({ entitlements: { active: { Pro: {} } } }));
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
+    expect(mock.customerInfoListeners.size).toBe(0);
+  });
+
+  it("stops watching when the redeem sheet fails to open", async () => {
+    const { presentRedeemCodeSheet } = await loadReady();
+    mock.presentCodeRedemptionSheet.mockRejectedValueOnce(new Error("no"));
+
+    await expect(presentRedeemCodeSheet()).rejects.toThrow("no");
+    expect(mock.customerInfoListeners.size).toBe(0);
   });
 
   it("reads again when the first read finds nothing yet", async () => {

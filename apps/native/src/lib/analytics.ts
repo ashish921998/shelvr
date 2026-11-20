@@ -139,6 +139,7 @@ export type AnalyticsEventProperties = {
     source: "purchase" | "restore";
     delay_ms: number;
   };
+  redeem_code_opened: Record<string, never>;
   paywall_blocked_action_resumed: {
     placement: string;
     delay_ms: number;

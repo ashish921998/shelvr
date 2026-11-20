@@ -27,6 +27,7 @@ import { observePaywallPresentation } from "@/lib/paywall-telemetry";
 import { randomUUID } from "expo-crypto";
 import {
   mapPaywallResult,
+  restoreFoundAccess,
   shouldOpenPaywallFallback,
   type PaywallOutcome,
 } from "@/lib/paywall-result";
@@ -617,6 +618,37 @@ export async function restorePurchases(): Promise<RestorePurchasesOutcome> {
   } catch {
     return "unavailable";
   }
+}
+
+const REDEEM_WATCH_MS = 10 * 60_000;
+let stopRedeemWatch: (() => void) | null = null;
+
+export async function presentRedeemCodeSheet(): Promise<boolean> {
+  const landing = reservePurchaseLanding();
+  if (!(await awaitRcSyncReady())) return false;
+  const rc = getPurchases();
+  if (!rc) return false;
+  stopRedeemWatch?.();
+  const listener = (info: { entitlements: { active: object } }) => {
+    if (!restoreFoundAccess(info)) return;
+    stop();
+    landing();
+  };
+  const timer = setTimeout(() => stop(), REDEEM_WATCH_MS);
+  const stop = () => {
+    clearTimeout(timer);
+    rc.removeCustomerInfoUpdateListener(listener);
+    if (stopRedeemWatch === stop) stopRedeemWatch = null;
+  };
+  stopRedeemWatch = stop;
+  rc.addCustomerInfoUpdateListener(listener);
+  try {
+    await rc.presentCodeRedemptionSheet();
+  } catch (error) {
+    stop();
+    throw error;
+  }
+  return true;
 }
 
 export async function readRcTrialCancellation(): Promise<TrialCancellationState> {
