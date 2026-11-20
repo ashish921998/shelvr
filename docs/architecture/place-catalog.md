@@ -275,8 +275,12 @@ read the row.
 point with Overture's, and deletes a row with no match together with its index entry, so no Apple
 point stays behind. It also re-points each saved place to its open-data match and drops the Apple
 point of one with no match, keeping its name and city; the place then shows in lists but not as a
-pin until the person sets a point. A point the person set themselves is theirs and stays. Until the
-pass runs, `items.placePins` and the `places` rows still hold Apple points.
+pin until the person sets a point. The pass does the same to every other copy of a point:
+`tripStops`, `sharedListPlaces`, `placeVisits`, `placeRemovals` and place corrections. Each copy is
+re-pointed to its open-data match; a copy with no match keeps its name and city and loses its
+point, and a visit or removal then matches by name and city only. A point the person set
+themselves, such as a correction or a pin they dropped, is theirs and stays. Until the pass runs,
+these tables, `items.placePins` and the `places` rows still hold Apple points.
 
 This reads the published terms; it is not legal advice. Before the place page ships, ask Google to
 confirm rules 1 and 2 in writing.
