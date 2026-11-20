@@ -30,8 +30,10 @@ filled yet, and the Apple question at the end of this step is open.
 
 The Map tab shows the table's places in the area on screen as "Discover" pins, beside and under the
 person's own pins, up to 300 at a time (see Reading by area in
-[place-catalog.md](../architecture/place-catalog.md)). A new user opens the Map on the busiest city of
-the first answer, not an empty state. There is no switch to hide them. Tapping one opens Apple's place card (`openPlaceDetails(appleId)`), as a
+[place-catalog.md](../architecture/place-catalog.md)). A new user who shares their location stays on
+it when a Discover place is within 50 km, or when the area answer may have left a nearer one out;
+otherwise, or without location, the Map opens on the busiest city of the first answer, not an empty
+state. There is no switch to hide them. Tapping one opens Apple's place card (`openPlaceDetails(appleId)`), as a
 saved pin does today. Where the card cannot open (before iOS 18, on Android, or when Apple has no card
 for the id), it opens the place in Apple Maps, or Google Maps on Android. Search and the kind filters
 cover them too, and search lists the person's own match before a Discover one.
