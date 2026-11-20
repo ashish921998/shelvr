@@ -176,17 +176,18 @@ describe("useInviteJoinCoordinator", () => {
   });
 
   it.each([
-    ["dropping onboarding's queue", mocks.clearPending],
-    ["finishing onboarding", mocks.completeOnboarding],
+    ["dropping onboarding's queue", mocks.clearPending, 0],
+    ["finishing onboarding", mocks.completeOnboarding, 1],
   ])(
     "still navigates and reports it when %s fails after the invite cleared",
-    async (_step, store) => {
+    async (_step, store, onboardingCalls) => {
       const failure = new Error("keychain locked");
       store.mockImplementationOnce(() => {
         throw failure;
       });
       await joinWith(false, "list1");
       expect(mocks.clearPendingInvite).toHaveBeenCalled();
+      expect(mocks.completeOnboarding).toHaveBeenCalledTimes(onboardingCalls);
       expect(mocks.router.replace).toHaveBeenCalledWith(
         "/shared-list/list1?joined=1",
       );
