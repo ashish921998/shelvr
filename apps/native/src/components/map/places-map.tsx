@@ -42,7 +42,7 @@ type Props = {
   pins: MapPin[];
   /** The places the first camera frames when it cannot open on the person. */
   framed: MapPin[];
-  anchors: LatLng[];
+  anchors: LatLng[] | undefined;
   /** iOS: open on the person's location and show it. */
   showsUser: boolean;
   /** Clears the floating filter row above the map. */
@@ -98,18 +98,24 @@ export function PlacesMap({
   const [firstCamera] = useState(showsUser ? undefined : fit);
   // The opening check reads these when it fires, so a filter picked while it waits is the one it frames.
   const latest = useRef({ anchors, fit });
-  useEffect(() => {
-    latest.current = { anchors, fit };
-  }, [anchors, fit]);
   const centredOnUser = useRef(false);
   const centre = useRef<LatLng | undefined>(undefined);
   const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  // Set while the camera travels to the person; once it rests, a map with none of their places in
-  // reach moves on to the city they saved the most in.
+  // Set while the camera travels to the person; once it rests and the places in reach have loaded, a
+  // map with none of them moves on to the busiest city.
   const checkNearby = useRef<(() => void) | undefined>(undefined);
+  const rested = useRef(false);
+  useEffect(() => {
+    latest.current = { anchors, fit };
+    if (anchors !== undefined && rested.current) checkNearby.current?.();
+  }, [anchors, fit]);
   const waitForRest = () => {
     clearTimeout(settle.current);
-    settle.current = setTimeout(() => checkNearby.current?.(), SETTLE_MS);
+    rested.current = false;
+    settle.current = setTimeout(() => {
+      rested.current = true;
+      checkNearby.current?.();
+    }, SETTLE_MS);
   };
   useEffect(() => {
     if (!showsUser || centredOnUser.current) return;
@@ -124,8 +130,10 @@ export function PlacesMap({
           );
     };
     checkNearby.current = () => {
+      const { anchors } = latest.current;
+      if (anchors === undefined) return;
       checkNearby.current = undefined;
-      if (!hasPlaceNear(centre.current, latest.current.anchors)) showCity();
+      if (!hasPlaceNear(centre.current, anchors)) showCity();
     };
     // No position means the person's own location. A map mounted moments ago can refuse its first
     // move, so it is retried; if every try fails, the map shows the busiest city instead.

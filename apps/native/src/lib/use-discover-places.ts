@@ -16,6 +16,7 @@ export function useDiscoverPlaces(
   box: MapBox | undefined,
 ): {
   settled: boolean;
+  areaLoaded: boolean;
   beside: DiscoverPlace[];
   open: (place: DiscoverPlace) => void;
 } {
@@ -45,9 +46,19 @@ export function useDiscoverPlaces(
   return useMemo(
     () => ({
       settled: !query.isPending,
+      areaLoaded:
+        box !== undefined && query.isSuccess && !query.isPlaceholderData,
       beside: discoverBeside(own, query.data ?? NONE),
       open,
     }),
-    [query.isPending, query.data, own, open],
+    [
+      query.isPending,
+      query.isSuccess,
+      query.isPlaceholderData,
+      box,
+      query.data,
+      own,
+      open,
+    ],
   );
 }

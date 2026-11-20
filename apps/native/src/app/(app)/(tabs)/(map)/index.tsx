@@ -100,6 +100,7 @@ export default function MapScreen() {
   const all = places.data;
   const {
     settled,
+    areaLoaded,
     beside,
     open: openDiscover,
   } = useDiscoverPlaces(all ?? NO_PLACES, area);
@@ -162,7 +163,7 @@ export default function MapScreen() {
       })),
     [matches, rt.themeName, theme],
   );
-  const { anchorEntries, anchors } = useAnchors(shown);
+  const { anchorEntries, anchors } = useAnchors(shown, areaLoaded);
   const liveFraming = useMemo(
     () =>
       // As on the city page, a pin far out of town stays on the map but does not set the zoom.

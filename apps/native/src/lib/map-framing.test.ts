@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { anchorsOf, nextFraming } from "./map-framing";
+import { anchorsKnown, anchorsOf, nextFraming } from "./map-framing";
 
 describe("nextFraming", () => {
   const first = { key: "all", places: ["a"], opened: true };
@@ -49,5 +49,21 @@ describe("anchorsOf", () => {
     expect(anchorsOf([other, own])).toEqual([own]);
     expect(anchorsOf([other])).toEqual([other]);
     expect(anchorsOf([])).toEqual([]);
+  });
+});
+
+describe("anchorsKnown", () => {
+  const own = { source: "own" as const, lat: 1, lng: 1 };
+  const other = { source: "discover" as const, lat: 2, lng: 2 };
+
+  it("trusts the person's own places at once", () => {
+    expect(anchorsKnown([own], false)).toBe(true);
+  });
+
+  it("waits for the area's answer before judging by Discover places", () => {
+    expect(anchorsKnown([other], false)).toBe(false);
+    expect(anchorsKnown([], false)).toBe(false);
+    expect(anchorsKnown([other], true)).toBe(true);
+    expect(anchorsKnown([], true)).toBe(true);
   });
 });

@@ -9,15 +9,29 @@ export function anchorsOf<T extends Anchored>(shown: T[]): T[] {
   return own.length > 0 ? own : shown;
 }
 
+export function anchorsKnown(
+  anchorEntries: readonly Anchored[],
+  areaLoaded: boolean,
+): boolean {
+  return areaLoaded || anchorEntries.some((place) => place.source === "own");
+}
+
 export function useAnchors<T extends Anchored>(
   shown: T[],
-): { anchorEntries: T[]; anchors: { lat: number; lng: number }[] } {
+  areaLoaded: boolean,
+): {
+  anchorEntries: T[];
+  anchors: { lat: number; lng: number }[] | undefined;
+} {
   const anchorEntries = useMemo(() => anchorsOf(shown), [shown]);
   const anchors = useMemo(
     () => anchorEntries.map(({ lat, lng }) => ({ lat, lng })),
     [anchorEntries],
   );
-  return { anchorEntries, anchors };
+  return {
+    anchorEntries,
+    anchors: anchorsKnown(anchorEntries, areaLoaded) ? anchors : undefined,
+  };
 }
 
 export function nextFraming<T>(
