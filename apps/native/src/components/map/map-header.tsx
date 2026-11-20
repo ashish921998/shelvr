@@ -117,7 +117,7 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     gap: 7,
   },
-  actions: { flexDirection: "row", alignItems: "center", gap: 10 },
+  actions: { flexDirection: "row", alignItems: "center", gap: theme.gap(1.25) },
   title: {
     flex: 1,
     minWidth: 0,
