@@ -99,19 +99,45 @@ describe("visibleBox", () => {
     expect(tight.east).toBeLessThanOrEqual(wide.east);
   });
 
-  it("clamps a world view to the world box", () => {
+  it("sends the world box for a view half the world wide", () => {
+    const screen = { width: WIDTH, height: HEIGHT, apple: false };
+    expect(visibleBox({ latitude: 0, longitude: 0, zoom: 0 }, screen)).toEqual(
+      WORLD_BOX,
+    );
     expect(
-      visibleBox(
-        { latitude: 0, longitude: 0, zoom: 0 },
-        { width: WIDTH, height: HEIGHT, apple: false },
-      ),
+      visibleBox({ latitude: 20, longitude: 100, zoom: 2 }, screen),
     ).toEqual(WORLD_BOX);
-    const poles = visibleBox(
-      { latitude: 89, longitude: 179.9, zoom: 4 },
+    const poles = visibleBox({ latitude: 89, longitude: 10, zoom: 4 }, screen)!;
+    expect(poles.north).toBe(85);
+  });
+
+  it("keeps both sides of the antimeridian", () => {
+    const box = visibleBox(
+      { latitude: -16.8, longitude: 179.95, zoom: 11 },
       { width: WIDTH, height: HEIGHT, apple: false },
     )!;
-    expect(poles.north).toBe(85);
-    expect(poles.east).toBe(180);
+    expect(box.east).toBeGreaterThan(180);
+    expect(contains(box, { latitude: -16.8, longitude: -179.98 + 360 })).toBe(
+      true,
+    );
+  });
+
+  it("covers the span a rotated or tilted map reports", () => {
+    const screen = { width: WIDTH, height: HEIGHT, apple: false };
+    const centre = { latitude: 38.72, longitude: -9.125, zoom: 13 };
+    const edge = { latitude: 38.72, longitude: -9.195 };
+    expect(contains(visibleBox(centre, screen)!, edge)).toBe(false);
+    const rotated = visibleBox(
+      { ...centre, latitudeDelta: 0.07, longitudeDelta: 0.1476 },
+      screen,
+    )!;
+    expect(contains(rotated, edge)).toBe(true);
+    const horizon = { latitude: 38.72 + 0.2, longitude: -9.125 };
+    const flat = { ...centre, latitudeDelta: 0.25, longitudeDelta: 0.07 };
+    expect(contains(visibleBox(flat, screen)!, horizon)).toBe(false);
+    expect(contains(visibleBox({ ...flat, tilt: 45 }, screen)!, horizon)).toBe(
+      true,
+    );
   });
 
   it("gives no box for a camera it cannot read", () => {

@@ -219,8 +219,12 @@ export function PlacesMap({
   const trackCamera = (event: {
     coordinates: { latitude?: number; longitude?: number };
     zoom: number;
+    tilt: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
   }) => {
     const { latitude, longitude } = event.coordinates;
+    const { zoom, tilt, latitudeDelta, longitudeDelta } = event;
     centre.current =
       latitude !== undefined && longitude !== undefined
         ? { lat: latitude, lng: longitude }
@@ -229,7 +233,15 @@ export function PlacesMap({
     clearTimeout(areaTimer.current);
     if (latitude !== undefined && longitude !== undefined)
       areaTimer.current = setTimeout(
-        () => reportArea({ latitude, longitude, zoom: event.zoom }),
+        () =>
+          reportArea({
+            latitude,
+            longitude,
+            zoom,
+            tilt,
+            latitudeDelta,
+            longitudeDelta,
+          }),
         AREA_REST_MS,
       );
   };

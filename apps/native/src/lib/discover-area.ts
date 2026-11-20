@@ -12,13 +12,21 @@ export const WORLD_BOX: MapBox = {
   north: 85,
 };
 
-export type CameraView = { latitude: number; longitude: number; zoom: number };
+export type CameraView = {
+  latitude: number;
+  longitude: number;
+  zoom: number;
+  tilt?: number;
+  latitudeDelta?: number;
+  longitudeDelta?: number;
+};
 
 type ScreenView = { width: number; height: number; apple: boolean };
 
 const WORLD_WIDTH = 256;
 const MAX_LATITUDE = 85;
 const MIN_HALF_SPAN = 1e-6;
+const WORLD_SPAN = 180;
 
 function standardZoom(camera: CameraView, screen: ScreenView): number {
   if (!screen.apple) return camera.zoom;
@@ -29,19 +37,16 @@ function standardZoom(camera: CameraView, screen: ScreenView): number {
   );
 }
 
-function snapped(
-  centre: number,
-  half: number,
-  min: number,
-  max: number,
-): [number, number] {
+function snapped(centre: number, half: number): [number, number] {
   const step = 2 ** Math.ceil(Math.log2(Math.max(half, MIN_HALF_SPAN) / 2));
   const cell = Math.floor(centre / step);
   const reach = Math.ceil(half / step);
-  return [
-    Math.max(min, (cell - reach) * step),
-    Math.min(max, (cell + 1 + reach) * step),
-  ];
+  return [(cell - reach) * step, (cell + 1 + reach) * step];
+}
+
+function spanHalf(delta: number | undefined, tilted: boolean): number {
+  if (delta === undefined || !Number.isFinite(delta)) return 0;
+  return tilted ? delta : delta / 2;
 }
 
 export function visibleBox(
@@ -62,21 +67,30 @@ export function visibleBox(
   );
   const degreesPerPoint =
     360 / (WORLD_WIDTH * 2 ** standardZoom(camera, screen));
+  const tilted = (camera.tilt ?? 0) > 0;
   const [west, east] = snapped(
     camera.longitude,
-    (screen.width / 2) * degreesPerPoint,
-    -180,
-    180,
+    Math.max(
+      (screen.width / 2) * degreesPerPoint,
+      spanHalf(camera.longitudeDelta, tilted),
+    ),
   );
+  if (east - west >= WORLD_SPAN) return WORLD_BOX;
   const [south, north] = snapped(
     latitude,
-    (screen.height / 2) *
-      degreesPerPoint *
-      Math.cos((latitude * Math.PI) / 180),
-    -MAX_LATITUDE,
-    MAX_LATITUDE,
+    Math.max(
+      (screen.height / 2) *
+        degreesPerPoint *
+        Math.cos((latitude * Math.PI) / 180),
+      spanHalf(camera.latitudeDelta, tilted),
+    ),
   );
-  return { west, south, east, north };
+  return {
+    west,
+    south: Math.max(-MAX_LATITUDE, south),
+    east,
+    north: Math.min(MAX_LATITUDE, north),
+  };
 }
 
 export function sameBox(a: MapBox | undefined, b: MapBox | undefined): boolean {
