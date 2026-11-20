@@ -43,7 +43,7 @@ vi.mock("@/components/home/home-header", () => ({
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { colors: {} } }),
+  useUnistyles: () => ({ theme: { colors: {}, control: { minHeight: 48 } } }),
 }));
 vi.mock("react-native", () => ({
   View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
