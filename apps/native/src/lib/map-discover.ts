@@ -4,8 +4,8 @@ import type { FunctionReturnType } from "convex/server";
 import { searchPlaces } from "./map-filters";
 
 export type DiscoverPlace = FunctionReturnType<
-  typeof api.places.forMap
->[number];
+  typeof api.places.inArea
+>["places"][number];
 
 type OwnPin = { name: string; lat: number; lng: number; appleId?: string };
 

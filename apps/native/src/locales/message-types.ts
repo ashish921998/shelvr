@@ -783,7 +783,6 @@ type MessageParams = {
   "signInScene.dessert": undefined;
   "opener.getStarted": undefined;
   "map.filterAll": undefined;
-  "map.discover": undefined;
   "map.kindFood": undefined;
   "map.kindCoffee": undefined;
   "map.kindDessert": undefined;
@@ -794,6 +793,7 @@ type MessageParams = {
   "map.kindStay": undefined;
   "map.filters": undefined;
   "map.searchPlaceholder": undefined;
+  "map.showMyLocation": undefined;
   "map.searchNoResults": { query: string };
   "map.searchMore": { count: number; total: number };
   "navigation.trips": undefined;

@@ -79,6 +79,7 @@ import type * as model_passportMap from "../model/passportMap.js";
 import type * as model_paymentTelemetry from "../model/paymentTelemetry.js";
 import type * as model_placeIdentity from "../model/placeIdentity.js";
 import type * as model_placeImport from "../model/placeImport.js";
+import type * as model_placeIndex from "../model/placeIndex.js";
 import type * as model_placeKinds from "../model/placeKinds.js";
 import type * as model_placeList from "../model/placeList.js";
 import type * as model_placeRemovals from "../model/placeRemovals.js";
@@ -227,6 +228,7 @@ declare const fullApi: ApiFromModules<{
   "model/paymentTelemetry": typeof model_paymentTelemetry;
   "model/placeIdentity": typeof model_placeIdentity;
   "model/placeImport": typeof model_placeImport;
+  "model/placeIndex": typeof model_placeIndex;
   "model/placeKinds": typeof model_placeKinds;
   "model/placeList": typeof model_placeList;
   "model/placeRemovals": typeof model_placeRemovals;
@@ -326,4 +328,5 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+  geospatial: import("@convex-dev/geospatial/_generated/component.js").ComponentApi<"geospatial">;
 };

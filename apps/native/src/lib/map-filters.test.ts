@@ -3,6 +3,7 @@ import {
   busiestCityPlaces,
   filterPlaces,
   hasPlaceNear,
+  keepSelected,
   mapFilters,
   searchPlaces,
   topSearchResults,
@@ -10,6 +11,18 @@ import {
 } from "./map-filters";
 
 const place = (kinds: string[], city?: string) => ({ kinds, city });
+
+describe("keepSelected", () => {
+  it("keeps the picked kind when no place in view has it", () => {
+    expect(keepSelected(["food"], "coffee")).toEqual(["food", "coffee"]);
+    expect(keepSelected(["food", "coffee"], "coffee")).toEqual([
+      "food",
+      "coffee",
+    ]);
+    expect(keepSelected(["food"], null)).toEqual(["food"]);
+    expect(keepSelected([], null)).toEqual([]);
+  });
+});
 
 describe("mapFilters", () => {
   it("offers only the kinds with three or more places, most places first", () => {
