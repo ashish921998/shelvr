@@ -217,7 +217,7 @@ export function TripPlannerMap({
       ...pins.map((pin) => ({
         id: pin.id,
         name: `${t("trip.dayTab", { day: String(pin.day + 1) })} · ${Number(pin.id.split(":")[1]) + 1}. ${pin.name}`,
-        title: pin.title,
+        title: process.env.EXPO_OS === "ios" ? pin.title : pin.name,
         text: pin.text,
         lat: pin.coordinates.latitude,
         lng: pin.coordinates.longitude,

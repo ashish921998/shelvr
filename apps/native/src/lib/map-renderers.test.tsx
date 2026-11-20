@@ -215,6 +215,33 @@ it("shows the stay and only the selected day's markers and line, then restores t
   ]);
 });
 
+it("names every Overview stop on Android, where the marker title is all TalkBack reads", async () => {
+  vi.stubEnv("EXPO_OS", "android");
+  const { GoogleMaps } = await import("expo-maps");
+  render(
+    <TripPlannerMap
+      days={days}
+      stay={undefined}
+      activeDay={null}
+      height={330}
+      onSelectDay={vi.fn()}
+    />,
+  );
+  const markers = vi.mocked(GoogleMaps.View).mock.lastCall?.[0].markers ?? [];
+  act(() =>
+    vi
+      .mocked(GoogleMaps.View)
+      .mock.lastCall?.[0].onCameraMove?.({ zoom: 16 } as never),
+  );
+  const zoomed = vi.mocked(GoogleMaps.View).mock.lastCall?.[0].markers ?? [];
+  expect(markers.length).toBeGreaterThan(0);
+  expect(zoomed.map((marker) => marker.title)).toEqual([
+    "Alpha",
+    "Beta",
+    "Gamma",
+  ]);
+});
+
 it("keeps a chosen trip stop in focus after its day's stops are reordered", async () => {
   const map = (stops: typeof cityPins) => (
     <TripPlannerMap
