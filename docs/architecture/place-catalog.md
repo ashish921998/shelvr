@@ -140,16 +140,21 @@ move to plain strings before the list grows.
 ### Order
 
 1. PR #794: kind, cuisine and four features, set by hand.
-2. Store an Overture id and type on `places`, matched at import. Move the stored point to Overture.
-3. The type list, its labels in every language, and pin emoji from the type.
-4. Type and features from the classifier for saves.
-5. The second row of chips on the Map, and the type and features on a place's detail.
+2. Store an Overture id, type and `googlePlaceId` on `places`, matched at import. Move the stored
+   point to Overture.
+3. The full-screen place page with live Google details. It has no map, so it can ship before the
+   Mapbox map.
+4. The Mapbox map. It needs a store build, because it moves the native fingerprint. Apple drops out.
+5. The type list, its labels in every language, and pin emoji from the type.
+6. Type and features from the classifier for saves.
+7. The second row of chips on the Map, and the type and features on the place page.
 
 ### Open questions
 
 - **Overture attribution.** What the app must show when it uses Overture data.
-- **Matching** an Overture place to an Apple id for the same venue, and what to do when they
-  disagree on the point.
+- **Matching** an Overture place to its Google id, and what to do when the two disagree on the
+  point or Google finds a different venue.
+- **Google's written confirmation** of rules 1 and 2 under "Provider data".
 - **Which 60 types.** The Lisbon counts above are a first cut; a second city should confirm them.
 
 ## Reading by area
@@ -216,24 +221,48 @@ change do.
 
 ## Provider data
 
-Apple says that MapKit place ids are unique and stay valid over time, and Apple's own sample code
-stores them ([WWDC25 session 204](https://developer.apple.com/videos/play/wwdc2025/204?time=45),
-[Interacting with nearby points of interest](https://developer.apple.com/tutorials/data/documentation/mapkit/interacting-with-nearby-points-of-interest.md)).
-The Apple Maps Server API looks places up by id, one at a time or in batches, and maps an id that
-changed to its new id ([Apple Maps Server API](https://developer.apple.com/documentation/applemapsserverapi.md)).
-Google exempts its place ids from its caching limits
-([Places SDK policies](https://developers.google.com/maps/documentation/places/ios-sdk/policies)).
+Decided on 2026-11-20: **Mapbox draws the map, Google gives a place's live details, and open data
+is what we store.** Apple drops out once the Mapbox map ships.
 
-Apple's developer agreement allows only temporary storage of its place data and no database built
-from it (DPLA Attachment 6, §2.2 and §2.5). Keeping the id and refreshing the rest is not enough:
-the stored name and point should come from a provider whose data we may keep. Overture's open
-places can be kept; see "Labels" above.
+| Provider             | Used for                                       | May we store it?                         | May it sit on a Mapbox map? |
+| -------------------- | ---------------------------------------------- | ---------------------------------------- | --------------------------- |
+| Overture open places | Every pin: name, point, type                   | Yes                                      | Yes                         |
+| Google Places (New)  | A place's page: photos, rating, hours, details | Only the place id; a point for 30 days   | No                          |
+| Mapbox               | Drawing the map                                | Search results are temporary only        | Yes                         |
+| Apple Maps (today)   | Today's lookups and map                        | Temporary only (DPLA Att. 6, §2.2, §2.5) | No: Apple maps only (§2.4)  |
 
-- The refresh job fetches stale rows by id. It refreshes only rows that people view, because saves,
-  imports and refreshes share one daily Apple quota.
-- Refresh bookkeeping lives in its own table. The job patches a `places` row only when the
-  provider's data changed, because a patch re-runs every query that read the row.
-- A second provider (Mapbox, Google, Foursquare) is one more optional, indexed id field.
+Google's terms say "No use with a non-Google map"
+([service terms](https://cloud.google.com/maps-platform/terms/maps-service-terms), §14.2) and allow
+its content without a map ([Places policies](https://developers.google.com/maps/documentation/places/web-service/policies)).
+Mapbox's place search is "only available for temporary use"
+([Search Box API](https://docs.mapbox.com/api/search/search-box/)). So the app keeps these rules:
+
+1. **A pin never comes from Google.** Its name and point come from our `places` row, filled from
+   open data. A Google point never places a pin, cached or not.
+2. **Google's details show on a full-screen place page with no map on it.** Not in a sheet over the
+   Mapbox map, and with no small map inside the page.
+3. **Google's block is labelled and set apart.** The Google Maps logo sits beside it, each photo
+   shows its author credit, and our own name and type stay visibly separate from it.
+4. **Only Google's place id is stored.** A row keeps an optional, indexed `googlePlaceId`. Photos,
+   rating and hours are fetched when the page opens and never written to our database.
+5. **The id comes from a search.** An import finds each place's Google id with Text Search that
+   asks for ids only, which Google does not charge for.
+
+Google's key stays on the server: a Convex action fetches the details and returns them to the page.
+For a place from a person's own save it checks `aiAllowed` first, like every other path that sends
+a person's place to a third party. Its
+field mask asks only for what the page shows, because a call is billed at its most expensive
+field. At list prices, one opened page costs about 2 to 3 cents after the free monthly amount:
+Place Details with rating and hours is $20 per 1,000 (1,000 free), and a photo $7 per 1,000
+(1,000 free) ([pricing](https://developers.google.com/maps/billing-and-pricing/pricing), read
+2026-11-20).
+
+A refresh reads each new Overture release and updates the rows whose name, point or type changed.
+It patches a `places` row only when something changed, because a patch re-runs every query that
+read the row.
+
+This reads the published terms; it is not legal advice. Before the place page ships, ask Google to
+confirm rules 1 and 2 in writing.
 
 ## Counts
 
@@ -264,8 +293,7 @@ reasons. Each one is a constraint on this design:
   save of a venue is matched and another is not, a visit must not split in two, and a place that
   gains a match later must keep its visit. The plan is to keep today's matching and add the `places`
   link as one more match. The merge rule is not designed yet.
-- **Apple's terms** on keeping a place's name and point: storage must be temporary. See "Provider data".
-- **Apple's daily quota.** Saves, imports and refreshes share it.
+- **Apple's daily quota.** Saves share it until the Mapbox map ships and Apple drops out.
 
 ## Phases
 
