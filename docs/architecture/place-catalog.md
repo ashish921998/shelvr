@@ -291,7 +291,10 @@ missed by one run is at most 30 days old at the next, since saves keep using App
 map ships. At cutover, the backend deploy that comes before the Mapbox
 build's release stops every Apple lookup for every build, old ones included, and changes `withListPins`
 (`model/placeList.ts`), which both `pinListPlaces` and `addPlaceListParts` use, to match each list place's Google point to an open-data point and store that point instead, the way
-the import uses it only to find a match, so a list saved later never stores a Google point; and then one last run
+the import uses it only to find a match, so a list saved later never stores a Google point. The same deploy makes the mutations that write
+a point (`placePins.storePins`, `withListPins` and any other) refuse an Apple or Google point. A
+mutation always runs the deployed code, so a lookup that started before the deploy and finishes
+after it is refused at the write, and no draining is needed. Then one last run
 handles every remaining Apple or Google point whatever its age. The Mapbox build is released only after that
 run finishes, so a Mapbox map never shows an Apple or Google point. It replaces each `places` row's
 point with Overture's, and deletes a row with no match together with its index entry, so no Apple
