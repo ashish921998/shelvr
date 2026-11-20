@@ -38,6 +38,7 @@ type Props = {
   pins: MapPin[];
   /** The places the first camera frames when it cannot open on the person. */
   framed: MapPin[];
+  anchors: LatLng[];
   /** iOS: open on the person's location and show it. */
   showsUser: boolean;
   height: number;
@@ -55,6 +56,7 @@ type Props = {
 export function PlacesMap({
   pins,
   framed,
+  anchors,
   showsUser,
   height,
   topInset,
@@ -112,10 +114,10 @@ export function PlacesMap({
     () => (overview ? cameraFor(overview) : undefined),
     [cameraFor, overview],
   );
-  const latest = useRef({ pins, fit, overviewCamera });
+  const latest = useRef({ anchors, fit, overviewCamera });
   useEffect(() => {
-    latest.current = { pins, fit, overviewCamera };
-  }, [pins, fit, overviewCamera]);
+    latest.current = { anchors, fit, overviewCamera };
+  }, [anchors, fit, overviewCamera]);
   const centredOnUser = useRef(false);
   const framedOnce = useRef(showsUser || firstCamera !== undefined);
   const touched = useRef(false);
@@ -149,7 +151,7 @@ export function PlacesMap({
     };
     checkNearby.current = () => {
       checkNearby.current = undefined;
-      if (!hasPlaceNear(centre.current, latest.current.pins)) showCity();
+      if (!hasPlaceNear(centre.current, latest.current.anchors)) showCity();
     };
     // No position means the person's own location. A map mounted moments ago can refuse its first
     // move, so it is retried; if every try fails, the map shows the busiest city instead.
@@ -220,7 +222,8 @@ export function PlacesMap({
     const initialFit = latest.current.fit;
     if (framedOnce.current || !canFrameLatePlaces || !initialFit) return;
     framedOnce.current = true;
-    if (showsUser && hasPlaceNear(centre.current, latest.current.pins)) return;
+    if (showsUser && hasPlaceNear(centre.current, latest.current.anchors))
+      return;
     return moveCamera(
       () =>
         map()

@@ -837,6 +837,7 @@ type MessageParams = {
   "map.kindStay": undefined;
   "map.filters": undefined;
   "map.filterAll": undefined;
+  "map.discover": undefined;
   "map.searchPlaceholder": undefined;
   "map.searchNoResults": { query: string };
   "map.searchMore": { count: number; total: number };

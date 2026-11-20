@@ -9,6 +9,10 @@ const mocks = vi.hoisted(() => ({
   centre: undefined as ((c: object, zoom: number) => void) | undefined,
   zoomOut: undefined as number | undefined,
   viewport: undefined as { height: number; bottomInset: number } | undefined,
+  pins: [] as { id: string }[],
+  select: undefined as ((id: string) => void) | undefined,
+  chip: undefined as { selected: boolean; onPress: () => void } | undefined,
+  discover: { settled: true, beside: [] as object[], open: vi.fn() },
 }));
 const place = (name: string, city: string, lat: number) => ({
   itemId: name,
@@ -28,6 +32,9 @@ vi.mock("@/lib/analytics", () => ({
   analytics: { capture: vi.fn(), captureError: vi.fn() },
 }));
 vi.mock("@/lib/map-location", () => ({ useMapLocation: () => "denied" }));
+vi.mock("@/lib/use-discover-places", () => ({
+  useDiscoverPlaces: () => mocks.discover,
+}));
 vi.mock("@/lib/apple-place-card", () => ({
   canOpenPlaceCard: () => false,
   openPlaceDetails: vi.fn(),
@@ -46,10 +53,13 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@/components/map/map-trip-pill", () => ({
   MapTripPill: vi.fn(() => null),
 }));
-vi.mock("expo-router", () => ({
-  useRouter: () => ({ push: vi.fn() }),
-  useFocusEffect: (cb: () => void) => void cb,
-}));
+vi.mock("expo-router", async () => {
+  const { useEffect } = await import("react");
+  return {
+    useRouter: () => ({ push: vi.fn() }),
+    useFocusEffect: (cb: () => void) => useEffect(cb, [cb]),
+  };
+});
 vi.mock("expo-router/js-tabs", () => ({ useBottomTabBarHeight: () => 80 }));
 vi.mock("@/components/back-circle", () => ({
   BackCircle: vi.fn(
@@ -84,7 +94,11 @@ vi.mock("@/components/map/places-map", () => ({
       zoomOut: number;
       height: number;
       bottomInset: number;
+      pins: { id: string }[];
+      onSelect: (id: string) => void;
     }) => {
+      mocks.pins = props.pins;
+      mocks.select = props.onSelect;
       mocks.centre = props.onCentreChange;
       mocks.zoomOut = props.zoomOut;
       mocks.viewport = props;
@@ -99,6 +113,13 @@ vi.mock("@/components/map/map-empty", () => ({ MapEmpty: vi.fn(() => null) }));
 vi.mock("@/components/map/map-kind-row", () => ({
   MapKindRow: vi.fn(() => null),
 }));
+vi.mock("@/components/map/map-filter-chips", () => ({
+  MapFilterChip: vi.fn((props: NonNullable<typeof mocks.chip>) => {
+    mocks.chip = props;
+    return null;
+  }),
+}));
+vi.mock("@/lib/haptics", () => ({ haptics: { selection: vi.fn() } }));
 vi.mock("@/components/map/map-round-button", () => ({
   MapRoundButton: vi.fn(() => null),
 }));
@@ -122,7 +143,7 @@ vi.mock("@/components/ui/screen-loader", () => ({
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}), absoluteFillObject: {} },
   useUnistyles: () => ({
-    theme: { gap: (n: number) => n * 8 },
+    theme: { gap: (n: number) => n * 8, colors: { muted: "#999" } },
     rt: { insets: { top: 0 } },
   }),
 }));
@@ -150,7 +171,11 @@ vi.mock("react-native", () => ({
   ),
 }));
 
-beforeEach(() => mocks.setCity.mockClear());
+beforeEach(() => {
+  mocks.setCity.mockClear();
+  mocks.discover = { settled: true, beside: [], open: vi.fn() };
+  mocks.chip = undefined;
+});
 
 it("tells the tab bar which city is in view, and clears it when zoomed out to every place", () => {
   render(<MapScreen />);
@@ -171,4 +196,29 @@ it("keeps the map behind the floating controls while framing places above them",
   render(<MapScreen />);
   expect(mocks.viewport?.height).toBe(800);
   expect(mocks.viewport?.bottomInset).toBeGreaterThan(80);
+});
+
+it("shows Discover places beside the person's own, opens them, and hides them with the chip", () => {
+  const cafe = {
+    _id: "p1",
+    name: "Cafe",
+    city: "Lisbon",
+    lat: 38.71,
+    lng: -9.1,
+    appleId: "apple-1",
+    kinds: ["coffee"],
+  };
+  mocks.discover = { settled: true, beside: [cafe], open: vi.fn() };
+  render(<MapScreen />);
+  expect(mocks.pins.map((pin) => pin.id)).toContain("discover:p1");
+  expect(mocks.chip?.selected).toBe(true);
+
+  act(() => mocks.select?.("discover:p1"));
+  expect(mocks.discover.open).toHaveBeenCalledWith(
+    expect.objectContaining({ _id: "p1", source: "discover" }),
+  );
+
+  act(() => mocks.chip?.onPress());
+  expect(mocks.chip?.selected).toBe(false);
+  expect(mocks.pins.map((pin) => pin.id)).not.toContain("discover:p1");
 });

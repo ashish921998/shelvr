@@ -12,7 +12,7 @@ import {
 import { uniquePlacePins } from "./model/trip";
 
 /** Arrays a function returns hold at most 8192 values; a pin is 30 per save at most. */
-const MAX_MAP_PLACES = 3000;
+export const MAX_MAP_PLACES = 3000;
 
 const mapPlaceValidator = v.object({
   itemId: v.id("items"),

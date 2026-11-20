@@ -55,9 +55,11 @@ export function MapFilterChips({
   onSelect,
   inset = true,
   inline = false,
+  discover,
 }: {
   inset?: boolean;
   inline?: boolean;
+  discover?: { on: boolean; onToggle: () => void };
   kinds: PlaceKind[];
   selected: PlaceKind | readonly PlaceKind[] | null;
   onSelect: (kind: PlaceKind | null) => void;
@@ -69,7 +71,19 @@ export function MapFilterChips({
   };
   const selection =
     typeof selected === "string" ? [selected] : (selected ?? []);
-  const chips = kinds.map((kind) => {
+  const discoverChip = discover ? (
+    <MapFilterChip
+      key="discover"
+      label={t("map.discover")}
+      icon="sparkles"
+      selected={discover.on}
+      onPress={() => {
+        void haptics.selection();
+        discover.onToggle();
+      }}
+    />
+  ) : null;
+  const kindChips = kinds.map((kind) => {
     const picked = selection.includes(kind);
     return (
       <MapFilterChip
@@ -81,6 +95,7 @@ export function MapFilterChips({
       />
     );
   });
+  const chips = [discoverChip, ...kindChips];
   if (inline) return <View style={[styles.row, styles.inline]}>{chips}</View>;
   return (
     <ScrollView
@@ -119,10 +134,17 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.gap(1.25),
     borderRadius: theme.radius.xl,
     borderCurve: "continuous",
-    boxShadow: "0 1px 3px rgba(43, 36, 24, 0.10)",
+    borderWidth: StyleSheet.hairlineWidth,
+    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.12)",
   },
-  selected: { backgroundColor: theme.colors.foreground },
-  plain: { backgroundColor: theme.colors.surface },
+  selected: {
+    backgroundColor: theme.colors.foreground,
+    borderColor: theme.colors.foreground,
+  },
+  plain: {
+    backgroundColor: theme.colors.frame,
+    borderColor: theme.colors.border,
+  },
   label: {
     ...theme.type.labelStrong,
     color: theme.colors.foreground,

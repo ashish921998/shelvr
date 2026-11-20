@@ -91,6 +91,7 @@ function map(person: { locate?: number; focus?: MapFocus } = {}) {
   return (
     <PlacesMap
       pins={AUSTIN}
+      anchors={AUSTIN}
       framed={AUSTIN}
       showsUser
       height={800}
@@ -141,6 +142,7 @@ it.each([false, true])(
     ) => (
       <PlacesMap
         pins={pins}
+        anchors={pins}
         framed={framed}
         showsUser={showsUser}
         height={800}
@@ -179,6 +181,7 @@ it("keeps initial saved-city positioning when loaded visits refresh the places",
   rerender(
     <PlacesMap
       pins={refreshed}
+      anchors={refreshed}
       framed={refreshed}
       showsUser
       height={800}
@@ -222,6 +225,7 @@ it("uses native markers to declutter nearby places, keeping their emoji, title a
   render(
     <PlacesMap
       pins={[{ ...AUSTIN[0]!, emoji: "🍜" }, AUSTIN[1]!]}
+      anchors={AUSTIN}
       framed={AUSTIN}
       showsUser={false}
       height={800}
@@ -255,6 +259,7 @@ it("draws nearby places as one place pin named after the first and keeps them al
   render(
     <PlacesMap
       pins={AUSTIN}
+      anchors={AUSTIN}
       framed={AUSTIN}
       showsUser={false}
       height={800}
@@ -289,6 +294,7 @@ it("flies out to frame every place when asked to zoom out", async () => {
   rerender(
     <PlacesMap
       pins={AUSTIN}
+      anchors={AUSTIN}
       framed={AUSTIN}
       overview={far}
       zoomOut={1}
@@ -313,6 +319,7 @@ it("frames the first saved places once when the map opened empty without locatio
   const noLocation = (pins: typeof AUSTIN, bottomInset = 120) => (
     <PlacesMap
       pins={pins}
+      anchors={pins}
       framed={pins}
       showsUser={false}
       height={800}
@@ -345,6 +352,7 @@ it.each([
       <PlacesMap
         pins={AUSTIN}
         framed={AUSTIN}
+        anchors={AUSTIN}
         showsUser={false}
         height={800}
         topInset={100}
@@ -375,6 +383,7 @@ it("drops a pending sheet refit once the person touches the map", async () => {
     <PlacesMap
       pins={AUSTIN}
       framed={AUSTIN}
+      anchors={AUSTIN}
       showsUser={false}
       height={800}
       topInset={100}
@@ -402,6 +411,7 @@ it.each([
     const located = (pins: typeof AUSTIN) => (
       <PlacesMap
         pins={pins}
+        anchors={pins}
         framed={pins}
         showsUser
         height={800}
@@ -436,6 +446,7 @@ it("keeps the area the person panned to when their first places arrive", async (
   const located = (pins: typeof AUSTIN) => (
     <PlacesMap
       pins={pins}
+      anchors={pins}
       framed={pins}
       showsUser
       height={800}
@@ -467,6 +478,7 @@ it("frames the first places when the map moved without the person touching it", 
   const located = (pins: typeof AUSTIN) => (
     <PlacesMap
       pins={pins}
+      anchors={pins}
       framed={pins}
       showsUser
       height={800}
@@ -504,6 +516,7 @@ it("keeps the chosen area when location access is turned off later", async () =>
   rerender(
     <PlacesMap
       pins={AUSTIN}
+      anchors={AUSTIN}
       framed={AUSTIN}
       showsUser={false}
       height={800}
