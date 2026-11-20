@@ -49,6 +49,7 @@ type Props = {
   /** Clears the floating filter row above the map. */
   topInset: number;
   focus?: MapFocus;
+  locate?: number;
   onSelect: (id: string) => void;
   onArea: (box: MapBox) => void;
 };
@@ -60,6 +61,7 @@ export function PlacesMap({
   showsUser,
   topInset,
   focus,
+  locate,
   onSelect,
   onArea,
 }: Props) {
@@ -204,6 +206,14 @@ export function PlacesMap({
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
   }, [focus]);
+  useEffect(() => {
+    if (locate === undefined) return;
+    checkNearby.current = undefined;
+    return moveCamera(
+      () => map()?.setCameraPosition(),
+      (error) => analytics.captureError("places_map_camera_failed", error),
+    );
+  }, [locate]);
 
   // A new filter whose places are all out of reach brings them into view. While the opening move is
   // still deciding where to go, its check frames the new filter instead. Search does not refit:
@@ -275,7 +285,8 @@ export function PlacesMap({
         properties={{ isMyLocationEnabled: showsUser }}
         uiSettings={{
           compassEnabled: false,
-          myLocationButtonEnabled: showsUser,
+          myLocationButtonEnabled: false,
+          togglePitchEnabled: false,
         }}
         markers={pins.map((pin) => ({
           id: pin.id,

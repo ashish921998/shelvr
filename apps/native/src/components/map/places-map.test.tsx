@@ -157,6 +157,23 @@ describe("PlacesMap opening on the person", () => {
     await restOnPerson({ lat: CASCAIS.lat, lng: CASCAIS.lng + 0.2 });
     expect(holds(areas.at(-1), LISBON[0])).toBe(false);
   });
+
+  it("goes back to the person on every locate press, and the opening check no longer moves away", async () => {
+    const props = {
+      pins: LISBON,
+      framed: LISBON,
+      showsUser: true,
+      topInset: 100,
+      onSelect: () => {},
+      onArea: () => {},
+    };
+    const view = render(<PlacesMap {...props} anchors={undefined} />);
+    await restOnPerson(PARIS);
+    view.rerender(<PlacesMap {...props} anchors={undefined} locate={1} />);
+    view.rerender(<PlacesMap {...props} anchors={undefined} locate={2} />);
+    view.rerender(<PlacesMap {...props} anchors={[]} locate={2} />);
+    expect(latitudes()).toEqual([undefined, undefined, undefined]);
+  });
 });
 
 describe("PlacesMap without the person's location", () => {

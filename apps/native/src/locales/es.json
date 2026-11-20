@@ -900,6 +900,7 @@
   "map.kindStay": "Alojamiento",
   "map.filters": "Filtrar lugares",
   "map.searchPlaceholder": "Buscar lugares",
+  "map.showMyLocation": "Mostrar mi ubicación",
   "map.searchNoResults": "Ningún lugar coincide con «%{query}».",
   "map.searchMore": "Se muestran %{count} de %{total}. Sigue escribiendo para acotar.",
   "navigation.trips": "Planes",

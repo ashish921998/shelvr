@@ -846,6 +846,7 @@
   "map.kindStay": "숙소",
   "map.filters": "장소 필터",
   "map.searchPlaceholder": "장소 검색",
+  "map.showMyLocation": "내 위치 보기",
   "map.searchNoResults": "“%{query}”에 맞는 장소가 없어요.",
   "map.searchMore": "%{total}개 중 %{count}개 표시 중. 더 입력하면 좁혀져요.",
   "navigation.trips": "플랜",

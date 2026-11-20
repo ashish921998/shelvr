@@ -1,5 +1,6 @@
 import { EmptyState } from "@/components/empty-state";
 import { MapFilterChips } from "@/components/map/map-filter-chips";
+import { MapLocateButton } from "@/components/map/map-locate-button";
 import { MapSearch } from "@/components/map/map-search";
 import { MapWentSwitch } from "@/components/map/map-went-switch";
 import {
@@ -50,9 +51,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/** Room left at the right of the filter row for MapKit's my-location button. */
-const LOCATE_BUTTON_CLEARANCE = 64;
-
 type OwnPlace = FunctionReturnType<typeof api.mapPlaces.listMapPlaces>[number];
 type Entry = MapEntry<OwnPlace>;
 
@@ -95,6 +93,7 @@ export default function MapScreen() {
   // Closed once a result is picked, so the map and place card get the room; typing opens it again.
   const [listOpen, setListOpen] = useState(true);
   const [focus, setFocus] = useState<MapFocus | undefined>(undefined);
+  const [locate, setLocate] = useState<number | undefined>(undefined);
   const [area, setArea] = useState<MapBox | undefined>(undefined);
 
   const all = places.data;
@@ -264,6 +263,7 @@ export default function MapScreen() {
         showsUser={location === "granted"}
         topInset={top + overlayHeight}
         focus={focus}
+        locate={locate}
         onSelect={select}
         onArea={setArea}
       />
@@ -280,30 +280,32 @@ export default function MapScreen() {
         }}
       />
       <View style={[styles.overlay, { top }]}>
-        <View
-          style={{
-            // Kept clear of MapKit's my-location button in the top right corner, which it would cover.
-            marginRight: location === "granted" ? LOCATE_BUTTON_CLEARANCE : 0,
-          }}
-        >
-          <MapSearch
-            text={searchText}
-            onChangeText={(text) => {
-              setSearchText(text);
-              setListOpen(true);
-            }}
-            total={matches.length}
-            results={
-              searching && listOpen
-                ? topSearchResults(matches).map((place) => ({
-                    id: entryId(place),
-                    name: place.name,
-                    city: place.city,
-                  }))
-                : undefined
-            }
-            onSelect={pickResult}
-          />
+        <View style={styles.searchRow}>
+          <View style={styles.search}>
+            <MapSearch
+              text={searchText}
+              onChangeText={(text) => {
+                setSearchText(text);
+                setListOpen(true);
+              }}
+              total={matches.length}
+              results={
+                searching && listOpen
+                  ? topSearchResults(matches).map((place) => ({
+                      id: entryId(place),
+                      name: place.name,
+                      city: place.city,
+                    }))
+                  : undefined
+              }
+              onSelect={pickResult}
+            />
+          </View>
+          {location === "granted" ? (
+            <MapLocateButton
+              onPress={() => setLocate((previous) => (previous ?? 0) + 1)}
+            />
+          ) : null}
         </View>
         {went.showSwitch && !searching ? (
           <MapWentSwitch selected={went.selected} onSelect={setWentFilter} />
@@ -320,4 +322,10 @@ const styles = StyleSheet.create((theme) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
   empty: { flex: 1, backgroundColor: theme.colors.background },
   overlay: { position: "absolute", left: 0, right: 0, gap: theme.gap(1) },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingRight: theme.gap(2),
+  },
+  search: { flex: 1, marginRight: -theme.gap(1) },
 }));

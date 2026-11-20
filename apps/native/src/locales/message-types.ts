@@ -793,6 +793,7 @@ type MessageParams = {
   "map.kindStay": undefined;
   "map.filters": undefined;
   "map.searchPlaceholder": undefined;
+  "map.showMyLocation": undefined;
   "map.searchNoResults": { query: string };
   "map.searchMore": { count: number; total: number };
   "navigation.trips": undefined;
