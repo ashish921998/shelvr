@@ -173,7 +173,10 @@ export default function MapScreen() {
       })),
     [anchorEntries],
   );
-  const framed = useHeldFraming(liveFraming, `${kind ?? ""}|${went.selected}`);
+  const framed = useHeldFraming(
+    liveFraming,
+    `${all !== undefined}|${kind ?? ""}|${went.selected}`,
+  );
 
   const reported = useRef(false);
   useEffect(() => {
