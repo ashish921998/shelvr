@@ -26,7 +26,7 @@ export const KIND_LABELS: Record<PlaceKind, TextMessageKey> = {
 };
 
 /** How far from the person, or from the map's centre, a saved place still counts as nearby. */
-const NEARBY_KM = 50;
+export const NEARBY_KM = 50;
 
 /** A filter shows only once enough of your places fit it to be worth a tap. */
 const MIN_FILTER_PLACES = 3;
@@ -55,6 +55,13 @@ export function mapRowFilters(
   places: readonly Kinded[],
 ): { kind: PlaceKind; count: number }[] {
   return mapFilters(places).filter((filter) => filter.kind !== "stay");
+}
+
+export function keepSelected(
+  kinds: PlaceKind[],
+  selected: readonly PlaceKind[],
+): PlaceKind[] {
+  return [...kinds, ...selected.filter((kind) => !kinds.includes(kind))];
 }
 
 export function filterPlaces<T extends Kinded>(

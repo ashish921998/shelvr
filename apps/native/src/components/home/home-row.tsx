@@ -50,7 +50,7 @@ export function HomeRow({
 
 const styles = StyleSheet.create((theme) => ({
   row: {
-    height: 47,
+    height: theme.control.minHeight,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(2),

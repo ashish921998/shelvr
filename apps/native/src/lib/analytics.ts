@@ -234,7 +234,6 @@ export type AnalyticsEventProperties = {
   city_place_visited: { visited: boolean };
   city_card_share_sheet_opened: { place_count: number; visited_count: number };
   map_opened: { count: number; discover: number; located: boolean };
-  map_discover_toggled: { on: boolean };
   map_filter_selected: { kind: string };
   map_place_opened: { card: boolean; source: "own" | "discover" };
   map_search_result_opened: Record<string, never>;

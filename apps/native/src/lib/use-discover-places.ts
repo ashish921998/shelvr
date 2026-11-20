@@ -4,20 +4,29 @@ import { stopAction } from "@/lib/trip-planner";
 import { usePlaceOpener } from "@/lib/use-place-opener";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
-import { useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo } from "react";
+import { type MapBox, WORLD_BOX } from "./discover-area";
 import { type DiscoverPlace, discoverBeside } from "./map-discover";
 
 const NONE: DiscoverPlace[] = [];
+const AREA_CACHE_MS = 5 * 60 * 1000;
 
 export function useDiscoverPlaces(
   own: readonly { name: string; lat: number; lng: number; appleId?: string }[],
+  box: MapBox | undefined,
 ): {
   settled: boolean;
+  areaLoaded: boolean;
+  areaPartial: boolean;
   beside: DiscoverPlace[];
   open: (place: DiscoverPlace) => void;
 } {
-  const query = useQuery(convexQuery(api.places.forMap, {}));
+  const query = useQuery({
+    ...convexQuery(api.places.inArea, { box: box ?? WORLD_BOX }),
+    placeholderData: keepPreviousData,
+    gcTime: AREA_CACHE_MS,
+  });
   const { open: openWith } = usePlaceOpener(
     stopAction,
     "map_discover_maps_failed",
@@ -37,12 +46,16 @@ export function useDiscoverPlaces(
     },
     [openWith],
   );
+  const areaLoaded =
+    box !== undefined && query.isSuccess && !query.isPlaceholderData;
   return useMemo(
     () => ({
       settled: !query.isPending,
-      beside: discoverBeside(own, query.data ?? NONE),
+      areaLoaded,
+      areaPartial: areaLoaded && query.data?.complete === false,
+      beside: discoverBeside(own, query.data?.places ?? NONE),
       open,
     }),
-    [query.isPending, query.data, own, open],
+    [query.isPending, areaLoaded, query.data, own, open],
   );
 }

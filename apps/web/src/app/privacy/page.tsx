@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMetadata(
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="November 14, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="November 20, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
@@ -75,8 +75,12 @@ export default function PrivacyPage() {
             <strong>Your location.</strong> On iPhone, the Map tab asks for
             permission to show where you are. If you allow it, the map uses your
             location on your device to open near you and to show your position.
-            The map does not send your location to us, and we do not track your
-            live location.
+            The map never sends us your exact position. To show places we
+            suggest, it asks us for the places in the area on screen. When the
+            map is on you, that area tells us roughly where you are, more
+            closely the further you zoom in, but never more closely than about a
+            kilometre. We do not save these areas, and we do not track your live
+            location.
           </li>
           <li>
             <strong>Purchase information.</strong> If you subscribe to Shelvr

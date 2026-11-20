@@ -11,8 +11,15 @@ const mocks = vi.hoisted(() => ({
   viewport: undefined as { height: number; bottomInset: number } | undefined,
   pins: [] as { id: string }[],
   select: undefined as ((id: string) => void) | undefined,
-  chip: undefined as { selected: boolean; onPress: () => void } | undefined,
-  discover: { settled: true, beside: [] as object[], open: vi.fn() },
+  chips: undefined as { kinds: string[] } | undefined,
+  went: undefined as ((value: string) => void) | undefined,
+  discover: {
+    settled: true,
+    areaLoaded: true,
+    areaPartial: false,
+    beside: [] as object[],
+    open: vi.fn(),
+  },
 }));
 const place = (name: string, city: string, lat: number) => ({
   itemId: name,
@@ -111,20 +118,19 @@ vi.mock("@/components/map/map-search", () => ({
 }));
 vi.mock("@/components/map/map-empty", () => ({ MapEmpty: vi.fn(() => null) }));
 vi.mock("@/components/map/map-kind-row", () => ({
-  MapKindRow: vi.fn(() => null),
-}));
-vi.mock("@/components/map/map-filter-chips", () => ({
-  MapFilterChip: vi.fn((props: NonNullable<typeof mocks.chip>) => {
-    mocks.chip = props;
+  MapKindRow: vi.fn((props: typeof mocks.chips) => {
+    mocks.chips = props;
     return null;
   }),
 }));
-vi.mock("@/lib/haptics", () => ({ haptics: { selection: vi.fn() } }));
 vi.mock("@/components/map/map-round-button", () => ({
   MapRoundButton: vi.fn(() => null),
 }));
 vi.mock("@/components/map/map-went-switch", () => ({
-  MapWentSwitch: vi.fn(() => null),
+  MapWentSwitch: vi.fn(({ onSelect }: { onSelect: (v: string) => void }) => {
+    mocks.went = onSelect;
+    return null;
+  }),
 }));
 vi.mock("@/lib/use-place-visit", () => ({
   usePlaceVisits: () => ({
@@ -134,6 +140,9 @@ vi.mock("@/lib/use-place-visit", () => ({
     error: null,
     offerRetry: vi.fn(),
   }),
+}));
+vi.mock("@convex/model/placeVisits", () => ({
+  visitMatcher: () => (place: { name: string }) => place.name === "A",
 }));
 vi.mock("@/lib/appearance", () => ({ isDarkThemeName: () => false }));
 vi.mock("@/components/empty-state", () => ({ EmptyState: vi.fn(() => null) }));
@@ -173,8 +182,14 @@ vi.mock("react-native", () => ({
 
 beforeEach(() => {
   mocks.setCity.mockClear();
-  mocks.discover = { settled: true, beside: [], open: vi.fn() };
-  mocks.chip = undefined;
+  mocks.discover = {
+    settled: true,
+    areaLoaded: true,
+    areaPartial: false,
+    beside: [],
+    open: vi.fn(),
+  };
+  mocks.chips = undefined;
 });
 
 it("tells the tab bar which city is in view, and clears it when zoomed out to every place", () => {
@@ -198,7 +213,7 @@ it("keeps the map behind the floating controls while framing places above them",
   expect(mocks.viewport?.bottomInset).toBeGreaterThan(80);
 });
 
-it("shows Discover places beside the person's own, opens them, and hides them with the chip", () => {
+it("shows Discover places beside the person's own while the went switch is on All, and opens them", () => {
   const cafe = {
     _id: "p1",
     name: "Cafe",
@@ -208,17 +223,21 @@ it("shows Discover places beside the person's own, opens them, and hides them wi
     appleId: "apple-1",
     kinds: ["coffee"],
   };
-  mocks.discover = { settled: true, beside: [cafe], open: vi.fn() };
+  mocks.discover = {
+    settled: true,
+    areaLoaded: true,
+    areaPartial: false,
+    beside: [cafe],
+    open: vi.fn(),
+  };
   render(<MapScreen />);
   expect(mocks.pins.map((pin) => pin.id)).toContain("discover:p1");
-  expect(mocks.chip?.selected).toBe(true);
 
   act(() => mocks.select?.("discover:p1"));
   expect(mocks.discover.open).toHaveBeenCalledWith(
     expect.objectContaining({ _id: "p1", source: "discover" }),
   );
 
-  act(() => mocks.chip?.onPress());
-  expect(mocks.chip?.selected).toBe(false);
+  act(() => mocks.went?.("want"));
   expect(mocks.pins.map((pin) => pin.id)).not.toContain("discover:p1");
 });

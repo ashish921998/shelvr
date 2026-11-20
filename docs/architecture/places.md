@@ -103,6 +103,10 @@ proved its worth on new saves. Until then old saves fall back to name matching a
 
 ## The larger design, and why not now
 
+On 2026-11-20 we chose to build a shared catalog after all: see
+[place-catalog.md](place-catalog.md). It keeps a person's own names, points and cities on their own
+rows and answers each problem below.
+
 The rejected draft made a shared catalog of places, one per Apple id, and one row per person per place
 holding their city, visits and removals. Codex found these problems in it, checked against the code:
 

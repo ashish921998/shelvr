@@ -1,7 +1,6 @@
 import { EmptyState } from "@/components/empty-state";
 import { MapEmpty } from "@/components/map/map-empty";
 import { MapHeader, MAP_HEADER_HEIGHT } from "@/components/map/map-header";
-import { MapFilterChip } from "@/components/map/map-filter-chips";
 import { MapKindRow } from "@/components/map/map-kind-row";
 import { MapRoundButton } from "@/components/map/map-round-button";
 import { MapSearchResults } from "@/components/map/map-search";
@@ -22,11 +21,12 @@ import {
 import { isDarkThemeName } from "@/lib/appearance";
 import { withAlpha } from "@/lib/color";
 import { framedPins } from "@/lib/city-pins";
-import { haptics } from "@/lib/haptics";
+import type { MapBox } from "@/lib/discover-area";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
   busiestCityPlaces,
   filterPlaces,
+  keepSelected,
   mapRowFilters,
   topSearchResults,
   type WentFilter,
@@ -41,6 +41,7 @@ import {
   ownOnTop,
   searchEntries,
 } from "@/lib/map-discover";
+import { useAnchors, useHeldFraming } from "@/lib/map-framing";
 import { useMapLocation } from "@/lib/map-location";
 import { useMapCity } from "@/lib/use-map-city";
 import { placeEmoji } from "@/lib/map-pin-emoji";
@@ -55,7 +56,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Keyboard, ScrollView, View } from "react-native";
+import { Keyboard, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type OwnPlace = FunctionReturnType<typeof api.mapPlaces.listMapPlaces>[number];
@@ -82,52 +83,58 @@ function useMapEntries(
   went: { selected: WentFilter; places: OwnPlace[] },
   visited: (place: OwnPlace) => boolean,
   kinds: PlaceKind[],
-  onToggle: () => void,
 ) {
-  const { settled, beside, open } = useDiscoverPlaces(all ?? NO_PLACES);
-  const [on, setOn] = useState(true);
-  const showChip =
-    went.selected === "all" && (all?.length ?? 0) > 0 && beside.length > 0;
-  const discoverShown =
-    went.selected === "all" && (on || !showChip) ? beside : NO_DISCOVER;
+  const [area, setArea] = useState<MapBox | undefined>(undefined);
+  const { settled, areaLoaded, areaPartial, beside, open } = useDiscoverPlaces(
+    all ?? NO_PLACES,
+    area,
+  );
+  const discoverShown = went.selected === "all" ? beside : NO_DISCOVER;
   const entries = useMemo(
     () => mapEntries(went.places, discoverShown, visited),
     [went.places, discoverShown, visited],
   );
-  const filters = useMemo(
-    () => mapRowFilters([...(all ?? NO_PLACES), ...discoverShown]),
-    [all, discoverShown],
-  );
-  const active = useMemo(
+  const chipKinds = useMemo(
     () =>
-      kinds.filter((kind) => filters.some((filter) => filter.kind === kind)),
-    [kinds, filters],
+      keepSelected(
+        mapRowFilters([...(all ?? NO_PLACES), ...discoverShown]).map(
+          (filter) => filter.kind,
+        ),
+        kinds,
+      ),
+    [all, discoverShown, kinds],
   );
-  const shown = useMemo(() => filterPlaces(entries, active), [entries, active]);
-  const anchorEntries = useMemo(() => {
-    const own = shown.filter((place) => place.source === "own");
-    return own.length > 0 ? own : shown;
-  }, [shown]);
-  const discover = showChip
-    ? {
-        on,
-        onToggle: () => {
-          analytics.capture("map_discover_toggled", { on: !on });
-          setOn(!on);
-          onToggle();
-        },
-      }
-    : undefined;
+  const shown = useMemo(() => filterPlaces(entries, kinds), [entries, kinds]);
+  const { anchorEntries, anchors } = useAnchors(shown, areaLoaded);
   return {
+    area,
+    setArea,
     settled,
+    areaPartial,
     beside,
     openDiscover: open,
-    discover,
-    filters,
-    active,
+    chipKinds,
     shown,
     anchorEntries,
+    anchors,
   };
+}
+
+function useFraming(anchorEntries: Entry[], key: string) {
+  const live = useMemo(
+    () =>
+      // As on the city page, a pin far out of town stays on the map but does not set the zoom.
+      framedPins(busiestCityPlaces(anchorEntries)).map((place) => ({
+        ...place,
+        id: entryId(place),
+      })),
+    [anchorEntries],
+  );
+  const overview = useMemo(
+    () => anchorEntries.map((place) => ({ ...place, id: entryId(place) })),
+    [anchorEntries],
+  );
+  return { framed: useHeldFraming(live, key), overview };
 }
 
 export default function MapScreen() {
@@ -181,17 +188,17 @@ export default function MapScreen() {
   );
   const { city, onCentreChange } = useMapCity(all ?? NO_PLACES);
   const {
+    area,
+    setArea,
     settled,
+    areaPartial,
     beside,
     openDiscover,
-    discover,
-    filters,
-    active,
+    chipKinds,
     shown,
     anchorEntries,
-  } = useMapEntries(all, went, visited, kinds, () =>
-    setFilterRevision((revision) => revision + 1),
-  );
+    anchors,
+  } = useMapEntries(all, went, visited, kinds);
   const searching = searchText.trim() !== "";
   const showWent = went.showSwitch && !searchOpen;
   // Search narrows whatever the filter shows; every match stays on the map, the first few are listed.
@@ -218,21 +225,16 @@ export default function MapScreen() {
       })),
     [matches, rt.themeName, theme],
   );
-  const overview = useMemo(
-    () => anchorEntries.map((place) => ({ ...place, id: entryId(place) })),
-    [anchorEntries],
-  );
   useEffect(() => {
     setMapCityInView(city);
   }, [city]);
-  const framed = useMemo(
-    () =>
-      // As on the city page, a pin far out of town stays on the map but does not set the zoom.
-      framedPins(busiestCityPlaces(anchorEntries)).map((place) => ({
-        ...place,
-        id: entryId(place),
-      })),
-    [anchorEntries],
+  const waiting =
+    all === undefined ||
+    (all.length === 0 && !settled) ||
+    location === "asking";
+  const { framed, overview } = useFraming(
+    anchorEntries,
+    `${waiting}|${kinds.join(",")}|${went.selected}`,
   );
 
   const reported = useRef(false);
@@ -256,14 +258,9 @@ export default function MapScreen() {
       />
     );
   }
-  if (
-    all === undefined ||
-    (all.length === 0 && !settled) ||
-    location === "asking"
-  )
-    return <ScreenLoader />;
+  if (waiting) return <ScreenLoader />;
   const hasPlaces = all.length > 0 || beside.length > 0;
-  const showStrip = filters.length > 0 || showWent || discover !== undefined;
+  const showStrip = chipKinds.length > 0 || showWent;
   const headerBottom = rt.insets.top + MAP_HEADER_HEIGHT;
   const located = location === "granted";
   const select = (id: string) => {
@@ -329,7 +326,11 @@ export default function MapScreen() {
         <PlacesMap
           pins={pins}
           framed={framed}
-          anchors={anchorEntries}
+          anchors={anchors}
+          areaPartial={
+            areaPartial &&
+            anchorEntries.every((place) => place.source === "discover")
+          }
           showsUser={located}
           height={mapHeight}
           topInset={headerBottom + theme.gap(1)}
@@ -341,6 +342,7 @@ export default function MapScreen() {
           filterRevision={filterRevision}
           onCentreChange={onCentreChange}
           onSelect={select}
+          onArea={setArea}
         />
       ) : null}
       <MapHeader
@@ -378,7 +380,7 @@ export default function MapScreen() {
         pointerEvents="box-none"
         style={[styles.aboveBar, { bottom: barHeight }]}
       >
-        {!hasPlaces ? (
+        {!hasPlaces && area === undefined ? (
           <MapEmpty
             located={located}
             onLocate={() => setLocate((n) => n + 1)}
@@ -386,7 +388,7 @@ export default function MapScreen() {
         ) : null}
         <View pointerEvents="box-none" style={styles.controls}>
           <MapTripPill city={city} />
-          {hasPlaces && located ? (
+          {(hasPlaces || area !== undefined) && located ? (
             <View style={styles.locate}>
               <MapRoundButton
                 icon="location"
@@ -412,38 +414,21 @@ export default function MapScreen() {
                 },
               ]}
             />
-            {showWent || discover ? (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.went}
-              >
-                {showWent ? (
-                  <MapWentSwitch
-                    selected={went.selected}
-                    onSelect={(value) => {
-                      setWentFilter(value);
-                      setFilterRevision((revision) => revision + 1);
-                    }}
-                  />
-                ) : null}
-                {discover ? (
-                  <MapFilterChip
-                    label={t("map.discover")}
-                    icon="sparkles"
-                    selected={discover.on}
-                    onPress={() => {
-                      void haptics.selection();
-                      discover.onToggle();
-                    }}
-                  />
-                ) : null}
-              </ScrollView>
+            {showWent ? (
+              <View style={styles.went}>
+                <MapWentSwitch
+                  selected={went.selected}
+                  onSelect={(value) => {
+                    setWentFilter(value);
+                    setFilterRevision((revision) => revision + 1);
+                  }}
+                />
+              </View>
             ) : null}
-            {filters.length > 0 ? (
+            {chipKinds.length > 0 ? (
               <MapKindRow
-                kinds={filters.map((filter) => filter.kind)}
-                selected={active}
+                kinds={chipKinds}
+                selected={kinds}
                 onSelect={choose}
               />
             ) : null}
