@@ -20,7 +20,7 @@ type Children = { children?: ReactNode };
 type Sample = { kind: string; city: string };
 
 const mocks = vi.hoisted(() => ({
-  setOnboardingProgress: vi.fn(),
+  storage: new Map<string, string>(),
   setPendingSpaces: vi.fn(),
   queueDemoUrl: vi.fn(),
   queueCityStamps: vi.fn(),
@@ -44,16 +44,6 @@ const mocks = vi.hoisted(() => ({
   carousel: vi.fn(),
   notifications: vi.fn(),
   permission: vi.fn<() => Promise<"granted" | "ask" | "blocked">>(),
-  progress: {
-    spaces: [] as string[],
-    step: 0,
-    travelCity: null as string | null,
-    beenCities: [] as string[],
-    goals: [] as string[],
-    savedCount: null as string | null,
-    skippedShare: false,
-    viewed: [] as string[],
-  },
   paywall: {} as { onPro: () => void },
 }));
 
@@ -92,12 +82,16 @@ vi.mock("@/lib/onboarding-paywall", async () => {
     },
   };
 });
-vi.mock("@/lib/pending-onboarding", () => ({
+vi.mock("expo-secure-store", () => ({
+  getItem: (key: string) => mocks.storage.get(key) ?? null,
+  setItem: (key: string, value: string) => mocks.storage.set(key, value),
+}));
+vi.mock("expo-crypto", () => ({ randomUUID: () => "operation" }));
+vi.mock("@/lib/pending-onboarding", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/pending-onboarding")>()),
   clearPending: vi.fn(),
-  getOnboardingProgress: () => mocks.progress,
   queueDemoUrl: mocks.queueDemoUrl,
   resolveOnboardingSpaceName: (name: string) => name,
-  setOnboardingProgress: mocks.setOnboardingProgress,
   setPendingSpaces: mocks.setPendingSpaces,
 }));
 vi.mock("@/lib/pending-city-stamps", () => ({
@@ -279,13 +273,19 @@ vi.mock("react-native", () => ({
 
 const tap = (name: string) =>
   fireEvent.click(screen.getByRole("button", { name }));
-const saved = () => mocks.setOnboardingProgress.mock.lastCall?.[0];
-const startAt = (step: (typeof ONBOARDING_STEPS)[number]) => {
-  mocks.progress = { ...mocks.progress, step: ONBOARDING_STEPS.indexOf(step) };
+const PROGRESS_KEY = "shelvr.onboarding.progress";
+const saved = () => JSON.parse(mocks.storage.get(PROGRESS_KEY) || "null");
+const startAt = (
+  step: (typeof ONBOARDING_STEPS)[number],
+  answers: Record<string, unknown> = {},
+) => {
+  mocks.storage.set(
+    PROGRESS_KEY,
+    JSON.stringify({ format: 1, step, viewed: [], completed: [], ...answers }),
+  );
 };
 const relaunch = () => {
   cleanup();
-  mocks.progress = saved();
   render(<OnboardingScreen />);
 };
 const viewsOf = (stepId: string) =>
@@ -297,17 +297,8 @@ const viewsOf = (stepId: string) =>
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.permission.mockReset().mockResolvedValue("ask");
+  mocks.storage.clear();
   mocks.authenticated = false;
-  mocks.progress = {
-    spaces: [],
-    step: 0,
-    travelCity: null,
-    beenCities: [],
-    goals: [],
-    savedCount: null,
-    skippedShare: false,
-    viewed: [],
-  };
 });
 afterEach(cleanup);
 
@@ -325,11 +316,10 @@ it("walks the questions, the chart and the city echo into a sample for the goal 
   tap("city:trip:trip:lisbon");
   expect(saved()).toMatchObject({
     goals: ["food", "travel"],
-    spaces: ["Travel", "Restaurants to try"],
     savedCount: "hundreds",
     beenCities: ["lisbon"],
     travelCity: "lisbon",
-    step: ONBOARDING_STEPS.indexOf("cityEcho"),
+    step: "cityEcho",
   });
   expect(screen.getByText("onboardingStatement.cityPicked")).toBeTruthy();
   tap("statement");
@@ -340,12 +330,7 @@ it("walks the questions, the chart and the city echo into a sample for the goal 
 });
 
 it("praises the city the user picked", () => {
-  mocks.progress = {
-    ...mocks.progress,
-    goals: ["travel"],
-    travelCity: "austin",
-  };
-  startAt("cityEcho");
+  startAt("cityEcho", { goals: ["travel"], travelCity: "austin" });
   render(<OnboardingScreen />);
   expect(screen.getByText("onboardingStatement.cityPicked")).toBeTruthy();
 });
@@ -369,8 +354,7 @@ it("plans for every goal when the goal question is skipped", () => {
 });
 
 it("asks where a person goes out when a date leads the goals", () => {
-  mocks.progress = { ...mocks.progress, goals: ["date", "travel", "food"] };
-  startAt("chart");
+  startAt("chart", { goals: ["date", "travel", "food"] });
   render(<OnboardingScreen />);
   tap("chart:date");
   expect(
@@ -393,25 +377,19 @@ it("goes back from the been step to the goals, and from the sample", () => {
 });
 
 it("asks where they have been after the goals, and keeps the picks with the progress", () => {
-  mocks.progress = { ...mocks.progress, goals: ["date"] };
-  startAt("goal");
+  startAt("goal", { goals: ["date"] });
   render(<OnboardingScreen />);
   tap("goal:continue");
   tap("been:lisbon");
   expect(saved()).toMatchObject({
     beenCities: ["lisbon"],
-    step: ONBOARDING_STEPS.indexOf("been"),
+    step: "been",
     viewed: expect.arrayContaining(["goal", "been"]),
   });
 });
 
 it("skips the been step with no cities and opens the chart", () => {
-  mocks.progress = {
-    ...mocks.progress,
-    goals: ["date"],
-    beenCities: ["lisbon"],
-  };
-  startAt("been");
+  startAt("been", { goals: ["date"], beenCities: ["lisbon"] });
   render(<OnboardingScreen />);
   tap("onboardingQ.skip");
   expect(saved()?.beenCities).toEqual([]);
@@ -419,8 +397,7 @@ it("skips the been step with no cities and opens the chart", () => {
 });
 
 it("goes back from the chart to the been step with its picks, also after a relaunch", () => {
-  mocks.progress = { ...mocks.progress, goals: ["date"] };
-  startAt("been");
+  startAt("been", { goals: ["date"] });
   render(<OnboardingScreen />);
   tap("been:lisbon");
   tap("been:continue");
@@ -434,8 +411,7 @@ it("goes back from the chart to the been step with its picks, also after a relau
 });
 
 it("sends the been step's view once, even after going back and closing the app", () => {
-  mocks.progress = { ...mocks.progress, goals: ["date"] };
-  startAt("goal");
+  startAt("goal", { goals: ["date"] });
   render(<OnboardingScreen />);
   tap("goal:continue");
   tap("common.back");
@@ -466,12 +442,7 @@ it("sends a step's view once, even after going back and closing the app", () => 
 });
 
 it("reuses the sample for the carousel after the spots, before the paywall", async () => {
-  mocks.progress = {
-    ...mocks.progress,
-    goals: ["travel"],
-    travelCity: "lisbon",
-  };
-  startAt("ahaSpots");
+  startAt("ahaSpots", { goals: ["travel"], travelCity: "lisbon" });
   render(<OnboardingScreen />);
   await act(async () => tap("aha:spots"));
   expect(mocks.ask).not.toHaveBeenCalled();
@@ -489,7 +460,7 @@ it("reuses the sample for the carousel after the spots, before the paywall", asy
     kind: "trip",
     city: "lisbon",
   });
-  expect(saved()?.step).toBe(ONBOARDING_STEPS.indexOf("notifications"));
+  expect(saved()?.step).toBe("notifications");
   await act(async () => tap("notifications:continue"));
   expect(mocks.ask).toHaveBeenCalledTimes(1);
 });
@@ -605,17 +576,21 @@ it("returns from the notifications step to the same carousel without opening the
 });
 
 it("hands the goals' spaces to the replay and reports the answers when onboarding ends", () => {
-  mocks.progress = {
-    ...mocks.progress,
-    step: ONBOARDING_STEPS.indexOf("ahaSpots"),
+  startAt("ahaSpots", {
     goals: ["date"],
     savedCount: "few",
     travelCity: "paris",
-  };
+  });
   render(<OnboardingScreen />);
   act(() => mocks.paywall.onPro());
-  expect(mocks.setPendingSpaces).toHaveBeenCalledWith(["Date nights"]);
-  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(ahaReelUrl(ahaReel("paris")));
+  expect(mocks.setPendingSpaces).toHaveBeenCalledWith(
+    ["Date nights"],
+    expect.objectContaining({ goals: ["date"], travelCity: "paris" }),
+  );
+  expect(saved()).toBeNull();
+  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
+    ahaReelUrl(ahaReel("paris")),
+  );
   expect(mocks.completeOnboarding).toHaveBeenCalled();
   expect(mocks.capture).toHaveBeenCalledWith(
     "onboarding_completed",
@@ -629,12 +604,7 @@ it("hands the goals' spaces to the replay and reports the answers when onboardin
 });
 
 it("queues the cities they have been to before leaving onboarding, and counts them", () => {
-  mocks.progress = {
-    ...mocks.progress,
-    step: ONBOARDING_STEPS.indexOf("ahaSpots"),
-    goals: ["date"],
-    beenCities: ["lisbon", "madrid"],
-  };
+  startAt("ahaSpots", { goals: ["date"], beenCities: ["lisbon", "madrid"] });
   render(<OnboardingScreen />);
   act(() => mocks.paywall.onPro());
   expect(mocks.queueCityStamps).toHaveBeenCalledWith(["lisbon", "madrid"]);
@@ -649,7 +619,7 @@ it("queues the cities they have been to before leaving onboarding, and counts th
 
 it("queues no cities for someone who signs in from the opener", () => {
   mocks.authenticated = true;
-  mocks.progress = { ...mocks.progress, beenCities: ["lisbon"] };
+  startAt("opener", { beenCities: ["lisbon"] });
   render(<OnboardingScreen />);
   tap("opener:signIn");
   tap("signIn:done");
@@ -658,12 +628,7 @@ it("queues no cities for someone who signs in from the opener", () => {
 });
 
 it("queues the real reel it played as the first save when onboarding ends", () => {
-  mocks.progress = {
-    ...mocks.progress,
-    step: ONBOARDING_STEPS.indexOf("ahaSpots"),
-    goals: ["date"],
-    travelCity: "austin",
-  };
+  startAt("ahaSpots", { goals: ["date"], travelCity: "austin" });
   render(<OnboardingScreen />);
   act(() => mocks.paywall.onPro());
   expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
@@ -672,12 +637,7 @@ it("queues the real reel it played as the first save when onboarding ends", () =
 });
 
 it("queues the default reel before leaving onboarding when the city question was skipped", () => {
-  mocks.progress = {
-    ...mocks.progress,
-    step: ONBOARDING_STEPS.indexOf("carousel"),
-    goals: ["travel"],
-    travelCity: null,
-  };
+  startAt("carousel", { goals: ["travel"], travelCity: null });
   render(<OnboardingScreen />);
   act(() => mocks.paywall.onPro());
   expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
@@ -696,8 +656,7 @@ it.each([
   ["firstSave", "aha:spots"],
   ["ahaSpots", "carousel:continue"],
 ] as const)("moves on from %s when it is skipped", (step, next) => {
-  mocks.progress = { ...mocks.progress, goals: ["date", "travel"] };
-  startAt(step);
+  startAt(step, { goals: ["date", "travel"] });
   render(<OnboardingScreen />);
   tap("onboardingQ.skip");
   expect(screen.getByRole("button", { name: next })).toBeTruthy();
@@ -722,7 +681,7 @@ it("goes past the first-save moment to the spots when sharing is skipped, and ba
   tap("onboardingQ.skip");
   expect(screen.getByRole("button", { name: "aha:spots" })).toBeTruthy();
   expect(saved()).toMatchObject({
-    step: ONBOARDING_STEPS.indexOf("ahaSpots"),
+    step: "ahaSpots",
     skippedShare: true,
   });
   const completions = mocks.capture.mock.calls.filter(
@@ -739,14 +698,14 @@ it("goes past the first-save moment to the spots when sharing is skipped, and ba
 });
 
 it("saves no reel for someone who skipped sharing, and saves it once they share after all", () => {
-  mocks.progress = { ...mocks.progress, goals: ["date"] };
-  startAt("ahaShare");
+  startAt("ahaShare", { goals: ["date"] });
   render(<OnboardingScreen />);
   tap("onboardingQ.skip");
   act(() => mocks.paywall.onPro());
   expect(mocks.queueDemoUrl).not.toHaveBeenCalled();
   expect(mocks.completeOnboarding).toHaveBeenCalled();
   cleanup();
+  startAt("ahaShare", { goals: ["date"] });
   render(<OnboardingScreen />);
   tap("onboardingQ.skip");
   tap("common.back");
@@ -808,4 +767,14 @@ it("sends the first-save view when someone skipped sharing, closed the app, then
   tap("common.back");
   tap("aha:share");
   expect(viewsOf("first_save")).toHaveLength(1);
+});
+
+it("ends onboarding progress when someone signs in to an existing account", () => {
+  mocks.authenticated = true;
+  startAt("opener", { goals: ["travel"] });
+  render(<OnboardingScreen />);
+  tap("opener:signIn");
+  tap("signIn:done");
+  expect(saved()).toBeNull();
+  expect(mocks.completeOnboarding).toHaveBeenCalled();
 });

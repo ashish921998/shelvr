@@ -16,7 +16,7 @@ import {
 
 const PENDING_KEY = "shelvr.pending.onboarding";
 
-const PROGRESS_VERSION = 14;
+const LEGACY_PROGRESS_VERSION = 14;
 
 export type PendingDemo = {
   url: string;
@@ -42,7 +42,7 @@ type PendingRecord = {
   skippedShare?: boolean;
 };
 
-type OnboardingAnswers = {
+export type OnboardingAnswers = {
   travelCity: SampleCityId | null;
   beenCities: SampleCityId[];
   goals: Goal[];
@@ -50,21 +50,9 @@ type OnboardingAnswers = {
   skippedShare: boolean;
 };
 
-type OnboardingProgress = OnboardingAnswers & {
-  spaces: string[];
-  step: number | null;
-  viewed: OnboardingStep[];
-};
-
-const NO_ANSWERS: OnboardingAnswers = {
-  travelCity: null,
-  beenCities: [],
-  goals: [],
-  savedCount: null,
-  skippedShare: false,
-};
-
-function answersOf(record: Partial<OnboardingAnswers>): OnboardingAnswers {
+export function parseOnboardingAnswers(
+  record: Partial<OnboardingAnswers>,
+): OnboardingAnswers {
   return {
     travelCity: isSampleCity(record.travelCity) ? record.travelCity : null,
     beenCities: readSampleCities(record.beenCities),
@@ -140,7 +128,7 @@ function readPendingRecord(): PendingRecord | null {
       step,
       viewed: readViewed(record.viewed),
       spaceNames: readSpaceNames(record.spaceNames),
-      ...answersOf(record),
+      ...parseOnboardingAnswers(record),
     };
   } catch {
     return null;
@@ -190,7 +178,10 @@ export function getOrCreatePendingOperationId(): string {
 }
 
 /** Onboarding finished: hands the spaces to the replay hook. */
-export function setPendingSpaces(spaces: string[]) {
+export function setPendingSpaces(
+  spaces: string[],
+  answers?: Pick<OnboardingAnswers, "goals" | "travelCity">,
+) {
   const existing = readPendingRecord();
   const operationId =
     spaces.length > 0 && !existing?.demoUrl
@@ -207,9 +198,13 @@ export function setPendingSpaces(spaces: string[]) {
     step: existing?.step ?? null,
     viewed: existing?.viewed ?? [],
     spaceNames: existing?.spaceNames ?? {},
-    ...answersOf(existing ?? {}),
+    ...parseOnboardingAnswers({ ...existing, ...answers }),
   });
   notifyChanged();
+}
+
+export function getPendingAnswers(): OnboardingAnswers {
+  return parseOnboardingAnswers(readPendingRecord() ?? {});
 }
 
 export function getPendingSpaces(): string[] {
@@ -268,46 +263,25 @@ export function clearLegacyDemoUrl() {
   notifyChanged();
 }
 
-function isCurrentProgress(record: PendingRecord | null): boolean {
-  return record?.progressVersion === PROGRESS_VERSION;
-}
-
-export function getOnboardingProgress(): OnboardingProgress {
+export function takeLegacyProgress():
+  | (OnboardingAnswers & { step: number | null; viewed: OnboardingStep[] })
+  | null {
   const record = readPendingRecord();
-  if (record === null || !isCurrentProgress(record)) {
-    return { ...NO_ANSWERS, spaces: [], step: null, viewed: [] };
-  }
+  if (record?.progressVersion !== LEGACY_PROGRESS_VERSION) return null;
+  writePendingRecord({
+    ...record,
+    progressVersion: null,
+    step: null,
+    viewed: [],
+    beenCities: [],
+    savedCount: null,
+    skippedShare: false,
+  });
   return {
-    ...answersOf(record),
-    spaces: record.spaces,
+    ...parseOnboardingAnswers(record),
     step: record.step,
     viewed: record.viewed,
   };
-}
-
-export function setOnboardingProgress(
-  progress: Partial<OnboardingAnswers> & {
-    spaces: string[];
-    step: number;
-    viewed?: OnboardingStep[];
-  },
-) {
-  const existing = readPendingRecord();
-  const operationId = existing?.operationId ?? createOperationId();
-  writePendingRecord({
-    operationId,
-    declinedOperationId: existing?.declinedOperationId ?? null,
-    spaces: progress.spaces,
-    demoUrl: existing?.demoUrl ?? null,
-    demoSpace: existing?.demoSpace ?? null,
-    demoOwner: existing?.demoOwner ?? null,
-    progressVersion: PROGRESS_VERSION,
-    step: progress.step,
-    viewed: progress.viewed ?? [],
-    spaceNames: existing?.spaceNames ?? {},
-    ...answersOf(progress),
-  });
-  notifyChanged();
 }
 
 export function noteReplayDeclined(operationId: string | null) {

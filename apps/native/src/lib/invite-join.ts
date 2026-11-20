@@ -2,6 +2,7 @@ import { analytics } from "@/lib/analytics";
 import { t } from "@/lib/i18n";
 import { useOnboarding } from "@/lib/onboarding";
 import { holdIncomingShare } from "@/lib/onboarding-exit";
+import { clearOnboardingProgress } from "@/lib/onboarding-progress";
 import { clearPending } from "@/lib/pending-onboarding";
 import {
   clearPendingInvite,
@@ -116,6 +117,7 @@ export function useInviteJoinCoordinator() {
         if (outcome.completeOnboarding) {
           holdIncomingShare();
           clearPending();
+          clearOnboardingProgress();
           completeOnboarding();
         }
         router.replace(outcome.href as never);
