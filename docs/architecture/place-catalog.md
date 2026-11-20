@@ -273,7 +273,9 @@ read the row.
 **Points that came from Apple** are kept at most 30 days once the open-data match (step 2 under
 "Order") exists. Apple's terms allow only temporary storage and name no number, so 30 days is our
 own limit, the same as Google's limit for a cached point. Today nothing removes them, so every
-point stored before the match's first run is kept longer than that; the first run handles every
+point stored before the match's first run is kept longer than that. This is a known exception:
+meeting the limit sooner means deleting every Apple point now, which would remove every saved pin
+before there is anything to replace it with. The first run handles every
 Apple point at once and is due as soon as it is built, by 31 December 2026 at the latest and before
 the Mapbox map ships. After that it runs daily on every Apple point 29 days old or more, so a point
 missed by one run is at most 30 days old at the next, since saves keep using Apple until the Mapbox
