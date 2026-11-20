@@ -465,21 +465,33 @@ describe("selling before sign-in", () => {
       created: true,
     });
     await loadReady();
-    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
     await vi.waitFor(() =>
-      expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe(""),
+      expect(mock.store.get("shelvr.purchase.merged")).toBe(""),
     );
+    expect(mock.syncPurchase).toHaveBeenCalledOnce();
+    expect(mock.syncPurchasesForResult).not.toHaveBeenCalled();
+    expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBeUndefined();
   });
 
-  it("keeps a taken-over purchase for the next launch when the read fails", async () => {
+  it("reads a taken-over purchase again on the next launch without syncing the receipt", async () => {
     mock.logIn.mockResolvedValueOnce({
       customerInfo: { entitlements: { active: { pro_under_test: {} } } },
       created: true,
     });
     mock.syncPurchase.mockResolvedValue(false);
-    await loadReady();
+    const first = await loadReady();
     await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalled());
-    expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBe("user:user_1");
+    first.hook.unmount();
+    expect(mock.store.get("shelvr.purchase.merged")).toMatch(/^user_1@/);
+
+    mock.syncPurchase.mockReset().mockResolvedValue(true);
+    await loadReady();
+    await vi.waitFor(() =>
+      expect(mock.store.get("shelvr.purchase.merged")).toBe(""),
+    );
+    expect(mock.syncPurchase).toHaveBeenCalledOnce();
+    expect(mock.syncPurchasesForResult).not.toHaveBeenCalled();
+    expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBeUndefined();
   });
 
   it("leaves an existing account's Pro to the webhook at sign-in", async () => {

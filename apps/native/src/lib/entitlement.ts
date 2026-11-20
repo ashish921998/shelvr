@@ -46,9 +46,11 @@ import { AppState } from "react-native";
 import { isProHiddenForE2E } from "@/lib/e2e-hide-pro";
 import {
   claimPurchaseBeforeSignIn,
+  clearMergedPurchase,
   clearPurchaseBeforeSignIn,
+  hasMergedPurchase,
   hasPurchaseBeforeSignIn,
-  notePurchaseBeforeSignIn,
+  noteMergedPurchase,
 } from "@/lib/purchase-before-sign-in";
 import {
   notePurchaseLanding,
@@ -199,6 +201,19 @@ export function useEntitlementSync(): void {
           analytics.captureError("purchase_sync_failed", error),
       });
     };
+    let readMerged: ReturnType<typeof startRevenueCatIdentitySync> | null =
+      null;
+    const readMergedPurchase = () => {
+      readMerged = startRevenueCatIdentitySync({
+        sync: async () => {
+          if (!(await syncPurchaseRef.current({})))
+            throw new Error("purchase_not_attached");
+        },
+        onReady: clearMergedPurchase,
+        onError: (error) =>
+          analytics.captureError("purchase_sync_failed", error),
+      });
+    };
     let mergedPro = false;
     const observer = startRevenueCatIdentitySync({
       sync: () => {
@@ -219,11 +234,11 @@ export function useEntitlementSync(): void {
       onReady: () => {
         markRcUserSynced(sub);
         if (cancelled) return;
-        if (!claimed && mergedPro) {
-          notePurchaseBeforeSignIn();
-          claimPurchaseBeforeSignIn(sub);
+        if (claimed) attachPurchase();
+        else if (mergedPro || hasMergedPurchase(sub)) {
+          if (mergedPro) noteMergedPurchase(sub);
+          readMergedPurchase();
         }
-        if (claimed || mergedPro) attachPurchase();
       },
       onError: reportRevenueCatIdentityError,
     });
@@ -236,6 +251,7 @@ export function useEntitlementSync(): void {
       if (state !== "active") return;
       observer.retry();
       attach?.retry();
+      readMerged?.retry();
     });
 
     return () => {
@@ -243,6 +259,7 @@ export function useEntitlementSync(): void {
       if (_rcRetryIdentity === retryIdentity) _rcRetryIdentity = null;
       observer.dispose();
       attach?.dispose();
+      readMerged?.dispose();
       stopLanding();
       subscription.remove();
       if (_rcTargetUserId === sub) setRcTargetUserId(null);
