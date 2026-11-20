@@ -632,6 +632,7 @@ export async function presentRedeemCodeSheet(): Promise<boolean> {
   const listener = (info: { entitlements: { active: object } }) => {
     if (!restoreFoundAccess(info)) return;
     stop();
+    if (!hasActiveEntitlement()) recordAccess("redeem");
     landing();
   };
   const timer = setTimeout(() => stop(), REDEEM_WATCH_MS);

@@ -136,7 +136,7 @@ export type AnalyticsEventProperties = {
   };
   entitlement_activated: {
     status: "trialing" | "pro" | "lifetime";
-    source: "purchase" | "restore";
+    source: "purchase" | "restore" | "redeem";
     delay_ms: number;
   };
   redeem_code_opened: Record<string, never>;
