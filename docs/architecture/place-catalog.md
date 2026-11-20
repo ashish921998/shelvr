@@ -144,8 +144,8 @@ move to plain strings before the list grows.
 1. PR #794: kind, cuisine and four features, set by hand.
 2. Store an Overture id, type and `googlePlaceId` on `places`, matched at import. Move the stored
    point to Overture.
-3. The full-screen place page with live Google details. It has no map, so it can ship before the
-   Mapbox map.
+3. The full-screen place page with our own data and an "Open in Google Maps" button (see "First
+   version" under "Provider data"). It has no map, so it can ship before the Mapbox map.
 4. The Mapbox map. It needs a store build, because it moves the native fingerprint. Apple drops out.
 5. The type list, its labels in every language, and pin emoji from the type.
 6. Type and features from the classifier for saves.
@@ -225,6 +225,15 @@ change do.
 
 Decided on 2026-11-20: **Mapbox draws the map, Google gives a place's live details, and open data
 is what we store.** Apple drops out once the Mapbox map ships.
+
+**First version, decided the same day: no Google API call on the place page.** The page shows our
+own data (name, type, kind, features, the save it came from) and an "Open in Google Maps" button.
+The button is a [Maps URL](https://developers.google.com/maps/documentation/urls/get-started):
+`https://www.google.com/maps/search/?api=1&query=<name, city>`, with `&query_place_id=<googlePlaceId>`
+when the row has one, so it opens the exact place. Opening a link is not a Places API request: it
+costs nothing and stores nothing, and the person sees hours, photos and reviews in Google Maps
+itself. Live details on our own page, under rules 2 to 4 below, come later and only if people ask
+for them, behind a monthly spending cap.
 
 | Provider             | Used for                                       | May we store it?                         | May it sit on a Mapbox map? |
 | -------------------- | ---------------------------------------------- | ---------------------------------------- | --------------------------- |
