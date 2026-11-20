@@ -58,9 +58,7 @@ two ways, and both stay far below Convex's limit of 4,096 index ranges for each 
   read 646 index ranges.
 - A wider box reads the live rows in the order they were added. It keeps the first 300 inside the box
   and looks at no more than 2,000 rows, in 2 index ranges. A caller without a box, such as the Map
-  from phase 1, gets this read for the whole world. Once Discover holds more than 2,000 places, a
-  zoomed-out view shows only the oldest of them. A sample for each area, or the counts in phase 5,
-  will replace that.
+  from phase 1, gets this read for the whole world.
 
 The index's level options are fixed once it holds points. The component removes a point by the cells
 it computes from the current options, so after a change to `minLevel` it cannot find the cells of
@@ -68,15 +66,38 @@ points indexed before. Change the options only when the index is empty.
 
 The Map works out the visible area from the camera's centre, zoom and screen size, and from the span
 that the map reports when it is rotated or tilted. It snaps the area to a grid and asks again only
-once the camera rests, so a pan does not open a new query on every frame, and people who look at the
-same area share cached results. A view half the world wide or wider asks for the whole world.
+once the camera rests, so a pan does not open a new query on every frame, and a return to an area
+reuses the answer the person already has. Convex caches `forMap` for each person, not across people,
+because the query reads who is calling. A view half the world wide or wider asks for the whole world.
 
-A person with no saves first asks for the whole world. The capped answer feeds the Map's "busiest
-city" framing, which opens the camera on a filled city. When the camera rests there, the Map asks
-for that area.
+Before the camera reports an area, the Map asks for the whole world. For a person with no saves, the
+capped answer feeds the Map's "busiest city" framing. Without the person's location, the camera opens
+on that city, and when it rests there, the Map asks for that area.
+
+With the person's location, the Map opens on them. When the camera rests, the Map waits for the
+answer for that area, then moves to the busiest city only if no place is within reach. The person's
+own saved places count at once, because they all load together. An answer that comes after the first
+3 seconds is ignored, and the camera stays on the person.
 
 A change to the Discover places in view never moves the camera. Only the first framing and a filter
 change do.
+
+### Known limits
+
+- **A wide view shows the oldest places.** It keeps the first 300 places added inside the box, so a
+  city added later can show nothing until the person zooms in. Past 2,000 Discover places, a wide
+  view never reaches the rest. A sample for each area, or the counts in phase 5, will replace this
+  read.
+- **The busiest city comes from the same sample.** A newer city with more places can lose the
+  opening framing to an older one.
+- **A dense narrow view can leave part of the screen empty.** In a box with more than 300 places, the
+  index returns the first 300 that it finds, in its own order.
+- **Search covers only what is loaded.** The Map searches the person's own places and the Discover
+  places of the area last in view. A name search over `places` on the server would find the rest.
+- **An empty box over dense cells is untested.** The component stops after reading 1,024 rows, but it
+  checks that count only when a row falls inside the box. A box with no Discover places, whose index
+  cells hold more than about 4,000 points, could pass Convex's read limits and fail. No test holds
+  that many points yet.
 
 ## Provider data
 
