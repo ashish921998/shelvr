@@ -79,7 +79,8 @@ vi.mock("@/lib/analytics", () => ({ analytics: { captureError: vi.fn() } }));
 vi.mock("@/lib/i18n", () => ({
   formattingLocale: () => "en",
   useAppLocale: () => "en",
-  t: (_key: string, { count }: { count: number }) => `${count} places`,
+  t: (key: string, { count, name }: { count?: number; name?: string } = {}) =>
+    key === "mapSheet.groupTitle" ? `${name} +${count}` : `${count} places`,
 }));
 
 const AUSTIN = [
@@ -263,7 +264,7 @@ it("uses native markers to declutter nearby places, keeping their emoji, title a
   expect(mock.props.markers[1].tintColor).toBe("#ffffff");
 });
 
-it("keeps all nearby places reachable through the count marker's picker", () => {
+it("draws nearby places as one place pin named after the first and keeps them all reachable", () => {
   const onSelect = vi.fn();
   render(
     <PlacesMap
@@ -281,8 +282,8 @@ it("keeps all nearby places reachable through the count marker's picker", () => 
   );
   expect(mock.props.markers).toHaveLength(1);
   expect(mock.props.markers[0]).toMatchObject({
-    title: "2 places",
-    monogram: "2",
+    title: "Ramen +1",
+    tintColor: "#ffffff",
   });
   act(() => mock.props.onMarkerClick({ id: mock.props.markers[0].id }));
   expect(mock.clearSelection).toHaveBeenCalledWith(undefined);
@@ -352,9 +353,72 @@ it("frames the first saved places once when the map opened empty without locatio
   await act(() => vi.advanceTimersByTimeAsync(200));
   expect(mock.moves).toHaveLength(2);
   expect(mock.moves[1]).not.toEqual(mock.moves[0]);
-  rerender(noLocation(AUSTIN.slice(0, 1)));
+  rerender(noLocation(AUSTIN.slice(0, 1), 170));
   await act(() => vi.advanceTimersByTimeAsync(200));
   expect(mock.moves).toHaveLength(2);
+});
+
+it.each([
+  ["refits", false, 1],
+  ["keeps the area the person moved to", true, 0],
+])(
+  "%s when the sheet covers more of the map after the first framing",
+  async (_name, touchedFirst, refits) => {
+    const opened = (bottomInset: number) => (
+      <PlacesMap
+        areaPartial={false}
+        onArea={vi.fn()}
+        pins={AUSTIN}
+        framed={AUSTIN}
+        anchors={AUSTIN}
+        showsUser={false}
+        height={800}
+        topInset={100}
+        bottomInset={bottomInset}
+        onSelect={vi.fn()}
+      />
+    );
+    const { getByTestId, rerender } = render(opened(120));
+    const first = mock.props.cameraPosition as Camera;
+    expect(first).toBeDefined();
+    if (touchedFirst) fireEvent.touchStart(getByTestId("map-touch"));
+    rerender(opened(320));
+    await act(() => vi.advanceTimersByTimeAsync(200));
+    expect(mock.moves).toHaveLength(refits);
+    if (refits) {
+      const refit = mock.moves[0] as Camera & {
+        coordinates: { latitude: number };
+      };
+      expect(refit.coordinates.latitude).toBeLessThan(
+        (first.coordinates as { latitude: number }).latitude,
+      );
+    }
+  },
+);
+
+it("drops a pending sheet refit once the person touches the map", async () => {
+  const opened = (bottomInset: number) => (
+    <PlacesMap
+      areaPartial={false}
+      onArea={vi.fn()}
+      pins={AUSTIN}
+      framed={AUSTIN}
+      anchors={AUSTIN}
+      showsUser={false}
+      height={800}
+      topInset={100}
+      bottomInset={bottomInset}
+      onSelect={vi.fn()}
+    />
+  );
+  const { getByTestId, rerender } = render(opened(120));
+  mock.moveToPlace.mockRejectedValueOnce(new Error("map is mounting"));
+  rerender(opened(320));
+  await act(() => vi.advanceTimersByTimeAsync(10));
+  expect(mock.moves).toHaveLength(1);
+  fireEvent.touchStart(getByTestId("map-touch"));
+  await act(() => vi.advanceTimersByTimeAsync(1000));
+  expect(mock.moves).toHaveLength(1);
 });
 
 it.each([

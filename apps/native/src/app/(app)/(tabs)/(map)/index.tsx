@@ -1,7 +1,7 @@
 import { EmptyState } from "@/components/empty-state";
-import { MapFilterChips } from "@/components/map/map-filter-chips";
 import { MapEmpty } from "@/components/map/map-empty";
 import { MapHeader, MAP_HEADER_HEIGHT } from "@/components/map/map-header";
+import { MapKindRow } from "@/components/map/map-kind-row";
 import { MapRoundButton } from "@/components/map/map-round-button";
 import { MapSearchResults } from "@/components/map/map-search";
 import { MapTripPill } from "@/components/map/map-trip-pill";
@@ -19,6 +19,7 @@ import {
   openPlaceDetails,
 } from "@/lib/apple-place-card";
 import { isDarkThemeName } from "@/lib/appearance";
+import { withAlpha } from "@/lib/color";
 import { framedPins } from "@/lib/city-pins";
 import type { MapBox } from "@/lib/discover-area";
 import { t, useAppLocale } from "@/lib/i18n";
@@ -26,7 +27,7 @@ import {
   busiestCityPlaces,
   filterPlaces,
   keepSelected,
-  mapFilters,
+  mapRowFilters,
   topSearchResults,
   type WentFilter,
   wentView,
@@ -55,7 +56,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Keyboard, ScrollView, View } from "react-native";
+import { Keyboard, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type OwnPlace = FunctionReturnType<typeof api.mapPlaces.listMapPlaces>[number];
@@ -96,7 +97,7 @@ function useMapEntries(
   const chipKinds = useMemo(
     () =>
       keepSelected(
-        mapFilters([...(all ?? NO_PLACES), ...discoverShown]).map(
+        mapRowFilters([...(all ?? NO_PLACES), ...discoverShown]).map(
           (filter) => filter.kind,
         ),
         kinds,
@@ -386,7 +387,7 @@ export default function MapScreen() {
           />
         ) : null}
         <View pointerEvents="box-none" style={styles.controls}>
-          <MapTripPill />
+          <MapTripPill city={city} />
           {(hasPlaces || area !== undefined) && located ? (
             <View style={styles.locate}>
               <MapRoundButton
@@ -404,13 +405,17 @@ export default function MapScreen() {
               setStripHeight(event.nativeEvent.layout.height)
             }
           >
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              accessibilityLabel={t("map.filters")}
-              contentContainerStyle={styles.filters}
-            >
-              {showWent ? (
+            <View
+              pointerEvents="none"
+              style={[
+                styles.fade,
+                {
+                  experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0)} 0%, ${withAlpha(theme.colors.background, 0.85)} 35%, ${withAlpha(theme.colors.background, 0.85)} 75%, ${withAlpha(theme.colors.background, 0)} 100%)`,
+                },
+              ]}
+            />
+            {showWent ? (
+              <View style={styles.went}>
                 <MapWentSwitch
                   selected={went.selected}
                   onSelect={(value) => {
@@ -418,16 +423,15 @@ export default function MapScreen() {
                     setFilterRevision((revision) => revision + 1);
                   }}
                 />
-              ) : null}
-              {chipKinds.length > 0 ? (
-                <MapFilterChips
-                  inline
-                  kinds={chipKinds}
-                  selected={kinds}
-                  onSelect={choose}
-                />
-              ) : null}
-            </ScrollView>
+              </View>
+            ) : null}
+            {chipKinds.length > 0 ? (
+              <MapKindRow
+                kinds={chipKinds}
+                selected={kinds}
+                onSelect={choose}
+              />
+            ) : null}
           </View>
         ) : null}
       </View>
@@ -451,10 +455,18 @@ const styles = StyleSheet.create((theme) => ({
     paddingTop: theme.gap(1),
     paddingBottom: theme.gap(1.5),
   },
-  filters: {
+  fade: {
+    position: "absolute",
+    top: -theme.gap(3),
+    bottom: -theme.gap(1),
+    left: 0,
+    right: 0,
+  },
+  went: {
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(1),
     paddingHorizontal: theme.gap(2.5),
+    paddingBottom: theme.gap(0.5),
   },
 }));

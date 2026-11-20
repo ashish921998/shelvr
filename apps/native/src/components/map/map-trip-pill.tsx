@@ -8,10 +8,10 @@ import { useRouter } from "expo-router";
 import { Pressable } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-export function MapTripPill() {
+export function MapTripPill({ city }: { city: string | undefined }) {
   const { theme } = useUnistyles();
   const router = useRouter();
-  const next = useTripToContinue();
+  const next = useTripToContinue(city);
   if (!next) return null;
   const name = tripName(next.trip);
   const onPress = () => {

@@ -20,13 +20,11 @@ export function useMapPinClusters(
   const [picked, setPicked] = useState<string | null>(null);
   const selected =
     options.selectedId === undefined ? picked : options.selectedId;
+  const worldWidth =
+    (process.env.EXPO_OS === "ios" ? rt.screen.width : 256) * 2 ** zoom;
   const clusters = useMemo(
-    () =>
-      clusterMapPins(
-        pins,
-        (process.env.EXPO_OS === "ios" ? rt.screen.width : 256) * 2 ** zoom,
-      ),
-    [pins, rt.screen.width, zoom],
+    () => clusterMapPins(pins, worldWidth),
+    [pins, worldWidth],
   );
   const choose = (id: string) => {
     setPicked(id);
@@ -50,16 +48,21 @@ export function useMapPinClusters(
     return {
       id: group.id,
       coordinates: { latitude: group.lat, longitude: group.lng },
-      title: grouped
-        ? t("homePlaces.spotCount", { count: group.pins.length })
-        : (first.title ?? first.name),
-      monogram: grouped
-        ? (options.clusterText?.(group.pins.length) ??
-          String(group.pins.length))
-        : (first.text ?? first.emoji),
+      title: !grouped
+        ? (first.title ?? first.name)
+        : options.clusterText
+          ? t("homePlaces.spotCount", { count: group.pins.length })
+          : t("mapSheet.groupTitle", {
+              name: first.title ?? first.name,
+              count: group.pins.length - 1,
+            }),
+      monogram:
+        grouped && options.clusterText
+          ? options.clusterText(group.pins.length)
+          : (first.text ?? first.emoji),
       tintColor: group.pins.some((pin) => pin.id === selected)
         ? theme.colors.primary
-        : sameColor
+        : sameColor || !options.clusterText
           ? (first.tintColor ?? theme.colors.frame)
           : theme.colors.foreground,
     };
@@ -74,5 +77,5 @@ export function useMapPinClusters(
   const trackZoom = (zoom: number | undefined) => {
     if (zoom !== undefined) setZoom(Math.floor(zoom * 4) / 4);
   };
-  return { markers, select, trackZoom, sheet };
+  return { markers, select, trackZoom, sheet, worldWidth };
 }

@@ -1442,5 +1442,6 @@
   "passport.momentCityStamp": "%{city}に行きました",
   "passport.paywallHeadline": {
     "other": "パスポートに%{formattedCount}都市"
-  }
+  },
+  "mapSheet.groupTitle": "%{name} +%{count}"
 }

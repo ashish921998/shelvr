@@ -1590,5 +1590,6 @@
     "one": "Tu pasaporte tiene %{formattedCount} ciudad",
     "many": "Tu pasaporte tiene %{formattedCount} ciudades",
     "other": "Tu pasaporte tiene %{formattedCount} ciudades"
-  }
+  },
+  "mapSheet.groupTitle": "%{name} +%{count}"
 }
