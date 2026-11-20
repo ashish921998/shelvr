@@ -56,6 +56,7 @@ import type * as model_datePlan from "../model/datePlan.js";
 import type * as model_dateRank from "../model/dateRank.js";
 import type * as model_demoErrors from "../model/demoErrors.js";
 import type * as model_deployment from "../model/deployment.js";
+import type * as model_discoverLimit from "../model/discoverLimit.js";
 import type * as model_entitlement from "../model/entitlement.js";
 import type * as model_externalUrl from "../model/externalUrl.js";
 import type * as model_fakeAi from "../model/fakeAi.js";
@@ -205,6 +206,7 @@ declare const fullApi: ApiFromModules<{
   "model/dateRank": typeof model_dateRank;
   "model/demoErrors": typeof model_demoErrors;
   "model/deployment": typeof model_deployment;
+  "model/discoverLimit": typeof model_discoverLimit;
   "model/entitlement": typeof model_entitlement;
   "model/externalUrl": typeof model_externalUrl;
   "model/fakeAi": typeof model_fakeAi;
