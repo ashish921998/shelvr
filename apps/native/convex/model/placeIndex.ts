@@ -3,8 +3,8 @@ import { v, type Infer } from "convex/values";
 import { components } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
+import { MAX_DISCOVER_PLACES } from "./discoverLimit";
 
-const MAX_DISCOVER_PLACES = 300;
 const MAX_SCANNED = 2000;
 const WIDE_DEGREES = 90;
 const MAX_INDEX_CALLS = 2;

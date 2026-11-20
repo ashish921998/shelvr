@@ -44,6 +44,7 @@ type Props = {
   /** The places the first camera frames when it cannot open on the person. */
   framed: MapPin[];
   anchors: LatLng[] | undefined;
+  areaFull: boolean;
   /** iOS: open on the person's location and show it. */
   showsUser: boolean;
   /** Clears the floating filter row above the map. */
@@ -58,6 +59,7 @@ export function PlacesMap({
   pins,
   framed,
   anchors,
+  areaFull,
   showsUser,
   topInset,
   focus,
@@ -100,7 +102,7 @@ export function PlacesMap({
   // expo-maps applies a cameraPosition prop without animation, so it only ever holds the first camera.
   const [firstCamera] = useState(showsUser ? undefined : fit);
   // The opening check reads these when it fires, so a filter picked while it waits is the one it frames.
-  const latest = useRef({ anchors, fit });
+  const latest = useRef({ anchors, areaFull, fit });
   const centredOnUser = useRef(false);
   const centre = useRef<LatLng | undefined>(undefined);
   const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -122,9 +124,9 @@ export function PlacesMap({
     [],
   );
   useEffect(() => {
-    latest.current = { anchors, fit };
+    latest.current = { anchors, areaFull, fit };
     if (anchors !== undefined && rested.current) checkNearby.current?.();
-  }, [anchors, fit]);
+  }, [anchors, areaFull, fit]);
   const waitForRest = () => {
     clearTimeout(settle.current);
     rested.current = false;
@@ -146,10 +148,10 @@ export function PlacesMap({
           );
     };
     checkNearby.current = () => {
-      const { anchors } = latest.current;
+      const { anchors, areaFull } = latest.current;
       if (anchors === undefined) return;
       checkNearby.current = undefined;
-      if (!hasPlaceNear(centre.current, anchors)) showCity();
+      if (!areaFull && !hasPlaceNear(centre.current, anchors)) showCity();
     };
     // No position means the person's own location. A map mounted moments ago can refuse its first
     // move, so it is retried; if every try fails, the map shows the busiest city instead.

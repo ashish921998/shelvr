@@ -3,6 +3,7 @@ import { canOpenPlaceCard } from "@/lib/apple-place-card";
 import { stopAction } from "@/lib/trip-planner";
 import { usePlaceOpener } from "@/lib/use-place-opener";
 import { api } from "@convex/_generated/api";
+import { MAX_DISCOVER_PLACES } from "@convex/model/discoverLimit";
 import { convexQuery } from "@convex-dev/react-query";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo } from "react";
@@ -18,6 +19,7 @@ export function useDiscoverPlaces(
 ): {
   settled: boolean;
   areaLoaded: boolean;
+  areaFull: boolean;
   beside: DiscoverPlace[];
   open: (place: DiscoverPlace) => void;
 } {
@@ -45,22 +47,16 @@ export function useDiscoverPlaces(
     },
     [openWith],
   );
+  const areaLoaded =
+    box !== undefined && query.isSuccess && !query.isPlaceholderData;
   return useMemo(
     () => ({
       settled: !query.isPending,
-      areaLoaded:
-        box !== undefined && query.isSuccess && !query.isPlaceholderData,
+      areaLoaded,
+      areaFull: areaLoaded && (query.data?.length ?? 0) >= MAX_DISCOVER_PLACES,
       beside: discoverBeside(own, query.data ?? NONE),
       open,
     }),
-    [
-      query.isPending,
-      query.isSuccess,
-      query.isPlaceholderData,
-      box,
-      query.data,
-      own,
-      open,
-    ],
+    [query.isPending, areaLoaded, query.data, own, open],
   );
 }

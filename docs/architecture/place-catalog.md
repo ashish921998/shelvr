@@ -97,8 +97,9 @@ change do.
   index returns the first 300 that it finds, in its own order.
 - **The opening check sees at most 300 places.** It asks for 50 km around the person, and the answer
   is capped before any distance test. Where more than 300 Discover places fall in that box, the 300
-  it returns can all lie outside 50 km while a nearer one is left out, and the Map moves to the busiest
-  city. A server query for the nearest Discover place within 50 km would answer this directly.
+  it returns can all lie outside 50 km while a nearer one is left out. So when the answer is full and
+  the person has no saved place in reach, the Map stays on them rather than moving to the busiest city.
+  A server query for the nearest Discover place within 50 km would answer this directly.
 - **Search covers only what is loaded.** The Map searches the person's own places and the Discover
   places of the area last in view. A name search over `places` on the server would find the rest.
 - **An empty box over dense cells is untested.** The component stops after reading 1,024 rows, but it

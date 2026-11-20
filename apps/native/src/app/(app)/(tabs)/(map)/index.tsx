@@ -100,6 +100,7 @@ export default function MapScreen() {
   const {
     settled,
     areaLoaded,
+    areaFull,
     beside,
     open: openDiscover,
   } = useDiscoverPlaces(all ?? NO_PLACES, area);
@@ -260,6 +261,10 @@ export default function MapScreen() {
         pins={pins}
         framed={framed}
         anchors={anchors}
+        areaFull={
+          areaFull &&
+          anchorEntries.every((place) => place.source === "discover")
+        }
         showsUser={location === "granted"}
         topInset={top + overlayHeight}
         focus={focus}
