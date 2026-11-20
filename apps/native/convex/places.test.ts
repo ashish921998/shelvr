@@ -428,6 +428,50 @@ describe("places:forMap read limits", () => {
   }, 180_000);
 });
 
+describe("places:curate", () => {
+  it("shows a bar inside a hotel as a bar with its features", async () => {
+    const { base, user } = await signedIn();
+    await base.mutation(internal.places.store, {
+      city: "Lisbon",
+      places: [{ ...cafe("H", "Hotel Rooftop"), category: "Hotel" }],
+    });
+    const [row] = await rows(base);
+    await base.mutation(internal.places.curate, {
+      id: row._id,
+      kind: "drinks",
+      features: ["rooftop", "in hotel", "rooftop"],
+    });
+    const [place] = await user.query(api.places.forMap, {});
+    expect(place).not.toHaveProperty("category");
+    expect(place.kinds).toEqual(["drinks"]);
+    expect(place.features).toEqual(["rooftop", "in hotel"]);
+    expect((await rows(base))[0].category).toBe("Hotel");
+  });
+
+  it("leaves fields it is not given alone", async () => {
+    const { base, user } = await signedIn();
+    await base.mutation(internal.places.store, {
+      city: "Lisbon",
+      places: [{ ...cafe("C", "Corner Cafe"), category: "Cafe" }],
+    });
+    const [row] = await rows(base);
+    await base.mutation(internal.places.curate, {
+      id: row._id,
+      features: ["terrace"],
+    });
+    await base.mutation(internal.places.curate, {
+      id: row._id,
+      cuisine: "coffee",
+    });
+    const [place] = await user.query(api.places.forMap, {});
+    expect(place).toMatchObject({
+      category: "Cafe",
+      cuisine: "coffee",
+      features: ["terrace"],
+    });
+  });
+});
+
 describe("places:store indexing", () => {
   it("indexes a row it inserts and leaves an existing row's point alone", async () => {
     const t = newConvexTest();

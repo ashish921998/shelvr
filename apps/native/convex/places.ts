@@ -3,7 +3,11 @@ import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { internalAction, internalMutation } from "./_generated/server";
 import { authedQuery } from "./model/auth";
-import { cuisineValidator } from "./model/itemFields";
+import {
+  cuisineValidator,
+  placeFeatureValidator,
+  placeKindValidator,
+} from "./model/itemFields";
 import { logEvent } from "./model/log";
 import { MAX_MAP_PLACES } from "./mapPlaces";
 import { boxValidator, discoverPlaces, indexPlace } from "./model/placeIndex";
@@ -31,6 +35,7 @@ const mapPlaceValidator = v.object({
   category: v.optional(v.string()),
   cuisine: v.optional(cuisineValidator),
   kinds: v.array(v.string()),
+  features: v.optional(v.array(placeFeatureValidator)),
 });
 
 const mapPlace = (row: Doc<"places">) => ({
@@ -40,9 +45,10 @@ const mapPlace = (row: Doc<"places">) => ({
   lng: row.lng,
   city: row.city,
   appleId: row.appleId,
-  ...(row.category ? { category: row.category } : {}),
+  ...(row.category && !row.kind ? { category: row.category } : {}),
   ...(row.cuisine ? { cuisine: row.cuisine } : {}),
-  kinds: placeKinds(row.category, [], row.cuisine),
+  kinds: row.kind ? [row.kind] : placeKinds(row.category, [], row.cuisine),
+  ...(row.features?.length ? { features: row.features } : {}),
 });
 
 export const forMap = authedQuery({
@@ -113,6 +119,24 @@ export const store = internalMutation({
         });
     }
     return { added, existing };
+  },
+});
+
+export const curate = internalMutation({
+  args: {
+    id: v.id("places"),
+    kind: v.optional(placeKindValidator),
+    cuisine: v.optional(cuisineValidator),
+    features: v.optional(v.array(placeFeatureValidator)),
+  },
+  returns: v.null(),
+  handler: async (ctx, { id, ...fields }) => {
+    if ((await ctx.db.get(id)) === null) throw new Error("no such place");
+    await ctx.db.patch(id, {
+      ...fields,
+      ...(fields.features ? { features: [...new Set(fields.features)] } : {}),
+    });
+    return null;
   },
 });
 

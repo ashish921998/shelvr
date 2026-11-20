@@ -21,12 +21,12 @@ row is written by every save that names it, and no query reads every place.
 
 ## Tables
 
-| Table                                                           | One row per                               | Holds                                                                                                                                                        | Written by                                                                     |
-| --------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
-| `places`                                                        | real venue that anyone saved or we picked | provider ids (Apple now, others later), a copy of the provider's name, point, city and category, our "picked by hand" mark, sources and reviewed cuisine     | a save (only to add a missing venue), the imports, the refresh job, moderation |
-| `savedPlaces`                                                   | place that a save names                   | a link to `places` when matched, the save's own name for the place, its city, the model's category and cuisine, and a point only when unmatched or corrected | the save pipeline and corrections                                              |
-| `placeStats`                                                    | venue                                     | how many people saved it                                                                                                                                     | a scheduled job                                                                |
-| `placeVisits`, `placeRemovals`, `tripStops`, `sharedListPlaces` | as today                                  | as today, plus a link to `places`                                                                                                                            | as today                                                                       |
+| Table                                                           | One row per                               | Holds                                                                                                                                                                    | Written by                                                                     |
+| --------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `places`                                                        | real venue that anyone saved or we picked | provider ids (Apple now, others later), a copy of the provider's name, point, city and category, our "picked by hand" mark, sources, reviewed cuisine, kind and features | a save (only to add a missing venue), the imports, the refresh job, moderation |
+| `savedPlaces`                                                   | place that a save names                   | a link to `places` when matched, the save's own name for the place, its city, the model's category and cuisine, and a point only when unmatched or corrected             | the save pipeline and corrections                                              |
+| `placeStats`                                                    | venue                                     | how many people saved it                                                                                                                                                 | a scheduled job                                                                |
+| `placeVisits`, `placeRemovals`, `tripStops`, `sharedListPlaces` | as today                                  | as today, plus a link to `places`                                                                                                                                        | as today                                                                       |
 
 `savedPlaces` replaces `items.placePins`, `items.places`, `items.placeLocations` and
 `items.placeCuisines`. A matched row reads its point from `places`, so each fact has one owner and no
@@ -47,6 +47,18 @@ row with a corrected point keeps that point, and it wins over the one in `places
 6. Hiding a `places` row hides it from Discover only, never from a person's own Map.
 7. Account deletion removes the person's `savedPlaces`, visits and removals. `places` rows hold no
    personal data and stay. Every `savedPlaces` write checks `liveOwner` in the mutation that writes.
+
+## Our own labels
+
+A provider's category says what the building is, not what a person goes there for: Apple files a
+hotel's rooftop bar as a hotel. `places:curate` sets our own labels on a row, which a refresh never
+overwrites:
+
+- `kind` replaces the provider's category on the Map: the pin's emoji, its filter and its kinds come
+  from the kind, and the answer leaves the category out.
+- `features` lists what a place has (`rooftop`, `terrace`, `view`, `in hotel`). The Map's search
+  matches them, in English only.
+- `cuisine` sets what it serves, for a restaurant or a bar.
 
 ## Reading by area
 
