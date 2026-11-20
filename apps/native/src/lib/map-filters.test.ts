@@ -4,6 +4,7 @@ import {
   cityNear,
   filterPlaces,
   hasPlaceNear,
+  keepSelected,
   mapFilters,
   searchPlaces,
   topSearchResults,
@@ -11,6 +12,19 @@ import {
 } from "./map-filters";
 
 const place = (kinds: string[], city?: string) => ({ kinds, city });
+
+describe("keepSelected", () => {
+  it("keeps the picked kinds when no place in view has them", () => {
+    expect(keepSelected(["food"], ["coffee"])).toEqual(["food", "coffee"]);
+    expect(keepSelected(["food", "coffee"], ["coffee", "drinks"])).toEqual([
+      "food",
+      "coffee",
+      "drinks",
+    ]);
+    expect(keepSelected(["food"], [])).toEqual(["food"]);
+    expect(keepSelected([], [])).toEqual([]);
+  });
+});
 
 describe("mapFilters", () => {
   it("offers only the kinds with three or more places, most places first", () => {

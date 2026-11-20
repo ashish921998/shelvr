@@ -78,6 +78,9 @@ importers:
       '@convex-dev/auth':
         specifier: 0.0.98
         version: 0.0.98(@auth/core@0.41.3)(convex@1.43.0(@clerk/react@6.12.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
+      '@convex-dev/geospatial':
+        specifier: 0.2.1
+        version: 0.2.1(convex@1.43.0(@clerk/react@6.12.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(bufferutil@4.1.0)(react@19.3.0))
       '@convex-dev/rate-limiter':
         specifier: ^0.3.2
         version: 0.3.2(convex@1.43.0(@clerk/react@6.12.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)
@@ -1188,6 +1191,11 @@ packages:
     peerDependenciesMeta:
       react:
         optional: true
+
+  '@convex-dev/geospatial@0.2.1':
+    resolution: {integrity: sha512-qSo5UJyX0il0zYbtdss9Gew5wVishL8jKxEwjx3FysxOWzzpODFN87ct/YUayAVuYCnXqdhxZ2xpvXADKqdrbg==}
+    peerDependencies:
+      convex: ^1.24.8
 
   '@convex-dev/rate-limiter@0.3.2':
     resolution: {integrity: sha512-+oBPsBfFbzdxiF/9XaaTQmVnvDlvEfg/c69/v8LxTbw4VLuiflIKlfnPQL8OS0azXQQ11hcPWHmU8ytFmHKDXA==}
@@ -3700,6 +3708,9 @@ packages:
   ast-v8-to-istanbul@1.0.6:
     resolution: {integrity: sha512-fvpl29helSO2w/z7utIbrkNXILdrLwDwAMH2I/zPKlGf5244+gf+B4cyS1sANcrPY2h+hWCGSgC8N61s/+AF9A==}
 
+  async-channel@0.2.0:
+    resolution: {integrity: sha512-BJyjI/sfKlyijaBt2hbOSxT28xGNtLR0QLzAKO1Hlnv5BULY7sAoYoTPW3lfr1ZIC7y+FxabxO9T8GXpyoofGg==}
+
   async-function@1.0.0:
     resolution: {integrity: sha512-hsU18Ae8CDTR6Kgu9DYf0EbCr/a5iGL0rytQDobUcdpYOKokk8LEjVphnXkDkgpi0wYVsqrXuP0bZxJaTqdgoA==}
     engines: {node: '>= 0.4'}
@@ -5062,6 +5073,10 @@ packages:
   hasown@2.0.3:
     resolution: {integrity: sha512-ej4AhfhfL2Q2zpMmLo7U1Uv9+PyhIZpgQLGT1F9miIGmiCJIoCgSmczFdrc97mWT4kVY72KA+WnnhJ5pghSvSg==}
     engines: {node: '>= 0.4'}
+
+  heap-js@2.7.1:
+    resolution: {integrity: sha512-EQfezRg0NCZGNlhlDR3Evrw1FVL2G3LhU7EgPoxufQKruNBSYA8MiRPHeWbU+36o+Fhel0wMwM+sLEiBAlNLJA==}
+    engines: {node: '>=10.0.0'}
 
   hermes-compiler@260318099.0.4:
     resolution: {integrity: sha512-8odcPFkPC82HlqCl0C5QI9mBN4rEAT+IAo55sJhzwKw//K3qZloiv3ex6J2O8CuBbhdmkJozfidNsset2KH25w==}
@@ -8300,6 +8315,12 @@ snapshots:
     optionalDependencies:
       react: 19.3.0
 
+  '@convex-dev/geospatial@0.2.1(convex@1.43.0(@clerk/react@6.12.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(bufferutil@4.1.0)(react@19.3.0))':
+    dependencies:
+      async-channel: 0.2.0
+      convex: 1.43.0(@clerk/react@6.12.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(bufferutil@4.1.0)(react@19.3.0)
+      heap-js: 2.7.1
+
   '@convex-dev/rate-limiter@0.3.2(convex@1.43.0(@clerk/react@6.12.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(bufferutil@4.1.0)(react@19.3.0))(react@19.3.0)':
     dependencies:
       convex: 1.43.0(@clerk/react@6.12.10(react-dom@19.3.0(react@19.3.0))(react@19.3.0))(bufferutil@4.1.0)(react@19.3.0)
@@ -10485,6 +10506,8 @@ snapshots:
 
   async-function@1.0.0: {}
 
+  async-channel@0.2.0: {}
+
   available-typed-arrays@1.0.7:
     dependencies:
       possible-typed-array-names: 1.1.0
@@ -12189,6 +12212,8 @@ snapshots:
   hermes-estree@0.25.1: {}
 
   hermes-estree@0.36.1: {}
+
+  heap-js@2.7.1: {}
 
   hermes-parser@0.25.1:
     dependencies:

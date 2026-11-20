@@ -21,13 +21,18 @@ const SERVER_ONLY = [
   /^node:/,
   /^@convex-dev\/auth\/server/,
   /^@convex-dev\/rate-limiter/,
+  /^@convex-dev\/geospatial/,
 ];
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((name) => {
     const path = join(dir, name);
     if (statSync(path).isDirectory()) return sourceFiles(path);
-    return /\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name) ? [path] : [];
+    return /\.tsx?$/.test(name) &&
+      !/\.test\.tsx?$/.test(name) &&
+      name !== "test.setup.ts"
+      ? [path]
+      : [];
   });
 }
 
@@ -82,13 +87,15 @@ function resolveConvex(from: string, specifier: string): string | undefined {
 function serverImportsReachableFromApp(): string[] {
   const seen = new Set<string>();
   const queue: { file: string; via: string[] }[] = [];
+  const found: string[] = [];
   for (const file of sourceFiles(SRC)) {
     for (const specifier of runtimeImports(file)) {
+      if (SERVER_ONLY.some((re) => re.test(specifier)))
+        found.push(`${relative(APP, file)} -> ${specifier}`);
       const target = resolveConvex(file, specifier);
       if (target) queue.push({ file: target, via: [relative(APP, file)] });
     }
   }
-  const found: string[] = [];
   while (queue.length > 0) {
     const { file, via } = queue.shift()!;
     if (seen.has(file) || file.includes("/_generated/")) continue;
@@ -105,7 +112,7 @@ function serverImportsReachableFromApp(): string[] {
   return found;
 }
 
-describe("convex modules the app imports", () => {
+describe("app code and the convex modules it imports", () => {
   it("never pull a server-only package into the app bundle", () => {
     expect(serverImportsReachableFromApp()).toEqual([]);
   });

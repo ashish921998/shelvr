@@ -28,9 +28,12 @@ filled yet, and the Apple question at the end of this step is open.
 
 ### What the person sees
 
-The Map tab shows every place in the table as a "Discover" pin, beside and under the person's own
-pins. A new user opens the Map and sees places in every city we have filled, not an empty state. A
-"Discover" chip hides them. Tapping one opens Apple's place card (`openPlaceDetails(appleId)`), as a
+The Map tab shows the table's places in the area on screen as "Discover" pins, beside and under the
+person's own pins, up to 300 at a time (see Reading by area in
+[place-catalog.md](../architecture/place-catalog.md)). A new user who shares their location stays on
+it when a Discover place is within 50 km, or when the area answer may have left a nearer one out;
+otherwise, or without location, the Map opens on the busiest city of the first answer, not an empty
+state. There is no switch to hide them. Tapping one opens Apple's place card (`openPlaceDetails(appleId)`), as a
 saved pin does today. Where the card cannot open (before iOS 18, on Android, or when Apple has no card
 for the id), it opens the place in Apple Maps, or Google Maps on Android. Search and the kind filters
 cover them too, and search lists the person's own match before a Discover one.
@@ -116,21 +119,25 @@ if it is not listed yet and the place has fewer than 3. Running an import twice 
 When Apple is rate-limited or down, both imports stop with "Apple Maps is unavailable" instead of
 reporting every name as missed. Nothing from that run is stored; run it again.
 
-A row can also be edited or hidden in the Convex dashboard.
+A row can also be edited or hidden in the Convex dashboard. A dashboard write does not update the
+geospatial index, so after changing a row's `status`, `lat` or `lng`, run `places:reindexPage` from
+cursor `null` and wait for `done: true`.
 
 **Which cities first:** the 10 to 20 cities where users' saves land most (`items.cities`), at about 30
 to 60 places each. With the Google Maps import, a city takes about an hour.
 
 ### Public functions
 
-- `places:forMap`: `authedQuery`, `args: {}`, returns the `live` rows (id, name, point, city, Apple
-  id, category, cuisine and kinds). It takes up to 3,000 rows, the cap `listMapPlaces` uses, and gains a
-  `city` argument once the table outgrows that. It is a new function, so no `Convex-Api: changed`
-  trailer.
+- `places:forMap`: `authedQuery`, returns `live` rows (id, name, point, city, Apple id, category,
+  cuisine and kinds), up to 3,000. Step 0 shipped it with `args: {}` and no `Convex-Api: changed`
+  trailer, because it was new. Phase 2 of [place-catalog.md](../architecture/place-catalog.md)
+  leaves it unchanged for the phase 1 client.
+- `places:inArea`: `authedQuery`, takes a `box` and returns `{ places, complete }`: the same rows as
+  `forMap`, and whether the read covered the whole area. Added in phase 2; the Map reads it.
 
 ### Client changes (OTA, no native change)
 
-- `src/lib/use-discover-places.ts` loads `places:forMap`. `discoverBeside` (`src/lib/map-discover.ts`)
+- `src/lib/use-discover-places.ts` loads `places:inArea`. `discoverBeside` (`src/lib/map-discover.ts`)
   drops a Discover place that is one of the person's own (same Apple id, or `samePlace`), so their
   pin wins. `samePlace` also merges two Apple ids with nested names close together, such as a hotel
   and its restaurant. That hides a few distinct Discover places, but an own pin's Apple id can come
@@ -147,17 +154,16 @@ to 60 places each. With the Google Maps import, a city takes about an hour.
     person has no pins of their own, since their pins frame the first camera
   - kind filters and search cover Discover pins. The "went" switch covers only the person's own, so
     Discover pins hide while it is not on All
-  - the "Discover" chip shows only to someone with pins of their own, while the "went" switch is on
-    All and some Discover place is left beside their pins. Otherwise it would hide nothing. Without
-    pins of their own, Discover pins are all the map has
+  - Discover pins always show while the "went" switch is on All. A "Discover" chip that hid them was
+    removed before release
 - `src/components/map/places-map.tsx` takes `anchors`: the person's own pins when they have any,
   otherwise the Discover pins. With location on, the camera opens on the person and stays if an
   anchor is near. Otherwise, and without location, it frames the busiest city of the anchors, as it
   did with own pins. A later filter change moves the camera only when no pin it shows, own or
   Discover, is in reach.
-- Copy in nine catalogs: the "Discover" chip, and the search field now reads "Search places".
-- Analytics: `map_opened` gains `discover` (Discover places shown), `map_place_opened` gains `source`,
-  and `map_discover_toggled` is new.
+- Copy in nine catalogs: the search field now reads "Search places".
+- Analytics: `map_opened` gains `discover` (Discover places shown), and `map_place_opened` gains
+  `source`.
 
 ### Not in the first version
 
@@ -190,6 +196,10 @@ user. Today the app keeps them only on a person's own saves. Check before launch
 allowed, keep the name and city we typed and look the point up on the device when the Map opens.
 
 ## Constraints from earlier decisions
+
+The long-term place model is now [place-catalog.md](../architecture/place-catalog.md): one
+`places` row per venue and a `savedPlaces` row per place a save names. Its counts phase replaces
+step 1 below.
 
 `docs/architecture/places.md` ("The larger design, and why not now") rejected a shared place catalog
 for eight reasons. Its last paragraph names the conditions for revisiting it: admit only
