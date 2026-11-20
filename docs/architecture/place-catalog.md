@@ -235,12 +235,20 @@ Apple's search and 17 in Overture; Overture missed Verride, Park and Prado. Over
 finer (cocktail bar, tapas bar, seafood restaurant where Apple says Nightlife or Restaurant). Both
 filed two hotel bars as hotels, which our own `kind` fixes.
 
-While we stay on Apple, tapping a place already opens Apple's own place card
-(`modules/apple-place-card`, `MKMapItemDetailViewController` on iOS 18 and later) on the Map, a
-city page, a shared list, a trip and a date plan. It shows Apple's live hours, photos and ratings
-at no cost and within Apple's terms, so the place page in step 3 of "Order" is not needed yet. It
-becomes needed when the Mapbox map replaces Apple, and for a place with no `appleId` or an iPhone
-before iOS 18, where the save opens instead.
+While we stay on Apple, Apple's own place card (`modules/apple-place-card`,
+`MKMapItemDetailViewController` on iOS 18 and later) shows Apple's live hours, photos and ratings
+at no cost and within Apple's terms. "The card" below means it is shown when the place has an
+`appleId` and the iPhone runs iOS 18 or later. What a tap opens:
+
+- A person's own pin on the Map, and a place on a city page: the card, else the save.
+- A Discover pin, a shared-list place and a trip stop (`stopAction` in `src/lib/trip-planner.ts`):
+  the save when there is one, else the card, else Apple Maps. A Discover place has no save, so an
+  older iPhone opens Apple Maps.
+- A date-plan stop (`infoAction` in `src/lib/date-plan.ts`): the card, else the save, else Apple
+  Maps.
+
+So the place page in step 3 of "Order" is not needed yet. It becomes needed when the Mapbox map
+replaces Apple; it would then replace the card in each of these paths.
 
 **First version, decided the same day: no Google API call on the place page.** The page shows our
 own data (name, type, kind, features, the save it came from) and an "Open in Google Maps" button.
