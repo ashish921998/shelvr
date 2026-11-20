@@ -796,6 +796,33 @@ describe("a purchase made while signed in", () => {
     expect(mock.customerInfoListeners.size).toBe(0);
   });
 
+  it("keeps watching past an existing Pro until the redeemed extension lands", async () => {
+    const current = { latestPurchaseDate: "2026-11-01", expirationDate: "a" };
+    mock.getCustomerInfo.mockResolvedValue({
+      entitlements: { active: { pro_under_test: current } },
+    });
+    const { presentRedeemCodeSheet } = await loadReady();
+    await presentRedeemCodeSheet();
+    const [listener] = [...mock.customerInfoListeners];
+
+    act(() =>
+      listener!({ entitlements: { active: { pro_under_test: current } } }),
+    );
+    await act(() => new Promise<void>((r) => setTimeout(r, 0)));
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
+    expect(mock.customerInfoListeners.size).toBe(1);
+
+    act(() =>
+      listener!({
+        entitlements: {
+          active: { pro_under_test: { ...current, expirationDate: "b" } },
+        },
+      }),
+    );
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
+    expect(mock.customerInfoListeners.size).toBe(0);
+  });
+
   it("stops watching for a redeemed code once a paywall opens", async () => {
     const { presentRedeemCodeSheet, openPaywall } = await loadReady();
     await presentRedeemCodeSheet();

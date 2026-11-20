@@ -653,15 +653,32 @@ async function runRestore(): Promise<RestorePurchasesOutcome> {
 
 const REDEEM_WATCH_MS = 10 * 60_000;
 
+type ProCustomerInfo = {
+  entitlements: {
+    active: Record<
+      string,
+      { latestPurchaseDate?: string; expirationDate?: string | null }
+    >;
+  };
+};
+
+function proPurchase(info: ProCustomerInfo): string | null {
+  const pro = info.entitlements.active[REVENUECAT_PRO_ENTITLEMENT];
+  return pro ? `${pro.latestPurchaseDate}|${pro.expirationDate}` : null;
+}
+
 export async function presentRedeemCodeSheet(): Promise<boolean> {
   const landing = reservePurchaseLanding();
   if (!(await awaitRcSyncReady())) return false;
   const rc = getPurchases();
-  if (!rc || restoresRunning > 0) return false;
+  if (!rc) return false;
+  const before = await rc.getCustomerInfo().then(proPurchase, () => null);
+  if (restoresRunning > 0) return false;
   stopRedeemWatch?.();
   const unrecorded = !hasActiveEntitlement();
-  const listener = (info: { entitlements: { active: object } }) => {
-    if (!(REVENUECAT_PRO_ENTITLEMENT in info.entitlements.active)) return;
+  const listener = (info: ProCustomerInfo) => {
+    const after = proPurchase(info);
+    if (after === null || after === before) return;
     stop();
     if (unrecorded) recordAccess("redeem");
     landing();
