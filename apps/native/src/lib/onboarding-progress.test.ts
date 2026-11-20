@@ -466,10 +466,14 @@ describe("progress written by the previous build", () => {
     expect(getPendingSpaces()).toEqual(["Date nights"]);
   });
 
-  it("keeps the old progress when the new key cannot be written", () => {
+  it("resumes in memory and keeps the old progress when the new key cannot be written", () => {
     legacy({ step: 5, goals: ["date"] });
     failingKeys.add(PROGRESS_KEY);
-    expect(() => loadOnboardingProgress()).toThrow();
+    expect(loadOnboardingProgress()?.step).toBe("city");
+    expect(captureError).toHaveBeenCalledWith(
+      "onboarding_progress_save_failed",
+      expect.any(Error),
+    );
     failingKeys.clear();
     expect(loadOnboardingProgress()?.step).toBe("city");
   });

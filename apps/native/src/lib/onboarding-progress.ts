@@ -437,7 +437,12 @@ function importLegacyProgress(): SavedProgress | null {
     viewed: stepsIn([...passed, ...viewed]),
     completed: passed.filter((seen) => seen !== resumed),
   };
-  writeProgress(saved);
+  try {
+    writeProgress(saved);
+  } catch (error) {
+    analytics.captureError("onboarding_progress_save_failed", error);
+    return saved;
+  }
   try {
     dropLegacyProgress();
   } catch (error) {
