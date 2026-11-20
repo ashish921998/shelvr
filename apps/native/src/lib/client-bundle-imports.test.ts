@@ -21,6 +21,7 @@ const SERVER_ONLY = [
   /^node:/,
   /^@convex-dev\/auth\/server/,
   /^@convex-dev\/rate-limiter/,
+  /^@convex-dev\/geospatial/,
 ];
 
 function sourceFiles(dir: string): string[] {
