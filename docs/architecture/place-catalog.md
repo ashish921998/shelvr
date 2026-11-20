@@ -145,7 +145,8 @@ move to plain strings before the list grows.
 2. Store an Overture id, type and `googlePlaceId` on `places`, matched at import. Move the stored
    point to Overture.
 3. The full-screen place page with our own data and an "Open in Google Maps" button (see "First
-   version" under "Provider data"). It has no map, so it can ship before the Mapbox map.
+   version" under "Provider data"). It has no map, so it can ship before the Mapbox map. Not needed
+   while Apple's place card covers it (see "Until then we stay on Apple").
 4. The Mapbox map, once open data finds the places people save (see "Until then we stay on
    Apple"). It needs a store build, because it moves the native fingerprint. Apple drops out.
 5. The type list, its labels in every language, and pin emoji from the type.
@@ -233,6 +234,13 @@ finds the places people save. A check of 20 well-known Lisbon places on 2026-11-
 Apple's search and 17 in Overture; Overture missed Verride, Park and Prado. Overture's types were
 finer (cocktail bar, tapas bar, seafood restaurant where Apple says Nightlife or Restaurant). Both
 filed two hotel bars as hotels, which our own `kind` fixes.
+
+While we stay on Apple, tapping a place already opens Apple's own place card
+(`modules/apple-place-card`, `MKMapItemDetailViewController` on iOS 18 and later) on the Map, a
+city page, a shared list, a trip and a date plan. It shows Apple's live hours, photos and ratings
+at no cost and within Apple's terms, so the place page in step 3 of "Order" is not needed yet. It
+becomes needed when the Mapbox map replaces Apple, and for a place with no `appleId` or an iPhone
+before iOS 18, where the save opens instead.
 
 **First version, decided the same day: no Google API call on the place page.** The page shows our
 own data (name, type, kind, features, the save it came from) and an "Open in Google Maps" button.
