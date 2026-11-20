@@ -279,7 +279,10 @@ before there is anything to replace it with. The first run handles every
 Apple point at once and is due as soon as it is built, by 31 December 2026 at the latest and before
 the Mapbox map ships. After that it runs daily on every Apple point 29 days old or more, so a point
 missed by one run is at most 30 days old at the next, since saves keep using Apple until the Mapbox
-map ships. It replaces each `places` row's
+map ships. At cutover, the backend deploy that comes before the Mapbox
+build's release stops every Apple lookup for every build, old ones included, and then one last run
+handles every remaining Apple point whatever its age. The Mapbox build is released only after that
+run finishes, so a Mapbox map never shows an Apple point. It replaces each `places` row's
 point with Overture's, and deletes a row with no match together with its index entry, so no Apple
 point stays behind. It also re-points each saved place to its open-data match and drops the Apple
 point of one with no match, keeping its name and city; the place then shows in lists but not as a
