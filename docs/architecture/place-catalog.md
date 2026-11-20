@@ -30,7 +30,8 @@ row is written by every save that names it, and no query reads every place.
 
 `savedPlaces` replaces `items.placePins`, `items.places`, `items.placeLocations` and
 `items.placeCuisines`. A matched row reads its point from `places`, so each fact has one owner and no
-save keeps a permanent copy of a provider's point. A place the provider cannot match has a
+save keeps a permanent copy of a provider's point. A person's correction is the one exception: a matched
+row with a corrected point keeps that point, and it wins over the one in `places`. A place the provider cannot match has a
 `savedPlaces` row with no link and its own point.
 
 ## Rules
