@@ -180,7 +180,7 @@ export function getOrCreatePendingOperationId(): string {
 /** Onboarding finished: hands the spaces to the replay hook. */
 export function setPendingSpaces(
   spaces: string[],
-  answers?: Pick<OnboardingAnswers, "goals" | "travelCity">,
+  answers?: OnboardingAnswers,
 ) {
   const existing = readPendingRecord();
   const operationId =
@@ -263,11 +263,21 @@ export function clearLegacyDemoUrl() {
   notifyChanged();
 }
 
-export function takeLegacyProgress():
+export function readLegacyProgress():
   | (OnboardingAnswers & { step: number | null; viewed: OnboardingStep[] })
   | null {
   const record = readPendingRecord();
   if (record?.progressVersion !== LEGACY_PROGRESS_VERSION) return null;
+  return {
+    ...parseOnboardingAnswers(record),
+    step: record.step,
+    viewed: record.viewed,
+  };
+}
+
+export function dropLegacyProgress() {
+  const record = readPendingRecord();
+  if (record?.progressVersion !== LEGACY_PROGRESS_VERSION) return;
   writePendingRecord({
     ...record,
     progressVersion: null,
@@ -277,11 +287,6 @@ export function takeLegacyProgress():
     savedCount: null,
     skippedShare: false,
   });
-  return {
-    ...parseOnboardingAnswers(record),
-    step: record.step,
-    viewed: record.viewed,
-  };
 }
 
 export function noteReplayDeclined(operationId: string | null) {

@@ -23,9 +23,13 @@ import {
 import type { OnboardingStep } from "./onboarding-steps";
 
 const storage = vi.hoisted(() => new Map<string, string>());
+const failingKeys = vi.hoisted(() => new Set<string>());
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => storage.get(key) ?? null,
-  setItem: (key: string, value: string) => storage.set(key, value),
+  setItem: (key: string, value: string) => {
+    if (failingKeys.has(key)) throw new Error("keychain unavailable");
+    storage.set(key, value);
+  },
 }));
 vi.mock("expo-crypto", () => ({ randomUUID: () => "new-operation-id" }));
 vi.mock("@/lib/analytics", () => ({ analytics: { capture: vi.fn() } }));
@@ -33,7 +37,10 @@ vi.mock("@/lib/analytics", () => ({ analytics: { capture: vi.fn() } }));
 const PROGRESS_KEY = "shelvr.onboarding.progress";
 const PENDING_KEY = "shelvr.pending.onboarding";
 
-beforeEach(() => storage.clear());
+beforeEach(() => {
+  storage.clear();
+  failingKeys.clear();
+});
 
 function at(
   step: OnboardingStep,
@@ -435,6 +442,14 @@ describe("progress written by the previous build", () => {
     expect(getPendingSpaces()).toEqual(["Date nights"]);
   });
 
+  it("keeps the old progress when the new key cannot be written", () => {
+    legacy({ step: 5, goals: ["date"] });
+    failingKeys.add(PROGRESS_KEY);
+    expect(() => loadOnboardingProgress()).toThrow();
+    failingKeys.clear();
+    expect(loadOnboardingProgress()?.step).toBe("city");
+  });
+
   it.each([undefined, 12, 13, "14"])(
     "is not taken from a record of version %s",
     (progressVersion) => {
@@ -460,12 +475,19 @@ describe("the answers the paywall echoes", () => {
       goals: ["travel"],
       travelCity: "tokyo",
     });
-    setPendingSpaces(["Trips"], { goals: ["travel"], travelCity: "tokyo" });
+    setPendingSpaces(["Trips"], {
+      goals: ["travel"],
+      savedCount: null,
+      travelCity: "tokyo",
+      beenCities: ["lisbon"],
+      skippedShare: false,
+    });
     clearOnboardingProgress();
     queueDemoUrl("https://example.com/reel");
     expect(onboardingAnswers()).toMatchObject({
       goals: ["travel"],
       travelCity: "tokyo",
+      beenCities: ["lisbon"],
     });
   });
 });

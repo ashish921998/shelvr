@@ -15,7 +15,8 @@ import {
 import {
   getPendingAnswers,
   parseOnboardingAnswers,
-  takeLegacyProgress,
+  dropLegacyProgress,
+  readLegacyProgress,
   type OnboardingAnswers,
 } from "@/lib/pending-onboarding";
 
@@ -408,7 +409,7 @@ export function clearOnboardingProgress() {
 }
 
 function importLegacyProgress(): SavedProgress | null {
-  const legacy = takeLegacyProgress();
+  const legacy = readLegacyProgress();
   if (legacy === null) return null;
   const { step, viewed, ...answers } = legacy;
   const resumed = restoreOnboardingStep(step);
@@ -422,6 +423,7 @@ function importLegacyProgress(): SavedProgress | null {
     completed: passed.filter((seen) => seen !== resumed),
   };
   writeProgress(saved);
+  dropLegacyProgress();
   return saved;
 }
 
