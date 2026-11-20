@@ -178,9 +178,11 @@ export function PlacesMap({
     },
     [width, height, onArea],
   );
+  const seeded = useRef(false);
   useEffect(() => {
-    if (firstCamera)
-      reportArea({ ...firstCamera.coordinates, zoom: firstCamera.zoom });
+    if (!firstCamera || seeded.current) return;
+    seeded.current = true;
+    reportArea({ ...firstCamera.coordinates, zoom: firstCamera.zoom });
   }, [firstCamera, reportArea]);
   useEffect(
     () => () => {

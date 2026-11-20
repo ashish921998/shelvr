@@ -174,9 +174,13 @@ export default function MapScreen() {
       })),
     [anchorEntries],
   );
+  const waiting =
+    all === undefined ||
+    (all.length === 0 && !settled) ||
+    location === "asking";
   const framed = useHeldFraming(
     liveFraming,
-    `${all !== undefined}|${kind ?? ""}|${went.selected}`,
+    `${waiting}|${kind ?? ""}|${went.selected}`,
   );
 
   const reported = useRef(false);
@@ -200,12 +204,7 @@ export default function MapScreen() {
       />
     );
   }
-  if (
-    all === undefined ||
-    (all.length === 0 && !settled) ||
-    location === "asking"
-  )
-    return <ScreenLoader />;
+  if (waiting) return <ScreenLoader />;
   if (all.length === 0 && beside.length === 0 && area === undefined) {
     return (
       <View style={styles.empty}>
@@ -216,7 +215,6 @@ export default function MapScreen() {
 
   const showChips = kinds.length > 0 || showDiscoverChip;
   const top = rt.insets.top + theme.gap(1);
-  const located = location === "granted";
   // The search field, then the chips under it.
   const overlayHeight =
     theme.control.minHeight +
@@ -271,7 +269,7 @@ export default function MapScreen() {
         pins={pins}
         framed={framed}
         anchors={anchors}
-        showsUser={located}
+        showsUser={location === "granted"}
         topInset={top + overlayHeight}
         focus={focus}
         onSelect={select}
@@ -293,7 +291,7 @@ export default function MapScreen() {
         style={[
           styles.overlay,
           // Kept clear of MapKit's my-location button in the top right corner, which it would cover.
-          { top, right: located ? LOCATE_BUTTON_CLEARANCE : 0 },
+          { top, right: location === "granted" ? LOCATE_BUTTON_CLEARANCE : 0 },
         ]}
       >
         <MapSearch

@@ -24,6 +24,7 @@ type MapProps = {
 const mock = vi.hoisted(() => ({
   moves: [] as Camera[],
   props: undefined as MapProps | undefined,
+  screen: { width: 393, height: 852 },
 }));
 
 vi.mock("expo-maps", () => ({
@@ -47,7 +48,7 @@ vi.mock("react-native-unistyles", () => ({
     theme: { colors: { primary: "#amber" }, gap: (n: number) => n * 4 },
     rt: {
       themeName: "light",
-      screen: { width: 393, height: 852 },
+      screen: mock.screen,
       insets: { bottom: 34 },
     },
   }),
@@ -107,6 +108,7 @@ const latitudes = () =>
 beforeEach(() => {
   mock.moves = [];
   mock.props = undefined;
+  mock.screen = { width: 393, height: 852 };
   vi.useFakeTimers();
   vi.stubEnv("EXPO_OS", "ios");
 });
@@ -154,5 +156,25 @@ describe("PlacesMap opening on the person", () => {
     expect(latitudes()).toEqual([undefined]);
     await restOnPerson({ lat: CASCAIS.lat, lng: CASCAIS.lng + 0.2 });
     expect(holds(areas.at(-1), LISBON[0])).toBe(false);
+  });
+});
+
+describe("PlacesMap without the person's location", () => {
+  it("asks for the opening area once, even when the screen size changes", () => {
+    const onArea = vi.fn();
+    const props = {
+      pins: LISBON,
+      framed: LISBON,
+      anchors: LISBON,
+      showsUser: false,
+      topInset: 100,
+      onSelect: () => {},
+      onArea,
+    };
+    const view = render(<PlacesMap {...props} />);
+    expect(onArea).toHaveBeenCalledTimes(1);
+    mock.screen = { width: 852, height: 393 };
+    view.rerender(<PlacesMap {...props} />);
+    expect(onArea).toHaveBeenCalledTimes(1);
   });
 });
