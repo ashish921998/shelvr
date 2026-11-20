@@ -272,8 +272,8 @@ read the row.
 
 **Points that came from Apple** are kept at most 30 days once the open-data match (step 2 under
 "Order") exists. Apple's terms allow only temporary storage and name no number, so 30 days is our
-own limit, the same as Google's limit for a cached point. Today nothing removes them, so every
-point stored before the match's first run is kept longer than that. This is a known exception:
+own limit, the same as Google's limit for a cached point. Today nothing removes them, so a point
+stored more than 30 days before the match's first run is kept longer than that. This is a known exception:
 meeting the limit sooner means deleting every Apple point now, which would remove every saved pin
 before there is anything to replace it with. The first run handles every
 Apple point at once and is due as soon as it is built, by 31 December 2026 at the latest and before
