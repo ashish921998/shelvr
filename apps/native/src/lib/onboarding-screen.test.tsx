@@ -22,6 +22,7 @@ type Sample = { kind: string; city: string };
 const mocks = vi.hoisted(() => ({
   setOnboardingProgress: vi.fn(),
   setPendingSpaces: vi.fn(),
+  clearPending: vi.fn(),
   queueDemoUrl: vi.fn(),
   queueCityStamps: vi.fn(),
   completeOnboarding: vi.fn(),
@@ -93,7 +94,7 @@ vi.mock("@/lib/onboarding-paywall", async () => {
   };
 });
 vi.mock("@/lib/pending-onboarding", () => ({
-  clearPending: vi.fn(),
+  clearPending: mocks.clearPending,
   getOnboardingProgress: () => mocks.progress,
   queueDemoUrl: mocks.queueDemoUrl,
   resolveOnboardingSpaceName: (name: string) => name,
@@ -655,6 +656,39 @@ it("queues no cities for someone who signs in from the opener", () => {
   tap("signIn:done");
   expect(mocks.completeOnboarding).toHaveBeenCalled();
   expect(mocks.queueCityStamps).not.toHaveBeenCalled();
+});
+
+it("still finishes onboarding after sign-in and reports it when clearing the pending handoff throws", () => {
+  const error = new Error("keychain locked");
+  mocks.clearPending.mockImplementationOnce(() => {
+    throw error;
+  });
+  mocks.authenticated = true;
+  render(<OnboardingScreen />);
+  tap("opener:signIn");
+  tap("signIn:done");
+  expect(mocks.completeOnboarding).toHaveBeenCalled();
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "onboarding_sign_in_finish_failed",
+    error,
+  );
+});
+
+it("still finishes onboarding after sign-in and reports it when finishing onboarding throws", () => {
+  const error = new Error("keychain locked");
+  mocks.completeOnboarding.mockImplementationOnce(() => {
+    throw error;
+  });
+  mocks.authenticated = true;
+  render(<OnboardingScreen />);
+  tap("opener:signIn");
+  tap("signIn:done");
+  expect(mocks.clearPending).toHaveBeenCalled();
+  expect(mocks.completeOnboarding).toHaveBeenCalled();
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "onboarding_sign_in_finish_failed",
+    error,
+  );
 });
 
 it("queues the real reel it played as the first save when onboarding ends", () => {

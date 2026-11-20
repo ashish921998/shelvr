@@ -30,8 +30,8 @@ export function OnboardingProvider({
   const [onboarded, setOnboarded] = useState(readOnboardedFlag);
 
   const completeOnboarding = useCallback(() => {
-    SecureStore.setItem(ONBOARDING_KEY, "true");
     setOnboarded(true);
+    SecureStore.setItem(ONBOARDING_KEY, "true");
   }, []);
 
   const value = useMemo(
