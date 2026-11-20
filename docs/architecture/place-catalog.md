@@ -49,13 +49,27 @@ save keeps a permanent copy of a provider's point. A place the provider cannot m
 
 ## Reading by area
 
-`places:forMap({ box })` returns the Discover places inside a map area, capped. A geospatial index
-(`@convex-dev/geospatial`) finds them. It holds only the rows that Discover can show, so a save never
-writes to it, and it grows only as large as Discover.
+`places:forMap({ box })` returns up to 300 Discover places inside a map area. It reads them in one of
+two ways, and both stay far below Convex's limit of 4,096 index ranges for each query:
 
-The Map works out the visible area from the camera's centre, zoom and screen size. It snaps the area
-to a grid and asks again only once the camera rests, so a pan does not open a new query on every
-frame, and people who look at the same area share cached results.
+- A box narrower than 90° of longitude reads a geospatial index (`@convex-dev/geospatial`). The index
+  holds only the rows that Discover can show, so a save never writes to it, and it grows only as large
+  as Discover. A query makes at most two calls to it. In a test with 1,860 places, a box 80° wide
+  read 646 index ranges.
+- A wider box reads the live rows in the order they were added. It keeps the first 300 inside the box
+  and looks at no more than 2,000 rows, in 2 index ranges. A caller without a box, such as the Map
+  from phase 1, gets this read for the whole world. Once Discover holds more than 2,000 places, a
+  zoomed-out view shows only the oldest of them. A sample for each area, or the counts in phase 5,
+  will replace that.
+
+The index's level options are fixed once it holds points. The component removes a point by the cells
+it computes from the current options, so after a change to `minLevel` it cannot find the cells of
+points indexed before. Change the options only when the index is empty.
+
+The Map works out the visible area from the camera's centre, zoom and screen size, and from the span
+that the map reports when it is rotated or tilted. It snaps the area to a grid and asks again only
+once the camera rests, so a pan does not open a new query on every frame, and people who look at the
+same area share cached results. A view half the world wide or wider asks for the whole world.
 
 A person with no saves first asks for the whole world. The capped answer feeds the Map's "busiest
 city" framing, which opens the camera on a filled city. When the camera rests there, the Map asks
@@ -121,8 +135,8 @@ reasons. Each one is a constraint on this design:
 
 1. **Hand-picked Discover places (PR #789, merged).** `places`, the two imports, and `forMap`
    returning every live row.
-2. **Discover by area.** The geospatial index and `forMap({ box })`. This lands before the next app
-   release: `forMap({})` becomes a public contract once a release ships a client that calls it.
+2. **Discover by area.** The geospatial index and `forMap({ box })`. The box is optional, so the
+   phase 1 client's `forMap({})` keeps working.
 3. **`savedPlaces`.** Copy every save's pins into it. Saving writes it and adds or links `places`
    rows. The Map reads it.
 4. **Everything else moves.** City pages, trips, shared lists, visits, removals and corrections
