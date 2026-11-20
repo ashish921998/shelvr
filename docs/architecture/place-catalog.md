@@ -271,12 +271,12 @@ point clears its `googlePlaceId` and runs the check above again. It patches a `p
 read the row.
 
 **Points that came from Apple** may stay only until the open-data match runs (step 2 under
-"Order"). That pass replaces each `places` row's point with Overture's and hides a row with no
-match. The same pass re-points each saved place to its open-data match and drops the Apple point of
-one with no match, keeping its name and city; the place then shows in lists but not as a pin until
-the person sets a point. A point the person set themselves is theirs and stays. Today
-`items.placePins` and the `places` rows still hold Apple points, so this pass is the deadline for
-them, and it has to run before the Mapbox map ships.
+"Order"), and that pass has to run before the Mapbox map ships. It replaces each `places` row's
+point with Overture's, and deletes a row with no match together with its index entry, so no Apple
+point stays behind. It also re-points each saved place to its open-data match and drops the Apple
+point of one with no match, keeping its name and city; the place then shows in lists but not as a
+pin until the person sets a point. A point the person set themselves is theirs and stays. Until the
+pass runs, `items.placePins` and the `places` rows still hold Apple points.
 
 This reads the published terms; it is not legal advice. Before the place page ships, ask Google to
 confirm rules 1 and 2 in writing.
