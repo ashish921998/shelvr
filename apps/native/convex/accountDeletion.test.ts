@@ -27,6 +27,8 @@ const UNOWNED_TABLES: Record<string, string> = {
   paymentAnalyticsReceipts: "event ids only, no reference to an account",
   cityPhotos:
     "a cache shared by every account of one public photo per city name, with no reference to an account or a save",
+  places:
+    "the hand-filled Map places, ours alone: no owner key, no user content, nothing of a person",
   waitlistSignups:
     "the marketing waitlist, keyed by email and consented to apart from any account",
   authVerifiers:

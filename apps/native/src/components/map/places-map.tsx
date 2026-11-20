@@ -35,6 +35,7 @@ type Props = {
   pins: MapPin[];
   /** The places the first camera frames when it cannot open on the person. */
   framed: MapPin[];
+  anchors: LatLng[];
   /** iOS: open on the person's location and show it. */
   showsUser: boolean;
   /** Clears the floating filter row above the map. */
@@ -46,6 +47,7 @@ type Props = {
 export function PlacesMap({
   pins,
   framed,
+  anchors,
   showsUser,
   topInset,
   focus,
@@ -86,10 +88,10 @@ export function PlacesMap({
   // expo-maps applies a cameraPosition prop without animation, so it only ever holds the first camera.
   const [firstCamera] = useState(showsUser ? undefined : fit);
   // The opening check reads these when it fires, so a filter picked while it waits is the one it frames.
-  const latest = useRef({ pins, fit });
+  const latest = useRef({ anchors, fit });
   useEffect(() => {
-    latest.current = { pins, fit };
-  }, [pins, fit]);
+    latest.current = { anchors, fit };
+  }, [anchors, fit]);
   const centredOnUser = useRef(false);
   const centre = useRef<LatLng | undefined>(undefined);
   const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -114,7 +116,7 @@ export function PlacesMap({
     };
     checkNearby.current = () => {
       checkNearby.current = undefined;
-      if (!hasPlaceNear(centre.current, latest.current.pins)) showCity();
+      if (!hasPlaceNear(centre.current, latest.current.anchors)) showCity();
     };
     // No position means the person's own location. A map mounted moments ago can refuse its first
     // move, so it is retried; if every try fails, the map shows the busiest city instead.

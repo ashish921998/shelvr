@@ -4,6 +4,7 @@ import { v } from "convex/values";
 import { recipientValidator } from "./model/notificationFields";
 import {
   articleMediaValidator,
+  cuisineValidator,
   enrichmentValidator,
   failureReasonValidator,
   intentValidator,
@@ -91,6 +92,21 @@ export default defineSchema({
     "by_event",
     ["eventId"],
   ),
+
+  places: defineTable({
+    name: v.string(),
+    city: v.string(),
+    lat: v.number(),
+    lng: v.number(),
+    appleId: v.string(),
+    category: v.optional(v.string()),
+    cuisine: v.optional(cuisineValidator),
+    sources: v.optional(v.array(v.object({ url: v.string() }))),
+    status: v.union(v.literal("live"), v.literal("hidden")),
+    addedAt: v.number(),
+  })
+    .index("by_status", ["status"])
+    .index("by_apple_id", ["appleId"]),
 
   placeRemovals: defineTable({
     userId: v.string(),

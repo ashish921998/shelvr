@@ -22,17 +22,24 @@ import {
   busiestCityPlaces,
   filterPlaces,
   mapFilters,
-  searchPlaces,
   topSearchResults,
   type WentFilter,
   wentView,
 } from "@/lib/map-filters";
+import {
+  type MapEntry,
+  mapEntries,
+  ownOnTop,
+  searchEntries,
+} from "@/lib/map-discover";
 import { useMapLocation } from "@/lib/map-location";
 import { placeEmoji } from "@/lib/map-pin-emoji";
+import { useDiscoverPlaces } from "@/lib/use-discover-places";
 import { usePlaceVisits } from "@/lib/use-place-visit";
 import { visitMatcher } from "@convex/model/placeVisits";
 import { api } from "@convex/_generated/api";
 import type { PlaceKind } from "@convex/model/placeKinds";
+import type { FunctionReturnType } from "convex/server";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -43,6 +50,11 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 /** Room left at the right of the filter row for MapKit's my-location button. */
 const LOCATE_BUTTON_CLEARANCE = 64;
 
+type OwnPlace = FunctionReturnType<typeof api.mapPlaces.listMapPlaces>[number];
+type Entry = MapEntry<OwnPlace>;
+
+const NO_PLACES: OwnPlace[] = [];
+
 function placeId(place: {
   itemId: string;
   name: string;
@@ -50,6 +62,10 @@ function placeId(place: {
   lng: number;
 }) {
   return `${place.itemId}:${place.name}:${place.lat}:${place.lng}`;
+}
+
+function entryId(place: Entry) {
+  return place.source === "discover" ? `discover:${place._id}` : placeId(place);
 }
 
 export default function MapScreen() {
@@ -78,6 +94,12 @@ export default function MapScreen() {
   const [focus, setFocus] = useState<MapFocus | undefined>(undefined);
 
   const all = places.data;
+  const {
+    settled,
+    beside,
+    open: openDiscover,
+  } = useDiscoverPlaces(all ?? NO_PLACES);
+  const [discoverOn, setDiscoverOn] = useState(true);
   const { visits, loaded, isError, error, offerRetry } = usePlaceVisits();
   const visitsFailed = isError && !loaded;
   useEffect(() => {
@@ -94,57 +116,74 @@ export default function MapScreen() {
     () => wentView(all ?? [], wentFilter, visited),
     [all, wentFilter, visited],
   );
-  const filters = useMemo(() => mapFilters(went.places), [went.places]);
+  const showDiscoverChip =
+    went.selected === "all" && (all?.length ?? 0) > 0 && beside.length > 0;
+  const withDiscover =
+    went.selected === "all" && (discoverOn || !showDiscoverChip);
+  const entries = useMemo(
+    () => mapEntries(went.places, withDiscover ? beside : [], visited),
+    [went.places, withDiscover, beside, visited],
+  );
+  const filters = useMemo(() => mapFilters(entries), [entries]);
   // A filter that no longer has enough places (a save was deleted) falls back to All.
   const active = filters.some((filter) => filter.kind === kind) ? kind : null;
-  const shown = useMemo(
-    () => filterPlaces(went.places, active),
-    [went.places, active],
-  );
+  const shown = useMemo(() => filterPlaces(entries, active), [entries, active]);
   const searching = searchText.trim() !== "";
   // Search narrows whatever the filter shows; every match stays on the map, the first few are listed.
   const matches = useMemo(
-    () => (searching ? searchPlaces(shown, searchText) : shown),
+    () => (searching ? searchEntries(shown, searchText) : shown),
     [searching, shown, searchText],
   );
   const pins: MapPin[] = useMemo(
     () =>
-      matches.map((place) => ({
+      ownOnTop(matches).map((place) => ({
         ...place,
-        id: placeId(place),
+        id: entryId(place),
         emoji: placeEmoji(place),
-        ...(visited(place)
-          ? {
-              tint: isDarkThemeName(rt.themeName)
-                ? theme.colors.primarySoft
-                : theme.colors.primaryText,
-              snippet: t("passport.wentNoDate"),
-            }
-          : {}),
+        ...(place.source === "discover"
+          ? { tint: theme.colors.muted }
+          : place.visited
+            ? {
+                tint: isDarkThemeName(rt.themeName)
+                  ? theme.colors.primarySoft
+                  : theme.colors.primaryText,
+                snippet: t("passport.wentNoDate"),
+              }
+            : {}),
       })),
-    [matches, visited, rt.themeName, theme],
+    [matches, rt.themeName, theme],
+  );
+  const anchorEntries = useMemo(() => {
+    const own = shown.filter((place) => place.source === "own");
+    return own.length > 0 ? own : shown;
+  }, [shown]);
+  const anchors = useMemo(
+    () => anchorEntries.map(({ lat, lng }) => ({ lat, lng })),
+    [anchorEntries],
   );
   const framed = useMemo(
     () =>
       // As on the city page, a pin far out of town stays on the map but does not set the zoom.
       // Framed from the filter's places, so a filter with none in view can bring them in.
-      framedPins(busiestCityPlaces(shown)).map((place) => ({
+      framedPins(busiestCityPlaces(anchorEntries)).map((place) => ({
         ...place,
-        id: placeId(place),
+        id: entryId(place),
       })),
-    [shown],
+    [anchorEntries],
   );
 
   const reported = useRef(false);
   useEffect(() => {
-    if (!opened || all === undefined || location === "asking") return;
+    if (!opened || all === undefined || !settled || location === "asking")
+      return;
     if (reported.current) return;
     reported.current = true;
     analytics.capture("map_opened", {
       count: all.length,
+      discover: beside.length,
       located: location === "granted",
     });
-  }, [opened, all, location]);
+  }, [opened, all, beside, settled, location]);
 
   if (places.isError) {
     return (
@@ -154,8 +193,13 @@ export default function MapScreen() {
       />
     );
   }
-  if (all === undefined || location === "asking") return <ScreenLoader />;
-  if (all.length === 0) {
+  if (
+    all === undefined ||
+    (all.length === 0 && !settled) ||
+    location === "asking"
+  )
+    return <ScreenLoader />;
+  if (all.length === 0 && beside.length === 0) {
     return (
       <View style={styles.empty}>
         <EmptyState title={t("map.emptyTitle")} message={t("map.emptyBody")} />
@@ -163,6 +207,7 @@ export default function MapScreen() {
     );
   }
 
+  const showChips = filters.length > 0 || showDiscoverChip;
   const top = rt.insets.top + theme.gap(1);
   const located = location === "granted";
   // The search field, then the chips under it.
@@ -171,16 +216,20 @@ export default function MapScreen() {
     (went.showSwitch && !searching
       ? theme.gap(1) + theme.control.minHeight
       : 0) +
-    (filters.length > 0 ? theme.gap(1) + theme.control.minHeight : 0);
+    (showChips ? theme.gap(1) + theme.control.minHeight : 0);
   const select = (id: string) => {
-    const place = shown.find((candidate) => placeId(candidate) === id);
+    const place = shown.find((candidate) => entryId(candidate) === id);
     if (!place || !focused.current) return;
+    if (place.source === "discover") {
+      openDiscover(place);
+      return;
+    }
     const openSave = () => {
       if (!focused.current) return;
       router.push({ pathname: "/item/[id]", params: { id: place.itemId } });
     };
     const card = place.appleId !== undefined && canOpenPlaceCard(place.appleId);
-    analytics.capture("map_place_opened", { card });
+    analytics.capture("map_place_opened", { card, source: "own" });
     if (card && place.appleId !== undefined) {
       void openPlaceDetails(place.appleId, openSave);
     } else {
@@ -188,7 +237,7 @@ export default function MapScreen() {
     }
   };
   const pickResult = (id: string) => {
-    const place = matches.find((candidate) => placeId(candidate) === id);
+    const place = matches.find((candidate) => entryId(candidate) === id);
     if (!place) return;
     Keyboard.dismiss();
     setListOpen(false);
@@ -200,6 +249,10 @@ export default function MapScreen() {
     }));
     select(id);
   };
+  const toggleDiscover = () => {
+    analytics.capture("map_discover_toggled", { on: !discoverOn });
+    setDiscoverOn(!discoverOn);
+  };
   const choose = (next: PlaceKind | null) => {
     setKind(next);
     if (next !== null) analytics.capture("map_filter_selected", { kind: next });
@@ -210,6 +263,7 @@ export default function MapScreen() {
       <PlacesMap
         pins={pins}
         framed={framed}
+        anchors={anchors}
         showsUser={located}
         topInset={top + overlayHeight}
         focus={focus}
@@ -244,7 +298,7 @@ export default function MapScreen() {
           results={
             searching && listOpen
               ? topSearchResults(matches).map((place) => ({
-                  id: placeId(place),
+                  id: entryId(place),
                   name: place.name,
                   city: place.city,
                 }))
@@ -255,8 +309,13 @@ export default function MapScreen() {
         {went.showSwitch && !searching ? (
           <MapWentSwitch selected={went.selected} onSelect={setWentFilter} />
         ) : null}
-        {filters.length > 0 && !searching ? (
+        {showChips && !searching ? (
           <MapFilterChips
+            discover={
+              showDiscoverChip
+                ? { on: discoverOn, onToggle: toggleDiscover }
+                : undefined
+            }
             kinds={filters.map((filter) => filter.kind)}
             selected={active}
             onSelect={choose}
