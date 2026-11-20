@@ -1,10 +1,10 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction, internalMutation } from "./_generated/server";
-import { MAX_MAP_PLACES } from "./mapPlaces";
 import { authedQuery } from "./model/auth";
 import { cuisineValidator } from "./model/itemFields";
 import { logEvent } from "./model/log";
+import { boxValidator, indexPlace, placesInBox } from "./model/placeIndex";
 import {
   cityCentre,
   findVenue,
@@ -17,9 +17,10 @@ import { placeKinds } from "./model/placeKinds";
 
 const MAX_SOURCES = 3;
 const MAX_NAMES = 100;
+const REINDEX_PAGE = 50;
 
 export const forMap = authedQuery({
-  args: {},
+  args: { box: boxValidator },
   returns: v.array(
     v.object({
       _id: v.id("places"),
@@ -33,22 +34,26 @@ export const forMap = authedQuery({
       kinds: v.array(v.string()),
     }),
   ),
-  handler: async (ctx) => {
-    const rows = await ctx.db
-      .query("places")
-      .withIndex("by_status", (q) => q.eq("status", "live"))
-      .take(MAX_MAP_PLACES);
-    return rows.map((row) => ({
-      _id: row._id,
-      name: row.name,
-      lat: row.lat,
-      lng: row.lng,
-      city: row.city,
-      appleId: row.appleId,
-      ...(row.category ? { category: row.category } : {}),
-      ...(row.cuisine ? { cuisine: row.cuisine } : {}),
-      kinds: placeKinds(row.category, [], row.cuisine),
-    }));
+  handler: async (ctx, args) => {
+    const ids = await placesInBox(ctx, args.box);
+    const rows = await Promise.all(ids.map((id) => ctx.db.get(id)));
+    return rows.flatMap((row) =>
+      row?.status === "live"
+        ? [
+            {
+              _id: row._id,
+              name: row.name,
+              lat: row.lat,
+              lng: row.lng,
+              city: row.city,
+              appleId: row.appleId,
+              ...(row.category ? { category: row.category } : {}),
+              ...(row.cuisine ? { cuisine: row.cuisine } : {}),
+              kinds: placeKinds(row.category, [], row.cuisine),
+            },
+          ]
+        : [],
+    );
   },
 });
 
@@ -68,7 +73,7 @@ export const store = internalMutation({
         .withIndex("by_apple_id", (q) => q.eq("appleId", place.appleId))
         .first();
       if (row === null) {
-        await ctx.db.insert("places", {
+        const fresh = {
           name: place.name,
           city: args.city,
           lat: place.lat,
@@ -76,9 +81,11 @@ export const store = internalMutation({
           appleId: place.appleId,
           ...(place.category ? { category: place.category } : {}),
           ...(args.source ? { sources: [{ url: args.source }] } : {}),
-          status: "live",
+          status: "live" as const,
           addedAt: Date.now(),
-        });
+        };
+        const _id = await ctx.db.insert("places", fresh);
+        await indexPlace(ctx, { _id, ...fresh });
         added++;
         continue;
       }
@@ -137,5 +144,22 @@ export const addByName = internalAction({
     );
     logEvent("info", "places_imported", { ...stored, missed: missed.length });
     return { ...stored, missed };
+  },
+});
+
+export const reindexPage = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { page, isDone, continueCursor } = await ctx.db
+      .query("places")
+      .paginate({ numItems: REINDEX_PAGE, cursor: args.cursor });
+    for (const row of page) await indexPlace(ctx, row);
+    logEvent("info", "places_reindexed", { count: page.length, done: isDone });
+    if (!isDone)
+      await ctx.scheduler.runAfter(0, internal.places.reindexPage, {
+        cursor: continueCursor,
+      });
+    return null;
   },
 });

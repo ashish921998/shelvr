@@ -17,7 +17,11 @@ export function useDiscoverPlaces(
   beside: DiscoverPlace[];
   open: (place: DiscoverPlace) => void;
 } {
-  const query = useQuery(convexQuery(api.places.forMap, {}));
+  const query = useQuery(
+    convexQuery(api.places.forMap, {
+      box: { west: -180, south: -85, east: 180, north: 85 },
+    }),
+  );
   const { open: openWith } = usePlaceOpener(
     stopAction,
     "map_discover_maps_failed",

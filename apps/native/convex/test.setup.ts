@@ -1,4 +1,5 @@
 import { convexTest } from "convex-test";
+import { register as registerGeospatial } from "@convex-dev/geospatial/test";
 import { register as registerRateLimiter } from "@convex-dev/rate-limiter/test";
 import type { Id } from "./_generated/dataModel";
 import type { MutationCtx } from "./_generated/server";
@@ -73,6 +74,7 @@ const modules = import.meta.glob("./**/*.ts");
 export function newConvexTest() {
   const t = convexTest(schema, modules);
   registerRateLimiter(t);
+  registerGeospatial(t);
   return t;
 }
 
