@@ -1,6 +1,6 @@
 ---
 name: verify-shelvr
-description: Launch, check, drive, and prove the Shelvr iOS app (apps/native development build on the iOS simulator) with the e2e suite in tools/e2e. Use before claiming any change a person can see works on a device (saving a link, Home's cities, the Map tab, city pages, the paywall), before putting simulator screenshots in a pull request, when asked to verify or screenshot the app, or to bug bash it.
+description: Launch, check, drive, and prove the Shelvr iOS app (apps/native development build on the iOS simulator) with the e2e suite in tools/e2e. Use before claiming any change a person can see works on a device (saving a link, Home's cities, city pages, the paywall; the Map tab has no scripted test yet, so screenshot it by hand), before putting simulator screenshots in a pull request, when asked to verify or screenshot the app, or to bug bash it.
 ---
 
 # Verify Shelvr
@@ -88,7 +88,8 @@ the model writes the label (a link's title). Stable handles in this
 app: test ids `add-article-input`, `dev-login-button`, `reset-flow-fixtures`;
 the city cards on Home (buttons named `<City>` without pins, or `<City>, N places`
 once mapped; do not require the comma); the `Profile` and `Add`
-buttons on Home. There is no tab bar.
+buttons on Home. The tab bar (`src/components/tab-bar.tsx`) switches between
+Library and Map and holds the + for Add spots; no test drives the Map tab yet.
 
 Live, over MCP: no `e2e mcp` server is registered in this repo. Add one for
 your client with `--config tools/e2e/e2e.config.ts` (topic `mcp`), then
