@@ -5,11 +5,16 @@ import {
   cleanup,
   fireEvent,
   render,
+  renderHook,
   screen,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import OnboardingScreen from "@/app/(app)/onboarding";
 import { ahaReel, ahaReelUrl } from "@/lib/aha-reels";
+import {
+  clearOnboardingProgress,
+  useOnboardingProgress,
+} from "@/lib/onboarding-progress";
 import {
   ONBOARDING_FLOW_VERSION,
   ONBOARDING_STEP_IDS,
@@ -21,6 +26,7 @@ type Sample = { kind: string; city: string };
 
 const mocks = vi.hoisted(() => ({
   storage: new Map<string, string>(),
+  failingKeys: new Set<string>(),
   setPendingSpaces: vi.fn(),
   queueDemoUrl: vi.fn(),
   queueCityStamps: vi.fn(),
@@ -84,7 +90,10 @@ vi.mock("@/lib/onboarding-paywall", async () => {
 });
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => mocks.storage.get(key) ?? null,
-  setItem: (key: string, value: string) => mocks.storage.set(key, value),
+  setItem: (key: string, value: string) => {
+    if (mocks.failingKeys.has(key)) throw new Error("keychain unavailable");
+    mocks.storage.set(key, value);
+  },
 }));
 vi.mock("expo-crypto", () => ({ randomUUID: () => "operation" }));
 vi.mock("@/lib/pending-onboarding", async (importOriginal) => ({
@@ -298,6 +307,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.permission.mockReset().mockResolvedValue("ask");
   mocks.storage.clear();
+  mocks.failingKeys.clear();
   mocks.authenticated = false;
 });
 afterEach(cleanup);
@@ -502,6 +512,37 @@ it("shows the carousel as leaving while it reads the notifications answer", asyn
   expect(mocks.carousel.mock.lastCall?.[0].leaving).toBe(true);
 });
 
+it("drops a permission answer that lands after onboarding progress ended", async () => {
+  let answer: (value: "blocked") => void = () => undefined;
+  mocks.permission.mockImplementation(
+    () => new Promise((resolve) => (answer = resolve)),
+  );
+  startAt("carousel");
+  render(<OnboardingScreen />);
+  tap("carousel:continue");
+  act(() => clearOnboardingProgress());
+  await act(async () => answer("blocked"));
+  expect(mocks.ask).not.toHaveBeenCalled();
+  expect(saved()).toBeNull();
+});
+
+it("keeps the step it could not save, so the next tap starts the permission check", () => {
+  startAt("carousel");
+  const { result } = renderHook(() => useOnboardingProgress());
+  mocks.failingKeys.add(PROGRESS_KEY);
+  expect(() =>
+    act(() => {
+      result.current.dispatch({ type: "continue", from: "carousel" });
+    }),
+  ).toThrow();
+  expect(result.current.read().lock).toBeNull();
+  mocks.failingKeys.clear();
+  let command: ReturnType<typeof result.current.dispatch> = null;
+  act(() => {
+    command = result.current.dispatch({ type: "continue", from: "carousel" });
+  });
+  expect(command).toMatchObject({ kind: "checkPermission" });
+});
 it("opens the paywall when the permission cannot be read", async () => {
   mocks.permission.mockRejectedValue(new Error("no"));
   startAt("carousel");
@@ -588,9 +629,7 @@ it("hands the goals' spaces to the replay and reports the answers when onboardin
     expect.objectContaining({ goals: ["date"], travelCity: "paris" }),
   );
   expect(saved()).toBeNull();
-  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
-    ahaReelUrl(ahaReel("paris")),
-  );
+  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(ahaReelUrl(ahaReel("paris")));
   expect(mocks.completeOnboarding).toHaveBeenCalled();
   expect(mocks.capture).toHaveBeenCalledWith(
     "onboarding_completed",

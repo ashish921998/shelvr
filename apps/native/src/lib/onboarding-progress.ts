@@ -404,8 +404,15 @@ function writeProgress(saved: SavedProgress) {
   );
 }
 
+let progressEnds = 0;
+
 export function clearOnboardingProgress() {
-  SecureStore.setItem(PROGRESS_KEY, "");
+  progressEnds += 1;
+  try {
+    SecureStore.setItem(PROGRESS_KEY, "");
+  } catch (error) {
+    analytics.captureError("onboarding_progress_clear_failed", error);
+  }
 }
 
 function importLegacyProgress(): SavedProgress | null {
@@ -423,7 +430,11 @@ function importLegacyProgress(): SavedProgress | null {
     completed: passed.filter((seen) => seen !== resumed),
   };
   writeProgress(saved);
-  dropLegacyProgress();
+  try {
+    dropLegacyProgress();
+  } catch (error) {
+    analytics.captureError("onboarding_legacy_progress_drop_failed", error);
+  }
   return saved;
 }
 
@@ -442,6 +453,7 @@ export function useOnboardingProgress() {
   const [state, setState] = useState(start.state);
   const current = useRef(start.state);
   const started = useRef(false);
+  const [era] = useState(() => progressEnds);
 
   useEffect(() => {
     if (started.current) return;
@@ -452,18 +464,22 @@ export function useOnboardingProgress() {
     }
   }, [start]);
 
-  const dispatch = useCallback((event: ProgressEvent) => {
-    const result = transitionProgress(current.current, event, Date.now());
-    if (result.state !== current.current) {
-      current.current = result.state;
-      if (!result.state.finished) writeProgress(result.state);
-      setState(result.state);
-    }
-    for (const entry of result.analytics) {
-      analytics.capture(entry.event, entry.properties);
-    }
-    return result.command;
-  }, []);
+  const dispatch = useCallback(
+    (event: ProgressEvent) => {
+      if (era !== progressEnds) return null;
+      const result = transitionProgress(current.current, event, Date.now());
+      if (result.state !== current.current) {
+        if (!result.state.finished) writeProgress(result.state);
+        current.current = result.state;
+        setState(result.state);
+      }
+      for (const entry of result.analytics) {
+        analytics.capture(entry.event, entry.properties);
+      }
+      return result.command;
+    },
+    [era],
+  );
 
   const read = useCallback(() => current.current, []);
 

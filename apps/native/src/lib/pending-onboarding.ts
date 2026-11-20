@@ -194,9 +194,9 @@ export function setPendingSpaces(
     demoUrl: existing?.demoUrl ?? null,
     demoSpace: existing?.demoSpace ?? null,
     demoOwner: existing?.demoOwner ?? null,
-    progressVersion: existing?.progressVersion ?? null,
-    step: existing?.step ?? null,
-    viewed: existing?.viewed ?? [],
+    progressVersion: null,
+    step: null,
+    viewed: [],
     spaceNames: existing?.spaceNames ?? {},
     ...parseOnboardingAnswers({ ...existing, ...answers }),
   });

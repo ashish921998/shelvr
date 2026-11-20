@@ -32,7 +32,10 @@ vi.mock("expo-secure-store", () => ({
   },
 }));
 vi.mock("expo-crypto", () => ({ randomUUID: () => "new-operation-id" }));
-vi.mock("@/lib/analytics", () => ({ analytics: { capture: vi.fn() } }));
+const captureError = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/analytics", () => ({
+  analytics: { capture: vi.fn(), captureError },
+}));
 
 const PROGRESS_KEY = "shelvr.onboarding.progress";
 const PENDING_KEY = "shelvr.pending.onboarding";
@@ -40,6 +43,7 @@ const PENDING_KEY = "shelvr.pending.onboarding";
 beforeEach(() => {
   storage.clear();
   failingKeys.clear();
+  captureError.mockClear();
 });
 
 function at(
@@ -286,13 +290,24 @@ describe("leaving the carousel", () => {
     const first = checking();
     const back = run(first.state, { type: "back", from: "carousel" });
     expect(back.state.lock).toBeNull();
-    const returned = run(back.state, { type: "continue", from: "ahaSpots" });
+    const returned = run(
+      back.state,
+      { type: "continue", from: "ahaSpots" },
+      { type: "continue", from: "carousel" },
+    );
+    expect(returned.state.lock?.kind).toBe("checking");
     const late = run(returned.state, {
       type: "permission",
       visit: first.state.visit,
       canAsk: true,
     });
     expect(late.state).toBe(returned.state);
+    const answered = run(returned.state, {
+      type: "permission",
+      visit: returned.state.visit,
+      canAsk: true,
+    });
+    expect(answered.state.step).toBe("notifications");
   });
 });
 
@@ -377,6 +392,15 @@ describe("stored progress", () => {
     clearOnboardingProgress();
     expect(loadOnboardingProgress()).toBeNull();
   });
+
+  it("reports a clear that cannot be written instead of throwing", () => {
+    failingKeys.add(PROGRESS_KEY);
+    expect(() => clearOnboardingProgress()).not.toThrow();
+    expect(captureError).toHaveBeenCalledWith(
+      "onboarding_progress_clear_failed",
+      expect.any(Error),
+    );
+  });
 });
 
 describe("progress written by the previous build", () => {
@@ -448,6 +472,26 @@ describe("progress written by the previous build", () => {
     expect(() => loadOnboardingProgress()).toThrow();
     failingKeys.clear();
     expect(loadOnboardingProgress()?.step).toBe("city");
+  });
+
+  it("resumes when the old record cannot be cleared, and finish still drops it", () => {
+    legacy({ step: 5, goals: ["date"] });
+    failingKeys.add(PENDING_KEY);
+    expect(loadOnboardingProgress()?.step).toBe("city");
+    expect(captureError).toHaveBeenCalledWith(
+      "onboarding_legacy_progress_drop_failed",
+      expect.any(Error),
+    );
+    failingKeys.clear();
+    setPendingSpaces(["Date nights"], {
+      goals: ["date"],
+      savedCount: null,
+      travelCity: null,
+      beenCities: [],
+      skippedShare: false,
+    });
+    clearOnboardingProgress();
+    expect(loadOnboardingProgress()).toBeNull();
   });
 
   it.each([undefined, 12, 13, "14"])(
