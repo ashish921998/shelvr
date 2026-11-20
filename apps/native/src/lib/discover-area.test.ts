@@ -140,6 +140,25 @@ describe("visibleBox", () => {
     );
   });
 
+  it("never narrows to less than about a kilometre around the person, however far it zooms in", () => {
+    for (const apple of [true, false]) {
+      const near = visibleBox(
+        { ...LISBON, zoom: 20 },
+        { width: WIDTH, height: HEIGHT, apple },
+      )!;
+      const moved = visibleBox(
+        {
+          latitude: LISBON.latitude + 0.004,
+          longitude: LISBON.longitude + 0.004,
+          zoom: 20,
+        },
+        { width: WIDTH, height: HEIGHT, apple },
+      )!;
+      expect((near.north - near.south) * 111).toBeGreaterThan(1);
+      expect(sameBox(near, moved)).toBe(true);
+    }
+  });
+
   it("gives no box for a camera it cannot read", () => {
     const screen = { width: WIDTH, height: HEIGHT, apple: true };
     expect(

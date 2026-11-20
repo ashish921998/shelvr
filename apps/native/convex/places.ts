@@ -45,10 +45,10 @@ const mapPlace = (row: Doc<"places">) => ({
 });
 
 export const forMap = authedQuery({
-  args: { box: v.optional(boxValidator) },
+  args: {},
   returns: v.array(mapPlaceValidator),
-  handler: async (ctx, args) =>
-    (await discoverPlaces(ctx, args.box)).rows.map(mapPlace),
+  handler: async (ctx) =>
+    (await discoverPlaces(ctx, undefined)).rows.map(mapPlace),
 });
 
 export const inArea = authedQuery({

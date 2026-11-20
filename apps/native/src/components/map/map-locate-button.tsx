@@ -11,6 +11,7 @@ export function MapLocateButton({ onPress }: { onPress: () => void }) {
       accessibilityRole="button"
       accessibilityLabel={t("map.showMyLocation")}
       onPress={onPress}
+      pressRetentionOffset={theme.control.pressRetentionOffset}
       style={({ pressed }) => [styles.button, pressed && styles.pressed]}
     >
       <AppSymbolIcon
@@ -33,5 +34,5 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface,
     boxShadow: "0 2px 8px rgba(0, 0, 0, 0.16)",
   },
-  pressed: { opacity: 0.7 },
+  pressed: { opacity: theme.opacity.pressed },
 }));

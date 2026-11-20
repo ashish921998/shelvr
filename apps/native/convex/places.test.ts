@@ -177,7 +177,7 @@ describe("places:forMap", () => {
       city: "Lisbon",
       places: [{ ...cafe("A", "Live Cafe"), category: "Cafe" }],
     });
-    const result = await user.query(api.places.forMap, { box: WORLD });
+    const result = await user.query(api.places.forMap, {});
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({
       name: "Live Cafe",

@@ -78,8 +78,9 @@ export default function PrivacyPage() {
             The map never sends us your exact position. To show places we
             suggest, it asks us for the places in the area on screen. When the
             map is on you, that area tells us roughly where you are, more
-            closely the further you zoom in. We do not save these areas, and we
-            do not track your live location.
+            closely the further you zoom in, but never more closely than about a
+            kilometre. We do not save these areas, and we do not track your live
+            location.
           </li>
           <li>
             <strong>Purchase information.</strong> If you subscribe to Shelvr

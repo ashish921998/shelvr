@@ -25,7 +25,7 @@ type ScreenView = { width: number; height: number; apple: boolean };
 
 const WORLD_WIDTH = 256;
 const MAX_LATITUDE = 85;
-const MIN_HALF_SPAN = 1e-6;
+const MIN_HALF_SPAN = 1 / 32;
 const WORLD_SPAN = 180;
 
 const clampLatitude = (degrees: number) =>
@@ -87,9 +87,9 @@ export function visibleBox(
   );
   return {
     west,
-    south: Math.max(-MAX_LATITUDE, south),
+    south: clampLatitude(south),
     east,
-    north: Math.min(MAX_LATITUDE, north),
+    north: clampLatitude(north),
   };
 }
 
@@ -122,8 +122,8 @@ export function withReach(
   if (east - west >= WORLD_SPAN) return WORLD_BOX;
   return {
     west,
-    south: Math.max(-MAX_LATITUDE, Math.min(box.south, reachSouth)),
+    south: clampLatitude(Math.min(box.south, reachSouth)),
     east,
-    north: Math.min(MAX_LATITUDE, Math.max(box.north, reachNorth)),
+    north: clampLatitude(Math.max(box.north, reachNorth)),
   };
 }
