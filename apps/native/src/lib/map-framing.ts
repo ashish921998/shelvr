@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 
-type Framing<T> = { key: string; places: T[] };
+type Framing<T> = { key: string; places: T[]; opened: boolean };
 
 type Anchored = { source: "own" | "discover"; lat: number; lng: number };
 
@@ -25,13 +25,18 @@ export function nextFraming<T>(
   live: T[],
   key: string,
 ): Framing<T> {
-  if (held.key !== key || (held.places.length === 0 && live.length > 0))
-    return { key, places: live };
+  const opened = held.opened || live.length > 0;
+  if (held.key !== key || opened !== held.opened)
+    return { key, places: live, opened };
   return held;
 }
 
 export function useHeldFraming<T>(live: T[], key: string): T[] {
-  const [held, setHeld] = useState<Framing<T>>({ key, places: live });
+  const [held, setHeld] = useState<Framing<T>>(() => ({
+    key,
+    places: live,
+    opened: live.length > 0,
+  }));
   const next = nextFraming(held, live, key);
   if (next !== held) setHeld(next);
   return next.places;
