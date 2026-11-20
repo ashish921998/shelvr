@@ -54,10 +54,8 @@ export function MapFilterChips({
   selected,
   onSelect,
   inset = true,
-  discover,
 }: {
   inset?: boolean;
-  discover?: { on: boolean; onToggle: () => void };
   kinds: PlaceKind[];
   selected: PlaceKind | null;
   onSelect: (kind: PlaceKind | null) => void;
@@ -73,17 +71,6 @@ export function MapFilterChips({
       accessibilityLabel={t("map.filters")}
       contentContainerStyle={[styles.row, !inset && styles.flush]}
     >
-      {discover ? (
-        <Chip
-          label={t("map.discover")}
-          emoji="✨"
-          selected={discover.on}
-          onPress={() => {
-            void haptics.selection();
-            discover.onToggle();
-          }}
-        />
-      ) : null}
       {kinds.length > 0 ? (
         <Chip
           label={t("map.filterAll")}

@@ -104,7 +104,6 @@ export default function MapScreen() {
     beside,
     open: openDiscover,
   } = useDiscoverPlaces(all ?? NO_PLACES, area);
-  const [discoverOn, setDiscoverOn] = useState(true);
   const { visits, loaded, isError, error, offerRetry } = usePlaceVisits();
   const visitsFailed = isError && !loaded;
   useEffect(() => {
@@ -121,10 +120,7 @@ export default function MapScreen() {
     () => wentView(all ?? [], wentFilter, visited),
     [all, wentFilter, visited],
   );
-  const showDiscoverChip =
-    went.selected === "all" && (all?.length ?? 0) > 0 && beside.length > 0;
-  const withDiscover =
-    went.selected === "all" && (discoverOn || !showDiscoverChip);
+  const withDiscover = went.selected === "all";
   const entries = useMemo(
     () => mapEntries(went.places, withDiscover ? beside : [], visited),
     [went.places, withDiscover, beside, visited],
@@ -213,7 +209,7 @@ export default function MapScreen() {
     );
   }
 
-  const showChips = kinds.length > 0 || showDiscoverChip;
+  const showChips = kinds.length > 0;
   const top = rt.insets.top + theme.gap(1);
   // The search field, then the chips under it.
   const overlayHeight =
@@ -253,10 +249,6 @@ export default function MapScreen() {
       key: (previous?.key ?? 0) + 1,
     }));
     select(id);
-  };
-  const toggleDiscover = () => {
-    analytics.capture("map_discover_toggled", { on: !discoverOn });
-    setDiscoverOn(!discoverOn);
   };
   const choose = (next: PlaceKind | null) => {
     setKind(next);
@@ -316,16 +308,7 @@ export default function MapScreen() {
           <MapWentSwitch selected={went.selected} onSelect={setWentFilter} />
         ) : null}
         {showChips && !searching ? (
-          <MapFilterChips
-            discover={
-              showDiscoverChip
-                ? { on: discoverOn, onToggle: toggleDiscover }
-                : undefined
-            }
-            kinds={kinds}
-            selected={kind}
-            onSelect={choose}
-          />
+          <MapFilterChips kinds={kinds} selected={kind} onSelect={choose} />
         ) : null}
       </View>
     </View>

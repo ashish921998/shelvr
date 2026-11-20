@@ -783,7 +783,6 @@ type MessageParams = {
   "signInScene.dessert": undefined;
   "opener.getStarted": undefined;
   "map.filterAll": undefined;
-  "map.discover": undefined;
   "map.kindFood": undefined;
   "map.kindCoffee": undefined;
   "map.kindDessert": undefined;
