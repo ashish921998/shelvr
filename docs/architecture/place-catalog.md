@@ -286,8 +286,12 @@ point of one with no match, keeping its name and city; the place then shows in l
 pin until the person sets a point. The pass does the same to every other copy of a point:
 `tripStops`, `sharedListPlaces`, `placeVisits`, `placeRemovals` and place corrections. Each copy is
 re-pointed to its open-data match; a copy with no match keeps its name and city and loses its
-point, and a visit or removal then matches by name and city only. A point the person set
-themselves, such as a correction or a pin they dropped, is theirs and stays. Until the pass runs,
+point, and a visit or removal then matches by name and city only. Every point stored today came from Apple, so
+the pass treats all of them as Apple's and needs no rule to tell them apart: a pin has no origin
+field and `appleId` is optional, but there is no other source. The automatic lookups use Apple, and
+so does a correction, which searches Apple Maps (`placeCorrectionSearch`). Once the Mapbox map lets
+a person pick a point from open data or drop one, each pin records where its point came from, and a
+point the person set that way stays. Until the pass runs,
 these tables, `items.placePins` and the `places` rows still hold Apple points.
 
 This reads the published terms; it is not legal advice. Before the place page ships, ask Google to
