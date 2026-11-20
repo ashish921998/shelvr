@@ -74,10 +74,11 @@ Before the camera reports an area, the Map asks for the whole world. For a perso
 capped answer feeds the Map's "busiest city" framing. Without the person's location, the camera opens
 on that city, and when it rests there, the Map asks for that area.
 
-With the person's location, the Map opens on them. When the camera rests, the Map waits for the
-answer for that area, then moves to the busiest city only if no place is within reach. The person's
-own saved places count at once, because they all load together. An answer that comes after the first
-3 seconds is ignored, and the camera stays on the person.
+With the person's location, the Map opens on them. When the camera rests, the Map asks for the area
+on screen together with 50 km around the person, waits for the answer, and moves to the busiest city
+only if no place is within 50 km. When any of the person's own places are shown, only those count,
+and they count at once, because they all load together. An answer that comes after the first 3
+seconds is ignored, and the camera stays on the person.
 
 A change to the Discover places in view never moves the camera. Only the first framing and a filter
 change do.

@@ -6,9 +6,10 @@ import {
   type MapBox,
   sameBox,
   visibleBox,
+  withReach,
 } from "@/lib/discover-area";
 import { moveCamera } from "@/lib/map-camera";
-import { hasPlaceNear } from "@/lib/map-filters";
+import { hasPlaceNear, NEARBY_KM } from "@/lib/map-filters";
 import { fitCamera } from "@/lib/trip";
 import type { LatLng } from "@convex/model/trip";
 import { AppleMaps, GoogleMaps } from "expo-maps";
@@ -162,12 +163,16 @@ export function PlacesMap({
   const reportedArea = useRef<MapBox | undefined>(undefined);
   const reportArea = useCallback(
     (camera: CameraView) => {
-      const box = visibleBox(camera, {
+      const visible = visibleBox(camera, {
         width,
         height,
         apple: process.env.EXPO_OS === "ios",
       });
-      if (!box || sameBox(box, reportedArea.current)) return;
+      if (!visible) return;
+      const box = checkNearby.current
+        ? withReach(visible, camera, NEARBY_KM)
+        : visible;
+      if (sameBox(box, reportedArea.current)) return;
       reportedArea.current = box;
       onArea(box);
     },

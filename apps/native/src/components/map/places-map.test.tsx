@@ -3,6 +3,8 @@ import { act, render } from "@testing-library/react";
 import { forwardRef, useImperativeHandle } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { MapBox } from "@/lib/discover-area";
+
 import { type MapPin, PlacesMap } from "./places-map";
 
 type LatLng = { lat: number; lng: number };
@@ -59,15 +61,26 @@ const LISBON: MapPin[] = [
   { id: "b", name: "Ramiro", lat: 38.72, lng: -9.13 },
 ];
 const PARIS = { lat: 48.857, lng: 2.352 };
+const CASCAIS = { lat: 38.6979, lng: -9.4215 };
 
-function openMap(anchors: LatLng[] | undefined) {
+const holds = (box: MapBox | undefined, at: LatLng) =>
+  box !== undefined &&
+  box.south <= at.lat &&
+  at.lat <= box.north &&
+  box.west <= at.lng &&
+  at.lng <= box.east;
+
+function openMap(
+  anchors: LatLng[] | undefined,
+  onArea: (box: MapBox) => void = () => {},
+) {
   const props = {
     pins: LISBON,
     framed: LISBON,
     showsUser: true,
     topInset: 100,
     onSelect: () => {},
-    onArea: () => {},
+    onArea,
   };
   const view = render(<PlacesMap {...props} anchors={anchors} />);
   return (next: LatLng[] | undefined) =>
@@ -130,5 +143,16 @@ describe("PlacesMap opening on the person", () => {
     act(() => vi.advanceTimersByTime(3000));
     answer([]);
     expect(latitudes()).toEqual([undefined]);
+  });
+
+  it("asks for the places within reach of the person, not only those on screen", async () => {
+    const areas: MapBox[] = [];
+    const answer = openMap(undefined, (box) => areas.push(box));
+    await restOnPerson(CASCAIS);
+    expect(holds(areas.at(-1), LISBON[0])).toBe(true);
+    answer([LISBON[0]]);
+    expect(latitudes()).toEqual([undefined]);
+    await restOnPerson({ lat: CASCAIS.lat, lng: CASCAIS.lng + 0.2 });
+    expect(holds(areas.at(-1), LISBON[0])).toBe(false);
   });
 });

@@ -2,7 +2,7 @@ import { PLACE_KINDS, type PlaceKind } from "@convex/model/placeKinds";
 import { cityKey, distanceKm, type LatLng } from "@convex/model/trip";
 
 /** How far from the person a saved place still counts as nearby when the map opens on them. */
-const NEARBY_KM = 50;
+export const NEARBY_KM = 50;
 
 /** A filter shows only once enough of your places fit it to be worth a tap. */
 const MIN_FILTER_PLACES = 3;
