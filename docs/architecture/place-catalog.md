@@ -289,8 +289,8 @@ Apple point at once and is due as soon as it is built, by 31 December 2026 at th
 the Mapbox map ships. After that it runs daily on every Apple point 29 days old or more, so a point
 missed by one run is at most 30 days old at the next, since saves keep using Apple until the Mapbox
 map ships. At cutover, the backend deploy that comes before the Mapbox
-build's release stops every Apple lookup for every build, old ones included, and changes `pinListPlaces` to
-match each list place's Google point to an open-data point and store that point instead, the way
+build's release stops every Apple lookup for every build, old ones included, and changes `withListPins`
+(`model/placeList.ts`), which both `pinListPlaces` and `addPlaceListParts` use, to match each list place's Google point to an open-data point and store that point instead, the way
 the import uses it only to find a match, so a list saved later never stores a Google point; and then one last run
 handles every remaining Apple or Google point whatever its age. The Mapbox build is released only after that
 run finishes, so a Mapbox map never shows an Apple or Google point. It replaces each `places` row's
@@ -305,7 +305,8 @@ so the pass treats all of them alike and needs no rule to tell them apart: a pin
 field and `appleId` is optional, but no point was set by a person. Most come from Apple: the
 automatic lookups, and a correction, which searches Apple Maps (`placeCorrectionSearch`). The rest come
 from a Google Maps list: its reader (`model/readers/googleMaps.ts`) gives each place Google's
-point, and `pinListPlaces` copies that point into the save's pins, even when the pin also carries
+point, and `withListPins` copies that point into the save's pins (for the first city through
+`pinListPlaces`, for the rest through `addPlaceListParts`), even when the pin also carries
 an `appleId`. `placesImport:importGoogleMapsList` is different: it uses Google's point only to find
 an Apple match and stores Apple's point in the `places` row. Those list pins get the same pass and
 the same 30-day limit. Google's 30-day allowance covers its API results, not points read from a
