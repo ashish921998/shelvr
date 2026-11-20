@@ -130,10 +130,12 @@ to 60 places each. With the Google Maps import, a city takes about an hour.
   `Convex-Api: changed` trailer, because it was new. Phase 2 of
   [place-catalog.md](../architecture/place-catalog.md) added an optional map area (`box`) under that
   trailer, since no installed app calls `forMap` yet. Without a box it answers for the whole world.
+- `places:inArea`: `authedQuery`, takes a `box` and returns `{ places, complete }`: the same rows as
+  `forMap`, and whether the read covered the whole area. Added in phase 2; the Map reads it.
 
 ### Client changes (OTA, no native change)
 
-- `src/lib/use-discover-places.ts` loads `places:forMap`. `discoverBeside` (`src/lib/map-discover.ts`)
+- `src/lib/use-discover-places.ts` loads `places:inArea`. `discoverBeside` (`src/lib/map-discover.ts`)
   drops a Discover place that is one of the person's own (same Apple id, or `samePlace`), so their
   pin wins. `samePlace` also merges two Apple ids with nested names close together, such as a hotel
   and its restaurant. That hides a few distinct Discover places, but an own pin's Apple id can come

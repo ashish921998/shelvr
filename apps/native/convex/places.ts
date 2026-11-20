@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import type { Doc } from "./_generated/dataModel";
 import { internalAction, internalMutation } from "./_generated/server";
 import { authedQuery } from "./model/auth";
 import { cuisineValidator } from "./model/itemFields";
@@ -19,34 +20,46 @@ const MAX_SOURCES = 3;
 const MAX_NAMES = 100;
 const REINDEX_PAGE = 50;
 
+const mapPlaceValidator = v.object({
+  _id: v.id("places"),
+  name: v.string(),
+  lat: v.number(),
+  lng: v.number(),
+  city: v.string(),
+  appleId: v.string(),
+  category: v.optional(v.string()),
+  cuisine: v.optional(cuisineValidator),
+  kinds: v.array(v.string()),
+});
+
+const mapPlace = (row: Doc<"places">) => ({
+  _id: row._id,
+  name: row.name,
+  lat: row.lat,
+  lng: row.lng,
+  city: row.city,
+  appleId: row.appleId,
+  ...(row.category ? { category: row.category } : {}),
+  ...(row.cuisine ? { cuisine: row.cuisine } : {}),
+  kinds: placeKinds(row.category, [], row.cuisine),
+});
+
 export const forMap = authedQuery({
   args: { box: v.optional(boxValidator) },
-  returns: v.array(
-    v.object({
-      _id: v.id("places"),
-      name: v.string(),
-      lat: v.number(),
-      lng: v.number(),
-      city: v.string(),
-      appleId: v.string(),
-      category: v.optional(v.string()),
-      cuisine: v.optional(cuisineValidator),
-      kinds: v.array(v.string()),
-    }),
-  ),
+  returns: v.array(mapPlaceValidator),
+  handler: async (ctx, args) =>
+    (await discoverPlaces(ctx, args.box)).rows.map(mapPlace),
+});
+
+export const inArea = authedQuery({
+  args: { box: boxValidator },
+  returns: v.object({
+    places: v.array(mapPlaceValidator),
+    complete: v.boolean(),
+  }),
   handler: async (ctx, args) => {
-    const rows = await discoverPlaces(ctx, args.box);
-    return rows.map((row) => ({
-      _id: row._id,
-      name: row.name,
-      lat: row.lat,
-      lng: row.lng,
-      city: row.city,
-      appleId: row.appleId,
-      ...(row.category ? { category: row.category } : {}),
-      ...(row.cuisine ? { cuisine: row.cuisine } : {}),
-      kinds: placeKinds(row.category, [], row.cuisine),
-    }));
+    const { rows, complete } = await discoverPlaces(ctx, args.box);
+    return { places: rows.map(mapPlace), complete };
   },
 });
 

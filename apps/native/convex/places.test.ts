@@ -160,8 +160,8 @@ async function names(
   user: ReturnType<ReturnType<typeof newConvexTest>["withIdentity"]>,
   box: typeof WORLD,
 ) {
-  const result = await user.query(api.places.forMap, { box });
-  return result.map((place) => place.name).sort();
+  const result = await user.query(api.places.inArea, { box });
+  return result.places.map((place) => place.name).sort();
 }
 
 async function indexed(t: ReturnType<typeof newConvexTest>, key: string) {
@@ -235,9 +235,39 @@ describe("places:forMap", () => {
         ),
       ),
     );
-    const result = await user.query(api.places.forMap, { box: WORLD });
-    expect(result).toHaveLength(300);
-    expect(new Set(result.map((place) => place._id)).size).toBe(300);
+    const result = await user.query(api.places.inArea, { box: WORLD });
+    expect(result.places).toHaveLength(300);
+    expect(new Set(result.places.map((place) => place._id)).size).toBe(300);
+    expect(result.complete).toBe(false);
+  }, 60_000);
+
+  it("says the answer is complete only when it read the whole area", async () => {
+    const { base, user } = await signedIn();
+    await storeAll(base, [venue("Lisbon", 38.72, -9.14)]);
+    const small = await user.query(api.places.inArea, {
+      box: { west: -10, south: 38, east: -9, north: 39 },
+    });
+    expect(small).toMatchObject({
+      complete: true,
+      places: [{ name: "Lisbon" }],
+    });
+    await base.run(async (ctx) => {
+      for (let i = 0; i < 2000; i++)
+        await ctx.db.insert("places", {
+          name: `South${i}`,
+          city: "South",
+          lat: -40,
+          lng: i / 100,
+          appleId: `South${i}`,
+          status: "live",
+          addedAt: i,
+        });
+    });
+    const wide = await user.query(api.places.inArea, {
+      box: { west: -180, south: 0, east: 180, north: 60 },
+    });
+    expect(wide.places.map((place) => place.name)).toEqual(["Lisbon"]);
+    expect(wide.complete).toBe(false);
   }, 60_000);
 
   it("leaves out a row hidden after it was indexed", async () => {
@@ -344,10 +374,10 @@ describe("places:forMap", () => {
   it("rejects a box that is not degrees", async () => {
     const { user } = await signedIn();
     await expect(
-      user.query(api.places.forMap, { box: { ...WORLD, west: Number.NaN } }),
+      user.query(api.places.inArea, { box: { ...WORLD, west: Number.NaN } }),
     ).rejects.toThrow("finite");
     await expect(
-      user.query(api.places.forMap, { box: { ...WORLD, south: 10, north: 5 } }),
+      user.query(api.places.inArea, { box: { ...WORLD, south: 10, north: 5 } }),
     ).rejects.toThrow("south");
   });
 });
@@ -375,7 +405,9 @@ describe("places:forMap read limits", () => {
       }),
     ]);
     const count = async (box?: typeof WORLD) =>
-      (await user.query(api.places.forMap, box ? { box } : {})).length;
+      box
+        ? (await user.query(api.places.inArea, { box })).places.length
+        : (await user.query(api.places.forMap, {})).length;
     expect(await count()).toBe(300);
     expect(await count(WORLD)).toBe(300);
     expect(await count({ west: -45, south: -40, east: 45, north: 70 })).toBe(

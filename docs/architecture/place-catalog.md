@@ -50,7 +50,9 @@ row with a corrected point keeps that point, and it wins over the one in `places
 
 ## Reading by area
 
-`places:forMap({ box })` returns up to 300 Discover places inside a map area. It reads them in one of
+`places:inArea({ box })` returns up to 300 Discover places inside a map area, and `complete`, which is
+true only when it read the whole area. `places:forMap({ box })` returns the same places without that
+flag. It reads them in one of
 two ways, and both stay far below Convex's limit of 4,096 index ranges for each query:
 
 - A box narrower than 90° of longitude reads a geospatial index (`@convex-dev/geospatial`). The index
@@ -68,7 +70,7 @@ points indexed before. Change the options only when the index is empty.
 The Map works out the visible area from the camera's centre, zoom and screen size, and from the span
 that the map reports when it is rotated or tilted. It snaps the area to a grid and asks again only
 once the camera rests, so a pan does not open a new query on every frame, and a return to an area
-reuses the answer the person already has. Convex caches `forMap` for each person, not across people,
+reuses the answer the person already has. Convex caches `inArea` for each person, not across people,
 because the query reads who is calling. A view half the world wide or wider asks for the whole world.
 
 Before the camera reports an area, the Map asks for the whole world. For a person with no saves, the
@@ -95,11 +97,12 @@ change do.
   opening framing to an older one.
 - **A dense narrow view can leave part of the screen empty.** In a box with more than 300 places, the
   index returns the first 300 that it finds, in its own order.
-- **The opening check sees at most 300 places.** It asks for 50 km around the person, and the answer
-  is capped before any distance test. Where more than 300 Discover places fall in that box, the 300
-  it returns can all lie outside 50 km while a nearer one is left out. So when the answer is full and
-  the person has no saved place in reach, the Map stays on them rather than moving to the busiest city.
-  A server query for the nearest Discover place within 50 km would answer this directly.
+- **The opening check sees only what one answer holds.** It asks for 50 km around the person. The
+  answer stops at 300 places or when a read budget runs out (two index calls of up to 1,024 rows, or
+  2,000 rows for a wide box), before any distance test, so a nearer place can be left out. When the
+  answer is not `complete` and the person has no saved place in reach, the Map stays on them rather
+  than moving to the busiest city. A server query for the nearest Discover place within 50 km would
+  answer this directly.
 - **Search covers only what is loaded.** The Map searches the person's own places and the Discover
   places of the area last in view. A name search over `places` on the server would find the rest.
 - **An empty box over dense cells is untested.** The component stops after reading 1,024 rows, but it
@@ -164,8 +167,8 @@ reasons. Each one is a constraint on this design:
 
 1. **Hand-picked Discover places (PR #789, merged).** `places`, the two imports, and `forMap`
    returning every live row.
-2. **Discover by area.** The geospatial index and `forMap({ box })`. The box is optional, so the
-   phase 1 client's `forMap({})` keeps working.
+2. **Discover by area.** The geospatial index, `forMap({ box })` and `inArea({ box })`, which the
+   Map reads. The box on `forMap` is optional, so the phase 1 client's `forMap({})` keeps working.
 3. **`savedPlaces`.** Copy every save's pins into it. Saving writes it and adds or links `places`
    rows. The Map reads it.
 4. **Everything else moves.** City pages, trips, shared lists, visits, removals and corrections

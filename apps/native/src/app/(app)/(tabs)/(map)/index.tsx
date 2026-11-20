@@ -100,7 +100,7 @@ export default function MapScreen() {
   const {
     settled,
     areaLoaded,
-    areaFull,
+    areaPartial,
     beside,
     open: openDiscover,
   } = useDiscoverPlaces(all ?? NO_PLACES, area);
@@ -261,8 +261,8 @@ export default function MapScreen() {
         pins={pins}
         framed={framed}
         anchors={anchors}
-        areaFull={
-          areaFull &&
+        areaPartial={
+          areaPartial &&
           anchorEntries.every((place) => place.source === "discover")
         }
         showsUser={location === "granted"}

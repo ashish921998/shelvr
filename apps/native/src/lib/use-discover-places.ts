@@ -3,7 +3,6 @@ import { canOpenPlaceCard } from "@/lib/apple-place-card";
 import { stopAction } from "@/lib/trip-planner";
 import { usePlaceOpener } from "@/lib/use-place-opener";
 import { api } from "@convex/_generated/api";
-import { MAX_DISCOVER_PLACES } from "@convex/model/discoverLimit";
 import { convexQuery } from "@convex-dev/react-query";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo } from "react";
@@ -19,12 +18,12 @@ export function useDiscoverPlaces(
 ): {
   settled: boolean;
   areaLoaded: boolean;
-  areaFull: boolean;
+  areaPartial: boolean;
   beside: DiscoverPlace[];
   open: (place: DiscoverPlace) => void;
 } {
   const query = useQuery({
-    ...convexQuery(api.places.forMap, { box: box ?? WORLD_BOX }),
+    ...convexQuery(api.places.inArea, { box: box ?? WORLD_BOX }),
     placeholderData: keepPreviousData,
     gcTime: AREA_CACHE_MS,
   });
@@ -53,8 +52,8 @@ export function useDiscoverPlaces(
     () => ({
       settled: !query.isPending,
       areaLoaded,
-      areaFull: areaLoaded && (query.data?.length ?? 0) >= MAX_DISCOVER_PLACES,
-      beside: discoverBeside(own, query.data ?? NONE),
+      areaPartial: areaLoaded && query.data?.complete === false,
+      beside: discoverBeside(own, query.data?.places ?? NONE),
       open,
     }),
     [query.isPending, areaLoaded, query.data, own, open],

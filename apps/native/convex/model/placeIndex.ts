@@ -3,8 +3,7 @@ import { v, type Infer } from "convex/values";
 import { components } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
-import { MAX_DISCOVER_PLACES } from "./discoverLimit";
-
+const MAX_DISCOVER_PLACES = 300;
 const MAX_SCANNED = 2000;
 const WIDE_DEGREES = 90;
 const MAX_INDEX_CALLS = 2;
@@ -64,6 +63,8 @@ function boxRectangles(box: MapBox): Rectangle[] {
   ];
 }
 
+type DiscoverAnswer = { rows: Doc<"places">[]; complete: boolean };
+
 const inside = (rectangles: Rectangle[], place: Doc<"places">) =>
   rectangles.some(
     (r) =>
@@ -76,7 +77,7 @@ const inside = (rectangles: Rectangle[], place: Doc<"places">) =>
 async function scanLive(
   ctx: QueryCtx,
   rectangles: Rectangle[] | undefined,
-): Promise<Doc<"places">[]> {
+): Promise<DiscoverAnswer> {
   const found: Doc<"places">[] = [];
   let scanned = 0;
   for await (const place of ctx.db
@@ -85,15 +86,16 @@ async function scanLive(
     if (rectangles === undefined || inside(rectangles, place))
       found.push(place);
     scanned++;
-    if (found.length >= MAX_DISCOVER_PLACES || scanned >= MAX_SCANNED) break;
+    if (found.length >= MAX_DISCOVER_PLACES || scanned >= MAX_SCANNED)
+      return { rows: found, complete: false };
   }
-  return found;
+  return { rows: found, complete: true };
 }
 
 async function searchIndex(
   ctx: QueryCtx,
   rectangles: Rectangle[],
-): Promise<Doc<"places">[]> {
+): Promise<DiscoverAnswer> {
   const slices = rectangles.map((rectangle) => ({
     rectangle,
     cursor: undefined as string | undefined,
@@ -123,15 +125,18 @@ async function searchIndex(
     }
   }
   const rows = await Promise.all([...found].map((id) => ctx.db.get(id)));
-  return rows.flatMap((row) =>
-    row?.status === "live" && inside(rectangles, row) ? [row] : [],
-  );
+  return {
+    rows: rows.flatMap((row) =>
+      row?.status === "live" && inside(rectangles, row) ? [row] : [],
+    ),
+    complete: slices.every((slice) => slice.done),
+  };
 }
 
 export async function discoverPlaces(
   ctx: QueryCtx,
   box: MapBox | undefined,
-): Promise<Doc<"places">[]> {
+): Promise<DiscoverAnswer> {
   if (box === undefined) return await scanLive(ctx, undefined);
   const rectangles = boxRectangles(box);
   const width = rectangles.reduce((sum, r) => sum + r.east - r.west, 0);

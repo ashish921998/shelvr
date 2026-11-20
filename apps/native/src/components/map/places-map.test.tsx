@@ -77,13 +77,13 @@ const holds = (box: MapBox | undefined, at: LatLng) =>
 function openMap(
   anchors: LatLng[] | undefined,
   onArea: (box: MapBox) => void = () => {},
-  areaFull = false,
+  areaPartial = false,
 ) {
   const props = {
     pins: LISBON,
     framed: LISBON,
     showsUser: true,
-    areaFull,
+    areaPartial,
     topInset: 100,
     onSelect: () => {},
     onArea,
@@ -139,7 +139,7 @@ describe("PlacesMap opening on the person", () => {
     expect(latitudes()).toEqual([undefined, expect.closeTo(38.7, 0)]);
   });
 
-  it("stays on the person when the area answered with its cap, as a nearer place may be left out", async () => {
+  it("stays on the person when the area answer may leave a nearer place out", async () => {
     const answer = openMap(undefined, () => {}, true);
     await restOnPerson(PARIS);
     answer([]);
@@ -176,7 +176,7 @@ describe("PlacesMap opening on the person", () => {
       pins: LISBON,
       framed: LISBON,
       showsUser: true,
-      areaFull: false,
+      areaPartial: false,
       topInset: 100,
       onSelect: () => {},
       onArea: () => {},
@@ -196,7 +196,7 @@ describe("PlacesMap opening on the person", () => {
       framed: LISBON,
       anchors: undefined,
       showsUser: true,
-      areaFull: false,
+      areaPartial: false,
       topInset: 100,
       onSelect: () => {},
       onArea: () => {},
@@ -222,7 +222,7 @@ describe("PlacesMap without the person's location", () => {
       framed: LISBON,
       anchors: LISBON,
       showsUser: false,
-      areaFull: false,
+      areaPartial: false,
       topInset: 100,
       onSelect: () => {},
       onArea,
