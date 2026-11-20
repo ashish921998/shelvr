@@ -665,7 +665,7 @@ export async function presentRedeemCodeSheet(): Promise<boolean> {
   const rc = getPurchases();
   if (!rc) return false;
   const before = await rc.getCustomerInfo().then(proPurchase, () => null);
-  if (restoresRunning > 0) return false;
+  if (restoresRunning > 0 || liveSheet()) return false;
   stopRedeemWatch?.();
   const unrecorded = !hasActiveEntitlement();
   const listener = (info: ProCustomerInfo) => {
