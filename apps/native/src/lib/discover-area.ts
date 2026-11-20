@@ -115,14 +115,18 @@ export function withReach(
     Math.min(MAX_LATITUDE, centre.latitude),
   );
   const half = km / KM_PER_DEGREE;
-  const halfLongitude = half / Math.cos((latitude * Math.PI) / 180);
-  const west = Math.min(box.west, centre.longitude - halfLongitude);
-  const east = Math.max(box.east, centre.longitude + halfLongitude);
+  const [reachWest, reachEast] = snapped(
+    centre.longitude,
+    half / Math.cos((latitude * Math.PI) / 180),
+  );
+  const [reachSouth, reachNorth] = snapped(latitude, half);
+  const west = Math.min(box.west, reachWest);
+  const east = Math.max(box.east, reachEast);
   if (east - west >= WORLD_SPAN) return WORLD_BOX;
   return {
     west,
-    south: Math.max(-MAX_LATITUDE, Math.min(box.south, latitude - half)),
+    south: Math.max(-MAX_LATITUDE, Math.min(box.south, reachSouth)),
     east,
-    north: Math.min(MAX_LATITUDE, Math.max(box.north, latitude + half)),
+    north: Math.min(MAX_LATITUDE, Math.max(box.north, reachNorth)),
   };
 }

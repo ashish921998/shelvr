@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { appleZoom } from "./city-pins";
-import { sameBox, visibleBox, WORLD_BOX } from "./discover-area";
+import { sameBox, visibleBox, withReach, WORLD_BOX } from "./discover-area";
 import { fitCamera } from "./trip";
 
 const WIDTH = 400;
@@ -148,6 +148,28 @@ describe("visibleBox", () => {
     expect(
       visibleBox({ ...LISBON, zoom: 5 }, { ...screen, width: 0 }),
     ).toBeUndefined();
+  });
+});
+
+describe("withReach", () => {
+  const screen = { width: 393, height: 852, apple: true };
+  const near = (latitude: number, longitude: number) =>
+    withReach(
+      visibleBox({ latitude, longitude, zoom: 13 }, screen)!,
+      { latitude, longitude },
+      50,
+    );
+
+  it("covers 50 km around the person", () => {
+    const box = near(38.6979, -9.4215);
+    expect(box.south).toBeLessThanOrEqual(38.6979 - 50 / 111);
+    expect(box.north).toBeGreaterThanOrEqual(38.6979 + 50 / 111);
+    expect(box.west).toBeLessThanOrEqual(-9.4215 - 0.57);
+    expect(box.east).toBeGreaterThanOrEqual(-9.4215 + 0.57);
+  });
+
+  it("does not reveal where the person is within its grid cell", () => {
+    expect(near(38.6979, -9.4215)).toEqual(near(38.71, -9.43));
   });
 });
 

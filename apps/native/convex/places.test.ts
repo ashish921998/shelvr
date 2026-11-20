@@ -252,6 +252,17 @@ describe("places:forMap", () => {
     expect(await names(user, WORLD)).toEqual(["Keep"]);
   });
 
+  it("leaves out a row moved out of the area before it was reindexed", async () => {
+    const { base, user } = await signedIn();
+    await storeAll(base, [
+      venue("Keep", 38.7, -9.1),
+      venue("Moved", 38.71, -9.1),
+    ]);
+    const moved = (await rows(base)).find((r) => r.appleId === "Moved")!;
+    await base.run((ctx) => ctx.db.patch(moved._id, { lat: 48.85, lng: 2.35 }));
+    expect(await names(user, LISBON_BOX)).toEqual(["Keep"]);
+  });
+
   it("finds places on both sides of the antimeridian", async () => {
     const { base, user } = await signedIn();
     await storeAll(base, [

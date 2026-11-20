@@ -123,7 +123,9 @@ async function searchIndex(
     }
   }
   const rows = await Promise.all([...found].map((id) => ctx.db.get(id)));
-  return rows.flatMap((row) => (row?.status === "live" ? [row] : []));
+  return rows.flatMap((row) =>
+    row?.status === "live" && inside(rectangles, row) ? [row] : [],
+  );
 }
 
 export async function discoverPlaces(

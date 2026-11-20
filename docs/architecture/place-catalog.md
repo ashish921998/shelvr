@@ -76,7 +76,8 @@ capped answer feeds the Map's "busiest city" framing. Without the person's locat
 on that city, and when it rests there, the Map asks for that area.
 
 With the person's location, the Map opens on them. When the camera rests, the Map asks for the area
-on screen together with 50 km around the person, waits for the answer, and moves to the busiest city
+on screen together with 50 km around the person, snapped outward to a grid so the box does not give
+away where in it the person is. It waits for the answer, and moves to the busiest city
 only if no place is within 50 km. When any of the person's own places are shown, only those count,
 and they count at once, because they all load together. An answer that comes after the first 3
 seconds is ignored, and the camera stays on the person.

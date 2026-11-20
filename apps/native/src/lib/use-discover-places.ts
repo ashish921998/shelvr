@@ -10,6 +10,7 @@ import { type MapBox, WORLD_BOX } from "./discover-area";
 import { type DiscoverPlace, discoverBeside } from "./map-discover";
 
 const NONE: DiscoverPlace[] = [];
+const AREA_CACHE_MS = 5 * 60 * 1000;
 
 export function useDiscoverPlaces(
   own: readonly { name: string; lat: number; lng: number; appleId?: string }[],
@@ -23,6 +24,7 @@ export function useDiscoverPlaces(
   const query = useQuery({
     ...convexQuery(api.places.forMap, { box: box ?? WORLD_BOX }),
     placeholderData: keepPreviousData,
+    gcTime: AREA_CACHE_MS,
   });
   const { open: openWith } = usePlaceOpener(
     stopAction,
