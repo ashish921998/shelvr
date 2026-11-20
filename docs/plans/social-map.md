@@ -129,10 +129,9 @@ to 60 places each. With the Google Maps import, a city takes about an hour.
 ### Public functions
 
 - `places:forMap`: `authedQuery`, returns `live` rows (id, name, point, city, Apple id, category,
-  cuisine and kinds), at most 300. Step 0 shipped it with `args: {}` and up to 3,000 rows, and no
-  `Convex-Api: changed` trailer, because it was new. Phase 2 of
-  [place-catalog.md](../architecture/place-catalog.md) keeps its arguments and reads the first 300
-  for the whole world.
+  cuisine and kinds), up to 3,000. Step 0 shipped it with `args: {}` and no `Convex-Api: changed`
+  trailer, because it was new. Phase 2 of [place-catalog.md](../architecture/place-catalog.md)
+  leaves it unchanged for the phase 1 client.
 - `places:inArea`: `authedQuery`, takes a `box` and returns `{ places, complete }`: the same rows as
   `forMap`, and whether the read covered the whole area. Added in phase 2; the Map reads it.
 

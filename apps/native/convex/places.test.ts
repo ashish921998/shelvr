@@ -413,7 +413,7 @@ describe("places:forMap read limits", () => {
       box
         ? (await user.query(api.places.inArea, { box })).places.length
         : (await user.query(api.places.forMap, {})).length;
-    expect(await count()).toBe(300);
+    expect(await count()).toBe(1860);
     expect(await count(WORLD)).toBe(300);
     expect(await count({ west: -45, south: -40, east: 45, north: 70 })).toBe(
       300,

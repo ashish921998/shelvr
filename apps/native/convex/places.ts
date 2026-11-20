@@ -5,6 +5,7 @@ import { internalAction, internalMutation } from "./_generated/server";
 import { authedQuery } from "./model/auth";
 import { cuisineValidator } from "./model/itemFields";
 import { logEvent } from "./model/log";
+import { MAX_MAP_PLACES } from "./mapPlaces";
 import { boxValidator, discoverPlaces, indexPlace } from "./model/placeIndex";
 import {
   cityCentre,
@@ -48,7 +49,12 @@ export const forMap = authedQuery({
   args: {},
   returns: v.array(mapPlaceValidator),
   handler: async (ctx) =>
-    (await discoverPlaces(ctx, undefined)).rows.map(mapPlace),
+    (
+      await ctx.db
+        .query("places")
+        .withIndex("by_status", (q) => q.eq("status", "live"))
+        .take(MAX_MAP_PLACES)
+    ).map(mapPlace),
 });
 
 export const inArea = authedQuery({

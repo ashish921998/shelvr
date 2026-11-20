@@ -51,16 +51,16 @@ row with a corrected point keeps that point, and it wins over the one in `places
 ## Reading by area
 
 `places:inArea({ box })` returns up to 300 Discover places inside a map area, and `complete`, which is
-true only when it read the whole area. `places:forMap({})`, kept for the phase 1 client, returns the
-first 300 for the whole world. Both read in one of two ways, and both stay far below Convex's limit of 4,096 index ranges for each query:
+true only when it read the whole area. It reads in one of two ways, and both stay far below Convex's
+limit of 4,096 index ranges for each query. `places:forMap({})`, kept for the phase 1 client, still
+returns up to 3,000 live rows for the whole world, as it did in phase 1.
 
 - A box narrower than 90° of longitude reads a geospatial index (`@convex-dev/geospatial`). The index
   holds only the rows that Discover can show, so a save never writes to it, and it grows only as large
   as Discover. A query makes at most two calls to it. In a test with 1,860 places, a box 80° wide
   read 646 index ranges.
 - A wider box reads the live rows in the order they were added. It keeps the first 300 inside the box
-  and looks at no more than 2,000 rows, in 2 index ranges. A caller without a box, such as the Map
-  from phase 1, gets this read for the whole world.
+  and looks at no more than 2,000 rows, in one index range.
 
 The index's level options are fixed once it holds points. The component removes a point by the cells
 it computes from the current options, so after a change to `minLevel` it cannot find the cells of
@@ -166,7 +166,7 @@ reasons. Each one is a constraint on this design:
 ## Phases
 
 1. **Hand-picked Discover places (PR #789, merged).** `places`, the two imports, and `forMap`
-   returning every live row.
+   returning up to 3,000 live rows (`MAX_MAP_PLACES`).
 2. **Discover by area.** The geospatial index and `inArea({ box })`, which the Map reads.
    `forMap({})` keeps its arguments for the phase 1 client.
 3. **`savedPlaces`.** Copy every save's pins into it. Saving writes it and adds or links `places`

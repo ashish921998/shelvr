@@ -76,15 +76,14 @@ const inside = (rectangles: Rectangle[], place: Doc<"places">) =>
 
 async function scanLive(
   ctx: QueryCtx,
-  rectangles: Rectangle[] | undefined,
+  rectangles: Rectangle[],
 ): Promise<DiscoverAnswer> {
   const found: Doc<"places">[] = [];
   let scanned = 0;
   for await (const place of ctx.db
     .query("places")
     .withIndex("by_status", (q) => q.eq("status", "live"))) {
-    if (rectangles === undefined || inside(rectangles, place))
-      found.push(place);
+    if (inside(rectangles, place)) found.push(place);
     scanned++;
     if (found.length >= MAX_DISCOVER_PLACES || scanned >= MAX_SCANNED)
       return { rows: found, complete: false };
@@ -135,9 +134,8 @@ async function searchIndex(
 
 export async function discoverPlaces(
   ctx: QueryCtx,
-  box: MapBox | undefined,
+  box: MapBox,
 ): Promise<DiscoverAnswer> {
-  if (box === undefined) return await scanLive(ctx, undefined);
   const rectangles = boxRectangles(box);
   const width = rectangles.reduce((sum, r) => sum + r.east - r.west, 0);
   return width >= WIDE_DEGREES
