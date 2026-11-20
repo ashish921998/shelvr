@@ -1,0 +1,48 @@
+import { analytics } from "@/lib/analytics";
+import { canOpenPlaceCard } from "@/lib/apple-place-card";
+import { stopAction } from "@/lib/trip-planner";
+import { usePlaceOpener } from "@/lib/use-place-opener";
+import { api } from "@convex/_generated/api";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useCallback, useEffect, useMemo } from "react";
+import { type DiscoverPlace, discoverBeside } from "./map-discover";
+
+const NONE: DiscoverPlace[] = [];
+
+export function useDiscoverPlaces(
+  own: readonly { name: string; lat: number; lng: number; appleId?: string }[],
+): {
+  settled: boolean;
+  beside: DiscoverPlace[];
+  open: (place: DiscoverPlace) => void;
+} {
+  const query = useQuery(convexQuery(api.places.forMap, {}));
+  const { open: openWith } = usePlaceOpener(
+    stopAction,
+    "map_discover_maps_failed",
+  );
+  useEffect(() => {
+    if (query.error)
+      analytics.captureError("discover_places_load_failed", query.error);
+  }, [query.error]);
+  const open = useCallback(
+    (place: DiscoverPlace) => {
+      const action = stopAction(place, canOpenPlaceCard(place.appleId));
+      analytics.capture("map_place_opened", {
+        card: action.kind === "card",
+        source: "discover",
+      });
+      openWith(place, action);
+    },
+    [openWith],
+  );
+  return useMemo(
+    () => ({
+      settled: !query.isPending,
+      beside: discoverBeside(own, query.data ?? NONE),
+      open,
+    }),
+    [query.isPending, query.data, own, open],
+  );
+}

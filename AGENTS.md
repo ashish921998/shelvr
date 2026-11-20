@@ -75,7 +75,9 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `map-round-button.tsx` behind the search, profile and locate buttons; `map-empty.tsx` is the
   no-places card; the title's city comes from `src/lib/use-map-city.ts`), filter rules in `src/lib/map-filters.ts` and
   `convex/model/placeKinds.ts`, each pin's emoji in `src/lib/map-pin-emoji.ts`, data from
-  `convex/mapPlaces.ts`.
+  `convex/mapPlaces.ts`. Discover pins come from the hand-filled `places` table
+  (`convex/places.ts`, filled by `places:addByName` and `placesImport:importGoogleMapsList`) and
+  join the person's own pins in `src/lib/map-discover.ts`. The plan is `docs/plans/social-map.md`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;
