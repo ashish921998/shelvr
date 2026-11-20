@@ -253,7 +253,9 @@ Mapbox's place search is "only available for temporary use"
    one candidate's name matches ours with its point within 100 m of our point. With none, or more
    than one, the row has no `googlePlaceId` and its page shows only our own data. The name and
    point are used for the check and never stored. A place is checked again only when its name or
-   point changes, so the cost stays small.
+   point changes, so the cost stays small. A search that fails, such as a timeout or an error from
+   Google, decides nothing: the row is marked as still to check, and the next import or refresh
+   runs the check again.
 
 Google's key stays on the server: a Convex action fetches the details and returns them to the page.
 For a place from a person's own save it checks `aiAllowed` first, like every other path that sends
