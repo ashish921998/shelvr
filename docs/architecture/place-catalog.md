@@ -146,7 +146,8 @@ move to plain strings before the list grows.
    point to Overture.
 3. The full-screen place page with our own data and an "Open in Google Maps" button (see "First
    version" under "Provider data"). It has no map, so it can ship before the Mapbox map.
-4. The Mapbox map. It needs a store build, because it moves the native fingerprint. Apple drops out.
+4. The Mapbox map, once open data finds the places people save (see "Until then we stay on
+   Apple"). It needs a store build, because it moves the native fingerprint. Apple drops out.
 5. The type list, its labels in every language, and pin emoji from the type.
 6. Type and features from the classifier for saves.
 7. The second row of chips on the Map, and the type and features on the place page.
@@ -225,6 +226,13 @@ change do.
 
 Decided on 2026-11-20: **Mapbox draws the map, Google gives a place's live details, and open data
 is what we store.** Apple drops out once the Mapbox map ships.
+
+**Until then we stay on Apple, decided the same day.** The app keeps Apple's map and Apple's place
+data together, as it does today, which Apple's terms allow. The Mapbox map waits until open data
+finds the places people save. A check of 20 well-known Lisbon places on 2026-11-20 found all 20 in
+Apple's search and 17 in Overture; Overture missed Verride, Park and Prado. Overture's types were
+finer (cocktail bar, tapas bar, seafood restaurant where Apple says Nightlife or Restaurant). Both
+filed two hotel bars as hotels, which our own `kind` fixes.
 
 **First version, decided the same day: no Google API call on the place page.** The page shows our
 own data (name, type, kind, features, the save it came from) and an "Open in Google Maps" button.
