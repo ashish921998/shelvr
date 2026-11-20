@@ -4,7 +4,7 @@ import { internalAction, internalMutation } from "./_generated/server";
 import { authedQuery } from "./model/auth";
 import { cuisineValidator } from "./model/itemFields";
 import { logEvent } from "./model/log";
-import { boxValidator, indexPlace, placesInBox } from "./model/placeIndex";
+import { boxValidator, discoverPlaces, indexPlace } from "./model/placeIndex";
 import {
   cityCentre,
   findVenue,
@@ -20,7 +20,7 @@ const MAX_NAMES = 100;
 const REINDEX_PAGE = 50;
 
 export const forMap = authedQuery({
-  args: { box: boxValidator },
+  args: { box: v.optional(boxValidator) },
   returns: v.array(
     v.object({
       _id: v.id("places"),
@@ -35,25 +35,18 @@ export const forMap = authedQuery({
     }),
   ),
   handler: async (ctx, args) => {
-    const ids = await placesInBox(ctx, args.box);
-    const rows = await Promise.all(ids.map((id) => ctx.db.get(id)));
-    return rows.flatMap((row) =>
-      row?.status === "live"
-        ? [
-            {
-              _id: row._id,
-              name: row.name,
-              lat: row.lat,
-              lng: row.lng,
-              city: row.city,
-              appleId: row.appleId,
-              ...(row.category ? { category: row.category } : {}),
-              ...(row.cuisine ? { cuisine: row.cuisine } : {}),
-              kinds: placeKinds(row.category, [], row.cuisine),
-            },
-          ]
-        : [],
-    );
+    const rows = await discoverPlaces(ctx, args.box);
+    return rows.map((row) => ({
+      _id: row._id,
+      name: row.name,
+      lat: row.lat,
+      lng: row.lng,
+      city: row.city,
+      appleId: row.appleId,
+      ...(row.category ? { category: row.category } : {}),
+      ...(row.cuisine ? { cuisine: row.cuisine } : {}),
+      kinds: placeKinds(row.category, [], row.cuisine),
+    }));
   },
 });
 

@@ -4,10 +4,10 @@ import { components } from "../_generated/api";
 import type { Doc, Id } from "../_generated/dataModel";
 import type { MutationCtx, QueryCtx } from "../_generated/server";
 
-export const MAX_DISCOVER_PLACES = 300;
-
-const MAX_INDEX_CALLS = 8;
-const MAX_SLICE_DEGREES = 90;
+const MAX_DISCOVER_PLACES = 300;
+const MAX_SCANNED = 2000;
+const WIDE_DEGREES = 90;
+const MAX_INDEX_CALLS = 2;
 const MAX_LATITUDE = 90;
 
 export const boxValidator = v.object({
@@ -20,6 +20,7 @@ export const boxValidator = v.object({
 export type MapBox = Infer<typeof boxValidator>;
 
 const index = new GeospatialIndex<Id<"places">>(components.geospatial, {
+  minLevel: 2,
   logLevel: "ERROR",
 });
 
@@ -46,7 +47,7 @@ const clampLatitude = (degrees: number) =>
 const wrapLongitude = (degrees: number) =>
   ((((degrees + 180) % 360) + 360) % 360) - 180;
 
-export function boxRectangles(box: MapBox): Rectangle[] {
+function boxRectangles(box: MapBox): Rectangle[] {
   const { west, south, east, north } = box;
   if (![west, south, east, north].every(Number.isFinite))
     throw new Error("box must hold finite degrees");
@@ -54,40 +55,85 @@ export function boxRectangles(box: MapBox): Rectangle[] {
   const rows = { south: clampLatitude(south), north: clampLatitude(north) };
   const reach = east - west;
   const span = reach >= 360 ? 360 : ((reach % 360) + 360) % 360;
-  const rectangles: Rectangle[] = [];
-  let from = span === 360 ? -180 : wrapLongitude(west);
-  let left = span;
-  do {
-    const to = Math.min(from + left, 180, from + MAX_SLICE_DEGREES);
-    rectangles.push({ ...rows, west: from, east: to });
-    left -= to - from;
-    from = to === 180 ? -180 : to;
-  } while (left > 0);
-  return rectangles;
+  const from = span === 360 ? -180 : wrapLongitude(west);
+  const to = from + span;
+  if (to <= 180) return [{ ...rows, west: from, east: to }];
+  return [
+    { ...rows, west: from, east: 180 },
+    { ...rows, west: -180, east: to - 360 },
+  ];
 }
 
-export async function placesInBox(
+const inside = (rectangles: Rectangle[], place: Doc<"places">) =>
+  rectangles.some(
+    (r) =>
+      place.lat >= r.south &&
+      place.lat <= r.north &&
+      place.lng >= r.west &&
+      place.lng <= r.east,
+  );
+
+async function scanLive(
   ctx: QueryCtx,
-  box: MapBox,
-): Promise<Id<"places">[]> {
+  rectangles: Rectangle[] | undefined,
+): Promise<Doc<"places">[]> {
+  const found: Doc<"places">[] = [];
+  let scanned = 0;
+  for await (const place of ctx.db
+    .query("places")
+    .withIndex("by_status", (q) => q.eq("status", "live"))) {
+    if (rectangles === undefined || inside(rectangles, place))
+      found.push(place);
+    scanned++;
+    if (found.length >= MAX_DISCOVER_PLACES || scanned >= MAX_SCANNED) break;
+  }
+  return found;
+}
+
+async function searchIndex(
+  ctx: QueryCtx,
+  rectangles: Rectangle[],
+): Promise<Doc<"places">[]> {
+  const slices = rectangles.map((rectangle) => ({
+    rectangle,
+    cursor: undefined as string | undefined,
+    done: false,
+  }));
   const found = new Set<Id<"places">>();
   let calls = 0;
-  for (const rectangle of boxRectangles(box)) {
-    let cursor: string | undefined;
-    while (found.size < MAX_DISCOVER_PLACES && calls < MAX_INDEX_CALLS) {
+  while (calls < MAX_INDEX_CALLS && found.size < MAX_DISCOVER_PLACES) {
+    const open = slices.filter((slice) => !slice.done);
+    if (open.length === 0) break;
+    for (const [i, slice] of open.entries()) {
+      if (calls === MAX_INDEX_CALLS || found.size >= MAX_DISCOVER_PLACES) break;
       calls++;
       const page = await index.query(
         ctx,
         {
-          shape: { type: "rectangle", rectangle },
-          limit: MAX_DISCOVER_PLACES - found.size,
+          shape: { type: "rectangle", rectangle: slice.rectangle },
+          limit: Math.ceil(
+            (MAX_DISCOVER_PLACES - found.size) / (open.length - i),
+          ),
         },
-        cursor,
+        slice.cursor,
       );
       for (const hit of page.results) found.add(hit.key);
-      if (page.nextCursor === undefined) break;
-      cursor = page.nextCursor;
+      slice.cursor = page.nextCursor;
+      slice.done = page.nextCursor === undefined;
     }
   }
-  return [...found].slice(0, MAX_DISCOVER_PLACES);
+  const rows = await Promise.all([...found].map((id) => ctx.db.get(id)));
+  return rows.flatMap((row) => (row?.status === "live" ? [row] : []));
+}
+
+export async function discoverPlaces(
+  ctx: QueryCtx,
+  box: MapBox | undefined,
+): Promise<Doc<"places">[]> {
+  if (box === undefined) return await scanLive(ctx, undefined);
+  const rectangles = boxRectangles(box);
+  const width = rectangles.reduce((sum, r) => sum + r.east - r.west, 0);
+  return width >= WIDE_DEGREES
+    ? await scanLive(ctx, rectangles)
+    : await searchIndex(ctx, rectangles);
 }

@@ -126,6 +126,7 @@ describe("places:store", () => {
 });
 
 const WORLD = { west: -180, south: -85, east: 180, north: 85 };
+const LISBON_BOX = { west: -9.3, south: 38.6, east: -8.9, north: 38.8 };
 
 function signedIn() {
   const base = newConvexTest();
@@ -202,6 +203,24 @@ describe("places:forMap", () => {
     expect(
       await names(user, { west: 20, south: -10, east: 30, north: 10 }),
     ).toEqual([]);
+    expect(
+      await names(user, { west: -100, south: 0, east: 0, north: 60 }),
+    ).toEqual(["Lisbon", "Porto"]);
+    expect(
+      await names(user, { west: 100, south: 0, east: 200, north: 60 }),
+    ).toEqual(["Tokyo"]);
+  });
+
+  it("answers a caller that sends no box with the live places", async () => {
+    const { base, user } = await signedIn();
+    await storeAll(base, [
+      venue("Keep", 38.7, -9.1),
+      venue("Hide", 35.68, 139.69),
+    ]);
+    const hidden = (await rows(base)).find((r) => r.appleId === "Hide")!;
+    await base.run((ctx) => ctx.db.patch(hidden._id, { status: "hidden" }));
+    const result = await user.query(api.places.forMap, {});
+    expect(result.map((place) => place.name)).toEqual(["Keep"]);
   });
 
   it("caps the answer", async () => {
@@ -229,6 +248,7 @@ describe("places:forMap", () => {
     ]);
     const hidden = (await rows(base)).find((r) => r.appleId === "Hide")!;
     await base.run((ctx) => ctx.db.patch(hidden._id, { status: "hidden" }));
+    expect(await names(user, LISBON_BOX)).toEqual(["Keep"]);
     expect(await names(user, WORLD)).toEqual(["Keep"]);
   });
 
@@ -321,6 +341,45 @@ describe("places:forMap", () => {
   });
 });
 
+describe("places:forMap read limits", () => {
+  it("answers wide and narrow boxes over a dense city and many cells", async () => {
+    const base = newConvexTest({ transactionLimits: true });
+    const userId = await base.run((ctx) => ctx.db.insert("users", {}));
+    const user = base.withIdentity({ subject: `${userId}|session-1` });
+    await storeAll(base, [
+      ...Array.from({ length: 260 }, (_, i) =>
+        venue(
+          `SF${i}`,
+          37.7 + (i % 20) / 200,
+          -122.5 + Math.floor(i / 20) / 200,
+        ),
+      ),
+      ...Array.from({ length: 1600 }, (_, i) => {
+        const cell = Math.floor(i / 20);
+        return venue(
+          `E${i}`,
+          -40 + (cell % 10) * 10 + (i % 5) / 50,
+          2 + Math.floor(cell / 10) * 11 + Math.floor((i % 20) / 5) / 50,
+        );
+      }),
+    ]);
+    const count = async (box?: typeof WORLD) =>
+      (await user.query(api.places.forMap, box ? { box } : {})).length;
+    expect(await count()).toBe(300);
+    expect(await count(WORLD)).toBe(300);
+    expect(await count({ west: -45, south: -40, east: 45, north: 70 })).toBe(
+      300,
+    );
+    expect(await count({ west: 0, south: -45, east: 80, north: 60 })).toBe(300);
+    expect(
+      await count({ west: -122.3, south: 37, east: -100, north: 50 }),
+    ).toBe(0);
+    expect(
+      await count({ west: -123, south: 37.5, east: -122, north: 38 }),
+    ).toBe(260);
+  }, 180_000);
+});
+
 describe("places:store indexing", () => {
   it("indexes a row it inserts and leaves an existing row's point alone", async () => {
     const t = newConvexTest();
@@ -348,12 +407,10 @@ describe("places:reindexPage", () => {
           addedAt: i,
         });
     });
-    expect(await user.query(api.places.forMap, { box: WORLD })).toEqual([]);
+    expect(await names(user, LISBON_BOX)).toEqual([]);
     await base.mutation(internal.places.reindexPage, { cursor: null });
     await base.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
-    expect(await user.query(api.places.forMap, { box: WORLD })).toHaveLength(
-      120,
-    );
+    expect(await names(user, LISBON_BOX)).toHaveLength(120);
     const before = await Promise.all(
       (await rows(base)).map((row) => indexed(base, row._id)),
     );
@@ -363,9 +420,7 @@ describe("places:reindexPage", () => {
       (await rows(base)).map((row) => indexed(base, row._id)),
     );
     expect(after).toEqual(before);
-    expect(await user.query(api.places.forMap, { box: WORLD })).toHaveLength(
-      120,
-    );
+    expect(await names(user, LISBON_BOX)).toHaveLength(120);
   }, 60_000);
 
   it("removes a hidden row from the index", async () => {

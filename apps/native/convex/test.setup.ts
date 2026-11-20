@@ -71,8 +71,8 @@ export function stubRevenueCatFetch(body: unknown) {
 
 const modules = import.meta.glob("./**/*.ts");
 
-export function newConvexTest() {
-  const t = convexTest(schema, modules);
+export function newConvexTest(options: { transactionLimits?: boolean } = {}) {
+  const t = convexTest({ schema, modules, ...options });
   registerRateLimiter(t);
   registerGeospatial(t);
   return t;
