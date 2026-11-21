@@ -170,6 +170,19 @@ export function useEntitlementSync(): void {
       entitlement.status === "lifetime")
       ? entitlement.status
       : null;
+  const convexFree = !entitlement.loading && !entitlement.entitled;
+  const [rcProFor, setRcProFor] = useState<string | null>(null);
+  const rcProReadFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (sub === null || rcProFor !== sub || !convexFree) return;
+    if (rcProReadFor.current === sub || isProHiddenForE2E()) return;
+    rcProReadFor.current = sub;
+    syncPurchaseRef
+      .current({})
+      .catch((error: unknown) =>
+        analytics.captureError("purchase_sync_failed", error),
+      );
+  }, [sub, rcProFor, convexFree]);
 
   useEffect(() => {
     setRcTargetUserId(sub);
@@ -215,6 +228,7 @@ export function useEntitlementSync(): void {
       });
     };
     let mergedPro = false;
+    let existingPro = false;
     const observer = startRevenueCatIdentitySync({
       sync: () => {
         const attempt = _rcIdentitySync.then(async () => {
@@ -224,9 +238,10 @@ export function useEntitlementSync(): void {
           const rc = getPurchases();
           if (!rc) throw new Error("revenuecat_module_unavailable");
           const { customerInfo, created } = await rc.logIn(sub);
-          mergedPro =
-            created &&
+          const rcPro =
             REVENUECAT_PRO_ENTITLEMENT in customerInfo.entitlements.active;
+          mergedPro = created && rcPro;
+          existingPro = !created && rcPro;
         });
         _rcIdentitySync = attempt.catch(() => {});
         return attempt;
@@ -238,7 +253,7 @@ export function useEntitlementSync(): void {
         else if (mergedPro || hasMergedPurchase(sub)) {
           if (mergedPro) noteMergedPurchase(sub);
           readMergedPurchase();
-        }
+        } else if (existingPro) setRcProFor(sub);
       },
       onError: reportRevenueCatIdentityError,
     });
@@ -262,6 +277,8 @@ export function useEntitlementSync(): void {
       readMerged?.dispose();
       stopLanding();
       subscription.remove();
+      rcProReadFor.current = null;
+      setRcProFor(null);
       if (_rcTargetUserId === sub) setRcTargetUserId(null);
     };
   }, [sub, signedOut]);
@@ -679,7 +696,19 @@ function proPurchase(info: ProCustomerInfo): string | null {
   return pro ? `${pro.latestPurchaseDate}|${pro.expirationDate}` : null;
 }
 
+let redeemOpening = false;
+
 export async function presentRedeemCodeSheet(): Promise<boolean> {
+  if (redeemOpening) return false;
+  redeemOpening = true;
+  try {
+    return await openRedeemCodeSheet();
+  } finally {
+    redeemOpening = false;
+  }
+}
+
+async function openRedeemCodeSheet(): Promise<boolean> {
   const landing = reservePurchaseLanding();
   if (!(await awaitRcSyncReady())) return false;
   const rc = getPurchases();

@@ -494,11 +494,44 @@ describe("selling before sign-in", () => {
     expect(mock.store.get("shelvr.purchase.beforeSignIn")).toBeUndefined();
   });
 
-  it("leaves an existing account's Pro to the webhook at sign-in", async () => {
+  it("makes no backend call when an existing account's Pro is already in Convex", async () => {
     mock.logIn.mockResolvedValueOnce({
       customerInfo: { entitlements: { active: { pro_under_test: {} } } },
       created: false,
     });
+    mock.useQuery.mockReturnValue({
+      data: { status: "pro", expiresAt: Date.now() + 60 * 60 * 1000 },
+    });
+    mock.isEntitled.mockReturnValue(true);
+    await loadReady();
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
+  });
+
+  it("reads Pro into an existing account that Convex still shows as free", async () => {
+    mock.logIn.mockResolvedValueOnce({
+      customerInfo: { entitlements: { active: { pro_under_test: {} } } },
+      created: false,
+    });
+    const { hook } = await loadReady();
+    expect(mock.syncPurchase).not.toHaveBeenCalled();
+
+    mock.useQuery.mockReturnValue({ data: { status: "none" } });
+    await act(async () => {
+      hook.rerender();
+      await Promise.resolve();
+    });
+    await vi.waitFor(() => expect(mock.syncPurchase).toHaveBeenCalledOnce());
+    await act(async () => {
+      hook.rerender();
+      await Promise.resolve();
+    });
+    expect(mock.syncPurchase).toHaveBeenCalledOnce();
+    expect(mock.syncPurchasesForResult).not.toHaveBeenCalled();
+    expect(mock.store.get("shelvr.purchase.merged")).toBeUndefined();
+  });
+
+  it("makes no backend call when an existing account has no Pro in RevenueCat", async () => {
+    mock.useQuery.mockReturnValue({ data: { status: "none" } });
     await loadReady();
     expect(mock.syncPurchase).not.toHaveBeenCalled();
   });
@@ -740,6 +773,16 @@ describe("paywall activation funnel", () => {
       }),
     );
   });
+  it("opens the redeem sheet once for two quick taps", async () => {
+    const { presentRedeemCodeSheet } = await loadReady();
+    const first = presentRedeemCodeSheet();
+    const second = presentRedeemCodeSheet();
+    await expect(second).resolves.toBe(false);
+    await expect(first).resolves.toBe(true);
+    expect(mock.presentCodeRedemptionSheet).toHaveBeenCalledOnce();
+    expect(mock.customerInfoListeners.size).toBe(1);
+  });
+
   it("reports a redeemed code even when the webhook lands first", async () => {
     const { presentRedeemCodeSheet, hook } = await loadReady();
     await presentRedeemCodeSheet();
