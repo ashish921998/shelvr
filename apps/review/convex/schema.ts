@@ -30,6 +30,7 @@ export default defineSchema({
     role: roleValidator,
   })
     .index("by_campaignId_and_userId", ["campaignId", "userId"])
+    .index("by_campaignId_and_role", ["campaignId", "role"])
     .index("by_userId", ["userId"]),
   invites: defineTable({
     campaignId: v.id("campaigns"),

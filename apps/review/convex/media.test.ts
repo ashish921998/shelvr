@@ -278,6 +278,21 @@ describe("completeUpload", () => {
     );
   });
 
+  test("marks the media errored when storage fails mid-way", async () => {
+    const { t, alice, mediaId } = await setup();
+    await alice.as.action(api.media.createUpload, {
+      mediaId,
+      contentType: "video/mp4",
+    });
+    head.mockRejectedValueOnce(new Error("network"));
+    expect(await alice.as.action(api.media.completeUpload, { mediaId })).toBe(
+      "errored",
+    );
+    expect((await t.run((ctx) => ctx.db.get("media", mediaId)))?.status).toBe(
+      "errored",
+    );
+  });
+
   test("refuses to finish an upload that never started", async () => {
     const { alice, mediaId } = await setup();
     await expect(

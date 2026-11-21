@@ -201,17 +201,20 @@ export const completeUpload = action({
     if (uploaded === null) {
       throw new Error("This upload is not yours to finish");
     }
-    const head = await headObject(config, uploaded);
     const finalKey = mediaKey(args.mediaId);
+    const head = await headObject(config, uploaded).catch(() => null);
     const fits =
       head !== null && head.size > 0 && head.size <= MAX_UPLOAD_BYTES;
     const copied =
-      fits && (await copyObject(config, uploaded, finalKey, head.etag));
-    await deleteObject(config, uploaded);
+      fits &&
+      (await copyObject(config, uploaded, finalKey, head.etag).catch(
+        () => false,
+      ));
     if (!copied || head === null) {
       await ctx.runMutation(internal.media.markErrored, {
         mediaId: args.mediaId,
       });
+      await deleteObject(config, uploaded).catch(() => undefined);
       return "errored";
     }
     const duration =
@@ -230,6 +233,7 @@ export const completeUpload = action({
           ? aspectRatio(args.width, args.height)
           : undefined,
     });
+    await deleteObject(config, uploaded).catch(() => undefined);
     return "ready";
   },
 });

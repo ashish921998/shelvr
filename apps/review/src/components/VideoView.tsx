@@ -22,6 +22,7 @@ export default function VideoView({ videoId }: { videoId: string }) {
     versionId: Id<"versions"> | null;
     seconds: number;
   }>({ versionId: null, seconds: 0 });
+  const [statusError, setStatusError] = useState<string | null>(null);
   const player = useRef<PlayerHandle | null>(null);
 
   if (chosen === null && video?.versions[0]) {
@@ -61,6 +62,19 @@ export default function VideoView({ videoId }: { videoId: string }) {
     setCurrentTime(seconds);
   };
   const pause = () => player.current?.pause();
+  const openVersion = (versionId: Id<"versions">) => {
+    setChosen(versionId);
+    setClock({ versionId, seconds: 0 });
+  };
+  const decide = (status: (typeof STATUS_ORDER)[number]) => {
+    setStatusError(null);
+    setStatus({ videoId: id, versionId: version._id, status }).catch(
+      (error: unknown) =>
+        setStatusError(
+          error instanceof Error ? error.message : "That didn't save.",
+        ),
+    );
+  };
   const isLatest = version._id === video.versions[0]._id;
 
   return (
@@ -90,7 +104,7 @@ export default function VideoView({ videoId }: { videoId: string }) {
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <select
             value={version._id}
-            onChange={(e) => setChosen(e.target.value as Id<"versions">)}
+            onChange={(e) => openVersion(e.target.value as Id<"versions">)}
             className="rounded-lg border border-white/10 bg-black/40 px-2 py-1.5 text-sm"
           >
             {video.versions.map((v, index) => (
@@ -103,7 +117,7 @@ export default function VideoView({ videoId }: { videoId: string }) {
           {!isLatest && (
             <button
               type="button"
-              onClick={() => setChosen(video.versions[0]._id)}
+              onClick={() => openVersion(video.versions[0]._id)}
               className="text-xs text-amber-300 underline-offset-2 hover:underline"
             >
               You&apos;re looking at an older version. Open v
@@ -120,13 +134,7 @@ export default function VideoView({ videoId }: { videoId: string }) {
                 <button
                   key={status}
                   type="button"
-                  onClick={() =>
-                    void setStatus({
-                      videoId: id,
-                      versionId: version._id,
-                      status,
-                    })
-                  }
+                  onClick={() => decide(status)}
                   className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
                     status === "approved"
                       ? "bg-emerald-500 text-black"
@@ -147,6 +155,9 @@ export default function VideoView({ videoId }: { videoId: string }) {
             )}
           </div>
         </div>
+        {statusError && (
+          <p className="mt-3 text-sm text-rose-300">{statusError}</p>
+        )}
         {!video.canReview && video.status !== "needs_review" && (
           <p className="mt-3 text-sm text-zinc-500">
             An admin marked this {STATUS_LABEL[video.status].toLowerCase()}.

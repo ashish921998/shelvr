@@ -237,6 +237,15 @@ export default function Recorder({
       }
       return;
     }
+    if (screen.getVideoTracks()[0]?.readyState !== "live") {
+      for (const stream of camera ? [screen, camera] : [screen]) {
+        for (const track of stream.getTracks()) track.stop();
+      }
+      session.current = null;
+      setError("Screen sharing stopped before recording started.");
+      setPhase("idle");
+      return;
+    }
     try {
       begin(screen, camera);
     } catch {
