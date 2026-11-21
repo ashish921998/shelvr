@@ -13,7 +13,7 @@ export default function UploadVideo({
   campaignId: Id<"campaigns">;
 }) {
   const create = useMutation(api.videos.create);
-  const { uploadNew, progress, error } = useUpload();
+  const { uploadNew, progress, error, busy } = useUpload();
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -61,7 +61,7 @@ export default function UploadVideo({
         placeholder="Title"
         className="w-56 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:border-orange-400"
       />
-      {progress === null ? (
+      {!busy ? (
         <>
           <button
             type="submit"
@@ -78,7 +78,7 @@ export default function UploadVideo({
           </button>
         </>
       ) : (
-        <ProgressBar value={progress} />
+        <ProgressBar value={progress ?? 0} />
       )}
       {error && <p className="w-full text-sm text-rose-300">{error}</p>}
     </form>

@@ -15,7 +15,7 @@ export default function UploadVersion({
   campaignId: Id<"campaigns">;
 }) {
   const addVersion = useMutation(api.videos.addVersion);
-  const { uploadNew, progress, error } = useUpload();
+  const { uploadNew, progress, error, busy } = useUpload();
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [note, setNote] = useState("");
@@ -61,7 +61,7 @@ export default function UploadVersion({
         placeholder="What changed? (optional)"
         className="w-56 rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-sm outline-none focus:border-orange-400"
       />
-      {progress === null ? (
+      {!busy ? (
         <>
           <button
             type="submit"
@@ -78,7 +78,7 @@ export default function UploadVersion({
           </button>
         </>
       ) : (
-        <ProgressBar value={progress} />
+        <ProgressBar value={progress ?? 0} />
       )}
       {error && <p className="w-full text-sm text-rose-300">{error}</p>}
     </form>

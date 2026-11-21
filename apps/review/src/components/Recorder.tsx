@@ -17,7 +17,7 @@ type Props = {
 };
 
 type Session = {
-  recorder: MediaRecorder;
+  recorder: MediaRecorder | null;
   streams: MediaStream[];
   stopDrawing: () => void;
   audio: AudioContext | null;
@@ -115,8 +115,10 @@ export default function Recorder({
   onStart,
 }: Props) {
   const add = useMutation(api.comments.add);
-  const { uploadNew, progress, error: uploadError } = useUpload();
-  const [phase, setPhase] = useState<"idle" | "recording" | "review">("idle");
+  const { uploadNew, progress, error: uploadError, busy } = useUpload();
+  const [phase, setPhase] = useState<
+    "idle" | "starting" | "recording" | "review"
+  >("idle");
   const [startedAt, setStartedAt] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [moment, setMoment] = useState(0);
@@ -148,9 +150,10 @@ export default function Recorder({
     return () => {
       alive.current = false;
       const current = session.current;
-      if (current) {
-        current.recorder.onstop = null;
-        if (current.recorder.state !== "inactive") current.recorder.stop();
+      const recorder = current?.recorder;
+      if (recorder) {
+        recorder.onstop = null;
+        if (recorder.state !== "inactive") recorder.stop();
       }
       cleanup();
     };
@@ -167,30 +170,15 @@ export default function Recorder({
     session.current = null;
   }
 
-  async function start() {
-    setError(null);
-    onStart();
-    setMoment(currentTime);
-    let screen: MediaStream;
-    try {
-      screen = await navigator.mediaDevices.getDisplayMedia({
-        video: { frameRate: 30 },
-        audio: true,
-        preferCurrentTab: true,
-      } as DisplayMediaStreamOptions);
-    } catch {
-      setError("Screen sharing was cancelled.");
-      return;
-    }
-    const camera = await openCamera();
-    if (!alive.current) {
-      for (const stream of camera ? [screen, camera] : [screen]) {
-        for (const track of stream.getTracks()) track.stop();
-      }
-      return;
-    }
+  function begin(screen: MediaStream, camera: MediaStream | null) {
     const { stream: video, stop } = composite(screen, camera);
     const { tracks, context } = mixAudio(camera ? [screen, camera] : [screen]);
+    session.current = {
+      recorder: null,
+      streams: camera ? [screen, camera, video] : [screen, video],
+      stopDrawing: stop,
+      audio: context,
+    };
     const mimeType = pickMimeType((type) =>
       MediaRecorder.isTypeSupported(type),
     );
@@ -214,13 +202,46 @@ export default function Recorder({
     screen.getVideoTracks()[0]?.addEventListener("ended", () => {
       if (recorder.state !== "inactive") recorder.stop();
     });
-    session.current = {
-      recorder,
-      streams: camera ? [screen, camera, video] : [screen, video],
-      stopDrawing: stop,
-      audio: context,
-    };
+    session.current.recorder = recorder;
     recorder.start(1000);
+  }
+
+  async function start() {
+    if (phase !== "idle") return;
+    setPhase("starting");
+    setError(null);
+    onStart();
+    setMoment(currentTime);
+    let screen: MediaStream;
+    try {
+      screen = await navigator.mediaDevices.getDisplayMedia({
+        video: { frameRate: 30 },
+        audio: true,
+        preferCurrentTab: true,
+      } as DisplayMediaStreamOptions);
+    } catch {
+      setError("Screen sharing was cancelled.");
+      setPhase("idle");
+      return;
+    }
+    const camera = await openCamera();
+    if (!alive.current) {
+      for (const stream of camera ? [screen, camera] : [screen]) {
+        for (const track of stream.getTracks()) track.stop();
+      }
+      return;
+    }
+    try {
+      begin(screen, camera);
+    } catch {
+      for (const stream of camera ? [screen, camera] : [screen]) {
+        for (const track of stream.getTracks()) track.stop();
+      }
+      cleanup();
+      setError("This browser couldn't start recording.");
+      setPhase("idle");
+      return;
+    }
     setStartedAt(Date.now());
     setElapsed(0);
     setPhase("recording");
@@ -296,8 +317,8 @@ export default function Recorder({
               className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:border-orange-400"
             />
             <div className="flex items-center justify-end gap-2">
-              {progress !== null ? (
-                <ProgressBar value={progress} />
+              {busy ? (
+                <ProgressBar value={progress ?? 0} />
               ) : (
                 <>
                   <button

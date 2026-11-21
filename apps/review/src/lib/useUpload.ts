@@ -1,7 +1,7 @@
 "use client";
 
 import { useAction, useMutation } from "convex/react";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { putFile, readVideoInfo, videoContentType } from "./upload";
@@ -12,6 +12,8 @@ export function useUpload() {
   const start = useMutation(api.media.start);
   const [progress, setProgress] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
   const upload = useCallback(
     async (mediaId: Id<"media">, file: Blob, info?: { duration?: number }) => {
       setError(null);
@@ -48,6 +50,9 @@ export function useUpload() {
       finish: (mediaId: Id<"media">) => Promise<void>,
       info?: { duration?: number },
     ) => {
+      if (busyRef.current) return false;
+      busyRef.current = true;
+      setBusy(true);
       try {
         const mediaId = await start({
           campaignId,
@@ -59,9 +64,12 @@ export function useUpload() {
       } catch (e) {
         setError(e instanceof Error ? e.message : "Upload failed");
         return false;
+      } finally {
+        busyRef.current = false;
+        setBusy(false);
       }
     },
     [start, upload],
   );
-  return { upload, uploadNew, progress, error };
+  return { uploadNew, progress, error, busy };
 }

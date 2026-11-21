@@ -44,6 +44,7 @@ export default function SignIn() {
               type="email"
               required
               autoFocus
+              disabled={state === "sending"}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
