@@ -16,8 +16,12 @@ describe("list invite link metadata", () => {
     const metadata = await generateMetadata({
       params: Promise.resolve({ token: "tok123" }),
     });
-    expect(metadata.alternates?.canonical).toBe("/l/tok123");
-    expect(metadata.openGraph?.url).toBe("/l/tok123");
+    expect(metadata.alternates?.canonical).toBe(
+      "https://shelvr-web.vercel.app/l/tok123",
+    );
+    expect(metadata.openGraph?.url).toBe(
+      "https://shelvr-web.vercel.app/l/tok123",
+    );
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });
 });
