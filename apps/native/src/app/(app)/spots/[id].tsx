@@ -116,9 +116,10 @@ function Spots({
   const dropped = useDroppedPins(pins.length);
   useLandingHaptics(dropped, pins.length);
   const mapHeight = rt.screen.height * MAP_SHARE;
+  const mapParams = { city, save: save._id };
   const openCity = () => {
     analytics.capture("share_spots_city_opened", { pin_count: pins.length });
-    router.dismissTo("/(app)/(tabs)/(home)");
+    router.dismissTo({ pathname: "/(app)/(tabs)/(map)", params: mapParams });
     router.push({ pathname: "/city/[name]", params: { name: city } });
   };
   return (
@@ -157,7 +158,12 @@ function Spots({
           <Button title={t("spots.openCity", { city })} onPress={openCity} />
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.replace("/(app)/(tabs)/(home)")}
+            onPress={() =>
+              router.replace({
+                pathname: "/(app)/(tabs)/(map)",
+                params: mapParams,
+              })
+            }
             style={({ pressed }) => [styles.done, pressed && styles.pressed]}
           >
             <Text style={styles.doneText}>{t("common.done")}</Text>

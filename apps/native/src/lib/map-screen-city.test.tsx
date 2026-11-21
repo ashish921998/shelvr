@@ -6,6 +6,8 @@ import MapScreen from "@/app/(app)/(tabs)/(map)/index";
 
 const mocks = vi.hoisted(() => ({
   setCity: vi.fn(),
+  params: {} as Record<string, string>,
+  frame: undefined as { key: string; places: { city: string }[] } | undefined,
   centre: undefined as ((c: object, zoom: number) => void) | undefined,
   zoomOut: undefined as number | undefined,
   viewport: undefined as { height: number; bottomInset: number } | undefined,
@@ -64,6 +66,7 @@ vi.mock("expo-router", async () => {
   const { useEffect } = await import("react");
   return {
     useRouter: () => ({ push: vi.fn() }),
+    useLocalSearchParams: () => mocks.params,
     useFocusEffect: (cb: () => void) => useEffect(cb, [cb]),
   };
 });
@@ -103,7 +106,9 @@ vi.mock("@/components/map/places-map", () => ({
       bottomInset: number;
       pins: { id: string }[];
       onSelect: (id: string) => void;
+      frame?: typeof mocks.frame;
     }) => {
+      mocks.frame = props.frame;
       mocks.pins = props.pins;
       mocks.select = props.onSelect;
       mocks.centre = props.onCentreChange;
@@ -190,6 +195,7 @@ beforeEach(() => {
     open: vi.fn(),
   };
   mocks.chips = undefined;
+  mocks.params = {};
 });
 
 it("tells the tab bar which city is in view, and clears it when zoomed out to every place", () => {
@@ -240,4 +246,16 @@ it("shows Discover places beside the person's own while the went switch is on Al
 
   act(() => mocks.went?.("want"));
   expect(mocks.pins.map((pin) => pin.id)).not.toContain("discover:p1");
+});
+
+it("frames the city a share just added to, keyed by its save", () => {
+  mocks.params = { city: "porto", save: "save-1" };
+  render(<MapScreen />);
+  expect(mocks.frame?.key).toBe("save-1");
+  expect(mocks.frame?.places.map((p) => p.city)).toEqual(["Porto"]);
+});
+
+it("leaves the framing alone without a shared city", () => {
+  render(<MapScreen />);
+  expect(mocks.frame).toBeUndefined();
 });
