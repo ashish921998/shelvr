@@ -220,7 +220,12 @@ describe("shipped localization resources", () => {
         "utf8",
       ),
     );
-    for (const key of ["widget.title", "widget.description"] as const) {
+    for (const key of [
+      "widget.title",
+      "widget.description",
+      "tripWidget.title",
+      "tripWidget.description",
+    ] as const) {
       const nativeKey = en[key];
       expect(
         Object.keys(widget.strings[nativeKey].localizations).sort(),

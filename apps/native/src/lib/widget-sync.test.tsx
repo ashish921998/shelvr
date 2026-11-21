@@ -47,6 +47,12 @@ vi.mock("expo-constants", () => ({
   default: { expoConfig: { extra: { variant: "production" } } },
 }));
 vi.mock("@/lib/analytics", () => ({ analytics: analyticsMock }));
+const tripCountdown = vi.hoisted(() => ({
+  clear: vi.fn(() => Promise.resolve()),
+}));
+vi.mock("@/lib/trip-countdown-sync", () => ({
+  clearTripCountdownWidget: tripCountdown.clear,
+}));
 
 vi.mock("react-native", () => ({
   Platform: {
@@ -602,6 +608,12 @@ describe("RecentSavesWidgetSync", () => {
 });
 
 describe("clearRecentSavesWidget", () => {
+  it("clears the trip countdown widget with Recent Saves", async () => {
+    tripCountdown.clear.mockClear();
+    expect(await clearRecentSavesWidget()).toBe(true);
+    expect(tripCountdown.clear).toHaveBeenCalledOnce();
+  });
+
   it("retries an already-failed clear before a newly mounted account publishes", async () => {
     fsx.snapshotFailuresRemaining = 2;
     await expect(clearRecentSavesWidget()).rejects.toThrow(
