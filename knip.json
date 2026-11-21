@@ -40,6 +40,12 @@
       ],
       "project": ["tools/**/*.{mjs,cjs}"],
       "ignoreDependencies": ["expo-updates"]
+    },
+    "apps/review": {
+      "entry": ["src/app/**/*.{ts,tsx}", "convex/*.ts", "convex/**/*.test.ts"],
+      "project": ["src/**/*.{ts,tsx}", "convex/**/*.ts"],
+      "ignore": ["convex/_generated/**"],
+      "ignoreDependencies": ["tailwindcss"]
     }
   }
 }

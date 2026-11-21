@@ -1,0 +1,106 @@
+// @vitest-environment edge-runtime
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
+import { api } from "./_generated/api";
+import { addMember, addUser, newConvexTest } from "./test.setup";
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  vi.stubEnv("REVIEW_STAFF_EMAILS", "boss@shelvr.app");
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.useRealTimers();
+});
+
+async function setup() {
+  const t = newConvexTest();
+  const boss = await addUser(t, "boss@shelvr.app");
+  const campaignId = await boss.as.mutation(api.campaigns.create, {
+    name: "Launch",
+  });
+  const alice = await addMember(t, campaignId, "alice@example.com", "creator");
+  const bob = await addMember(t, campaignId, "bob@example.com", "creator");
+  const outsider = await addUser(t, "eve@example.com");
+  const { videoId } = await alice.as.mutation(api.videos.create, {
+    campaignId,
+    title: "Hook take",
+  });
+  return { t, boss, alice, bob, outsider, campaignId, videoId };
+}
+
+describe("videos", () => {
+  test("everyone in the campaign sees every video", async () => {
+    const { alice, bob, campaignId, videoId } = await setup();
+    const bobsView = await bob.as.query(api.videos.list, { campaignId });
+    expect(bobsView).toMatchObject([
+      {
+        _id: videoId,
+        title: "Hook take",
+        creatorName: "alice",
+        isMine: false,
+        status: "needs_review",
+        media: { status: "waiting" },
+      },
+    ]);
+    const alicesView = await alice.as.query(api.videos.get, { videoId });
+    expect(alicesView).toMatchObject({ canUpload: true, canReview: false });
+  });
+
+  test("people outside the campaign see nothing and cannot upload", async () => {
+    const { outsider, campaignId, videoId } = await setup();
+    expect(await outsider.as.query(api.videos.list, { campaignId })).toEqual(
+      [],
+    );
+    expect(await outsider.as.query(api.videos.get, { videoId })).toBeNull();
+    await expect(
+      outsider.as.mutation(api.videos.create, { campaignId, title: "x" }),
+    ).rejects.toThrow("not in this campaign");
+  });
+
+  test("only admins change the status", async () => {
+    const { boss, alice, videoId } = await setup();
+    await expect(
+      alice.as.mutation(api.videos.setStatus, { videoId, status: "approved" }),
+    ).rejects.toThrow("Only admins");
+    await boss.as.mutation(api.videos.setStatus, {
+      videoId,
+      status: "changes_requested",
+    });
+    expect((await alice.as.query(api.videos.get, { videoId }))?.status).toBe(
+      "changes_requested",
+    );
+  });
+
+  test("a new version goes back to needs review", async () => {
+    const { boss, alice, videoId } = await setup();
+    await boss.as.mutation(api.videos.setStatus, {
+      videoId,
+      status: "changes_requested",
+    });
+    await alice.as.mutation(api.videos.addVersion, {
+      videoId,
+      note: "Fixed the lighting",
+    });
+    const video = await alice.as.query(api.videos.get, { videoId });
+    expect(video?.status).toBe("needs_review");
+    expect(video?.versions.map((v) => [v.number, v.note])).toEqual([
+      [2, "Fixed the lighting"],
+      [1, null],
+    ]);
+  });
+
+  test("another creator cannot upload a version or rename", async () => {
+    const { bob, boss, videoId } = await setup();
+    await expect(
+      bob.as.mutation(api.videos.addVersion, { videoId }),
+    ).rejects.toThrow("Only the creator or an admin");
+    await expect(
+      bob.as.mutation(api.videos.rename, { videoId, title: "Mine now" }),
+    ).rejects.toThrow("Only the creator or an admin");
+    await boss.as.mutation(api.videos.rename, { videoId, title: "Hook v2" });
+    expect((await bob.as.query(api.videos.get, { videoId }))?.title).toBe(
+      "Hook v2",
+    );
+  });
+});

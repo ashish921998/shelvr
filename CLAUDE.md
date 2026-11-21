@@ -22,7 +22,9 @@ behind each city's plans.
 
 `apps/native` is the Expo app with its Convex backend in `apps/native/convex` (the source of
 truth); `apps/web` is the marketing site only, with no auth or product UI, whose server routes
-forward to Convex HTTP routes and store nothing. Business notes, marketing assets, metric
+forward to Convex HTTP routes and store nothing. `apps/review` is a separate invite-only video review
+app for campaign creators with its own Convex project (`apps/review/README.md`); the rules
+below are about the Shelvr app backend and do not cover it. Business notes, marketing assets, metric
 snapshots and store media live in the separate `shelvr-notes` repo; do not add them here.
 
 ## Commands

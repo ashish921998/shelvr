@@ -15,6 +15,8 @@ workflow described there.
 
 - `apps/native` is the full product: Expo Router client plus Convex backend.
 - `apps/web` is the marketing site and its server-backed waitlist routes.
+- `apps/review` is the invite-only campaign video review app, with its own
+  Convex project in `apps/review/convex`. See `apps/review/README.md`.
 - `apps/native/convex` is the backend source of truth.
 
 ### Where things live

@@ -1,0 +1,4 @@
+.next/
+coverage/
+.env.local
+next-env.d.ts
