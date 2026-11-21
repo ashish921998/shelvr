@@ -254,6 +254,30 @@ describe("completeUpload", () => {
     );
   });
 
+  test("lets only one of two overlapping calls finish an upload", async () => {
+    const { t, alice, mediaId } = await setup();
+    await alice.as.action(api.media.createUpload, {
+      mediaId,
+      contentType: "video/mp4",
+    });
+    head.mockResolvedValueOnce(sized(100));
+    head.mockResolvedValueOnce(new Response(null, { status: 404 }));
+    const results = await Promise.allSettled([
+      alice.as.action(api.media.completeUpload, { mediaId }),
+      alice.as.action(api.media.completeUpload, { mediaId }),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual([
+      "fulfilled",
+      "rejected",
+    ]);
+    expect(results.find((r) => r.status === "fulfilled")).toMatchObject({
+      value: "ready",
+    });
+    expect((await t.run((ctx) => ctx.db.get("media", mediaId)))?.status).toBe(
+      "ready",
+    );
+  });
+
   test("refuses to finish an upload that never started", async () => {
     const { alice, mediaId } = await setup();
     await expect(

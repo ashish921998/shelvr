@@ -83,6 +83,24 @@ export const recordUpload = internalMutation({
   },
 });
 
+export const claimCompletion = internalMutation({
+  args: { mediaId: v.id("media") },
+  returns: v.union(v.string(), v.null()),
+  handler: async (ctx, { mediaId }) => {
+    const user = await currentUser(ctx);
+    const media = await ctx.db.get("media", mediaId);
+    if (user === null || media === null) return null;
+    if (media.uploaderId !== user._id || media.status !== "waiting") {
+      return null;
+    }
+    if (!media.storageKey) return null;
+    const member = await membership(ctx, media.campaignId, user._id);
+    if (member === null) return null;
+    await ctx.db.patch("media", mediaId, { status: "processing" });
+    return media.storageKey;
+  },
+});
+
 export const markReady = internalMutation({
   args: {
     mediaId: v.id("media"),
@@ -94,7 +112,7 @@ export const markReady = internalMutation({
   returns: v.null(),
   handler: async (ctx, args) => {
     const media = await ctx.db.get("media", args.mediaId);
-    if (media === null || media.status !== "waiting") return null;
+    if (media === null || media.status !== "processing") return null;
     await ctx.db.patch("media", args.mediaId, {
       status: "ready",
       storageKey: args.storageKey,
@@ -111,7 +129,7 @@ export const markErrored = internalMutation({
   returns: v.null(),
   handler: async (ctx, { mediaId }) => {
     const media = await ctx.db.get("media", mediaId);
-    if (media === null || media.status !== "waiting") return null;
+    if (media === null || media.status !== "processing") return null;
     await ctx.db.patch("media", mediaId, { status: "errored" });
     return null;
   },
@@ -176,21 +194,20 @@ export const completeUpload = action({
   },
   returns: v.union(v.literal("ready"), v.literal("errored")),
   handler: async (ctx, args) => {
-    const target = await ctx.runQuery(internal.media.uploadTarget, {
+    const config = r2Config();
+    const uploaded = await ctx.runMutation(internal.media.claimCompletion, {
       mediaId: args.mediaId,
     });
-    if (target === null || target.storageKey === null) {
+    if (uploaded === null) {
       throw new Error("This upload is not yours to finish");
     }
-    const config = r2Config();
-    const head = await headObject(config, target.storageKey);
+    const head = await headObject(config, uploaded);
     const finalKey = mediaKey(args.mediaId);
     const fits =
       head !== null && head.size > 0 && head.size <= MAX_UPLOAD_BYTES;
     const copied =
-      fits &&
-      (await copyObject(config, target.storageKey, finalKey, head.etag));
-    await deleteObject(config, target.storageKey);
+      fits && (await copyObject(config, uploaded, finalKey, head.etag));
+    await deleteObject(config, uploaded);
     if (!copied || head === null) {
       await ctx.runMutation(internal.media.markErrored, {
         mediaId: args.mediaId,
