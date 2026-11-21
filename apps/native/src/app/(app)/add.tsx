@@ -5,11 +5,11 @@ import {
   BottomSheetView,
   type BottomSheetMethods,
 } from "@expo/ui/community/bottom-sheet";
-import { openPaywall } from "@/lib/entitlement";
+import { useProGate } from "@/lib/pro-gate";
 import { useAccess } from "@/lib/free-plan";
 import { freeSavesTitle } from "@/lib/free-saves-title";
 import { backOrHome } from "@/lib/screen-dismiss";
-import { saveErrorCode, saveFailureStage } from "@convex/model/saveErrors";
+import { saveFailureStage } from "@convex/model/saveErrors";
 import { api } from "@convex/_generated/api";
 import { useMutation } from "convex/react";
 import * as Crypto from "expo-crypto";
@@ -29,8 +29,6 @@ import {
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { analytics } from "@/lib/analytics";
 import { typedLink } from "@/lib/url";
-
-const PAYWALL_PLACEMENT = "add";
 
 function AndroidAddHeader({
   canSave,
@@ -79,7 +77,7 @@ function AndroidAddHeader({
 function AddContent({ close }: { close: () => void }) {
   useAppLocale();
   const { theme } = useUnistyles();
-  const router = useRouter();
+  const gate = useProGate("add");
   const [saving, setSaving] = useState(false);
   const [value, setValue] = useState("");
   const inputRef = useRef<TextInputInstance>(null);
@@ -126,6 +124,7 @@ function AddContent({ close }: { close: () => void }) {
         analyticsSessionId: analytics.sessionId(),
         saveSource: "manual_link",
       });
+      gate.passed();
       analytics.capture("article_saved");
       dismiss();
     } catch (error) {
@@ -136,10 +135,7 @@ function AddContent({ close }: { close: () => void }) {
         operation_id: operationId,
       });
       setSaving(false);
-      if (saveErrorCode(error) === "pro_required") {
-        await openPaywall(router, PAYWALL_PLACEMENT);
-        return;
-      }
+      if (await gate.denied(error)) return;
       Alert.alert(t("errors.saveTitle"), t("errors.tryAgain"));
     }
   };

@@ -33,7 +33,9 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `src/lib/haptics.ts`. Shared
   primitives: `src/components/ui` (`themed-text.tsx`, `button.tsx`). See `docs/architecture/design-system.md`.
 - **Paywall and entitlement:** `src/lib/entitlement.ts` owns `useEntitlement`,
-  `openPaywall`, `openPaywallOutcome`, `usePaywallGuard` and `restorePurchases`.
+  `openPaywall`, `openPaywallOutcome` and `restorePurchases`. An action that
+  needs Pro asks `useProGate` in `src/lib/pro-gate.ts`, which checks access,
+  handles the server's `pro_required`, opens the paywall and reports a resume.
   Around it: `trial-reminder.ts`, `paywall-funnel.ts`,
   `paywall-telemetry.ts` and `revenuecat-*.ts`.
   The server side is `convex/subscriptions.ts`.
@@ -86,7 +88,9 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   takes a pasted link only.
 - **Onboarding:** screen `src/app/(app)/onboarding.tsx`, steps in
   `src/components/onboarding`, state in `src/lib/onboarding.tsx`,
-  `onboarding-steps.ts` and `pending-onboarding.ts`.
+  `onboarding-steps.ts`, `onboarding-progress.ts` (where the person is in the
+  flow: steps, answers, skip and back rules, step analytics) and
+  `pending-onboarding.ts` (the handoff finished onboarding leaves).
 - **Copy:** `src/locales/en.json` is the source catalog; `t()` and
   `useAppLocale()` come from `src/lib/i18n.ts`. `src/locales/catalogs.ts`,
   `src/locales/message-types.ts` and

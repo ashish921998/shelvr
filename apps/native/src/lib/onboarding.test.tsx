@@ -6,10 +6,12 @@ import { OnboardingProvider, useOnboarding } from "./onboarding";
 
 const store = vi.hoisted(() => ({
   map: new Map<string, string>(),
+  failWrites: false,
 }));
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => store.map.get(key) ?? null,
   setItem: (key: string, value: string) => {
+    if (store.failWrites) throw new Error("keychain locked");
     store.map.set(key, value);
   },
 }));
@@ -24,6 +26,7 @@ function Probe({ sink }: { sink: Onboarding[] }) {
 describe("OnboardingProvider", () => {
   beforeEach(() => {
     store.map.clear();
+    store.failWrites = false;
   });
 
   it("defaults to onboarded outside the provider", () => {
@@ -54,6 +57,20 @@ describe("OnboardingProvider", () => {
       sink[0].completeOnboarding();
     });
     expect(store.map.get("shelvr.onboarded")).toBe("true");
+    expect(sink.at(-1)?.onboarded).toBe(true);
+  });
+
+  it("still flips the gate when persisting the flag throws, and passes the throw on", () => {
+    store.failWrites = true;
+    const sink: Onboarding[] = [];
+    render(
+      <OnboardingProvider>
+        <Probe sink={sink} />
+      </OnboardingProvider>,
+    );
+    act(() => {
+      expect(() => sink[0].completeOnboarding()).toThrow("keychain locked");
+    });
     expect(sink.at(-1)?.onboarded).toBe(true);
   });
 

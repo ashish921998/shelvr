@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
-import { usePaywallGuard } from "@/lib/entitlement";
+import { useProGate } from "@/lib/pro-gate";
 import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
@@ -94,7 +94,7 @@ export default function NewSharedListScreen() {
   const { theme } = useUnistyles();
   const cities = useQuery(convexQuery(api.items.listCities, {}));
   const create = useMutation(api.sharedLists.createSharedList);
-  const { guard, loading } = usePaywallGuard("shared_list");
+  const { admit, passed, loading } = useProGate("shared_list");
   const [name, setName] = useState("");
   const { city: cityParam, from } = useLocalSearchParams<{
     city?: string;
@@ -146,11 +146,12 @@ export default function NewSharedListScreen() {
     if (busy || loading || name.trim() === "" || picked.length === 0) return;
     setBusy(true);
     try {
-      if (!(await guard()) || !active.current) return;
+      if ((await admit()) !== "go" || !active.current) return;
       const { listId, inviteToken } = await create({
         name: name.trim(),
         cities: picked,
       });
+      passed();
       analytics.capture("shared_list_created", { cities: picked.length });
       if (!active.current) return;
       void haptics.success();

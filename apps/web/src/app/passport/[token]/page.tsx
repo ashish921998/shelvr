@@ -1,3 +1,4 @@
+import { APP_LINK_ORIGIN } from "@/lib/appLinkOrigin";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { after } from "next/server";
@@ -27,12 +28,12 @@ export async function generateMetadata({
   return {
     title: `${title} — Shelvr`,
     description,
-    alternates: { canonical: `/passport/${token}` },
+    alternates: { canonical: `${APP_LINK_ORIGIN}/passport/${token}` },
     robots: { index: false, follow: false },
     openGraph: {
       title,
       description,
-      url: `/passport/${token}`,
+      url: `${APP_LINK_ORIGIN}/passport/${token}`,
       siteName: "Shelvr",
       type: "website",
     },

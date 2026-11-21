@@ -6,7 +6,8 @@ import NewTripScreen from "@/app/(app)/new-trip";
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
-  guard: vi.fn(),
+  admit: vi.fn(),
+  passed: vi.fn(),
   replace: vi.fn(),
   capture: vi.fn(),
   params: {} as Record<string, string>,
@@ -24,8 +25,8 @@ vi.mock("@/lib/analytics", () => ({
 vi.mock("@/lib/haptics", () => ({ haptics: { success: vi.fn() } }));
 vi.mock("@/lib/appearance", () => ({ isDarkThemeName: () => false }));
 vi.mock("@/lib/plan-gate", () => ({ usePlanGate: () => ({ gated: false }) }));
-vi.mock("@/lib/entitlement", () => ({
-  usePaywallGuard: () => ({ guard: mocks.guard }),
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: () => ({ admit: mocks.admit, passed: mocks.passed }),
 }));
 vi.mock("@/lib/create-trip-plan", () => ({ useCreateTripPlan: vi.fn() }));
 vi.mock("@/lib/trip-edit", () => ({ usePlaceSearch: vi.fn() }));
@@ -191,7 +192,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(new Date(2026, 10, 10, 12));
-  mocks.guard.mockResolvedValue(true);
+  mocks.admit.mockResolvedValue("go");
   mocks.create.mockResolvedValue("trip-9");
   mocks.params = {};
 });
@@ -284,7 +285,7 @@ describe("Plan a trip from scratch", () => {
   });
 
   it("creates nothing when the paywall is dismissed", async () => {
-    mocks.guard.mockResolvedValue(false);
+    mocks.admit.mockResolvedValue("paywalled");
     render(<NewTripScreen />);
     fireEvent.change(screen.getByTestId("trip-setup-name"), {
       target: { value: "Iberia" },
@@ -295,7 +296,7 @@ describe("Plan a trip from scratch", () => {
     press("tripSetup.start");
     press("tripSetup.decideLater");
 
-    await waitFor(() => expect(mocks.guard).toHaveBeenCalled());
+    await waitFor(() => expect(mocks.admit).toHaveBeenCalled());
     expect(mocks.create).not.toHaveBeenCalled();
     expect(mocks.replace).not.toHaveBeenCalled();
   });

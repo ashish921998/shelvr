@@ -1,7 +1,7 @@
 import { analytics } from "@/lib/analytics";
-import { openPaywall } from "@/lib/entitlement";
 import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
+import { useProGate } from "@/lib/pro-gate";
 import {
   placeStampMoment,
   type StampPlace,
@@ -11,11 +11,10 @@ import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { isRateLimitedError } from "@convex/model/demoErrors";
 import type { VisitMark } from "@convex/model/placeVisits";
-import { saveErrorCode } from "@convex/model/saveErrors";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
-import { useNavigation, useRouter } from "expo-router";
+import { useNavigation } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { Alert } from "react-native";
 
@@ -57,7 +56,7 @@ type VisitPlace = {
 export function usePlaceVisit(
   surface: "city" | "passport" | "next_to_stamp" = "city",
 ) {
-  const router = useRouter();
+  const gate = useProGate("mark_visited");
   const navigation = useNavigation();
   const setVisited = useMutation(api.placeVisits.setVisited);
   const { play: playStamp, queue: queueStamp, badgesReady } = useStampMoment();
@@ -89,6 +88,7 @@ export function usePlaceVisit(
               },
             }),
       });
+      if (visited) gate.passed();
       if (!visited) void haptics.impact("medium");
       else if (navigation.isFocused()) {
         const moment = placeStampMoment(name, stamp);
@@ -102,10 +102,7 @@ export function usePlaceVisit(
       }
       return true;
     } catch (error) {
-      if (saveErrorCode(error) === "pro_required") {
-        await openPaywall(router, "mark_visited");
-        return false;
-      }
+      if (await gate.denied(error)) return false;
       if (isRateLimitedError(error)) {
         Alert.alert(t("cityProgress.rateLimited"));
         return false;

@@ -12,7 +12,6 @@ vi.mock("@convex/_generated/api", () => ({
 }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => ({ entitled: false, loading: false }),
-  usePaywallGuard: () => ({ guard: vi.fn(), loading: false }),
 }));
 vi.mock("@/lib/replay-onboarding", () => ({
   useAwaitingOnboardingPurchase: () => false,

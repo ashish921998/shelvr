@@ -17,8 +17,12 @@ describe("passport link metadata", () => {
       params: Promise.resolve({ token: "tok123" }),
     });
     expect(metadata.title).toBe("Maya’s passport — Shelvr");
-    expect(metadata.alternates?.canonical).toBe("/passport/tok123");
-    expect(metadata.openGraph?.url).toBe("/passport/tok123");
+    expect(metadata.alternates?.canonical).toBe(
+      "https://shelvr-web.vercel.app/passport/tok123",
+    );
+    expect(metadata.openGraph?.url).toBe(
+      "https://shelvr-web.vercel.app/passport/tok123",
+    );
     expect(metadata.robots).toEqual({ index: false, follow: false });
   });
 });

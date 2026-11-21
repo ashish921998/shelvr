@@ -1,5 +1,5 @@
 import { analytics } from "@/lib/analytics";
-import { openPaywall, usePaywallGuard } from "@/lib/entitlement";
+import { useProGate } from "@/lib/pro-gate";
 import {
   type CityChoice,
   sameCity,
@@ -14,8 +14,6 @@ import { useAction } from "convex/react";
 import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-const PLACEMENT = "plan_trip";
-
 type CreateTripState =
   | { status: "idle"; problem: TripPlanProblem | null }
   | { status: "planning"; city: string }
@@ -29,7 +27,7 @@ export function useCreateTripPlan(
 ) {
   const router = useRouter();
   const create = useAction(api.tripPlanner.createTripPlan);
-  const { guard, loading } = usePaywallGuard(PLACEMENT);
+  const { admit, denied, passed, loading } = useProGate("plan_trip");
   const [state, setState] = useState<CreateTripState>({
     status: "idle",
     problem: null,
@@ -50,7 +48,7 @@ export function useCreateTripPlan(
         setState({ status: "idle", problem: { kind: parsed.problem } });
         return;
       }
-      if (listId === undefined && !(await guard())) return;
+      if (listId === undefined && (await admit()) !== "go") return;
       if (!alive.current) return;
       const { args } = parsed;
       const shared = { days: args.days, pace: args.pace };
@@ -73,6 +71,7 @@ export function useCreateTripPlan(
           suggested: result.suggested,
           made: result.tripId !== null,
         });
+        if (listId === undefined && result.tripId !== null) passed();
         if (!alive.current) return;
         setState(
           result.tripId === null
@@ -88,13 +87,15 @@ export function useCreateTripPlan(
         if (!alive.current) return;
         if (reason === "pro_required") {
           setState({ status: "idle", problem: null });
-          await openPaywall(router, PLACEMENT);
-          return;
+          if ((await denied(error)) || !alive.current) return;
         }
-        setState({ status: "idle", problem: { kind: reason } });
+        setState({
+          status: "idle",
+          problem: { kind: reason === "pro_required" ? "error" : reason },
+        });
       }
     },
-    [locale, guard, cities, create, router, listId],
+    [locale, admit, denied, passed, cities, create, listId],
   );
 
   const submit = useCallback(

@@ -3,10 +3,10 @@ import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { AddButton, addButtonBottom } from "@/components/tab-bar";
 import { ThemedText } from "@/components/ui/themed-text";
 import { withAlpha } from "@/lib/color";
-import { useSaveGuard } from "@/lib/free-plan";
 import { t, useAppLocale } from "@/lib/i18n";
 import { sheetIn } from "@/lib/motion";
 import { usePlanPicker } from "@/lib/plan-picker";
+import { useProGate } from "@/lib/pro-gate";
 import { backOrHome } from "@/lib/screen-dismiss";
 import { useSiriShortcuts } from "@/lib/siri-phrases";
 import { useRouter } from "expo-router";
@@ -98,13 +98,15 @@ export function AddSpotsSheet() {
   const router = useRouter();
   const { theme, rt } = useUnistyles();
   const reduced = useReducedMotion();
-  const { guard, loading } = useSaveGuard("tab_bar");
+  const { admit, passed, loading } = useProGate("tab_bar");
   const planner = usePlanPicker({ onLeave: () => backOrHome(router) });
   const siri = useSiriShortcuts();
   const closeBottom = addButtonBottom(rt.insets.bottom);
   const addLink = () => {
     if (loading) return;
-    void guard(() => {
+    void admit().then((admission) => {
+      if (admission !== "go") return;
+      passed();
       router.back();
       router.push("/add");
     });

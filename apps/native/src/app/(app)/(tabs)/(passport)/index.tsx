@@ -201,9 +201,10 @@ export default function PassportScreen() {
     <PassportCityHead
       section={section}
       locked={ring.locked}
-      onOpen={(city) =>
-        router.push({ pathname: "/next-to-stamp", params: { city } })
-      }
+      onOpen={(city) => {
+        ring.passed();
+        router.push({ pathname: "/next-to-stamp", params: { city } });
+      }}
       onUnlock={ring.unlock}
       onShare={(city) => router.push(shareCardHref(city, "passport"))}
       onCityStamp={(city) => removeCityStamp(city, stampedCities.length - 1)}
@@ -263,7 +264,10 @@ export default function PassportScreen() {
             totals={badges.totals}
             locked={badgeAccess.locked}
             onUnlock={badgeAccess.unlock}
-            onShare={(badge) => void shareBadge(badge)}
+            onShare={(badge) => {
+              badgeAccess.passed();
+              void shareBadge(badge);
+            }}
           />
         ) : null}
         {sections.stamped.map((section) => (

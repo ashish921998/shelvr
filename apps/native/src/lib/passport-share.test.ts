@@ -2,7 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 import { passportUrl } from "./passport-share";
 import { pendingInviteOf } from "./pending-invite";
 
-vi.mock("@/lib/entitlement", () => ({ openPaywall: vi.fn() }));
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: () => ({
+    admit: async () => "go",
+    denied: async () => true,
+    blocked: async () => {},
+    passed: () => {},
+    loading: false,
+  }),
+}));
 vi.mock("@/lib/share-link", () => ({ shareUrl: vi.fn() }));
 vi.mock("@/lib/analytics", () => ({ analytics: {} }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));

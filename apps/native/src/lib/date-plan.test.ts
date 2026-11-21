@@ -17,7 +17,15 @@ vi.mock("react-native", () => ({ Platform: platform }));
 vi.mock("convex/react", () => ({ useAction: vi.fn() }));
 vi.mock("@convex/_generated/api", () => ({ api: {} }));
 vi.mock("expo-router", () => ({ useRouter: vi.fn() }));
-vi.mock("@/lib/entitlement", () => ({ openPaywall: vi.fn() }));
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: () => ({
+    admit: async () => "go",
+    denied: async () => true,
+    blocked: async () => {},
+    passed: () => {},
+    loading: false,
+  }),
+}));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: vi.fn(), captureError: vi.fn() },
 }));

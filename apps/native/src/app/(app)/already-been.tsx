@@ -5,7 +5,7 @@ import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
-import { usePaywallGuard } from "@/lib/entitlement";
+import { useProGate } from "@/lib/pro-gate";
 import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { unstampedCities, type UnstampedPlace } from "@/lib/passport";
@@ -13,7 +13,6 @@ import { backOrHome } from "@/lib/screen-dismiss";
 import { bulkStampMoment, useStampMoment } from "@/lib/stamp-moment";
 import { api } from "@convex/_generated/api";
 import { MAX_BATCH_PLACES } from "@convex/model/placeVisits";
-import { saveErrorCode } from "@convex/model/saveErrors";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
@@ -121,7 +120,7 @@ export default function AlreadyBeenScreen() {
     });
   };
 
-  const { guard } = usePaywallGuard("passport");
+  const { denied, passed } = useProGate("passport");
   const active = useRef(true);
   useEffect(
     () => () => {
@@ -142,6 +141,7 @@ export default function AlreadyBeenScreen() {
           spot,
         })),
       });
+      passed();
       analytics.capture("passport_backfilled", { places: count });
       if (!active.current) return;
       const moment = bulkStampMoment(count, picked);
@@ -150,7 +150,7 @@ export default function AlreadyBeenScreen() {
     } catch (error) {
       analytics.captureError("passport_backfill_failed", error);
       if (!active.current) return;
-      if (saveErrorCode(error) === "pro_required" && !(await guard())) return;
+      if (await denied(error)) return;
       if (!active.current) return;
       Alert.alert(t("errors.unexpectedTitle"), t("errors.retrySoon"));
     } finally {

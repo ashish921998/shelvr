@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearLegacyDemoUrl,
   clearPending,
-  getOnboardingProgress,
   getOrCreatePendingOperationId,
   getPendingDemoOwner,
   getPendingDemoSpace,
@@ -13,7 +12,6 @@ import {
   noteReplayDeclined,
   queueDemoUrl,
   replayDeclined,
-  setOnboardingProgress,
   setPendingSpaces,
 } from "./pending-onboarding";
 
@@ -32,7 +30,6 @@ describe("a no to the replay's paywall", () => {
     noteReplayDeclined(getPendingOperationId());
     expect(replayDeclined()).toBe(true);
     setPendingSpaces(["Recipes"]);
-    setOnboardingProgress({ spaces: ["Recipes"], step: 2 });
     clearLegacyDemoUrl();
     expect(replayDeclined()).toBe(true);
     clearPending();
@@ -74,153 +71,6 @@ describe("onboarding recovery", () => {
     expect(getOrCreatePendingOperationId()).toBe("legacy-operation");
     expect(hasPending()).toBe(true);
   });
-
-  it("recovers the picked topics and step", () => {
-    setOnboardingProgress({ spaces: ["Travel"], step: 2 });
-    expect(getOnboardingProgress()).toEqual({
-      spaces: ["Travel"],
-      step: 2,
-      viewed: [],
-      travelCity: null,
-      beenCities: [],
-      goals: [],
-      savedCount: null,
-      skippedShare: false,
-    });
-  });
-});
-
-describe("the steps already viewed", () => {
-  it("are kept with the progress through a relaunch and the hand-off to the replay", () => {
-    setOnboardingProgress({
-      spaces: [],
-      step: 10,
-      viewed: ["opener", "goal", "carousel"],
-    });
-    setPendingSpaces(["Date nights"]);
-    expect(getOnboardingProgress().viewed).toEqual([
-      "opener",
-      "goal",
-      "carousel",
-    ]);
-  });
-
-  it("read back as only the steps this flow has", () => {
-    setOnboardingProgress({ spaces: [], step: 2 });
-    const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");
-    const storeViewed = (viewed: unknown) =>
-      storage.set(
-        "shelvr.pending.onboarding",
-        JSON.stringify({ ...stored, viewed }),
-      );
-    storeViewed(["commitment", 3, "goal"]);
-    expect(getOnboardingProgress().viewed).toEqual(["goal"]);
-    storeViewed("goal");
-    expect(getOnboardingProgress().viewed).toEqual([]);
-  });
-});
-
-describe("the survey answers", () => {
-  it("are kept with the progress through a relaunch and the hand-off to the replay", () => {
-    setOnboardingProgress({
-      spaces: ["Date nights"],
-      step: 5,
-      goals: ["date", "food"],
-      savedCount: "hundreds",
-      skippedShare: true,
-    });
-    setPendingSpaces(["Date nights"]);
-    expect(getOnboardingProgress()).toMatchObject({
-      goals: ["date", "food"],
-      savedCount: "hundreds",
-      skippedShare: true,
-    });
-  });
-
-  it("read back as none when stored answers are not ones onboarding asks", () => {
-    setOnboardingProgress({ spaces: [], step: 2 });
-    const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");
-    storage.set(
-      "shelvr.pending.onboarding",
-      JSON.stringify({
-        ...stored,
-        goals: ["shopping", "travel"],
-        savedCount: "millions",
-        skippedShare: "yes",
-      }),
-    );
-    expect(getOnboardingProgress()).toMatchObject({
-      goals: ["travel"],
-      savedCount: null,
-      skippedShare: false,
-    });
-  });
-
-  it("drop the step of an earlier flow, whose indexes mean other screens", () => {
-    setOnboardingProgress({ spaces: [], step: 9, goals: ["travel"] });
-    const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");
-    storage.set(
-      "shelvr.pending.onboarding",
-      JSON.stringify({ ...stored, progressVersion: 11 }),
-    );
-    expect(getOnboardingProgress()).toMatchObject({ step: null, goals: [] });
-  });
-});
-
-describe("the sample trip's city", () => {
-  it("is kept with the progress through a relaunch", () => {
-    setOnboardingProgress({ spaces: ["Travel"], step: 2, travelCity: "tokyo" });
-    expect(getOnboardingProgress().travelCity).toBe("tokyo");
-  });
-
-  it("reads back as none when the record holds no city", () => {
-    setOnboardingProgress({ spaces: [], step: 1 });
-    expect(getOnboardingProgress().travelCity).toBeNull();
-  });
-
-  it("reads back as none when the stored city is not a sample city", () => {
-    setOnboardingProgress({ spaces: ["Travel"], step: 2, travelCity: "tokyo" });
-    const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");
-    storage.set(
-      "shelvr.pending.onboarding",
-      JSON.stringify({ ...stored, travelCity: "atlantis" }),
-    );
-    expect(getOnboardingProgress().travelCity).toBeNull();
-  });
-});
-
-describe("the cities they have been to", () => {
-  it("are kept with the progress beside the steps viewed", () => {
-    setOnboardingProgress({
-      spaces: [],
-      step: 5,
-      beenCities: ["lisbon", "madrid"],
-      viewed: ["opener", "been"],
-    });
-    expect(getOnboardingProgress()).toMatchObject({
-      beenCities: ["lisbon", "madrid"],
-      viewed: ["opener", "been"],
-    });
-  });
-
-  it("read back once each, in the list's order, without unknown cities", () => {
-    setOnboardingProgress({ spaces: [], step: 5 });
-    const stored = JSON.parse(storage.get("shelvr.pending.onboarding") ?? "{}");
-    storage.set(
-      "shelvr.pending.onboarding",
-      JSON.stringify({
-        ...stored,
-        beenCities: ["madrid", "lisbon", "atlantis", "lisbon"],
-      }),
-    );
-    expect(getOnboardingProgress().beenCities).toEqual(["lisbon", "madrid"]);
-  });
-
-  it("survive the hand-off to the replay", () => {
-    setOnboardingProgress({ spaces: [], step: 5, beenCities: ["tokyo"] });
-    setPendingSpaces(["Date nights"]);
-    expect(getOnboardingProgress().beenCities).toEqual(["tokyo"]);
-  });
 });
 
 describe("a first save queued before sign-in", () => {
@@ -247,127 +97,9 @@ describe("a first save queued before sign-in", () => {
     clearLegacyDemoUrl();
     expect(getPendingDemoOwner()).toBeNull();
   });
-
-  it("keeps the onboarding progress beside it", () => {
-    setOnboardingProgress({ spaces: ["a"], step: 3 });
-    queueDemoUrl("https://example.com/recipe");
-    expect(getOnboardingProgress()).toMatchObject({ spaces: ["a"], step: 3 });
-  });
 });
 
-describe("progress written by an older onboarding flow", () => {
-  const fresh = {
-    spaces: [],
-    step: null,
-    viewed: [],
-    travelCity: null,
-    beenCities: [],
-    goals: [],
-    savedCount: null,
-    skippedShare: false,
-  };
-
-  it.each([0, 1, 2, 3, 4, 5, 6, 7])(
-    "restarts a record at old step %i with fresh progress",
-    (step) => {
-      storage.set(
-        "shelvr.pending.onboarding",
-        JSON.stringify({
-          operationId: "legacy-operation",
-          spaces: ["Recipes"],
-          demoUrl: null,
-          q1: ["X bookmarks"],
-          q2: ["Recipes"],
-          step,
-          demo: { url: "https://example.com/recipe", destination: "Recipes" },
-        }),
-      );
-      expect(getOnboardingProgress()).toEqual(fresh);
-    },
-  );
-
-  it.each([
-    ["no version", {}],
-    ["an unknown version", { progressVersion: 1 }],
-    ["the flow before the source step", { progressVersion: 2 }],
-    ["the flow that had the source step", { progressVersion: 3 }],
-    ["the flow before the interests step", { progressVersion: 4 }],
-    ["the flow that had the reveal step", { progressVersion: 5 }],
-    ["the flow that had the first save", { progressVersion: 6 }],
-    ["the flow that asked topics first", { progressVersion: 7 }],
-    ["the flow that asked one goal", { progressVersion: 8 }],
-    ["the flow without the chart step", { progressVersion: 9 }],
-    ["the flow that had the sample plan step", { progressVersion: 10 }],
-    ["the flow with the chart and commitment", { progressVersion: 11 }],
-    ["the flow with the trip and planner questions", { progressVersion: 12 }],
-    ["the flow before the been step", { progressVersion: 13 }],
-    ["a non-numeric version", { progressVersion: "2" }],
-  ])("restarts a record with %s", (_name, version) => {
-    storage.set(
-      "shelvr.pending.onboarding",
-      JSON.stringify({
-        operationId: "op",
-        spaces: ["Travel"],
-        demoUrl: null,
-        saveKinds: ["Travel"],
-        step: 2,
-        viewed: ["opener", "goal"],
-        ...version,
-      }),
-    );
-    expect(getOnboardingProgress()).toEqual(fresh);
-  });
-
-  it("restores a record written by the current flow", () => {
-    storage.set(
-      "shelvr.pending.onboarding",
-      JSON.stringify({
-        operationId: "op",
-        spaces: ["Travel"],
-        demoUrl: null,
-        progressVersion: 14,
-        step: 2,
-        spaceNames: {},
-      }),
-    );
-    expect(getOnboardingProgress()).toEqual({
-      spaces: ["Travel"],
-      step: 2,
-      viewed: [],
-      travelCity: null,
-      beenCities: [],
-      goals: [],
-      savedCount: null,
-      skippedShare: false,
-    });
-  });
-
-  it("keeps the replay fields once the new flow writes progress", () => {
-    storage.set(
-      "shelvr.pending.onboarding",
-      JSON.stringify({
-        operationId: "legacy-operation",
-        spaces: ["Recipes"],
-        demoUrl: "https://example.com/queued",
-        step: 5,
-        demo: { url: "https://example.com/recipe", destination: "Recipes" },
-      }),
-    );
-    setOnboardingProgress({ spaces: [], step: 0 });
-    expect(getOnboardingProgress()).toEqual({
-      spaces: [],
-      step: 0,
-      viewed: [],
-      travelCity: null,
-      beenCities: [],
-      goals: [],
-      savedCount: null,
-      skippedShare: false,
-    });
-    expect(getPendingDemoUrl()).toBe("https://example.com/queued");
-    expect(getOrCreatePendingOperationId()).toBe("legacy-operation");
-  });
-
+describe("a record written by an older onboarding flow", () => {
   it("still hands an older finished record's spaces to the replay", () => {
     storage.set(
       "shelvr.pending.onboarding",

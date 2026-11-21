@@ -6,7 +6,7 @@ import { useAction, useConvexAuth } from "convex/react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrentUser } from "@/lib/current-user";
 import { analytics } from "@/lib/analytics";
-import { getOnboardingProgress } from "@/lib/pending-onboarding";
+import { onboardingAnswers } from "@/lib/onboarding-progress";
 import { goalProgressFor } from "@/lib/paywall-goal";
 import {
   activeProductId,
@@ -17,9 +17,7 @@ import {
   readPaywallOffering,
   refreshCustomerInfo,
   recordAccess,
-  recordBlockedAction,
   restoreCameBackEmpty,
-  resumeBlockedAction,
   useEntitlementActivation,
 } from "@/lib/paywall-funnel";
 import { getRCUI, getPurchases } from "@/lib/revenuecat-module";
@@ -41,7 +39,7 @@ import {
 } from "@/lib/revenuecat-api-key";
 import { startRevenueCatIdentitySync } from "./revenuecat-identity-sync";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { isProHiddenForE2E } from "@/lib/e2e-hide-pro";
 import {
@@ -387,7 +385,7 @@ async function presentPaywallImpl(
       trial,
       offering?.availablePackages.map((pkg) => pkg.product) ?? [],
       enriched.trial_eligible,
-      goalProgressFor(getOnboardingProgress(), placement),
+      goalProgressFor(onboardingAnswers(), placement),
     );
     // A sign-out during those reads must not open a paywall that cannot close.
     if (!rcReadyFor(anonymous)) {
@@ -404,14 +402,16 @@ async function presentPaywallImpl(
     const result = await observePaywallPresentation(
       enriched,
       () =>
-        nativePresentation(owner, present).then((outcome) =>
-          confirmRestore(outcome, owner),
-        ),
+        nativePresentation(owner, present)
+          .then((outcome) => confirmRestore(outcome, owner))
+          .then((outcome) => {
+            if (outcome === "PURCHASED" || outcome === "RESTORED") {
+              recordAccess(outcome === "RESTORED" ? "restore" : "purchase");
+            }
+            return outcome;
+          }),
       activeProductId,
     );
-    if (result === "PURCHASED" || result === "RESTORED") {
-      recordAccess(result === "RESTORED" ? "restore" : "purchase");
-    }
     return mapPaywallResult(result);
   } catch {
     return "unavailable";
@@ -573,7 +573,6 @@ export async function openPaywallAnswer(
   if (owned && shouldOpenPaywallFallback(outcome) && fallback) {
     router.push("/(app)/paywall");
   }
-  recordBlockedAction(placement, outcome === "success");
   return { outcome, answered };
 }
 
@@ -634,27 +633,4 @@ export async function readTrialEligible(): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-/** Runs `action` only when entitled, else opens the paywall; resolves false whenever the action did not run. */
-export function usePaywallGuard(placement = "pro_gate"): {
-  guard: (action?: () => void) => Promise<boolean>;
-  loading: boolean;
-} {
-  const { entitled, loading } = useEntitlement();
-  const router = useRouter();
-  const guard = useCallback(
-    async (action?: () => void) => {
-      if (loading) return false;
-      if (entitled) {
-        resumeBlockedAction(placement);
-        action?.();
-        return true;
-      }
-      await openPaywall(router, placement);
-      return false;
-    },
-    [entitled, loading, placement, router],
-  );
-  return { guard, loading };
 }
