@@ -1,3 +1,4 @@
+import { APP_LINK_ORIGIN } from "@/lib/appLinkOrigin";
 import type { Metadata } from "next";
 
 import AppStoreButton from "@/components/AppStoreButton";
@@ -20,12 +21,12 @@ export async function generateMetadata({
   return {
     title: `${title} — Shelvr`,
     description,
-    alternates: { canonical: `/l/${token}` },
+    alternates: { canonical: `${APP_LINK_ORIGIN}/l/${token}` },
     robots: { index: false, follow: false },
     openGraph: {
       title,
       description,
-      url: `/l/${token}`,
+      url: `${APP_LINK_ORIGIN}/l/${token}`,
       siteName: "Shelvr",
       type: "website",
     },
