@@ -1,8 +1,8 @@
 import { saveErrorCode } from "@convex/model/saveErrors";
 import { useRouter } from "expo-router";
 import { useCallback } from "react";
-import { canSave, saveWaiting, type Access } from "@/lib/access";
-import { openPaywallAnswer } from "@/lib/entitlement";
+import { canSave, type Access } from "@/lib/access";
+import { openPaywallAnswer, useEntitlement } from "@/lib/entitlement";
 import { useAccess } from "@/lib/free-plan";
 import { recordBlockedAction, resumeBlockedAction } from "@/lib/paywall-funnel";
 
@@ -25,9 +25,14 @@ export type Admission = "go" | "wait" | "paywalled";
 
 const FREE_SAVE_PLACEMENTS: ReadonlySet<ProPlacement> = new Set(["home"]);
 
-function admission(access: Access, freeSaves: boolean): Admission {
-  if (saveWaiting(access)) return "wait";
-  if (access.kind === "pro") return "go";
+function admission(
+  access: Access,
+  freeSaves: boolean,
+  entitlementLoading: boolean,
+): Admission {
+  if (access.kind === "pro") return access.syncing ? "wait" : "go";
+  if (access.kind === "loading")
+    return freeSaves || entitlementLoading ? "wait" : "paywalled";
   return freeSaves && canSave(access) ? "go" : "paywalled";
 }
 
@@ -40,7 +45,12 @@ export function useProGate(placement: ProPlacement): {
 } {
   const router = useRouter();
   const access = useAccess();
-  const verdict = admission(access, FREE_SAVE_PLACEMENTS.has(placement));
+  const entitlement = useEntitlement();
+  const verdict = admission(
+    access,
+    FREE_SAVE_PLACEMENTS.has(placement),
+    entitlement.loading,
+  );
   const pro = access.kind === "pro";
 
   const blocked = useCallback(async () => {

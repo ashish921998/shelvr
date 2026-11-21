@@ -8,6 +8,7 @@ import { useProGate, type ProPlacement } from "@/lib/pro-gate";
 
 const mocks = vi.hoisted(() => ({
   access: { kind: "loading" } as Access,
+  entitlement: { entitled: false, loading: false },
   sheet: vi.fn(),
   capture: vi.fn(),
   router: { push: vi.fn() },
@@ -15,7 +16,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("expo-router", () => ({ useRouter: () => mocks.router }));
 vi.mock("@/lib/free-plan", () => ({ useAccess: () => mocks.access }));
-vi.mock("@/lib/entitlement", () => ({ openPaywallAnswer: mocks.sheet }));
+vi.mock("@/lib/entitlement", () => ({
+  openPaywallAnswer: mocks.sheet,
+  useEntitlement: () => mocks.entitlement,
+}));
 vi.mock("@/lib/analytics", () => ({ analytics: { capture: mocks.capture } }));
 vi.mock("@/lib/revenuecat-module", () => ({ getPurchases: () => null }));
 vi.mock("@/lib/paywall-goal", () => ({}));
@@ -71,6 +75,7 @@ beforeEach(() => {
   forgetPaywallFunnel();
   mocks.sheet.mockResolvedValue({ outcome: "cancelled", answered: true });
   mocks.access = { kind: "free", ...free };
+  mocks.entitlement = { entitled: false, loading: false };
 });
 
 describe.each(PLACEMENTS)("%s", (placement) => {
@@ -169,12 +174,32 @@ describe("admit", () => {
 
   it.each(cases)("with %s", async (_name, access, placement, verdict) => {
     mocks.access = access;
+    mocks.entitlement = { entitled: false, loading: access.kind === "loading" };
     const result = gate(placement);
     await act(async () => {
       expect(await result.current.admit()).toBe(verdict);
     });
     expect(result.current.loading).toBe(verdict === "wait");
     expect(mocks.sheet).toHaveBeenCalledTimes(verdict === "paywalled" ? 1 : 0);
+  });
+
+  it("opens the paywall for a Pro-only action while only the free-save count is loading", async () => {
+    mocks.access = { kind: "loading" };
+    const result = gate("passport");
+    expect(result.current.loading).toBe(false);
+    await act(async () => {
+      expect(await result.current.admit()).toBe("paywalled");
+    });
+    expect(mocks.sheet).toHaveBeenCalledWith(mocks.router, "passport");
+  });
+
+  it("waits on the free-save count where a free save can pass", async () => {
+    mocks.access = { kind: "loading" };
+    const result = gate("home");
+    await act(async () => {
+      expect(await result.current.admit()).toBe("wait");
+    });
+    expect(mocks.sheet).not.toHaveBeenCalled();
   });
 
   it("reports a later pass at a placement it blocked", async () => {

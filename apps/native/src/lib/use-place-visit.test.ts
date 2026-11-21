@@ -28,7 +28,10 @@ vi.mock("expo-router", () => ({
   useRouter: () => mocks.router,
   useNavigation: () => ({ isFocused: () => mocks.focused }),
 }));
-vi.mock("@/lib/entitlement", () => ({ openPaywallAnswer: mocks.openPaywall }));
+vi.mock("@/lib/entitlement", () => ({
+  openPaywallAnswer: mocks.openPaywall,
+  useEntitlement: () => ({ entitled: false, loading: false }),
+}));
 vi.mock("@/lib/free-plan", () => ({ useAccess: () => mocks.access }));
 vi.mock("@/lib/revenuecat-module", () => ({ getPurchases: () => null }));
 vi.mock("@/lib/paywall-goal", () => ({}));

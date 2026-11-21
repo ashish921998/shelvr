@@ -15,7 +15,10 @@ const mocks = vi.hoisted(() => ({
   openPaywall: vi.fn(),
   access: { kind: "locked" } as { kind: string; syncing?: boolean },
 }));
-vi.mock("@/lib/entitlement", () => ({ openPaywallAnswer: mocks.openPaywall }));
+vi.mock("@/lib/entitlement", () => ({
+  openPaywallAnswer: mocks.openPaywall,
+  useEntitlement: () => ({ entitled: false, loading: false }),
+}));
 vi.mock("@/lib/free-plan", () => ({ useAccess: () => mocks.access }));
 vi.mock("@/lib/revenuecat-module", () => ({ getPurchases: () => null }));
 vi.mock("@/lib/paywall-goal", () => ({}));
