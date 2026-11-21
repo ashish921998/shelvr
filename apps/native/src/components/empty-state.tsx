@@ -31,8 +31,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     gap: theme.gap(1),
   },
   title: {
-    fontFamily: theme.fonts.display,
-    fontSize: 22,
+    ...theme.type.title,
     color: theme.colors.foreground,
   },
   message: {

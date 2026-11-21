@@ -7,15 +7,15 @@ Home (`startOnSeededHome` in `tools/e2e/tests/seeded-home.ts`); onboarding
 launches as a fresh install (`-E2EFreshInstall YES`) and starts at "Get started". Not mapped yet:
 Trips, item pages, sharing, settings, notifications. Map them when a change touches them.
 
-| Feature                       | Where                                       | Test                                                       | Status                                     |
-| ----------------------------- | ------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------ |
-| [Save a link](save-link.md)   | Home > Add                                  | `tests/save-link.e2e.ts`, `tests/save-link-fixture.e2e.ts` | tested (real page: model key; fixture: CI) |
-| [Paywall](paywall.md)         | Home > Add or "View Pro plans", without Pro | `tests/paywall.e2e.ts`                                     | tested                                     |
-| [Onboarding](onboarding.md)   | Fresh install > Get started                 | `tests/onboarding.e2e.ts`                                  | tested                                     |
-| [Plan a date](plan-a-date.md) | Home > a city > Plan a date                 | `tests/plan-city-date.e2e.ts`                              | tested (CI fake model only)                |
+| Feature                       | Where                                                | Test                                                       | Status                                     |
+| ----------------------------- | ---------------------------------------------------- | ---------------------------------------------------------- | ------------------------------------------ |
+| [Save a link](save-link.md)   | Add > Paste a link                                   | `tests/save-link.e2e.ts`, `tests/save-link-fixture.e2e.ts` | tested (real page: model key; fixture: CI) |
+| [Paywall](paywall.md)         | Add > Paste a link, or "View Pro plans", without Pro | `tests/paywall.e2e.ts`                                     | tested                                     |
+| [Onboarding](onboarding.md)   | Fresh install > Get started                          | `tests/onboarding.e2e.ts`                                  | tested                                     |
+| [Plan a date](plan-a-date.md) | Home > Cities > a city > Plan a date                 | `tests/plan-city-date.e2e.ts`                              | tested (CI fake model only)                |
 
-`tests/home-cities.e2e.ts` is the Doctor, not a feature: it checks Home lists
-a Lisbon city card. The `e2e ios` workflow
+`tests/home-cities.e2e.ts` is the Doctor, not a feature: it checks Home's Cities
+row lists a Lisbon city card. The `e2e ios` workflow
 (`.github/workflows/e2e-ios.yml`) runs home-cities and onboarding (shard a),
 the paywall, plan-city-date and save-link-fixture (shard b) on main and on pull requests
 that touch the app and carry the `run-e2e` label, against a local Convex backend that runs the fake model

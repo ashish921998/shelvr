@@ -6,8 +6,12 @@ import { haptics } from "@/lib/haptics";
 import { MapFilterChips } from "./map-filter-chips";
 
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
+vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}), hairlineWidth: 1 },
+  useUnistyles: () => ({
+    theme: { colors: { foreground: "#000", onTint: "#000" } },
+  }),
 }));
 vi.mock("react-native", () => ({
   ScrollView: vi.fn(({ children }: { children: ReactNode }) => (
@@ -40,55 +44,84 @@ vi.mock("react-native", () => ({
   ),
 }));
 
-it("lists All then each filter, and a second tap on the selected filter returns to All", () => {
+it.each([false, true])(
+  "lists and toggles the filters with inline=%s",
+  (inline) => {
+    const onSelect = vi.fn();
+    const { rerender } = render(
+      <MapFilterChips
+        inline={inline}
+        kinds={["dessert", "dateNight"]}
+        selected={null}
+        onSelect={onSelect}
+      />,
+    );
+    expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "map.kindDessert",
+      "map.kindDateNight",
+    ]);
+
+    fireEvent.click(screen.getByLabelText("map.kindDateNight"));
+    expect(onSelect).toHaveBeenLastCalledWith("dateNight");
+
+    rerender(
+      <MapFilterChips
+        inline={inline}
+        kinds={["dessert", "dateNight"]}
+        selected="dateNight"
+        onSelect={onSelect}
+      />,
+    );
+    fireEvent.click(screen.getByLabelText("map.kindDateNight"));
+    expect(onSelect).toHaveBeenLastCalledWith(null);
+  },
+);
+
+it.each([
+  ["a new filter", null, 1],
+  ["turning the selected filter off", "dessert", 1],
+] as const)("ticks %s once", (_, selected, ticks) => {
+  const selection = vi.spyOn(haptics, "selection");
+  render(
+    <MapFilterChips
+      kinds={["dessert"]}
+      selected={selected}
+      onSelect={vi.fn()}
+    />,
+  );
+  fireEvent.click(screen.getByLabelText("map.kindDessert"));
+  expect(selection).toHaveBeenCalledTimes(ticks);
+  selection.mockRestore();
+});
+
+it("keeps several category tags selected and toggles one without clearing the others", () => {
+  const selection = vi.spyOn(haptics, "selection");
   const onSelect = vi.fn();
   const { rerender } = render(
     <MapFilterChips
-      kinds={["dessert", "dateNight"]}
-      selected={null}
+      inline
+      kinds={["coffee", "drinks"]}
+      selected={["coffee", "drinks"]}
       onSelect={onSelect}
     />,
   );
-  expect(screen.getAllByRole("button").map((b) => b.textContent)).toEqual([
-    "map.filterAll",
-    "🍰 map.kindDessert",
-    "💕 map.kindDateNight",
-  ]);
-  expect(screen.getByLabelText("map.filterAll").ariaPressed).toBe("true");
-
-  fireEvent.click(screen.getByLabelText("map.kindDateNight"));
-  expect(onSelect).toHaveBeenLastCalledWith("dateNight");
+  expect(screen.getByLabelText("map.kindCoffee").ariaPressed).toBe("true");
+  expect(screen.getByLabelText("map.kindDrinks").ariaPressed).toBe("true");
+  fireEvent.click(screen.getByLabelText("map.kindCoffee"));
+  expect(onSelect).toHaveBeenLastCalledWith("coffee");
 
   rerender(
     <MapFilterChips
-      kinds={["dessert", "dateNight"]}
-      selected="dateNight"
+      inline
+      kinds={["coffee", "drinks"]}
+      selected={["drinks"]}
       onSelect={onSelect}
     />,
   );
-  fireEvent.click(screen.getByLabelText("map.kindDateNight"));
-  expect(onSelect).toHaveBeenLastCalledWith(null);
+  expect(screen.getByLabelText("map.kindCoffee").ariaPressed).toBe("false");
+  expect(screen.getByLabelText("map.kindDrinks").ariaPressed).toBe("true");
+  fireEvent.click(screen.getByLabelText("map.kindCoffee"));
+  expect(onSelect).toHaveBeenCalledTimes(2);
+  expect(selection).not.toHaveBeenCalled();
+  selection.mockRestore();
 });
-
-it.each([
-  ["a new filter", null, "map.kindDessert", 1],
-  ["clearing the selected filter", "dessert", "map.kindDessert", 1],
-  ["All when a filter is on", "dessert", "map.filterAll", 1],
-  ["All when it is already on", null, "map.filterAll", 0],
-] as const)(
-  "ticks %s the right number of times",
-  (_, selected, label, ticks) => {
-    const selection = vi.spyOn(haptics, "selection");
-    const { unmount } = render(
-      <MapFilterChips
-        kinds={["dessert"]}
-        selected={selected}
-        onSelect={vi.fn()}
-      />,
-    );
-    fireEvent.click(screen.getByLabelText(label));
-    expect(selection).toHaveBeenCalledTimes(ticks);
-    selection.mockRestore();
-    unmount();
-  },
-);

@@ -76,7 +76,7 @@ export default function AppLayout() {
     ? "/onboarding"
     : gated
       ? "/plan-gate"
-      : "/(app)/(tabs)/(home)";
+      : "/(app)/(tabs)/(map)";
   const modal = {
     presentation: "modal",
     headerShown: true,
@@ -117,6 +117,17 @@ export default function AppLayout() {
               name="city/[name]"
               options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
             />
+            <Stack.Screen name="saves" options={{ headerShown: false }} />
+            <Stack.Screen name="cities" options={{ headerShown: false }} />
+            <Stack.Screen name="collections" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="how-to-share"
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen
+              name="save-with-siri"
+              options={{ headerShown: false }}
+            />
             <Stack.Screen
               name="city-stamps"
               options={{ headerBackButtonDisplayMode: "minimal" }}
@@ -131,12 +142,17 @@ export default function AppLayout() {
             redirectTo={onboarded ? "/plan-gate" : "/onboarding"}
           >
             <Stack.Screen
-              name="trip-plan/[id]"
+              name="date-plan"
               options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
             />
             <Stack.Screen
-              name="date-plan"
-              options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+              name="go-out"
+              options={{
+                presentation: "transparentModal",
+                animation: "fade",
+                headerShown: false,
+                contentStyle: { backgroundColor: "transparent" },
+              }}
             />
             <Stack.Screen
               name="shared-list/[id]"
@@ -148,7 +164,10 @@ export default function AppLayout() {
             guard={listRoutes && !planUnknown}
             redirectTo={waitingRedirect}
           >
-            <Stack.Screen name="new-trip" options={modal} />
+            <Stack.Screen
+              name="new-trip"
+              options={{ ...modal, headerShown: false }}
+            />
             <Stack.Screen name="add-list-place" options={modal} />
             <Stack.Screen name="add-trip-stop" options={modal} />
           </Stack.Protected>
@@ -187,11 +206,24 @@ export default function AppLayout() {
             <Stack.Screen name="passport-story" options={modal} />
             <Stack.Screen name="city-card" options={modal} />
             <Stack.Screen
+              name="add-spots"
+              options={{
+                presentation: "transparentModal",
+                animation: "fade",
+                headerShown: false,
+                contentStyle: { backgroundColor: "transparent" },
+              }}
+            />
+            <Stack.Screen
               name="edit-save-places"
               options={{ headerShown: true, headerTransparent: false }}
             />
           </Stack.Protected>
           <Stack.Protected guard={onboarded} redirectTo="/onboarding">
+            <Stack.Screen
+              name="trip-plan/[id]"
+              options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
+            />
             <Stack.Screen
               name="profile"
               options={{
@@ -215,11 +247,11 @@ export default function AppLayout() {
           </Stack.Protected>
           <Stack.Protected
             guard={onboarded && gated}
-            redirectTo="/(app)/(tabs)/(home)"
+            redirectTo="/(app)/(tabs)/(map)"
           >
             <Stack.Screen name="plan-gate" options={{ headerShown: false }} />
           </Stack.Protected>
-          <Stack.Protected guard={!onboarded} redirectTo="/(app)/(tabs)/(home)">
+          <Stack.Protected guard={!onboarded} redirectTo="/(app)/(tabs)/(map)">
             <Stack.Screen name="onboarding" options={{ headerShown: false }} />
           </Stack.Protected>
           {/* Without a redirectTo, Expo Router falls back to the shortest unguarded route name: `paywall`. */}

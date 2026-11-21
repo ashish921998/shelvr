@@ -1,7 +1,7 @@
 import { analytics } from "@/lib/analytics";
 import {
   countEligibleSaves,
-  isHomeRootRoute,
+  isTabRootRoute,
   markNativeReviewPrompted,
   setNativeReviewAttemptInFlight,
   type FeedbackFeedItem,
@@ -30,7 +30,7 @@ export function useReviewPrompt(
   { defer = false }: { defer?: boolean } = {},
 ) {
   const segments: readonly string[] = useSegments();
-  const home = isHomeRootRoute(segments);
+  const home = isTabRootRoute(segments);
   const onSave = segments[1] === "item";
   const cameFromSave = useRef(false);
   const [returned, setReturned] = useState(false);

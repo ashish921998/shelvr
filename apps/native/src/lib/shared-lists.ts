@@ -1,3 +1,4 @@
+import { haptics } from "@/lib/haptics";
 import { analytics } from "@/lib/analytics";
 import { type CityPin, cityPinId } from "@/lib/city-pins";
 import type { CityPlanKind } from "@/lib/city-plan";
@@ -160,6 +161,7 @@ export async function shareInvite(
   try {
     const result = await shareUrl(inviteUrl(token));
     const shared = result.action === Share.sharedAction;
+    if (shared) void haptics.success();
     analytics.capture("shared_list_invite_sent", { shared, surface });
     return shared;
   } catch (error) {
@@ -415,9 +417,10 @@ export function useListPlan(listId: Id<"sharedLists">, city: string) {
   const router = useRouter();
   return useCallback(
     (kind: CityPlanKind) => {
-      analytics.capture("city_plan_started", { kind });
+      if (kind === "trip")
+        analytics.capture("city_plan_started", { kind, from: "direct" });
       router.push({
-        pathname: kind === "date" ? "/date-plan" : "/new-trip",
+        pathname: kind === "date" ? "/go-out" : "/new-trip",
         params: { city, listId },
       });
     },

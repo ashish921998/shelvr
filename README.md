@@ -180,11 +180,12 @@ environment by default and opt into jsdom per file when browser APIs are needed.
 #### End-to-end flows on the iOS simulator (pilot)
 
 `tools/e2e` drives the development build through the app's one flow with the
-[e2e](https://github.com/tester-army/e2e) framework: Home lists the seeded
-city cards (`tests/home-cities.e2e.ts`), onboarding, the paywall, and saving
-a pasted link, which lands under "No place found" when it names no place, and
-planning a date from a city (`tests/plan-city-date.e2e.ts`): it saves a Lisbon
-fixture page, opens Lisbon from Home and checks Plan a date returns a shortlist.
+[e2e](https://github.com/tester-army/e2e) framework: Home's Cities row lists the
+seeded city cards (`tests/home-cities.e2e.ts`), onboarding, the paywall, and
+saving a pasted link, which lands under Without a place when it names no place,
+and planning a date from a city (`tests/plan-city-date.e2e.ts`): it saves a
+Lisbon fixture page, opens Lisbon from Cities and checks Plan a date returns a
+shortlist.
 Home-cities, onboarding and the paywall use plain locators and make no model
 call from the test. The paywall flow relaunches the app with `-E2EHidePro YES`,
 which makes a development build show its always-Pro dev user as not Pro.

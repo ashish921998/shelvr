@@ -18,6 +18,7 @@ export default defineConfig({
     },
   },
   test: {
+    server: { deps: { inline: ["lucide-react-native"] } },
     setupFiles: ["./src/test.setup.ts"],
     include: ["src/**/*.test.ts", "src/**/*.test.tsx", "convex/**/*.test.ts"],
     coverage: {

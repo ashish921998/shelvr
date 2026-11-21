@@ -1,11 +1,11 @@
 import { ConvexQueryClient } from "@convex-dev/react-query";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { QueryClient } from "@tanstack/react-query";
-import { ConvexReactClient } from "convex/react";
+import { AuthRefreshClient } from "./auth-refresh-client";
 import { createMMKV } from "react-native-mmkv";
 import { readConvexUrl } from "@/lib/convex-url";
 
-export const convex = new ConvexReactClient(readConvexUrl(), {
+export const convex = new AuthRefreshClient(readConvexUrl(), {
   unsavedChangesWarning: false,
 });
 

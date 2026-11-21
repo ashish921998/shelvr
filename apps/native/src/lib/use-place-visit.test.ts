@@ -18,7 +18,7 @@ const mocks = vi.hoisted(() => ({
   queue: vi.fn(),
   badgesReady: vi.fn(),
   success: vi.fn(),
-  selection: vi.fn(),
+  impact: vi.fn(),
   router: { push: vi.fn() },
   focused: true,
 }));
@@ -41,7 +41,7 @@ vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mocks.capture, captureError: mocks.captureError },
 }));
 vi.mock("@/lib/haptics", () => ({
-  haptics: { success: mocks.success, selection: mocks.selection },
+  haptics: { success: mocks.success, impact: mocks.impact },
 }));
 vi.mock("@/lib/stamp-moment", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/stamp-moment")>()),
@@ -244,7 +244,7 @@ describe("usePlaceVisit", () => {
       ],
     ]);
     expect(mocks.success).not.toHaveBeenCalled();
-    expect(mocks.selection).not.toHaveBeenCalled();
+    expect(mocks.impact).not.toHaveBeenCalled();
   });
 
   it("marks the moment as the city's last place when the stamp completes it", async () => {
@@ -317,7 +317,7 @@ describe("usePlaceVisit", () => {
     const { result } = renderHook(() => usePlaceVisit());
     await act(() => result.current.toggle(itemId, taco, false));
     expect(mocks.play).not.toHaveBeenCalled();
-    expect(mocks.selection).toHaveBeenCalledTimes(1);
+    expect(mocks.impact).toHaveBeenCalledTimes(1);
     expect(mocks.capture).toHaveBeenCalledWith("city_place_visited", {
       visited: false,
     });

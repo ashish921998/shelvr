@@ -98,6 +98,16 @@ describe("layoutMorphText", () => {
     expect(cells[1]?.x).toBe(115);
   });
 
+  it("spaces glyphs and the ellipsis by the letter spacing", () => {
+    const cells = layoutMorphText("abc", 240, 0, advance10, true, -1);
+    expect(cells.map((cell) => cell.x)).toEqual([106.5, 115.5, 124.5]);
+
+    const fits = layoutMorphText("abc", 27, 0, advance10, true, -1);
+    expect(fits.map((cell) => cell.char).join("")).toBe("abc");
+    const cut = layoutMorphText("abcde", 36, 0, advance10, true, -1);
+    expect(cut.map((cell) => cell.char).join("")).toBe("abc…");
+  });
+
   it("truncates with an ellipsis when the run exceeds the slot", () => {
     const cells = layoutMorphText("abcde", 45, 0, advance10);
     expect(cells.map((cell) => cell.char).join("")).toBe("abc…");

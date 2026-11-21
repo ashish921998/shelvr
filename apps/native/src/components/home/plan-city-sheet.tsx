@@ -34,7 +34,7 @@ export function PlanCitySheet({
       visible={visible}
       onClose={onClose}
       onDismiss={flush}
-      title={t(kind === "date" ? "homePlaces.planDate" : "homePlaces.planTrip")}
+      title={t(kind === "date" ? "plan.goOut" : "homePlaces.planTrip")}
       body={t("homePlaces.planWhichCity")}
       actions={null}
     >

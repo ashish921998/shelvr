@@ -8,6 +8,7 @@ import { recordBlockedAction, resumeBlockedAction } from "@/lib/paywall-funnel";
 
 export type ProPlacement =
   | "home"
+  | "tab_bar"
   | "add"
   | "share"
   | "remove_place"
@@ -23,7 +24,10 @@ export type ProPlacement =
 
 export type Admission = "go" | "wait" | "paywalled";
 
-const FREE_SAVE_PLACEMENTS: ReadonlySet<ProPlacement> = new Set(["home"]);
+const FREE_SAVE_PLACEMENTS: ReadonlySet<ProPlacement> = new Set([
+  "home",
+  "tab_bar",
+]);
 
 function admission(
   access: Access,

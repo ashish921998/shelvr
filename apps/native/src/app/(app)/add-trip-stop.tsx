@@ -4,26 +4,39 @@ import {
   AddPlaceSheet,
 } from "@/components/add-place-sheet";
 import { Chip } from "@/components/trip-planner/chip";
+import {
+  TripStopSearchMap,
+  type StopSearchPin,
+} from "@/components/trip-planner/trip-stop-search-map";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
 import {
   editDayLabel,
-  matchSavePlaces,
   type NewTripStop,
   onTrip,
+  tripStopSearchResults,
   useAddTripStop,
   useTripPlaceSearch,
 } from "@/lib/trip-edit";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { UNPLANNED_DAY } from "@convex/model/tripPlan";
+import {
+  type TripPlanDetail,
+  type TripSavePlace,
+  UNPLANNED_DAY,
+} from "@convex/model/tripPlan";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { haptics } from "@/lib/haptics";
 import { personalPlanAllowed } from "@/lib/list-gate";
 import { usePlanGate } from "@/lib/plan-gate";
-import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useMemo, useState } from "react";
+import {
+  Redirect,
+  useLocalSearchParams,
+  useNavigation,
+  useRouter,
+} from "expo-router";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { ScrollView } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -31,6 +44,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 export default function AddTripStopScreen() {
   const locale = useAppLocale();
   const router = useRouter();
+  const navigation = useNavigation();
   const { theme } = useUnistyles();
   const params = useLocalSearchParams<{ tripId: string; day?: string }>();
   const tripId = params.tripId as Id<"tripPlans">;
@@ -48,6 +62,7 @@ export default function AddTripStopScreen() {
   const [day, setDay] = useState(Number.isInteger(asked) ? asked : 1);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
   const search = useTripPlaceSearch(tripId, query, locale);
   const add = useAddTripStop(tripId);
   const close = useCallback(() => backOrHome(router), [router]);
@@ -63,16 +78,22 @@ export default function AddTripStopScreen() {
         : [],
     [data],
   );
-  const savePlaces = matchSavePlaces(saves.data ?? [], query);
+  const availableSaves = gated ? [] : (saves.data ?? []);
+  const results = tripStopSearchResults(availableSaves, query, search);
 
   const pick = async (place: NewTripStop) => {
-    if (busy) return;
+    if (pending.current) return;
+    pending.current = true;
     setBusy(true);
-    const added = await add(day, place);
-    setBusy(false);
-    if (!added) return;
-    void haptics.success();
-    close();
+    try {
+      if ((await add(day, place)) && navigation.isFocused()) {
+        void haptics.success();
+        close();
+      }
+    } finally {
+      pending.current = false;
+      setBusy(false);
+    }
   };
 
   if (data && !personalPlanAllowed(gated, data.listId)) {
@@ -84,6 +105,18 @@ export default function AddTripStopScreen() {
     background: theme.colors.primary,
     foreground: theme.colors.onTint,
   };
+  const context = tripSearchContext(data, day);
+  const found = results.search.status === "done" ? results.search.places : [];
+  const pins: StopSearchPin[] = [
+    ...savePins(results.saves),
+    ...found.map(
+      (place): StopSearchPin => ({
+        ...place,
+        id: place.appleId ?? `${place.name}-${place.lat}-${place.lng}`,
+        source: "search",
+      }),
+    ),
+  ];
 
   return (
     <AddPlaceSheet onClose={close}>
@@ -92,7 +125,13 @@ export default function AddTripStopScreen() {
         city={data.city}
         query={query}
         onQueryChange={setQuery}
-        search={search}
+        search={results.search}
+        mapPreview={
+          <TripStopSearchMap
+            places={pins}
+            context={[...context, ...savePins(availableSaves)]}
+          />
+        }
         busy={busy}
         addedLabel={t("tripPlanner.onTrip")}
         isAdded={(place) => onTrip(data, place)}
@@ -104,10 +143,10 @@ export default function AddTripStopScreen() {
                 ...(saves.data?.length === 0
                   ? { note: t("tripPlanner.noSavesLeft") }
                   : {}),
-                rows: savePlaces.map((place) => ({
+                rows: results.saves.map((place) => ({
                   key: `${place.itemId}-${place.name}`,
                   name: place.name,
-                  detail: place.title,
+                  detail: place.title === place.name ? undefined : place.title,
                   onPress: () =>
                     void pick({
                       kind: "save",
@@ -140,6 +179,41 @@ export default function AddTripStopScreen() {
       </AddPlaceSearch>
     </AddPlaceSheet>
   );
+}
+
+function savePins(saves: TripSavePlace[]): StopSearchPin[] {
+  return saves.flatMap((save) =>
+    save.location
+      ? [
+          {
+            ...save.location,
+            name: save.name,
+            id: `${save.itemId}-${save.name}`,
+            source: "save",
+          },
+        ]
+      : [],
+  );
+}
+
+function tripSearchContext(trip: TripPlanDetail, day: number): StopSearchPin[] {
+  const selected =
+    day === UNPLANNED_DAY ? trip.unplanned : (trip.days[day - 1] ?? []);
+  const stops = selected.length ? selected : trip.days.flat();
+  const pins = stops.map(
+    (stop): StopSearchPin => ({ ...stop, id: stop._id, source: "trip" }),
+  );
+  const stay = trip.stay;
+  if (stay?.lat !== undefined && stay.lng !== undefined) {
+    pins.unshift({
+      id: "stay",
+      name: stay.name,
+      lat: stay.lat,
+      lng: stay.lng,
+      source: "trip",
+    });
+  }
+  return pins;
 }
 
 const styles = StyleSheet.create((theme) => ({

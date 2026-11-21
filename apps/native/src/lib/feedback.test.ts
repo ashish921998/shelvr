@@ -8,6 +8,7 @@ import {
   emptyInvitationState,
   feedbackAnalytics,
   isHomeRootRoute,
+  isTabRootRoute,
   lastNativeReviewPromptAt,
   markFeedbackSubmitted,
   markNativeReviewPrompted,
@@ -207,6 +208,16 @@ describe("sanitizeFeedbackMessage", () => {
   it("trims whitespace and caps length", () => {
     expect(sanitizeFeedbackMessage("  hello  ")).toBe("hello");
     expect(sanitizeFeedbackMessage("a".repeat(5000)).length).toBe(1000);
+  });
+});
+
+describe("isTabRootRoute", () => {
+  it("accepts the root of any tab and nothing pushed over it", () => {
+    expect(isTabRootRoute(["(app)", "(tabs)", "(home)"])).toBe(true);
+    expect(isTabRootRoute(["(app)", "(tabs)", "(map)"])).toBe(true);
+    expect(isTabRootRoute(["(app)", "item", "[id]"])).toBe(false);
+    expect(isTabRootRoute(["(app)", "(tabs)", "(map)", "city"])).toBe(false);
+    expect(isTabRootRoute([])).toBe(false);
   });
 });
 

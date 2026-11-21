@@ -1,46 +1,29 @@
 import { useEffect, useState } from "react";
 import { t, useAppLocale } from "@/lib/i18n";
 import { FreeSavesCard, ProCard } from "@/components/home/pro-card";
+import { HomeHeader } from "@/components/home/home-header";
 import { HomeSearch } from "@/components/home/home-search";
-import { SharedListsNudge } from "@/components/home/shared-lists-nudge";
-import { WelcomeSaveSheet } from "@/components/home/welcome-save-sheet";
+import { RecentSaves } from "@/components/home/recent-saves";
 import { CancelSurveyCard } from "@/components/cancel-survey/cancel-survey-card";
 import { FeedbackInvitation } from "@/components/feedback/feedback-invitation";
-import { FeedbackModal } from "@/components/feedback/feedback-modal";
-import {
-  HomePlaces,
-  HomePlacesEmptyCard,
-  UnplacedSaves,
-} from "@/components/home/home-places";
-import { ReviewSaves } from "@/components/home/review-saves";
+import { HomePlaces, HomePlacesEmptyCard } from "@/components/home/home-places";
+import { LibraryRows } from "@/components/home/library-rows";
 import { ScreenLoader } from "@/components/ui/screen-loader";
-import { HeaderScrim } from "@/components/ui/header-scrim";
-import { useCurrentUser } from "@/lib/current-user";
-import { type Entitlement, useEntitlement } from "@/lib/entitlement";
-import { FREE_SAVES_NUDGE_AT, saveWaiting } from "@/lib/access";
+import { useOneTimePrompts } from "@/components/one-time-prompts";
+import { useEntitlement } from "@/lib/entitlement";
+import { FREE_SAVES_NUDGE_AT } from "@/lib/access";
 import { useAccess } from "@/lib/free-plan";
 import { useHomeFeed } from "@/lib/home-feed";
 import { unplacedSaves } from "@/lib/home-places";
-import {
-  useBusySaving,
-  useFeedbackInvitation,
-} from "@/lib/feedback-invitation";
-import { useCancelSurvey } from "@/lib/use-cancel-survey";
-import { useReviewPrompt } from "@/lib/review-prompt";
-import { NameSheet } from "@/components/shared-list/name-sheet";
-import {
-  useHoldSheetTurns,
-  useSheetTurnUp,
-  useSheetTurnsBusy,
-} from "@/lib/one-time-sheets";
-import { useWelcomeName } from "@/lib/welcome-name";
+import { useBusySaving } from "@/lib/feedback-invitation";
+import { useSheetTurnUp } from "@/lib/one-time-sheets";
 import {
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   ScrollView,
   View,
 } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 // Older saves with no place sit past the first feed page, so Home pages on like a list would.
 const LOAD_MORE_DISTANCE = 600;
@@ -48,12 +31,9 @@ const LOAD_MORE_DISTANCE = 600;
 const AUTO_LOAD_SAVES = 200;
 const AUTO_LOAD_UNPLACED = 5;
 
-function trialEnd(entitlement: Entitlement): number | undefined {
-  return entitlement.status === "trialing" ? entitlement.expiresAt : undefined;
-}
-
 export default function HomeScreen() {
   useAppLocale();
+  const { theme } = useUnistyles();
   const { items, canLoadMore, loadingMore, loadMore } = useHomeFeed();
   const [viewportHeight, setViewportHeight] = useState(0);
   const [contentHeight, setContentHeight] = useState(0);
@@ -74,33 +54,13 @@ export default function HomeScreen() {
     loadMore,
     items?.length,
   ]);
-  const cancelSurvey = useCancelSurvey();
+  const { cancelSurvey, feedback } = useOneTimePrompts();
   const entitlement = useEntitlement();
   const access = useAccess();
   const locked = access.kind === "locked";
   const nearLimit =
     access.kind === "free" && access.left <= FREE_SAVES_NUDGE_AT;
-  const { data: user } = useCurrentUser();
-  const welcomeName = useWelcomeName(
-    user?._id,
-    items !== undefined &&
-      !cancelSurvey.visible &&
-      !entitlement.loading &&
-      !saveWaiting(access),
-  );
-  const sheetsBusy = useSheetTurnsBusy();
   const sheetUp = useSheetTurnUp();
-  const deferPrompts =
-    cancelSurvey.visible ||
-    entitlement.loading ||
-    locked ||
-    sheetsBusy ||
-    welcomeName.pending;
-  const feedback = useFeedbackInvitation(items, { defer: deferPrompts });
-  useHoldSheetTurns(feedback.modalOpen);
-  useReviewPrompt(items, {
-    defer: deferPrompts || feedback.invitationVisible || feedback.modalOpen,
-  });
   const busySaving = useBusySaving(items);
 
   if (items === undefined) {
@@ -125,14 +85,14 @@ export default function HomeScreen() {
       onDismiss={feedback.dismissInvitation}
     />
   ) : null;
+  const top = topCard ? <View style={styles.topCard}>{topCard}</View> : null;
 
   return (
     <View style={styles.container}>
       <ScrollView
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
-        contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
+        contentContainerStyle={{ paddingBottom: theme.gap(2) }}
         scrollEventThrottle={200}
         onLayout={(e) => setViewportHeight(e.nativeEvent.layout.height)}
         onContentSizeChange={(_, height) => setContentHeight(height)}
@@ -146,60 +106,48 @@ export default function HomeScreen() {
             loadMore();
         }}
       >
-        {topCard ? <View style={styles.topCard}>{topCard}</View> : null}
-        {locked ? null : (
-          <HomeSearch>
-            <SharedListsNudge />
+        {locked ? (
+          <>
+            <HomeHeader />
+            {top}
+          </>
+        ) : (
+          <HomeSearch top={top}>
             {items.length > 0 ? (
               <>
-                <HomePlaces />
-                <UnplacedSaves saves={items} />
-                <ReviewSaves saves={items} />
+                <HomePlaces saves={items} />
+                <RecentSaves saves={items} />
               </>
             ) : (
-              <View style={styles.empty}>
-                <HomePlacesEmptyCard />
-              </View>
+              <>
+                <View style={styles.rows}>
+                  <LibraryRows />
+                </View>
+                <View style={styles.empty}>
+                  <HomePlacesEmptyCard />
+                </View>
+              </>
             )}
           </HomeSearch>
         )}
       </ScrollView>
-      <HeaderScrim />
-      {user ? (
-        <WelcomeSaveSheet
-          userId={user._id}
-          ready={entitlement.entitled && !cancelSurvey.visible}
-          trialEndsAt={trialEnd(entitlement)}
-        />
-      ) : null}
-      <NameSheet
-        visible={welcomeName.open}
-        kind="welcome"
-        onDone={welcomeName.close}
-        onCancel={welcomeName.close}
-      />
-      {feedback.modalOpen ? (
-        <FeedbackModal surface="home" onClose={feedback.closeFeedback} />
-      ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((theme, rt) => ({
   container: {
     flex: 1,
-  },
-  content: {
-    paddingTop: theme.gap(1),
-    paddingBottom: theme.gap(6),
+    paddingTop: rt.insets.top,
   },
   topCard: {
     paddingHorizontal: theme.gap(2),
     paddingBottom: theme.gap(1.5),
   },
+  rows: { paddingHorizontal: theme.gap(2.5) },
   empty: {
     gap: theme.gap(1.5),
     paddingHorizontal: theme.gap(2),
-    paddingTop: theme.gap(4),
+    paddingTop: theme.gap(3),
   },
 }));
