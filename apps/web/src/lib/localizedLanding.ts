@@ -60,11 +60,11 @@ export const GERMAN: LocalizedLanding = {
     },
     {
       heading: "Date planen",
-      body: `Ein Abend, zwei Stopps, nur einen kurzen Fußweg voneinander entfernt, aus deinen gespeicherten Orten. Klassisch (Abendessen, danach Drinks oder Dessert), entspannt (Kaffee, danach ein Spaziergang) oder „Überrasch mich“.`,
+      body: `Ein Abend, zwei Stopps, nur einen kurzen Fußweg voneinander entfernt, ausgehend von deinen gespeicherten Orten. Klassisch (Abendessen, danach Drinks oder Dessert), entspannt (Kaffee, danach ein Spaziergang) oder „Überrasch mich“.`,
     },
     {
       heading: "Reise planen",
-      body: "Mach aus deinen gespeicherten Orten Tage: ein Viertel pro Tag, von morgens bis abends, im Tempo deiner Wahl, dazu Vorschläge in der Nähe.",
+      body: "Mach aus deinen gespeicherten Orten Tage: ein, zwei Viertel pro Tag, von morgens bis abends, im Tempo deiner Wahl, dazu Vorschläge in der Nähe.",
     },
     {
       heading: "Schon da gewesen?",
@@ -120,7 +120,7 @@ export const FRENCH: LocalizedLanding = {
     "Dans Instagram ou TikTok, touchez Partager et choisissez Shelvr.",
     "Shelvr lit la publication et retrouve les restaurants, cafés, bars et sites qu’elle cite.",
     "Chaque lieu arrive dans sa ville, sur une carte, à côté du reel d’où il vient.",
-    "Le moment venu, ouvrez la ville et demandez un rendez-vous ou un voyage.",
+    "Le moment venu, ouvrez la ville et planifiez un rendez-vous ou un voyage.",
   ],
   sections: [
     {
@@ -129,11 +129,11 @@ export const FRENCH: LocalizedLanding = {
     },
     {
       heading: "Planifier un rendez-vous",
-      body: `Une soirée, deux étapes à quelques minutes à pied l’une de l’autre, choisies parmi vos lieux enregistrés. Classique (dîner, puis un verre ou un dessert), tranquille (un café, puis une balade) ou «${NBSP}Surprenez-moi${NBSP}».`,
+      body: `Une soirée, deux étapes à quelques minutes à pied l’une de l’autre, à partir de vos lieux enregistrés. Classique (dîner, puis un verre ou un dessert), tranquille (un café, puis une balade) ou «${NBSP}Surprenez-moi${NBSP}».`,
     },
     {
       heading: "Planifier un voyage",
-      body: `Transformez vos lieux enregistrés en journées${NBSP}: un quartier par jour, du matin au soir, au rythme que vous choisissez, avec des suggestions à proximité.`,
+      body: `Transformez vos lieux enregistrés en journées${NBSP}: un ou deux quartiers par jour, du matin au soir, au rythme que vous choisissez, avec des suggestions à proximité.`,
     },
     {
       heading: `Déjà visité${NBSP}?`,
