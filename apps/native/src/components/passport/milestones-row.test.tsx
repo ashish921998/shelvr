@@ -19,6 +19,7 @@ import { type BadgeStamp, badgeTotals } from "@convex/model/badges";
 const mocks = vi.hoisted(() => ({
   entitlement: { entitled: true, loading: false },
   admit: vi.fn(),
+  passed: vi.fn(),
   capture: vi.fn(),
 }));
 
@@ -73,6 +74,7 @@ vi.mock("@/lib/entitlement", () => ({
 vi.mock("@/lib/pro-gate", () => ({
   useProGate: (placement: string) => ({
     admit: (...args: unknown[]) => mocks.admit(placement, ...args),
+    passed: () => mocks.passed(placement),
   }),
 }));
 vi.mock("@/lib/analytics", () => ({ analytics: { capture: mocks.capture } }));
@@ -175,6 +177,13 @@ describe("useBadgeAccess", () => {
       surface: "badge",
     });
     expect(mocks.admit).toHaveBeenCalledWith("passport");
+  });
+
+  it("reports the unlocked badge tap to the passport gate", () => {
+    mocks.entitlement = { entitled: true, loading: false };
+    const { result } = renderHook(() => useBadgeAccess());
+    act(() => result.current.passed());
+    expect(mocks.passed).toHaveBeenCalledWith("passport");
   });
 
   it("leaves a Pro user unlocked, and waits while the plan loads", () => {

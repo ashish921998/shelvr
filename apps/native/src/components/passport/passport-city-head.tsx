@@ -15,14 +15,18 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const HEAD_STAMP_SIZE = 64;
 
-export function useRingAccess(): { locked: boolean; unlock: () => void } {
+export function useRingAccess(): {
+  locked: boolean;
+  unlock: () => void;
+  passed: () => void;
+} {
   const { entitled, loading } = useEntitlement();
-  const { admit } = useProGate("passport");
+  const { admit, passed } = useProGate("passport");
   const unlock = useCallback(() => {
     analytics.capture("passport_paywall_opened", { surface: "ring" });
     void admit();
   }, [admit]);
-  return { locked: !loading && !entitled, unlock };
+  return { locked: !loading && !entitled, unlock, passed };
 }
 
 function RingButton({
