@@ -32,6 +32,7 @@ export type Alternative = {
 export const CHECKED = "November 2026";
 
 const NOT_DESCRIBED = "Not described on its site";
+const NOT_IN_HELP = "Not described in Google’s list help";
 
 export const SHELVR_CELLS: Record<Row, string> = {
   platforms: "iPhone. Android is coming",
@@ -59,7 +60,7 @@ const LOGIN_FAQ = {
   a: "No. You share a post from the share sheet, and Shelvr reads the public post.",
 };
 
-export const PLOTLINE: Alternative = {
+const PLOTLINE: Alternative = {
   slug: "plotline",
   name: "Plotline",
   summary: "An iPhone app that pins places from social posts and plans trips.",
@@ -80,7 +81,7 @@ export const PLOTLINE: Alternative = {
   },
   pickThem: [
     "You want to send reels to it by DM, without leaving Instagram.",
-    "You already keep places in Google Maps lists or Apple Maps and want them on the same map.",
+    "You keep places as Apple Maps pins and want them on the same map.",
     "You want a free tier. Plotline’s site says saving, the map and your first trip plan are free.",
   ],
   pickShelvr: [
@@ -95,7 +96,7 @@ export const PLOTLINE: Alternative = {
   ],
 };
 
-export const FEEDTRIP: Alternative = {
+const FEEDTRIP: Alternative = {
   slug: "feedtrip",
   name: "feedtrip",
   summary: "A TikTok and Instagram place saver on iPhone, Android and the web.",
@@ -134,7 +135,7 @@ export const FEEDTRIP: Alternative = {
   ],
 };
 
-export const REELTRIP: Alternative = {
+const REELTRIP: Alternative = {
   slug: "reeltrip",
   name: "ReelTrip",
   summary: "An Android app that turns reels into trips organised by day.",
@@ -174,7 +175,7 @@ export const REELTRIP: Alternative = {
   ],
 };
 
-export const REELTRAVEL: Alternative = {
+const REELTRAVEL: Alternative = {
   slug: "reeltravel",
   name: "ReelTravel",
   summary:
@@ -212,7 +213,7 @@ export const REELTRAVEL: Alternative = {
   ],
 };
 
-export const GOOGLE_MAPS_LISTS: Alternative = {
+const GOOGLE_MAPS_LISTS: Alternative = {
   slug: "google-maps-lists",
   name: "Google Maps lists",
   summary: "The saved lists built into Google Maps.",
@@ -220,15 +221,15 @@ export const GOOGLE_MAPS_LISTS: Alternative = {
   description:
     "Google Maps lists are where most people keep places. How they compare with Shelvr for places you find in reels and TikToks, and when to use both.",
   heading: "Shelvr vs Google Maps lists",
-  lede: "A Google Maps list is the default place to keep spots, and it’s already on your phone. The catch with reels is getting the places in: you search and save each one by hand. Here’s how the two compare.",
+  lede: "A Google Maps list is the default place to keep spots, and it’s already on your phone. Here’s how it compares with Shelvr for the places you find in reels and TikToks.",
   cells: {
     platforms: "Android, iPhone and the web",
-    saveFrom: "Places you search for and save one by one",
+    saveFrom: "Places you save in Google Maps",
     byCity: "Lists you name and fill yourself",
-    trips: "Not part of saved lists",
-    dates: "Not part of saved lists",
+    trips: NOT_IN_HELP,
+    dates: NOT_IN_HELP,
     together: "Shared lists friends can view or edit",
-    been: "Not part of saved lists",
+    been: NOT_IN_HELP,
   },
   pickThem: [
     "You already keep your places there and they’re in good shape.",
@@ -236,7 +237,7 @@ export const GOOGLE_MAPS_LISTS: Alternative = {
     "You want reviews, opening hours and directions in the same app as your list.",
   ],
   pickShelvr: [
-    "Most of your places come from reels and TikToks, and typing each name into Maps is where they get lost.",
+    "Most of your places come from reels and TikToks, and you’d rather share the reel and let the app find its places.",
     "You want your saves filed by city without making the lists yourself.",
     "You want a trip or a date night planned from what you saved.",
   ],

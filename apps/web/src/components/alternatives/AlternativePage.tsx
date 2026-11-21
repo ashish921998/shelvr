@@ -88,7 +88,7 @@ export default function AlternativePage({ alt }: { alt: Alternative }) {
             </tbody>
           </table>
           <p className="mt-4 text-sm leading-normal text-pretty text-muted">
-            {alt.name}’s column comes from{" "}
+            The {alt.name} column comes from{" "}
             {alt.sources.map((source, i) => (
               <span key={source.url}>
                 {i > 0 ? " and " : ""}
