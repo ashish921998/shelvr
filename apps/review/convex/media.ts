@@ -125,7 +125,7 @@ export const playable = internalQuery({
     if (user === null) return [];
     const allowed = new Map<Id<"campaigns">, boolean>();
     const result = [];
-    for (const mediaId of mediaIds.slice(0, 100)) {
+    for (const mediaId of mediaIds.slice(0, 250)) {
       const media = await ctx.db.get("media", mediaId);
       if (media?.status !== "ready" || !media.storageKey) continue;
       if (!allowed.has(media.campaignId)) {

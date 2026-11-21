@@ -46,13 +46,14 @@ export function useUpload() {
       campaignId: Id<"campaigns">,
       file: Blob,
       finish: (mediaId: Id<"media">) => Promise<void>,
+      info?: { duration?: number },
     ) => {
       try {
         const mediaId = await start({
           campaignId,
           contentType: videoContentType(file),
         });
-        if (!(await upload(mediaId, file))) return false;
+        if (!(await upload(mediaId, file, info))) return false;
         await finish(mediaId);
         return true;
       } catch (e) {

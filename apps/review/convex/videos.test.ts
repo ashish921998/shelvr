@@ -27,7 +27,9 @@ async function setup() {
     title: "Hook take",
     mediaId: await readyMedia(t, campaignId, alice.userId),
   });
-  return { t, boss, alice, bob, outsider, campaignId, videoId };
+  const video = await alice.as.query(api.videos.get, { videoId });
+  const versionId = video!.versions[0]._id;
+  return { t, boss, alice, bob, outsider, campaignId, videoId, versionId };
 }
 
 describe("videos", () => {
@@ -64,12 +66,17 @@ describe("videos", () => {
   });
 
   test("only admins change the status", async () => {
-    const { boss, alice, videoId } = await setup();
+    const { boss, alice, videoId, versionId } = await setup();
     await expect(
-      alice.as.mutation(api.videos.setStatus, { videoId, status: "approved" }),
+      alice.as.mutation(api.videos.setStatus, {
+        videoId,
+        versionId,
+        status: "approved",
+      }),
     ).rejects.toThrow("Only admins");
     await boss.as.mutation(api.videos.setStatus, {
       videoId,
+      versionId,
       status: "changes_requested",
     });
     expect((await alice.as.query(api.videos.get, { videoId }))?.status).toBe(
@@ -78,9 +85,10 @@ describe("videos", () => {
   });
 
   test("a new version goes back to needs review", async () => {
-    const { t, boss, alice, campaignId, videoId } = await setup();
+    const { t, boss, alice, campaignId, videoId, versionId } = await setup();
     await boss.as.mutation(api.videos.setStatus, {
       videoId,
+      versionId,
       status: "changes_requested",
     });
     await alice.as.mutation(api.videos.addVersion, {
@@ -114,9 +122,11 @@ describe("videos", () => {
   });
 
   test("a video or version is only added once its upload is ready", async () => {
-    const { t, boss, alice, bob, campaignId, videoId } = await setup();
+    const { t, boss, alice, bob, campaignId, videoId, versionId } =
+      await setup();
     await boss.as.mutation(api.videos.setStatus, {
       videoId,
+      versionId,
       status: "approved",
     });
     const pending = await alice.as.mutation(api.media.start, {
@@ -146,11 +156,29 @@ describe("videos", () => {
   });
 
   test("an upload cannot be used twice", async () => {
-    const { t, alice, campaignId, videoId } = await setup();
+    const { t, alice, campaignId, videoId, versionId } = await setup();
     const mediaId = await readyMedia(t, campaignId, alice.userId);
     await alice.as.mutation(api.videos.addVersion, { videoId, mediaId });
     await expect(
       alice.as.mutation(api.videos.create, { campaignId, title: "x", mediaId }),
     ).rejects.toThrow("already used");
+  });
+
+  test("an older version cannot be approved once a newer one exists", async () => {
+    const { t, boss, alice, campaignId, videoId, versionId } = await setup();
+    await alice.as.mutation(api.videos.addVersion, {
+      videoId,
+      mediaId: await readyMedia(t, campaignId, alice.userId),
+    });
+    await expect(
+      boss.as.mutation(api.videos.setStatus, {
+        videoId,
+        versionId,
+        status: "approved",
+      }),
+    ).rejects.toThrow("newer version");
+    expect((await boss.as.query(api.videos.get, { videoId }))?.status).toBe(
+      "needs_review",
+    );
   });
 });

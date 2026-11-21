@@ -12,6 +12,7 @@ import Spinner from "./Spinner";
 
 type Props = {
   versionId: Id<"versions">;
+  campaignId: Id<"campaigns">;
   duration: number | null;
   currentTime: number;
   onSeek: (seconds: number) => void;
@@ -20,6 +21,7 @@ type Props = {
 
 export default function CommentsPanel({
   versionId,
+  campaignId,
   duration,
   currentTime,
   onSeek,
@@ -155,6 +157,7 @@ export default function CommentsPanel({
           </button>
           <Recorder
             versionId={versionId}
+            campaignId={campaignId}
             currentTime={currentTime}
             onStart={onPause}
           />

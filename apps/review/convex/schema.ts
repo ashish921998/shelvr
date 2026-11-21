@@ -75,5 +75,7 @@ export default defineSchema({
     body: v.string(),
     mediaId: v.optional(v.id("media")),
     resolved: v.boolean(),
-  }).index("by_versionId", ["versionId"]),
+  })
+    .index("by_versionId", ["versionId"])
+    .index("by_mediaId", ["mediaId"]),
 });

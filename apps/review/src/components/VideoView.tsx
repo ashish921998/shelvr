@@ -101,11 +101,18 @@ export default function VideoView({ videoId }: { videoId: string }) {
           )}
           <div className="ml-auto flex flex-wrap gap-2">
             {video.canReview &&
+              isLatest &&
               STATUS_ORDER.filter((s) => s !== video.status).map((status) => (
                 <button
                   key={status}
                   type="button"
-                  onClick={() => void setStatus({ videoId: id, status })}
+                  onClick={() =>
+                    void setStatus({
+                      videoId: id,
+                      versionId: version._id,
+                      status,
+                    })
+                  }
                   className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
                     status === "approved"
                       ? "bg-emerald-500 text-black"
@@ -135,6 +142,7 @@ export default function VideoView({ videoId }: { videoId: string }) {
       <CommentsPanel
         key={version._id}
         versionId={version._id}
+        campaignId={video.campaignId}
         duration={version.media?.duration ?? null}
         currentTime={currentTime}
         onSeek={seek}

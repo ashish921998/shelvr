@@ -11,6 +11,7 @@ import { ProgressBar } from "./UploadVideo";
 
 type Props = {
   versionId: Id<"versions">;
+  campaignId: Id<"campaigns">;
   currentTime: number;
   onStart: () => void;
 };
@@ -107,9 +108,14 @@ function mixAudio(sources: MediaStream[]) {
   return { tracks: destination.stream.getAudioTracks(), context };
 }
 
-export default function Recorder({ versionId, currentTime, onStart }: Props) {
+export default function Recorder({
+  versionId,
+  campaignId,
+  currentTime,
+  onStart,
+}: Props) {
   const add = useMutation(api.comments.add);
-  const { upload, progress, error: uploadError } = useUpload();
+  const { uploadNew, progress, error: uploadError } = useUpload();
   const [phase, setPhase] = useState<"idle" | "recording" | "review">("idle");
   const [startedAt, setStartedAt] = useState(0);
   const [elapsed, setElapsed] = useState(0);
@@ -119,6 +125,7 @@ export default function Recorder({ versionId, currentTime, onStart }: Props) {
   const [note, setNote] = useState("");
   const [error, setError] = useState<string | null>(null);
   const session = useRef<Session | null>(null);
+  const alive = useRef(true);
 
   useEffect(() => {
     if (phase !== "recording") return;
@@ -135,6 +142,19 @@ export default function Recorder({ versionId, currentTime, onStart }: Props) {
     },
     [preview],
   );
+
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      const current = session.current;
+      if (current) {
+        current.recorder.onstop = null;
+        if (current.recorder.state !== "inactive") current.recorder.stop();
+      }
+      cleanup();
+    };
+  }, []);
 
   function cleanup() {
     const current = session.current;
@@ -163,6 +183,12 @@ export default function Recorder({ versionId, currentTime, onStart }: Props) {
       return;
     }
     const camera = await openCamera();
+    if (!alive.current) {
+      for (const stream of camera ? [screen, camera] : [screen]) {
+        for (const track of stream.getTracks()) track.stop();
+      }
+      return;
+    }
     const { stream: video, stop } = composite(screen, camera);
     const { tracks, context } = mixAudio(camera ? [screen, camera] : [screen]);
     const mimeType = pickMimeType((type) =>
@@ -214,14 +240,15 @@ export default function Recorder({ versionId, currentTime, onStart }: Props) {
 
   async function post() {
     if (!clip) return;
-    const { mediaId } = await add({
-      versionId,
-      body: note,
-      timestamp: moment,
-      withRecording: true,
-    });
-    if (mediaId && (await upload(mediaId, clip, { duration: elapsed })))
-      discard();
+    const posted = await uploadNew(
+      campaignId,
+      clip,
+      async (mediaId) => {
+        await add({ versionId, body: note, timestamp: moment, mediaId });
+      },
+      { duration: elapsed },
+    );
+    if (posted) discard();
   }
 
   return (

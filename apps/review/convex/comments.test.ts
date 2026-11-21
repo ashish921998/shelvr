@@ -29,7 +29,7 @@ async function setup() {
   });
   const video = await alice.as.query(api.videos.get, { videoId });
   const versionId = video!.versions[0]._id;
-  return { t, boss, alice, bob, outsider, videoId, versionId };
+  return { t, boss, alice, bob, outsider, campaignId, videoId, versionId };
 }
 
 describe("comments", () => {
@@ -57,12 +57,12 @@ describe("comments", () => {
 
   test("replies attach to the top comment and drop their timestamp", async () => {
     const { boss, alice, bob, versionId } = await setup();
-    const { commentId } = await boss.as.mutation(api.comments.add, {
+    const commentId = await boss.as.mutation(api.comments.add, {
       versionId,
       body: "Cut this pause",
       timestamp: 3,
     });
-    const { commentId: replyId } = await alice.as.mutation(api.comments.add, {
+    const replyId = await alice.as.mutation(api.comments.add, {
       versionId,
       body: "On it",
       parentId: commentId,
@@ -80,20 +80,32 @@ describe("comments", () => {
     expect(replies.every((r) => r.timestamp === null)).toBe(true);
   });
 
-  test("a recording comment opens a waiting upload", async () => {
-    const { boss, versionId } = await setup();
-    const { mediaId } = await boss.as.mutation(api.comments.add, {
+  test("a recording comment carries its finished upload", async () => {
+    const { t, boss, campaignId, versionId } = await setup();
+    const mediaId = await readyMedia(t, campaignId, boss.userId);
+    await boss.as.mutation(api.comments.add, {
       versionId,
       body: "",
       timestamp: 4,
-      withRecording: true,
+      mediaId,
     });
-    expect(mediaId).not.toBeNull();
     const rows = await boss.as.query(api.comments.list, { versionId });
-    expect(rows[0].recording).toMatchObject({
-      _id: mediaId,
-      status: "waiting",
+    expect(rows[0].recording).toMatchObject({ _id: mediaId, status: "ready" });
+    await expect(
+      boss.as.mutation(api.comments.add, { versionId, body: "", mediaId }),
+    ).rejects.toThrow("already used");
+  });
+
+  test("a recording that hasn't finished uploading posts nothing", async () => {
+    const { boss, campaignId, versionId } = await setup();
+    const mediaId = await boss.as.mutation(api.media.start, {
+      campaignId,
+      contentType: "video/webm",
     });
+    await expect(
+      boss.as.mutation(api.comments.add, { versionId, body: "", mediaId }),
+    ).rejects.toThrow("hasn't finished");
+    expect(await boss.as.query(api.comments.list, { versionId })).toEqual([]);
   });
 
   test("an empty note without a recording is refused", async () => {
@@ -115,7 +127,7 @@ describe("comments", () => {
 
   test("the video's creator can resolve; another creator cannot", async () => {
     const { boss, alice, bob, versionId } = await setup();
-    const { commentId } = await boss.as.mutation(api.comments.add, {
+    const commentId = await boss.as.mutation(api.comments.add, {
       versionId,
       body: "Reframe",
       timestamp: 1,
@@ -133,7 +145,7 @@ describe("comments", () => {
 
   test("deleting a comment removes its replies; only author or admin", async () => {
     const { boss, alice, bob, versionId } = await setup();
-    const { commentId } = await alice.as.mutation(api.comments.add, {
+    const commentId = await alice.as.mutation(api.comments.add, {
       versionId,
       body: "Question about the hook",
     });

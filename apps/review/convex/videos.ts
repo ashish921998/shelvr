@@ -7,6 +7,7 @@ import {
   type QueryCtx,
 } from "./_generated/server";
 import { displayName, requireMember, viewerRole } from "./model/access";
+import { claimUpload } from "./model/uploads";
 import {
   canSetStatus,
   canUploadVersion,
@@ -35,28 +36,6 @@ function viewMedia(media: Doc<"media"> | null) {
     duration: media.duration ?? null,
     aspectRatio: media.aspectRatio ?? null,
   };
-}
-
-async function claimUpload(
-  ctx: MutationCtx,
-  mediaId: Id<"media">,
-  campaignId: Id<"campaigns">,
-  uploaderId: Id<"users">,
-): Promise<void> {
-  const media = await ctx.db.get("media", mediaId);
-  if (
-    media === null ||
-    media.campaignId !== campaignId ||
-    media.uploaderId !== uploaderId
-  ) {
-    throw new Error("This upload is not yours");
-  }
-  if (media.status !== "ready") throw new Error("The upload hasn't finished");
-  const used = await ctx.db
-    .query("versions")
-    .withIndex("by_mediaId", (q) => q.eq("mediaId", mediaId))
-    .first();
-  if (used !== null) throw new Error("This upload is already used");
 }
 
 async function latestVersion(
@@ -261,14 +240,26 @@ export const rename = mutation({
 });
 
 export const setStatus = mutation({
-  args: { videoId: v.id("videos"), status: reviewStatusValidator },
+  args: {
+    videoId: v.id("videos"),
+    versionId: v.id("versions"),
+    status: reviewStatusValidator,
+  },
   returns: v.null(),
-  handler: async (ctx, { videoId, status }) => {
+  handler: async (ctx, { videoId, versionId, status }) => {
     const video = await ctx.db.get("videos", videoId);
     if (video === null) throw new Error("Video not found");
     const { role } = await requireMember(ctx, video.campaignId);
     if (!canSetStatus(role))
       throw new Error("Only admins can change the status");
+    const version = await ctx.db.get("versions", versionId);
+    if (
+      version === null ||
+      version.videoId !== videoId ||
+      version.number !== video.latestVersion
+    ) {
+      throw new Error("A newer version was uploaded. Review that one.");
+    }
     await ctx.db.patch("videos", videoId, { status, updatedAt: Date.now() });
     return null;
   },

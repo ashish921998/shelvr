@@ -1,6 +1,7 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { displayName, requireMember, viewerRole } from "./model/access";
+import { claimUpload } from "./model/uploads";
 import {
   canModerateComment,
   cleanText,
@@ -94,12 +95,9 @@ export const add = mutation({
     body: v.string(),
     timestamp: v.optional(v.number()),
     parentId: v.optional(v.id("comments")),
-    withRecording: v.optional(v.boolean()),
+    mediaId: v.optional(v.id("media")),
   },
-  returns: v.object({
-    commentId: v.id("comments"),
-    mediaId: v.union(v.id("media"), v.null()),
-  }),
+  returns: v.id("comments"),
   handler: async (ctx, args) => {
     const version = await ctx.db.get("versions", args.versionId);
     if (version === null) throw new Error("Version not found");
@@ -107,7 +105,7 @@ export const add = mutation({
     if (video === null) throw new Error("Video not found");
     const { user } = await requireMember(ctx, video.campaignId);
     const body = cleanText(args.body, MAX_BODY);
-    if (body.length === 0 && !args.withRecording) {
+    if (body.length === 0 && !args.mediaId) {
       throw new Error("Write something first");
     }
     let parentId = undefined;
@@ -118,13 +116,9 @@ export const add = mutation({
       }
       parentId = parent.parentId ?? parent._id;
     }
-    const mediaId = args.withRecording
-      ? await ctx.db.insert("media", {
-          campaignId: video.campaignId,
-          uploaderId: user._id,
-          status: "waiting",
-        })
-      : null;
+    if (args.mediaId) {
+      await claimUpload(ctx, args.mediaId, video.campaignId, user._id);
+    }
     const commentId = await ctx.db.insert("comments", {
       videoId: video._id,
       versionId: args.versionId,
@@ -132,10 +126,10 @@ export const add = mutation({
       parentId,
       timestamp: parentId ? undefined : cleanTimestamp(args.timestamp),
       body,
-      mediaId: mediaId ?? undefined,
+      mediaId: args.mediaId,
       resolved: false,
     });
-    return { commentId, mediaId };
+    return commentId;
   },
 });
 
