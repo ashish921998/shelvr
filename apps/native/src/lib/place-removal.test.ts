@@ -192,12 +192,12 @@ it("counts a removal that runs after a purchase as the blocked action resumed", 
   const funnel = await import("@/lib/paywall-funnel");
   mocks.openPaywall.mockImplementation(() => {
     funnel.recordAccess("purchase");
-    mocks.access = { kind: "pro", syncing: false };
     return Promise.resolve({ outcome: "success", answered: true });
   });
   const { result, rerender } = renderHook(usePlaceRemoval);
   mocks.remove.mockRejectedValueOnce(new ConvexError({ code: "pro_required" }));
   await act(() => result.current.remove(ITEM, PIN));
+  mocks.access = { kind: "pro", syncing: false };
   rerender();
   await act(() => result.current.remove(ITEM, PIN));
   expect(mocks.capture).toHaveBeenCalledWith(

@@ -214,9 +214,24 @@ describe("admit", () => {
 });
 
 it("never reports a pass at another placement as resumed", async () => {
-  const removal = gate("remove_place");
-  const visit = gate("mark_visited");
-  await act(() => removal.current.denied(PRO_REQUIRED));
-  act(() => visit.current.passed());
+  const removal = gateWithAccess("remove_place");
+  const visit = gateWithAccess("mark_visited");
+  await act(() => removal.result.current.denied(PRO_REQUIRED));
+  mocks.access = PRO;
+  removal.rerender();
+  visit.rerender();
+  act(() => visit.result.current.passed());
   expect(resumed()).toEqual([]);
+  act(() => removal.result.current.passed());
+  expect(resumed()[0]?.[1]).toMatchObject({ placement: "remove_place" });
+});
+
+it("reports a pass from a callback kept since before Pro arrived", async () => {
+  const { result, rerender } = gateWithAccess("add");
+  const kept = result.current;
+  await act(() => kept.denied(PRO_REQUIRED));
+  mocks.access = PRO;
+  rerender();
+  act(() => kept.passed());
+  expect(resumed()[0]?.[1]).toMatchObject({ placement: "add" });
 });

@@ -1,6 +1,6 @@
 import { saveErrorCode } from "@convex/model/saveErrors";
 import { useRouter } from "expo-router";
-import { useCallback } from "react";
+import { useCallback, useLayoutEffect, useRef } from "react";
 import { canSave, type Access } from "@/lib/access";
 import { openPaywallAnswer, useEntitlement } from "@/lib/entitlement";
 import { useAccess } from "@/lib/free-plan";
@@ -72,9 +72,14 @@ export function useProGate(placement: ProPlacement): {
     [pro, blocked],
   );
 
+  const proNow = useRef(pro);
+  useLayoutEffect(() => {
+    proNow.current = pro;
+  }, [pro]);
+
   const passed = useCallback(() => {
-    if (pro) resumeBlockedAction(placement);
-  }, [pro, placement]);
+    if (proNow.current) resumeBlockedAction(placement);
+  }, [placement]);
 
   return { admit, denied, blocked, passed, loading: verdict === "wait" };
 }
