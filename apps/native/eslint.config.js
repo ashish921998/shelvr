@@ -2,6 +2,26 @@ const { defineConfig } = require("eslint/config");
 const expoConfig = require("eslint-config-expo/flat");
 const checkFile = require("eslint-plugin-check-file");
 
+const CONVEX_TEST_IMPORT = {
+  name: "convex-test",
+  importNames: ["convexTest"],
+  allowTypeImports: true,
+  message:
+    "Build the harness with newConvexTest() from convex/test.setup.ts. It registers the rate-limiter component, without which any mutation that calls rateLimiter.limit fails.",
+};
+
+const RAW_PUBLIC_BUILDER_MESSAGE =
+  "Build a public query or mutation with authedQuery or authedMutation from model/auth.ts; they refuse a signed-out or deleting caller before the handler. Server-only functions use internalQuery or internalMutation. A function that must answer a signed-out or deleting caller goes in PUBLIC_ON_PURPOSE (model/publicFunctions.ts) with a reason, and its module joins this rule's ignores in eslint.config.js.";
+
+const PUBLIC_ON_PURPOSE_MODULES = [
+  "convex/model/auth.ts",
+  "convex/devFixtures.ts",
+  "convex/freeSaves.ts",
+  "convex/passportShares.ts",
+  "convex/sharedLists.ts",
+  "convex/users.ts",
+];
+
 module.exports = defineConfig([
   expoConfig,
   {
@@ -116,14 +136,27 @@ module.exports = defineConfig([
     rules: {
       "@typescript-eslint/no-restricted-imports": [
         "error",
+        { paths: [CONVEX_TEST_IMPORT] },
+      ],
+    },
+  },
+  {
+    files: ["convex/**/*.{ts,tsx}"],
+    ignores: [
+      "convex/**/*.test.{ts,tsx}",
+      "convex/test.setup.ts",
+      ...PUBLIC_ON_PURPOSE_MODULES,
+    ],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
         {
-          paths: [
+          paths: [CONVEX_TEST_IMPORT],
+          patterns: [
             {
-              name: "convex-test",
-              importNames: ["convexTest"],
-              allowTypeImports: true,
-              message:
-                "Build the harness with newConvexTest() from convex/test.setup.ts. It registers the rate-limiter component, without which any mutation that calls rateLimiter.limit fails.",
+              regex: "(^|/)_generated/server(\\.js)?$",
+              importNames: ["query", "mutation"],
+              message: RAW_PUBLIC_BUILDER_MESSAGE,
             },
           ],
         },
