@@ -7,6 +7,8 @@ import { GUIDES } from "@/lib/guides";
 // Only the public pages people should land on; shares, votes and flows stay out.
 const PAGES = [
   "/",
+  "/de",
+  "/fr",
   "/oracle",
   "/reel-place-finder",
   ...GUIDES.map((page) => page.path),

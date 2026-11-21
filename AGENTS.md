@@ -97,6 +97,12 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   through `apps/web/src/components/alternatives/AlternativePage.tsx`, with one
   dynamic route; each other app's column cites its own site and the month it
   was checked (`CHECKED`).
+- **German and French landing pages:** `/de` and `/fr` take their copy from
+  `apps/web/src/lib/localizedLanding.ts` and render through
+  `apps/web/src/components/landing/LocalizedLandingPage.tsx`, which marks the page
+  with its `lang` (the root layout stays `lang="en"`). Every page lists the others
+  in `LANGUAGE_ALTERNATES` for hreflang. The copy follows the app's register: German
+  says du and Inhalte, French says vous with a no-break space before `? : ; !`.
 - **Link reading:** `convex/model/pageRead.ts` (`readPage`, host dispatcher),
   shared extraction and recipe helpers in `convex/model/pageReadCore.ts`, and
   per-host readers in `convex/model/readers/` (Google Maps lists split by city in

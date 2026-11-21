@@ -26,7 +26,8 @@ Without it, links stay plain and nothing is attributed.
   under a guide's intro (`/save-instagram-reels-to-map` and the other
   guides in `apps/web/src/lib/guides.ts`; `$current_url` names the guide),
   `web_alternative` for the button on `/alternatives` and each comparison
-  under it,
+  under it, `web_landing` for the buttons on the German and French landing
+  pages (`/de`, `/fr`; `$current_url` says which),
   `web_place_tool` for the reel
   place finder's results card, `web_place_banner` for the finder's phone
   banner, `web_bio` for the bio page and `web_plan` for the plan vote page).
@@ -322,8 +323,8 @@ effect: the season and the campaigns move too.
 
 ### The button emoji test
 
-The six buttons in `MapCta` (`header`, `hero`, `footer`, `guide`,
-`alternative` and `place_tool`) test their label 50/50: `plain` ("Map my saves", "Save these to Shelvr") or
+The seven buttons in `MapCta` (`header`, `hero`, `footer`, `guide`,
+`alternative`, `landing` and `place_tool`) test their label 50/50: `plain` ("Map my saves", "Save these to Shelvr") or
 `emoji` (the same label, then a no-break space and 📍). The badges on the share
 pages, `/apple` and the bio page are not in the test.
 

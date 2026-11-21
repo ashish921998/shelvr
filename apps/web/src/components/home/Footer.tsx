@@ -14,6 +14,11 @@ const links = [
   { title: "Privacy", url: "/privacy" },
 ];
 
+const languages = [
+  { title: "Deutsch", url: "/de", lang: "de" },
+  { title: "Français", url: "/fr", lang: "fr" },
+];
+
 function LinkRow({
   items,
   label,
@@ -46,6 +51,23 @@ export default function Footer() {
       <LinkRow items={guides} label="Guides" />
       <div className="flex flex-wrap items-center justify-center gap-x-5">
         <LinkRow items={links} label="About" />
+        <ul
+          aria-label="Languages"
+          className="flex flex-wrap items-center justify-center gap-x-5"
+        >
+          {languages.map((link) => (
+            <li key={link.url}>
+              <Link
+                href={link.url}
+                lang={link.lang}
+                hrefLang={link.lang}
+                className="inline-flex min-h-11 items-center transition-colors hover:text-ember-deep"
+              >
+                {link.title}
+              </Link>
+            </li>
+          ))}
+        </ul>
         <span>Shelvr ©{new Date().getFullYear()}</span>
       </div>
     </footer>
