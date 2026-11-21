@@ -74,10 +74,12 @@ export const recordUpload = internalMutation({
     storageKey: v.string(),
     contentType: v.string(),
   },
-  returns: v.null(),
+  returns: v.boolean(),
   handler: async (ctx, { mediaId, storageKey, contentType }) => {
+    const media = await ctx.db.get("media", mediaId);
+    if (media === null || media.status !== "waiting") return false;
     await ctx.db.patch("media", mediaId, { storageKey, contentType });
-    return null;
+    return true;
   },
 });
 
@@ -149,11 +151,12 @@ export const createUpload = action({
     const type = cleanContentType(contentType);
     const config = r2Config();
     const storageKey = target.storageKey ?? uploadKey(mediaId);
-    await ctx.runMutation(internal.media.recordUpload, {
+    const recorded = await ctx.runMutation(internal.media.recordUpload, {
       mediaId,
       storageKey,
       contentType: type,
     });
+    if (!recorded) throw new Error("This upload is not yours to start");
     const url = await presign(config, {
       key: storageKey,
       method: "PUT",

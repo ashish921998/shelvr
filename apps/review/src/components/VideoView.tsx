@@ -18,11 +18,15 @@ export default function VideoView({ videoId }: { videoId: string }) {
   const video = useQuery(api.videos.get, { videoId: id });
   const setStatus = useMutation(api.videos.setStatus);
   const [chosen, setChosen] = useState<Id<"versions"> | null>(null);
-  const [currentTime, setCurrentTime] = useState(0);
+  const [clock, setClock] = useState<{
+    versionId: Id<"versions"> | null;
+    seconds: number;
+  }>({ versionId: null, seconds: 0 });
   const player = useRef<PlayerHandle | null>(null);
 
   const version =
     video?.versions.find((v) => v._id === chosen) ?? video?.versions[0];
+  const currentTime = clock.versionId === version?._id ? clock.seconds : 0;
   const mediaIds = useMemo(
     () => (version?.media?.status === "ready" ? [version.media._id] : []),
     [version],
@@ -47,6 +51,8 @@ export default function VideoView({ videoId }: { videoId: string }) {
     );
   }
 
+  const setCurrentTime = (seconds: number) =>
+    setClock({ versionId: version._id, seconds });
   const seek = (seconds: number) => {
     player.current?.seek(seconds);
     setCurrentTime(seconds);

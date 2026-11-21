@@ -1,6 +1,6 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { api } from "./_generated/api";
+import { api, internal } from "./_generated/api";
 import { addMember, addUser, newConvexTest } from "./test.setup";
 
 const calls: string[] = [];
@@ -149,6 +149,27 @@ describe("createUpload", () => {
         contentType: "video/mp4",
       }),
     ).rejects.toThrow("not set up");
+  });
+});
+
+describe("recordUpload", () => {
+  test("leaves a finished upload's key alone", async () => {
+    const { t, alice, mediaId } = await setup();
+    await alice.as.action(api.media.createUpload, {
+      mediaId,
+      contentType: "video/mp4",
+    });
+    head.mockResolvedValueOnce(sized(100));
+    await alice.as.action(api.media.completeUpload, { mediaId });
+    expect(
+      await t.mutation(internal.media.recordUpload, {
+        mediaId,
+        storageKey: `uploads/${mediaId}`,
+        contentType: "video/mp4",
+      }),
+    ).toBe(false);
+    const media = await t.run((ctx) => ctx.db.get("media", mediaId));
+    expect(media?.storageKey).toBe(`media/${mediaId}`);
   });
 });
 
