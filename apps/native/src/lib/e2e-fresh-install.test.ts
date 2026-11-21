@@ -10,6 +10,7 @@ const mock = vi.hoisted(() => ({
     forgetStoredSession: vi.fn(),
     forgetOnboarded: vi.fn(),
     clearPending: vi.fn(),
+    clearOnboardingProgress: vi.fn(),
     clearPurchaseBeforeSignIn: vi.fn(),
     clearQueued: vi.fn(),
     clearQueuedCityStamps: vi.fn(),
@@ -40,6 +41,9 @@ vi.mock("@/lib/auth-storage", () => ({
 }));
 vi.mock("@/lib/onboarding", () => ({
   forgetOnboarded: mock.resets.forgetOnboarded,
+}));
+vi.mock("@/lib/onboarding-progress", () => ({
+  clearOnboardingProgress: mock.resets.clearOnboardingProgress,
 }));
 vi.mock("@/lib/pending-onboarding", () => ({
   clearPending: mock.resets.clearPending,

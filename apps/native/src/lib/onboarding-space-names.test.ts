@@ -1,10 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import {
   clearPending,
-  getOnboardingProgress,
   getPendingSpaces,
   resolveOnboardingSpaceName,
-  setOnboardingProgress,
   setPendingSpaces,
 } from "@/lib/pending-onboarding";
 import { onboardingLabel } from "@/lib/onboarding-labels";
@@ -30,16 +28,13 @@ beforeEach(() => {
 afterEach(() => vi.useRealTimers());
 
 it("names the picked topics' spaces in the language onboarding finishes in", () => {
-  setOnboardingProgress({ spaces: ["Food & recipes"], step: 1 });
-
   device.locale = "de-DE";
-  const resumed = getOnboardingProgress();
-  setPendingSpaces(resumed.spaces.map(resolveOnboardingSpaceName));
+  setPendingSpaces(["Food & recipes"].map(resolveOnboardingSpaceName));
   expect(getPendingSpaces()).toEqual([onboardingLabel("Food & recipes")]);
   expect(getPendingSpaces()).not.toEqual(["Food & recipes"]);
 });
 
-it("keeps an old record's frozen names but not its progress, and clears them with onboarding", () => {
+it("keeps an old record's frozen names, and clears them with onboarding", () => {
   device.storage.set(
     "shelvr.pending.onboarding",
     JSON.stringify({
@@ -49,7 +44,6 @@ it("keeps an old record's frozen names but not its progress, and clears them wit
       step: 3,
     }),
   );
-  expect(getOnboardingProgress().spaces).toEqual([]);
   expect(resolveOnboardingSpaceName("Recipes")).toBe("Recipes");
   device.locale = "de-DE";
   expect(resolveOnboardingSpaceName("Recipes")).toBe("Recipes");

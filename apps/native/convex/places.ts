@@ -3,7 +3,11 @@ import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
 import { internalAction, internalMutation } from "./_generated/server";
 import { authedQuery } from "./model/auth";
-import { cuisineValidator } from "./model/itemFields";
+import {
+  cuisineValidator,
+  placeFeatureValidator,
+  placeKindValidator,
+} from "./model/itemFields";
 import { logEvent } from "./model/log";
 import { MAX_MAP_PLACES } from "./mapPlaces";
 import { boxValidator, discoverPlaces, indexPlace } from "./model/placeIndex";
@@ -31,19 +35,24 @@ const mapPlaceValidator = v.object({
   category: v.optional(v.string()),
   cuisine: v.optional(cuisineValidator),
   kinds: v.array(v.string()),
+  features: v.optional(v.array(placeFeatureValidator)),
 });
 
-const mapPlace = (row: Doc<"places">) => ({
-  _id: row._id,
-  name: row.name,
-  lat: row.lat,
-  lng: row.lng,
-  city: row.city,
-  appleId: row.appleId,
-  ...(row.category ? { category: row.category } : {}),
-  ...(row.cuisine ? { cuisine: row.cuisine } : {}),
-  kinds: placeKinds(row.category, [], row.cuisine),
-});
+const mapPlace = (row: Doc<"places">) => {
+  const category = row.kind ? undefined : row.category;
+  return {
+    _id: row._id,
+    name: row.name,
+    lat: row.lat,
+    lng: row.lng,
+    city: row.city,
+    appleId: row.appleId,
+    ...(category ? { category } : {}),
+    ...(row.cuisine ? { cuisine: row.cuisine } : {}),
+    kinds: row.kind ? [row.kind] : placeKinds(category, [], row.cuisine),
+    ...(row.features ? { features: row.features } : {}),
+  };
+};
 
 export const forMap = authedQuery({
   args: {},
@@ -113,6 +122,26 @@ export const store = internalMutation({
         });
     }
     return { added, existing };
+  },
+});
+
+export const curate = internalMutation({
+  args: {
+    id: v.id("places"),
+    kind: v.optional(v.union(placeKindValidator, v.null())),
+    cuisine: v.optional(v.union(cuisineValidator, v.null())),
+    features: v.optional(v.array(placeFeatureValidator)),
+  },
+  returns: v.null(),
+  handler: async (ctx, { id, kind, cuisine, features }) => {
+    await ctx.db.patch(id, {
+      ...(kind === undefined ? {} : { kind: kind ?? undefined }),
+      ...(cuisine === undefined ? {} : { cuisine: cuisine ?? undefined }),
+      ...(features === undefined
+        ? {}
+        : { features: features.length ? [...new Set(features)] : undefined }),
+    });
+    return null;
   },
 });
 
