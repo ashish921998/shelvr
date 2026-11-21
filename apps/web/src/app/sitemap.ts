@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const SITE = "https://shelvr-web.vercel.app";
+const SITE = "https://tryshelvr.app";
 
 // Only the public pages people should land on; shares, votes and flows stay out.
 const PAGES = [

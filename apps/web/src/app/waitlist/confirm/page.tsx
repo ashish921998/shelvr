@@ -30,7 +30,7 @@ export default async function ConfirmationPage({
     if (!token || !/^[a-f0-9]{64}$/.test(token))
       redirect("/waitlist/confirm?status=expired");
     const ip = clientIp(
-      new Request("https://shelvr-web.vercel.app/waitlist/confirm", {
+      new Request("https://tryshelvr.app/waitlist/confirm", {
         headers: await headers(),
       }),
     );
