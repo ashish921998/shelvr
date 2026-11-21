@@ -696,19 +696,7 @@ function proPurchase(info: ProCustomerInfo): string | null {
   return pro ? `${pro.latestPurchaseDate}|${pro.expirationDate}` : null;
 }
 
-let redeemOpening = false;
-
 export async function presentRedeemCodeSheet(): Promise<boolean> {
-  if (redeemOpening) return false;
-  redeemOpening = true;
-  try {
-    return await openRedeemCodeSheet();
-  } finally {
-    redeemOpening = false;
-  }
-}
-
-async function openRedeemCodeSheet(): Promise<boolean> {
   const landing = reservePurchaseLanding();
   if (!(await awaitRcSyncReady())) return false;
   const rc = getPurchases();

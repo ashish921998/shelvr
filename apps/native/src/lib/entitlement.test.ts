@@ -773,16 +773,6 @@ describe("paywall activation funnel", () => {
       }),
     );
   });
-  it("opens the redeem sheet once for two quick taps", async () => {
-    const { presentRedeemCodeSheet } = await loadReady();
-    const first = presentRedeemCodeSheet();
-    const second = presentRedeemCodeSheet();
-    await expect(second).resolves.toBe(false);
-    await expect(first).resolves.toBe(true);
-    expect(mock.presentCodeRedemptionSheet).toHaveBeenCalledOnce();
-    expect(mock.customerInfoListeners.size).toBe(1);
-  });
-
   it("reports a redeemed code even when the webhook lands first", async () => {
     const { presentRedeemCodeSheet, hook } = await loadReady();
     await presentRedeemCodeSheet();

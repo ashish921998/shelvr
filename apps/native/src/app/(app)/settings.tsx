@@ -30,7 +30,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { useNavigation, useRouter } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import {
   Alert,
   Linking,
@@ -133,7 +133,10 @@ export default function SettingsScreen() {
     }
   };
 
+  const redeeming = useRef(false);
   const redeemCode = async () => {
+    if (redeeming.current) return;
+    redeeming.current = true;
     try {
       if (await presentRedeemCodeSheet()) {
         analytics.capture("redeem_code_opened", {});
@@ -145,6 +148,8 @@ export default function SettingsScreen() {
       );
     } catch (error) {
       analytics.captureError("redeem_code_failed", error);
+    } finally {
+      redeeming.current = false;
     }
     Alert.alert(t("pro.redeemFailed"), t("errors.trySoon"));
   };

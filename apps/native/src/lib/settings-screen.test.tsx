@@ -313,6 +313,21 @@ it("counts a redeem sheet as opened only once it is presented", async () => {
   expect(mocks.alert).not.toHaveBeenCalled();
 });
 
+it("ignores a second redeem tap while the sheet is opening", async () => {
+  let open: (opened: boolean) => void = () => {};
+  mocks.presentRedeemCodeSheet.mockReturnValue(
+    new Promise<boolean>((resolve) => (open = resolve)),
+  );
+  render(<SettingsScreen />);
+  fireEvent.click(screen.getByText("pro.redeemCode"));
+  fireEvent.click(screen.getByText("pro.redeemCode"));
+  await act(async () => open(true));
+
+  expect(mocks.presentRedeemCodeSheet).toHaveBeenCalledTimes(1);
+  expect(mocks.captureError).not.toHaveBeenCalled();
+  expect(mocks.alert).not.toHaveBeenCalled();
+});
+
 it("does not count a redeem sheet that never opened", async () => {
   mocks.presentRedeemCodeSheet.mockResolvedValue(false);
   render(<SettingsScreen />);
