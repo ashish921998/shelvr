@@ -70,3 +70,16 @@ export function ownOnTop<T extends { source: "own" | "discover" }>(
     ...entries.filter((entry) => entry.source === "own"),
   ];
 }
+
+export function mapWaits(state: {
+  own: readonly unknown[] | undefined;
+  discoverSettled: boolean;
+  areaShown: boolean;
+  askingLocation: boolean;
+}): boolean {
+  return (
+    state.own === undefined ||
+    (state.own.length === 0 && !state.discoverSettled && !state.areaShown) ||
+    state.askingLocation
+  );
+}

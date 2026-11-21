@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { anchorsKnown, anchorsOf, nextFraming } from "./map-framing";
 
 describe("nextFraming", () => {
-  const first = { key: "all", places: ["a"], opened: true };
+  const first = { key: "all", places: ["a"] };
 
   it("holds the framing while the places in view change", () => {
     expect(nextFraming(first, ["a", "b"], "all")).toBe(first);
@@ -14,30 +14,16 @@ describe("nextFraming", () => {
     expect(nextFraming(first, ["c"], "coffee")).toEqual({
       key: "coffee",
       places: ["c"],
-      opened: true,
     });
     expect(nextFraming(first, [], "coffee")).toEqual({
       key: "coffee",
       places: [],
-      opened: true,
     });
   });
 
-  it("takes the first framing once there are places to frame", () => {
-    const empty = { key: "all", places: [], opened: false };
-    expect(nextFraming(empty, [], "all")).toBe(empty);
-    expect(nextFraming(empty, ["a"], "all")).toEqual({
-      key: "all",
-      places: ["a"],
-      opened: true,
-    });
-  });
-
-  it("keeps an empty framing after the map opened, whatever Discover sends", () => {
-    const coffee = nextFraming(first, ["cafe"], "coffee");
-    const all = nextFraming(coffee, [], "all");
-    expect(all).toEqual({ key: "all", places: [], opened: true });
-    expect(nextFraming(all, ["distant cafe"], "all")).toBe(all);
+  it("keeps an empty framing whatever Discover sends later", () => {
+    const empty = { key: "all", places: [] };
+    expect(nextFraming(empty, ["far cafe"], "all")).toBe(empty);
   });
 });
 

@@ -4,6 +4,7 @@ import {
   type DiscoverPlace,
   discoverBeside,
   mapEntries,
+  mapWaits,
   ownOnTop,
   searchEntries,
 } from "./map-discover";
@@ -118,4 +119,29 @@ it("draws Discover pins first, so the person's own pins sit on top", () => {
     "B",
     "Mine",
   ]);
+});
+
+const waits = (
+  own: readonly unknown[] | undefined,
+  discoverSettled: boolean,
+  areaShown: boolean,
+  askingLocation = false,
+) => mapWaits({ own, discoverSettled, areaShown, askingLocation });
+
+it("waits for the person's own places and for the location prompt", () => {
+  expect(waits(undefined, true, true)).toBe(true);
+  expect(waits([{}], true, true, true)).toBe(true);
+});
+
+it("with no saves, waits for the first Discover answer only", () => {
+  expect(waits([], false, false)).toBe(true);
+  expect(waits([], true, false)).toBe(false);
+});
+
+it("keeps the map up while a later area loads, even after a failed one", () => {
+  expect(waits([], false, true)).toBe(false);
+});
+
+it("never waits for Discover when the person has places", () => {
+  expect(waits([{}], false, false)).toBe(false);
 });
