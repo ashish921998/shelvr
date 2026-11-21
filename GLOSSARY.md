@@ -27,3 +27,11 @@ _Avoid_: AI opt-in, AI setting
 **Settlement**:
 The one decision that turns a processing run's reading and classification into what the save shows, under the owner's AI consent at that moment. A retry or refresh settles the save again.
 _Avoid_: finalization
+
+**Onboarding progress**:
+Where a person is in onboarding before they finish it: the current step, their answers, and which steps they have viewed and completed. It survives a relaunch and ends when they finish onboarding or sign in to an existing account.
+_Avoid_: onboarding state, onboarding session, pending onboarding
+
+**Onboarding handoff**:
+What finished onboarding leaves for the account to act on later: the spaces to create, the first save to make, and the answers the paywall echoes. It ends once that work is done.
+_Avoid_: pending onboarding, onboarding replay

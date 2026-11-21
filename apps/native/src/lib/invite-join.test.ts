@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   completeOnboarding: vi.fn(),
   holdIncomingShare: vi.fn(),
   clearPending: vi.fn(),
+  clearOnboardingProgress: vi.fn(),
   clearPendingInvite: vi.fn(),
   router: { replace: vi.fn() },
 }));
@@ -38,6 +39,9 @@ vi.mock("@/lib/onboarding", () => ({
 }));
 vi.mock("@/lib/onboarding-exit", () => ({
   holdIncomingShare: mocks.holdIncomingShare,
+}));
+vi.mock("@/lib/onboarding-progress", () => ({
+  clearOnboardingProgress: mocks.clearOnboardingProgress,
 }));
 vi.mock("@/lib/pending-onboarding", () => ({
   clearPending: mocks.clearPending,
@@ -168,11 +172,13 @@ describe("useInviteJoinCoordinator", () => {
     expect(mocks.alert).toHaveBeenCalledWith("sharedLists.joinFailed");
   });
 
-  it("drops onboarding's queue before finishing onboarding for a person who joined", async () => {
+  it("drops onboarding's queue and progress before finishing onboarding for a person who joined", async () => {
     await joinWith(false, "list1");
     const [cleared] = mocks.clearPending.mock.invocationCallOrder;
+    const [forgot] = mocks.clearOnboardingProgress.mock.invocationCallOrder;
     const [completed] = mocks.completeOnboarding.mock.invocationCallOrder;
     expect(cleared).toBeLessThan(completed!);
+    expect(forgot).toBeLessThan(completed!);
   });
 
   it.each([
