@@ -167,7 +167,6 @@ function readSpaceNames(value: unknown): Record<string, string> {
   );
 }
 
-// SecureStore's delete is async-only, so clearing writes ""; readers treat "" as unset.
 function writeRecord(record: StoredRecord | null) {
   SecureStore.setItem(
     HANDOFF_KEY,
@@ -357,7 +356,6 @@ export function noteReplayDeclined(operationId: string | null) {
   });
 }
 
-/** True while a purchase or restore, from anywhere in the app, is still reaching Convex. */
 export function useAwaitingOnboardingPurchase(entitled: boolean): boolean {
   const until = useSyncExternalStore(
     subscribePurchaseLanding,
