@@ -2,11 +2,10 @@ import Link from "next/link";
 
 import Header from "@/components/Header";
 import MapCta from "@/components/MapCta";
+import FaqList, { SECTION_HEADING } from "@/components/guides/FaqList";
 import Footer from "@/components/home/Footer";
 import { SITE_URL } from "@/lib/siteMetadata";
 import { GUIDES, type Guide, guideStructuredData } from "@/lib/guides";
-
-const SECTION_HEADING = "font-display text-[32px] leading-tight sm:text-[40px]";
 
 export default function GuidePage({ page }: { page: Guide }) {
   const related = GUIDES.filter((other) => other.path !== page.path);
@@ -58,27 +57,7 @@ export default function GuidePage({ page }: { page: Guide }) {
           </section>
         ))}
 
-        <section className="mt-16">
-          <h2 className={SECTION_HEADING}>Questions</h2>
-          <div className="mt-4 border-t border-line">
-            {page.faqs.map((faq) => (
-              <details key={faq.q} className="group border-b border-line">
-                <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between gap-4 py-4 text-[17px] font-bold [&::-webkit-details-marker]:hidden">
-                  <h3>{faq.q}</h3>
-                  <span
-                    aria-hidden
-                    className="flex size-7 flex-none items-center justify-center rounded-full bg-paper-deep text-lg leading-none transition-transform group-open:rotate-45"
-                  >
-                    +
-                  </span>
-                </summary>
-                <p className="max-w-[56ch] pr-11 pb-[18px] text-base leading-[1.55] text-pretty text-muted">
-                  {faq.a}
-                </p>
-              </details>
-            ))}
-          </div>
-        </section>
+        <FaqList faqs={page.faqs} />
 
         <nav aria-label="More guides" className="mt-16">
           <h2 className={SECTION_HEADING}>More guides</h2>

@@ -11,6 +11,7 @@ type AppStoreLinkSource =
   | "hero"
   | "footer"
   | "guide"
+  | "alternative"
   | "share"
   | "oracle"
   | "plan"

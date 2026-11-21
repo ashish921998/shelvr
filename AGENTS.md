@@ -92,7 +92,11 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   the others) take their copy from `apps/web/src/lib/guides.ts` and render
   through `apps/web/src/components/guides/GuidePage.tsx`, one route folder
   each. The sitemap and footer list them from `GUIDES`; a new guide needs its
-  folder and an entry there.
+  folder and an entry there. The comparisons (`/alternatives` and
+  `/alternatives/<app>`) work the same way from `apps/web/src/lib/alternatives.ts`
+  through `apps/web/src/components/alternatives/AlternativePage.tsx`, with one
+  dynamic route; each other app's column cites its own site and the month it
+  was checked (`CHECKED`).
 - **Link reading:** `convex/model/pageRead.ts` (`readPage`, host dispatcher),
   shared extraction and recipe helpers in `convex/model/pageReadCore.ts`, and
   per-host readers in `convex/model/readers/` (Google Maps lists split by city in

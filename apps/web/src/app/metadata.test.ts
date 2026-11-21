@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { generateMetadata as alternativeMetadata } from "./alternatives/[app]/page";
+import { metadata as alternativesHub } from "./alternatives/page";
 import { metadata as layout } from "./layout";
 import { metadata as home } from "./page";
 import { metadata as dateGuide } from "./plan-a-date-from-saved-places/page";
@@ -26,6 +28,7 @@ describe("site metadata", () => {
     ["/save-tiktok-places-to-map", tiktokGuide],
     ["/plan-a-trip-from-saved-reels", tripGuide],
     ["/plan-a-date-from-saved-places", dateGuide],
+    ["/alternatives", alternativesHub],
   ])("gives %s its own canonical and og:url", (path, metadata) => {
     expect(metadata.alternates?.canonical).toBe(path);
     expect(metadata.openGraph).toMatchObject({
@@ -33,5 +36,13 @@ describe("site metadata", () => {
       title: metadata.title,
       description: metadata.description,
     });
+  });
+
+  it("gives each comparison its own canonical and og:url", async () => {
+    const metadata = await alternativeMetadata({
+      params: Promise.resolve({ app: "plotline" }),
+    });
+    expect(metadata.alternates?.canonical).toBe("/alternatives/plotline");
+    expect(metadata.openGraph).toMatchObject({ url: "/alternatives/plotline" });
   });
 });

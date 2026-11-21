@@ -5,7 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import MapCta from "./MapCta";
 
-type Source = "header" | "hero" | "footer" | "guide" | "place_tool";
+type Source =
+  | "header"
+  | "hero"
+  | "footer"
+  | "guide"
+  | "alternative"
+  | "place_tool";
 
 const fetchMock = vi.fn();
 
@@ -45,6 +51,7 @@ describe("MapCta", () => {
     ["hero", "Map my saves"],
     ["footer", "Map my saves"],
     ["guide", "Map my saves"],
+    ["alternative", "Map my saves"],
     ["place_tool", "Save these to Shelvr"],
   ] as const)("labels the %s button %s, on the App Store", (source, label) => {
     const link = mount(source);
@@ -68,7 +75,13 @@ describe("MapCta", () => {
     const header = mount("header");
     expect(header.querySelectorAll("svg")).toHaveLength(1);
     expect(header.querySelectorAll('svg[aria-hidden="true"]')).toHaveLength(1);
-    for (const source of ["hero", "footer", "guide", "place_tool"] as const) {
+    for (const source of [
+      "hero",
+      "footer",
+      "guide",
+      "alternative",
+      "place_tool",
+    ] as const) {
       expect(mount(source).querySelector("svg")).toBeNull();
     }
   });

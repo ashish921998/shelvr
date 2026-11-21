@@ -5,6 +5,7 @@ import { GUIDES } from "@/lib/guides";
 const guides = [
   { title: "Reel place finder", url: "/reel-place-finder" },
   ...GUIDES.map((guide) => ({ title: guide.linkTitle, url: guide.path })),
+  { title: "Compare apps", url: "/alternatives" },
 ];
 
 const links = [
