@@ -702,6 +702,28 @@ describe("a blocked action across another paywall", () => {
   });
 });
 
+describe("a pass while the purchase details load", () => {
+  it("counts the purchase for a pass that lands before the product lookup returns", async () => {
+    const { openPaywall } = await loadReady();
+    const funnel = await import("./paywall-funnel");
+    funnel.recordBlockedAction("share");
+    mock.presentPaywallIfNeeded.mockResolvedValue("PURCHASED");
+    mock.observed.mockImplementationOnce(() =>
+      funnel.resumeBlockedAction("share"),
+    );
+
+    await openPaywall(router, "share");
+
+    expect(mock.capture).toHaveBeenCalledWith(
+      "paywall_blocked_action_resumed",
+      expect.objectContaining({
+        placement: "share",
+        purchased_since_block: true,
+      }),
+    );
+  });
+});
+
 describe("a purchase made while signed in", () => {
   it("reads it into the account without waiting for the webhook", async () => {
     const { openPaywall } = await loadReady();

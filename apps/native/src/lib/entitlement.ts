@@ -402,14 +402,16 @@ async function presentPaywallImpl(
     const result = await observePaywallPresentation(
       enriched,
       () =>
-        nativePresentation(owner, present).then((outcome) =>
-          confirmRestore(outcome, owner),
-        ),
+        nativePresentation(owner, present)
+          .then((outcome) => confirmRestore(outcome, owner))
+          .then((outcome) => {
+            if (outcome === "PURCHASED" || outcome === "RESTORED") {
+              recordAccess(outcome === "RESTORED" ? "restore" : "purchase");
+            }
+            return outcome;
+          }),
       activeProductId,
     );
-    if (result === "PURCHASED" || result === "RESTORED") {
-      recordAccess(result === "RESTORED" ? "restore" : "purchase");
-    }
     return mapPaywallResult(result);
   } catch {
     return "unavailable";
