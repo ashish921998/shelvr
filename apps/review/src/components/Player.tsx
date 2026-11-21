@@ -70,6 +70,7 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
           }
         }}
         onTimeUpdate={(event) => {
+          if (event.currentTarget.readyState === 0) return;
           position.current = event.currentTarget.currentTime;
           onTime?.(event.currentTarget.currentTime);
         }}
