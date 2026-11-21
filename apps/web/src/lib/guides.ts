@@ -46,13 +46,13 @@ export const INSTAGRAM_REELS: Guide = {
     },
     {
       heading: "When you get there",
-      body: "Open the city and every place you saved is on one map. Mark the ones you’ve tried with We went, then ask Shelvr for a date night or a day-by-day trip built from the rest.",
+      body: "Open the city and every place you saved is on one map. Tick off the ones you’ve been to, then ask Shelvr for a date night or a day-by-day trip built from the rest.",
     },
   ],
   faqs: [
     {
       q: "Can I save the places in a reel to Google Maps?",
-      a: "Instagram has no button for it, so you’d copy each name into Google Maps by hand. Shelvr finds the places for you and keeps them on its own map, and the plans it makes give each stop directions in Google Maps.",
+      a: "Instagram has no button for it, so you’d copy each name into Google Maps by hand. Shelvr finds the places for you and keeps them on its own map, filed by city.",
     },
     {
       q: "Do I need to give Shelvr my Instagram login?",
@@ -102,7 +102,7 @@ export const TIKTOK_PLACES: Guide = {
   faqs: [
     {
       q: "Can I save TikTok places to Google Maps?",
-      a: "TikTok has no export, so you’d copy each name into Google Maps by hand. Shelvr finds the places for you, and the plans it makes give each stop directions in Google Maps.",
+      a: "TikTok has no export, so you’d copy each name into Google Maps by hand. Shelvr finds the places for you and keeps them on its own map, filed by city.",
     },
     {
       q: "Do I need to give Shelvr my TikTok login?",
@@ -133,7 +133,7 @@ export const TRIP_FROM_REELS: Guide = {
     "Share the reels and TikToks you saved about a city to Shelvr.",
     "Open the city in Shelvr and tap Plan a trip.",
     "Pick how many days, a start date if you have one, and a pace: easy, balanced or packed.",
-    "Get one area a day, morning to evening. Swap any stop you don’t want.",
+    "Get one area a day, morning to evening. Move or remove any stop, or add your own.",
   ],
   sections: [
     {
@@ -142,11 +142,11 @@ export const TRIP_FROM_REELS: Guide = {
     },
     {
       heading: "Days that make sense on a map",
-      body: "Each day keeps to one or two neighborhoods, so you aren’t crossing the city between lunch and coffee. Your saved stops show the reel they came from, and every stop has directions.",
+      body: "Each day keeps to one or two neighborhoods, so you aren’t crossing the city between lunch and coffee. Tap a saved stop to open the reel it came from.",
     },
     {
       heading: "Plan again after you go",
-      body: "Mark the places you’ve tried with We went, and the next plan picks something new.",
+      body: "Tick off the places you’ve been, and the next plan picks something new.",
     },
   ],
   faqs: [
@@ -192,7 +192,7 @@ export const DATE_FROM_SAVES: Guide = {
     },
     {
       heading: "Something new next time",
-      body: "Mark the places you’ve tried with We went, and the next date picks somewhere new.",
+      body: "Tick off the places you’ve been, and the next date picks somewhere new.",
     },
   ],
   faqs: [
@@ -202,7 +202,7 @@ export const DATE_FROM_SAVES: Guide = {
     },
     {
       q: "Does it make reservations?",
-      a: "No. Shelvr picks where to go and gives each stop directions. Booking a table is up to you.",
+      a: "No. Shelvr picks where to go and gives you directions to the first stop. Booking a table is up to you.",
     },
     ANDROID_FAQ,
   ],

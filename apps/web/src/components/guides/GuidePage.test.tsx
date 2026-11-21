@@ -11,6 +11,9 @@ const UNSHIPPED_CLAIMS = [
   /free trial/i,
   /\bfor free\b/i,
   /listens? to/i,
+  /directions in Google Maps/i,
+  /\bswap\b/i,
+  /every stop has directions/i,
   /book(s|ing)? (a|your) (hotel|flight)s? for/i,
 ];
 
