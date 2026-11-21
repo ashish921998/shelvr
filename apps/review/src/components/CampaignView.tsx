@@ -108,9 +108,7 @@ export default function CampaignView({ campaignId }: { campaignId: string }) {
               <VideoCard
                 key={video._id}
                 video={video}
-                playback={
-                  video.media ? playback.get(video.media._id) : undefined
-                }
+                src={video.media ? playback.get(video.media._id) : undefined}
               />
             ))}
           </div>

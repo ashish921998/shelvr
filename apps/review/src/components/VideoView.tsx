@@ -3,13 +3,12 @@
 import { useMutation, useQuery } from "convex/react";
 import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
-import type { MuxPlayerRefAttributes as MuxPlayerElement } from "@mux/mux-player-react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { STATUS_LABEL, STATUS_ORDER } from "@/lib/status";
 import { usePlayback } from "@/lib/usePlayback";
 import CommentsPanel from "./CommentsPanel";
-import Player from "./Player";
+import Player, { type PlayerHandle } from "./Player";
 import Spinner from "./Spinner";
 import StatusBadge from "./StatusBadge";
 import UploadVersion from "./UploadVersion";
@@ -20,7 +19,7 @@ export default function VideoView({ videoId }: { videoId: string }) {
   const setStatus = useMutation(api.videos.setStatus);
   const [chosen, setChosen] = useState<Id<"versions"> | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
-  const player = useRef<MuxPlayerElement | null>(null);
+  const player = useRef<PlayerHandle | null>(null);
 
   const version =
     video?.versions.find((v) => v._id === chosen) ?? video?.versions[0];
@@ -49,10 +48,7 @@ export default function VideoView({ videoId }: { videoId: string }) {
   }
 
   const seek = (seconds: number) => {
-    const element = player.current;
-    if (!element) return;
-    element.currentTime = seconds;
-    element.pause();
+    player.current?.seek(seconds);
     setCurrentTime(seconds);
   };
   const pause = () => player.current?.pause();
@@ -78,9 +74,7 @@ export default function VideoView({ videoId }: { videoId: string }) {
           <Player
             ref={player}
             media={version.media}
-            playback={
-              version.media ? playback.get(version.media._id) : undefined
-            }
+            src={version.media ? playback.get(version.media._id) : undefined}
             onTime={setCurrentTime}
           />
         </div>

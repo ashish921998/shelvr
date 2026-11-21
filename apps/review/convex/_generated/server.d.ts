@@ -26,11 +26,10 @@ import type { DataModel } from "./dataModel.js";
  */
 type Env = {
   readonly AUTH_RESEND_KEY: string | undefined;
-  readonly MUX_SIGNING_KEY_ID: string | undefined;
-  readonly MUX_SIGNING_PRIVATE_KEY: string | undefined;
-  readonly MUX_TOKEN_ID: string | undefined;
-  readonly MUX_TOKEN_SECRET: string | undefined;
-  readonly MUX_WEBHOOK_SECRET: string | undefined;
+  readonly R2_ACCESS_KEY_ID: string | undefined;
+  readonly R2_ACCOUNT_ID: string | undefined;
+  readonly R2_BUCKET: string | undefined;
+  readonly R2_SECRET_ACCESS_KEY: string | undefined;
   readonly REVIEW_EMAIL_FROM: string | undefined;
   readonly REVIEW_STAFF_EMAILS: string | undefined;
   readonly SITE_URL: string | undefined;

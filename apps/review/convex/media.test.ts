@@ -1,38 +1,25 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { api, internal } from "./_generated/api";
+import { api } from "./_generated/api";
 import { addMember, addUser, newConvexTest } from "./test.setup";
 
-const SECRET = "whsec_test";
-
-async function sign(body: string, timestamp: number) {
-  const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    encoder.encode(SECRET),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const mac = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    encoder.encode(`${timestamp}.${body}`),
-  );
-  const hex = Array.from(new Uint8Array(mac))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  return `t=${timestamp},v1=${hex}`;
-}
+const head =
+  vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
 
 beforeEach(() => {
   vi.useFakeTimers();
   vi.stubEnv("REVIEW_STAFF_EMAILS", "boss@shelvr.app");
-  vi.stubEnv("MUX_WEBHOOK_SECRET", SECRET);
+  vi.stubEnv("R2_ACCOUNT_ID", "acct");
+  vi.stubEnv("R2_ACCESS_KEY_ID", "key");
+  vi.stubEnv("R2_SECRET_ACCESS_KEY", "secret");
+  vi.stubEnv("R2_BUCKET", "review");
+  head.mockReset();
+  vi.stubGlobal("fetch", head);
 });
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
   vi.useRealTimers();
 });
 
@@ -43,102 +30,168 @@ async function setup() {
     name: "Launch",
   });
   const alice = await addMember(t, campaignId, "alice@example.com", "creator");
+  const bob = await addMember(t, campaignId, "bob@example.com", "creator");
   const outsider = await addUser(t, "eve@example.com");
   const { videoId, mediaId } = await alice.as.mutation(api.videos.create, {
     campaignId,
     title: "Hook",
   });
-  return { t, boss, alice, outsider, campaignId, videoId, mediaId };
+  return { t, boss, alice, bob, outsider, campaignId, videoId, mediaId };
 }
 
-async function deliver(
-  t: ReturnType<typeof newConvexTest>,
-  payload: unknown,
-  signature?: string,
-) {
-  const body = JSON.stringify(payload);
-  const now = Math.floor(Date.now() / 1000);
-  return t.fetch("/mux/webhook", {
-    method: "POST",
-    headers: { "mux-signature": signature ?? (await sign(body, now)) },
-    body,
+function sized(size: number) {
+  return new Response(null, {
+    status: 200,
+    headers: { "content-length": String(size) },
   });
 }
 
-describe("mux webhook", () => {
-  test("a ready asset makes the video playable for members only", async () => {
-    const { t, alice, outsider, campaignId, mediaId } = await setup();
-    const created = await deliver(t, {
-      type: "video.upload.asset_created",
-      data: {
-        asset_id: "asset1",
-        new_asset_settings: { passthrough: mediaId },
-      },
+describe("createUpload", () => {
+  test("gives the uploader a signed PUT for the media key", async () => {
+    const { t, alice, mediaId } = await setup();
+    const target = await alice.as.action(api.media.createUpload, {
+      mediaId,
+      contentType: "video/MP4; codecs=avc1",
     });
-    expect(created.status).toBe(204);
-    let list = await alice.as.query(api.videos.list, { campaignId });
-    expect(list[0].media?.status).toBe("processing");
+    expect(target.contentType).toBe("video/mp4");
+    const url = new URL(target.url);
+    expect(url.host).toBe("acct.r2.cloudflarestorage.com");
+    expect(url.pathname).toBe(`/review/media/${mediaId}`);
+    expect(url.searchParams.get("X-Amz-Signature")).toBeTruthy();
+    expect(url.searchParams.get("X-Amz-Expires")).toBe("3600");
+    const media = await t.run((ctx) => ctx.db.get("media", mediaId));
+    expect(media).toMatchObject({
+      status: "waiting",
+      storageKey: `media/${mediaId}`,
+      contentType: "video/mp4",
+    });
+  });
 
-    await deliver(t, {
-      type: "video.asset.ready",
-      data: {
-        id: "asset1",
-        passthrough: mediaId,
-        duration: 31.2,
-        aspect_ratio: "9:16",
-        playback_ids: [{ id: "play1", policy: "signed" }],
-      },
+  test("refuses anyone but the uploader", async () => {
+    const { bob, boss, mediaId } = await setup();
+    for (const who of [bob, boss]) {
+      await expect(
+        who.as.action(api.media.createUpload, {
+          mediaId,
+          contentType: "video/mp4",
+        }),
+      ).rejects.toThrow("not yours");
+    }
+  });
+
+  test("refuses a file that is not a video", async () => {
+    const { alice, mediaId } = await setup();
+    await expect(
+      alice.as.action(api.media.createUpload, {
+        mediaId,
+        contentType: "text/html",
+      }),
+    ).rejects.toThrow("Upload a video file");
+  });
+
+  test("says storage is not set up when R2 settings are missing", async () => {
+    const { alice, mediaId } = await setup();
+    vi.stubEnv("R2_BUCKET", "");
+    await expect(
+      alice.as.action(api.media.createUpload, {
+        mediaId,
+        contentType: "video/mp4",
+      }),
+    ).rejects.toThrow("not set up");
+  });
+});
+
+describe("completeUpload", () => {
+  test("marks the media ready with its size, length and shape", async () => {
+    const { t, alice, mediaId } = await setup();
+    await alice.as.action(api.media.createUpload, {
+      mediaId,
+      contentType: "video/quicktime",
     });
-    list = await alice.as.query(api.videos.list, { campaignId });
-    expect(list[0].media).toMatchObject({
+    head.mockResolvedValueOnce(sized(5_000_000));
+    const status = await alice.as.action(api.media.completeUpload, {
+      mediaId,
+      duration: 31.5,
+      width: 1080,
+      height: 1920,
+    });
+    expect(status).toBe("ready");
+    const media = await t.run((ctx) => ctx.db.get("media", mediaId));
+    expect(media).toMatchObject({
       status: "ready",
-      duration: 31.2,
+      size: 5_000_000,
+      duration: 31.5,
       aspectRatio: "9:16",
     });
+  });
+
+  test("marks the media errored when nothing was uploaded", async () => {
+    const { t, alice, mediaId } = await setup();
+    await alice.as.action(api.media.createUpload, {
+      mediaId,
+      contentType: "video/mp4",
+    });
+    head.mockResolvedValueOnce(new Response(null, { status: 404 }));
+    const status = await alice.as.action(api.media.completeUpload, {
+      mediaId,
+      duration: Number.NaN,
+    });
+    expect(status).toBe("errored");
+    const media = await t.run((ctx) => ctx.db.get("media", mediaId));
+    expect(media?.status).toBe("errored");
+  });
+
+  test("refuses to finish an upload that never started", async () => {
+    const { alice, mediaId } = await setup();
+    await expect(
+      alice.as.action(api.media.completeUpload, { mediaId }),
+    ).rejects.toThrow("not yours");
+  });
+});
+
+describe("playbackTokens", () => {
+  async function ready() {
+    const ctx = await setup();
+    await ctx.alice.as.action(api.media.createUpload, {
+      mediaId: ctx.mediaId,
+      contentType: "video/mp4",
+    });
+    head.mockResolvedValueOnce(sized(100));
+    await ctx.alice.as.action(api.media.completeUpload, {
+      mediaId: ctx.mediaId,
+    });
+    return ctx;
+  }
+
+  test("gives campaign members a signed GET", async () => {
+    const { bob, boss, mediaId } = await ready();
+    for (const who of [bob, boss]) {
+      const [token] = await who.as.action(api.media.playbackTokens, {
+        mediaIds: [mediaId],
+      });
+      expect(token.mediaId).toBe(mediaId);
+      const url = new URL(token.url);
+      expect(url.pathname).toBe(`/review/media/${mediaId}`);
+      expect(url.searchParams.get("X-Amz-Signature")).toBeTruthy();
+    }
+  });
+
+  test("gives nothing to people outside the campaign", async () => {
+    const { t, outsider, mediaId } = await ready();
     expect(
-      await alice.as.query(internal.media.playable, { mediaIds: [mediaId] }),
-    ).toEqual([{ mediaId, playbackId: "play1" }]);
+      await outsider.as.action(api.media.playbackTokens, {
+        mediaIds: [mediaId],
+      }),
+    ).toEqual([]);
     expect(
-      await outsider.as.query(internal.media.playable, { mediaIds: [mediaId] }),
+      await t.action(api.media.playbackTokens, { mediaIds: [mediaId] }),
     ).toEqual([]);
   });
 
-  test("a bad signature is refused and changes nothing", async () => {
-    const { t, alice, campaignId, mediaId } = await setup();
-    const response = await deliver(
-      t,
-      { type: "video.asset.errored", data: { id: "a", passthrough: mediaId } },
-      "t=1,v1=00",
-    );
-    expect(response.status).toBe(401);
-    const list = await alice.as.query(api.videos.list, { campaignId });
-    expect(list[0].media?.status).toBe("waiting");
-  });
-
-  test("an errored asset is marked so the uploader can retry", async () => {
-    const { t, alice, campaignId, mediaId } = await setup();
-    await deliver(t, {
-      type: "video.asset.errored",
-      data: { id: "a", passthrough: mediaId },
-    });
-    const list = await alice.as.query(api.videos.list, { campaignId });
-    expect(list[0].media?.status).toBe("errored");
-  });
-
-  test("only the uploader can start the upload, once", async () => {
-    const { t, boss, alice, mediaId } = await setup();
+  test("skips media that is not ready yet", async () => {
+    const { alice, mediaId } = await setup();
     expect(
-      await boss.as.query(internal.media.uploadTarget, { mediaId }),
-    ).toBeNull();
-    expect(
-      await alice.as.query(internal.media.uploadTarget, { mediaId }),
-    ).not.toBeNull();
-    await t.mutation(internal.media.recordUpload, {
-      mediaId,
-      muxUploadId: "up1",
-    });
-    expect(
-      await alice.as.query(internal.media.uploadTarget, { mediaId }),
-    ).toBeNull();
+      await alice.as.action(api.media.playbackTokens, { mediaIds: [mediaId] }),
+    ).toEqual([]);
   });
 });

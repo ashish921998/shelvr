@@ -61,8 +61,8 @@ function Recording({
     <div className="mt-2">
       <Player
         compact
-        media={{ status: recording.status, aspectRatio: null }}
-        playback={playback.get(recording._id)}
+        media={{ status: recording.status }}
+        src={playback.get(recording._id)}
       />
     </div>
   );

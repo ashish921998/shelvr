@@ -14,10 +14,8 @@ import type * as comments from "../comments.js";
 import type * as http from "../http.js";
 import type * as media from "../media.js";
 import type * as model_access from "../model/access.js";
-import type * as model_muxEvent from "../model/muxEvent.js";
-import type * as model_muxKey from "../model/muxKey.js";
-import type * as model_muxSignature from "../model/muxSignature.js";
 import type * as model_rules from "../model/rules.js";
+import type * as model_storage from "../model/storage.js";
 import type * as videos from "../videos.js";
 
 import type {
@@ -33,10 +31,8 @@ declare const fullApi: ApiFromModules<{
   http: typeof http;
   media: typeof media;
   "model/access": typeof model_access;
-  "model/muxEvent": typeof model_muxEvent;
-  "model/muxKey": typeof model_muxKey;
-  "model/muxSignature": typeof model_muxSignature;
   "model/rules": typeof model_rules;
+  "model/storage": typeof model_storage;
   videos: typeof videos;
 }>;
 

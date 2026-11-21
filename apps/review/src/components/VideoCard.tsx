@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { Id } from "@convex/_generated/dataModel";
 import type { ReviewStatus } from "@/lib/status";
-import { thumbnailUrl, type Playback } from "@/lib/usePlayback";
 import { formatTime } from "@/lib/time";
 import StatusBadge from "./StatusBadge";
 
@@ -17,7 +16,7 @@ type Props = {
       duration: number | null;
     } | null;
   };
-  playback: Playback | undefined;
+  src: string | undefined;
 };
 
 const MEDIA_NOTE = {
@@ -27,16 +26,17 @@ const MEDIA_NOTE = {
   ready: "",
 };
 
-export default function VideoCard({ video, playback }: Props) {
+export default function VideoCard({ video, src }: Props) {
   const mediaStatus = video.media?.status ?? "waiting";
   return (
     <Link href={`/videos/${video._id}`} className="group block">
       <div className="relative aspect-[9/16] overflow-hidden rounded-xl bg-zinc-900 ring-1 ring-white/5 transition group-hover:ring-white/25">
-        {playback ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={thumbnailUrl(playback)}
-            alt=""
+        {src ? (
+          <video
+            src={`${src}#t=1`}
+            muted
+            playsInline
+            preload="metadata"
             className="h-full w-full object-cover"
           />
         ) : (

@@ -220,7 +220,8 @@ export default function Recorder({ versionId, currentTime, onStart }: Props) {
       timestamp: moment,
       withRecording: true,
     });
-    if (mediaId && (await upload(mediaId, clip))) discard();
+    if (mediaId && (await upload(mediaId, clip, { duration: elapsed })))
+      discard();
   }
 
   return (

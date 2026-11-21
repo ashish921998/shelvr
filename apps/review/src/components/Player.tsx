@@ -1,39 +1,50 @@
 "use client";
 
-import MuxPlayer, { type MuxPlayerRefAttributes } from "@mux/mux-player-react";
-import { forwardRef } from "react";
-import type { Playback } from "@/lib/usePlayback";
+import { forwardRef, useImperativeHandle, useRef } from "react";
 import Spinner from "./Spinner";
 
+export type PlayerHandle = {
+  seek: (seconds: number) => void;
+  pause: () => void;
+};
+
 type Props = {
-  media: {
-    status: "waiting" | "processing" | "ready" | "errored";
-    aspectRatio: string | null;
-  } | null;
-  playback: Playback | undefined;
+  media: { status: "waiting" | "processing" | "ready" | "errored" } | null;
+  src: string | undefined;
   onTime?: (seconds: number) => void;
   compact?: boolean;
 };
 
 const NOTE = {
   waiting: "Waiting for the upload to finish…",
-  processing: "Processing the video. This takes about a minute.",
+  processing: "Processing the video…",
   errored: "This upload failed. Upload it again as a new version.",
   ready: "Loading…",
 };
 
-const Player = forwardRef<MuxPlayerRefAttributes, Props>(function Player(
-  { media, playback, onTime, compact },
+const Player = forwardRef<PlayerHandle, Props>(function Player(
+  { media, src, onTime, compact },
   ref,
 ) {
+  const video = useRef<HTMLVideoElement>(null);
+  useImperativeHandle(ref, () => ({
+    seek: (seconds) => {
+      const element = video.current;
+      if (!element) return;
+      element.pause();
+      element.currentTime = seconds;
+    },
+    pause: () => video.current?.pause(),
+  }));
+
   const status = media?.status ?? "waiting";
-  const frame = compact
+  const box = compact
     ? "aspect-video w-full"
     : "mx-auto h-[min(70vh,720px)] w-full";
-  if (status !== "ready" || !playback) {
+  if (status !== "ready" || !src) {
     return (
       <div
-        className={`${frame} grid place-items-center rounded-xl bg-zinc-900 p-6 text-center text-sm text-zinc-400`}
+        className={`${box} grid place-items-center rounded-xl bg-zinc-900 p-6 text-center text-sm text-zinc-400`}
       >
         {status === "ready" || status === "processing" ? (
           <Spinner label={NOTE[status]} />
@@ -44,21 +55,16 @@ const Player = forwardRef<MuxPlayerRefAttributes, Props>(function Player(
     );
   }
   return (
-    <div className={`${frame} overflow-hidden rounded-xl bg-black`}>
-      <MuxPlayer
-        ref={ref}
-        playbackId={playback.playbackId}
-        tokens={{
-          playback: playback.playback,
-          thumbnail: playback.thumbnail,
-          storyboard: playback.storyboard,
-        }}
-        streamType="on-demand"
-        accentColor="#fb923c"
-        onTimeUpdate={(event) => {
-          const target = event.target as HTMLMediaElement | null;
-          if (target && onTime) onTime(target.currentTime);
-        }}
+    <div className={`${box} overflow-hidden rounded-xl bg-black`}>
+      <video
+        ref={video}
+        src={src}
+        controls
+        playsInline
+        preload="metadata"
+        className="h-full w-full object-contain"
+        onTimeUpdate={(event) => onTime?.(event.currentTarget.currentTime)}
+        onSeeked={(event) => onTime?.(event.currentTarget.currentTime)}
       />
     </div>
   );

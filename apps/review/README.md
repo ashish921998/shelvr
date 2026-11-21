@@ -11,13 +11,13 @@ tables, users or functions with the Shelvr app backend in `apps/native/convex`.
 
 ## Pieces
 
-| Piece         | Where                                                                                                               |
-| ------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Schema        | `convex/schema.ts` (campaigns, members, invites, videos, versions, media, comments)                                 |
-| Access rules  | `convex/model/access.ts`, `convex/model/rules.ts`                                                                   |
-| Sign-in       | `convex/auth.ts`: Convex Auth magic links through Resend; only staff emails or invited emails can create an account |
-| Video hosting | `convex/media.ts` (Mux direct uploads, signed playback tokens), `convex/http.ts` (`/mux/webhook`)                   |
-| Pages         | `src/app` → `src/components` (`CampaignView`, `VideoView`, `CommentsPanel`, `Recorder`)                             |
+| Piece         | Where                                                                                                                                 |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| Schema        | `convex/schema.ts` (campaigns, members, invites, videos, versions, media, comments)                                                   |
+| Access rules  | `convex/model/access.ts`, `convex/model/rules.ts`                                                                                     |
+| Sign-in       | `convex/auth.ts`: Convex Auth magic links through Resend; only staff emails or invited emails can create an account                   |
+| Video hosting | `convex/media.ts`, `convex/model/storage.ts`: Cloudflare R2, presigned uploads straight from the browser and presigned playback links |
+| Pages         | `src/app` → `src/components` (`CampaignView`, `VideoView`, `CommentsPanel`, `Recorder`)                                               |
 
 ## Set up
 
@@ -30,12 +30,22 @@ tables, users or functions with the Shelvr app backend in `apps/native/convex`.
    - `REVIEW_STAFF_EMAILS`: comma-separated emails that may start campaigns
    - `AUTH_RESEND_KEY`, `REVIEW_EMAIL_FROM`: magic links and invite emails
    - `SITE_URL`: e.g. `https://review.tryshelvr.app`
-   - `MUX_TOKEN_ID`, `MUX_TOKEN_SECRET`: a Mux access token with Video write access
-   - `MUX_SIGNING_KEY_ID`, `MUX_SIGNING_PRIVATE_KEY`: a Mux signing key (the
-     base64 value Mux shows is accepted as is)
-   - `MUX_WEBHOOK_SECRET`: from a Mux webhook pointed at
-     `https://<deployment>.convex.site/mux/webhook`
-4. Vercel: a new project with root directory `apps/review`,
+   - `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`:
+     a private Cloudflare R2 bucket and an R2 API token with Object Read & Write
+     on that bucket only
+4. R2 CORS: on the bucket, allow `PUT`, `GET` and `HEAD` from the site origin
+   with the `Content-Type` header, so browsers can upload and play directly:
+   ```json
+   [
+     {
+       "AllowedOrigins": ["https://review.tryshelvr.app"],
+       "AllowedMethods": ["PUT", "GET", "HEAD"],
+       "AllowedHeaders": ["Content-Type"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+5. Vercel: a new project with root directory `apps/review`,
    `NEXT_PUBLIC_CONVEX_URL` set, and the `review.tryshelvr.app` domain.
 
 ## Roles
