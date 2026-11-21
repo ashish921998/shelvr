@@ -20,9 +20,7 @@ vi.mock("expo-secure-store", () => ({ getItem: vi.fn(), setItem: vi.fn() }));
 
 describe("passportUrl", () => {
   it("points at the web passport page", () => {
-    expect(passportUrl("ab/c")).toBe(
-      "https://shelvr-web.vercel.app/passport/ab%2Fc",
-    );
+    expect(passportUrl("ab/c")).toBe("https://tryshelvr.app/passport/ab%2Fc");
   });
 });
 

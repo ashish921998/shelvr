@@ -20,7 +20,7 @@ Without it, links stay plain and nothing is attributed.
 
 - The campaign (`ct=`) is the visitor's own `?ct=` or `?utm_campaign=` from the
   landing URL, kept for the browser session. Give each creator, ad set or post
-  its own link, for example `https://shelvr-web.vercel.app/?ct=tiktok_jane`.
+  its own link, for example `https://tryshelvr.app/?ct=tiktok_jane`.
 - A visitor with no campaign gets `web_<button>` (`web_hero`, `web_header`,
   `web_footer`, `web_footer-nav`, `web_oracle`, `web_place_tool` for the reel
   place finder's results card, `web_place_banner` for the finder's phone

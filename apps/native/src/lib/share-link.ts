@@ -7,7 +7,7 @@ import { useCallback } from "react";
 import { Platform, Share } from "react-native";
 
 function shareLinkUrl(token: string): string {
-  return `https://shelvr-web.vercel.app/i/${token}`;
+  return `https://tryshelvr.app/i/${token}`;
 }
 
 export async function shareRefOf(
