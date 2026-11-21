@@ -71,11 +71,13 @@ export function MapFilterChips({
       accessibilityLabel={t("map.filters")}
       contentContainerStyle={[styles.row, !inset && styles.flush]}
     >
-      <Chip
-        label={t("map.filterAll")}
-        selected={selected === null}
-        onPress={() => choose(null)}
-      />
+      {kinds.length > 0 ? (
+        <Chip
+          label={t("map.filterAll")}
+          selected={selected === null}
+          onPress={() => choose(null)}
+        />
+      ) : null}
       {kinds.map((kind) => (
         <Chip
           key={kind}

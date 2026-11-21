@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 
-export const SITE_URL = "https://shelvr-web.vercel.app";
+export const SITE_URL = "https://tryshelvr.app";
 
 export const SITE_TITLE = "Shelvr — saved it, now go there";
 export const SITE_DESCRIPTION =

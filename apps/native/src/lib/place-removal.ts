@@ -1,17 +1,15 @@
 import { analytics } from "@/lib/analytics";
-import { openPaywall } from "@/lib/entitlement";
 import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
+import { useProGate } from "@/lib/pro-gate";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
-import { saveErrorCode } from "@convex/model/saveErrors";
 import { useMutation } from "convex/react";
-import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "react-native";
 
 export function usePlaceRemoval() {
-  const router = useRouter();
+  const gate = useProGate("remove_place");
   const remove = useMutation(api.placeRemovals.removePlace);
   const restore = useMutation(api.placeRemovals.undoRemovePlace);
   const [busy, setBusy] = useState(false);
@@ -36,10 +34,7 @@ export function usePlaceRemoval() {
     try {
       await action();
     } catch (error) {
-      if (saveErrorCode(error) === "pro_required") {
-        await openPaywall(router, "remove_place");
-        return;
-      }
+      if (await gate.denied(error)) return;
       analytics.captureError("place_removal_failed", error);
       Alert.alert(t("errors.unexpectedTitle"), t("errors.retrySoon"));
     } finally {
@@ -62,6 +57,7 @@ export function usePlaceRemoval() {
           lng: pin.lng,
           ...(pin.appleId ? { appleId: pin.appleId } : {}),
         });
+        gate.passed();
         void haptics.success();
         setPending((entries) => [...entries, { removalId, name: pin.name }]);
       }),

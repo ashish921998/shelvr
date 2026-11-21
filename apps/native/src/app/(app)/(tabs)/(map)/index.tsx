@@ -1,5 +1,6 @@
 import { EmptyState } from "@/components/empty-state";
 import { MapFilterChips } from "@/components/map/map-filter-chips";
+import { MapLocateButton } from "@/components/map/map-locate-button";
 import { MapSearch } from "@/components/map/map-search";
 import { MapWentSwitch } from "@/components/map/map-went-switch";
 import {
@@ -17,22 +18,32 @@ import {
 } from "@/lib/apple-place-card";
 import { isDarkThemeName } from "@/lib/appearance";
 import { framedPins } from "@/lib/city-pins";
+import type { MapBox } from "@/lib/discover-area";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
   busiestCityPlaces,
   filterPlaces,
+  keepSelected,
   mapFilters,
-  searchPlaces,
   topSearchResults,
   type WentFilter,
   wentView,
 } from "@/lib/map-filters";
+import {
+  type MapEntry,
+  mapEntries,
+  ownOnTop,
+  searchEntries,
+} from "@/lib/map-discover";
+import { useAnchors, useHeldFraming } from "@/lib/map-framing";
 import { useMapLocation } from "@/lib/map-location";
 import { placeEmoji } from "@/lib/map-pin-emoji";
+import { useDiscoverPlaces } from "@/lib/use-discover-places";
 import { usePlaceVisits } from "@/lib/use-place-visit";
 import { visitMatcher } from "@convex/model/placeVisits";
 import { api } from "@convex/_generated/api";
 import type { PlaceKind } from "@convex/model/placeKinds";
+import type { FunctionReturnType } from "convex/server";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -40,8 +51,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-/** Room left at the right of the filter row for MapKit's my-location button. */
-const LOCATE_BUTTON_CLEARANCE = 64;
+type OwnPlace = FunctionReturnType<typeof api.mapPlaces.listMapPlaces>[number];
+type Entry = MapEntry<OwnPlace>;
+
+const NO_PLACES: OwnPlace[] = [];
 
 function placeId(place: {
   itemId: string;
@@ -50,6 +63,10 @@ function placeId(place: {
   lng: number;
 }) {
   return `${place.itemId}:${place.name}:${place.lat}:${place.lng}`;
+}
+
+function entryId(place: Entry) {
+  return place.source === "discover" ? `discover:${place._id}` : placeId(place);
 }
 
 export default function MapScreen() {
@@ -76,8 +93,17 @@ export default function MapScreen() {
   // Closed once a result is picked, so the map and place card get the room; typing opens it again.
   const [listOpen, setListOpen] = useState(true);
   const [focus, setFocus] = useState<MapFocus | undefined>(undefined);
+  const [locate, setLocate] = useState<number | undefined>(undefined);
+  const [area, setArea] = useState<MapBox | undefined>(undefined);
 
   const all = places.data;
+  const {
+    settled,
+    areaLoaded,
+    areaPartial,
+    beside,
+    open: openDiscover,
+  } = useDiscoverPlaces(all ?? NO_PLACES, area);
   const { visits, loaded, isError, error, offerRetry } = usePlaceVisits();
   const visitsFailed = isError && !loaded;
   useEffect(() => {
@@ -94,57 +120,77 @@ export default function MapScreen() {
     () => wentView(all ?? [], wentFilter, visited),
     [all, wentFilter, visited],
   );
-  const filters = useMemo(() => mapFilters(went.places), [went.places]);
-  // A filter that no longer has enough places (a save was deleted) falls back to All.
-  const active = filters.some((filter) => filter.kind === kind) ? kind : null;
-  const shown = useMemo(
-    () => filterPlaces(went.places, active),
-    [went.places, active],
+  const withDiscover = went.selected === "all";
+  const entries = useMemo(
+    () => mapEntries(went.places, withDiscover ? beside : [], visited),
+    [went.places, withDiscover, beside, visited],
   );
+  const kinds = useMemo(
+    () =>
+      keepSelected(
+        mapFilters(entries).map((filter) => filter.kind),
+        kind,
+      ),
+    [entries, kind],
+  );
+  const shown = useMemo(() => filterPlaces(entries, kind), [entries, kind]);
   const searching = searchText.trim() !== "";
   // Search narrows whatever the filter shows; every match stays on the map, the first few are listed.
   const matches = useMemo(
-    () => (searching ? searchPlaces(shown, searchText) : shown),
+    () => (searching ? searchEntries(shown, searchText) : shown),
     [searching, shown, searchText],
   );
   const pins: MapPin[] = useMemo(
     () =>
-      matches.map((place) => ({
+      ownOnTop(matches).map((place) => ({
         ...place,
-        id: placeId(place),
+        id: entryId(place),
         emoji: placeEmoji(place),
-        ...(visited(place)
-          ? {
-              tint: isDarkThemeName(rt.themeName)
-                ? theme.colors.primarySoft
-                : theme.colors.primaryText,
-              snippet: t("passport.wentNoDate"),
-            }
-          : {}),
+        ...(place.source === "discover"
+          ? { tint: theme.colors.muted }
+          : place.visited
+            ? {
+                tint: isDarkThemeName(rt.themeName)
+                  ? theme.colors.primarySoft
+                  : theme.colors.primaryText,
+                snippet: t("passport.wentNoDate"),
+              }
+            : {}),
       })),
-    [matches, visited, rt.themeName, theme],
+    [matches, rt.themeName, theme],
   );
-  const framed = useMemo(
+  const { anchorEntries, anchors } = useAnchors(shown, areaLoaded);
+  const liveFraming = useMemo(
     () =>
       // As on the city page, a pin far out of town stays on the map but does not set the zoom.
       // Framed from the filter's places, so a filter with none in view can bring them in.
-      framedPins(busiestCityPlaces(shown)).map((place) => ({
+      framedPins(busiestCityPlaces(anchorEntries)).map((place) => ({
         ...place,
-        id: placeId(place),
+        id: entryId(place),
       })),
-    [shown],
+    [anchorEntries],
+  );
+  const waiting =
+    all === undefined ||
+    (all.length === 0 && !settled) ||
+    location === "asking";
+  const framed = useHeldFraming(
+    liveFraming,
+    `${waiting}|${kind ?? ""}|${went.selected}`,
   );
 
   const reported = useRef(false);
   useEffect(() => {
-    if (!opened || all === undefined || location === "asking") return;
+    if (!opened || all === undefined || !settled || location === "asking")
+      return;
     if (reported.current) return;
     reported.current = true;
     analytics.capture("map_opened", {
       count: all.length,
+      discover: beside.length,
       located: location === "granted",
     });
-  }, [opened, all, location]);
+  }, [opened, all, beside, settled, location]);
 
   if (places.isError) {
     return (
@@ -154,8 +200,8 @@ export default function MapScreen() {
       />
     );
   }
-  if (all === undefined || location === "asking") return <ScreenLoader />;
-  if (all.length === 0) {
+  if (waiting) return <ScreenLoader />;
+  if (all.length === 0 && beside.length === 0 && area === undefined) {
     return (
       <View style={styles.empty}>
         <EmptyState title={t("map.emptyTitle")} message={t("map.emptyBody")} />
@@ -163,24 +209,28 @@ export default function MapScreen() {
     );
   }
 
+  const showChips = kinds.length > 0;
   const top = rt.insets.top + theme.gap(1);
-  const located = location === "granted";
   // The search field, then the chips under it.
   const overlayHeight =
     theme.control.minHeight +
     (went.showSwitch && !searching
       ? theme.gap(1) + theme.control.minHeight
       : 0) +
-    (filters.length > 0 ? theme.gap(1) + theme.control.minHeight : 0);
+    (showChips ? theme.gap(1) + theme.control.minHeight : 0);
   const select = (id: string) => {
-    const place = shown.find((candidate) => placeId(candidate) === id);
+    const place = shown.find((candidate) => entryId(candidate) === id);
     if (!place || !focused.current) return;
+    if (place.source === "discover") {
+      openDiscover(place);
+      return;
+    }
     const openSave = () => {
       if (!focused.current) return;
       router.push({ pathname: "/item/[id]", params: { id: place.itemId } });
     };
     const card = place.appleId !== undefined && canOpenPlaceCard(place.appleId);
-    analytics.capture("map_place_opened", { card });
+    analytics.capture("map_place_opened", { card, source: "own" });
     if (card && place.appleId !== undefined) {
       void openPlaceDetails(place.appleId, openSave);
     } else {
@@ -188,7 +238,7 @@ export default function MapScreen() {
     }
   };
   const pickResult = (id: string) => {
-    const place = matches.find((candidate) => placeId(candidate) === id);
+    const place = matches.find((candidate) => entryId(candidate) === id);
     if (!place) return;
     Keyboard.dismiss();
     setListOpen(false);
@@ -210,10 +260,17 @@ export default function MapScreen() {
       <PlacesMap
         pins={pins}
         framed={framed}
-        showsUser={located}
+        anchors={anchors}
+        areaPartial={
+          areaPartial &&
+          anchorEntries.every((place) => place.source === "discover")
+        }
+        showsUser={location === "granted"}
         topInset={top + overlayHeight}
         focus={focus}
+        locate={locate}
         onSelect={select}
+        onArea={setArea}
       />
       <View
         pointerEvents="none"
@@ -227,40 +284,39 @@ export default function MapScreen() {
           experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0.92)} 0%, ${withAlpha(theme.colors.background, 0.6)} 60%, ${withAlpha(theme.colors.background, 0)} 100%)`,
         }}
       />
-      <View
-        style={[
-          styles.overlay,
-          // Kept clear of MapKit's my-location button in the top right corner, which it would cover.
-          { top, right: located ? LOCATE_BUTTON_CLEARANCE : 0 },
-        ]}
-      >
-        <MapSearch
-          text={searchText}
-          onChangeText={(text) => {
-            setSearchText(text);
-            setListOpen(true);
-          }}
-          total={matches.length}
-          results={
-            searching && listOpen
-              ? topSearchResults(matches).map((place) => ({
-                  id: placeId(place),
-                  name: place.name,
-                  city: place.city,
-                }))
-              : undefined
-          }
-          onSelect={pickResult}
-        />
+      <View style={[styles.overlay, { top }]} pointerEvents="box-none">
+        <View style={styles.searchRow}>
+          <View style={styles.search}>
+            <MapSearch
+              text={searchText}
+              onChangeText={(text) => {
+                setSearchText(text);
+                setListOpen(true);
+              }}
+              total={matches.length}
+              results={
+                searching && listOpen
+                  ? topSearchResults(matches).map((place) => ({
+                      id: entryId(place),
+                      name: place.name,
+                      city: place.city,
+                    }))
+                  : undefined
+              }
+              onSelect={pickResult}
+            />
+          </View>
+          {location === "granted" ? (
+            <MapLocateButton
+              onPress={() => setLocate((previous) => (previous ?? 0) + 1)}
+            />
+          ) : null}
+        </View>
         {went.showSwitch && !searching ? (
           <MapWentSwitch selected={went.selected} onSelect={setWentFilter} />
         ) : null}
-        {filters.length > 0 && !searching ? (
-          <MapFilterChips
-            kinds={filters.map((filter) => filter.kind)}
-            selected={active}
-            onSelect={choose}
-          />
+        {showChips && !searching ? (
+          <MapFilterChips kinds={kinds} selected={kind} onSelect={choose} />
         ) : null}
       </View>
     </View>
@@ -270,5 +326,11 @@ export default function MapScreen() {
 const styles = StyleSheet.create((theme) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
   empty: { flex: 1, backgroundColor: theme.colors.background },
-  overlay: { position: "absolute", left: 0, gap: theme.gap(1) },
+  overlay: { position: "absolute", left: 0, right: 0, gap: theme.gap(1) },
+  searchRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    paddingRight: theme.gap(2),
+  },
+  search: { flex: 1, marginRight: -theme.gap(1) },
 }));

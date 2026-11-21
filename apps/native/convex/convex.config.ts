@@ -1,5 +1,6 @@
 import { defineApp } from "convex/server";
 import { v } from "convex/values";
+import geospatial from "@convex-dev/geospatial/convex.config";
 import rateLimiter from "@convex-dev/rate-limiter/convex.config";
 
 const app = defineApp({
@@ -41,5 +42,6 @@ const app = defineApp({
   },
 });
 app.use(rateLimiter);
+app.use(geospatial);
 
 export default app;

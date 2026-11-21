@@ -132,6 +132,8 @@ module.exports = ({ config }) => ({
     bundleIdentifier: bundleId,
     associatedDomains: isProduction
       ? [
+          "applinks:tryshelvr.app",
+          "webcredentials:tryshelvr.app",
           "applinks:shelvr-web.vercel.app",
           "webcredentials:shelvr-web.vercel.app",
         ]

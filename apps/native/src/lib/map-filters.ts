@@ -2,7 +2,7 @@ import { PLACE_KINDS, type PlaceKind } from "@convex/model/placeKinds";
 import { cityKey, distanceKm, type LatLng } from "@convex/model/trip";
 
 /** How far from the person a saved place still counts as nearby when the map opens on them. */
-const NEARBY_KM = 50;
+export const NEARBY_KM = 50;
 
 /** A filter shows only once enough of your places fit it to be worth a tap. */
 const MIN_FILTER_PLACES = 3;
@@ -25,6 +25,15 @@ export function mapFilters(
     const count = counts.get(kind) ?? 0;
     return count >= MIN_FILTER_PLACES ? [{ kind, count }] : [];
   }).sort((a, b) => b.count - a.count);
+}
+
+export function keepSelected(
+  kinds: PlaceKind[],
+  selected: PlaceKind | null,
+): PlaceKind[] {
+  return selected === null || kinds.includes(selected)
+    ? kinds
+    : [...kinds, selected];
 }
 
 export function filterPlaces<T extends Kinded>(
@@ -90,16 +99,17 @@ function folded(text: string): string {
   return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 }
 
-/** Places whose name or city holds every word of the query, names that start with it first. */
-export function searchPlaces<T extends { name: string; city?: string }>(
-  places: readonly T[],
-  query: string,
-): T[] {
+/** Places whose name, city or features hold every word of the query, names that start with it first. */
+export function searchPlaces<
+  T extends { name: string; city?: string; features?: readonly string[] },
+>(places: readonly T[], query: string): T[] {
   const words = folded(query).split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];
   const first = words.join(" ");
   const matches = places.filter((place) => {
-    const text = folded(`${place.name} ${place.city ?? ""}`);
+    const text = folded(
+      `${place.name} ${place.city ?? ""} ${place.features?.join(" ") ?? ""}`,
+    );
     return words.every((word) => text.includes(word));
   });
   const leading = (place: T) => (folded(place.name).startsWith(first) ? 0 : 1);

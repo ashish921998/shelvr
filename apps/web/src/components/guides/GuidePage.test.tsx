@@ -62,7 +62,7 @@ describe.each(GUIDES.map((guide) => [guide.path, guide] as const))(
         /<script type="application\/ld\+json">(.+?)<\/script>/,
       )?.[1];
       const graph = JSON.parse(decode(json ?? "{}"))["@graph"];
-      expect(graph[0].url).toBe(`https://shelvr-web.vercel.app${path}`);
+      expect(graph[0].url).toBe(`https://tryshelvr.app${path}`);
       expect(graph[1].mainEntity.map((q: { name: string }) => q.name)).toEqual(
         guide.faqs.map((f) => f.q),
       );
@@ -79,7 +79,7 @@ describe.each(GUIDES.map((guide) => [guide.path, guide] as const))(
 
     it("is in the sitemap", () => {
       expect(sitemap().map((entry) => entry.url)).toContain(
-        `https://shelvr-web.vercel.app${path}`,
+        `https://tryshelvr.app${path}`,
       );
     });
   },

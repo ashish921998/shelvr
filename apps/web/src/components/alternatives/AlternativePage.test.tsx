@@ -12,7 +12,7 @@ import {
 
 import AlternativePage from "./AlternativePage";
 
-const SITE = "https://shelvr-web.vercel.app";
+const SITE = "https://tryshelvr.app";
 const PRICE_CLAIMS = [/\bfree\b/i, /\$\d/, /€/, /\bprice/i, /\btrial\b/i];
 
 function decode(html: string) {

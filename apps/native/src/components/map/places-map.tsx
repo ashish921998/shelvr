@@ -1,16 +1,24 @@
 import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
 import { appleZoom } from "@/lib/city-pins";
+import {
+  type CameraView,
+  type MapBox,
+  sameBox,
+  visibleBox,
+  withReach,
+} from "@/lib/discover-area";
 import { moveCamera } from "@/lib/map-camera";
-import { hasPlaceNear } from "@/lib/map-filters";
+import { hasPlaceNear, NEARBY_KM } from "@/lib/map-filters";
 import { fitCamera } from "@/lib/trip";
 import type { LatLng } from "@convex/model/trip";
 import { AppleMaps, GoogleMaps } from "expo-maps";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 /** How long the camera must rest after moving to the person before the map checks what is near. */
 const SETTLE_MS = 600;
+const AREA_REST_MS = 400;
 /** After this, the opening check is dropped so it never pulls back a camera the person moved. */
 const DISARM_MS = 3000;
 
@@ -35,21 +43,29 @@ type Props = {
   pins: MapPin[];
   /** The places the first camera frames when it cannot open on the person. */
   framed: MapPin[];
+  anchors: LatLng[] | undefined;
+  areaPartial: boolean;
   /** iOS: open on the person's location and show it. */
   showsUser: boolean;
   /** Clears the floating filter row above the map. */
   topInset: number;
   focus?: MapFocus;
+  locate?: number;
   onSelect: (id: string) => void;
+  onArea: (box: MapBox) => void;
 };
 
 export function PlacesMap({
   pins,
   framed,
+  anchors,
+  areaPartial,
   showsUser,
   topInset,
   focus,
+  locate,
   onSelect,
+  onArea,
 }: Props) {
   const { theme, rt } = useUnistyles();
   const appleRef = useRef<AppleMaps.MapView>(null);
@@ -86,19 +102,38 @@ export function PlacesMap({
   // expo-maps applies a cameraPosition prop without animation, so it only ever holds the first camera.
   const [firstCamera] = useState(showsUser ? undefined : fit);
   // The opening check reads these when it fires, so a filter picked while it waits is the one it frames.
-  const latest = useRef({ pins, fit });
-  useEffect(() => {
-    latest.current = { pins, fit };
-  }, [pins, fit]);
+  const latest = useRef({ anchors, areaPartial, fit });
   const centredOnUser = useRef(false);
   const centre = useRef<LatLng | undefined>(undefined);
   const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  // Set while the camera travels to the person; once it rests, a map with none of their places in
-  // reach moves on to the city they saved the most in.
+  // Set while the camera travels to the person; once it rests and the places in reach have loaded, a
+  // map with none of them moves on to the busiest city.
   const checkNearby = useRef<(() => void) | undefined>(undefined);
+  const rested = useRef(false);
+  const cameraCommand = useRef<(() => void) | undefined>(undefined);
+  const command = useCallback(
+    (
+      move: () => Promise<void> | undefined,
+      onFail: (error: unknown) => void,
+    ) => {
+      cameraCommand.current?.();
+      const cancel = moveCamera(move, onFail);
+      cameraCommand.current = cancel;
+      return cancel;
+    },
+    [],
+  );
+  useEffect(() => {
+    latest.current = { anchors, areaPartial, fit };
+    if (anchors !== undefined && rested.current) checkNearby.current?.();
+  }, [anchors, areaPartial, fit]);
   const waitForRest = () => {
     clearTimeout(settle.current);
-    settle.current = setTimeout(() => checkNearby.current?.(), SETTLE_MS);
+    rested.current = false;
+    settle.current = setTimeout(() => {
+      rested.current = true;
+      checkNearby.current?.();
+    }, SETTLE_MS);
   };
   useEffect(() => {
     if (!showsUser || centredOnUser.current) return;
@@ -113,12 +148,14 @@ export function PlacesMap({
           );
     };
     checkNearby.current = () => {
+      const { anchors, areaPartial } = latest.current;
+      if (anchors === undefined) return;
       checkNearby.current = undefined;
-      if (!hasPlaceNear(centre.current, latest.current.pins)) showCity();
+      if (!areaPartial && !hasPlaceNear(centre.current, anchors)) showCity();
     };
     // No position means the person's own location. A map mounted moments ago can refuse its first
     // move, so it is retried; if every try fails, the map shows the busiest city instead.
-    const cancel = moveCamera(
+    const cancel = command(
       () => map()?.setCameraPosition().then(waitForRest),
       (error) => {
         checkNearby.current = undefined;
@@ -136,13 +173,46 @@ export function PlacesMap({
       checkNearby.current = undefined;
       centredOnUser.current = false;
     };
-  }, [showsUser]);
-  useEffect(() => () => clearTimeout(settle.current), []);
+  }, [showsUser, command]);
+  const areaTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const reportedArea = useRef<MapBox | undefined>(undefined);
+  const reportArea = useCallback(
+    (camera: CameraView) => {
+      const visible = visibleBox(camera, {
+        width,
+        height,
+        apple: process.env.EXPO_OS === "ios",
+      });
+      if (!visible) return;
+      const box = checkNearby.current
+        ? withReach(visible, camera, NEARBY_KM)
+        : visible;
+      if (sameBox(box, reportedArea.current)) return;
+      reportedArea.current = box;
+      onArea(box);
+    },
+    [width, height, onArea],
+  );
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (!firstCamera || seeded.current) return;
+    seeded.current = true;
+    reportArea({ ...firstCamera.coordinates, zoom: firstCamera.zoom });
+  }, [firstCamera, reportArea]);
+  useEffect(
+    () => () => {
+      clearTimeout(settle.current);
+      clearTimeout(areaTimer.current);
+    },
+    [],
+  );
   useEffect(() => {
     if (!focus) return;
     // A place the person picked wins over the opening check.
     checkNearby.current = undefined;
-    return moveCamera(
+    return command(
       () =>
         map()?.setCameraPosition({
           coordinates: { latitude: focus.lat, longitude: focus.lng },
@@ -150,7 +220,15 @@ export function PlacesMap({
         }),
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
-  }, [focus]);
+  }, [focus, command]);
+  useEffect(() => {
+    if (locate === undefined) return;
+    checkNearby.current = undefined;
+    return command(
+      () => map()?.setCameraPosition(),
+      (error) => analytics.captureError("places_map_camera_failed", error),
+    );
+  }, [locate, command]);
 
   // A new filter whose places are all out of reach brings them into view. While the opening move is
   // still deciding where to go, its check frames the new filter instead. Search does not refit:
@@ -180,13 +258,32 @@ export function PlacesMap({
   };
   const trackCamera = (event: {
     coordinates: { latitude?: number; longitude?: number };
+    zoom: number;
+    tilt: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
   }) => {
     const { latitude, longitude } = event.coordinates;
+    const { zoom, tilt, latitudeDelta, longitudeDelta } = event;
     centre.current =
       latitude !== undefined && longitude !== undefined
         ? { lat: latitude, lng: longitude }
         : undefined;
     if (checkNearby.current) waitForRest();
+    clearTimeout(areaTimer.current);
+    if (latitude !== undefined && longitude !== undefined)
+      areaTimer.current = setTimeout(
+        () =>
+          reportArea({
+            latitude,
+            longitude,
+            zoom,
+            tilt,
+            latitudeDelta,
+            longitudeDelta,
+          }),
+        AREA_REST_MS,
+      );
   };
 
   if (process.env.EXPO_OS === "ios") {
@@ -203,7 +300,8 @@ export function PlacesMap({
         properties={{ isMyLocationEnabled: showsUser }}
         uiSettings={{
           compassEnabled: false,
-          myLocationButtonEnabled: showsUser,
+          myLocationButtonEnabled: false,
+          togglePitchEnabled: false,
         }}
         markers={pins.map((pin) => ({
           id: pin.id,

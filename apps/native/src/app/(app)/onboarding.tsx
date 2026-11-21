@@ -1,5 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
+import { bestEffort } from "@/lib/best-effort";
 import { ahaSample } from "@/lib/aha-sample";
 import { stepTransition } from "@/lib/motion";
 import { useOnboarding } from "@/lib/onboarding";
@@ -7,9 +8,7 @@ import { noteOnboardingFinished } from "@/lib/welcome-save";
 import { notificationPermissionState } from "@/lib/notification-token";
 import { useOnboardingPaywall } from "@/lib/onboarding-paywall";
 import { useFreePlanOpen } from "@/lib/free-plan";
-import type { SampleCityId } from "@/lib/sample-cities";
 import {
-  GOALS,
   cityQuestion,
   goalSpaces,
   planKindFor,
@@ -18,23 +17,24 @@ import {
 } from "@/lib/onboarding-goals";
 import { cityEchoText } from "@/lib/onboarding-echo";
 import { onboardingCompletedProperties } from "@/lib/onboarding-completed";
+import { type SampleCityId } from "@/lib/sample-cities";
 import {
-  ONBOARDING_FLOW_VERSION,
-  ONBOARDING_STEP_IDS,
-  ONBOARDING_STEPS,
-  nextOnboardingStep,
-  onboardingProgress,
-  previousOnboardingStep,
-  restoreOnboardingStep,
-  viewedBeforeResume,
+  onboardingProgressFraction,
   type OnboardingStep,
 } from "@/lib/onboarding-steps";
 import {
+  canGoBack,
+  canSkip,
+  clearOnboardingProgress,
+  isLeaving,
+  useOnboardingProgress,
+  type ProgressCommand,
+  type ProgressEvent,
+} from "@/lib/onboarding-progress";
+import {
   clearPending,
-  getOnboardingProgress,
   queueDemoUrl,
   resolveOnboardingSpaceName,
-  setOnboardingProgress,
   setPendingSpaces,
 } from "@/lib/pending-onboarding";
 import { queueCityStamps } from "@/lib/pending-city-stamps";
@@ -55,46 +55,11 @@ import { GoalStep, SavedCountStep } from "@/components/onboarding/questions";
 import { AppSymbolIcon } from "@/components/symbol";
 import { useConvexAuth } from "convex/react";
 import { haptics } from "@/lib/haptics";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Text, View } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-
-function useStepAnalytics(step: OnboardingStep, viewed: Set<OnboardingStep>) {
-  const tracked = useRef(new Set<OnboardingStep>());
-  const enteredAt = useRef(0);
-  const current = useRef<OnboardingStep | null>(null);
-  const index = ONBOARDING_STEPS.indexOf(step);
-
-  useEffect(() => {
-    if (current.current === step) return;
-    current.current = step;
-    enteredAt.current = Date.now();
-    if (viewed.has(step)) return;
-    viewed.add(step);
-    analytics.capture("onboarding_step_viewed", {
-      step_id: ONBOARDING_STEP_IDS[step],
-      step_index: index,
-      flow_version: ONBOARDING_FLOW_VERSION,
-    });
-  }, [step, index, viewed]);
-
-  return useCallback(
-    (skipped = false) => {
-      if (tracked.current.has(step)) return;
-      analytics.capture("onboarding_step_completed", {
-        step_id: ONBOARDING_STEP_IDS[step],
-        step_index: index,
-        flow_version: ONBOARDING_FLOW_VERSION,
-        duration_ms: Math.max(0, Date.now() - enteredAt.current),
-        skipped,
-      });
-      tracked.current.add(step);
-    },
-    [step, index],
-  );
-}
 
 function Header({
   step,
@@ -106,7 +71,7 @@ function Header({
   onSkip: (() => void) | null;
 }) {
   const { theme } = useUnistyles();
-  const progress = onboardingProgress(step);
+  const progress = onboardingProgressFraction(step);
   if (progress === null) return null;
   return (
     <View style={styles.header}>
@@ -156,103 +121,54 @@ export default function OnboardingScreen() {
   const { completeOnboarding } = useOnboarding();
   const { isAuthenticated } = useConvexAuth();
 
-  const [initial] = useState(() => getOnboardingProgress());
-  const [step, setStep] = useState<OnboardingStep>(() =>
-    restoreOnboardingStep(initial.step),
-  );
-  const [goals, setGoals] = useState<Goal[]>(initial.goals);
-  const [savedCount, setSavedCount] = useState<SavedCount | null>(
-    initial.savedCount,
-  );
-  const [skippedShare, setSkippedShare] = useState(initial.skippedShare);
-  const [askingNotifications, setAskingNotifications] = useState(false);
-  const [travelCity, setTravelCity] = useState<SampleCityId | null>(
-    initial.travelCity,
-  );
-  const [beenCities, setBeenCities] = useState<SampleCityId[]>(
-    initial.beenCities,
-  );
   const [showSignIn, setShowSignIn] = useState(false);
   const [viewedOpenerPages] = useState(() => new Set<number>());
-  const [viewedSteps] = useState(
-    () =>
-      new Set([
-        ...viewedBeforeResume(initial.step).filter(
-          (passed) => !(initial.skippedShare && passed === "firstSave"),
-        ),
-        ...initial.viewed,
-      ]),
-  );
   const [signedIn, setSignedIn] = useState(false);
-  const recordCurrentStep = useStepAnalytics(step, viewedSteps);
+
+  const progress = useOnboardingProgress();
+  const { state, read } = progress;
+  const { step, answers } = state;
+  const { goals, savedCount, travelCity } = answers;
   const kind = planKindFor(goals);
-  const spaces = goalSpaces(goals);
   const sample = ahaSample(kind, travelCity);
-  const stepIndex = ONBOARDING_STEPS.indexOf(step);
-  const currentStep = useRef(step);
-  const stepVisit = useRef(0);
+  const record = progress.dispatch;
 
-  useEffect(() => {
-    currentStep.current = step;
-    stepVisit.current += 1;
-  }, [step]);
-
-  useEffect(() => {
-    setOnboardingProgress({
-      spaces: goalSpaces(goals),
-      travelCity,
-      goals,
-      savedCount,
-      skippedShare,
-      beenCities,
-      step: stepIndex,
-      viewed: [...viewedSteps],
-    });
-  }, [
-    travelCity,
-    goals,
-    savedCount,
-    skippedShare,
-    beenCities,
-    stepIndex,
-    viewedSteps,
-  ]);
-
-  const [backward, setBackward] = useState(false);
-  const completeStep = (skipped: boolean) => {
-    recordCurrentStep(skipped);
-    setBackward(false);
-    setStep((current) =>
-      current === step ? nextOnboardingStep(current) : current,
-    );
-  };
-  const advance = () => completeStep(false);
+  const onAsking = useCallback(
+    (asking: boolean) => {
+      record({ type: "prompting", asking });
+    },
+    [record],
+  );
 
   useEffect(() => {
     if (!signedIn || !isAuthenticated) return;
     holdIncomingShare();
-    clearPending();
-    completeOnboarding();
+    bestEffort("onboarding_sign_in_finish_failed", clearPending);
+    clearOnboardingProgress();
+    bestEffort("onboarding_sign_in_finish_failed", completeOnboarding);
   }, [signedIn, isAuthenticated, completeOnboarding]);
 
   const finish = () => {
+    const finished = read().answers;
+    const spaces = goalSpaces(finished.goals);
     void haptics.success();
     analytics.capture(
       "onboarding_completed",
-      onboardingCompletedProperties(spaces, {
-        travelCity,
-        beenCities,
-        goals,
-        savedCount,
-      }),
+      onboardingCompletedProperties(spaces, finished),
     );
-    recordCurrentStep();
+    record({ type: "finish" });
     holdIncomingShare();
-    setPendingSpaces(spaces.map(resolveOnboardingSpaceName));
+    setPendingSpaces(spaces.map(resolveOnboardingSpaceName), finished);
     // The reel they shared in the demo becomes their first real save once they can save.
-    if (!skippedShare) queueDemoUrl(sample.firstSaveUrl);
-    queueCityStamps(beenCities);
+    if (!finished.skippedShare) {
+      queueDemoUrl(
+        ahaSample(planKindFor(finished.goals), finished.travelCity)
+          .firstSaveUrl,
+      );
+    }
+    queueCityStamps(finished.beenCities);
     noteOnboardingFinished();
+    clearOnboardingProgress();
     completeOnboarding();
   };
 
@@ -262,28 +178,29 @@ export default function OnboardingScreen() {
     onUnavailable: finish,
     onClosed: freePlanOpen === false ? undefined : finish,
   });
-  const [checkingNotifications, setCheckingNotifications] = useState(false);
 
-  const askForPlan = (skipped = false) => {
-    recordCurrentStep(skipped);
-    paywall.ask();
-  };
-
-  const leaveCarousel = (skipped = false) => {
-    const visit = stepVisit.current;
-    setCheckingNotifications(true);
+  function follow(command: ProgressCommand | null): void {
+    if (command?.kind === "askPaywall") paywall.ask();
+    if (command?.kind !== "checkPermission") return;
     void notificationPermissionState()
       .catch((error: unknown) => {
         analytics.captureError("onboarding_notifications_check_failed", error);
         return "blocked" as const;
       })
-      .then((state) => {
-        if (stepVisit.current !== visit) return;
-        setCheckingNotifications(false);
-        if (state === "ask") completeStep(skipped);
-        else askForPlan(skipped);
-      });
-  };
+      .then((permission) =>
+        follow(
+          record({
+            type: "permission",
+            visit: command.visit,
+            canAsk: permission === "ask",
+          }),
+        ),
+      );
+  }
+  const dispatch = (event: ProgressEvent) => follow(record(event));
+  const advance = () => dispatch({ type: "continue", from: step });
+  const answer = (changes: Partial<typeof answers>) =>
+    dispatch({ type: "answer", answers: changes });
 
   if (showSignIn) {
     return (
@@ -293,39 +210,6 @@ export default function OnboardingScreen() {
       />
     );
   }
-
-  const previous =
-    step === "ahaSpots" && skippedShare
-      ? "ahaShare"
-      : previousOnboardingStep(step);
-  const skip = () => {
-    switch (step) {
-      case "goal":
-        setGoals([...GOALS]);
-        return completeStep(true);
-      case "been":
-        setBeenCities([]);
-        return completeStep(true);
-      case "city":
-        setTravelCity(null);
-        return completeStep(true);
-      case "ahaShare":
-        setSkippedShare(true);
-        recordCurrentStep(true);
-        setBackward(false);
-        return setStep((current) => (current === step ? "ahaSpots" : current));
-      case "carousel":
-        return leaveCarousel(true);
-      case "notifications":
-        analytics.capture("onboarding_notifications", {
-          action: "skip",
-          granted: false,
-        });
-        return askForPlan(true);
-      default:
-        return completeStep(true);
-    }
-  };
 
   const body = (() => {
     switch (step) {
@@ -341,15 +225,17 @@ export default function OnboardingScreen() {
         return (
           <SavedCountStep
             picked={savedCount}
-            onPick={setSavedCount}
+            onPick={(count: SavedCount) => answer({ savedCount: count })}
             onContinue={advance}
           />
         );
       case "been":
         return (
           <BeenStep
-            picked={beenCities}
-            onChange={setBeenCities}
+            picked={answers.beenCities}
+            onChange={(picked: SampleCityId[]) =>
+              answer({ beenCities: picked })
+            }
             onContinue={advance}
           />
         );
@@ -357,7 +243,11 @@ export default function OnboardingScreen() {
         return <ProgressChartStep kind={kind} onContinue={advance} />;
       case "goal":
         return (
-          <GoalStep picked={goals} onChange={setGoals} onContinue={advance} />
+          <GoalStep
+            picked={goals}
+            onChange={(picked: Goal[]) => answer({ goals: picked })}
+            onContinue={advance}
+          />
         );
       case "city":
         return (
@@ -365,10 +255,13 @@ export default function OnboardingScreen() {
             kind={kind}
             question={cityQuestion(goals)}
             city={travelCity}
-            onPick={(city) => {
-              setTravelCity(city);
-              advance();
-            }}
+            onPick={(city) =>
+              dispatch({
+                type: "continue",
+                from: "city",
+                answers: { travelCity: city },
+              })
+            }
           />
         );
       case "cityEcho":
@@ -382,10 +275,13 @@ export default function OnboardingScreen() {
         return (
           <AhaShareStep
             sample={sample}
-            onShared={() => {
-              setSkippedShare(false);
-              advance();
-            }}
+            onShared={() =>
+              dispatch({
+                type: "continue",
+                from: "ahaShare",
+                answers: { skippedShare: false },
+              })
+            }
           />
         );
       case "firstSave":
@@ -396,17 +292,17 @@ export default function OnboardingScreen() {
         return (
           <CarouselStep
             sample={sample}
-            leaving={checkingNotifications || paywall.asked}
-            onContinue={() => leaveCarousel()}
+            leaving={isLeaving(state, paywall.asked)}
+            onContinue={advance}
           />
         );
       case "notifications":
         return (
           <NotificationsStep
             sample={sample}
-            leaving={paywall.asked}
-            onAsking={setAskingNotifications}
-            onContinue={() => askForPlan()}
+            leaving={isLeaving(state, paywall.asked)}
+            onAsking={onAsking}
+            onContinue={advance}
           />
         );
     }
@@ -422,21 +318,21 @@ export default function OnboardingScreen() {
       <Header
         step={step}
         onBack={
-          paywall.asked || previous === null
-            ? null
-            : () => {
-                setBackward(true);
-                setCheckingNotifications(false);
-                setStep(previous);
-              }
+          canGoBack(state, paywall.asked)
+            ? () => dispatch({ type: "back", from: step })
+            : null
         }
-        onSkip={paywall.asked || askingNotifications ? null : skip}
+        onSkip={
+          canSkip(state, paywall.asked)
+            ? () => dispatch({ type: "skip", from: step })
+            : null
+        }
       />
       <View style={styles.content}>
         {/* Keyed by step, so a new step springs in while the old one leaves; neither blocks a tap. */}
         <Animated.View
           key={step}
-          {...stepTransition(reduced, backward)}
+          {...stepTransition(reduced, state.backward)}
           style={styles.step}
         >
           {body}

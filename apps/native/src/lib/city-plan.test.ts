@@ -5,7 +5,8 @@ import { useCityPlan } from "./city-plan";
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
-  guard: vi.fn(),
+  admit: vi.fn(),
+  passed: vi.fn(),
   capture: vi.fn(),
   captureError: vi.fn(),
   focus: undefined as (() => void) | undefined,
@@ -13,8 +14,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mocks.capture, captureError: mocks.captureError },
 }));
-vi.mock("@/lib/entitlement", () => ({
-  usePaywallGuard: () => ({ guard: mocks.guard, loading: false }),
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: () => ({ admit: mocks.admit, passed: mocks.passed }),
 }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
 vi.mock("expo-router", () => ({
@@ -30,7 +31,7 @@ const TRIP_FORM = { pathname: "/new-trip", params: { city: "Lisbon" } };
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.focus = undefined;
-  mocks.guard.mockResolvedValue(true);
+  mocks.admit.mockResolvedValue("go");
 });
 
 it("opens the trip form once for a double tap on Plan a trip", async () => {
@@ -70,5 +71,6 @@ it("opens one date planner for a double tap on Plan a date", async () => {
     pathname: "/date-plan",
     params: { city: "Lisbon" },
   });
+  expect(mocks.passed).toHaveBeenCalledTimes(1);
   expect(result.current.busy).toBeNull();
 });
