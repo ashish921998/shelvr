@@ -682,6 +682,26 @@ describe("paywall activation funnel", () => {
   });
 });
 
+describe("a blocked action across another paywall", () => {
+  it("keeps the pending block through an upsell sheet and counts its purchase", async () => {
+    const { openPaywall } = await loadReady();
+    const funnel = await import("./paywall-funnel");
+    funnel.recordBlockedAction("remove_place");
+    mock.presentPaywallIfNeeded.mockResolvedValue("PURCHASED");
+
+    await openPaywall(router, "home_card");
+    funnel.resumeBlockedAction("remove_place");
+
+    expect(mock.capture).toHaveBeenCalledWith(
+      "paywall_blocked_action_resumed",
+      expect.objectContaining({
+        placement: "remove_place",
+        purchased_since_block: true,
+      }),
+    );
+  });
+});
+
 describe("a purchase made while signed in", () => {
   it("reads it into the account without waiting for the webhook", async () => {
     const { openPaywall } = await loadReady();
