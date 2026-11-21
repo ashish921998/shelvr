@@ -3,7 +3,8 @@ import { PlanCitySheet } from "@/components/home/plan-city-sheet";
 import { AppSymbolIcon } from "@/components/symbol";
 import { type CityPlanKind, useCityPlan } from "@/lib/city-plan";
 import { canBrowse } from "@/lib/access";
-import { useAccess, useSaveGuard } from "@/lib/free-plan";
+import { useAccess } from "@/lib/free-plan";
+import { useProGate } from "@/lib/pro-gate";
 import {
   type City,
   cityCountLine,
@@ -303,7 +304,7 @@ export function UnplacedSaves({ saves }: { saves: UnplacedSave[] }) {
 /** The places pitch for an empty shelf; Home shows it before the first save. */
 export function HomePlacesEmptyCard() {
   const router = useRouter();
-  const { guard } = useSaveGuard("home");
+  const { admit, passed } = useProGate("home");
   return (
     <View style={styles.card}>
       <Text style={styles.cardTitle}>{t("homePlaces.emptyTitle")}</Text>
@@ -311,7 +312,11 @@ export function HomePlacesEmptyCard() {
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={t("homePlaces.addSpot")}
-        onPress={() => void guard(() => router.push("/add"))}
+        onPress={async () => {
+          if ((await admit()) !== "go") return;
+          passed();
+          router.push("/add");
+        }}
         style={({ pressed }) => [styles.button, pressed && styles.pressed]}
       >
         <Text style={styles.buttonLabel}>{t("homePlaces.addSpot")}</Text>

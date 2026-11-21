@@ -33,7 +33,9 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `src/lib/haptics.ts`. Shared
   primitives: `src/components/ui` (`themed-text.tsx`, `button.tsx`). See `docs/architecture/design-system.md`.
 - **Paywall and entitlement:** `src/lib/entitlement.ts` owns `useEntitlement`,
-  `openPaywall`, `openPaywallOutcome`, `usePaywallGuard` and `restorePurchases`.
+  `openPaywall`, `openPaywallOutcome` and `restorePurchases`. An action that
+  needs Pro asks `useProGate` in `src/lib/pro-gate.ts`, which checks access,
+  handles the server's `pro_required`, opens the paywall and reports a resume.
   Around it: `trial-reminder.ts`, `paywall-funnel.ts`,
   `paywall-telemetry.ts` and `revenuecat-*.ts`.
   The server side is `convex/subscriptions.ts`.

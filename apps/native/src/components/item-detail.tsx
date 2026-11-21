@@ -1,7 +1,6 @@
 import type { TextMessageKey } from "@/locales/message-types";
 import { t, useAppLocale } from "@/lib/i18n";
 import { isStaleProcessing, isTerminalFailure } from "@convex/model/itemFields";
-import { saveErrorCode } from "@convex/model/saveErrors";
 import { SiteButton, SitePanel } from "@/components/site-panel";
 import { MediaViewerPage } from "@/components/media-viewer-page";
 import { PostMediaButton } from "@/components/post-media-button";
@@ -9,7 +8,7 @@ import { analytics } from "@/lib/analytics";
 import { IntentChip } from "@/components/intent-chip";
 import { TagChip } from "@/components/tag-chip";
 import { ItemSourceLink, openItemSource } from "@/components/item-source-link";
-import { usePaywallGuard } from "@/lib/entitlement";
+import { useProGate } from "@/lib/pro-gate";
 import { useAppHeaderHeight } from "@/lib/header-layout";
 import { runIntent } from "@/lib/intents";
 import { withoutSourceLink } from "@/lib/source-link";
@@ -512,21 +511,21 @@ function ItemPageBody({
 
 function EditPlacesLink({ item }: { item: DetailItem }) {
   const router = useRouter();
-  const { guard, loading } = usePaywallGuard("edit_places");
+  const { admit, passed, loading } = useProGate("edit_places");
   if (item.status !== "ready") return null;
   return (
     <Pressable
       accessibilityRole="button"
       disabled={loading}
       style={{ paddingVertical: 12 }}
-      onPress={() =>
-        void guard(() =>
-          router.push({
-            pathname: "/edit-save-places",
-            params: { itemId: item._id },
-          }),
-        )
-      }
+      onPress={async () => {
+        if ((await admit()) !== "go") return;
+        passed();
+        router.push({
+          pathname: "/edit-save-places",
+          params: { itemId: item._id },
+        });
+      }}
     >
       <Text style={styles.description}>{t("placeCorrection.title")}</Text>
     </Pressable>
@@ -685,7 +684,11 @@ function SaveStatusNotice({
   useAppLocale();
   const { theme } = useUnistyles();
   const reprocess = useMutation(api.items.reprocessItem);
-  const { guard, loading: entitlementLoading } = usePaywallGuard("item_detail");
+  const {
+    denied,
+    passed,
+    loading: entitlementLoading,
+  } = useProGate("item_detail");
   const [retrying, setRetrying] = useState(false);
   // The React Compiler flags impure calls such as Date.now() in the render body.
   const [now, setNow] = useState(() => Date.now());
@@ -737,13 +740,10 @@ function SaveStatusNotice({
             setRetrying(true);
             try {
               const scheduled = await reprocess({ id: item._id });
-              if (!scheduled) {
-                Alert.alert(t("item.stillWorking"), t("item.retryLater"));
-              }
+              if (scheduled) passed();
+              else Alert.alert(t("item.stillWorking"), t("item.retryLater"));
             } catch (error) {
-              const paywalled =
-                saveErrorCode(error) === "pro_required" && !(await guard());
-              if (!paywalled)
+              if (!(await denied(error)))
                 Alert.alert(t("errors.retryTitle"), t("errors.retrySoon"));
             } finally {
               setRetrying(false);
