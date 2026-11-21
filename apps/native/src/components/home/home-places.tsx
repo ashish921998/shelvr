@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { ThemedText } from "@/components/ui/themed-text";
 import { withAlpha } from "@/lib/color";
 import { canBrowse } from "@/lib/access";
-import { useAccess, useSaveGuard } from "@/lib/free-plan";
+import { useAccess } from "@/lib/free-plan";
+import { useProGate } from "@/lib/pro-gate";
 import { t, useAppLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
 import { convexQuery } from "@convex-dev/react-query";
@@ -17,7 +18,7 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 export function HomePlacesEmptyCard() {
   const router = useRouter();
   const { theme } = useUnistyles();
-  const { guard } = useSaveGuard("home");
+  const { admit, passed } = useProGate("home");
   return (
     <View style={styles.card}>
       <View style={styles.cardIcon}>
@@ -35,7 +36,11 @@ export function HomePlacesEmptyCard() {
       </ThemedText>
       <Button
         title={t("homePlaces.addSpot")}
-        onPress={() => void guard(() => router.push("/add"))}
+        onPress={async () => {
+          if ((await admit()) !== "go") return;
+          passed();
+          router.push("/add");
+        }}
         style={styles.cardButton}
       />
     </View>

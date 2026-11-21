@@ -156,12 +156,12 @@ const styles = StyleSheet.create((theme, rt) => ({
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "flex-end",
-    paddingTop: theme.gap(2),
     paddingBottom: Math.max(rt.insets.bottom, 12) + ATTRIBUTION_CLEARANCE,
   },
   libraryBar: {
     position: "relative",
     flexShrink: 0,
+    paddingTop: theme.gap(2),
     backgroundColor: theme.colors.background,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: theme.colors.border,

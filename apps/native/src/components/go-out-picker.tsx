@@ -32,6 +32,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+const CHIP_HEIGHT = 44;
+
 function CategoryChip({
   label,
   icon,
@@ -57,6 +59,10 @@ function CategoryChip({
       }}
       disabled={count === 0}
       onPress={onPress}
+      hitSlop={{
+        top: (theme.control.minHeight - CHIP_HEIGHT) / 2,
+        bottom: (theme.control.minHeight - CHIP_HEIGHT) / 2,
+      }}
       style={({ pressed }) => [
         styles.chip,
         selected && styles.chipSelected,
@@ -107,6 +113,7 @@ function PickResult({ place }: { place: GoOutPlace }) {
       <Pressable
         accessibilityRole="button"
         onPress={open}
+        hitSlop={(theme.control.minHeight - CHIP_HEIGHT) / 2}
         style={styles.directions}
       >
         <AppSymbolIcon
@@ -321,7 +328,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     width: "100%",
   },
   chip: {
-    minHeight: 44,
+    minHeight: CHIP_HEIGHT,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -349,7 +356,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.surface,
   },
   directions: {
-    minHeight: 44,
+    minHeight: CHIP_HEIGHT,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(0.5),

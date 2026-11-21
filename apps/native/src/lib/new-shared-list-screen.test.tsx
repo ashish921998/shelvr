@@ -20,8 +20,12 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: vi.fn(), captureError: vi.fn() },
 }));
-vi.mock("@/lib/entitlement", () => ({
-  usePaywallGuard: () => ({ guard: async () => true, loading: false }),
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: () => ({
+    admit: async () => "go",
+    passed: () => undefined,
+    loading: false,
+  }),
 }));
 vi.mock("@/lib/haptics", () => ({ haptics: { success: vi.fn() } }));
 vi.mock("@/lib/shared-lists", () => ({

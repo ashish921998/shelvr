@@ -1,3 +1,4 @@
+import { analytics } from "@/lib/analytics";
 import * as SecureStore from "expo-secure-store";
 
 const PENDING_INVITE_KEY = "shelvr.pending.invite";
@@ -44,6 +45,11 @@ export function setPendingPassport(token: string): void {
 }
 
 export function clearPendingInvite(): void {
-  SecureStore.setItem(PENDING_INVITE_KEY, "");
+  try {
+    SecureStore.setItem(PENDING_INVITE_KEY, "");
+  } catch (error) {
+    analytics.captureError("pending_invite_clear_failed", error);
+    return;
+  }
   notifyChanged();
 }

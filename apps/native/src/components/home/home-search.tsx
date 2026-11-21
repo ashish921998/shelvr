@@ -17,6 +17,8 @@ import {
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+const CLEAR_SIZE = 28;
+
 export function HomeSearch({
   top,
   children,
@@ -60,7 +62,7 @@ export function HomeSearch({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t("search.clear")}
-              hitSlop={8}
+              hitSlop={(theme.control.minHeight - CLEAR_SIZE) / 2}
               onPress={() => {
                 void haptics.impact();
                 setText("");
@@ -199,8 +201,8 @@ const styles = StyleSheet.create((theme) => ({
     paddingVertical: 0,
   },
   clear: {
-    width: 28,
-    height: 28,
+    width: CLEAR_SIZE,
+    height: CLEAR_SIZE,
     alignItems: "center",
     justifyContent: "center",
   },

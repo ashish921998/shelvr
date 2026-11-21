@@ -15,7 +15,11 @@ describe("plan vote link metadata", () => {
     const metadata = await generateMetadata({
       params: Promise.resolve({ token: "tok123" }),
     });
-    expect(metadata.alternates?.canonical).toBe("/p/tok123");
-    expect(metadata.openGraph?.url).toBe("/p/tok123");
+    expect(metadata.alternates?.canonical).toBe(
+      "https://shelvr-web.vercel.app/p/tok123",
+    );
+    expect(metadata.openGraph?.url).toBe(
+      "https://shelvr-web.vercel.app/p/tok123",
+    );
   });
 });

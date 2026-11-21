@@ -224,7 +224,10 @@ it("drops a pinned save's spots on its city and opens that city", () => {
     waited_ms: 0,
   });
   fireEvent.click(screen.getByText('spots.openCity {"city":"Austin"}'));
-  expect(mocks.dismissTo).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
+  expect(mocks.dismissTo).toHaveBeenCalledWith({
+    pathname: "/(app)/(tabs)/(map)",
+    params: { city: "Austin", save: "item-1" },
+  });
   expect(mocks.push).toHaveBeenCalledWith({
     pathname: "/city/[name]",
     params: { name: "Austin" },
@@ -233,6 +236,21 @@ it("drops a pinned save's spots on its city and opens that city", () => {
     mocks.push.mock.invocationCallOrder[0],
   );
   expect(mocks.replace).not.toHaveBeenCalled();
+});
+
+it("goes back to the Map on the save's city when Done is tapped", () => {
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [{ name: "Uchi", lat: 30.26, lng: -97.75, city: "Austin" }],
+  };
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByText("common.done"));
+  expect(mocks.replace).toHaveBeenCalledWith({
+    pathname: "/(app)/(tabs)/(map)",
+    params: { city: "Austin", save: "item-1" },
+  });
 });
 
 it("goes Home, as before, when the save has no place", () => {

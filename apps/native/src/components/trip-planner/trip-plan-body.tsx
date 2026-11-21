@@ -739,8 +739,8 @@ const styles = StyleSheet.create((theme, rt) => ({
   },
   selected: { borderWidth: 1, borderColor: theme.colors.primaryText },
   move: {
-    width: 44,
-    height: 44,
+    width: theme.control.minHeight,
+    height: theme.control.minHeight,
     alignItems: "center",
     justifyContent: "center",
   },

@@ -921,7 +921,6 @@ export const addTripStop = authedMutation({
   },
 });
 
-/** Names the trip; an empty name goes back to "<city> trip". */
 export const updateTripStopDetails = authedMutation({
   args: {
     stopId: v.id("tripStops"),
@@ -945,6 +944,7 @@ export const updateTripStopDetails = authedMutation({
   },
 });
 
+/** Names the trip; an empty name goes back to "<city> trip". */
 export const renameTripPlan = authedMutation({
   args: { tripId: v.id("tripPlans"), name: v.string() },
   returns: v.null(),

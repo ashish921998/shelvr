@@ -1,6 +1,6 @@
 import { analytics } from "@/lib/analytics";
-import { usePaywallGuard } from "@/lib/entitlement";
 import { t } from "@/lib/i18n";
+import { useProGate } from "@/lib/pro-gate";
 import { useFocusEffect, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import { Alert } from "react-native";
@@ -9,7 +9,7 @@ export type CityPlanKind = "date" | "trip";
 
 export function useCityPlan() {
   const router = useRouter();
-  const planGuard = usePaywallGuard("make_plan").guard;
+  const { admit, passed } = useProGate("make_plan");
   const [busy, setBusy] = useState<CityPlanKind | null>(null);
   // A ref, not `busy`: a second tap can land before React re-renders with the first one's state.
   // The trip form stays open after `busy` clears, so its lock is released when this screen is back in focus.
@@ -30,8 +30,8 @@ export function useCityPlan() {
     setBusy(kind);
     let formOpen = false;
     try {
-      const allowed = await planGuard(() => undefined);
-      if (!allowed) return;
+      if ((await admit()) !== "go") return;
+      passed();
       if (kind === "trip")
         analytics.capture("city_plan_started", { kind, from: "direct" });
       onLeave?.();

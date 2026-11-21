@@ -485,11 +485,8 @@ describe("fetchXPost", () => {
         options.headers["User-Agent"],
       ]),
     ).toEqual([
-      [
-        "cdn.syndication.twimg.com",
-        "Shelvr/1.0 (+https://shelvr-web.vercel.app)",
-      ],
-      ["publish.twitter.com", "Shelvr/1.0 (+https://shelvr-web.vercel.app)"],
+      ["cdn.syndication.twimg.com", "Shelvr/1.0 (+https://tryshelvr.app)"],
+      ["publish.twitter.com", "Shelvr/1.0 (+https://tryshelvr.app)"],
     ]);
   });
 });
@@ -1021,7 +1018,7 @@ describe("fetchInstagram", () => {
       "https://www.instagram.com/reel/DHVrPLrIyQ_/embed/captioned/",
       expect.objectContaining({
         headers: expect.objectContaining({
-          "User-Agent": "Shelvr/1.0 (+https://shelvr-web.vercel.app)",
+          "User-Agent": "Shelvr/1.0 (+https://tryshelvr.app)",
         }),
       }),
     );

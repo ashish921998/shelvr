@@ -56,7 +56,7 @@ const structuredData = {
     {
       "@type": "WebApplication",
       name: "Reel Place Finder",
-      url: `https://shelvr-web.vercel.app${PATH}`,
+      url: `https://tryshelvr.app${PATH}`,
       applicationCategory: "UtilitiesApplication",
       operatingSystem: "Any",
       isAccessibleForFree: true,

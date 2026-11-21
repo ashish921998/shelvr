@@ -16,6 +16,8 @@ for (const ext of [".jpg", ".jpeg", ".png", ".webp"]) {
 
 process.env.EXPO_PUBLIC_CONVEX_URL ??= "https://test.convex.cloud";
 
+Object.assign(globalThis, { Convex: {} });
+
 vi.mock("expo-haptics", () => ({
   selectionAsync: vi.fn(async () => {}),
   impactAsync: vi.fn(async () => {}),

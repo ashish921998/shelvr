@@ -89,7 +89,7 @@ app: test ids `add-article-input`, `dev-login-button`, `reset-flow-fixtures`;
 the city cards on Cities, which `openCities` opens from Home's `Cities` row
 (buttons named `<City>` without pins, or `<City>, N places` once mapped; do not
 require the comma); the Map's `Profile` button; and the tab bar's `Library`,
-`Add` and `Plan a date` buttons. The app opens on the Map, and `openHome` taps
+`Add` and `Go out` buttons. The app opens on the Map, and `openHome` taps
 `Library`; on Home the same tab bar button reads `Map`.
 
 Live, over MCP: no `e2e mcp` server is registered in this repo. Add one for

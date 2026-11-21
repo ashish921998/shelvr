@@ -11,10 +11,8 @@ const mocks = vi.hoisted(() => ({
   plan: vi.fn(),
   loading: false,
   siri: [] as unknown[],
-  guard: vi.fn(async (action?: () => void) => {
-    action?.();
-    return true;
-  }),
+  admit: vi.fn(async () => "go"),
+  passed: vi.fn(),
 }));
 
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
@@ -23,8 +21,12 @@ vi.mock("@/components/ui/themed-text", () => ({
     <h2>{children}</h2>
   )),
 }));
-vi.mock("@/lib/free-plan", () => ({
-  useSaveGuard: () => ({ guard: mocks.guard, loading: mocks.loading }),
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: () => ({
+    admit: mocks.admit,
+    passed: mocks.passed,
+    loading: mocks.loading,
+  }),
 }));
 vi.mock("@/lib/plan-picker", () => ({
   usePlanPicker: () => ({ plan: mocks.plan, sheet: null }),
@@ -64,7 +66,8 @@ beforeEach(() => {
   mocks.calls = [];
   mocks.canGoBack = true;
   mocks.plan.mockReset();
-  mocks.guard.mockClear();
+  mocks.admit.mockClear();
+  mocks.passed.mockClear();
   mocks.loading = false;
   mocks.siri = [];
 });
@@ -77,15 +80,17 @@ function press(name: string | RegExp) {
 it("closes the sheet, then opens the link field after the save check", async () => {
   press(/^Paste a link/);
   await Promise.resolve();
-  expect(mocks.guard).toHaveBeenCalledTimes(1);
+  expect(mocks.admit).toHaveBeenCalledTimes(1);
+  expect(mocks.passed).toHaveBeenCalledTimes(1);
   expect(mocks.calls).toEqual(["back", "/add"]);
 });
 
 it("keeps the sheet open under the paywall when the save check stops the save", async () => {
-  mocks.guard.mockImplementationOnce(async () => false);
+  mocks.admit.mockImplementationOnce(async () => "paywalled");
   press(/^Paste a link/);
   await Promise.resolve();
-  expect(mocks.guard).toHaveBeenCalledTimes(1);
+  expect(mocks.admit).toHaveBeenCalledTimes(1);
+  expect(mocks.passed).not.toHaveBeenCalled();
   expect(mocks.calls).toEqual([]);
 });
 
@@ -98,7 +103,7 @@ it("takes a Google Maps list through the same link field", async () => {
 it("waits while the save check is still loading", () => {
   mocks.loading = true;
   press(/^Paste a link/);
-  expect(mocks.guard).not.toHaveBeenCalled();
+  expect(mocks.admit).not.toHaveBeenCalled();
   expect(mocks.calls).toEqual([]);
 });
 

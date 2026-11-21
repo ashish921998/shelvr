@@ -6,6 +6,8 @@ import type { ReactNode } from "react";
 import { Pressable, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
+const AVATAR_SIZE = 46;
+
 export function HomeHeader({ children }: { children?: ReactNode }) {
   useAppLocale();
   const router = useRouter();
@@ -17,6 +19,7 @@ export function HomeHeader({ children }: { children?: ReactNode }) {
         accessibilityRole="button"
         accessibilityLabel={t("navigation.profile")}
         onPress={() => router.push("/profile")}
+        hitSlop={(theme.control.minHeight - AVATAR_SIZE) / 2}
         style={({ pressed }) => [styles.avatar, pressed && styles.pressed]}
       >
         <AppSymbolIcon
@@ -31,7 +34,7 @@ export function HomeHeader({ children }: { children?: ReactNode }) {
 
 const styles = StyleSheet.create((theme) => ({
   row: {
-    minHeight: 46,
+    minHeight: AVATAR_SIZE,
     flexDirection: "row",
     alignItems: "center",
     gap: 13,
@@ -41,11 +44,11 @@ const styles = StyleSheet.create((theme) => ({
   },
   middle: { flex: 1, minWidth: 0 },
   avatar: {
-    width: 46,
-    height: 46,
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 23,
+    borderRadius: AVATAR_SIZE / 2,
     borderWidth: 2.5,
     borderColor: withAlpha(theme.colors.primary, 0.45),
     backgroundColor: theme.colors.surfaceMuted,

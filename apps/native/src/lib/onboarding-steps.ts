@@ -31,7 +31,9 @@ export const ONBOARDING_STEP_IDS: Record<OnboardingStep, string> = {
   notifications: "notification_ask",
 };
 
-export function onboardingProgress(step: OnboardingStep): number | null {
+export function onboardingProgressFraction(
+  step: OnboardingStep,
+): number | null {
   const index = ONBOARDING_STEPS.indexOf(step);
   return index <= 0 ? null : index / (ONBOARDING_STEPS.length - 1);
 }
@@ -47,7 +49,7 @@ export function nextOnboardingStep(step: OnboardingStep): OnboardingStep {
   return ONBOARDING_STEPS[ONBOARDING_STEPS.indexOf(step) + 1] ?? step;
 }
 
-/** `step` must be an index written by this flow version; getOnboardingProgress drops older flows' records. */
+/** `step` must be an index written by this flow version; the legacy progress import reads only records of the last index-keyed flow. */
 export function restoreOnboardingStep(step: number | null): OnboardingStep {
   if (step === null || !Number.isInteger(step)) return "opener";
   return ONBOARDING_STEPS[step] ?? "opener";

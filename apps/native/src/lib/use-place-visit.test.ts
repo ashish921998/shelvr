@@ -10,6 +10,7 @@ import type { Id } from "@convex/_generated/dataModel";
 const mocks = vi.hoisted(() => ({
   setVisited: vi.fn(),
   openPaywall: vi.fn(),
+  access: { kind: "locked" } as { kind: string; syncing?: boolean },
   alert: vi.fn(),
   capture: vi.fn(),
   captureError: vi.fn(),
@@ -27,7 +28,15 @@ vi.mock("expo-router", () => ({
   useRouter: () => mocks.router,
   useNavigation: () => ({ isFocused: () => mocks.focused }),
 }));
-vi.mock("@/lib/entitlement", () => ({ openPaywall: mocks.openPaywall }));
+vi.mock("@/lib/entitlement", () => ({
+  openPaywallAnswer: mocks.openPaywall,
+  useEntitlement: () => ({ entitled: false, loading: false }),
+}));
+vi.mock("@/lib/free-plan", () => ({ useAccess: () => mocks.access }));
+vi.mock("@/lib/revenuecat-module", () => ({ getPurchases: () => null }));
+vi.mock("@/lib/paywall-goal", () => ({}));
+vi.mock("@/lib/trial-reminder-lead", () => ({}));
+vi.mock("@/lib/date", () => ({}));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mocks.capture, captureError: mocks.captureError },
 }));
@@ -62,6 +71,7 @@ function toggle(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.access = { kind: "locked" };
   mocks.setVisited.mockResolvedValue(null);
   mocks.badgesReady.mockResolvedValue(undefined);
   mocks.focused = true;
@@ -135,6 +145,44 @@ describe("usePlaceVisit", () => {
     );
     expect(mocks.alert).not.toHaveBeenCalled();
     expect(mocks.play).not.toHaveBeenCalled();
+  });
+
+  it("counts a mark that runs after a purchase as the blocked action resumed", async () => {
+    const funnel = await import("@/lib/paywall-funnel");
+    mocks.openPaywall.mockImplementation(() => {
+      funnel.recordAccess("purchase");
+      mocks.access = { kind: "pro", syncing: false };
+      return Promise.resolve({ outcome: "success", answered: true });
+    });
+    mocks.setVisited.mockRejectedValueOnce(
+      new ConvexError({ code: "pro_required", message: "Pro required" }),
+    );
+    await toggle(taco);
+    await toggle(taco);
+    expect(mocks.capture).toHaveBeenCalledWith(
+      "paywall_blocked_action_resumed",
+      expect.objectContaining({
+        placement: "mark_visited",
+        purchased_since_block: true,
+      }),
+    );
+  });
+
+  it("does not count a free un-mark as the blocked mark resumed", async () => {
+    mocks.setVisited.mockRejectedValueOnce(
+      new ConvexError({ code: "pro_required", message: "Pro required" }),
+    );
+    mocks.openPaywall.mockResolvedValue({
+      outcome: "cancelled",
+      answered: true,
+    });
+    await toggle(taco);
+    const { result } = renderHook(() => usePlaceVisit());
+    await act(() => result.current.toggle(itemId, taco, false));
+    expect(mocks.capture).not.toHaveBeenCalledWith(
+      "paywall_blocked_action_resumed",
+      expect.anything(),
+    );
   });
 
   it("says to wait a few minutes when too many places were marked", async () => {

@@ -1,17 +1,13 @@
 import { analytics } from "@/lib/analytics";
-import {
-  openPaywall,
-  useEntitlement,
-  usePaywallGuard,
-} from "@/lib/entitlement";
+import { useEntitlement } from "@/lib/entitlement";
 import { t } from "@/lib/i18n";
+import { useProGate } from "@/lib/pro-gate";
 import { type CityStamp, cityStampLabel } from "@/lib/city-stamp-data";
 import type { SampleCityId } from "@/lib/sample-cities";
 import { cityStampMoment, useStampMoment } from "@/lib/stamp-moment";
 import { api } from "@convex/_generated/api";
 import { CITY_STAMP_CITIES, isCityStampId } from "@convex/model/cityStamps";
 import { isRateLimitedError } from "@convex/model/demoErrors";
-import { saveErrorCode } from "@convex/model/saveErrors";
 import type { OptimisticLocalStore } from "convex/browser";
 import { useMutation } from "convex/react";
 import { useNavigation, useRouter } from "expo-router";
@@ -80,7 +76,7 @@ export function useCityStampToggle(): (
   stamped: boolean,
   stamps: readonly string[],
 ) => Promise<boolean> {
-  const router = useRouter();
+  const { denied, passed } = useProGate("passport");
   const navigation = useNavigation();
   const mutations = useCityStampMutations();
   const { play, badgesReady } = useStampMoment();
@@ -95,24 +91,23 @@ export function useCityStampToggle(): (
           await mutations.remove(city);
         } else {
           await badgesReady();
-          if ((await mutations.add(city)) && navigation.isFocused()) {
+          const added = await mutations.add(city);
+          passed();
+          if (added && navigation.isFocused()) {
             play(cityStampMoment(cityStampLabel(city)), "city_stamps");
           }
         }
         analytics.capture("passport_city_stamp_changed", { stamped, count });
         return true;
       } catch (error) {
-        if (saveErrorCode(error) === "pro_required") {
-          await openPaywall(router, "passport");
-          return false;
-        }
+        if (await denied(error)) return false;
         reportFailure(error);
         return false;
       } finally {
         working.current.delete(city);
       }
     },
-    [badgesReady, mutations, navigation, play, router],
+    [badgesReady, denied, mutations, navigation, passed, play],
   );
 }
 
@@ -152,16 +147,19 @@ export function useCityStampAccess(count: number): {
 } {
   const router = useRouter();
   const { entitled, loading } = useEntitlement();
-  const { guard } = usePaywallGuard("passport");
+  const { admit, passed, loading: waiting } = useProGate("passport");
   const locked = !loading && !entitled;
   const open = useCallback(() => {
     if (locked) {
-      analytics.capture("passport_paywall_opened", { surface: "city_stamp" });
-      void guard();
+      if (!waiting) {
+        analytics.capture("passport_paywall_opened", { surface: "city_stamp" });
+      }
+      void admit();
       return;
     }
+    passed();
     analytics.capture("passport_city_stamps_opened", { count });
     router.push("/city-stamps");
-  }, [count, guard, locked, router]);
+  }, [admit, count, locked, passed, router, waiting]);
   return { locked, open };
 }

@@ -10,8 +10,8 @@ import { TripCountryPicker } from "@/components/trip-planner/trip-country-picker
 import { Button } from "@/components/ui/button";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
+import { useProGate } from "@/lib/pro-gate";
 import { isDarkThemeName } from "@/lib/appearance";
-import { usePaywallGuard } from "@/lib/entitlement";
 import { formattingLocale, t, useAppLocale } from "@/lib/i18n";
 import { MAX_TRIP_DAYS, toDateKey, tripDayDate } from "@/lib/trip";
 import { usePlaceSearch } from "@/lib/trip-edit";
@@ -105,7 +105,11 @@ function DateField({
         />
       ) : (
         <>
-          <Pressable accessibilityRole="button" onPress={() => setOpen(true)}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setOpen(true)}
+            style={styles.dateButton}
+          >
             <ThemedText variant="bodyLabel">
               {value.toLocaleDateString(formattingLocale())}
             </ThemedText>
@@ -517,7 +521,7 @@ export function TripSetup({
   const [draft, setDraft] = useState<TripDraft>(() => {
     const start = shiftDate(new Date(), 0);
     return {
-      name: "",
+      name: city ?? "",
       countries: [],
       city: city ?? "",
       dated: true,
@@ -530,7 +534,7 @@ export function TripSetup({
   const [failed, setFailed] = useState(false);
   const pending = useRef(false);
   const create = useMutation(api.tripPlannerData.createBlankTrip);
-  const { guard } = usePaywallGuard("plan_trip");
+  const { admit, passed } = useProGate("plan_trip");
   const pins = useQuery(
     convexQuery(
       api.mapPlaces.listMapPlaces,
@@ -560,7 +564,7 @@ export function TripSetup({
     setBusy(true);
     setFailed(false);
     try {
-      if (!(await guard()) || !navigation.isFocused()) return;
+      if ((await admit()) !== "go" || !navigation.isFocused()) return;
       const {
         name,
         countries,
@@ -582,6 +586,7 @@ export function TripSetup({
           ? { stay: { name: stay.name, lat: stay.lat, lng: stay.lng } }
           : {}),
       });
+      passed();
       analytics.capture("trip_blank_created", {
         days: dated ? duration(start, end) : days,
         dated,
@@ -730,6 +735,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.surfaceMuted,
   },
   datePicker: { minWidth: 132 },
+  dateButton: { minHeight: theme.control.minHeight, justifyContent: "center" },
   cover: {
     alignSelf: "center",
     width: 104,

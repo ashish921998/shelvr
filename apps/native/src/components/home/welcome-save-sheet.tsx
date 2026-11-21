@@ -7,7 +7,7 @@ import { useEffect, useRef } from "react";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
-/** The one-time letter a new account opens Home to. */
+/** The one-time letter a new account sees on whichever tab the app opens to. */
 export function WelcomeSaveSheet({
   userId,
   ready,

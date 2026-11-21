@@ -1,14 +1,12 @@
 import { analytics } from "@/lib/analytics";
-import { openPaywall } from "@/lib/entitlement";
 import { t } from "@/lib/i18n";
+import { useProGate } from "@/lib/pro-gate";
 import { shareUrl } from "@/lib/share-link";
 import { webUrl } from "@/lib/web-url";
 import { api } from "@convex/_generated/api";
-import { saveErrorCode } from "@convex/model/saveErrors";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth, useMutation } from "convex/react";
-import { useRouter } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Share } from "react-native";
 
@@ -76,7 +74,7 @@ export function useStopSharingPassport() {
 }
 
 export function useSaveFriendPlaces(token: string, ownerName?: string) {
-  const router = useRouter();
+  const { denied, passed } = useProGate("passport_friend_places");
   const save = useMutation(api.passportShares.saveFriendPlaces);
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState<number | null>(null);
@@ -95,18 +93,16 @@ export function useSaveFriendPlaces(token: string, ownerName?: string) {
         Alert.alert(t("passportShare.deadTitle"));
         return;
       }
+      passed();
       analytics.capture("passport_friend_places_saved", result);
       setSaved((before) => (before ?? 0) + result.saved);
     } catch (error) {
-      if (saveErrorCode(error) === "pro_required") {
-        await openPaywall(router, "passport_friend_places");
-        return;
-      }
+      if (await denied(error)) return;
       analytics.captureError("passport_friend_places_failed", error);
       Alert.alert(t("errors.unexpectedTitle"), t("errors.retrySoon"));
     } finally {
       setBusy(false);
     }
-  }, [busy, save, token, ownerName, router]);
+  }, [busy, save, token, ownerName, denied, passed]);
   return { save: run, busy, saved };
 }

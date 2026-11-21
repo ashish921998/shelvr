@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
-import { act, render } from "@testing-library/react";
-import { forwardRef, useImperativeHandle } from "react";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { act, fireEvent, render } from "@testing-library/react";
+import { forwardRef, type ReactNode, useImperativeHandle } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { type MapFocus, PlacesMap } from "./places-map";
+import type { MapBox } from "@/lib/discover-area";
+
+import { type MapFocus, type MapFrame, PlacesMap } from "./places-map";
 
 type Camera = { coordinates: object; zoom: number };
 
@@ -50,6 +52,21 @@ vi.mock("expo-maps", () => ({
   },
   GoogleMaps: { View: vi.fn(() => null) },
 }));
+vi.mock("react-native", () => ({
+  View: vi.fn(
+    ({
+      children,
+      onTouchStart,
+    }: {
+      children: ReactNode;
+      onTouchStart?: () => void;
+    }) => (
+      <div data-testid="map-touch" onTouchStart={onTouchStart}>
+        {children}
+      </div>
+    ),
+  ),
+}));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}), absoluteFillObject: {} },
   useUnistyles: () => ({
@@ -71,10 +88,15 @@ const AUSTIN = [
 ];
 const FOCUS: MapFocus = { lat: 30.27, lng: -97.73, key: 1 };
 
-function map(person: { locate?: number; focus?: MapFocus } = {}) {
+function map(
+  person: { locate?: number; focus?: MapFocus; frame?: MapFrame } = {},
+) {
   return (
     <PlacesMap
+      areaPartial={false}
+      onArea={vi.fn()}
       pins={AUSTIN}
+      anchors={AUSTIN}
       framed={AUSTIN}
       showsUser
       height={800}
@@ -124,7 +146,10 @@ it.each([false, true])(
       filterRevision = 0,
     ) => (
       <PlacesMap
+        areaPartial={false}
+        onArea={vi.fn()}
         pins={pins}
+        anchors={pins}
         framed={framed}
         showsUser={showsUser}
         height={800}
@@ -162,7 +187,10 @@ it("keeps initial saved-city positioning when loaded visits refresh the places",
   const refreshed = AUSTIN.map((pin) => ({ ...pin }));
   rerender(
     <PlacesMap
+      areaPartial={false}
+      onArea={vi.fn()}
       pins={refreshed}
+      anchors={refreshed}
       framed={refreshed}
       showsUser
       height={800}
@@ -205,7 +233,10 @@ it("uses native markers to declutter nearby places, keeping their emoji, title a
   const onSelect = vi.fn();
   render(
     <PlacesMap
+      areaPartial={false}
+      onArea={vi.fn()}
       pins={[{ ...AUSTIN[0]!, emoji: "🍜" }, AUSTIN[1]!]}
+      anchors={AUSTIN}
       framed={AUSTIN}
       showsUser={false}
       height={800}
@@ -238,7 +269,10 @@ it("keeps all nearby places reachable through the count marker's picker", () => 
   const onSelect = vi.fn();
   render(
     <PlacesMap
+      areaPartial={false}
+      onArea={vi.fn()}
       pins={AUSTIN}
+      anchors={AUSTIN}
       framed={AUSTIN}
       showsUser={false}
       height={800}
@@ -265,6 +299,33 @@ it("keeps all nearby places reachable through the count marker's picker", () => 
   expect(mock.cluster.pins).toEqual([]);
 });
 
+it("flies to a shared city's places once for each save", async () => {
+  const NYC = [
+    { lat: 40.71, lng: -74.0 },
+    { lat: 40.76, lng: -73.98 },
+  ];
+  const { rerender } = render(map());
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  const before = mock.moves.length;
+  rerender(map({ frame: { key: "save-1", places: NYC } }));
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  const moves = mock.moves.slice(before).filter((m) => m !== "person");
+  expect(moves).toHaveLength(1);
+  const centre = (moves[0] as Camera).coordinates as {
+    latitude: number;
+    longitude: number;
+  };
+  expect(centre.latitude).toBeGreaterThan(40.71);
+  expect(centre.latitude).toBeLessThan(40.76);
+  const refreshed = mock.moves.length;
+  rerender(map({ frame: { key: "save-1", places: [...NYC] } }));
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  expect(mock.moves.length).toBe(refreshed);
+  rerender(map({ frame: { key: "save-2", places: NYC } }));
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  expect(mock.moves.length).toBe(refreshed + 1);
+});
+
 it("flies out to frame every place when asked to zoom out", async () => {
   const far = [...AUSTIN, { id: "c", name: "Bar", lat: 32.78, lng: -96.8 }];
   const { rerender } = render(map());
@@ -272,7 +333,10 @@ it("flies out to frame every place when asked to zoom out", async () => {
   const before = mock.moves.length;
   rerender(
     <PlacesMap
+      areaPartial={false}
+      onArea={vi.fn()}
       pins={AUSTIN}
+      anchors={AUSTIN}
       framed={AUSTIN}
       overview={far}
       zoomOut={1}
@@ -296,7 +360,10 @@ it("flies out to frame every place when asked to zoom out", async () => {
 it("frames the first saved places once when the map opened empty without location", async () => {
   const noLocation = (pins: typeof AUSTIN, bottomInset = 120) => (
     <PlacesMap
+      areaPartial={false}
+      onArea={vi.fn()}
       pins={pins}
+      anchors={pins}
       framed={pins}
       showsUser={false}
       height={800}
@@ -328,7 +395,10 @@ it.each([
     mock.findsPerson = true;
     const located = (pins: typeof AUSTIN) => (
       <PlacesMap
+        areaPartial={false}
+        onArea={vi.fn()}
         pins={pins}
+        anchors={pins}
         framed={pins}
         showsUser
         height={800}
@@ -362,7 +432,10 @@ it("keeps the area the person panned to when their first places arrive", async (
   mock.findsPerson = true;
   const located = (pins: typeof AUSTIN) => (
     <PlacesMap
+      areaPartial={false}
+      onArea={vi.fn()}
       pins={pins}
+      anchors={pins}
       framed={pins}
       showsUser
       height={800}
@@ -378,14 +451,53 @@ it("keeps the area the person panned to when their first places arrive", async (
         zoom: 13,
       }),
     );
-  const { rerender } = render(located([]));
+  const { getByTestId, rerender } = render(located([]));
   await act(() => vi.advanceTimersByTimeAsync(10));
   pan(28.6, 77.2);
   await act(() => vi.advanceTimersByTimeAsync(5000));
+  fireEvent.touchStart(getByTestId("map-touch"));
   pan(19.07, 72.88);
   rerender(located(AUSTIN));
   await act(() => vi.advanceTimersByTimeAsync(200));
   expect(mock.moves).toEqual(["person"]);
+});
+
+it("frames the first places when the map moved without the person touching it", async () => {
+  mock.findsPerson = true;
+  const located = (pins: typeof AUSTIN) => (
+    <PlacesMap
+      areaPartial={false}
+      onArea={vi.fn()}
+      pins={pins}
+      anchors={pins}
+      framed={pins}
+      showsUser
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={vi.fn()}
+    />
+  );
+  const { rerender } = render(located([]));
+  await act(() => vi.advanceTimersByTimeAsync(5000));
+  act(() =>
+    mock.props.onCameraMove({
+      coordinates: { latitude: 0.4, longitude: 0.2 },
+      zoom: 13,
+    }),
+  );
+  rerender(located(AUSTIN));
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  expect(mock.moves).toEqual([
+    "person",
+    {
+      coordinates: {
+        latitude: expect.closeTo(30.27, 2),
+        longitude: expect.closeTo(-97.73, 2),
+      },
+      zoom: expect.any(Number),
+    },
+  ]);
 });
 
 it("keeps the chosen area when location access is turned off later", async () => {
@@ -394,7 +506,10 @@ it("keeps the chosen area when location access is turned off later", async () =>
   const before = mock.moves.length;
   rerender(
     <PlacesMap
+      areaPartial={false}
+      onArea={vi.fn()}
       pins={AUSTIN}
+      anchors={AUSTIN}
       framed={AUSTIN}
       showsUser={false}
       height={800}
@@ -405,4 +520,165 @@ it("keeps the chosen area when location access is turned off later", async () =>
   );
   await act(() => vi.advanceTimersByTimeAsync(200));
   expect(mock.moves.slice(before)).toEqual([]);
+});
+
+type LatLng = { lat: number; lng: number };
+
+const LISBON = [
+  { id: "a", name: "Manteigaria", lat: 38.71, lng: -9.14 },
+  { id: "b", name: "Ramiro", lat: 38.72, lng: -9.13 },
+];
+const PARIS = { lat: 48.857, lng: 2.352 };
+const CASCAIS = { lat: 38.6979, lng: -9.4215 };
+
+const holds = (box: MapBox | undefined, at: LatLng) =>
+  box !== undefined &&
+  box.south <= at.lat &&
+  at.lat <= box.north &&
+  box.west <= at.lng &&
+  at.lng <= box.east;
+
+const latitudes = () =>
+  mock.moves.map((move) =>
+    move === "person"
+      ? undefined
+      : (move.coordinates as { latitude: number }).latitude,
+  );
+
+function areaMap(
+  overrides: {
+    anchors?: LatLng[];
+    areaPartial?: boolean;
+    locate?: number;
+    showsUser?: boolean;
+    height?: number;
+    onArea?: (box: MapBox) => void;
+  } = {},
+) {
+  return (
+    <PlacesMap
+      pins={LISBON}
+      framed={LISBON}
+      anchors={undefined}
+      showsUser
+      areaPartial={false}
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={vi.fn()}
+      onArea={vi.fn()}
+      {...overrides}
+    />
+  );
+}
+
+function openMap(
+  anchors: LatLng[] | undefined,
+  onArea: (box: MapBox) => void = () => {},
+  areaPartial = false,
+) {
+  const view = render(areaMap({ anchors, onArea, areaPartial }));
+  return (next: LatLng[] | undefined) =>
+    act(() => view.rerender(areaMap({ anchors: next, onArea, areaPartial })));
+}
+
+async function restOnPerson(at: LatLng) {
+  await act(async () => {
+    await Promise.resolve();
+    mock.props.onCameraMove({
+      coordinates: { latitude: at.lat, longitude: at.lng },
+      zoom: 13,
+      tilt: 0,
+      latitudeDelta: 0.05,
+      longitudeDelta: 0.05,
+    });
+    vi.advanceTimersByTime(600);
+  });
+}
+
+describe("opening on the person while Discover loads by area", () => {
+  beforeEach(() => {
+    mock.findsPerson = true;
+  });
+
+  it("waits for the area's places, then stays when one is near", async () => {
+    const answer = openMap(undefined);
+    await restOnPerson(PARIS);
+    expect(latitudes()).toEqual([undefined]);
+    answer([PARIS]);
+    expect(latitudes()).toEqual([undefined]);
+  });
+
+  it("moves on to the busiest city once the area answers with nothing near", async () => {
+    const answer = openMap(undefined);
+    await restOnPerson(PARIS);
+    answer([]);
+    expect(latitudes()).toEqual([undefined, expect.closeTo(38.7, 0)]);
+  });
+
+  it("stays on the person when the area answer may leave a nearer place out", async () => {
+    const answer = openMap(undefined, () => {}, true);
+    await restOnPerson(PARIS);
+    answer([]);
+    expect(latitudes()).toEqual([undefined]);
+  });
+
+  it("judges by the person's own places as soon as the camera rests", async () => {
+    openMap([LISBON[0]]);
+    await restOnPerson(PARIS);
+    expect(latitudes()).toEqual([undefined, expect.closeTo(38.7, 0)]);
+  });
+
+  it("leaves the person where they are when the area answers too late", async () => {
+    const answer = openMap(undefined);
+    await restOnPerson(PARIS);
+    act(() => vi.advanceTimersByTime(3000));
+    answer([]);
+    expect(latitudes()).toEqual([undefined]);
+  });
+
+  it("asks for the places within reach of the person, not only those on screen", async () => {
+    const areas: MapBox[] = [];
+    const answer = openMap(undefined, (box) => areas.push(box));
+    await restOnPerson(CASCAIS);
+    expect(holds(areas.at(-1), LISBON[0])).toBe(true);
+    answer([LISBON[0]]);
+    expect(latitudes()).toEqual([undefined]);
+    await restOnPerson({ lat: CASCAIS.lat, lng: CASCAIS.lng + 0.2 });
+    expect(holds(areas.at(-1), LISBON[0])).toBe(false);
+  });
+
+  it("goes back to the person on every locate press, and the opening check no longer moves away", async () => {
+    const view = render(areaMap());
+    await restOnPerson(PARIS);
+    view.rerender(areaMap({ locate: 1 }));
+    view.rerender(areaMap({ locate: 2 }));
+    view.rerender(areaMap({ anchors: [], locate: 2 }));
+    expect(latitudes()).toEqual([undefined, undefined, undefined]);
+  });
+
+  it("drops a still-retrying opening move once locate is pressed", async () => {
+    mock.findsPerson = false;
+    const view = render(areaMap());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    mock.findsPerson = true;
+    view.rerender(areaMap({ locate: 1 }));
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+    expect(latitudes()).toEqual([undefined, undefined]);
+  });
+
+  it("asks for the opening area once without location, even when the map's size changes", () => {
+    const onArea = vi.fn();
+    const view = render(areaMap({ anchors: LISBON, showsUser: false, onArea }));
+    expect(onArea).toHaveBeenCalledTimes(1);
+    view.rerender(
+      areaMap({ anchors: LISBON, showsUser: false, onArea, height: 400 }),
+    );
+    expect(onArea).toHaveBeenCalledTimes(1);
+  });
 });

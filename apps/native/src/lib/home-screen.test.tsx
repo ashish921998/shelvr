@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import HomeScreen from "@/app/(app)/(tabs)/(home)/index";
+import { OneTimePrompts } from "@/components/one-time-prompts";
 import type { Access } from "@/lib/access";
 import { analytics } from "@/lib/analytics";
 import { useFeedbackInvitation } from "@/lib/feedback-invitation";
@@ -222,12 +223,12 @@ const trialing = {
   expiresAt: Date.now() + 7 * 86_400_000,
 };
 
-function App() {
+function App({ tab = <HomeScreen /> }: { tab?: ReactNode }) {
   useTrialReminder();
   const primerOpen = useTrialReminderPrimerOpen();
   return (
     <>
-      <HomeScreen />
+      <OneTimePrompts>{tab}</OneTimePrompts>
       {primerOpen ? <div>trial primer</div> : null}
     </>
   );
@@ -282,6 +283,19 @@ it("waits for a purchase made before sign-in, then shows the letter before askin
   mocks.access = { kind: "pro", syncing: false };
   rerender(<App />);
   await settle();
+  expect(sheets()).toEqual({ letter: true, name: false, primer: false });
+
+  act(() => welcomeSave.finish(USER));
+  await settle();
+  expect(sheets()).toEqual({ letter: false, name: true, primer: false });
+});
+
+it("shows the letter, then the name ask, when onboarding lands on the Map and Library never opens", async () => {
+  mocks.entitlement = trialing;
+  mocks.access = { kind: "pro", syncing: false };
+  render(<App tab={<div>map</div>} />);
+  await settle();
+  expect(screen.queryByText("map")).not.toBeNull();
   expect(sheets()).toEqual({ letter: true, name: false, primer: false });
 
   act(() => welcomeSave.finish(USER));
@@ -426,7 +440,7 @@ it("hides the feedback invitation while the trial primer holds its turn but has 
 
 it("shows the library rows on a Home with no saves", async () => {
   mocks.access = FREE;
-  render(<HomeScreen />);
+  render(<App />);
   await settle();
   expect(screen.getByText("library rows")).toBeTruthy();
 });

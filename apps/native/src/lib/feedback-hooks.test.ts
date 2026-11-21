@@ -253,6 +253,16 @@ describe("useReviewPrompt", () => {
     ).toBeLessThan(mock.requestReview.mock.invocationCallOrder[0]);
   });
 
+  it("asks for a review when a save opened from the Map returns to the Map", async () => {
+    const items = threeReady();
+    mock.segments = ["(app)", "item", "[id]"];
+    react.mount(() => useReviewPrompt(items));
+    mock.segments = ["(app)", "(tabs)", "(map)"];
+    react.rerender();
+    await flush();
+    expect(mock.requestReview).toHaveBeenCalledOnce();
+  });
+
   it("records nothing when a guard fails after hasAction() resolves, and retries on the next return from a save", async () => {
     let items = threeReady();
     mock.hasAction.mockImplementationOnce(async () => {

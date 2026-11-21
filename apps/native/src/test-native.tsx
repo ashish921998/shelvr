@@ -106,6 +106,7 @@ export const unistyles = {
         { get: (colors, key) => Reflect.get(colors, key) ?? "#000000" },
       ),
       gap: (n: number) => n * 8,
+      control: { minHeight: 48 },
       type: {},
     },
     rt: {

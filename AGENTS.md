@@ -33,7 +33,9 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `src/lib/haptics.ts`. Shared
   primitives: `src/components/ui` (`themed-text.tsx`, `button.tsx`). See `docs/architecture/design-system.md`.
 - **Paywall and entitlement:** `src/lib/entitlement.ts` owns `useEntitlement`,
-  `openPaywall`, `openPaywallOutcome`, `usePaywallGuard` and `restorePurchases`.
+  `openPaywall`, `openPaywallOutcome` and `restorePurchases`. An action that
+  needs Pro asks `useProGate` in `src/lib/pro-gate.ts`, which checks access,
+  handles the server's `pro_required`, opens the paywall and reports a resume.
   Around it: `trial-reminder.ts`, `paywall-funnel.ts`,
   `paywall-telemetry.ts` and `revenuecat-*.ts`.
   The server side is `convex/subscriptions.ts`.
@@ -75,7 +77,10 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   `map-round-button.tsx` behind the search, profile and locate buttons; `map-empty.tsx` is the
   no-places card; the title's city comes from `src/lib/use-map-city.ts`), filter rules in `src/lib/map-filters.ts` and
   `convex/model/placeKinds.ts`, each pin's emoji in `src/lib/map-pin-emoji.ts`, data from
-  `convex/mapPlaces.ts`.
+  `convex/mapPlaces.ts`. Discover pins come from the hand-filled `places` table
+  (`convex/places.ts`, filled by `places:addByName` and `placesImport:importGoogleMapsList`) and
+  join the person's own pins in `src/lib/map-discover.ts`. The plan is `docs/plans/social-map.md`;
+  the long-term place model is `docs/architecture/place-catalog.md`.
 - **Item detail:** route `src/app/(app)/item/[id].tsx`, body
   `src/components/item-detail.tsx`.
 - **Saving:** share flow in `src/lib/share` and `src/app/(app)/share.tsx`;
@@ -83,7 +88,9 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   takes a pasted link only.
 - **Onboarding:** screen `src/app/(app)/onboarding.tsx`, steps in
   `src/components/onboarding`, state in `src/lib/onboarding.tsx`,
-  `onboarding-steps.ts` and `pending-onboarding.ts`.
+  `onboarding-steps.ts`, `onboarding-progress.ts` (where the person is in the
+  flow: steps, answers, skip and back rules, step analytics) and
+  `pending-onboarding.ts` (the handoff finished onboarding leaves).
 - **Copy:** `src/locales/en.json` is the source catalog; `t()` and
   `useAppLocale()` come from `src/lib/i18n.ts`. `src/locales/catalogs.ts`,
   `src/locales/message-types.ts` and

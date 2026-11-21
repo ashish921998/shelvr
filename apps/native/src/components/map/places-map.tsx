@@ -1,15 +1,22 @@
 import { analytics } from "@/lib/analytics";
 import { isDarkThemeName } from "@/lib/appearance";
 import { appleZoom } from "@/lib/city-pins";
+import {
+  type CameraView,
+  type MapBox,
+  sameBox,
+  visibleBox,
+  withReach,
+} from "@/lib/discover-area";
 import { moveCamera } from "@/lib/map-camera";
-import { CITY_ZOOM } from "@/lib/map-city-zoom";
-import { hasPlaceNear } from "@/lib/map-filters";
+import { hasPlaceNear, NEARBY_KM } from "@/lib/map-filters";
 import { type MapPin } from "@/lib/map-pin-clusters";
 import { useMapPinClusters } from "@/lib/use-map-pin-clusters";
 import { fitCamera } from "@/lib/trip";
 import type { LatLng } from "@convex/model/trip";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const LANDMARKS = [
@@ -22,6 +29,7 @@ const LANDMARKS = [
 
 /** How long the camera must rest after moving to the person before the map checks what is near. */
 const SETTLE_MS = 600;
+const AREA_REST_MS = 400;
 /** After this, the opening check is dropped so it never pulls back a camera the person moved. */
 const DISARM_MS = 3000;
 
@@ -30,6 +38,8 @@ export type { MapPin } from "@/lib/map-pin-clusters";
 /** A place the camera flies to; a new key moves it again even to the same spot. */
 export type MapFocus = LatLng & { key: number };
 
+export type MapFrame = { key: string; places: LatLng[] };
+
 /** How close the camera comes to a place picked from search. */
 const FOCUS_ZOOM = 15;
 
@@ -37,34 +47,42 @@ type Props = {
   pins: MapPin[];
   /** The places the first camera frames when it cannot open on the person. */
   framed: MapPin[];
+  anchors: LatLng[] | undefined;
+  areaPartial: boolean;
   /** iOS: open on the person's location and show it. */
   showsUser: boolean;
   height: number;
   topInset: number;
   bottomInset: number;
   focus?: MapFocus;
+  frame?: MapFrame;
   locate?: number;
   overview?: MapPin[];
   zoomOut?: number;
   filterRevision?: number;
   onCentreChange?: (centre: LatLng, zoom: number) => void;
   onSelect: (id: string) => void;
+  onArea: (box: MapBox) => void;
 };
 
 export function PlacesMap({
   pins,
   framed,
+  anchors,
+  areaPartial,
   showsUser,
   height,
   topInset,
   bottomInset,
   focus,
+  frame,
   locate,
   overview,
   zoomOut,
   filterRevision = 0,
   onCentreChange,
   onSelect,
+  onArea,
 }: Props) {
   const { rt } = useUnistyles();
   const appleRef = useRef<AppleMaps.MapView>(null);
@@ -77,7 +95,7 @@ export function PlacesMap({
   });
 
   const cameraFor = useCallback(
-    (points: MapPin[]) => {
+    (points: LatLng[]) => {
       const camera = fitCamera(
         points.map((pin) => ({ latitude: pin.lat, longitude: pin.lng })),
         {
@@ -111,21 +129,40 @@ export function PlacesMap({
     () => (overview ? cameraFor(overview) : undefined),
     [cameraFor, overview],
   );
-  const latest = useRef({ pins, fit, overviewCamera });
-  useEffect(() => {
-    latest.current = { pins, fit, overviewCamera };
-  }, [pins, fit, overviewCamera]);
+  const latest = useRef({ anchors, areaPartial, fit, overviewCamera });
   const centredOnUser = useRef(false);
   const framedOnce = useRef(showsUser || firstCamera !== undefined);
+  const touched = useRef(false);
   const centre = useRef<LatLng | undefined>(undefined);
   const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  // Set while the camera travels to the person; once it rests, a map with none of their places in
-  // reach moves on to the city they saved the most in.
+  // Set while the camera travels to the person; once it rests and the places in reach have loaded, a
+  // map with none of them moves on to the busiest city.
   const checkNearby = useRef<(() => void) | undefined>(undefined);
-  const cancelOpening = useRef<(() => void) | undefined>(undefined);
+  const rested = useRef(false);
+  const cameraCommand = useRef<(() => void) | undefined>(undefined);
+  const command = useCallback(
+    (
+      move: () => Promise<void> | undefined,
+      onFail: (error: unknown) => void,
+    ) => {
+      cameraCommand.current?.();
+      const cancel = moveCamera(move, onFail);
+      cameraCommand.current = cancel;
+      return cancel;
+    },
+    [],
+  );
+  useEffect(() => {
+    latest.current = { anchors, areaPartial, fit, overviewCamera };
+    if (anchors !== undefined && rested.current) checkNearby.current?.();
+  }, [anchors, areaPartial, fit, overviewCamera]);
   const waitForRest = () => {
     clearTimeout(settle.current);
-    settle.current = setTimeout(() => checkNearby.current?.(), SETTLE_MS);
+    rested.current = false;
+    settle.current = setTimeout(() => {
+      rested.current = true;
+      checkNearby.current?.();
+    }, SETTLE_MS);
   };
   useEffect(() => {
     if (!showsUser || centredOnUser.current || filterRevision > 0) return;
@@ -141,12 +178,14 @@ export function PlacesMap({
           );
     };
     checkNearby.current = () => {
+      const { anchors, areaPartial } = latest.current;
+      if (anchors === undefined) return;
       checkNearby.current = undefined;
-      if (!hasPlaceNear(centre.current, latest.current.pins)) showCity();
+      if (!areaPartial && !hasPlaceNear(centre.current, anchors)) showCity();
     };
     // No position means the person's own location. A map mounted moments ago can refuse its first
     // move, so it is retried; if every try fails, the map shows the busiest city instead.
-    const cancel = moveCamera(
+    const cancel = command(
       () => map()?.setCameraPosition().then(waitForRest),
       (error) => {
         checkNearby.current = undefined;
@@ -154,7 +193,6 @@ export function PlacesMap({
         showCity();
       },
     );
-    cancelOpening.current = cancel;
     // Only the opening move may be redirected; a later pan or my-location tap is the person's own.
     const disarm = setTimeout(() => {
       checkNearby.current = undefined;
@@ -165,14 +203,46 @@ export function PlacesMap({
       checkNearby.current = undefined;
       centredOnUser.current = false;
     };
-  }, [showsUser, filterRevision]);
-  useEffect(() => () => clearTimeout(settle.current), []);
+  }, [showsUser, filterRevision, command]);
+  const areaTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  const reportedArea = useRef<MapBox | undefined>(undefined);
+  const reportArea = useCallback(
+    (camera: CameraView) => {
+      const visible = visibleBox(camera, {
+        width,
+        height,
+        apple: process.env.EXPO_OS === "ios",
+      });
+      if (!visible) return;
+      const box = checkNearby.current
+        ? withReach(visible, camera, NEARBY_KM)
+        : visible;
+      if (sameBox(box, reportedArea.current)) return;
+      reportedArea.current = box;
+      onArea(box);
+    },
+    [width, height, onArea],
+  );
+  const seeded = useRef(false);
+  useEffect(() => {
+    if (!firstCamera || seeded.current) return;
+    seeded.current = true;
+    reportArea({ ...firstCamera.coordinates, zoom: firstCamera.zoom });
+  }, [firstCamera, reportArea]);
+  useEffect(
+    () => () => {
+      clearTimeout(settle.current);
+      clearTimeout(areaTimer.current);
+    },
+    [],
+  );
   useEffect(() => {
     if (!focus) return;
     // A place the person picked wins over the opening check.
     checkNearby.current = undefined;
-    cancelOpening.current?.();
-    return moveCamera(
+    return command(
       () =>
         map()?.setCameraPosition({
           coordinates: { latitude: focus.lat, longitude: focus.lng },
@@ -180,46 +250,69 @@ export function PlacesMap({
         }),
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
-  }, [focus]);
+  }, [focus, command]);
+
+  const frameKey = frame?.key;
+  const frameCamera = useRef<ReturnType<typeof cameraFor>>(undefined);
+  useEffect(() => {
+    frameCamera.current = frame ? cameraFor(frame.places) : undefined;
+  }, [frame, cameraFor]);
+  useEffect(() => {
+    const camera = frameCamera.current;
+    if (frameKey === undefined || !camera) return;
+    checkNearby.current = undefined;
+    return command(
+      () => map()?.setCameraPosition(camera),
+      (error) => analytics.captureError("places_map_camera_failed", error),
+    );
+  }, [frameKey, command]);
 
   useEffect(() => {
     if (!zoomOut) return;
     checkNearby.current = undefined;
-    cancelOpening.current?.();
     const camera = latest.current.overviewCamera;
     if (!camera) return;
-    return moveCamera(
+    return command(
       () => map()?.setCameraPosition(camera),
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
-  }, [zoomOut]);
+  }, [zoomOut, command]);
 
   useEffect(() => {
     if (!locate) return;
     checkNearby.current = undefined;
-    cancelOpening.current?.();
-    return moveCamera(
+    return command(
       () => map()?.setCameraPosition(),
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
-  }, [locate]);
+  }, [locate, command]);
 
   const canFrameLatePlaces =
-    filterRevision === 0 && !focus && !locate && !zoomOut && !!fit;
+    filterRevision === 0 &&
+    !focus &&
+    frameKey === undefined &&
+    !locate &&
+    !zoomOut &&
+    !!fit &&
+    (!showsUser || anchors !== undefined);
   useEffect(() => {
     const initialFit = latest.current.fit;
     if (framedOnce.current || !canFrameLatePlaces || !initialFit) return;
     framedOnce.current = true;
-    if (showsUser && hasPlaceNear(centre.current, latest.current.pins)) return;
-    return moveCamera(
+    if (showsUser && hasPlaceNear(centre.current, latest.current.anchors ?? []))
+      return;
+    return command(
       () => map()?.setCameraPosition(latest.current.fit ?? initialFit),
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
-  }, [canFrameLatePlaces, showsUser]);
+  }, [canFrameLatePlaces, showsUser, command]);
 
   const trackCamera = (event: {
     coordinates: { latitude?: number; longitude?: number };
-    zoom?: number;
+    zoom: number;
+    tilt: number;
+    latitudeDelta: number;
+    longitudeDelta: number;
   }) => {
     clustered.trackZoom(event.zoom);
     const { latitude, longitude } = event.coordinates;
@@ -227,10 +320,24 @@ export function PlacesMap({
       latitude !== undefined && longitude !== undefined
         ? { lat: latitude, lng: longitude }
         : undefined;
-    if (centre.current)
-      onCentreChange?.(centre.current, event.zoom ?? CITY_ZOOM);
+    if (centre.current) onCentreChange?.(centre.current, event.zoom);
     if (checkNearby.current) waitForRest();
-    else if (showsUser) framedOnce.current = true;
+    else if (showsUser && touched.current) framedOnce.current = true;
+    clearTimeout(areaTimer.current);
+    if (latitude === undefined || longitude === undefined) return;
+    const { zoom, tilt, latitudeDelta, longitudeDelta } = event;
+    areaTimer.current = setTimeout(
+      () =>
+        reportArea({
+          latitude,
+          longitude,
+          zoom,
+          tilt,
+          latitudeDelta,
+          longitudeDelta,
+        }),
+      AREA_REST_MS,
+    );
   };
 
   const nativeMap =
@@ -270,7 +377,14 @@ export function PlacesMap({
     );
   return (
     <>
-      {nativeMap}
+      <View
+        style={styles.map}
+        onTouchStart={() => {
+          touched.current = true;
+        }}
+      >
+        {nativeMap}
+      </View>
       {clustered.sheet}
     </>
   );

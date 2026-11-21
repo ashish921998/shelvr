@@ -78,6 +78,8 @@ import type * as model_passport from "../model/passport.js";
 import type * as model_passportMap from "../model/passportMap.js";
 import type * as model_paymentTelemetry from "../model/paymentTelemetry.js";
 import type * as model_placeIdentity from "../model/placeIdentity.js";
+import type * as model_placeImport from "../model/placeImport.js";
+import type * as model_placeIndex from "../model/placeIndex.js";
 import type * as model_placeKinds from "../model/placeKinds.js";
 import type * as model_placeList from "../model/placeList.js";
 import type * as model_placeRemovals from "../model/placeRemovals.js";
@@ -135,6 +137,8 @@ import type * as placeCorrections from "../placeCorrections.js";
 import type * as placePins from "../placePins.js";
 import type * as placeRemovals from "../placeRemovals.js";
 import type * as placeVisits from "../placeVisits.js";
+import type * as places from "../places.js";
+import type * as placesImport from "../placesImport.js";
 import type * as planShares from "../planShares.js";
 import type * as plans from "../plans.js";
 import type * as reelPlaces from "../reelPlaces.js";
@@ -226,6 +230,8 @@ declare const fullApi: ApiFromModules<{
   "model/passportMap": typeof model_passportMap;
   "model/paymentTelemetry": typeof model_paymentTelemetry;
   "model/placeIdentity": typeof model_placeIdentity;
+  "model/placeImport": typeof model_placeImport;
+  "model/placeIndex": typeof model_placeIndex;
   "model/placeKinds": typeof model_placeKinds;
   "model/placeList": typeof model_placeList;
   "model/placeRemovals": typeof model_placeRemovals;
@@ -283,6 +289,8 @@ declare const fullApi: ApiFromModules<{
   placePins: typeof placePins;
   placeRemovals: typeof placeRemovals;
   placeVisits: typeof placeVisits;
+  places: typeof places;
+  placesImport: typeof placesImport;
   planShares: typeof planShares;
   plans: typeof plans;
   reelPlaces: typeof reelPlaces;
@@ -326,4 +334,5 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+  geospatial: import("@convex-dev/geospatial/_generated/component.js").ComponentApi<"geospatial">;
 };

@@ -2,7 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 import { passportUrl } from "./passport-share";
 import { pendingInviteOf } from "./pending-invite";
 
-vi.mock("@/lib/entitlement", () => ({ openPaywall: vi.fn() }));
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: () => ({
+    admit: async () => "go",
+    denied: async () => true,
+    blocked: async () => {},
+    passed: () => {},
+    loading: false,
+  }),
+}));
 vi.mock("@/lib/share-link", () => ({ shareUrl: vi.fn() }));
 vi.mock("@/lib/analytics", () => ({ analytics: {} }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
@@ -12,9 +20,7 @@ vi.mock("expo-secure-store", () => ({ getItem: vi.fn(), setItem: vi.fn() }));
 
 describe("passportUrl", () => {
   it("points at the web passport page", () => {
-    expect(passportUrl("ab/c")).toBe(
-      "https://shelvr-web.vercel.app/passport/ab%2Fc",
-    );
+    expect(passportUrl("ab/c")).toBe("https://tryshelvr.app/passport/ab%2Fc");
   });
 });
 

@@ -36,6 +36,7 @@ function captureEntitlementActivation(
 
 export function recordAccess(source: "purchase" | "restore"): void {
   const at = Date.now();
+  if (blockedAction !== null) blockedAction.purchased = true;
   if (activeEntitlementStatus !== null) {
     captureEntitlementActivation(source, at, activeEntitlementStatus);
     return;
@@ -74,11 +75,8 @@ let blockedAction: {
 
 const BLOCKED_ACTION_RESUME_MS = 30 * 60_000;
 
-export function recordBlockedAction(
-  placement: string,
-  purchased: boolean,
-): void {
-  blockedAction = { placement, at: Date.now(), purchased };
+export function recordBlockedAction(placement: string): void {
+  blockedAction = { placement, at: Date.now(), purchased: false };
 }
 
 export function resumeBlockedAction(placement: string): void {

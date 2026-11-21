@@ -38,7 +38,13 @@ export function countryFlag(code: string) {
 }
 
 export function tripCountryLine(countries: string[]) {
-  return countries.map((code) => countryName(code) ?? code).join(" · ");
+  const display =
+    typeof Intl.DisplayNames === "function"
+      ? new Intl.DisplayNames([formattingLocale()], { type: "region" })
+      : null;
+  return countries
+    .map((code) => display?.of(code) ?? countryName(code) ?? code)
+    .join(" · ");
 }
 
 export function tripCoverUri(cover: string) {
