@@ -28,6 +28,10 @@ vi.mock("expo-router", () => ({
   useNavigation: () => ({ isFocused: () => mocks.focused }),
 }));
 vi.mock("@/lib/entitlement", () => ({ openPaywall: mocks.openPaywall }));
+vi.mock("@/lib/revenuecat-module", () => ({ getPurchases: () => null }));
+vi.mock("@/lib/paywall-goal", () => ({}));
+vi.mock("@/lib/trial-reminder-lead", () => ({}));
+vi.mock("@/lib/date", () => ({}));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mocks.capture, captureError: mocks.captureError },
 }));
@@ -135,6 +139,25 @@ describe("usePlaceVisit", () => {
     );
     expect(mocks.alert).not.toHaveBeenCalled();
     expect(mocks.play).not.toHaveBeenCalled();
+  });
+
+  it("counts a mark that runs after a purchase as the blocked action resumed", async () => {
+    const funnel = await import("@/lib/paywall-funnel");
+    mocks.openPaywall.mockImplementation(
+      (_router: unknown, placement: string) => {
+        funnel.recordBlockedAction(placement, true);
+        return Promise.resolve(true);
+      },
+    );
+    mocks.setVisited.mockRejectedValueOnce(
+      new ConvexError({ code: "pro_required", message: "Pro required" }),
+    );
+    await toggle(taco);
+    await toggle(taco);
+    expect(mocks.capture).toHaveBeenCalledWith(
+      "paywall_blocked_action_resumed",
+      expect.objectContaining({ placement: "mark_visited" }),
+    );
   });
 
   it("says to wait a few minutes when too many places were marked", async () => {

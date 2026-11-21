@@ -10,10 +10,19 @@ const mocks = vi.hoisted(() => ({
   restore: vi.fn(),
   alert: vi.fn(),
   error: vi.fn(),
+  capture: vi.fn(),
   success: vi.fn(),
   openPaywall: vi.fn(),
 }));
 vi.mock("@/lib/entitlement", () => ({ openPaywall: mocks.openPaywall }));
+vi.mock("@/lib/revenuecat-module", () => ({ getPurchases: () => null }));
+vi.mock("@/lib/paywall-goal", () => ({}));
+vi.mock("@/lib/trial-reminder-lead", () => ({}));
+vi.mock("@/lib/date", () => ({}));
+vi.mock("@/lib/i18n", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/i18n-core")>()),
+  t: (key: string) => key,
+}));
 vi.mock("expo-router", () => ({ useRouter: () => ({}) }));
 vi.mock("@/lib/haptics", () => ({ haptics: { success: mocks.success } }));
 vi.mock("@convex/_generated/api", () => ({
@@ -27,7 +36,7 @@ vi.mock("react-native", () => ({
   Alert: { alert: mocks.alert },
 }));
 vi.mock("@/lib/analytics", () => ({
-  analytics: { captureError: mocks.error },
+  analytics: { captureError: mocks.error, capture: mocks.capture },
 }));
 
 const ITEM = "item1" as Id<"items">;
@@ -171,4 +180,22 @@ it("opens the paywall instead of an error when removing needs Pro", async () => 
   await act(() => result.current.remove(ITEM, PIN));
   expect(mocks.openPaywall).toHaveBeenCalledWith({}, "remove_place");
   expect(mocks.alert).not.toHaveBeenCalled();
+});
+
+it("counts a removal that runs after a purchase as the blocked action resumed", async () => {
+  const funnel = await import("@/lib/paywall-funnel");
+  mocks.openPaywall.mockImplementation(
+    (_router: unknown, placement: string) => {
+      funnel.recordBlockedAction(placement, true);
+      return Promise.resolve(true);
+    },
+  );
+  const { result } = renderHook(usePlaceRemoval);
+  mocks.remove.mockRejectedValueOnce(new ConvexError({ code: "pro_required" }));
+  await act(() => result.current.remove(ITEM, PIN));
+  await act(() => result.current.remove(ITEM, PIN));
+  expect(mocks.capture).toHaveBeenCalledWith(
+    "paywall_blocked_action_resumed",
+    expect.objectContaining({ placement: "remove_place" }),
+  );
 });
