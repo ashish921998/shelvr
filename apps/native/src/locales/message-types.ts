@@ -665,6 +665,7 @@ type MessageParams = {
   "homePlaces.spotCount": { count: number };
   "homePlaces.moreCities": { n: string };
   "homePlaces.yourSpaces": undefined;
+  "homePlaces.yourCities": undefined;
   "homePlaces.seeAll": undefined;
   "homePlaces.emptyTitle": undefined;
   "homePlaces.emptyBody": undefined;
@@ -796,6 +797,9 @@ type MessageParams = {
   "map.showMyLocation": undefined;
   "map.searchNoResults": { query: string };
   "map.searchMore": { count: number; total: number };
+  "navigation.saved": undefined;
+  "saved.places": undefined;
+  "saved.lists": undefined;
   "navigation.trips": undefined;
   "plans.title": undefined;
   "plans.together": undefined;

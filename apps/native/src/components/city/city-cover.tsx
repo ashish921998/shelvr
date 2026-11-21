@@ -69,7 +69,7 @@ export function CityCover({
   const count = cityCountLine(entry);
   if (layout === "pair") {
     return (
-      <View style={styles.card}>
+      <View style={styles.tile}>
         <View style={styles.art}>
           <CoverArt entry={entry} />
         </View>
@@ -109,7 +109,13 @@ const styles = StyleSheet.create((theme) => ({
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface,
   },
-  art: { height: 112, overflow: "hidden" },
+  tile: { gap: theme.gap(0.5) },
+  art: {
+    aspectRatio: 1.55,
+    overflow: "hidden",
+    borderRadius: theme.radius.lg,
+    borderCurve: "continuous",
+  },
   tint: {
     alignItems: "center",
     justifyContent: "center",
@@ -118,9 +124,7 @@ const styles = StyleSheet.create((theme) => ({
   tintMuted: { backgroundColor: theme.colors.surfaceMuted },
   text: {
     gap: theme.gap(0.125),
-    paddingHorizontal: theme.gap(1.5),
-    paddingTop: theme.gap(1.25),
-    paddingBottom: theme.gap(1.5),
+    paddingHorizontal: theme.gap(0.5),
   },
   wide: { minHeight: 140, justifyContent: "flex-end" },
   only: { minHeight: 200 },

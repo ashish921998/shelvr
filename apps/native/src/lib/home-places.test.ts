@@ -5,7 +5,6 @@ import {
   cityCountLine,
   cityRows,
   newlyUnplaced,
-  plannableCities,
   savesToReview,
   unplacedSaves,
   visibleCities,
@@ -20,18 +19,14 @@ const city = (name: string, count = 1) => ({
 describe("visibleCities", () => {
   const six = ["A", "B", "C", "D", "E", "F"].map((name) => city(name));
 
-  it("shows four and counts the rest until expanded", () => {
-    const { shown, hidden } = visibleCities(six, false);
+  it("shows four and counts the rest", () => {
+    const { shown, hidden } = visibleCities(six);
     expect(shown.map((c) => c.city)).toEqual(["A", "B", "C", "D"]);
     expect(hidden).toBe(2);
   });
 
-  it("shows every city once expanded", () => {
-    expect(visibleCities(six, true)).toEqual({ shown: six, hidden: 0 });
-  });
-
   it("hides nothing at exactly four", () => {
-    expect(visibleCities(six.slice(0, 4), false).hidden).toBe(0);
+    expect(visibleCities(six.slice(0, 4)).hidden).toBe(0);
   });
 });
 
@@ -100,20 +95,6 @@ describe("canRetrySave", () => {
   });
 });
 
-describe("plannableCities", () => {
-  it("drops only cities whose place count is zero", () => {
-    const cities = [
-      { ...city("Lisbon"), placeCount: 3 },
-      { ...city("Rome"), placeCount: 0 },
-      city("Oslo"),
-    ];
-    expect(plannableCities(cities).map((c) => c.city)).toEqual([
-      "Lisbon",
-      "Oslo",
-    ]);
-  });
-});
-
 describe("cityRows", () => {
   const names = (count: number) =>
     cityRows(
@@ -148,13 +129,13 @@ describe("cityRows", () => {
 });
 
 describe("cityCountLine", () => {
-  it("counts places until one is marked visited", () => {
+  it("counts places even when some have been visited", () => {
     expect(cityCountLine({ ...city("Austin"), placeCount: 23 })).toBe(
       "23 places",
     );
     expect(
       cityCountLine({ ...city("Austin"), placeCount: 23, visitedCount: 7 }),
-    ).toBe("7 of 23 places visited");
+    ).toBe("23 places");
   });
 
   it("says a city with saves but no place has none yet", () => {

@@ -118,6 +118,13 @@ export default function AppLayout() {
               options={{ title: "", headerBackButtonDisplayMode: "minimal" }}
             />
             <Stack.Screen
+              name="cities"
+              options={{
+                title: t("homePlaces.yourCities"),
+                headerBackButtonDisplayMode: "minimal",
+              }}
+            />
+            <Stack.Screen
               name="city-stamps"
               options={{ headerBackButtonDisplayMode: "minimal" }}
             />

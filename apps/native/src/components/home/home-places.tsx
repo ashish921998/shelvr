@@ -1,45 +1,30 @@
 import { CityCover, type CoverLayout } from "@/components/city/city-cover";
-import { PlanCitySheet } from "@/components/home/plan-city-sheet";
-import { AppSymbolIcon } from "@/components/symbol";
-import { type CityPlanKind, useCityPlan } from "@/lib/city-plan";
-import { canBrowse } from "@/lib/access";
-import { useAccess, useSaveGuard } from "@/lib/free-plan";
+import { HomeSectionHeading } from "@/components/home/home-section-heading";
+import { useSaveGuard } from "@/lib/free-plan";
 import {
   type City,
   cityCountLine,
   cityRows,
-  plannableCities,
   saveSource,
   unplacedSaves,
   visibleCities,
 } from "@/lib/home-places";
 import { t, useAppLocale } from "@/lib/i18n";
-import { api } from "@convex/_generated/api";
-import { convexQuery } from "@convex-dev/react-query";
-import { useQuery } from "@tanstack/react-query";
+import { useHomeCities } from "@/lib/use-home-cities";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Pressable, Text, View, type ViewStyle } from "react-native";
-import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import Animated, {
-  FadeIn,
-  ReduceMotion,
-  useReducedMotion,
-} from "react-native-reanimated";
-import { motion } from "@/lib/motion";
+import { StyleSheet } from "react-native-unistyles";
 
 function CityCard({
   entry,
   layout,
   style,
-  reveal = false,
 }: {
   entry: City;
   layout: CoverLayout;
   style?: ViewStyle;
-  reveal?: boolean;
 }) {
-  const reduced = useReducedMotion();
   const router = useRouter();
   const count = cityCountLine(entry);
   return (
@@ -51,32 +36,16 @@ function CityCard({
       }
       style={({ pressed }) => [style, pressed && styles.pressed]}
     >
-      <Animated.View
-        entering={
-          reveal
-            ? FadeIn.duration(
-                reduced ? motion.duration.feedback : motion.duration.state,
-              )
-                .easing(motion.easing.out)
-                .reduceMotion(ReduceMotion.Never)
-            : undefined
-        }
-      >
-        <CityCover entry={entry} layout={layout} />
-      </Animated.View>
+      <CityCover entry={entry} layout={layout} />
     </Pressable>
   );
 }
 
-function CityGrid({ cities }: { cities: City[] }) {
-  const { theme } = useUnistyles();
-  const [expanded, setExpanded] = useState(false);
-  const { shown, hidden } = visibleCities(cities, expanded);
-  const collapsed = visibleCities(cities, false).shown;
+export function CityGrid({ cities }: { cities: City[] }) {
   const only = cities.length === 1;
   return (
     <View style={styles.grid}>
-      {cityRows(shown).map((row) =>
+      {cityRows(cities).map((row) =>
         row.kind === "pair" ? (
           <View key={row.cities[0].city} style={styles.pair}>
             {row.cities.map((entry) => (
@@ -85,10 +54,6 @@ function CityGrid({ cities }: { cities: City[] }) {
                 entry={entry}
                 layout="pair"
                 style={styles.half}
-                reveal={
-                  expanded &&
-                  !collapsed.some((city) => city.city === entry.city)
-                }
               />
             ))}
           </View>
@@ -97,130 +62,9 @@ function CityGrid({ cities }: { cities: City[] }) {
             key={row.city.city}
             entry={row.city}
             layout={only ? "only" : "wide"}
-            reveal={
-              expanded && !collapsed.some((city) => city.city === row.city.city)
-            }
           />
         ),
       )}
-      {hidden > 0 ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t("homePlaces.moreCities", { n: String(hidden) })}
-          onPress={() => setExpanded(true)}
-          style={({ pressed }) => [styles.more, pressed && styles.pressed]}
-        >
-          <Text style={styles.moreLabel}>
-            {t("homePlaces.moreCities", { n: String(hidden) })}
-          </Text>
-        </Pressable>
-      ) : null}
-      {only ? (
-        <View style={styles.tip}>
-          <AppSymbolIcon
-            name="plus"
-            size={18}
-            tintColor={theme.colors.primaryText}
-          />
-          <Text style={styles.tipText}>{t("homePlaces.shareTip")}</Text>
-        </View>
-      ) : null}
-    </View>
-  );
-}
-
-function PlanTile({
-  kind,
-  subtitle,
-  disabled,
-  locked,
-  onPress,
-}: {
-  kind: CityPlanKind;
-  subtitle: string;
-  disabled: boolean;
-  locked: boolean;
-  onPress: () => void;
-}) {
-  const { theme } = useUnistyles();
-  const title = t(
-    kind === "date" ? "homePlaces.planDate" : "homePlaces.planTrip",
-  );
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={
-        locked
-          ? `${title}, ${subtitle}, ${t("freePlan.proTag")}`
-          : `${title}, ${subtitle}`
-      }
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.tile,
-        (pressed || disabled) && styles.pressed,
-      ]}
-    >
-      <View style={styles.tileIcon}>
-        <AppSymbolIcon
-          name={kind === "date" ? "heart" : "airplane"}
-          size={18}
-          tintColor={theme.colors.primaryText}
-        />
-      </View>
-      <View style={styles.tileText}>
-        <Text style={styles.tileTitle} numberOfLines={1}>
-          {title}
-        </Text>
-        <View style={styles.tileSubtitleRow}>
-          <Text style={styles.tileSubtitle} numberOfLines={1}>
-            {subtitle}
-          </Text>
-          {locked ? (
-            <Text style={styles.proTag}>{t("freePlan.proTag")}</Text>
-          ) : null}
-        </View>
-      </View>
-    </Pressable>
-  );
-}
-
-function PlanTiles({ cities, pro }: { cities: City[]; pro: boolean }) {
-  const { busy, start } = useCityPlan();
-  const [picking, setPicking] = useState<{ kind: CityPlanKind; open: boolean }>(
-    { kind: "date", open: false },
-  );
-  const [only] = cities;
-  if (!only) return null;
-  const subtitle =
-    cities.length === 1
-      ? t("homePlaces.planInCity", { city: only.city })
-      : t("homePlaces.planPickCity");
-  const press = (kind: CityPlanKind) =>
-    cities.length === 1
-      ? void start(kind, only.city)
-      : setPicking({ kind, open: true });
-  return (
-    <View style={styles.pair}>
-      {(["date", "trip"] as const).map((kind) => (
-        <View key={kind} style={styles.half}>
-          <PlanTile
-            kind={kind}
-            subtitle={subtitle}
-            disabled={busy !== null}
-            locked={!pro}
-            onPress={() => press(kind)}
-          />
-        </View>
-      ))}
-      <PlanCitySheet
-        visible={picking.open}
-        kind={picking.kind}
-        cities={cities}
-        onClose={() => setPicking({ ...picking, open: false })}
-        onPick={(city) => void start(picking.kind, city)}
-      />
     </View>
   );
 }
@@ -322,26 +166,31 @@ export function HomePlacesEmptyCard() {
 
 export function HomePlaces() {
   useAppLocale();
-  const access = useAccess();
-  const browsing = canBrowse(access);
-  const cities = useQuery(
-    convexQuery(api.items.listCities, browsing ? {} : "skip"),
-  );
-  if (!browsing || cities.data === undefined) return null;
-  if (cities.data.length === 0) {
+  const router = useRouter();
+  const { data: cities } = useHomeCities();
+  if (cities === undefined) return null;
+  if (cities.length === 0) {
     return (
       <View style={styles.container}>
         <HomePlacesEmptyCard />
       </View>
     );
   }
+  const { shown, hidden } = visibleCities(cities);
   return (
     <View style={styles.container}>
-      <PlanTiles
-        cities={plannableCities(cities.data)}
-        pro={access.kind === "pro"}
+      <HomeSectionHeading
+        title={t("homePlaces.yourCities")}
+        action={
+          hidden > 0
+            ? {
+                label: t("homePlaces.moreCities", { n: String(hidden) }),
+                onPress: () => router.push("/cities"),
+              }
+            : undefined
+        }
       />
-      <CityGrid cities={cities.data} />
+      <CityGrid cities={shown} />
     </View>
   );
 }
@@ -352,71 +201,11 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.gap(2),
     paddingBottom: theme.gap(1.5),
   },
-  grid: { gap: theme.gap(1.5) },
+  grid: { gap: theme.gap(2) },
   pair: { flexDirection: "row", gap: theme.gap(1.5) },
   half: { flex: 1 },
   pressed: { opacity: theme.opacity.pressed },
-  more: {
-    minHeight: theme.control.minHeight,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.surfaceMuted,
-  },
   moreLabel: { ...theme.type.subheadStrong, color: theme.colors.foreground },
-  tile: {
-    minHeight: 64,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.25),
-    paddingVertical: theme.gap(1.25),
-    paddingHorizontal: theme.gap(1.5),
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-    backgroundColor: theme.colors.surface,
-  },
-  tileIcon: {
-    width: 36,
-    height: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 18,
-    backgroundColor: theme.colors.primarySoft,
-  },
-  tileText: { flex: 1 },
-  tileTitle: { ...theme.type.subheadLabel, color: theme.colors.foreground },
-  tileSubtitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(0.75),
-  },
-  tileSubtitle: {
-    ...theme.type.caption,
-    flexShrink: 1,
-    color: theme.colors.muted,
-  },
-  proTag: {
-    ...theme.type.captionStrong,
-    color: theme.colors.primaryText,
-    paddingHorizontal: theme.gap(0.75),
-    paddingVertical: theme.gap(0.25),
-    borderRadius: theme.radius.sm,
-    overflow: "hidden",
-    backgroundColor: theme.colors.primarySoft,
-  },
-  tip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: theme.gap(1.25),
-    padding: theme.gap(1.5),
-    borderRadius: theme.radius.lg,
-    borderCurve: "continuous",
-    backgroundColor: theme.colors.surfaceMuted,
-  },
-  tipText: { flex: 1, ...theme.type.footnote, color: theme.colors.muted },
   muted: { ...theme.type.footnote, color: theme.colors.muted },
   unplaced: {
     gap: theme.gap(0.5),

@@ -1,25 +1,9 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import { HomePlaces, UnplacedSaves } from "@/components/home/home-places";
-
-vi.mock("@/lib/motion", () => ({
-  motion: { duration: { feedback: 120, state: 180 }, easing: { out: "out" } },
-}));
-vi.mock("react-native-reanimated", () => ({
-  default: {
-    View: vi.fn(({ children }: { children: ReactNode }) => (
-      <div>{children}</div>
-    )),
-  },
-  useReducedMotion: () => false,
-  ReduceMotion: { Never: "never" },
-  FadeIn: {
-    duration: () => ({ easing: () => ({ reduceMotion: () => undefined }) }),
-  },
-}));
 
 const mocks = vi.hoisted(() => ({
   cities: [] as {
@@ -28,8 +12,7 @@ const mocks = vi.hoisted(() => ({
     placeCount?: number;
     cover: string | null;
   }[],
-  start: vi.fn(),
-  busy: null as "date" | "trip" | null,
+  push: vi.fn(),
   access: { kind: "pro", syncing: false } as Record<string, unknown>,
 }));
 
@@ -38,38 +21,10 @@ vi.mock("@/components/city/city-cover", () => ({
     <span>{entry.city}</span>
   )),
 }));
-vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
-vi.mock("@/components/ui/prompt-sheet", () => ({
-  PromptSheet: vi.fn(
-    ({
-      visible,
-      title,
-      children,
-      onDismiss,
-    }: {
-      visible: boolean;
-      title: string;
-      children: ReactNode;
-      onDismiss?: () => void;
-    }) => (
-      <>
-        {visible ? (
-          <div data-testid="sheet">
-            <h1>{title}</h1>
-            {children}
-          </div>
-        ) : null}
-        <button onClick={onDismiss}>dismissed</button>
-      </>
-    ),
-  ),
-}));
-vi.mock("@/lib/city-plan", () => ({
-  useCityPlan: () => ({ busy: mocks.busy, start: mocks.start }),
-}));
-vi.mock("@/lib/entitlement", () => ({
-  useEntitlement: () => ({ entitled: true }),
-  usePaywallGuard: () => ({ guard: vi.fn() }),
+vi.mock("@/components/ui/themed-text", () => ({
+  ThemedText: vi.fn(({ children }: { children: ReactNode }) => (
+    <span>{children}</span>
+  )),
 }));
 vi.mock("@/lib/free-plan", () => ({
   useAccess: () => mocks.access,
@@ -79,7 +34,7 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: mocks.cities }),
 }));
 vi.mock("@convex-dev/react-query", () => ({ convexQuery: vi.fn() }));
-vi.mock("expo-router", () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock("expo-router", () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
   useUnistyles: () => ({ theme: { colors: {} } }),
@@ -185,109 +140,6 @@ describe("unplaced save states", () => {
   });
 });
 
-describe("plan tiles", () => {
-  const entry = (city: string, placeCount?: number) => ({
-    city,
-    count: 2,
-    placeCount,
-    cover: null,
-  });
-
-  beforeEach(() => {
-    mocks.start.mockReset();
-    mocks.busy = null;
-    mocks.access = { kind: "pro", syncing: false };
-    vi.unstubAllEnvs();
-  });
-
-  it("tags both tiles Pro for a free account and still starts the plan", () => {
-    mocks.access = {
-      kind: "free",
-      limit: 10,
-      used: 4,
-      left: 6,
-      pending: 0,
-      open: true,
-    };
-    mocks.cities = [entry("Lisbon", 3)];
-    render(<HomePlaces />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Plan a date, In Lisbon, Pro" }),
-    );
-    expect(mocks.start).toHaveBeenCalledWith("date", "Lisbon");
-    expect(
-      screen.getByRole("button", { name: "Plan a trip, In Lisbon, Pro" }),
-    ).toBeTruthy();
-  });
-
-  it("shows no tiles when no city has a mapped place", () => {
-    mocks.cities = [entry("Rome", 0)];
-    render(<HomePlaces />);
-    expect(screen.queryByText("Plan a date")).toBeNull();
-    expect(screen.queryByText("Plan a trip")).toBeNull();
-  });
-
-  it("starts the plan directly when one city is plannable", () => {
-    mocks.cities = [entry("Lisbon", 3), entry("Rome", 0)];
-    render(<HomePlaces />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Plan a date, In Lisbon" }),
-    );
-    expect(mocks.start).toHaveBeenCalledWith("date", "Lisbon");
-    fireEvent.click(
-      screen.getByRole("button", { name: "Plan a trip, In Lisbon" }),
-    );
-    expect(mocks.start).toHaveBeenCalledWith("trip", "Lisbon");
-  });
-
-  it("treats a city with no place count as plannable", () => {
-    mocks.cities = [entry("Lisbon")];
-    render(<HomePlaces />);
-    expect(
-      screen.getByRole("button", { name: "Plan a date, In Lisbon" }),
-    ).toBeTruthy();
-  });
-
-  it("offers only cities with places in the picker and starts after it closes", () => {
-    mocks.cities = [entry("Lisbon", 3), entry("Austin", 5), entry("Rome", 0)];
-    render(<HomePlaces />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Plan a trip, Pick a city" }),
-    );
-    const sheet = within(screen.getByTestId("sheet"));
-    expect(sheet.getByText("Plan a trip")).toBeTruthy();
-    expect(sheet.queryByText("Rome")).toBeNull();
-    fireEvent.click(sheet.getByRole("button", { name: "Austin, 5 places" }));
-    expect(mocks.start).toHaveBeenCalledWith("trip", "Austin");
-    expect(screen.queryByTestId("sheet")).toBeNull();
-  });
-
-  it("waits for the sheet to dismiss on iOS before starting", () => {
-    vi.stubEnv("EXPO_OS", "ios");
-    mocks.cities = [entry("Lisbon", 3), entry("Austin", 5)];
-    render(<HomePlaces />);
-    fireEvent.click(
-      screen.getByRole("button", { name: "Plan a date, Pick a city" }),
-    );
-    fireEvent.click(
-      within(screen.getByTestId("sheet")).getByRole("button", {
-        name: "Lisbon, 3 places",
-      }),
-    );
-    expect(mocks.start).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText("dismissed"));
-    expect(mocks.start).toHaveBeenCalledWith("date", "Lisbon");
-  });
-
-  it("disables both tiles while a plan is starting", () => {
-    mocks.busy = "date";
-    mocks.cities = [entry("Lisbon", 3)];
-    render(<HomePlaces />);
-    const tile = screen.getByRole("button", { name: "Plan a trip, In Lisbon" });
-    expect((tile as HTMLButtonElement).disabled).toBe(true);
-  });
-});
-
 describe("city cards", () => {
   it("names a city's status for screen readers, including no place yet", () => {
     mocks.cities = [
@@ -303,16 +155,21 @@ describe("city cards", () => {
     ).toBeTruthy();
   });
 
-  it("shows the share tip only for a single city", () => {
-    mocks.cities = [{ city: "Lisbon", count: 1, placeCount: 1, cover: null }];
-    const { unmount } = render(<HomePlaces />);
-    expect(screen.getByText(/Share a reel or TikTok to Shelvr/)).toBeTruthy();
-    unmount();
-    mocks.cities = [
-      { city: "Lisbon", count: 1, placeCount: 1, cover: null },
-      { city: "Rome", count: 1, placeCount: 1, cover: null },
-    ];
+  it("shows the first four cities in order and opens the full grid", () => {
+    mocks.cities = ["Houston", "Kyoto", "Austin", "Lisbon", "Rome"].map(
+      (city) => ({ city, count: 1, placeCount: 1, cover: null }),
+    );
     render(<HomePlaces />);
-    expect(screen.queryByText(/Share a reel or TikTok to Shelvr/)).toBeNull();
+    expect(screen.getByText("Your cities")).toBeTruthy();
+    expect(
+      screen.getAllByRole("button").map((button) => button.textContent),
+    ).toEqual(["+ 1 more", "Houston", "Kyoto", "Austin", "Lisbon"]);
+    fireEvent.click(screen.getByRole("button", { name: "+ 1 more" }));
+    expect(mocks.push).toHaveBeenCalledWith("/cities");
+    fireEvent.click(screen.getByRole("button", { name: "Kyoto, 1 place" }));
+    expect(mocks.push).toHaveBeenCalledWith({
+      pathname: "/city/[name]",
+      params: { name: "Kyoto" },
+    });
   });
 });

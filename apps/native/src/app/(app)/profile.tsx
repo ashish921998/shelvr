@@ -151,6 +151,10 @@ export default function ProfileScreen() {
           />
         </ActionMenu>
         <SettingsRow
+          label={t("passport.title")}
+          onPress={() => router.dismissTo("/(app)/(tabs)/(passport)")}
+        />
+        <SettingsRow
           label={t("feedback.open")}
           icon="arrow.up.right"
           onPress={() => setFeedbackOpen(true)}

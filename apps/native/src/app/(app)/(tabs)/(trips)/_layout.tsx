@@ -19,7 +19,7 @@ export default function TripsStackLayout() {
         options={
           Platform.OS === "android"
             ? {
-                title: t("plans.title"),
+                title: t("navigation.trips"),
                 headerTitleStyle: styles.title,
                 headerRight: () => (
                   <HeaderIconButton
@@ -35,7 +35,7 @@ export default function TripsStackLayout() {
         {Platform.OS === "ios" ? (
           <Stack.Title asChild>
             <Text style={styles.title} accessibilityRole="header">
-              {t("plans.title")}
+              {t("navigation.trips")}
             </Text>
           </Stack.Title>
         ) : null}

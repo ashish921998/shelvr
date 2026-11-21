@@ -4,10 +4,11 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SharedListSummary } from "@/lib/shared-lists";
 import type { Id } from "@convex/_generated/dataModel";
-import { TogetherSection } from "./together-section";
+import { SavedLists } from "./saved-lists";
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
+  refetch: vi.fn(),
   lists: [] as unknown[] | undefined,
   failed: false,
 }));
@@ -18,7 +19,11 @@ vi.mock("@/lib/analytics", () => ({
 vi.mock("@/lib/share-link", () => ({ shareUrl: vi.fn() }));
 vi.mock("@/lib/shared-lists", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/shared-lists")>()),
-  useSharedLists: () => ({ data: mocks.lists, isError: mocks.failed }),
+  useSharedLists: () => ({
+    data: mocks.lists,
+    isError: mocks.failed,
+    refetch: mocks.refetch,
+  }),
 }));
 vi.mock("@/components/shared-list/list-card", () => ({
   SharedListCard: vi.fn(({ list }: { list: { name: string } }) => (
@@ -72,15 +77,14 @@ function summary(over: Partial<SharedListSummary> = {}): SharedListSummary {
 
 beforeEach(() => {
   mocks.push.mockReset();
+  mocks.refetch.mockReset();
   mocks.lists = [];
   mocks.failed = false;
 });
 
-describe("TogetherSection", () => {
+describe("SavedLists", () => {
   it("offers to start a list when there is none", () => {
-    render(<TogetherSection showTripsHeading={false} />);
-    expect(screen.getByText("Together")).toBeTruthy();
-    expect(screen.queryByText("Trips")).toBeNull();
+    render(<SavedLists />);
     expect(screen.queryByLabelText("Loading")).toBeNull();
     fireEvent.click(
       screen.getByRole("button", { name: "Start a shared list" }),
@@ -90,32 +94,31 @@ describe("TogetherSection", () => {
 
   it("waits for the lists before offering to start one", () => {
     mocks.lists = undefined;
-    render(<TogetherSection showTripsHeading={false} />);
-    expect(screen.getByText("Together")).toBeTruthy();
+    render(<SavedLists />);
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.getByLabelText("Loading")).toBeTruthy();
   });
 
-  it("still offers to start a list when the lists fail to load", () => {
+  it("offers to retry when the lists fail to load", () => {
     mocks.lists = undefined;
     mocks.failed = true;
-    render(<TogetherSection showTripsHeading={false} />);
+    render(<SavedLists />);
     expect(screen.queryByLabelText("Loading")).toBeNull();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Start a shared list" }),
-    );
-    expect(mocks.push).toHaveBeenCalledWith("/new-shared-list");
+    expect(
+      screen.queryByRole("button", { name: "Start a shared list" }),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(mocks.refetch).toHaveBeenCalledOnce();
   });
 
-  it("lists shared lists above the trips heading", () => {
+  it("shows existing lists and offers to create another", () => {
     mocks.lists = [
       summary(),
       summary({ _id: "b" as Id<"sharedLists">, name: "Lisbon" }),
     ];
-    render(<TogetherSection showTripsHeading />);
+    render(<SavedLists />);
     expect(screen.getByText("Date spots")).toBeTruthy();
     expect(screen.getByText("Lisbon")).toBeTruthy();
-    expect(screen.getByText("Trips")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "New list" }));
     expect(mocks.push).toHaveBeenCalledWith("/new-shared-list");
   });
