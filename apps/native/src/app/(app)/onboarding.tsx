@@ -1,5 +1,6 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { analytics } from "@/lib/analytics";
+import { bestEffort } from "@/lib/best-effort";
 import { ahaSample } from "@/lib/aha-sample";
 import { stepTransition } from "@/lib/motion";
 import { useOnboarding } from "@/lib/onboarding";
@@ -142,9 +143,9 @@ export default function OnboardingScreen() {
   useEffect(() => {
     if (!signedIn || !isAuthenticated) return;
     holdIncomingShare();
-    clearPending();
+    bestEffort("onboarding_sign_in_finish_failed", clearPending);
     clearOnboardingProgress();
-    completeOnboarding();
+    bestEffort("onboarding_sign_in_finish_failed", completeOnboarding);
   }, [signedIn, isAuthenticated, completeOnboarding]);
 
   const finish = () => {
