@@ -34,6 +34,7 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
       if (!element) return;
       element.pause();
       element.currentTime = seconds;
+      position.current = seconds;
     },
     pause: () => video.current?.pause(),
   }));
