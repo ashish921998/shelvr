@@ -86,7 +86,8 @@ describe("entitlement activation", () => {
 describe("blocked action resume", () => {
   it("reports one resume at the same placement, then clears the memory", async () => {
     const funnel = await loadFunnel();
-    funnel.recordBlockedAction("add", true);
+    funnel.recordBlockedAction("add");
+    funnel.recordAccess("purchase");
     funnel.resumeBlockedAction("add");
     expect(mock.capture).toHaveBeenCalledWith(
       "paywall_blocked_action_resumed",
@@ -102,7 +103,27 @@ describe("blocked action resume", () => {
 
   it("ignores a resume at a different placement", async () => {
     const funnel = await loadFunnel();
-    funnel.recordBlockedAction("map", false);
+    funnel.recordBlockedAction("map");
+    funnel.resumeBlockedAction("add");
+    expect(mock.capture).not.toHaveBeenCalled();
+  });
+
+  it("reports no purchase when none landed since the block", async () => {
+    const funnel = await loadFunnel();
+    funnel.recordAccess("purchase");
+    funnel.recordBlockedAction("add");
+    funnel.resumeBlockedAction("add");
+    expect(mock.capture).toHaveBeenCalledWith(
+      "paywall_blocked_action_resumed",
+      expect.objectContaining({ purchased_since_block: false }),
+    );
+  });
+
+  it("forgets a block when the account signs out", async () => {
+    const funnel = await loadFunnel();
+    funnel.recordBlockedAction("add");
+    funnel.forgetPaywallFunnel();
+    funnel.recordAccess("purchase");
     funnel.resumeBlockedAction("add");
     expect(mock.capture).not.toHaveBeenCalled();
   });
@@ -110,7 +131,7 @@ describe("blocked action resume", () => {
   it("ignores a block older than the resume window", async () => {
     vi.useFakeTimers();
     const funnel = await loadFunnel();
-    funnel.recordBlockedAction("home", false);
+    funnel.recordBlockedAction("home");
     vi.setSystemTime(Date.now() + 31 * 60 * 1000);
     funnel.resumeBlockedAction("home");
     expect(mock.capture).not.toHaveBeenCalled();

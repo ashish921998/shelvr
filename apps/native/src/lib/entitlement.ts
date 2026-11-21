@@ -17,7 +17,6 @@ import {
   readPaywallOffering,
   refreshCustomerInfo,
   recordAccess,
-  recordBlockedAction,
   restoreCameBackEmpty,
   resumeBlockedAction,
   useEntitlementActivation,
@@ -573,7 +572,6 @@ export async function openPaywallAnswer(
   if (owned && shouldOpenPaywallFallback(outcome) && fallback) {
     router.push("/(app)/paywall");
   }
-  recordBlockedAction(placement, outcome === "success");
   return { outcome, answered };
 }
 
