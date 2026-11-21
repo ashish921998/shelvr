@@ -1,10 +1,16 @@
+import { analytics } from "@/lib/analytics";
 import * as SecureStore from "expo-secure-store";
 import { createContext, use, useCallback, useMemo, useState } from "react";
 
 const ONBOARDING_KEY = "shelvr.onboarded";
 
 export function readOnboardedFlag(): boolean {
-  return SecureStore.getItem(ONBOARDING_KEY) === "true";
+  try {
+    return SecureStore.getItem(ONBOARDING_KEY) === "true";
+  } catch (error) {
+    analytics.captureError("onboarded_flag_read_failed", error);
+    return true;
+  }
 }
 
 // SecureStore's delete is async-only, so clearing writes "".
@@ -30,7 +36,11 @@ export function OnboardingProvider({
   const [onboarded, setOnboarded] = useState(readOnboardedFlag);
 
   const completeOnboarding = useCallback(() => {
-    SecureStore.setItem(ONBOARDING_KEY, "true");
+    try {
+      SecureStore.setItem(ONBOARDING_KEY, "true");
+    } catch (error) {
+      analytics.captureError("onboarded_flag_write_failed", error);
+    }
     setOnboarded(true);
   }, []);
 
