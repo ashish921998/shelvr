@@ -224,6 +224,12 @@ export default function Recorder({
       setPhase("idle");
       return;
     }
+    session.current = {
+      recorder: null,
+      streams: [screen],
+      stopDrawing: () => {},
+      audio: null,
+    };
     const camera = await openCamera();
     if (!alive.current) {
       for (const stream of camera ? [screen, camera] : [screen]) {

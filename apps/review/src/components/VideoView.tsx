@@ -24,6 +24,9 @@ export default function VideoView({ videoId }: { videoId: string }) {
   }>({ versionId: null, seconds: 0 });
   const player = useRef<PlayerHandle | null>(null);
 
+  if (chosen === null && video?.versions[0]) {
+    setChosen(video.versions[0]._id);
+  }
   const version =
     video?.versions.find((v) => v._id === chosen) ?? video?.versions[0];
   const currentTime = clock.versionId === version?._id ? clock.seconds : 0;
@@ -98,9 +101,14 @@ export default function VideoView({ videoId }: { videoId: string }) {
             ))}
           </select>
           {!isLatest && (
-            <span className="text-xs text-amber-300">
-              You&apos;re looking at an older version.
-            </span>
+            <button
+              type="button"
+              onClick={() => setChosen(video.versions[0]._id)}
+              className="text-xs text-amber-300 underline-offset-2 hover:underline"
+            >
+              You&apos;re looking at an older version. Open v
+              {video.versions[0].number}
+            </button>
           )}
           {version.note && (
             <span className="text-sm text-zinc-400">“{version.note}”</span>
