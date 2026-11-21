@@ -333,7 +333,9 @@ export function firstSaveDone(operationId: string): boolean {
   }
 }
 
-export function settleHandoff(attempted: HandoffWork): "cleared" | "changed" {
+export function settleHandoff(
+  attempted: HandoffWork,
+): "cleared" | "changed" | "failed" {
   const done = workKey(attempted.operationId, attempted.spaces, null);
   try {
     if (workOf(readRecord()).key !== done) return "changed";
@@ -341,7 +343,7 @@ export function settleHandoff(attempted: HandoffWork): "cleared" | "changed" {
     return "cleared";
   } catch (error) {
     analytics.captureError("onboarding_handoff_settle_failed", error);
-    return "changed";
+    return "failed";
   }
 }
 

@@ -15,6 +15,7 @@ import { useReplayOnboarding } from "./replay-onboarding";
 import { ahaSample } from "./aha-sample";
 
 const storage = vi.hoisted(() => new Map<string, string>());
+const keychain = vi.hoisted(() => ({ refusesWrites: false }));
 const createSpace = vi.hoisted(() => vi.fn());
 const createLinkItem = vi.hoisted(() => vi.fn());
 const entitlement = vi.hoisted(() => ({ entitled: true, loading: false }));
@@ -25,7 +26,10 @@ const account = vi.hoisted(() => ({
 
 vi.mock("expo-secure-store", () => ({
   getItem: (key: string) => storage.get(key) ?? null,
-  setItem: (key: string, value: string) => storage.set(key, value),
+  setItem: (key: string, value: string) => {
+    if (keychain.refusesWrites) throw new Error("keychain locked");
+    storage.set(key, value);
+  },
 }));
 vi.mock("expo-crypto", () => ({ randomUUID: () => crypto.randomUUID() }));
 vi.mock("@convex/_generated/api", () => ({
@@ -98,6 +102,7 @@ function failingServer() {
 
 beforeEach(() => {
   storage.clear();
+  keychain.refusesWrites = false;
   createSpace.mockReset();
   createLinkItem.mockReset();
   captureError.mockReset();
@@ -409,6 +414,20 @@ describe("useReplayOnboarding retries", () => {
 
     expect(createLinkItem).toHaveBeenCalledOnce();
     expect(getPendingDemoUrl()).toBe("https://example.com/a");
+  });
+
+  it("stops after one pass when the keychain will not take the clear, keeping the work", async () => {
+    finishWith(["food"]);
+    keychain.refusesWrites = true;
+
+    renderHook(() => useReplayOnboarding());
+    await settle();
+
+    const settleFailures = captureError.mock.calls.filter(
+      ([event]) => event === "onboarding_handoff_settle_failed",
+    );
+    expect(settleFailures).toHaveLength(1);
+    expect(hasPending()).toBe(true);
   });
 
   it("retries failed work on the next mount", async () => {

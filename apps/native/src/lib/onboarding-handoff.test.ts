@@ -321,7 +321,7 @@ describe("a store that cannot be read", () => {
     device.unreadable = true;
     expect(readHandoffWork().has).toBe(false);
     expect(paywallBlocked()).toBe(true);
-    expect(settleHandoff(attempted)).toBe("changed");
+    expect(settleHandoff(attempted)).toBe("failed");
     finishHandoff(answers(["date"]), null);
     expect(captureError).toHaveBeenCalledWith(
       "onboarding_handoff_read_failed",
@@ -337,7 +337,7 @@ describe("settling while the store cannot be read", () => {
     finishHandoff(answers(["food"]), REEL);
     const before = device.storage.get(KEY);
     device.unreadable = true;
-    expect(settleHandoff(readHandoffWork())).toBe("changed");
+    expect(settleHandoff(readHandoffWork())).toBe("failed");
     device.unreadable = false;
     expect(device.storage.get(KEY)).toBe(before);
   });
