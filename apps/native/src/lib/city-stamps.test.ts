@@ -14,8 +14,12 @@ import {
 const mocks = vi.hoisted(() => ({
   add: vi.fn(),
   remove: vi.fn(),
-  openPaywall: vi.fn(),
-  guard: vi.fn(),
+  gate: {
+    admit: vi.fn(),
+    denied: vi.fn(),
+    passed: vi.fn(),
+    placements: [] as string[],
+  },
   entitlement: { entitled: false, loading: false },
   alert: vi.fn(),
   capture: vi.fn(),
@@ -44,9 +48,13 @@ vi.mock("expo-router", () => ({
   useNavigation: () => ({ isFocused: () => mocks.focused }),
 }));
 vi.mock("@/lib/entitlement", () => ({
-  openPaywall: mocks.openPaywall,
   useEntitlement: () => mocks.entitlement,
-  usePaywallGuard: () => ({ guard: mocks.guard }),
+}));
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: (placement: string) => {
+    mocks.gate.placements.push(placement);
+    return { ...mocks.gate, loading: false };
+  },
 }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mocks.capture, captureError: mocks.captureError },
@@ -81,6 +89,11 @@ beforeEach(() => {
   mocks.remove.mockResolvedValue(true);
   mocks.badgesReady.mockResolvedValue(undefined);
   mocks.entitlement = { entitled: false, loading: false };
+  mocks.gate.placements = [];
+  mocks.gate.denied.mockImplementation(
+    async (error: unknown) =>
+      error instanceof ConvexError && error.data.code === "pro_required",
+  );
   mocks.focused = true;
 });
 
@@ -212,7 +225,9 @@ describe("useCityStampToggle", () => {
       new ConvexError({ code: "pro_required", message: "Pro required" }),
     );
     expect(await toggle("lisbon", true)).toBe(false);
-    expect(mocks.openPaywall).toHaveBeenCalledWith(mocks.router, "passport");
+    expect(mocks.gate.placements).toContain("passport");
+    expect(mocks.gate.denied).toHaveBeenCalledWith(expect.any(ConvexError));
+    expect(mocks.gate.passed).not.toHaveBeenCalled();
     expect(mocks.play).not.toHaveBeenCalled();
     expect(mocks.captureError).not.toHaveBeenCalled();
   });
@@ -260,7 +275,7 @@ describe("useCityStampAccess", () => {
     expect(mocks.capture).toHaveBeenCalledWith("passport_paywall_opened", {
       surface: "city_stamp",
     });
-    expect(mocks.guard).toHaveBeenCalled();
+    expect(mocks.gate.admit).toHaveBeenCalled();
     expect(mocks.router.push).not.toHaveBeenCalled();
   });
 
@@ -273,7 +288,8 @@ describe("useCityStampAccess", () => {
       count: 2,
     });
     expect(mocks.router.push).toHaveBeenCalledWith("/city-stamps");
-    expect(mocks.guard).not.toHaveBeenCalled();
+    expect(mocks.gate.admit).not.toHaveBeenCalled();
+    expect(mocks.gate.passed).toHaveBeenCalled();
   });
 });
 

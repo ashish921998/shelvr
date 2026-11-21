@@ -27,7 +27,8 @@ vi.mock("expo-router", () => ({
   useRouter: () => mocks.router,
   useNavigation: () => ({ isFocused: () => mocks.focused }),
 }));
-vi.mock("@/lib/entitlement", () => ({ openPaywall: mocks.openPaywall }));
+vi.mock("@/lib/entitlement", () => ({ openPaywallAnswer: mocks.openPaywall }));
+vi.mock("@/lib/free-plan", () => ({ useAccess: () => ({ kind: "locked" }) }));
 vi.mock("@/lib/revenuecat-module", () => ({ getPurchases: () => null }));
 vi.mock("@/lib/paywall-goal", () => ({}));
 vi.mock("@/lib/trial-reminder-lead", () => ({}));
@@ -143,12 +144,10 @@ describe("usePlaceVisit", () => {
 
   it("counts a mark that runs after a purchase as the blocked action resumed", async () => {
     const funnel = await import("@/lib/paywall-funnel");
-    mocks.openPaywall.mockImplementation(
-      (_router: unknown, placement: string) => {
-        funnel.recordBlockedAction(placement, true);
-        return Promise.resolve(true);
-      },
-    );
+    mocks.openPaywall.mockImplementation(() => {
+      funnel.recordAccess("purchase");
+      return Promise.resolve({ outcome: "success", answered: true });
+    });
     mocks.setVisited.mockRejectedValueOnce(
       new ConvexError({ code: "pro_required", message: "Pro required" }),
     );
@@ -156,7 +155,27 @@ describe("usePlaceVisit", () => {
     await toggle(taco);
     expect(mocks.capture).toHaveBeenCalledWith(
       "paywall_blocked_action_resumed",
-      expect.objectContaining({ placement: "mark_visited" }),
+      expect.objectContaining({
+        placement: "mark_visited",
+        purchased_since_block: true,
+      }),
+    );
+  });
+
+  it("does not count a free un-mark as the blocked mark resumed", async () => {
+    mocks.setVisited.mockRejectedValueOnce(
+      new ConvexError({ code: "pro_required", message: "Pro required" }),
+    );
+    mocks.openPaywall.mockResolvedValue({
+      outcome: "cancelled",
+      answered: true,
+    });
+    await toggle(taco);
+    const { result } = renderHook(() => usePlaceVisit());
+    await act(() => result.current.toggle(itemId, taco, false));
+    expect(mocks.capture).not.toHaveBeenCalledWith(
+      "paywall_blocked_action_resumed",
+      expect.anything(),
     );
   });
 

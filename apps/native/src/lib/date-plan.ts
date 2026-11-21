@@ -1,6 +1,6 @@
 import { analytics } from "@/lib/analytics";
-import { openPaywall } from "@/lib/entitlement";
 import { t } from "@/lib/i18n";
+import { useProGate } from "@/lib/pro-gate";
 import {
   placeMapsUrl,
   type StopAction,
@@ -20,11 +20,9 @@ import {
 } from "@convex/model/datePlan";
 import { distanceKm } from "@convex/model/trip";
 import { useAction } from "convex/react";
-import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
 
-const PLACEMENT = "make_plan";
 /** Streets wind: a walk is about this much longer than the straight line. */
 const STREET_FACTOR = 1.3;
 const WALK_KMH = 4.8;
@@ -157,7 +155,7 @@ export function useDatePlan(
   locale: string,
   listId?: Id<"sharedLists">,
 ) {
-  const router = useRouter();
+  const { denied, passed } = useProGate("make_plan");
   const make = useAction(api.datePlans.makeDatePlan);
   const [state, setState] = useState<DatePlanState>({
     status: "picking",
@@ -178,7 +176,7 @@ export function useDatePlan(
       busy.current = true;
       setState({ status: "planning", ask });
       analytics.capture("date_plan_started", { kind: ask });
-      let paywall = false;
+      let refused: unknown = null;
       try {
         const result = await make({
           city,
@@ -194,6 +192,7 @@ export function useDatePlan(
           suggested: result.stops.filter((s) => s.source === "suggested")
             .length,
         });
+        if (listId === undefined) passed();
         if (!alive.current) return;
         setState(
           result.status === "ready"
@@ -215,15 +214,17 @@ export function useDatePlan(
           status: "picking",
           problem: reason === "pro_required" ? null : reason,
         });
-        paywall = reason === "pro_required";
+        if (reason === "pro_required") refused = error;
       } finally {
         busy.current = false;
       }
       // Opened after `busy` is released: a tap before the sheet appears plans again and
       // joins (or, if iOS refused it, replaces) the same sheet instead of being dropped.
-      if (paywall) await openPaywall(router, PLACEMENT);
+      if (refused !== null && !(await denied(refused)) && alive.current) {
+        setState({ status: "picking", problem: "error" });
+      }
     },
-    [make, city, locale, listId, router],
+    [make, city, locale, listId, denied, passed],
   );
 
   /** Changes one stop; the screen offers it only when `canChange` says something fits. */

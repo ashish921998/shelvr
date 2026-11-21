@@ -14,7 +14,8 @@ const mocks = vi.hoisted(() => ({
   success: vi.fn(),
   openPaywall: vi.fn(),
 }));
-vi.mock("@/lib/entitlement", () => ({ openPaywall: mocks.openPaywall }));
+vi.mock("@/lib/entitlement", () => ({ openPaywallAnswer: mocks.openPaywall }));
+vi.mock("@/lib/free-plan", () => ({ useAccess: () => ({ kind: "locked" }) }));
 vi.mock("@/lib/revenuecat-module", () => ({ getPurchases: () => null }));
 vi.mock("@/lib/paywall-goal", () => ({}));
 vi.mock("@/lib/trial-reminder-lead", () => ({}));
@@ -184,18 +185,19 @@ it("opens the paywall instead of an error when removing needs Pro", async () => 
 
 it("counts a removal that runs after a purchase as the blocked action resumed", async () => {
   const funnel = await import("@/lib/paywall-funnel");
-  mocks.openPaywall.mockImplementation(
-    (_router: unknown, placement: string) => {
-      funnel.recordBlockedAction(placement, true);
-      return Promise.resolve(true);
-    },
-  );
+  mocks.openPaywall.mockImplementation(() => {
+    funnel.recordAccess("purchase");
+    return Promise.resolve({ outcome: "success", answered: true });
+  });
   const { result } = renderHook(usePlaceRemoval);
   mocks.remove.mockRejectedValueOnce(new ConvexError({ code: "pro_required" }));
   await act(() => result.current.remove(ITEM, PIN));
   await act(() => result.current.remove(ITEM, PIN));
   expect(mocks.capture).toHaveBeenCalledWith(
     "paywall_blocked_action_resumed",
-    expect.objectContaining({ placement: "remove_place" }),
+    expect.objectContaining({
+      placement: "remove_place",
+      purchased_since_block: true,
+    }),
   );
 });
