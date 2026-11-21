@@ -162,6 +162,16 @@ function useSharedCityFrame(all: OwnPlace[] | undefined): MapFrame | undefined {
   }, [all, city, save]);
 }
 
+function useOnNewKey(key: string | undefined, run: () => void) {
+  const latest = useRef(run);
+  useEffect(() => {
+    latest.current = run;
+  });
+  useEffect(() => {
+    if (key !== undefined) latest.current();
+  }, [key]);
+}
+
 export default function MapScreen() {
   useAppLocale();
   const router = useRouter();
@@ -196,14 +206,13 @@ export default function MapScreen() {
 
   const all = places.data;
   const { visits, loaded, isError, error, offerRetry } = usePlaceVisits();
-  const visitsFailed = isError && !loaded;
   useEffect(() => {
     if (error) analytics.captureError("place_visits_load_failed", error);
   }, [error]);
   useFocusEffect(
     useCallback(() => {
-      if (visitsFailed) offerRetry();
-    }, [visitsFailed, offerRetry]),
+      if (isError && !loaded) offerRetry();
+    }, [isError, loaded, offerRetry]),
   );
   const visited = useMemo(() => visitMatcher(visits, all ?? []), [visits, all]);
   const [wentFilter, setWentFilter] = useState<WentFilter>("all");
@@ -262,6 +271,14 @@ export default function MapScreen() {
     `${waiting}|${kinds.join(",")}|${went.selected}`,
     all,
   );
+
+  useOnNewKey(frame?.key, () => {
+    setKinds([]);
+    setWentFilter("all");
+    setSearchText("");
+    setSearchOpen(false);
+    setListOpen(true);
+  });
 
   const reported = useRef(false);
   useEffect(() => {
