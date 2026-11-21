@@ -32,6 +32,7 @@ import {
 import {
   type MapEntry,
   mapEntries,
+  mapWaits,
   ownOnTop,
   searchEntries,
 } from "@/lib/map-discover";
@@ -170,10 +171,12 @@ export default function MapScreen() {
       })),
     [anchorEntries],
   );
-  const waiting =
-    all === undefined ||
-    (all.length === 0 && !settled && area === undefined) ||
-    location === "asking";
+  const waiting = mapWaits({
+    own: all,
+    discoverSettled: settled,
+    areaShown: area !== undefined,
+    askingLocation: location === "asking",
+  });
   const framed = useHeldFraming(
     liveFraming,
     `${waiting}|${kind ?? ""}|${went.selected}`,
