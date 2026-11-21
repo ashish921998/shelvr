@@ -19,9 +19,9 @@ const UNSHIPPED_CLAIMS = [
 
 function decode(html: string) {
   return html
-    .replaceAll("&amp;", "&")
     .replaceAll("&quot;", '"')
-    .replaceAll("&#x27;", "'");
+    .replaceAll("&#x27;", "'")
+    .replaceAll("&amp;", "&");
 }
 
 describe.each(GUIDES.map((guide) => [guide.path, guide] as const))(
