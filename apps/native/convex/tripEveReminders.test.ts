@@ -707,6 +707,49 @@ describe("the week-before trip push", () => {
     ]);
   });
 
+  it("gives way to another trip's evening-before push on the same evening", async () => {
+    const { t, tripId, newerTripId, rows } = await setup({
+      startDate: "2026-10-02",
+      newerTrip: true,
+      createdAt: EVE - 9 * DAY,
+    });
+    await t.mutation(internal.notifications.prepareTripWeek, {
+      tripId,
+      now: EVE,
+    });
+    await t.mutation(internal.notifications.prepareTripEve, {
+      tripId: newerTripId!,
+      now: EVE,
+    });
+    await t.mutation(internal.notifications.prepareTripWeek, {
+      tripId,
+      now: EVE + HOUR,
+    });
+    expect(
+      (await rows()).map((row) => [row.tripId, row.kind ?? "eve"]),
+    ).toEqual([[newerTripId, "eve"]]);
+  });
+
+  it("holds a save reminder due within 20 hours before it", async () => {
+    const { t, userId } = await weekSetup({ article: true });
+    const remind = async (now: number) => {
+      vi.setSystemTime(now);
+      await t.run(async (ctx) => {
+        const row = await ctx.db
+          .query("notificationPreferences")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
+          .unique();
+        await ctx.db.patch(row!._id, { nextReminderAt: now });
+      });
+      await t.mutation(internal.notifications.prepareSaveReminder, {
+        userId,
+        now,
+      });
+      return t.run((ctx) => ctx.db.query("saveReminders").collect());
+    };
+    expect(await remind(WEEK - HOUR)).toEqual([]);
+  });
+
   it("sweeps only trips starting about a week from now", async () => {
     const { t, tripId, userId } = await weekSetup();
     const tomorrowId = await t.run((ctx) =>

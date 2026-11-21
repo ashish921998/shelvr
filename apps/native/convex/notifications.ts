@@ -53,7 +53,7 @@ import {
 } from "./model/saveReminders";
 import { placeKey } from "./model/plan";
 import {
-  nextTripEveAt,
+  nextTripReminderAt,
   type TripReminderKind,
   tripReminderDateRange,
   tripReminderDue,
@@ -657,11 +657,12 @@ export const armSaveReminders = internalMutation({
   },
 });
 
-async function upcomingTripEveAt(
+async function upcomingTripPushAt(
   ctx: QueryCtx,
   userId: string,
   timezone: string | undefined,
   now: number,
+  kinds: readonly TripReminderKind[],
 ): Promise<number | undefined> {
   const trips = await ctx.db
     .query("tripPlans")
@@ -672,10 +673,11 @@ async function upcomingTripEveAt(
   const counts = await Promise.all(
     dated.map((trip) => tripSavedStopCount(ctx, trip._id)),
   );
-  return nextTripEveAt(
+  return nextTripReminderAt(
     dated.filter((_, index) => counts[index] >= 1),
     timezone,
     now,
+    kinds,
   );
 }
 
@@ -755,11 +757,12 @@ export const prepareSaveReminder = internalMutation({
     )
       .filter((eve) => eve.deliveryStatus !== "failed")
       .map((eve) => eve.createdAt);
-    const upcomingEveAt = await upcomingTripEveAt(
+    const upcomingEveAt = await upcomingTripPushAt(
       ctx,
       userId,
       preferences.timezone,
       now,
+      ["eve", "week"],
     );
     const sentAt = [
       ...reminders.map((reminder) => reminder.createdAt),
@@ -966,6 +969,16 @@ async function newerTripTakesReminder(
   return false;
 }
 
+async function eveSoon(
+  ctx: QueryCtx,
+  userId: string,
+  timezone: string | undefined,
+  now: number,
+): Promise<boolean> {
+  const eveAt = await upcomingTripPushAt(ctx, userId, timezone, now, ["eve"]);
+  return eveAt !== undefined && eveAt - now < MIN_GAP_MS;
+}
+
 async function alreadyReminded(
   ctx: QueryCtx,
   kind: TripReminderKind,
@@ -1018,7 +1031,9 @@ async function prepareTripReminder(
       preferences.timezone,
       now,
     )) ||
-    (await pushedRecently(ctx, trip.userId, now))
+    (await pushedRecently(ctx, trip.userId, now)) ||
+    (kind === "week" &&
+      (await eveSoon(ctx, trip.userId, preferences.timezone, now)))
   )
     return null;
   const reminderId = await ctx.db.insert("tripEveReminders", {

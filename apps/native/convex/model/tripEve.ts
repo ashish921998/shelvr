@@ -69,19 +69,32 @@ export function tripEveDue(
   return tripReminderDue("eve", trip, timezone, now);
 }
 
+export function nextTripReminderAt(
+  trips: readonly DatedTrip[],
+  timezone: string | undefined,
+  now: number,
+  kinds: readonly TripReminderKind[],
+): number | undefined {
+  const upcoming = trips.flatMap((trip) => {
+    const startDate = trip.startDate;
+    if (startDate === undefined) return [];
+    return kinds.flatMap((kind) => {
+      const remindAt = tripReminderAt(kind, startDate, timezone);
+      return trip._creationTime < remindAt - MIN_LEAD_MS &&
+        now < remindAt + MAX_LATE_MS
+        ? [remindAt]
+        : [];
+    });
+  });
+  return upcoming.length === 0 ? undefined : Math.min(...upcoming);
+}
+
 export function nextTripEveAt(
   trips: readonly DatedTrip[],
   timezone: string | undefined,
   now: number,
 ): number | undefined {
-  const upcoming = trips.flatMap((trip) => {
-    if (trip.startDate === undefined) return [];
-    const eveAt = tripEveAt(trip.startDate, timezone);
-    return trip._creationTime < eveAt - MIN_LEAD_MS && now < eveAt + MAX_LATE_MS
-      ? [eveAt]
-      : [];
-  });
-  return upcoming.length === 0 ? undefined : Math.min(...upcoming);
+  return nextTripReminderAt(trips, timezone, now, ["eve"]);
 }
 
 export function tripEveDateRange(now: number): { from: string; to: string } {
