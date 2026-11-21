@@ -287,7 +287,10 @@ export function handOverFirstSave(
 }
 
 export function readHandoffWork(): HandoffWork {
-  const record = peekRecord();
+  return workOf(peekRecord());
+}
+
+function workOf(record: StoredRecord | null): HandoffWork {
   const firstSave = firstSaveOf(record);
   return {
     has: record !== null && (record.spaces.length > 0 || firstSave !== null),
@@ -332,9 +335,14 @@ export function firstSaveDone(operationId: string): boolean {
 
 export function settleHandoff(attempted: HandoffWork): "cleared" | "changed" {
   const done = workKey(attempted.operationId, attempted.spaces, null);
-  if (readHandoffWork().key !== done) return "changed";
-  bestEffort("onboarding_handoff_settle_failed", () => writeRecord(null));
-  return "cleared";
+  try {
+    if (workOf(readRecord()).key !== done) return "changed";
+    writeRecord(null);
+    return "cleared";
+  } catch (error) {
+    analytics.captureError("onboarding_handoff_settle_failed", error);
+    return "changed";
+  }
 }
 
 export function clearHandoff() {
@@ -357,8 +365,13 @@ export function forgetPaywallAnswer() {
 
 export function paywallBlocked(): boolean {
   if (onboardingPaywall !== "unseen") return true;
-  const record = peekRecord();
-  return record !== null && record.declinedOperationId === record.operationId;
+  try {
+    const record = readRecord();
+    return record !== null && record.declinedOperationId === record.operationId;
+  } catch (error) {
+    analytics.captureError("onboarding_handoff_read_failed", error);
+    return true;
+  }
 }
 
 export function noteReplayDeclined(operationId: string | null) {

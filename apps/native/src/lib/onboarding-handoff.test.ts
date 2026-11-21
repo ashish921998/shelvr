@@ -314,19 +314,30 @@ describe("a store that cannot be written", () => {
 });
 
 describe("a store that cannot be read", () => {
-  it("reports it, shows the replay no work, and keeps the record for the next launch", () => {
+  it("reports it, shows the replay no work and no paywall, and keeps the record for the next launch", () => {
     finishHandoff(answers(["food"]), REEL);
     const attempted = readHandoffWork();
     const before = device.storage.get(KEY);
     device.unreadable = true;
     expect(readHandoffWork().has).toBe(false);
-    expect(paywallBlocked()).toBe(false);
+    expect(paywallBlocked()).toBe(true);
     expect(settleHandoff(attempted)).toBe("changed");
     finishHandoff(answers(["date"]), null);
     expect(captureError).toHaveBeenCalledWith(
       "onboarding_handoff_read_failed",
       expect.any(Error),
     );
+    device.unreadable = false;
+    expect(device.storage.get(KEY)).toBe(before);
+  });
+});
+
+describe("settling while the store cannot be read", () => {
+  it("never clears the record, even for the empty work an unreadable store showed", () => {
+    finishHandoff(answers(["food"]), REEL);
+    const before = device.storage.get(KEY);
+    device.unreadable = true;
+    expect(settleHandoff(readHandoffWork())).toBe("changed");
     device.unreadable = false;
     expect(device.storage.get(KEY)).toBe(before);
   });
