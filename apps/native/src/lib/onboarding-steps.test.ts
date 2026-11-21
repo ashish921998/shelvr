@@ -4,7 +4,7 @@ import {
   ONBOARDING_STEP_IDS,
   ONBOARDING_STEPS,
   nextOnboardingStep,
-  onboardingProgress,
+  onboardingProgressFraction,
   previousOnboardingStep,
   restoreOnboardingStep,
   type OnboardingStep,
@@ -74,11 +74,11 @@ describe("ONBOARDING_STEP_IDS", () => {
   });
 });
 
-describe("onboardingProgress", () => {
+describe("onboardingProgressFraction", () => {
   it("has no bar on the opener and fills evenly to the last step", () => {
-    expect(onboardingProgress("opener")).toBeNull();
+    expect(onboardingProgressFraction("opener")).toBeNull();
     const bars = ONBOARDING_STEPS.slice(1).map((step) =>
-      onboardingProgress(step),
+      onboardingProgressFraction(step),
     );
     expect(bars.at(-1)).toBe(1);
     bars.forEach((bar, index) => {

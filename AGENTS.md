@@ -73,7 +73,9 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   the Add sheet (`src/app/(app)/add.tsx`) takes a pasted link only.
 - **Onboarding:** screen `src/app/(app)/onboarding.tsx`, steps in
   `src/components/onboarding`, state in `src/lib/onboarding.tsx`,
-  `onboarding-steps.ts` and `pending-onboarding.ts`.
+  `onboarding-steps.ts`, `onboarding-progress.ts` (where the person is in the
+  flow: steps, answers, skip and back rules, step analytics) and
+  `pending-onboarding.ts` (the handoff finished onboarding leaves).
 - **Copy:** `src/locales/en.json` is the source catalog; `t()` and
   `useAppLocale()` come from `src/lib/i18n.ts`. `src/locales/catalogs.ts`,
   `src/locales/message-types.ts` and

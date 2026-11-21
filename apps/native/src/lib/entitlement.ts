@@ -6,7 +6,7 @@ import { useAction, useConvexAuth } from "convex/react";
 import { useQuery } from "@tanstack/react-query";
 import { useCurrentUser } from "@/lib/current-user";
 import { analytics } from "@/lib/analytics";
-import { getOnboardingProgress } from "@/lib/pending-onboarding";
+import { onboardingAnswers } from "@/lib/onboarding-progress";
 import { goalProgressFor } from "@/lib/paywall-goal";
 import {
   activeProductId,
@@ -387,7 +387,7 @@ async function presentPaywallImpl(
       trial,
       offering?.availablePackages.map((pkg) => pkg.product) ?? [],
       enriched.trial_eligible,
-      goalProgressFor(getOnboardingProgress(), placement),
+      goalProgressFor(onboardingAnswers(), placement),
     );
     // A sign-out during those reads must not open a paywall that cannot close.
     if (!rcReadyFor(anonymous)) {
