@@ -37,16 +37,26 @@ function viewMedia(media: Doc<"media"> | null) {
   };
 }
 
-async function newMedia(
+async function claimUpload(
   ctx: MutationCtx,
+  mediaId: Id<"media">,
   campaignId: Id<"campaigns">,
   uploaderId: Id<"users">,
-): Promise<Id<"media">> {
-  return await ctx.db.insert("media", {
-    campaignId,
-    uploaderId,
-    status: "waiting",
-  });
+): Promise<void> {
+  const media = await ctx.db.get("media", mediaId);
+  if (
+    media === null ||
+    media.campaignId !== campaignId ||
+    media.uploaderId !== uploaderId
+  ) {
+    throw new Error("This upload is not yours");
+  }
+  if (media.status !== "ready") throw new Error("The upload hasn't finished");
+  const used = await ctx.db
+    .query("versions")
+    .withIndex("by_mediaId", (q) => q.eq("mediaId", mediaId))
+    .first();
+  if (used !== null) throw new Error("This upload is already used");
 }
 
 async function latestVersion(
@@ -171,12 +181,16 @@ export const get = query({
 });
 
 export const create = mutation({
-  args: { campaignId: v.id("campaigns"), title: v.string() },
-  returns: v.object({ videoId: v.id("videos"), mediaId: v.id("media") }),
-  handler: async (ctx, { campaignId, title }) => {
+  args: {
+    campaignId: v.id("campaigns"),
+    title: v.string(),
+    mediaId: v.id("media"),
+  },
+  returns: v.id("videos"),
+  handler: async (ctx, { campaignId, title, mediaId }) => {
     const { user } = await requireMember(ctx, campaignId);
+    await claimUpload(ctx, mediaId, campaignId, user._id);
     const clean = cleanText(title, MAX_TITLE) || "Untitled video";
-    const mediaId = await newMedia(ctx, campaignId, user._id);
     const now = Date.now();
     const videoId = await ctx.db.insert("videos", {
       campaignId,
@@ -192,21 +206,25 @@ export const create = mutation({
       mediaId,
       uploadedBy: user._id,
     });
-    return { videoId, mediaId };
+    return videoId;
   },
 });
 
 export const addVersion = mutation({
-  args: { videoId: v.id("videos"), note: v.optional(v.string()) },
-  returns: v.object({ versionId: v.id("versions"), mediaId: v.id("media") }),
-  handler: async (ctx, { videoId, note }) => {
+  args: {
+    videoId: v.id("videos"),
+    mediaId: v.id("media"),
+    note: v.optional(v.string()),
+  },
+  returns: v.id("versions"),
+  handler: async (ctx, { videoId, mediaId, note }) => {
     const video = await ctx.db.get("videos", videoId);
     if (video === null) throw new Error("Video not found");
     const { user, role } = await requireMember(ctx, video.campaignId);
     if (!canUploadVersion(role, video.creatorId === user._id)) {
       throw new Error("Only the creator or an admin can upload a new version");
     }
-    const mediaId = await newMedia(ctx, video.campaignId, user._id);
+    await claimUpload(ctx, mediaId, video.campaignId, user._id);
     const number = video.latestVersion + 1;
     const cleanNote = note ? cleanText(note, MAX_BODY) : "";
     const versionId = await ctx.db.insert("versions", {
@@ -221,7 +239,7 @@ export const addVersion = mutation({
       status: "needs_review",
       updatedAt: Date.now(),
     });
-    return { versionId, mediaId };
+    return versionId;
   },
 });
 

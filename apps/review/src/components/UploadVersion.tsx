@@ -7,9 +7,15 @@ import type { Id } from "@convex/_generated/dataModel";
 import { useUpload } from "@/lib/useUpload";
 import { ProgressBar } from "./UploadVideo";
 
-export default function UploadVersion({ videoId }: { videoId: Id<"videos"> }) {
+export default function UploadVersion({
+  videoId,
+  campaignId,
+}: {
+  videoId: Id<"videos">;
+  campaignId: Id<"campaigns">;
+}) {
   const addVersion = useMutation(api.videos.addVersion);
-  const { upload, progress, error } = useUpload();
+  const { uploadNew, progress, error } = useUpload();
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [note, setNote] = useState("");
@@ -17,8 +23,9 @@ export default function UploadVersion({ videoId }: { videoId: Id<"videos"> }) {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!file) return;
-    const { mediaId } = await addVersion({ videoId, note });
-    const ok = await upload(mediaId, file);
+    const ok = await uploadNew(campaignId, file, async (mediaId) => {
+      await addVersion({ videoId, mediaId, note });
+    });
     if (ok) {
       setFile(null);
       setNote("");

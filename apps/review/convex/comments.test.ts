@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api } from "./_generated/api";
-import { addMember, addUser, newConvexTest } from "./test.setup";
+import { addMember, addUser, newConvexTest, readyMedia } from "./test.setup";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -22,9 +22,10 @@ async function setup() {
   const alice = await addMember(t, campaignId, "alice@example.com", "creator");
   const bob = await addMember(t, campaignId, "bob@example.com", "creator");
   const outsider = await addUser(t, "eve@example.com");
-  const { videoId } = await alice.as.mutation(api.videos.create, {
+  const videoId = await alice.as.mutation(api.videos.create, {
     campaignId,
     title: "Hook take",
+    mediaId: await readyMedia(t, campaignId, alice.userId),
   });
   const video = await alice.as.query(api.videos.get, { videoId });
   const versionId = video!.versions[0]._id;

@@ -53,7 +53,9 @@ export default defineSchema({
     mediaId: v.id("media"),
     uploadedBy: v.id("users"),
     note: v.optional(v.string()),
-  }).index("by_videoId_and_number", ["videoId", "number"]),
+  })
+    .index("by_videoId_and_number", ["videoId", "number"])
+    .index("by_mediaId", ["mediaId"]),
   media: defineTable({
     campaignId: v.id("campaigns"),
     uploaderId: v.id("users"),

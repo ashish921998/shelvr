@@ -1,7 +1,7 @@
 // @vitest-environment edge-runtime
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api } from "./_generated/api";
-import { addMember, addUser, newConvexTest } from "./test.setup";
+import { addMember, addUser, newConvexTest, readyMedia } from "./test.setup";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -22,9 +22,10 @@ async function setup() {
   const alice = await addMember(t, campaignId, "alice@example.com", "creator");
   const bob = await addMember(t, campaignId, "bob@example.com", "creator");
   const outsider = await addUser(t, "eve@example.com");
-  const { videoId } = await alice.as.mutation(api.videos.create, {
+  const videoId = await alice.as.mutation(api.videos.create, {
     campaignId,
     title: "Hook take",
+    mediaId: await readyMedia(t, campaignId, alice.userId),
   });
   return { t, boss, alice, bob, outsider, campaignId, videoId };
 }
@@ -40,7 +41,7 @@ describe("videos", () => {
         creatorName: "alice",
         isMine: false,
         status: "needs_review",
-        media: { status: "waiting" },
+        media: { status: "ready" },
       },
     ]);
     const alicesView = await alice.as.query(api.videos.get, { videoId });
@@ -48,13 +49,17 @@ describe("videos", () => {
   });
 
   test("people outside the campaign see nothing and cannot upload", async () => {
-    const { outsider, campaignId, videoId } = await setup();
+    const { t, outsider, campaignId, videoId } = await setup();
     expect(await outsider.as.query(api.videos.list, { campaignId })).toEqual(
       [],
     );
     expect(await outsider.as.query(api.videos.get, { videoId })).toBeNull();
     await expect(
-      outsider.as.mutation(api.videos.create, { campaignId, title: "x" }),
+      outsider.as.mutation(api.videos.create, {
+        campaignId,
+        title: "x",
+        mediaId: await readyMedia(t, campaignId, outsider.userId),
+      }),
     ).rejects.toThrow("not in this campaign");
   });
 
@@ -73,13 +78,14 @@ describe("videos", () => {
   });
 
   test("a new version goes back to needs review", async () => {
-    const { boss, alice, videoId } = await setup();
+    const { t, boss, alice, campaignId, videoId } = await setup();
     await boss.as.mutation(api.videos.setStatus, {
       videoId,
       status: "changes_requested",
     });
     await alice.as.mutation(api.videos.addVersion, {
       videoId,
+      mediaId: await readyMedia(t, campaignId, alice.userId),
       note: "Fixed the lighting",
     });
     const video = await alice.as.query(api.videos.get, { videoId });
@@ -91,9 +97,12 @@ describe("videos", () => {
   });
 
   test("another creator cannot upload a version or rename", async () => {
-    const { bob, boss, videoId } = await setup();
+    const { t, bob, boss, campaignId, videoId } = await setup();
     await expect(
-      bob.as.mutation(api.videos.addVersion, { videoId }),
+      bob.as.mutation(api.videos.addVersion, {
+        videoId,
+        mediaId: await readyMedia(t, campaignId, bob.userId),
+      }),
     ).rejects.toThrow("Only the creator or an admin");
     await expect(
       bob.as.mutation(api.videos.rename, { videoId, title: "Mine now" }),
@@ -102,5 +111,46 @@ describe("videos", () => {
     expect((await bob.as.query(api.videos.get, { videoId }))?.title).toBe(
       "Hook v2",
     );
+  });
+
+  test("a video or version is only added once its upload is ready", async () => {
+    const { t, boss, alice, bob, campaignId, videoId } = await setup();
+    await boss.as.mutation(api.videos.setStatus, {
+      videoId,
+      status: "approved",
+    });
+    const pending = await alice.as.mutation(api.media.start, {
+      campaignId,
+      contentType: "video/mp4",
+    });
+    await expect(
+      alice.as.mutation(api.videos.addVersion, { videoId, mediaId: pending }),
+    ).rejects.toThrow("hasn't finished");
+    await expect(
+      alice.as.mutation(api.videos.create, {
+        campaignId,
+        title: "Again",
+        mediaId: pending,
+      }),
+    ).rejects.toThrow("hasn't finished");
+    const bobs = await readyMedia(t, campaignId, bob.userId);
+    await expect(
+      alice.as.mutation(api.videos.addVersion, { videoId, mediaId: bobs }),
+    ).rejects.toThrow("not yours");
+    const video = await alice.as.query(api.videos.get, { videoId });
+    expect(video?.status).toBe("approved");
+    expect(video?.versions).toHaveLength(1);
+    expect(await alice.as.query(api.videos.list, { campaignId })).toHaveLength(
+      1,
+    );
+  });
+
+  test("an upload cannot be used twice", async () => {
+    const { t, alice, campaignId, videoId } = await setup();
+    const mediaId = await readyMedia(t, campaignId, alice.userId);
+    await alice.as.mutation(api.videos.addVersion, { videoId, mediaId });
+    await expect(
+      alice.as.mutation(api.videos.create, { campaignId, title: "x", mediaId }),
+    ).rejects.toThrow("already used");
   });
 });

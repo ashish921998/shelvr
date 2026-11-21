@@ -32,11 +32,11 @@ async function setup() {
   const alice = await addMember(t, campaignId, "alice@example.com", "creator");
   const bob = await addMember(t, campaignId, "bob@example.com", "creator");
   const outsider = await addUser(t, "eve@example.com");
-  const { videoId, mediaId } = await alice.as.mutation(api.videos.create, {
+  const mediaId = await alice.as.mutation(api.media.start, {
     campaignId,
-    title: "Hook",
+    contentType: "video/mp4",
   });
-  return { t, boss, alice, bob, outsider, campaignId, videoId, mediaId };
+  return { t, boss, alice, bob, outsider, campaignId, mediaId };
 }
 
 function sized(size: number) {
@@ -46,7 +46,44 @@ function sized(size: number) {
   });
 }
 
+describe("start", () => {
+  test("refuses people outside the campaign and files that are not video", async () => {
+    const { alice, outsider, campaignId } = await setup();
+    await expect(
+      outsider.as.mutation(api.media.start, {
+        campaignId,
+        contentType: "video/mp4",
+      }),
+    ).rejects.toThrow("not in this campaign");
+    await expect(
+      alice.as.mutation(api.media.start, {
+        campaignId,
+        contentType: "video/x-msvideo",
+      }),
+    ).rejects.toThrow("Upload a video file");
+  });
+});
+
 describe("createUpload", () => {
+  test("refuses an uploader who was removed from the campaign", async () => {
+    const { t, alice, campaignId, mediaId } = await setup();
+    await t.run(async (ctx) => {
+      const row = await ctx.db
+        .query("members")
+        .withIndex("by_campaignId_and_userId", (q) =>
+          q.eq("campaignId", campaignId).eq("userId", alice.userId),
+        )
+        .unique();
+      if (row) await ctx.db.delete("members", row._id);
+    });
+    await expect(
+      alice.as.action(api.media.createUpload, {
+        mediaId,
+        contentType: "video/mp4",
+      }),
+    ).rejects.toThrow("not yours");
+  });
+
   test("gives the uploader a signed PUT for the media key", async () => {
     const { t, alice, mediaId } = await setup();
     const target = await alice.as.action(api.media.createUpload, {
@@ -58,7 +95,7 @@ describe("createUpload", () => {
     expect(url.host).toBe("acct.r2.cloudflarestorage.com");
     expect(url.pathname).toBe(`/review/media/${mediaId}`);
     expect(url.searchParams.get("X-Amz-Signature")).toBeTruthy();
-    expect(url.searchParams.get("X-Amz-Expires")).toBe("3600");
+    expect(url.searchParams.get("X-Amz-Expires")).toBe("900");
     const media = await t.run((ctx) => ctx.db.get("media", mediaId));
     expect(media).toMatchObject({
       status: "waiting",

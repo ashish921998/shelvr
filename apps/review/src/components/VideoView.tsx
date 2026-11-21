@@ -121,7 +121,9 @@ export default function VideoView({ videoId }: { videoId: string }) {
                       : "Request changes"}
                 </button>
               ))}
-            {video.canUpload && <UploadVersion videoId={id} />}
+            {video.canUpload && (
+              <UploadVersion videoId={id} campaignId={video.campaignId} />
+            )}
           </div>
         </div>
         {!video.canReview && video.status !== "needs_review" && (

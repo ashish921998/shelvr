@@ -29,3 +29,19 @@ export async function addMember(
   });
   return user;
 }
+
+export async function readyMedia(
+  t: ConvexTest,
+  campaignId: Id<"campaigns">,
+  uploaderId: Id<"users">,
+) {
+  return await t.run(async (ctx) =>
+    ctx.db.insert("media", {
+      campaignId,
+      uploaderId,
+      status: "ready",
+      storageKey: "media/x",
+      size: 1,
+    }),
+  );
+}

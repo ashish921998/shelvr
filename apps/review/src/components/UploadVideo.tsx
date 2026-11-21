@@ -13,7 +13,7 @@ export default function UploadVideo({
   campaignId: Id<"campaigns">;
 }) {
   const create = useMutation(api.videos.create);
-  const { upload, progress, error } = useUpload();
+  const { uploadNew, progress, error } = useUpload();
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -22,9 +22,10 @@ export default function UploadVideo({
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     if (!file) return;
-    const { videoId, mediaId } = await create({ campaignId, title });
-    const ok = await upload(mediaId, file);
-    if (ok) router.push(`/videos/${videoId}`);
+    await uploadNew(campaignId, file, async (mediaId) => {
+      const videoId = await create({ campaignId, title, mediaId });
+      router.push(`/videos/${videoId}`);
+    });
   }
 
   if (file === null) {

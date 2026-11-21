@@ -6,8 +6,9 @@ import {
   env,
   internalMutation,
   internalQuery,
+  mutation,
 } from "./_generated/server";
-import { currentUser, membership } from "./model/access";
+import { currentUser, membership, requireMember } from "./model/access";
 import {
   aspectRatio,
   cleanContentType,
@@ -18,7 +19,7 @@ import {
   type R2Config,
 } from "./model/storage";
 
-const UPLOAD_TTL_SECONDS = 60 * 60;
+const UPLOAD_TTL_SECONDS = 15 * 60;
 const PLAYBACK_TTL_SECONDS = 6 * 60 * 60;
 
 function r2Config(): R2Config {
@@ -32,6 +33,20 @@ function r2Config(): R2Config {
   return { accountId, accessKeyId, secretAccessKey, bucket };
 }
 
+export const start = mutation({
+  args: { campaignId: v.id("campaigns"), contentType: v.string() },
+  returns: v.id("media"),
+  handler: async (ctx, { campaignId, contentType }) => {
+    const { user } = await requireMember(ctx, campaignId);
+    cleanContentType(contentType);
+    return await ctx.db.insert("media", {
+      campaignId,
+      uploaderId: user._id,
+      status: "waiting",
+    });
+  },
+});
+
 export const uploadTarget = internalQuery({
   args: { mediaId: v.id("media") },
   returns: v.union(
@@ -44,6 +59,8 @@ export const uploadTarget = internalQuery({
     if (user === null || media === null) return null;
     if (media.uploaderId !== user._id) return null;
     if (media.status !== "waiting") return null;
+    const member = await membership(ctx, media.campaignId, user._id);
+    if (member === null) return null;
     return { storageKey: media.storageKey ?? null };
   },
 });

@@ -15,6 +15,7 @@ import type * as http from "../http.js";
 import type * as media from "../media.js";
 import type * as model_access from "../model/access.js";
 import type * as model_rules from "../model/rules.js";
+import type * as model_signUp from "../model/signUp.js";
 import type * as model_storage from "../model/storage.js";
 import type * as videos from "../videos.js";
 
@@ -32,6 +33,7 @@ declare const fullApi: ApiFromModules<{
   media: typeof media;
   "model/access": typeof model_access;
   "model/rules": typeof model_rules;
+  "model/signUp": typeof model_signUp;
   "model/storage": typeof model_storage;
   videos: typeof videos;
 }>;
