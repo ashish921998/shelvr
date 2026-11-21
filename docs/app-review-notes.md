@@ -43,7 +43,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 - A shared list is one list of places that up to 8 people keep together. A person can be on 20 lists, and a list holds up to 200 places.
 - Home shows the person's lists above the Plan a date and Plan a trip tiles. A list starts from a city page's "Invite" button, beside the city's name.
-- Starting a list needs Pro. The form takes a name and at least one city; places the owner already saved in those cities come along. "Send invite" opens the share sheet with a link to `https://shelvr-web.vercel.app/l/<token>`.
+- Starting a list needs Pro. The form takes a name and at least one city; places the owner already saved in those cities come along. "Send invite" opens the share sheet with a link to `https://tryshelvr.app/l/<token>`.
 - With Shelvr installed, the link opens the Join screen, which says "Free to join. You don’t need Pro." and has "Join list". Without the app, the web page shows the invite. A person who isn't signed in joins after sign-in, finishing onboarding first if they need to.
 - Joining, opening the list, marking a place "We went" and leaving need no Pro. While the owner has Pro, a member without it can also add places and plan a date or a trip from the list. Everywhere else they still see the plan screen.
 - Members see the list's name, its places with their pins and cities, the first name of whoever added each place, and "We went" marks. They don't see each other's saves, titles or captions. A place's source save opens only for the person who saved it.
@@ -54,7 +54,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 ## Vote links
 
 - A city page with places shows "Ask someone" under the place count. Making a vote link needs Pro, and without Pro the row opens the paywall.
-- The sheet lists the city's places, and up to 5 can be picked. "Send vote link" opens the share sheet with a link to `https://shelvr-web.vercel.app/p/<token>`.
+- The sheet lists the city's places, and up to 5 can be picked. "Send vote link" opens the share sheet with a link to `https://tryshelvr.app/p/<token>`.
 - Voters need no app or account. They tap ✓ or ✕ on each place and may type a first name. The page shows the sender's first name, the city and the places, with a saved link's cover image but never a photo save.
 - Votes appear on the city page as they land, with the newest vote, how many people voted, the days left, and a tally on each place. While the link is open, "Share" sends it again.
 - A link closes after 7 days and is deleted a week later with its votes and names.
@@ -87,7 +87,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Legal and support
 
-- Sign-in: tappable **Terms** and **Privacy Policy** (https://shelvr-web.vercel.app/terms, https://shelvr-web.vercel.app/privacy).
+- Sign-in: tappable **Terms** and **Privacy Policy** (https://tryshelvr.app/terms, https://tryshelvr.app/privacy).
 - Profile → Settings: Contact Support, Restore Purchases, Terms, and Privacy.
 - Paywall fallback (only on SDK/network failure): Terms and Privacy links plus retry.
 

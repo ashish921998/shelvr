@@ -47,6 +47,34 @@ describe("redirectSystemPath", () => {
     expect(markPendingShareOnDevice).not.toHaveBeenCalled();
   });
 
+  it.each([
+    "https://tryshelvr.app/auth/callback?code=verification-code",
+    "https://shelvr-web.vercel.app/auth/callback?code=verification-code",
+  ])(
+    "keeps universal-link OAuth callbacks on the sign-in route for %s",
+    (path) => {
+      expect(redirectSystemPath({ path, initial: false })).toBe("/sign-in");
+    },
+  );
+
+  it("does not treat another host's /auth/callback as an OAuth callback", () => {
+    expect(
+      redirectSystemPath({
+        path: "https://example.com/auth/callback?code=verification-code",
+        initial: false,
+      }),
+    ).not.toBe("/sign-in");
+  });
+
+  it.each([
+    "https://tryshelvr.app/l/tok123",
+    "https://shelvr-web.vercel.app/l/tok123",
+  ])("opens a list invite from %s on the join screen", (path) => {
+    expect(redirectSystemPath({ path, initial: true })).toBe(
+      "/list-invite/tok123",
+    );
+  });
+
   it("opens a shared passport link on the passport invite screen", () => {
     expect(
       redirectSystemPath({
