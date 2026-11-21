@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { ConvexError } from "convex/values";
+import { saveErrorCode } from "@convex/model/saveErrors";
 import { useFixSave } from "./fix-save";
 
 const mock = vi.hoisted(() => ({
@@ -8,7 +9,9 @@ const mock = vi.hoisted(() => ({
   impact: vi.fn(),
   success: vi.fn(),
   alert: vi.fn(),
-  denied: vi.fn(async (error: unknown) => error instanceof ConvexError),
+  denied: vi.fn(
+    async (error: unknown) => saveErrorCode(error) === "pro_required",
+  ),
   passed: vi.fn(),
 }));
 

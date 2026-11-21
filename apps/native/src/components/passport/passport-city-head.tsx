@@ -21,11 +21,12 @@ export function useRingAccess(): {
   passed: () => void;
 } {
   const { entitled, loading } = useEntitlement();
-  const { admit, passed } = useProGate("passport");
+  const { admit, passed, loading: waiting } = useProGate("passport");
   const unlock = useCallback(() => {
-    analytics.capture("passport_paywall_opened", { surface: "ring" });
+    if (!waiting)
+      analytics.capture("passport_paywall_opened", { surface: "ring" });
     void admit();
-  }, [admit]);
+  }, [admit, waiting]);
   return { locked: !loading && !entitled, unlock, passed };
 }
 

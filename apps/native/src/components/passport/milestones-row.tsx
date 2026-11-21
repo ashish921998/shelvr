@@ -28,11 +28,12 @@ export function useBadgeAccess(): {
   passed: () => void;
 } {
   const { entitled, loading } = useEntitlement();
-  const { admit, passed } = useProGate("passport");
+  const { admit, passed, loading: waiting } = useProGate("passport");
   const unlock = useCallback(() => {
-    analytics.capture("passport_paywall_opened", { surface: "badge" });
+    if (!waiting)
+      analytics.capture("passport_paywall_opened", { surface: "badge" });
     void admit();
-  }, [admit]);
+  }, [admit, waiting]);
   return { locked: !loading && !entitled, unlock, passed };
 }
 

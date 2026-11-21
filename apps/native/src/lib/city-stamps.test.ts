@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
     placements: [] as string[],
   },
   entitlement: { entitled: false, loading: false },
+  gateWaiting: false,
   alert: vi.fn(),
   capture: vi.fn(),
   captureError: vi.fn(),
@@ -53,7 +54,7 @@ vi.mock("@/lib/entitlement", () => ({
 vi.mock("@/lib/pro-gate", () => ({
   useProGate: (placement: string) => {
     mocks.gate.placements.push(placement);
-    return { ...mocks.gate, loading: false };
+    return { ...mocks.gate, loading: mocks.gateWaiting };
   },
 }));
 vi.mock("@/lib/analytics", () => ({
@@ -89,6 +90,7 @@ beforeEach(() => {
   mocks.remove.mockResolvedValue(true);
   mocks.badgesReady.mockResolvedValue(undefined);
   mocks.entitlement = { entitled: false, loading: false };
+  mocks.gateWaiting = false;
   mocks.gate.placements = [];
   mocks.gate.denied.mockImplementation(
     async (error: unknown) =>
@@ -277,6 +279,17 @@ describe("useCityStampAccess", () => {
     });
     expect(mocks.gate.admit).toHaveBeenCalled();
     expect(mocks.router.push).not.toHaveBeenCalled();
+  });
+
+  it("records no paywall while the gate waits for a purchase to sync", () => {
+    mocks.gateWaiting = true;
+    const { result } = renderHook(() => useCityStampAccess(2));
+    result.current.open();
+    expect(mocks.gate.admit).toHaveBeenCalled();
+    expect(mocks.capture).not.toHaveBeenCalledWith(
+      "passport_paywall_opened",
+      expect.anything(),
+    );
   });
 
   it("opens the city grid for Pro", () => {

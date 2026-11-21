@@ -147,17 +147,19 @@ export function useCityStampAccess(count: number): {
 } {
   const router = useRouter();
   const { entitled, loading } = useEntitlement();
-  const { admit, passed } = useProGate("passport");
+  const { admit, passed, loading: waiting } = useProGate("passport");
   const locked = !loading && !entitled;
   const open = useCallback(() => {
     if (locked) {
-      analytics.capture("passport_paywall_opened", { surface: "city_stamp" });
+      if (!waiting) {
+        analytics.capture("passport_paywall_opened", { surface: "city_stamp" });
+      }
       void admit();
       return;
     }
     passed();
     analytics.capture("passport_city_stamps_opened", { count });
     router.push("/city-stamps");
-  }, [admit, count, locked, passed, router]);
+  }, [admit, count, locked, passed, router, waiting]);
   return { locked, open };
 }
