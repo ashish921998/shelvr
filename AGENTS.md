@@ -88,6 +88,11 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   assigned before paint by the inline script from
   `apps/web/src/lib/ctaVariant.ts` in `apps/web/src/app/layout.tsx`, and sent
   as `cta_variant` on every web event (`apps/web/src/lib/analytics.ts`).
+- **Search guides:** the use-case pages (`/save-instagram-reels-to-map` and
+  the others) take their copy from `apps/web/src/lib/guides.ts` and render
+  through `apps/web/src/components/guides/GuidePage.tsx`, one route folder
+  each. The sitemap and footer list them from `GUIDES`; a new guide needs its
+  folder and an entry there.
 - **Link reading:** `convex/model/pageRead.ts` (`readPage`, host dispatcher),
   shared extraction and recipe helpers in `convex/model/pageReadCore.ts`, and
   per-host readers in `convex/model/readers/` (Google Maps lists split by city in
