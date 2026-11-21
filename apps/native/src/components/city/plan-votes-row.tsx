@@ -2,7 +2,7 @@ import { AskVotesSheet } from "@/components/city/ask-votes-sheet";
 import { AppSymbolIcon } from "@/components/symbol";
 import { analytics } from "@/lib/analytics";
 import type { CityPin } from "@/lib/city-pins";
-import { usePaywallGuard } from "@/lib/entitlement";
+import { useProGate } from "@/lib/pro-gate";
 import { t } from "@/lib/i18n";
 import { fadeIn } from "@/lib/motion";
 import {
@@ -39,7 +39,7 @@ export function CityVotes({
   link: VoteLink | null | undefined;
 }) {
   const now = useClock();
-  const { guard, loading } = usePaywallGuard("plan_vote");
+  const { admit, passed, loading } = useProGate("plan_vote");
   const [sheet, setSheet] = useState({ open: false, round: 0 });
   const seen = useRef(false);
   useEffect(() => {
@@ -54,11 +54,12 @@ export function CityVotes({
   if (link === undefined) return null;
   const row = votesRow(link, now);
   const openLink = row.kind === "waiting" || row.kind === "votes" ? link : null;
-  const onAsk = () =>
-    void guard(() => {
-      analytics.capture("plan_ask_opened", { has_link: openLink !== null });
-      setSheet((current) => ({ open: true, round: current.round + 1 }));
-    });
+  const onAsk = async () => {
+    if ((await admit()) !== "go") return;
+    passed();
+    analytics.capture("plan_ask_opened", { has_link: openLink !== null });
+    setSheet((current) => ({ open: true, round: current.round + 1 }));
+  };
 
   return (
     <>

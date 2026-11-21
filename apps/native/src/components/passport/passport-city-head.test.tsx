@@ -18,7 +18,7 @@ import type { PassportSection } from "@/lib/passport";
 
 const mocks = vi.hoisted(() => ({
   entitlement: { entitled: false, loading: false },
-  guard: vi.fn(),
+  admit: vi.fn(),
   capture: vi.fn(),
 }));
 
@@ -83,9 +83,10 @@ vi.mock("@/components/passport/city-ring", () => ({
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => mocks.entitlement,
-  usePaywallGuard: (placement: string) => ({
-    guard: (...args: unknown[]) => mocks.guard(placement, ...args),
-    loading: false,
+}));
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: (placement: string) => ({
+    admit: (...args: unknown[]) => mocks.admit(placement, ...args),
   }),
 }));
 vi.mock("@/lib/use-large-text", () => ({ LARGE_TEXT_SCALE: 1.4 }));
@@ -200,7 +201,7 @@ describe("useRingAccess", () => {
     expect(mocks.capture).toHaveBeenCalledWith("passport_paywall_opened", {
       surface: "ring",
     });
-    expect(mocks.guard).toHaveBeenCalledWith("passport");
+    expect(mocks.admit).toHaveBeenCalledWith("passport");
   });
 
   it("does not lock while the plan is loading or for Pro", () => {

@@ -40,9 +40,9 @@ import { useSaveImages } from "@/lib/use-save-image";
 import { analytics } from "@/lib/analytics";
 import { bestEffort } from "@/lib/best-effort";
 import { saveFailureStage } from "@convex/model/saveErrors";
-import { openPaywall } from "@/lib/entitlement";
 import { canSave, saveWaiting } from "@/lib/access";
 import { useAccess } from "@/lib/free-plan";
+import { useProGate } from "@/lib/pro-gate";
 import { useCurrentUser } from "@/lib/current-user";
 import { api } from "@convex/_generated/api";
 import { useMutation } from "convex/react";
@@ -111,6 +111,7 @@ function withSaveTelemetry<T>(
 export default function ShareScreen() {
   useAppLocale();
   const router = useRouter();
+  const { blocked, passed } = useProGate("share");
   const { theme } = useUnistyles();
   const { data: user } = useCurrentUser();
   const access = useAccess();
@@ -193,7 +194,13 @@ export default function ShareScreen() {
       });
       owner.current = next.state;
       for (const effect of next.effects) {
-        runEffect(effect, dispatch, { clearSharedPayloads, router, saveDeps });
+        runEffect(effect, dispatch, {
+          clearSharedPayloads,
+          router,
+          saveDeps,
+          blocked,
+          passed,
+        });
       }
       setPhase(owner.current.phase);
     },
@@ -207,6 +214,8 @@ export default function ShareScreen() {
       clearSharedPayloads,
       router,
       saveDeps,
+      blocked,
+      passed,
     ],
   );
 
@@ -441,6 +450,8 @@ type EffectDeps = {
   clearSharedPayloads: () => void;
   router: ReturnType<typeof useRouter>;
   saveDeps: ShareSaveDeps;
+  blocked: () => Promise<void>;
+  passed: () => void;
 };
 
 function runEffect(
@@ -489,6 +500,7 @@ function runEffect(
       persistEntry(effect.entry, effect.sessionId);
       return;
     case "save":
+      deps.passed();
       void save(effect, dispatch, deps.saveDeps);
       return;
     case "saveFailed":
@@ -514,7 +526,7 @@ function runEffect(
       });
       return;
     case "openPaywall":
-      void openPaywall(deps.router, "share");
+      void deps.blocked();
       return;
     case "navigateHome":
       deps.router.replace("/(app)/(tabs)/(home)");

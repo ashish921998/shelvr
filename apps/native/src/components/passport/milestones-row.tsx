@@ -6,7 +6,8 @@ import {
   badgeName,
   badgeProgress,
 } from "@/lib/badge-copy";
-import { useEntitlement, usePaywallGuard } from "@/lib/entitlement";
+import { useEntitlement } from "@/lib/entitlement";
+import { useProGate } from "@/lib/pro-gate";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
   type BadgeId,
@@ -23,11 +24,11 @@ const MEDAL_SIZE = 56;
 
 export function useBadgeAccess(): { locked: boolean; unlock: () => void } {
   const { entitled, loading } = useEntitlement();
-  const { guard } = usePaywallGuard("passport");
+  const { admit } = useProGate("passport");
   const unlock = useCallback(() => {
     analytics.capture("passport_paywall_opened", { surface: "badge" });
-    void guard();
-  }, [guard]);
+    void admit();
+  }, [admit]);
   return { locked: !loading && !entitled, unlock };
 }
 

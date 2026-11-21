@@ -18,7 +18,7 @@ import { type BadgeStamp, badgeTotals } from "@convex/model/badges";
 
 const mocks = vi.hoisted(() => ({
   entitlement: { entitled: true, loading: false },
-  guard: vi.fn(),
+  admit: vi.fn(),
   capture: vi.fn(),
 }));
 
@@ -69,9 +69,10 @@ vi.mock("@/components/symbol", () => ({
 }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => mocks.entitlement,
-  usePaywallGuard: (placement: string) => ({
-    guard: (...args: unknown[]) => mocks.guard(placement, ...args),
-    loading: false,
+}));
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: (placement: string) => ({
+    admit: (...args: unknown[]) => mocks.admit(placement, ...args),
   }),
 }));
 vi.mock("@/lib/analytics", () => ({ analytics: { capture: mocks.capture } }));
@@ -173,7 +174,7 @@ describe("useBadgeAccess", () => {
     expect(mocks.capture).toHaveBeenCalledWith("passport_paywall_opened", {
       surface: "badge",
     });
-    expect(mocks.guard).toHaveBeenCalledWith("passport");
+    expect(mocks.admit).toHaveBeenCalledWith("passport");
   });
 
   it("leaves a Pro user unlocked, and waits while the plan loads", () => {

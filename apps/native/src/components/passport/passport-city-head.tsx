@@ -3,7 +3,8 @@ import { CityStampArt } from "@/components/passport/city-stamp";
 import { cityStampLabel } from "@/lib/city-stamp-data";
 import { AppSymbolIcon } from "@/components/symbol";
 import { analytics } from "@/lib/analytics";
-import { useEntitlement, usePaywallGuard } from "@/lib/entitlement";
+import { useEntitlement } from "@/lib/entitlement";
+import { useProGate } from "@/lib/pro-gate";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LARGE_TEXT_SCALE } from "@/lib/use-large-text";
 import type { PassportSection } from "@/lib/passport";
@@ -16,11 +17,11 @@ const HEAD_STAMP_SIZE = 64;
 
 export function useRingAccess(): { locked: boolean; unlock: () => void } {
   const { entitled, loading } = useEntitlement();
-  const { guard } = usePaywallGuard("passport");
+  const { admit } = useProGate("passport");
   const unlock = useCallback(() => {
     analytics.capture("passport_paywall_opened", { surface: "ring" });
-    void guard();
-  }, [guard]);
+    void admit();
+  }, [admit]);
   return { locked: !loading && !entitled, unlock };
 }
 

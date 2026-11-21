@@ -18,7 +18,6 @@ import {
   refreshCustomerInfo,
   recordAccess,
   restoreCameBackEmpty,
-  resumeBlockedAction,
   useEntitlementActivation,
 } from "@/lib/paywall-funnel";
 import { getRCUI, getPurchases } from "@/lib/revenuecat-module";
@@ -40,7 +39,7 @@ import {
 } from "@/lib/revenuecat-api-key";
 import { startRevenueCatIdentitySync } from "./revenuecat-identity-sync";
 import { useRouter } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import { isProHiddenForE2E } from "@/lib/e2e-hide-pro";
 import {
@@ -632,27 +631,4 @@ export async function readTrialEligible(): Promise<boolean> {
   } catch {
     return false;
   }
-}
-
-/** Runs `action` only when entitled, else opens the paywall; resolves false whenever the action did not run. */
-export function usePaywallGuard(placement = "pro_gate"): {
-  guard: (action?: () => void) => Promise<boolean>;
-  loading: boolean;
-} {
-  const { entitled, loading } = useEntitlement();
-  const router = useRouter();
-  const guard = useCallback(
-    async (action?: () => void) => {
-      if (loading) return false;
-      if (entitled) {
-        resumeBlockedAction(placement);
-        action?.();
-        return true;
-      }
-      await openPaywall(router, placement);
-      return false;
-    },
-    [entitled, loading, placement, router],
-  );
-  return { guard, loading };
 }

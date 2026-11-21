@@ -69,11 +69,12 @@ vi.mock("@/lib/city-plan", () => ({
 }));
 vi.mock("@/lib/entitlement", () => ({
   useEntitlement: () => ({ entitled: true }),
-  usePaywallGuard: () => ({ guard: vi.fn() }),
 }));
 vi.mock("@/lib/free-plan", () => ({
   useAccess: () => mocks.access,
-  useSaveGuard: () => ({ guard: vi.fn(), loading: false }),
+}));
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: () => ({ admit: vi.fn(), passed: vi.fn() }),
 }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: mocks.cities }),

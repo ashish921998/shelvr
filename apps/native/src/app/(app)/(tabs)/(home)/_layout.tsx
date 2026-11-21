@@ -1,7 +1,7 @@
 import { t, useAppLocale } from "@/lib/i18n";
 import { Wordmark } from "@/components/wordmark";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
-import { useSaveGuard } from "@/lib/free-plan";
+import { useProGate } from "@/lib/pro-gate";
 import { Stack, useRouter } from "expo-router";
 import { Platform } from "react-native";
 import { useTabStackChrome } from "@/lib/tab-stack-chrome";
@@ -12,11 +12,12 @@ export default function HomeStackLayout() {
   const { labelColor, screenOptions, tap } = useTabStackChrome({
     softScrollEdge: true,
   });
-  const { guard, loading: entitlementLoading } = useSaveGuard("home");
+  const { admit, passed, loading } = useProGate("home");
 
-  const guardedTap = (href: "/add") => () => {
-    if (entitlementLoading) return;
-    void guard(() => router.push(href));
+  const guardedTap = (href: "/add") => async () => {
+    if (loading || (await admit()) !== "go") return;
+    passed();
+    router.push(href);
   };
 
   return (
