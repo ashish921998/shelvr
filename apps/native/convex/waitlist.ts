@@ -427,7 +427,7 @@ export async function joinWaitlist(
         from,
         to: [email],
         subject: "Confirm your Shelvr waitlist request",
-        text: `Confirm that you requested a Shelvr launch notification: https://shelvr-web.vercel.app/waitlist/confirm?token=${token}\n\nThis link expires in 24 hours. If you did not request this, ignore this email. You are not subscribed.`,
+        text: `Confirm that you requested a Shelvr launch notification: https://tryshelvr.app/waitlist/confirm?token=${token}\n\nThis link expires in 24 hours. If you did not request this, ignore this email. You are not subscribed.`,
       }),
     });
     if (!response.ok)
