@@ -195,6 +195,17 @@ export const invite = mutation({
     if (existingUser) {
       const member = await membership(ctx, args.campaignId, existingUser._id);
       if (member) {
+        if (member.role === "admin" && args.role !== "admin") {
+          const members = await ctx.db
+            .query("members")
+            .withIndex("by_campaignId_and_userId", (q) =>
+              q.eq("campaignId", args.campaignId),
+            )
+            .take(500);
+          if (members.filter((m) => m.role === "admin").length <= 1) {
+            throw new Error("A campaign needs at least one admin");
+          }
+        }
         await ctx.db.patch("members", member._id, { role: args.role });
       } else {
         await ctx.db.insert("members", {

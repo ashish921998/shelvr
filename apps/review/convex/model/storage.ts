@@ -17,6 +17,10 @@ export function cleanContentType(raw: string): string {
   return type;
 }
 
+export function uploadKey(mediaId: string): string {
+  return `uploads/${mediaId}`;
+}
+
 export function mediaKey(mediaId: string): string {
   return `media/${mediaId}`;
 }
@@ -39,36 +43,59 @@ export async function presign(
     contentType?: string;
   },
 ): Promise<string> {
-  const client = new AwsClient({
+  const url = new URL(objectUrl(config, key));
+  url.searchParams.set("X-Amz-Expires", String(expiresIn));
+  const headers = contentType ? { "Content-Type": contentType } : undefined;
+  const signed = await client(config).sign(
+    new Request(url, { method, headers }),
+    {
+      aws: { signQuery: true },
+    },
+  );
+  return signed.url;
+}
+
+function client(config: R2Config) {
+  return new AwsClient({
     accessKeyId: config.accessKeyId,
     secretAccessKey: config.secretAccessKey,
     service: "s3",
     region: "auto",
   });
-  const url = new URL(objectUrl(config, key));
-  url.searchParams.set("X-Amz-Expires", String(expiresIn));
-  const headers = contentType ? { "Content-Type": contentType } : undefined;
-  const signed = await client.sign(new Request(url, { method, headers }), {
-    aws: { signQuery: true },
-  });
-  return signed.url;
 }
 
 export async function headObject(
   config: R2Config,
   key: string,
-): Promise<{ size: number } | null> {
-  const client = new AwsClient({
-    accessKeyId: config.accessKeyId,
-    secretAccessKey: config.secretAccessKey,
-    service: "s3",
-    region: "auto",
-  });
-  const response = await client.fetch(objectUrl(config, key), {
+): Promise<{ size: number; etag: string } | null> {
+  const response = await client(config).fetch(objectUrl(config, key), {
     method: "HEAD",
   });
   if (!response.ok) return null;
-  return { size: Number(response.headers.get("content-length") ?? 0) };
+  return {
+    size: Number(response.headers.get("content-length") ?? 0),
+    etag: response.headers.get("etag") ?? "",
+  };
+}
+
+export async function copyObject(
+  config: R2Config,
+  from: string,
+  to: string,
+  etag: string,
+): Promise<boolean> {
+  const response = await client(config).fetch(objectUrl(config, to), {
+    method: "PUT",
+    headers: {
+      "x-amz-copy-source": `/${config.bucket}/${from}`,
+      "x-amz-copy-source-if-match": etag,
+    },
+  });
+  return response.ok;
+}
+
+export async function deleteObject(config: R2Config, key: string) {
+  await client(config).fetch(objectUrl(config, key), { method: "DELETE" });
 }
 
 export function aspectRatio(width: number, height: number): string | undefined {

@@ -138,4 +138,23 @@ describe("campaigns", () => {
     expect(after?.invites).toEqual([]);
     expect(after?.brief).toBe("Golden hour, vertical, 30s");
   });
+
+  test("the last admin cannot be demoted", async () => {
+    const { t, boss, campaignId } = await staffCampaign();
+    await expect(
+      boss.as.mutation(api.campaigns.invite, {
+        campaignId,
+        email: "boss@shelvr.app",
+        role: "creator",
+      }),
+    ).rejects.toThrow("at least one admin");
+    await addMember(t, campaignId, "ops@shelvr.app", "admin");
+    await expect(
+      boss.as.mutation(api.campaigns.invite, {
+        campaignId,
+        email: "boss@shelvr.app",
+        role: "creator",
+      }),
+    ).resolves.toBe("added");
+  });
 });

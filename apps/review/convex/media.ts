@@ -12,11 +12,14 @@ import { currentUser, membership, requireMember } from "./model/access";
 import {
   aspectRatio,
   cleanContentType,
+  copyObject,
+  deleteObject,
   headObject,
   MAX_UPLOAD_BYTES,
   mediaKey,
   presign,
   type R2Config,
+  uploadKey,
 } from "./model/storage";
 
 const UPLOAD_TTL_SECONDS = 15 * 60;
@@ -81,6 +84,7 @@ export const recordUpload = internalMutation({
 export const markReady = internalMutation({
   args: {
     mediaId: v.id("media"),
+    storageKey: v.string(),
     size: v.number(),
     duration: v.optional(v.number()),
     aspectRatio: v.optional(v.string()),
@@ -91,6 +95,7 @@ export const markReady = internalMutation({
     if (media === null || media.status !== "waiting") return null;
     await ctx.db.patch("media", args.mediaId, {
       status: "ready",
+      storageKey: args.storageKey,
       size: args.size,
       duration: args.duration,
       aspectRatio: args.aspectRatio,
@@ -143,7 +148,7 @@ export const createUpload = action({
     if (target === null) throw new Error("This upload is not yours to start");
     const type = cleanContentType(contentType);
     const config = r2Config();
-    const storageKey = target.storageKey ?? mediaKey(mediaId);
+    const storageKey = target.storageKey ?? uploadKey(mediaId);
     await ctx.runMutation(internal.media.recordUpload, {
       mediaId,
       storageKey,
@@ -174,8 +179,16 @@ export const completeUpload = action({
     if (target === null || target.storageKey === null) {
       throw new Error("This upload is not yours to finish");
     }
-    const head = await headObject(r2Config(), target.storageKey);
-    if (head === null || head.size === 0 || head.size > MAX_UPLOAD_BYTES) {
+    const config = r2Config();
+    const head = await headObject(config, target.storageKey);
+    const finalKey = mediaKey(args.mediaId);
+    const fits =
+      head !== null && head.size > 0 && head.size <= MAX_UPLOAD_BYTES;
+    const copied =
+      fits &&
+      (await copyObject(config, target.storageKey, finalKey, head.etag));
+    await deleteObject(config, target.storageKey);
+    if (!copied || head === null) {
       await ctx.runMutation(internal.media.markErrored, {
         mediaId: args.mediaId,
       });
@@ -189,6 +202,7 @@ export const completeUpload = action({
         : undefined;
     await ctx.runMutation(internal.media.markReady, {
       mediaId: args.mediaId,
+      storageKey: finalKey,
       size: head.size,
       duration,
       aspectRatio:

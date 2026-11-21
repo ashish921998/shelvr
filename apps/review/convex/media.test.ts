@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { api } from "./_generated/api";
 import { addMember, addUser, newConvexTest } from "./test.setup";
 
+const calls: string[] = [];
+const copy = vi.fn<(request: Request) => Promise<Response>>();
 const head =
   vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>();
 
@@ -14,7 +16,19 @@ beforeEach(() => {
   vi.stubEnv("R2_SECRET_ACCESS_KEY", "secret");
   vi.stubEnv("R2_BUCKET", "review");
   head.mockReset();
-  vi.stubGlobal("fetch", head);
+  copy.mockReset();
+  copy.mockResolvedValue(new Response(null, { status: 200 }));
+  calls.length = 0;
+  vi.stubGlobal(
+    "fetch",
+    async (input: RequestInfo | URL, init?: RequestInit) => {
+      const request = new Request(input, init);
+      calls.push(`${request.method} ${new URL(request.url).pathname}`);
+      if (request.method === "HEAD") return head(input, init);
+      if (request.method === "PUT") return copy(request);
+      return new Response(null, { status: 204 });
+    },
+  );
 });
 
 afterEach(() => {
@@ -42,7 +56,7 @@ async function setup() {
 function sized(size: number) {
   return new Response(null, {
     status: 200,
-    headers: { "content-length": String(size) },
+    headers: { "content-length": String(size), etag: '"abc"' },
   });
 }
 
@@ -93,13 +107,13 @@ describe("createUpload", () => {
     expect(target.contentType).toBe("video/mp4");
     const url = new URL(target.url);
     expect(url.host).toBe("acct.r2.cloudflarestorage.com");
-    expect(url.pathname).toBe(`/review/media/${mediaId}`);
+    expect(url.pathname).toBe(`/review/uploads/${mediaId}`);
     expect(url.searchParams.get("X-Amz-Signature")).toBeTruthy();
     expect(url.searchParams.get("X-Amz-Expires")).toBe("900");
     const media = await t.run((ctx) => ctx.db.get("media", mediaId));
     expect(media).toMatchObject({
       status: "waiting",
-      storageKey: `media/${mediaId}`,
+      storageKey: `uploads/${mediaId}`,
       contentType: "video/mp4",
     });
   });
@@ -139,7 +153,7 @@ describe("createUpload", () => {
 });
 
 describe("completeUpload", () => {
-  test("marks the media ready with its size, length and shape", async () => {
+  test("moves the checked upload to its own key and marks it ready", async () => {
     const { t, alice, mediaId } = await setup();
     await alice.as.action(api.media.createUpload, {
       mediaId,
@@ -154,8 +168,19 @@ describe("completeUpload", () => {
     });
     expect(status).toBe("ready");
     const media = await t.run((ctx) => ctx.db.get("media", mediaId));
+    expect(calls).toEqual([
+      `HEAD /review/uploads/${mediaId}`,
+      `PUT /review/media/${mediaId}`,
+      `DELETE /review/uploads/${mediaId}`,
+    ]);
+    const request = copy.mock.calls[0][0];
+    expect(request.headers.get("x-amz-copy-source")).toBe(
+      `/review/uploads/${mediaId}`,
+    );
+    expect(request.headers.get("x-amz-copy-source-if-match")).toBe('"abc"');
     expect(media).toMatchObject({
       status: "ready",
+      storageKey: `media/${mediaId}`,
       size: 5_000_000,
       duration: 31.5,
       aspectRatio: "9:16",
@@ -176,6 +201,36 @@ describe("completeUpload", () => {
     expect(status).toBe("errored");
     const media = await t.run((ctx) => ctx.db.get("media", mediaId));
     expect(media?.status).toBe("errored");
+  });
+
+  test("marks the media errored and deletes an upload over the size cap", async () => {
+    const { t, alice, mediaId } = await setup();
+    await alice.as.action(api.media.createUpload, {
+      mediaId,
+      contentType: "video/mp4",
+    });
+    head.mockResolvedValueOnce(sized(3 * 1024 * 1024 * 1024));
+    expect(await alice.as.action(api.media.completeUpload, { mediaId })).toBe(
+      "errored",
+    );
+    expect(calls).toContain(`DELETE /review/uploads/${mediaId}`);
+    expect(copy).not.toHaveBeenCalled();
+    expect((await t.run((ctx) => ctx.db.get("media", mediaId)))?.status).toBe(
+      "errored",
+    );
+  });
+
+  test("marks the media errored when the upload changed before the copy", async () => {
+    const { alice, mediaId } = await setup();
+    await alice.as.action(api.media.createUpload, {
+      mediaId,
+      contentType: "video/mp4",
+    });
+    head.mockResolvedValueOnce(sized(100));
+    copy.mockResolvedValueOnce(new Response(null, { status: 412 }));
+    expect(await alice.as.action(api.media.completeUpload, { mediaId })).toBe(
+      "errored",
+    );
   });
 
   test("refuses to finish an upload that never started", async () => {
