@@ -1,6 +1,6 @@
 import { api } from "@convex/_generated/api";
 import { useEntitlement } from "@/lib/entitlement";
-import { useAwaitingOnboardingPurchase } from "@/lib/replay-onboarding";
+import { useAwaitingOnboardingPurchase } from "@/lib/onboarding-handoff";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useConvexAuth } from "convex/react";

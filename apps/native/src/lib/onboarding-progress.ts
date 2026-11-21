@@ -13,12 +13,12 @@ import {
   type OnboardingStep,
 } from "@/lib/onboarding-steps";
 import {
-  getPendingAnswers,
-  parseOnboardingAnswers,
   dropLegacyProgress,
+  handoffAnswers,
+  parseOnboardingAnswers,
   readLegacyProgress,
   type OnboardingAnswers,
-} from "@/lib/pending-onboarding";
+} from "@/lib/onboarding-handoff";
 
 const PROGRESS_KEY = "shelvr.onboarding.progress";
 const PROGRESS_FORMAT = 1;
@@ -443,11 +443,7 @@ function importLegacyProgress(): SavedProgress | null {
     analytics.captureError("onboarding_progress_save_failed", error);
     return saved;
   }
-  try {
-    dropLegacyProgress();
-  } catch (error) {
-    analytics.captureError("onboarding_legacy_progress_drop_failed", error);
-  }
+  dropLegacyProgress();
   return saved;
 }
 
@@ -456,7 +452,7 @@ export function loadOnboardingProgress(): SavedProgress | null {
 }
 
 export function onboardingAnswers(): OnboardingAnswers {
-  return readProgress()?.answers ?? getPendingAnswers();
+  return readProgress()?.answers ?? handoffAnswers();
 }
 
 export function useOnboardingProgress() {

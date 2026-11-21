@@ -14,12 +14,10 @@ import {
 } from "./onboarding-progress";
 import { GOALS } from "./onboarding-goals";
 import {
-  getOrCreatePendingOperationId,
-  getPendingDemoUrl,
-  getPendingSpaces,
-  queueDemoUrl,
-  setPendingSpaces,
-} from "./pending-onboarding";
+  finishHandoff,
+  handOverFirstSave,
+  readHandoffWork,
+} from "./onboarding-handoff";
 import type { OnboardingStep } from "./onboarding-steps";
 
 const storage = vi.hoisted(() => new Map<string, string>());
@@ -461,9 +459,13 @@ describe("progress written by the previous build", () => {
     loadOnboardingProgress();
     clearOnboardingProgress();
     expect(loadOnboardingProgress()).toBeNull();
-    expect(getPendingDemoUrl()).toBe("https://example.com/queued");
-    expect(getOrCreatePendingOperationId()).toBe("legacy-operation");
-    expect(getPendingSpaces()).toEqual(["Date nights"]);
+    expect(readHandoffWork()).toMatchObject({
+      operationId: "legacy-operation",
+      firstSave: { url: "https://example.com/queued" },
+    });
+    expect(JSON.parse(storage.get(PENDING_KEY) ?? "{}")).toMatchObject({
+      spaces: ["Date nights"],
+    });
   });
 
   it("resumes in memory and keeps the old progress when the new key cannot be written", () => {
@@ -487,13 +489,16 @@ describe("progress written by the previous build", () => {
       expect.any(Error),
     );
     failingKeys.clear();
-    setPendingSpaces(["Date nights"], {
-      goals: ["date"],
-      savedCount: null,
-      travelCity: null,
-      beenCities: [],
-      skippedShare: false,
-    });
+    finishHandoff(
+      {
+        goals: ["date"],
+        savedCount: null,
+        travelCity: null,
+        beenCities: [],
+        skippedShare: false,
+      },
+      null,
+    );
     clearOnboardingProgress();
     expect(loadOnboardingProgress()).toBeNull();
   });
@@ -523,15 +528,18 @@ describe("the answers the paywall echoes", () => {
       goals: ["travel"],
       travelCity: "tokyo",
     });
-    setPendingSpaces(["Trips"], {
-      goals: ["travel"],
-      savedCount: null,
-      travelCity: "tokyo",
-      beenCities: ["lisbon"],
-      skippedShare: false,
-    });
+    finishHandoff(
+      {
+        goals: ["travel"],
+        savedCount: null,
+        travelCity: "tokyo",
+        beenCities: ["lisbon"],
+        skippedShare: false,
+      },
+      null,
+    );
     clearOnboardingProgress();
-    queueDemoUrl("https://example.com/reel");
+    handOverFirstSave("https://example.com/reel");
     expect(onboardingAnswers()).toMatchObject({
       goals: ["travel"],
       travelCity: "tokyo",

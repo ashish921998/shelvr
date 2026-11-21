@@ -24,9 +24,9 @@ vi.mock("@/lib/entitlement", () => ({
 vi.mock("@/lib/purchase-before-sign-in", () => ({
   notePurchaseBeforeSignIn: state.beforeSignIn,
 }));
-vi.mock("@/lib/replay-onboarding", () => ({
-  notePurchasedDuringOnboarding: state.purchased,
-  noteDeclinedDuringOnboarding: state.declined,
+vi.mock("@/lib/onboarding-handoff", () => ({
+  notePaywallAnswer: (answer: "purchased" | "declined") =>
+    answer === "purchased" ? state.purchased() : state.declined(),
 }));
 
 async function ask(entitlement: { entitled: boolean; loading: boolean }) {

@@ -6,7 +6,7 @@ import { useCurrentUser } from "@/lib/current-user";
 import { recordShareSaved } from "@/lib/first-share";
 import { useOnboarding } from "@/lib/onboarding";
 import { findSample } from "@/lib/onboarding-demo";
-import { queueDemoUrl, type PendingDemo } from "@/lib/pending-onboarding";
+import { handOverFirstSave } from "@/lib/onboarding-handoff";
 import { ConvexError } from "convex/values";
 import { useConvexAuth, useMutation } from "convex/react";
 import * as SecureStore from "expo-secure-store";
@@ -14,7 +14,12 @@ import { useEffect, useRef } from "react";
 
 const KEY = "shelvr.onboarding.queuedSave";
 
-type QueuedSave = PendingDemo & { owner: string | null };
+type QueuedSave = {
+  url: string;
+  destination: string | null;
+  source: "direct" | "share";
+  owner: string | null;
+};
 
 function readQueued(): QueuedSave | null {
   try {
@@ -85,7 +90,7 @@ export function useQueuedFirstSave() {
     }).then(
       (result) => {
         if (result.reused && !result.urlMatchesRequest) {
-          queueDemoUrl(url, destination, userId);
+          handOverFirstSave(url, destination, userId);
         } else {
           if (!result.reused) analytics.capture("onboarding_demo_submitted");
           if (source === "share" && result.urlMatchesRequest) {
@@ -97,7 +102,7 @@ export function useQueuedFirstSave() {
       (error: unknown) => {
         analytics.captureError("onboarding_queued_save_failed", error);
         if (error instanceof ConvexError && !isRateLimitedError(error)) {
-          queueDemoUrl(url, destination, userId);
+          handOverFirstSave(url, destination, userId);
           clearQueued();
         }
       },

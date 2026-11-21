@@ -6,20 +6,16 @@ import { useConvexAuth, useMutation } from "convex/react";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
-  clearLegacyDemoUrl,
-  clearPending,
-  getPendingDemoSpace,
-  getPendingDemoOwner,
-  getPendingDemoUrl,
-  getPendingSpaces,
-  getPendingOperationId,
-  getOrCreatePendingOperationId,
-  hasPending,
-  subscribePendingOnboarding,
-  getPendingOnboardingRevision,
+  dropFirstSaveNotFor,
+  firstSaveDone,
+  forgetPaywallAnswer,
+  handoffRevision,
   noteReplayDeclined,
-  replayDeclined,
-} from "@/lib/pending-onboarding";
+  paywallBlocked,
+  readHandoffWork,
+  settleHandoff,
+  subscribeHandoff,
+} from "@/lib/onboarding-handoff";
 import {
   getPurchaseBeforeSignInRevision,
   hasPurchaseBeforeSignIn,
@@ -35,65 +31,8 @@ import {
   initialReplay,
   observeReplay,
 } from "@/lib/replay-onboarding-machine";
-import {
-  readPurchaseLanding,
-  settlePurchaseLanding,
-  subscribePurchaseLanding,
-} from "@/lib/purchase-landing";
 
-let onboardingPaywall: "unseen" | "purchased" | "declined" = "unseen";
-
-export function notePurchasedDuringOnboarding() {
-  onboardingPaywall = "purchased";
-}
-
-/** True while a purchase or restore, from anywhere in the app, is still reaching Convex. */
-export function useAwaitingOnboardingPurchase(entitled: boolean): boolean {
-  const until = useSyncExternalStore(
-    subscribePurchaseLanding,
-    readPurchaseLanding,
-    readPurchaseLanding,
-  );
-  const [now, setNow] = useState(Date.now);
-  const awaiting = !entitled && now < until;
-  useEffect(() => {
-    if (entitled) {
-      settlePurchaseLanding();
-      if (onboardingPaywall === "purchased") onboardingPaywall = "unseen";
-    }
-    if (!awaiting) return;
-    const id = setTimeout(() => setNow(Date.now()), until - Date.now());
-    return () => clearTimeout(id);
-  }, [entitled, awaiting, until, now]);
-  return awaiting;
-}
-
-export function noteDeclinedDuringOnboarding() {
-  onboardingPaywall = "declined";
-}
-
-function pendingWorkKey(): string {
-  return JSON.stringify([
-    getPendingOperationId(),
-    getPendingSpaces(),
-    getPendingDemoUrl(),
-  ]);
-}
-
-function pendingDemo(): {
-  url: string;
-  space: string | null;
-  operationId: string;
-} | null {
-  const url = getPendingDemoUrl();
-  return url === null
-    ? null
-    : {
-        url,
-        space: getPendingDemoSpace(),
-        operationId: getOrCreatePendingOperationId(),
-      };
-}
+const NO_WORK = { has: false, key: "" };
 
 /** Mount once: after onboarding and sign-in, shows the paywall and saves the queued sample reel. */
 export function useReplayOnboarding(
@@ -123,9 +62,9 @@ export function useReplayOnboarding(
     };
   }, [isAuthenticated, userId]);
   const pendingRevision = useSyncExternalStore(
-    subscribePendingOnboarding,
-    getPendingOnboardingRevision,
-    getPendingOnboardingRevision,
+    subscribeHandoff,
+    handoffRevision,
+    handoffRevision,
   );
   const purchaseRevision = useSyncExternalStore(
     subscribePurchaseBeforeSignIn,
@@ -138,21 +77,16 @@ export function useReplayOnboarding(
       ready:
         isAuthenticated && accountLoaded && onboarded && !entitlementLoading,
       entitled,
-      paywallBlocked:
-        onboardingPaywall !== "unseen" ||
-        hasPurchaseBeforeSignIn() ||
-        replayDeclined(),
-      readPending: () => {
-        const demoOwner = getPendingDemoOwner();
-        if (demoOwner !== null && demoOwner !== userId) clearLegacyDemoUrl();
-        return { has: hasPending(), key: pendingWorkKey() };
-      },
+      paywallBlocked: paywallBlocked() || hasPurchaseBeforeSignIn(),
+      readPending: () =>
+        dropFirstSaveNotFor(userId) ? readHandoffWork() : NO_WORK,
     });
     machine.current = step.state;
     if (step.action === "none") return;
-    if (step.action === "save") onboardingPaywall = "unseen";
+    if (step.action === "save") forgetPaywallAnswer();
 
-    const demo = pendingDemo();
+    const work = readHandoffWork();
+    const demo = work.firstSave;
 
     let purchased = false;
     let remainderKey: string | null = null;
@@ -167,7 +101,6 @@ export function useReplayOnboarding(
     const run = async () => {
       try {
         if (step.action === "sell") {
-          const askedFor = getPendingOperationId();
           await waitForSheetTransition();
           const { outcome, answered } = await openPaywallAnswer(
             router,
@@ -175,15 +108,16 @@ export function useReplayOnboarding(
             { fallback: true },
           );
           purchased = outcome === "success";
-          if (outcome === "cancelled" && answered) noteReplayDeclined(askedFor);
+          if (outcome === "cancelled" && answered)
+            noteReplayDeclined(work.operationId);
           return;
         }
 
         if (!sameAccount()) return;
 
-        remainderKey = pendingWorkKey();
+        remainderKey = work.key;
 
-        if (demo) {
+        if (demo && work.operationId !== null) {
           if (!sameAccount()) return;
           try {
             const spaceId =
@@ -194,35 +128,27 @@ export function useReplayOnboarding(
             await createLinkItem({
               url: demo.url,
               spaceId,
-              operationId: demo.operationId,
+              operationId: work.operationId,
               analyticsSessionId: analytics.sessionId(),
               saveSource: "onboarding_demo",
             });
-            if (getPendingOperationId() === demo.operationId)
-              clearLegacyDemoUrl();
-            if (!sameAccount()) return;
-            remainderKey = pendingWorkKey();
           } catch (error) {
             analytics.captureError("onboarding_demo_save_failed", error);
             return;
           }
+          if (!firstSaveDone(work.operationId)) return;
         }
 
         if (!sameAccount()) return;
 
-        if (getPendingDemoUrl() !== null) {
-          lateDemoUrl = true;
-          return;
-        }
-
-        clearPending();
+        if (settleHandoff(work) === "changed") lateDemoUrl = true;
       } finally {
         const done = finishReplay(machine.current, {
           purchased,
           remainderKey,
           lateDemoUrl,
           accountChanged,
-          pending: { has: hasPending(), key: pendingWorkKey() },
+          pending: readHandoffWork(),
         });
         machine.current = done.state;
         if (done.rerun) setRetryNonce((nonce) => nonce + 1);

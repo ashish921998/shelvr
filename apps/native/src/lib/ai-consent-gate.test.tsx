@@ -29,6 +29,8 @@ vi.mock("@/lib/onboarding", () => ({
 }));
 vi.mock("@/lib/replay-onboarding", () => ({
   useReplayOnboarding: mocks.replay,
+}));
+vi.mock("@/lib/onboarding-handoff", () => ({
   useAwaitingOnboardingPurchase: () => mocks.awaitingPurchase,
 }));
 vi.mock("@/lib/queued-first-save", () => ({

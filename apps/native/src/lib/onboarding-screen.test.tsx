@@ -23,9 +23,8 @@ type Sample = { kind: string; city: string };
 const mocks = vi.hoisted(() => ({
   storage: new Map<string, string>(),
   failingKeys: new Set<string>(),
-  setPendingSpaces: vi.fn(),
-  clearPending: vi.fn(),
-  queueDemoUrl: vi.fn(),
+  finishHandoff: vi.fn(),
+  clearHandoff: vi.fn(),
   queueCityStamps: vi.fn(),
   completeOnboarding: vi.fn(),
   authenticated: false,
@@ -93,12 +92,10 @@ vi.mock("expo-secure-store", () => ({
   },
 }));
 vi.mock("expo-crypto", () => ({ randomUUID: () => "operation" }));
-vi.mock("@/lib/pending-onboarding", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@/lib/pending-onboarding")>()),
-  clearPending: mocks.clearPending,
-  queueDemoUrl: mocks.queueDemoUrl,
-  resolveOnboardingSpaceName: (name: string) => name,
-  setPendingSpaces: mocks.setPendingSpaces,
+vi.mock("@/lib/onboarding-handoff", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/onboarding-handoff")>()),
+  clearHandoff: mocks.clearHandoff,
+  finishHandoff: mocks.finishHandoff,
 }));
 vi.mock("@/lib/pending-city-stamps", () => ({
   queueCityStamps: mocks.queueCityStamps,
@@ -621,12 +618,11 @@ it("hands the goals' spaces to the replay and reports the answers when onboardin
   });
   render(<OnboardingScreen />);
   act(() => mocks.paywall.onPro());
-  expect(mocks.setPendingSpaces).toHaveBeenCalledWith(
-    ["Date nights"],
+  expect(mocks.finishHandoff).toHaveBeenCalledWith(
     expect.objectContaining({ goals: ["date"], travelCity: "paris" }),
+    ahaReelUrl(ahaReel("paris")),
   );
   expect(saved()).toBeNull();
-  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(ahaReelUrl(ahaReel("paris")));
   expect(mocks.completeOnboarding).toHaveBeenCalled();
   expect(mocks.capture).toHaveBeenCalledWith(
     "onboarding_completed",
@@ -663,22 +659,6 @@ it("queues no cities for someone who signs in from the opener", () => {
   expect(mocks.queueCityStamps).not.toHaveBeenCalled();
 });
 
-it("still finishes onboarding after sign-in and reports it when clearing the pending handoff throws", () => {
-  const error = new Error("keychain locked");
-  mocks.clearPending.mockImplementationOnce(() => {
-    throw error;
-  });
-  mocks.authenticated = true;
-  render(<OnboardingScreen />);
-  tap("opener:signIn");
-  tap("signIn:done");
-  expect(mocks.completeOnboarding).toHaveBeenCalled();
-  expect(mocks.captureError).toHaveBeenCalledWith(
-    "onboarding_sign_in_finish_failed",
-    error,
-  );
-});
-
 it("still finishes onboarding after sign-in and reports it when finishing onboarding throws", () => {
   const error = new Error("keychain locked");
   mocks.completeOnboarding.mockImplementationOnce(() => {
@@ -688,7 +668,7 @@ it("still finishes onboarding after sign-in and reports it when finishing onboar
   render(<OnboardingScreen />);
   tap("opener:signIn");
   tap("signIn:done");
-  expect(mocks.clearPending).toHaveBeenCalled();
+  expect(mocks.clearHandoff).toHaveBeenCalled();
   expect(mocks.completeOnboarding).toHaveBeenCalled();
   expect(mocks.captureError).toHaveBeenCalledWith(
     "onboarding_sign_in_finish_failed",
@@ -700,7 +680,8 @@ it("queues the real reel it played as the first save when onboarding ends", () =
   startAt("ahaSpots", { goals: ["date"], travelCity: "austin" });
   render(<OnboardingScreen />);
   act(() => mocks.paywall.onPro());
-  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
+  expect(mocks.finishHandoff).toHaveBeenCalledWith(
+    expect.anything(),
     ahaReelUrl(ahaReel("austin")),
   );
 });
@@ -709,10 +690,11 @@ it("queues the default reel before leaving onboarding when the city question was
   startAt("carousel", { goals: ["travel"], travelCity: null });
   render(<OnboardingScreen />);
   act(() => mocks.paywall.onPro());
-  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
+  expect(mocks.finishHandoff).toHaveBeenCalledWith(
+    expect.anything(),
     ahaReelUrl(ahaReel("austin")),
   );
-  expect(mocks.queueDemoUrl.mock.invocationCallOrder[0]).toBeLessThan(
+  expect(mocks.finishHandoff.mock.invocationCallOrder[0]).toBeLessThan(
     mocks.completeOnboarding.mock.invocationCallOrder[0],
   );
 });
@@ -771,7 +753,7 @@ it("saves no reel for someone who skipped sharing, and saves it once they share 
   render(<OnboardingScreen />);
   tap("onboardingQ.skip");
   act(() => mocks.paywall.onPro());
-  expect(mocks.queueDemoUrl).not.toHaveBeenCalled();
+  expect(mocks.finishHandoff).toHaveBeenCalledWith(expect.anything(), null);
   expect(mocks.completeOnboarding).toHaveBeenCalled();
   cleanup();
   startAt("ahaShare", { goals: ["date"] });
@@ -781,7 +763,8 @@ it("saves no reel for someone who skipped sharing, and saves it once they share 
   tap("aha:share");
   expect(saved()?.skippedShare).toBe(false);
   act(() => mocks.paywall.onPro());
-  expect(mocks.queueDemoUrl).toHaveBeenCalledWith(
+  expect(mocks.finishHandoff).toHaveBeenCalledWith(
+    expect.anything(),
     ahaReelUrl(ahaReel("austin")),
   );
 });

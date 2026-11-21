@@ -2,19 +2,12 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { notePurchaseLanding } from "./purchase-landing";
-import { useAwaitingOnboardingPurchase } from "./replay-onboarding";
+import { useAwaitingOnboardingPurchase } from "./onboarding-handoff";
 
-vi.mock("@convex/_generated/api", () => ({ api: {} }));
-vi.mock("convex/react", () => ({
-  useConvexAuth: () => ({ isAuthenticated: false }),
-  useMutation: () => vi.fn(),
-}));
-vi.mock("expo-router", () => ({ useRouter: () => ({}) }));
 vi.mock("@/lib/analytics", () => ({ analytics: {} }));
-vi.mock("@/lib/onboarding", () => ({ useOnboarding: () => ({}) }));
-vi.mock("@/lib/pending-onboarding", () => ({}));
-vi.mock("@/lib/purchase-before-sign-in", () => ({}));
-vi.mock("@/lib/entitlement", () => ({}));
+vi.mock("@/lib/onboarding-labels", () => ({}));
+vi.mock("expo-secure-store", () => ({}));
+vi.mock("expo-crypto", () => ({}));
 
 describe("useAwaitingOnboardingPurchase", () => {
   beforeEach(() => {
