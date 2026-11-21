@@ -71,6 +71,28 @@ describe("MapCta", () => {
     }
   });
 
+  it("takes a translated label and screen reader text", () => {
+    const container = document.createElement("div");
+    document.body.append(container);
+    const root = createRoot(container);
+    act(() =>
+      root.render(
+        <MapCta
+          source="landing"
+          label="Orte auf die Karte"
+          ariaLabel="Orte auf die Karte, im App Store"
+        />,
+      ),
+    );
+    const link = container.querySelector("a") as HTMLAnchorElement;
+    expect(link.querySelector("span")?.firstChild?.textContent).toBe(
+      "Orte auf die Karte",
+    );
+    expect(link.getAttribute("aria-label")).toBe(
+      "Orte auf die Karte, im App Store",
+    );
+  });
+
   it("shows the Apple logo on the header pill only", () => {
     const header = mount("header");
     expect(header.querySelectorAll("svg")).toHaveLength(1);

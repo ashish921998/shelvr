@@ -12,6 +12,7 @@ type AppStoreLinkSource =
   | "footer"
   | "guide"
   | "alternative"
+  | "landing"
   | "share"
   | "oracle"
   | "plan"

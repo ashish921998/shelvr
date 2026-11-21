@@ -7,13 +7,13 @@ import Hero from "@/components/home/Hero";
 import Plans from "@/components/home/Plans";
 import ProblemProof from "@/components/home/ProblemProof";
 import Story from "@/components/home/Story";
+import { LANGUAGE_ALTERNATES } from "@/lib/localizedLanding";
 import { pageMetadata, SITE_DESCRIPTION, SITE_TITLE } from "@/lib/siteMetadata";
 
-export const metadata: Metadata = pageMetadata(
-  "/",
-  SITE_TITLE,
-  SITE_DESCRIPTION,
-);
+export const metadata: Metadata = {
+  ...pageMetadata("/", SITE_TITLE, SITE_DESCRIPTION),
+  alternates: { canonical: "/", languages: LANGUAGE_ALTERNATES },
+};
 
 export default function Home() {
   return (
