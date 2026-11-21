@@ -95,6 +95,7 @@ export default function VideoView({ videoId }: { videoId: string }) {
         </div>
         <div className="mt-4">
           <Player
+            key={version._id}
             ref={player}
             media={version.media}
             src={version.media ? playback.get(version.media._id) : undefined}

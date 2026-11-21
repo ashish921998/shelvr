@@ -27,6 +27,7 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
   ref,
 ) {
   const video = useRef<HTMLVideoElement>(null);
+  const position = useRef(0);
   useImperativeHandle(ref, () => ({
     seek: (seconds) => {
       const element = video.current;
@@ -63,8 +64,19 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
         playsInline
         preload="metadata"
         className="h-full w-full object-contain"
-        onTimeUpdate={(event) => onTime?.(event.currentTarget.currentTime)}
-        onSeeked={(event) => onTime?.(event.currentTarget.currentTime)}
+        onLoadedMetadata={(event) => {
+          if (position.current > 0) {
+            event.currentTarget.currentTime = position.current;
+          }
+        }}
+        onTimeUpdate={(event) => {
+          position.current = event.currentTarget.currentTime;
+          onTime?.(event.currentTarget.currentTime);
+        }}
+        onSeeked={(event) => {
+          position.current = event.currentTarget.currentTime;
+          onTime?.(event.currentTarget.currentTime);
+        }}
       />
     </div>
   );
