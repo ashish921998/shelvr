@@ -11,7 +11,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   });
   if (client === null) {
     return (
-      <main className="mx-auto max-w-md p-8 text-sm text-zinc-400">
+      <main className="mx-auto max-w-md p-8 text-sm text-muted">
         Set NEXT_PUBLIC_CONVEX_URL to the review backend&apos;s URL.
       </main>
     );

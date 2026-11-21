@@ -38,9 +38,9 @@ export default function CampaignView({ campaignId }: { campaignId: string }) {
   }
   if (campaign === null) {
     return (
-      <main className="mx-auto max-w-3xl px-4 py-16 text-zinc-400">
+      <main className="mx-auto max-w-3xl px-5 py-16 text-muted">
         This campaign doesn&apos;t exist or you&apos;re not in it.{" "}
-        <Link href="/" className="text-zinc-100 underline">
+        <Link href="/" className="text-ink underline">
           Back to campaigns
         </Link>
       </main>
@@ -60,50 +60,59 @@ export default function CampaignView({ campaignId }: { campaignId: string }) {
   ) as Record<ReviewStatus, number>;
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-8 px-4 py-8 lg:grid-cols-[1fr_300px]">
-      <section>
+    <main className="mx-auto grid max-w-[1440px] gap-8 px-5 py-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <section className="min-w-0">
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <Link
-              href="/"
-              className="text-sm text-zinc-500 hover:text-zinc-300"
-            >
-              Campaigns
-            </Link>
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <nav className="flex items-center gap-1.5 text-sm text-faint">
+              <Link href="/" className="transition hover:text-ink">
+                Campaigns
+              </Link>
+              <span>/</span>
+            </nav>
+            <h1 className="mt-1 text-3xl font-semibold tracking-tight">
               {campaign.name}
             </h1>
+            <p className="mt-1.5 text-sm text-muted">
+              {videos.length} {videos.length === 1 ? "video" : "videos"} ·{" "}
+              {counts.needs_review} waiting on review
+            </p>
           </div>
           <UploadVideo campaignId={id} />
         </div>
-        <div className="mt-6 flex flex-wrap gap-2 text-sm">
+        <div className="mt-7 flex flex-wrap items-center gap-1 rounded-xl border border-line bg-panel p-1 text-sm sm:w-fit">
           {(["all", "mine", ...STATUS_ORDER] as Filter[]).map((option) => (
             <button
               key={option}
               type="button"
               onClick={() => setFilter(option)}
-              className={`rounded-full px-3 py-1 ring-1 ring-inset ${
+              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 transition ${
                 filter === option
-                  ? "bg-white text-black ring-white"
-                  : "text-zinc-400 ring-white/10 hover:text-zinc-100"
+                  ? "bg-raised text-ink shadow-sm ring-1 ring-line-strong"
+                  : "text-muted hover:text-ink"
               }`}
             >
               {option === "all"
-                ? `All ${videos.length}`
+                ? "All"
                 : option === "mine"
                   ? "Mine"
-                  : `${STATUS_LABEL[option]} ${counts[option]}`}
+                  : STATUS_LABEL[option]}
+              {option !== "mine" && (
+                <span className="rounded-md bg-white/5 px-1.5 text-xs tabular-nums text-faint">
+                  {option === "all" ? videos.length : counts[option]}
+                </span>
+              )}
             </button>
           ))}
         </div>
         {shown.length === 0 ? (
-          <p className="mt-16 text-center text-zinc-500">
+          <div className="mt-6 grid place-items-center rounded-2xl border border-dashed border-line-strong py-24 text-sm text-muted">
             {videos.length === 0
               ? "No videos yet. Upload the first one."
               : "Nothing here with this filter."}
-          </p>
+          </div>
         ) : (
-          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4">
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {shown.map((video) => (
               <VideoCard
                 key={video._id}

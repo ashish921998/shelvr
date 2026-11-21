@@ -4,6 +4,7 @@ import { useMutation } from "convex/react";
 import { useState } from "react";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
+import Avatar from "./Avatar";
 
 type Role = "admin" | "creator";
 
@@ -48,16 +49,27 @@ export default function MembersPanel({ campaign }: Props) {
   }
 
   return (
-    <aside className="space-y-6 text-sm">
-      <div className="rounded-xl border border-white/10 p-4">
-        <h2 className="mb-2 font-medium">Brief</h2>
+    <aside className="space-y-4 text-sm lg:sticky lg:top-20 lg:self-start">
+      <div className="panel p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="eyebrow">Brief</h2>
+          {isAdmin && brief === null && (
+            <button
+              type="button"
+              onClick={() => setBrief(campaign.brief ?? "")}
+              className="text-xs text-muted transition hover:text-ink"
+            >
+              Edit
+            </button>
+          )}
+        </div>
         {brief !== null ? (
           <div className="space-y-2">
             <textarea
               value={brief}
               onChange={(e) => setBrief(e.target.value)}
               rows={6}
-              className="w-full rounded-lg border border-white/10 bg-black/40 p-2 outline-none focus:border-orange-400"
+              className="field resize-none leading-relaxed"
             />
             <button
               type="button"
@@ -65,113 +77,112 @@ export default function MembersPanel({ campaign }: Props) {
                 await updateBrief({ campaignId: campaign._id, brief });
                 setBrief(null);
               }}
-              className="rounded-md bg-white px-3 py-1 font-medium text-black"
+              className="btn-primary px-3 py-1.5"
             >
               Save
             </button>
           </div>
         ) : (
-          <>
-            <p className="whitespace-pre-wrap text-zinc-400">
-              {campaign.brief ?? "No brief yet."}
-            </p>
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => setBrief(campaign.brief ?? "")}
-                className="mt-2 text-zinc-500 hover:text-zinc-200"
-              >
-                Edit
-              </button>
-            )}
-          </>
+          <p className="leading-relaxed whitespace-pre-wrap text-muted">
+            {campaign.brief ?? "No brief yet."}
+          </p>
         )}
       </div>
-      <div className="rounded-xl border border-white/10 p-4">
-        <h2 className="mb-3 font-medium">People · {campaign.members.length}</h2>
-        <ul className="space-y-2">
+      <div className="panel p-5">
+        <h2 className="eyebrow mb-4">
+          People <span className="text-muted">{campaign.members.length}</span>
+        </h2>
+        <ul className="space-y-1">
           {campaign.members.map((member) => (
             <li
               key={member._id}
-              className="flex items-center justify-between gap-2"
+              className="group -mx-2 flex items-center gap-3 rounded-lg px-2 py-1.5 transition hover:bg-white/[0.03]"
             >
-              <span className="min-w-0">
-                <span className="block truncate">
+              <Avatar name={member.name} />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate font-medium">
                   {member.name}
                   {member.isYou && (
-                    <span className="text-zinc-500"> (you)</span>
+                    <span className="font-normal text-faint"> (you)</span>
                   )}
                 </span>
                 {member.email && (
-                  <span className="block truncate text-xs text-zinc-500">
+                  <span className="block truncate text-xs text-faint">
                     {member.email}
                   </span>
                 )}
               </span>
-              <span className="flex items-center gap-2">
-                <span className="text-xs uppercase tracking-wide text-zinc-500">
-                  {member.role}
-                </span>
-                {isAdmin && !member.isYou && (
-                  <button
-                    type="button"
-                    onClick={() => void remove({ memberId: member._id })}
-                    className="text-zinc-600 hover:text-rose-300"
-                    aria-label={`Remove ${member.name}`}
-                  >
-                    ×
-                  </button>
-                )}
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] capitalize ${
+                  member.role === "admin"
+                    ? "bg-accent-soft text-accent"
+                    : "bg-white/5 text-muted"
+                }`}
+              >
+                {member.role}
               </span>
+              {isAdmin && !member.isYou && (
+                <button
+                  type="button"
+                  onClick={() => void remove({ memberId: member._id })}
+                  className="text-faint opacity-0 transition group-hover:opacity-100 hover:text-rose-300"
+                  aria-label={`Remove ${member.name}`}
+                >
+                  ×
+                </button>
+              )}
             </li>
           ))}
           {campaign.invites.map((pending) => (
             <li
               key={pending._id}
-              className="flex items-center justify-between gap-2 text-zinc-500"
+              className="group -mx-2 flex items-center gap-3 rounded-lg px-2 py-1.5 text-muted"
             >
-              <span className="truncate">{pending.email}</span>
-              <span className="flex items-center gap-2">
-                <span className="text-xs">invited</span>
-                <button
-                  type="button"
-                  onClick={() => void revoke({ inviteId: pending._id })}
-                  className="hover:text-rose-300"
-                  aria-label={`Cancel invite for ${pending.email}`}
-                >
-                  ×
-                </button>
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-dashed border-line-strong text-xs text-faint">
+                @
               </span>
+              <span className="min-w-0 flex-1 truncate">{pending.email}</span>
+              <span className="rounded-full border border-line px-2 py-0.5 text-[11px] text-faint">
+                invited
+              </span>
+              <button
+                type="button"
+                onClick={() => void revoke({ inviteId: pending._id })}
+                className="text-faint transition hover:text-rose-300"
+                aria-label={`Cancel invite for ${pending.email}`}
+              >
+                ×
+              </button>
             </li>
           ))}
         </ul>
         {isAdmin && (
-          <form onSubmit={submit} className="mt-4 space-y-2">
+          <form
+            onSubmit={submit}
+            className="mt-4 space-y-2 border-t border-line pt-4"
+          >
             <input
               type="email"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Invite by email"
-              className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 outline-none focus:border-orange-400"
+              className="field"
             />
             <div className="flex gap-2">
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as Role)}
-                className="flex-1 rounded-lg border border-white/10 bg-black/40 px-2 py-2"
+                className="field flex-1"
               >
                 <option value="creator">Creator</option>
                 <option value="admin">Admin</option>
               </select>
-              <button
-                type="submit"
-                className="rounded-lg bg-white px-3 py-2 font-medium text-black"
-              >
+              <button type="submit" className="btn-primary">
                 Invite
               </button>
             </div>
-            {message && <p className="text-xs text-zinc-400">{message}</p>}
+            {message && <p className="text-xs text-muted">{message}</p>}
           </form>
         )}
       </div>

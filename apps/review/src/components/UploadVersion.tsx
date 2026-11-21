@@ -45,7 +45,7 @@ export default function UploadVersion({
         <button
           type="button"
           onClick={() => input.current?.click()}
-          className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-black"
+          className="btn-primary py-1.5"
         >
           Upload new version
         </button>
@@ -59,20 +59,17 @@ export default function UploadVersion({
         value={note}
         onChange={(e) => setNote(e.target.value)}
         placeholder="What changed? (optional)"
-        className="w-56 rounded-lg border border-white/10 bg-black/40 px-3 py-1.5 text-sm outline-none focus:border-orange-400"
+        className="field w-56 py-1.5"
       />
       {!busy ? (
         <>
-          <button
-            type="submit"
-            className="rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-black"
-          >
+          <button type="submit" className="btn-primary py-1.5">
             Upload
           </button>
           <button
             type="button"
             onClick={() => setFile(null)}
-            className="px-2 text-sm text-zinc-400"
+            className="btn-ghost py-1.5"
           >
             Cancel
           </button>

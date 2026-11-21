@@ -25,17 +25,26 @@ export default function SignIn() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/[0.03] p-8">
-        <div className="mb-6 grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-orange-400 to-pink-500 font-bold text-black">
-          S
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-4">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -top-40 left-1/2 h-[480px] w-[760px] -translate-x-1/2 rounded-full bg-accent/20 blur-[120px]"
+      />
+      <div className="panel relative w-full max-w-sm p-8 shadow-2xl shadow-black/50">
+        <div className="mb-8 flex items-center gap-2.5">
+          <span className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-orange-400 to-pink-500 font-bold text-black">
+            S
+          </span>
+          <span className="text-sm font-semibold">
+            Shelvr <span className="font-normal text-muted">Review</span>
+          </span>
         </div>
-        <h1 className="text-xl font-semibold">Shelvr Review</h1>
-        <p className="mt-1 text-sm text-zinc-400">
+        <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
+        <p className="mt-1.5 text-sm text-muted">
           Invite only. Sign in with the email your invite went to.
         </p>
         {state === "sent" ? (
-          <p className="mt-6 rounded-lg bg-emerald-500/10 p-4 text-sm text-emerald-300">
+          <p className="mt-6 rounded-xl border border-emerald-400/20 bg-emerald-500/10 p-4 text-sm text-emerald-300">
             Check {email} for a sign-in link.
           </p>
         ) : (
@@ -48,12 +57,12 @@ export default function SignIn() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
-              className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 outline-none focus:border-orange-400"
+              className="field py-2.5"
             />
             <button
               type="submit"
               disabled={state === "sending"}
-              className="w-full rounded-lg bg-white py-2 font-medium text-black disabled:opacity-60"
+              className="btn-primary w-full py-2.5"
             >
               {state === "sending" ? "Sending…" : "Email me a link"}
             </button>

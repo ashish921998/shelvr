@@ -27,27 +27,35 @@ export default function CampaignList() {
   }
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="text-2xl font-semibold tracking-tight">Campaigns</h1>
+    <main className="mx-auto max-w-5xl px-5 py-12">
+      <p className="eyebrow">Workspace</p>
+      <h1 className="mt-1 text-3xl font-semibold tracking-tight">Campaigns</h1>
       {campaigns === undefined ? (
-        <div className="mt-8">
+        <div className="mt-10">
           <Spinner />
         </div>
       ) : campaigns.length === 0 ? (
-        <p className="mt-4 text-zinc-400">
+        <div className="panel mt-8 p-10 text-center text-sm text-muted">
           You&apos;re not in a campaign yet. Ask a Shelvr admin to invite you.
-        </p>
+        </div>
       ) : (
-        <ul className="mt-6 divide-y divide-white/5 overflow-hidden rounded-xl border border-white/10">
+        <ul className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {campaigns.map((campaign) => (
             <li key={campaign._id}>
               <Link
                 href={`/campaigns/${campaign._id}`}
-                className="flex items-center justify-between bg-white/[0.02] px-4 py-4 hover:bg-white/[0.05]"
+                className="panel group flex h-full flex-col justify-between gap-8 p-5 transition hover:-translate-y-0.5 hover:border-line-strong hover:bg-raised"
               >
-                <span className="font-medium">{campaign.name}</span>
-                <span className="text-xs uppercase tracking-wide text-zinc-500">
-                  {campaign.role}
+                <span className="grid h-10 w-10 place-items-center rounded-xl bg-accent-soft text-base font-semibold text-accent">
+                  {campaign.name.slice(0, 1).toUpperCase()}
+                </span>
+                <span className="flex items-end justify-between gap-3">
+                  <span className="font-medium leading-snug">
+                    {campaign.name}
+                  </span>
+                  <span className="shrink-0 rounded-full border border-line px-2 py-0.5 text-[11px] text-muted capitalize">
+                    {campaign.role}
+                  </span>
                 </span>
               </Link>
             </li>
@@ -55,17 +63,20 @@ export default function CampaignList() {
         </ul>
       )}
       {me?.isStaff && (
-        <form onSubmit={submit} className="mt-10 flex gap-2">
+        <form
+          onSubmit={submit}
+          className="panel mt-10 flex flex-col gap-3 p-4 sm:flex-row sm:items-center"
+        >
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="New campaign name"
-            className="flex-1 rounded-lg border border-white/10 bg-black/40 px-3 py-2 outline-none focus:border-orange-400"
+            className="field flex-1"
           />
           <button
             type="submit"
             disabled={name.trim().length === 0}
-            className="rounded-lg bg-white px-4 py-2 font-medium text-black disabled:opacity-40"
+            className="btn-primary"
           >
             Start campaign
           </button>

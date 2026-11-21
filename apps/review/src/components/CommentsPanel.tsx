@@ -60,47 +60,56 @@ export default function CommentsPanel({
   }
 
   return (
-    <aside className="flex max-h-[calc(100vh-5rem)] flex-col rounded-xl border border-white/10 bg-white/[0.02] lg:sticky lg:top-16">
-      <div className="border-b border-white/5 p-4">
+    <aside className="flex max-h-[calc(100vh-5.5rem)] flex-col overflow-hidden rounded-2xl border border-line bg-panel lg:sticky lg:top-20">
+      <div className="border-b border-line px-4 pt-4 pb-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-medium">
-            Feedback{" "}
+          <h2 className="flex items-center gap-2 font-semibold">
+            Feedback
             {rows ? (
-              <span className="text-zinc-500">· {countOpen(rows)} open</span>
+              <span className="rounded-full bg-accent-soft px-2 py-0.5 text-xs font-medium text-accent tabular-nums">
+                {countOpen(rows)} open
+              </span>
             ) : null}
           </h2>
-          <label className="flex items-center gap-1.5 text-xs text-zinc-400">
+          <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted select-none">
             <input
               type="checkbox"
               checked={showResolved}
               onChange={(e) => setShowResolved(e.target.checked)}
+              className="accent-accent"
             />
             Show resolved
           </label>
         </div>
         {duration ? (
-          <div
-            className="relative mt-3 h-2 rounded-full bg-white/10"
-            aria-label="Comment timeline"
-          >
+          <div className="mt-4">
             <div
-              className="absolute inset-y-0 left-0 rounded-full bg-white/15"
-              style={{ width: `${markerPercent(currentTime, duration)}%` }}
-            />
-            {markers.map((marker) => (
-              <button
-                key={marker._id}
-                type="button"
-                title={`${formatTime(marker.timestamp)} · ${marker.authorName}`}
-                onClick={() => onSeek(marker.timestamp ?? 0)}
-                className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-[#0b0b0d] ${
-                  marker.recording ? "bg-pink-400" : "bg-orange-400"
-                }`}
-                style={{
-                  left: `${markerPercent(marker.timestamp ?? 0, duration)}%`,
-                }}
+              className="relative h-1.5 rounded-full bg-white/[0.07]"
+              aria-label="Comment timeline"
+            >
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-accent/40 to-accent"
+                style={{ width: `${markerPercent(currentTime, duration)}%` }}
               />
-            ))}
+              {markers.map((marker) => (
+                <button
+                  key={marker._id}
+                  type="button"
+                  title={`${formatTime(marker.timestamp)} · ${marker.authorName}`}
+                  onClick={() => onSeek(marker.timestamp ?? 0)}
+                  className={`absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-[3px] ring-panel transition hover:scale-125 ${
+                    marker.recording ? "bg-rec" : "bg-accent"
+                  }`}
+                  style={{
+                    left: `${markerPercent(marker.timestamp ?? 0, duration)}%`,
+                  }}
+                />
+              ))}
+            </div>
+            <div className="mt-1.5 flex justify-between text-[10px] text-faint tabular-nums">
+              <span>{formatTime(currentTime)}</span>
+              <span>{formatTime(duration)}</span>
+            </div>
           </div>
         ) : null}
       </div>
@@ -110,7 +119,7 @@ export default function CommentsPanel({
             <Spinner />
           </div>
         ) : threads.length === 0 ? (
-          <p className="p-4 text-sm text-zinc-500">
+          <p className="p-6 text-center text-sm leading-relaxed text-muted">
             No feedback yet. Pause on a moment and leave a note, or record a
             walkthrough.
           </p>
@@ -125,51 +134,53 @@ export default function CommentsPanel({
           ))
         )}
       </div>
-      <form onSubmit={submit} className="space-y-2 border-t border-white/5 p-3">
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          onFocus={() => {
-            onPause();
-            setPinned(currentTime);
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-              e.currentTarget.form?.requestSubmit();
-            }
-          }}
-          rows={3}
-          placeholder="Leave feedback…"
-          className="w-full resize-none rounded-lg border border-white/10 bg-black/40 p-2 text-sm outline-none focus:border-orange-400"
-        />
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setAtTime(!atTime)}
-            className={`rounded-md px-2 py-1 text-xs font-medium tabular-nums ring-1 ring-inset ${
-              atTime
-                ? "bg-orange-400/15 text-orange-300 ring-orange-400/30"
-                : "text-zinc-500 ring-white/10"
-            }`}
-            title="Pin this note to the moment in the video"
-          >
-            {atTime ? `@ ${formatTime(stamp)}` : "No timestamp"}
-          </button>
-          <Recorder
-            versionId={versionId}
-            campaignId={campaignId}
-            currentTime={currentTime}
-            onStart={onPause}
+      <form onSubmit={submit} className="border-t border-line bg-canvas/40 p-3">
+        <div className="rounded-xl border border-line bg-canvas transition focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/25">
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            onFocus={() => {
+              onPause();
+              setPinned(currentTime);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                e.currentTarget.form?.requestSubmit();
+              }
+            }}
+            rows={3}
+            placeholder="Leave feedback…"
+            className="w-full resize-none bg-transparent px-3 pt-3 text-sm outline-none placeholder:text-faint"
           />
-          <button
-            type="submit"
-            disabled={body.trim().length === 0}
-            className="ml-auto rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-black disabled:opacity-40"
-          >
-            Post
-          </button>
+          <div className="flex items-center gap-2 p-2">
+            <button
+              type="button"
+              onClick={() => setAtTime(!atTime)}
+              className={`rounded-md px-2 py-1 text-xs font-medium tabular-nums ring-1 ring-inset transition ${
+                atTime
+                  ? "bg-accent-soft text-accent ring-accent/30"
+                  : "text-faint ring-line-strong hover:text-muted"
+              }`}
+              title="Pin this note to the moment in the video"
+            >
+              {atTime ? `@ ${formatTime(stamp)}` : "No timestamp"}
+            </button>
+            <Recorder
+              versionId={versionId}
+              campaignId={campaignId}
+              currentTime={currentTime}
+              onStart={onPause}
+            />
+            <button
+              type="submit"
+              disabled={body.trim().length === 0}
+              className="btn-primary ml-auto px-3 py-1.5"
+            >
+              Post
+            </button>
+          </div>
         </div>
-        {error && <p className="text-xs text-rose-300">{error}</p>}
+        {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
       </form>
     </aside>
   );

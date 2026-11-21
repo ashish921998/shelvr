@@ -45,8 +45,9 @@ export default function UploadVideo({
         <button
           type="button"
           onClick={() => input.current?.click()}
-          className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black"
+          className="btn-primary"
         >
+          <span className="text-base leading-none">+</span>
           Upload video
         </button>
       </>
@@ -54,25 +55,25 @@ export default function UploadVideo({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-wrap items-center gap-2">
+    <form
+      onSubmit={submit}
+      className="panel flex flex-wrap items-center gap-2 p-2"
+    >
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="Title"
-        className="w-56 rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:border-orange-400"
+        className="field w-56"
       />
       {!busy ? (
         <>
-          <button
-            type="submit"
-            className="rounded-lg bg-white px-4 py-2 text-sm font-medium text-black"
-          >
+          <button type="submit" className="btn-primary">
             Upload
           </button>
           <button
             type="button"
             onClick={() => setFile(null)}
-            className="px-2 text-sm text-zinc-400"
+            className="btn-ghost"
           >
             Cancel
           </button>
@@ -87,10 +88,10 @@ export default function UploadVideo({
 
 export function ProgressBar({ value }: { value: number }) {
   return (
-    <div className="flex items-center gap-2 text-xs text-zinc-400">
+    <div className="flex items-center gap-2 text-xs tabular-nums text-muted">
       <div className="h-1.5 w-40 overflow-hidden rounded-full bg-white/10">
         <div
-          className="h-full bg-orange-400 transition-all"
+          className="h-full rounded-full bg-accent transition-all"
           style={{ width: `${Math.round(value * 100)}%` }}
         />
       </div>

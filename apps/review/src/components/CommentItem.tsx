@@ -7,6 +7,7 @@ import type { Id } from "@convex/_generated/dataModel";
 import type { Thread } from "@/lib/threads";
 import { formatTime } from "@/lib/time";
 import { usePlayback } from "@/lib/usePlayback";
+import Avatar from "./Avatar";
 import Player from "./Player";
 
 type Row = {
@@ -36,10 +37,11 @@ type Props = {
 
 function Author({ row }: { row: Row }) {
   return (
-    <span className="flex items-center gap-1.5 text-xs">
-      <span className="font-medium text-zinc-200">{row.authorName}</span>
+    <span className="flex min-w-0 items-center gap-2 text-xs">
+      <Avatar name={row.authorName} size="sm" />
+      <span className="truncate font-semibold text-ink">{row.authorName}</span>
       {row.authorRole === "admin" && (
-        <span className="rounded bg-white/10 px-1 py-px text-[10px] uppercase tracking-wide text-zinc-400">
+        <span className="rounded bg-accent-soft px-1.5 py-px text-[10px] font-medium tracking-wide text-accent uppercase">
           admin
         </span>
       )}
@@ -58,7 +60,7 @@ function Recording({
   );
   const playback = usePlayback(ids);
   return (
-    <div className="mt-2">
+    <div className="mt-2 ml-8 overflow-hidden rounded-lg border border-line">
       <Player
         compact
         media={{ status: recording.status }}
@@ -85,7 +87,7 @@ export default function CommentItem({ thread, versionId, onSeek }: Props) {
 
   return (
     <div
-      className={`rounded-lg p-3 hover:bg-white/[0.03] ${root.resolved ? "opacity-50" : ""}`}
+      className={`group rounded-xl p-3 transition hover:bg-white/[0.03] ${root.resolved ? "opacity-50" : ""}`}
     >
       <div className="flex items-center justify-between gap-2">
         <Author row={root} />
@@ -93,10 +95,10 @@ export default function CommentItem({ thread, versionId, onSeek }: Props) {
           <button
             type="button"
             onClick={() => onSeek(root.timestamp ?? 0)}
-            className={`rounded px-1.5 py-0.5 text-xs font-medium tabular-nums ${
+            className={`shrink-0 rounded-md px-1.5 py-0.5 text-xs font-medium tabular-nums transition ${
               root.recording
-                ? "bg-pink-400/15 text-pink-300"
-                : "bg-orange-400/15 text-orange-300"
+                ? "bg-rec/15 text-rec hover:bg-rec/25"
+                : "bg-accent-soft text-accent hover:bg-accent/25"
             }`}
           >
             {formatTime(root.timestamp)}
@@ -104,35 +106,38 @@ export default function CommentItem({ thread, versionId, onSeek }: Props) {
         )}
       </div>
       {root.body && (
-        <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-300">
+        <p className="mt-1.5 ml-8 text-sm leading-relaxed whitespace-pre-wrap text-ink/85">
           {root.body}
         </p>
       )}
       {root.recording && <Recording recording={root.recording} />}
       {replies.map((row) => (
-        <div key={row._id} className="ml-3 mt-3 border-l border-white/10 pl-3">
+        <div
+          key={row._id}
+          className="mt-3 ml-8 border-l-2 border-line-strong pl-3"
+        >
           <div className="flex items-center justify-between">
             <Author row={row} />
             {row.canModerate && (
               <button
                 type="button"
                 onClick={() => void remove({ commentId: row._id })}
-                className="text-xs text-zinc-600 hover:text-rose-300"
+                className="text-xs text-faint transition hover:text-rose-300"
               >
                 Delete
               </button>
             )}
           </div>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-300">
+          <p className="mt-1.5 ml-8 text-sm leading-relaxed whitespace-pre-wrap text-ink/85">
             {row.body}
           </p>
         </div>
       ))}
-      <div className="mt-2 flex gap-3 text-xs text-zinc-500">
+      <div className="mt-2 ml-8 flex gap-3 text-xs text-faint">
         <button
           type="button"
           onClick={() => setReplying(!replying)}
-          className="hover:text-zinc-200"
+          className="transition hover:text-ink"
         >
           Reply
         </button>
@@ -145,7 +150,7 @@ export default function CommentItem({ thread, versionId, onSeek }: Props) {
                 resolved: !root.resolved,
               })
             }
-            className="hover:text-zinc-200"
+            className="transition hover:text-emerald-300"
           >
             {root.resolved ? "Reopen" : "Resolve"}
           </button>
@@ -154,25 +159,25 @@ export default function CommentItem({ thread, versionId, onSeek }: Props) {
           <button
             type="button"
             onClick={() => void remove({ commentId: root._id })}
-            className="hover:text-rose-300"
+            className="transition hover:text-rose-300"
           >
             Delete
           </button>
         )}
       </div>
       {replying && (
-        <form onSubmit={sendReply} className="mt-2 flex gap-2">
+        <form onSubmit={sendReply} className="mt-2 ml-8 flex gap-2">
           <input
             autoFocus
             value={reply}
             onChange={(e) => setReply(e.target.value)}
             placeholder="Reply…"
-            className="flex-1 rounded-md border border-white/10 bg-black/40 px-2 py-1 text-sm outline-none focus:border-orange-400"
+            className="field py-1.5"
           />
           <button
             type="submit"
             disabled={reply.trim().length === 0}
-            className="rounded-md bg-white px-2 py-1 text-xs font-medium text-black disabled:opacity-40"
+            className="btn-primary px-3 py-1.5 text-xs"
           >
             Send
           </button>

@@ -42,11 +42,11 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
   const status = media?.status ?? "waiting";
   const box = compact
     ? "aspect-video w-full"
-    : "mx-auto h-[min(70vh,720px)] w-full";
+    : "mx-auto h-[min(68vh,720px)] w-full";
   if (status !== "ready" || !src) {
     return (
       <div
-        className={`${box} grid place-items-center rounded-xl bg-zinc-900 p-6 text-center text-sm text-zinc-400`}
+        className={`${box} grid place-items-center bg-[radial-gradient(circle_at_center,#1b1b20,#0a0a0c)] p-6 text-center text-sm text-muted ${compact ? "rounded-lg" : ""}`}
       >
         {status === "ready" || status === "processing" ? (
           <Spinner label={NOTE[status]} />
@@ -57,7 +57,9 @@ const Player = forwardRef<PlayerHandle, Props>(function Player(
     );
   }
   return (
-    <div className={`${box} overflow-hidden rounded-xl bg-black`}>
+    <div
+      className={`${box} overflow-hidden bg-black ${compact ? "rounded-lg" : ""}`}
+    >
       <video
         ref={video}
         src={src}

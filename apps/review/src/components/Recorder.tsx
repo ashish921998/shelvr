@@ -293,60 +293,58 @@ export default function Recorder({
         type="button"
         onClick={() => void start()}
         disabled={phase !== "idle"}
-        className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-pink-300 ring-1 ring-inset ring-pink-400/30 hover:bg-pink-400/10 disabled:opacity-40"
+        className="flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-rec ring-1 ring-rec/30 transition ring-inset hover:bg-rec/10 disabled:opacity-40"
         title="Record your screen and camera, pinned to this moment"
       >
-        <span className="h-2 w-2 rounded-full bg-pink-400" />
+        <span className="h-2 w-2 rounded-full bg-rec" />
         Record
       </button>
       {error && <span className="text-xs text-rose-300">{error}</span>}
       {phase === "recording" && (
-        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full bg-zinc-900 px-4 py-2 text-sm shadow-2xl ring-1 ring-white/10">
-          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-rose-500" />
-          <span className="tabular-nums">{formatTime(elapsed)}</span>
-          <span className="text-zinc-500">at {formatTime(moment)}</span>
+        <div className="fixed bottom-6 left-1/2 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full border border-line-strong bg-raised/90 py-2 pr-2 pl-4 text-sm shadow-2xl shadow-black/60 backdrop-blur-xl">
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-rec shadow-[0_0_12px_var(--color-rec)]" />
+          <span className="font-medium tabular-nums">
+            {formatTime(elapsed)}
+          </span>
+          <span className="text-faint">at {formatTime(moment)}</span>
           <button
             type="button"
             onClick={stopRecording}
-            className="rounded-full bg-white px-3 py-1 text-xs font-medium text-black"
+            className="rounded-full bg-white px-3.5 py-1.5 text-xs font-semibold text-black transition hover:bg-white/90"
           >
             Stop
           </button>
         </div>
       )}
       {phase === "review" && preview && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4">
-          <div className="w-full max-w-2xl space-y-3 rounded-2xl bg-zinc-900 p-5 ring-1 ring-white/10">
-            <h3 className="font-medium">
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/75 p-4 backdrop-blur-sm">
+          <div className="panel w-full max-w-2xl space-y-4 p-5 shadow-2xl shadow-black/60">
+            <h3 className="font-semibold">
               Your recording, pinned at {formatTime(moment)}
             </h3>
             <video
               src={preview}
               controls
-              className="w-full rounded-lg bg-black"
+              className="w-full rounded-xl border border-line bg-black"
             />
             <input
               value={note}
               onChange={(e) => setNote(e.target.value)}
               placeholder="Add a note (optional)"
-              className="w-full rounded-lg border border-white/10 bg-black/40 px-3 py-2 text-sm outline-none focus:border-orange-400"
+              className="field"
             />
             <div className="flex items-center justify-end gap-2">
               {busy ? (
                 <ProgressBar value={progress ?? 0} />
               ) : (
                 <>
-                  <button
-                    type="button"
-                    onClick={discard}
-                    className="px-3 py-1.5 text-sm text-zinc-400"
-                  >
+                  <button type="button" onClick={discard} className="btn-ghost">
                     Discard
                   </button>
                   <button
                     type="button"
                     onClick={() => void post()}
-                    className="rounded-lg bg-white px-4 py-1.5 text-sm font-medium text-black"
+                    className="btn-primary"
                   >
                     Post recording
                   </button>
