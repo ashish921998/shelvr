@@ -775,9 +775,9 @@ const RECIPES: Record<string, Recipe> = {
       );
     },
   },
-  "notifications.ts#prepareTripEve": {
+  "notifications.ts#prepareTripReminder": {
     fence:
-      "liveOwner at the top of the handler, so a draining account gets no trip push",
+      "liveOwner at the top of prepareTripReminder, which prepareTripEve and prepareTripWeek both run, so a draining account gets no trip push",
     table: "tripEveReminders",
     padding: 3 * DELETE_BATCH + 1,
     fillers: {},

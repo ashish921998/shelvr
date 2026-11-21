@@ -627,6 +627,12 @@
     "many": "Você salvou %{formattedCount} de lugares para visitar.",
     "other": "Você salvou %{formattedCount} lugares para visitar."
   },
+  "reminder.tripWeekTitle": "Sua viagem para %{city} é daqui a uma semana",
+  "reminder.tripWeekBody": {
+    "one": "%{formattedCount} lugar salvo está no roteiro. Dê uma olhada nos seus dias.",
+    "many": "%{formattedCount} de lugares salvos estão no roteiro. Dê uma olhada nos seus dias.",
+    "other": "%{formattedCount} lugares salvos estão no roteiro. Dê uma olhada nos seus dias."
+  },
   "search.noResults": "Nenhum conteúdo corresponde a «%{query}».",
   "spaces.addedTo": "Adicionado a %{space}",
   "spaces.removedFrom": "Removido de %{space}",

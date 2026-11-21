@@ -6,6 +6,9 @@ import {
   tripEveAt,
   tripEveDateRange,
   tripEveDue,
+  tripReminderAt,
+  tripReminderDateRange,
+  tripReminderDue,
 } from "./tripEve";
 
 const HOUR = 60 * 60 * 1000;
@@ -116,5 +119,47 @@ describe("nextTripEveAt and the reminder budget", () => {
       reminderBlocked(eve - 21 * HOUR, [], [], undefined, eve),
     ).toBeUndefined();
     expect(reminderBlocked(eve, [], [], undefined, undefined)).toBeUndefined();
+  });
+});
+
+describe("the week-before reminder", () => {
+  it.each([
+    ["2026-09-26", "UTC", "2026-09-19T18:00:00Z"],
+    ["2026-09-26", "Asia/Kolkata", "2026-09-19T12:30:00Z"],
+    ["2026-03-14", "America/New_York", "2026-03-07T23:00:00Z"],
+    ["2026-03-15", "America/New_York", "2026-03-08T22:00:00Z"],
+    ["2026-09-26", undefined, "2026-09-19T18:00:00Z"],
+  ])("for %s in %s is %s", (startDate, timezone, expected) => {
+    expect(tripReminderAt("week", startDate, timezone)).toBe(at(expected));
+  });
+
+  it("opens at 18:00 local seven days out, for a trip planned well before", () => {
+    const week = at("2026-09-19T12:30:00Z");
+    const trip = { startDate: "2026-09-26", _creationTime: week - 7 * HOUR };
+    expect(tripReminderDue("week", trip, "Asia/Kolkata", week - 1)).toBe(false);
+    expect(tripReminderDue("week", trip, "Asia/Kolkata", week)).toBe(true);
+    expect(tripReminderDue("week", trip, "Asia/Kolkata", week + 2 * HOUR)).toBe(
+      false,
+    );
+    expect(
+      tripReminderDue(
+        "week",
+        { ...trip, _creationTime: week - 5 * HOUR },
+        "Asia/Kolkata",
+        week,
+      ),
+    ).toBe(false);
+  });
+
+  it("sweeps start dates around a week ahead, and the eve the days around tomorrow", () => {
+    const now = at("2026-09-19T12:00:00Z");
+    expect(tripReminderDateRange("week", now)).toEqual({
+      from: "2026-09-24",
+      to: "2026-09-27",
+    });
+    expect(tripReminderDateRange("eve", now)).toEqual({
+      from: "2026-09-18",
+      to: "2026-09-21",
+    });
   });
 });
