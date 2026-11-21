@@ -61,6 +61,16 @@ export function getQueuedFirstSaveUrl(): string | null {
 }
 
 /** Mount once, beside useReplayOnboarding: after sign-in, saves the queued first save as the free demo save. */
+function handOver(url: string, space: string | null, owner: string): boolean {
+  try {
+    handOverFirstSave(url, space, owner);
+    return true;
+  } catch (error) {
+    analytics.captureError("onboarding_first_save_handover_failed", error);
+    return false;
+  }
+}
+
 export function useQueuedFirstSave() {
   const { isAuthenticated } = useConvexAuth();
   const { onboarded } = useOnboarding();
@@ -90,7 +100,7 @@ export function useQueuedFirstSave() {
     }).then(
       (result) => {
         if (result.reused && !result.urlMatchesRequest) {
-          handOverFirstSave(url, destination, userId);
+          if (!handOver(url, destination, userId)) return;
         } else {
           if (!result.reused) analytics.capture("onboarding_demo_submitted");
           if (source === "share" && result.urlMatchesRequest) {
@@ -101,8 +111,11 @@ export function useQueuedFirstSave() {
       },
       (error: unknown) => {
         analytics.captureError("onboarding_queued_save_failed", error);
-        if (error instanceof ConvexError && !isRateLimitedError(error)) {
-          handOverFirstSave(url, destination, userId);
+        if (
+          error instanceof ConvexError &&
+          !isRateLimitedError(error) &&
+          handOver(url, destination, userId)
+        ) {
           clearQueued();
         }
       },

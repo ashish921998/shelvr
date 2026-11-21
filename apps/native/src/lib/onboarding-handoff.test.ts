@@ -4,6 +4,7 @@ import {
   dropFirstSaveNotFor,
   finishHandoff,
   firstSaveDone,
+  dropLegacyProgress,
   forgetPaywallAnswer,
   handOverFirstSave,
   noteReplayDeclined,
@@ -11,6 +12,7 @@ import {
   paywallBlocked,
   readHandoffWork,
   settleHandoff,
+  subscribeHandoff,
   type OnboardingAnswers,
 } from "./onboarding-handoff";
 import type { Goal } from "./onboarding-goals";
@@ -21,11 +23,15 @@ const REEL = "https://example.com/reel";
 const device = vi.hoisted(() => ({
   storage: new Map<string, string>(),
   failing: false,
+  unreadable: false,
   minted: 0,
 }));
 const captureError = vi.hoisted(() => vi.fn());
 vi.mock("expo-secure-store", () => ({
-  getItem: (key: string) => device.storage.get(key) ?? null,
+  getItem: (key: string) => {
+    if (device.unreadable) throw new Error("keychain locked");
+    return device.storage.get(key) ?? null;
+  },
   setItem: (key: string, value: string) => {
     if (device.failing) throw new Error("keychain locked");
     device.storage.set(key, value);
@@ -62,6 +68,7 @@ const operation = () => readHandoffWork().operationId;
 beforeEach(() => {
   device.storage.clear();
   device.failing = false;
+  device.unreadable = false;
   device.minted = 0;
   captureError.mockReset();
   forgetPaywallAnswer();
@@ -306,6 +313,25 @@ describe("a store that cannot be written", () => {
   });
 });
 
+describe("a store that cannot be read", () => {
+  it("reports it, shows the replay no work, and keeps the record for the next launch", () => {
+    finishHandoff(answers(["food"]), REEL);
+    const attempted = readHandoffWork();
+    const before = device.storage.get(KEY);
+    device.unreadable = true;
+    expect(readHandoffWork().has).toBe(false);
+    expect(paywallBlocked()).toBe(false);
+    expect(settleHandoff(attempted)).toBe("changed");
+    finishHandoff(answers(["date"]), null);
+    expect(captureError).toHaveBeenCalledWith(
+      "onboarding_handoff_read_failed",
+      expect.any(Error),
+    );
+    device.unreadable = false;
+    expect(device.storage.get(KEY)).toBe(before);
+  });
+});
+
 describe("a record written by an older onboarding flow", () => {
   it("still hands an older finished record's spaces to the replay", () => {
     store({
@@ -318,6 +344,22 @@ describe("a record written by an older onboarding flow", () => {
       has: true,
       operationId: "legacy-operation",
     });
+  });
+
+  it("drops its progress without waking the replay", () => {
+    store({
+      operationId: "legacy-operation",
+      spaces: [],
+      demoUrl: null,
+      progressVersion: 14,
+      step: 3,
+    });
+    const listener = vi.fn();
+    const unsubscribe = subscribeHandoff(listener);
+    dropLegacyProgress();
+    unsubscribe();
+    expect(listener).not.toHaveBeenCalled();
+    expect(stored()).toMatchObject({ progressVersion: null, step: null });
   });
 
   it("is written back in the shape an older app reads", () => {

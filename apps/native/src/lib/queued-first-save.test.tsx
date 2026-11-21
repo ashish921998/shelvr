@@ -147,6 +147,22 @@ describe("a first save queued before sign-in", () => {
     expect(getQueuedFirstSaveUrl()).toBeNull();
   });
 
+  it("reports a handover the keychain refused and keeps the link queued", async () => {
+    mock.createDemoItem.mockResolvedValue(
+      result({ reused: true, urlMatchesRequest: false, url: "https://old" }),
+    );
+    mock.handOverFirstSave.mockImplementation(() => {
+      throw new Error("keychain unavailable");
+    });
+    queueFirstSave({ url: SAMPLE, destination: "Recipes", source: "direct" });
+    await mount();
+    expect(mock.captureError).toHaveBeenCalledWith(
+      "onboarding_first_save_handover_failed",
+      expect.any(Error),
+    );
+    expect(getQueuedFirstSaveUrl()).toBe(SAMPLE);
+  });
+
   it("records a shared link as the account's first share", async () => {
     queueFirstSave({ url: SAMPLE, destination: null, source: "share" });
     await mount();

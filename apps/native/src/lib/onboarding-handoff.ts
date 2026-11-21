@@ -167,11 +167,24 @@ function readSpaceNames(value: unknown): Record<string, string> {
   );
 }
 
-function writeRecord(record: StoredRecord | null) {
+function peekRecord(): StoredRecord | null {
+  try {
+    return readRecord();
+  } catch (error) {
+    analytics.captureError("onboarding_handoff_read_failed", error);
+    return null;
+  }
+}
+
+function storeRecord(record: StoredRecord | null) {
   SecureStore.setItem(
     HANDOFF_KEY,
     record === null ? "" : JSON.stringify(record),
   );
+}
+
+function writeRecord(record: StoredRecord | null) {
+  storeRecord(record);
   revision += 1;
   for (const listener of listeners) listener();
 }
@@ -274,7 +287,7 @@ export function handOverFirstSave(
 }
 
 export function readHandoffWork(): HandoffWork {
-  const record = readRecord();
+  const record = peekRecord();
   const firstSave = firstSaveOf(record);
   return {
     has: record !== null && (record.spaces.length > 0 || firstSave !== null),
@@ -329,7 +342,7 @@ export function clearHandoff() {
 }
 
 export function handoffAnswers(): OnboardingAnswers {
-  return parseOnboardingAnswers(readRecord() ?? {});
+  return parseOnboardingAnswers(peekRecord() ?? {});
 }
 
 let onboardingPaywall: "unseen" | "purchased" | "declined" = "unseen";
@@ -344,7 +357,7 @@ export function forgetPaywallAnswer() {
 
 export function paywallBlocked(): boolean {
   if (onboardingPaywall !== "unseen") return true;
-  const record = readRecord();
+  const record = peekRecord();
   return record !== null && record.declinedOperationId === record.operationId;
 }
 
@@ -379,7 +392,7 @@ export function useAwaitingOnboardingPurchase(entitled: boolean): boolean {
 export function readLegacyProgress():
   | (OnboardingAnswers & { step: number | null; viewed: OnboardingStep[] })
   | null {
-  const record = readRecord();
+  const record = peekRecord();
   if (record?.progressVersion !== LEGACY_PROGRESS_VERSION) return null;
   return {
     ...parseOnboardingAnswers(record),
@@ -392,7 +405,7 @@ export function dropLegacyProgress() {
   bestEffort("onboarding_legacy_progress_drop_failed", () => {
     const record = readRecord();
     if (record?.progressVersion !== LEGACY_PROGRESS_VERSION) return;
-    writeRecord({
+    storeRecord({
       ...record,
       progressVersion: null,
       step: null,
