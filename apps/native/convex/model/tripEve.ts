@@ -12,11 +12,53 @@ const MAX_TRIP_STOPS = 300;
 
 type DatedTrip = Pick<Doc<"tripPlans">, "startDate" | "_creationTime">;
 
+export type TripReminderKind = "eve" | "week";
+
+export const TRIP_WEEK_DAYS = 7;
+
+const LEAD_DAYS: Record<TripReminderKind, number> = {
+  eve: 1,
+  week: TRIP_WEEK_DAYS,
+};
+
+export function tripReminderAt(
+  kind: TripReminderKind,
+  startDate: string,
+  timezone: string | undefined,
+): number {
+  return localHourOnDayAt(startDate, -LEAD_DAYS[kind], TRIP_EVE_HOUR, timezone);
+}
+
+export function tripReminderDue(
+  kind: TripReminderKind,
+  trip: DatedTrip,
+  timezone: string | undefined,
+  now: number,
+): boolean {
+  if (trip.startDate === undefined) return false;
+  const remindAt = tripReminderAt(kind, trip.startDate, timezone);
+  return (
+    remindAt <= now &&
+    now < remindAt + MAX_LATE_MS &&
+    trip._creationTime < remindAt - MIN_LEAD_MS
+  );
+}
+
+export function tripReminderDateRange(
+  kind: TripReminderKind,
+  now: number,
+): { from: string; to: string } {
+  const day = (offset: number) =>
+    new Date(now + offset * DAY_MS).toISOString().slice(0, 10);
+  const lead = LEAD_DAYS[kind];
+  return { from: day(lead - 2), to: day(lead + 1) };
+}
+
 export function tripEveAt(
   startDate: string,
   timezone: string | undefined,
 ): number {
-  return localHourOnDayAt(startDate, -1, TRIP_EVE_HOUR, timezone);
+  return tripReminderAt("eve", startDate, timezone);
 }
 
 export function tripEveDue(
@@ -24,13 +66,27 @@ export function tripEveDue(
   timezone: string | undefined,
   now: number,
 ): boolean {
-  if (trip.startDate === undefined) return false;
-  const eveAt = tripEveAt(trip.startDate, timezone);
-  return (
-    eveAt <= now &&
-    now < eveAt + MAX_LATE_MS &&
-    trip._creationTime < eveAt - MIN_LEAD_MS
-  );
+  return tripReminderDue("eve", trip, timezone, now);
+}
+
+export function nextTripReminderAt(
+  trips: readonly DatedTrip[],
+  timezone: string | undefined,
+  now: number,
+  kinds: readonly TripReminderKind[],
+): number | undefined {
+  const upcoming = trips.flatMap((trip) => {
+    const startDate = trip.startDate;
+    if (startDate === undefined) return [];
+    return kinds.flatMap((kind) => {
+      const remindAt = tripReminderAt(kind, startDate, timezone);
+      return trip._creationTime < remindAt - MIN_LEAD_MS &&
+        now < remindAt + MAX_LATE_MS
+        ? [remindAt]
+        : [];
+    });
+  });
+  return upcoming.length === 0 ? undefined : Math.min(...upcoming);
 }
 
 export function nextTripEveAt(
@@ -38,20 +94,11 @@ export function nextTripEveAt(
   timezone: string | undefined,
   now: number,
 ): number | undefined {
-  const upcoming = trips.flatMap((trip) => {
-    if (trip.startDate === undefined) return [];
-    const eveAt = tripEveAt(trip.startDate, timezone);
-    return trip._creationTime < eveAt - MIN_LEAD_MS && now < eveAt + MAX_LATE_MS
-      ? [eveAt]
-      : [];
-  });
-  return upcoming.length === 0 ? undefined : Math.min(...upcoming);
+  return nextTripReminderAt(trips, timezone, now, ["eve"]);
 }
 
 export function tripEveDateRange(now: number): { from: string; to: string } {
-  const day = (offset: number) =>
-    new Date(now + offset * DAY_MS).toISOString().slice(0, 10);
-  return { from: day(-1), to: day(2) };
+  return tripReminderDateRange("eve", now);
 }
 
 export function savedStopCount(

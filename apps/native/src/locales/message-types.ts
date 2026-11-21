@@ -552,6 +552,8 @@ type MessageParams = {
   "reminder.visitBody": { title: string };
   "reminder.tripEveTitle": { city: string };
   "reminder.tripEveBody": { count: number };
+  "reminder.tripWeekTitle": { city: string };
+  "reminder.tripWeekBody": { count: number };
   "search.noResults": { query: string };
   "spaces.addedTo": { space: string };
   "spaces.removedFrom": { space: string };

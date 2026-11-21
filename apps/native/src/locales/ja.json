@@ -591,6 +591,10 @@
   "reminder.tripEveBody": {
     "other": "行きたい場所を%{formattedCount}件保存しています。"
   },
+  "reminder.tripWeekTitle": "%{city}への旅行まであと1週間",
+  "reminder.tripWeekBody": {
+    "other": "保存した%{formattedCount}か所がプランに入っています。日ごとの予定を確認しましょう。"
+  },
   "search.noResults": "「%{query}」に一致する保存項目はありません。",
   "spaces.addedTo": "%{space}に追加しました",
   "spaces.removedFrom": "%{space}から取り除きました",

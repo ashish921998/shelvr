@@ -36,6 +36,7 @@ async function setup({
   article = false,
   newerTrip = false,
   newerTripAt = createdAt,
+  at = EVE,
 }: {
   device?: boolean;
   preferences?: Partial<Doc<"notificationPreferences">>;
@@ -47,6 +48,7 @@ async function setup({
   article?: boolean;
   newerTrip?: boolean;
   newerTripAt?: number;
+  at?: number;
 } = {}) {
   const t = newConvexTest();
   vi.setSystemTime(EVE - 10 * DAY);
@@ -114,7 +116,7 @@ async function setup({
         });
         return id;
       });
-  vi.setSystemTime(EVE);
+  vi.setSystemTime(at);
   await t.run(async (ctx) => {
     if (withPreferences)
       await ctx.db.insert("notificationPreferences", {
@@ -614,6 +616,166 @@ describe("sharing the budget with save reminders", () => {
         await ctx.db.patch(trip._id, { startDate: undefined });
     });
     expect(await remind(EVE - 10 * HOUR)).toHaveLength(1);
+  });
+});
+
+describe("the week-before trip push", () => {
+  const WEEK = EVE - 6 * DAY;
+  const early = { createdAt: EVE - 9 * DAY };
+
+  async function weekSetup(options: Parameters<typeof setup>[0] = {}) {
+    const context = await setup({ ...early, at: WEEK, ...options });
+    const prepareWeek = (now = WEEK) =>
+      context.t.mutation(internal.notifications.prepareTripWeek, {
+        tripId: context.tripId,
+        now,
+      });
+    return { ...context, prepareWeek };
+  }
+
+  it("queues at 18:00 local seven days before, and not an hour earlier", async () => {
+    const { prepareWeek, rows, tripId } = await weekSetup();
+    await prepareWeek(WEEK - HOUR);
+    expect(await rows()).toEqual([]);
+    await prepareWeek();
+    expect(await rows()).toMatchObject([
+      { tripId, kind: "week", createdAt: WEEK, deliveryStatus: "pending" },
+    ]);
+  });
+
+  it("queues exactly one however often it is swept", async () => {
+    const { prepareWeek, rows, jobs } = await weekSetup();
+    await prepareWeek();
+    await prepareWeek(WEEK + HOUR);
+    expect(await rows()).toHaveLength(1);
+    expect(await jobs(/notificationDelivery:sendTripEve/)).toHaveLength(1);
+  });
+
+  it("leaves the trip's evening-before push to go out as well", async () => {
+    const { prepareWeek, prepare, rows } = await weekSetup();
+    await prepareWeek();
+    await prepare();
+    expect((await rows()).map((row) => row.kind ?? "eve")).toEqual([
+      "week",
+      "eve",
+    ]);
+  });
+
+  it("is not counted as the evening-before push already sent", async () => {
+    const { prepare, rows } = await weekSetup();
+    await prepare();
+    expect(await rows()).toMatchObject([{ createdAt: EVE }]);
+    expect((await rows())[0].kind).toBeUndefined();
+  });
+
+  it.each<[string, Parameters<typeof setup>[0]]>([
+    ["a trip planned less than a week ahead", { createdAt: EVE - 3 * DAY }],
+    ["no saved stops", { stops: [] }],
+    ["reminders turned off", { preferences: { remindersEnabled: false } }],
+  ])("sends nothing for %s", async (_name, options) => {
+    const { prepareWeek, rows } = await weekSetup(options);
+    await prepareWeek();
+    expect(await rows()).toEqual([]);
+  });
+
+  it("names the trip a week out in the push and opens the trip", async () => {
+    const { t, prepareWeek, rows, tripId } = await weekSetup({
+      stops: [
+        ["save", 1],
+        ["list", 2],
+      ],
+    });
+    await prepareWeek();
+    const [reminder] = await rows();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(json([{ status: "ok", id: "ticket-a" }]));
+    vi.stubGlobal("fetch", fetchMock);
+    await t.action(internal.notificationDelivery.sendTripEve, {
+      reminderId: reminder._id,
+    });
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toMatchObject([
+      {
+        title: "Your Lisbon trip is in a week",
+        body: "2 saved places are on the plan. Take a look at your days.",
+        data: {
+          url: `/trip-plan/${tripId}`,
+          kind: "trip_week",
+          notificationId: reminder._id,
+        },
+      },
+    ]);
+  });
+
+  it("gives way to another trip's evening-before push on the same evening", async () => {
+    const { t, tripId, newerTripId, rows } = await setup({
+      startDate: "2026-10-02",
+      newerTrip: true,
+      createdAt: EVE - 9 * DAY,
+    });
+    await t.mutation(internal.notifications.prepareTripWeek, {
+      tripId,
+      now: EVE,
+    });
+    await t.mutation(internal.notifications.prepareTripEve, {
+      tripId: newerTripId!,
+      now: EVE,
+    });
+    await t.mutation(internal.notifications.prepareTripWeek, {
+      tripId,
+      now: EVE + HOUR,
+    });
+    expect(
+      (await rows()).map((row) => [row.tripId, row.kind ?? "eve"]),
+    ).toEqual([[newerTripId, "eve"]]);
+  });
+
+  it("holds a save reminder due within 20 hours before it", async () => {
+    const { t, userId } = await weekSetup({ article: true });
+    const remind = async (now: number) => {
+      vi.setSystemTime(now);
+      await t.run(async (ctx) => {
+        const row = await ctx.db
+          .query("notificationPreferences")
+          .withIndex("by_user", (q) => q.eq("userId", userId))
+          .unique();
+        await ctx.db.patch(row!._id, { nextReminderAt: now });
+      });
+      await t.mutation(internal.notifications.prepareSaveReminder, {
+        userId,
+        now,
+      });
+      return t.run((ctx) => ctx.db.query("saveReminders").collect());
+    };
+    expect(await remind(WEEK - HOUR)).toEqual([]);
+  });
+
+  it("sweeps only trips starting about a week from now", async () => {
+    const { t, tripId, userId } = await weekSetup();
+    const tomorrowId = await t.run((ctx) =>
+      ctx.db.insert("tripPlans", {
+        userId,
+        city: "Porto",
+        startDate: "2026-09-20",
+        dayCount: 2,
+        pace: "balanced",
+        interests: [],
+        stopCount: 0,
+        savedCount: 0,
+      }),
+    );
+    await t.mutation(internal.notifications.prepareDueTripWeeks, {
+      now: WEEK,
+    });
+    const queued = (
+      await t.run((ctx) =>
+        ctx.db.system.query("_scheduled_functions").collect(),
+      )
+    )
+      .filter((job) => job.name.includes("prepareTripWeek"))
+      .map((job) => (job.args[0] as { tripId: Id<"tripPlans"> }).tripId);
+    expect(queued).toEqual([tripId]);
+    expect(queued).not.toContain(tomorrowId);
   });
 });
 

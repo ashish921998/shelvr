@@ -121,6 +121,7 @@ describe("shipped localization resources", () => {
           { title: string; body: string }
         >;
         tripEve: { title: string; body: Record<string, string> };
+        tripWeek: { title: string; body: Record<string, string> };
         planVote: {
           title: string;
           pick: { named: string; someone: string };
@@ -152,6 +153,10 @@ describe("shipped localization resources", () => {
       tripEve: {
         title: messages["reminder.tripEveTitle"],
         body: messages["reminder.tripEveBody"],
+      },
+      tripWeek: {
+        title: messages["reminder.tripWeekTitle"],
+        body: messages["reminder.tripWeekBody"],
       },
       planVote: {
         title: messages["plan.votePushTitle"],

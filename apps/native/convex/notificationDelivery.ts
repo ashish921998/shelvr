@@ -17,6 +17,7 @@ import {
   recipientError,
   reminderCopy,
   tripEveCopy,
+  tripWeekCopy,
   type Recipient,
 } from "./model/notificationFields";
 import {
@@ -42,6 +43,7 @@ import { liveSharePlaces, newestCityShare, shareVotes } from "./planShares";
 const NOTIFICATION_KIND = "weekly_shelf";
 const reminderNotificationKind = (kind: ReminderKind) => `${kind}_reminder`;
 const TRIP_EVE_KIND = "trip_eve";
+const TRIP_WEEK_KIND = "trip_week";
 
 const LEASE_MS = 5 * 60 * 1000;
 const RECEIPT_DELAY_MS = 15 * 60 * 1000;
@@ -753,6 +755,7 @@ export const claimTripEve = internalMutation({
       tripId: v.id("tripPlans"),
       city: v.string(),
       count: v.number(),
+      week: v.boolean(),
     }),
   ),
   handler: async (ctx, { reminderId }) => {
@@ -789,7 +792,7 @@ export const claimTripEve = internalMutation({
         {
           userId: reminder.userId,
           notificationId: reminderId,
-          kind: TRIP_EVE_KIND,
+          kind: reminder.kind === "week" ? TRIP_WEEK_KIND : TRIP_EVE_KIND,
           itemCount: count,
           sentAt: reminder.deliverySentAt,
         },
@@ -826,7 +829,14 @@ export const claimTripEve = internalMutation({
       deliveryRecipients: recipients,
       deliveryNextAttemptAt: now + LEASE_MS,
     });
-    return { attempt, recipients, tripId: trip._id, city: trip.city, count };
+    return {
+      attempt,
+      recipients,
+      tripId: trip._id,
+      city: trip.city,
+      count,
+      week: reminder.kind === "week",
+    };
   },
 });
 
@@ -867,7 +877,7 @@ export const finishTripEve = internalMutation({
       await ctx.scheduler.runAfter(0, internal.analytics.captureNotification, {
         userId: reminder.userId,
         notificationId: reminder._id,
-        kind: TRIP_EVE_KIND,
+        kind: reminder.kind === "week" ? TRIP_WEEK_KIND : TRIP_EVE_KIND,
         itemCount: args.count,
         delivered: status === "complete",
         sentAt: sentAt ?? now,
@@ -889,10 +899,14 @@ export const sendTripEve = internalAction({
       delivery.recipients,
       reminderId,
       (recipient) => ({
-        ...tripEveCopy(recipient.locale, delivery.city, delivery.count),
+        ...(delivery.week ? tripWeekCopy : tripEveCopy)(
+          recipient.locale,
+          delivery.city,
+          delivery.count,
+        ),
         data: {
           url: `/trip-plan/${delivery.tripId}`,
-          kind: TRIP_EVE_KIND,
+          kind: delivery.week ? TRIP_WEEK_KIND : TRIP_EVE_KIND,
           notificationId: reminderId,
         },
         sound: "default",

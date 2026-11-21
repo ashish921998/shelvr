@@ -84,6 +84,7 @@ const catalogs: Record<
     namedShelfSingle: string;
     reminder: Record<ReminderKind, { title: string; body: string }>;
     tripEve: { title: string; body: Record<string, string> };
+    tripWeek: { title: string; body: Record<string, string> };
     planVote: {
       title: string;
       pick: { named: string; someone: string };
@@ -152,13 +153,12 @@ export function reminderCopy(
   };
 }
 
-export function tripEveCopy(
-  locale: string | undefined,
+function tripCopy(
+  copy: { title: string; body: Record<string, string> },
+  selected: string,
   city: string,
   count: number,
 ) {
-  const selected = notificationLocale(locale) ?? "en";
-  const copy = catalogs[selected].tripEve;
   return {
     title: copy.title.replace("%{city}", () => truncateTitle(city) ?? city),
     body: copy.body[pluralRules[selected](count)].replace(
@@ -166,6 +166,24 @@ export function tripEveCopy(
       new Intl.NumberFormat(selected).format(count),
     ),
   };
+}
+
+export function tripEveCopy(
+  locale: string | undefined,
+  city: string,
+  count: number,
+) {
+  const selected = notificationLocale(locale) ?? "en";
+  return tripCopy(catalogs[selected].tripEve, selected, city, count);
+}
+
+export function tripWeekCopy(
+  locale: string | undefined,
+  city: string,
+  count: number,
+) {
+  const selected = notificationLocale(locale) ?? "en";
+  return tripCopy(catalogs[selected].tripWeek, selected, city, count);
 }
 
 export function planVoteCopy(
