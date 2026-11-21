@@ -105,7 +105,11 @@ function DateField({
         />
       ) : (
         <>
-          <Pressable accessibilityRole="button" onPress={() => setOpen(true)}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => setOpen(true)}
+            style={styles.dateButton}
+          >
             <ThemedText variant="bodyLabel">
               {value.toLocaleDateString(formattingLocale())}
             </ThemedText>
@@ -731,6 +735,7 @@ const styles = StyleSheet.create((theme, rt) => ({
     backgroundColor: theme.colors.surfaceMuted,
   },
   datePicker: { minWidth: 132 },
+  dateButton: { minHeight: theme.control.minHeight, justifyContent: "center" },
   cover: {
     alignSelf: "center",
     width: 104,
