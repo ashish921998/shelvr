@@ -47,6 +47,12 @@ vi.mock("expo-constants", () => ({
   default: { expoConfig: { extra: { variant: "production" } } },
 }));
 vi.mock("@/lib/analytics", () => ({ analytics: analyticsMock }));
+const tripCountdown = vi.hoisted(() => ({
+  clear: vi.fn(() => Promise.resolve()),
+}));
+vi.mock("@/lib/trip-countdown-sync", () => ({
+  clearTripCountdownWidget: tripCountdown.clear,
+}));
 
 vi.mock("react-native", () => ({
   Platform: {
@@ -602,6 +608,36 @@ describe("RecentSavesWidgetSync", () => {
 });
 
 describe("clearRecentSavesWidget", () => {
+  it("clears the trip countdown widget with Recent Saves", async () => {
+    tripCountdown.clear.mockClear();
+    expect(await clearRecentSavesWidget()).toBe(true);
+    expect(tripCountdown.clear).toHaveBeenCalledOnce();
+  });
+
+  it("blanks the trip countdown even when a thumbnail cannot be deleted", async () => {
+    tripCountdown.clear.mockClear();
+    const retained = new File("file:///widgets", "recent-saves-private.jpg");
+    retained.exists = true;
+    fsx.listed = [retained];
+    vi.spyOn(retained, "delete").mockImplementation(() => {
+      throw new Error("private file path");
+    });
+    await expect(clearRecentSavesWidget()).rejects.toThrow(
+      "widget_thumbnail_cleanup_failed",
+    );
+    expect(tripCountdown.clear).toHaveBeenCalledOnce();
+  });
+
+  it("keeps the cleanup pending when the trip countdown cannot be cleared", async () => {
+    tripCountdown.clear.mockRejectedValueOnce(
+      new Error("widget_thumbnail_cleanup_failed"),
+    );
+    await expect(clearRecentSavesWidget()).rejects.toThrow(
+      "widget_thumbnail_cleanup_failed",
+    );
+    expect(await retryPendingWidgetClear()).toBe(true);
+  });
+
   it("retries an already-failed clear before a newly mounted account publishes", async () => {
     fsx.snapshotFailuresRemaining = 2;
     await expect(clearRecentSavesWidget()).rejects.toThrow(

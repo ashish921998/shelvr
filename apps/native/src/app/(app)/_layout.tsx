@@ -19,6 +19,7 @@ import { useQueuedFirstSave } from "@/lib/queued-first-save";
 import { useResumePendingShare } from "@/lib/share/use-resume-pending-share";
 import { useTrialReminder } from "@/lib/trial-reminder";
 import { useWelcomeSaveTracker } from "@/lib/welcome-save";
+import { TripCountdownWidgetSync } from "@/lib/trip-countdown-sync";
 import { RecentSavesWidgetSync } from "@/lib/widget-sync";
 import { listRouteAllowed } from "@/lib/list-gate";
 import { useSharedLists } from "@/lib/shared-lists";
@@ -90,6 +91,7 @@ export default function AppLayout() {
     <HomeFeedProvider>
       <StampMomentProvider>
         <RecentSavesWidgetSync />
+        <TripCountdownWidgetSync />
         <AppIntentsBridge />
         <TrialReminderPrimerSheet />
         <Stack
