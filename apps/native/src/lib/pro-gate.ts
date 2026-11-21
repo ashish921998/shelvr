@@ -62,7 +62,9 @@ export function useProGate(placement: ProPlacement): {
     [pro, blocked],
   );
 
-  const passed = useCallback(() => resumeBlockedAction(placement), [placement]);
+  const passed = useCallback(() => {
+    if (pro) resumeBlockedAction(placement);
+  }, [pro, placement]);
 
   return { admit, denied, blocked, passed, loading: verdict === "wait" };
 }

@@ -46,9 +46,16 @@ function gate(placement: ProPlacement) {
   return renderHook(() => useProGate(placement)).result;
 }
 
+function gateWithAccess(placement: ProPlacement) {
+  return renderHook(() => useProGate(placement));
+}
+
+const PRO: Access = { kind: "pro", syncing: false };
+
 function buyInSheet() {
   mocks.sheet.mockImplementation(async () => {
     recordAccess("purchase");
+    mocks.access = PRO;
     return { outcome: "success", answered: true };
   });
 }
@@ -69,12 +76,13 @@ beforeEach(() => {
 describe.each(PLACEMENTS)("%s", (placement) => {
   it("opens the paywall on a Pro refusal and reports the next pass as resumed after a purchase", async () => {
     buyInSheet();
-    const result = gate(placement);
+    const { result, rerender } = gateWithAccess(placement);
     await act(async () => {
       expect(await result.current.denied(PRO_REQUIRED)).toBe(true);
     });
     expect(mocks.sheet).toHaveBeenCalledWith(mocks.router, placement);
 
+    rerender();
     act(() => result.current.passed());
     expect(resumed()).toEqual([
       [
@@ -109,9 +117,18 @@ describe("denied", () => {
     expect(resumed()).toEqual([]);
   });
 
-  it("reports a pass without a purchase when the sheet was closed", async () => {
-    const result = gate("add");
+  it("reports nothing for a pass the app does not see as Pro", async () => {
+    const result = gate("home");
     await act(() => result.current.denied(PRO_REQUIRED));
+    act(() => result.current.passed());
+    expect(resumed()).toEqual([]);
+  });
+
+  it("reports a later Pro pass without a purchase when the sheet was closed", async () => {
+    const { result, rerender } = gateWithAccess("add");
+    await act(() => result.current.denied(PRO_REQUIRED));
+    mocks.access = PRO;
+    rerender();
     act(() => result.current.passed());
     expect(resumed()[0]?.[1]).toMatchObject({ purchased_since_block: false });
   });
@@ -162,8 +179,10 @@ describe("admit", () => {
 
   it("reports a later pass at a placement it blocked", async () => {
     mocks.access = { kind: "free", ...free };
-    const result = gate("make_plan");
+    const { result, rerender } = gateWithAccess("make_plan");
     await act(() => result.current.admit());
+    mocks.access = PRO;
+    rerender();
     act(() => result.current.passed());
     expect(resumed()[0]?.[1]).toMatchObject({ placement: "make_plan" });
   });

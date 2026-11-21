@@ -500,7 +500,6 @@ function runEffect(
       persistEntry(effect.entry, effect.sessionId);
       return;
     case "save":
-      deps.passed();
       void save(effect, dispatch, deps.saveDeps);
       return;
     case "saveFailed":
@@ -520,6 +519,7 @@ function runEffect(
       analytics.capture(effect.event);
       return;
     case "sharedContentSaved":
+      deps.passed();
       void haptics.success();
       analytics.capture("shared_content_saved", {
         item_count: effect.itemCount,

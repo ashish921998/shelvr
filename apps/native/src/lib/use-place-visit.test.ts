@@ -10,6 +10,7 @@ import type { Id } from "@convex/_generated/dataModel";
 const mocks = vi.hoisted(() => ({
   setVisited: vi.fn(),
   openPaywall: vi.fn(),
+  access: { kind: "locked" } as { kind: string; syncing?: boolean },
   alert: vi.fn(),
   capture: vi.fn(),
   captureError: vi.fn(),
@@ -28,7 +29,7 @@ vi.mock("expo-router", () => ({
   useNavigation: () => ({ isFocused: () => mocks.focused }),
 }));
 vi.mock("@/lib/entitlement", () => ({ openPaywallAnswer: mocks.openPaywall }));
-vi.mock("@/lib/free-plan", () => ({ useAccess: () => ({ kind: "locked" }) }));
+vi.mock("@/lib/free-plan", () => ({ useAccess: () => mocks.access }));
 vi.mock("@/lib/revenuecat-module", () => ({ getPurchases: () => null }));
 vi.mock("@/lib/paywall-goal", () => ({}));
 vi.mock("@/lib/trial-reminder-lead", () => ({}));
@@ -67,6 +68,7 @@ function toggle(
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.access = { kind: "locked" };
   mocks.setVisited.mockResolvedValue(null);
   mocks.badgesReady.mockResolvedValue(undefined);
   mocks.focused = true;
@@ -146,6 +148,7 @@ describe("usePlaceVisit", () => {
     const funnel = await import("@/lib/paywall-funnel");
     mocks.openPaywall.mockImplementation(() => {
       funnel.recordAccess("purchase");
+      mocks.access = { kind: "pro", syncing: false };
       return Promise.resolve({ outcome: "success", answered: true });
     });
     mocks.setVisited.mockRejectedValueOnce(
