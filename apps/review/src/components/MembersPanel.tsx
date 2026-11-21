@@ -125,7 +125,7 @@ export default function MembersPanel({ campaign }: Props) {
                 <button
                   type="button"
                   onClick={() => void remove({ memberId: member._id })}
-                  className="text-faint opacity-0 transition group-hover:opacity-100 hover:text-rose-300"
+                  className="text-faint opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100 hover:text-rose-300"
                   aria-label={`Remove ${member.name}`}
                 >
                   ×
