@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { pageMetadata } from "@/lib/siteMetadata";
 
-export type LandingLocale = "de" | "fr";
+type LandingLocale = "de" | "fr";
 
 export type LocalizedLanding = {
   locale: LandingLocale;
