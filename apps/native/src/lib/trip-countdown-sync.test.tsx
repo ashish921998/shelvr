@@ -13,6 +13,8 @@ type Entry = { date: Date; props: Record<string, unknown> };
 const env = vi.hoisted(() => ({
   os: "ios",
   native: true,
+  signedIn: true,
+  failDelete: false,
   trips: [] as unknown[],
   cities: [] as unknown[],
   queried: [] as unknown[],
@@ -32,7 +34,10 @@ vi.mock("react-native", () => ({
     },
   },
 }));
-vi.mock("convex/react", () => ({ useAction: vi.fn() }));
+vi.mock("convex/react", () => ({
+  useAction: vi.fn(),
+  useConvexAuth: () => ({ isAuthenticated: env.signedIn, isLoading: false }),
+}));
 vi.mock("expo-constants", () => ({
   default: { expoConfig: { extra: { variant: "production" } } },
 }));
@@ -72,10 +77,13 @@ vi.mock("expo-file-system", () => {
       public uri: string,
       public name: string,
     ) {}
+    gone = false;
     get exists() {
-      return true;
+      return !this.gone;
     }
     delete() {
+      if (env.failDelete) throw new Error("locked");
+      this.gone = true;
       env.deleted.push(this.name);
     }
   }
@@ -130,6 +138,8 @@ async function mount() {
 beforeEach(() => {
   env.os = "ios";
   env.native = true;
+  env.signedIn = true;
+  env.failDelete = false;
   env.trips = [lisbon];
   env.cities = [{ city: "Lisbon", count: 3, cover: null, photo }];
   env.queried = [];
@@ -190,6 +200,51 @@ describe("TripCountdownWidgetSync", () => {
     expect(env.timelines).toHaveLength(1);
   });
 
+  it("fetches a photo for each trip the timeline shows", async () => {
+    const porto = {
+      ...lisbon,
+      _id: "trip2",
+      city: "Porto",
+      startDate: isoDay(12),
+    };
+    const portoPhoto = "https://cdn.example/porto.jpg";
+    env.trips = [porto, lisbon];
+    env.cities = [
+      { city: "Lisbon", count: 3, cover: null, photo },
+      { city: "Porto", count: 1, cover: portoPhoto },
+    ];
+    env.listed = [
+      cityImageName("Lisbon", photo),
+      cityImageName("Porto", portoPhoto),
+      "trip-countdown-old.jpg",
+    ];
+    await mount();
+    expect(env.images.map(([, url]) => url)).toEqual([photo, portoPhoto]);
+    const ids = env.timelines[0].map((e) => e.props.tripId ?? "-");
+    expect(ids[0]).toBe("trip1");
+    expect(ids).toContain("trip2");
+    expect(env.deleted).toEqual(["trip-countdown-old.jpg"]);
+  });
+
+  it("publishes nothing while signed out", async () => {
+    env.signedIn = false;
+    await mount();
+    expect(env.queried.every((args) => args === "skip")).toBe(true);
+    expect(env.timelines).toEqual([]);
+  });
+
+  it("publishes the trip again after a clear while still signed in", async () => {
+    const view = await mount();
+    await act(async () => {
+      await clearTripCountdownWidget();
+    });
+    view.rerender(<TripCountdownWidgetSync />);
+    await act(async () => {});
+    expect(env.timelines).toHaveLength(3);
+    expect(env.timelines[1][0].props).toEqual({});
+    expect(env.timelines[2][0].props).toMatchObject({ tripId: "trip1" });
+  });
+
   it("does nothing outside iOS", async () => {
     env.os = "android";
     await mount();
@@ -214,15 +269,28 @@ describe("clearTripCountdownWidget", () => {
     expect(env.deleted).toEqual(["trip-countdown-a.jpg"]);
   });
 
+  it("fails, so the cleanup is retried, when a photo cannot be deleted", async () => {
+    env.listed = ["trip-countdown-a.jpg"];
+    env.failDelete = true;
+    await expect(clearTripCountdownWidget()).rejects.toThrow(
+      "widget_thumbnail_cleanup_failed",
+    );
+    expect(env.timelines[0][0].props).toEqual({});
+  });
+
   it("keeps a sync that was mid-download from republishing the trip", async () => {
     let release!: () => void;
     env.imageGate = new Promise<void>((resolve) => (release = resolve));
-    await mount();
+    const view = await mount();
     expect(env.images).toHaveLength(1);
 
+    env.signedIn = false;
     const clearing = clearTripCountdownWidget();
     release();
-    await clearing;
+    await act(async () => {
+      await clearing;
+    });
+    view.rerender(<TripCountdownWidgetSync />);
     await act(async () => {});
 
     expect(env.timelines).toHaveLength(1);

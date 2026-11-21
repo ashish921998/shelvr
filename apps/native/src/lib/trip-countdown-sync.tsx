@@ -1,8 +1,9 @@
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
+import { useConvexAuth } from "convex/react";
 import { Directory, File } from "expo-file-system";
 import { requireOptionalNativeModule } from "expo-modules-core";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { Platform } from "react-native";
 
 import { analytics } from "@/lib/analytics";
@@ -12,7 +13,7 @@ import {
   type CountdownEntry,
   type CountdownTrip,
   countdownTimeline,
-  nextTrip,
+  timelineTrips,
 } from "@/lib/trip-countdown";
 import {
   deleteQuietly,
@@ -25,6 +26,9 @@ import { cityKey } from "@convex/model/trip";
 
 const IMAGE_PREFIX = "trip-countdown-";
 const TRIP_PAGE = 50;
+const CLEANUP_FAILED = "widget_thumbnail_cleanup_failed";
+
+type City = { city: string; photo?: string; cover: string | null };
 
 type Host = {
   directory: string;
@@ -33,13 +37,22 @@ type Host = {
 
 let generation = 0;
 let chain: Promise<unknown> = Promise.resolve();
+let clears = 0;
+const clearListeners = new Set<() => void>();
 
-export function hasTripCountdownWidget(): boolean {
-  return Platform.OS === "ios";
+function onClear(listener: () => void) {
+  clearListeners.add(listener);
+  return () => {
+    clearListeners.delete(listener);
+  };
+}
+
+function clearCount() {
+  return clears;
 }
 
 async function loadHost(): Promise<Host | null> {
-  if (!hasTripCountdownWidget()) return null;
+  if (Platform.OS !== "ios") return null;
   if (!requireOptionalNativeModule("ExpoWidgets")) return null;
   const [{ widgetsDirectory }, { default: TripCountdownWidget }] =
     await Promise.all([
@@ -64,30 +77,41 @@ export function cityImageName(city: string, url: string): string {
   return `${IMAGE_PREFIX}${hash(`${cityKey(city)}|${url}`)}.jpg`;
 }
 
-function deleteImages(dir: Directory, keep?: string) {
-  for (const entry of dir.list()) {
-    if (
-      entry instanceof File &&
-      entry.name.startsWith(IMAGE_PREFIX) &&
-      entry.name !== keep
-    ) {
-      deleteQuietly(entry);
-    }
-  }
+function cityPhoto(cities: City[], city: string): string | undefined {
+  const key = cityKey(city);
+  const match = cities.find((entry) => cityKey(entry.city) === key);
+  return match?.photo ?? match?.cover ?? undefined;
 }
 
-async function cityImage(
+function tripImages(dir: Directory): File[] {
+  return dir
+    .list()
+    .filter(
+      (entry): entry is File =>
+        entry instanceof File && entry.name.startsWith(IMAGE_PREFIX),
+    );
+}
+
+function deleteCheckedImages(dir: Directory) {
+  let failed = false;
+  for (const file of tripImages(dir)) {
+    try {
+      file.delete();
+      if (file.exists) failed = true;
+    } catch {
+      failed = true;
+    }
+  }
+  if (failed) throw new Error(CLEANUP_FAILED);
+}
+
+async function fetchImage(
   dir: Directory,
-  trip: CountdownTrip,
+  name: string,
   url: string,
 ): Promise<string | undefined> {
   try {
-    return await ensureWidgetImage(
-      dir,
-      cityImageName(trip.city, url),
-      url,
-      IMAGE_PREFIX,
-    );
+    return await ensureWidgetImage(dir, name, url, IMAGE_PREFIX);
   } catch (error) {
     analytics.capture("widget_sync_failed", {
       reason:
@@ -101,8 +125,8 @@ async function cityImage(
 }
 
 async function syncTripCountdown(
-  trip: CountdownTrip | null,
-  photoUrl: string | undefined,
+  trips: readonly CountdownTrip[],
+  cities: City[],
   run: number,
 ): Promise<void> {
   if (run !== generation) return;
@@ -110,20 +134,30 @@ async function syncTripCountdown(
   if (!host || run !== generation) return;
   const dir = new Directory(host.directory);
   if (!dir.exists) dir.create({ intermediates: true });
-  const imageUri =
-    trip !== null && photoUrl !== undefined
-      ? await cityImage(dir, trip, photoUrl)
-      : undefined;
-  if (run !== generation) return;
+
+  const now = new Date();
+  const images = new Map<string, string>();
+  for (const trip of timelineTrips(trips, now)) {
+    const url = cityPhoto(cities, trip.city);
+    if (url === undefined) continue;
+    const name = cityImageName(trip.city, url);
+    if (images.has(name)) continue;
+    const uri = await fetchImage(dir, name, url);
+    if (run !== generation) return;
+    if (uri !== undefined) images.set(name, uri);
+  }
+
   host.publish(
-    countdownTimeline(trip, new Date(), { scheme: widgetScheme(), imageUri }),
+    countdownTimeline(trips, now, widgetScheme(), (trip) => {
+      const url = cityPhoto(cities, trip.city);
+      return url === undefined
+        ? undefined
+        : images.get(cityImageName(trip.city, url));
+    }),
   );
-  deleteImages(
-    dir,
-    imageUri && trip && photoUrl
-      ? cityImageName(trip.city, photoUrl)
-      : undefined,
-  );
+  for (const file of tripImages(dir)) {
+    if (!images.has(file.name)) deleteQuietly(file);
+  }
 }
 
 export function clearTripCountdownWidget(): Promise<void> {
@@ -133,25 +167,20 @@ export function clearTripCountdownWidget(): Promise<void> {
     if (!host) return;
     host.publish([{ date: new Date(), props: {} }]);
     const dir = new Directory(host.directory);
-    if (dir.exists) deleteImages(dir);
+    if (dir.exists) deleteCheckedImages(dir);
   });
   chain = run.catch(() => {});
-  return run;
-}
-
-function cityPhoto(
-  cities: { city: string; photo?: string; cover: string | null }[] | undefined,
-  city: string | undefined,
-): string | undefined {
-  if (city === undefined) return undefined;
-  const key = cityKey(city);
-  const match = cities?.find((entry) => cityKey(entry.city) === key);
-  return match?.photo ?? match?.cover ?? undefined;
+  return run.finally(() => {
+    clears += 1;
+    for (const listener of clearListeners) listener();
+  });
 }
 
 export function TripCountdownWidgetSync() {
   const locale = useAppLocale();
-  const enabled = hasTripCountdownWidget();
+  const { isAuthenticated } = useConvexAuth();
+  const cleared = useSyncExternalStore(onClear, clearCount, clearCount);
+  const enabled = Platform.OS === "ios" && isAuthenticated;
   const { data: trips } = useQuery(
     convexQuery(
       api.tripPlannerData.listTripPlans,
@@ -167,35 +196,34 @@ export function TripCountdownWidgetSync() {
 
   useEffect(() => {
     if (!enabled || trips === undefined || cities === undefined) return;
-    const today = new Date();
-    const trip = nextTrip(trips.page, today);
-    const photoUrl = cityPhoto(cities, trip?.city);
+    const page = trips.page;
     const key = [
+      cleared,
       locale,
-      toDateKey(today),
-      trip
-        ? [
-            trip._id,
-            trip.name ?? "",
-            trip.city,
-            trip.startDate,
-            trip.dayCount,
-            trip.stopCount,
-            trip.savedCount,
-          ].join(":")
-        : "none",
-      photoUrl ?? "",
+      toDateKey(new Date()),
+      ...page.map((trip) =>
+        [
+          trip._id,
+          trip.name ?? "",
+          trip.city,
+          trip.startDate ?? "",
+          trip.dayCount,
+          trip.stopCount,
+          trip.savedCount,
+          cityPhoto(cities, trip.city) ?? "",
+        ].join(":"),
+      ),
     ].join("|");
     if (key === lastKey.current) return;
     lastKey.current = key;
     const run = generation;
     chain = chain
-      .then(() => syncTripCountdown(trip, photoUrl, run))
+      .then(() => syncTripCountdown(page, cities, run))
       .catch((error) => {
         lastKey.current = null;
         console.warn("Trip countdown widget sync failed", error);
       });
-  }, [enabled, trips, cities, locale]);
+  }, [enabled, trips, cities, locale, cleared]);
 
   return null;
 }

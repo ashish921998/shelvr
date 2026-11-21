@@ -24,7 +24,7 @@ export type CountdownPhase =
 
 export type CountdownEntry = { date: Date; props: TripCountdownWidgetProps };
 
-type Shared = Pick<TripCountdownWidgetProps, "scheme" | "imageUri">;
+type Scheme = TripCountdownWidgetProps["scheme"];
 
 export const TIMELINE_DAYS = 60;
 
@@ -88,9 +88,9 @@ function headline(trip: CountdownTrip, phase: CountdownPhase): string {
   }
 }
 
-export function emptyCountdownProps(shared: Shared): TripCountdownWidgetProps {
+function emptyProps(scheme: Scheme): TripCountdownWidgetProps {
   return {
-    scheme: shared.scheme,
+    scheme,
     emptyTitle: t("tripWidget.emptyTitle"),
     emptyBody: t("tripWidget.emptyBody"),
   };
@@ -99,43 +99,69 @@ export function emptyCountdownProps(shared: Shared): TripCountdownWidgetProps {
 function tripProps(
   trip: CountdownTrip,
   text: string,
-  shared: Shared,
+  scheme: Scheme,
+  imageUri: string | undefined,
 ): TripCountdownWidgetProps {
   return {
-    ...emptyCountdownProps(shared),
+    ...emptyProps(scheme),
     tripId: trip._id,
     label: tripName(trip),
     headline: text,
     detail: tripDateRange(trip.startDate, trip.dayCount) ?? undefined,
     footnote: tripStopsLine(trip),
-    ...(shared.imageUri ? { imageUri: shared.imageUri } : {}),
+    ...(imageUri ? { imageUri } : {}),
   };
 }
 
-export function countdownTimeline(
-  trip: CountdownTrip | null,
-  now: Date,
-  shared: Shared,
-): CountdownEntry[] {
-  if (trip === null) return [{ date: now, props: emptyCountdownProps(shared) }];
-  const startsOn = tripDateRange(trip.startDate, 1) ?? "";
-  const entries: CountdownEntry[] = [];
+type Step = {
+  date: Date;
+  trip: CountdownTrip | null;
+  phase: CountdownPhase;
+  last: boolean;
+};
+
+function timelineSteps(trips: readonly CountdownTrip[], now: Date): Step[] {
+  const steps: Step[] = [];
   for (let day = 0; day <= TIMELINE_DAYS + MAX_TRIP_DAYS; day++) {
     const date = day === 0 ? now : midnight(now, day);
+    const trip = nextTrip(trips, date);
+    if (trip === null) {
+      steps.push({ date, trip, phase: { kind: "over" }, last: true });
+      return steps;
+    }
     const phase = countdownPhase(trip, date);
-    if (phase.kind === "over") {
-      entries.push({ date, props: emptyCountdownProps(shared) });
-      return entries;
-    }
-    if (day >= TIMELINE_DAYS && phase.kind !== "during") {
-      const text = t("tripWidget.onDate", { date: startsOn });
-      entries.push({ date, props: tripProps(trip, text, shared) });
-      return entries;
-    }
-    entries.push({
-      date,
-      props: tripProps(trip, headline(trip, phase), shared),
-    });
+    const last = day >= TIMELINE_DAYS && phase.kind !== "during";
+    steps.push({ date, trip, phase, last });
+    if (last) return steps;
   }
-  return entries;
+  return steps;
+}
+
+export function timelineTrips(
+  trips: readonly CountdownTrip[],
+  now: Date,
+): CountdownTrip[] {
+  const seen = new Map<string, CountdownTrip>();
+  for (const step of timelineSteps(trips, now)) {
+    if (step.trip !== null) seen.set(step.trip._id, step.trip);
+  }
+  return [...seen.values()];
+}
+
+export function countdownTimeline(
+  trips: readonly CountdownTrip[],
+  now: Date,
+  scheme: Scheme,
+  imageFor: (trip: CountdownTrip) => string | undefined = () => undefined,
+): CountdownEntry[] {
+  return timelineSteps(trips, now).map(({ date, trip, phase, last }) => {
+    if (trip === null) return { date, props: emptyProps(scheme) };
+    const text =
+      last && phase.kind !== "during"
+        ? t("tripWidget.onDate", {
+            date: tripDateRange(trip.startDate, 1) ?? "",
+          })
+        : headline(trip, phase);
+    return { date, props: tripProps(trip, text, scheme, imageFor(trip)) };
+  });
 }

@@ -7,6 +7,7 @@ import {
   daysBetween,
   nextTrip,
   TIMELINE_DAYS,
+  timelineTrips,
 } from "./trip-countdown";
 
 vi.mock("react-native", () => ({ Platform: { OS: "ios" } }));
@@ -30,7 +31,7 @@ function trip(overrides: Partial<CountdownTrip> = {}): CountdownTrip {
 }
 
 const at = (y: number, m: number, d: number, h = 9) => new Date(y, m - 1, d, h);
-const shared = { scheme: "shelvr" as const, imageUri: "file:///w/lisbon.jpg" };
+const photo = () => "file:///w/lisbon.jpg";
 
 describe("daysBetween", () => {
   it("counts calendar days, whatever the hour", () => {
@@ -113,7 +114,12 @@ describe("nextTrip", () => {
 
 describe("countdownTimeline", () => {
   it("shows the empty state when there is no trip", () => {
-    const [entry, ...rest] = countdownTimeline(null, at(2026, 12, 1), shared);
+    const [entry, ...rest] = countdownTimeline(
+      [],
+      at(2026, 12, 1),
+      "shelvr",
+      photo,
+    );
     expect(rest).toHaveLength(0);
     expect(entry.props.tripId).toBeUndefined();
     expect(entry.props.emptyTitle).toBe("No trip coming up");
@@ -122,7 +128,7 @@ describe("countdownTimeline", () => {
 
   it("ticks over at each midnight and ends on the empty state", () => {
     const now = at(2026, 12, 7, 15);
-    const entries = countdownTimeline(trip(), now, shared);
+    const entries = countdownTimeline([trip()], now, "shelvr", photo);
     expect(entries.map((e) => e.props.headline ?? "empty")).toEqual([
       "3 days to go",
       "2 days to go",
@@ -141,9 +147,10 @@ describe("countdownTimeline", () => {
 
   it("carries the trip's name, dates, stops, link target and photo", () => {
     const [first] = countdownTimeline(
-      trip({ name: "Lisbon with Sam" }),
+      [trip({ name: "Lisbon with Sam" })],
       at(2026, 12, 7),
-      shared,
+      "shelvr",
+      photo,
     );
     expect(first.props).toMatchObject({
       scheme: "shelvr",
@@ -157,18 +164,18 @@ describe("countdownTimeline", () => {
 
   it("says Today for a one-day trip", () => {
     const entries = countdownTimeline(
-      trip({ dayCount: 1 }),
+      [trip({ dayCount: 1 })],
       at(2026, 12, 10),
-      shared,
+      "shelvr",
     );
     expect(entries[0].props.headline).toBe("Today");
   });
 
   it("ends a far-off countdown on the start date, which stays true", () => {
     const entries = countdownTimeline(
-      trip({ startDate: "2027-06-01" }),
+      [trip({ startDate: "2027-06-01" })],
       at(2026, 12, 1),
-      shared,
+      "shelvr",
     );
     expect(entries).toHaveLength(TIMELINE_DAYS + 1);
     expect(entries.at(-2)?.props.headline).toMatch(/days to go$/);
@@ -178,9 +185,9 @@ describe("countdownTimeline", () => {
   it("follows a trip already under way at the horizon to its end", () => {
     const now = at(2026, 12, 1);
     const entries = countdownTimeline(
-      trip({ startDate: "2027-01-29", dayCount: 5 }),
+      [trip({ startDate: "2027-01-29", dayCount: 5 })],
       now,
-      shared,
+      "shelvr",
     );
     const headlines = entries.map((e) => e.props.headline ?? "empty");
     expect(headlines).not.toContain(expect.stringMatching(/^On /));
@@ -192,5 +199,54 @@ describe("countdownTimeline", () => {
       "Day 5 of 5",
       "empty",
     ]);
+  });
+
+  it("moves on to the next trip when one ends", () => {
+    const lisbon = trip({ _id: "a" as CountdownTrip["_id"], dayCount: 2 });
+    const porto = trip({
+      _id: "b" as CountdownTrip["_id"],
+      city: "Porto",
+      startDate: "2026-12-15",
+      dayCount: 1,
+    });
+    const entries = countdownTimeline(
+      [porto, lisbon],
+      at(2026, 12, 9),
+      "shelvr",
+      (t) => `file:///w/${t.city}.jpg`,
+    );
+    const rows = entries.map((e) => [
+      e.props.tripId ?? "-",
+      e.props.headline ?? "empty",
+    ]);
+    expect(rows).toEqual([
+      ["a", "Tomorrow"],
+      ["a", "Day 1 of 2"],
+      ["a", "Day 2 of 2"],
+      ["b", "3 days to go"],
+      ["b", "2 days to go"],
+      ["b", "Tomorrow"],
+      ["b", "Today"],
+      ["-", "empty"],
+    ]);
+    expect(entries[3].props.imageUri).toBe("file:///w/Porto.jpg");
+    expect(entries[0].props.imageUri).toBe("file:///w/Lisbon.jpg");
+  });
+});
+
+describe("timelineTrips", () => {
+  it("lists each trip the timeline will show, in order", () => {
+    const lisbon = trip({ _id: "a" as CountdownTrip["_id"] });
+    const porto = trip({
+      _id: "b" as CountdownTrip["_id"],
+      startDate: "2026-12-20",
+    });
+    const far = trip({
+      _id: "c" as CountdownTrip["_id"],
+      startDate: "2028-01-01",
+    });
+    expect(
+      timelineTrips([far, porto, lisbon], at(2026, 12, 1)).map((t) => t._id),
+    ).toEqual(["a", "b", "c"]);
   });
 });

@@ -243,16 +243,21 @@ async function clearWidgetAndPendingThumbnails(
   generation: number,
   pendingSync: Promise<unknown>,
 ): Promise<boolean> {
+  const tripCleared = clearTripCountdownWidget();
+  tripCleared.catch(() => {});
   try {
     return await clearWidgetSnapshot(generation);
   } finally {
-    await pendingSync;
     try {
-      await clearWidgetFiles(generation);
-    } catch {
-      await clearWidgetFiles(generation);
+      await pendingSync;
+      try {
+        await clearWidgetFiles(generation);
+      } catch {
+        await clearWidgetFiles(generation);
+      }
+    } finally {
+      await tripCleared;
     }
-    await clearTripCountdownWidget();
   }
 }
 
