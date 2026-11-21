@@ -8,7 +8,7 @@
   --color-line-strong: rgb(255 255 255 / 0.13);
   --color-ink: #f2f2f5;
   --color-muted: #9a9aa6;
-  --color-faint: #66666f;
+  --color-faint: #85858f;
   --color-accent: #7b6cff;
   --color-accent-soft: rgb(123 108 255 / 0.15);
   --color-rec: #ff4d7d;
@@ -51,11 +51,11 @@ body {
 }
 
 @utility btn {
-  @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium whitespace-nowrap transition focus-visible:ring-2 focus-visible:ring-accent/50 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40;
+  @apply inline-flex items-center justify-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium whitespace-nowrap transition focus-visible:ring-2 focus-visible:ring-accent focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-40;
 }
 
 @utility btn-primary {
-  @apply btn bg-accent text-white shadow-[0_8px_24px_-10px_rgb(123_108_255/0.8)] hover:bg-[#8b7eff];
+  @apply btn bg-[#6556f0] text-white shadow-[0_8px_24px_-10px_rgb(123_108_255/0.8)] hover:bg-[#5847de];
 }
 
 @utility btn-secondary {
