@@ -180,6 +180,7 @@ export default function MapScreen() {
   const framed = useHeldFraming(
     liveFraming,
     `${waiting}|${kind ?? ""}|${went.selected}`,
+    area === undefined,
   );
 
   const reported = useRef(false);

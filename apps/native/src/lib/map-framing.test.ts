@@ -33,6 +33,16 @@ describe("nextFraming", () => {
     });
   });
 
+  it("never opens on places that arrive after the map reported an area", () => {
+    const empty = { key: "all", places: [], opened: false };
+    expect(nextFraming(empty, ["far cafe"], "all", false)).toBe(empty);
+    expect(nextFraming(empty, ["cafe"], "coffee", false)).toEqual({
+      key: "coffee",
+      places: ["cafe"],
+      opened: false,
+    });
+  });
+
   it("keeps an empty framing after the map opened, whatever Discover sends", () => {
     const coffee = nextFraming(first, ["cafe"], "coffee");
     const all = nextFraming(coffee, [], "all");
