@@ -2,7 +2,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { expect, it, vi } from "vitest";
-import { MapSearch } from "./map-search";
+import { MapSearchField, MapSearchResults } from "./map-search";
 
 vi.mock("@/lib/i18n", () => ({
   t: (key: string, params?: { query?: string }) =>
@@ -49,12 +49,11 @@ vi.mock("react-native", () => ({
   ),
 }));
 
-it("lists matches under the field and hands back the one tapped", () => {
+it("lists matches under the header and hands back the one tapped", () => {
   const onSelect = vi.fn();
   render(
-    <MapSearch
+    <MapSearchResults
       text="ram"
-      onChangeText={vi.fn()}
       total={2}
       results={[
         { id: "a", name: "Ramen Tatsu-Ya", city: "Austin" },
@@ -68,41 +67,42 @@ it("lists matches under the field and hands back the one tapped", () => {
   expect(screen.getByText("Austin")).toBeTruthy();
 });
 
-it("says when nothing matches, and clearing empties the field", () => {
-  const onChangeText = vi.fn();
+it("says when nothing matches", () => {
   render(
-    <MapSearch
+    <MapSearchResults
       text="sushi "
-      onChangeText={onChangeText}
       total={0}
       results={[]}
       onSelect={vi.fn()}
     />,
   );
   expect(screen.getByText("map.searchNoResults:sushi")).toBeTruthy();
+});
+
+it.each(["", "  "])("shows no list for the empty query %j", (text) => {
+  const { container } = render(
+    <MapSearchResults text={text} total={3} results={[]} onSelect={vi.fn()} />,
+  );
+  expect(container.textContent).toBe("");
+});
+
+it("clearing empties the field", () => {
+  const onChangeText = vi.fn();
+  render(<MapSearchField text="sushi" onChangeText={onChangeText} />);
   fireEvent.click(screen.getByLabelText("search.clear"));
   expect(onChangeText).toHaveBeenCalledWith("");
 });
 
-it("shows no list while the field is empty", () => {
-  render(
-    <MapSearch
-      text=""
-      onChangeText={vi.fn()}
-      total={0}
-      results={undefined}
-      onSelect={vi.fn()}
-    />,
-  );
+it("shows no clear button while the field is empty", () => {
+  render(<MapSearchField text="" onChangeText={vi.fn()} />);
   expect(screen.queryByLabelText("search.clear")).toBeNull();
   expect(screen.getAllByRole("textbox")).toHaveLength(1);
 });
 
 it("says how many more places match than it lists", () => {
   render(
-    <MapSearch
+    <MapSearchResults
       text="chicago"
-      onChangeText={vi.fn()}
       total={45}
       results={[{ id: "a", name: "Olio e Più", city: "Chicago" }]}
       onSelect={vi.fn()}

@@ -383,8 +383,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   title: {
     ...CAPTION_SHADOW,
-    fontFamily: theme.fonts.display,
-    fontSize: 26,
+    ...theme.type.largeTitle,
     lineHeight: 31,
     color: "white",
   },

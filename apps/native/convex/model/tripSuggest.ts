@@ -363,6 +363,7 @@ export function chainNames(
 
 /** Results farther than this from the city centre are another town, whatever Apple calls the locality. */
 export const SUGGEST_RADIUS_KM = 25;
+export const SEARCH_RADIUS_KM = SUGGEST_RADIUS_KM * 2;
 
 export type Suggestion = ApplePoi & { interest: TripInterest };
 

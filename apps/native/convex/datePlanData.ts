@@ -1,9 +1,15 @@
 import { userRemovals, removalValidator } from "./model/placeRemovals";
 import { v } from "convex/values";
 import { internalMutation } from "./_generated/server";
+import type { Id } from "./_generated/dataModel";
+import type { QueryCtx } from "./_generated/server";
+import { dateStartValidator } from "./model/datePlan";
+import type { DateCandidate } from "./model/dateRank";
+import { saveWhy } from "./model/tripSuggest";
+import { unvisitedSavedPlaces } from "./tripPlanner";
 import { aiAllowed } from "./aiConsent";
 import { readyCitySaves } from "./items";
-import { requireUserId } from "./model/auth";
+import { authedQuery, requireUserId } from "./model/auth";
 import {
   unscopedVisitNames,
   userVisits,
@@ -13,13 +19,104 @@ import { listPlanClaimValidator } from "./model/sharedLists";
 import { namesOneVenue } from "./model/dateRank";
 import { MAX_PLAN_ITEMS, planSourceValidator } from "./model/plan";
 import { rateLimiter } from "./model/rateLimiter";
-import { MAX_CITY_CHARS, pinsForCity, tidyCity } from "./model/trip";
+import {
+  dropStrays,
+  MAX_CITY_CHARS,
+  pinsForCity,
+  tidyCity,
+} from "./model/trip";
 import { claimListPlan } from "./sharedLists";
 import { requireProEntitlement } from "./subscriptions";
 import { toPlanSource } from "./tripData";
 import { savedPinValidator } from "./tripPlannerData";
 
 const TAGS_PER_SAVE = 8;
+
+async function readSavedDate(ctx: QueryCtx, userId: Id<"users">, city: string) {
+  const removed = await userRemovals(ctx, userId);
+  const items = await readyCitySaves(
+    ctx,
+    userId,
+    city,
+    MAX_PLAN_ITEMS,
+    removed,
+  );
+  const sources = items.map((item) => toPlanSource(item, city));
+  const visits = await userVisits(ctx, userId, items);
+  return {
+    from: "saves" as const,
+    city,
+    sources,
+    removed,
+    been: unscopedVisitNames(visits),
+    visitMarks: visits,
+    pins: items.flatMap((item) =>
+      pinsForCity(item, city).map((pin) => ({
+        itemId: item._id,
+        name: pin.name,
+        lat: pin.lat,
+        lng: pin.lng,
+        ...(pin.appleId !== undefined ? { appleId: pin.appleId } : {}),
+        ...(pin.category !== undefined ? { category: pin.category } : {}),
+      })),
+    ),
+    saves: items.map((item) => ({
+      itemId: item._id,
+      tags: item.tags.slice(0, TAGS_PER_SAVE),
+      ownTags: namesOneVenue(item),
+      savedAt: item._creationTime,
+    })),
+    aiAllowed: await aiAllowed(ctx, userId),
+  };
+}
+
+export function savedCandidates(
+  claim: Awaited<ReturnType<typeof readSavedDate>>,
+): DateCandidate[] {
+  const candidates = unvisitedSavedPlaces(claim);
+  const pinned = dropStrays(candidates.map(({ pin }) => pin));
+  const sources = new Map(
+    claim.sources.map((source) => [source.itemId, source]),
+  );
+  const saves = new Map(claim.saves.map((save) => [save.itemId, save]));
+  return candidates.flatMap(({ place }, i) => {
+    const pin = pinned[i];
+    const source = sources.get(place.itemId);
+    const save = saves.get(place.itemId);
+    if (!pin || !source || !save) return [];
+    const why = saveWhy(place, source);
+    return [
+      {
+        itemId: place.itemId,
+        name: place.name,
+        ...(place.area ? { area: place.area } : {}),
+        ...(why ? { why } : {}),
+        lat: pin.lat,
+        lng: pin.lng,
+        ...(pin.appleId !== undefined ? { appleId: pin.appleId } : {}),
+        ...(pin.category !== undefined ? { category: pin.category } : {}),
+        tags: save.tags,
+        ownTags: save.ownTags,
+        savedAt: save.savedAt,
+      },
+    ];
+  });
+}
+
+export const listDateStarts = authedQuery({
+  args: { city: v.string() },
+  returns: v.array(dateStartValidator),
+  handler: async (ctx, { city }) => {
+    const claim = await readSavedDate(
+      ctx,
+      ctx.userId,
+      tidyCity(city).slice(0, MAX_CITY_CHARS),
+    );
+    return savedCandidates(claim)
+      .map(({ name, lat, lng, appleId }) => ({ name, lat, lng, appleId }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  },
+});
 
 /**
  * Checks the caller may plan a date, spends one plan from the rate limit before anything is
@@ -68,40 +165,6 @@ export const claimDatePlanInternal = internalMutation({
     }
     await requireProEntitlement(ctx, userId);
     await rateLimiter.limit(ctx, "makePlan", { key: userId, throws: true });
-    const removed = await userRemovals(ctx, userId);
-    const items = await readyCitySaves(
-      ctx,
-      userId,
-      city,
-      MAX_PLAN_ITEMS,
-      removed,
-    );
-    const sources = items.map((item) => toPlanSource(item, city));
-    const visits = await userVisits(ctx, userId, items);
-    return {
-      from: "saves" as const,
-      city,
-      sources,
-      removed,
-      been: unscopedVisitNames(visits),
-      visitMarks: visits,
-      pins: items.flatMap((item) =>
-        pinsForCity(item, city).map((pin) => ({
-          itemId: item._id,
-          name: pin.name,
-          lat: pin.lat,
-          lng: pin.lng,
-          ...(pin.appleId !== undefined ? { appleId: pin.appleId } : {}),
-          ...(pin.category !== undefined ? { category: pin.category } : {}),
-        })),
-      ),
-      saves: items.map((item) => ({
-        itemId: item._id,
-        tags: item.tags.slice(0, TAGS_PER_SAVE),
-        ownTags: namesOneVenue(item),
-        savedAt: item._creationTime,
-      })),
-      aiAllowed: await aiAllowed(ctx, userId),
-    };
+    return await readSavedDate(ctx, userId, city);
   },
 });

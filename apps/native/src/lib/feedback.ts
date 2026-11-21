@@ -121,6 +121,12 @@ export function isHomeRootRoute(segments: readonly string[]): boolean {
   );
 }
 
+export function isTabRootRoute(segments: readonly string[]): boolean {
+  return (
+    segments.length === 3 && segments[0] === "(app)" && segments[1] === "(tabs)"
+  );
+}
+
 const store = createMMKV({ id: "feedback" });
 
 const invitationKey = (userId: string) => `feedback.invitation.${userId}`;

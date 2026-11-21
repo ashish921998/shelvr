@@ -5,7 +5,6 @@ export type SheetSnaps = {
   collapsed: number;
 };
 
-// The back button's bottom edge, below the safe area.
 const EXPANDED_BELOW_INSET = 52;
 // The grabber, city name, place count and plan buttons, until they are measured.
 const COLLAPSED_VISIBLE = 176;
@@ -17,10 +16,14 @@ export function sheetSnaps(view: {
   insetTop: number;
   insetBottom: number;
   middle: number;
+  minimumMapHeight?: number;
   /** The measured height of what stays showing when the sheet is down, above the bottom inset. */
   collapsedVisible?: number;
 }): SheetSnaps {
-  const expanded = view.insetTop + EXPANDED_BELOW_INSET;
+  const expanded = Math.max(
+    view.insetTop + EXPANDED_BELOW_INSET,
+    view.minimumMapHeight ?? 0,
+  );
   const collapsed = Math.max(
     expanded,
     view.height -

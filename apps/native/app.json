@@ -157,6 +157,10 @@
     },
     "plugins": [
       [
+        "expo-image-picker",
+        { "cameraPermission": false, "microphonePermission": false }
+      ],
+      [
         "expo-font",
         {
           "fonts": [

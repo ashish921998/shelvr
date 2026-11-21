@@ -111,6 +111,7 @@ function AddContent({ close }: { close: () => void }) {
       Alert.alert(t("errors.saveTitle"), t("errors.notALink"));
       return;
     }
+    void haptics.impact();
     setSaving(true);
     const operationId = `link:${Crypto.randomUUID()}`;
     analytics.capture("save_attempt_started", {
@@ -126,7 +127,6 @@ function AddContent({ close }: { close: () => void }) {
         saveSource: "manual_link",
       });
       analytics.capture("article_saved");
-      void haptics.success();
       dismiss();
     } catch (error) {
       analytics.capture("save_failed", {
@@ -245,8 +245,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.gap(1.5),
   },
   heading: {
-    fontFamily: theme.fonts.display,
-    fontSize: 24,
+    ...theme.type.sheetTitle,
     color: theme.colors.foreground,
   },
   androidHeader: {
@@ -256,8 +255,7 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "space-between",
   },
   androidHeaderTitle: {
-    fontFamily: theme.fonts.display,
-    fontSize: 22,
+    ...theme.type.title,
     color: theme.colors.foreground,
   },
   androidHeaderTitleContainer: {

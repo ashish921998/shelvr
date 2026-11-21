@@ -1,7 +1,31 @@
 import { PLACE_KINDS, type PlaceKind } from "@convex/model/placeKinds";
 import { cityKey, distanceKm, type LatLng } from "@convex/model/trip";
+import type { TextMessageKey } from "@/locales/message-types";
+import type { AppSymbolName } from "@/components/symbol";
 
-/** How far from the person a saved place still counts as nearby when the map opens on them. */
+export const KIND_ICONS = {
+  food: "fork.knife",
+  coffee: "cup.and.saucer.fill",
+  dessert: "dessert",
+  drinks: "drinks",
+  dateNight: "heart.fill",
+  activities: "activities",
+  shopping: "shopping",
+  stay: "stay",
+} as const satisfies Record<PlaceKind, AppSymbolName>;
+
+export const KIND_LABELS: Record<PlaceKind, TextMessageKey> = {
+  food: "map.kindFood",
+  coffee: "map.kindCoffee",
+  dessert: "map.kindDessert",
+  drinks: "map.kindDrinks",
+  dateNight: "map.kindDateNight",
+  activities: "map.kindActivities",
+  shopping: "map.kindShopping",
+  stay: "map.kindStay",
+};
+
+/** How far from the person, or from the map's centre, a saved place still counts as nearby. */
 export const NEARBY_KM = 50;
 
 /** A filter shows only once enough of your places fit it to be worth a tap. */
@@ -29,20 +53,19 @@ export function mapFilters(
 
 export function keepSelected(
   kinds: PlaceKind[],
-  selected: PlaceKind | null,
+  selected: readonly PlaceKind[],
 ): PlaceKind[] {
-  return selected === null || kinds.includes(selected)
-    ? kinds
-    : [...kinds, selected];
+  return [...kinds, ...selected.filter((kind) => !kinds.includes(kind))];
 }
 
 export function filterPlaces<T extends Kinded>(
   places: readonly T[],
-  kind: PlaceKind | null,
+  selection: PlaceKind | readonly PlaceKind[] | null,
 ): T[] {
-  return kind === null
-    ? [...places]
-    : places.filter((place) => place.kinds.includes(kind));
+  const kinds = typeof selection === "string" ? [selection] : selection;
+  return kinds?.length
+    ? places.filter((place) => kinds.some((kind) => place.kinds.includes(kind)))
+    : [...places];
 }
 
 export type WentFilter = "all" | "want" | "went";
@@ -79,6 +102,23 @@ export function busiestCityPlaces<T extends { city?: string }>(
   return top === undefined
     ? [...places]
     : places.filter((place) => cityKey(place.city ?? "") === top);
+}
+
+export function cityNear(
+  places: readonly (LatLng & { city?: string })[],
+  centre: LatLng,
+): string | undefined {
+  let nearest: string | undefined;
+  let best = Infinity;
+  for (const place of places) {
+    if (!place.city) continue;
+    const gap = distanceKm(centre, place);
+    if (gap <= NEARBY_KM && gap < best) {
+      best = gap;
+      nearest = place.city;
+    }
+  }
+  return nearest;
 }
 
 /** Whether opening on the person shows any of their places; if not, the map opens on their busiest city. */

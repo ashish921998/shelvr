@@ -1,3 +1,4 @@
+import { haptics } from "@/lib/haptics";
 import {
   FULL_PHONE_HEIGHT,
   FULL_PHONE_WIDTH,
@@ -364,7 +365,10 @@ export function OpenerStep({
       <View style={styles.foot}>
         <Pressable
           accessibilityRole="button"
-          onPress={onStart}
+          onPress={() => {
+            void haptics.impact("medium");
+            onStart();
+          }}
           style={({ pressed }) => [styles.start, pressed && styles.pressed]}
         >
           <Text style={styles.startText}>{t("opener.getStarted")}</Text>

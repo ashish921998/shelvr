@@ -5,6 +5,7 @@ import {
   type DateEvening,
   type DateKind,
   type DateSlot,
+  type DateStart,
   type DateStop,
   MAX_WALK_KM,
   pairs,
@@ -180,6 +181,23 @@ export function savedScore(candidate: DateCandidate, now: number): number {
   return 2 + (dateNight ? 3 : 0) + (recent ? 1 : 0);
 }
 
+function scoredSave(
+  candidate: DateCandidate,
+  slot: DateSlot,
+  now: number,
+): ScoredStop {
+  const {
+    tags: _tags,
+    ownTags: _ownTags,
+    savedAt: _savedAt,
+    ...place
+  } = candidate;
+  return {
+    stop: { ...place, slot, source: "save" },
+    score: savedScore(candidate, now),
+  };
+}
+
 /** The candidates that fit this kind of date, one stop per venue, each with its weight. */
 export function savedDateStops(
   kind: DateKind,
@@ -195,21 +213,37 @@ export function savedDateStops(
       candidate.ownTags,
     );
     if (slot === null) continue;
-    const score = savedScore(candidate, now);
-    const {
-      tags: _tags,
-      ownTags: _ownTags,
-      savedAt: _savedAt,
-      ...place
-    } = candidate;
-    const stop: DateStop = { ...place, slot, source: "save" };
+    const entry = scoredSave(candidate, slot, now);
     const twin = kept.findIndex(
-      (other) => other.stop.slot === slot && samePlace(other.stop, stop),
+      (other) => other.stop.slot === slot && samePlace(other.stop, entry.stop),
     );
-    if (twin === -1) kept.push({ stop, score });
-    else if (score > kept[twin].score) kept[twin] = { stop, score };
+    if (twin === -1) kept.push(entry);
+    else if (entry.score > kept[twin].score) kept[twin] = entry;
   }
   return kept;
+}
+
+export function anchoredDateStops(
+  start: DateStart,
+  candidates: readonly DateCandidate[],
+  now: number,
+): { kind: DateKind; scored: ScoredStop[] } {
+  const chosen =
+    (start.appleId
+      ? candidates.find((candidate) => candidate.appleId === start.appleId)
+      : undefined) ??
+    candidates.find((candidate) => sameVenue(candidate, start));
+  if (!chosen) return { kind: "classic", scored: [] };
+  const kind =
+    dateSlotOf("lowkey", chosen.category, chosen.tags, chosen.ownTags) ===
+    "first"
+      ? "lowkey"
+      : "classic";
+  const first = scoredSave(chosen, "first", now);
+  const seconds = savedDateStops(kind, candidates, now).filter(({ stop }) =>
+    pairs(first.stop, stop),
+  );
+  return { kind, scored: [first, ...seconds] };
 }
 
 /** Up to two points for a pair next door, falling to none at the walk limit. */

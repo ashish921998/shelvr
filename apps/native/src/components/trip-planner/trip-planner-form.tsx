@@ -11,12 +11,20 @@ import {
   paceLabel,
   sameCity,
   toggleInterest,
+  tripCitySuggestions,
+  type TripCityCompletion,
   TRIP_PACES,
 } from "@/lib/trip-planner";
+import type { LatLng } from "@convex/model/trip";
 import { TRIP_INTERESTS, type TripInterest } from "@convex/model/tripPlan";
+import { api } from "@convex/_generated/api";
+import { convexQuery } from "@convex-dev/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { useAction } from "convex/react";
+import { analytics } from "@/lib/analytics";
 import { haptics } from "@/lib/haptics";
-import type { ReactNode } from "react";
-import { Pressable, ScrollView, TextInput, View } from "react-native";
+import { useEffect, useState, type ReactNode } from "react";
+import { Keyboard, Pressable, ScrollView, TextInput, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 function tick() {
@@ -55,6 +63,38 @@ function useAccentFill(): ChipFill {
   return { background: theme.colors.primary, foreground: theme.colors.onTint };
 }
 
+function useCitySuggestions(query: string, locale: string) {
+  const search = useAction(api.tripPlanner.searchTripCities);
+  const [answer, setAnswer] = useState<{
+    query: string;
+    locale: string;
+    cities: TripCityCompletion[];
+  } | null>(null);
+  useEffect(() => {
+    if (query.length < 2) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        const cities = await search({ query, locale });
+        if (!cancelled) setAnswer({ query, locale, cities });
+      } catch (error) {
+        if (cancelled) return;
+        analytics.captureError("trip_city_search_failed", error);
+        setAnswer({ query, locale, cities: [] });
+      }
+    }, 450);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query, locale, search]);
+  return query.length >= 2 &&
+    answer?.query === query &&
+    answer.locale === locale
+    ? answer.cities
+    : null;
+}
+
 export function CityPicker({
   cities,
   value,
@@ -62,11 +102,33 @@ export function CityPicker({
 }: {
   cities: CityChoice[];
   value: string;
-  onChange: (city: string) => void;
+  onChange: (city: string, location?: LatLng) => void;
 }) {
-  useAppLocale();
+  const locale = useAppLocale();
   const { theme } = useUnistyles();
   const fill = useAccentFill();
+  const [focused, setFocused] = useState(false);
+  const query = focused ? value.trim() : "";
+  const remoteCities = useCitySuggestions(query, locale);
+  const pins = useQuery(
+    convexQuery(
+      api.mapPlaces.listMapPlaces,
+      focused && cities.length > 0 ? {} : "skip",
+    ),
+  );
+  const suggestions = tripCitySuggestions(
+    cities,
+    remoteCities ?? [],
+    pins.data ?? [],
+    query,
+  );
+  const searching = query.length >= 2 && remoteCities === null;
+  const select = (city: string, location?: LatLng) => {
+    tick();
+    onChange(city, location);
+    setFocused(false);
+    Keyboard.dismiss();
+  };
   return (
     <View style={styles.cityPicker}>
       {cities.length > 0 ? (
@@ -85,7 +147,10 @@ export function CityPicker({
               selected={sameCity(choice.city, value)}
               pick="radio"
               fill={fill}
-              onPress={() => onChange(choice.city)}
+              onPress={() => {
+                onChange(choice.city);
+                Keyboard.dismiss();
+              }}
             />
           ))}
         </ScrollView>
@@ -94,6 +159,8 @@ export function CityPicker({
         testID="new-trip-city"
         value={value}
         onChangeText={onChange}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         placeholder={t("tripPlanner.cityPlaceholder")}
         placeholderTextColor={theme.colors.muted}
         accessibilityLabel={t("tripPlanner.whereTo")}
@@ -103,6 +170,37 @@ export function CityPicker({
         returnKeyType="done"
         style={styles.input}
       />
+      {suggestions.length > 0 || searching ? (
+        <View style={styles.citySuggestions}>
+          {suggestions.map(({ city, label, count, location }) => (
+            <Pressable
+              key={city}
+              accessibilityRole="button"
+              onPress={() => select(city, location)}
+              style={({ pressed }) => [
+                styles.citySuggestion,
+                pressed && styles.pressed,
+              ]}
+            >
+              <ThemedText variant="bodyLabel">{label}</ThemedText>
+              {count !== undefined ? (
+                <ThemedText variant="caption" style={styles.muted}>
+                  {t("trip.revealSaves", { count })}
+                </ThemedText>
+              ) : null}
+            </Pressable>
+          ))}
+          {searching && suggestions.length === 0 ? (
+            <ThemedText
+              variant="body"
+              accessibilityLiveRegion="polite"
+              style={[styles.citySuggestion, styles.muted]}
+            >
+              {t("tripPlanner.searching")}
+            </ThemedText>
+          ) : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -276,6 +374,19 @@ const styles = StyleSheet.create((theme) => ({
   pressed: { opacity: theme.opacity.pressed },
   disabled: { opacity: theme.opacity.disabled },
   cityPicker: { gap: theme.gap(1.25) },
+  citySuggestions: {
+    backgroundColor: theme.colors.surface,
+    borderColor: theme.colors.border,
+    borderWidth: 1,
+    borderRadius: theme.radius.lg,
+    borderCurve: "continuous",
+  },
+  citySuggestion: {
+    minHeight: theme.control.minHeight,
+    justifyContent: "center",
+    paddingHorizontal: theme.gap(1.5),
+    paddingVertical: theme.gap(0.75),
+  },
   // The chip row bleeds to the screen edge so it can scroll; its content keeps the inset.
   bleed: { marginHorizontal: -theme.gap(2.5) },
   cityChips: {

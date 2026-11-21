@@ -1,4 +1,5 @@
 import type { ReviewSave } from "@/components/home/review-saves";
+import { AppSymbolIcon } from "@/components/symbol";
 import { useFixSave } from "@/lib/fix-save";
 import { useHomeFeed } from "@/lib/home-feed";
 import { canRetrySave, newlyUnplaced, saveSource } from "@/lib/home-places";
@@ -7,7 +8,7 @@ import { useRouter } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AccessibilityInfo, Pressable, Text, View } from "react-native";
 import Animated, { FadeInDown, FadeOutDown } from "react-native-reanimated";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const TOAST_MS = 6000;
 
@@ -37,6 +38,7 @@ function useNewlyUnplaced(
  */
 export function UnplacedToast() {
   useAppLocale();
+  const { theme } = useUnistyles();
   const router = useRouter();
   const { items } = useHomeFeed();
   const [save, dismiss] = useNewlyUnplaced(items);
@@ -94,7 +96,11 @@ export function UnplacedToast() {
           onPress={dismiss}
           style={({ pressed }) => [styles.action, pressed && styles.pressed]}
         >
-          <Text style={styles.close}>✕</Text>
+          <AppSymbolIcon
+            name="xmark"
+            size={16}
+            tintColor={theme.colors.border}
+          />
         </Pressable>
       </Animated.View>
     </View>
@@ -105,7 +111,7 @@ const styles = StyleSheet.create((theme, rt) => ({
   overlay: {
     position: "absolute",
     // Above the floating tab bar, clear of the header's Profile and Add buttons.
-    bottom: rt.insets.bottom + theme.gap(8),
+    bottom: rt.insets.bottom + theme.gap(12),
     left: theme.gap(2),
     right: theme.gap(2),
   },
@@ -125,6 +131,5 @@ const styles = StyleSheet.create((theme, rt) => ({
   source: { ...theme.type.footnote, color: theme.colors.border },
   action: { paddingVertical: theme.gap(0.5) },
   actionLabel: { ...theme.type.subheadStrong, color: theme.colors.primary },
-  close: { ...theme.type.subheadStrong, color: theme.colors.border },
   pressed: { opacity: theme.opacity.pressed },
 }));

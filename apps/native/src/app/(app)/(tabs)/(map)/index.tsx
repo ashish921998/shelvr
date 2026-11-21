@@ -1,7 +1,10 @@
 import { EmptyState } from "@/components/empty-state";
 import { MapFilterChips } from "@/components/map/map-filter-chips";
-import { MapLocateButton } from "@/components/map/map-locate-button";
-import { MapSearch } from "@/components/map/map-search";
+import { MapEmpty } from "@/components/map/map-empty";
+import { MapHeader, MAP_HEADER_HEIGHT } from "@/components/map/map-header";
+import { MapRoundButton } from "@/components/map/map-round-button";
+import { MapSearchResults } from "@/components/map/map-search";
+import { MapTripPill } from "@/components/map/map-trip-pill";
 import { MapWentSwitch } from "@/components/map/map-went-switch";
 import {
   type MapFocus,
@@ -10,7 +13,6 @@ import {
 } from "@/components/map/places-map";
 import { ScreenLoader } from "@/components/ui/screen-loader";
 import { analytics } from "@/lib/analytics";
-import { withAlpha } from "@/lib/color";
 import {
   canOpenPlaceCard,
   cancelPlaceDetails,
@@ -29,7 +31,10 @@ import {
   type WentFilter,
   wentView,
 } from "@/lib/map-filters";
+import { setMapCityInView } from "@/lib/map-city-in-view";
+import { canShowAllCities } from "@/lib/map-city-zoom";
 import {
+  type DiscoverPlace,
   type MapEntry,
   mapEntries,
   ownOnTop,
@@ -37,6 +42,7 @@ import {
 } from "@/lib/map-discover";
 import { useAnchors, useHeldFraming } from "@/lib/map-framing";
 import { useMapLocation } from "@/lib/map-location";
+import { useMapCity } from "@/lib/use-map-city";
 import { placeEmoji } from "@/lib/map-pin-emoji";
 import { useDiscoverPlaces } from "@/lib/use-discover-places";
 import { usePlaceVisits } from "@/lib/use-place-visit";
@@ -47,14 +53,16 @@ import type { FunctionReturnType } from "convex/server";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useFocusEffect, useRouter } from "expo-router";
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Keyboard, View } from "react-native";
+import { Keyboard, ScrollView, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 type OwnPlace = FunctionReturnType<typeof api.mapPlaces.listMapPlaces>[number];
 type Entry = MapEntry<OwnPlace>;
 
 const NO_PLACES: OwnPlace[] = [];
+const NO_DISCOVER: DiscoverPlace[] = [];
 
 function placeId(place: {
   itemId: string;
@@ -67,6 +75,65 @@ function placeId(place: {
 
 function entryId(place: Entry) {
   return place.source === "discover" ? `discover:${place._id}` : placeId(place);
+}
+
+function useMapEntries(
+  all: OwnPlace[] | undefined,
+  went: { selected: WentFilter; places: OwnPlace[] },
+  visited: (place: OwnPlace) => boolean,
+  kinds: PlaceKind[],
+) {
+  const [area, setArea] = useState<MapBox | undefined>(undefined);
+  const { settled, areaLoaded, areaPartial, beside, open } = useDiscoverPlaces(
+    all ?? NO_PLACES,
+    area,
+  );
+  const discoverShown = went.selected === "all" ? beside : NO_DISCOVER;
+  const entries = useMemo(
+    () => mapEntries(went.places, discoverShown, visited),
+    [went.places, discoverShown, visited],
+  );
+  const chipKinds = useMemo(
+    () =>
+      keepSelected(
+        mapFilters([...(all ?? NO_PLACES), ...discoverShown]).map(
+          (filter) => filter.kind,
+        ),
+        kinds,
+      ),
+    [all, discoverShown, kinds],
+  );
+  const shown = useMemo(() => filterPlaces(entries, kinds), [entries, kinds]);
+  const { anchorEntries, anchors } = useAnchors(shown, areaLoaded);
+  return {
+    area,
+    setArea,
+    settled,
+    areaPartial,
+    beside,
+    openDiscover: open,
+    chipKinds,
+    shown,
+    anchorEntries,
+    anchors,
+  };
+}
+
+function useFraming(anchorEntries: Entry[], key: string) {
+  const live = useMemo(
+    () =>
+      // As on the city page, a pin far out of town stays on the map but does not set the zoom.
+      framedPins(busiestCityPlaces(anchorEntries)).map((place) => ({
+        ...place,
+        id: entryId(place),
+      })),
+    [anchorEntries],
+  );
+  const overview = useMemo(
+    () => anchorEntries.map((place) => ({ ...place, id: entryId(place) })),
+    [anchorEntries],
+  );
+  return { framed: useHeldFraming(live, key), overview };
 }
 
 export default function MapScreen() {
@@ -88,22 +155,20 @@ export default function MapScreen() {
   );
   const places = useQuery(convexQuery(api.mapPlaces.listMapPlaces, {}));
   const location = useMapLocation(opened);
-  const [kind, setKind] = useState<PlaceKind | null>(null);
+  const [kinds, setKinds] = useState<PlaceKind[]>([]);
+  const [filterRevision, setFilterRevision] = useState(0);
   const [searchText, setSearchText] = useState("");
   // Closed once a result is picked, so the map and place card get the room; typing opens it again.
   const [listOpen, setListOpen] = useState(true);
   const [focus, setFocus] = useState<MapFocus | undefined>(undefined);
-  const [locate, setLocate] = useState<number | undefined>(undefined);
-  const [area, setArea] = useState<MapBox | undefined>(undefined);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [locate, setLocate] = useState(0);
+  const [zoomOut, setZoomOut] = useState(0);
+  const [mapHeight, setMapHeight] = useState(0);
+  const [stripHeight, setStripHeight] = useState(0);
+  const barHeight = useBottomTabBarHeight();
 
   const all = places.data;
-  const {
-    settled,
-    areaLoaded,
-    areaPartial,
-    beside,
-    open: openDiscover,
-  } = useDiscoverPlaces(all ?? NO_PLACES, area);
   const { visits, loaded, isError, error, offerRetry } = usePlaceVisits();
   const visitsFailed = isError && !loaded;
   useEffect(() => {
@@ -120,21 +185,21 @@ export default function MapScreen() {
     () => wentView(all ?? [], wentFilter, visited),
     [all, wentFilter, visited],
   );
-  const withDiscover = went.selected === "all";
-  const entries = useMemo(
-    () => mapEntries(went.places, withDiscover ? beside : [], visited),
-    [went.places, withDiscover, beside, visited],
-  );
-  const kinds = useMemo(
-    () =>
-      keepSelected(
-        mapFilters(entries).map((filter) => filter.kind),
-        kind,
-      ),
-    [entries, kind],
-  );
-  const shown = useMemo(() => filterPlaces(entries, kind), [entries, kind]);
+  const { city, onCentreChange } = useMapCity(all ?? NO_PLACES);
+  const {
+    area,
+    setArea,
+    settled,
+    areaPartial,
+    beside,
+    openDiscover,
+    chipKinds,
+    shown,
+    anchorEntries,
+    anchors,
+  } = useMapEntries(all, went, visited, kinds);
   const searching = searchText.trim() !== "";
+  const showWent = went.showSwitch && !searchOpen;
   // Search narrows whatever the filter shows; every match stays on the map, the first few are listed.
   const matches = useMemo(
     () => (searching ? searchEntries(shown, searchText) : shown),
@@ -147,36 +212,28 @@ export default function MapScreen() {
         id: entryId(place),
         emoji: placeEmoji(place),
         ...(place.source === "discover"
-          ? { tint: theme.colors.muted }
+          ? { tintColor: theme.colors.muted }
           : place.visited
             ? {
-                tint: isDarkThemeName(rt.themeName)
+                tintColor: isDarkThemeName(rt.themeName)
                   ? theme.colors.primarySoft
                   : theme.colors.primaryText,
-                snippet: t("passport.wentNoDate"),
+                title: `✓ ${place.name}`,
               }
             : {}),
       })),
     [matches, rt.themeName, theme],
   );
-  const { anchorEntries, anchors } = useAnchors(shown, areaLoaded);
-  const liveFraming = useMemo(
-    () =>
-      // As on the city page, a pin far out of town stays on the map but does not set the zoom.
-      // Framed from the filter's places, so a filter with none in view can bring them in.
-      framedPins(busiestCityPlaces(anchorEntries)).map((place) => ({
-        ...place,
-        id: entryId(place),
-      })),
-    [anchorEntries],
-  );
+  useEffect(() => {
+    setMapCityInView(city);
+  }, [city]);
   const waiting =
     all === undefined ||
     (all.length === 0 && !settled) ||
     location === "asking";
-  const framed = useHeldFraming(
-    liveFraming,
-    `${waiting}|${kind ?? ""}|${went.selected}`,
+  const { framed, overview } = useFraming(
+    anchorEntries,
+    `${waiting}|${kinds.join(",")}|${went.selected}`,
   );
 
   const reported = useRef(false);
@@ -201,23 +258,10 @@ export default function MapScreen() {
     );
   }
   if (waiting) return <ScreenLoader />;
-  if (all.length === 0 && beside.length === 0 && area === undefined) {
-    return (
-      <View style={styles.empty}>
-        <EmptyState title={t("map.emptyTitle")} message={t("map.emptyBody")} />
-      </View>
-    );
-  }
-
-  const showChips = kinds.length > 0;
-  const top = rt.insets.top + theme.gap(1);
-  // The search field, then the chips under it.
-  const overlayHeight =
-    theme.control.minHeight +
-    (went.showSwitch && !searching
-      ? theme.gap(1) + theme.control.minHeight
-      : 0) +
-    (showChips ? theme.gap(1) + theme.control.minHeight : 0);
+  const hasPlaces = all.length > 0 || beside.length > 0;
+  const showStrip = chipKinds.length > 0 || showWent;
+  const headerBottom = rt.insets.top + MAP_HEADER_HEIGHT;
+  const located = location === "granted";
   const select = (id: string) => {
     const place = shown.find((candidate) => entryId(candidate) === id);
     if (!place || !focused.current) return;
@@ -251,72 +295,140 @@ export default function MapScreen() {
     select(id);
   };
   const choose = (next: PlaceKind | null) => {
-    setKind(next);
-    if (next !== null) analytics.capture("map_filter_selected", { kind: next });
+    setFilterRevision((revision) => revision + 1);
+    if (next === null) {
+      setKinds([]);
+      return;
+    }
+    setKinds((previous) =>
+      previous.includes(next)
+        ? previous.filter((kind) => kind !== next)
+        : [...previous, next],
+    );
+    if (!kinds.includes(next))
+      analytics.capture("map_filter_selected", { kind: next });
+  };
+
+  const cancelSearch = () => {
+    setSearchText("");
+    setListOpen(true);
+    setSearchOpen(false);
+    Keyboard.dismiss();
   };
 
   return (
-    <View style={styles.container}>
-      <PlacesMap
-        pins={pins}
-        framed={framed}
-        anchors={anchors}
-        areaPartial={
-          areaPartial &&
-          anchorEntries.every((place) => place.source === "discover")
-        }
-        showsUser={location === "granted"}
-        topInset={top + overlayHeight}
-        focus={focus}
-        locate={locate}
-        onSelect={select}
-        onArea={setArea}
-      />
-      <View
-        pointerEvents="none"
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          height: top + overlayHeight + theme.gap(2),
-          // Built in render: Unistyles drops a stylesheet's backgroundImage on theme change.
-          experimental_backgroundImage: `linear-gradient(180deg, ${withAlpha(theme.colors.background, 0.92)} 0%, ${withAlpha(theme.colors.background, 0.6)} 60%, ${withAlpha(theme.colors.background, 0)} 100%)`,
+    <View
+      style={styles.container}
+      onLayout={(event) => setMapHeight(event.nativeEvent.layout.height)}
+    >
+      {mapHeight > 0 ? (
+        <PlacesMap
+          pins={pins}
+          framed={framed}
+          anchors={anchors}
+          areaPartial={
+            areaPartial &&
+            anchorEntries.every((place) => place.source === "discover")
+          }
+          showsUser={located}
+          height={mapHeight}
+          topInset={headerBottom + theme.gap(1)}
+          bottomInset={barHeight + (showStrip ? stripHeight : 0) + theme.gap(1)}
+          focus={focus}
+          locate={locate}
+          overview={overview}
+          zoomOut={zoomOut}
+          filterRevision={filterRevision}
+          onCentreChange={onCentreChange}
+          onSelect={select}
+          onArea={setArea}
+        />
+      ) : null}
+      <MapHeader
+        city={city}
+        canSearch={hasPlaces}
+        searchOpen={searchOpen}
+        text={searchText}
+        onChangeText={(text) => {
+          setSearchText(text);
+          setListOpen(true);
         }}
+        onOpenSearch={() => setSearchOpen(true)}
+        onCancel={cancelSearch}
+        onShowAllCities={
+          canShowAllCities(city, anchorEntries)
+            ? () => setZoomOut((n) => n + 1)
+            : undefined
+        }
       />
-      <View style={[styles.overlay, { top }]} pointerEvents="box-none">
-        <View style={styles.searchRow}>
-          <View style={styles.search}>
-            <MapSearch
-              text={searchText}
-              onChangeText={(text) => {
-                setSearchText(text);
-                setListOpen(true);
-              }}
-              total={matches.length}
-              results={
-                searching && listOpen
-                  ? topSearchResults(matches).map((place) => ({
-                      id: entryId(place),
-                      name: place.name,
-                      city: place.city,
-                    }))
-                  : undefined
-              }
-              onSelect={pickResult}
-            />
-          </View>
-          {location === "granted" ? (
-            <MapLocateButton
-              onPress={() => setLocate((previous) => (previous ?? 0) + 1)}
-            />
+      {searchOpen && listOpen ? (
+        <View style={[styles.results, { top: headerBottom }]}>
+          <MapSearchResults
+            text={searchText}
+            total={matches.length}
+            results={topSearchResults(matches).map((place) => ({
+              id: entryId(place),
+              name: place.name,
+              city: place.city,
+            }))}
+            onSelect={pickResult}
+          />
+        </View>
+      ) : null}
+      <View
+        pointerEvents="box-none"
+        style={[styles.aboveBar, { bottom: barHeight }]}
+      >
+        {!hasPlaces && area === undefined ? (
+          <MapEmpty
+            located={located}
+            onLocate={() => setLocate((n) => n + 1)}
+          />
+        ) : null}
+        <View pointerEvents="box-none" style={styles.controls}>
+          <MapTripPill />
+          {(hasPlaces || area !== undefined) && located ? (
+            <View style={styles.locate}>
+              <MapRoundButton
+                icon="location"
+                label={t("map.showMyLocation")}
+                onPress={() => setLocate((n) => n + 1)}
+              />
+            </View>
           ) : null}
         </View>
-        {went.showSwitch && !searching ? (
-          <MapWentSwitch selected={went.selected} onSelect={setWentFilter} />
-        ) : null}
-        {showChips && !searching ? (
-          <MapFilterChips kinds={kinds} selected={kind} onSelect={choose} />
+        {showStrip ? (
+          <View
+            style={styles.strip}
+            onLayout={(event) =>
+              setStripHeight(event.nativeEvent.layout.height)
+            }
+          >
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              accessibilityLabel={t("map.filters")}
+              contentContainerStyle={styles.filters}
+            >
+              {showWent ? (
+                <MapWentSwitch
+                  selected={went.selected}
+                  onSelect={(value) => {
+                    setWentFilter(value);
+                    setFilterRevision((revision) => revision + 1);
+                  }}
+                />
+              ) : null}
+              {chipKinds.length > 0 ? (
+                <MapFilterChips
+                  inline
+                  kinds={chipKinds}
+                  selected={kinds}
+                  onSelect={choose}
+                />
+              ) : null}
+            </ScrollView>
+          </View>
         ) : null}
       </View>
     </View>
@@ -325,12 +437,24 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create((theme) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  empty: { flex: 1, backgroundColor: theme.colors.background },
-  overlay: { position: "absolute", left: 0, right: 0, gap: theme.gap(1) },
-  searchRow: {
+  results: { position: "absolute", left: theme.gap(2), right: theme.gap(2) },
+  aboveBar: { ...StyleSheet.absoluteFillObject, justifyContent: "flex-end" },
+  controls: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    paddingRight: theme.gap(2),
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: theme.gap(1),
+    paddingHorizontal: theme.gap(2.5),
   },
-  search: { flex: 1, marginRight: -theme.gap(1) },
+  locate: { marginLeft: "auto", marginBottom: 10 },
+  strip: {
+    paddingTop: theme.gap(1),
+    paddingBottom: theme.gap(1.5),
+  },
+  filters: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1),
+    paddingHorizontal: theme.gap(2.5),
+  },
 }));

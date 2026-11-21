@@ -24,23 +24,41 @@ function PlaceRow({
   addedLabel,
   disabled,
   onPress,
+  saved = false,
 }: {
   name: string;
   detail: string | undefined;
   addedLabel: string | null;
   disabled: boolean;
   onPress: () => void;
+  saved?: boolean;
 }) {
   const { theme } = useUnistyles();
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={[name, detail, addedLabel].filter(Boolean).join(", ")}
+      accessibilityLabel={[
+        name,
+        detail,
+        saved ? t("tripPlanner.fromSaves") : null,
+        addedLabel,
+      ]
+        .filter(Boolean)
+        .join(", ")}
       accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [styles.place, pressed && styles.pressed]}
     >
+      {saved ? (
+        <View style={styles.saveBadge}>
+          <AppSymbolIcon
+            name="bookmark.fill"
+            size={15}
+            tintColor={theme.colors.primaryText}
+          />
+        </View>
+      ) : null}
       <View style={styles.placeText}>
         <ThemedText variant="subheadStrong" numberOfLines={2}>
           {name}
@@ -170,6 +188,7 @@ export function AddPlaceSearch({
   isAdded,
   onPickFound,
   saved,
+  mapPreview,
   children,
 }: {
   testID: string;
@@ -190,60 +209,96 @@ export function AddPlaceSearch({
       onPress: () => void;
     }[];
   } | null;
+  mapPreview?: ReactNode;
   children?: ReactNode;
 }) {
   const { theme } = useUnistyles();
   const placeholder = t("tripPlanner.searchPlaceholder", { city });
   const results = search.status === "done" ? search.places : [];
-  return (
+  const input = (
+    <TextInput
+      testID={testID}
+      value={query}
+      onChangeText={onQueryChange}
+      autoFocus={!mapPreview}
+      placeholder={placeholder}
+      placeholderTextColor={theme.colors.muted}
+      accessibilityLabel={placeholder}
+      maxLength={MAX_QUERY_LENGTH}
+      autoCorrect={false}
+      returnKeyType="search"
+      clearButtonMode="while-editing"
+      style={styles.input}
+    />
+  );
+  const found =
+    query.trim().length > 0 &&
+    !(
+      mapPreview &&
+      search.status === "done" &&
+      results.length === 0 &&
+      saved?.rows.length
+    ) ? (
+      <AddPlaceSection title={t("tripPlanner.onAppleMaps")}>
+        <SearchNote search={search} />
+        {results.map((place) => (
+          <PlaceRow
+            key={place.appleId ?? `${place.name}-${place.lat}`}
+            name={place.name}
+            detail={place.area}
+            addedLabel={isAdded(place) ? addedLabel : null}
+            disabled={busy}
+            onPress={() => onPickFound(place)}
+          />
+        ))}
+      </AddPlaceSection>
+    ) : null;
+  const saves =
+    saved && (!mapPreview || !query.trim() || saved.rows.length > 0) ? (
+      <AddPlaceSection title={t("tripPlanner.fromSaves")}>
+        {saved.note ? (
+          <ThemedText variant="footnote" style={styles.muted}>
+            {saved.note}
+          </ThemedText>
+        ) : null}
+        {saved.rows.map(({ key, ...row }) => (
+          <PlaceRow
+            key={key}
+            {...row}
+            addedLabel={null}
+            disabled={busy}
+            saved={!!mapPreview}
+          />
+        ))}
+      </AddPlaceSection>
+    ) : null;
+  return mapPreview ? (
+    <View style={styles.screen}>
+      <View style={styles.mapInput}>{input}</View>
+      {mapPreview}
+      <ScrollView
+        style={styles.screen}
+        automaticallyAdjustKeyboardInsets
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="none"
+        contentContainerStyle={styles.mapResults}
+      >
+        {children}
+        {saves}
+        {found}
+      </ScrollView>
+    </View>
+  ) : (
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
       contentContainerStyle={styles.content}
     >
-      <TextInput
-        testID={testID}
-        value={query}
-        onChangeText={onQueryChange}
-        autoFocus
-        placeholder={placeholder}
-        placeholderTextColor={theme.colors.muted}
-        accessibilityLabel={placeholder}
-        maxLength={MAX_QUERY_LENGTH}
-        autoCorrect={false}
-        returnKeyType="search"
-        clearButtonMode="while-editing"
-        style={styles.input}
-      />
+      {input}
       {children}
-      {query.trim().length > 0 ? (
-        <AddPlaceSection title={t("tripPlanner.onAppleMaps")}>
-          <SearchNote search={search} />
-          {results.map((place) => (
-            <PlaceRow
-              key={place.appleId ?? `${place.name}-${place.lat}`}
-              name={place.name}
-              detail={place.area}
-              addedLabel={isAdded(place) ? addedLabel : null}
-              disabled={busy}
-              onPress={() => onPickFound(place)}
-            />
-          ))}
-        </AddPlaceSection>
-      ) : null}
-      {saved ? (
-        <AddPlaceSection title={t("tripPlanner.fromSaves")}>
-          {saved.note ? (
-            <ThemedText variant="footnote" style={styles.muted}>
-              {saved.note}
-            </ThemedText>
-          ) : null}
-          {saved.rows.map(({ key, ...row }) => (
-            <PlaceRow key={key} {...row} addedLabel={null} disabled={busy} />
-          ))}
-        </AddPlaceSection>
-      ) : null}
+      {found}
+      {saves}
     </ScrollView>
   );
 }
@@ -266,6 +321,25 @@ const styles = StyleSheet.create((theme) => ({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.border,
     color: theme.colors.foreground,
+  },
+  mapInput: {
+    paddingHorizontal: theme.gap(2.5),
+    paddingTop: theme.gap(0.75),
+    paddingBottom: theme.gap(1),
+  },
+  mapResults: {
+    gap: theme.gap(2),
+    paddingHorizontal: theme.gap(2.5),
+    paddingTop: theme.gap(1.5),
+    paddingBottom: theme.gap(4),
+  },
+  saveBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.primarySoft,
   },
   section: { gap: theme.gap(1) },
   place: {

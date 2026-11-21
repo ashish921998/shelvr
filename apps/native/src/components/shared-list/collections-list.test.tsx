@@ -4,10 +4,11 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SharedListSummary } from "@/lib/shared-lists";
 import type { Id } from "@convex/_generated/dataModel";
-import { TogetherSection } from "./together-section";
+import { CollectionsList } from "./collections-list";
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
+  refetch: vi.fn(),
   lists: [] as unknown[] | undefined,
   failed: false,
 }));
@@ -18,7 +19,11 @@ vi.mock("@/lib/analytics", () => ({
 vi.mock("@/lib/share-link", () => ({ shareUrl: vi.fn() }));
 vi.mock("@/lib/shared-lists", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/shared-lists")>()),
-  useSharedLists: () => ({ data: mocks.lists, isError: mocks.failed }),
+  useSharedLists: () => ({
+    data: mocks.lists,
+    isError: mocks.failed,
+    refetch: mocks.refetch,
+  }),
 }));
 vi.mock("@/components/shared-list/list-card", () => ({
   SharedListCard: vi.fn(({ list }: { list: { name: string } }) => (
@@ -37,6 +42,9 @@ vi.mock("react-native-unistyles", () => ({
 }));
 vi.mock("react-native", () => ({
   ActivityIndicator: vi.fn(() => <progress aria-label="Loading" />),
+  ScrollView: vi.fn(({ children }: { children: ReactNode }) => (
+    <section>{children}</section>
+  )),
   View: vi.fn(({ children }: { children: ReactNode }) => (
     <section>{children}</section>
   )),
@@ -72,51 +80,51 @@ function summary(over: Partial<SharedListSummary> = {}): SharedListSummary {
 
 beforeEach(() => {
   mocks.push.mockReset();
+  mocks.refetch.mockReset();
   mocks.lists = [];
   mocks.failed = false;
 });
 
-describe("TogetherSection", () => {
+describe("CollectionsList", () => {
   it("offers to start a list when there is none", () => {
-    render(<TogetherSection showTripsHeading={false} />);
-    expect(screen.getByText("Together")).toBeTruthy();
-    expect(screen.queryByText("Trips")).toBeNull();
+    render(<CollectionsList />);
     expect(screen.queryByLabelText("Loading")).toBeNull();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Start a shared list" }),
-    );
-    expect(mocks.push).toHaveBeenCalledWith("/new-shared-list");
+    fireEvent.click(screen.getByRole("button", { name: "New collection" }));
+    expect(mocks.push).toHaveBeenCalledWith({
+      pathname: "/new-shared-list",
+      params: { from: "collections" },
+    });
   });
 
   it("waits for the lists before offering to start one", () => {
     mocks.lists = undefined;
-    render(<TogetherSection showTripsHeading={false} />);
-    expect(screen.getByText("Together")).toBeTruthy();
+    render(<CollectionsList />);
     expect(screen.queryByRole("button")).toBeNull();
     expect(screen.getByLabelText("Loading")).toBeTruthy();
   });
 
-  it("still offers to start a list when the lists fail to load", () => {
+  it("offers to retry when the lists fail to load", () => {
     mocks.lists = undefined;
     mocks.failed = true;
-    render(<TogetherSection showTripsHeading={false} />);
+    render(<CollectionsList />);
     expect(screen.queryByLabelText("Loading")).toBeNull();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Start a shared list" }),
-    );
-    expect(mocks.push).toHaveBeenCalledWith("/new-shared-list");
+    expect(screen.queryByRole("button", { name: "New collection" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(mocks.refetch).toHaveBeenCalledOnce();
   });
 
-  it("lists shared lists above the trips heading", () => {
+  it("shows existing lists and offers to create another", () => {
     mocks.lists = [
       summary(),
       summary({ _id: "b" as Id<"sharedLists">, name: "Lisbon" }),
     ];
-    render(<TogetherSection showTripsHeading />);
+    render(<CollectionsList />);
     expect(screen.getByText("Date spots")).toBeTruthy();
     expect(screen.getByText("Lisbon")).toBeTruthy();
-    expect(screen.getByText("Trips")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "New list" }));
-    expect(mocks.push).toHaveBeenCalledWith("/new-shared-list");
+    fireEvent.click(screen.getByRole("button", { name: "New collection" }));
+    expect(mocks.push).toHaveBeenCalledWith({
+      pathname: "/new-shared-list",
+      params: { from: "collections" },
+    });
   });
 });

@@ -10,9 +10,14 @@ const mocks = vi.hoisted(() => ({
   remove: Object.assign(vi.fn(), { withOptimisticUpdate: vi.fn() }),
   selection: vi.fn(),
   landing: vi.fn(),
+  impact: vi.fn(),
 }));
 vi.mock("@/lib/haptics", () => ({
-  haptics: { selection: mocks.selection, landing: mocks.landing },
+  haptics: {
+    selection: mocks.selection,
+    landing: mocks.landing,
+    impact: mocks.impact,
+  },
 }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: vi.fn(), captureError: vi.fn() },
@@ -87,8 +92,7 @@ it("plays the changed drop before the server answers", async () => {
 it("ticks on successful removal, and stays quiet when an edit fails", async () => {
   const { result } = renderHook(() => useTripEditor(TRIP));
   await act(() => result.current.removeStop(TRIP.days[0][0]));
-  expect(mocks.selection).toHaveBeenCalledOnce();
-  mocks.selection.mockClear();
+  expect(mocks.impact).toHaveBeenCalledWith("medium");
   mocks.move.mockRejectedValueOnce(new Error("offline"));
   await act(() => result.current.moveStop(STOP, { day: 2, index: 0 }, "menu"));
   expect(mocks.selection).not.toHaveBeenCalled();

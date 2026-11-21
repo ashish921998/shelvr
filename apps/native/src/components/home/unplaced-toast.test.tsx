@@ -29,7 +29,9 @@ vi.mock("react-native-reanimated", () => ({
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
+  useUnistyles: () => ({ theme: { colors: { border: "#e3d9c8" } } }),
 }));
+vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 vi.mock("react-native", () => ({
   AccessibilityInfo: { announceForAccessibility: vi.fn() },
   View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),

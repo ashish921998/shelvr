@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
   capture: vi.fn(),
   captureError: vi.fn(),
   selection: vi.fn(),
+  impact: vi.fn(),
   success: vi.fn(),
   moveSheet: vi.fn(),
   scrollToIndex: vi.fn(),
@@ -60,7 +61,11 @@ vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mocks.capture, captureError: mocks.captureError },
 }));
 vi.mock("@/lib/haptics", () => ({
-  haptics: { selection: mocks.selection, success: mocks.success },
+  haptics: {
+    impact: mocks.impact,
+    selection: mocks.selection,
+    success: mocks.success,
+  },
 }));
 vi.mock("@/lib/motion", () => ({
   motion: { duration: { stagger: 300 } },
@@ -167,12 +172,21 @@ vi.mock("@/components/city/city-map", () => ({
       pins,
       selected,
       onSelect,
+      height,
+      coveredBottom,
     }: {
       pins: { number: number; name: string }[];
       selected: string | null;
       onSelect: (id: string) => void;
+      height: number;
+      coveredBottom: number;
     }) => (
-      <div data-testid="map" data-selected={selected ?? ""}>
+      <div
+        data-testid="map"
+        data-selected={selected ?? ""}
+        data-height={height}
+        data-covered-bottom={coveredBottom}
+      >
         {pins.map((pin, index) => (
           <button
             key={`${pin.name}-${index}`}
@@ -381,6 +395,11 @@ vi.mock("@/components/ui/themed-text", () => ({
 }));
 vi.mock("react-native-reanimated", () => ({
   default: {
+    View: vi.fn(
+      ({ children, style }: { children: ReactNode; style: object[] }) => (
+        <div style={Object.assign({}, ...style)}>{children}</div>
+      ),
+    ),
     FlatList: vi.fn(
       ({
         ref,
@@ -418,6 +437,7 @@ vi.mock("react-native-reanimated", () => ({
     get: () => mocks.sheetTop || initial,
     set: mocks.sheetSet,
   }),
+  useAnimatedStyle: (style: () => object) => style(),
   useReducedMotion: () => mocks.reduced,
 }));
 vi.mock("react-native-unistyles", () => ({
@@ -523,6 +543,27 @@ beforeEach(() => {
   mocks.removeListPlace.mockResolvedValue(null);
   mocks.openUrl.mockResolvedValue(true);
 });
+
+it.each(["city", "shared list"])(
+  "keeps native map credits above the %s panel while it moves",
+  (kind) => {
+    mocks.params = { name: "Austin", id: "list-1" };
+    mocks.queries[CITY_ITEMS] = [save];
+    mocks.queries[LIST] = listDetail();
+    const Page = kind === "city" ? CityScreen : SharedListScreen;
+    const { rerender } = render(<Page />);
+    const map = screen.getByTestId("map");
+    expect(map.getAttribute("data-covered-bottom")).toBe("0");
+    expect(Number(map.getAttribute("data-height"))).toBe(mocks.snaps?.middle);
+    expect(map.parentElement?.style.height).toBe(`${mocks.snaps?.middle}px`);
+    mocks.sheetTop = mocks.snaps?.collapsed ?? 0;
+    rerender(<Page />);
+    expect(map.parentElement?.style.height).toBe(`${mocks.snaps?.collapsed}px`);
+    mocks.sheetTop = mocks.snaps?.expanded ?? 0;
+    rerender(<Page />);
+    expect(map.parentElement?.style.height).toBe(`${mocks.snaps?.expanded}px`);
+  },
+);
 
 describe("city page", () => {
   beforeEach(() => {
@@ -1204,7 +1245,7 @@ describe("list page", () => {
       placeId: "p1",
       went: true,
     });
-    expect(mocks.success).toHaveBeenCalledOnce();
+    expect(mocks.impact.mock.calls).toEqual([["medium"]]);
     await act(async () => {
       fireEvent.click(screen.getByText("not yet Taco Spot"));
     });
@@ -1212,7 +1253,7 @@ describe("list page", () => {
       placeId: "p1",
       went: false,
     });
-    expect(mocks.success).toHaveBeenCalledOnce();
+    expect(mocks.impact.mock.calls).toEqual([["medium"], ["medium"]]);
     await act(async () => {
       fireEvent.click(screen.getByText("remove Taco Spot"));
     });
@@ -1307,7 +1348,7 @@ describe("list page", () => {
       beat();
       expect(lastMap().visible).toBe(5);
       expect(mocks.selection).not.toHaveBeenCalled();
-      expect(mocks.success).not.toHaveBeenCalled();
+      expect(mocks.impact).not.toHaveBeenCalled();
     });
 
     it("shows every pin at once under Reduce Motion", () => {
@@ -1361,6 +1402,6 @@ describe("list page", () => {
       failure,
     );
     expect(mocks.alert).toHaveBeenCalledWith("sharedLists.failed");
-    expect(mocks.success).not.toHaveBeenCalled();
+    expect(mocks.impact).not.toHaveBeenCalled();
   });
 });

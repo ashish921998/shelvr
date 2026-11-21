@@ -11,7 +11,11 @@ vi.mock("@/lib/i18n", () => ({
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}), hairlineWidth: 1 },
+  useUnistyles: () => ({
+    theme: { colors: { foreground: "#000", background: "#fff" } },
+  }),
 }));
+vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
 vi.mock("react-native", () => ({
   View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
   Text: vi.fn(({ children }: { children: ReactNode }) => (

@@ -34,13 +34,14 @@ export function layoutMorphText(
   overscan: number,
   measure: (char: string) => number,
   ellipsis = true,
+  tracking = 0,
 ): MorphCell[] {
   if (width <= 0) return [];
   const glyphs: { char: string; width: number }[] = [];
   let total = 0;
   let truncated = false;
   for (const char of text) {
-    const advance = Math.max(0, measure(char));
+    const advance = Math.max(0, measure(char) + tracking);
     if (glyphs.length === MAX_MORPH_GLYPHS || total + advance > width) {
       truncated = true;
       break;
@@ -48,7 +49,7 @@ export function layoutMorphText(
     glyphs.push({ char, width: advance });
     total += advance;
   }
-  const ellipsisWidth = ellipsis ? Math.max(0, measure("…")) : 0;
+  const ellipsisWidth = ellipsis ? Math.max(0, measure("…") + tracking) : 0;
   if (truncated && ellipsis && ellipsisWidth <= width) {
     while (
       glyphs.length > 0 &&

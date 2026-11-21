@@ -78,3 +78,21 @@ describe("haptics", () => {
     await expect(haptics.selection()).resolves.toBeUndefined();
   });
 });
+
+it("plays the iOS dice beats and cancels a roll when the picker closes", async () => {
+  vi.useFakeTimers();
+  vi.stubEnv("EXPO_OS", "ios");
+  try {
+    haptics.rollDice();
+    await vi.advanceTimersByTimeAsync(985);
+    expect(
+      vi.mocked(Haptics.impactAsync).mock.calls.map(([style]) => style),
+    ).toEqual(["heavy", "light", "light", "heavy", "light", "medium", "light"]);
+    const cancel = haptics.rollDice();
+    cancel();
+    await vi.runAllTimersAsync();
+    expect(Haptics.impactAsync).toHaveBeenCalledTimes(8);
+  } finally {
+    vi.useRealTimers();
+  }
+});

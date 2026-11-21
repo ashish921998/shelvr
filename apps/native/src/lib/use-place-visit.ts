@@ -89,7 +89,7 @@ export function usePlaceVisit(
               },
             }),
       });
-      if (!visited) void haptics.selection();
+      if (!visited) void haptics.impact("medium");
       else if (navigation.isFocused()) {
         const moment = placeStampMoment(name, stamp);
         if (surface === "next_to_stamp") queueStamp(moment, surface);

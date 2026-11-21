@@ -113,7 +113,10 @@ function Header({
       <View style={styles.side}>
         {onBack ? (
           <ScalePressable
-            onPress={onBack}
+            onPress={() => {
+              void haptics.impact();
+              onBack();
+            }}
             accessibilityRole="button"
             accessibilityLabel={t("common.back")}
             hitSlop={theme.gap(1)}
