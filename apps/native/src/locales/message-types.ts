@@ -443,8 +443,6 @@ type MessageParams = {
   "map.proTitle": undefined;
   "map.proBody": undefined;
   "loading.places": undefined;
-  "map.emptyTitle": undefined;
-  "map.emptyBody": undefined;
   "navigation.searchHeader": undefined;
   "search.placeholder": undefined;
   "search.clear": undefined;

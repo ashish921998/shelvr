@@ -172,7 +172,7 @@ export default function MapScreen() {
   );
   const waiting =
     all === undefined ||
-    (all.length === 0 && !settled) ||
+    (all.length === 0 && !settled && area === undefined) ||
     location === "asking";
   const framed = useHeldFraming(
     liveFraming,
@@ -201,13 +201,6 @@ export default function MapScreen() {
     );
   }
   if (waiting) return <ScreenLoader />;
-  if (all.length === 0 && beside.length === 0 && area === undefined) {
-    return (
-      <View style={styles.empty}>
-        <EmptyState title={t("map.emptyTitle")} message={t("map.emptyBody")} />
-      </View>
-    );
-  }
 
   const showChips = kinds.length > 0;
   const top = rt.insets.top + theme.gap(1);
@@ -325,7 +318,6 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create((theme) => ({
   container: { flex: 1, backgroundColor: theme.colors.background },
-  empty: { flex: 1, backgroundColor: theme.colors.background },
   overlay: { position: "absolute", left: 0, right: 0, gap: theme.gap(1) },
   searchRow: {
     flexDirection: "row",

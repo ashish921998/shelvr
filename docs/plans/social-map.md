@@ -150,7 +150,8 @@ to 60 places each. With the Google Maps import, a city takes about an hour.
   - a tapped Discover pin goes through `useDiscoverPlaces`' `open`, which uses `stopAction` and
     `usePlaceOpener` as shared lists do: Apple's place card when it can open, otherwise the place in
     the maps app. Never `/item/[id]`
-  - the empty state shows only when both lists are empty. The map waits for Discover only when the
+  - the map shows even when both lists are empty, so a person with no saves can pan to any city and
+    load its Discover places. The map waits for Discover only when the
     person has no pins of their own, since their pins frame the first camera
   - kind filters and search cover Discover pins. The "went" switch covers only the person's own, so
     Discover pins hide while it is not on All
@@ -475,7 +476,7 @@ There is no `src/lib/use-map-pin-clusters.tsx`. Pins are drawn by `expo-maps` in
     yours (your pin wins)
   - give editorial pins an id that does not start with an `itemId`, since `placeId` assumes one
   - in `select`, open the Apple card or the editorial card, never `/item/[id]`
-  - show the empty state only when both lists are empty
+  - show the map even when both lists are empty
 - `src/lib/map-filters.ts`: kind filters and search include editorial pins. The "went" switch and
   `visitMatcher` cover your own pins only.
 - `src/lib/city-pins.ts` / `framedPins`: frame on your own pins when you have any. Otherwise frame on

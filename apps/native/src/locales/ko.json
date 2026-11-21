@@ -464,8 +464,6 @@
   "map.proTitle": "지도는 Pro 기능이에요",
   "map.proBody": "Shelvr Pro 구독으로 저장한 사진을 위치별로 확인하세요.",
   "loading.places": "저장한 장소 불러오는 중",
-  "map.emptyTitle": "아직 지도에 장소가 없어요",
-  "map.emptyBody": "장소가 나오는 릴스나 TikTok을 공유하면 여기에 표시돼요.",
   "navigation.searchHeader": "검색",
   "search.placeholder": "저장한 항목 검색",
   "search.clear": "검색 지우기",
