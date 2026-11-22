@@ -82,7 +82,7 @@ export default function SpotsScreen() {
   const gone = reveal.kind === "none";
   const focused = useIsFocused();
   useEffect(() => {
-    if (gone && focused) router.replace("/(app)/(tabs)/(home)");
+    if (gone && focused) router.replace("/(app)/(tabs)/(map)");
   }, [gone, focused, router]);
 
   if (reveal.kind !== "spots" || !save) {

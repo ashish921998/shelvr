@@ -252,3 +252,12 @@ it("leaves the framing alone without a shared city", () => {
   render(<MapScreen />);
   expect(mocks.frame).toBeUndefined();
 });
+
+it("clears the went switch so a shared city's places show", () => {
+  const { rerender } = render(<MapScreen />);
+  act(() => mocks.went?.("went"));
+  expect(mocks.pins.some((pin) => pin.id.startsWith("B:"))).toBe(false);
+  mocks.params = { city: "porto", save: "save-1" };
+  rerender(<MapScreen />);
+  expect(mocks.pins.some((pin) => pin.id.startsWith("B:"))).toBe(true);
+});

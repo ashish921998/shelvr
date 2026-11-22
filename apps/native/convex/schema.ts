@@ -343,10 +343,6 @@ export default defineSchema({
     itemId: v.optional(v.id("items")),
     listPlaceId: v.optional(v.id("sharedListPlaces")),
     visitedAt: v.number(),
-    city: v.optional(v.string()),
-    countryCode: v.optional(v.string()),
-    lat: v.optional(v.number()),
-    lng: v.optional(v.number()),
     spots: v.optional(v.array(visitSpotValidator)),
     stampPlaces: v.optional(
       v.array(
