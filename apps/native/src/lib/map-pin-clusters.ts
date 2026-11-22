@@ -6,6 +6,7 @@ export type MapPin = Pin & {
   title?: string;
   text?: string;
   tintColor?: string;
+  source?: "own" | "discover";
 };
 
 const MARKER_SPACING = 56;

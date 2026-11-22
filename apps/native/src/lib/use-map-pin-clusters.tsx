@@ -45,6 +45,7 @@ export function useMapPinClusters(
     const sameColor = group.pins.every(
       (pin) => pin.tintColor === first.tintColor,
     );
+    const lead = group.pins.find((pin) => pin.source !== "discover") ?? first;
     return {
       id: group.id,
       coordinates: { latitude: group.lat, longitude: group.lng },
@@ -53,18 +54,20 @@ export function useMapPinClusters(
         : options.clusterText
           ? t("homePlaces.spotCount", { count: group.pins.length })
           : t("mapSheet.groupTitle", {
-              name: first.title ?? first.name,
+              name: sameColor ? (lead.title ?? lead.name) : lead.name,
               count: group.pins.length - 1,
             }),
       monogram:
         grouped && options.clusterText
           ? options.clusterText(group.pins.length)
-          : (first.text ?? first.emoji),
+          : (lead.text ?? lead.emoji),
       tintColor: group.pins.some((pin) => pin.id === selected)
         ? theme.colors.primary
-        : sameColor || !options.clusterText
+        : sameColor
           ? (first.tintColor ?? theme.colors.frame)
-          : theme.colors.foreground,
+          : options.clusterText
+            ? theme.colors.foreground
+            : theme.colors.frame,
     };
   });
   const sheet = (

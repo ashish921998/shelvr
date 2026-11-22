@@ -169,18 +169,18 @@ export function PlacesMap({
   useEffect(() => {
     if (!showsUser || centredOnUser.current || filterRevision > 0) return;
     centredOnUser.current = true;
+    onFit.current = false;
     const showCity = () => {
       const { fit } = latest.current;
       if (!fit) framedOnce.current = false;
-      else
+      else {
+        onFit.current = true;
         map()
           ?.setCameraPosition(fit)
-          .then(() => {
-            onFit.current = true;
-          })
           .catch((error: unknown) =>
             analytics.captureError("places_map_camera_failed", error),
           );
+      }
     };
     checkNearby.current = () => {
       const { anchors, areaPartial } = latest.current;
@@ -310,13 +310,9 @@ export function PlacesMap({
     framedOnce.current = true;
     if (showsUser && hasPlaceNear(centre.current, latest.current.anchors ?? []))
       return;
+    onFit.current = true;
     return command(
-      () =>
-        map()
-          ?.setCameraPosition(latest.current.fit ?? initialFit)
-          .then(() => {
-            onFit.current = true;
-          }),
+      () => map()?.setCameraPosition(latest.current.fit ?? initialFit),
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
   }, [canFrameLatePlaces, showsUser, command]);

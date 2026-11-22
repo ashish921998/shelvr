@@ -361,6 +361,135 @@ it.each([
   },
 );
 
+it("stays on the person who turned location on when the space under the map grows", async () => {
+  mock.findsPerson = true;
+  const { rerender } = render(map({ showsUser: false, bottomInset: 120 }));
+  rerender(map({ showsUser: true, bottomInset: 120 }));
+  act(() =>
+    mock.props.onCameraMove({
+      coordinates: { latitude: 30.26, longitude: -97.74 },
+      zoom: 14,
+    }),
+  );
+  await act(() => vi.advanceTimersByTimeAsync(5000));
+  rerender(map({ showsUser: true, bottomInset: 320 }));
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  expect(mock.moves).toEqual(["person"]);
+});
+
+it.each([
+  ["refits to a taller strip", undefined, 2, 30.2],
+  [
+    "stays on a shared city",
+    { key: "save-1", places: [{ lat: 40.71, lng: -74.0 }] },
+    2,
+    40.71,
+  ],
+])(
+  "%s that arrives before the first framing finishes",
+  async (_name, frame, moves, latitude) => {
+    const opened = (framed: typeof AUSTIN, bottom: number, at?: MapFrame) => (
+      <PlacesMap
+        areaPartial={false}
+        onArea={vi.fn()}
+        pins={framed}
+        framed={framed}
+        anchors={framed}
+        showsUser={false}
+        height={800}
+        topInset={100}
+        bottomInset={bottom}
+        frame={at}
+        onSelect={vi.fn()}
+      />
+    );
+    const { rerender } = render(opened([], 120));
+    let finish = () => {};
+    mock.moveToPlace.mockImplementationOnce(
+      () => new Promise<void>((resolve) => (finish = resolve)),
+    );
+    rerender(opened(AUSTIN, 120));
+    rerender(opened(AUSTIN, frame ? 120 : 320, frame));
+    await act(async () => finish());
+    rerender(opened(AUSTIN, 320, frame));
+    await act(() => vi.advanceTimersByTimeAsync(200));
+    expect(mock.moves).toHaveLength(moves);
+    const last = mock.moves.at(-1) as Camera & {
+      coordinates: { latitude: number };
+    };
+    expect(last.coordinates.latitude).toBeCloseTo(latitude, 0);
+  },
+);
+
+it.each([
+  [
+    "a save and a Discover place",
+    {
+      id: "discover:a",
+      name: "Monument",
+      source: "discover",
+      tintColor: "#muted",
+    },
+    { id: "jd7b", name: "Ramen", source: "own" },
+    "Ramen +1",
+    "#ffffff",
+  ],
+  [
+    "a visited save and a Discover place",
+    {
+      id: "discover:a",
+      name: "Monument",
+      source: "discover",
+      tintColor: "#muted",
+    },
+    {
+      id: "jd7b",
+      name: "Ramen",
+      title: "✓ Ramen",
+      source: "own",
+      tintColor: "#went",
+    },
+    "Ramen +1",
+    "#ffffff",
+  ],
+  [
+    "a visited and an unvisited save",
+    { id: "a", name: "Ramen", title: "✓ Ramen", tintColor: "#went" },
+    { id: "b", name: "Tacos" },
+    "Ramen +1",
+    "#ffffff",
+  ],
+  [
+    "two visited saves",
+    { id: "a", name: "Ramen", title: "✓ Ramen", tintColor: "#went" },
+    { id: "b", name: "Tacos", title: "✓ Tacos", tintColor: "#went" },
+    "✓ Ramen +1",
+    "#went",
+  ],
+] as const)(
+  "says only what is true of every place in a pin grouping %s",
+  (_name, one, other, title, tintColor) => {
+    render(
+      <PlacesMap
+        areaPartial={false}
+        onArea={vi.fn()}
+        pins={[
+          { ...one, lat: 30.26, lng: -97.74 },
+          { ...other, lat: 30.2601, lng: -97.7401 },
+        ]}
+        anchors={AUSTIN}
+        framed={AUSTIN}
+        showsUser={false}
+        height={800}
+        topInset={100}
+        bottomInset={120}
+        onSelect={vi.fn()}
+      />,
+    );
+    expect(mock.props.markers[0]).toMatchObject({ title, tintColor });
+  },
+);
+
 it("flies out to frame every place when asked to zoom out", async () => {
   const far = [...AUSTIN, { id: "c", name: "Bar", lat: 32.78, lng: -96.8 }];
   const { rerender } = render(map());
