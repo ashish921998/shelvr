@@ -76,12 +76,19 @@ vi.mock("@tanstack/react-query", () => ({
 }));
 const retry = vi.hoisted(() => ({
   reprocess: vi.fn(),
-  guard: vi.fn(),
+  admit: vi.fn(),
+  denied: vi.fn(),
+  passed: vi.fn(),
   push: vi.fn(),
 }));
 vi.mock("convex/react", () => ({ useMutation: () => retry.reprocess }));
-vi.mock("@/lib/entitlement", () => ({
-  usePaywallGuard: () => ({ guard: retry.guard, loading: false }),
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: () => ({
+    admit: retry.admit,
+    denied: retry.denied,
+    passed: retry.passed,
+    loading: false,
+  }),
 }));
 vi.mock("@/lib/header-layout", () => ({ useAppHeaderHeight: () => 0 }));
 vi.mock("@/lib/intents", () => ({ runIntent: vi.fn() }));
@@ -259,26 +266,30 @@ describe("a plain link's page", () => {
 
   it("retries without the paywall when the server allows it, as for the free demo save", async () => {
     retry.reprocess.mockReset().mockResolvedValue(true);
-    retry.guard.mockReset();
+    retry.denied.mockReset();
+    retry.passed.mockReset();
     renderPage({ ...product, status: "failed", failureReason: "error" });
     fireEvent.click(screen.getByText("common.tryAgain"));
     await waitFor(() =>
       expect(retry.reprocess).toHaveBeenCalledWith({ id: "item-1" }),
     );
-    expect(retry.guard).not.toHaveBeenCalled();
+    expect(retry.denied).not.toHaveBeenCalled();
+    await waitFor(() => expect(retry.passed).toHaveBeenCalledOnce());
   });
 
   it("opens the paywall only when the server asks for Pro", async () => {
     retry.reprocess.mockReset().mockRejectedValue(saveError("pro_required"));
-    retry.guard.mockReset();
+    retry.denied.mockReset().mockResolvedValue(true);
+    vi.mocked(Alert.alert).mockClear();
     renderPage({ ...product, status: "failed", failureReason: "error" });
     fireEvent.click(screen.getByText("common.tryAgain"));
-    await waitFor(() => expect(retry.guard).toHaveBeenCalledOnce());
+    await waitFor(() => expect(retry.denied).toHaveBeenCalledOnce());
+    expect(Alert.alert).not.toHaveBeenCalled();
   });
 
   it("says the retry failed when the server wants Pro this device still shows", async () => {
     retry.reprocess.mockReset().mockRejectedValue(saveError("pro_required"));
-    retry.guard.mockReset().mockResolvedValue(true);
+    retry.denied.mockReset().mockResolvedValue(false);
     vi.mocked(Alert.alert).mockClear();
     renderPage({ ...product, status: "failed", failureReason: "error" });
     fireEvent.click(screen.getByText("common.tryAgain"));
@@ -325,11 +336,8 @@ it("shows a note's own text, read-only", () => {
   expect(screen.getByText("Lamp, shelves, linen.")).toBeTruthy();
 });
 
-it("offers place correction on a ready save", () => {
-  retry.guard.mockReset().mockImplementation(async (action?: () => void) => {
-    action?.();
-    return true;
-  });
+it("offers place correction on a ready save", async () => {
+  retry.admit.mockReset().mockResolvedValue("go");
   retry.push.mockReset();
   render(
     <ItemDetail
@@ -342,9 +350,11 @@ it("offers place correction on a ready save", () => {
   fireEvent.click(
     screen.getByRole("button", { name: "placeCorrection.title" }),
   );
-  expect(retry.guard).toHaveBeenCalledOnce();
-  expect(retry.push).toHaveBeenCalledWith({
-    pathname: "/edit-save-places",
-    params: { itemId: product._id },
-  });
+  await waitFor(() =>
+    expect(retry.push).toHaveBeenCalledWith({
+      pathname: "/edit-save-places",
+      params: { itemId: product._id },
+    }),
+  );
+  expect(retry.admit).toHaveBeenCalledOnce();
 });

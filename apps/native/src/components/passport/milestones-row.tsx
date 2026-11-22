@@ -6,7 +6,8 @@ import {
   badgeName,
   badgeProgress,
 } from "@/lib/badge-copy";
-import { useEntitlement, usePaywallGuard } from "@/lib/entitlement";
+import { useEntitlement } from "@/lib/entitlement";
+import { useProGate } from "@/lib/pro-gate";
 import { t, useAppLocale } from "@/lib/i18n";
 import {
   type BadgeId,
@@ -21,14 +22,19 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const MEDAL_SIZE = 56;
 
-export function useBadgeAccess(): { locked: boolean; unlock: () => void } {
+export function useBadgeAccess(): {
+  locked: boolean;
+  unlock: () => void;
+  passed: () => void;
+} {
   const { entitled, loading } = useEntitlement();
-  const { guard } = usePaywallGuard("passport");
+  const { admit, passed, loading: waiting } = useProGate("passport");
   const unlock = useCallback(() => {
-    analytics.capture("passport_paywall_opened", { surface: "badge" });
-    void guard();
-  }, [guard]);
-  return { locked: !loading && !entitled, unlock };
+    if (!waiting)
+      analytics.capture("passport_paywall_opened", { surface: "badge" });
+    void admit();
+  }, [admit, waiting]);
+  return { locked: !loading && !entitled, unlock, passed };
 }
 
 function shownBadges(totals: BadgeTotals, locked: boolean): BadgeState[] {

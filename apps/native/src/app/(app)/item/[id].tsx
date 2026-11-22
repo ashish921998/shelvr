@@ -1,5 +1,4 @@
 import { t, useAppLocale } from "@/lib/i18n";
-import { forgetDeletedSharedItem } from "@/lib/share/share-store";
 import { EmptyState } from "@/components/empty-state";
 import { HeaderActionMenu } from "@/components/ui/header-icon-button";
 import { ScreenLoader } from "@/components/ui/screen-loader";
@@ -17,9 +16,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { AppEntityView } from "expo-app-intents";
-import * as Clipboard from "expo-clipboard";
 import { StatusBar } from "expo-status-bar";
-import { haptics } from "@/lib/haptics";
 import {
   Stack,
   useFocusEffect,
@@ -36,7 +33,6 @@ import {
   type RefObject,
 } from "react";
 import {
-  Alert,
   type LayoutChangeEvent,
   Platform,
   useWindowDimensions,
@@ -45,12 +41,10 @@ import {
 import { ProgressiveBlurHeader } from "progressive-blur";
 import { useReducedMotion } from "react-native-reanimated";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
-import { confirmItemDelete } from "@/lib/confirm-item-delete";
-import { analytics } from "@/lib/analytics";
 import { useHomeFeed } from "@/lib/home-feed";
 import { pagerResyncIndex } from "@/lib/item-pager";
 import { useItemOpen } from "@/lib/use-item-open";
-import { useItemShare } from "@/lib/use-item-share";
+import { useSaveActions } from "@/lib/use-save-actions";
 import { isMediaSave, MEDIA_CANVAS } from "@/lib/media-viewer";
 
 function pagerEndReached(
@@ -262,7 +256,6 @@ function ItemScreenContent() {
   const router = useRouter();
   const { theme } = useUnistyles();
   const { width, height } = useWindowDimensions();
-  const deleteItem = useMutation(api.items.deleteItem);
   const markItemOpened = useMutation(api.notifications.markItemOpened);
   const { listRef, reducedMotion } = usePagerScroll();
 
@@ -342,50 +335,30 @@ function ItemScreenContent() {
   );
   useItemOpen(activeItem, from ?? "direct", markOpened);
 
-  const shareActive = useItemShare(activeFull ?? activeItem);
-
-  const copyLink = useCallback(async () => {
-    if (!activeItem?.url) return;
-    await Clipboard.setStringAsync(activeItem.url);
-    analytics.capture("item_link_copied");
-    analytics.itemAction(activeItem, "copy");
-    void haptics.success();
-  }, [activeItem]);
-
-  const onDelete = useCallback(() => {
+  const onRemoved = useCallback(() => {
     if (!activeItem || !items) return;
-    confirmItemDelete(async () => {
-      cancelParamWrite();
-      const idx = items.findIndex((item) => item._id === activeItem._id);
-      const neighbor = items[idx + 1] ?? items[idx - 1];
-      try {
-        await deleteItem({ id: activeItem._id });
-        forgetDeletedSharedItem(activeItem._id);
-        analytics.itemDeleted(activeItem, "item_detail");
-        if (neighbor) {
-          goTo(neighbor._id);
-          writeParams(neighbor._id);
-          listRef.current?.scrollToIndex({
-            index: Math.min(idx, items.length - 2),
-            animated: !reducedMotion,
-          });
-        } else if (router.canGoBack()) router.back();
-        else router.replace("/(app)/(tabs)/(home)");
-      } catch {
-        Alert.alert(t("item.deleteFailed"), t("errors.retrySoon"));
-      }
-    });
-  }, [
-    activeItem,
-    items,
-    deleteItem,
-    router,
-    goTo,
-    writeParams,
-    cancelParamWrite,
-    listRef,
-    reducedMotion,
-  ]);
+    const idx = items.findIndex((item) => item._id === activeItem._id);
+    const neighbor = items[idx + 1] ?? items[idx - 1];
+    if (neighbor) {
+      goTo(neighbor._id);
+      writeParams(neighbor._id);
+      listRef.current?.scrollToIndex({
+        index: Math.min(idx, items.length - 2),
+        animated: !reducedMotion,
+      });
+    } else if (router.canGoBack()) router.back();
+    else router.replace("/(app)/(tabs)/(home)");
+  }, [activeItem, items, router, goTo, writeParams, listRef, reducedMotion]);
+
+  const {
+    share: shareActive,
+    copyLink,
+    remove: onDelete,
+    actions,
+  } = useSaveActions(activeFull ?? activeItem, "item_detail", {
+    beforeRemove: cancelParamWrite,
+    onRemoved,
+  });
 
   if (items === undefined) {
     return <ScreenLoader label={t("loading.item")} />;
@@ -418,17 +391,7 @@ function ItemScreenContent() {
                     title={
                       activeItem?.title ?? activeItem?.note ?? t("item.actions")
                     }
-                    actions={[
-                      { label: t("common.share"), onPress: shareActive },
-                      ...(activeItem?.url
-                        ? [{ label: t("item.copyLink"), onPress: copyLink }]
-                        : []),
-                      {
-                        label: t("common.delete"),
-                        destructive: true,
-                        onPress: onDelete,
-                      },
-                    ]}
+                    actions={actions}
                   />
                 ),
               }

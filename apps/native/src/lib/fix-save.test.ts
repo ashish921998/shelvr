@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { ConvexError } from "convex/values";
+import { saveErrorCode } from "@convex/model/saveErrors";
 import { useFixSave } from "./fix-save";
 
 const mock = vi.hoisted(() => ({
@@ -8,7 +9,10 @@ const mock = vi.hoisted(() => ({
   impact: vi.fn(),
   success: vi.fn(),
   alert: vi.fn(),
-  guard: vi.fn(async () => false),
+  denied: vi.fn(
+    async (error: unknown) => saveErrorCode(error) === "pro_required",
+  ),
+  passed: vi.fn(),
 }));
 
 vi.mock("convex/react", () => ({
@@ -23,8 +27,8 @@ vi.mock("@/lib/analytics", () => ({ analytics: { itemDeleted: vi.fn() } }));
 vi.mock("@/lib/confirm-item-delete", () => ({
   confirmItemDelete: (onConfirm: () => Promise<void>) => onConfirm(),
 }));
-vi.mock("@/lib/entitlement", () => ({
-  usePaywallGuard: () => ({ guard: mock.guard }),
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: () => ({ denied: mock.denied, passed: mock.passed }),
 }));
 vi.mock("@/lib/haptics", () => ({
   haptics: { impact: mock.impact, success: mock.success },
@@ -41,6 +45,7 @@ it("marks a scheduled retry as started, not finished, since the read can still f
   mock.reprocess.mockResolvedValueOnce(true);
   await useFixSave().retry(save);
   expect(mock.impact).toHaveBeenCalledOnce();
+  expect(mock.passed).toHaveBeenCalledOnce();
   expect(mock.success).not.toHaveBeenCalled();
   expect(mock.alert).not.toHaveBeenCalled();
 });
@@ -51,6 +56,7 @@ it("stays quiet and explains when a retry is not scheduled or fails", async () =
   mock.reprocess.mockRejectedValueOnce(new Error("offline"));
   await useFixSave().retry(save);
   expect(mock.impact).not.toHaveBeenCalled();
+  expect(mock.passed).not.toHaveBeenCalled();
   expect(mock.alert).toHaveBeenCalledTimes(2);
 });
 
@@ -59,7 +65,7 @@ it("opens the paywall instead of an error when a retry has no free save left", a
     new ConvexError({ code: "pro_required" }),
   );
   await useFixSave().retry(save);
-  expect(mock.guard).toHaveBeenCalledOnce();
+  expect(mock.denied).toHaveBeenCalledOnce();
   expect(mock.alert).not.toHaveBeenCalled();
 });
 

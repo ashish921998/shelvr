@@ -1,3 +1,4 @@
+import { haptics } from "@/lib/haptics";
 import { NameSheet } from "@/components/shared-list/name-sheet";
 import { SignInView } from "@/components/sign-in-view";
 import { AppSymbolIcon } from "@/components/symbol";
@@ -128,7 +129,10 @@ export default function ListInviteScreen() {
           />
           <Pressable
             accessibilityRole="button"
-            onPress={leave}
+            onPress={() => {
+              void haptics.impact();
+              leave();
+            }}
             style={({ pressed }) => [styles.notNow, pressed && styles.pressed]}
           >
             <ThemedText variant="button" style={styles.muted}>

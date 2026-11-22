@@ -40,6 +40,12 @@ export const rateLimiter = new RateLimiter(components.rateLimiter, {
     period: HOUR,
     capacity: 30,
   },
+  tripCitySearch: {
+    kind: "token bucket",
+    rate: 120,
+    period: HOUR,
+    capacity: 30,
+  },
   sharedListCreate: {
     kind: "token bucket",
     rate: 10,

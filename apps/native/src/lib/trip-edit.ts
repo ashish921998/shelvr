@@ -269,7 +269,7 @@ export function useTripEditor(trip: TripPlanDetail) {
       offerUndo(null);
       try {
         const before = await optimistic.remove({ stopId: stop._id });
-        void haptics.selection();
+        void haptics.impact("medium");
         analytics.capture("trip_plan_stop_removed", { source: stop.source });
         if (edit !== latest.current) return;
         offerUndo({
@@ -417,6 +417,29 @@ export function matchSavePlaces(
     const text = `${place.name} ${place.title ?? ""}`.toLocaleLowerCase();
     return words.every((word) => text.includes(word));
   });
+}
+
+export function tripStopSearchResults(
+  saves: TripSavePlace[],
+  query: string,
+  search: PlaceSearch,
+): { saves: TripSavePlace[]; search: PlaceSearch } {
+  const matching = new Set(matchSavePlaces(saves, query));
+  if (search.status !== "done") return { saves: [...matching], search };
+  const places = search.places.filter((place) => {
+    const saved = saves.find(
+      (save) =>
+        save.location &&
+        sameTripPlace(
+          { ...save.location, name: save.name, itemId: save.itemId },
+          place,
+        ),
+    );
+    if (!saved) return true;
+    matching.add(saved);
+    return false;
+  });
+  return { saves: [...matching], search: { status: "done", places } };
 }
 
 /** Whether a search result is already one of the trip's stops, by the rule adding it uses. */

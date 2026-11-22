@@ -1,10 +1,16 @@
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import type { Doc } from "./_generated/dataModel";
 import { internalAction, internalMutation } from "./_generated/server";
-import { MAX_MAP_PLACES } from "./mapPlaces";
 import { authedQuery } from "./model/auth";
-import { cuisineValidator } from "./model/itemFields";
+import {
+  cuisineValidator,
+  placeFeatureValidator,
+  placeKindValidator,
+} from "./model/itemFields";
 import { logEvent } from "./model/log";
+import { MAX_MAP_PLACES } from "./mapPlaces";
+import { boxValidator, discoverPlaces, indexPlace } from "./model/placeIndex";
 import {
   cityCentre,
   findVenue,
@@ -17,38 +23,58 @@ import { placeKinds } from "./model/placeKinds";
 
 const MAX_SOURCES = 3;
 const MAX_NAMES = 100;
+const REINDEX_PAGE = 50;
+
+const mapPlaceValidator = v.object({
+  _id: v.id("places"),
+  name: v.string(),
+  lat: v.number(),
+  lng: v.number(),
+  city: v.string(),
+  appleId: v.string(),
+  category: v.optional(v.string()),
+  cuisine: v.optional(cuisineValidator),
+  kinds: v.array(v.string()),
+  features: v.optional(v.array(placeFeatureValidator)),
+});
+
+const mapPlace = (row: Doc<"places">) => {
+  const category = row.kind ? undefined : row.category;
+  return {
+    _id: row._id,
+    name: row.name,
+    lat: row.lat,
+    lng: row.lng,
+    city: row.city,
+    appleId: row.appleId,
+    ...(category ? { category } : {}),
+    ...(row.cuisine ? { cuisine: row.cuisine } : {}),
+    kinds: row.kind ? [row.kind] : placeKinds(category, [], row.cuisine),
+    ...(row.features ? { features: row.features } : {}),
+  };
+};
 
 export const forMap = authedQuery({
   args: {},
-  returns: v.array(
-    v.object({
-      _id: v.id("places"),
-      name: v.string(),
-      lat: v.number(),
-      lng: v.number(),
-      city: v.string(),
-      appleId: v.string(),
-      category: v.optional(v.string()),
-      cuisine: v.optional(cuisineValidator),
-      kinds: v.array(v.string()),
-    }),
-  ),
-  handler: async (ctx) => {
-    const rows = await ctx.db
-      .query("places")
-      .withIndex("by_status", (q) => q.eq("status", "live"))
-      .take(MAX_MAP_PLACES);
-    return rows.map((row) => ({
-      _id: row._id,
-      name: row.name,
-      lat: row.lat,
-      lng: row.lng,
-      city: row.city,
-      appleId: row.appleId,
-      ...(row.category ? { category: row.category } : {}),
-      ...(row.cuisine ? { cuisine: row.cuisine } : {}),
-      kinds: placeKinds(row.category, [], row.cuisine),
-    }));
+  returns: v.array(mapPlaceValidator),
+  handler: async (ctx) =>
+    (
+      await ctx.db
+        .query("places")
+        .withIndex("by_status", (q) => q.eq("status", "live"))
+        .take(MAX_MAP_PLACES)
+    ).map(mapPlace),
+});
+
+export const inArea = authedQuery({
+  args: { box: boxValidator },
+  returns: v.object({
+    places: v.array(mapPlaceValidator),
+    complete: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const { rows, complete } = await discoverPlaces(ctx, args.box);
+    return { places: rows.map(mapPlace), complete };
   },
 });
 
@@ -68,7 +94,7 @@ export const store = internalMutation({
         .withIndex("by_apple_id", (q) => q.eq("appleId", place.appleId))
         .first();
       if (row === null) {
-        await ctx.db.insert("places", {
+        const fresh = {
           name: place.name,
           city: args.city,
           lat: place.lat,
@@ -76,9 +102,11 @@ export const store = internalMutation({
           appleId: place.appleId,
           ...(place.category ? { category: place.category } : {}),
           ...(args.source ? { sources: [{ url: args.source }] } : {}),
-          status: "live",
+          status: "live" as const,
           addedAt: Date.now(),
-        });
+        };
+        const _id = await ctx.db.insert("places", fresh);
+        await indexPlace(ctx, { _id, ...fresh });
         added++;
         continue;
       }
@@ -94,6 +122,26 @@ export const store = internalMutation({
         });
     }
     return { added, existing };
+  },
+});
+
+export const curate = internalMutation({
+  args: {
+    id: v.id("places"),
+    kind: v.optional(v.union(placeKindValidator, v.null())),
+    cuisine: v.optional(v.union(cuisineValidator, v.null())),
+    features: v.optional(v.array(placeFeatureValidator)),
+  },
+  returns: v.null(),
+  handler: async (ctx, { id, kind, cuisine, features }) => {
+    await ctx.db.patch(id, {
+      ...(kind === undefined ? {} : { kind: kind ?? undefined }),
+      ...(cuisine === undefined ? {} : { cuisine: cuisine ?? undefined }),
+      ...(features === undefined
+        ? {}
+        : { features: features.length ? [...new Set(features)] : undefined }),
+    });
+    return null;
   },
 });
 
@@ -137,5 +185,22 @@ export const addByName = internalAction({
     );
     logEvent("info", "places_imported", { ...stored, missed: missed.length });
     return { ...stored, missed };
+  },
+});
+
+export const reindexPage = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, args) => {
+    const { page, isDone, continueCursor } = await ctx.db
+      .query("places")
+      .paginate({ numItems: REINDEX_PAGE, cursor: args.cursor });
+    for (const row of page) await indexPlace(ctx, row);
+    logEvent("info", "places_reindexed", { count: page.length, done: isDone });
+    if (!isDone)
+      await ctx.scheduler.runAfter(0, internal.places.reindexPage, {
+        cursor: continueCursor,
+      });
+    return null;
   },
 });

@@ -73,7 +73,7 @@ function usePlaceEdits() {
     visited: (placeId: Id<"sharedListPlaces">, visited: boolean) =>
       setWent({ placeId, went: visited })
         .then(() => {
-          if (visited) void haptics.success();
+          void haptics.impact("medium");
         })
         .catch(report),
     remove: (placeId: Id<"sharedListPlaces">) =>

@@ -1,49 +1,49 @@
 import type { PlaceKind } from "@convex/model/placeKinds";
+import { AppSymbolIcon, type AppSymbolName } from "@/components/symbol";
 import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
-import { KIND_EMOJI } from "@/lib/map-pin-emoji";
-import type { TextMessageKey } from "@/locales/message-types";
+import { KIND_ICONS, KIND_LABELS } from "@/lib/map-filters";
 import { Pressable, ScrollView, Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-const KIND_LABELS: Record<PlaceKind, TextMessageKey> = {
-  food: "map.kindFood",
-  coffee: "map.kindCoffee",
-  dessert: "map.kindDessert",
-  drinks: "map.kindDrinks",
-  dateNight: "map.kindDateNight",
-  activities: "map.kindActivities",
-  shopping: "map.kindShopping",
-  stay: "map.kindStay",
-};
-
-function Chip({
+export function MapFilterChip({
   label,
-  emoji,
+  icon,
   selected,
   onPress,
+  role = "button",
+  testID,
 }: {
   label: string;
-  emoji?: string;
+  icon?: AppSymbolName;
   selected: boolean;
   onPress: () => void;
+  role?: "button" | "tab";
+  testID?: string;
 }) {
-  const text = (
-    <Text style={[styles.label, selected && styles.labelSelected]}>
-      {emoji ? `${emoji} ${label}` : label}
-    </Text>
-  );
+  const { theme } = useUnistyles();
   return (
     <Pressable
-      accessibilityRole="button"
+      testID={testID}
+      accessibilityRole={role}
       accessibilityLabel={label}
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={({ pressed }) => pressed && styles.pressed}
+      style={({ pressed }) => [styles.target, pressed && styles.pressed]}
     >
-      {/* Solid, not glass: a see-through chip is unreadable over busy map labels. */}
       <View style={[styles.chip, selected ? styles.selected : styles.plain]}>
-        {text}
+        {icon ? (
+          <AppSymbolIcon
+            name={icon}
+            size={12}
+            tintColor={
+              selected ? theme.colors.background : theme.colors.foreground
+            }
+          />
+        ) : null}
+        <Text style={[styles.label, selected && styles.labelSelected]}>
+          {label}
+        </Text>
       </View>
     </Pressable>
   );
@@ -54,18 +54,34 @@ export function MapFilterChips({
   selected,
   onSelect,
   inset = true,
-  discover,
+  inline = false,
 }: {
   inset?: boolean;
-  discover?: { on: boolean; onToggle: () => void };
+  inline?: boolean;
   kinds: PlaceKind[];
-  selected: PlaceKind | null;
+  selected: PlaceKind | readonly PlaceKind[] | null;
   onSelect: (kind: PlaceKind | null) => void;
 }) {
+  const multiple = Array.isArray(selected);
   const choose = (kind: PlaceKind | null) => {
-    if (kind !== selected) void haptics.selection();
+    if (!multiple && kind !== selected) void haptics.selection();
     onSelect(kind);
   };
+  const selection =
+    typeof selected === "string" ? [selected] : (selected ?? []);
+  const chips = kinds.map((kind) => {
+    const picked = selection.includes(kind);
+    return (
+      <MapFilterChip
+        key={kind}
+        label={t(KIND_LABELS[kind])}
+        icon={KIND_ICONS[kind]}
+        selected={picked}
+        onPress={() => choose(picked && !multiple ? null : kind)}
+      />
+    );
+  });
+  if (inline) return <View style={[styles.row, styles.inline]}>{chips}</View>;
   return (
     <ScrollView
       horizontal
@@ -73,58 +89,51 @@ export function MapFilterChips({
       accessibilityLabel={t("map.filters")}
       contentContainerStyle={[styles.row, !inset && styles.flush]}
     >
-      {discover ? (
-        <Chip
-          label={t("map.discover")}
-          emoji="✨"
-          selected={discover.on}
-          onPress={() => {
-            void haptics.selection();
-            discover.onToggle();
-          }}
-        />
-      ) : null}
-      {kinds.length > 0 ? (
-        <Chip
-          label={t("map.filterAll")}
-          selected={selected === null}
-          onPress={() => choose(null)}
-        />
-      ) : null}
-      {kinds.map((kind) => (
-        <Chip
-          key={kind}
-          label={t(KIND_LABELS[kind])}
-          emoji={KIND_EMOJI[kind]}
-          selected={selected === kind}
-          onPress={() => choose(selected === kind ? null : kind)}
-        />
-      ))}
+      {chips}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create((theme) => ({
-  row: { gap: theme.gap(1), paddingHorizontal: theme.gap(2) },
-  flush: { paddingHorizontal: 0, paddingVertical: theme.gap(0.5) },
-  chip: {
-    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.16)",
-    paddingVertical: theme.gap(1),
-    paddingHorizontal: theme.gap(2),
-    borderRadius: 999,
-    borderCurve: "continuous",
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(1),
+    paddingHorizontal: theme.gap(2.5),
+    paddingVertical: theme.gap(0.5),
   },
-  selected: { backgroundColor: theme.colors.primary },
-  plain: {
-    backgroundColor: theme.colors.surface,
+  inline: { paddingHorizontal: 0, paddingVertical: 0 },
+  flush: { paddingHorizontal: 0, paddingVertical: theme.gap(0.5) },
+  target: {
+    minWidth: theme.control.minHeight,
+    minHeight: theme.control.minHeight,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  chip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.gap(0.5),
+    minHeight: theme.gap(3.5),
+    paddingVertical: theme.gap(0.5),
+    paddingHorizontal: theme.gap(1.25),
+    borderRadius: theme.radius.xl,
+    borderCurve: "continuous",
     borderWidth: StyleSheet.hairlineWidth,
+    boxShadow: "0 2px 8px rgba(0, 0, 0, 0.12)",
+  },
+  selected: {
+    backgroundColor: theme.colors.foreground,
+    borderColor: theme.colors.foreground,
+  },
+  plain: {
+    backgroundColor: theme.colors.frame,
     borderColor: theme.colors.border,
   },
   label: {
-    ...theme.type.secondaryLabel,
-    lineHeight: 20,
+    ...theme.type.labelStrong,
     color: theme.colors.foreground,
   },
-  labelSelected: { color: theme.colors.onTint },
+  labelSelected: { color: theme.colors.background },
   pressed: { opacity: theme.opacity.pressed },
 }));

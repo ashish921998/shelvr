@@ -74,8 +74,11 @@ read [localization](docs/architecture/localization.md); before simulator QA read
 - **Run-by-hand backfills** after deploying the change that needs them, from `apps/native`:
   `pnpm exec convex run --prod <fn> '{"cursor":null}'` with `items:backfillPlaceSearch`
   (finish it before releasing the search UI),
-  `placePins:backfillPage`, `cityPhotos:backfillPage` (looks up a photo for every city already saved, spaced 1.5 s apart; run it once after the deploy that adds `cityPhotos`) or `placeVisits:backfillCountries` (old "We went" marks get a city
-  and country; run it before the Passport client ships). Each schedules its remaining pages and is safe to restart.
+  `placePins:backfillPage`, `cityPhotos:backfillPage` (looks up a photo for every city already saved, spaced 1.5 s apart; run it once after the deploy that adds `cityPhotos`), `placeVisits:backfillCountries` (old "We went" marks get a city
+  and country; run it before the Passport client ships) or `places:reindexPage` (puts every Discover place
+  in the geospatial index; run it once after the deploy that adds the index, and release the client that reads
+  by area only after its last `places_reindexed` log line shows `done: true`; run it again after a dashboard
+  edit to a place's status or point). Each schedules its remaining pages and is safe to restart.
 - **Privacy rules the code enforces on purpose:** a shared list's place search sends Apple only
   the city name, never a member's pin; a plan from a shared list needs every contributor's AI
   permission, former members included; `sharedListPlaces` copies no save title or text, and
@@ -91,6 +94,7 @@ read [localization](docs/architecture/localization.md); before simulator QA read
   (`model/readers/googleMaps.ts`). A format change fails quietly to a plain page read.
 - **Retired screens' links** open Home through `src/lib/home-href.ts` and
   `src/app/+native-intent.ts`, so an old link or notification never lands on a missing screen.
+  A bare `/` link opens the Map tab, where the app starts.
 
 ## Environment variables
 

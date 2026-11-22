@@ -1,3 +1,4 @@
+import { haptics } from "@/lib/haptics";
 import { PillButton } from "@/components/onboarding/parts";
 import { SampleAppleMap } from "@/components/onboarding/sample-apple-map";
 import {
@@ -91,7 +92,10 @@ export function AhaSpotsStep({
       </View>
       <PillButton
         label={t("common.continue")}
-        onPress={onContinue}
+        onPress={() => {
+          void haptics.impact("medium");
+          onContinue();
+        }}
         disabled={dropped < sample.spots.length}
       />
     </View>

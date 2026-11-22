@@ -1,4 +1,5 @@
 import { SharedListCard } from "@/components/shared-list/list-card";
+import { SharedTripsSection } from "@/components/trip-planner/shared-trips-section";
 import { Button } from "@/components/ui/button";
 import { ThemedText } from "@/components/ui/themed-text";
 import { Wordmark } from "@/components/wordmark";
@@ -52,6 +53,7 @@ export default function PlanGateScreen() {
             ))}
           </View>
         ) : null}
+        <SharedTripsSection />
         <Button
           title={t("planGate.seePlans")}
           onPress={() => void openPaywall(router, "plan_gate")}

@@ -36,16 +36,14 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ ...mocks.result, refetch: mocks.refetch }),
 }));
 vi.mock("@/components/symbol", () => ({ AppSymbolIcon: vi.fn(() => null) }));
-vi.mock("@/components/ui/header-icon-button", () => ({
-  HeaderIconButton: vi.fn(
-    ({ label, onPress }: { label: string; onPress: () => void }) => (
-      <button onClick={onPress}>{label}</button>
-    ),
-  ),
+vi.mock("@/components/home/home-header", () => ({
+  HomeHeader: vi.fn(({ children }: { children: ReactNode }) => (
+    <header>{children}</header>
+  )),
 }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
-  useUnistyles: () => ({ theme: { colors: {} } }),
+  useUnistyles: () => ({ theme: { colors: {}, control: { minHeight: 48 } } }),
 }));
 vi.mock("react-native", () => ({
   View: vi.fn(({ children }: { children: ReactNode }) => <div>{children}</div>),
@@ -70,8 +68,18 @@ vi.mock("react-native", () => ({
     ),
   ),
   Pressable: vi.fn(
-    ({ children, onPress }: { children: ReactNode; onPress: () => void }) => (
-      <button onClick={onPress}>{children}</button>
+    ({
+      children,
+      onPress,
+      accessibilityLabel,
+    }: {
+      children: ReactNode;
+      onPress: () => void;
+      accessibilityLabel?: string;
+    }) => (
+      <button onClick={onPress} aria-label={accessibilityLabel}>
+        {children}
+      </button>
     ),
   ),
   ActivityIndicator: vi.fn(

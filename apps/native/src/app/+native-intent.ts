@@ -5,6 +5,8 @@ import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
 import { isDeepLink, markDirectLaunch } from "@/lib/splash/launch-intent";
 import * as Linking from "expo-linking";
 
+const CLAIMED_HOSTS = ["tryshelvr.app", "shelvr-web.vercel.app"];
+
 export function redirectSystemPath({
   path,
 }: {
@@ -15,6 +17,7 @@ export function redirectSystemPath({
     markDirectLaunch();
     rememberSheetLink(path);
   }
+  if (path.startsWith("/")) return resolveRootHref(path);
 
   try {
     const url = new URL(path);
@@ -25,7 +28,7 @@ export function redirectSystemPath({
         (url.hostname === "" && url.pathname === "/auth/callback"));
     const isClaimedOAuthCallback =
       url.protocol === "https:" &&
-      url.hostname === "shelvr-web.vercel.app" &&
+      CLAIMED_HOSTS.includes(url.hostname) &&
       url.pathname === "/auth/callback";
     if (isOAuthCallback || isClaimedOAuthCallback) {
       return "/sign-in";
@@ -48,7 +51,7 @@ export function redirectSystemPath({
     }
 
     const route = appSchemeRoute(path);
-    if (route !== null && route !== "/") {
+    if (route !== null) {
       const href = resolveRootHref(route);
       if (href !== route) return href;
     }

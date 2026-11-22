@@ -24,7 +24,7 @@ const preferUniversalLinks =
   Constants.expoConfig?.extra?.variant === "production" &&
   (iosVersion[0] > 17 || (iosVersion[0] === 17 && (iosVersion[1] ?? 0) >= 4));
 const oauthRedirectTo = preferUniversalLinks
-  ? "https://shelvr-web.vercel.app/auth/callback"
+  ? "https://tryshelvr.app/auth/callback"
   : makeRedirectUri({
       native: `${oauthScheme}://auth/callback`,
       scheme: oauthScheme,

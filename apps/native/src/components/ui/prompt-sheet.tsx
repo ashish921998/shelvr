@@ -53,7 +53,7 @@ export function PromptSheet({
         <View style={styles.sheet} testID={testID}>
           <View style={styles.grabber} />
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.body}>{body}</Text>
+          {body ? <Text style={styles.body}>{body}</Text> : null}
           {children}
           <View style={styles.actions}>{actions}</View>
         </View>

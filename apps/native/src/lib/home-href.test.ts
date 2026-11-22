@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { appSchemeRoute, resolveRootHref } from "./home-href";
 
 describe("resolveRootHref", () => {
-  it("sends the root to Home and keeps its query", () => {
-    expect(resolveRootHref("/")).toBe("/(app)/(tabs)/(home)");
-    expect(resolveRootHref("/?a=1")).toBe("/(app)/(tabs)/(home)?a=1");
+  it("sends the root to the Map and keeps its query", () => {
+    expect(resolveRootHref("/")).toBe("/(app)/(tabs)/(map)");
+    expect(resolveRootHref("/?a=1")).toBe("/(app)/(tabs)/(map)?a=1");
+    expect(resolveRootHref("/#x")).toBe("/(app)/(tabs)/(map)#x");
   });
 
   it("leaves other routes alone", () => {

@@ -1,5 +1,6 @@
+import { haptics } from "@/lib/haptics";
+import { HomeHeader } from "@/components/home/home-header";
 import { AppSymbolIcon } from "@/components/symbol";
-import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { api } from "@convex/_generated/api";
@@ -16,7 +17,15 @@ import {
 } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
-export function HomeSearch({ children }: { children: ReactNode }) {
+const CLEAR_SIZE = 28;
+
+export function HomeSearch({
+  top,
+  children,
+}: {
+  top?: ReactNode;
+  children: ReactNode;
+}) {
   useAppLocale();
   const { theme } = useUnistyles();
   const [text, setText] = useState("");
@@ -29,36 +38,48 @@ export function HomeSearch({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <View style={styles.field}>
-        <AppSymbolIcon
-          name="magnifyingglass"
-          size={20}
-          tintColor={theme.colors.muted}
-        />
-        <TextInput
-          testID="home-search-input"
-          accessibilityLabel={t("search.placeholder")}
-          placeholder={t("search.placeholder")}
-          placeholderTextColor={theme.colors.muted}
-          value={text}
-          onChangeText={setText}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-          maxLength={200}
-          style={styles.input}
-        />
-        {text.length > 0 ? (
-          <HeaderIconButton
-            icon="xmark"
-            label={t("search.clear")}
-            onPress={() => {
-              setText("");
-              setQuery("");
-            }}
+      <HomeHeader>
+        <View style={styles.field}>
+          <AppSymbolIcon
+            name="magnifyingglass"
+            size={17}
+            tintColor={theme.colors.muted}
           />
-        ) : null}
-      </View>
+          <TextInput
+            testID="home-search-input"
+            accessibilityLabel={t("search.placeholder")}
+            placeholder={t("navigation.search")}
+            placeholderTextColor={theme.colors.muted}
+            value={text}
+            onChangeText={setText}
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
+            maxLength={200}
+            style={styles.input}
+          />
+          {text.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t("search.clear")}
+              hitSlop={(theme.control.minHeight - CLEAR_SIZE) / 2}
+              onPress={() => {
+                void haptics.impact();
+                setText("");
+                setQuery("");
+              }}
+              style={({ pressed }) => [styles.clear, pressed && styles.pressed]}
+            >
+              <AppSymbolIcon
+                name="xmark"
+                size={14}
+                tintColor={theme.colors.muted}
+              />
+            </Pressable>
+          ) : null}
+        </View>
+      </HomeHeader>
+      {top}
       {trimmed ? (
         <SearchResults query={query} pending={query !== trimmed} />
       ) : (
@@ -160,22 +181,30 @@ function SearchResults({
 
 const styles = StyleSheet.create((theme) => ({
   field: {
-    marginHorizontal: theme.gap(2),
-    marginBottom: theme.gap(2),
-    paddingLeft: theme.gap(1.5),
-    paddingRight: theme.gap(0.5),
-    minHeight: theme.control.minHeight,
+    minHeight: 38,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.gap(1),
-    borderRadius: theme.radius.lg,
-    backgroundColor: theme.colors.surfaceMuted,
+    paddingHorizontal: theme.gap(1.5),
+    borderRadius: 19,
+    borderCurve: "continuous",
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    backgroundColor: theme.colors.background,
   },
   input: {
     flex: 1,
+    minWidth: 0,
     ...theme.type.body,
     color: theme.colors.foreground,
-    minHeight: theme.control.minHeight,
+    minHeight: 34,
+    paddingVertical: 0,
+  },
+  clear: {
+    width: CLEAR_SIZE,
+    height: CLEAR_SIZE,
+    alignItems: "center",
+    justifyContent: "center",
   },
   results: { paddingHorizontal: theme.gap(2) },
   row: {

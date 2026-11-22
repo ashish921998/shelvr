@@ -13,6 +13,18 @@ describe("sheetSnaps", () => {
     expect(snaps).toEqual({ expanded: 114, middle: 326, collapsed: 664 });
   });
 
+  it("reserves map credit space only when a map needs it", () => {
+    expect(
+      sheetSnaps({
+        height: 874,
+        insetTop: 62,
+        insetBottom: 34,
+        middle: 326,
+        minimumMapHeight: 166,
+      }).expanded,
+    ).toBe(166);
+  });
+
   it("leaves exactly the measured header and buttons showing when down", () => {
     expect(
       sheetSnaps({

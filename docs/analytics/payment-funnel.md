@@ -56,13 +56,18 @@ Dashboard: https://us.posthog.com/project/546847/dashboard/2075680
   restore reports nothing while an entitlement is already visible, because restoring
   an already-active entitlement made nothing new visible.
 - `paywall_blocked_action_resumed` records a gated action that later passed at
-  the same placement within 30 minutes of the block. `purchased_since_block`
+  the same placement within 30 minutes of the block. A block is recorded by
+  `useProGate` (`apps/native/src/lib/pro-gate.ts`) before the paywall opens,
+  whether the app checked first or the server answered `pro_required`, and a
+  pass is reported only when the action ran with Pro. `purchased_since_block`
+  is true when a purchase or restore landed after the block, so it
   distinguishes a post-purchase retry from a later independent visit. The
-  memory is one action deep (a new block replaces it), and a resume is only
-  reported where a `usePaywallGuard` backs the placement: a screen-level gate
-  (Map, in builds that still have it) blocks through its Pro gate CTA, and no guard runs there after
-  the purchase, so those placements report requests and outcomes but never a
-  resume.
+  memory is one action deep: a new block replaces it, and an upsell or
+  onboarding paywall records none. Placements that never pass through
+  `useProGate`, such as a screen-level gate (Map, in builds that still have
+  it), report requests and outcomes but never a resume. Builds before
+  `useProGate` reported resumes only for placements behind the old screen
+  guard, and an upsell sheet there replaced the pending block.
 - Purchase and restore outcomes add `product_id` when RevenueCat returns the
   active store product. It is absent when the SDK cannot provide it.
 - `trial_started`: authenticated RevenueCat INITIAL_PURCHASE with TRIAL period.

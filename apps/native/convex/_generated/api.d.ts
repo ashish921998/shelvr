@@ -79,6 +79,7 @@ import type * as model_passportMap from "../model/passportMap.js";
 import type * as model_paymentTelemetry from "../model/paymentTelemetry.js";
 import type * as model_placeIdentity from "../model/placeIdentity.js";
 import type * as model_placeImport from "../model/placeImport.js";
+import type * as model_placeIndex from "../model/placeIndex.js";
 import type * as model_placeKinds from "../model/placeKinds.js";
 import type * as model_placeList from "../model/placeList.js";
 import type * as model_placeRemovals from "../model/placeRemovals.js";
@@ -117,9 +118,11 @@ import type * as model_spaceName from "../model/spaceName.js";
 import type * as model_storage from "../model/storage.js";
 import type * as model_storedImage from "../model/storedImage.js";
 import type * as model_trip from "../model/trip.js";
+import type * as model_tripCountries from "../model/tripCountries.js";
 import type * as model_tripEve from "../model/tripEve.js";
 import type * as model_tripPlace from "../model/tripPlace.js";
 import type * as model_tripPlan from "../model/tripPlan.js";
+import type * as model_tripSharePage from "../model/tripSharePage.js";
 import type * as model_tripSuggest from "../model/tripSuggest.js";
 import type * as model_videoTranscript from "../model/videoTranscript.js";
 import type * as model_weeklyShelf from "../model/weeklyShelf.js";
@@ -145,6 +148,7 @@ import type * as subscriptions from "../subscriptions.js";
 import type * as tripData from "../tripData.js";
 import type * as tripPlanner from "../tripPlanner.js";
 import type * as tripPlannerData from "../tripPlannerData.js";
+import type * as tripShares from "../tripShares.js";
 import type * as trips from "../trips.js";
 import type * as users from "../users.js";
 import type * as waitlist from "../waitlist.js";
@@ -227,6 +231,7 @@ declare const fullApi: ApiFromModules<{
   "model/paymentTelemetry": typeof model_paymentTelemetry;
   "model/placeIdentity": typeof model_placeIdentity;
   "model/placeImport": typeof model_placeImport;
+  "model/placeIndex": typeof model_placeIndex;
   "model/placeKinds": typeof model_placeKinds;
   "model/placeList": typeof model_placeList;
   "model/placeRemovals": typeof model_placeRemovals;
@@ -265,9 +270,11 @@ declare const fullApi: ApiFromModules<{
   "model/storage": typeof model_storage;
   "model/storedImage": typeof model_storedImage;
   "model/trip": typeof model_trip;
+  "model/tripCountries": typeof model_tripCountries;
   "model/tripEve": typeof model_tripEve;
   "model/tripPlace": typeof model_tripPlace;
   "model/tripPlan": typeof model_tripPlan;
+  "model/tripSharePage": typeof model_tripSharePage;
   "model/tripSuggest": typeof model_tripSuggest;
   "model/videoTranscript": typeof model_videoTranscript;
   "model/weeklyShelf": typeof model_weeklyShelf;
@@ -293,6 +300,7 @@ declare const fullApi: ApiFromModules<{
   tripData: typeof tripData;
   tripPlanner: typeof tripPlanner;
   tripPlannerData: typeof tripPlannerData;
+  tripShares: typeof tripShares;
   trips: typeof trips;
   users: typeof users;
   waitlist: typeof waitlist;
@@ -326,4 +334,5 @@ export declare const internal: FilterApi<
 
 export declare const components: {
   rateLimiter: import("@convex-dev/rate-limiter/_generated/component.js").ComponentApi<"rateLimiter">;
+  geospatial: import("@convex-dev/geospatial/_generated/component.js").ComponentApi<"geospatial">;
 };

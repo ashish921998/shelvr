@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   busiestCityPlaces,
+  cityNear,
   filterPlaces,
   hasPlaceNear,
+  keepSelected,
   mapFilters,
   searchPlaces,
   topSearchResults,
@@ -10,6 +12,19 @@ import {
 } from "./map-filters";
 
 const place = (kinds: string[], city?: string) => ({ kinds, city });
+
+describe("keepSelected", () => {
+  it("keeps the picked kinds when no place in view has them", () => {
+    expect(keepSelected(["food"], ["coffee"])).toEqual(["food", "coffee"]);
+    expect(keepSelected(["food", "coffee"], ["coffee", "drinks"])).toEqual([
+      "food",
+      "coffee",
+      "drinks",
+    ]);
+    expect(keepSelected(["food"], [])).toEqual(["food"]);
+    expect(keepSelected([], [])).toEqual([]);
+  });
+});
 
 describe("mapFilters", () => {
   it("offers only the kinds with three or more places, most places first", () => {
@@ -44,6 +59,19 @@ describe("filterPlaces", () => {
     expect(filterPlaces(places, null)).toEqual(places);
     expect(filterPlaces(places, "coffee")).toEqual([places[1]]);
   });
+
+  it("combines category tags without duplicating places and clears to All", () => {
+    const places = [
+      place(["food", "coffee"]),
+      place(["coffee"]),
+      place(["drinks"]),
+      place(["shopping"]),
+    ];
+    expect(filterPlaces(places, ["coffee", "drinks"])).toEqual(
+      places.slice(0, 3),
+    );
+    expect(filterPlaces(places, [])).toEqual(places);
+  });
 });
 
 describe("busiestCityPlaces", () => {
@@ -60,6 +88,30 @@ describe("busiestCityPlaces", () => {
   it("frames every place when none has a city", () => {
     const places = [place([]), place([])];
     expect(busiestCityPlaces(places)).toEqual(places);
+  });
+});
+
+describe("cityNear", () => {
+  const spots = [
+    { lat: 38.72, lng: -9.14, city: "Lisbon" },
+    { lat: 41.15, lng: -8.61, city: "Porto" },
+    { lat: 41.14, lng: -8.62 },
+  ];
+
+  it("names the city of the nearest place that has one", () => {
+    expect(cityNear(spots, { lat: 38.7, lng: -9.1 })).toBe("Lisbon");
+    expect(cityNear(spots, { lat: 41.14, lng: -8.62 })).toBe("Porto");
+  });
+
+  it("is undefined when no place has a city", () => {
+    expect(cityNear([spots[2]], { lat: 41, lng: -8 })).toBeUndefined();
+    expect(cityNear([], { lat: 41, lng: -8 })).toBeUndefined();
+  });
+
+  it("is undefined when every place with a city is more than 50 km from the centre", () => {
+    expect(cityNear(spots, { lat: 40.42, lng: -3.7 })).toBeUndefined();
+    expect(cityNear(spots, { lat: 39.2, lng: -9.1 })).toBeUndefined();
+    expect(cityNear(spots, { lat: 38.9, lng: -9.1 })).toBe("Lisbon");
   });
 });
 
@@ -98,6 +150,11 @@ describe("searchPlaces", () => {
     expect(searchPlaces(places, "paris bar").map((p) => p.name)).toEqual([
       "Le Bar",
     ]);
+  });
+
+  it("matches a place's features", () => {
+    const rooftop = { name: "Hotel Mondial", features: ["rooftop"] };
+    expect(searchPlaces([...places, rooftop], "rooftop")).toEqual([rooftop]);
   });
 
   it("finds nothing for a blank or unmatched query", () => {

@@ -47,7 +47,7 @@ export function startOnSeededHome(options: { reset?: "settings" } = {}): void {
     const wasSignedIn = await profile.isVisible();
     if (!wasSignedIn) await devLogin.tap({ timeout: 30_000 });
     await expect(profile).toBeVisible({ timeout: 60_000 });
-    if (fromBackend && wasSignedIn) return;
+    if (fromBackend && wasSignedIn) return openHome(screen);
 
     if (fromBackend) await resetFixturesFromBackend();
     else await resetThroughSettings(screen, profile);
@@ -56,7 +56,16 @@ export function startOnSeededHome(options: { reset?: "settings" } = {}): void {
     await expect(screen.getByRole("image", "Shelvr")).toBeHidden({
       timeout: 30_000,
     });
+    await openHome(screen);
   });
+}
+
+export async function openHome(screen: Screen): Promise<void> {
+  await screen.getByRole("button", "Library").tap({ timeout: 30_000 });
+}
+
+export async function openCities(screen: Screen): Promise<void> {
+  await screen.getByRole("button", /^Cities(?:,|$)/).tap({ timeout: 30_000 });
 }
 
 // The Convex CLI reads its deployment from .env.local in this directory.
@@ -161,12 +170,14 @@ export async function tapUntilVisible(
   );
 }
 
-/** Opens the + sheet, which takes a link and nothing else. */
 export async function openAddSheet(screen: Screen): Promise<Locator> {
   const input = screen.getByTestId("add-article-input");
-  await tapUntilVisible(screen.getByRole("button", "Add"), input, {
+  const pasteLink = screen.getByRole("button", /^Paste a link,/);
+  await tapUntilVisible(screen.getByRole("button", "Add"), pasteLink, {
     waitMs: ADD_SHEET_WAIT_MS,
     timeout: 60_000,
   });
+  await pasteLink.tap();
+  await expect(input).toBeVisible({ timeout: 30_000 });
   return input;
 }

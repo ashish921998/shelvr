@@ -38,6 +38,7 @@ import { useHasPlacesToStamp } from "@/lib/places-to-stamp";
 import { usePlaceVisit } from "@/lib/use-place-visit";
 import { useRemoveListStamp } from "@/lib/use-remove-list-stamp";
 import { Stack, useRouter } from "expo-router";
+import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useEffect, useRef, useState } from "react";
 import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
@@ -126,6 +127,7 @@ export default function PassportScreen() {
   useAppLocale();
   const router = useRouter();
   const { theme } = useUnistyles();
+  const barHeight = useBottomTabBarHeight();
   const { stamps, failed, error } = usePassport();
   const visit = usePlaceVisit("passport");
   const removeListStamp = useRemoveListStamp();
@@ -199,9 +201,10 @@ export default function PassportScreen() {
     <PassportCityHead
       section={section}
       locked={ring.locked}
-      onOpen={(city) =>
-        router.push({ pathname: "/next-to-stamp", params: { city } })
-      }
+      onOpen={(city) => {
+        ring.passed();
+        router.push({ pathname: "/next-to-stamp", params: { city } });
+      }}
       onUnlock={ring.unlock}
       onShare={(city) => router.push(shareCardHref(city, "passport"))}
       onCityStamp={(city) => removeCityStamp(city, stampedCities.length - 1)}
@@ -217,7 +220,10 @@ export default function PassportScreen() {
       <ScrollView
         style={styles.screen}
         contentInsetAdjustmentBehavior="automatic"
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: barHeight + theme.gap(4) },
+        ]}
       >
         <PassportHero
           stamps={stamps}
@@ -258,7 +264,10 @@ export default function PassportScreen() {
             totals={badges.totals}
             locked={badgeAccess.locked}
             onUnlock={badgeAccess.unlock}
-            onShare={(badge) => void shareBadge(badge)}
+            onShare={(badge) => {
+              badgeAccess.passed();
+              void shareBadge(badge);
+            }}
           />
         ) : null}
         {sections.stamped.map((section) => (
@@ -322,7 +331,6 @@ const styles = StyleSheet.create((theme, rt) => ({
   content: {
     gap: theme.gap(2),
     paddingHorizontal: theme.gap(2),
-    paddingBottom: rt.insets.bottom + theme.gap(4),
   },
   backfill: {
     minHeight: theme.control.minHeight,

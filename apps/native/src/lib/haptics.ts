@@ -28,7 +28,33 @@ async function playOptionalFeedback(
   }
 }
 
+function rollDice() {
+  if (process.env.EXPO_OS !== "ios") {
+    void playOptionalFeedback("impact");
+    return () => {};
+  }
+  const {
+    Heavy: heavy,
+    Light: light,
+    Medium: medium,
+  } = Haptics.ImpactFeedbackStyle;
+  void playOptionalFeedback("impact", heavy);
+  const beats = [
+    [190, light],
+    [380, light],
+    [628, heavy],
+    [780, light],
+    [908, medium],
+    [985, light],
+  ] as const;
+  const timers = beats.map(([delay, strength]) =>
+    setTimeout(() => void playOptionalFeedback("impact", strength), delay),
+  );
+  return () => timers.forEach((timer) => clearTimeout(timer));
+}
+
 export const haptics = {
+  rollDice,
   landing: () =>
     playOptionalFeedback("landing", Haptics.ImpactFeedbackStyle.Soft),
   selection: () => playOptionalFeedback("selection"),

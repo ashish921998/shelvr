@@ -4,7 +4,7 @@ import { expect } from "e2e";
 import { startFreshOnboarding } from "./fresh-onboarding.ts";
 import { scrollSettingsTo, tapUntilVisible } from "./seeded-home.ts";
 
-test("a new account reaches Home without AI permission prompts or a Settings switch", async ({
+test("a new account reaches the Map without AI permission prompts or a Settings switch", async ({
   device,
   screen,
 }) => {

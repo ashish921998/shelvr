@@ -19,6 +19,9 @@ vi.mock("@/lib/analytics", () => ({
   analytics: { capture: vi.fn(), captureError: vi.fn() },
 }));
 vi.mock("@/lib/entitlement", () => ({ openPaywall: vi.fn() }));
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: () => ({ admit: vi.fn(), denied: vi.fn(), passed: vi.fn() }),
+}));
 vi.mock("@/lib/haptics", () => ({
   haptics: { success: vi.fn(), selection: vi.fn() },
 }));

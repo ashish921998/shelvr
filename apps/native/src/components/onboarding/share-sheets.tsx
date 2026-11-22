@@ -4,7 +4,6 @@ import { withAlpha } from "@/lib/color";
 import { t } from "@/lib/i18n";
 import { sheetIn } from "@/lib/motion";
 import { Image } from "expo-image";
-import { haptics } from "@/lib/haptics";
 import type { ReactNode } from "react";
 import { Text, View, type StyleProp, type ViewStyle } from "react-native";
 import Animated, { useReducedMotion } from "react-native-reanimated";
@@ -161,10 +160,6 @@ export function IosSheet({
       </View>
     </Sheet>
   );
-}
-
-export function tick() {
-  void haptics.selection();
 }
 
 /** The Apps list after More: Shelvr is available immediately, without pretending to change system Favorites. */

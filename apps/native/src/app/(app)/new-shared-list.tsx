@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { HeaderIconButton } from "@/components/ui/header-icon-button";
 import { ThemedText } from "@/components/ui/themed-text";
 import { analytics } from "@/lib/analytics";
-import { usePaywallGuard } from "@/lib/entitlement";
+import { useProGate } from "@/lib/pro-gate";
 import { haptics } from "@/lib/haptics";
 import { t, useAppLocale } from "@/lib/i18n";
 import { backOrHome } from "@/lib/screen-dismiss";
@@ -22,7 +22,7 @@ import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
 import { useMutation } from "convex/react";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Alert,
   Platform,
@@ -94,9 +94,13 @@ export default function NewSharedListScreen() {
   const { theme } = useUnistyles();
   const cities = useQuery(convexQuery(api.items.listCities, {}));
   const create = useMutation(api.sharedLists.createSharedList);
-  const { guard, loading } = usePaywallGuard("shared_list");
+  const { admit, passed, loading } = useProGate("shared_list");
   const [name, setName] = useState("");
-  const { city: cityParam } = useLocalSearchParams<{ city?: string }>();
+  const { city: cityParam, from } = useLocalSearchParams<{
+    city?: string;
+    from?: string;
+  }>();
+  const fromCollections = from === "collections";
   const [picked, setPicked] = useState<string[]>(() =>
     cityParam ? [cityParam.slice(0, MAX_CITY_CHARS)] : [],
   );
@@ -109,7 +113,17 @@ export default function NewSharedListScreen() {
   );
   const [busy, setBusy] = useState(false);
   const nameGate = useNameGate();
-  const close = useCallback(() => backOrHome(router), [router]);
+  const active = useRef(true);
+  useEffect(() => {
+    active.current = true;
+    return () => {
+      active.current = false;
+    };
+  }, []);
+  const close = useCallback(() => {
+    active.current = false;
+    backOrHome(router);
+  }, [router]);
   const known = (cities.data ?? []).slice(0, MAX_LIST_CITIES);
   const custom = picked.filter(
     (city) => !known.some((choice) => choice.city === city),
@@ -132,20 +146,27 @@ export default function NewSharedListScreen() {
     if (busy || loading || name.trim() === "" || picked.length === 0) return;
     setBusy(true);
     try {
-      if (!(await guard())) return;
+      if ((await admit()) !== "go" || !active.current) return;
       const { listId, inviteToken } = await create({
         name: name.trim(),
         cities: picked,
       });
+      passed();
       analytics.capture("shared_list_created", { cities: picked.length });
+      if (!active.current) return;
       void haptics.success();
-      await shareInvite(inviteToken, "new");
-      router.replace({ pathname: "/shared-list/[id]", params: { id: listId } });
+      if (!fromCollections) await shareInvite(inviteToken, "new");
+      if (active.current) {
+        router.replace({
+          pathname: "/shared-list/[id]",
+          params: { id: listId },
+        });
+      }
     } catch (error) {
       analytics.captureError("shared_list_create_failed", error);
-      Alert.alert(t("sharedLists.createFailed"));
+      if (active.current) Alert.alert(t("sharedLists.createFailed"));
     } finally {
-      setBusy(false);
+      if (active.current) setBusy(false);
     }
   };
 
@@ -153,7 +174,11 @@ export default function NewSharedListScreen() {
     <View style={styles.screen} accessibilityViewIsModal>
       <Stack.Screen
         options={{
-          title: t("sharedLists.newTitle"),
+          title: t(
+            fromCollections
+              ? "homePlaces.newCollection"
+              : "sharedLists.newTitle",
+          ),
           headerTitleStyle: {
             ...theme.type.title,
             color: theme.colors.foreground,
@@ -263,15 +288,24 @@ export default function NewSharedListScreen() {
         </FormSection>
       </ScrollView>
       <View style={styles.footer}>
-        <ThemedText variant="footnote" style={[styles.muted, styles.hint]}>
-          {t("sharedLists.inviteHint")}
-        </ThemedText>
+        {!fromCollections ? (
+          <ThemedText variant="footnote" style={[styles.muted, styles.hint]}>
+            {t("sharedLists.inviteHint")}
+          </ThemedText>
+        ) : null}
         <Button
           testID="new-shared-list-submit"
-          title={t("sharedLists.sendInvite")}
+          title={t(
+            fromCollections
+              ? "homePlaces.createCollection"
+              : "sharedLists.sendInvite",
+          )}
           disabled={name.trim() === "" || picked.length === 0}
           loading={busy || loading}
-          onPress={() => nameGate.gate(() => void submit())}
+          onPress={() => {
+            if (fromCollections) void submit();
+            else nameGate.gate(() => void submit());
+          }}
         />
       </View>
       <NameSheet

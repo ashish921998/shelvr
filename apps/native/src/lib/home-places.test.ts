@@ -3,36 +3,16 @@ import { describe, expect, it } from "vitest";
 import {
   canRetrySave,
   cityCountLine,
-  cityRows,
   newlyUnplaced,
   plannableCities,
   savesToReview,
   unplacedSaves,
-  visibleCities,
 } from "@/lib/home-places";
 
 const city = (name: string, count = 1) => ({
   city: name,
   count,
   cover: null,
-});
-
-describe("visibleCities", () => {
-  const six = ["A", "B", "C", "D", "E", "F"].map((name) => city(name));
-
-  it("shows four and counts the rest until expanded", () => {
-    const { shown, hidden } = visibleCities(six, false);
-    expect(shown.map((c) => c.city)).toEqual(["A", "B", "C", "D"]);
-    expect(hidden).toBe(2);
-  });
-
-  it("shows every city once expanded", () => {
-    expect(visibleCities(six, true)).toEqual({ shown: six, hidden: 0 });
-  });
-
-  it("hides nothing at exactly four", () => {
-    expect(visibleCities(six.slice(0, 4), false).hidden).toBe(0);
-  });
 });
 
 describe("unplacedSaves", () => {
@@ -111,39 +91,6 @@ describe("plannableCities", () => {
       "Lisbon",
       "Oslo",
     ]);
-  });
-});
-
-describe("cityRows", () => {
-  const names = (count: number) =>
-    cityRows(
-      Array.from({ length: count }, (_, index) => city(String(index))),
-    ).map((row) =>
-      row.kind === "pair" ? row.cities.map((c) => c.city) : row.city.city,
-    );
-
-  it("has no rows for no cities", () => {
-    expect(names(0)).toEqual([]);
-  });
-
-  it("gives a lone city a wide row", () => {
-    expect(names(1)).toEqual(["0"]);
-  });
-
-  it("pairs two cities", () => {
-    expect(names(2)).toEqual([["0", "1"]]);
-  });
-
-  it("ends an odd list with a wide row", () => {
-    expect(names(3)).toEqual([["0", "1"], "2"]);
-    expect(names(5)).toEqual([["0", "1"], ["2", "3"], "4"]);
-  });
-
-  it("marks only the last odd city as wide", () => {
-    const kinds = cityRows(["a", "b", "c"].map((name) => city(name))).map(
-      (row) => row.kind,
-    );
-    expect(kinds).toEqual(["pair", "wide"]);
   });
 });
 

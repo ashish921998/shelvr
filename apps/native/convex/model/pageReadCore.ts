@@ -25,7 +25,7 @@ export const MAX_STORED_CONTENT_CHARS = 100000;
 export const BROWSER_USER_AGENT =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36";
 
-export const SHELVR_USER_AGENT = "Shelvr/1.0 (+https://shelvr-web.vercel.app)";
+export const SHELVR_USER_AGENT = "Shelvr/1.0 (+https://tryshelvr.app)";
 
 export const PROMPT_CONTENT_CHARS = 6000;
 

@@ -1,0 +1,78 @@
+// @vitest-environment jsdom
+import { act, renderHook } from "@testing-library/react";
+import { describe, expect, it } from "vitest";
+import { useMapCity } from "./use-map-city";
+
+const places = [
+  { lat: 38.72, lng: -9.14, city: "Lisbon" },
+  { lat: 38.71, lng: -9.13, city: "Lisbon" },
+  { lat: 41.15, lng: -8.61, city: "Porto" },
+];
+
+describe("useMapCity", () => {
+  it("names the busiest city before the map reports where it is", () => {
+    const { result } = renderHook(() => useMapCity(places));
+    expect(result.current.city).toBe("Lisbon");
+  });
+
+  it("names the city whose places are in view as the map moves", () => {
+    const { result } = renderHook(() => useMapCity(places));
+    act(() => result.current.onCentreChange({ lat: 41.14, lng: -8.6 }));
+    expect(result.current.city).toBe("Porto");
+  });
+
+  it("names no city once the map is zoomed out past a single city", () => {
+    const { result } = renderHook(() => useMapCity(places));
+    act(() => result.current.onCentreChange({ lat: 38.72, lng: -9.14 }, 5));
+    expect(result.current.city).toBeUndefined();
+    act(() => result.current.onCentreChange({ lat: 38.72, lng: -9.14 }, 12));
+    expect(result.current.city).toBe("Lisbon");
+  });
+
+  it("names no city once the map is far from every saved place", () => {
+    const { result } = renderHook(() => useMapCity(places));
+    act(() => result.current.onCentreChange({ lat: 40.42, lng: -3.7 }));
+    expect(result.current.city).toBeUndefined();
+    act(() => result.current.onCentreChange({ lat: 38.72, lng: -9.14 }));
+    expect(result.current.city).toBe("Lisbon");
+  });
+
+  it("renames the city when the places under a still map change", () => {
+    const { result, rerender } = renderHook(({ saved }) => useMapCity(saved), {
+      initialProps: { saved: places },
+    });
+    act(() => result.current.onCentreChange({ lat: 41.14, lng: -8.6 }));
+    expect(result.current.city).toBe("Porto");
+    rerender({ saved: places.filter((place) => place.city !== "Porto") });
+    expect(result.current.city).toBeUndefined();
+    rerender({ saved: places });
+    expect(result.current.city).toBe("Porto");
+  });
+
+  it("names a city saved under a still map after panning over empty land", () => {
+    const { result, rerender } = renderHook(({ saved }) => useMapCity(saved), {
+      initialProps: { saved: places },
+    });
+    act(() => result.current.onCentreChange({ lat: 40.42, lng: -3.7 }));
+    act(() => result.current.onCentreChange({ lat: 37.39, lng: -5.98 }));
+    expect(result.current.city).toBeUndefined();
+    rerender({
+      saved: [...places, { lat: 37.38, lng: -5.99, city: "Seville" }],
+    });
+    expect(result.current.city).toBe("Seville");
+  });
+
+  it("does not re-render while the map moves within one city", () => {
+    let renders = 0;
+    const { result } = renderHook(() => {
+      renders += 1;
+      return useMapCity(places);
+    });
+    act(() => result.current.onCentreChange({ lat: 38.72, lng: -9.14 }));
+    const settled = renders;
+    act(() => result.current.onCentreChange({ lat: 38.71, lng: -9.13 }));
+    act(() => result.current.onCentreChange({ lat: 38.73, lng: -9.15 }));
+    expect(renders).toBe(settled);
+    expect(result.current.city).toBe("Lisbon");
+  });
+});

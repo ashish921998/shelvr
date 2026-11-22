@@ -78,7 +78,7 @@ vi.mock("@/lib/analytics", () => ({
   },
 }));
 vi.mock("@/lib/entitlement", () => ({
-  openPaywall: mock.openPaywall,
+  openPaywallAnswer: mock.openPaywall,
   useEntitlement: () => ({
     entitled: mock.entitled,
     loading: mock.entitlementLoading,
@@ -257,6 +257,18 @@ it("holds the link while no free save is left, then saves once one is", async ()
   });
   await waitFor(() => expect(mock.router.replace).toHaveBeenCalledWith(SPOTS));
   expect(mock.openPaywall).toHaveBeenCalledTimes(1);
+  expect(
+    vi
+      .mocked(analytics.capture)
+      .mock.calls.filter(
+        ([event]) => event === "paywall_blocked_action_resumed",
+      ),
+  ).toEqual([
+    [
+      "paywall_blocked_action_resumed",
+      expect.objectContaining({ placement: "share" }),
+    ],
+  ]);
 });
 
 it("keeps a held link on the device for later", async () => {

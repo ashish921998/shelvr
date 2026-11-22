@@ -47,6 +47,34 @@ describe("redirectSystemPath", () => {
     expect(markPendingShareOnDevice).not.toHaveBeenCalled();
   });
 
+  it.each([
+    "https://tryshelvr.app/auth/callback?code=verification-code",
+    "https://shelvr-web.vercel.app/auth/callback?code=verification-code",
+  ])(
+    "keeps universal-link OAuth callbacks on the sign-in route for %s",
+    (path) => {
+      expect(redirectSystemPath({ path, initial: false })).toBe("/sign-in");
+    },
+  );
+
+  it("does not treat another host's /auth/callback as an OAuth callback", () => {
+    expect(
+      redirectSystemPath({
+        path: "https://example.com/auth/callback?code=verification-code",
+        initial: false,
+      }),
+    ).not.toBe("/sign-in");
+  });
+
+  it.each([
+    "https://tryshelvr.app/l/tok123",
+    "https://shelvr-web.vercel.app/l/tok123",
+  ])("opens a list invite from %s on the join screen", (path) => {
+    expect(redirectSystemPath({ path, initial: true })).toBe(
+      "/list-invite/tok123",
+    );
+  });
+
   it("opens a shared passport link on the passport invite screen", () => {
     expect(
       redirectSystemPath({
@@ -118,11 +146,24 @@ describe("redirectSystemPath and the launch animation", () => {
   });
 
   it.each([
-    ["the root URL a home-screen launch produces", "shelvr:///"],
-    ["the same root without its trailing slash", "shelvr://"],
-    ["a path that is not a link at all", "/share"],
-  ])("leaves the splash alone for %s", (_name, path) => {
-    expect(redirectSystemPath({ path, initial: true })).toBe(path);
+    [
+      "the root URL a home-screen launch produces",
+      "shelvr:///",
+      "/(app)/(tabs)/(map)",
+    ],
+    [
+      "the same root without its trailing slash",
+      "shelvr://",
+      "/(app)/(tabs)/(map)",
+    ],
+    [
+      "the bare root the router falls back to without a scheme",
+      "/",
+      "/(app)/(tabs)/(map)",
+    ],
+    ["a path that is not a link at all", "/share", "/share"],
+  ])("leaves the splash alone for %s", (_name, path, href) => {
+    expect(redirectSystemPath({ path, initial: true })).toBe(href);
     expect(isDirectLaunch()).toBe(false);
   });
 });

@@ -1,13 +1,12 @@
 import { primaryGoal, type Goal } from "@/lib/onboarding-goals";
-import type { getOnboardingProgress } from "@/lib/pending-onboarding";
 import { t } from "@/lib/i18n";
-import { SAMPLE_CITIES } from "@/lib/sample-cities";
+import { SAMPLE_CITIES, type SampleCityId } from "@/lib/sample-cities";
 
-export type GoalProgress = Pick<
-  ReturnType<typeof getOnboardingProgress>,
-  "goals" | "travelCity"
-> &
-  Partial<Pick<ReturnType<typeof getOnboardingProgress>, "beenCities">>;
+export type GoalProgress = {
+  goals: Goal[];
+  travelCity: SampleCityId | null;
+  beenCities?: SampleCityId[];
+};
 
 /** What a slot's copy can depend on: the city the user picked (null for "not sure"). */
 type Answers = { city: string | null };

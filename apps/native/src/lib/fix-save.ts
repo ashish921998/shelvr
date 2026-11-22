@@ -1,13 +1,12 @@
-import { saveErrorCode } from "@convex/model/saveErrors";
 import { api } from "@convex/_generated/api";
 import type { Id } from "@convex/_generated/dataModel";
 import { useMutation } from "convex/react";
 import { Alert } from "react-native";
 import { analytics, type AnalyticsItem } from "@/lib/analytics";
 import { confirmItemDelete } from "@/lib/confirm-item-delete";
-import { usePaywallGuard } from "@/lib/entitlement";
 import { haptics } from "@/lib/haptics";
 import { t } from "@/lib/i18n";
+import { useProGate } from "@/lib/pro-gate";
 
 type FixableSave = AnalyticsItem & { _id: Id<"items"> };
 
@@ -15,20 +14,19 @@ type FixableSave = AnalyticsItem & { _id: Id<"items"> };
 export function useFixSave() {
   const reprocess = useMutation(api.items.reprocessItem);
   const deleteItem = useMutation(api.items.deleteItem);
-  const { guard } = usePaywallGuard("home");
+  const { denied, passed } = useProGate("home");
 
   const retry = async (save: FixableSave): Promise<void> => {
     try {
       const scheduled = await reprocess({ id: save._id });
       if (scheduled) {
+        passed();
         void haptics.impact();
       } else {
         Alert.alert(t("item.stillWorking"), t("item.retryLater"));
       }
     } catch (error) {
-      const paywalled =
-        saveErrorCode(error) === "pro_required" && !(await guard());
-      if (!paywalled)
+      if (!(await denied(error)))
         Alert.alert(t("errors.retryTitle"), t("errors.retrySoon"));
     }
   };
