@@ -47,7 +47,10 @@ export default function PrivacyPage() {
             in our backend (Convex) so it syncs to your devices. We do not store
             the video itself. If you share a photo or text to Shelvr, including
             through Siri or Shortcuts, we store that too. Photos and notes stay
-            in your account until you delete them.
+            in your account until you delete them. If you add a cover photo to a
+            trip, we store a smaller copy of it with that trip. We do not send
+            it to AI providers or show it on a shared trip link, and we delete
+            it when you delete the trip or your account.
           </li>
           <li>
             <strong>Cities you’ve been to.</strong> If you pick cities you have

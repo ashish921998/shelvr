@@ -1,6 +1,6 @@
 {
   "ios": {
-    "NSPhotoLibraryUsageDescription": "Shelvr permet d'enregistrer des photos et captures d'écran de votre photothèque dans votre bibliothèque, et de trier vos photos.",
+    "NSPhotoLibraryUsageDescription": "Shelvr vous permet de choisir une photo de votre photothèque comme couverture d'un voyage.",
     "NSPhotoLibraryAddUsageDescription": "Shelvr enregistre dans vos photos les images que vous partagez, comme votre story Passeport.",
     "NSCalendarsUsageDescription": "Shelvr ajoute des événements à votre calendrier à partir de vos contenus enregistrés.",
     "NSCalendarsFullAccessUsageDescription": "Shelvr ajoute des événements à votre calendrier à partir de vos contenus enregistrés.",

@@ -1,6 +1,6 @@
 {
   "ios": {
-    "NSPhotoLibraryUsageDescription": "Mit Shelvr kannst du Fotos und Bildschirmfotos aus deiner Mediathek in deiner Bibliothek speichern und deine Fotomediathek aufräumen.",
+    "NSPhotoLibraryUsageDescription": "Mit Shelvr kannst du ein Foto aus deiner Mediathek als Titelbild für eine Reise auswählen.",
     "NSPhotoLibraryAddUsageDescription": "Shelvr speichert Bilder, die du teilst, wie deine Pass-Story, in deinen Fotos.",
     "NSCalendarsUsageDescription": "Shelvr fügt deinem Kalender Ereignisse aus deinen gespeicherten Inhalten hinzu.",
     "NSCalendarsFullAccessUsageDescription": "Shelvr fügt deinem Kalender Ereignisse aus deinen gespeicherten Inhalten hinzu.",

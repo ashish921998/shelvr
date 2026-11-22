@@ -30,24 +30,24 @@ Use these notes in App Store Connect when submitting Shelvr for review.
    - The reel's link is kept on the device and saved to the account as its first save once the account is signed in, as if the user had shared it. On the free plan it uses one of the 10 free saves. After **Skip** on the sample reel, nothing is saved.
 9. **Paywall:** the RevenueCat paywall, which has three screens. The opener, "Save the link. Shelvr does the filing.", shows a short carousel of what Shelvr does and has **Continue**. The trial explainer, "Get a heads-up before you pay", describes the 7-day trial on the Annual plan, which the paywall labels Yearly: Today, a reminder before the trial ends that is sent only if the user turns it on, and Day 7, when annual billing begins. It says to cancel at least 24 hours before the trial ends to avoid a charge, and where to cancel (Settings > your name > Subscriptions). **See plans** continues. The plan picker, "Pick a plan", offers **Yearly** (7-day trial, then the yearly price) and **Weekly** (no trial), each with its localized price. The buy button reads "Try for $0.00, then <price>/year" for Yearly with the trial (the zero is shown in the storefront's currency), and "Subscribe for <price>/week" for Weekly. The renewal line above the button, **Restore**, **Terms**, and **Privacy** are on this screen. These three screens are the offering for an account that can still start the trial, which includes a fresh sandbox account. An account that has already used its trial is shown a separate no-trial offering instead, which this note does not cover. The paywall fills the screen. Its first screen has a back arrow that closes it; during onboarding, while the free plan is on, closing finishes onboarding and goes on to sign-in, then the Map on the free plan (with it off, closing returns to the screen before). Its second and third screens can go back to the paywall screen before them. Anyone whose paywall cannot load also goes on to sign-in and the Map (with the free plan off, sign-in leads to the plan screen instead), and an account that already has Pro skips the paywall. After a purchase or restore, Shelvr asks for Sign in with Apple or Google, attaches the purchase to the new account, and saves anything the user shared to Shelvr meanwhile. Once a trial has started, a sheet titled "Want a heads-up before you're charged?" offers the trial reminder when notifications are off and iOS can still ask, and its **Remind me** button asks for the iOS notification permission.
 10. **After sign-in:** the app opens on the Map. Over whichever tab is open, Map or Library, a one-time letter, "Plan less, go out more", greets an account that had no saves when it signed in after onboarding, or that has just started Pro or a trial; **Explore Shelvr** closes it. The letter shows only while the account has Pro or a trial, so a free account sees it once it starts one. After onboarding and sign-in, on the free plan or with Pro, the demonstrated reel is saved through the normal link-reading flow, unless **Skip** was tapped on the sample reel. It appears under "Finding places…" during reading, then under its city when places are found. If Shelvr has no first name for the account, a sheet over the open tab asks "What should we call you?" once; **Skip for now** closes it.
-11. Camera and Photo Library permissions are **not** requested, during onboarding or after. This build cannot save a photo or use the camera. The only photo it reads is an optional trip cover: in a new trip, **Add cover photo** opens the system photo picker, which needs no Photo Library permission, and the chosen photo is shrunk and stored with that trip.
+11. Onboarding asks for no Camera or Photo Library permission, and Shelvr never uses the camera. Photos reach Shelvr when the user shares them to it, saves them with a Shortcuts or Siri action, or picks a trip cover. In a new trip, **Add cover photo** opens the system photo picker, which needs no Photo Library permission, and the chosen photo is shrunk and stored with that trip. Saving a photo needs Pro.
 12. Shelvr never asks for an App Store rating during onboarding. The system prompt is eligible only after the user has at least three successfully processed saves, when they return to the Map or Library from a save they opened, and never on launch or in an account's first session. Shelvr requests it at most once in total.
 
 ## Core save loop
 
-- **Link:** tap the + button in the tab bar, then **Paste a link**, paste an Instagram Reel or TikTok link (any page link is accepted), and save. While Shelvr reads a save, Library lists it under Recents with "Finding places…". Once reading finishes, its places appear on the Map and under their city, which Library's Cities row opens. If a save the user is watching fails or names no place, a banner says "Couldn't find places in that link" with **Retry** (or **View** when a retry can't help). Library's "Without a place" row counts the failed and placeless saves among those it has loaded. It opens a sheet with **Delete** for each save, and **Retry** for a save that a retry can help. Note saves, photo saves and the camera are not part of this build.
+- **Link:** tap the + button in the tab bar, then **Paste a link**, paste an Instagram Reel or TikTok link (any page link is accepted), and save. While Shelvr reads a save, Library lists it under Recents with "Finding places…". Once reading finishes, its places appear on the Map and under their city, which Library's Cities row opens. If a save the user is watching fails or names no place, a banner says "Couldn't find places in that link" with **Retry** (or **View** when a retry can't help). Library's "Without a place" row counts the failed and placeless saves among those it has loaded. It opens a sheet with **Delete** for each save, and **Retry** for a save that a retry can help. The + button takes links only. Text and photos can be saved from the share sheet, and photos also through Shortcuts and Siri ("Save an Image"). Photos need Pro. The app has no camera.
 - **Free plan:** an account without Pro gets 10 free saves. A save holds a slot while it is being read and keeps it once it finishes with a place in a city; a failed or placeless save gives its slot back, as does deleting a save still being read, but deleting a placed save does not. A shared Google Maps list counts as one save. With 2 or fewer left, Library shows a card with the count and **See plans**. Once all 10 are used, adding a save in the app, Retry and the share sheet open the paywall; the share sheet can keep the link and save it right after a purchase. Existing saves, city pages and Map stay open.
-- **Share Sheet:** From Safari, Instagram or TikTok, share to Shelvr. While signed in, content saves automatically. While signed out, Shelvr preserves the intent and resumes after sign-in. During onboarding, a shared link is held on the device until sign-in. If the app is relaunched or interrupted mid-save, the pending marker and local session resume the flow on the next launch; successful completion or explicit abandonment clears them. If native payload cleanup fails, the completed session stays available for **Try again** or **Cancel**.
+- **Share Sheet:** From Safari, Instagram, TikTok or Photos, share to Shelvr, which opens the app. While signed in, content saves automatically. A photo needs Pro, and without it the screen says "Photos need Pro". While signed out, Shelvr preserves the intent and resumes after sign-in. During onboarding, a shared link is held on the device until sign-in. If the app is relaunched or interrupted mid-save, the pending marker and local session resume the flow on the next launch; successful completion or explicit abandonment clears them. If native payload cleanup fails, the completed session stays available for **Try again** or **Cancel**.
 
 ## Shared lists
 
 - A shared list is one list of places that up to 8 people keep together. A person can be on 20 lists, and a list holds up to 200 places.
-- Library's Plans row opens Plans, whose Together section shows the person's lists above their trips. A list starts from a city page's "Invite" button, beside the city's name, or from "Start a shared list" on the "Add spots" sheet.
-- Starting a list needs Pro. The form takes a name and at least one city; places the owner already saved in those cities come along. "Send invite" opens the share sheet with a link to `https://tryshelvr.app/l/<token>`.
-- With Shelvr installed, the link opens the Join screen, which says "Free to join. You don’t need Pro." and has "Join list". Without the app, the web page shows the invite. A person who isn't signed in joins after sign-in, finishing onboarding first if they need to.
+- Library's Collections row opens Collections, which shows the person's lists. Trips has its own row. A list starts from a city page's "Invite" button, beside the city's name, from "Start a shared list" on the "Add spots" sheet, or from "New collection" in Collections.
+- Starting a list needs Pro. The form takes a name and at least one city; places the owner already saved in those cities come along. "Send invite" opens the share sheet with a link to `https://tryshelvr.app/l/<token>`. A list started in Collections has "Create collection" instead, and its invite is sent later from the list's "Invite" button.
+- With Shelvr installed, the link opens the Join screen, which says "Free to join. You don’t need Pro." and has "Join list". Without the app, the web page shows the invite; after installing, while the invite link is on the clipboard (the web page copies it), the first screen and the sign-in screen offer "Invited to a list?" with "Join it", which opens the same Join screen. A person who isn't signed in joins after sign-in, finishing onboarding first if they need to.
 - Joining, opening the list, marking a place "We went" and leaving need no Pro. While the owner has Pro, a member without it can also add places and plan a date or a trip from the list. Everywhere else they still see the plan screen.
 - Members see the list's name, its places with their pins and cities, the first name of whoever added each place, and "We went" marks. They don't see each other's saves, titles or captions. A place's source save opens only for the person who saved it.
-- When another member adds places, a line in Library, the list's card in Plans and the top of the list say who added how many, those places head the list, and their pins drop onto the map one by one. Once the list has been opened, those places are no longer new.
+- When another member adds places, the list's card in Collections and the top of the list say who added how many, those places head the list, and their pins drop onto the map one by one. Once the list has been opened, those places are no longer new.
 - The owner can "Remove" a member. That member loses the list, the old invite link stops working, and the places they added stay. Anyone can "Leave list". When the owner leaves, the oldest member whose account isn't being deleted becomes the owner. When no such member is left, the list is deleted.
 - There is no report or block control. A list name is free text, and anyone holding a live link can join until the list is full. Removing a member is the only control, and it also replaces the link.
 
@@ -62,7 +62,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Pro / subscriptions (RevenueCat sandbox)
 
-- Shelvr Pro gates saves past the 10 free ones, Plan a date, Plan a trip, editing or removing a save's places, starting a shared list, and making a vote link. For free accounts, Go out opens the paywall from the tab bar or a city page, and Plan a trip opens it from the "Add spots" sheet or a city page. From the tab bar or the "Add spots" sheet, each needs a saved place pinned in a city first; without one, it shows "No places yet" instead of the paywall.
+- Shelvr Pro gates saves past the 10 free ones, every photo save, Plan a date, Plan a trip, editing or removing a save's places, starting a shared list, and making a vote link. For free accounts, Go out opens the paywall from the tab bar or a city page, and Plan a trip opens it from the "Add spots" sheet or a city page. From the tab bar or the "Add spots" sheet, each needs a saved place pinned in a city first; without one, it shows "No places yet" instead of the paywall.
 - Plans: **Annual** (labelled Yearly on the paywall; 7-day trial, then the yearly price) and **Weekly** (no trial). Both auto-renew until canceled.
 - Lapsed subscribers are on the free plan: their existing saves stay open, and saves made while they had Pro do not count toward the 10.
 - Present paywall from any gated action or Profile → View Pro plans.
@@ -80,7 +80,7 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 ## Account deletion
 
 - Profile → Settings → **Delete account**.
-- Deleting an account that used Sign in with Apple also revokes its Apple token, when Shelvr holds one. Shelvr started keeping that token with this release, so an account that last signed in before it has none: its deletion still removes everything, the revocation is skipped, and signing in again once stores a token.
+- Deleting an account that used Sign in with Apple also revokes its Apple token, when Shelvr holds one. An account that last signed in before Shelvr began keeping that token has none: its deletion still removes everything, the revocation is skipped, and signing in again once stores a token.
 - Confirmation explains what is deleted (saves, places, identity) and that **App Store subscriptions are not cancelled** by account deletion. A user with an active subscription or trial also gets a **Manage subscription** button on that confirmation.
 - Deletion also removes the places the user added to shared lists and takes them off every list, as if they had left it.
 - After success the user is signed out.
@@ -93,11 +93,12 @@ Use these notes in App Store Connect when submitting Shelvr for review.
 
 ## Permissions
 
-| Permission    | When requested                                                 | Why                                                                                  |
-| ------------- | -------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Calendar      | User adds an event from an item intent                         | Create calendar event from saved content                                             |
-| Location      | The Map tab opens for the first time                           | Center the map on the user; Map works without it                                     |
-| Notifications | "Turn on reminders" in onboarding, or the trial reminder sheet | Reminders about saved places, trips and the trial, and the first vote on a vote link |
+| Permission        | When requested                                                     | Why                                                                                  |
+| ----------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------ |
+| Calendar          | User adds an event from an item intent                             | Create calendar event from saved content                                             |
+| Location          | The Map tab opens for the first time                               | Center the map on the user; Map works without it                                     |
+| Notifications     | "Turn on reminders" in onboarding, or the trial reminder sheet     | Reminders about saved places, trips and the trial, and the first vote on a vote link |
+| Photos (add only) | User picks Save Image in the share sheet of an image Shelvr shares | Save that image, such as a Passport story, to Photos                                 |
 
 Shelvr does **not** record microphone audio and does not request microphone access in production.
 
@@ -105,6 +106,10 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 
 - Account email via Apple/Google.
 - Saved URLs, extracted page content and spoken words, and the places Gemini finds in them (AI runs automatically unless the account has a previously recorded opt-out).
+- Photos and text the user saves, sent to Gemini unless the account has that opt-out.
+- An optional trip cover photo, stored with the trip. It is not sent to AI and is not on a shared trip link.
+- An unlisted trip link shows the trip's name, city, dates and scheduled stops with their times and notes, until the user revokes it.
+- An unlisted Passport link shows the user's first name, their counts and the names of their stamped places by city, until the user stops sharing it.
 - Place names sent to Apple Maps to pin a trip's stops (no live location tracking).
 - Shared list members see the list's places and each other's first names.
 - Voters on a vote link: their choices and an optional first name, seen only by the person who sent the link and deleted with the link.
@@ -137,45 +142,45 @@ Shelvr does **not** record microphone audio and does not request microphone acce
 
 ## Paste-ready App Review notes
 
-Paste everything after this paragraph into App Review Information's notes. It began as the text submitted with 1.0.13 (build 53), whose first core review step named a Home heading that does not exist. Since then it has added the free plan (10 free saves, a closable onboarding paywall) and the Map and Library screens. App Store Connect allows 4,000 characters, and `tools/onboarding-sync.test.mjs` fails when the text after this paragraph is longer.
+Paste everything after this paragraph into App Review Information's notes. It began as the text submitted with 1.0.13 (build 53), whose first core review step named a Home heading that does not exist. Since then it has added the free plan (10 free saves, a closable onboarding paywall), the Map and Library screens, and what is new in 1.0.14. App Store Connect allows 4,000 characters, and `tools/onboarding-sync.test.mjs` fails when the text after this paragraph is longer.
 
-New in 1.0.13: shared lists, and Trips, for planning and editing a day-by-day trip for a city.
+New in 1.0.14: a free plan, the Map as first screen, Library, Passport and a new trip planner.
 
-Shelvr is a private save-it-for-later app for Instagram Reels and TikToks. It uses AI to find the places a post names and file them under a city. It has no feed, no messaging and no public profiles. A user can share one save through an unlisted link, or invite people to a shared list.
+Shelvr is a private save-it-for-later app for Instagram Reels and TikToks. It uses AI to find the places a post names and file them under a city. It has no feed, messaging or public profiles. Users can share a save, trip, Passport or vote by unlisted link, or invite people to a shared list.
 
 Account access:
 
 1. Launch Shelvr and tap "Get started".
 2. Answer "How many places have you saved?", "What would you like to plan?" and "Where have you been?" (tap answers, then "Continue", or "Skip"). Tap "Continue" under the chart, tap a city, then "Continue".
-3. On the sample reel, follow the pills: Share, Share to…, More, then Shelvr. This is a demonstration drawn inside the app; the reel becomes a real save after onboarding and sign-in.
-4. After the paywall in the next section, Shelvr asks you to sign in: choose Continue with Apple. App Review may use its own Apple account; no invitation or code is needed.
+3. On the sample reel, follow the pills: Share, Share to…, More, then Shelvr. This demo is drawn inside the app; the reel becomes a real save after sign-in.
+4. After the paywall (next section), choose Continue with Apple. Any Apple account works; no invitation or code is needed.
 
 Subscription testing:
 
-1. After the sample reel, tap "Continue" on the first-save screen, then on its spots and through the carousel. If a reminders screen appears, tap "Turn on reminders" or "Not now". The RevenueCat paywall (Apple sandbox) opens. Closing it skips buying: you sign in on the free plan (10 free saves; plans need Pro).
+1. After the sample reel, tap "Continue" on the first-save screen, then on its spots and through the carousel. If a reminders screen appears, tap "Turn on reminders" or "Not now". The RevenueCat paywall (Apple sandbox) opens. Closing it skips buying: you sign in on the free plan (10 free saves; plans and photos need Pro).
 2. The paywall has three screens: "Save the link. Shelvr does the filing.", "Get a heads-up before you pay", and "Pick a plan". Tap Continue, then See plans, then buy or start the trial with a sandbox account. Sign-in follows the purchase or restore.
 3. Weekly and Annual (labelled Yearly) subscriptions auto-renew. Annual has a 7-day free trial for accounts that have not used one; Weekly has no trial.
 
 Core review flow:
 
 1. Tap the + button, then Paste a link, paste an Instagram Reel or TikTok link, and save. It shows as processing under Recents in Library, then its places appear on the Map and under their city. A link that names no place shows in Library's "Without a place" row, whose sheet offers Delete, and Retry when a retry can help.
-2. Tap Library, then Cities and a city to open its page: a map with a pin per place and a list of the places.
-3. Tap "Go out", then "Plan a date". Pick a kind of date or a saved first spot. The planner pairs two nearby stops. Tap "Plan a trip" in Go out to build a day-by-day trip. In the itinerary, add or move a stop and use "Share trip" to make or revoke a view-only link.
-4. The app opens on the Map: every pinned place, with search and filters. Shelvr asks for location only when Map first opens, to center it on you; Map works without it.
+2. Tap Library, Cities, then a city: a map and list of its places.
+3. Tap "Go out", then "Plan a date" for two nearby stops. For a trip, tap "Plan a trip" in Go out, add a country, then "Start planning" and "Decide later". The cover photo is optional and uses the system picker. "Share trip" makes or revokes a view-only link.
+4. The app opens on the Map, with search and filters. It asks for location on first open to center on you, and works without it.
 
 Shared lists:
 
-A list holds places kept by people its owner invites, at most 8. On a city page, tap "Invite", enter a name, then "Send invite" for a link in the share sheet. Anyone with the link can join; joining needs a second account, the list works with one. Members see the list's name, its places and each other's first names. The owner can "Remove" a member, which also stops the old link. Anyone can "Leave list".
+On a city page, tap "Invite", enter a name, then "Send invite". Anyone with the link can join (8 people at most); the list also works with one account. Members see its name, places and each other's first names. The owner can "Remove" a member, which also stops the old link. Anyone can "Leave list".
 
 Share extension, Siri and widget:
 
-1. In Safari, Instagram or TikTok, tap Share on a post and choose Shelvr. The link saves without leaving that app.
-2. In the Shortcuts app, open Shelvr and run "Save a Link". The same action works through Siri.
+1. Share a post from Safari, Instagram or TikTok, or a photo from Photos, to Shelvr. Shelvr opens and saves it. Photos need Pro.
+2. In Shortcuts, open Shelvr and run "Save a Link" (also works through Siri) or "Save an Image".
 3. The "Recent Saves" widget shows the latest saves.
 
 Third-party AI:
 
-To find the places in a saved reel or TikTok, Shelvr sends its caption and spoken words to Google Gemini. Planning does not send the saved collection or visit history to Gemini.
+To find places, Shelvr sends Google Gemini what it reads from a saved link (including captions and spoken words) and the photos and text users save. Planning does not send the saved collection or visit history to Gemini. Trip covers are never sent.
 
 Account and support controls:
 
