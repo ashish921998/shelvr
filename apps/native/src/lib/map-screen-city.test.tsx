@@ -274,6 +274,89 @@ it("reads every city as the level even where the map cannot zoom out that far", 
   expect(screen.getByText("map.yourCities")).toBeTruthy();
 });
 
+it.each([1.1, 1.6, 2, 2.4, 3, 5])(
+  "keeps a country through a nudge when its flight lands at zoom %s",
+  (zoom) => {
+    mocks.places = [
+      place("A", "New York", 40.71, -74.01),
+      place("B", "New York", 40.72, -74),
+      place("C", "Los Angeles", 34.05, -118.24),
+      place("D", "Paris", 48.86, 2.35),
+    ];
+    render(<MapScreen />);
+    fireEvent.click(screen.getByLabelText("map.showCountry"));
+    act(() => mocks.centre?.({ lat: 37.4, lng: -96.1 }, zoom, false));
+
+    act(() => mocks.centre?.({ lat: 37.41, lng: -96.11 }, zoom, true));
+    expect(screen.getByText("United States")).toBeTruthy();
+    expect(screen.getByLabelText("map.showAllCities")).toBeTruthy();
+
+    act(() => mocks.centre?.({ lat: 37.41, lng: -96.11 }, zoom - 1, true));
+    if (zoom - 1 < 2.5) expect(screen.getByText("map.yourCities")).toBeTruthy();
+  },
+);
+
+it.each([1, 2, 3, 4.2])(
+  "keeps every city through a nudge when its flight lands at zoom %s",
+  (zoom) => {
+    render(<MapScreen />);
+    fireEvent.click(screen.getByLabelText("map.showCountry"));
+    fireEvent.click(screen.getByLabelText("map.showAllCities"));
+    act(() => mocks.centre?.({ lat: 40, lng: -9 }, zoom, false));
+
+    act(() => mocks.centre?.({ lat: 40.01, lng: -9.01 }, zoom, true));
+    expect(screen.getByText("map.yourCities")).toBeTruthy();
+  },
+);
+
+it("keeps every city through a nudge when the step up to it did not move the map", () => {
+  render(<MapScreen />);
+  fireEvent.click(screen.getByLabelText("map.showCountry"));
+  act(() => mocks.centre?.({ lat: 40, lng: -9 }, 3, false));
+  fireEvent.click(screen.getByLabelText("map.showAllCities"));
+
+  act(() => mocks.centre?.({ lat: 40.01, lng: -9.01 }, 3, true));
+  expect(screen.getByText("map.yourCities")).toBeTruthy();
+});
+
+it("gives the tab bar the city in the title after a pill tap", () => {
+  mocks.places = [
+    place("A", "Los Angeles", 34.05, -118.25),
+    place("B", "Los Angeles", 33.99, -118.47),
+    place("C", "Beverly Hills", 34.07, -118.4),
+  ];
+  render(<MapScreen />);
+  act(() => mocks.pill?.("los angeles"));
+  act(() => mocks.centre?.({ lat: 34.02, lng: -118.36 }, 10, false));
+  expect(screen.getByText("Los Angeles")).toBeTruthy();
+  expect(mocks.setCity).toHaveBeenLastCalledWith("Los Angeles");
+
+  act(() => mocks.centre?.({ lat: 34.06, lng: -118.39 }, 10, true));
+  expect(screen.getByText("Beverly Hills")).toBeTruthy();
+  expect(mocks.setCity).toHaveBeenLastCalledWith("Beverly Hills");
+});
+
+it("lets go of a city it flew to once that city's saves are gone", () => {
+  const { rerender } = render(<MapScreen />);
+  act(() => mocks.pill?.("porto"));
+  act(() => mocks.centre?.({ lat: 41.1, lng: -9 }, 10, false));
+  expect(screen.getByText("Porto")).toBeTruthy();
+
+  mocks.places = [place("A", "Lisbon", 38.7)];
+  rerender(<MapScreen />);
+  expect(screen.queryByText("Porto")).toBeNull();
+  expect(mocks.setCity).toHaveBeenLastCalledWith(undefined);
+});
+
+it("lets go of every city once there are no saves", () => {
+  const { rerender } = render(<MapScreen />);
+  fireEvent.click(screen.getByLabelText("map.showCountry"));
+  fireEvent.click(screen.getByLabelText("map.showAllCities"));
+  mocks.places = [];
+  rerender(<MapScreen />);
+  expect(screen.queryByText("map.yourCities")).toBeNull();
+});
+
 it("keeps the map behind the floating controls while framing places above them", () => {
   render(<MapScreen />);
   expect(mocks.viewport?.height).toBe(800);

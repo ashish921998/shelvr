@@ -285,7 +285,9 @@ export default function MapScreen() {
     () => wentView(all ?? [], wentFilter, visited),
     [all, wentFilter, visited],
   );
-  const { level, cities, hold, onCentreChange } = useMapCity(all ?? NO_PLACES);
+  const { city, level, cities, hold, onCentreChange } = useMapCity(
+    all ?? NO_PLACES,
+  );
   const { flight, fly } = useFlight(hold);
   const {
     area,
@@ -464,7 +466,7 @@ export default function MapScreen() {
         />
       ) : null}
       <MapHeader
-        city={level.kind === "city" ? level.city : undefined}
+        city={city}
         heading={levelHeading(level)}
         canSearch={hasPlaces}
         searchOpen={searchOpen}

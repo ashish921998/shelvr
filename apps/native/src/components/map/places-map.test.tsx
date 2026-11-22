@@ -725,6 +725,36 @@ it("draws a marker per city with its count, and a tap opens that city, not a pla
   expect(mock.clearSelection).toHaveBeenCalledWith(undefined);
 });
 
+it("does not count the tap on a pill as moving the map", async () => {
+  const onCentreChange = vi.fn();
+  const { getByTestId } = render(
+    <PlacesMap
+      areaPartial={false}
+      onArea={vi.fn()}
+      pins={[]}
+      anchors={[]}
+      framed={[]}
+      pills={[{ id: "austin", name: "Austin", count: 2, lat: 30, lng: -97 }]}
+      onPill={vi.fn()}
+      onCentreChange={onCentreChange}
+      showsUser={false}
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={vi.fn()}
+    />,
+  );
+  fireEvent.touchStart(getByTestId("map-touch"));
+  act(() => mock.props.onMarkerClick({ id: "city:austin" }));
+  act(() =>
+    mock.props.onCameraMove({
+      coordinates: { latitude: 30, longitude: -97 },
+      zoom: 4,
+    }),
+  );
+  expect(onCentreChange).toHaveBeenLastCalledWith(expect.anything(), 4, false);
+});
+
 it("keeps both ends of a wide country in view on the step up to it", async () => {
   const cities = mapCities([
     { lat: 49.28, lng: -123.12, city: "Vancouver" },

@@ -363,6 +363,11 @@ export function PlacesMap({
     );
   };
 
+  const tapPill = (markerId: string) => {
+    movedSinceFlight.current = false;
+    onPill?.(markerId.slice(PILL_PREFIX.length));
+  };
+
   const nativeMap =
     process.env.EXPO_OS === "ios" ? (
       <AppleMaps.View
@@ -397,7 +402,7 @@ export function PlacesMap({
         onMarkerClick={(marker) => {
           if (marker.id?.startsWith(PILL_PREFIX)) {
             appleRef.current?.selectMarker(undefined);
-            onPill?.(marker.id.slice(PILL_PREFIX.length));
+            tapPill(marker.id);
           } else clustered.select(marker.id);
         }}
         onCameraMove={trackCamera}
@@ -417,8 +422,7 @@ export function PlacesMap({
           })),
         ]}
         onMarkerClick={(marker) => {
-          if (marker.id?.startsWith(PILL_PREFIX))
-            onPill?.(marker.id.slice(PILL_PREFIX.length));
+          if (marker.id?.startsWith(PILL_PREFIX)) tapPill(marker.id);
           else clustered.select(marker.id);
         }}
         onCameraMove={trackCamera}

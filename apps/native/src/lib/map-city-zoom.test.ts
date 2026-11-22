@@ -5,7 +5,10 @@ import {
   COUNTRY_ZOOM,
   cityFillingMap,
   flyToCity,
+  holdLevel,
   mapLevel,
+  type MapLevel,
+  moveView,
   stepUp,
 } from "./map-city-zoom";
 
@@ -22,19 +25,25 @@ it("names the city only while the camera is close enough for it to fill the map"
 });
 
 it("reads city, country or world from the camera", () => {
-  expect(mapLevel("Lisbon", lisbon, CITY_ZOOM, cities)).toEqual({
+  expect(
+    mapLevel({ centre: lisbon, zoom: CITY_ZOOM }, "Lisbon", cities),
+  ).toEqual({
     kind: "city",
     city: "Lisbon",
   });
-  expect(mapLevel("Lisbon", undefined, undefined, cities).kind).toBe("city");
-  expect(mapLevel(undefined, porto, CITY_ZOOM - 1, cities)).toEqual({
+  expect(mapLevel({}, "Lisbon", cities).kind).toBe("city");
+  expect(
+    mapLevel({ centre: porto, zoom: CITY_ZOOM - 1 }, undefined, cities),
+  ).toEqual({
     kind: "country",
     country: "PT",
   });
-  expect(mapLevel(undefined, porto, COUNTRY_ZOOM - 0.1, cities)).toEqual({
+  expect(
+    mapLevel({ centre: porto, zoom: COUNTRY_ZOOM - 0.1 }, undefined, cities),
+  ).toEqual({
     kind: "world",
   });
-  expect(mapLevel(undefined, porto, 4, [])).toEqual({
+  expect(mapLevel({ centre: porto, zoom: 4 }, undefined, [])).toEqual({
     kind: "city",
     city: undefined,
   });
@@ -75,7 +84,9 @@ it("prefers the country under the view to a nearer city across the border", () =
     { lat: 40.71, lng: -74.01, city: "New York" },
     { lat: 43.65, lng: -79.38, city: "Toronto" },
   ]);
-  expect(mapLevel(undefined, { lat: 41.5, lng: -81.7 }, 6, saves)).toEqual({
+  expect(
+    mapLevel({ centre: { lat: 41.5, lng: -81.7 }, zoom: 6 }, undefined, saves),
+  ).toEqual({
     kind: "country",
     country: "US",
   });
@@ -84,6 +95,43 @@ it("prefers the country under the view to a nearer city across the border", () =
 it("always offers every city from a zoomed-out view with none of them in it", () => {
   const india = { lat: 22, lng: 79 };
   const away = mapCities([tokyo]);
-  const level = mapLevel(undefined, india, 6, away);
+  const level = mapLevel({ centre: india, zoom: 6 }, undefined, away);
   expect(stepUp(level, away)?.to).toEqual({ kind: "world" });
 });
+
+it("falls back to the nearest country over open sea, past a city with none", () => {
+  const saves = mapCities([lisbon, { lat: 30, lng: -45, city: "Sea" }]);
+  expect(
+    mapLevel({ centre: { lat: 31, lng: -40 }, zoom: 4 }, undefined, saves),
+  ).toEqual({ kind: "country", country: "PT" });
+});
+
+const RUNGS = { world: 0, country: 1, city: 2 };
+const FLOWN_TO: MapLevel[] = [
+  { kind: "city", city: "Lisbon" },
+  { kind: "country", country: "PT" },
+  { kind: "world" },
+];
+
+it.each(FLOWN_TO)(
+  "never changes rung on a nudge, or moves the wrong way on a pinch, after flying to $kind",
+  (to) => {
+    const landings =
+      to.kind === "city" ? [9.25, 12] : [1, 1.5, 2, 2.5, 3, 6, 8];
+    for (const zoom of landings) {
+      const landed = moveView(holdLevel({}, to), lisbon, zoom, false);
+      const rungAt = (at: number) =>
+        RUNGS[
+          mapLevel(moveView(landed, porto, at, true), "Porto", cities).kind
+        ];
+      expect(rungAt(zoom)).toBe(RUNGS[to.kind]);
+
+      let last = -1;
+      for (let at = 0; at <= 14; at += 0.1) {
+        const rung = rungAt(at);
+        expect(rung).toBeGreaterThanOrEqual(last);
+        last = rung;
+      }
+    }
+  },
+);

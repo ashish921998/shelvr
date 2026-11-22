@@ -13,6 +13,13 @@ export type MapLevel =
   | { kind: "country"; country: string }
   | { kind: "world" };
 
+export type MapView = {
+  centre?: LatLng;
+  zoom?: number;
+  held?: MapLevel;
+  worldBelow?: number;
+};
+
 export type MapFlight = {
   places: LatLng[];
   minZoom?: number;
@@ -29,19 +36,52 @@ export function cityFillingMap(
   return zoom !== undefined && zoom < CITY_ZOOM ? undefined : city;
 }
 
-export function mapLevel(
-  city: string | undefined,
-  centre: LatLng | undefined,
+function worldEdge(to: MapLevel, zoom: number | undefined) {
+  if (zoom === undefined || to.kind === "city") return undefined;
+  return to.kind === "country"
+    ? Math.min(COUNTRY_ZOOM, zoom - LANDING_ROOM)
+    : Math.max(COUNTRY_ZOOM, zoom + LANDING_ROOM);
+}
+
+export function holdLevel(view: MapView, to: MapLevel): MapView {
+  return { ...view, held: to, worldBelow: worldEdge(to, view.zoom) };
+}
+
+export function moveView(
+  view: MapView,
+  centre: LatLng,
   zoom: number | undefined,
+  moved: boolean,
+): MapView {
+  const { held, worldBelow } = view;
+  if (held && !moved)
+    return { centre, zoom, held, worldBelow: worldEdge(held, zoom) };
+  const inCity = zoom !== undefined && zoom >= CITY_ZOOM;
+  return { centre, zoom, worldBelow: inCity ? undefined : worldBelow };
+}
+
+function stillSaved(level: MapLevel, cities: readonly MapCity[]) {
+  if (level.kind === "world") return cities.length > 0;
+  return level.kind === "country"
+    ? cities.some((city) => city.country === level.country)
+    : cities.some((city) => city.key === cityKey(level.city ?? ""));
+}
+
+export function mapLevel(
+  view: MapView,
+  cityInView: string | undefined,
   cities: readonly MapCity[],
 ): MapLevel {
+  const { centre, zoom, held, worldBelow = COUNTRY_ZOOM } = view;
+  if (held && stillSaved(held, cities)) return held;
   if (zoom === undefined || zoom >= CITY_ZOOM || cities.length === 0)
-    return { kind: "city", city };
-  if (!centre || zoom < COUNTRY_ZOOM) return { kind: "world" };
+    return { kind: "city", city: cityFillingMap(cityInView, zoom) };
+  if (!centre || zoom < worldBelow) return { kind: "world" };
+  const placed = cities.filter((city) => city.country);
   const under = countryAt(centre);
-  const country = cities.some((here) => here.country === under)
+  const country = placed.some((city) => city.country === under)
     ? under
-    : nearestCity(cities, centre)?.country;
+    : nearestCity(placed, centre)?.country;
   return country ? { kind: "country", country } : { kind: "world" };
 }
 
