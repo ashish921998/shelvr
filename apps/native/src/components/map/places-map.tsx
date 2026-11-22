@@ -267,6 +267,7 @@ export function PlacesMap({
     const camera = frameCamera.current;
     if (frameKey === undefined || !camera) return;
     checkNearby.current = undefined;
+    onFit.current = false;
     return command(
       () => map()?.setCameraPosition(camera),
       (error) => analytics.captureError("places_map_camera_failed", error),

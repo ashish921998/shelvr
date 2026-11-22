@@ -90,7 +90,13 @@ const AUSTIN = [
 const FOCUS: MapFocus = { lat: 30.27, lng: -97.73, key: 1 };
 
 function map(
-  person: { locate?: number; focus?: MapFocus; frame?: MapFrame } = {},
+  person: {
+    locate?: number;
+    focus?: MapFocus;
+    frame?: MapFrame;
+    showsUser?: boolean;
+    bottomInset?: number;
+  } = {},
 ) {
   return (
     <PlacesMap
@@ -326,6 +332,34 @@ it("flies to a shared city's places once for each save", async () => {
   await act(() => vi.advanceTimersByTimeAsync(200));
   expect(mock.moves.length).toBe(refreshed + 1);
 });
+
+it.each([
+  ["as the Map opens", true],
+  ["after the Map framed the saved places", false],
+])(
+  "stays on a city shared %s when the space under the map grows",
+  async (_name, sharedAtOpen) => {
+    const shared: MapFrame = {
+      key: "save-1",
+      places: [{ lat: 40.71, lng: -74.0 }],
+    };
+    const opened = (bottomInset: number, frame?: MapFrame) =>
+      map({ showsUser: false, bottomInset, frame });
+    const { rerender } = render(opened(120, sharedAtOpen ? shared : undefined));
+    rerender(opened(120, shared));
+    await act(() => vi.advanceTimersByTimeAsync(200));
+    rerender(opened(320, shared));
+    await act(() => vi.advanceTimersByTimeAsync(200));
+    expect(mock.moves).toEqual([
+      expect.objectContaining({
+        coordinates: {
+          latitude: expect.closeTo(40.71, 0),
+          longitude: expect.closeTo(-74, 0),
+        },
+      }),
+    ]);
+  },
+);
 
 it("flies out to frame every place when asked to zoom out", async () => {
   const far = [...AUSTIN, { id: "c", name: "Bar", lat: 32.78, lng: -96.8 }];
