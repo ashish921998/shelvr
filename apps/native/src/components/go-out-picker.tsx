@@ -95,6 +95,12 @@ function CategoryChip({
   );
 }
 
+const samePick = (a: GoOutPlace, b: GoOutPlace) =>
+  a.itemId === b.itemId &&
+  a.name === b.name &&
+  a.lat === b.lat &&
+  a.lng === b.lng;
+
 function PickResult({ place }: { place: GoOutPlace }) {
   const { theme } = useUnistyles();
   const open = () => {
@@ -155,7 +161,7 @@ export function GoOutPicker({
   const stopRoll = useRef<(() => void) | undefined>(undefined);
   useEffect(() => () => stopRoll.current?.(), []);
   const matches = places.filter((place) => goOutMatches(place, category));
-  const shown = picked && matches.includes(picked) ? picked : undefined;
+  const shown = picked && matches.find((place) => samePick(place, picked));
   const choose = (value: GoOutCategory | null) => {
     stopRoll.current?.();
     setCategory(value);
