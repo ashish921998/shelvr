@@ -42,24 +42,37 @@ type MapView = {
 const FIT_FILL = 0.8;
 const MIN_SPAN = 0.004;
 
+function shortestArc(longitudes: number[]): { middle: number; span: number } {
+  const sorted = [...longitudes].sort((a, b) => a - b);
+  let west = sorted[0];
+  let east = sorted[sorted.length - 1];
+  for (let i = 1; i < sorted.length; i++) {
+    const eastPastLine = sorted[i - 1] + 360;
+    if (eastPastLine - sorted[i] < east - west) {
+      west = sorted[i];
+      east = eastPastLine;
+    }
+  }
+  const middle = (west + east) / 2;
+  return { middle: middle > 180 ? middle - 360 : middle, span: east - west };
+}
+
 export function fitCamera(
   points: LatLng[],
   view: MapView,
 ): { coordinates: LatLng; zoom: number } | undefined {
   if (points.length === 0) return undefined;
   const lats = points.map((p) => p.latitude);
-  const lngs = points.map((p) => p.longitude);
   const minLat = Math.min(...lats);
   const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
+  const lng = shortestArc(points.map((p) => p.longitude));
   const midLat = (minLat + maxLat) / 2;
   // In Mercator a degree of latitude is 1 / cos(latitude) times taller than a degree of longitude is wide.
   const cos = Math.cos((midLat * Math.PI) / 180);
   const visible = Math.max(view.height - view.top - view.bottom, 1);
   const byWidth = Math.log2(
     (360 * FIT_FILL * view.width) /
-      (view.worldWidth * Math.max(maxLng - minLng, MIN_SPAN)),
+      (view.worldWidth * Math.max(lng.span, MIN_SPAN)),
   );
   const byHeight = Math.log2(
     (360 * FIT_FILL * visible * cos) /
@@ -71,7 +84,7 @@ export function fitCamera(
   return {
     coordinates: {
       latitude: midLat - (view.centerY - visibleMiddle) * latPerPoint,
-      longitude: (minLng + maxLng) / 2,
+      longitude: lng.middle,
     },
     zoom,
   };

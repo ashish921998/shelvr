@@ -79,4 +79,36 @@ describe("fitCamera", () => {
       0,
     );
   });
+
+  const alongEquator = (longitudes: number[]) =>
+    longitudes.map((longitude) => ({ latitude: 0, longitude }));
+
+  it.each([
+    ["Fiji, centred east", [177.44, -178.8, 179.33], 179.32],
+    ["the Aleutians, centred west", [-166.54, 173.18, -176.64], -176.68],
+    ["both names of the line", [180, -180], 180],
+    ["a pair centred on the line", [179, -179], 180],
+    ["the Pacific, more than a hemisphere apart", [-118.24, 139.69], -169.275],
+  ])("takes the short way round for %s", (_, longitudes, centre) => {
+    const camera = fitCamera(alongEquator(longitudes), view)!;
+    const awayFromTheLine = fitCamera(
+      alongEquator(longitudes.map((lng) => ((lng + 360) % 360) - 180)),
+      view,
+    )!;
+    expect(camera.coordinates.longitude).toBeCloseTo(centre);
+    expect(Math.abs(camera.coordinates.longitude)).toBeLessThanOrEqual(180);
+    expect(camera.zoom).toBeCloseTo(awayFromTheLine.zoom);
+  });
+
+  it.each([
+    ["one place", [178.4419]],
+    ["places up against the line", [179.991, 177.4434]],
+    ["places either side of Greenwich", [2.3522, -0.1276, -9.1393]],
+    ["a tie between both ways round", [180, 0]],
+    ["places all round the globe", [120, -120, 0]],
+  ])("keeps the plain middle for %s", (_, longitudes) => {
+    expect(
+      fitCamera(alongEquator(longitudes), view)!.coordinates.longitude,
+    ).toBe((Math.min(...longitudes) + Math.max(...longitudes)) / 2);
+  });
 });
