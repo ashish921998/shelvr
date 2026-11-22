@@ -37,6 +37,7 @@ type MapView = {
   bottom: number;
   worldWidth: number;
   centerY: number;
+  minZoom?: number;
 };
 
 const FIT_FILL = 0.8;
@@ -65,7 +66,10 @@ export function fitCamera(
     (360 * FIT_FILL * visible * cos) /
       (view.worldWidth * Math.max(maxLat - minLat, MIN_SPAN)),
   );
-  const zoom = Math.min(16, Math.max(3, Math.min(byWidth, byHeight)));
+  const zoom = Math.min(
+    16,
+    Math.max(view.minZoom ?? 3, Math.min(byWidth, byHeight)),
+  );
   const latPerPoint = (360 * cos) / (view.worldWidth * 2 ** zoom);
   const visibleMiddle = view.top + visible / 2;
   return {

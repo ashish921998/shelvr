@@ -891,6 +891,8 @@
   "map.searchMore": "%{total}件中%{count}件を表示中。続けて入力すると絞り込めます。",
   "map.showMyLocation": "現在地を表示",
   "map.showAllCities": "保存した都市をすべて表示",
+  "map.showCountry": "%{country}を表示",
+  "map.yourCities": "保存した都市",
   "map.continueTrip": "%{name}の計画を続ける",
   "navigation.trips": "旅行",
   "plans.title": "プラン",

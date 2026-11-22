@@ -37,24 +37,42 @@ function CityTitle({ city }: { city: string }) {
   );
 }
 
+function Heading({ text }: { text: string }) {
+  return (
+    <View accessibilityRole="header" style={styles.title}>
+      <ThemedText
+        variant="displayTitle"
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.6}
+        style={styles.city}
+      >
+        {text}
+      </ThemedText>
+    </View>
+  );
+}
+
 export function MapHeader({
   city,
+  heading,
   canSearch,
   searchOpen,
   text,
   onChangeText,
   onOpenSearch,
   onCancel,
-  onShowAllCities,
+  back,
 }: {
   city?: string;
+  heading?: string;
   canSearch: boolean;
   searchOpen: boolean;
   text: string;
   onChangeText: (text: string) => void;
   onOpenSearch: () => void;
   onCancel: () => void;
-  onShowAllCities?: () => void;
+  back?: { label: string; onPress: () => void };
 }) {
   const router = useRouter();
   const { rt } = useUnistyles();
@@ -67,11 +85,9 @@ export function MapHeader({
     left = <MapSearchField text={text} onChangeText={onChangeText} />;
   } else if (city) {
     left = <CityTitle city={city} />;
+  } else if (heading) {
+    left = <Heading text={heading} />;
   }
-  const back =
-    city && !searchOpen && onShowAllCities ? (
-      <BackCircle label={t("map.showAllCities")} onPress={onShowAllCities} />
-    ) : null;
   let right = null;
   if (searchOpen) {
     right = (
@@ -95,7 +111,9 @@ export function MapHeader({
   }
   return (
     <View style={[styles.row, { top: rt.insets.top }]}>
-      {back}
+      {back && !searchOpen ? (
+        <BackCircle label={back.label} onPress={back.onPress} />
+      ) : null}
       {left}
       <View style={styles.actions}>
         {right}

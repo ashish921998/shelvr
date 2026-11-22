@@ -9,7 +9,11 @@ const mocks = vi.hoisted(() => ({
   params: {} as Record<string, string>,
   frame: undefined as { key: string; places: { city: string }[] } | undefined,
   centre: undefined as ((c: object, zoom: number) => void) | undefined,
-  zoomOut: undefined as number | undefined,
+  flight: undefined as
+    | { key: number; places: object[]; minZoom?: number; maxZoom?: number }
+    | undefined,
+  pills: [] as { id: string; text: string }[],
+  pill: undefined as ((id: string) => void) | undefined,
   viewport: undefined as { height: number; bottomInset: number } | undefined,
   pins: [] as { id: string }[],
   select: undefined as ((id: string) => void) | undefined,
@@ -83,15 +87,17 @@ vi.mock("@/components/map/map-header", () => ({
   MapHeader: vi.fn(
     ({
       city,
-      onShowAllCities,
+      heading,
+      back,
     }: {
       city?: string;
-      onShowAllCities?: () => void;
+      heading?: string;
+      back?: { label: string; onPress: () => void };
     }) => (
       <div>
-        <span>{city ?? "wordmark"}</span>
-        {onShowAllCities ? (
-          <button aria-label="all" onClick={onShowAllCities} />
+        <span>{city ?? heading ?? "wordmark"}</span>
+        {back ? (
+          <button aria-label={back.label} onClick={back.onPress} />
         ) : null}
       </div>
     ),
@@ -101,7 +107,9 @@ vi.mock("@/components/map/places-map", () => ({
   PlacesMap: vi.fn(
     (props: {
       onCentreChange: (c: object, zoom: number) => void;
-      zoomOut: number;
+      flight?: typeof mocks.flight;
+      pills: typeof mocks.pills;
+      onPill: (id: string) => void;
       height: number;
       bottomInset: number;
       pins: { id: string }[];
@@ -112,7 +120,9 @@ vi.mock("@/components/map/places-map", () => ({
       mocks.pins = props.pins;
       mocks.select = props.onSelect;
       mocks.centre = props.onCentreChange;
-      mocks.zoomOut = props.zoomOut;
+      mocks.flight = props.flight;
+      mocks.pills = props.pills;
+      mocks.pill = props.onPill;
       mocks.viewport = props;
       return null;
     },
@@ -198,7 +208,7 @@ beforeEach(() => {
   mocks.params = {};
 });
 
-it("tells the tab bar which city is in view, and clears it when zoomed out to every place", () => {
+it("tells the tab bar which city is in view, and clears it when zoomed out", () => {
   render(<MapScreen />);
   expect(mocks.setCity).toHaveBeenLastCalledWith("Lisbon");
 
@@ -206,11 +216,33 @@ it("tells the tab bar which city is in view, and clears it when zoomed out to ev
   expect(mocks.setCity).toHaveBeenLastCalledWith("Porto");
   expect(screen.getByText("Porto")).toBeTruthy();
 
-  fireEvent.click(screen.getByLabelText("all"));
-  expect(mocks.zoomOut).toBe(1);
   act(() => mocks.centre?.({ lat: 40, lng: -9 }, 6));
   expect(mocks.setCity).toHaveBeenLastCalledWith(undefined);
-  expect(screen.getByText("wordmark")).toBeTruthy();
+});
+
+it("steps from a city to its country to every city, with a pill per city once zoomed out", () => {
+  render(<MapScreen />);
+  expect(screen.getByText("Lisbon")).toBeTruthy();
+  expect(mocks.pills).toEqual([]);
+
+  fireEvent.click(screen.getByLabelText("map.showCountry"));
+  expect(mocks.flight?.key).toBe(1);
+  expect(mocks.flight?.places).toHaveLength(2);
+
+  act(() => mocks.centre?.({ lat: 40, lng: -9 }, 6));
+  expect(screen.getByText("Portugal")).toBeTruthy();
+  expect(mocks.pills.map((pill) => pill.id)).toEqual(["lisbon", "porto"]);
+  expect(mocks.pins).toEqual([]);
+
+  fireEvent.click(screen.getByLabelText("map.showAllCities"));
+  expect(mocks.flight?.key).toBe(2);
+  act(() => mocks.centre?.({ lat: 40, lng: -9 }, 1));
+  expect(screen.getByText("map.yourCities")).toBeTruthy();
+  expect(screen.queryByRole("button")).toBeNull();
+
+  act(() => mocks.pill?.("porto"));
+  expect(mocks.flight?.key).toBe(3);
+  expect(mocks.flight?.minZoom).toBe(9);
 });
 
 it("keeps the map behind the floating controls while framing places above them", () => {

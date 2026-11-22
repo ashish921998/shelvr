@@ -941,6 +941,8 @@
   "map.searchMore": "Mostrando %{count} de %{total}. Continue digitando para filtrar.",
   "map.showMyLocation": "Mostrar minha localização",
   "map.showAllCities": "Mostrar todas as suas cidades",
+  "map.showCountry": "Mostrar %{country}",
+  "map.yourCities": "Suas cidades",
   "map.continueTrip": "Continuar planejando %{name}",
   "navigation.trips": "Viagens",
   "plans.title": "Planos",

@@ -891,6 +891,8 @@
   "map.searchMore": "%{total}개 중 %{count}개 표시 중. 더 입력하면 좁혀져요.",
   "map.showMyLocation": "내 위치 보기",
   "map.showAllCities": "내 도시 모두 보기",
+  "map.showCountry": "%{country} 보기",
+  "map.yourCities": "내 도시",
   "map.continueTrip": "%{name} 계획 이어서 하기",
   "navigation.trips": "여행",
   "plans.title": "플랜",

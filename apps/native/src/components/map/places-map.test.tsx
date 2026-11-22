@@ -326,7 +326,7 @@ it("flies to a shared city's places once for each save", async () => {
   expect(mock.moves.length).toBe(refreshed + 1);
 });
 
-it("flies out to frame every place when asked to zoom out", async () => {
+it("flies to fit the places it is given, held between the zooms it is given", async () => {
   const far = [...AUSTIN, { id: "c", name: "Bar", lat: 32.78, lng: -96.8 }];
   const { rerender } = render(map());
   await act(() => vi.advanceTimersByTimeAsync(200));
@@ -338,8 +338,7 @@ it("flies out to frame every place when asked to zoom out", async () => {
       pins={AUSTIN}
       anchors={AUSTIN}
       framed={AUSTIN}
-      overview={far}
-      zoomOut={1}
+      flight={{ key: 1, places: far, maxZoom: 6 }}
       showsUser
       height={800}
       topInset={100}
@@ -349,7 +348,7 @@ it("flies out to frame every place when asked to zoom out", async () => {
   );
   await act(() => vi.advanceTimersByTimeAsync(200));
   const move = mock.moves.slice(before).find((m) => m !== "person") as Camera;
-  expect(move.zoom).toBeLessThan(9);
+  expect(move.zoom).toBe(6);
   const centre = move.coordinates as { latitude: number; longitude: number };
   expect(centre.latitude).toBeGreaterThan(30.28);
   expect(centre.latitude).toBeLessThan(32.78);
@@ -681,4 +680,39 @@ describe("opening on the person while Discover loads by area", () => {
     );
     expect(onArea).toHaveBeenCalledTimes(1);
   });
+});
+
+it("draws a marker per city with its count, and a tap opens that city, not a place", () => {
+  const onPill = vi.fn();
+  const onSelect = vi.fn();
+  render(
+    <PlacesMap
+      areaPartial={false}
+      onArea={vi.fn()}
+      pins={[]}
+      anchors={[]}
+      framed={AUSTIN}
+      pills={[
+        { id: "austin", lat: 30.27, lng: -97.74, name: "Austin", count: 2 },
+      ]}
+      onPill={onPill}
+      showsUser={false}
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={onSelect}
+    />,
+  );
+  expect(mock.props.markers).toEqual([
+    expect.objectContaining({
+      id: "city:austin",
+      title: "Austin",
+      monogram: "2",
+    }),
+  ]);
+  mock.clearSelection.mockClear();
+  act(() => mock.props.onMarkerClick({ id: "city:austin" }));
+  expect(onPill).toHaveBeenCalledWith("austin");
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(mock.clearSelection).toHaveBeenCalledWith(undefined);
 });

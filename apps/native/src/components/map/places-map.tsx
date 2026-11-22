@@ -9,6 +9,7 @@ import {
   withReach,
 } from "@/lib/discover-area";
 import { moveCamera } from "@/lib/map-camera";
+import type { MapFlight } from "@/lib/map-city-zoom";
 import { hasPlaceNear, NEARBY_KM } from "@/lib/map-filters";
 import { type MapPin } from "@/lib/map-pin-clusters";
 import { useMapPinClusters } from "@/lib/use-map-pin-clusters";
@@ -40,6 +41,10 @@ export type MapFocus = LatLng & { key: number };
 
 export type MapFrame = { key: string; places: LatLng[] };
 
+export type MapCityPill = LatLng & { id: string; name: string; count: number };
+
+const PILL_PREFIX = "city:";
+
 /** How close the camera comes to a place picked from search. */
 const FOCUS_ZOOM = 15;
 
@@ -57,8 +62,9 @@ type Props = {
   focus?: MapFocus;
   frame?: MapFrame;
   locate?: number;
-  overview?: MapPin[];
-  zoomOut?: number;
+  flight?: MapFlight & { key: number };
+  pills?: MapCityPill[];
+  onPill?: (id: string) => void;
   filterRevision?: number;
   onCentreChange?: (centre: LatLng, zoom: number) => void;
   onSelect: (id: string) => void;
@@ -77,14 +83,15 @@ export function PlacesMap({
   focus,
   frame,
   locate,
-  overview,
-  zoomOut,
+  flight,
+  pills = [],
+  onPill,
   filterRevision = 0,
   onCentreChange,
   onSelect,
   onArea,
 }: Props) {
-  const { rt } = useUnistyles();
+  const { theme, rt } = useUnistyles();
   const appleRef = useRef<AppleMaps.MapView>(null);
   const googleRef = useRef<GoogleMaps.MapView>(null);
   // Whichever map this platform rendered.
@@ -95,7 +102,7 @@ export function PlacesMap({
   });
 
   const cameraFor = useCallback(
-    (points: LatLng[]) => {
+    (points: LatLng[], minZoom?: number) => {
       const camera = fitCamera(
         points.map((pin) => ({ latitude: pin.lat, longitude: pin.lng })),
         {
@@ -105,6 +112,7 @@ export function PlacesMap({
           bottom: bottomInset,
           worldWidth: 256,
           centerY: height / 2,
+          minZoom,
         },
       );
       return camera && process.env.EXPO_OS === "ios"
@@ -125,11 +133,7 @@ export function PlacesMap({
 
   // expo-maps applies a cameraPosition prop without animation, so it only ever holds the first camera.
   const [firstCamera] = useState(showsUser ? undefined : fit);
-  const overviewCamera = useMemo(
-    () => (overview ? cameraFor(overview) : undefined),
-    [cameraFor, overview],
-  );
-  const latest = useRef({ anchors, areaPartial, fit, overviewCamera });
+  const latest = useRef({ anchors, areaPartial, fit });
   const centredOnUser = useRef(false);
   const framedOnce = useRef(showsUser || firstCamera !== undefined);
   const touched = useRef(false);
@@ -153,9 +157,9 @@ export function PlacesMap({
     [],
   );
   useEffect(() => {
-    latest.current = { anchors, areaPartial, fit, overviewCamera };
+    latest.current = { anchors, areaPartial, fit };
     if (anchors !== undefined && rested.current) checkNearby.current?.();
-  }, [anchors, areaPartial, fit, overviewCamera]);
+  }, [anchors, areaPartial, fit]);
   const waitForRest = () => {
     clearTimeout(settle.current);
     rested.current = false;
@@ -267,16 +271,30 @@ export function PlacesMap({
     );
   }, [frameKey, command]);
 
+  const flightKey = flight?.key;
+  const flightCamera = useRef<ReturnType<typeof cameraFor>>(undefined);
   useEffect(() => {
-    if (!zoomOut) return;
+    const camera = flight ? cameraFor(flight.places, 0) : undefined;
+    flightCamera.current = camera && {
+      ...camera,
+      zoom: Math.min(
+        flight?.maxZoom ?? Infinity,
+        Math.max(
+          flight?.minZoom ?? -Infinity,
+          camera.zoom - (flight?.room ?? 0),
+        ),
+      ),
+    };
+  }, [flight, cameraFor]);
+  useEffect(() => {
+    const camera = flightCamera.current;
+    if (flightKey === undefined || !camera) return;
     checkNearby.current = undefined;
-    const camera = latest.current.overviewCamera;
-    if (!camera) return;
     return command(
       () => map()?.setCameraPosition(camera),
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
-  }, [zoomOut, command]);
+  }, [flightKey, command]);
 
   useEffect(() => {
     if (!locate) return;
@@ -292,7 +310,7 @@ export function PlacesMap({
     !focus &&
     frameKey === undefined &&
     !locate &&
-    !zoomOut &&
+    flightKey === undefined &&
     !!fit &&
     (!showsUser || anchors !== undefined);
   useEffect(() => {
@@ -361,8 +379,22 @@ export function PlacesMap({
           myLocationButtonEnabled: false,
           togglePitchEnabled: false,
         }}
-        markers={clustered.markers}
-        onMarkerClick={(marker) => clustered.select(marker.id)}
+        markers={[
+          ...clustered.markers,
+          ...pills.map((pill) => ({
+            id: PILL_PREFIX + pill.id,
+            coordinates: { latitude: pill.lat, longitude: pill.lng },
+            title: pill.name,
+            monogram: String(pill.count),
+            tintColor: theme.colors.primary,
+          })),
+        ]}
+        onMarkerClick={(marker) => {
+          if (marker.id?.startsWith(PILL_PREFIX)) {
+            appleRef.current?.selectMarker(undefined);
+            onPill?.(marker.id.slice(PILL_PREFIX.length));
+          } else clustered.select(marker.id);
+        }}
         onCameraMove={trackCamera}
       />
     ) : (
@@ -370,8 +402,20 @@ export function PlacesMap({
         ref={googleRef}
         style={styles.map}
         cameraPosition={firstCamera}
-        markers={clustered.markers}
-        onMarkerClick={(marker) => clustered.select(marker.id)}
+        markers={[
+          ...clustered.markers,
+          ...pills.map((pill) => ({
+            id: PILL_PREFIX + pill.id,
+            coordinates: { latitude: pill.lat, longitude: pill.lng },
+            title: pill.name,
+            snippet: String(pill.count),
+          })),
+        ]}
+        onMarkerClick={(marker) => {
+          if (marker.id?.startsWith(PILL_PREFIX))
+            onPill?.(marker.id.slice(PILL_PREFIX.length));
+          else clustered.select(marker.id);
+        }}
         onCameraMove={trackCamera}
       />
     );

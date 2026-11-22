@@ -74,20 +74,23 @@ vi.mock("react-native", () => ({
 
 function Harness({
   city,
+  heading,
   canSearch = true,
-  onShowAllCities,
+  back,
 }: {
   city?: string;
+  heading?: string;
   canSearch?: boolean;
-  onShowAllCities?: () => void;
+  back?: { label: string; onPress: () => void };
 }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   return (
     <MapHeader
       city={city}
+      heading={heading}
       canSearch={canSearch}
-      onShowAllCities={onShowAllCities}
+      back={back}
       searchOpen={open}
       text={text}
       onChangeText={setText}
@@ -136,16 +139,23 @@ it("hides Search when there are no places but keeps Profile", () => {
   expect(push).toHaveBeenCalledWith("/profile");
 });
 
-it("offers the way back to every city only beside a city title, and not while searching", () => {
-  const showAll = vi.fn();
-  const { rerender } = render(<Harness onShowAllCities={showAll} />);
-  expect(screen.queryByLabelText("map.showAllCities")).toBeNull();
-  rerender(<Harness city="Lisbon" onShowAllCities={showAll} />);
-  fireEvent.click(screen.getByLabelText("map.showAllCities"));
-  expect(showAll).toHaveBeenCalledTimes(1);
-  rerender(<Harness city="Lisbon" />);
-  expect(screen.queryByLabelText("map.showAllCities")).toBeNull();
-  rerender(<Harness city="Lisbon" onShowAllCities={showAll} />);
+it("titles a zoomed-out map with its heading, which opens no city page", () => {
+  render(<Harness heading="Portugal" />);
+  expect(screen.getByText("Portugal")).toBeTruthy();
+  expect(screen.queryByText("wordmark")).toBeNull();
+  fireEvent.click(screen.getByText("Portugal"));
+  expect(push).not.toHaveBeenCalled();
+});
+
+it("shows the step up beside the title, and not while searching", () => {
+  const onPress = vi.fn();
+  const { rerender } = render(<Harness city="Lisbon" />);
+  expect(screen.queryByLabelText("Show Portugal")).toBeNull();
+  rerender(
+    <Harness city="Lisbon" back={{ label: "Show Portugal", onPress }} />,
+  );
+  fireEvent.click(screen.getByLabelText("Show Portugal"));
+  expect(onPress).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByLabelText("map.searchPlaceholder"));
-  expect(screen.queryByLabelText("map.showAllCities")).toBeNull();
+  expect(screen.queryByLabelText("Show Portugal")).toBeNull();
 });

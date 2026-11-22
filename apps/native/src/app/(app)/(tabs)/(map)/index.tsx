@@ -7,6 +7,7 @@ import { MapSearchResults } from "@/components/map/map-search";
 import { MapTripPill } from "@/components/map/map-trip-pill";
 import { MapWentSwitch } from "@/components/map/map-went-switch";
 import {
+  type MapCityPill,
   type MapFocus,
   type MapFrame,
   type MapPin,
@@ -32,8 +33,14 @@ import {
   type WentFilter,
   wentView,
 } from "@/lib/map-filters";
-import { setMapCityInView } from "@/lib/map-city-in-view";
-import { canShowAllCities } from "@/lib/map-city-zoom";
+import { cityCounts, type MapCity } from "@/lib/map-cities";
+import {
+  flyToCity,
+  type MapFlight,
+  type MapLevel,
+  type MapStep,
+  stepUp,
+} from "@/lib/map-city-zoom";
 import {
   type DiscoverPlace,
   type MapEntry,
@@ -48,6 +55,7 @@ import { placeEmoji } from "@/lib/map-pin-emoji";
 import { useDiscoverPlaces } from "@/lib/use-discover-places";
 import { usePlaceVisits } from "@/lib/use-place-visit";
 import { visitMatcher } from "@convex/model/placeVisits";
+import { countryName } from "@convex/model/tripCountries";
 import { cityKey } from "@convex/model/trip";
 import { api } from "@convex/_generated/api";
 import type { PlaceKind } from "@convex/model/placeKinds";
@@ -135,13 +143,8 @@ function useFraming(
       })),
     [anchorEntries],
   );
-  const overview = useMemo(
-    () => anchorEntries.map((place) => ({ ...place, id: entryId(place) })),
-    [anchorEntries],
-  );
   return {
     framed: useHeldFraming(live, key),
-    overview,
     frame: useSharedCityFrame(all),
   };
 }
@@ -160,6 +163,67 @@ function useSharedCityFrame(all: OwnPlace[] | undefined): MapFrame | undefined {
       ? { key: save, places: framedPins(places) }
       : undefined;
   }, [all, city, save]);
+}
+
+function countryLabel(code: string) {
+  return countryName(code) ?? code;
+}
+
+function levelHeading(level: MapLevel) {
+  if (level.kind === "country") return countryLabel(level.country);
+  return level.kind === "world" ? t("map.yourCities") : undefined;
+}
+
+function useFlight() {
+  const [flight, setFlight] = useState<
+    (MapFlight & { key: number }) | undefined
+  >(undefined);
+  const fly = useCallback(
+    (next: MapFlight) =>
+      setFlight((previous) => ({
+        places: next.places,
+        minZoom: next.minZoom,
+        maxZoom: next.maxZoom,
+        room: next.room,
+        key: (previous?.key ?? 0) + 1,
+      })),
+    [],
+  );
+  return { flight, fly };
+}
+
+function useCityPills(
+  zoomedOut: boolean,
+  cities: MapCity[],
+  matches: Entry[],
+): MapCityPill[] {
+  return useMemo(
+    () =>
+      zoomedOut
+        ? cityCounts(
+            cities,
+            matches.filter((place) => place.source !== "discover"),
+          ).map(({ city, count }) => ({
+            id: city.key,
+            lat: city.lat,
+            lng: city.lng,
+            name: city.name,
+            count,
+          }))
+        : [],
+    [zoomedOut, cities, matches],
+  );
+}
+
+function backFor(step: MapStep | undefined, fly: (flight: MapFlight) => void) {
+  if (!step) return undefined;
+  return {
+    label:
+      step.to.kind === "country"
+        ? t("map.showCountry", { country: countryLabel(step.to.country) })
+        : t("map.showAllCities"),
+    onPress: () => fly(step),
+  };
 }
 
 function useOnNewKey(key: string | undefined, run: () => void) {
@@ -199,7 +263,7 @@ export default function MapScreen() {
   const [focus, setFocus] = useState<MapFocus | undefined>(undefined);
   const [searchOpen, setSearchOpen] = useState(false);
   const [locate, setLocate] = useState(0);
-  const [zoomOut, setZoomOut] = useState(0);
+  const { flight, fly } = useFlight();
   const [mapHeight, setMapHeight] = useState(0);
   const [stripHeight, setStripHeight] = useState(0);
   const barHeight = useBottomTabBarHeight();
@@ -220,7 +284,7 @@ export default function MapScreen() {
     () => wentView(all ?? [], wentFilter, visited),
     [all, wentFilter, visited],
   );
-  const { city, onCentreChange } = useMapCity(all ?? NO_PLACES);
+  const { city, level, cities, onCentreChange } = useMapCity(all ?? NO_PLACES);
   const {
     area,
     setArea,
@@ -240,9 +304,16 @@ export default function MapScreen() {
     () => (searching ? searchEntries(shown, searchText) : shown),
     [searching, shown, searchText],
   );
+  const pills = useCityPills(level.kind !== "city", cities, matches);
   const pins: MapPin[] = useMemo(
     () =>
-      ownOnTop(matches).map((place) => ({
+      ownOnTop(
+        level.kind !== "city"
+          ? matches.filter(
+              (place) => place.source !== "discover" && !place.city,
+            )
+          : matches,
+      ).map((place) => ({
         ...place,
         id: entryId(place),
         emoji: placeEmoji(place),
@@ -257,16 +328,13 @@ export default function MapScreen() {
               }
             : {}),
       })),
-    [matches, rt.themeName, theme],
+    [level.kind, matches, rt.themeName, theme],
   );
-  useEffect(() => {
-    setMapCityInView(city);
-  }, [city]);
   const waiting =
     all === undefined ||
     (all.length === 0 && !settled) ||
     location === "asking";
-  const { framed, overview, frame } = useFraming(
+  const { framed, frame } = useFraming(
     anchorEntries,
     `${waiting}|${kinds.join(",")}|${went.selected}`,
     all,
@@ -381,8 +449,12 @@ export default function MapScreen() {
           focus={focus}
           frame={frame}
           locate={locate}
-          overview={overview}
-          zoomOut={zoomOut}
+          flight={flight}
+          pills={pills}
+          onPill={(key) => {
+            const picked = cities.find((each) => each.key === key);
+            if (picked) fly(flyToCity(picked));
+          }}
           filterRevision={filterRevision}
           onCentreChange={onCentreChange}
           onSelect={select}
@@ -390,7 +462,8 @@ export default function MapScreen() {
         />
       ) : null}
       <MapHeader
-        city={city}
+        city={level.kind === "city" ? city : undefined}
+        heading={levelHeading(level)}
         canSearch={hasPlaces}
         searchOpen={searchOpen}
         text={searchText}
@@ -400,11 +473,7 @@ export default function MapScreen() {
         }}
         onOpenSearch={() => setSearchOpen(true)}
         onCancel={cancelSearch}
-        onShowAllCities={
-          canShowAllCities(city, anchorEntries)
-            ? () => setZoomOut((n) => n + 1)
-            : undefined
-        }
+        back={backFor(stepUp(level, cities), fly)}
       />
       {searchOpen && listOpen ? (
         <View style={[styles.results, { top: headerBottom }]}>

@@ -26,6 +26,7 @@
     "@expo/ui": "~58.0.20",
     "@mozilla/readability": "^0.6.0",
     "@posthog/react-native-plugin": "^2.12.0",
+    "@rapideditor/country-coder": "6.0.0",
     "@shopify/flash-list": "2.0.2",
     "@shopify/react-native-skia": "2.14.0",
     "@tanstack/query-sync-storage-persister": "^5.101.2",
