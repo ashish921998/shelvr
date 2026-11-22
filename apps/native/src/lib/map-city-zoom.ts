@@ -1,10 +1,13 @@
 import { framedPins } from "@/lib/city-pins";
 import { type MapCity, nearestCity } from "@/lib/map-cities";
-import { cityKey, type LatLng } from "@convex/model/trip";
+import { cityKey, distanceKm, type LatLng } from "@convex/model/trip";
 
 export const CITY_ZOOM = 9;
 export const COUNTRY_ZOOM = 2.5;
 const PILL_ROOM = 0.7;
+const WORLD_ZOOM = 1;
+const LANDING_ROOM = 0.25;
+const WORLD_KM = 40_000;
 
 export type MapLevel =
   | { kind: "city"; city?: string }
@@ -35,11 +38,11 @@ export function mapLevel(
 ): MapLevel {
   if (zoom === undefined || zoom >= CITY_ZOOM || cities.length === 0)
     return { kind: "city", city };
-  const country =
-    centre && zoom >= COUNTRY_ZOOM
-      ? nearestCity(cities, centre)?.country
-      : undefined;
-  return country ? { kind: "country", country } : { kind: "world" };
+  if (!centre || zoom < COUNTRY_ZOOM) return { kind: "world" };
+  const nearest = nearestCity(cities, centre);
+  return nearest?.country && distanceKm(centre, nearest) <= WORLD_KM / 2 ** zoom
+    ? { kind: "country", country: nearest.country }
+    : { kind: "world" };
 }
 
 export function stepUp(
@@ -54,7 +57,7 @@ export function stepUp(
       return {
         to: { kind: "country", country: here.country },
         places: cities.filter((city) => city.country === here.country),
-        minZoom: COUNTRY_ZOOM,
+        minZoom: COUNTRY_ZOOM + LANDING_ROOM,
         maxZoom: CITY_ZOOM - 1,
         room: PILL_ROOM,
       };
@@ -62,11 +65,15 @@ export function stepUp(
   return {
     to: { kind: "world" },
     places: [...cities],
+    minZoom: WORLD_ZOOM,
     maxZoom: COUNTRY_ZOOM - 0.5,
     room: PILL_ROOM,
   };
 }
 
 export function flyToCity(city: MapCity): MapFlight {
-  return { places: framedPins(city.places), minZoom: CITY_ZOOM };
+  return {
+    places: framedPins(city.places),
+    minZoom: CITY_ZOOM + LANDING_ROOM,
+  };
 }

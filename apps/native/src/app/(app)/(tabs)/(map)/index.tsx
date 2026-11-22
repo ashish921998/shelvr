@@ -52,10 +52,10 @@ import { useAnchors, useHeldFraming } from "@/lib/map-framing";
 import { useMapLocation } from "@/lib/map-location";
 import { useMapCity } from "@/lib/use-map-city";
 import { placeEmoji } from "@/lib/map-pin-emoji";
+import { tripCountryLine } from "@/lib/trip-planner";
 import { useDiscoverPlaces } from "@/lib/use-discover-places";
 import { usePlaceVisits } from "@/lib/use-place-visit";
 import { visitMatcher } from "@convex/model/placeVisits";
-import { countryName } from "@convex/model/tripCountries";
 import { cityKey } from "@convex/model/trip";
 import { api } from "@convex/_generated/api";
 import type { PlaceKind } from "@convex/model/placeKinds";
@@ -165,12 +165,8 @@ function useSharedCityFrame(all: OwnPlace[] | undefined): MapFrame | undefined {
   }, [all, city, save]);
 }
 
-function countryLabel(code: string) {
-  return countryName(code) ?? code;
-}
-
 function levelHeading(level: MapLevel) {
-  if (level.kind === "country") return countryLabel(level.country);
+  if (level.kind === "country") return tripCountryLine([level.country]);
   return level.kind === "world" ? t("map.yourCities") : undefined;
 }
 
@@ -220,7 +216,7 @@ function backFor(step: MapStep | undefined, fly: (flight: MapFlight) => void) {
   return {
     label:
       step.to.kind === "country"
-        ? t("map.showCountry", { country: countryLabel(step.to.country) })
+        ? t("map.showCountry", { country: tripCountryLine([step.to.country]) })
         : t("map.showAllCities"),
     onPress: () => fly(step),
   };
@@ -310,7 +306,7 @@ export default function MapScreen() {
       ownOnTop(
         level.kind !== "city"
           ? matches.filter(
-              (place) => place.source !== "discover" && !place.city,
+              (place) => place.source === "discover" || !place.city,
             )
           : matches,
       ).map((place) => ({

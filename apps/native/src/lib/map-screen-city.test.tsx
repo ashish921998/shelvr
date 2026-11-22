@@ -39,6 +39,7 @@ const place = (name: string, city: string, lat: number) => ({
 vi.mock("@/lib/map-city-in-view", () => ({ setMapCityInView: mocks.setCity }));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
+  formattingLocale: () => "ja",
   useAppLocale: () => "en",
 }));
 vi.mock("@/lib/analytics", () => ({
@@ -230,7 +231,7 @@ it("steps from a city to its country to every city, with a pill per city once zo
   expect(mocks.flight?.places).toHaveLength(2);
 
   act(() => mocks.centre?.({ lat: 40, lng: -9 }, 6));
-  expect(screen.getByText("Portugal")).toBeTruthy();
+  expect(screen.getByText("ポルトガル")).toBeTruthy();
   expect(mocks.pills.map((pill) => pill.id)).toEqual(["lisbon", "porto"]);
   expect(mocks.pins).toEqual([]);
 
@@ -242,7 +243,7 @@ it("steps from a city to its country to every city, with a pill per city once zo
 
   act(() => mocks.pill?.("porto"));
   expect(mocks.flight?.key).toBe(3);
-  expect(mocks.flight?.minZoom).toBe(9);
+  expect(mocks.flight?.minZoom).toBeGreaterThan(9);
 });
 
 it("keeps the map behind the floating controls while framing places above them", () => {
@@ -275,6 +276,9 @@ it("shows Discover places beside the person's own while the went switch is on Al
   expect(mocks.discover.open).toHaveBeenCalledWith(
     expect.objectContaining({ _id: "p1", source: "discover" }),
   );
+
+  act(() => mocks.centre?.({ lat: 40, lng: -9 }, 6));
+  expect(mocks.pins.map((pin) => pin.id)).toEqual(["discover:p1"]);
 
   act(() => mocks.went?.("want"));
   expect(mocks.pins.map((pin) => pin.id)).not.toContain("discover:p1");
