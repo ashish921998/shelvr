@@ -60,6 +60,7 @@ type Props = {
   overview?: MapPin[];
   zoomOut?: number;
   filterRevision?: number;
+  searchOpen?: boolean;
   onCentreChange?: (centre: LatLng, zoom: number) => void;
   onSelect: (id: string) => void;
   onArea: (box: MapBox) => void;
@@ -80,6 +81,7 @@ export function PlacesMap({
   overview,
   zoomOut,
   filterRevision = 0,
+  searchOpen = false,
   onCentreChange,
   onSelect,
   onArea,
@@ -90,9 +92,15 @@ export function PlacesMap({
   // Whichever map this platform rendered.
   const map = () => appleRef.current ?? googleRef.current;
   const { width } = rt.screen;
-  const clustered = useMapPinClusters(pins, onSelect, {
-    clearSelection: () => appleRef.current?.selectMarker(undefined),
-  });
+  const clearSelection = () => appleRef.current?.selectMarker(undefined);
+  const clustered = useMapPinClusters(
+    pins,
+    (id) => {
+      clearSelection();
+      onSelect(id);
+    },
+    { clearSelection },
+  );
 
   const cameraFor = useCallback(
     (points: LatLng[]) => {
@@ -318,6 +326,9 @@ export function PlacesMap({
   }, [canFrameLatePlaces, showsUser, command]);
 
   useEffect(() => {
+    if (searchOpen) onFit.current = false;
+  }, [searchOpen]);
+  useEffect(() => {
     if (fittedInset.current === bottomInset) return;
     fittedInset.current = bottomInset;
     const { fit } = latest.current;
@@ -386,6 +397,7 @@ export function PlacesMap({
           togglePitchEnabled: false,
         }}
         markers={clustered.markers}
+        annotations={clustered.badges}
         onMarkerClick={(marker) => clustered.select(marker.id)}
         onCameraMove={trackCamera}
       />

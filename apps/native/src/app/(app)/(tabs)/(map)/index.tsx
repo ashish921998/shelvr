@@ -19,7 +19,6 @@ import {
   cancelPlaceDetails,
   openPlaceDetails,
 } from "@/lib/apple-place-card";
-import { isDarkThemeName } from "@/lib/appearance";
 import { withAlpha } from "@/lib/color";
 import { framedPins } from "@/lib/city-pins";
 import type { MapBox } from "@/lib/discover-area";
@@ -109,7 +108,6 @@ function useMapEntries(
   const shown = useMemo(() => filterPlaces(entries, kinds), [entries, kinds]);
   const { anchorEntries, anchors } = useAnchors(shown, areaLoaded);
   return {
-    area,
     setArea,
     settled,
     areaPartial,
@@ -223,7 +221,6 @@ export default function MapScreen() {
   );
   const { city, onCentreChange } = useMapCity(all ?? NO_PLACES);
   const {
-    area,
     setArea,
     settled,
     areaPartial,
@@ -250,15 +247,10 @@ export default function MapScreen() {
         ...(place.source === "discover"
           ? { tintColor: theme.colors.muted }
           : place.visited
-            ? {
-                tintColor: isDarkThemeName(rt.themeName)
-                  ? theme.colors.primarySoft
-                  : theme.colors.primaryText,
-                title: `✓ ${place.name}`,
-              }
+            ? { title: `✓ ${place.name}` }
             : {}),
       })),
-    [matches, rt.themeName, theme],
+    [matches, theme],
   );
   useEffect(() => {
     setMapCityInView(city);
@@ -379,6 +371,7 @@ export default function MapScreen() {
           height={mapHeight}
           topInset={headerBottom + theme.gap(1)}
           bottomInset={barHeight + (showStrip ? stripHeight : 0) + theme.gap(1)}
+          searchOpen={searchOpen}
           focus={focus}
           frame={frame}
           locate={locate}
@@ -425,7 +418,7 @@ export default function MapScreen() {
         pointerEvents="box-none"
         style={[styles.aboveBar, { bottom: barHeight }]}
       >
-        {!hasPlaces && area === undefined ? (
+        {!hasPlaces && !showStrip ? (
           <MapEmpty
             located={located}
             onLocate={() => setLocate((n) => n + 1)}
@@ -433,7 +426,7 @@ export default function MapScreen() {
         ) : null}
         <View pointerEvents="box-none" style={styles.controls}>
           <MapTripPill city={city} />
-          {(hasPlaces || area !== undefined) && located ? (
+          {(hasPlaces || showStrip) && located ? (
             <View style={styles.locate}>
               <MapRoundButton
                 icon="location"

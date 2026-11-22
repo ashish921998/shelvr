@@ -130,7 +130,6 @@ function Spots({
           selected={null}
           height={mapHeight}
           coveredBottom={theme.gap(5)}
-          onSelect={() => undefined}
           visible={dropped}
         />
         <View style={styles.added}>

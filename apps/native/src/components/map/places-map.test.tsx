@@ -52,6 +52,9 @@ vi.mock("expo-maps", () => ({
   },
   GoogleMaps: { View: vi.fn(() => null) },
 }));
+vi.mock("expo-image", () => ({
+  Image: { loadAsync: () => Promise.resolve({ width: 150 }) },
+}));
 vi.mock("react-native", () => ({
   View: vi.fn(
     ({
@@ -96,6 +99,7 @@ function map(
     frame?: MapFrame;
     showsUser?: boolean;
     bottomInset?: number;
+    searchOpen?: boolean;
   } = {},
 ) {
   return (
@@ -258,18 +262,49 @@ it("uses native markers to declutter nearby places, keeping their emoji, title a
       zoom: 14,
     }),
   );
-  expect(mock.props.annotations).toBeUndefined();
+  expect(mock.props.annotations).toEqual([]);
   expect(mock.props.markers[0]).toMatchObject({
-    id: "a",
     title: "Ramen",
     monogram: "🍜",
     tintColor: "#ffffff",
   });
   expect(mock.props.properties.emphasis).toBe("MUTED");
-  act(() => mock.props.onMarkerClick({ id: "a" }));
+  act(() => mock.props.onMarkerClick({ id: mock.props.markers[0].id }));
   expect(onSelect).toHaveBeenCalledWith("a");
+  expect(mock.clearSelection).toHaveBeenCalledWith(undefined);
   expect(mock.props.markers[0].tintColor).toBe("#amber");
   expect(mock.props.markers[1].tintColor).toBe("#ffffff");
+});
+
+it("replaces a marker whose own color changes, so a hidden map paints it, but not one that is only picked", () => {
+  const onSelect = vi.fn();
+  const colored = (tintColor?: string) => (
+    <PlacesMap
+      areaPartial={false}
+      onArea={vi.fn()}
+      pins={[{ ...AUSTIN[0]!, tintColor }]}
+      anchors={AUSTIN}
+      framed={AUSTIN}
+      showsUser={false}
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={onSelect}
+    />
+  );
+  const { rerender } = render(colored());
+  const white = mock.props.markers[0].id;
+  rerender(colored("#muted"));
+  const muted = mock.props.markers[0].id;
+  expect(muted).not.toBe(white);
+  act(() => mock.props.onMarkerClick({ id: muted }));
+  expect(onSelect).toHaveBeenCalledWith("a");
+  expect(mock.props.markers[0]).toMatchObject({
+    id: muted,
+    tintColor: "#amber",
+  });
+  rerender(colored());
+  expect(mock.props.markers[0].id).toBe(white);
 });
 
 it("draws nearby places as one place pin named after the first and keeps them all reachable", () => {
@@ -433,6 +468,7 @@ it.each([
     { id: "jd7b", name: "Ramen", source: "own" },
     "Ramen +1",
     "#ffffff",
+    false,
   ],
   [
     "a visited save and a Discover place",
@@ -447,28 +483,31 @@ it.each([
       name: "Ramen",
       title: "✓ Ramen",
       source: "own",
-      tintColor: "#went",
+      visited: true,
     },
     "Ramen +1",
     "#ffffff",
+    false,
   ],
   [
     "a visited and an unvisited save",
-    { id: "a", name: "Ramen", title: "✓ Ramen", tintColor: "#went" },
+    { id: "a", name: "Ramen", title: "✓ Ramen", visited: true },
     { id: "b", name: "Tacos" },
     "Ramen +1",
     "#ffffff",
+    false,
   ],
   [
     "two visited saves",
-    { id: "a", name: "Ramen", title: "✓ Ramen", tintColor: "#went" },
-    { id: "b", name: "Tacos", title: "✓ Tacos", tintColor: "#went" },
+    { id: "a", name: "Ramen", title: "✓ Ramen", visited: true },
+    { id: "b", name: "Tacos", title: "✓ Tacos", visited: true },
     "✓ Ramen +1",
-    "#went",
+    "#ffffff",
+    true,
   ],
 ] as const)(
   "says only what is true of every place in a pin grouping %s",
-  (_name, one, other, title, tintColor) => {
+  async (_name, one, other, title, tintColor, badged) => {
     render(
       <PlacesMap
         areaPartial={false}
@@ -487,6 +526,8 @@ it.each([
       />,
     );
     expect(mock.props.markers[0]).toMatchObject({ title, tintColor });
+    await act(async () => {});
+    expect(mock.props.annotations).toHaveLength(badged ? 1 : 0);
   },
 );
 
@@ -587,6 +628,18 @@ it.each([
     }
   },
 );
+
+it("leaves the map alone when Search changes the room under it, open or closed", async () => {
+  const opened = (bottomInset: number, searchOpen: boolean) =>
+    map({ showsUser: false, bottomInset, searchOpen });
+  const { rerender } = render(opened(228, false));
+  rerender(opened(178, true));
+  rerender(opened(98, true));
+  rerender(opened(98, false));
+  rerender(opened(228, false));
+  await act(() => vi.advanceTimersByTimeAsync(1000));
+  expect(mock.moves).toEqual([]);
+});
 
 it("drops a pending sheet refit once the person touches the map", async () => {
   const opened = (bottomInset: number) => (
@@ -907,5 +960,26 @@ describe("opening on the person while Discover loads by area", () => {
       areaMap({ anchors: LISBON, showsUser: false, onArea, height: 400 }),
     );
     expect(onArea).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("a touch while the map is still opening", () => {
+  beforeEach(() => {
+    mock.findsPerson = true;
+  });
+
+  it("still reaches the person when a touch lands before the opening move does", async () => {
+    mock.findsPerson = false;
+    const view = render(areaMap());
+    await act(async () => {
+      await Promise.resolve();
+    });
+    fireEvent.touchStart(view.getByTestId("map-touch"));
+    mock.findsPerson = true;
+    await act(async () => {
+      vi.advanceTimersByTime(1000);
+      await Promise.resolve();
+    });
+    expect(latitudes()).toEqual([undefined, undefined]);
   });
 });

@@ -6,6 +6,7 @@ export type MapPin = Pin & {
   title?: string;
   text?: string;
   tintColor?: string;
+  visited?: boolean;
   source?: "own" | "discover";
 };
 
