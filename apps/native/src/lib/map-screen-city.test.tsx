@@ -7,11 +7,16 @@ import MapScreen from "@/app/(app)/(tabs)/(map)/index";
 const mocks = vi.hoisted(() => ({
   setCity: vi.fn(),
   params: {} as Record<string, string>,
+  places: undefined as object[] | undefined,
+  location: "denied",
+  area: undefined as ((box: object) => void) | undefined,
   frame: undefined as { key: string; places: { city: string }[] } | undefined,
   centre: undefined as ((c: object, zoom: number) => void) | undefined,
   zoomOut: undefined as number | undefined,
-  viewport: undefined as { height: number; bottomInset: number } | undefined,
-  pins: [] as { id: string }[],
+  viewport: undefined as
+    | { height: number; bottomInset: number; searchOpen: boolean }
+    | undefined,
+  pins: [] as { id: string; title?: string; tintColor?: string }[],
   select: undefined as ((id: string) => void) | undefined,
   chips: undefined as { kinds: string[] } | undefined,
   went: undefined as ((value: string) => void) | undefined,
@@ -40,7 +45,7 @@ vi.mock("@/lib/i18n", () => ({
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: vi.fn(), captureError: vi.fn() },
 }));
-vi.mock("@/lib/map-location", () => ({ useMapLocation: () => "denied" }));
+vi.mock("@/lib/map-location", () => ({ useMapLocation: () => mocks.location }));
 vi.mock("@/lib/use-discover-places", () => ({
   useDiscoverPlaces: () => mocks.discover,
 }));
@@ -56,7 +61,10 @@ vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({
     isError: false,
-    data: [place("A", "Lisbon", 38.7), place("B", "Porto", 41.1)],
+    data: mocks.places ?? [
+      place("A", "Lisbon", 38.7),
+      place("B", "Porto", 41.1),
+    ],
   }),
 }));
 vi.mock("@/components/map/map-trip-pill", () => ({
@@ -84,11 +92,14 @@ vi.mock("@/components/map/map-header", () => ({
     ({
       city,
       onShowAllCities,
+      onOpenSearch,
     }: {
       city?: string;
       onShowAllCities?: () => void;
+      onOpenSearch: () => void;
     }) => (
       <div>
+        <button aria-label="search" onClick={onOpenSearch} />
         <span>{city ?? "wordmark"}</span>
         {onShowAllCities ? (
           <button aria-label="all" onClick={onShowAllCities} />
@@ -104,10 +115,13 @@ vi.mock("@/components/map/places-map", () => ({
       zoomOut: number;
       height: number;
       bottomInset: number;
+      searchOpen: boolean;
       pins: { id: string }[];
       onSelect: (id: string) => void;
       frame?: typeof mocks.frame;
+      onArea: (box: object) => void;
     }) => {
+      mocks.area = props.onArea;
       mocks.frame = props.frame;
       mocks.pins = props.pins;
       mocks.select = props.onSelect;
@@ -121,20 +135,26 @@ vi.mock("@/components/map/places-map", () => ({
 vi.mock("@/components/map/map-search", () => ({
   MapSearchResults: vi.fn(() => null),
 }));
-vi.mock("@/components/map/map-empty", () => ({ MapEmpty: vi.fn(() => null) }));
-vi.mock("@/components/map/map-filter-chips", () => ({
-  MapFilterChips: vi.fn((props: typeof mocks.chips) => {
+vi.mock("@/components/map/map-empty", () => ({
+  MapEmpty: vi.fn(({ located }: { located: boolean }) => (
+    <div data-testid="empty">{located ? <i data-testid="locate" /> : null}</div>
+  )),
+}));
+vi.mock("@/components/map/map-kind-row", () => ({
+  MapKindRow: vi.fn((props: typeof mocks.chips) => {
     mocks.chips = props;
     return null;
   }),
 }));
 vi.mock("@/components/map/map-round-button", () => ({
-  MapRoundButton: vi.fn(() => null),
+  MapRoundButton: vi.fn(({ label }: { label: string }) =>
+    label === "map.showMyLocation" ? <i data-testid="locate" /> : null,
+  ),
 }));
 vi.mock("@/components/map/map-went-switch", () => ({
   MapWentSwitch: vi.fn(({ onSelect }: { onSelect: (v: string) => void }) => {
     mocks.went = onSelect;
-    return null;
+    return <span data-testid="went" />;
   }),
 }));
 vi.mock("@/lib/use-place-visit", () => ({
@@ -156,9 +176,15 @@ vi.mock("@/components/ui/screen-loader", () => ({
 }));
 vi.mock("react-native", () => ({
   Keyboard: { dismiss: vi.fn() },
-  ScrollView: vi.fn(({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  )),
+  ScrollView: vi.fn(
+    ({
+      children,
+      horizontal,
+    }: {
+      children: ReactNode;
+      horizontal?: boolean;
+    }) => <div data-horizontal={horizontal}>{children}</div>,
+  ),
   View: vi.fn(
     ({
       children,
@@ -180,6 +206,8 @@ vi.mock("react-native", () => ({
 
 beforeEach(() => {
   mocks.setCity.mockClear();
+  mocks.places = undefined;
+  mocks.location = "denied";
   mocks.discover = {
     settled: true,
     areaLoaded: true,
@@ -206,10 +234,28 @@ it("tells the tab bar which city is in view, and clears it when zoomed out to ev
   expect(screen.getByText("wordmark")).toBeTruthy();
 });
 
+it("marks a visited place by its title and badge, without recoloring its pin", () => {
+  render(<MapScreen />);
+  const [visited, unvisited] = ["A:", "B:"].map((prefix) =>
+    mocks.pins.find((pin) => pin.id.startsWith(prefix)),
+  );
+  expect(visited).toMatchObject({ visited: true, title: "✓ A" });
+  expect(visited?.tintColor).toBeUndefined();
+  expect(unvisited).toMatchObject({ visited: false });
+});
+
 it("keeps the map behind the floating controls while framing places above them", () => {
   render(<MapScreen />);
   expect(mocks.viewport?.height).toBe(800);
   expect(mocks.viewport?.bottomInset).toBeGreaterThan(80);
+});
+
+it("tells the map when Search hides the went switch", () => {
+  render(<MapScreen />);
+  expect(mocks.viewport?.searchOpen).toBe(false);
+  fireEvent.click(screen.getByLabelText("search"));
+  expect(screen.queryByTestId("went")).toBeNull();
+  expect(mocks.viewport?.searchOpen).toBe(true);
 });
 
 it("shows Discover places beside the person's own while the went switch is on All, and opens them", () => {
@@ -241,6 +287,11 @@ it("shows Discover places beside the person's own while the went switch is on Al
   expect(mocks.pins.map((pin) => pin.id)).not.toContain("discover:p1");
 });
 
+it("lets the went switch scroll sideways when large text makes it wider than the screen", () => {
+  render(<MapScreen />);
+  expect(screen.getByTestId("went").closest("[data-horizontal]")).toBeTruthy();
+});
+
 it("frames the city a share just added to, keyed by its save", () => {
   mocks.params = { city: "porto", save: "save-1" };
   render(<MapScreen />);
@@ -260,4 +311,29 @@ it("clears the went switch so a shared city's places show", () => {
   mocks.params = { city: "porto", save: "save-1" };
   rerender(<MapScreen />);
   expect(mocks.pins.some((pin) => pin.id.startsWith("B:"))).toBe(true);
+});
+
+it.each([
+  ["denied", 0],
+  ["granted", 1],
+])(
+  "keeps the no-places card once the map reports its area, with location %s",
+  (location, buttons) => {
+    mocks.params = {};
+    mocks.places = [];
+    mocks.location = location;
+    render(<MapScreen />);
+    expect(screen.getByTestId("empty")).toBeTruthy();
+    act(() => mocks.area?.({ south: 1, north: 2, west: 3, east: 4 }));
+    expect(screen.getByTestId("empty")).toBeTruthy();
+    expect(screen.queryAllByTestId("locate")).toHaveLength(buttons);
+  },
+);
+
+it("drops the no-places card when the area in view has Discover places", () => {
+  mocks.params = {};
+  mocks.places = [];
+  mocks.discover.beside = [{ ...place("C", "Paris", 48.8), _id: "c" }];
+  render(<MapScreen />);
+  expect(screen.queryByTestId("empty")).toBeNull();
 });

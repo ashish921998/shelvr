@@ -1,0 +1,14 @@
+diff --git a/ios/AppleMapsView.swift b/ios/AppleMapsView.swift
+index 3b718c64fdee51c7061fa30c53502a9fb4d5329a..4cdb0cba5f6e359eacabb9c69e0c1ddfc3163dfc 100644
+--- a/ios/AppleMapsView.swift
++++ b/ios/AppleMapsView.swift
+@@ -4,7 +4,8 @@ import ExpoModulesCore
+ import MapKit
+ import SwiftUI
+ 
+-class AppleMapsViewProps: ExpoSwiftUI.ViewProps {
++class AppleMapsViewProps: ExpoSwiftUI.ViewProps, ExpoSwiftUI.SafeAreaControllable {
++  var ignoreSafeArea: ExpoSwiftUI.IgnoreSafeArea? = .keyboard
+   @Field var markers: [MapMarker] = []
+   @Field var annotations: [MapAnnotation] = []
+   @Field var polylines: [ExpoAppleMapPolyline] = []

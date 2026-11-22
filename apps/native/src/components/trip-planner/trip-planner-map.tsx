@@ -111,6 +111,7 @@ export function TripPlannerMap({
     day: number | null;
   } | null>(null);
   if (focusedPin && focusedPin.day !== activeDay) setFocusedPin(null);
+  const focused = focusedPin?.day === activeDay ? focusedPin : null;
   const pins = useMemo(
     () => planPins(days, activeDay).filter((pin) => pin.active),
     [days, activeDay],
@@ -134,9 +135,9 @@ export function TripPlannerMap({
   const bottom = theme.gap(4);
   const camera = useMemo(() => {
     const chosen =
-      focusedPin?.key === STAY_ID
+      focused?.key === STAY_ID
         ? stayPoint
-        : pins.find((pin) => pinKey(pin) === focusedPin?.key)?.coordinates;
+        : pins.find((pin) => pinKey(pin) === focused?.key)?.coordinates;
     const nearbyStay =
       stayPoint &&
       (activeDay === null ||
@@ -175,12 +176,18 @@ export function TripPlannerMap({
     top,
     bottom,
     insetTop,
-    focusedPin,
+    focused,
   ]);
 
   // expo-maps applies every cameraPosition change without animation, so the prop holds the first camera only.
-  const [firstCamera, setFirstCamera] = useState(camera);
-  if (firstCamera === undefined && camera !== undefined) setFirstCamera(camera);
+  const mapKey = activeDay === null ? "overview-map" : "day-map";
+  const [opened, setOpened] = useState({ mapKey, camera });
+  if (
+    opened.mapKey !== mapKey ||
+    (opened.camera === undefined && camera !== undefined)
+  )
+    setOpened({ mapKey, camera });
+  const firstCamera = opened.camera;
   useEffect(() => {
     if (!camera || camera === firstCamera) return;
     return moveCamera(
@@ -260,6 +267,7 @@ export function TripPlannerMap({
       <View style={styles.header} onLayout={onLayout}>
         <View style={[styles.map, { height }]}>
           <AppleMaps.View
+            key={mapKey}
             ref={ref}
             style={StyleSheet.absoluteFill}
             cameraPosition={firstCamera}
@@ -298,6 +306,7 @@ export function TripPlannerMap({
     <View style={styles.header} onLayout={onLayout}>
       <View style={[styles.map, { height }]}>
         <GoogleMaps.View
+          key={mapKey}
           style={StyleSheet.absoluteFill}
           cameraPosition={camera}
           properties={

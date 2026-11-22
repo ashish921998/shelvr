@@ -1590,5 +1590,6 @@
     "one": "Votre passeport compte %{formattedCount} ville",
     "many": "Votre passeport compte %{formattedCount} villes",
     "other": "Votre passeport compte %{formattedCount} villes"
-  }
+  },
+  "mapSheet.groupTitle": "%{name} +%{count}"
 }

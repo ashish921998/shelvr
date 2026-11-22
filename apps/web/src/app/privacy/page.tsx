@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMetadata(
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="November 20, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="November 22, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
@@ -229,6 +229,14 @@ export default function PrivacyPage() {
           vote page, their first name. Only you see that name, in the app and in
           one notification about the first vote. The link closes after a week,
           and we delete it, its votes and those names about a week after that.
+        </p>
+        <p className="mt-2">
+          If you share your Shelvr Passport, anyone with the link can see your
+          first name, if we have it, and the names of places you’ve marked as
+          visited, grouped by city. The page shows counts of places, cities and,
+          when available, countries. It can also show a map from Apple Maps with
+          approximate locations for the cities. To turn off the link, open
+          Settings and choose “Stop sharing my passport”.
         </p>
       </section>
 

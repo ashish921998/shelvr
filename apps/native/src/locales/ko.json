@@ -1442,5 +1442,6 @@
   "passport.momentCityStamp": "%{city}에 가 봤어요",
   "passport.paywallHeadline": {
     "other": "여권에 도시 %{formattedCount}곳"
-  }
+  },
+  "mapSheet.groupTitle": "%{name} +%{count}"
 }

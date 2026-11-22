@@ -6,6 +6,7 @@ import {
   hasPlaceNear,
   keepSelected,
   mapFilters,
+  mapRowFilters,
   searchPlaces,
   topSearchResults,
   wentView,
@@ -50,6 +51,15 @@ describe("mapFilters", () => {
     expect(mapFilters([...places, ...places, ...places])).toEqual([
       { kind: "drinks", count: 3 },
     ]);
+  });
+});
+
+describe("mapRowFilters", () => {
+  it("leaves Stays off the Map's row, however many hotels are saved", () => {
+    const places = [place(["stay"]), place(["food", "stay"]), place(["food"])];
+    const saved = [...places, ...places];
+    expect(mapFilters(saved).map((filter) => filter.kind)).toContain("stay");
+    expect(mapRowFilters(saved)).toEqual([{ kind: "food", count: 4 }]);
   });
 });
 

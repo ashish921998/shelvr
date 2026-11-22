@@ -575,7 +575,6 @@ export function TripPlanBody({
       ) : null}
       {showMap && mapHasPoints ? (
         <TripPlannerMap
-          key={day === null ? "overview-map" : "day-map"}
           days={trip.days}
           stay={trip.stay}
           activeDay={day}

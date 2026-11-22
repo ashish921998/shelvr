@@ -120,3 +120,13 @@ it("goes back and closes", () => {
   expect(onBack).toHaveBeenCalledTimes(1);
   expect(onClose).toHaveBeenCalledTimes(1);
 });
+
+it("keeps the pick when a refresh sends the same places as new objects", () => {
+  const view = render(picker());
+  fireEvent.click(roll());
+  const refreshed = places.map((place) => ({ ...place }));
+  view.rerender(picker({ places: refreshed }));
+  expect(screen.getByText("Franklin Barbecue")).toBeTruthy();
+  fireEvent.click(roll());
+  expect(screen.getByText("Small Victory")).toBeTruthy();
+});

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { Id } from "../_generated/dataModel";
 import type { ApplePoi } from "./appleMaps";
 import {
+  anchoredDateStops,
   dateSlotOf,
   fillTargets,
   keepDateSuggestion,
@@ -367,4 +368,30 @@ describe("keepDateSuggestion", () => {
       ),
     ).toBe(false);
   });
+});
+
+it("starts at the place picked, not a nearby one whose name sits inside its name", () => {
+  const cedar = candidate({ name: "Cedar", category: "Restaurant" });
+  const bar = candidate({
+    name: "Cedar Bar",
+    category: "Restaurant",
+    ...north(1),
+    itemId: item(2),
+  });
+  const start = { name: bar.name, lat: bar.lat, lng: bar.lng };
+  const { scored } = anchoredDateStops(start, [cedar, bar], NOW);
+  expect(scored[0]?.stop.name).toBe("Cedar Bar");
+});
+
+it("starts at the nearer of two branches with the same name", () => {
+  const far = candidate({ name: "Cedar", category: "Restaurant" });
+  const picked = candidate({
+    name: "Cedar",
+    category: "Restaurant",
+    ...north(1),
+    itemId: item(2),
+  });
+  const start = { name: picked.name, lat: picked.lat, lng: picked.lng };
+  const { scored } = anchoredDateStops(start, [far, picked], NOW);
+  expect(scored[0]?.stop.itemId).toBe(item(2));
 });

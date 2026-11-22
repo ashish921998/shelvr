@@ -131,6 +131,7 @@
           }
         ]
       },
+      "deploymentTarget": "18.0",
       "bundleIdentifier": "app.shelvr.save"
     },
     "android": {

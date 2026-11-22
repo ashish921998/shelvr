@@ -223,6 +223,20 @@ export function savedDateStops(
   return kept;
 }
 
+function pickedVenue(
+  start: DateStart,
+  candidates: readonly DateCandidate[],
+): DateCandidate | undefined {
+  const key = placeKey(start.name);
+  return candidates
+    .filter((candidate) => sameVenue(candidate, start))
+    .sort(
+      (a, b) =>
+        Number(placeKey(b.name) === key) - Number(placeKey(a.name) === key) ||
+        distanceKm(a, start) - distanceKm(b, start),
+    )[0];
+}
+
 export function anchoredDateStops(
   start: DateStart,
   candidates: readonly DateCandidate[],
@@ -231,8 +245,7 @@ export function anchoredDateStops(
   const chosen =
     (start.appleId
       ? candidates.find((candidate) => candidate.appleId === start.appleId)
-      : undefined) ??
-    candidates.find((candidate) => sameVenue(candidate, start));
+      : undefined) ?? pickedVenue(start, candidates);
   if (!chosen) return { kind: "classic", scored: [] };
   const kind =
     dateSlotOf("lowkey", chosen.category, chosen.tags, chosen.ownTags) ===

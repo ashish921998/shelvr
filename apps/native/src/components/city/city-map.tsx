@@ -21,7 +21,7 @@ type Props = {
   height: number;
   /** How much of the map's bottom the places sheet covers when the page opens. */
   coveredBottom: number;
-  onSelect: (id: string) => void;
+  onSelect?: (id: string) => void;
   visible?: number;
   visited?: ReadonlySet<string>;
 };
@@ -43,20 +43,21 @@ export function CityMap({
       pins.slice(0, visible).map((pin) => {
         const id = cityPinId(pin);
         return visited?.has(id)
-          ? {
-              ...pin,
-              id,
-              title: `✓ ${pin.name}`,
-              tintColor: theme.colors.muted,
-            }
+          ? { ...pin, id, title: `✓ ${pin.name}`, visited: true }
           : { ...pin, id };
       }),
-    [pins, visible, visited, theme.colors.muted],
+    [pins, visible, visited],
   );
-  const clustered = useMapPinClusters(shown, onSelect, {
-    selectedId: selected,
-    clearSelection: () => ref.current?.selectMarker(undefined),
-  });
+  const clearSelection = () => ref.current?.selectMarker(undefined);
+  const clustered = useMapPinClusters(
+    shown,
+    (id) => {
+      if (!onSelect) return;
+      clearSelection();
+      onSelect(id);
+    },
+    { selectedId: selected, clearSelection },
+  );
 
   const fit = useMemo(
     () =>
@@ -136,6 +137,7 @@ export function CityMap({
         }
         uiSettings={{ compassEnabled: false, myLocationButtonEnabled: false }}
         markers={clustered.markers}
+        annotations={clustered.badges}
         onMarkerClick={(pin) => clustered.select(pin.id)}
         onCameraMove={({ zoom }) => clustered.trackZoom(zoom)}
       />

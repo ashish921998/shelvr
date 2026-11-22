@@ -92,11 +92,20 @@ vi.mock("@/components/ui/action-menu", () => ({
     ),
   ),
 }));
-vi.mock("@/components/trip-planner/trip-planner-map", () => ({
-  TripPlannerMap: vi.fn(({ activeDay }: { activeDay: number | null }) => (
-    <div>{`map ${activeDay}`}</div>
-  )),
-}));
+vi.mock("@/components/trip-planner/trip-planner-map", async () => {
+  const { useState } = await import("react");
+  function TripPlannerMap({ activeDay }: { activeDay: number | null }) {
+    const [pin, setPin] = useState<string>();
+    return (
+      <>
+        <div>{`map ${activeDay}`}</div>
+        <button onClick={() => setPin("Barton Springs")}>tap pin</button>
+        {pin ? <p>{`map focused on ${pin}`}</p> : null}
+      </>
+    );
+  }
+  return { TripPlannerMap };
+});
 vi.mock("@/components/trip-planner/trip-stop-details-sheet", () => ({
   TripStopDetailsSheet: vi.fn(({ stop }: { stop: { name: string } }) => (
     <div>{`details ${stop.name}`}</div>
@@ -256,4 +265,22 @@ it("shows the map for the open day and stops loading saves behind it", () => {
   fireEvent.click(button("navigation.map"));
   expect(screen.getByText("map 0")).toBeTruthy();
   expect(mocks.placesArgs.at(-1)).toBe("skip");
+});
+
+it("keeps the pin tapped on the overview when its day opens", () => {
+  const body = (day: number | null) => (
+    <TripPlanBody
+      trip={trip}
+      canUseSaves
+      canFillFromSaves
+      day={day}
+      onPickDay={vi.fn()}
+      onAddPlace={vi.fn()}
+    />
+  );
+  const { rerender } = render(body(null));
+  fireEvent.click(button("navigation.map"));
+  fireEvent.click(button("tap pin"));
+  rerender(body(0));
+  expect(screen.getByText("map focused on Barton Springs")).toBeTruthy();
 });
