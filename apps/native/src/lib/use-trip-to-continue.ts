@@ -1,4 +1,8 @@
-import { CONTINUE_LEAD_DAYS, tripToContinue } from "@/lib/trip-planner";
+import {
+  CONTINUE_LEAD_DAYS,
+  sameCity,
+  tripToContinue,
+} from "@/lib/trip-planner";
 import { MAX_TRIP_DAYS, toDateKey, tripDayDate } from "@/lib/trip";
 import { useReportLoadFailure } from "@/lib/use-report-load-failure";
 import { api } from "@convex/_generated/api";
@@ -37,7 +41,7 @@ function dayKey(today: string, offset: number): string {
   return date ? toDateKey(date) : today;
 }
 
-export function useTripToContinue() {
+export function useTripToContinue(city: string | undefined) {
   const today = useToday();
   const trips = useQuery(
     convexQuery(api.tripPlannerData.listTripsStarting, {
@@ -47,7 +51,13 @@ export function useTripToContinue() {
   );
   useReportLoadFailure("map_trips_load_failed", trips);
   return useMemo(
-    () => tripToContinue(trips.data ?? [], tripDayDate(today, 0) ?? new Date()),
-    [trips.data, today],
+    () =>
+      city === undefined
+        ? null
+        : tripToContinue(
+            (trips.data ?? []).filter((trip) => sameCity(trip.city, city)),
+            tripDayDate(today, 0) ?? new Date(),
+          ),
+    [trips.data, today, city],
   );
 }

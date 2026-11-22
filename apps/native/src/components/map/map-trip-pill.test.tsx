@@ -7,6 +7,7 @@ import { MapTripPill } from "./map-trip-pill";
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
   capture: vi.fn(),
+  useTrip: vi.fn(),
   next: null as null | {
     trip: { _id: string; city: string; name?: string };
     inProgress: boolean;
@@ -14,7 +15,10 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/use-trip-to-continue", () => ({
-  useTripToContinue: () => mocks.next,
+  useTripToContinue: (city: string | undefined) => {
+    mocks.useTrip(city);
+    return mocks.next;
+  },
 }));
 vi.mock("@/lib/trip-planner", () => ({
   tripName: (trip: { name?: string; city: string }) =>
@@ -59,16 +63,24 @@ beforeEach(() => {
 });
 
 it("shows nothing without a trip under way or about to start", () => {
-  const { container } = render(<MapTripPill />);
+  const { container } = render(<MapTripPill city="Kyoto" />);
   expect(container.innerHTML).toBe("");
 });
+
+it.each([["New York"], [undefined]])(
+  "asks for a trip in the city the map shows: %s",
+  (city) => {
+    render(<MapTripPill city={city} />);
+    expect(mocks.useTrip).toHaveBeenCalledWith(city);
+  },
+);
 
 it("opens the trip and records whether it is under way", () => {
   mocks.next = {
     trip: { _id: "trip1", city: "Kyoto", name: "Autumn in Kyoto" },
     inProgress: false,
   };
-  render(<MapTripPill />);
+  render(<MapTripPill city="kyoto" />);
   fireEvent.click(
     screen.getByRole("button", { name: "map.continueTrip Autumn in Kyoto" }),
   );

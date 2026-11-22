@@ -51,6 +51,12 @@ export function mapFilters(
   }).sort((a, b) => b.count - a.count);
 }
 
+export function mapRowFilters(
+  places: readonly Kinded[],
+): { kind: PlaceKind; count: number }[] {
+  return mapFilters(places).filter((filter) => filter.kind !== "stay");
+}
+
 export function keepSelected(
   kinds: PlaceKind[],
   selected: readonly PlaceKind[],

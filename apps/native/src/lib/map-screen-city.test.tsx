@@ -122,8 +122,8 @@ vi.mock("@/components/map/map-search", () => ({
   MapSearchResults: vi.fn(() => null),
 }));
 vi.mock("@/components/map/map-empty", () => ({ MapEmpty: vi.fn(() => null) }));
-vi.mock("@/components/map/map-filter-chips", () => ({
-  MapFilterChips: vi.fn((props: typeof mocks.chips) => {
+vi.mock("@/components/map/map-kind-row", () => ({
+  MapKindRow: vi.fn((props: typeof mocks.chips) => {
     mocks.chips = props;
     return null;
   }),
@@ -134,7 +134,7 @@ vi.mock("@/components/map/map-round-button", () => ({
 vi.mock("@/components/map/map-went-switch", () => ({
   MapWentSwitch: vi.fn(({ onSelect }: { onSelect: (v: string) => void }) => {
     mocks.went = onSelect;
-    return null;
+    return <span data-testid="went" />;
   }),
 }));
 vi.mock("@/lib/use-place-visit", () => ({
@@ -163,9 +163,15 @@ vi.mock("react-native-unistyles", () => ({
 }));
 vi.mock("react-native", () => ({
   Keyboard: { dismiss: vi.fn() },
-  ScrollView: vi.fn(({ children }: { children: ReactNode }) => (
-    <div>{children}</div>
-  )),
+  ScrollView: vi.fn(
+    ({
+      children,
+      horizontal,
+    }: {
+      children: ReactNode;
+      horizontal?: boolean;
+    }) => <div data-horizontal={horizontal}>{children}</div>,
+  ),
   View: vi.fn(
     ({
       children,
@@ -246,6 +252,11 @@ it("shows Discover places beside the person's own while the went switch is on Al
 
   act(() => mocks.went?.("want"));
   expect(mocks.pins.map((pin) => pin.id)).not.toContain("discover:p1");
+});
+
+it("lets the went switch scroll sideways when large text makes it wider than the screen", () => {
+  render(<MapScreen />);
+  expect(screen.getByTestId("went").closest("[data-horizontal]")).toBeTruthy();
 });
 
 it("frames the city a share just added to, keyed by its save", () => {

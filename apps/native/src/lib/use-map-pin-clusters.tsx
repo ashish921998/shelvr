@@ -20,13 +20,11 @@ export function useMapPinClusters(
   const [picked, setPicked] = useState<string | null>(null);
   const selected =
     options.selectedId === undefined ? picked : options.selectedId;
+  const worldWidth =
+    (process.env.EXPO_OS === "ios" ? rt.screen.width : 256) * 2 ** zoom;
   const clusters = useMemo(
-    () =>
-      clusterMapPins(
-        pins,
-        (process.env.EXPO_OS === "ios" ? rt.screen.width : 256) * 2 ** zoom,
-      ),
-    [pins, rt.screen.width, zoom],
+    () => clusterMapPins(pins, worldWidth),
+    [pins, worldWidth],
   );
   const choose = (id: string) => {
     setPicked(id);
@@ -47,21 +45,29 @@ export function useMapPinClusters(
     const sameColor = group.pins.every(
       (pin) => pin.tintColor === first.tintColor,
     );
+    const lead = group.pins.find((pin) => pin.source !== "discover") ?? first;
     return {
       id: group.id,
       coordinates: { latitude: group.lat, longitude: group.lng },
-      title: grouped
-        ? t("homePlaces.spotCount", { count: group.pins.length })
-        : (first.title ?? first.name),
-      monogram: grouped
-        ? (options.clusterText?.(group.pins.length) ??
-          String(group.pins.length))
-        : (first.text ?? first.emoji),
+      title: !grouped
+        ? (first.title ?? first.name)
+        : options.clusterText
+          ? t("homePlaces.spotCount", { count: group.pins.length })
+          : t("mapSheet.groupTitle", {
+              name: sameColor ? (lead.title ?? lead.name) : lead.name,
+              count: group.pins.length - 1,
+            }),
+      monogram:
+        grouped && options.clusterText
+          ? options.clusterText(group.pins.length)
+          : (lead.text ?? lead.emoji),
       tintColor: group.pins.some((pin) => pin.id === selected)
         ? theme.colors.primary
         : sameColor
           ? (first.tintColor ?? theme.colors.frame)
-          : theme.colors.foreground,
+          : options.clusterText
+            ? theme.colors.foreground
+            : theme.colors.frame,
     };
   });
   const sheet = (
@@ -74,5 +80,5 @@ export function useMapPinClusters(
   const trackZoom = (zoom: number | undefined) => {
     if (zoom !== undefined) setZoom(Math.floor(zoom * 4) / 4);
   };
-  return { markers, select, trackZoom, sheet };
+  return { markers, select, trackZoom, sheet, worldWidth };
 }

@@ -1516,5 +1516,6 @@
   "passport.paywallHeadline": {
     "one": "Your passport has %{formattedCount} city",
     "other": "Your passport has %{formattedCount} cities"
-  }
+  },
+  "mapSheet.groupTitle": "%{name} +%{count}"
 }

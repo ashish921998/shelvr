@@ -54,14 +54,14 @@ afterEach(() => vi.useRealTimers());
 
 it("asks for trips that could be under way or start within three days", () => {
   vi.setSystemTime(new Date(2026, 10, 18, 9));
-  const { result } = renderHook(() => useTripToContinue());
+  const { result } = renderHook(() => useTripToContinue("Kyoto"));
   expect(mocks.args.at(-1)).toEqual({ from: "2026-11-04", to: "2026-11-21" });
   expect(result.current?.trip._id).toBe("kyoto");
 });
 
 it("moves to the next day at midnight and when the app comes back", () => {
   vi.setSystemTime(new Date(2026, 10, 18, 23, 59));
-  const { result } = renderHook(() => useTripToContinue());
+  const { result } = renderHook(() => useTripToContinue("Kyoto"));
   act(() => vi.advanceTimersByTime(2 * 60 * 1000));
   expect(mocks.args.at(-1)).toEqual({ from: "2026-11-05", to: "2026-11-22" });
   expect(result.current).toBeNull();
@@ -69,4 +69,18 @@ it("moves to the next day at midnight and when the app comes back", () => {
   vi.setSystemTime(new Date(2026, 10, 25, 8));
   act(() => mocks.appState?.("active"));
   expect(mocks.args.at(-1)).toEqual({ from: "2026-11-11", to: "2026-11-28" });
+});
+
+it("picks from the trips in the city in view", () => {
+  vi.setSystemTime(new Date(2026, 10, 18, 9));
+  mocks.data = [
+    { _id: "austin", city: "Austin", startDate: "2026-11-19", dayCount: 2 },
+    { _id: "kyoto", city: "Kyoto", startDate: "2026-11-20", dayCount: 2 },
+  ];
+  const kyoto = renderHook(() => useTripToContinue("kyoto"));
+  expect(kyoto.result.current?.trip._id).toBe("kyoto");
+  const austin = renderHook(() => useTripToContinue("Austin"));
+  expect(austin.result.current?.trip._id).toBe("austin");
+  const none = renderHook(() => useTripToContinue(undefined));
+  expect(none.result.current).toBeNull();
 });
