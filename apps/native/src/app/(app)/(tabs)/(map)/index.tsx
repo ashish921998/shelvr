@@ -8,6 +8,7 @@ import { MapTripPill } from "@/components/map/map-trip-pill";
 import { MapWentSwitch } from "@/components/map/map-went-switch";
 import {
   type MapFocus,
+  type MapFrame,
   type MapPin,
   PlacesMap,
 } from "@/components/map/places-map";
@@ -48,12 +49,13 @@ import { placeEmoji } from "@/lib/map-pin-emoji";
 import { useDiscoverPlaces } from "@/lib/use-discover-places";
 import { usePlaceVisits } from "@/lib/use-place-visit";
 import { visitMatcher } from "@convex/model/placeVisits";
+import { cityKey } from "@convex/model/trip";
 import { api } from "@convex/_generated/api";
 import type { PlaceKind } from "@convex/model/placeKinds";
 import type { FunctionReturnType } from "convex/server";
 import { convexQuery } from "@convex-dev/react-query";
 import { useQuery } from "@tanstack/react-query";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useBottomTabBarHeight } from "expo-router/js-tabs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Keyboard, View } from "react-native";
@@ -120,7 +122,11 @@ function useMapEntries(
   };
 }
 
-function useFraming(anchorEntries: Entry[], key: string) {
+function useFraming(
+  anchorEntries: Entry[],
+  key: string,
+  all: OwnPlace[] | undefined,
+) {
   const live = useMemo(
     () =>
       // As on the city page, a pin far out of town stays on the map but does not set the zoom.
@@ -134,7 +140,37 @@ function useFraming(anchorEntries: Entry[], key: string) {
     () => anchorEntries.map((place) => ({ ...place, id: entryId(place) })),
     [anchorEntries],
   );
-  return { framed: useHeldFraming(live, key), overview };
+  return {
+    framed: useHeldFraming(live, key),
+    overview,
+    frame: useSharedCityFrame(all),
+  };
+}
+
+function useSharedCityFrame(all: OwnPlace[] | undefined): MapFrame | undefined {
+  const { city, save } = useLocalSearchParams<{
+    city?: string;
+    save?: string;
+  }>();
+  return useMemo(() => {
+    if (!city || !save || !all) return undefined;
+    const places = all.filter(
+      (place) => cityKey(place.city ?? "") === cityKey(city),
+    );
+    return places.length > 0
+      ? { key: save, places: framedPins(places) }
+      : undefined;
+  }, [all, city, save]);
+}
+
+function useOnNewKey(key: string | undefined, run: () => void) {
+  const latest = useRef(run);
+  useEffect(() => {
+    latest.current = run;
+  });
+  useEffect(() => {
+    if (key !== undefined) latest.current();
+  }, [key]);
 }
 
 export default function MapScreen() {
@@ -171,14 +207,13 @@ export default function MapScreen() {
 
   const all = places.data;
   const { visits, loaded, isError, error, offerRetry } = usePlaceVisits();
-  const visitsFailed = isError && !loaded;
   useEffect(() => {
     if (error) analytics.captureError("place_visits_load_failed", error);
   }, [error]);
   useFocusEffect(
     useCallback(() => {
-      if (visitsFailed) offerRetry();
-    }, [visitsFailed, offerRetry]),
+      if (isError && !loaded) offerRetry();
+    }, [isError, loaded, offerRetry]),
   );
   const visited = useMemo(() => visitMatcher(visits, all ?? []), [visits, all]);
   const [wentFilter, setWentFilter] = useState<WentFilter>("all");
@@ -232,10 +267,19 @@ export default function MapScreen() {
     all === undefined ||
     (all.length === 0 && !settled) ||
     location === "asking";
-  const { framed, overview } = useFraming(
+  const { framed, overview, frame } = useFraming(
     anchorEntries,
     `${waiting}|${kinds.join(",")}|${went.selected}`,
+    all,
   );
+
+  useOnNewKey(frame?.key, () => {
+    setKinds([]);
+    setWentFilter("all");
+    setSearchText("");
+    setSearchOpen(false);
+    setListOpen(true);
+  });
 
   const reported = useRef(false);
   useEffect(() => {
@@ -336,6 +380,7 @@ export default function MapScreen() {
           topInset={headerBottom + theme.gap(1)}
           bottomInset={barHeight + (showStrip ? stripHeight : 0) + theme.gap(1)}
           focus={focus}
+          frame={frame}
           locate={locate}
           overview={overview}
           zoomOut={zoomOut}

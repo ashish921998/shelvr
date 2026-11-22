@@ -145,16 +145,17 @@ function folded(text: string): string {
   return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
 }
 
-/** Places whose name or city holds every word of the query, names that start with it first. */
-export function searchPlaces<T extends { name: string; city?: string }>(
-  places: readonly T[],
-  query: string,
-): T[] {
+/** Places whose name, city or features hold every word of the query, names that start with it first. */
+export function searchPlaces<
+  T extends { name: string; city?: string; features?: readonly string[] },
+>(places: readonly T[], query: string): T[] {
   const words = folded(query).split(/\s+/).filter(Boolean);
   if (words.length === 0) return [];
   const first = words.join(" ");
   const matches = places.filter((place) => {
-    const text = folded(`${place.name} ${place.city ?? ""}`);
+    const text = folded(
+      `${place.name} ${place.city ?? ""} ${place.features?.join(" ") ?? ""}`,
+    );
     return words.every((word) => text.includes(word));
   });
   const leading = (place: T) => (folded(place.name).startsWith(first) ? 0 : 1);

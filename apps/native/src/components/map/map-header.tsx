@@ -121,6 +121,7 @@ const styles = StyleSheet.create((theme) => ({
   title: {
     flex: 1,
     minWidth: 0,
+    minHeight: theme.control.minHeight,
     flexDirection: "row",
     alignItems: "center",
   },

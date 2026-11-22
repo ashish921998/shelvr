@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MapBox } from "@/lib/discover-area";
 
-import { type MapFocus, PlacesMap } from "./places-map";
+import { type MapFocus, type MapFrame, PlacesMap } from "./places-map";
 
 type Camera = { coordinates: object; zoom: number };
 
@@ -89,7 +89,9 @@ const AUSTIN = [
 ];
 const FOCUS: MapFocus = { lat: 30.27, lng: -97.73, key: 1 };
 
-function map(person: { locate?: number; focus?: MapFocus } = {}) {
+function map(
+  person: { locate?: number; focus?: MapFocus; frame?: MapFrame } = {},
+) {
   return (
     <PlacesMap
       areaPartial={false}
@@ -296,6 +298,33 @@ it("draws nearby places as one place pin named after the first and keeps them al
   expect(onSelect).toHaveBeenCalledWith("b");
   act(() => mock.cluster.onClose());
   expect(mock.cluster.pins).toEqual([]);
+});
+
+it("flies to a shared city's places once for each save", async () => {
+  const NYC = [
+    { lat: 40.71, lng: -74.0 },
+    { lat: 40.76, lng: -73.98 },
+  ];
+  const { rerender } = render(map());
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  const before = mock.moves.length;
+  rerender(map({ frame: { key: "save-1", places: NYC } }));
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  const moves = mock.moves.slice(before).filter((m) => m !== "person");
+  expect(moves).toHaveLength(1);
+  const centre = (moves[0] as Camera).coordinates as {
+    latitude: number;
+    longitude: number;
+  };
+  expect(centre.latitude).toBeGreaterThan(40.71);
+  expect(centre.latitude).toBeLessThan(40.76);
+  const refreshed = mock.moves.length;
+  rerender(map({ frame: { key: "save-1", places: [...NYC] } }));
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  expect(mock.moves.length).toBe(refreshed);
+  rerender(map({ frame: { key: "save-2", places: NYC } }));
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  expect(mock.moves.length).toBe(refreshed + 1);
 });
 
 it("flies out to frame every place when asked to zoom out", async () => {

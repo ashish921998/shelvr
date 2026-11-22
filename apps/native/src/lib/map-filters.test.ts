@@ -162,6 +162,11 @@ describe("searchPlaces", () => {
     ]);
   });
 
+  it("matches a place's features", () => {
+    const rooftop = { name: "Hotel Mondial", features: ["rooftop"] };
+    expect(searchPlaces([...places, rooftop], "rooftop")).toEqual([rooftop]);
+  });
+
   it("finds nothing for a blank or unmatched query", () => {
     expect(searchPlaces(places, "  ")).toEqual([]);
     expect(searchPlaces(places, "sushi")).toEqual([]);

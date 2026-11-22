@@ -329,7 +329,7 @@ describe("withLine and inviteUrl", () => {
   });
 
   it("builds the invite link on the web origin", () => {
-    expect(inviteUrl("ab cd")).toBe("https://shelvr-web.vercel.app/l/ab%20cd");
+    expect(inviteUrl("ab cd")).toBe("https://tryshelvr.app/l/ab%20cd");
   });
 });
 

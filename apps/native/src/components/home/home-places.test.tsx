@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import type { ReactNode } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 
 import type { Id } from "@convex/_generated/dataModel";
@@ -17,10 +17,8 @@ const mocks = vi.hoisted(() => ({
       }[]
     | undefined,
   push: vi.fn(),
-  guard: vi.fn(async (action?: () => void) => {
-    action?.();
-    return true;
-  }),
+  admit: vi.fn(async () => "go"),
+  passed: vi.fn(),
   access: { kind: "pro", syncing: false } as Record<string, unknown>,
 }));
 
@@ -49,7 +47,9 @@ vi.mock("@/components/home/library-rows", () => ({
 }));
 vi.mock("@/lib/free-plan", () => ({
   useAccess: () => mocks.access,
-  useSaveGuard: () => ({ guard: mocks.guard, loading: false }),
+}));
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: () => ({ admit: mocks.admit, passed: mocks.passed }),
 }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({ data: mocks.cities }),
@@ -76,7 +76,8 @@ const lisbon = { city: "Lisbon", count: 2, placeCount: 1, cover: null };
 
 beforeEach(() => {
   mocks.push.mockReset();
-  mocks.guard.mockClear();
+  mocks.admit.mockClear();
+  mocks.passed.mockClear();
   mocks.access = { kind: "pro", syncing: false };
   mocks.cities = [lisbon];
 });
@@ -113,17 +114,20 @@ it("pitches saving places when the account has no city", () => {
   expect(screen.getByText("Add a spot")).toBeTruthy();
 });
 
-it("pitches saving places and opens Add through the save guard", () => {
+it("pitches saving places and opens Add through the Pro gate", async () => {
   render(<HomePlacesEmptyCard />);
   expect(screen.getByText("Save places from TikTok or Instagram")).toBeTruthy();
   fireEvent.click(screen.getByRole("button", { name: "Add a spot" }));
-  expect(mocks.guard).toHaveBeenCalledTimes(1);
-  expect(mocks.push).toHaveBeenCalledWith("/add");
+  await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/add"));
+  expect(mocks.admit).toHaveBeenCalledTimes(1);
+  expect(mocks.passed).toHaveBeenCalledTimes(1);
 });
 
-it("does not open Add when the guard refuses", () => {
-  mocks.guard.mockImplementationOnce(async () => false);
+it("does not open Add when the gate shows the paywall", async () => {
+  mocks.admit.mockImplementationOnce(async () => "paywalled");
   render(<HomePlacesEmptyCard />);
   fireEvent.click(screen.getByRole("button", { name: "Add a spot" }));
+  await waitFor(() => expect(mocks.admit).toHaveBeenCalledTimes(1));
   expect(mocks.push).not.toHaveBeenCalled();
+  expect(mocks.passed).not.toHaveBeenCalled();
 });

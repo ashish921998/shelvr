@@ -224,7 +224,10 @@ it("drops a pinned save's spots on its city and opens that city", () => {
     waited_ms: 0,
   });
   fireEvent.click(screen.getByText('spots.openCity {"city":"Austin"}'));
-  expect(mocks.dismissTo).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
+  expect(mocks.dismissTo).toHaveBeenCalledWith({
+    pathname: "/(app)/(tabs)/(map)",
+    params: { city: "Austin", save: "item-1" },
+  });
   expect(mocks.push).toHaveBeenCalledWith({
     pathname: "/city/[name]",
     params: { name: "Austin" },
@@ -235,17 +238,32 @@ it("drops a pinned save's spots on its city and opens that city", () => {
   expect(mocks.replace).not.toHaveBeenCalled();
 });
 
-it("goes Home, as before, when the save has no place", () => {
+it("goes back to the Map on the save's city when Done is tapped", () => {
+  mocks.save = {
+    _id: "item-1",
+    status: "ready",
+    cities: ["Austin"],
+    placePins: [{ name: "Uchi", lat: 30.26, lng: -97.75, city: "Austin" }],
+  };
+  render(<SpotsScreen />);
+  fireEvent.click(screen.getByText("common.done"));
+  expect(mocks.replace).toHaveBeenCalledWith({
+    pathname: "/(app)/(tabs)/(map)",
+    params: { city: "Austin", save: "item-1" },
+  });
+});
+
+it("goes to the Map when the save has no place", () => {
   mocks.save = { _id: "item-1", status: "ready", cities: [] };
   render(<SpotsScreen />);
-  expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
+  expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(map)");
   expect(mocks.capture).toHaveBeenCalledWith("share_spots_skipped", {
     reason: "no_place",
     waited_ms: 0,
   });
 });
 
-it("goes Home when the revealed save is deleted from its detail screen", () => {
+it("goes to the Map when the revealed save is deleted from its detail screen", () => {
   mocks.save = {
     _id: "item-1",
     status: "ready",
@@ -256,11 +274,11 @@ it("goes Home when the revealed save is deleted from its detail screen", () => {
   expect(mocks.replace).not.toHaveBeenCalled();
   mocks.save = null;
   rerender(<SpotsScreen />);
-  expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
+  expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(map)");
   expect(mocks.capture).toHaveBeenCalledTimes(1);
 });
 
-it("stays put under the detail screen while a retry runs, then goes Home on return", () => {
+it("stays put under the detail screen while a retry runs, then goes to the Map on return", () => {
   mocks.save = {
     _id: "item-1",
     status: "ready",
@@ -277,7 +295,7 @@ it("stays put under the detail screen while a retry runs, then goes Home on retu
   expect(mocks.replace).not.toHaveBeenCalled();
   mocks.focused = true;
   rerender(<SpotsScreen />);
-  expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(home)");
+  expect(mocks.replace).toHaveBeenCalledWith("/(app)/(tabs)/(map)");
 });
 
 it("shows the spots again when a retry finished before the return", () => {

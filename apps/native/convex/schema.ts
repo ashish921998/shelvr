@@ -8,6 +8,8 @@ import {
   enrichmentValidator,
   failureReasonValidator,
   intentValidator,
+  placeFeatureValidator,
+  placeKindValidator,
   placePinsValidator,
   placeCuisinesValidator,
   placeLocationsValidator,
@@ -101,6 +103,8 @@ export default defineSchema({
     appleId: v.string(),
     category: v.optional(v.string()),
     cuisine: v.optional(cuisineValidator),
+    kind: v.optional(placeKindValidator),
+    features: v.optional(v.array(placeFeatureValidator)),
     sources: v.optional(v.array(v.object({ url: v.string() }))),
     status: v.union(v.literal("live"), v.literal("hidden")),
     addedAt: v.number(),
@@ -339,10 +343,6 @@ export default defineSchema({
     itemId: v.optional(v.id("items")),
     listPlaceId: v.optional(v.id("sharedListPlaces")),
     visitedAt: v.number(),
-    city: v.optional(v.string()),
-    countryCode: v.optional(v.string()),
-    lat: v.optional(v.number()),
-    lng: v.optional(v.number()),
     spots: v.optional(v.array(visitSpotValidator)),
     stampPlaces: v.optional(
       v.array(

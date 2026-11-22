@@ -8,8 +8,10 @@ import { initialTripForm } from "./trip-planner";
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
-  guard: vi.fn(),
-  openPaywall: vi.fn(),
+  admit: vi.fn(),
+  denied: vi.fn(),
+  passed: vi.fn(),
+  placement: "",
   replace: vi.fn(),
   capture: vi.fn(),
   captureError: vi.fn(),
@@ -19,9 +21,16 @@ vi.mock("@convex/_generated/api", () => ({ api: { tripPlanner: {} } }));
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mocks.capture, captureError: mocks.captureError },
 }));
-vi.mock("@/lib/entitlement", () => ({
-  usePaywallGuard: () => ({ guard: mocks.guard, loading: false }),
-  openPaywall: mocks.openPaywall,
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: (placement: string) => {
+    mocks.placement = placement;
+    return {
+      admit: mocks.admit,
+      denied: mocks.denied,
+      passed: mocks.passed,
+      loading: false,
+    };
+  },
 }));
 vi.mock("expo-router", () => ({
   useRouter: () => ({ replace: mocks.replace }),
@@ -34,7 +43,8 @@ const FORM = initialTripForm("Lisbon");
 
 beforeEach(() => {
   vi.resetAllMocks();
-  mocks.guard.mockResolvedValue(true);
+  mocks.admit.mockResolvedValue("go");
+  mocks.denied.mockResolvedValue(true);
 });
 
 it("plans the trip, then opens it once the reveal is done", async () => {
@@ -58,6 +68,7 @@ it("plans the trip, then opens it once the reveal is done", async () => {
     city: "Lisbon",
     tripId: TRIP,
   });
+  expect(mocks.passed).toHaveBeenCalledOnce();
   act(() => result.current.open());
   expect(mocks.replace).toHaveBeenCalledWith({
     pathname: "/trip-plan/[id]",
@@ -108,15 +119,27 @@ it("opens the paywall when the server says Pro is needed", async () => {
   );
   const { result } = renderHook(() => useCreateTripPlan("en", CITIES));
   await act(() => result.current.submit(FORM));
-  expect(mocks.openPaywall).toHaveBeenCalledWith(
-    expect.anything(),
-    "plan_trip",
-  );
+  expect(mocks.placement).toBe("plan_trip");
+  expect(mocks.denied).toHaveBeenCalledWith(expect.any(ConvexError));
+  expect(mocks.passed).not.toHaveBeenCalled();
   expect(result.current.state).toEqual({ status: "idle", problem: null });
 });
 
+it("asks to try again when the server wants Pro the app already sees", async () => {
+  mocks.denied.mockResolvedValue(false);
+  mocks.create.mockRejectedValue(
+    new ConvexError({ code: "pro_required", message: "Pro required" }),
+  );
+  const { result } = renderHook(() => useCreateTripPlan("en", CITIES));
+  await act(() => result.current.submit(FORM));
+  expect(result.current.state).toEqual({
+    status: "idle",
+    problem: { kind: "error" },
+  });
+});
+
 it("does not plan without Pro or without a city", async () => {
-  mocks.guard.mockResolvedValue(false);
+  mocks.admit.mockResolvedValue("paywalled");
   const { result } = renderHook(() => useCreateTripPlan("en", CITIES));
   await act(() => result.current.submit(FORM));
   expect(mocks.create).not.toHaveBeenCalled();
@@ -126,5 +149,5 @@ it("does not plan without Pro or without a city", async () => {
     status: "idle",
     problem: { kind: "city" },
   });
-  expect(mocks.guard).toHaveBeenCalledTimes(1);
+  expect(mocks.admit).toHaveBeenCalledTimes(1);
 });

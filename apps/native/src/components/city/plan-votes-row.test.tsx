@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AskVotesSheet } from "@/components/city/ask-votes-sheet";
 import type { CityPin } from "@/lib/city-pins";
-import { usePaywallGuard } from "@/lib/entitlement";
+import { useProGate } from "@/lib/pro-gate";
 import type { VoteLink } from "@/lib/plan-votes";
 import type { Id } from "@convex/_generated/dataModel";
 import { CityVotes } from "./plan-votes-row";
@@ -16,16 +16,18 @@ const mocks = vi.hoisted(() => ({
   share: vi.fn(),
   pro: true,
   loading: false,
-  guard: vi.fn(),
+  admit: vi.fn(),
+  passed: vi.fn(),
   mounts: 0,
 }));
 
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mocks.capture, captureError: mocks.captureError },
 }));
-vi.mock("@/lib/entitlement", () => ({
-  usePaywallGuard: vi.fn(() => ({
-    guard: mocks.guard,
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: vi.fn(() => ({
+    admit: mocks.admit,
+    passed: mocks.passed,
     loading: mocks.loading,
   })),
 }));
@@ -163,11 +165,7 @@ beforeEach(() => {
   mocks.pro = true;
   mocks.loading = false;
   mocks.mounts = 0;
-  mocks.guard.mockImplementation(async (action?: () => void) => {
-    if (!mocks.pro) return false;
-    action?.();
-    return true;
-  });
+  mocks.admit.mockImplementation(async () => (mocks.pro ? "go" : "paywalled"));
 });
 
 afterEach(() => {
@@ -234,8 +232,9 @@ describe("CityVotes", () => {
     mocks.pro = false;
     show(waiting);
     await tap(screen.getByTestId("plan-votes-row"));
-    expect(usePaywallGuard).toHaveBeenCalledWith("plan_vote");
-    expect(mocks.guard).toHaveBeenCalledTimes(1);
+    expect(useProGate).toHaveBeenCalledWith("plan_vote");
+    expect(mocks.admit).toHaveBeenCalledTimes(1);
+    expect(mocks.passed).not.toHaveBeenCalled();
     expect(AskVotesSheet).not.toHaveBeenCalled();
     expect(mocks.capture).not.toHaveBeenCalledWith(
       "plan_ask_opened",
@@ -293,7 +292,7 @@ describe("CityVotes", () => {
     mocks.share.mockResolvedValue({ action: "sharedAction" });
     show(votes);
     await tap(screen.getByTestId("plan-votes-share"));
-    expect(mocks.guard).not.toHaveBeenCalled();
+    expect(mocks.admit).not.toHaveBeenCalled();
     expect(mocks.share).toHaveBeenCalledWith({
       message: expect.stringMatching(/\/p\/tok-open$/),
     });
@@ -343,7 +342,7 @@ describe("CityVotes", () => {
     const row = screen.getByTestId("plan-votes-row") as HTMLButtonElement;
     expect(row.disabled).toBe(true);
     await tap(row);
-    expect(mocks.guard).not.toHaveBeenCalled();
+    expect(mocks.admit).not.toHaveBeenCalled();
     await tap(screen.getByTestId("plan-votes-share"));
     expect(mocks.share).toHaveBeenCalledTimes(1);
   });

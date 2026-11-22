@@ -6,7 +6,7 @@ import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/siteMetadata";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://shelvr-web.vercel.app"),
+  metadataBase: new URL("https://tryshelvr.app"),
   title: SITE_TITLE,
   description: SITE_DESCRIPTION,
   itunes: { appId: APP_STORE_ID },

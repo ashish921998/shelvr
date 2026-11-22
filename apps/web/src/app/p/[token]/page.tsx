@@ -1,3 +1,4 @@
+import { APP_LINK_ORIGIN } from "@/lib/appLinkOrigin";
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 
@@ -26,12 +27,12 @@ export async function generateMetadata({
     title: `${title} — Shelvr`,
     description,
     // Without its own canonical and og:url the page inherits "/", and Facebook and Messenger preview the homepage.
-    alternates: { canonical: `/p/${token}` },
+    alternates: { canonical: `${APP_LINK_ORIGIN}/p/${token}` },
     robots: { index: false, follow: false },
     openGraph: {
       title,
       description,
-      url: `/p/${token}`,
+      url: `${APP_LINK_ORIGIN}/p/${token}`,
       siteName: "Shelvr",
       type: "website",
     },

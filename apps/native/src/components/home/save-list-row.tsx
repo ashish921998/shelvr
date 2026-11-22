@@ -111,9 +111,9 @@ const styles = StyleSheet.create((theme) => ({
   title: { fontSize: 16.5, lineHeight: 21 },
   detail: { fontSize: 13.3, lineHeight: 17, color: theme.colors.muted },
   menu: {
-    width: 44,
-    height: 44,
-    marginRight: -9,
+    width: theme.control.minHeight,
+    height: theme.control.minHeight,
+    marginRight: -11,
     alignItems: "center",
     justifyContent: "center",
   },

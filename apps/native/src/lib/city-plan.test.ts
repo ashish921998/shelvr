@@ -5,7 +5,8 @@ import { useCityPlan } from "./city-plan";
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn(),
-  guard: vi.fn(),
+  admit: vi.fn(),
+  passed: vi.fn(),
   capture: vi.fn(),
   captureError: vi.fn(),
   focus: undefined as (() => void) | undefined,
@@ -13,8 +14,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/analytics", () => ({
   analytics: { capture: mocks.capture, captureError: mocks.captureError },
 }));
-vi.mock("@/lib/entitlement", () => ({
-  usePaywallGuard: () => ({ guard: mocks.guard, loading: false }),
+vi.mock("@/lib/pro-gate", () => ({
+  useProGate: () => ({ admit: mocks.admit, passed: mocks.passed }),
 }));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
 vi.mock("expo-router", () => ({
@@ -30,7 +31,7 @@ const TRIP_FORM = { pathname: "/new-trip", params: { city: "Lisbon" } };
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.focus = undefined;
-  mocks.guard.mockResolvedValue(true);
+  mocks.admit.mockResolvedValue("go");
 });
 
 it("opens the trip form once for a double tap on Plan a trip", async () => {
@@ -63,9 +64,9 @@ it("opens the trip form again once the city page is back in focus", async () => 
 
 it("runs the plan check before leaving, then opens the planner", async () => {
   const order: string[] = [];
-  mocks.guard.mockImplementation(async () => {
+  mocks.admit.mockImplementation(async () => {
     order.push("check");
-    return true;
+    return "go";
   });
   mocks.push.mockImplementation(() => order.push("open"));
   const { result } = renderHook(() => useCityPlan());
@@ -76,7 +77,7 @@ it("runs the plan check before leaving, then opens the planner", async () => {
 });
 
 it("stays put when the paywall stops the plan", async () => {
-  mocks.guard.mockResolvedValue(false);
+  mocks.admit.mockResolvedValue("paywalled");
   const leave = vi.fn();
   const { result } = renderHook(() => useCityPlan());
   await act(() => result.current.start("trip", "Lisbon", leave));
@@ -98,5 +99,6 @@ it("opens one picker for a double tap on Go out", async () => {
     params: { city: "Lisbon" },
   });
   expect(mocks.capture).not.toHaveBeenCalled();
+  expect(mocks.passed).toHaveBeenCalledTimes(1);
   expect(result.current.busy).toBeNull();
 });

@@ -3,7 +3,8 @@ import { CityStampArt } from "@/components/passport/city-stamp";
 import { cityStampLabel } from "@/lib/city-stamp-data";
 import { AppSymbolIcon } from "@/components/symbol";
 import { analytics } from "@/lib/analytics";
-import { useEntitlement, usePaywallGuard } from "@/lib/entitlement";
+import { useEntitlement } from "@/lib/entitlement";
+import { useProGate } from "@/lib/pro-gate";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LARGE_TEXT_SCALE } from "@/lib/use-large-text";
 import type { PassportSection } from "@/lib/passport";
@@ -14,14 +15,19 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 const HEAD_STAMP_SIZE = 64;
 
-export function useRingAccess(): { locked: boolean; unlock: () => void } {
+export function useRingAccess(): {
+  locked: boolean;
+  unlock: () => void;
+  passed: () => void;
+} {
   const { entitled, loading } = useEntitlement();
-  const { guard } = usePaywallGuard("passport");
+  const { admit, passed, loading: waiting } = useProGate("passport");
   const unlock = useCallback(() => {
-    analytics.capture("passport_paywall_opened", { surface: "ring" });
-    void guard();
-  }, [guard]);
-  return { locked: !loading && !entitled, unlock };
+    if (!waiting)
+      analytics.capture("passport_paywall_opened", { surface: "ring" });
+    void admit();
+  }, [admit, waiting]);
+  return { locked: !loading && !entitled, unlock, passed };
 }
 
 function RingButton({

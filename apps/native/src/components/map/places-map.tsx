@@ -38,6 +38,8 @@ export type { MapPin } from "@/lib/map-pin-clusters";
 /** A place the camera flies to; a new key moves it again even to the same spot. */
 export type MapFocus = LatLng & { key: number };
 
+export type MapFrame = { key: string; places: LatLng[] };
+
 /** How close the camera comes to a place picked from search. */
 const FOCUS_ZOOM = 15;
 
@@ -53,6 +55,7 @@ type Props = {
   topInset: number;
   bottomInset: number;
   focus?: MapFocus;
+  frame?: MapFrame;
   locate?: number;
   overview?: MapPin[];
   zoomOut?: number;
@@ -72,6 +75,7 @@ export function PlacesMap({
   topInset,
   bottomInset,
   focus,
+  frame,
   locate,
   overview,
   zoomOut,
@@ -91,7 +95,7 @@ export function PlacesMap({
   });
 
   const cameraFor = useCallback(
-    (points: MapPin[]) => {
+    (points: LatLng[]) => {
       const camera = fitCamera(
         points.map((pin) => ({ latitude: pin.lat, longitude: pin.lng })),
         {
@@ -254,6 +258,21 @@ export function PlacesMap({
     );
   }, [focus, command]);
 
+  const frameKey = frame?.key;
+  const frameCamera = useRef<ReturnType<typeof cameraFor>>(undefined);
+  useEffect(() => {
+    frameCamera.current = frame ? cameraFor(frame.places) : undefined;
+  }, [frame, cameraFor]);
+  useEffect(() => {
+    const camera = frameCamera.current;
+    if (frameKey === undefined || !camera) return;
+    checkNearby.current = undefined;
+    return command(
+      () => map()?.setCameraPosition(camera),
+      (error) => analytics.captureError("places_map_camera_failed", error),
+    );
+  }, [frameKey, command]);
+
   useEffect(() => {
     if (!zoomOut) return;
     checkNearby.current = undefined;
@@ -279,6 +298,7 @@ export function PlacesMap({
   const canFrameLatePlaces =
     filterRevision === 0 &&
     !focus &&
+    frameKey === undefined &&
     !locate &&
     !zoomOut &&
     !!fit &&
