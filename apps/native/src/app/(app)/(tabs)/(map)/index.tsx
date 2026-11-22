@@ -52,10 +52,10 @@ import { useAnchors, useHeldFraming } from "@/lib/map-framing";
 import { useMapLocation } from "@/lib/map-location";
 import { useMapCity } from "@/lib/use-map-city";
 import { placeEmoji } from "@/lib/map-pin-emoji";
-import { tripCountryLine } from "@/lib/trip-planner";
 import { useDiscoverPlaces } from "@/lib/use-discover-places";
 import { usePlaceVisits } from "@/lib/use-place-visit";
 import { visitMatcher } from "@convex/model/placeVisits";
+import { countryName } from "@convex/model/tripCountries";
 import { cityKey } from "@convex/model/trip";
 import { api } from "@convex/_generated/api";
 import type { PlaceKind } from "@convex/model/placeKinds";
@@ -165,25 +165,31 @@ function useSharedCityFrame(all: OwnPlace[] | undefined): MapFrame | undefined {
   }, [all, city, save]);
 }
 
+function countryLabel(code: string) {
+  return countryName(code) ?? code;
+}
+
 function levelHeading(level: MapLevel) {
-  if (level.kind === "country") return tripCountryLine([level.country]);
+  if (level.kind === "country") return countryLabel(level.country);
   return level.kind === "world" ? t("map.yourCities") : undefined;
 }
 
-function useFlight() {
+function useFlight(hold: (level: MapLevel) => void) {
   const [flight, setFlight] = useState<
     (MapFlight & { key: number }) | undefined
   >(undefined);
   const fly = useCallback(
-    (next: MapFlight) =>
+    (next: MapStep) => {
+      hold(next.to);
       setFlight((previous) => ({
         places: next.places,
         minZoom: next.minZoom,
         maxZoom: next.maxZoom,
         room: next.room,
         key: (previous?.key ?? 0) + 1,
-      })),
-    [],
+      }));
+    },
+    [hold],
   );
   return { flight, fly };
 }
@@ -211,12 +217,12 @@ function useCityPills(
   );
 }
 
-function backFor(step: MapStep | undefined, fly: (flight: MapFlight) => void) {
+function backFor(step: MapStep | undefined, fly: (step: MapStep) => void) {
   if (!step) return undefined;
   return {
     label:
       step.to.kind === "country"
-        ? t("map.showCountry", { country: tripCountryLine([step.to.country]) })
+        ? t("map.showCountry", { country: countryLabel(step.to.country) })
         : t("map.showAllCities"),
     onPress: () => fly(step),
   };
@@ -259,7 +265,6 @@ export default function MapScreen() {
   const [focus, setFocus] = useState<MapFocus | undefined>(undefined);
   const [searchOpen, setSearchOpen] = useState(false);
   const [locate, setLocate] = useState(0);
-  const { flight, fly } = useFlight();
   const [mapHeight, setMapHeight] = useState(0);
   const [stripHeight, setStripHeight] = useState(0);
   const barHeight = useBottomTabBarHeight();
@@ -280,7 +285,8 @@ export default function MapScreen() {
     () => wentView(all ?? [], wentFilter, visited),
     [all, wentFilter, visited],
   );
-  const { city, level, cities, onCentreChange } = useMapCity(all ?? NO_PLACES);
+  const { level, cities, hold, onCentreChange } = useMapCity(all ?? NO_PLACES);
+  const { flight, fly } = useFlight(hold);
   const {
     area,
     setArea,
@@ -458,7 +464,7 @@ export default function MapScreen() {
         />
       ) : null}
       <MapHeader
-        city={level.kind === "city" ? city : undefined}
+        city={level.kind === "city" ? level.city : undefined}
         heading={levelHeading(level)}
         canSearch={hasPlaces}
         searchOpen={searchOpen}

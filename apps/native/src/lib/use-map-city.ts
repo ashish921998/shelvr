@@ -10,14 +10,24 @@ type Located = LatLng & { city?: string };
 function mapCentre() {
   let centre: LatLng | undefined;
   let zoom: number | undefined;
+  let held: MapLevel | undefined;
   const listeners = new Set<() => void>();
+  const changed = () => {
+    for (const listener of listeners) listener();
+  };
   return {
     read: () => centre,
     zoom: () => zoom,
-    move: (next: LatLng, nextZoom?: number) => {
+    held: () => held,
+    hold: (next: MapLevel) => {
+      held = next;
+      changed();
+    },
+    move: (next: LatLng, nextZoom?: number, moved?: boolean) => {
       centre = next;
       zoom = nextZoom;
-      for (const listener of listeners) listener();
+      if (moved) held = undefined;
+      changed();
     },
     subscribe: (listener: () => void) => {
       listeners.add(listener);
@@ -41,13 +51,21 @@ export function useMapCity(all: readonly Located[]) {
     const level = mapLevel(undefined, centre.read(), centre.zoom(), cities);
     return level.kind === "country" ? level.country : level.kind;
   });
+  const held = useSyncExternalStore(centre.subscribe, centre.held);
   const level = useMemo((): MapLevel => {
+    if (held) return held;
     if (above === "city") return { kind: "city", city };
     if (above === "world") return { kind: "world" };
     return { kind: "country", country: above };
-  }, [above, city]);
+  }, [above, city, held]);
   useEffect(() => {
     setMapCityInView(city);
   }, [city]);
-  return { city, level, cities, onCentreChange: centre.move };
+  return {
+    city,
+    level,
+    cities,
+    hold: centre.hold,
+    onCentreChange: centre.move,
+  };
 }

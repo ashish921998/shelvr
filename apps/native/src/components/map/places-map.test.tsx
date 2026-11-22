@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MapBox } from "@/lib/discover-area";
 
+import { mapCities } from "@/lib/map-cities";
+import { type MapStep, stepUp } from "@/lib/map-city-zoom";
 import { type MapFocus, type MapFrame, PlacesMap } from "./places-map";
 
 type Camera = { coordinates: object; zoom: number };
@@ -89,7 +91,13 @@ const AUSTIN = [
 const FOCUS: MapFocus = { lat: 30.27, lng: -97.73, key: 1 };
 
 function map(
-  person: { locate?: number; focus?: MapFocus; frame?: MapFrame } = {},
+  person: {
+    locate?: number;
+    focus?: MapFocus;
+    frame?: MapFrame;
+    flight?: MapStep & { key: number };
+    onCentreChange?: (centre: object, zoom: number, moved: boolean) => void;
+  } = {},
 ) {
   return (
     <PlacesMap
@@ -715,4 +723,53 @@ it("draws a marker per city with its count, and a tap opens that city, not a pla
   expect(onPill).toHaveBeenCalledWith("austin");
   expect(onSelect).not.toHaveBeenCalled();
   expect(mock.clearSelection).toHaveBeenCalledWith(undefined);
+});
+
+it("keeps both ends of a wide country in view on the step up to it", async () => {
+  const cities = mapCities([
+    { lat: 49.28, lng: -123.12, city: "Vancouver" },
+    { lat: 44.65, lng: -63.58, city: "Halifax" },
+  ]);
+  const step = stepUp({ kind: "city", city: "Vancouver" }, cities)!;
+  const { rerender } = render(map());
+  rerender(map({ flight: { ...step, key: 1 } }));
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  const move = mock.moves.findLast((m) => m !== "person") as Camera;
+  expect(360 / 2 ** move.zoom).toBeGreaterThan(123.12 - 63.58);
+});
+
+it("says whether a camera change is its flight landing or another move", async () => {
+  mock.findsPerson = true;
+  const onCentreChange = vi.fn();
+  const flight: MapStep & { key: number } = {
+    key: 1,
+    to: { kind: "world" },
+    places: AUSTIN,
+  };
+  const { getByTestId, rerender } = render(map({ onCentreChange }));
+  const landed = () => {
+    act(() =>
+      mock.props.onCameraMove({
+        coordinates: { latitude: 30, longitude: -97 },
+        zoom: 2,
+      }),
+    );
+    return onCentreChange.mock.lastCall?.[2];
+  };
+  fireEvent.touchStart(getByTestId("map-touch"));
+  rerender(map({ onCentreChange, flight }));
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  expect(landed()).toBe(false);
+  expect(landed()).toBe(false);
+
+  fireEvent.touchStart(getByTestId("map-touch"));
+  expect(landed()).toBe(true);
+
+  rerender(map({ onCentreChange, flight: { ...flight, key: 2 } }));
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  expect(landed()).toBe(false);
+
+  rerender(map({ onCentreChange, flight: { ...flight, key: 2 }, locate: 1 }));
+  await act(() => vi.advanceTimersByTimeAsync(200));
+  expect(landed()).toBe(true);
 });

@@ -44,7 +44,6 @@ it("steps from a city to its country, then to every city, then stops", () => {
   const toCountry = stepUp({ kind: "city", city: "lisbon" }, cities);
   expect(toCountry?.to).toEqual({ kind: "country", country: "PT" });
   expect(toCountry?.places.map((place) => place)).toHaveLength(2);
-  expect(toCountry!.minZoom!).toBeGreaterThan(COUNTRY_ZOOM);
   expect(toCountry!.maxZoom!).toBeLessThan(CITY_ZOOM);
   const toWorld = stepUp({ kind: "country", country: "PT" }, cities);
   expect(toWorld?.to).toEqual({ kind: "world" });
@@ -66,26 +65,25 @@ it("steps a city with no known country straight to every city, and offers nothin
 it("flies into a city close enough to read as that city", () => {
   const [city] = mapCities([lisbon, { ...lisbon, lat: 38.73 }]);
   const flight = flyToCity(city!);
+  expect(flight.to).toEqual({ kind: "city", city: "Lisbon" });
   expect(flight.places).toEqual(city!.places);
   expect(flight.minZoom!).toBeGreaterThan(CITY_ZOOM);
 });
 
-it("names a country only while one of its cities is near the view", () => {
-  const india = { lat: 22, lng: 79 };
-  expect(mapLevel(undefined, india, 6, mapCities([tokyo]))).toEqual({
-    kind: "world",
-  });
-});
-
-it("still names a country as wide as the United States on the step up to it", () => {
-  const wide = mapCities([
+it("prefers the country under the view to a nearer city across the border", () => {
+  const saves = mapCities([
     { lat: 40.71, lng: -74.01, city: "New York" },
-    { lat: 21.31, lng: -157.86, city: "Honolulu" },
+    { lat: 43.65, lng: -79.38, city: "Toronto" },
   ]);
-  const step = stepUp({ kind: "city", city: "New York" }, wide)!;
-  const middle = { lat: 31.01, lng: -115.93 };
-  expect(mapLevel(undefined, middle, step.minZoom, wide)).toEqual({
+  expect(mapLevel(undefined, { lat: 41.5, lng: -81.7 }, 6, saves)).toEqual({
     kind: "country",
     country: "US",
   });
+});
+
+it("always offers every city from a zoomed-out view with none of them in it", () => {
+  const india = { lat: 22, lng: 79 };
+  const away = mapCities([tokyo]);
+  const level = mapLevel(undefined, india, 6, away);
+  expect(stepUp(level, away)?.to).toEqual({ kind: "world" });
 });

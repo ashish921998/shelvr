@@ -66,7 +66,7 @@ type Props = {
   pills?: MapCityPill[];
   onPill?: (id: string) => void;
   filterRevision?: number;
-  onCentreChange?: (centre: LatLng, zoom: number) => void;
+  onCentreChange?: (centre: LatLng, zoom: number, moved: boolean) => void;
   onSelect: (id: string) => void;
   onArea: (box: MapBox) => void;
 };
@@ -143,6 +143,7 @@ export function PlacesMap({
   // map with none of them moves on to the busiest city.
   const checkNearby = useRef<(() => void) | undefined>(undefined);
   const rested = useRef(false);
+  const movedSinceFlight = useRef(false);
   const cameraCommand = useRef<(() => void) | undefined>(undefined);
   const command = useCallback(
     (
@@ -150,6 +151,7 @@ export function PlacesMap({
       onFail: (error: unknown) => void,
     ) => {
       cameraCommand.current?.();
+      movedSinceFlight.current = true;
       const cancel = moveCamera(move, onFail);
       cameraCommand.current = cancel;
       return cancel;
@@ -290,10 +292,12 @@ export function PlacesMap({
     const camera = flightCamera.current;
     if (flightKey === undefined || !camera) return;
     checkNearby.current = undefined;
-    return command(
+    const cancel = command(
       () => map()?.setCameraPosition(camera),
       (error) => analytics.captureError("places_map_camera_failed", error),
     );
+    movedSinceFlight.current = false;
+    return cancel;
   }, [flightKey, command]);
 
   useEffect(() => {
@@ -338,7 +342,8 @@ export function PlacesMap({
       latitude !== undefined && longitude !== undefined
         ? { lat: latitude, lng: longitude }
         : undefined;
-    if (centre.current) onCentreChange?.(centre.current, event.zoom);
+    if (centre.current)
+      onCentreChange?.(centre.current, event.zoom, movedSinceFlight.current);
     if (checkNearby.current) waitForRest();
     else if (showsUser && touched.current) framedOnce.current = true;
     clearTimeout(areaTimer.current);
@@ -425,6 +430,7 @@ export function PlacesMap({
         style={styles.map}
         onTouchStart={() => {
           touched.current = true;
+          movedSinceFlight.current = true;
         }}
       >
         {nativeMap}

@@ -8,7 +8,10 @@ const mocks = vi.hoisted(() => ({
   setCity: vi.fn(),
   params: {} as Record<string, string>,
   frame: undefined as { key: string; places: { city: string }[] } | undefined,
-  centre: undefined as ((c: object, zoom: number) => void) | undefined,
+  centre: undefined as
+    | ((c: object, zoom: number, moved?: boolean) => void)
+    | undefined,
+  places: [] as object[],
   flight: undefined as
     | { key: number; places: object[]; minZoom?: number; maxZoom?: number }
     | undefined,
@@ -27,19 +30,18 @@ const mocks = vi.hoisted(() => ({
     open: vi.fn(),
   },
 }));
-const place = (name: string, city: string, lat: number) => ({
+const place = (name: string, city: string, lat: number, lng = -9) => ({
   itemId: name,
   name,
   city,
   lat,
-  lng: -9,
+  lng,
   kinds: [],
 });
 
 vi.mock("@/lib/map-city-in-view", () => ({ setMapCityInView: mocks.setCity }));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
-  formattingLocale: () => "ja",
   useAppLocale: () => "en",
 }));
 vi.mock("@/lib/analytics", () => ({
@@ -61,7 +63,7 @@ vi.mock("@convex-dev/react-query", () => ({ convexQuery: () => ({}) }));
 vi.mock("@tanstack/react-query", () => ({
   useQuery: () => ({
     isError: false,
-    data: [place("A", "Lisbon", 38.7), place("B", "Porto", 41.1)],
+    data: mocks.places,
   }),
 }));
 vi.mock("@/components/map/map-trip-pill", () => ({
@@ -107,7 +109,7 @@ vi.mock("@/components/map/map-header", () => ({
 vi.mock("@/components/map/places-map", () => ({
   PlacesMap: vi.fn(
     (props: {
-      onCentreChange: (c: object, zoom: number) => void;
+      onCentreChange: (c: object, zoom: number, moved?: boolean) => void;
       flight?: typeof mocks.flight;
       pills: typeof mocks.pills;
       onPill: (id: string) => void;
@@ -207,6 +209,7 @@ beforeEach(() => {
   };
   mocks.chips = undefined;
   mocks.params = {};
+  mocks.places = [place("A", "Lisbon", 38.7), place("B", "Porto", 41.1)];
 });
 
 it("tells the tab bar which city is in view, and clears it when zoomed out", () => {
@@ -231,7 +234,7 @@ it("steps from a city to its country to every city, with a pill per city once zo
   expect(mocks.flight?.places).toHaveLength(2);
 
   act(() => mocks.centre?.({ lat: 40, lng: -9 }, 6));
-  expect(screen.getByText("ポルトガル")).toBeTruthy();
+  expect(screen.getByText("Portugal")).toBeTruthy();
   expect(mocks.pills.map((pill) => pill.id)).toEqual(["lisbon", "porto"]);
   expect(mocks.pins).toEqual([]);
 
@@ -244,6 +247,31 @@ it("steps from a city to its country to every city, with a pill per city once zo
   act(() => mocks.pill?.("porto"));
   expect(mocks.flight?.key).toBe(3);
   expect(mocks.flight?.minZoom).toBeGreaterThan(9);
+});
+
+it("keeps the country it stepped to until the map is moved, though another country's city is nearer", () => {
+  mocks.places = [
+    place("A", "Berlin", 52.52, 13.4),
+    place("C", "Berlin", 52.53, 13.41),
+    place("B", "Munich", 48.14, 11.58),
+    place("D", "Prague", 50.08, 14.44),
+  ];
+  render(<MapScreen />);
+  fireEvent.click(screen.getByLabelText("map.showCountry"));
+
+  act(() => mocks.centre?.({ lat: 50.33, lng: 12.5 }, 5, false));
+  expect(screen.getByText("Germany")).toBeTruthy();
+
+  act(() => mocks.centre?.({ lat: 50.33, lng: 12.5 }, 5, true));
+  expect(screen.getByText("Czechia")).toBeTruthy();
+});
+
+it("reads every city as the level even where the map cannot zoom out that far", () => {
+  render(<MapScreen />);
+  fireEvent.click(screen.getByLabelText("map.showCountry"));
+  fireEvent.click(screen.getByLabelText("map.showAllCities"));
+  act(() => mocks.centre?.({ lat: 40, lng: -9 }, 3, false));
+  expect(screen.getByText("map.yourCities")).toBeTruthy();
 });
 
 it("keeps the map behind the floating controls while framing places above them", () => {
@@ -277,7 +305,7 @@ it("shows Discover places beside the person's own while the went switch is on Al
     expect.objectContaining({ _id: "p1", source: "discover" }),
   );
 
-  act(() => mocks.centre?.({ lat: 40, lng: -9 }, 6));
+  act(() => mocks.centre?.({ lat: 40, lng: -9 }, 6, true));
   expect(mocks.pins.map((pin) => pin.id)).toEqual(["discover:p1"]);
 
   act(() => mocks.went?.("want"));
