@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, type ComponentProps } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import MapCta from "./MapCta";
 
-type Source = "header" | "hero" | "footer" | "place_tool";
+type Source = ComponentProps<typeof MapCta>["source"];
 
 const fetchMock = vi.fn();
 
@@ -44,6 +44,7 @@ describe("MapCta", () => {
     ["header", "Map my saves"],
     ["hero", "Map my saves"],
     ["footer", "Map my saves"],
+    ["alternative", "Map my saves"],
     ["place_tool", "Save these to Shelvr"],
   ] as const)("labels the %s button %s, on the App Store", (source, label) => {
     const link = mount(source);
@@ -94,6 +95,20 @@ describe("MapCta", () => {
         source: "hero",
         campaign: "web_hero",
       },
+    });
+  });
+
+  it("reports an App Store click from an app comparison", () => {
+    const link = mount("alternative");
+    link.addEventListener("click", (event) => event.preventDefault());
+
+    act(() => link.click());
+
+    expect(link.href).toContain("ct=web_alternative");
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      event: "app_store_clicked",
+      properties: { source: "alternative", campaign: "web_alternative" },
     });
   });
 

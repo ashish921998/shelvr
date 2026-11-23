@@ -2,6 +2,7 @@ import Link from "next/link";
 
 const links = [
   { title: "Reel place finder", url: "/reel-place-finder" },
+  { title: "Compare apps", url: "/alternatives" },
   { title: "Support", url: "/support" },
   { title: "Terms", url: "/terms" },
   { title: "Privacy", url: "/privacy" },

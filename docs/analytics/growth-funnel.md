@@ -24,7 +24,8 @@ Without it, links stay plain and nothing is attributed.
 - A visitor with no campaign gets `web_<button>` (`web_hero`, `web_header`,
   `web_footer`, `web_footer-nav`, `web_oracle`, `web_place_tool` for the reel
   place finder's results card, `web_place_banner` for the finder's phone
-  banner, `web_bio` for the bio page and `web_plan` for the plan vote page).
+  banner, `web_bio` for the bio page, `web_plan` for the plan vote page and
+  `web_alternative` for the app comparisons).
   The share preview page uses `share`.
 - Campaigns are lowercased and reduced to `a-z 0-9 _ -`, at most 40 characters.
 
