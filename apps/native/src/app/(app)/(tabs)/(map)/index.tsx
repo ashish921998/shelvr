@@ -418,9 +418,10 @@ export default function MapScreen() {
         pointerEvents="box-none"
         style={[styles.aboveBar, { bottom: barHeight }]}
       >
-        {!hasPlaces && !showStrip ? (
+        {all.length === 0 && !searchOpen ? (
           <MapEmpty
-            located={located}
+            located={located && !hasPlaces && !showStrip}
+            listsOnly={hasPlaces || showStrip}
             onLocate={() => setLocate((n) => n + 1)}
           />
         ) : null}

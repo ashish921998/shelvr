@@ -4,6 +4,7 @@ import {
   FULL_PHONE_WIDTH,
   PhoneFrame,
 } from "@/components/onboarding/opener-phone";
+import { InviteOffer } from "@/components/invite-offer";
 import { Wordmark } from "@/components/wordmark";
 import { analytics } from "@/lib/analytics";
 import { t, useAppLocale } from "@/lib/i18n";
@@ -373,6 +374,7 @@ export function OpenerStep({
         >
           <Text style={styles.startText}>{t("opener.getStarted")}</Text>
         </Pressable>
+        <InviteOffer />
         <Pressable
           accessibilityRole="button"
           onPress={onSignIn}

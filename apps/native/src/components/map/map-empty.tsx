@@ -1,20 +1,31 @@
 import { MapRoundButton } from "@/components/map/map-round-button";
+import { SharedListCard } from "@/components/shared-list/list-card";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t } from "@/lib/i18n";
+import { useSharedLists } from "@/lib/shared-lists";
 import { View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
 export function MapEmpty({
   located,
+  listsOnly = false,
   onLocate,
 }: {
   located: boolean;
+  listsOnly?: boolean;
   onLocate: () => void;
 }) {
   const { theme } = useUnistyles();
+  const { data, isPending } = useSharedLists();
+  const lists = data ?? [];
+  const hasLists = lists.length > 0;
+  if (listsOnly && !hasLists) return null;
   return (
-    <View style={styles.column} pointerEvents="box-none">
+    <View
+      style={listsOnly ? styles.stack : styles.column}
+      pointerEvents="box-none"
+    >
       {located ? (
         <View style={styles.locate}>
           <MapRoundButton
@@ -24,21 +35,29 @@ export function MapEmpty({
           />
         </View>
       ) : null}
-      <View style={styles.card}>
-        <View style={styles.badge}>
-          <AppSymbolIcon
-            name="mappin"
-            size={20}
-            tintColor={theme.colors.primaryText}
-          />
+      {isPending ? null : hasLists ? (
+        lists.slice(0, 2).map((list) => (
+          <View key={list._id} style={styles.list}>
+            <SharedListCard list={list} />
+          </View>
+        ))
+      ) : (
+        <View style={styles.card}>
+          <View style={styles.badge}>
+            <AppSymbolIcon
+              name="mappin"
+              size={20}
+              tintColor={theme.colors.primaryText}
+            />
+          </View>
+          <View style={styles.copy}>
+            <ThemedText variant="title">{t("map.emptyTitle")}</ThemedText>
+            <ThemedText variant="subhead" style={styles.body}>
+              {t("map.emptyBody")}
+            </ThemedText>
+          </View>
         </View>
-        <View style={styles.copy}>
-          <ThemedText variant="title">{t("map.emptyTitle")}</ThemedText>
-          <ThemedText variant="subhead" style={styles.body}>
-            {t("map.emptyBody")}
-          </ThemedText>
-        </View>
-      </View>
+      )}
     </View>
   );
 }
@@ -49,6 +68,11 @@ const styles = StyleSheet.create((theme) => ({
     left: theme.gap(2),
     right: theme.gap(2),
     bottom: theme.gap(5),
+    gap: theme.gap(1),
+  },
+  stack: {
+    paddingHorizontal: theme.gap(2),
+    paddingBottom: theme.gap(1),
     gap: theme.gap(1),
   },
   locate: { alignSelf: "flex-end" },
@@ -62,6 +86,10 @@ const styles = StyleSheet.create((theme) => ({
     backgroundColor: theme.colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: theme.colors.border,
+    boxShadow: "0 4px 14px rgba(0, 0, 0, 0.12)",
+  },
+  list: {
+    borderRadius: theme.radius.lg,
     boxShadow: "0 4px 14px rgba(0, 0, 0, 0.12)",
   },
   badge: {

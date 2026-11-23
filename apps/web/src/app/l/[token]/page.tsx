@@ -2,6 +2,7 @@ import { APP_LINK_ORIGIN } from "@/lib/appLinkOrigin";
 import type { Metadata } from "next";
 
 import AppStoreButton from "@/components/AppStoreButton";
+import InviteActions from "@/components/InviteActions";
 import Logo from "@/components/common/Logo";
 import { inviteHeading, inviteSummary, loadListInvite } from "@/lib/listInvite";
 import { SUPPORT_EMAIL } from "@/lib/support";
@@ -78,21 +79,12 @@ export default async function ListInvitePage({ params }: PageProps) {
           </div>
         )}
 
-        <div className="mt-6 flex flex-wrap items-center gap-3">
-          {invite && (
-            <a
-              href={`shelvr://list-invite/${encodeURIComponent(token)}`}
-              className="inline-flex min-h-11 items-center justify-center rounded-xl border border-line-strong bg-card px-5 text-sm font-semibold text-ink transition hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-            >
-              Open in Shelvr
-            </a>
-          )}
-          <AppStoreButton source="share" compact />
-        </div>
-        {invite && (
-          <p className="mt-4 text-sm text-muted">
-            New to Shelvr? Install it, then tap your invite link again.
-          </p>
+        {invite ? (
+          <InviteActions token={token} />
+        ) : (
+          <div className="mt-6">
+            <AppStoreButton source="share" compact />
+          </div>
         )}
 
         <p className="mt-6 text-xs text-muted">

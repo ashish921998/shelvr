@@ -136,9 +136,18 @@ vi.mock("@/components/map/map-search", () => ({
   MapSearchResults: vi.fn(() => null),
 }));
 vi.mock("@/components/map/map-empty", () => ({
-  MapEmpty: vi.fn(({ located }: { located: boolean }) => (
-    <div data-testid="empty">{located ? <i data-testid="locate" /> : null}</div>
-  )),
+  MapEmpty: vi.fn(
+    ({ located, listsOnly }: { located: boolean; listsOnly?: boolean }) =>
+      listsOnly ? (
+        <div data-testid="lists-only">
+          {located ? <i data-testid="locate" /> : null}
+        </div>
+      ) : (
+        <div data-testid="empty">
+          {located ? <i data-testid="locate" /> : null}
+        </div>
+      ),
+  ),
 }));
 vi.mock("@/components/map/map-kind-row", () => ({
   MapKindRow: vi.fn((props: typeof mocks.chips) => {
@@ -337,10 +346,35 @@ it.each([
   },
 );
 
-it("drops the no-places card when the area in view has Discover places", () => {
+it("drops the no-places card but keeps the shared lists when the area in view has Discover places", () => {
   mocks.params = {};
   mocks.places = [];
   mocks.discover.beside = [{ ...place("C", "Paris", 48.8), _id: "c" }];
   render(<MapScreen />);
   expect(screen.queryByTestId("empty")).toBeNull();
+  expect(screen.getByTestId("lists-only")).toBeTruthy();
+});
+
+it("keeps the shared lists when Discover places fill the area and the kind chips show", () => {
+  mocks.params = {};
+  mocks.places = [];
+  mocks.discover.beside = ["a", "b", "c"].map((id) => ({
+    ...place(id, "Lisbon", 38.7),
+    _id: id,
+    kinds: ["coffee"],
+  }));
+  render(<MapScreen />);
+  expect(mocks.chips).toBeDefined();
+  expect(screen.queryByTestId("empty")).toBeNull();
+  expect(screen.getByTestId("lists-only")).toBeTruthy();
+});
+
+it("hides the shared lists while Search is open so they never cover the results or the keyboard", () => {
+  mocks.params = {};
+  mocks.places = [];
+  mocks.discover.beside = [{ ...place("C", "Paris", 48.8), _id: "c" }];
+  render(<MapScreen />);
+  expect(screen.getByTestId("lists-only")).toBeTruthy();
+  fireEvent.click(screen.getByLabelText("search"));
+  expect(screen.queryByTestId("lists-only")).toBeNull();
 });
