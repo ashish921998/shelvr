@@ -108,6 +108,12 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   assigned before paint by the inline script from
   `apps/web/src/lib/ctaVariant.ts` in `apps/web/src/app/layout.tsx`, and sent
   as `cta_variant` on every web event (`apps/web/src/lib/analytics.ts`).
+- **German and French landing pages:** `/de` and `/fr` take their copy from
+  `apps/web/src/lib/localizedLanding.ts` and render through
+  `apps/web/src/components/landing/LocalizedLandingPage.tsx`, which marks the page
+  with its `lang` (the root layout stays `lang="en"`). Every page lists the others
+  in `LANGUAGE_ALTERNATES` for hreflang. The copy follows the app's register: German
+  says du and Inhalte, French says vous with a no-break space before `? : ; !`.
 - **Link reading:** `convex/model/pageRead.ts` (`readPage`, host dispatcher),
   shared extraction and recipe helpers in `convex/model/pageReadCore.ts`, and
   per-host readers in `convex/model/readers/` (Google Maps lists split by city in

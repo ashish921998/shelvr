@@ -10,6 +10,7 @@ type AppStoreLinkSource =
   | "header"
   | "hero"
   | "footer"
+  | "landing"
   | "share"
   | "oracle"
   | "plan"

@@ -3,12 +3,14 @@ export const SECTION_HEADING =
 
 export default function FaqList({
   faqs,
+  heading = "Questions",
 }: {
   faqs: { q: string; a: string }[];
+  heading?: string;
 }) {
   return (
     <section className="mt-16">
-      <h2 className={SECTION_HEADING}>Questions</h2>
+      <h2 className={SECTION_HEADING}>{heading}</h2>
       <div className="mt-4 border-t border-line">
         {faqs.map((faq) => (
           <details key={faq.q} className="group border-b border-line">

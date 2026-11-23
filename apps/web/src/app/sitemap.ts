@@ -6,6 +6,8 @@ import { SITE_ORIGIN } from "@/lib/siteMetadata";
 // Only the public pages people should land on; shares, votes and flows stay out.
 const PAGES = [
   "/",
+  "/de",
+  "/fr",
   "/date-night-planner",
   "/trip-planner",
   "/save-places-from-reels",

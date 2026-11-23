@@ -13,6 +13,7 @@ import {
   SITE_NAME,
   SITE_ORIGIN,
 } from "@/lib/siteMetadata";
+import { LANGUAGE_ALTERNATES } from "@/lib/localizedLanding";
 
 const TITLE = "Save Places from Reels and TikTok | Shelvr";
 const HOME_URL = `${SITE_ORIGIN}/`;
@@ -45,6 +46,7 @@ export const metadata: Metadata = {
     title: TITLE,
     description: SITE_DESCRIPTION,
   },
+  alternates: { canonical: "/", languages: LANGUAGE_ALTERNATES },
 };
 
 export default function Home() {
