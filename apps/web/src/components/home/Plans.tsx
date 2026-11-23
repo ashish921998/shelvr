@@ -10,6 +10,7 @@ const modes = [
   },
   {
     name: "Plan a trip",
+    href: "/trip-planner",
     body: "One area a day, morning to evening: your saves, plus suggested spots nearby.",
   },
 ];
@@ -36,13 +37,9 @@ export default function Plans() {
             {modes.map((mode) => (
               <div key={mode.name}>
                 <dt>
-                  {mode.href ? (
-                    <Link className={styles.modeLink} href={mode.href}>
-                      {mode.name}
-                    </Link>
-                  ) : (
-                    mode.name
-                  )}
+                  <Link className={styles.modeLink} href={mode.href}>
+                    {mode.name}
+                  </Link>
                 </dt>
                 <dd className={styles.text}>{mode.body}</dd>
               </div>

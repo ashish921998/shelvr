@@ -6,6 +6,7 @@ const SITE = "https://tryshelvr.app";
 const PAGES = [
   "/",
   "/date-night-planner",
+  "/trip-planner",
   "/save-places-from-reels",
   "/oracle",
   "/reel-place-finder",

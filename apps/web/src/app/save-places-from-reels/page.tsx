@@ -99,8 +99,16 @@ export default function SavePlacesFromReelsPage() {
               className="font-bold text-ink underline underline-offset-4"
               href="/date-night-planner"
             >
-              Plan a date from places you saved.
+              Plan a date
+            </Link>{" "}
+            or{" "}
+            <Link
+              className="font-bold text-ink underline underline-offset-4"
+              href="/trip-planner"
+            >
+              plan a trip
             </Link>
+            .
           </p>
         </div>
       </main>
