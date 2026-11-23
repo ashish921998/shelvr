@@ -2,12 +2,14 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { metadata as apple } from "./apple/layout";
 import { metadata as dateNightPlanner } from "./date-night-planner/page";
 import { metadata as layout } from "./layout";
 import Home, { metadata as home } from "./page";
 import { metadata as privacy } from "./privacy/page";
 import { metadata as support } from "./support/page";
 import { metadata as terms } from "./terms/page";
+import { metadata as waitlistConfirmed } from "./waitlist/confirmed/page";
 
 describe("site metadata", () => {
   // A page without its own alternates or openGraph inherits the layout's whole object.
@@ -23,6 +25,13 @@ describe("site metadata", () => {
     expect(home.openGraph?.title).toBe(title);
     expect(home.twitter?.title).toBe(title);
     expect(layout.title).toBe("Shelvr — saved it, now go there");
+  });
+
+  it.each([
+    ["/apple", apple],
+    ["/waitlist/confirmed", waitlistConfirmed],
+  ])("keeps %s out of search results", (_path, metadata) => {
+    expect(metadata.robots).toEqual({ index: false, follow: false });
   });
 
   it("publishes the site's preferred name and brand in homepage structured data", () => {
