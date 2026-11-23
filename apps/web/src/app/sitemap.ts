@@ -5,6 +5,7 @@ const SITE = "https://tryshelvr.app";
 // Only the public pages people should land on; shares, votes and flows stay out.
 const PAGES = [
   "/",
+  "/date-night-planner",
   "/oracle",
   "/reel-place-finder",
   "/support",

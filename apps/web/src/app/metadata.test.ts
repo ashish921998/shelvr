@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { metadata as dateNightPlanner } from "./date-night-planner/page";
 import { metadata as layout } from "./layout";
 import { metadata as home } from "./page";
 import { metadata as privacy } from "./privacy/page";
@@ -15,6 +16,7 @@ describe("site metadata", () => {
 
   it.each([
     ["/", home],
+    ["/date-night-planner", dateNightPlanner],
     ["/terms", terms],
     ["/privacy", privacy],
     ["/support", support],
@@ -24,6 +26,13 @@ describe("site metadata", () => {
       url: path,
       title: metadata.title,
       description: metadata.description,
+    });
+  });
+
+  it("gives the date night planner its own social preview copy", () => {
+    expect(dateNightPlanner.twitter).toMatchObject({
+      title: dateNightPlanner.title,
+      description: dateNightPlanner.description,
     });
   });
 });

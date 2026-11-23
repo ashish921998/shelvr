@@ -504,6 +504,13 @@
   line-height: 1.15;
 }
 
+.modeLink {
+  display: inline-block;
+  min-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
 .aside {
   margin-top: 24px;
   font-size: 15px;
