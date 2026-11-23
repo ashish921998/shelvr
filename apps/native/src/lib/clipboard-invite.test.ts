@@ -3,6 +3,8 @@ import { clipboardInviteToken } from "./clipboard-invite";
 
 vi.mock("expo-clipboard", () => ({}));
 vi.mock("@/lib/pending-invite", () => ({}));
+vi.mock("@/lib/analytics", () => ({}));
+vi.mock("react-native", () => ({}));
 
 it("reads the list token from an invite link on either Shelvr web address", () => {
   expect(clipboardInviteToken("https://tryshelvr.app/l/abc123")).toBe("abc123");

@@ -200,7 +200,7 @@ export default function MapScreen() {
   const [locate, setLocate] = useState(0);
   const [zoomOut, setZoomOut] = useState(0);
   const [mapHeight, setMapHeight] = useState(0);
-  const [stripHeight, setStripHeight] = useState(0);
+  const [overlay, setOverlay] = useState({ strip: 0, lists: 0 });
   const barHeight = useBottomTabBarHeight();
 
   const all = places.data;
@@ -370,7 +370,12 @@ export default function MapScreen() {
           showsUser={located}
           height={mapHeight}
           topInset={headerBottom + theme.gap(1)}
-          bottomInset={barHeight + (showStrip ? stripHeight : 0) + theme.gap(1)}
+          bottomInset={
+            barHeight +
+            (showStrip ? overlay.strip : 0) +
+            (all.length === 0 && !searchOpen ? overlay.lists : 0) +
+            theme.gap(1)
+          }
           searchOpen={searchOpen}
           focus={focus}
           frame={frame}
@@ -419,11 +424,18 @@ export default function MapScreen() {
         style={[styles.aboveBar, { bottom: barHeight }]}
       >
         {all.length === 0 && !searchOpen ? (
-          <MapEmpty
-            located={located && !hasPlaces && !showStrip}
-            listsOnly={hasPlaces || showStrip}
-            onLocate={() => setLocate((n) => n + 1)}
-          />
+          <View
+            pointerEvents="box-none"
+            onLayout={(event) =>
+              setOverlay(withHeight("lists", event.nativeEvent.layout.height))
+            }
+          >
+            <MapEmpty
+              located={located && !hasPlaces && !showStrip}
+              listsOnly={hasPlaces || showStrip}
+              onLocate={() => setLocate((n) => n + 1)}
+            />
+          </View>
         ) : null}
         <View pointerEvents="box-none" style={styles.controls}>
           <MapTripPill city={city} />
@@ -441,7 +453,7 @@ export default function MapScreen() {
           <View
             style={styles.strip}
             onLayout={(event) =>
-              setStripHeight(event.nativeEvent.layout.height)
+              setOverlay(withHeight("strip", event.nativeEvent.layout.height))
             }
           >
             <View
@@ -480,6 +492,11 @@ export default function MapScreen() {
       </View>
     </View>
   );
+}
+
+function withHeight(key: "strip" | "lists", height: number) {
+  return (overlay: { strip: number; lists: number }) =>
+    overlay[key] === height ? overlay : { ...overlay, [key]: height };
 }
 
 const styles = StyleSheet.create((theme) => ({

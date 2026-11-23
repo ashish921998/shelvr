@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => ({
   text: vi.fn(async () => ""),
   push: vi.fn(),
   alert: vi.fn(),
+  captureError: vi.fn(),
+  appState: undefined as ((state: string) => void) | undefined,
   pending: null as string | null,
 }));
 
@@ -21,12 +23,21 @@ vi.mock("@/lib/pending-invite", () => ({
   getPendingInvite: () => mocks.pending,
   subscribePendingInvite: () => () => {},
 }));
+vi.mock("@/lib/analytics", () => ({
+  analytics: { captureError: mocks.captureError },
+}));
 vi.mock("@/lib/i18n", () => ({ t: (key: string) => key }));
 vi.mock("react-native-unistyles", () => ({
   StyleSheet: { create: () => ({}) },
 }));
 vi.mock("react-native", () => ({
   Alert: { alert: mocks.alert },
+  AppState: {
+    addEventListener: (_: string, listener: (state: string) => void) => {
+      mocks.appState = listener;
+      return { remove: () => {} };
+    },
+  },
   Text: vi.fn(({ children }: { children: ReactNode }) => (
     <span>{children}</span>
   )),
@@ -41,6 +52,7 @@ beforeEach(() => {
   mocks.hasUrl.mockResolvedValue(true);
   mocks.push.mockClear();
   mocks.alert.mockClear();
+  mocks.captureError.mockClear();
   mocks.pending = null;
 });
 
@@ -83,6 +95,21 @@ it("says no invite was found when the clipboard cannot be read", async () => {
     "onboarding.noInviteTitle",
     "onboarding.noInviteBody",
   );
+  expect(mocks.captureError).toHaveBeenCalledWith(
+    "clipboard_invite_read_failed",
+    expect.any(Error),
+  );
+});
+
+it("offers to join when the person comes back to the app after copying their invite", async () => {
+  mocks.hasUrl.mockResolvedValue(false);
+  await renderOffer();
+  expect(screen.queryByText("onboarding.joinList")).toBeNull();
+  mocks.hasUrl.mockResolvedValue(true);
+  await act(async () => {
+    mocks.appState?.("active");
+  });
+  expect(screen.getByText("onboarding.joinList")).toBeTruthy();
 });
 
 it("stays hidden with no link on the clipboard or an invite already waiting", async () => {

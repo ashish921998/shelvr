@@ -1,6 +1,8 @@
+import { analytics } from "@/lib/analytics";
 import { getPendingInvite, subscribePendingInvite } from "@/lib/pending-invite";
 import * as Clipboard from "expo-clipboard";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { AppState } from "react-native";
 
 const INVITE_HOSTS = ["tryshelvr.app", "shelvr-web.vercel.app"];
 
@@ -25,16 +27,30 @@ export function useClipboardInvite() {
   );
   useEffect(() => {
     let live = true;
-    Clipboard.hasUrlAsync()
-      .then((found) => {
-        if (live) setHasUrl(found);
-      })
-      .catch(() => {});
+    const probe = () => {
+      Clipboard.hasUrlAsync()
+        .then((found) => {
+          if (live) setHasUrl(found);
+        })
+        .catch((error: unknown) => {
+          analytics.captureError("clipboard_invite_probe_failed", error);
+        });
+    };
+    probe();
+    const listener = AppState.addEventListener("change", (appState) => {
+      if (appState === "active") probe();
+    });
     return () => {
       live = false;
+      listener.remove();
     };
   }, []);
   const take = async () =>
-    clipboardInviteToken(await Clipboard.getStringAsync().catch(() => ""));
+    clipboardInviteToken(
+      await Clipboard.getStringAsync().catch((error: unknown) => {
+        analytics.captureError("clipboard_invite_read_failed", error);
+        return "";
+      }),
+    );
   return { offered: hasUrl && pending === null, take };
 }

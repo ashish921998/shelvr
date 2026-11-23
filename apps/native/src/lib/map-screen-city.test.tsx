@@ -378,3 +378,12 @@ it("hides the shared lists while Search is open so they never cover the results 
   fireEvent.click(screen.getByLabelText("search"));
   expect(screen.queryByTestId("lists-only")).toBeNull();
 });
+
+it("frames Discover places above the shared-list cards instead of under them", () => {
+  mocks.params = {};
+  mocks.places = [];
+  mocks.discover.beside = [{ ...place("C", "Paris", 48.8), _id: "c" }];
+  render(<MapScreen />);
+  expect(screen.getByTestId("lists-only")).toBeTruthy();
+  expect(mocks.viewport?.bottomInset).toBeGreaterThanOrEqual(800);
+});
