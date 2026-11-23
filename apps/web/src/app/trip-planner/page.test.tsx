@@ -9,6 +9,7 @@ describe("the trip planner page", () => {
 
     expect(html).toContain("Plan a trip from places you saved");
     expect(html).toContain("Personal trip planning requires Shelvr Pro.");
+    expect(html).toContain("tap Plan a trip, then Generate an itinerary");
     expect(html).toMatch(
       /Example day in Lisbon.*Miradouro da Graça.*Time Out Market.*LX Factory.*Pastéis de Belém/,
     );

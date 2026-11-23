@@ -26,7 +26,7 @@ const exampleStops = [
 const steps = [
   {
     title: "Choose your city and days",
-    body: "Open a city in Shelvr and tap Plan a trip. Choose how many days you have, what you’re into, and your pace.",
+    body: "Open a city in Shelvr and tap Plan a trip, then Generate an itinerary. Choose how many days you have, what you’re into, and your pace.",
   },
   {
     title: "See your itinerary on a map",
