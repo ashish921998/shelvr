@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { analytics } from "@/lib/analytics";
 import { useCurrentUser } from "@/lib/current-user";
 import { clearFirstSaveReminder } from "@/lib/first-save-reminder";
+import { clearMapOpening } from "@/lib/map-opening-store";
 import { clearTrialReminder } from "@/lib/trial-reminder";
 
 export function useSignOutWhenAccountGone(): void {
@@ -18,6 +19,7 @@ export function useSignOutWhenAccountGone(): void {
       await signOut();
       await clearFirstSaveReminder();
       await clearTrialReminder();
+      clearMapOpening();
     };
     signOutGone().catch((error: unknown) => {
       analytics.captureError("account_gone_sign_out_failed", error);
