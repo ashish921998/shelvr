@@ -88,7 +88,7 @@ describe("fitCamera", () => {
     ["the Aleutians, centred west", [-166.54, 173.18, -176.64], -176.68],
     ["both names of the line", [180, -180], 180],
     ["a pair centred on the line", [179, -179], 180],
-    ["the Pacific, more than a hemisphere apart", [-118.24, 139.69], -169.275],
+    ["places that fit on screen but not inside the margin", [160, -160], 180],
   ])("takes the short way round for %s", (_, longitudes, centre) => {
     const camera = fitCamera(alongEquator(longitudes), view)!;
     const awayFromTheLine = fitCamera(
@@ -107,6 +107,11 @@ describe("fitCamera", () => {
     ["a tie between both ways round", [180, 0]],
     ["a tie that rounding tips over", [-127.98, 52.02]],
     ["places all round the globe", [120, -120, 0]],
+    ["the Pacific, too wide to fit either way", [-118.24, 139.69]],
+    [
+      "cities too far apart to fit either way",
+      [-0.1276, 2.3522, 139.69, -157.86],
+    ],
   ])("keeps the plain middle for %s", (_, longitudes) => {
     expect(
       fitCamera(alongEquator(longitudes), view)!.coordinates.longitude,
