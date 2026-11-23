@@ -14,6 +14,15 @@ describe("site metadata", () => {
     expect(layout.openGraph).not.toHaveProperty("url");
   });
 
+  it("describes saving places in the homepage search and social title", () => {
+    const title = "Save Places from Reels and TikTok | Shelvr";
+
+    expect(home.title).toBe(title);
+    expect(home.openGraph?.title).toBe(title);
+    expect(home.twitter?.title).toBe(title);
+    expect(layout.title).toBe("Shelvr — saved it, now go there");
+  });
+
   it.each([
     ["/", home],
     ["/date-night-planner", dateNightPlanner],

@@ -7,13 +7,18 @@ import Hero from "@/components/home/Hero";
 import Plans from "@/components/home/Plans";
 import ProblemProof from "@/components/home/ProblemProof";
 import Story from "@/components/home/Story";
-import { pageMetadata, SITE_DESCRIPTION, SITE_TITLE } from "@/lib/siteMetadata";
+import { pageMetadata, SITE_DESCRIPTION } from "@/lib/siteMetadata";
 
-export const metadata: Metadata = pageMetadata(
-  "/",
-  SITE_TITLE,
-  SITE_DESCRIPTION,
-);
+const TITLE = "Save Places from Reels and TikTok | Shelvr";
+
+export const metadata: Metadata = {
+  ...pageMetadata("/", TITLE, SITE_DESCRIPTION),
+  twitter: {
+    card: "summary_large_image",
+    title: TITLE,
+    description: SITE_DESCRIPTION,
+  },
+};
 
 export default function Home() {
   return (
