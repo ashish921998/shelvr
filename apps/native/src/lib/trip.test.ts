@@ -105,6 +105,7 @@ describe("fitCamera", () => {
     ["places up against the line", [179.991, 177.4434]],
     ["places either side of Greenwich", [2.3522, -0.1276, -9.1393]],
     ["a tie between both ways round", [180, 0]],
+    ["a tie that rounding tips over", [-127.98, 52.02]],
     ["places all round the globe", [120, -120, 0]],
   ])("keeps the plain middle for %s", (_, longitudes) => {
     expect(

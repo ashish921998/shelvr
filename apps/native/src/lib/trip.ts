@@ -41,6 +41,7 @@ type MapView = {
 
 const FIT_FILL = 0.8;
 const MIN_SPAN = 0.004;
+const TIE_DEGREES = 1e-9;
 
 function shortestArc(longitudes: number[]): { middle: number; span: number } {
   const sorted = [...longitudes].sort((a, b) => a - b);
@@ -48,7 +49,7 @@ function shortestArc(longitudes: number[]): { middle: number; span: number } {
   let east = sorted[sorted.length - 1];
   for (let i = 1; i < sorted.length; i++) {
     const eastPastLine = sorted[i - 1] + 360;
-    if (eastPastLine - sorted[i] < east - west) {
+    if (eastPastLine - sorted[i] < east - west - TIE_DEGREES) {
       west = sorted[i];
       east = eastPastLine;
     }
