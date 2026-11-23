@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const analytics = vi.hoisted(() => ({ capture: vi.fn() }));
@@ -8,6 +9,7 @@ vi.mock("@/lib/analytics", () => ({
   captureWebAnalyticsEvent: analytics.capture,
 }));
 
+import ReelPlaceFinderPage from "@/app/reel-place-finder/page";
 import ReelPlaceFinder from "./ReelPlaceFinder";
 
 const CAPTION =
@@ -72,6 +74,29 @@ function sketchNumbers(figure: Element) {
     (pin) => pin.querySelector("text")?.textContent,
   );
 }
+
+describe("Reel Place Finder page", () => {
+  it("shows the caption limit and maps both example places in the initial HTML", () => {
+    const page = document.createElement("div");
+    page.innerHTML = renderToStaticMarkup(<ReelPlaceFinderPage />);
+
+    expect(page.querySelector("h1")?.textContent).toBe(
+      "Find places named in an Instagram Reel or TikTok caption",
+    );
+    const sample = page.querySelector('[aria-labelledby="sample-caption"]');
+    expect(sample?.querySelector("blockquote")?.textContent).toBe(
+      "“Start at Manteigaria, then head to LX Factory.”",
+    );
+    const links = [...(sample?.querySelectorAll("a") ?? [])];
+    expect(links.map((link) => link.textContent)).toEqual([
+      "Manteigaria",
+      "LX Factory",
+    ]);
+    expect(
+      links.map((link) => new URL(link.href).searchParams.get("query")),
+    ).toEqual(["Manteigaria, Lisbon", "LX Factory, Lisbon"]);
+  });
+});
 
 describe("ReelPlaceFinder results", () => {
   beforeEach(() => {
