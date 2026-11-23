@@ -69,6 +69,8 @@ describe("redirectSystemPath", () => {
   it.each([
     "https://tryshelvr.app/l/tok123",
     "https://shelvr-web.vercel.app/l/tok123",
+    "https://tryshelvr.app/l/tok123/",
+    "shelvr:///l/tok123",
   ])("opens a list invite from %s on the join screen", (path) => {
     expect(redirectSystemPath({ path, initial: true })).toBe(
       "/list-invite/tok123",
