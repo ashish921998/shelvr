@@ -342,10 +342,10 @@ it("leaves the framing alone without a shared city", () => {
 });
 
 it("opens on the city of a save the device has not seen, keyed by that save", () => {
-  mocks.known = new Set(["A"]);
+  mocks.known = new Set(["B"]);
   render(<MapScreen />);
-  expect(mocks.frame?.key).toBe("B");
-  expect(mocks.frame?.places.map((p) => p.city)).toEqual(["Porto"]);
+  expect(mocks.frame?.key).toBe("A");
+  expect(mocks.frame?.places.map((p) => p.city)).toEqual(["Lisbon"]);
 });
 
 it("treats nothing as new on the first run, then remembers what it showed", () => {
@@ -366,9 +366,9 @@ it("stops looking for a new save once the person touches the map", () => {
   const { rerender } = render(<MapScreen />);
   act(() => mocks.closeTouch?.());
   mocks.places = [
+    place("C", "Faro", 37),
     place("A", "Lisbon", 38.7),
     place("B", "Porto", 41.1),
-    place("C", "Faro", 37),
   ];
   rerender(<MapScreen />);
   expect(mocks.frame).toBeUndefined();

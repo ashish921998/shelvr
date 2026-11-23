@@ -138,8 +138,8 @@ export function newSaveFrame(
   known: ReadonlySet<string> | undefined,
 ): { key: string; places: LatLng[] } | undefined {
   if (known === undefined) return undefined;
-  const fresh = all.find((place) => !known.has(place.itemId));
-  if (!fresh) return undefined;
+  const fresh = all[0];
+  if (!fresh || known.has(fresh.itemId)) return undefined;
   const city = cityKey(fresh.city ?? "");
   const places =
     city === ""

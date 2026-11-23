@@ -147,7 +147,9 @@ export function PlacesMap({
   );
   const latest = useRef({ anchors, areaPartial, fit, overviewCamera });
   const centredOnUser = useRef(false);
-  const framedOnce = useRef(showsUser || firstCamera !== undefined);
+  const framedOnce = useRef(
+    showsUser || (firstCamera !== undefined && opening.kind !== "sample"),
+  );
   const touched = useRef(false);
   const onFit = useRef(opening.kind === "fit");
   const fittedInset = useRef(bottomInset);

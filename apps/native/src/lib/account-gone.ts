@@ -17,9 +17,9 @@ export function useSignOutWhenAccountGone(): void {
     if (!gone) return;
     const signOutGone = async () => {
       await signOut();
+      clearMapOpening();
       await clearFirstSaveReminder();
       await clearTrialReminder();
-      clearMapOpening();
     };
     signOutGone().catch((error: unknown) => {
       analytics.captureError("account_gone_sign_out_failed", error);

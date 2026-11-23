@@ -130,15 +130,15 @@ export function NotificationSessionProvider({
         signOut: async () => {
           await revokeSiriCapture(revokeCaptureToken);
           await signOut();
+          clearMapOpening();
           await clearFirstSaveReminder();
           await clearTrialReminder();
-          clearMapOpening();
         },
         deleteAccount: async () => {
           await deleteAccount({});
+          clearMapOpening();
           await clearFirstSaveReminder();
           await clearTrialReminder();
-          clearMapOpening();
         },
         clearWidget: clearRecentSavesWidget,
         resetAnalytics: () => void analytics.resetIfIdentified(),

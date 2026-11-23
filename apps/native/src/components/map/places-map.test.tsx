@@ -1112,3 +1112,33 @@ describe("remembering where the person left the map", () => {
     });
   });
 });
+
+it("flies to the first saved places when the map opened on a sample city", async () => {
+  const sample = (pins: typeof AUSTIN) => (
+    <PlacesMap
+      opening={{
+        kind: "sample",
+        city: "new-york",
+        places: [
+          { lat: 40.71, lng: -74.0 },
+          { lat: 40.75, lng: -73.98 },
+        ],
+      }}
+      areaPartial={false}
+      onArea={vi.fn()}
+      pins={pins}
+      anchors={pins}
+      framed={pins}
+      showsUser={false}
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={vi.fn()}
+    />
+  );
+  const { rerender } = render(sample([]));
+  expect(mock.props.cameraPosition).toBeDefined();
+  rerender(sample(AUSTIN));
+  await act(() => vi.advanceTimersByTimeAsync(500));
+  expect(mock.moves).toHaveLength(1);
+});

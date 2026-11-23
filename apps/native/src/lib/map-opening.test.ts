@@ -169,8 +169,15 @@ describe("newSaveFrame", () => {
     expect(frame?.places.map((place) => place.lat)).toEqual([41.1, 41.15]);
   });
 
+  it("is nothing when only an older save is unseen", () => {
+    expect(newSaveFrame(all, new Set(["new", "bare"]))).toBeUndefined();
+  });
+
   it("frames just the pin of a save without a city", () => {
-    const frame = newSaveFrame(all, new Set(["new", "old"]));
+    const frame = newSaveFrame(
+      [all[3], ...all.slice(0, 3)],
+      new Set(["new", "old"]),
+    );
     expect(frame).toEqual({
       key: "bare",
       places: [{ itemId: "bare", lat: 10, lng: 10 }],

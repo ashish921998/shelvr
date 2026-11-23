@@ -66,9 +66,9 @@ describe("useSignOutWhenAccountGone", () => {
     await vi.waitFor(() =>
       expect(mock.cleared).toEqual([
         "signed-out",
+        "map",
         "first-save",
         "trial",
-        "map",
       ]),
     );
   });
