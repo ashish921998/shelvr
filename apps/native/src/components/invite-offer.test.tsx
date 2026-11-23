@@ -143,3 +143,13 @@ it("offers to join on Android, which can only tell that some text is copied", as
   expect(mocks.push).toHaveBeenCalledWith("/list-invite/tok2");
   expect(mocks.captureError).not.toHaveBeenCalled();
 });
+
+it("opens the invite once when the line is tapped twice quickly", async () => {
+  mocks.text.mockResolvedValue("https://tryshelvr.app/l/tok1");
+  await renderOffer();
+  await act(async () => {
+    fireEvent.click(screen.getByText("onboarding.joinList"));
+    fireEvent.click(screen.getByText("onboarding.joinList"));
+  });
+  expect(mocks.push).toHaveBeenCalledTimes(1);
+});

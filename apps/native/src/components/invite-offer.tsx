@@ -1,18 +1,23 @@
 import { useClipboardInvite } from "@/lib/clipboard-invite";
 import { t } from "@/lib/i18n";
 import { useRouter } from "expo-router";
+import { useRef } from "react";
 import { Alert, Pressable, Text } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 
 export function InviteOffer() {
   const router = useRouter();
   const invite = useClipboardInvite();
+  const reading = useRef(false);
   if (!invite.offered) return null;
   return (
     <Pressable
       accessibilityRole="button"
       onPress={() => {
+        if (reading.current) return;
+        reading.current = true;
         void invite.take().then((token) => {
+          reading.current = false;
           if (token !== null) router.push(`/list-invite/${token}`);
           else {
             Alert.alert(
