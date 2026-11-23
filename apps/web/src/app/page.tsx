@@ -7,9 +7,36 @@ import Hero from "@/components/home/Hero";
 import Plans from "@/components/home/Plans";
 import ProblemProof from "@/components/home/ProblemProof";
 import Story from "@/components/home/Story";
-import { pageMetadata, SITE_DESCRIPTION } from "@/lib/siteMetadata";
+import {
+  pageMetadata,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_ORIGIN,
+} from "@/lib/siteMetadata";
 
 const TITLE = "Save Places from Reels and TikTok | Shelvr";
+const HOME_URL = `${SITE_ORIGIN}/`;
+const ORGANIZATION_ID = `${HOME_URL}#organization`;
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${HOME_URL}#website`,
+      name: SITE_NAME,
+      url: HOME_URL,
+      publisher: { "@id": ORGANIZATION_ID },
+    },
+    {
+      "@type": "Organization",
+      "@id": ORGANIZATION_ID,
+      name: SITE_NAME,
+      url: HOME_URL,
+      logo: `${SITE_ORIGIN}/shelvr-mark.svg`,
+    },
+  ],
+};
 
 export const metadata: Metadata = {
   ...pageMetadata("/", TITLE, SITE_DESCRIPTION),
@@ -23,6 +50,10 @@ export const metadata: Metadata = {
 export default function Home() {
   return (
     <div className="min-h-screen overflow-x-clip bg-paper">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+      />
       <Header />
       <main>
         <Hero />

@@ -1,8 +1,10 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
 import { metadata as dateNightPlanner } from "./date-night-planner/page";
 import { metadata as layout } from "./layout";
-import { metadata as home } from "./page";
+import Home, { metadata as home } from "./page";
 import { metadata as privacy } from "./privacy/page";
 import { metadata as support } from "./support/page";
 import { metadata as terms } from "./terms/page";
@@ -21,6 +23,36 @@ describe("site metadata", () => {
     expect(home.openGraph?.title).toBe(title);
     expect(home.twitter?.title).toBe(title);
     expect(layout.title).toBe("Shelvr — saved it, now go there");
+  });
+
+  it("publishes the site's preferred name and brand in homepage structured data", () => {
+    const html = renderToStaticMarkup(createElement(Home));
+    const scripts = [
+      ...html.matchAll(
+        /<script type="application\/ld\+json">(.*?)<\/script>/gs,
+      ),
+    ];
+
+    expect(scripts).toHaveLength(1);
+    expect(JSON.parse(scripts[0]?.[1] ?? "null")).toEqual({
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "https://tryshelvr.app/#website",
+          name: "Shelvr",
+          url: "https://tryshelvr.app/",
+          publisher: { "@id": "https://tryshelvr.app/#organization" },
+        },
+        {
+          "@type": "Organization",
+          "@id": "https://tryshelvr.app/#organization",
+          name: "Shelvr",
+          url: "https://tryshelvr.app/",
+          logo: "https://tryshelvr.app/shelvr-mark.svg",
+        },
+      ],
+    });
   });
 
   it.each([
