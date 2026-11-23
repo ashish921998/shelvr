@@ -43,6 +43,13 @@ describe("landing hero", () => {
       expect(markup).not.toMatch(pattern);
     }
   });
+
+  it("links to the free reel place finder after the App Store button", () => {
+    expect(markup).toMatch(
+      /<a[^>]+href="\/reel-place-finder"[^>]*>Find places in a reel for free<\/a>/,
+    );
+    expectInOrder(markup, ["Map my saves", "Find places in a reel for free"]);
+  });
 });
 
 describe("problem, then proof", () => {

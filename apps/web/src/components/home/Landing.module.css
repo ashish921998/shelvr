@@ -70,6 +70,18 @@
   text-underline-offset: 3px;
 }
 
+.finderLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 8px;
+  color: var(--color-ember-deep);
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .art {
   position: relative;
   height: 640px;
