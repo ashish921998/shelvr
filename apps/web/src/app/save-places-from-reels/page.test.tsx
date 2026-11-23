@@ -13,6 +13,7 @@ describe("the save places from Reels guide", () => {
     expect(html).toContain("Three saves in Prague");
     expect(html).toContain('href="/reel-place-finder"');
     expect(html).toContain('href="/date-night-planner"');
+    expect(html).toContain('href="/trip-planner"');
     expect(metadata.alternates?.canonical).toBe("/save-places-from-reels");
   });
 });

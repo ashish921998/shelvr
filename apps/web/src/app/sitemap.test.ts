@@ -8,6 +8,7 @@ describe("sitemap and robots", () => {
     const urls = sitemap().map((entry) => entry.url);
     expect(urls).toContain("https://tryshelvr.app");
     expect(urls).toContain("https://tryshelvr.app/date-night-planner");
+    expect(urls).toContain("https://tryshelvr.app/trip-planner");
     expect(urls).toContain("https://tryshelvr.app/save-places-from-reels");
     expect(urls).toContain("https://tryshelvr.app/privacy");
     expect(

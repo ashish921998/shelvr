@@ -115,10 +115,13 @@ describe("plans", () => {
     }
   });
 
-  it("links the Plan a date heading to the public date planner page", () => {
+  it("links both planning features to their public pages", () => {
     const markup = renderToStaticMarkup(<Plans />);
     expect(markup).toMatch(
       /<a[^>]+href="\/date-night-planner"[^>]*>Plan a date<\/a>/,
+    );
+    expect(markup).toMatch(
+      /<a[^>]+href="\/trip-planner"[^>]*>Plan a trip<\/a>/,
     );
   });
 });
