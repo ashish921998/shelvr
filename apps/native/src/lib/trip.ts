@@ -41,6 +41,32 @@ type MapView = {
 
 const FIT_FILL = 0.8;
 const MIN_SPAN = 0.004;
+const TIE_DEGREES = 1e-9;
+const MIN_ZOOM = 3;
+
+function longitudeArc(
+  longitudes: number[],
+  widest: number,
+): { middle: number; span: number } {
+  const sorted = [...longitudes].sort((a, b) => a - b);
+  const plainWest = sorted[0];
+  const plainEast = sorted[sorted.length - 1];
+  let west = plainWest;
+  let east = plainEast;
+  for (let i = 1; i < sorted.length; i++) {
+    const eastPastLine = sorted[i - 1] + 360;
+    if (eastPastLine - sorted[i] < east - west - TIE_DEGREES) {
+      west = sorted[i];
+      east = eastPastLine;
+    }
+  }
+  if (east - west > widest) {
+    west = plainWest;
+    east = plainEast;
+  }
+  const middle = (west + east) / 2;
+  return { middle: middle > 180 ? middle - 360 : middle, span: east - west };
+}
 
 export function fitCamera(
   points: LatLng[],
@@ -48,30 +74,31 @@ export function fitCamera(
 ): { coordinates: LatLng; zoom: number } | undefined {
   if (points.length === 0) return undefined;
   const lats = points.map((p) => p.latitude);
-  const lngs = points.map((p) => p.longitude);
   const minLat = Math.min(...lats);
   const maxLat = Math.max(...lats);
-  const minLng = Math.min(...lngs);
-  const maxLng = Math.max(...lngs);
+  const lng = longitudeArc(
+    points.map((p) => p.longitude),
+    (360 * view.width) / (view.worldWidth * 2 ** MIN_ZOOM),
+  );
   const midLat = (minLat + maxLat) / 2;
   // In Mercator a degree of latitude is 1 / cos(latitude) times taller than a degree of longitude is wide.
   const cos = Math.cos((midLat * Math.PI) / 180);
   const visible = Math.max(view.height - view.top - view.bottom, 1);
   const byWidth = Math.log2(
     (360 * FIT_FILL * view.width) /
-      (view.worldWidth * Math.max(maxLng - minLng, MIN_SPAN)),
+      (view.worldWidth * Math.max(lng.span, MIN_SPAN)),
   );
   const byHeight = Math.log2(
     (360 * FIT_FILL * visible * cos) /
       (view.worldWidth * Math.max(maxLat - minLat, MIN_SPAN)),
   );
-  const zoom = Math.min(16, Math.max(3, Math.min(byWidth, byHeight)));
+  const zoom = Math.min(16, Math.max(MIN_ZOOM, Math.min(byWidth, byHeight)));
   const latPerPoint = (360 * cos) / (view.worldWidth * 2 ** zoom);
   const visibleMiddle = view.top + visible / 2;
   return {
     coordinates: {
       latitude: midLat - (view.centerY - visibleMiddle) * latPerPoint,
-      longitude: (minLng + maxLng) / 2,
+      longitude: lng.middle,
     },
     zoom,
   };
