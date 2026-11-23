@@ -178,7 +178,10 @@ vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: vi.fn(() => null),
 }));
 vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}), absoluteFillObject: {} },
+  StyleSheet: {
+    create: () => new Proxy({}, { get: (_, name) => ({ name }) }),
+    absoluteFillObject: {},
+  },
   useUnistyles: () => ({
     theme: { gap: (n: number) => n * 8, colors: { muted: "#999" } },
     rt: { insets: { top: 0 } },
@@ -199,13 +202,21 @@ vi.mock("react-native", () => ({
     ({
       children,
       onLayout,
+      style,
     }: {
       children: ReactNode;
       onLayout?: (e: object) => void;
+      style?: unknown;
     }) => (
       <div
         ref={(el) => {
-          if (el) onLayout?.({ nativeEvent: { layout: { height: 800 } } });
+          const controls = [style]
+            .flat()
+            .some((part) => (part as { name?: string })?.name === "controls");
+          if (el)
+            onLayout?.({
+              nativeEvent: { layout: { height: controls ? 50 : 800 } },
+            });
         }}
       >
         {children}
@@ -379,5 +390,5 @@ it("frames Discover places above the shared-list cards instead of under them", (
   mocks.discover.beside = [{ ...place("C", "Paris", 48.8), _id: "c" }];
   render(<MapScreen />);
   expect(screen.getByTestId("lists-only")).toBeTruthy();
-  expect(mocks.viewport?.bottomInset).toBeGreaterThanOrEqual(800);
+  expect(mocks.viewport?.bottomInset).toBe(80 + 800 + 50 + 8);
 });

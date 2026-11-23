@@ -201,7 +201,7 @@ export default function MapScreen() {
   const [locate, setLocate] = useState(0);
   const [zoomOut, setZoomOut] = useState(0);
   const [mapHeight, setMapHeight] = useState(0);
-  const [overlay, setOverlay] = useState({ strip: 0, lists: 0 });
+  const [overlay, setOverlay] = useState({ strip: 0, lists: 0, controls: 0 });
   const barHeight = useBottomTabBarHeight();
 
   const all = places.data;
@@ -374,7 +374,9 @@ export default function MapScreen() {
           bottomInset={
             barHeight +
             (showStrip ? overlay.strip : 0) +
-            (all.length === 0 && !searchOpen ? overlay.lists : 0) +
+            (all.length === 0 && !searchOpen && overlay.lists > 0
+              ? overlay.lists + overlay.controls
+              : 0) +
             theme.gap(1)
           }
           searchOpen={searchOpen}
@@ -441,7 +443,13 @@ export default function MapScreen() {
             )}
           </View>
         ) : null}
-        <View pointerEvents="box-none" style={styles.controls}>
+        <View
+          pointerEvents="box-none"
+          style={styles.controls}
+          onLayout={(event) =>
+            setOverlay(withHeight("controls", event.nativeEvent.layout.height))
+          }
+        >
           <MapTripPill city={city} />
           {(hasPlaces || showStrip) && located ? (
             <View style={styles.locate}>
@@ -498,8 +506,10 @@ export default function MapScreen() {
   );
 }
 
-function withHeight(key: "strip" | "lists", height: number) {
-  return (overlay: { strip: number; lists: number }) =>
+type Overlay = { strip: number; lists: number; controls: number };
+
+function withHeight(key: keyof Overlay, height: number) {
+  return (overlay: Overlay) =>
     overlay[key] === height ? overlay : { ...overlay, [key]: height };
 }
 
