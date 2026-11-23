@@ -43,10 +43,23 @@ describe("landing hero", () => {
       expect(markup).not.toMatch(pattern);
     }
   });
+
+  it("links to the free reel place finder after the App Store button", () => {
+    expect(markup).toMatch(
+      /<a[^>]+href="\/reel-place-finder"[^>]*>Find places in a reel for free<\/a>/,
+    );
+    expectInOrder(markup, ["Map my saves", "Find places in a reel for free"]);
+  });
 });
 
 describe("problem, then proof", () => {
   const markup = renderToStaticMarkup(<ProblemProof />);
+
+  it("links to the iPhone workflow from the homepage", () => {
+    expect(markup).toMatch(
+      /<a[^>]+href="\/save-places-from-reels"[^>]*>How to save places from Reels on iPhone<\/a>/,
+    );
+  });
 
   it("walks from saves to a plan in three steps", () => {
     expect(markup).toMatch(
@@ -100,5 +113,15 @@ describe("plans", () => {
     ]) {
       expect(markup).not.toContain(claim);
     }
+  });
+
+  it("links both planning features to their public pages", () => {
+    const markup = renderToStaticMarkup(<Plans />);
+    expect(markup).toMatch(
+      /<a[^>]+href="\/date-night-planner"[^>]*>Plan a date<\/a>/,
+    );
+    expect(markup).toMatch(
+      /<a[^>]+href="\/trip-planner"[^>]*>Plan a trip<\/a>/,
+    );
   });
 });

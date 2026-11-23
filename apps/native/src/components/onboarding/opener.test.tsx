@@ -179,6 +179,9 @@ vi.mock("react-native-reanimated", async () => {
   };
 });
 vi.mock("expo-image", () => ({ Image: mock.image }));
+vi.mock("@/components/invite-offer", () => ({
+  InviteOffer: vi.fn(() => null),
+}));
 vi.mock("@/components/wordmark", () => ({
   Wordmark: mock.wordmark,
 }));

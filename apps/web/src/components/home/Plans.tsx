@@ -1,13 +1,16 @@
 import Image from "next/image";
+import Link from "next/link";
 import styles from "./Landing.module.css";
 
 const modes = [
   {
     name: "Plan a date",
+    href: "/date-night-planner",
     body: "One evening, two stops a short walk apart, built around your saves. Send it to your date.",
   },
   {
     name: "Plan a trip",
+    href: "/trip-planner",
     body: "One area a day, morning to evening: your saves, plus suggested spots nearby.",
   },
 ];
@@ -33,7 +36,11 @@ export default function Plans() {
           <dl className={styles.modes}>
             {modes.map((mode) => (
               <div key={mode.name}>
-                <dt>{mode.name}</dt>
+                <dt>
+                  <Link className={styles.modeLink} href={mode.href}>
+                    {mode.name}
+                  </Link>
+                </dt>
                 <dd className={styles.text}>{mode.body}</dd>
               </div>
             ))}

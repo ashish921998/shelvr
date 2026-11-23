@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { type CSSProperties, useEffect, useRef } from "react";
 import MapCta from "@/components/MapCta";
 import styles from "./Landing.module.css";
@@ -93,6 +94,9 @@ export default function Hero() {
               On the App Store, for iPhone. <a href="#android">Android soon.</a>
             </span>
           </div>
+          <Link className={styles.finderLink} href="/reel-place-finder">
+            Find places in a reel for free
+          </Link>
         </div>
 
         <div className={styles.art}>

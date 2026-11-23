@@ -14,6 +14,8 @@ type AppStoreLinkSource =
   | "oracle"
   | "plan"
   | "bio"
+  | "alternative"
+  | "landing"
   | "place_tool"
   | "place_banner";
 

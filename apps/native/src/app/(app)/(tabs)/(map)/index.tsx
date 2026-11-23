@@ -1,5 +1,6 @@
 import { EmptyState } from "@/components/empty-state";
 import { MapEmpty } from "@/components/map/map-empty";
+import { MapSharedLists } from "@/components/map/map-shared-lists";
 import { MapHeader, MAP_HEADER_HEIGHT } from "@/components/map/map-header";
 import { MapKindRow } from "@/components/map/map-kind-row";
 import { MapRoundButton } from "@/components/map/map-round-button";
@@ -44,6 +45,13 @@ import {
 import { useAnchors, useHeldFraming } from "@/lib/map-framing";
 import { useMapLocation } from "@/lib/map-location";
 import { useMapCity } from "@/lib/use-map-city";
+import type { OpeningLabel } from "@/lib/map-opening";
+import {
+  useMapOpening,
+  useNewSaveFrame,
+  useRegionHasSample,
+} from "@/lib/use-map-opening";
+import { useCurrentUser } from "@/lib/current-user";
 import { placeEmoji } from "@/lib/map-pin-emoji";
 import { useDiscoverPlaces } from "@/lib/use-discover-places";
 import { usePlaceVisits } from "@/lib/use-place-visit";
@@ -120,19 +128,22 @@ function useMapEntries(
   };
 }
 
-function useFraming(
-  anchorEntries: Entry[],
-  key: string,
-  all: OwnPlace[] | undefined,
-) {
+function useFraming(anchorEntries: Entry[], key: string) {
+  const ownOnly = useRegionHasSample();
   const live = useMemo(
     () =>
       // As on the city page, a pin far out of town stays on the map but does not set the zoom.
-      framedPins(busiestCityPlaces(anchorEntries)).map((place) => ({
+      framedPins(
+        busiestCityPlaces(
+          ownOnly
+            ? anchorEntries.filter((place) => place.source === "own")
+            : anchorEntries,
+        ),
+      ).map((place) => ({
         ...place,
         id: entryId(place),
       })),
-    [anchorEntries],
+    [anchorEntries, ownOnly],
   );
   const overview = useMemo(
     () => anchorEntries.map((place) => ({ ...place, id: entryId(place) })),
@@ -141,7 +152,6 @@ function useFraming(
   return {
     framed: useHeldFraming(live, key),
     overview,
-    frame: useSharedCityFrame(all),
   };
 }
 
@@ -159,6 +169,95 @@ function useSharedCityFrame(all: OwnPlace[] | undefined): MapFrame | undefined {
       ? { key: save, places: framedPins(places) }
       : undefined;
   }, [all, city, save]);
+}
+
+function useMapStart(
+  all: OwnPlace[] | undefined,
+  input: {
+    waiting: boolean;
+    mapHeight: number;
+    located: boolean;
+    hasFit: boolean;
+    controls: Controls;
+  },
+) {
+  const owner = useCurrentUser().data?._id;
+  const opening = useMapOpening(
+    !input.waiting && input.mapHeight > 0,
+    owner,
+    input.located,
+    input.hasFit,
+  );
+  const routeFrame = useSharedCityFrame(all);
+  const { frame: saveFrame, close } = useNewSaveFrame(
+    all,
+    routeFrame !== undefined,
+    opening !== undefined,
+  );
+  useCloseOnControl(close, input.controls);
+  const label: OpeningLabel | undefined = routeFrame
+    ? "frame"
+    : saveFrame
+      ? "save"
+      : opening?.kind;
+  return {
+    opening,
+    frame: routeFrame ?? saveFrame,
+    label,
+    closeNewSave: close,
+  };
+}
+
+function useMapOpenedEvent(input: {
+  opened: boolean;
+  all: OwnPlace[] | undefined;
+  discover: number;
+  settled: boolean;
+  location: "asking" | "granted" | "denied";
+  opening: OpeningLabel | undefined;
+}) {
+  const { opened, all, discover, settled, location, opening } = input;
+  const reported = useRef(false);
+  useEffect(() => {
+    if (
+      !opened ||
+      all === undefined ||
+      !settled ||
+      location === "asking" ||
+      opening === undefined ||
+      reported.current
+    )
+      return;
+    reported.current = true;
+    analytics.capture("map_opened", {
+      count: all.length,
+      discover,
+      located: location === "granted",
+      opening,
+    });
+  }, [opened, all, discover, settled, location, opening]);
+}
+
+type Controls = {
+  focus: MapFocus | undefined;
+  locate: number;
+  zoomOut: number;
+  filterRevision: number;
+  searchOpen: boolean;
+  went: WentFilter;
+};
+
+function useCloseOnControl(close: () => void, controls: Controls) {
+  const used =
+    controls.focus !== undefined ||
+    controls.locate > 0 ||
+    controls.zoomOut > 0 ||
+    controls.filterRevision > 0 ||
+    controls.searchOpen ||
+    controls.went !== "all";
+  useEffect(() => {
+    if (used) close();
+  }, [used, close]);
 }
 
 function useOnNewKey(key: string | undefined, run: () => void) {
@@ -200,7 +299,7 @@ export default function MapScreen() {
   const [locate, setLocate] = useState(0);
   const [zoomOut, setZoomOut] = useState(0);
   const [mapHeight, setMapHeight] = useState(0);
-  const [stripHeight, setStripHeight] = useState(0);
+  const [overlay, setOverlay] = useState({ strip: 0, lists: 0, controls: 0 });
   const barHeight = useBottomTabBarHeight();
 
   const all = places.data;
@@ -259,12 +358,24 @@ export default function MapScreen() {
     all === undefined ||
     (all.length === 0 && !settled) ||
     location === "asking";
-  const { framed, overview, frame } = useFraming(
+  const { framed, overview } = useFraming(
     anchorEntries,
     `${waiting}|${kinds.join(",")}|${went.selected}`,
-    all,
   );
-
+  const { opening, frame, label, closeNewSave } = useMapStart(all, {
+    waiting,
+    mapHeight,
+    located: location === "granted",
+    hasFit: framed.length > 0,
+    controls: {
+      focus,
+      locate,
+      zoomOut,
+      filterRevision,
+      searchOpen,
+      went: wentFilter,
+    },
+  });
   useOnNewKey(frame?.key, () => {
     setKinds([]);
     setWentFilter("all");
@@ -273,18 +384,14 @@ export default function MapScreen() {
     setListOpen(true);
   });
 
-  const reported = useRef(false);
-  useEffect(() => {
-    if (!opened || all === undefined || !settled || location === "asking")
-      return;
-    if (reported.current) return;
-    reported.current = true;
-    analytics.capture("map_opened", {
-      count: all.length,
-      discover: beside.length,
-      located: location === "granted",
-    });
-  }, [opened, all, beside, settled, location]);
+  useMapOpenedEvent({
+    opened,
+    all,
+    discover: beside.length,
+    settled,
+    location,
+    opening: label,
+  });
 
   if (places.isError) {
     return (
@@ -358,8 +465,9 @@ export default function MapScreen() {
       style={styles.container}
       onLayout={(event) => setMapHeight(event.nativeEvent.layout.height)}
     >
-      {mapHeight > 0 ? (
+      {opening ? (
         <PlacesMap
+          opening={opening}
           pins={pins}
           framed={framed}
           anchors={anchors}
@@ -370,7 +478,14 @@ export default function MapScreen() {
           showsUser={located}
           height={mapHeight}
           topInset={headerBottom + theme.gap(1)}
-          bottomInset={barHeight + (showStrip ? stripHeight : 0) + theme.gap(1)}
+          bottomInset={
+            barHeight +
+            (showStrip ? overlay.strip : 0) +
+            (all.length === 0 && !searchOpen && overlay.lists > 0
+              ? overlay.lists + overlay.controls
+              : 0) +
+            theme.gap(1)
+          }
           searchOpen={searchOpen}
           focus={focus}
           frame={frame}
@@ -379,6 +494,7 @@ export default function MapScreen() {
           zoomOut={zoomOut}
           filterRevision={filterRevision}
           onCentreChange={onCentreChange}
+          onTouch={closeNewSave}
           onSelect={select}
           onArea={setArea}
         />
@@ -418,13 +534,30 @@ export default function MapScreen() {
         pointerEvents="box-none"
         style={[styles.aboveBar, { bottom: barHeight }]}
       >
-        {!hasPlaces && !showStrip ? (
-          <MapEmpty
-            located={located}
-            onLocate={() => setLocate((n) => n + 1)}
-          />
+        {all.length === 0 && !searchOpen ? (
+          <View
+            pointerEvents="box-none"
+            onLayout={(event) =>
+              setOverlay(withHeight("lists", event.nativeEvent.layout.height))
+            }
+          >
+            {hasPlaces || showStrip ? (
+              <MapSharedLists />
+            ) : (
+              <MapEmpty
+                located={located}
+                onLocate={() => setLocate((n) => n + 1)}
+              />
+            )}
+          </View>
         ) : null}
-        <View pointerEvents="box-none" style={styles.controls}>
+        <View
+          pointerEvents="box-none"
+          style={styles.controls}
+          onLayout={(event) =>
+            setOverlay(withHeight("controls", event.nativeEvent.layout.height))
+          }
+        >
           <MapTripPill city={city} />
           {(hasPlaces || showStrip) && located ? (
             <View style={styles.locate}>
@@ -440,7 +573,7 @@ export default function MapScreen() {
           <View
             style={styles.strip}
             onLayout={(event) =>
-              setStripHeight(event.nativeEvent.layout.height)
+              setOverlay(withHeight("strip", event.nativeEvent.layout.height))
             }
           >
             <View
@@ -479,6 +612,13 @@ export default function MapScreen() {
       </View>
     </View>
   );
+}
+
+type Overlay = { strip: number; lists: number; controls: number };
+
+function withHeight(key: keyof Overlay, height: number) {
+  return (overlay: Overlay) =>
+    overlay[key] === height ? overlay : { ...overlay, [key]: height };
 }
 
 const styles = StyleSheet.create((theme) => ({

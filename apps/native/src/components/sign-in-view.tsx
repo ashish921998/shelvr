@@ -3,6 +3,7 @@ import { isAnonymousAuthEnabled } from "@/lib/anonymous-auth";
 import { t, useAppLocale } from "@/lib/i18n";
 import { LEGAL_URLS } from "@/lib/legal";
 import { useOAuthSignIn, type OAuthProvider } from "@/lib/oauth-sign-in";
+import { InviteOffer } from "@/components/invite-offer";
 import { SignInHero } from "@/components/sign-in-hero";
 import { useLargeText } from "@/lib/use-large-text";
 import { AppSymbolIcon } from "@/components/symbol";
@@ -21,9 +22,11 @@ import { StyleSheet, useUnistyles } from "react-native-unistyles";
 export function SignInView({
   onCompleted,
   onBack,
+  offerInvite = false,
 }: {
   onCompleted?: () => void;
   onBack?: () => void;
+  offerInvite?: boolean;
 }) {
   useAppLocale();
   const {
@@ -144,6 +147,8 @@ export function SignInView({
           )}
         </View>
       </View>
+
+      {offerInvite ? <InviteOffer /> : null}
 
       <Text style={styles.terms}>
         {t("legal.consent", {

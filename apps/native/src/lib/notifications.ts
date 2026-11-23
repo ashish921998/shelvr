@@ -1,5 +1,6 @@
 import { clearFirstSaveReminder } from "@/lib/first-save-reminder";
 import { clearTrialReminder } from "@/lib/trial-reminder";
+import { clearMapOpening } from "@/lib/map-opening-store";
 import { currentLocale, useAppLocale } from "@/lib/i18n";
 import { revokeSiriCapture } from "@/lib/app-intents";
 import { clearRecentSavesWidget } from "@/lib/widget-sync";
@@ -129,11 +130,13 @@ export function NotificationSessionProvider({
         signOut: async () => {
           await revokeSiriCapture(revokeCaptureToken);
           await signOut();
+          clearMapOpening();
           await clearFirstSaveReminder();
           await clearTrialReminder();
         },
         deleteAccount: async () => {
           await deleteAccount({});
+          clearMapOpening();
           await clearFirstSaveReminder();
           await clearTrialReminder();
         },
