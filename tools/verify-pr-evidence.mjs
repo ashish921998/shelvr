@@ -20,6 +20,7 @@ const UI_PATTERNS = [
   /^apps\/web\/src\/.+\.(tsx|jsx|css)$/,
   /^apps\/web\/src\/lib\/motion\.ts$/,
   /^apps\/web\/public\//,
+  /^apps\/ios\/Shelvr\//,
 ];
 
 const NOT_UI = [/\.test\.(ts|tsx|js|jsx)$/, /license[^/]*$/i];
@@ -39,6 +40,7 @@ const OWNER_PATTERNS = [
   /^apps\/native\/src\/lib\/(entitlement|revenuecat-[\w-]+|paywall-[\w-]+|onboarding-paywall|plan-gate|trial-[\w-]+|purchase-[\w-]+|use-restore-purchases|manage-subscription|list-gate)\.ts$/,
   /^apps\/native\/src\/app\/\(app\)\/(paywall|plan-gate)\.tsx$/,
   /^apps\/native\/(eas\.json|app\.json|app\.config\.js|released-builds\.json)$/,
+  /^apps\/ios\/(Config\/|ShelvrKit\/Sources\/ShelvrKit\/(Auth\/|Backend\.swift$))/,
   /^\.github\/(workflows|actions)\//,
   /^\.github\/CODEOWNERS$/,
   /^tools\/verify-pr-evidence\.mjs$/,

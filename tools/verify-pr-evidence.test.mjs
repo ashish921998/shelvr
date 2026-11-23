@@ -145,6 +145,10 @@ test("the owner paths cover billing, auth, release and CI", () => {
     "apps/native/eas.json",
     "apps/native/app.config.js",
     "apps/native/released-builds.json",
+    "apps/ios/Config/Release.xcconfig",
+    "apps/ios/Config/Shelvr.entitlements",
+    "apps/ios/ShelvrKit/Sources/ShelvrKit/Auth/AuthSession.swift",
+    "apps/ios/ShelvrKit/Sources/ShelvrKit/Backend.swift",
     ".github/workflows/ci.yml",
     ".github/actions/secure-review/action.yml",
     ".github/CODEOWNERS",
@@ -160,6 +164,9 @@ test("the owner paths cover billing, auth, release and CI", () => {
     "apps/native/src/lib/paywall-funnel.test.ts",
     "apps/native/src/app/(app)/settings.tsx",
     "docs/architecture/local-qa.md",
+    "apps/ios/ShelvrKit/Sources/ShelvrKit/Copy.swift",
+    "apps/ios/ShelvrKit/Tests/ShelvrKitTests/AuthSessionTests.swift",
+    "apps/ios/Shelvr/SignInView.swift",
   ]) {
     assert.equal(isOwnerFile(path), false, path);
   }
@@ -371,6 +378,8 @@ test("which files count as UI", () => {
     "apps/native/modules/recent-saves-widget/android/src/main/res/values-fr/strings.xml",
     "apps/native/convex/model/notificationTranslations.json",
     "apps/web/src/components/Hero.tsx",
+    "apps/ios/Shelvr/SignInView.swift",
+    "apps/ios/Shelvr/Assets.xcassets/AppIcon.appiconset/icon.png",
   ]) {
     assert.ok(isUiFile(path), path);
   }
@@ -381,6 +390,7 @@ test("which files count as UI", () => {
     "apps/native/src/lib/format.ts",
     "apps/native/convex/items.ts",
     ".github/workflows/ci.yml",
+    "apps/ios/ShelvrKit/Sources/ShelvrKit/Copy.swift",
   ]) {
     assert.ok(!isUiFile(path), path);
   }

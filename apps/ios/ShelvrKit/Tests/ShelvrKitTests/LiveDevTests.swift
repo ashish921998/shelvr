@@ -27,8 +27,8 @@ struct LiveDevTests {
     let client = ConvexClientWithAuth(
       deploymentUrl: environment.convexURL.absoluteString,
       authProvider: SessionAuthProvider(session: session))
-    guard case .success = await client.loginFromCache() else {
-      Issue.record("loginFromCache failed")
+    guard case .success = await client.login() else {
+      Issue.record("login failed")
       return
     }
     let user = try await client.subscribe(to: "users:getCurrentUser", yielding: CurrentUser?.self)

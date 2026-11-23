@@ -81,7 +81,7 @@ public final class Backend {
   }
 
   private func connect() async {
-    switch await client.loginFromCache() {
+    switch await client.login() {
     case .success: status = .signedIn
     case .failure: status = await session.isSignedIn ? .offline : .signedOut
     }
@@ -96,11 +96,15 @@ final class SessionAuthProvider: AuthProvider, Sendable {
   }
 
   func login(onIdToken: @Sendable @escaping (String?) -> Void) async throws -> String {
-    try await loginFromCache(onIdToken: onIdToken)
+    try await token(forceRefresh: false, onIdToken: onIdToken)
   }
 
   func loginFromCache(onIdToken: @Sendable @escaping (String?) -> Void) async throws -> String {
-    guard let token = try await session.validToken() else {
+    try await token(forceRefresh: true, onIdToken: onIdToken)
+  }
+
+  private func token(forceRefresh: Bool, onIdToken: @Sendable (String?) -> Void) async throws -> String {
+    guard let token = try await session.validToken(forceRefresh: forceRefresh) else {
       onIdToken(nil)
       throw AuthSessionError.notSignedIn
     }

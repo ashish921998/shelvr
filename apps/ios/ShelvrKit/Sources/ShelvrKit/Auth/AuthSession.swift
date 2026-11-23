@@ -83,9 +83,11 @@ public actor AuthSession {
     guard try await refreshed() != nil else { throw AuthSessionError.signInRefused }
   }
 
-  public func validToken(minimumLifetime: TimeInterval = 300) async throws -> String? {
+  public func validToken(minimumLifetime: TimeInterval = 300, forceRefresh: Bool = false) async throws
+    -> String?
+  {
     guard let current = tokens else { return nil }
-    if let freshUntil, freshUntil.timeIntervalSince(now()) > minimumLifetime {
+    if !forceRefresh, let freshUntil, freshUntil.timeIntervalSince(now()) > minimumLifetime {
       return current.token
     }
     do {
@@ -105,15 +107,15 @@ public actor AuthSession {
   private func refreshed() async throws -> AuthTokens? {
     if let refresh { return try await refresh.value }
     guard let refreshToken = tokens?.refreshToken else { return nil }
-    let task = Task { [transport] in
-      try await transport.signIn(SignInRequest(refreshToken: refreshToken)).tokens
+    let task = Task { () async throws -> AuthTokens? in
+      let fresh = try await transport.signIn(SignInRequest(refreshToken: refreshToken)).tokens
+      guard tokens?.refreshToken == refreshToken else { return tokens }
+      store(fresh)
+      return fresh
     }
     refresh = task
     defer { if refresh == task { refresh = nil } }
-    let fresh = try await task.value
-    guard tokens?.refreshToken == refreshToken else { return tokens }
-    store(fresh)
-    return fresh
+    return try await task.value
   }
 
   private func store(_ fresh: AuthTokens?) {
