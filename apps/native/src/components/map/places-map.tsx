@@ -9,7 +9,12 @@ import {
   withReach,
 } from "@/lib/discover-area";
 import { moveCamera } from "@/lib/map-camera";
-import { openingCamera, type Opening, viewCamera } from "@/lib/map-opening";
+import {
+  openingCamera,
+  type Opening,
+  type StoredView,
+  viewCamera,
+} from "@/lib/map-opening";
 import { writeLastView } from "@/lib/map-opening-store";
 import { hasPlaceNear, NEARBY_KM } from "@/lib/map-filters";
 import { type MapPin } from "@/lib/map-pin-clusters";
@@ -200,26 +205,25 @@ export function PlacesMap({
           );
       }
     };
-    const hopToLast = () => {
-      if (
-        !restore ||
-        touched.current ||
-        !centre.current ||
-        distanceKm(centre.current, { lat: restore.lat, lng: restore.lng }) >
-          NEARBY_KM
-      )
-        return false;
+    const hopToLast = (view: StoredView, at: LatLng) => {
       checkNearby.current = undefined;
+      if (
+        touched.current ||
+        distanceKm(at, { lat: view.lat, lng: view.lng }) > NEARBY_KM
+      )
+        return;
       onFit.current = false;
       map()
-        ?.setCameraPosition(viewCamera(restore))
+        ?.setCameraPosition(viewCamera(view))
         .catch((error: unknown) =>
           analytics.captureError("places_map_camera_failed", error),
         );
-      return true;
     };
     checkNearby.current = () => {
-      if (hopToLast()) return;
+      if (restore) {
+        if (centre.current) hopToLast(restore, centre.current);
+        return;
+      }
       const { anchors, areaPartial } = latest.current;
       if (anchors === undefined) return;
       checkNearby.current = undefined;

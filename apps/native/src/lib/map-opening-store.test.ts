@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import {
+  claimMapOpening,
   clearMapOpening,
   readKnownSaves,
   readLastView,
@@ -33,6 +34,17 @@ it("forgets both when the account leaves", () => {
   writeLastView({ lat: 1, lng: 2, zoom: 3 });
   writeKnownSaves(["a"]);
   clearMapOpening();
+  expect(readLastView()).toBeUndefined();
+  expect(readKnownSaves()).toBeUndefined();
+});
+
+it("forgets another account's map when a different account opens it", () => {
+  claimMapOpening("user-a");
+  writeLastView({ lat: 1, lng: 2, zoom: 3 });
+  writeKnownSaves(["a"]);
+  claimMapOpening("user-a");
+  expect(readLastView()).toEqual({ lat: 1, lng: 2, zoom: 3 });
+  claimMapOpening("user-b");
   expect(readLastView()).toBeUndefined();
   expect(readKnownSaves()).toBeUndefined();
 });

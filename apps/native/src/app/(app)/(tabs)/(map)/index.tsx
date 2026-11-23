@@ -46,7 +46,12 @@ import { useAnchors, useHeldFraming } from "@/lib/map-framing";
 import { useMapLocation } from "@/lib/map-location";
 import { useMapCity } from "@/lib/use-map-city";
 import type { OpeningLabel } from "@/lib/map-opening";
-import { useMapOpening, useNewSaveFrame } from "@/lib/use-map-opening";
+import {
+  useMapOpening,
+  useNewSaveFrame,
+  useRegionHasSample,
+} from "@/lib/use-map-opening";
+import { useCurrentUser } from "@/lib/current-user";
 import { placeEmoji } from "@/lib/map-pin-emoji";
 import { useDiscoverPlaces } from "@/lib/use-discover-places";
 import { usePlaceVisits } from "@/lib/use-place-visit";
@@ -124,14 +129,21 @@ function useMapEntries(
 }
 
 function useFraming(anchorEntries: Entry[], key: string) {
+  const ownOnly = useRegionHasSample();
   const live = useMemo(
     () =>
       // As on the city page, a pin far out of town stays on the map but does not set the zoom.
-      framedPins(busiestCityPlaces(anchorEntries)).map((place) => ({
+      framedPins(
+        busiestCityPlaces(
+          ownOnly
+            ? anchorEntries.filter((place) => place.source === "own")
+            : anchorEntries,
+        ),
+      ).map((place) => ({
         ...place,
         id: entryId(place),
       })),
-    [anchorEntries],
+    [anchorEntries, ownOnly],
   );
   const overview = useMemo(
     () => anchorEntries.map((place) => ({ ...place, id: entryId(place) })),
@@ -169,17 +181,20 @@ function useMapStart(
     controls: Controls;
   },
 ) {
+  const owner = useCurrentUser().data?._id;
+  const opening = useMapOpening(
+    !input.waiting && input.mapHeight > 0,
+    owner,
+    input.located,
+    input.hasFit,
+  );
   const routeFrame = useSharedCityFrame(all);
   const { frame: saveFrame, close } = useNewSaveFrame(
     all,
     routeFrame !== undefined,
+    opening !== undefined,
   );
   useCloseOnControl(close, input.controls);
-  const opening = useMapOpening(
-    !input.waiting && input.mapHeight > 0,
-    input.located,
-    input.hasFit,
-  );
   const label: OpeningLabel | undefined = routeFrame
     ? "frame"
     : saveFrame

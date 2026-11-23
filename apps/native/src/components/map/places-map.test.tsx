@@ -1064,9 +1064,7 @@ describe("remembering where the person left the map", () => {
     await act(() => vi.advanceTimersByTimeAsync(0));
     restAt(mock.props.onCameraMove, 38.7, -9.1);
     await act(() => vi.advanceTimersByTimeAsync(700));
-    expect(mock.moves).not.toContainEqual(
-      expect.objectContaining({ zoom: 13 }),
-    );
+    expect(mock.moves).toEqual(["person"]);
   });
 
   it("does not redirect a person who touched the map", async () => {

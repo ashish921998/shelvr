@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   zoomOut: undefined as number | undefined,
   known: undefined as Set<string> | undefined,
   writeKnown: vi.fn(),
+  claim: vi.fn(),
   opening: undefined as { kind: string } | undefined,
   closeTouch: undefined as (() => void) | undefined,
   viewport: undefined as
@@ -41,7 +42,14 @@ const place = (name: string, city: string, lat: number) => ({
   kinds: [],
 });
 
+vi.mock("expo-localization", () => ({
+  getLocales: () => [{ languageTag: "en-US", regionCode: "US" }],
+}));
+vi.mock("@/lib/current-user", () => ({
+  useCurrentUser: () => ({ data: { _id: "user-1" } }),
+}));
 vi.mock("@/lib/map-opening-store", () => ({
+  claimMapOpening: mocks.claim,
   readLastView: () => undefined,
   readKnownSaves: () => mocks.known,
   writeKnownSaves: mocks.writeKnown,
@@ -254,6 +262,7 @@ beforeEach(() => {
   mocks.known = undefined;
   mocks.opening = undefined;
   mocks.writeKnown.mockClear();
+  mocks.claim.mockClear();
 });
 
 it("tells the tab bar which city is in view, and clears it when zoomed out to every place", () => {
@@ -385,6 +394,26 @@ it("stops looking for a new save once the person uses a map control", () => {
   ];
   rerender(<MapScreen />);
   expect(mocks.frame).toBeUndefined();
+});
+
+it("records no save as seen while the map waits for the location answer", () => {
+  mocks.location = "asking";
+  mocks.known = new Set(["B"]);
+  render(<MapScreen />);
+  expect(mocks.writeKnown).not.toHaveBeenCalled();
+  expect(mocks.frame).toBeUndefined();
+});
+
+it("claims the remembered map for the signed-in account before reading it", () => {
+  render(<MapScreen />);
+  expect(mocks.claim).toHaveBeenCalledWith("user-1");
+});
+
+it("opens an empty account on its region's sample city, not on suggested places", () => {
+  mocks.places = [];
+  mocks.discover.beside = [{ ...place("C", "Paris", 48.8), _id: "c" }];
+  render(<MapScreen />);
+  expect(mocks.opening?.kind).toBe("sample");
 });
 
 it("hands the map the busiest-city opening when it has places and nothing remembered", () => {
