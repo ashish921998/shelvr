@@ -9,11 +9,13 @@ import {
   withReach,
 } from "@/lib/discover-area";
 import { moveCamera } from "@/lib/map-camera";
+import { openingCamera, type Opening, viewCamera } from "@/lib/map-opening";
+import { writeLastView } from "@/lib/map-opening-store";
 import { hasPlaceNear, NEARBY_KM } from "@/lib/map-filters";
 import { type MapPin } from "@/lib/map-pin-clusters";
 import { useMapPinClusters } from "@/lib/use-map-pin-clusters";
 import { fitCamera } from "@/lib/trip";
-import type { LatLng } from "@convex/model/trip";
+import { distanceKm, type LatLng } from "@convex/model/trip";
 import { AppleMaps, GoogleMaps } from "expo-maps";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { View } from "react-native";
@@ -49,6 +51,7 @@ type Props = {
   framed: MapPin[];
   anchors: LatLng[] | undefined;
   areaPartial: boolean;
+  opening: Opening;
   /** iOS: open on the person's location and show it. */
   showsUser: boolean;
   height: number;
@@ -62,6 +65,7 @@ type Props = {
   filterRevision?: number;
   searchOpen?: boolean;
   onCentreChange?: (centre: LatLng, zoom: number) => void;
+  onTouch?: () => void;
   onSelect: (id: string) => void;
   onArea: (box: MapBox) => void;
 };
@@ -71,6 +75,7 @@ export function PlacesMap({
   framed,
   anchors,
   areaPartial,
+  opening,
   showsUser,
   height,
   topInset,
@@ -83,6 +88,7 @@ export function PlacesMap({
   filterRevision = 0,
   searchOpen = false,
   onCentreChange,
+  onTouch,
   onSelect,
   onArea,
 }: Props) {
@@ -132,7 +138,9 @@ export function PlacesMap({
   const fit = useMemo(() => cameraFor(framed), [cameraFor, framed]);
 
   // expo-maps applies a cameraPosition prop without animation, so it only ever holds the first camera.
-  const [firstCamera] = useState(showsUser ? undefined : fit);
+  const [firstCamera] = useState(() => openingCamera(opening, fit, cameraFor));
+  const restore = opening.kind === "person" ? opening.restore : undefined;
+  const moved = useRef(false);
   const overviewCamera = useMemo(
     () => (overview ? cameraFor(overview) : undefined),
     [cameraFor, overview],
@@ -141,7 +149,7 @@ export function PlacesMap({
   const centredOnUser = useRef(false);
   const framedOnce = useRef(showsUser || firstCamera !== undefined);
   const touched = useRef(false);
-  const onFit = useRef(firstCamera !== undefined);
+  const onFit = useRef(opening.kind === "fit");
   const fittedInset = useRef(bottomInset);
   const centre = useRef<LatLng | undefined>(undefined);
   const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -190,7 +198,26 @@ export function PlacesMap({
           );
       }
     };
+    const hopToLast = () => {
+      if (
+        !restore ||
+        touched.current ||
+        !centre.current ||
+        distanceKm(centre.current, { lat: restore.lat, lng: restore.lng }) >
+          NEARBY_KM
+      )
+        return false;
+      checkNearby.current = undefined;
+      onFit.current = false;
+      map()
+        ?.setCameraPosition(viewCamera(restore))
+        .catch((error: unknown) =>
+          analytics.captureError("places_map_camera_failed", error),
+        );
+      return true;
+    };
     checkNearby.current = () => {
+      if (hopToLast()) return;
       const { anchors, areaPartial } = latest.current;
       if (anchors === undefined) return;
       checkNearby.current = undefined;
@@ -216,7 +243,7 @@ export function PlacesMap({
       checkNearby.current = undefined;
       centredOnUser.current = false;
     };
-  }, [showsUser, filterRevision, command]);
+  }, [showsUser, filterRevision, command, restore]);
   const areaTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
@@ -256,6 +283,7 @@ export function PlacesMap({
     // A place the person picked wins over the opening check.
     checkNearby.current = undefined;
     onFit.current = false;
+    moved.current = true;
     return command(
       () =>
         map()?.setCameraPosition({
@@ -276,6 +304,7 @@ export function PlacesMap({
     if (frameKey === undefined || !camera) return;
     checkNearby.current = undefined;
     onFit.current = false;
+    moved.current = true;
     return command(
       () => map()?.setCameraPosition(camera),
       (error) => analytics.captureError("places_map_camera_failed", error),
@@ -286,6 +315,7 @@ export function PlacesMap({
     if (!zoomOut) return;
     checkNearby.current = undefined;
     onFit.current = false;
+    moved.current = true;
     const camera = latest.current.overviewCamera;
     if (!camera) return;
     return command(
@@ -298,6 +328,7 @@ export function PlacesMap({
     if (!locate) return;
     checkNearby.current = undefined;
     onFit.current = false;
+    moved.current = true;
     return command(
       () => map()?.setCameraPosition(),
       (error) => analytics.captureError("places_map_camera_failed", error),
@@ -361,18 +392,17 @@ export function PlacesMap({
     clearTimeout(areaTimer.current);
     if (latitude === undefined || longitude === undefined) return;
     const { zoom, tilt, latitudeDelta, longitudeDelta } = event;
-    areaTimer.current = setTimeout(
-      () =>
-        reportArea({
-          latitude,
-          longitude,
-          zoom,
-          tilt,
-          latitudeDelta,
-          longitudeDelta,
-        }),
-      AREA_REST_MS,
-    );
+    areaTimer.current = setTimeout(() => {
+      reportArea({
+        latitude,
+        longitude,
+        zoom,
+        tilt,
+        latitudeDelta,
+        longitudeDelta,
+      });
+      if (moved.current) writeLastView({ lat: latitude, lng: longitude, zoom });
+    }, AREA_REST_MS);
   };
 
   const nativeMap =
@@ -417,7 +447,9 @@ export function PlacesMap({
         style={styles.map}
         onTouchStart={() => {
           touched.current = true;
+          moved.current = true;
           onFit.current = false;
+          onTouch?.();
         }}
       >
         {nativeMap}

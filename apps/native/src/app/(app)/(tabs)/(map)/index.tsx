@@ -45,6 +45,8 @@ import {
 import { useAnchors, useHeldFraming } from "@/lib/map-framing";
 import { useMapLocation } from "@/lib/map-location";
 import { useMapCity } from "@/lib/use-map-city";
+import type { OpeningLabel } from "@/lib/map-opening";
+import { useMapOpening, useNewSaveFrame } from "@/lib/use-map-opening";
 import { placeEmoji } from "@/lib/map-pin-emoji";
 import { useDiscoverPlaces } from "@/lib/use-discover-places";
 import { usePlaceVisits } from "@/lib/use-place-visit";
@@ -121,11 +123,7 @@ function useMapEntries(
   };
 }
 
-function useFraming(
-  anchorEntries: Entry[],
-  key: string,
-  all: OwnPlace[] | undefined,
-) {
+function useFraming(anchorEntries: Entry[], key: string) {
   const live = useMemo(
     () =>
       // As on the city page, a pin far out of town stays on the map but does not set the zoom.
@@ -142,7 +140,6 @@ function useFraming(
   return {
     framed: useHeldFraming(live, key),
     overview,
-    frame: useSharedCityFrame(all),
   };
 }
 
@@ -160,6 +157,68 @@ function useSharedCityFrame(all: OwnPlace[] | undefined): MapFrame | undefined {
       ? { key: save, places: framedPins(places) }
       : undefined;
   }, [all, city, save]);
+}
+
+function useMapStart(
+  all: OwnPlace[] | undefined,
+  input: {
+    waiting: boolean;
+    mapHeight: number;
+    located: boolean;
+    hasFit: boolean;
+  },
+) {
+  const routeFrame = useSharedCityFrame(all);
+  const { frame: saveFrame, close } = useNewSaveFrame(
+    all,
+    routeFrame !== undefined,
+  );
+  const opening = useMapOpening(
+    !input.waiting && input.mapHeight > 0,
+    input.located,
+    input.hasFit,
+  );
+  const label: OpeningLabel | undefined = routeFrame
+    ? "frame"
+    : saveFrame
+      ? "save"
+      : opening?.kind;
+  return {
+    opening,
+    frame: routeFrame ?? saveFrame,
+    label,
+    closeNewSave: close,
+  };
+}
+
+function useMapOpenedEvent(input: {
+  opened: boolean;
+  all: OwnPlace[] | undefined;
+  discover: number;
+  settled: boolean;
+  location: "asking" | "granted" | "denied";
+  opening: OpeningLabel | undefined;
+}) {
+  const { opened, all, discover, settled, location, opening } = input;
+  const reported = useRef(false);
+  useEffect(() => {
+    if (
+      !opened ||
+      all === undefined ||
+      !settled ||
+      location === "asking" ||
+      opening === undefined ||
+      reported.current
+    )
+      return;
+    reported.current = true;
+    analytics.capture("map_opened", {
+      count: all.length,
+      discover,
+      located: location === "granted",
+      opening,
+    });
+  }, [opened, all, discover, settled, location, opening]);
 }
 
 function useOnNewKey(key: string | undefined, run: () => void) {
@@ -260,12 +319,16 @@ export default function MapScreen() {
     all === undefined ||
     (all.length === 0 && !settled) ||
     location === "asking";
-  const { framed, overview, frame } = useFraming(
+  const { framed, overview } = useFraming(
     anchorEntries,
     `${waiting}|${kinds.join(",")}|${went.selected}`,
-    all,
   );
-
+  const { opening, frame, label, closeNewSave } = useMapStart(all, {
+    waiting,
+    mapHeight,
+    located: location === "granted",
+    hasFit: framed.length > 0,
+  });
   useOnNewKey(frame?.key, () => {
     setKinds([]);
     setWentFilter("all");
@@ -274,18 +337,14 @@ export default function MapScreen() {
     setListOpen(true);
   });
 
-  const reported = useRef(false);
-  useEffect(() => {
-    if (!opened || all === undefined || !settled || location === "asking")
-      return;
-    if (reported.current) return;
-    reported.current = true;
-    analytics.capture("map_opened", {
-      count: all.length,
-      discover: beside.length,
-      located: location === "granted",
-    });
-  }, [opened, all, beside, settled, location]);
+  useMapOpenedEvent({
+    opened,
+    all,
+    discover: beside.length,
+    settled,
+    location,
+    opening: label,
+  });
 
   if (places.isError) {
     return (
@@ -359,8 +418,9 @@ export default function MapScreen() {
       style={styles.container}
       onLayout={(event) => setMapHeight(event.nativeEvent.layout.height)}
     >
-      {mapHeight > 0 ? (
+      {opening ? (
         <PlacesMap
+          opening={opening}
           pins={pins}
           framed={framed}
           anchors={anchors}
@@ -387,6 +447,7 @@ export default function MapScreen() {
           zoomOut={zoomOut}
           filterRevision={filterRevision}
           onCentreChange={onCentreChange}
+          onTouch={closeNewSave}
           onSelect={select}
           onArea={setArea}
         />
