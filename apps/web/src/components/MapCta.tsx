@@ -14,7 +14,7 @@ const LOOKS = {
   hero: BIG,
   footer: BIG,
   alternative: BIG,
-  landing: BIG,
+  landing: `${BIG} max-w-full text-center`,
   place_tool:
     "min-h-12 rounded-xl px-6 text-base bg-ember text-ink hover:-translate-y-0.5 hover:bg-ember-soft focus-visible:outline-white",
 };
