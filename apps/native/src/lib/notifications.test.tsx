@@ -21,6 +21,7 @@ const mock = vi.hoisted(() => ({
   revokeSiri: vi.fn(async () => {}),
   clearFirstSave: vi.fn(async () => {}),
   clearTrial: vi.fn(async () => {}),
+  clearMap: vi.fn(),
   captureError: vi.fn(),
   capture: vi.fn(),
   push: vi.fn(),
@@ -50,6 +51,9 @@ vi.mock("@/lib/first-save-reminder", () => ({
 }));
 vi.mock("@/lib/trial-reminder", () => ({
   clearTrialReminder: mock.clearTrial,
+}));
+vi.mock("@/lib/map-opening-store", () => ({
+  clearMapOpening: mock.clearMap,
 }));
 vi.mock("@/lib/widget-sync", () => ({
   clearRecentSavesWidget: mock.clearWidget,
@@ -199,6 +203,19 @@ describe("notification session lifecycle", () => {
         await result.current.session[action]();
       });
       expect(mock.clearFirstSave).toHaveBeenCalled();
+    },
+  );
+  it.each(["signOut", "deleteAccount"] as const)(
+    "%s forgets where the map was left, so the next account never opens on it",
+    async (action) => {
+      const { result } = renderSession();
+      await waitFor(() =>
+        expect(result.current.session.isRegistered()).toBe(true),
+      );
+      await act(async () => {
+        await result.current.session[action]();
+      });
+      expect(mock.clearMap).toHaveBeenCalled();
     },
   );
   it("turns on the weekly shelf onboarding queued, once the session has started", async () => {

@@ -7,6 +7,7 @@ import type { CancelSurveyReason } from "@convex/model/cancelSurveyFields";
 import type { SaveSource } from "@convex/model/saveSource";
 import type { SaveFailureStage } from "@convex/model/saveErrors";
 import type { Goal, SavedCount } from "@/lib/onboarding-goals";
+import type { OpeningLabel } from "@/lib/map-opening";
 import type { SampleCityId } from "@/lib/sample-cities";
 import Constants from "expo-constants";
 
@@ -233,7 +234,12 @@ export type AnalyticsEventProperties = {
   city_opened: { count: number };
   city_place_visited: { visited: boolean };
   city_card_share_sheet_opened: { place_count: number; visited_count: number };
-  map_opened: { count: number; discover: number; located: boolean };
+  map_opened: {
+    count: number;
+    discover: number;
+    located: boolean;
+    opening: OpeningLabel;
+  };
   map_filter_selected: { kind: string };
   map_place_opened: { card: boolean; source: "own" | "discover" };
   map_search_result_opened: Record<string, never>;

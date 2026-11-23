@@ -13,6 +13,11 @@ const mocks = vi.hoisted(() => ({
   frame: undefined as { key: string; places: { city: string }[] } | undefined,
   centre: undefined as ((c: object, zoom: number) => void) | undefined,
   zoomOut: undefined as number | undefined,
+  known: undefined as Set<string> | undefined,
+  writeKnown: vi.fn(),
+  claim: vi.fn(),
+  opening: undefined as { kind: string } | undefined,
+  closeTouch: undefined as (() => void) | undefined,
   viewport: undefined as
     | { height: number; bottomInset: number; searchOpen: boolean }
     | undefined,
@@ -37,6 +42,18 @@ const place = (name: string, city: string, lat: number) => ({
   kinds: [],
 });
 
+vi.mock("expo-localization", () => ({
+  getLocales: () => [{ languageTag: "en-US", regionCode: "US" }],
+}));
+vi.mock("@/lib/current-user", () => ({
+  useCurrentUser: () => ({ data: { _id: "user-1" } }),
+}));
+vi.mock("@/lib/map-opening-store", () => ({
+  claimMapOpening: mocks.claim,
+  readLastView: () => undefined,
+  readKnownSaves: () => mocks.known,
+  writeKnownSaves: mocks.writeKnown,
+}));
 vi.mock("@/lib/map-city-in-view", () => ({ setMapCityInView: mocks.setCity }));
 vi.mock("@/lib/i18n", () => ({
   t: (key: string) => key,
@@ -120,7 +137,11 @@ vi.mock("@/components/map/places-map", () => ({
       onSelect: (id: string) => void;
       frame?: typeof mocks.frame;
       onArea: (box: object) => void;
+      opening: typeof mocks.opening;
+      onTouch: () => void;
     }) => {
+      mocks.opening = props.opening;
+      mocks.closeTouch = props.onTouch;
       mocks.area = props.onArea;
       mocks.frame = props.frame;
       mocks.pins = props.pins;
@@ -238,6 +259,10 @@ beforeEach(() => {
   };
   mocks.chips = undefined;
   mocks.params = {};
+  mocks.known = undefined;
+  mocks.opening = undefined;
+  mocks.writeKnown.mockClear();
+  mocks.claim.mockClear();
 });
 
 it("tells the tab bar which city is in view, and clears it when zoomed out to every place", () => {
@@ -323,6 +348,77 @@ it("frames the city a share just added to, keyed by its save", () => {
 it("leaves the framing alone without a shared city", () => {
   render(<MapScreen />);
   expect(mocks.frame).toBeUndefined();
+});
+
+it("opens on the city of a save the device has not seen, keyed by that save", () => {
+  mocks.known = new Set(["B"]);
+  render(<MapScreen />);
+  expect(mocks.frame?.key).toBe("A");
+  expect(mocks.frame?.places.map((p) => p.city)).toEqual(["Lisbon"]);
+});
+
+it("treats nothing as new on the first run, then remembers what it showed", () => {
+  render(<MapScreen />);
+  expect(mocks.frame).toBeUndefined();
+  expect(mocks.writeKnown).toHaveBeenLastCalledWith(["A", "B"]);
+});
+
+it("lets a shared city from the spots screen win over a new save", () => {
+  mocks.known = new Set(["A"]);
+  mocks.params = { city: "lisbon", save: "save-1" };
+  render(<MapScreen />);
+  expect(mocks.frame?.key).toBe("save-1");
+});
+
+it("stops looking for a new save once the person touches the map", () => {
+  mocks.known = new Set(["A", "B"]);
+  const { rerender } = render(<MapScreen />);
+  act(() => mocks.closeTouch?.());
+  mocks.places = [
+    place("C", "Faro", 37),
+    place("A", "Lisbon", 38.7),
+    place("B", "Porto", 41.1),
+  ];
+  rerender(<MapScreen />);
+  expect(mocks.frame).toBeUndefined();
+});
+
+it("stops looking for a new save once the person uses a map control", () => {
+  mocks.known = new Set(["A", "B"]);
+  const { rerender } = render(<MapScreen />);
+  act(() => mocks.went?.("want"));
+  mocks.places = [
+    place("C", "Faro", 37),
+    place("A", "Lisbon", 38.7),
+    place("B", "Porto", 41.1),
+  ];
+  rerender(<MapScreen />);
+  expect(mocks.frame).toBeUndefined();
+});
+
+it("records no save as seen while the map waits for the location answer", () => {
+  mocks.location = "asking";
+  mocks.known = new Set(["B"]);
+  render(<MapScreen />);
+  expect(mocks.writeKnown).not.toHaveBeenCalled();
+  expect(mocks.frame).toBeUndefined();
+});
+
+it("claims the remembered map for the signed-in account before reading it", () => {
+  render(<MapScreen />);
+  expect(mocks.claim).toHaveBeenCalledWith("user-1");
+});
+
+it("opens an empty account on its region's sample city, not on suggested places", () => {
+  mocks.places = [];
+  mocks.discover.beside = [{ ...place("C", "Paris", 48.8), _id: "c" }];
+  render(<MapScreen />);
+  expect(mocks.opening?.kind).toBe("sample");
+});
+
+it("hands the map the busiest-city opening when it has places and nothing remembered", () => {
+  render(<MapScreen />);
+  expect(mocks.opening?.kind).toBe("fit");
 });
 
 it("clears the went switch so a shared city's places show", () => {

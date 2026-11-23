@@ -4,6 +4,8 @@ import { forwardRef, type ReactNode, useImperativeHandle } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { MapBox } from "@/lib/discover-area";
+import type { Opening, StoredView } from "@/lib/map-opening";
+import { writeLastView } from "@/lib/map-opening-store";
 
 import { type MapFocus, type MapFrame, PlacesMap } from "./places-map";
 
@@ -17,6 +19,8 @@ const mock = vi.hoisted(() => ({
   clearSelection: vi.fn(),
   findsPerson: false,
 }));
+
+vi.mock("@/lib/map-opening-store", () => ({ writeLastView: vi.fn() }));
 
 vi.mock("./map-cluster-sheet", () => ({
   MapClusterSheet: vi.fn((props: Record<string, any>) => {
@@ -86,6 +90,13 @@ vi.mock("@/lib/i18n", () => ({
     key === "mapSheet.groupTitle" ? `${name} +${count}` : `${count} places`,
 }));
 
+const saved = vi.mocked(writeLastView);
+
+function openingFor(showsUser: boolean, framed: readonly unknown[]): Opening {
+  if (showsUser) return { kind: "person" };
+  return { kind: framed.length > 0 ? "fit" : "default" };
+}
+
 const AUSTIN = [
   { id: "a", name: "Ramen", lat: 30.26, lng: -97.74 },
   { id: "b", name: "Tacos", lat: 30.28, lng: -97.72 },
@@ -100,10 +111,12 @@ function map(
     showsUser?: boolean;
     bottomInset?: number;
     searchOpen?: boolean;
+    opening?: Opening;
   } = {},
 ) {
   return (
     <PlacesMap
+      opening={person.opening ?? openingFor(person.showsUser ?? true, AUSTIN)}
       areaPartial={false}
       onArea={vi.fn()}
       pins={AUSTIN}
@@ -123,6 +136,7 @@ beforeEach(() => {
   vi.useFakeTimers();
   vi.stubEnv("EXPO_OS", "ios");
   mock.moves = [];
+  saved.mockClear();
   mock.findsPerson = false;
   mock.clearSelection.mockClear();
 });
@@ -157,6 +171,7 @@ it.each([false, true])(
       filterRevision = 0,
     ) => (
       <PlacesMap
+        opening={openingFor(showsUser, framed)}
         areaPartial={false}
         onArea={vi.fn()}
         pins={pins}
@@ -198,6 +213,7 @@ it("keeps initial saved-city positioning when loaded visits refresh the places",
   const refreshed = AUSTIN.map((pin) => ({ ...pin }));
   rerender(
     <PlacesMap
+      opening={openingFor(true, refreshed)}
       areaPartial={false}
       onArea={vi.fn()}
       pins={refreshed}
@@ -244,6 +260,7 @@ it("uses native markers to declutter nearby places, keeping their emoji, title a
   const onSelect = vi.fn();
   render(
     <PlacesMap
+      opening={openingFor(false, AUSTIN)}
       areaPartial={false}
       onArea={vi.fn()}
       pins={[{ ...AUSTIN[0]!, emoji: "🍜" }, AUSTIN[1]!]}
@@ -280,6 +297,7 @@ it("replaces a marker whose own color changes, so a hidden map paints it, but no
   const onSelect = vi.fn();
   const colored = (tintColor?: string) => (
     <PlacesMap
+      opening={openingFor(false, AUSTIN)}
       areaPartial={false}
       onArea={vi.fn()}
       pins={[{ ...AUSTIN[0]!, tintColor }]}
@@ -311,6 +329,7 @@ it("draws nearby places as one place pin named after the first and keeps them al
   const onSelect = vi.fn();
   render(
     <PlacesMap
+      opening={openingFor(false, AUSTIN)}
       areaPartial={false}
       onArea={vi.fn()}
       pins={AUSTIN}
@@ -425,6 +444,7 @@ it.each([
   async (_name, frame, moves, latitude) => {
     const opened = (framed: typeof AUSTIN, bottom: number, at?: MapFrame) => (
       <PlacesMap
+        opening={openingFor(false, framed)}
         areaPartial={false}
         onArea={vi.fn()}
         pins={framed}
@@ -510,6 +530,7 @@ it.each([
   async (_name, one, other, title, tintColor, badged) => {
     render(
       <PlacesMap
+        opening={openingFor(false, AUSTIN)}
         areaPartial={false}
         onArea={vi.fn()}
         pins={[
@@ -538,6 +559,7 @@ it("flies out to frame every place when asked to zoom out", async () => {
   const before = mock.moves.length;
   rerender(
     <PlacesMap
+      opening={openingFor(true, AUSTIN)}
       areaPartial={false}
       onArea={vi.fn()}
       pins={AUSTIN}
@@ -565,6 +587,7 @@ it("flies out to frame every place when asked to zoom out", async () => {
 it("frames the first saved places once when the map opened empty without location", async () => {
   const noLocation = (pins: typeof AUSTIN, bottomInset = 120) => (
     <PlacesMap
+      opening={openingFor(false, pins)}
       areaPartial={false}
       onArea={vi.fn()}
       pins={pins}
@@ -599,6 +622,7 @@ it.each([
   async (_name, touchedFirst, refits) => {
     const opened = (bottomInset: number) => (
       <PlacesMap
+        opening={openingFor(false, AUSTIN)}
         areaPartial={false}
         onArea={vi.fn()}
         pins={AUSTIN}
@@ -644,6 +668,7 @@ it("leaves the map alone when Search changes the room under it, open or closed",
 it("drops a pending sheet refit once the person touches the map", async () => {
   const opened = (bottomInset: number) => (
     <PlacesMap
+      opening={openingFor(false, AUSTIN)}
       areaPartial={false}
       onArea={vi.fn()}
       pins={AUSTIN}
@@ -675,6 +700,7 @@ it.each([
     mock.findsPerson = true;
     const located = (pins: typeof AUSTIN) => (
       <PlacesMap
+        opening={openingFor(true, pins)}
         areaPartial={false}
         onArea={vi.fn()}
         pins={pins}
@@ -712,6 +738,7 @@ it("keeps the area the person panned to when their first places arrive", async (
   mock.findsPerson = true;
   const located = (pins: typeof AUSTIN) => (
     <PlacesMap
+      opening={openingFor(true, pins)}
       areaPartial={false}
       onArea={vi.fn()}
       pins={pins}
@@ -746,6 +773,7 @@ it("frames the first places when the map moved without the person touching it", 
   mock.findsPerson = true;
   const located = (pins: typeof AUSTIN) => (
     <PlacesMap
+      opening={openingFor(true, pins)}
       areaPartial={false}
       onArea={vi.fn()}
       pins={pins}
@@ -786,6 +814,7 @@ it("keeps the chosen area when location access is turned off later", async () =>
   const before = mock.moves.length;
   rerender(
     <PlacesMap
+      opening={openingFor(false, AUSTIN)}
       areaPartial={false}
       onArea={vi.fn()}
       pins={AUSTIN}
@@ -837,6 +866,7 @@ function areaMap(
 ) {
   return (
     <PlacesMap
+      opening={openingFor(overrides.showsUser ?? true, LISBON)}
       pins={LISBON}
       framed={LISBON}
       anchors={undefined}
@@ -982,4 +1012,131 @@ describe("a touch while the map is still opening", () => {
     });
     expect(latitudes()).toEqual([undefined, undefined]);
   });
+});
+function restAt(
+  onCameraMove: (event: object) => void,
+  latitude: number,
+  longitude: number,
+  zoom = 13,
+) {
+  act(() => {
+    onCameraMove({
+      coordinates: { latitude, longitude },
+      zoom,
+      tilt: 0,
+      latitudeDelta: 0.1,
+      longitudeDelta: 0.1,
+    });
+  });
+}
+
+describe("remembering where the person left the map", () => {
+  const NEAR: StoredView = { lat: 30.4, lng: -97.7, zoom: 13 };
+  it("opens on the last view and stays there when the space under the map grows", async () => {
+    const opening: Opening = { kind: "last", view: NEAR };
+    const { rerender } = render(
+      map({ showsUser: false, opening, bottomInset: 120 }),
+    );
+    expect(mock.props.cameraPosition).toEqual({
+      coordinates: { latitude: 30.4, longitude: -97.7 },
+      zoom: 13,
+    });
+    rerender(map({ showsUser: false, opening, bottomInset: 320 }));
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    expect(mock.moves).toEqual([]);
+  });
+
+  it("moves from the person to the last view when it is within 50 km", async () => {
+    mock.findsPerson = true;
+    render(map({ opening: { kind: "person", restore: NEAR } }));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    restAt(mock.props.onCameraMove, 30.27, -97.73);
+    await act(() => vi.advanceTimersByTimeAsync(700));
+    expect(mock.moves).toEqual([
+      "person",
+      { coordinates: { latitude: 30.4, longitude: -97.7 }, zoom: 13 },
+    ]);
+  });
+
+  it("stays with the person when the last view is farther than 50 km", async () => {
+    mock.findsPerson = true;
+    render(map({ opening: { kind: "person", restore: NEAR } }));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    restAt(mock.props.onCameraMove, 38.7, -9.1);
+    await act(() => vi.advanceTimersByTimeAsync(700));
+    expect(mock.moves).toEqual(["person"]);
+  });
+
+  it("does not redirect a person who touched the map", async () => {
+    mock.findsPerson = true;
+    const view = render(map({ opening: { kind: "person", restore: NEAR } }));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    fireEvent.touchStart(view.getByTestId("map-touch"));
+    restAt(mock.props.onCameraMove, 30.27, -97.73);
+    await act(() => vi.advanceTimersByTimeAsync(700));
+    expect(mock.moves).toEqual(["person"]);
+  });
+
+  it("never saves the opening moves, only where the person leaves the map", async () => {
+    mock.findsPerson = true;
+    const view = render(map({ opening: { kind: "person", restore: NEAR } }));
+    await act(() => vi.advanceTimersByTimeAsync(0));
+    restAt(mock.props.onCameraMove, 30.27, -97.73);
+    await act(() => vi.advanceTimersByTimeAsync(5000));
+    expect(saved).not.toHaveBeenCalled();
+
+    fireEvent.touchStart(view.getByTestId("map-touch"));
+    restAt(mock.props.onCameraMove, 30.3, -97.8, 14);
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    expect(saved).toHaveBeenCalledWith({
+      lat: 30.3,
+      lng: -97.8,
+      zoom: 14,
+    });
+  });
+
+  it("saves where a search pick leaves the camera", async () => {
+    const view = render(map({ showsUser: false }));
+    restAt(mock.props.onCameraMove, 30.2, -97.7);
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    expect(saved).not.toHaveBeenCalled();
+    view.rerender(map({ showsUser: false, focus: FOCUS }));
+    restAt(mock.props.onCameraMove, 30.27, -97.73, 15);
+    await act(() => vi.advanceTimersByTimeAsync(500));
+    expect(saved).toHaveBeenCalledWith({
+      lat: 30.27,
+      lng: -97.73,
+      zoom: 15,
+    });
+  });
+});
+
+it("flies to the first saved places when the map opened on a sample city", async () => {
+  const sample = (pins: typeof AUSTIN) => (
+    <PlacesMap
+      opening={{
+        kind: "sample",
+        city: "new-york",
+        places: [
+          { lat: 40.71, lng: -74.0 },
+          { lat: 40.75, lng: -73.98 },
+        ],
+      }}
+      areaPartial={false}
+      onArea={vi.fn()}
+      pins={pins}
+      anchors={pins}
+      framed={pins}
+      showsUser={false}
+      height={800}
+      topInset={100}
+      bottomInset={120}
+      onSelect={vi.fn()}
+    />
+  );
+  const { rerender } = render(sample([]));
+  expect(mock.props.cameraPosition).toBeDefined();
+  rerender(sample(AUSTIN));
+  await act(() => vi.advanceTimersByTimeAsync(500));
+  expect(mock.moves).toHaveLength(1);
 });

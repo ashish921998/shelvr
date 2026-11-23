@@ -30,6 +30,9 @@ vi.mock("@/lib/first-save-reminder", () => ({
 vi.mock("@/lib/trial-reminder", () => ({
   clearTrialReminder: vi.fn(async () => mock.cleared.push("trial")),
 }));
+vi.mock("@/lib/map-opening-store", () => ({
+  clearMapOpening: vi.fn(() => mock.cleared.push("map")),
+}));
 vi.mock("@/lib/analytics", () => ({
   analytics: { captureError: mock.captureError },
 }));
@@ -54,14 +57,19 @@ describe("useSignOutWhenAccountGone", () => {
     expect(mock.signOut).toHaveBeenCalledTimes(1);
   });
 
-  it("clears the local reminders after signing out", async () => {
+  it("clears the local reminders and the remembered map after signing out", async () => {
     mock.signOut.mockImplementation(async () => {
       mock.cleared.push("signed-out");
     });
     state(null);
     renderHook(() => useSignOutWhenAccountGone());
     await vi.waitFor(() =>
-      expect(mock.cleared).toEqual(["signed-out", "first-save", "trial"]),
+      expect(mock.cleared).toEqual([
+        "signed-out",
+        "map",
+        "first-save",
+        "trial",
+      ]),
     );
   });
 
