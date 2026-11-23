@@ -16,6 +16,10 @@ workflow described there.
 - `apps/native` is the full product: Expo Router client plus Convex backend.
 - `apps/web` is the marketing site and its server-backed waitlist routes.
 - `apps/native/convex` is the backend source of truth.
+- `apps/ios` is the SwiftUI app that replaces the Expo client, one milestone at a time
+  (`docs/plans/swift-migration.md`). Logic lives in the `ShelvrKit` package, which
+  `swift test` runs on the Mac; `Shelvr.xcodeproj` holds the views. Debug builds are
+  `app.shelvr.save.preview` on the dev deployment.
 
 ### Where things live
 

@@ -1,0 +1,124 @@
+import Foundation
+
+public enum SignInCredential: Sendable, Equatable {
+  case apple(identityToken: String, nonce: String, name: String?, authorizationCode: String?)
+  case oauthCode(provider: String, code: String, verifier: String)
+  case anonymous
+
+  var request: SignInRequest {
+    switch self {
+    case let .apple(identityToken, nonce, name, authorizationCode):
+      var params = ["identityToken": identityToken, "nonce": nonce]
+      params["name"] = name.flatMap { $0.isEmpty ? nil : $0 }
+      params["authorizationCode"] = authorizationCode
+      return SignInRequest(provider: "apple-native", params: params)
+    case let .oauthCode(provider, code, verifier):
+      return SignInRequest(provider: provider, params: ["code": code], verifier: verifier)
+    case .anonymous:
+      return SignInRequest(provider: "anonymous")
+    }
+  }
+}
+
+public struct OAuthStart: Sendable, Equatable {
+  public let url: URL
+  public let verifier: String
+}
+
+public enum AuthSessionError: Error, Equatable {
+  case notSignedIn
+  case signInRefused
+  case missingRedirect
+}
+
+public actor AuthSession {
+  private let transport: any AuthTransport
+  private let vault: any TokenVault
+  private let now: @Sendable () -> Date
+  private var tokens: AuthTokens?
+  private var freshUntil: Date?
+  private var refresh: Task<AuthTokens?, Error>?
+
+  public init(
+    transport: any AuthTransport,
+    vault: any TokenVault,
+    now: @escaping @Sendable () -> Date = Date.init
+  ) {
+    self.transport = transport
+    self.vault = vault
+    self.now = now
+    self.tokens = vault.read()
+  }
+
+  public var isSignedIn: Bool { tokens != nil }
+
+  public func signIn(_ credential: SignInCredential) async throws {
+    let response = try await transport.signIn(credential.request)
+    guard let fresh = response.tokens else { throw AuthSessionError.signInRefused }
+    store(fresh)
+  }
+
+  public func startOAuth(provider: String, redirectTo: URL) async throws -> OAuthStart {
+    let response = try await transport.signIn(
+      SignInRequest(provider: provider, params: ["redirectTo": redirectTo.absoluteString]))
+    guard
+      let redirect = response.redirect.flatMap(URL.init(string:)),
+      let verifier = response.verifier
+    else { throw AuthSessionError.missingRedirect }
+    return OAuthStart(url: redirect, verifier: verifier)
+  }
+
+  public func importLegacy(from legacy: some LegacySessionStore) async {
+    guard let refreshToken = legacy.refreshToken() else { return }
+    do {
+      try await adopt(refreshToken: refreshToken)
+      legacy.forget()
+    } catch AuthSessionError.signInRefused {
+      legacy.forget()
+    } catch {}
+  }
+
+  func adopt(refreshToken: String) async throws {
+    store(AuthTokens(token: "", refreshToken: refreshToken))
+    guard try await refreshed() != nil else { throw AuthSessionError.signInRefused }
+  }
+
+  public func validToken(minimumLifetime: TimeInterval = 300) async throws -> String? {
+    guard let current = tokens else { return nil }
+    if let freshUntil, freshUntil.timeIntervalSince(now()) > minimumLifetime {
+      return current.token
+    }
+    do {
+      return try await refreshed()?.token
+    } catch {
+      guard let stale = tokens?.token, !stale.isEmpty else { throw error }
+      return stale
+    }
+  }
+
+  public func signOut() {
+    refresh?.cancel()
+    refresh = nil
+    store(nil)
+  }
+
+  private func refreshed() async throws -> AuthTokens? {
+    if let refresh { return try await refresh.value }
+    guard let refreshToken = tokens?.refreshToken else { return nil }
+    let task = Task { [transport] in
+      try await transport.signIn(SignInRequest(refreshToken: refreshToken)).tokens
+    }
+    refresh = task
+    defer { if refresh == task { refresh = nil } }
+    let fresh = try await task.value
+    guard tokens?.refreshToken == refreshToken else { return tokens }
+    store(fresh)
+    return fresh
+  }
+
+  private func store(_ fresh: AuthTokens?) {
+    tokens = fresh
+    freshUntil = fresh?.lifetime.map { now().addingTimeInterval($0) }
+    vault.write(fresh)
+  }
+}

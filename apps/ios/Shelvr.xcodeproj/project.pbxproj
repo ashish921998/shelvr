@@ -1,0 +1,259 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000014 /* ShelvrKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000013 /* ShelvrKit */; };
+		A10000000000000000000060 /* de.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* de.json */; };
+		A10000000000000000000061 /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000041 /* en.json */; };
+		A10000000000000000000062 /* es-MX.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000042 /* es-MX.json */; };
+		A10000000000000000000063 /* es.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000043 /* es.json */; };
+		A10000000000000000000064 /* fr-CA.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000044 /* fr-CA.json */; };
+		A10000000000000000000065 /* fr.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000045 /* fr.json */; };
+		A10000000000000000000066 /* ja.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000046 /* ja.json */; };
+		A10000000000000000000067 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
+		A10000000000000000000068 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A10000000000000000000004 /* Shelvr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shelvr.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000015 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
+		A10000000000000000000016 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		A10000000000000000000017 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		A10000000000000000000018 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A10000000000000000000019 /* Shelvr.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Shelvr.entitlements; sourceTree = "<group>"; };
+		A10000000000000000000040 /* de.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "de.json"; sourceTree = "<group>"; };
+		A10000000000000000000041 /* en.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "en.json"; sourceTree = "<group>"; };
+		A10000000000000000000042 /* es-MX.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "es-MX.json"; sourceTree = "<group>"; };
+		A10000000000000000000043 /* es.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "es.json"; sourceTree = "<group>"; };
+		A10000000000000000000044 /* fr-CA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "fr-CA.json"; sourceTree = "<group>"; };
+		A10000000000000000000045 /* fr.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "fr.json"; sourceTree = "<group>"; };
+		A10000000000000000000046 /* ja.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "ja.json"; sourceTree = "<group>"; };
+		A10000000000000000000047 /* ko.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "ko.json"; sourceTree = "<group>"; };
+		A10000000000000000000048 /* pt-BR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "pt-BR.json"; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		A10000000000000000000005 /* Shelvr */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shelvr;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A1000000000000000000000A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000014 /* ShelvrKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		A10000000000000000000002 /* Shelvr project */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000005 /* Shelvr */,
+				A10000000000000000000006 /* Config */,
+				A10000000000000000000007 /* Locales */,
+				A10000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		A10000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000004 /* Shelvr.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000006 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000015 /* Shared.xcconfig */,
+				A10000000000000000000016 /* Debug.xcconfig */,
+				A10000000000000000000017 /* Release.xcconfig */,
+				A10000000000000000000018 /* Info.plist */,
+				A10000000000000000000019 /* Shelvr.entitlements */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000007 /* Locales */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000040 /* de.json */,
+				A10000000000000000000041 /* en.json */,
+				A10000000000000000000042 /* es-MX.json */,
+				A10000000000000000000043 /* es.json */,
+				A10000000000000000000044 /* fr-CA.json */,
+				A10000000000000000000045 /* fr.json */,
+				A10000000000000000000046 /* ja.json */,
+				A10000000000000000000047 /* ko.json */,
+				A10000000000000000000048 /* pt-BR.json */,
+			);
+			name = Locales;
+			path = ../native/src/locales;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A10000000000000000000008 /* Shelvr */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A1000000000000000000000D /* Build configuration list for PBXNativeTarget "Shelvr" */;
+			buildPhases = (
+				A10000000000000000000009 /* Sources */,
+				A1000000000000000000000A /* Frameworks */,
+				A1000000000000000000000B /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A10000000000000000000005 /* Shelvr */,
+			);
+			name = Shelvr;
+			packageProductDependencies = (
+				A10000000000000000000013 /* ShelvrKit */,
+			);
+			productName = Shelvr;
+			productReference = A10000000000000000000004 /* Shelvr.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A10000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
+			};
+			buildConfigurationList = A1000000000000000000000C /* Build configuration list for PBXProject "Shelvr" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = A10000000000000000000002;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				A10000000000000000000012 /* XCLocalSwiftPackageReference "ShelvrKit" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = A10000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A10000000000000000000008 /* Shelvr */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		A1000000000000000000000B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000060 /* de.json in Resources */,
+				A10000000000000000000061 /* en.json in Resources */,
+				A10000000000000000000062 /* es-MX.json in Resources */,
+				A10000000000000000000063 /* es.json in Resources */,
+				A10000000000000000000064 /* fr-CA.json in Resources */,
+				A10000000000000000000065 /* fr.json in Resources */,
+				A10000000000000000000066 /* ja.json in Resources */,
+				A10000000000000000000067 /* ko.json in Resources */,
+				A10000000000000000000068 /* pt-BR.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A10000000000000000000009 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		A1000000000000000000000E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		A1000000000000000000000F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+			};
+			name = Release;
+		};
+		A10000000000000000000010 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000016 /* Debug.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		A10000000000000000000011 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000017 /* Release.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		A1000000000000000000000C /* Build configuration list for PBXProject "Shelvr" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A1000000000000000000000E /* Debug */,
+				A1000000000000000000000F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A1000000000000000000000D /* Build configuration list for PBXNativeTarget "Shelvr" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A10000000000000000000010 /* Debug */,
+				A10000000000000000000011 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		A10000000000000000000012 /* XCLocalSwiftPackageReference "ShelvrKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ShelvrKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A10000000000000000000013 /* ShelvrKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ShelvrKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = A10000000000000000000001 /* Project object */;
+}
