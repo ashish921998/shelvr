@@ -7,6 +7,7 @@ import Hero from "@/components/home/Hero";
 import Plans from "@/components/home/Plans";
 import ProblemProof from "@/components/home/ProblemProof";
 import Story from "@/components/home/Story";
+import { LANGUAGE_ALTERNATES } from "@/lib/localizedLanding";
 import {
   pageMetadata,
   SITE_DESCRIPTION,
@@ -40,6 +41,7 @@ const structuredData = {
 
 export const metadata: Metadata = {
   ...pageMetadata("/", TITLE, SITE_DESCRIPTION),
+  alternates: { canonical: "/", languages: LANGUAGE_ALTERNATES },
   twitter: {
     card: "summary_large_image",
     title: TITLE,

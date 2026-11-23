@@ -15,6 +15,7 @@ type AppStoreLinkSource =
   | "plan"
   | "bio"
   | "alternative"
+  | "landing"
   | "place_tool"
   | "place_banner";
 
