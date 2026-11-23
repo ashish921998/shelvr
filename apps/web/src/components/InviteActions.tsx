@@ -23,7 +23,7 @@ function copyInvite(token: string) {
 export default function InviteActions({ token }: { token: string }) {
   return (
     <>
-      <div className="mt-6" onClickCapture={() => copyInvite(token)}>
+      <div className="mt-6 w-fit" onClickCapture={() => copyInvite(token)}>
         <AppStoreButton source="share" compact />
       </div>
       <p className="mt-4 text-sm text-muted">
