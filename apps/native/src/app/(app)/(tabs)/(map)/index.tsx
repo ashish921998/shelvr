@@ -1,5 +1,6 @@
 import { EmptyState } from "@/components/empty-state";
 import { MapEmpty } from "@/components/map/map-empty";
+import { MapSharedLists } from "@/components/map/map-shared-lists";
 import { MapHeader, MAP_HEADER_HEIGHT } from "@/components/map/map-header";
 import { MapKindRow } from "@/components/map/map-kind-row";
 import { MapRoundButton } from "@/components/map/map-round-button";
@@ -430,11 +431,14 @@ export default function MapScreen() {
               setOverlay(withHeight("lists", event.nativeEvent.layout.height))
             }
           >
-            <MapEmpty
-              located={located && !hasPlaces && !showStrip}
-              listsOnly={hasPlaces || showStrip}
-              onLocate={() => setLocate((n) => n + 1)}
-            />
+            {hasPlaces || showStrip ? (
+              <MapSharedLists />
+            ) : (
+              <MapEmpty
+                located={located}
+                onLocate={() => setLocate((n) => n + 1)}
+              />
+            )}
           </View>
         ) : null}
         <View pointerEvents="box-none" style={styles.controls}>

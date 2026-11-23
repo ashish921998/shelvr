@@ -73,25 +73,21 @@ it("shows the person's shared lists in place of the empty message", () => {
   lists.result = { data: [], isPending: false };
 });
 
+it("keeps the location button above the shared lists on a map with no places", () => {
+  lists.result = {
+    data: [{ _id: "l1", name: "Date spots" }],
+    isPending: false,
+  };
+  render(<MapEmpty located onLocate={vi.fn()} />);
+  expect(screen.getByLabelText("map.showMyLocation")).toBeTruthy();
+  expect(screen.getByText("Date spots")).toBeTruthy();
+  lists.result = { data: [], isPending: false };
+});
+
 it("keeps the location button but no empty message while the lists load", () => {
   lists.result = { data: undefined as never, isPending: true };
   render(<MapEmpty located onLocate={vi.fn()} />);
   expect(screen.queryByText("map.emptyTitle")).toBeNull();
   expect(screen.getByLabelText("map.showMyLocation")).toBeTruthy();
   lists.result = { data: [], isPending: false };
-});
-
-it("shows only the lists over Discover places, and nothing when there are none", () => {
-  lists.result = {
-    data: [{ _id: "l1", name: "Date spots" }],
-    isPending: false,
-  };
-  const { unmount } = render(
-    <MapEmpty located={false} listsOnly onLocate={vi.fn()} />,
-  );
-  expect(screen.getByText("Date spots")).toBeTruthy();
-  unmount();
-  lists.result = { data: [], isPending: false };
-  render(<MapEmpty located={false} listsOnly onLocate={vi.fn()} />);
-  expect(screen.queryByText("map.emptyTitle")).toBeNull();
 });

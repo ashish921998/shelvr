@@ -136,18 +136,12 @@ vi.mock("@/components/map/map-search", () => ({
   MapSearchResults: vi.fn(() => null),
 }));
 vi.mock("@/components/map/map-empty", () => ({
-  MapEmpty: vi.fn(
-    ({ located, listsOnly }: { located: boolean; listsOnly?: boolean }) =>
-      listsOnly ? (
-        <div data-testid="lists-only">
-          {located ? <i data-testid="locate" /> : null}
-        </div>
-      ) : (
-        <div data-testid="empty">
-          {located ? <i data-testid="locate" /> : null}
-        </div>
-      ),
-  ),
+  MapEmpty: vi.fn(({ located }: { located: boolean }) => (
+    <div data-testid="empty">{located ? <i data-testid="locate" /> : null}</div>
+  )),
+}));
+vi.mock("@/components/map/map-shared-lists", () => ({
+  MapSharedLists: vi.fn(() => <div data-testid="lists-only" />),
 }));
 vi.mock("@/components/map/map-kind-row", () => ({
   MapKindRow: vi.fn((props: typeof mocks.chips) => {
