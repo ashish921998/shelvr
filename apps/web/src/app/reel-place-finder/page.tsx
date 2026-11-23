@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import Logo from "@/components/common/Logo";
 import Footer from "@/components/home/Footer";
@@ -149,6 +150,12 @@ export default function ReelPlaceFinderPage() {
               </li>
             ))}
           </ol>
+          <Link
+            className="mt-4 inline-flex min-h-11 items-center text-base font-bold text-ember-deep underline underline-offset-4"
+            href="/save-places-from-reels"
+          >
+            How to keep places from Reels on your iPhone map
+          </Link>
         </section>
 
         <section className="mt-16">

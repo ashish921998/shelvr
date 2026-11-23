@@ -55,6 +55,12 @@ describe("landing hero", () => {
 describe("problem, then proof", () => {
   const markup = renderToStaticMarkup(<ProblemProof />);
 
+  it("links to the iPhone workflow from the homepage", () => {
+    expect(markup).toMatch(
+      /<a[^>]+href="\/save-places-from-reels"[^>]*>How to save places from Reels on iPhone<\/a>/,
+    );
+  });
+
   it("walks from saves to a plan in three steps", () => {
     expect(markup).toMatch(
       /<h2[^>]*>from the saved tab to friday night\.<\/h2>/,

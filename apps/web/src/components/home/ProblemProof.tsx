@@ -1,5 +1,6 @@
 import { BookmarkIcon } from "@heroicons/react/24/outline";
 import Image from "next/image";
+import Link from "next/link";
 import type { CSSProperties } from "react";
 
 import { SAMPLE_CITY } from "@/lib/sampleCity";
@@ -114,6 +115,12 @@ export default function ProblemProof() {
             </p>
           </li>
         </ol>
+        <Link
+          className="mt-6 inline-flex min-h-11 items-center text-base font-bold text-ember-deep underline underline-offset-4"
+          href="/save-places-from-reels"
+        >
+          How to save places from Reels on iPhone
+        </Link>
       </section>
     </div>
   );
