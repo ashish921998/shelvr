@@ -4,7 +4,7 @@ import { APP_STORE_ID } from "@/lib/appStore";
 
 export const SITE_ORIGIN = "https://tryshelvr.app";
 export const SITE_NAME = "Shelvr";
-export const SITE_TITLE = "Shelvr — saved it, now go there";
+const SITE_TITLE = "Shelvr — saved it, now go there";
 export const SITE_DESCRIPTION =
   "Share a reel or TikTok to Shelvr. The places in it land on a map of their city, ready for a date night or a trip.";
 
