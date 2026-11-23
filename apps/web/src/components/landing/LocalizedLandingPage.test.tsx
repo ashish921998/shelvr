@@ -1,9 +1,9 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
+import { metadata as homeMetadata } from "@/app/(en)/page";
 import { metadata as germanMetadata } from "@/app/de/page";
 import { metadata as frenchMetadata } from "@/app/fr/page";
-import { metadata as homeMetadata } from "@/app/page";
 import sitemap from "@/app/sitemap";
 import Footer from "@/components/home/Footer";
 import {
