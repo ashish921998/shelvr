@@ -6,7 +6,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { AppState, Platform } from "react-native";
 
 export function useClipboardInvite() {
-  const [hasUrl, setHasUrl] = useState(false);
+  const [copied, setCopied] = useState(false);
   const pending = useSyncExternalStore(
     subscribePendingInvite,
     getPendingInvite,
@@ -14,12 +14,12 @@ export function useClipboardInvite() {
   );
   useEffect(() => {
     let live = true;
+    const hasCopied =
+      Platform.OS === "ios" ? Clipboard.hasUrlAsync : Clipboard.hasStringAsync;
     const probe = () => {
-      (Platform.OS === "ios"
-        ? Clipboard.hasUrlAsync
-        : Clipboard.hasStringAsync)()
+      hasCopied()
         .then((found) => {
-          if (live) setHasUrl(found);
+          if (live) setCopied(found);
         })
         .catch((error: unknown) => {
           analytics.captureError("clipboard_invite_probe_failed", error);
@@ -41,5 +41,5 @@ export function useClipboardInvite() {
         return "";
       }),
     );
-  return { offered: hasUrl && pending === null, take };
+  return { offered: copied && pending === null, take };
 }
