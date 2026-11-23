@@ -166,6 +166,7 @@ function useMapStart(
     mapHeight: number;
     located: boolean;
     hasFit: boolean;
+    controls: Controls;
   },
 ) {
   const routeFrame = useSharedCityFrame(all);
@@ -173,6 +174,7 @@ function useMapStart(
     all,
     routeFrame !== undefined,
   );
+  useCloseOnControl(close, input.controls);
   const opening = useMapOpening(
     !input.waiting && input.mapHeight > 0,
     input.located,
@@ -219,6 +221,28 @@ function useMapOpenedEvent(input: {
       opening,
     });
   }, [opened, all, discover, settled, location, opening]);
+}
+
+type Controls = {
+  focus: MapFocus | undefined;
+  locate: number;
+  zoomOut: number;
+  filterRevision: number;
+  searchOpen: boolean;
+  went: WentFilter;
+};
+
+function useCloseOnControl(close: () => void, controls: Controls) {
+  const used =
+    controls.focus !== undefined ||
+    controls.locate > 0 ||
+    controls.zoomOut > 0 ||
+    controls.filterRevision > 0 ||
+    controls.searchOpen ||
+    controls.went !== "all";
+  useEffect(() => {
+    if (used) close();
+  }, [used, close]);
 }
 
 function useOnNewKey(key: string | undefined, run: () => void) {
@@ -328,6 +352,14 @@ export default function MapScreen() {
     mapHeight,
     located: location === "granted",
     hasFit: framed.length > 0,
+    controls: {
+      focus,
+      locate,
+      zoomOut,
+      filterRevision,
+      searchOpen,
+      went: wentFilter,
+    },
   });
   useOnNewKey(frame?.key, () => {
     setKinds([]);

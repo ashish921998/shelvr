@@ -374,6 +374,19 @@ it("stops looking for a new save once the person touches the map", () => {
   expect(mocks.frame).toBeUndefined();
 });
 
+it("stops looking for a new save once the person uses a map control", () => {
+  mocks.known = new Set(["A", "B"]);
+  const { rerender } = render(<MapScreen />);
+  act(() => mocks.went?.("want"));
+  mocks.places = [
+    place("C", "Faro", 37),
+    place("A", "Lisbon", 38.7),
+    place("B", "Porto", 41.1),
+  ];
+  rerender(<MapScreen />);
+  expect(mocks.frame).toBeUndefined();
+});
+
 it("hands the map the busiest-city opening when it has places and nothing remembered", () => {
   render(<MapScreen />);
   expect(mocks.opening?.kind).toBe("fit");
