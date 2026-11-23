@@ -4,12 +4,18 @@ import Logo from "@/components/common/Logo";
 import Footer from "@/components/home/Footer";
 import AppBanner from "@/components/tools/AppBanner";
 import ReelPlaceFinder from "@/components/tools/ReelPlaceFinder";
+import { googleMapsUrl } from "@/lib/reelPlaces";
 import { pageMetadata } from "@/lib/siteMetadata";
 
 const PATH = "/reel-place-finder";
 const TITLE = "Find the Places in an Instagram Reel or TikTok | Shelvr";
 const DESCRIPTION =
-  "Paste an Instagram reel or TikTok link and get the restaurants, cafés and sights it names, with a Maps link for each. No login, nothing to install.";
+  "Paste a public Instagram Reel or TikTok link to find places named in its caption. Get an Apple Maps and Google Maps link for each place. No login.";
+
+const SAMPLE_CAPTION_PLACES = [
+  { name: "Manteigaria", city: "Lisbon" },
+  { name: "LX Factory", city: "Lisbon" },
+];
 
 export const metadata: Metadata = {
   ...pageMetadata(PATH, TITLE, DESCRIPTION),
@@ -87,15 +93,42 @@ export default function ReelPlaceFinderPage() {
           Free tool · No login
         </p>
         <h1 className="mt-3 font-display text-[clamp(38px,8vw,60px)] leading-[1.02] text-balance">
-          Find every place in an Instagram reel or TikTok
+          Find places named in an Instagram Reel or TikTok caption
         </h1>
         <p className="mt-4 max-w-[52ch] text-[17px] leading-normal text-pretty text-muted">
-          Saw a spot in a video and the name is buried in the caption? Paste the
-          link and get the places it names, each one a tap from Apple Maps or
-          Google Maps.
+          Paste a public link to get an Apple Maps and Google Maps link for each
+          place the caption names.
         </p>
 
         <ReelPlaceFinder />
+
+        <section
+          aria-labelledby="sample-caption"
+          className="mt-5 rounded-2xl border border-line bg-paper-deep px-5 pt-4 pb-2 sm:px-6"
+        >
+          <h2 id="sample-caption" className="text-sm font-bold text-ink">
+            Sample caption
+          </h2>
+          <blockquote className="mt-1 text-base text-pretty text-ink-soft">
+            “Start at Manteigaria, then head to LX Factory.”
+          </blockquote>
+          <p className="mt-3 text-sm font-bold text-ink">Places found</p>
+          <ul className="flex flex-wrap gap-x-5">
+            {SAMPLE_CAPTION_PLACES.map((place) => (
+              <li key={place.name}>
+                <a
+                  href={googleMapsUrl(place)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`${place.name} in Google Maps`}
+                  className="inline-flex min-h-11 items-center font-medium text-ink underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                >
+                  {place.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
 
         <section className="mt-16">
           <h2 className="font-display text-[32px] leading-tight sm:text-[40px]">
