@@ -82,3 +82,30 @@ it("copies the invite as a link, so the iPhone app can see a link waiting withou
   ]);
   expect(writeText).not.toHaveBeenCalled();
 });
+
+it("still copies the plain link when the browser refuses to build a rich clipboard item", () => {
+  const write = vi.fn(async (_items: unknown[]) => {});
+  vi.stubGlobal(
+    "ClipboardItem",
+    class {
+      constructor() {
+        throw new TypeError("unsupported type");
+      }
+    },
+  );
+  Object.defineProperty(navigator, "clipboard", {
+    value: { write, writeText },
+    configurable: true,
+  });
+  const host = renderActions("tok1");
+  act(() =>
+    link(host, "Download").dispatchEvent(
+      new MouseEvent("click", { bubbles: true, cancelable: true }),
+    ),
+  );
+  vi.unstubAllGlobals();
+  expect(write).not.toHaveBeenCalled();
+  expect(writeText).toHaveBeenCalledWith(
+    "https://shelvr-web.vercel.app/l/tok1",
+  );
+});

@@ -13,10 +13,15 @@ function copyInvite(token: string) {
   if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
     return void asText();
   }
-  const item = new ClipboardItem({
-    "text/plain": new Blob([link], { type: "text/plain" }),
-    "text/uri-list": new Blob([link], { type: "text/uri-list" }),
-  });
+  let item: ClipboardItem;
+  try {
+    item = new ClipboardItem({
+      "text/plain": new Blob([link], { type: "text/plain" }),
+      "text/uri-list": new Blob([link], { type: "text/uri-list" }),
+    });
+  } catch {
+    return void asText();
+  }
   navigator.clipboard.write([item]).catch(asText);
 }
 
