@@ -16,4 +16,12 @@ describe("the public date night planner page", () => {
       /Example date in Lisbon.*Prado.*About 13 minutes on foot to the next stop.*Manteigaria/,
     );
   });
+
+  it("links to help using Google Maps lists from the first planning step", () => {
+    const html = renderToStaticMarkup(<DateNightPlannerPage />);
+
+    expect(html).toMatch(
+      /Save places you’d go.*<a\b[^>]*href="\/alternatives\/google-maps-lists"[^>]*>share a Google Maps list<\/a>.*Pick a first stop or a mood/,
+    );
+  });
 });

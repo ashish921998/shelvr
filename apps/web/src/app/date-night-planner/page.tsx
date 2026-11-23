@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
+import Link from "next/link";
 
 import AppStoreButton from "@/components/AppStoreButton";
 import Logo from "@/components/common/Logo";
@@ -19,7 +20,18 @@ export const metadata: Metadata = {
 const steps = [
   {
     title: "Save places you’d go",
-    body: "Share a restaurant Reel, TikTok, or Google Maps list to Shelvr. The places land on a map of their city.",
+    body: (
+      <>
+        Share a restaurant Reel or TikTok to Shelvr. You can also{" "}
+        <Link
+          href="/alternatives/google-maps-lists"
+          className="font-bold text-ink underline underline-offset-4"
+        >
+          share a Google Maps list
+        </Link>
+        . The places land on a map of their city.
+      </>
+    ),
   },
   {
     title: "Pick a first stop or a mood",
