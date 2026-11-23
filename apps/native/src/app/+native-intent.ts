@@ -1,11 +1,10 @@
 import { rememberSheetLink } from "@/lib/deferred-sheet-link";
+import { CLAIMED_HOSTS, inviteToken } from "@/lib/invite-link";
 import { appSchemeRoute, resolveRootHref } from "@/lib/home-href";
 import { readOnboardedFlag } from "@/lib/onboarding";
 import { markPendingShareOnDevice } from "@/lib/share/pending-share-store";
 import { isDeepLink, markDirectLaunch } from "@/lib/splash/launch-intent";
 import * as Linking from "expo-linking";
-
-const CLAIMED_HOSTS = ["tryshelvr.app", "shelvr-web.vercel.app"];
 
 export function redirectSystemPath({
   path,
@@ -34,9 +33,9 @@ export function redirectSystemPath({
       return "/sign-in";
     }
 
-    const invite = /^\/l\/([^/?#]+)\/?$/.exec(url.pathname);
+    const invite = inviteToken(url.pathname);
     if (invite !== null && url.hostname !== "expo-sharing") {
-      return `/list-invite/${invite[1]}`;
+      return `/list-invite/${invite}`;
     }
 
     const passport = /^\/passport\/([^/?#]+)\/?$/.exec(url.pathname);

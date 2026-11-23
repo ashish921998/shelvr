@@ -1,5 +1,6 @@
 import { EmptyState } from "@/components/empty-state";
 import { MapEmpty } from "@/components/map/map-empty";
+import { MapSharedLists } from "@/components/map/map-shared-lists";
 import { MapHeader, MAP_HEADER_HEIGHT } from "@/components/map/map-header";
 import { MapKindRow } from "@/components/map/map-kind-row";
 import { MapRoundButton } from "@/components/map/map-round-button";
@@ -200,7 +201,7 @@ export default function MapScreen() {
   const [locate, setLocate] = useState(0);
   const [zoomOut, setZoomOut] = useState(0);
   const [mapHeight, setMapHeight] = useState(0);
-  const [stripHeight, setStripHeight] = useState(0);
+  const [overlay, setOverlay] = useState({ strip: 0, lists: 0, controls: 0 });
   const barHeight = useBottomTabBarHeight();
 
   const all = places.data;
@@ -370,7 +371,14 @@ export default function MapScreen() {
           showsUser={located}
           height={mapHeight}
           topInset={headerBottom + theme.gap(1)}
-          bottomInset={barHeight + (showStrip ? stripHeight : 0) + theme.gap(1)}
+          bottomInset={
+            barHeight +
+            (showStrip ? overlay.strip : 0) +
+            (all.length === 0 && !searchOpen && overlay.lists > 0
+              ? overlay.lists + overlay.controls
+              : 0) +
+            theme.gap(1)
+          }
           searchOpen={searchOpen}
           focus={focus}
           frame={frame}
@@ -418,13 +426,30 @@ export default function MapScreen() {
         pointerEvents="box-none"
         style={[styles.aboveBar, { bottom: barHeight }]}
       >
-        {!hasPlaces && !showStrip ? (
-          <MapEmpty
-            located={located}
-            onLocate={() => setLocate((n) => n + 1)}
-          />
+        {all.length === 0 && !searchOpen ? (
+          <View
+            pointerEvents="box-none"
+            onLayout={(event) =>
+              setOverlay(withHeight("lists", event.nativeEvent.layout.height))
+            }
+          >
+            {hasPlaces || showStrip ? (
+              <MapSharedLists />
+            ) : (
+              <MapEmpty
+                located={located}
+                onLocate={() => setLocate((n) => n + 1)}
+              />
+            )}
+          </View>
         ) : null}
-        <View pointerEvents="box-none" style={styles.controls}>
+        <View
+          pointerEvents="box-none"
+          style={styles.controls}
+          onLayout={(event) =>
+            setOverlay(withHeight("controls", event.nativeEvent.layout.height))
+          }
+        >
           <MapTripPill city={city} />
           {(hasPlaces || showStrip) && located ? (
             <View style={styles.locate}>
@@ -440,7 +465,7 @@ export default function MapScreen() {
           <View
             style={styles.strip}
             onLayout={(event) =>
-              setStripHeight(event.nativeEvent.layout.height)
+              setOverlay(withHeight("strip", event.nativeEvent.layout.height))
             }
           >
             <View
@@ -479,6 +504,13 @@ export default function MapScreen() {
       </View>
     </View>
   );
+}
+
+type Overlay = { strip: number; lists: number; controls: number };
+
+function withHeight(key: keyof Overlay, height: number) {
+  return (overlay: Overlay) =>
+    overlay[key] === height ? overlay : { ...overlay, [key]: height };
 }
 
 const styles = StyleSheet.create((theme) => ({

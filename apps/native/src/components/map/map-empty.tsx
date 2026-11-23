@@ -1,7 +1,9 @@
 import { MapRoundButton } from "@/components/map/map-round-button";
+import { SharedListCards } from "@/components/map/map-shared-lists";
 import { AppSymbolIcon } from "@/components/symbol";
 import { ThemedText } from "@/components/ui/themed-text";
 import { t } from "@/lib/i18n";
+import { useSharedLists } from "@/lib/shared-lists";
 import { View } from "react-native";
 import { StyleSheet, useUnistyles } from "react-native-unistyles";
 
@@ -13,6 +15,7 @@ export function MapEmpty({
   onLocate: () => void;
 }) {
   const { theme } = useUnistyles();
+  const { data, isPending } = useSharedLists();
   return (
     <View style={styles.column} pointerEvents="box-none">
       {located ? (
@@ -24,21 +27,25 @@ export function MapEmpty({
           />
         </View>
       ) : null}
-      <View style={styles.card}>
-        <View style={styles.badge}>
-          <AppSymbolIcon
-            name="mappin"
-            size={20}
-            tintColor={theme.colors.primaryText}
-          />
+      {isPending ? null : data?.length ? (
+        <SharedListCards lists={data} />
+      ) : (
+        <View style={styles.card}>
+          <View style={styles.badge}>
+            <AppSymbolIcon
+              name="mappin"
+              size={20}
+              tintColor={theme.colors.primaryText}
+            />
+          </View>
+          <View style={styles.copy}>
+            <ThemedText variant="title">{t("map.emptyTitle")}</ThemedText>
+            <ThemedText variant="subhead" style={styles.body}>
+              {t("map.emptyBody")}
+            </ThemedText>
+          </View>
         </View>
-        <View style={styles.copy}>
-          <ThemedText variant="title">{t("map.emptyTitle")}</ThemedText>
-          <ThemedText variant="subhead" style={styles.body}>
-            {t("map.emptyBody")}
-          </ThemedText>
-        </View>
-      </View>
+      )}
     </View>
   );
 }

@@ -140,6 +140,9 @@ vi.mock("@/components/map/map-empty", () => ({
     <div data-testid="empty">{located ? <i data-testid="locate" /> : null}</div>
   )),
 }));
+vi.mock("@/components/map/map-shared-lists", () => ({
+  MapSharedLists: vi.fn(() => <div data-testid="lists-only" />),
+}));
 vi.mock("@/components/map/map-kind-row", () => ({
   MapKindRow: vi.fn((props: typeof mocks.chips) => {
     mocks.chips = props;
@@ -175,7 +178,10 @@ vi.mock("@/components/ui/screen-loader", () => ({
   ScreenLoader: vi.fn(() => null),
 }));
 vi.mock("react-native-unistyles", () => ({
-  StyleSheet: { create: () => ({}), absoluteFillObject: {} },
+  StyleSheet: {
+    create: () => new Proxy({}, { get: (_, name) => ({ name }) }),
+    absoluteFillObject: {},
+  },
   useUnistyles: () => ({
     theme: { gap: (n: number) => n * 8, colors: { muted: "#999" } },
     rt: { insets: { top: 0 } },
@@ -196,13 +202,21 @@ vi.mock("react-native", () => ({
     ({
       children,
       onLayout,
+      style,
     }: {
       children: ReactNode;
       onLayout?: (e: object) => void;
+      style?: unknown;
     }) => (
       <div
         ref={(el) => {
-          if (el) onLayout?.({ nativeEvent: { layout: { height: 800 } } });
+          const controls = [style]
+            .flat()
+            .some((part) => (part as { name?: string })?.name === "controls");
+          if (el)
+            onLayout?.({
+              nativeEvent: { layout: { height: controls ? 50 : 800 } },
+            });
         }}
       >
         {children}
@@ -337,10 +351,44 @@ it.each([
   },
 );
 
-it("drops the no-places card when the area in view has Discover places", () => {
+it("drops the no-places card but keeps the shared lists when the area in view has Discover places", () => {
   mocks.params = {};
   mocks.places = [];
   mocks.discover.beside = [{ ...place("C", "Paris", 48.8), _id: "c" }];
   render(<MapScreen />);
   expect(screen.queryByTestId("empty")).toBeNull();
+  expect(screen.getByTestId("lists-only")).toBeTruthy();
+});
+
+it("keeps the shared lists when Discover places fill the area and the kind chips show", () => {
+  mocks.params = {};
+  mocks.places = [];
+  mocks.discover.beside = ["a", "b", "c"].map((id) => ({
+    ...place(id, "Lisbon", 38.7),
+    _id: id,
+    kinds: ["coffee"],
+  }));
+  render(<MapScreen />);
+  expect(mocks.chips).toBeDefined();
+  expect(screen.queryByTestId("empty")).toBeNull();
+  expect(screen.getByTestId("lists-only")).toBeTruthy();
+});
+
+it("hides the shared lists while Search is open so they never cover the results or the keyboard", () => {
+  mocks.params = {};
+  mocks.places = [];
+  mocks.discover.beside = [{ ...place("C", "Paris", 48.8), _id: "c" }];
+  render(<MapScreen />);
+  expect(screen.getByTestId("lists-only")).toBeTruthy();
+  fireEvent.click(screen.getByLabelText("search"));
+  expect(screen.queryByTestId("lists-only")).toBeNull();
+});
+
+it("frames Discover places above the shared-list cards instead of under them", () => {
+  mocks.params = {};
+  mocks.places = [];
+  mocks.discover.beside = [{ ...place("C", "Paris", 48.8), _id: "c" }];
+  render(<MapScreen />);
+  expect(screen.getByTestId("lists-only")).toBeTruthy();
+  expect(mocks.viewport?.bottomInset).toBe(80 + 800 + 50 + 8);
 });

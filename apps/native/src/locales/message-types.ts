@@ -625,6 +625,10 @@ type MessageParams = {
   "onboarding.openerBody": undefined;
   "onboarding.haveAccount": undefined;
   "onboarding.signIn": undefined;
+  "onboarding.invitedToList": undefined;
+  "onboarding.joinList": undefined;
+  "onboarding.noInviteTitle": undefined;
+  "onboarding.noInviteBody": undefined;
   "onboarding.sampleTee": undefined;
   "onboarding.sampleNote": undefined;
   "onboarding.sampleEspresso": undefined;
