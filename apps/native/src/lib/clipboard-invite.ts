@@ -2,7 +2,7 @@ import { analytics } from "@/lib/analytics";
 import { getPendingInvite, subscribePendingInvite } from "@/lib/pending-invite";
 import * as Clipboard from "expo-clipboard";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { AppState } from "react-native";
+import { AppState, Platform } from "react-native";
 
 const INVITE_HOSTS = ["tryshelvr.app", "shelvr-web.vercel.app"];
 
@@ -28,7 +28,9 @@ export function useClipboardInvite() {
   useEffect(() => {
     let live = true;
     const probe = () => {
-      Clipboard.hasUrlAsync()
+      (Platform.OS === "ios"
+        ? Clipboard.hasUrlAsync
+        : Clipboard.hasStringAsync)()
         .then((found) => {
           if (live) setHasUrl(found);
         })

@@ -6,6 +6,8 @@ import { InviteOffer } from "./invite-offer";
 
 const mocks = vi.hoisted(() => ({
   hasUrl: vi.fn(async () => true),
+  hasString: vi.fn(async () => true),
+  os: "ios",
   text: vi.fn(async () => ""),
   push: vi.fn(),
   alert: vi.fn(),
@@ -16,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("expo-clipboard", () => ({
   hasUrlAsync: mocks.hasUrl,
+  hasStringAsync: mocks.hasString,
   getStringAsync: mocks.text,
 }));
 vi.mock("expo-router", () => ({ useRouter: () => ({ push: mocks.push }) }));
@@ -32,6 +35,11 @@ vi.mock("react-native-unistyles", () => ({
 }));
 vi.mock("react-native", () => ({
   Alert: { alert: mocks.alert },
+  Platform: {
+    get OS() {
+      return mocks.os;
+    },
+  },
   AppState: {
     addEventListener: (_: string, listener: (state: string) => void) => {
       mocks.appState = listener;
@@ -54,6 +62,7 @@ beforeEach(() => {
   mocks.alert.mockClear();
   mocks.captureError.mockClear();
   mocks.pending = null;
+  mocks.os = "ios";
 });
 
 async function renderOffer() {
@@ -121,4 +130,16 @@ it("stays hidden with no link on the clipboard or an invite already waiting", as
   mocks.pending = "tok1";
   await renderOffer();
   expect(screen.queryByText("onboarding.joinList")).toBeNull();
+});
+
+it("offers to join on Android, which can only tell that some text is copied", async () => {
+  mocks.os = "android";
+  mocks.hasUrl.mockRejectedValue(new Error("not available on Android"));
+  mocks.text.mockResolvedValue("https://tryshelvr.app/l/tok2");
+  await renderOffer();
+  await act(async () => {
+    fireEvent.click(screen.getByText("onboarding.joinList"));
+  });
+  expect(mocks.push).toHaveBeenCalledWith("/list-invite/tok2");
+  expect(mocks.captureError).not.toHaveBeenCalled();
 });
