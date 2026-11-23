@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { ALTERNATIVES, alternativePath, HUB_PATH } from "@/lib/alternatives";
 import { APP_LINK_ORIGIN } from "@/lib/appLinkOrigin";
+import { LANDINGS } from "@/lib/localizedLanding";
 import { SITE_ORIGIN } from "@/lib/siteMetadata";
 
 import nextConfig from "../../next.config";
@@ -11,6 +12,7 @@ describe("legacy marketing URLs", () => {
   it("redirects the public acquisition pages one to one", async () => {
     const paths = [
       "/",
+      ...LANDINGS.map(({ path }) => path),
       "/reel-place-finder",
       "/save-places-from-reels",
       "/date-night-planner",

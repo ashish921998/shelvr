@@ -9,7 +9,7 @@ vi.mock("@/lib/analytics", () => ({
   captureWebAnalyticsEvent: analytics.capture,
 }));
 
-import ReelPlaceFinderPage from "@/app/reel-place-finder/page";
+import ReelPlaceFinderPage from "@/app/(en)/reel-place-finder/page";
 import ReelPlaceFinder from "./ReelPlaceFinder";
 
 const CAPTION =

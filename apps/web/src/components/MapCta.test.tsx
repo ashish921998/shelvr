@@ -98,19 +98,23 @@ describe("MapCta", () => {
     });
   });
 
-  it("reports an App Store click from an app comparison", () => {
-    const link = mount("alternative");
-    link.addEventListener("click", (event) => event.preventDefault());
+  it.each(["alternative", "landing"] as const)(
+    "reports an App Store click from the %s page",
+    (source) => {
+      const link = mount(source);
+      link.addEventListener("click", (event) => event.preventDefault());
 
-    act(() => link.click());
+      act(() => link.click());
 
-    expect(link.href).toContain("ct=web_alternative");
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(JSON.parse(String(init.body))).toMatchObject({
-      event: "app_store_clicked",
-      properties: { source: "alternative", campaign: "web_alternative" },
-    });
-  });
+      const campaign = `web_${source}`;
+      expect(link.href).toContain(`ct=${campaign}`);
+      const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+      expect(JSON.parse(String(init.body))).toMatchObject({
+        event: "app_store_clicked",
+        properties: { source, campaign },
+      });
+    },
+  );
 
   it("reports the browser's button variant with a click", () => {
     window.localStorage.setItem("shelvr_cta_variant", "emoji");

@@ -2,6 +2,8 @@ import type { NextConfig } from "next";
 
 const acquisitionPaths = [
   "/",
+  "/de",
+  "/fr",
   "/reel-place-finder",
   "/save-places-from-reels",
   "/date-night-planner",
@@ -20,6 +22,7 @@ const legacyHost = {
 } as const;
 
 const nextConfig: NextConfig = {
+  experimental: { globalNotFound: true },
   async redirects() {
     return acquisitionPaths.map((source) => ({
       source,

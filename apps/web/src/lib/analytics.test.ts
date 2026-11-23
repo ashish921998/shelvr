@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { readdirSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
+import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,7 +19,12 @@ function tokenRoutes(dir: string): string[] {
     .filter((entry) => entry.isDirectory())
     .flatMap((entry) =>
       entry.name === "[token]"
-        ? [relative(APP, dir)]
+        ? [
+            relative(APP, dir)
+              .split(sep)
+              .filter((segment) => !/^\(.+\)$/.test(segment))
+              .join("/"),
+          ]
         : tokenRoutes(join(dir, entry.name)),
     );
 }

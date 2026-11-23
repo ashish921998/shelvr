@@ -8,6 +8,11 @@ const links = [
   { title: "Privacy", url: "/privacy" },
 ];
 
+const languages = [
+  { label: "Deutsch", code: "de" },
+  { label: "Français", code: "fr" },
+];
+
 export default function Footer() {
   return (
     <footer className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-center gap-2.5 px-5 pb-8 text-[13px] font-medium text-muted">
@@ -18,6 +23,19 @@ export default function Footer() {
             className="inline-flex min-h-11 items-center transition-colors hover:text-ember-deep"
           >
             {link.title}
+          </Link>
+          <span aria-hidden>•</span>
+        </span>
+      ))}
+      {languages.map(({ label, code }) => (
+        <span key={code} className="flex items-center gap-2.5">
+          <Link
+            lang={code}
+            hrefLang={code}
+            href={`/${code}`}
+            className="inline-flex min-h-11 items-center transition-colors hover:text-ember-deep"
+          >
+            {label}
           </Link>
           <span aria-hidden>•</span>
         </span>

@@ -1,8 +1,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 
-import { generateMetadata } from "@/app/alternatives/[app]/page";
-import AlternativesHub from "@/app/alternatives/page";
+import { generateMetadata } from "@/app/(en)/alternatives/[app]/page";
+import AlternativesHub from "@/app/(en)/alternatives/page";
 import sitemap from "@/app/sitemap";
 import Footer from "@/components/home/Footer";
 import {

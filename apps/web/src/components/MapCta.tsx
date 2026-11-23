@@ -14,6 +14,7 @@ const LOOKS = {
   hero: BIG,
   footer: BIG,
   alternative: BIG,
+  landing: `${BIG} max-w-full text-center`,
   place_tool:
     "min-h-12 rounded-xl px-6 text-base bg-ember text-ink hover:-translate-y-0.5 hover:bg-ember-soft focus-visible:outline-white",
 };
@@ -29,10 +30,19 @@ const APPLE_LOGO = (
   </svg>
 );
 
-export default function MapCta({ source }: { source: keyof typeof LOOKS }) {
+export default function MapCta({
+  source,
+  label,
+  ariaLabel,
+}: {
+  source: keyof typeof LOOKS;
+  label?: string;
+  ariaLabel?: string;
+}) {
   const { href, onClick } = useAppStoreLink(source);
-  const label =
-    source === "place_tool" ? "Save these to Shelvr" : "Map my saves";
+  const buttonLabel =
+    label ??
+    (source === "place_tool" ? "Save these to Shelvr" : "Map my saves");
   useLayoutEffect(() => {
     const variant = ctaVariant();
     if (variant) document.documentElement.setAttribute("data-cta", variant);
@@ -43,12 +53,12 @@ export default function MapCta({ source }: { source: keyof typeof LOOKS }) {
       target="_blank"
       rel="noopener noreferrer"
       onClick={onClick}
-      aria-label={`${label}, on the App Store`}
+      aria-label={ariaLabel ?? `${buttonLabel}, on the App Store`}
       className={`inline-flex shrink-0 items-center justify-center font-bold transition focus-visible:outline-2 focus-visible:outline-offset-2 ${LOOKS[source]}`}
     >
       {source === "header" ? APPLE_LOGO : null}
       <span>
-        {label}
+        {buttonLabel}
         <span aria-hidden="true" className="cta-emoji">
           {"\u00a0📍"}
         </span>

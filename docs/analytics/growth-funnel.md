@@ -25,7 +25,8 @@ Without it, links stay plain and nothing is attributed.
   `web_footer`, `web_footer-nav`, `web_oracle`, `web_place_tool` for the reel
   place finder's results card, `web_place_banner` for the finder's phone
   banner, `web_bio` for the bio page, `web_plan` for the plan vote page and
-  `web_alternative` for the app comparisons).
+  `web_alternative` for the app comparisons and `web_landing` for the
+  localized landing pages).
   The share preview page uses `share`.
 - Campaigns are lowercased and reduced to `a-z 0-9 _ -`, at most 40 characters.
 

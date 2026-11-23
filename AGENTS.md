@@ -69,7 +69,7 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
 - **Vote links:** the city page's votes row and ask sheet in `src/components/city`
   (`plan-votes-row.tsx`, `ask-votes-sheet.tsx`) with their logic in `src/lib/plan-votes.ts`;
   backend `convex/planShares.ts` (`cityPlanVotes`, `recordPlanVote`) with rules in
-  `convex/model/planVote.ts`; the web vote page `apps/web/src/app/p/[token]/page.tsx` with
+  `convex/model/planVote.ts`; the web vote page `apps/web/src/app/(en)/p/[token]/page.tsx` with
   `apps/web/src/components/PlanVote.tsx`. The first-vote push is `sendPlanVote` in
   `convex/notificationDelivery.ts`, with its rules in `convex/model/planVote.ts`.
 - **Map tab:** route `src/app/(app)/(tabs)/(map)/index.tsx`, map, search and filter chips in
@@ -106,7 +106,7 @@ under `apps/native`. Paths that start with `apps/`, `docs/`, `tools/` or
   finder's sketch from `apps/web/src/lib/placeSketch.ts`. Their click-through
   queries are in `docs/analytics/growth-funnel.md`. Their emoji test is
   assigned before paint by the inline script from
-  `apps/web/src/lib/ctaVariant.ts` in `apps/web/src/app/layout.tsx`, and sent
+  `apps/web/src/lib/ctaVariant.ts` in `apps/web/src/app/site-document.tsx`, and sent
   as `cta_variant` on every web event (`apps/web/src/lib/analytics.ts`).
 - **Link reading:** `convex/model/pageRead.ts` (`readPage`, host dispatcher),
   shared extraction and recipe helpers in `convex/model/pageReadCore.ts`, and
