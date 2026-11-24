@@ -13,6 +13,11 @@ struct CityDateView: View {
   @State private var triedSecond = Set<Int>()
   @State private var busy = false
   @State private var failed = false
+  @State private var picking = false
+  @State private var starts: [DateStart]?
+  @State private var lockedFirst = false
+  @State private var anchorFailed = false
+  @State private var loadAttempt = 0
 
   var body: some View {
     List {
@@ -31,6 +36,7 @@ struct CityDateView: View {
         }
         Button(copy("datePlan.changeKind")) { self.result = nil; self.evening = nil }
       } else {
+        Button(copy("datePlan.pickFirst")) { picking = true }
         ForEach([
           ("classic", copy("datePlan.classic"), copy("datePlan.classicHint")),
           ("lowkey", copy("datePlan.lowkey"), copy("datePlan.lowkeyHint")),
@@ -48,6 +54,28 @@ struct CityDateView: View {
         if failed { Text(copy("datePlan.failed")) }
       }
     }.navigationTitle(city)
+    .sheet(isPresented: $picking) {
+      NavigationStack {
+        Group {
+          if anchorFailed { Button(copy("common.retry")) { loadAttempt += 1 } }
+          else if let starts {
+            if starts.isEmpty { Text(copy("datePlan.firstUnavailable")) }
+            else {
+              List(starts, id: \.self) { spot in
+                Button(spot.name) { picking = false; Task { await generate("surprise", firstSpot: spot) } }
+              }
+            }
+          } else { ProgressView() }
+        }
+        .navigationTitle(copy("datePlan.pickFirst"))
+        .toolbar { Button(copy("common.cancel")) { picking = false } }
+        .task(id: loadAttempt) {
+          anchorFailed = false
+          do { for try await starts in backend.dateStarts(city: city, listID: listID) { self.starts = starts } }
+          catch { if !Task.isCancelled { anchorFailed = true } }
+        }
+      }
+    }
   }
 
   private func stop(_ date: CityDate, _ current: Evening, first: Bool) -> some View {
@@ -62,7 +90,7 @@ struct CityDateView: View {
         item.name = spot.name
         item.openInMaps()
       }
-      if let next {
+      if let next, !(first && lockedFirst) {
         Button(copy("datePlan.changeFor", ["name": spot.name])) {
           if first { triedFirst = date.nextRound(triedFirst, from: index, to: next.first); triedSecond = [] }
           else { triedSecond = date.nextRound(triedSecond, from: index, to: next.second); triedFirst = [] }
@@ -72,13 +100,14 @@ struct CityDateView: View {
     }.buttonStyle(.borderless)
   }
 
-  private func generate(_ kind: String) async {
+  private func generate(_ kind: String, firstSpot: DateStart? = nil) async {
     guard !busy else { return }
     busy = true
     defer { busy = false }
     failed = false
     do {
-      let plan = try await backend.planDate(city: city, kind: kind, locale: copy.locale, listID: listID)
+      let plan = try await backend.planDate(city: city, kind: kind, locale: copy.locale, listID: listID, firstSpot: firstSpot)
+      lockedFirst = firstSpot != nil
       result = plan
       evening = plan.evenings.first
       triedFirst = []; triedSecond = []

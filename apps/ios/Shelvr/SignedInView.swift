@@ -75,6 +75,13 @@ struct SignedInView: View {
                 guard path.last == link else { return }
                 path[path.count - 1] = created
               }.id(link)
+            } else if link.path == ["go-out"] {
+              GoOutView(city: city, listID: listID) { destination in
+                var parts = URLComponents()
+                parts.path = destination
+                parts.queryItems = link.query
+                if path.last == link, let next = parts.string.flatMap({ AppLink($0) }) { path[path.count - 1] = next }
+              }.id(link)
             } else { CityDateView(city: city, listID: listID).id(link) }
           } else { PlanCityView(trip: link.path.first == "new-trip") }
         case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1]).id(link.path[1])
@@ -141,7 +148,7 @@ private struct PlanCityView: View {
           List(cities, id: \.city) { city in
             var url: URLComponents {
               var parts = URLComponents()
-              parts.path = trip ? "/new-trip" : "/date-plan"
+              parts.path = trip ? "/new-trip" : "/go-out"
               parts.queryItems = [URLQueryItem(name: "city", value: city.city)]
               return parts
             }
