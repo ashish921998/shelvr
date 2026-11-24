@@ -11,6 +11,7 @@ enum Analytics {
   private static var reconciled = false
   private static var foreground = false
   private static var opened = false
+  private static var pendingNotificationOpen: [String: String]?
   private static let identifiedKey = "swift.analytics.identified"
 
   static var available: Bool { enabled && !PostHogSDK.shared.isOptOut() }
@@ -60,6 +61,16 @@ enum Analytics {
     }
     reconciled = true
     if UIApplication.shared.applicationState == .active { active(true) }
+    if let pendingNotificationOpen {
+      self.pendingNotificationOpen = nil
+      notificationOpened(pendingNotificationOpen)
+    }
+  }
+
+  static func notificationOpened(_ properties: [String: String]) {
+    guard enabled else { return }
+    if reconciled { capture("notification_opened", properties) }
+    else { pendingNotificationOpen = properties }
   }
 
   static var sessionID: String? { enabled ? PostHogSDK.shared.getSessionId() : nil }
