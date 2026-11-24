@@ -17,6 +17,12 @@ public struct LibrarySave: Decodable, Identifiable, Sendable {
   public let description: String?
   public let content: String?
   public let note: String?
+  public let processingStartedAt: Double?
+  public let recipe: LibraryRecipe?
+  public let products: [LibraryProduct]?
+  public let media: [LibraryMedia]?
+  public let articleMedia: [LibraryMedia]?
+  public let placePins: [EditablePlace]?
 
   public var id: String { _id }
   public var created: Date { Date(timeIntervalSince1970: _creationTime / 1000) }
@@ -64,4 +70,20 @@ extension Backend {
   public func librarySave(id: String) -> some AsyncSequence<LibrarySave?, any Error> {
     client.subscribe(to: "items:getItem", with: ["id": id], yielding: LibrarySave?.self).values
   }
+}
+
+public struct LibraryRecipe: Decodable, Sendable {
+  public let name: String?
+  public let ingredients: [String]
+  public let steps: [String]
+}
+
+public struct LibraryProduct: Decodable, Sendable {
+  public let title: String
+  public let url: String
+  public let price: String?
+}
+
+public struct LibraryMedia: Decodable, Sendable {
+  public let imageUrl: String
 }
