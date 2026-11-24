@@ -9,6 +9,12 @@ public struct AuthTokens: Codable, Sendable, Equatable {
     self.refreshToken = refreshToken
   }
 
+  static func ownerID(for token: String) -> String? {
+    guard let subject = JWT.claims(of: token)?.sub else { return nil }
+    let parts = subject.split(separator: "|", maxSplits: 1)
+    return parts.count == 2 ? String(parts[0]) : nil
+  }
+
   var lifetime: TimeInterval? { JWT.claims(of: token).map { $0.exp - $0.iat } }
 }
 

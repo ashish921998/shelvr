@@ -158,6 +158,70 @@ describe("weekly shelf notifications", () => {
     ).toHaveLength(1);
   });
 
+  it("finishes offline sign-out only for the installation holding the matching secret", async () => {
+    const t = newConvexTest();
+    const registrationId = crypto.randomUUID();
+    const owner = await signInA(t);
+    await owner.mutation(api.notifications.registerDevice, {
+      token: "token-a",
+      platform: "ios",
+      installSecret: "install-a",
+      registrationId,
+    });
+    await owner.mutation(api.notifications.registerDevice, {
+      token: "legacy",
+      platform: "ios",
+    });
+    const enabled = (token: string) =>
+      t.run(
+        async (ctx) =>
+          (
+            await ctx.db
+              .query("notificationDevices")
+              .withIndex("by_token", (q) => q.eq("token", token))
+              .unique()
+          )?.enabled,
+      );
+    for (const args of [
+      { token: "token-a", installSecret: "wrong" },
+      { token: "legacy", installSecret: "install-a" },
+      { token: "nonexistent", installSecret: "install-a" },
+    ]) {
+      expect(
+        await t.mutation(api.notifications.unregisterInstallation, {
+          ...args,
+          registrationId,
+        }),
+      ).toBeNull();
+    }
+    expect(await enabled("token-a")).toBe(true);
+    expect(await enabled("legacy")).toBe(true);
+    for (let retry = 0; retry < 2; retry++) {
+      expect(
+        await t.mutation(api.notifications.unregisterInstallation, {
+          token: " token-a ",
+          installSecret: "install-a",
+          registrationId,
+        }),
+      ).toBeNull();
+    }
+    expect(await enabled("token-a")).toBe(false);
+    expect(await enabled("legacy")).toBe(true);
+    const next = await signInB(t);
+    await next.mutation(api.notifications.registerDevice, {
+      token: "token-a",
+      platform: "ios",
+      installSecret: "install-a",
+      registrationId: crypto.randomUUID(),
+    });
+    await t.mutation(api.notifications.unregisterInstallation, {
+      token: "token-a",
+      installSecret: "install-a",
+      registrationId,
+    });
+    expect(await enabled("token-a")).toBe(true);
+  });
+
   it("moves another account's enabled token to a caller on the same install", async () => {
     const t = newConvexTest();
     const owner = await signInA(t);

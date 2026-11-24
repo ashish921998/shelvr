@@ -3,20 +3,24 @@ import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
+enum PhotoUploadFailure: String, Error, Decodable {
+  case tooLarge = "image_too_large"
+  case empty = "image_empty"
+
+  static func check(_ response: URLResponse, body: Data) throws {
+    struct Refusal: Decodable { let error: PhotoUploadFailure }
+    guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+    if !(200..<300).contains(http.statusCode) {
+      if let refusal = try? JSONDecoder().decode(Refusal.self, from: body) { throw refusal.error }
+      throw URLError(.badServerResponse)
+    }
+  }
+}
+
 public struct ImportPhoto: Sendable {
   public let data: Data
   public let contentType: String
   public let aspectRatio: Double
-
-  public static func failureCopy(_ error: Error) -> String {
-    switch saveErrorCode(error) {
-    case "pro_required": "freePlan.photosNeedPro"
-    case "photo_limit": "errors.photoLimit"
-    case "image_too_large": "errors.photoTooLarge"
-    case "image_empty": "errors.photoEmpty"
-    default: "errors.savePhoto"
-    }
-  }
 
   public init(_ input: Data) throws {
     guard let source = CGImageSourceCreateWithData(input as CFData, nil),
@@ -39,10 +43,15 @@ public struct ImportPhoto: Sendable {
   }
 }
 
-public enum PhotoSource: String { case picker = "photo_import", share = "share_extension", siri }
+protocol PhotoMutationClient: Sendable {
+  func mutation<T: Decodable>(_ name: String, with args: [String: ConvexEncodable?]?) async throws -> T
+}
 
-extension Backend {
-  public func savePhoto(_ photo: ImportPhoto, operationID: String, source: PhotoSource = .picker) async throws -> String {
+extension ConvexClient: PhotoMutationClient {}
+
+extension ImportPhoto {
+  @MainActor func save(using client: any PhotoMutationClient, operationID: String, source: SaveSource,
+    checkpoint: () throws -> Void, upload: (URLRequest, Data) async throws -> (Data, URLResponse)) async throws -> String {
     struct Begin: Decodable {
       let kind: String
       let itemId: String?
@@ -50,23 +59,35 @@ extension Backend {
     }
     struct Upload: Decodable { let storageId: String }
     struct Attachment: Decodable { let error: String? }
+    try checkpoint()
     let begin: Begin = try await client.mutation("items:beginImageImport", with: ["operationId": operationID])
+    try checkpoint()
     if begin.kind == "complete", let id = begin.itemId { return id }
     guard begin.kind == "upload", let url = begin.uploadUrl else { throw URLError(.badServerResponse) }
     var request = URLRequest(url: url)
     request.httpMethod = "POST"
-    request.setValue(photo.contentType, forHTTPHeaderField: "Content-Type")
-    let (body, response) = try await URLSession.shared.upload(for: request, from: photo.data)
-    guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode)
-    else { throw URLError(.badServerResponse) }
+    request.setValue(contentType, forHTTPHeaderField: "Content-Type")
+    let (body, response) = try await upload(request, data)
+    try PhotoUploadFailure.check(response, body: body)
     let uploaded = try JSONDecoder().decode(Upload.self, from: body)
+    try checkpoint()
     let attached: Attachment = try await client.mutation("items:attachImageUpload", with: [
       "operationId": operationID, "storageId": uploaded.storageId
     ])
     guard attached.error == nil else { throw URLError(.badServerResponse) }
+    try checkpoint()
     return try await client.mutation("items:finalizeImageImport", with: [
-      "operationId": operationID, "aspectRatio": photo.aspectRatio,
+      "operationId": operationID, "aspectRatio": aspectRatio,
       "saveSource": source.rawValue
     ])
+  }
+}
+
+extension Backend {
+  public func savePhoto(_ photo: ImportPhoto, operationID: String, source: SaveSource = .photoImport,
+    checkpoint: () throws -> Void = { try Task.checkCancellation() }) async throws -> String {
+    try await photo.save(using: client, operationID: operationID, source: source, checkpoint: checkpoint) { request, bytes in
+      try await URLSession.shared.upload(for: request, from: bytes)
+    }
   }
 }

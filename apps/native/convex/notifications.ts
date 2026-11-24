@@ -3,7 +3,7 @@ import {
   notificationLocale,
 } from "./model/notificationFields";
 import { ConvexError, v } from "convex/values";
-import { internalMutation, type QueryCtx } from "./_generated/server";
+import { internalMutation, mutation, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { enrichItems, enrichedItemValidator } from "./items";
@@ -173,6 +173,7 @@ export const registerDevice = authedMutation({
     nextDigestAt: v.optional(v.number()),
     timezone: v.optional(v.string()),
     installSecret: v.optional(v.string()),
+    registrationId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -188,6 +189,11 @@ export const registerDevice = authedMutation({
     ) {
       throw new Error("Invalid install secret");
     }
+    if (
+      args.registrationId !== undefined &&
+      (args.registrationId.length !== 36 || !args.installSecret)
+    )
+      throw new Error("Invalid registration id");
     const installSecretHash =
       args.installSecret === undefined
         ? undefined
@@ -208,6 +214,7 @@ export const registerDevice = authedMutation({
         platform: args.platform,
         ...languageFields,
         installSecretHash,
+        registrationId: args.registrationId,
         enabled: true,
         lastSeenAt: now,
       });
@@ -219,6 +226,7 @@ export const registerDevice = authedMutation({
     ) {
       await ctx.db.patch(existingToken._id, {
         userId,
+        registrationId: args.registrationId,
         installSecretHash:
           installSecretHash ??
           (existingToken.userId === userId
@@ -341,6 +349,38 @@ export const unregisterDevice = authedMutation({
       .unique();
     if (device?.userId === userId)
       await ctx.db.patch(device._id, { enabled: false });
+    return null;
+  },
+});
+
+export const unregisterInstallation = mutation({
+  args: {
+    token: v.string(),
+    installSecret: v.string(),
+    registrationId: v.string(),
+  },
+  returns: v.null(),
+  handler: async (ctx, { token: rawToken, installSecret, registrationId }) => {
+    const token = rawToken.trim();
+    if (
+      !token ||
+      token.length > 4096 ||
+      !installSecret ||
+      installSecret.length > MAX_CAPTURE_TOKEN_LENGTH
+    ) {
+      return null;
+    }
+    const device = await ctx.db
+      .query("notificationDevices")
+      .withIndex("by_token", (q) => q.eq("token", token))
+      .unique();
+    if (
+      device?.enabled &&
+      device.registrationId === registrationId &&
+      device.installSecretHash === (await sha256Hex(installSecret))
+    ) {
+      await ctx.db.patch(device._id, { enabled: false });
+    }
     return null;
   },
 });
