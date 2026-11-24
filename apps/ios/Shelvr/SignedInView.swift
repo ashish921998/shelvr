@@ -8,7 +8,9 @@ struct SignedInView: View {
   @Binding var pendingLink: AppLink?
   @Environment(\.copy) private var copy
   @State private var library = false
+  @State private var billing: BillingDestination?
   @State private var path: [AppLink] = []
+  @State private var namePrompts = MemberNamePrompts()
   @State private var stampMessage: String?
 
   var body: some View {
@@ -71,6 +73,7 @@ struct SignedInView: View {
           }
           .navigationTitle(copy("addSheet.title"))
         case "trips": TripsTabView()
+        case "shared-trip-links": ActiveTripLinksView()
         case "shared-lists", "collections": SharedListsView(collections: link.path.first == "collections")
         case "new-shared-list":
           CreateListView { id in
@@ -78,7 +81,8 @@ struct SignedInView: View {
             path.removeLast()
             path.append(target)
           }
-        case "shared-list" where link.path.count == 2: SharedListView(id: link.path[1])
+        case "shared-list" where link.path.count == 2:
+          SharedListView(id: link.path[1], joined: link.query.contains { $0.name == "joined" && $0.value == "1" }).id(link)
         case "list-invite" where link.path.count == 2:
           JoinListView(token: link.path[1]) { route in
             if path.last == link, let target = AppLink(route) { path = [target] }
@@ -104,7 +108,7 @@ struct SignedInView: View {
             }.id(link)
           } else { SharedListsView() }
         case "passport-story": PassportStoryView()
-        case "passport": PassportView()
+        case "passport": PassportView(open: open)
         case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)
         case "add": PasteLinkView()
         case "saves": LibraryView(screen: .saves)
@@ -125,8 +129,29 @@ struct SignedInView: View {
                 path[path.count - 1] = created
               }.id(link)
             } else { CityDateView(city: city, listID: listID).id(link) }
+          } else if let listID = link.query.first(where: { $0.name == "listId" })?.value {
+            SocialQuery(query: "sharedLists:getSharedList", arguments: ["listId": listID], type: SharedListDetail?.self) { list in
+              List(list?.cities ?? [], id: \.self) { city in
+                var route: URLComponents {
+                  var parts = URLComponents()
+                  parts.path = link.path.first == "new-trip" ? "/new-trip" : "/date-plan"
+                  parts.queryItems = [URLQueryItem(name: "city", value: city), URLQueryItem(name: "listId", value: listID)]
+                  return parts
+                }
+                if let target = route.string.flatMap({ AppLink($0) }) { NavigationLink(city, value: target) }
+              }
+            }
           } else { PlanCityView(trip: link.path.first == "new-trip") }
         case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1], sharedOnly: access.locked).id(link.path[1])
+        case "add-trip-stop":
+          if let id = link.query.first(where: { $0.name == "tripId" })?.value {
+            let day = link.query.first(where: { $0.name == "day" })?.value.flatMap(Int.init) ?? 1
+            if access.locked {
+              SocialQuery(query: "tripPlannerData:getTripPlan", arguments: ["tripId": id], type: CityTrip?.self) { trip in
+                if trip?.listId != nil { AddTripStopView(id: id, initialDay: day) } else { PlanGateView() }
+              }
+            } else { AddTripStopView(id: id, initialDay: day).id(link) }
+          } else { ShellDestination(link: link) }
         case "photo": PhotoSaveView()
         case "how-to-share": SaveInstructions(siri: false)
         case "save-with-siri": SaveInstructions(siri: true)
@@ -135,11 +160,14 @@ struct SignedInView: View {
         } }
       }
     }
+    .environment(access)
+    .sheet(item: $billing) { BillingSheet(destination: $0, confirmed: { access.retry += 1 }) }
     .task(id: access.retry) { await access.readPlan(backend) }
     .task(id: "\(access.retry):\(access.plan == nil):\(access.pro)") { await access.readAllowance(backend) }
     .task(id: access.plan?.expiresAt) {
       if let expiration = access.plan?.expiresAt, access.pro { await access.expire(at: expiration) }
     }
+    .environment(namePrompts)
     .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
       Button(copy("common.close")) {}
     } message: { Text(stampMessage ?? "") }
@@ -147,8 +175,9 @@ struct SignedInView: View {
       guard let link else { return }
       pendingLink = nil
       switch link.path {
-      case ["map"], ["share"]: library = false; path = []
+      case ["map"], ["share"], ["plan-gate"]: library = false; path = []
       case ["home"]: library = true; path = []
+      case ["paywall"]: billing = .paywall
       case ["sign-in"]: break
       default: path = [link]
       }
@@ -162,9 +191,9 @@ struct SignedInView: View {
 
   private func allowedWhileLocked(_ link: AppLink) -> Bool {
     switch link.path.first {
-    case "profile", "settings", "list-invite", "passport-invite", "shared-lists", "shared-list", "trip-plan":
+    case "add-trip-stop", "shared-trip-links", "profile", "settings", "list-invite", "passport-invite", "shared-lists", "shared-list", "trip-plan":
       true
-    case "date-plan", "go-out", "new-trip", "add-list-place", "add-trip-stop":
+    case "date-plan", "go-out", "new-trip", "add-list-place":
       link.query.contains { $0.name == "listId" && $0.value?.isEmpty == false }
     default: false
     }

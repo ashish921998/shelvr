@@ -66,10 +66,12 @@ public struct CityDate: Decodable, Sendable {
 public struct CityTrip: Decodable, Sendable {
   public struct Stop: Decodable, Identifiable, Sendable {
     public let _id: String
+    public let appleId: String?
     public let name: String
     public let area: String?
     public let why: String?
     public let time: String?
+    public let note: String?
     public let lat: Double
     public let lng: Double
     public var id: String { _id }

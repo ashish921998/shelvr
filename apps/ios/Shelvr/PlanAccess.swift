@@ -11,7 +11,7 @@ final class PlanAccess {
   var retry = 0
 
   private(set) var pro = false
-  var loading: Bool { plan == nil || (!pro && !receivedAllowance) }
+  var loading: Bool { failed || plan == nil || (!pro && !receivedAllowance) }
   var locked: Bool { !loading && !pro && allowance == nil }
 
   func readPlan(_ backend: Backend) async {
@@ -46,6 +46,7 @@ final class PlanAccess {
 
 struct PlanGateView: View {
   @Environment(\.copy) private var copy
+  @Environment(PlanAccess.self) private var access
   @State private var sheet: BillingDestination?
   var body: some View {
     VStack(spacing: 16) {
@@ -53,9 +54,10 @@ struct PlanGateView: View {
       Text(copy("planGate.body")).foregroundStyle(.secondary)
       Button(copy("planGate.seePlans")) { sheet = .paywall }.buttonStyle(.borderedProminent)
       if let route = AppLink("/shared-lists") { NavigationLink(copy("sharedLists.title"), value: route) }
+      if let route = AppLink("/shared-trip-links") { NavigationLink(copy("tripShare.manage"), value: route) }
       if let route = AppLink("/profile") { NavigationLink(copy("navigation.profile"), value: route) }
     }
     .padding(24)
-    .sheet(item: $sheet) { BillingSheet(destination: $0) }
+    .sheet(item: $sheet) { BillingSheet(destination: $0, confirmed: { access.retry += 1 }) }
   }
 }
