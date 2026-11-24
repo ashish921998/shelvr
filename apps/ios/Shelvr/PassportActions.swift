@@ -8,7 +8,6 @@ struct PassportActions: View {
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var showCities = false
-  @State private var share: ShareURL?
   @State private var activeToken: String?
   @State private var stopping = false
   @State private var busy = false
@@ -17,14 +16,13 @@ struct PassportActions: View {
   @State private var subscriptions = 0
   @State private var retryOperation: (@MainActor () async throws -> Void)?
 
-  private struct ShareURL: Identifiable { let url: URL; var id: URL { url } }
 
   var body: some View {
     Menu {
       Button(copy("cityStamps.add")) { showCities = true }.disabled(cities == nil)
       if hasPlaces {
-        Button(copy("passportShare.share")) {
-          run { share = ShareURL(url: try await backend.sharePassport()) }
+        if let route = AppLink("/passport-story") {
+          NavigationLink(copy("passportShare.share"), value: route)
         }
       }
       if subscriptionFailed { Button(copy("common.retry")) { subscriptions += 1 } }
@@ -45,7 +43,6 @@ struct PassportActions: View {
         }.padding()
       }
     }
-    .sheet(item: $share) { item in PassportShareSheet(url: item.url) }
     .confirmationDialog(copy("passportShare.stopTitle"), isPresented: $stopping, titleVisibility: .visible) {
       Button(copy("passportShare.stop"), role: .destructive) {
         run { try await backend.stopPassportSharing() }
@@ -78,14 +75,6 @@ struct PassportActions: View {
       catch { retryOperation = action; failed = true }
     }
   }
-}
-
-private struct PassportShareSheet: UIViewControllerRepresentable {
-  let url: URL
-  func makeUIViewController(context: Context) -> UIActivityViewController {
-    UIActivityViewController(activityItems: [url], applicationActivities: nil)
-  }
-  func updateUIViewController(_ controller: UIActivityViewController, context: Context) {}
 }
 
 private struct PassportCityPicker: View {
