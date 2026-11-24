@@ -15,6 +15,7 @@ struct SignedInView: View {
           List {
             entry("/saves", "homePlaces.allSaves", "bookmark")
             entry("/cities", "homePlaces.cities", "building.2")
+            entry("/trips", "navigation.trips", "airplane")
             entry("/shared-lists", "sharedLists.title", "person.2")
             entry("/passport", "passport.title", "book.closed")
           }
@@ -63,6 +64,7 @@ struct SignedInView: View {
             entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
           }
           .navigationTitle(copy("addSheet.title"))
+        case "trips": TripsTabView()
         case "shared-lists": SharedListsView()
         case "shared-list" where link.path.count == 2: SharedListView(id: link.path[1])
         case "list-invite" where link.path.count == 2:
