@@ -3,7 +3,7 @@ import { visitMatcher } from "@convex/model/placeVisits";
 import { discoverBeside, type DiscoverPlace } from "./map-discover";
 import { mapRowFilters } from "./map-filters";
 import { placeEmoji } from "./map-pin-emoji";
-import { CUISINES } from "@convex/model/placeKinds";
+import { CUISINES, PLACE_KINDS } from "@convex/model/placeKinds";
 import type { Id } from "@convex/_generated/dataModel";
 import vectors from "../../../ios/ShelvrKit/Tests/ShelvrKitTests/Fixtures/map-places.json";
 
@@ -13,6 +13,7 @@ it("keeps the Swift map pin, filter and visit vectors current", () => {
     vectors.discover.map(
       (place): DiscoverPlace => ({
         ...place,
+        kinds: PLACE_KINDS.filter((kind) => place.kinds.includes(kind)),
         city: "Lisbon",
         _id: place._id as Id<"places">,
       }),
