@@ -154,6 +154,7 @@ struct SignedInView: View {
         }
       }
     }
+    .modifier(TrialReminderObserver(home: library && path.isEmpty))
     .environment(namePrompts)
     .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
       Button(copy("common.close")) {}

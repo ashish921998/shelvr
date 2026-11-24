@@ -5,6 +5,7 @@ struct RootView: View {
   @EnvironmentObject private var pushDevice: PushDevice
   @Environment(Backend.self) private var backend
   @AppStorage("swift.appearance") private var appearance = "system"
+  @Environment(\.copy) private var copy
   @State private var pendingLink: AppLink?
 
   var body: some View {
@@ -43,6 +44,9 @@ struct RootView: View {
     .modifier(SiriSetup())
     .onOpenURL { url in
       if let link = AppLink(url.absoluteString), link.path != ["sign-in"] { pendingLink = link }
+    }
+    .onChange(of: backend.status, initial: true) { _, status in
+      if status == .signedOut { LocalTrialNotifications.shared.replace([], copy: copy) }
     }
     .animation(.default, value: backend.status)
   }
