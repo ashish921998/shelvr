@@ -22,3 +22,11 @@ public enum CancelSurveyResponse: String, Codable, CaseIterable, Sendable {
     [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "app.shelvr.cancel-survey", kSecAttrAccount as String: id]
   }
 }
+
+public enum CancelSurveyEligibility: Equatable, Sendable {
+  case unchecked, ineligible, cancelled
+
+  public func forVisit(home: Bool, active: Bool) -> Self {
+    home && active ? self : .unchecked
+  }
+}
