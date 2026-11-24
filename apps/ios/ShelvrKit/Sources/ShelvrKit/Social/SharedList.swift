@@ -26,13 +26,37 @@ public struct SharedListDetail: Decodable {
   public struct Place: Decodable, Identifiable {
     public struct Visitor: Decodable { public let isYou: Bool; public let firstName: String? }
     public let _id, name, city: String
-    public let itemId, addedByName: String?
+    public let itemId, addedByName, appleId: String?
+    public let lat, lng: Double?
     public let isNew: Bool
     public let visitedAt: Double?
     public let addedByYou: Bool
     public let wentBy: [Visitor]?
     public var id: String { _id }
     public var went: Bool { wentBy?.contains { $0.isYou } == true }
+    public func matches(name candidate: String, lat: Double, lng: Double, apple: String?, item: String?) -> Bool {
+      if let apple, let appleId { return apple == appleId }
+      let key = CityPlace.key(name), next = CityPlace.key(candidate)
+      if let item, itemId == item, key == next { return true }
+      guard let a = self.lat, let b = self.lng else { return false }
+      let r = Double.pi / 180
+      let h = pow(sin((lat - a) * r / 2), 2) + cos(a * r) * cos(lat * r) * pow(sin((lng - b) * r / 2), 2)
+      guard 12742 * asin(min(1, sqrt(h))) <= 0.3 else { return false }
+      if key == next { return true }
+      let words = Self.words(name), other = Self.words(candidate)
+      let (short, long) = words.count <= other.count ? (words, other) : (other, words)
+      guard !short.isEmpty else { return false }
+      return (0...(long.count - short.count)).contains { long[$0..<($0 + short.count)].elementsEqual(short) }
+    }
+
+    private static func words(_ name: String) -> [String] {
+      let scalars = name.decomposedStringWithCompatibilityMapping.unicodeScalars.filter {
+        !CharacterSet.nonBaseCharacters.contains($0)
+      }
+      return String(scalars).lowercased().replacing(/['’ʼ]/, with: "")
+        .split { !$0.isLetter && !$0.isNumber }.map(String.init)
+    }
+
     public func visitors(copy: Copy) -> String? {
       guard let group = wentBy, !group.isEmpty else { return visitedAt == nil ? nil : copy("plan.weWent") }
       return group.map { person in

@@ -1,3 +1,4 @@
+import ConvexMobile
 import Combine
 import Foundation
 
@@ -61,5 +62,53 @@ public struct CityPlace: Decodable, Identifiable, Hashable, Sendable {
 extension Backend {
   public func citySaves(_ city: String) -> some AsyncSequence<[LibrarySave], any Error> {
     client.subscribe(to: "items:listCityItems", with: ["city": city], yielding: [LibrarySave].self).values
+  }
+}
+
+extension CityPlace {
+  public static func visited(_ visits: [MapVisit], among pins: [Self]) -> Set<Self> {
+    let mapped = pins.map { pin in
+      MapPlace(source: .saved(itemID: pin.itemID), name: pin.name, lat: pin.lat, lng: pin.lng,
+        appleId: pin.appleID, city: nil, category: nil, cuisine: nil, kinds: [])
+    }
+    let ids = MapVisit.visitedIDs(visits, among: mapped)
+    return Set(zip(pins, mapped).compactMap { pin, place in ids.contains(place.id) ? pin : nil })
+  }
+}
+
+extension Backend {
+  public func changeVisit(_ pin: CityPlace, went: Bool) async throws {
+    var spot: [String: ConvexEncodable?] = ["lat": pin.lat, "lng": pin.lng]
+    if let apple = pin.appleID { spot["appleId"] = apple }
+    try await client.mutation("placeVisits:setVisited",
+      with: ["itemId": pin.itemID, "name": pin.name, "visited": went, "spot": spot])
+  }
+}
+
+extension CityPlace {
+  public struct CardPoint: Sendable {
+    public let pin: CityPlace
+    public let x, y: Double
+  }
+
+  public static func cardPoints(_ pins: [CityPlace], visited: Set<CityPlace>, width: Double, height: Double) -> [CardPoint] {
+    guard !pins.isEmpty else { return [] }
+    let mid = pins.count / 2
+    let middle = (pins.map(\.lat).sorted()[mid], pins.map(\.lng).sorted()[mid])
+    let distances = pins.map { km($0.lat, $0.lng, middle.0, middle.1) }
+    let reach = max(10, distances.sorted()[mid] * 3)
+    let nearby = zip(pins, distances).compactMap { pin, d in
+      !visited.contains(pin) && (pins.count < 3 || d <= reach) ? pin : nil
+    }
+    let shown = (pins.filter(visited.contains) + nearby).prefix(40)
+    let cosLat = cos(shown.map(\.lat).reduce(0, +) / Double(shown.count) * .pi / 180)
+    let xs = shown.map { $0.lng * cosLat }, ys = shown.map { -$0.lat }
+    guard let left = xs.min(), let right = xs.max(), let top = ys.min(), let bottom = ys.max() else { return [] }
+    let span = max((right - left) / max(1, width - 32), (bottom - top) / max(1, height - 32))
+    return shown.map { pin in
+      let x = width / 2 + (span > 0 ? (pin.lng * cosLat - (left + right) / 2) / span : 0)
+      let y = height / 2 + (span > 0 ? (-pin.lat - (top + bottom) / 2) / span : 0)
+      return CardPoint(pin: pin, x: x, y: y)
+    }
   }
 }

@@ -35,12 +35,26 @@ struct PassportView: View {
                 }
               }
             }
+            if let already = AppLink("/already-been") {
+              NavigationLink(value: already) { Label(copy("passport.beenSomewhere"), systemImage: "checkmark.seal") }
+            }
             ForEach(sections) { section in
               Section {
                 ForEach(section.places) { stamp in
                   if let item = stamp.itemId, let link = AppLink("/item/" + item) {
                     NavigationLink(value: link) { stampRow(stamp) }
                   } else { stampRow(stamp) }
+                }
+                if let city = section.city, let counts = section.completion, counts.stamped < counts.total {
+                  var url: URLComponents {
+                    var parts = URLComponents()
+                    parts.path = "/next-to-stamp"
+                    parts.queryItems = [URLQueryItem(name: "city", value: city)]
+                    return parts
+                  }
+                  if let link = url.string.flatMap({ AppLink($0) }) {
+                    NavigationLink(copy("passport.nextTitle"), value: link)
+                  }
                 }
                 if let city = section.city, !section.places.isEmpty {
                   NavigationLink {
