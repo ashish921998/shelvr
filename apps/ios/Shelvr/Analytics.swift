@@ -9,6 +9,7 @@ enum Analytics {
   private static var enabled = false
   private static var foreground = false
   private static var opened = false
+  private static var unidentifiedOfflineID: String?
   private static var notificationOpens = PushNotificationOpenBuffer()
   private static let identifiedKey = "swift.analytics.identified"
 
@@ -42,6 +43,7 @@ enum Analytics {
 
   static func identify(_ id: String?) {
     guard enabled else { return }
+    unidentifiedOfflineID = nil
     if let id {
       PostHogSDK.shared.identify(id)
       UserDefaults.standard.set(true, forKey: identifiedKey)
@@ -50,6 +52,20 @@ enum Analytics {
       UserDefaults.standard.removeObject(forKey: identifiedKey)
       registerContext()
     }
+    reconcile()
+  }
+
+  static func restoredOffline(accountID: String?) {
+    guard enabled else { return }
+    if let accountID {
+      identify(accountID)
+      return
+    }
+    if unidentifiedOfflineID == nil { unidentifiedOfflineID = UUID().uuidString }
+    reconcile()
+  }
+
+  private static func reconcile() {
     let pendingOpens = notificationOpens.reconcile()
     if UIApplication.shared.applicationState == .active { active(true) }
     for properties in pendingOpens { capture("notification_opened", properties) }
@@ -84,9 +100,9 @@ enum Analytics {
     }
   }
 
-  static func capture(_ event: String, _ properties: [String: Any] = [:]) {
+  static func capture(_ event: String, _ properties: [String: Any] = [:], distinctId: String? = nil) {
     guard enabled else { return }
-    PostHogSDK.shared.capture(event, properties: properties)
+    PostHogSDK.shared.capture(event, distinctId: distinctId ?? unidentifiedOfflineID, properties: properties)
   }
 
   static func failure(_ event: String) {
