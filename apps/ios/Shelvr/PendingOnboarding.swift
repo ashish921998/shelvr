@@ -11,12 +11,7 @@ struct ServerPlan: Decodable {
   }
 }
 
-struct PendingOnboarding: Codable {
-  var cities: [String]
-  var url: URL?
-  let operation: String
-  let space: String?
-
+extension OnboardingHandoff {
   static func key(_ account: String) -> String { "swift.onboarding.pending." + account }
 
   func save(_ account: String) throws {
@@ -37,11 +32,11 @@ struct OnboardingReplay: ViewModifier {
 
   private func replay(stamps: Bool) async {
     guard phase == .active else { return }
-    let key = PendingOnboarding.key(account)
+    let key = OnboardingHandoff.key(account)
     let generation = backend.sessionGeneration
     var delay = 2
-    func read() -> PendingOnboarding? {
-      UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode(PendingOnboarding.self, from: $0) }
+    func read() -> OnboardingHandoff? {
+      UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode(OnboardingHandoff.self, from: $0) }
     }
     while !Task.isCancelled, generation == backend.sessionGeneration, let entry = read() {
       do {
@@ -69,10 +64,9 @@ struct OnboardingReplay: ViewModifier {
           guard saved else { return }
         } else { return }
         try Task.checkCancellation()
-        guard generation == backend.sessionGeneration, var latest = read(), latest.operation == entry.operation else { return }
-        if stamps { latest.cities = [] } else { latest.url = nil }
-        if latest.cities.isEmpty && latest.url == nil { UserDefaults.standard.removeObject(forKey: key) }
-        else { try latest.save(account) }
+        guard generation == backend.sessionGeneration, let latest = read(), latest.operation == entry.operation else { return }
+        if let pending = latest.remaining(afterStamps: stamps) { try pending.save(account) }
+        else { UserDefaults.standard.removeObject(forKey: key) }
         return
       } catch {
         if Task.isCancelled { return }
