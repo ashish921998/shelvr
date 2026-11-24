@@ -20,3 +20,13 @@ import Testing
   #expect(JWT.claims(of: jwt(#"{"sub":"person|session","exp":2,"iat":1}"#))?.sub == "person|session")
   #expect(JWT.claims(of: jwt(#"{"exp":2,"iat":1}"#))?.sub == nil)
 }
+
+@MainActor @Test func rollsBackIssuedCredentialWhenKeychainRefusesIt() async {
+  var revoked = 0
+  await #expect(throws: AuthSessionError.sessionStorageUnavailable) {
+    try await Backend.installSiri({ throw AuthSessionError.sessionStorageUnavailable }, revokeOnFailure: { revoked += 1 })
+  }
+  #expect(revoked == 1)
+  try? await Backend.installSiri({}, revokeOnFailure: { revoked += 1 })
+  #expect(revoked == 1)
+}

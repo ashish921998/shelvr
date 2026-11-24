@@ -39,6 +39,14 @@ public struct SiriCredential: Codable, Sendable {
 }
 
 extension Backend {
+  @MainActor static func installSiri(_ install: () throws -> Void, revokeOnFailure: () async -> Void) async throws {
+    do { try install() }
+    catch {
+      await revokeOnFailure()
+      throw error
+    }
+  }
+
   public func prepareSiri(owner: String) async throws {
     guard status == .signedIn, let subject = SiriCredential.currentSubject,
       SiriCredential.current()?.owner != owner else { return }
@@ -50,6 +58,10 @@ extension Backend {
       return
     }
     let site = "https://" + host.dropLast(".cloud".count) + ".site"
-    try SiriCredential.store(SiriCredential(owner: owner, token: token, siteURL: site, subject: subject))
+    try await Self.installSiri({
+      try SiriCredential.store(SiriCredential(owner: owner, token: token, siteURL: site, subject: subject))
+    }, revokeOnFailure: {
+      try? await ConvexHTTPAuthTransport(deployment: environment.convexURL).revokeSiri(token, authorization: authorization)
+    })
   }
 }
