@@ -9,6 +9,7 @@ import Testing
   var userID: String? = "first"
   let photoClient = RecordingPhotoMutations()
   var sentLinks: [String] = []
+  var sentNotes: [String] = []
   var refuseLink = false
   var onUpload: (() async -> Void)?
 
@@ -17,6 +18,11 @@ import Testing
     if refuseLink { throw ClientError.ConvexError(data: #"{"code":"pro_required"}"#) }
     #expect(source == .shareExtension)
     sentLinks.append(url)
+  }
+
+  func saveNote(_ text: String, operationID: String, checkpoint: () throws -> Void) throws {
+    try checkpoint()
+    sentNotes.append(operationID + ":" + text)
   }
 
   func savePhoto(_ photo: ImportPhoto, operationID: String, source: SaveSource, checkpoint: () throws -> Void) async throws -> String {
@@ -155,5 +161,18 @@ private func tinyPNG() throws -> Data {
     #expect(try await processor.drain(owner: "first") == nil)
     #expect(inbox.activeOwner == "first")
     #expect(saver.sentLinks == [link.value])
+  }
+}
+
+@MainActor @Test func typedInboxKeepsTheOperationIDOfAQueuedSiriNote() async throws {
+  try await withShareInbox { inbox in
+    let stage = try inbox.stage(owner: "first")
+    try inbox.publish([InboxPayload(kind: .note, value: "coffee", operationID: "siri:fixture", siri: true)], in: stage)
+    let saver = RecordingShareSaver()
+    let processor = ShareInboxProcessor(inbox: inbox, saver: saver)
+
+    #expect(try await processor.drain(owner: "first") == nil)
+    #expect(saver.sentNotes == ["siri:fixture:coffee"])
+    #expect(try inbox.batches().isEmpty)
   }
 }

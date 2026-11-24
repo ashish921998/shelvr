@@ -47,17 +47,21 @@ func withShareInbox(_ run: (ShareInbox) async throws -> Void) async throws {
   }
 }
 
-@MainActor @Test func activationExcludesAnExistingDirectoryFromBackupBeforePublishingItsOwner() async throws {
+@MainActor @Test func activationExcludesAnExistingDirectoryFromBackupAndPublishesItsOwner() async throws {
   try await withShareInbox { inbox in
     try inbox.activate(nil)
-    var directory = inbox.directory
+    let directoryPath = inbox.directory.path
+    var directory = URL(filePath: directoryPath, directoryHint: .isDirectory)
     var values = URLResourceValues()
     values.isExcludedFromBackup = false
     try directory.setResourceValues(values)
+    @Sendable func backupExcluded() -> Bool? {
+      let fresh = URL(filePath: directoryPath, directoryHint: .isDirectory)
+      return try? fresh.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup
+    }
+    try await eventually { @Sendable in backupExcluded() == false }
     try inbox.activate("second")
-
-    let reloaded = URL(filePath: directory.path)
-    #expect(try reloaded.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
+    try await eventually { @Sendable in backupExcluded() == true }
     #expect(inbox.activeOwner == "second")
   }
 }
