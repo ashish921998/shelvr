@@ -5,6 +5,7 @@ import ShelvrInbox
 protocol ShareSaver {
   var userID: String? { get }
   func saveLink(_ url: String, operationID: String, source: SaveSource, analyticsSessionID: String?, checkpoint: () throws -> Void) async throws
+  func saveNote(_ text: String, operationID: String, checkpoint: () throws -> Void) async throws
   func savePhoto(_ photo: ImportPhoto, operationID: String, source: SaveSource, checkpoint: () throws -> Void) async throws -> String
 }
 
@@ -45,12 +46,15 @@ public struct ShareInboxProcessor {
     try inbox.prune(keeping: owner)
     let refusal = try await inbox.drain(owner: owner) { delivery in
       try checkpoint()
+      let source: SaveSource = delivery.siri ? .siri : .shareExtension
       switch delivery.content {
       case .link(let url):
-        try await saver.saveLink(url, operationID: delivery.operationID, source: .shareExtension, analyticsSessionID: nil, checkpoint: checkpoint)
+        try await saver.saveLink(url, operationID: delivery.operationID, source: source, analyticsSessionID: nil, checkpoint: checkpoint)
+      case .note(let text):
+        try await saver.saveNote(text, operationID: delivery.operationID, checkpoint: checkpoint)
       case .image(let file):
         let photo = try await Task.detached { try ImportPhoto(Data(contentsOf: file, options: .mappedIfSafe)) }.value
-        _ = try await saver.savePhoto(photo, operationID: delivery.operationID, source: .shareExtension, checkpoint: checkpoint)
+        _ = try await saver.savePhoto(photo, operationID: delivery.operationID, source: source, checkpoint: checkpoint)
       }
       try checkpoint()
     }

@@ -31,6 +31,7 @@ struct AccountSettingsView: View {
           Text(copy("notifications.previousAccount")).foregroundStyle(.secondary)
         }
         Button(copy("pro.manage")) { manage = true }
+        Link(copy("support.contact"), destination: URL(string: "mailto:ashish921998@zohomail.in?subject=Shelvr%20Support")!)
         Link(copy("legal.terms"), destination: URL(string: "https://tryshelvr.app/terms")!)
         Link(copy("legal.privacy"), destination: URL(string: "https://tryshelvr.app/privacy")!)
       }
