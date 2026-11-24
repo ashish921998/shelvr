@@ -3,6 +3,7 @@ import SwiftUI
 import UserNotifications
 
 struct AccountSettingsView: View {
+  @EnvironmentObject private var pushDevice: PushDevice
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var confirming = false
@@ -23,7 +24,7 @@ struct AccountSettingsView: View {
                 await UIApplication.shared.open(url)
               }
             } else if (try? await center.requestAuthorization(options: [.alert, .badge, .sound])) == true {
-              UIApplication.shared.registerForRemoteNotifications()
+              pushDevice.authorizationRevision += 1
             }
           }
         }
