@@ -105,4 +105,19 @@ struct ExpoDeviceStateTests {
     #expect(params.operationIds == ["op1", nil, "op3"])
     #expect(params.operationId == nil)
   }
+
+  @Test func aBadQueueEntryIsSkippedAndTheRestAreKept() throws {
+    let suite = UUID().uuidString
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let queue = Data(
+      #"[{"id":"a","name":"saveText","params":{},"createdAt":1},{"id":7,"name":"saveText","params":{},"createdAt":2},{"id":"c","params":{},"createdAt":3},{"id":"d","name":"saveText","params":"x","createdAt":4},{"id":"e","name":"saveText","params":{},"createdAt":"5"},null,"f",{"id":"g","name":"saveUrl","params":{"url":"u"},"createdAt":6}]"#.utf8)
+    defaults.set(queue, forKey: "dev.expo.appintents.invocations.pending")
+    let env = try AppEnvironment(
+      variant: .development, convexURL: URL(string: "https://dev.convex.cloud")!, bundleID: "app.shelvr.save.preview")
+    let state = ExpoDeviceState(environment: env, defaults: defaults, group: defaults) { _ in nil }
+    #expect(try state.pendingInvocations().map(\.id) == ["a", "g"])
+    defaults.set(Data(#"{"id":"a"}"#.utf8), forKey: "dev.expo.appintents.invocations.pending")
+    #expect(throws: DecodingError.self) { try state.pendingInvocations() }
+  }
 }

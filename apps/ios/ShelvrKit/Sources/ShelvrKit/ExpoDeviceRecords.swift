@@ -49,11 +49,12 @@ extension ExpoDeviceState {
 
       public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        func nonEmpty(_ text: String) -> String? { text.isEmpty ? nil : text }
         func string(_ key: CodingKeys) -> String? {
-          (try? c.decodeIfPresent(String.self, forKey: key)).flatMap(Item.nonEmpty)
+          (try? c.decodeIfPresent(String.self, forKey: key)).flatMap(nonEmpty)
         }
         func strings(_ key: CodingKeys) -> [String?]? {
-          (try? c.decodeIfPresent([Item].self, forKey: key))?.map(\.value)
+          (try? c.decodeIfPresent([Skippable<String>].self, forKey: key))?.map { $0.value.flatMap(nonEmpty) }
         }
         query = string(.query)
         id = string(.id)
@@ -64,16 +65,14 @@ extension ExpoDeviceState {
         operationId = string(.operationId)
         operationIds = strings(.operationIds)
       }
+    }
+  }
 
-      private struct Item: Decodable {
-        let value: String?
+  struct Skippable<Value: Decodable>: Decodable {
+    let value: Value?
 
-        static func nonEmpty(_ text: String) -> String? { text.isEmpty ? nil : text }
-
-        init(from decoder: any Decoder) throws {
-          value = (try? decoder.singleValueContainer().decode(String.self)).flatMap(Self.nonEmpty)
-        }
-      }
+    init(from decoder: any Decoder) throws {
+      value = try? Value(from: decoder)
     }
   }
 }

@@ -33,7 +33,8 @@ public struct ExpoDeviceState {
   }
 
   public func pendingInvocations() throws -> [Invocation] {
-    try decode([Invocation].self, defaults.data(forKey: "dev.expo.appintents.invocations.pending")) ?? []
+    try decode([Skippable<Invocation>].self, defaults.data(forKey: "dev.expo.appintents.invocations.pending"))?
+      .compactMap(\.value) ?? []
   }
 
   public var installationID: String? {
