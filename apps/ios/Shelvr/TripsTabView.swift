@@ -1,3 +1,4 @@
+import ImageIO
 import ShelvrKit
 import SwiftUI
 
@@ -49,10 +50,8 @@ private struct TripPageRows: View {
           if let link = AppLink("/trip-plan/" + trip.id) {
             NavigationLink(value: link) {
               HStack {
-                if let cover = trip.cover.flatMap(URL.init(string:)) {
-                  AsyncImage(url: cover) { image in image.resizable().scaledToFill() }
-                    placeholder: { Color.secondary.opacity(0.12) }
-                    .frame(width: 64, height: 64).clipShape(RoundedRectangle(cornerRadius: 10))
+                if let cover = trip.cover {
+                  TripCover(base64: cover)
                 }
                 VStack(alignment: .leading) {
                   Text(trip.name ?? copy("tripPlanner.tripTitle", ["city": trip.city])).font(.headline)
@@ -85,6 +84,30 @@ private struct TripPageRows: View {
           page = response
         }
       } catch { if !Task.isCancelled { failed = true } }
+    }
+  }
+}
+
+private struct TripCover: View {
+  let base64: String
+  @State private var image: UIImage?
+
+  var body: some View {
+    Group {
+      if let image { Image(uiImage: image).resizable().scaledToFill() }
+      else { Color.secondary.opacity(0.12) }
+    }
+    .frame(width: 64, height: 64)
+    .clipShape(RoundedRectangle(cornerRadius: 10))
+    .task(id: base64) {
+      guard let data = Data(base64Encoded: base64),
+        let source = CGImageSourceCreateWithData(data as CFData, nil),
+        let thumbnail = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+          kCGImageSourceCreateThumbnailFromImageAlways: true,
+          kCGImageSourceCreateThumbnailWithTransform: true,
+          kCGImageSourceThumbnailMaxPixelSize: 192
+        ] as CFDictionary) else { image = nil; return }
+      image = UIImage(cgImage: thumbnail)
     }
   }
 }
