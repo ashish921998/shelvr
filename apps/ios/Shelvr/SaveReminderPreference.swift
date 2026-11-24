@@ -12,6 +12,7 @@ struct SaveReminderPreference: View {
   @State private var busy = false
   @State private var message = ""
   @State private var attempt = 0
+  @State private var readFailed = false
 
   var body: some View {
     VStack(alignment: .leading) {
@@ -22,7 +23,9 @@ struct SaveReminderPreference: View {
         Toggle(copy("notifications.remindersToggle"), isOn: Binding(get: { permitted && preferences.remindersEnabled }, set: { value in
           Task { await set(value, weekly: false) }
         })).disabled(busy)
-      } else if !message.isEmpty {
+      }
+      if readFailed {
+        Text(copy("errors.retrySoon")).font(.footnote).foregroundStyle(.secondary)
         Button(copy("common.retry")) { attempt += 1 }
       }
       if !message.isEmpty { Text(message).font(.footnote).foregroundStyle(.secondary) }
@@ -34,10 +37,10 @@ struct SaveReminderPreference: View {
       permitted = [.authorized, .provisional, .ephemeral].contains(status)
     }
     .task(id: attempt) {
-      message = ""
+      readFailed = false
       do {
         for try await value in backend.query("notifications:getPreferences", as: TrialNotificationPreferences.self) { preferences = value }
-      } catch { if !Task.isCancelled { message = copy("errors.retrySoon") } }
+      } catch { if !Task.isCancelled { readFailed = true } }
     }
   }
 

@@ -186,3 +186,19 @@ private func tinyPNG() throws -> Data {
     #expect(try inbox.batches().isEmpty)
   }
 }
+
+
+@MainActor @Test func aQueuedSiriNoteThatNeedsProUsesTheGeneralSaveAllowanceCopy() async throws {
+  try await withShareInbox { inbox in
+    let stage = try inbox.stage(owner: "first")
+    let note = InboxPayload(kind: .note, value: String(repeating: "a", count: 20_001), siri: true)
+    try inbox.publish([note], in: stage)
+    let processor = ShareInboxProcessor(inbox: inbox, saver: RecordingShareSaver())
+    let failure = try #require(await processor.drain(owner: "first", deliverSiri: { _, _, _ in
+      throw SaveFailure.proRequired
+    }))
+    #expect(failure.copyKey == "freePlan.leftBody")
+    #expect(!failure.canRecoverNote)
+    #expect(try failure.share?.delivery.get().operationID == note.operationID)
+  }
+}

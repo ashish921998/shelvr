@@ -174,8 +174,9 @@ private final class OtherPushOwner: URLProtocol, @unchecked Sendable {
   let a = UUID(), b = UUID(), previous = Data([1]), rotated = Data([2])
   var delivery = PushDeliveryState()
   let coldStartPaused = delivery.prepare(generation: a, verified: [PushDeliveryState.digest(previous)])
+  #expect(coldStartPaused && !delivery.permitsPresentation)
   let confirmedTokenPaused = delivery.receive(previous)
-  #expect(!coldStartPaused && !confirmedTokenPaused && delivery.permitsPresentation)
+  #expect(!confirmedTokenPaused && delivery.permitsPresentation)
   let rotationPaused = delivery.receive(rotated)
   let staleTokenResumed = delivery.confirm(previous, generation: a)
   #expect(rotationPaused && !staleTokenResumed && !delivery.permitsPresentation)
@@ -218,7 +219,11 @@ private final class OtherPushOwner: URLProtocol, @unchecked Sendable {
     apnsDigest: PushDeliveryState.digest(apns))
   try store.write([confirmed])
   await #expect(throws: URLError(.timedOut)) {
-    try await store.registerFresh("current", native: apns, for: session, register: { _ in throw URLError(.timedOut) }) { _ in
+    try await store.registerFresh("current", native: apns, for: session, register: { _ in
+      #expect(try store.read().first?.apnsDigest == confirmed.apnsDigest)
+      #expect(try store.verifiedAPNSDigests(for: session).isEmpty)
+      throw URLError(.timedOut)
+    }) { _ in
       Issue.record("Refreshing the same token must not revoke it")
     }
   }
@@ -227,7 +232,7 @@ private final class OtherPushOwner: URLProtocol, @unchecked Sendable {
   var delivery = PushDeliveryState()
   let paused = delivery.prepare(generation: UUID(), verified: Set(restored.compactMap(\.apnsDigest)))
   let silenced = delivery.receive(apns)
-  #expect(!paused && !silenced && delivery.permitsPresentation)
+  #expect(paused && !silenced && delivery.permitsPresentation)
   await #expect(throws: PushRegistrationError.ownedByAnotherAccount) {
     try await store.registerFresh("current", native: apns, for: session, register: { _ in
       throw PushRegistrationError.ownedByAnotherAccount
@@ -259,4 +264,31 @@ private final class OtherPushOwner: URLProtocol, @unchecked Sendable {
   let needsSilence = delivery.prepare(generation: session, verified: [PushDeliveryState.digest(native)])
   #expect(!needsSilence && !delivery.isProbing && delivery.permitsPresentation)
   #expect(delivery.token == native)
+}
+
+
+@MainActor @Test func anInterruptedOwnershipRefusalCannotRestoreAnotherExpoTokensProof() async throws {
+  let endpoint = URL(string: "https://example.convex.cloud")!
+  let service = "test.refuse-refresh.\(UUID())"
+  let store = PushTokenStore(serviceURL: endpoint, keychainService: service)
+  defer { try? store.write([]) }
+  let registration = UUID()
+  let native = Data([42])
+  let digest = PushDeliveryState.digest(native)
+  let confirmed = PushRegistrationRecord(token: "old", registrationId: registration.uuidString, apnsDigest: digest)
+  try store.write([confirmed])
+  #expect(try store.verifiedAPNSDigests(for: registration) == [digest])
+
+  var interrupted: [PushRegistrationRecord] = []
+  await #expect(throws: PushRegistrationError.ownedByAnotherAccount) {
+    try await store.registerFresh("new", native: native, for: registration, register: { _ in
+      interrupted = try store.read()
+      #expect(try store.verifiedAPNSDigests(for: registration).isEmpty)
+      throw PushRegistrationError.ownedByAnotherAccount
+    }) { _ in Issue.record("A refused refresh cannot retire another registration") }
+  }
+  #expect(try store.read().allSatisfy { $0.apnsDigest == nil })
+  try store.write(interrupted)
+  let reopened = PushTokenStore(serviceURL: endpoint, keychainService: service)
+  #expect(try reopened.verifiedAPNSDigests(for: registration).isEmpty)
 }
