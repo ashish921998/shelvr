@@ -78,7 +78,7 @@ final class ShareViewController: UIViewController {
         try await loadImage(from: provider, into: image.file)
         return .payload(image.payload)
       }
-      return try await loadLink(from: provider, type: type)
+      return try await ShareAttachment.loadLink(from: provider, type: type)
     }
   }
 
@@ -90,19 +90,6 @@ final class ShareViewController: UIViewController {
           try FileManager.default.copyItem(at: url, to: file)
           continuation.resume()
         } catch { continuation.resume(throwing: error) }
-      }
-    }
-  }
-
-  private func loadLink(from provider: NSItemProvider, type: UTType) async throws -> ShareAttachment? {
-    try await withCheckedThrowingContinuation { continuation in
-      provider.loadItem(forTypeIdentifier: type.identifier, options: nil) { item, error in
-        if let error { continuation.resume(throwing: error); return }
-        if let url = item as? URL {
-          continuation.resume(returning: ShareAttachment.webLink(url.absoluteString))
-        } else if let text = item as? String {
-          continuation.resume(returning: type == .url ? ShareAttachment.webLink(text) : .caption(text))
-        } else { continuation.resume(returning: nil) }
       }
     }
   }

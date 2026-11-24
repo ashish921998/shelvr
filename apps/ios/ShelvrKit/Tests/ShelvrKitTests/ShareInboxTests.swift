@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import UniformTypeIdentifiers
 @testable import ShelvrInbox
 
 @MainActor
@@ -67,7 +68,8 @@ func withShareInbox(_ run: (ShareInbox) async throws -> Void) async throws {
     let shares = (0..<12).map { InboxPayload(kind: .link, value: "https://example.com/\($0)") }
     try inbox.publish(shares, in: stage)
     var received: [String] = []
-    try await inbox.drain(owner: "first") { received.append($0.operationID) }
+    let refusal = try await inbox.drain(owner: "first") { received.append($0.operationID) }
+    #expect(refusal == nil)
     #expect(received == shares.map(\.operationID))
     #expect(try inbox.batches().isEmpty)
   }
@@ -152,4 +154,26 @@ func withShareInbox(_ run: (ShareInbox) async throws -> Void) async throws {
     try failure.share.discard()
     #expect(try inbox.manifests(in: batch).isEmpty)
   }
+}
+
+@MainActor @Test func utf8ItemProviderPlainTextProducesASaveableLink() async throws {
+  let text = "Café tip https://example.com/coffee"
+  let provider = NSItemProvider(item: Data(text.utf8) as NSData, typeIdentifier: UTType.plainText.identifier)
+  let attachment = try #require(await ShareAttachment.loadLink(from: provider, type: .plainText))
+  #expect(ShareAttachment.payloads([attachment]).map(\.value) == ["https://example.com/coffee"])
+}
+
+@MainActor @Test func malformedUtf8ItemProviderTextIsIgnored() async throws {
+  let provider = NSItemProvider(item: Data([0xff]) as NSData, typeIdentifier: UTType.plainText.identifier)
+  let attachment = try await ShareAttachment.loadLink(from: provider, type: .plainText)
+  #expect(attachment == nil)
+}
+
+
+@MainActor @Test func urlItemProviderRetainsItsExplicitURL() async throws {
+  let value = "https://example.com/coffee!"
+  let url = try #require(URL(string: value))
+  let provider = NSItemProvider(item: url as NSURL, typeIdentifier: UTType.url.identifier)
+  let attachment = try #require(await ShareAttachment.loadLink(from: provider, type: .url))
+  #expect(ShareAttachment.payloads([attachment]).map(\.value) == [value])
 }

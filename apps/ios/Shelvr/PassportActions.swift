@@ -100,7 +100,7 @@ private struct PassportCityPicker: View {
             defer { working = nil }
             do { _ = try await backend.changeCityStamp(city.id, add: !selected) }
             catch {
-              failureKey = PastedLink.requiresPro(error) ? "cityStamps.lockedHint" : "cityStamps.saveFailed"
+              failureKey = SaveFailure(error) == .proRequired ? "cityStamps.lockedHint" : "cityStamps.saveFailed"
               failed = true
             }
           }

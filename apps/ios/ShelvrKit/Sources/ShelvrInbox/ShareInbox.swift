@@ -1,5 +1,6 @@
 import CoreFoundation
 import Foundation
+import UniformTypeIdentifiers
 
 public struct InboxPayload: Codable, Sendable {
   public enum Kind: String, Codable, Sendable { case link, image }
@@ -26,6 +27,20 @@ public enum ShareAttachment: Sendable {
     }
     if let failure { throw failure }
     return nil
+  }
+
+  @MainActor public static func loadLink(from provider: NSItemProvider, type: UTType) async throws -> ShareAttachment? {
+    try await withCheckedThrowingContinuation { continuation in
+      provider.loadItem(forTypeIdentifier: type.identifier, options: nil) { item, error in
+        if let error { continuation.resume(throwing: error); return }
+        if let url = item as? URL {
+          continuation.resume(returning: ShareAttachment.webLink(url.absoluteString))
+          return
+        }
+        let text = (item as? String) ?? (item as? Data).flatMap { String(data: $0, encoding: .utf8) }
+        continuation.resume(returning: text.flatMap { type == .url ? ShareAttachment.webLink($0) : .caption($0) })
+      }
+    }
   }
 
   public static func webLink(_ text: String) -> Self? {
