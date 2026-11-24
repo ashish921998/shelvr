@@ -303,6 +303,7 @@ export default defineSchema({
     token: v.string(),
     platform: v.union(v.literal("ios"), v.literal("android")),
     installSecretHash: v.optional(v.string()),
+    registrationId: v.optional(v.string()),
     enabled: v.boolean(),
     lastSeenAt: v.number(),
   })

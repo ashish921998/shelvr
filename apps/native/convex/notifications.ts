@@ -173,6 +173,7 @@ export const registerDevice = authedMutation({
     nextDigestAt: v.optional(v.number()),
     timezone: v.optional(v.string()),
     installSecret: v.optional(v.string()),
+    registrationId: v.optional(v.string()),
   },
   returns: v.null(),
   handler: async (ctx, args) => {
@@ -188,6 +189,11 @@ export const registerDevice = authedMutation({
     ) {
       throw new Error("Invalid install secret");
     }
+    if (
+      args.registrationId !== undefined &&
+      (args.registrationId.length !== 36 || !args.installSecret)
+    )
+      throw new Error("Invalid registration id");
     const installSecretHash =
       args.installSecret === undefined
         ? undefined
@@ -208,6 +214,7 @@ export const registerDevice = authedMutation({
         platform: args.platform,
         ...languageFields,
         installSecretHash,
+        registrationId: args.registrationId,
         enabled: true,
         lastSeenAt: now,
       });
@@ -219,6 +226,7 @@ export const registerDevice = authedMutation({
     ) {
       await ctx.db.patch(existingToken._id, {
         userId,
+        registrationId: args.registrationId,
         installSecretHash:
           installSecretHash ??
           (existingToken.userId === userId
@@ -346,9 +354,13 @@ export const unregisterDevice = authedMutation({
 });
 
 export const unregisterInstallation = mutation({
-  args: { token: v.string(), installSecret: v.string() },
+  args: {
+    token: v.string(),
+    installSecret: v.string(),
+    registrationId: v.string(),
+  },
   returns: v.null(),
-  handler: async (ctx, { token, installSecret }) => {
+  handler: async (ctx, { token, installSecret, registrationId }) => {
     if (
       !token ||
       token.length > 4096 ||
@@ -363,6 +375,7 @@ export const unregisterInstallation = mutation({
       .unique();
     if (
       device?.enabled &&
+      device.registrationId === registrationId &&
       device.installSecretHash === (await sha256Hex(installSecret))
     ) {
       await ctx.db.patch(device._id, { enabled: false });
