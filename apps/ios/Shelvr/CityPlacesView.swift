@@ -26,7 +26,7 @@ struct CityPlacesView: View {
             if let selected, pins.contains(selected), let link = AppLink("/item/" + selected.itemID) {
               NavigationLink(selected.name, value: link)
             }
-            planLink("/date-plan", "homePlaces.planDate", "heart")
+            planLink("/go-out", "plan.goOut", "figure.walk")
             planLink("/new-trip", "homePlaces.planTrip", "suitcase")
           }
           ForEach(pins) { pin in
