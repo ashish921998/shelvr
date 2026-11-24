@@ -110,6 +110,7 @@ struct LibraryView: View {
     do {
       for try await page in backend.libraryPage(after: cursor) {
         guard !Task.isCancelled, subscriptions.indices.contains(index), subscriptions[index] == cursor else { return }
+        failures.remove(index)
         if pages.count == index {
           pages.append(page)
         } else {
@@ -121,7 +122,9 @@ struct LibraryView: View {
         }
       }
     } catch {
-      if !Task.isCancelled { failures.insert(index) }
+      if !Task.isCancelled, subscriptions.indices.contains(index), subscriptions[index] == cursor {
+        failures.insert(index)
+      }
     }
   }
 
