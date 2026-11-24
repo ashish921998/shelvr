@@ -90,6 +90,7 @@ struct PushRegistrationRecord: Codable, Equatable {
   let token: String
   let registrationId: String
   var apnsDigest: String? = nil
+  var proofPending: Bool? = nil
 }
 
 public struct PushDeliveryState {
@@ -171,6 +172,12 @@ struct PushTokenStore {
 
   func read() throws -> [PushRegistrationRecord] { try values(PushRegistrationRecord.self, "swift-notification-registrations-") }
 
+  func verifiedAPNSDigests(for registration: UUID) throws -> Set<String> {
+    let records = try read().filter { $0.registrationId == registration.uuidString }
+    let pending = records.filter { $0.proofPending == true }.compactMap(\.apnsDigest)
+    return Set(records.compactMap(\.apnsDigest)).subtracting(pending)
+  }
+
   func legacyTokens(service: String? = nil) throws -> [String] { try values(String.self, "notification-tokens-", service: service) }
 
   func writeLegacy(_ tokens: [String], service: String? = nil) throws { try write(tokens, "notification-tokens-", service: service) }
@@ -178,19 +185,27 @@ struct PushTokenStore {
   @MainActor func registerFresh(_ fresh: String, native: Data, for generation: UUID,
     register: (PushRegistrationRecord) async throws -> Void,
     unregister: (PushRegistrationRecord) async throws -> Void) async throws {
-    var record = PushRegistrationRecord(token: fresh, registrationId: generation.uuidString)
     let digest = PushDeliveryState.digest(native)
+    let record = PushRegistrationRecord(token: fresh, registrationId: generation.uuidString,
+      apnsDigest: digest, proofPending: true)
     let records = try read()
     let previous = records.first { $0.token == fresh && $0.registrationId == record.registrationId }
     let other = records.filter { $0.token != fresh || $0.registrationId != record.registrationId }
-    if previous?.apnsDigest == digest { record.apnsDigest = digest }
     try write(other + [record])
     do {
       try await register(record)
     } catch PushRegistrationError.ownedByAnotherAccount {
-      record.apnsDigest = nil
-      try? write(other + [record])
+      let invalidated = (other + [record]).map { value in
+        guard value.registrationId == record.registrationId, value.apnsDigest == digest else { return value }
+        return PushRegistrationRecord(token: value.token, registrationId: value.registrationId)
+      }
+      try? write(invalidated)
       throw PushRegistrationError.ownedByAnotherAccount
+    } catch {
+      if let previous, previous.proofPending != true, previous.apnsDigest == digest {
+        try write(other + [previous])
+      }
+      throw error
     }
     for old in other { try await unregister(old) }
     try write([PushRegistrationRecord(token: fresh, registrationId: record.registrationId, apnsDigest: digest)])

@@ -71,6 +71,13 @@ Module-level variables and refs moved by hand, all in `src/lib` unless noted.
 | `pending-onboarding.ts`, `purchase-before-sign-in.ts`, `pending-invite.ts`, `queued-first-save.ts`, `pending-cancel-survey.ts`, `pending-weekly-shelf.ts`, `welcome-save.ts`, `pending-city-stamps.ts`, `share/pending-share-store.ts` | Persisted handoffs                                                                                                              | SecureStore, survive a cold launch. `pending-onboarding.ts` and `purchase-before-sign-in.ts` publish a revision counter for `useSyncExternalStore`; `queued-first-save.ts` is claimed by its owner before it feeds `queueDemoUrl`. `pending-city-stamps.ts` holds the onboarding city pick with `owner: null`, takes the signed-in account as owner before it sends the claim, clears the slot for any other account, and keeps it after a failed send so the next launch retries; a `ranFor` ref sends once per account per mount. |
 | `purchase-landing.ts`, `deferred-sheet-link.ts`                                                                                                                                                                                        | Launch-scoped handoffs                                                                                                          | Module variables only, forgotten on a cold launch.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
+The Swift push registration record in `apps/ios/ShelvrKit` persists a pending
+proof before calling the server. A pending record quarantines the same APNs
+digest for that registration, even if its Expo token changed. Successful
+registration publishes a confirmed proof. Ownership refusal clears the
+digest from every matching record. An interrupted refresh leaves that digest
+untrusted on relaunch until registration succeeds.
+
 ## Patterns behind past bugs
 
 - **Stale writers.** Anything that finishes later than it started (a run, a sync,

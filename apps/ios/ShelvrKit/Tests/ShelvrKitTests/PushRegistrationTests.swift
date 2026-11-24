@@ -220,7 +220,8 @@ private final class OtherPushOwner: URLProtocol, @unchecked Sendable {
   try store.write([confirmed])
   await #expect(throws: URLError(.timedOut)) {
     try await store.registerFresh("current", native: apns, for: session, register: { _ in
-      #expect(try store.read() == [confirmed])
+      #expect(try store.read().first?.apnsDigest == confirmed.apnsDigest)
+      #expect(try store.verifiedAPNSDigests(for: session).isEmpty)
       throw URLError(.timedOut)
     }) { _ in
       Issue.record("Refreshing the same token must not revoke it")
@@ -263,4 +264,31 @@ private final class OtherPushOwner: URLProtocol, @unchecked Sendable {
   let needsSilence = delivery.prepare(generation: session, verified: [PushDeliveryState.digest(native)])
   #expect(!needsSilence && !delivery.isProbing && delivery.permitsPresentation)
   #expect(delivery.token == native)
+}
+
+
+@MainActor @Test func anInterruptedOwnershipRefusalCannotRestoreAnotherExpoTokensProof() async throws {
+  let endpoint = URL(string: "https://example.convex.cloud")!
+  let service = "test.refuse-refresh.\(UUID())"
+  let store = PushTokenStore(serviceURL: endpoint, keychainService: service)
+  defer { try? store.write([]) }
+  let registration = UUID()
+  let native = Data([42])
+  let digest = PushDeliveryState.digest(native)
+  let confirmed = PushRegistrationRecord(token: "old", registrationId: registration.uuidString, apnsDigest: digest)
+  try store.write([confirmed])
+  #expect(try store.verifiedAPNSDigests(for: registration) == [digest])
+
+  var interrupted: [PushRegistrationRecord] = []
+  await #expect(throws: PushRegistrationError.ownedByAnotherAccount) {
+    try await store.registerFresh("new", native: native, for: registration, register: { _ in
+      interrupted = try store.read()
+      #expect(try store.verifiedAPNSDigests(for: registration).isEmpty)
+      throw PushRegistrationError.ownedByAnotherAccount
+    }) { _ in Issue.record("A refused refresh cannot retire another registration") }
+  }
+  #expect(try store.read().allSatisfy { $0.apnsDigest == nil })
+  try store.write(interrupted)
+  let reopened = PushTokenStore(serviceURL: endpoint, keychainService: service)
+  #expect(try reopened.verifiedAPNSDigests(for: registration).isEmpty)
 }
