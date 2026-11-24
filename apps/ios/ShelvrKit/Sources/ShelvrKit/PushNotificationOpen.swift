@@ -13,10 +13,13 @@ public struct PushNotificationOpen: Sendable {
       "cook_reminder", "visit_reminder", "trial_reminder", "trial_nudge"]
     let kind = payload["kind"] as? String ?? ""
     let id = payload["notificationId"] as? String ?? ""
+    let isTrial = kind == "trial_reminder" || kind == "trial_nudge"
+    let isSafeID = id.wholeMatch(of: /[A-Za-z0-9_-]{1,63}/) != nil ||
+      (isTrial && id.wholeMatch(of: /shelvr\.trial-[a-z0-9-]{1,40}/) != nil)
     self.link = link
     properties = [
       "notification_kind": kinds.contains(kind) ? kind : "unknown",
-      "notification_id": id.wholeMatch(of: /[A-Za-z0-9_-]{1,63}/) == nil ? "" : id
+      "notification_id": isSafeID ? id : ""
     ]
   }
 }
