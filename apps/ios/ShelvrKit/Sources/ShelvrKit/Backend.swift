@@ -83,6 +83,14 @@ public final class Backend {
     }
   }
 
+  public func deleteAccount() async throws {
+    guard status == .signedIn, !signingOut else { return }
+    signingOut = true
+    defer { signingOut = false }
+    try await client.mutation("users:deleteCurrentUserAccount")
+    try await session.signOut { await self.disconnect() }
+  }
+
   private func disconnect() async {
     await client.logout()
     status = .signedOut
