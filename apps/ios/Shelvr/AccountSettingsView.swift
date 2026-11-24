@@ -1,7 +1,9 @@
 import ShelvrKit
 import SwiftUI
+import UserNotifications
 
 struct AccountSettingsView: View {
+  @EnvironmentObject private var pushDevice: PushDevice
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var confirming = false
@@ -12,6 +14,22 @@ struct AccountSettingsView: View {
   var body: some View {
     List {
       Section {
+        Button(copy("onboardingNotify.allow")) {
+          Task {
+            let center = UNUserNotificationCenter.current()
+            let settings = await center.notificationSettings()
+            if settings.authorizationStatus == .denied {
+              if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                await UIApplication.shared.open(url)
+              }
+            } else if (try? await center.requestAuthorization(options: [.alert, .badge, .sound])) == true {
+              pushDevice.retryEnrollment()
+            }
+          }
+        }
+        if pushDevice.blockedSession == backend.sessionGeneration {
+          Text(copy("notifications.previousAccount")).foregroundStyle(.secondary)
+        }
         Button(copy("pro.manage")) { manage = true }
         Link(copy("support.contact"), destination: URL(string: "mailto:ashish921998@zohomail.in?subject=Shelvr%20Support")!)
         Link(copy("legal.terms"), destination: URL(string: "https://tryshelvr.app/terms")!)

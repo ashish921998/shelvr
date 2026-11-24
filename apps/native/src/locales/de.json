@@ -178,6 +178,7 @@
   "pro.openStore": "App Store öffnen",
   "notifications.disabledTitle": "Mitteilungen sind deaktiviert",
   "notifications.disabledBody": "Erlaube Shelvr-Mitteilungen in den Geräteeinstellungen, um das Wochenregal zu aktivieren.",
+  "notifications.previousAccount": "Benachrichtigungen sind noch mit einem anderen Shelvr-Konto verknüpft. Melden Sie sich auf diesem Gerät bei jenem Konto an und wieder ab. Aktivieren Sie dann hier die Benachrichtigungen.",
   "notifications.updateFailed": "Mitteilungen konnten nicht aktualisiert werden",
   "errors.trySoon": "Versuche es gleich noch einmal.",
   "pro.restoredTitle": "Käufe wiederhergestellt",
