@@ -57,7 +57,13 @@ struct SharedInboxReceiver: ViewModifier {
       } catch {
         if !Task.isCancelled {
           failedFile = file
-          failureCopy = ImportPhoto.failureCopy(error)
+          switch error as? ShelvrCapture.Failure {
+          case .proRequired: failureCopy = "freePlan.photosNeedPro"
+          case .refused("photo_limit"): failureCopy = "errors.photoLimit"
+          case .refused("image_too_large"): failureCopy = "errors.photoTooLarge"
+          case .refused("image_empty"): failureCopy = "errors.photoEmpty"
+          default: failureCopy = ImportPhoto.failureCopy(error)
+          }
           if failureCopy == "errors.savePhoto" { failureCopy = "share.retryHelp" }
           if failureCopy == "freePlan.photosNeedPro",
             let payload = try? JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: file)),

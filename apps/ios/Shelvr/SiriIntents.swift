@@ -85,13 +85,13 @@ struct SaveNoteIntent {
       }
       result = try await SiriSave.note(text).capture(spaceID: folder?.id, account: account)
     case .images(let images):
-      result = try await captureImages(images, words: text, account: account)
+      result = try await captureImages(images, total: files.filter(CaptureRouter.isImage).count, words: text, account: account)
 
     }
     return .result(value: NoteEntity(id: result.id, text: text, folder: folder), dialog: result.dialog)
   }
 
-  @MainActor private func captureImages(_ images: [CaptureRouter.Attachment], words: String, account: SiriCredential)
+  @MainActor private func captureImages(_ images: [CaptureRouter.Attachment], total: Int, words: String, account: SiriCredential)
     async throws -> (id: String, dialog: IntentDialog)
   {
     if images.count == 1, let image = images.first, let target = StickerTarget(words: words),
@@ -110,13 +110,14 @@ struct SaveNoteIntent {
       } catch { lastError = error }
     }
     guard let firstID = batch.firstID else { throw lastError }
-    let dialog: IntentDialog = "Saved \(batch.saved). Queued for Shelvr: \(batch.queued). Couldn’t save: \(batch.failed(of: images.count))."
+    let dialog: IntentDialog = "Saved \(batch.saved). Queued for Shelvr: \(batch.queued). Couldn’t save: \(batch.failed(of: total))."
     return (firstID, dialog)
   }
 
 }
 #endif
 
+@available(iOS, introduced: 18, obsoleted: 27)
 struct SavePlainNoteIntent: AppIntent {
   static let title: LocalizedStringResource = "Save a Note"
   @Parameter(title: "Text") var text: String
@@ -141,8 +142,8 @@ struct ShelvrShortcuts: AppShortcutsProvider {
       shortTitle: "Save a Note", systemImageName: "square.and.pencil")
     #if compiler(>=6.4)
     if #available(iOS 27.0, *) {
-      AppShortcut(intent: SaveNoteIntent(), phrases: ["Save a note to \(\.$folder) in \(.applicationName)"],
-        shortTitle: "Save to a Folder", systemImageName: "folder")
+      AppShortcut(intent: SaveNoteIntent(), phrases: ["Save a note in \(.applicationName)", "Add a note to \(.applicationName)",
+        "Save a note to \(\.$folder) in \(.applicationName)"], shortTitle: "Save a Note", systemImageName: "square.and.pencil")
     }
     #endif
   }

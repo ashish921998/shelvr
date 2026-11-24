@@ -42,6 +42,7 @@ import Testing
   #expect(batch.queued == 1)
   #expect(batch.saved == 1)
   #expect(batch.failed(of: 3) == 1)
+  #expect(batch.failed(of: 11) == 9)
 }
 
 @Test func stickerAndImageContextSurviveQueuedReplay() throws {

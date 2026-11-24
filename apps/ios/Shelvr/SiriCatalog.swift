@@ -52,7 +52,7 @@ protocol AppIntentEntityRecordConvertible {
       }
     } else {
       let rows: [Save] = await first("items:listItems") ?? []
-      records = rows.filter { $0.type == "note" && $0.status == "ready" }.map { record($0, as: $0._id) }
+      records = rows.filter { $0.type == "note" && $0.status == "ready" }.map { record($0, as: $0._id, fullContent: false) }
     }
     return await permits(account) ? records : []
   }
@@ -70,7 +70,7 @@ protocol AppIntentEntityRecordConvertible {
           for file in (try? inbox.manifests(in: batch)) ?? [] {
             guard let bytes = try? Data(contentsOf: file), let payload = try? JSONDecoder().decode(InboxPayload.self, from: bytes),
               payload.operationID == operation, payload.siri == true else { continue }
-            let text = payload.kind == .image ? Copy()("item.photo") : String(payload.value.prefix(600))
+            let text = payload.kind == .image ? Copy()("item.photo") : payload.value
             return AppIntentEntityRecord(id: id, title: text, metadata: ["kind": "note", "text": text])
           }
         }
@@ -78,13 +78,14 @@ protocol AppIntentEntityRecordConvertible {
       }
     }
     guard let item: Save = await first("items:getItem", args: ["id": itemID]) else { return nil }
-    return record(item, as: id)
+    return record(item, as: id, fullContent: true)
   }
 
-  private static func record(_ save: Save, as identifier: String) -> AppIntentEntityRecord {
+  private static func record(_ save: Save, as identifier: String, fullContent: Bool) -> AppIntentEntityRecord {
     let title = save.title ?? save.note ?? save.url ?? Copy()("item.savedItem")
+    let content = save.note ?? title
     return AppIntentEntityRecord(id: identifier, title: String(title.prefix(80)),
-      metadata: ["kind": "note", "text": String((save.note ?? title).prefix(600)), "savedAt": String(save._creationTime)])
+      metadata: ["kind": "note", "text": fullContent ? content : String(content.prefix(600)), "savedAt": String(save._creationTime)])
   }
 
   nonisolated static func matches(_ record: AppIntentEntityRecord, query: String) -> Bool {
