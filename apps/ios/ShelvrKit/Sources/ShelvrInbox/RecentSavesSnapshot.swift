@@ -42,9 +42,12 @@ public struct RecentSavesSnapshot: Codable, Sendable {
     return snapshot.visible(to: owner, at: now)
   }
 
-  public static func clear(_ file: URL, cache: URL = .cachesDirectory) throws {
+  public static func clear(_ file: URL, cache: URL = .cachesDirectory, invalidate: () -> Void) throws {
     let manager = FileManager.default
-    if manager.fileExists(atPath: file.path) { try manager.removeItem(at: file) }
+    do {
+      defer { invalidate() }
+      if manager.fileExists(atPath: file.path) { try manager.removeItem(at: file) }
+    }
     if manager.fileExists(atPath: cache.path) {
       for candidate in try manager.contentsOfDirectory(at: cache, includingPropertiesForKeys: nil)
       where candidate.lastPathComponent.hasPrefix("widget-download-") {
