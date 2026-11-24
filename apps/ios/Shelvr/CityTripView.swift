@@ -72,7 +72,16 @@ struct CityTripView: View {
   let id: String
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
+  @Environment(\.dismiss) private var dismiss
+  @State private var confirmingDeletion = false
   @State private var trip: CityTrip?
+  @State private var editing: CityTrip.Stop?
+  @State private var editFailed = false
+  @State private var busy = false
+  @State private var undo: (String, TripPosition)?
+  @State private var undoGeneration = 0
+  @State private var renaming = false
+  @State private var newName = ""
   @State private var loaded = false
   @State private var failed = false
   @State private var attempt = 0
@@ -85,21 +94,116 @@ struct CityTripView: View {
           ForEach(Array(trip.days.enumerated()), id: \.offset) { index, stops in
             Section(copy("trip.dayTab", ["day": (index + 1).formatted()])) {
               if stops.isEmpty { Text(copy("tripSetup.emptyDay")).foregroundStyle(.secondary) }
-              ForEach(stops) { stop in row(stop) }
+              ForEach(Array(stops.enumerated()), id: \.element.id) { position, stop in
+                editableRow(stop, trip: trip, day: index + 1, index: position)
+              }
+              add(day: index + 1)
             }
           }
-          if !trip.unplanned.isEmpty {
-            Section(copy("tripPlanner.unplanned")) { ForEach(trip.unplanned) { stop in row(stop) } }
+          Section(copy("tripPlanner.unplanned")) {
+            ForEach(Array(trip.unplanned.enumerated()), id: \.element.id) { position, stop in
+              editableRow(stop, trip: trip, day: 0, index: position)
+            }
+            add(day: 0)
           }
-        }.navigationTitle(trip.name ?? copy("tripPlanner.tripTitle", ["city": trip.city]))
+          if let undo {
+            Button(copy("common.undo")) { change(clearPrevious: false) {
+              _ = try await backend.moveTripStop(undo.0, day: undo.1.day, index: undo.1.index)
+              self.undo = nil
+            } }
+          }
+          if editFailed { Text(copy("tripPlanner.editFailed")) }
+        }.disabled(busy)
+         .toolbar {
+          Menu {
+            Button(copy("tripPlanner.nameLabel")) { newName = trip.name ?? ""; renaming = true }
+            Button(copy("tripPlanner.delete"), role: .destructive) { confirmingDeletion = true }
+          } label: { Label(copy("tripPlanner.tripActions"), systemImage: "ellipsis.circle") }
+        }
+        .confirmationDialog(copy("tripPlanner.deleteTitle"), isPresented: $confirmingDeletion, titleVisibility: .visible) {
+          Button(copy("tripPlanner.delete"), role: .destructive) { change {
+            try await backend.client.mutation("tripPlannerData:deleteTripPlan", with: ["tripId": id])
+            dismiss()
+          } }
+          Button(copy("common.cancel"), role: .cancel) {}
+        } message: { Text(copy("tripPlanner.deleteBody")) }
+        .alert(copy("tripPlanner.nameLabel"), isPresented: $renaming) {
+          TextField(copy("tripPlanner.nameLabel"), text: $newName)
+          Button(copy("common.save")) { change { try await backend.renameTrip(id, name: newName) } }
+            .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || newName.utf16.count > 80)
+          Button(copy("common.cancel"), role: .cancel) {}
+        }
+        .sheet(item: $editing) { stop in TripStopEditor(stop: stop) { undo = nil } }
+        .navigationTitle(trip.name ?? copy("tripPlanner.tripTitle", ["city": trip.city]))
       } else if loaded { ContentUnavailableView(copy("tripPlanner.goneTitle"), systemImage: "suitcase") }
       else { ProgressView() }
+    }
+    .onDisappear { undo = nil }
+    .task(id: undoGeneration) {
+      guard undo != nil else { return }
+      try? await Task.sleep(for: .seconds(10))
+      if !Task.isCancelled { undo = nil }
     }
     .task(id: attempt) {
       failed = false
       do {
         for try await trip in backend.cityTrip(id) { self.trip = trip; loaded = true }
       } catch { if !Task.isCancelled { failed = true } }
+    }
+  }
+
+  private func add(day: Int) -> some View {
+    Group {
+      if let link = AppLink("/add-trip-stop?tripId=\(id)&day=\(day)") {
+        NavigationLink(value: link) { Label(copy("tripPlanner.addPlace"), systemImage: "plus") }
+      }
+    }
+  }
+
+  private func editableRow(_ stop: CityTrip.Stop, trip: CityTrip, day: Int, index: Int) -> some View {
+    let count = day == 0 ? trip.unplanned.count : trip.days[day - 1].count
+    return HStack {
+      row(stop)
+      Spacer()
+      Menu {
+        Button(copy("tripPlanner.stopDetails")) { editing = stop }
+        if index > 0 { Button(copy("tripPlanner.moveUp")) { move(stop.id, day: day, index: index - 1) } }
+        if index + 1 < count { Button(copy("tripPlanner.moveDown")) { move(stop.id, day: day, index: index + 1) } }
+        ForEach(0...trip.days.count, id: \.self) { target in
+          if target != day {
+            Button(target == 0 ? copy("tripPlanner.moveToUnplanned") :
+              copy("tripPlanner.moveToDay", ["day": copy("trip.dayTab", ["day": target.formatted()])])) {
+              move(stop.id, day: target, index: target == 0 ? trip.unplanned.count : trip.days[target - 1].count)
+            }
+          }
+        }
+        if day != 0 {
+          Button(copy("tripPlanner.removeStop", ["name": stop.name]), role: .destructive) {
+            change { offerUndo(stop.id, try await backend.removeTripStop(stop.id)) }
+          }
+        }
+      } label: { Image(systemName: "ellipsis.circle") }
+      .accessibilityLabel(copy("tripPlanner.stopActions", ["name": stop.name]))
+    }
+  }
+
+  private func offerUndo(_ id: String, _ position: TripPosition) {
+    undoGeneration += 1
+    undo = (id, position)
+  }
+
+  private func move(_ stop: String, day: Int, index: Int) {
+    change { offerUndo(stop, try await backend.moveTripStop(stop, day: day, index: index)) }
+  }
+
+  private func change(clearPrevious: Bool = true, _ operation: @escaping @MainActor () async throws -> Void) {
+    guard !busy else { return }
+    busy = true
+    editFailed = false
+    if clearPrevious { undo = nil }
+    Task {
+      defer { busy = false }
+      do { try await operation() } catch { editFailed = true }
     }
   }
 
