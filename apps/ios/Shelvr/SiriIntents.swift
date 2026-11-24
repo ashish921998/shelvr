@@ -76,19 +76,23 @@ struct SaveNoteIntent {
     let files = attachments.map { CaptureRouter.Attachment(data: $0.data, type: $0.type, filename: $0.filename) }
     let links = CaptureRouter.linkAttributes(in: [name] + (content.map { [$0] } ?? []))
     let result: (id: String, dialog: IntentDialog)
+    let entityText: String
     switch CaptureRouter.route(text: text, linkAttributes: links, attachments: files) {
     case .link(let url):
+      entityText = url.absoluteString
       result = try await SiriSave.link(url).capture(spaceID: folder?.id, account: account)
     case .note:
       guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
         throw $name.needsValueError("What should the note say?")
       }
+      entityText = text
       result = try await SiriSave.note(text).capture(spaceID: folder?.id, account: account)
     case .images(let images):
+      entityText = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Copy()("item.photo") : text
       result = try await captureImages(images, total: files.filter(CaptureRouter.isImage).count, words: text, account: account)
 
     }
-    return .result(value: NoteEntity(id: result.id, text: text, folder: folder), dialog: result.dialog)
+    return .result(value: NoteEntity(id: result.id, text: entityText, folder: folder), dialog: result.dialog)
   }
 
   @MainActor private func captureImages(_ images: [CaptureRouter.Attachment], total: Int, words: String, account: SiriCredential)

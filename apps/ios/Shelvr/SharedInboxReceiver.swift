@@ -82,12 +82,16 @@ struct SharedInboxReceiver: ViewModifier {
     switch payload.kind {
     case .link, .note:
       let note = payload.kind == .note
-      var arguments = [
-        note ? "text" : "url": payload.value, "operationId": payload.operationID,
-        "saveSource": payload.siri == true ? "siri" : "share_extension"
-      ]
-      arguments["spaceId"] = payload.spaceID
-      let _: String = try await backend.client.mutation(note ? "items:createNoteItem" : "items:createLinkItem", with: arguments)
+      if payload.siri == true {
+        try await withCaptureToken(owner: owner) { credentials in
+          _ = try await ShelvrCapture.save(kind: note ? "note" : "link", text: note ? payload.value : nil,
+            url: note ? nil : payload.value, spaceId: payload.spaceID, operationId: payload.operationID, credentials: credentials)
+        }
+      } else {
+        let _: String = try await backend.client.mutation(note ? "items:createNoteItem" : "items:createLinkItem", with: [
+          note ? "text" : "url": payload.value, "operationId": payload.operationID, "saveSource": "share_extension"
+        ])
+      }
     case .image:
       guard UUID(uuidString: payload.value) != nil else { throw CocoaError(.fileReadCorruptFile) }
       let imageURL = batch.appending(path: payload.value)
@@ -95,22 +99,28 @@ struct SharedInboxReceiver: ViewModifier {
       try Task.checkCancellation()
       guard backend.status == .signedIn, inbox.activeOwner == owner else { throw CancellationError() }
       if payload.siri == true {
-        try await backend.prepareSiri(owner: owner)
-        try Task.checkCancellation()
-        guard let credential = SiriCredential.current(), credential.owner == owner else { throw ShelvrCapture.Failure.signedOut }
-        do {
+        try await withCaptureToken(owner: owner) { credentials in
           _ = try await ShelvrCapture.saveImage(photo.data, contentType: photo.contentType, aspectRatio: photo.aspectRatio,
             isSticker: payload.sticker == true, spaceId: payload.spaceID, context: payload.context, operationId: payload.operationID,
-            credentials: .init(siteUrl: credential.siteURL, token: credential.token))
-        } catch {
-          if case ShelvrCapture.Failure.signedOut = error { credential.removeIfCurrent() }
-          throw error
+            credentials: credentials)
         }
       } else {
         _ = try await backend.savePhoto(photo, operationID: payload.operationID, source: .share)
       }
     }
   }
+
+  private func withCaptureToken(owner: String, perform: (ShelvrCapture.Credentials) async throws -> Void) async throws {
+    try await backend.prepareSiri(owner: owner)
+    try Task.checkCancellation()
+    guard let credential = SiriCredential.current(), credential.owner == owner else { throw ShelvrCapture.Failure.signedOut }
+    do { try await perform(.init(siteUrl: credential.siteURL, token: credential.token)) }
+    catch {
+      if case ShelvrCapture.Failure.signedOut = error { credential.removeIfCurrent() }
+      throw error
+    }
+  }
+
 }
 
 

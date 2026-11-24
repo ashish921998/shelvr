@@ -1,3 +1,4 @@
+import ConvexMobile
 import Foundation
 import ShelvrKit
 import ShelvrInbox
@@ -51,8 +52,20 @@ protocol AppIntentEntityRecordConvertible {
         if let record = await resolve(id, owner: account.owner) { records.append(record) }
       }
     } else {
-      let rows: [Save] = await first("items:listItems") ?? []
-      records = rows.filter { $0.type == "note" && $0.status == "ready" }.map { record($0, as: $0._id, fullContent: false) }
+      struct Page: Decodable {
+        let page: [Save]
+        let continueCursor: String
+        let isDone: Bool
+      }
+      var cursor: String?
+      for _ in 0..<3 {
+        let pagination: [String: ConvexEncodable?] = ["numItems": 100.0, "cursor": cursor]
+        guard let page: Page = await first("items:listItemsPage", args: ["paginationOpts": pagination]) else { break }
+        records += page.page.filter { $0.type == "note" && $0.status == "ready" }
+          .map { record($0, as: $0._id, fullContent: false) }
+        if page.isDone || page.continueCursor == cursor { break }
+        cursor = page.continueCursor
+      }
     }
     return await permits(account) ? records : []
   }
@@ -99,7 +112,7 @@ protocol AppIntentEntityRecordConvertible {
     return plan.entitled && SiriCredential.current()?.token == account.token
   }
 
-  private static func first<T: Decodable>(_ query: String, args: [String: String] = [:]) async -> T? {
+  private static func first<T: Decodable>(_ query: String, args: [String: ConvexEncodable?] = [:]) async -> T? {
     let backend = AppEnvironment.sharedBackend
     await backend.start()
     guard backend.status == .signedIn else { return nil }
