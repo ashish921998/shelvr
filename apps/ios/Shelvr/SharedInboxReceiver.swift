@@ -11,41 +11,59 @@ struct SharedInboxReceiver: ViewModifier {
   @State private var failed = false
   @State private var failedFile: URL?
   @State private var failureCopy = "share.singleFailure"
-  @State private var attempt = 0
+  @State private var wake: AsyncStream<ScenePhase>.Continuation?
 
   func body(content: Content) -> some View {
     content
-      .onReceive(InboxSignal.shared.publisher) { _ in attempt += 1 }
-      .task(id: "\(phase)-\(backend.status)-\(attempt)") {
+      .onReceive(InboxSignal.shared.publisher) { _ in wake?.yield(phase) }
+      .onChange(of: phase) { _, phase in wake?.yield(phase) }
+      .task(id: backend.status) {
+        failed = false
+        failedFile = nil
+        failureCopy = "share.singleFailure"
         guard let inbox = ShareInbox.system() else { return }
         if backend.status == .signedOut { try? inbox.activate(nil); return }
-        guard backend.status == .signedIn, phase == .active else { return }
-        do {
-          for try await user in backend.query("users:getCurrentUser", as: AccountView.CurrentUser?.self) {
-            try Task.checkCancellation()
-            guard let owner = user?._id else { try inbox.activate(nil); return }
-            try inbox.activate(owner)
-            for batch in try inbox.batches() where (try inbox.owner(of: batch)) == owner {
-              try await process(batch, inbox: inbox, owner: owner)
-            }
-            return
-          }
-        } catch where !Task.isCancelled { failed = true }
-        catch {}
+        guard backend.status == .signedIn else { return }
+        let (events, continuation) = AsyncStream<ScenePhase>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        wake = continuation
+        defer { continuation.finish() }
+        continuation.yield(phase)
+        for await currentPhase in events {
+          guard !Task.isCancelled else { return }
+          guard currentPhase == .active, !failed else { continue }
+          failedFile = nil
+          failureCopy = "share.retryHelp"
+          do { try await drain(inbox) }
+          catch where !Task.isCancelled { failed = true }
+          catch {}
+        }
       }
       .alert(copy("share.singleFailure"), isPresented: $failed) {
-        Button(copy("common.tryAgain")) { attempt += 1 }
+        Button(copy("common.tryAgain")) { failed = false; wake?.yield(phase) }
         if failedFile != nil {
           Button(copy("common.delete"), role: .destructive) {
             if let file = failedFile { try? FileManager.default.removeItem(at: file) }
             failedFile = nil
-            attempt += 1
+            failed = false
+            wake?.yield(phase)
           }
         }
         Button(copy("common.close"), role: .cancel) {}
       } message: {
         Text(copy(failureCopy))
       }
+  }
+
+  private func drain(_ inbox: ShareInbox) async throws {
+    for try await user in backend.query("users:getCurrentUser", as: AccountView.CurrentUser?.self) {
+      try Task.checkCancellation()
+      guard let owner = user?._id else { try inbox.activate(nil); return }
+      try inbox.activate(owner)
+      for batch in try inbox.batches() where (try inbox.owner(of: batch)) == owner {
+        try await process(batch, inbox: inbox, owner: owner)
+      }
+      return
+    }
   }
 
   private func process(_ batch: URL, inbox: ShareInbox, owner: String) async throws {
