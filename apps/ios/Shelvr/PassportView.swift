@@ -102,7 +102,7 @@ struct PassportView: View {
     .toolbar {
       if cardCity == nil {
         ToolbarItem(placement: .topBarTrailing) {
-          PassportActions(cities: errors.contains("cityStamps:listCityStamps") ? nil : cities, hasPlaces: stamps?.isEmpty == false)
+          PassportActions(cities: errors.contains("cityStamps:listCityStamps") ? nil : cities, hasPlaces: stamps?.isEmpty == false) { retry += 1 }
         }
       }
     }

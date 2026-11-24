@@ -56,6 +56,7 @@ struct SignedInView: View {
         case "add-spots":
           List {
             entry("/add", "addSheet.pasteLink", "link")
+            entry("/photo", "item.photo", "photo")
             entry("/how-to-share", "addSheet.howToShare", "square.and.arrow.up")
             entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
           }
@@ -118,6 +119,7 @@ struct SignedInView: View {
             } else { CityDateView(city: city, listID: listID).id(link) }
           } else { PlanCityView(trip: link.path.first == "new-trip") }
         case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1]).id(link.path[1])
+        case "photo": PhotoSaveView()
         default: ShellDestination(link: link)
         }
       }
