@@ -101,7 +101,7 @@ public struct PushDeliveryState {
   public init() {}
 
   public var isProbing: Bool { generation != nil && suspended }
-  public var permitsPresentation: Bool { generation != nil && !suspended && !verified.isEmpty }
+  public var permitsPresentation: Bool { generation != nil && token != nil && !suspended }
 
   static func digest(_ data: Data) -> String { Data(SHA256.hash(data: data)).base64EncodedString() }
 
@@ -114,8 +114,9 @@ public struct PushDeliveryState {
       suspended = false
       return false
     }
-    if (changed && verified.isEmpty) || (token != nil && !suspended) { suspended = true; return true }
-    return false
+    let needsSilence = changed || !suspended
+    suspended = true
+    return needsSilence
   }
 
   public mutating func receive(_ native: Data) -> Bool {
@@ -177,19 +178,19 @@ struct PushTokenStore {
   @MainActor func registerFresh(_ fresh: String, native: Data, for generation: UUID,
     register: (PushRegistrationRecord) async throws -> Void,
     unregister: (PushRegistrationRecord) async throws -> Void) async throws {
-    let record = PushRegistrationRecord(token: fresh, registrationId: generation.uuidString)
+    var record = PushRegistrationRecord(token: fresh, registrationId: generation.uuidString)
     let digest = PushDeliveryState.digest(native)
     let records = try read()
     let previous = records.first { $0.token == fresh && $0.registrationId == record.registrationId }
     let other = records.filter { $0.token != fresh || $0.registrationId != record.registrationId }
+    if previous?.apnsDigest == digest { record.apnsDigest = digest }
     try write(other + [record])
     do {
       try await register(record)
     } catch PushRegistrationError.ownedByAnotherAccount {
+      record.apnsDigest = nil
+      try? write(other + [record])
       throw PushRegistrationError.ownedByAnotherAccount
-    } catch {
-      if let previous, previous.apnsDigest == digest { try write(other + [previous]) }
-      throw error
     }
     for old in other { try await unregister(old) }
     try write([PushRegistrationRecord(token: fresh, registrationId: record.registrationId, apnsDigest: digest)])
