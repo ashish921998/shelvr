@@ -1,49 +1,150 @@
+import MapKit
 import ShelvrKit
 import SwiftUI
 
 struct SignedInView: View {
-  struct CurrentUser: Decodable {
-    let _id: String
-    let email: String?
-  }
-
-  @Environment(Backend.self) private var backend
+  @Binding var pendingLink: AppLink?
   @Environment(\.copy) private var copy
-  @State private var user: CurrentUser?
-  @State private var signOutFailed = false
+  @State private var library = false
+  @State private var path: [AppLink] = []
 
   var body: some View {
-    VStack(spacing: 12) {
-      Image(systemName: "checkmark.seal.fill")
-        .font(.system(size: 44))
-        .foregroundStyle(Color.accentColor)
-      Text(user?.email ?? user?._id ?? " ")
-        .font(.headline)
-        .accessibilityIdentifier("signed-in-user")
-      Button(copy("account.signOut")) {
-        Task {
-          do {
-            try await backend.signOut()
-          } catch {
-            signOutFailed = true
+    NavigationStack(path: $path) {
+      Group {
+        if library {
+          List {
+            entry("/saves", "homePlaces.allSaves", "bookmark")
+            entry("/cities", "homePlaces.cities", "building.2")
+          }
+        } else {
+          Map()
+        }
+      }
+      .navigationTitle(copy(library ? "navigation.library" : "navigation.map"))
+      .toolbar {
+        ToolbarItem(placement: .topBarTrailing) {
+          Button { open("/profile") } label: {
+            Label(copy("navigation.profile"), systemImage: "person.crop.circle")
           }
         }
       }
-      .buttonStyle(.signIn)
-      .padding(.top, 24)
-      if signOutFailed {
-        Text(copy("account.signOutFailed"))
-          .font(.footnote)
-          .foregroundStyle(.red)
+      .safeAreaInset(edge: .bottom) {
+        HStack {
+          Button { library.toggle() } label: {
+            Label(copy(library ? "navigation.map" : "navigation.library"),
+              systemImage: library ? "map.fill" : "books.vertical.fill")
+          }
+          Spacer()
+          Button { open("/add-spots") } label: {
+            Image(systemName: "plus").font(.title2.bold()).frame(width: 54, height: 54)
+              .background(.regularMaterial, in: Circle())
+          }
+          .accessibilityLabel(copy("common.add"))
+          Spacer()
+          Button { open("/go-out") } label: {
+            Label(copy("plan.goOut"), systemImage: "figure.walk")
+          }
+        }
+        .labelStyle(.titleAndIcon)
+        .font(.subheadline.weight(.medium))
+        .padding(.horizontal, 20)
+        .padding(.vertical, 6)
+        .background(.thinMaterial)
+      }
+      .navigationDestination(for: AppLink.self) { link in
+        switch link.path.first {
+        case "profile", "settings": AccountView().navigationTitle(copy("navigation.profile"))
+        case "add-spots":
+          List {
+            entry("/add", "addSheet.pasteLink", "link")
+            entry("/how-to-share", "addSheet.howToShare", "square.and.arrow.up")
+            entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
+          }
+          .navigationTitle(copy("addSheet.title"))
+        case "go-out": PlanCityView()
+        default: ShellDestination(link: link)
+        }
       }
     }
-    .padding(24)
-    .task {
-      do {
-        for try await user in backend.query("users:getCurrentUser", as: CurrentUser?.self) {
-          self.user = user
+    .onChange(of: pendingLink, initial: true) { _, link in
+      guard let link else { return }
+      pendingLink = nil
+      switch link.path {
+      case ["map"]: library = false; path = []
+      case ["home"]: library = true; path = []
+      case ["sign-in"]: break
+      default: path = [link]
+      }
+    }
+  }
+
+  private func open(_ route: String) {
+    if let link = AppLink(route) { path.append(link) }
+  }
+
+  private func entry(_ route: String, _ title: String, _ symbol: String) -> some View {
+    Button { open(route) } label: { Label(copy(title), systemImage: symbol) }
+  }
+}
+
+private struct ShellDestination: View {
+  let link: AppLink
+  @Environment(\.copy) private var copy
+
+  var body: some View {
+    let titles = ["saves": "homePlaces.allSaves", "cities": "homePlaces.cities",
+      "add": "addSheet.pasteLink", "how-to-share": "addSheet.howToShare",
+      "save-with-siri": "addSheet.saveWithSiri", "passport": "passport.title",
+      "trips": "navigation.trips", "date-plan": "homePlaces.planDate"]
+    ContentUnavailableView(copy("common.unavailable"), systemImage: "rectangle.dashed")
+      .navigationTitle(titles[link.path.first ?? ""].map { copy($0) } ?? "")
+  }
+}
+
+private struct PlanCityView: View {
+  struct City: Decodable {
+    let city: String
+    let placeCount: Int?
+  }
+  @Environment(Backend.self) private var backend
+  @Environment(\.copy) private var copy
+  @State private var cities: [City]?
+  @State private var failed = false
+  @State private var attempt = 0
+
+  var body: some View {
+    Group {
+      if failed {
+        Button(copy("common.retry")) { attempt += 1 }
+      } else if let cities {
+        if cities.isEmpty {
+          ContentUnavailableView(copy("plan.emptyTitle"), systemImage: "mappin",
+            description: Text(copy("homePlaces.planNeedsPlaces")))
+        } else {
+          List(cities, id: \.city) { city in
+            var url: URLComponents {
+              var parts = URLComponents()
+              parts.path = "/date-plan"
+              parts.queryItems = [URLQueryItem(name: "city", value: city.city)]
+              return parts
+            }
+            if let link = url.string.flatMap({ AppLink($0) }) {
+              NavigationLink(city.city, value: link)
+            }
+          }
         }
-      } catch {}
+      } else {
+        ProgressView()
+      }
+    }
+    .navigationTitle(copy("plan.goOut"))
+    .task(id: attempt) {
+      failed = false
+      do {
+        for try await listed in backend.query("items:listCities", as: [City].self) {
+          cities = listed.filter { $0.placeCount != 0 }
+        }
+      } catch { if !Task.isCancelled { failed = true } }
     }
   }
 }
