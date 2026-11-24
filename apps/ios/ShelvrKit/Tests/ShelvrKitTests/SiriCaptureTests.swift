@@ -58,6 +58,8 @@ import Testing
   #expect(SiriText.fitsCapture(String(repeating: "a", count: 20_000)))
   #expect(!SiriText.fitsCapture(String(repeating: "a", count: 20_001)))
   #expect(!SiriText.fitsCapture(String(repeating: "😀", count: 10_001)))
+  #expect(SiriText.fitsLibrary(String(repeating: "a", count: 100_000)))
+  #expect(!SiriText.fitsLibrary(String(repeating: "a", count: 100_001)))
 }
 
 @Test func resolvedLinksKeepTheirURLAndPhotosKeepTheirPhotoLabel() {
