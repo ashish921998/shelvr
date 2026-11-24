@@ -45,10 +45,10 @@ enum Keychain {
     return result as? Data
   }
 
-  static func write(_ data: Data, to query: [String: Any]) -> Bool {
+  static func write(_ data: Data, to query: [String: Any], accessibility: CFString = kSecAttrAccessibleAfterFirstUnlock) -> Bool {
     let attributes: [String: Any] = [
       kSecValueData as String: data,
-      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+      kSecAttrAccessible as String: accessibility,
     ]
     let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
     if status == errSecItemNotFound {

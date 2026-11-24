@@ -52,7 +52,8 @@ struct SignedInView: View {
       }
       .navigationDestination(for: AppLink.self) { link in
         switch link.path.first {
-        case "profile", "settings": AccountView().navigationTitle(copy("navigation.profile"))
+        case "settings": AccountSettingsView()
+        case "profile": AccountView().navigationTitle(copy("navigation.profile"))
         case "add-spots":
           List {
             entry("/add", "addSheet.pasteLink", "link")
@@ -147,6 +148,8 @@ struct SignedInView: View {
           } else { ShellDestination(link: link) }
         case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1]).id(link.path[1])
         case "photo": PhotoSaveView()
+        case "how-to-share": SaveInstructions(siri: false)
+        case "save-with-siri": SaveInstructions(siri: true)
         default: ShellDestination(link: link)
         }
       }
