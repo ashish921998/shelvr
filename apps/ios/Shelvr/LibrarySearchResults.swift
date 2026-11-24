@@ -1,20 +1,24 @@
 import ShelvrKit
 import SwiftUI
 
+enum LibrarySearchState {
+  case loading
+  case items(String, [LibrarySave])
+  case failure(String)
+}
+
 struct LibrarySearchResults: View {
   let query: String
-  @Environment(Backend.self) private var backend
+  let state: LibrarySearchState
+  let retry: () -> Void
   @Environment(\.copy) private var copy
-  @State private var items: [LibrarySave]?
-  @State private var failed = false
-  @State private var attempt = 0
-
   var body: some View {
     Group {
-      if failed {
+      switch state {
+      case let .failure(term) where term == query:
         Text(copy("errors.searchTitle"))
-        Button(copy("common.retry")) { attempt += 1 }
-      } else if let items {
+        Button(copy("common.retry"), action: retry)
+      case let .items(term, items) where term == query:
         if items.isEmpty { Text(copy("search.noResults", ["query": query])) }
         if items.count >= 50 { Text(copy("search.resultLimit")).font(.caption) }
         ForEach(items) { item in
@@ -29,17 +33,8 @@ struct LibrarySearchResults: View {
             }
           }
         }
-      } else { ProgressView(copy("common.loading")) }
-    }
-    .task(id: attempt) {
-      failed = false
-      do {
-        try await Task.sleep(for: .milliseconds(250))
-        for try await items in backend.searchLibrary(query) {
-          guard !Task.isCancelled else { return }
-          self.items = items
-        }
-      } catch { if !Task.isCancelled { failed = true } }
+      default: ProgressView(copy("common.loading"))
+      }
     }
   }
 }
