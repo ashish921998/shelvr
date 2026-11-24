@@ -4,10 +4,14 @@
 <dict>
 	<key>ShelvrAppGroup</key>
 	<string>group.$(SHELVR_APP_ID)</string>
+	<key>ShelvrRevenueCatKey</key>
+	<string>$(SHELVR_REVENUECAT_KEY)</string>
 	<key>ShelvrConvexURL</key>
 	<string>$(SHELVR_CONVEX_URL)</string>
 	<key>ShelvrVariant</key>
 	<string>$(SHELVR_VARIANT)</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Shelvr shows where you are on the map so you can find the places you saved nearby.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

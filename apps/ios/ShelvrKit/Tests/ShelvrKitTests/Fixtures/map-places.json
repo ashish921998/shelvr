@@ -1,0 +1,137 @@
+{
+  "saved": [
+    {
+      "itemId": "one",
+      "name": "Café Joana",
+      "category": "Cafe",
+      "lat": 38.7,
+      "lng": -9.1,
+      "kinds": ["food", "coffee"]
+    },
+    {
+      "itemId": "two",
+      "name": "Joana Hotel",
+      "appleId": "hotel",
+      "category": "Hotel",
+      "lat": 38.7,
+      "lng": -9.1,
+      "kinds": ["stay"]
+    },
+    {
+      "itemId": "three",
+      "name": "Pizza Roma",
+      "category": "Restaurant",
+      "lat": 40,
+      "lng": -9,
+      "kinds": ["food"]
+    },
+    {
+      "itemId": "four",
+      "name": "Pizza Roma",
+      "category": "Restaurant",
+      "lat": 40.002,
+      "lng": -9,
+      "kinds": ["food", "food"]
+    },
+    {
+      "itemId": "five",
+      "name": "Shore",
+      "category": "Beach",
+      "cuisine": "pizza",
+      "lat": 12,
+      "lng": 30,
+      "kinds": ["activities"]
+    },
+    {
+      "itemId": "six",
+      "name": "Branch, Lisboa",
+      "lat": 30,
+      "lng": 45,
+      "kinds": ["activities"]
+    },
+    {
+      "itemId": "seven",
+      "name": "Park",
+      "appleId": "park",
+      "lat": 20,
+      "lng": 30,
+      "kinds": ["activities"]
+    }
+  ],
+  "discover": [
+    {
+      "_id": "on-site",
+      "city": "Lisbon",
+      "name": "Locke de Cafe Joana",
+      "appleId": "a",
+      "lat": 38.701,
+      "lng": -9.1,
+      "kinds": ["coffee"]
+    },
+    {
+      "_id": "exact",
+      "city": "Lisbon",
+      "name": "Other",
+      "appleId": "hotel",
+      "lat": 55,
+      "lng": 80,
+      "kinds": ["stay"]
+    },
+    {
+      "_id": "different",
+      "city": "Lisbon",
+      "name": "Another Park",
+      "appleId": "b",
+      "lat": 38.7,
+      "lng": -9.1,
+      "kinds": ["activities"]
+    },
+    {
+      "_id": "far",
+      "city": "Lisbon",
+      "name": "Cafe Joana",
+      "appleId": "c",
+      "lat": 50,
+      "lng": 50,
+      "kinds": ["coffee"]
+    }
+  ],
+  "visits": [
+    {
+      "key": "pizzaroma",
+      "spots": [
+        {
+          "lat": 40.0016,
+          "lng": -9
+        }
+      ]
+    },
+    {
+      "key": "cafejoana"
+    },
+    {
+      "key": "branch",
+      "name": "Branch",
+      "spots": [
+        {
+          "lat": 30,
+          "lng": 45
+        }
+      ]
+    },
+    {
+      "key": "wrong",
+      "spots": [
+        {
+          "lat": 19,
+          "lng": 29,
+          "appleId": "park"
+        }
+      ]
+    }
+  ],
+  "beside": ["different", "far"],
+  "kinds": ["activities", "food"],
+  "emoji": ["☕", "🛏️", "🍕", "🍕", "🏖️", "🎟️", "🎟️"],
+  "went": ["one", "four", "six", "seven"]
+}

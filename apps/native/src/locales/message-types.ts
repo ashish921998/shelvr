@@ -1145,6 +1145,7 @@ type MessageParams = {
   "passportStory.tagline": undefined;
   "passportStory.scan": undefined;
   "passportStory.shareLink": undefined;
+  "passportStory.linkNotePassportMenu": undefined;
   "passportStory.linkNote": undefined;
   "passport.shareCity": { city: string };
   "passport.momentCityComplete": { city: string };
