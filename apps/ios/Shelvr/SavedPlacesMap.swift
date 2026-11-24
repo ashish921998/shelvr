@@ -11,10 +11,8 @@ struct SavedPlacesMap: View {
   @State private var receivedDiscover = false
   @State private var visits: [MapVisit] = []
   @State private var area = DiscoverBox.world
-  @State private var kinds: Set<String> = []
-  @State private var went = "all"
+  @State private var filters = MapFilters()
   @State private var location = MapLocation()
-  @State private var search = ""
   @State private var selected: MapPlace?
   @State private var card: MKMapItem?
   @State private var cluster: [MapPlace] = []
@@ -22,20 +20,9 @@ struct SavedPlacesMap: View {
   @State private var retry = 0
 
   var body: some View {
-    let own = saved ?? []
-    let visited = MapVisit.visitedIDs(visits, among: own)
-    let filter = visited.isEmpty ? "all" : went
-    let entries = MapPlace.combined(saved: own, discover: filter == "all" ? discover : [])
-    let chips = MapPlace.filterKinds(entries, selected: kinds)
-    let filtered = entries.filter { place in
-      (filter == "all" || visited.contains(place.id) == (filter == "went")) &&
-        (kinds.isEmpty || !kinds.isDisjoint(with: place.kinds))
-    }
-    let visible = MapPlace.search(filtered, query: search)
-    let filtering = filter != "all" || !kinds.isEmpty || !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-    let opening = MapPlace.openingPins(saved: saved, discover: discover, visible: visible, filtered: filtering)
-    MapCanvas(places: visible, location: location.position, filterKey: [filter, search] + kinds.sorted(), opening: opening, visited: visited, onArea: { area = $0 },
-      onPick: { selected = $0 }, onCluster: { cluster = $0 })
+    let scene = MapScene(saved: saved, discover: discover, visits: visits, filters: filters)
+    MapCanvas(places: scene.visible, location: location.position, filters: scene.filters, opening: scene.opening,
+      visited: scene.visited, onArea: { area = $0 }, onPick: { selected = $0 }, onCluster: { cluster = $0 })
       .overlay(alignment: .bottom) {
         if saved?.isEmpty == true, receivedDiscover, discover.isEmpty, errors.isEmpty {
           VStack(alignment: .leading) {
@@ -47,38 +34,42 @@ struct SavedPlacesMap: View {
       .safeAreaInset(edge: .top, spacing: 0) {
         VStack(alignment: .leading, spacing: 8) {
           HStack {
-            TextField(copy("map.searchPlaceholder"), text: $search)
+            TextField(copy("map.searchPlaceholder"), text: $filters.search)
               .textFieldStyle(.roundedBorder).submitLabel(.search).autocorrectionDisabled()
             Button { location.locate() } label: {
               Image(systemName: "location").frame(width: 44, height: 44)
             }.accessibilityLabel(copy("map.showMyLocation"))
           }
-          if !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            ForEach(visible.prefix(5)) { place in
-              Button { Analytics.capture("map_search_result_opened"); selected = place } label: {
+          if scene.filters.hasSearch {
+            ForEach(scene.visible.prefix(5)) { place in
+              Button {
+                Analytics.capture("map_search_result_opened")
+                selected = place
+              } label: {
                 Label(place.name, systemImage: place.isSaved ? "bookmark" : "mappin")
                   .frame(maxWidth: .infinity, alignment: .leading)
               }
             }
-            if visible.isEmpty { Text(copy("map.searchNoResults", ["query": search])).font(.caption) }
+            if scene.visible.isEmpty { Text(copy("map.searchNoResults", ["query": filters.search])).font(.caption) }
           }
-          if !visited.isEmpty {
-            Picker(copy("map.filters"), selection: $went) {
-              Text(copy("map.filterAll")).tag("all")
-              Text(copy("passport.wantToGo")).tag("want")
-              Text(copy("passport.wentNoDate")).tag("went")
+          if scene.showsWentSwitch {
+            Picker(copy("map.filters"), selection: $filters.went) {
+              Text(copy("map.filterAll")).tag(WentFilter.all)
+              Text(copy("passport.wantToGo")).tag(WentFilter.want)
+              Text(copy("passport.wentNoDate")).tag(WentFilter.went)
             }.pickerStyle(.segmented)
           }
-          if !chips.isEmpty {
+          if !scene.chips.isEmpty {
             ScrollView(.horizontal) {
               HStack {
-                ForEach(chips, id: \.self) { kind in
-                  let key = "map.kind" + kind.prefix(1).uppercased() + kind.dropFirst()
-                  Button(copy(key)) {
-                    if kinds.insert(kind).inserted { Analytics.capture("map_filter_selected", ["kind": kind]) } else { kinds.remove(kind) }
+                ForEach(scene.chips, id: \.self) { kind in
+                  Button(copy(kind.labelKey)) {
+                    if filters.kinds.insert(kind).inserted {
+                      Analytics.capture("map_filter_selected", ["kind": kind.rawValue])
+                    } else { filters.kinds.remove(kind) }
                   }
-                  .buttonStyle(.bordered).tint(kinds.contains(kind) ? .accentColor : .secondary)
-                  .accessibilityAddTraits(kinds.contains(kind) ? .isSelected : [])
+                  .buttonStyle(.bordered).tint(filters.kinds.contains(kind) ? .accentColor : .secondary)
+                  .accessibilityAddTraits(filters.kinds.contains(kind) ? .isSelected : [])
                 }
               }
             }.scrollIndicators(.hidden)
@@ -97,7 +88,7 @@ struct SavedPlacesMap: View {
       }
       .task(id: retry) {
         await subscribe("saved") {
-          for try await rows in backend.query("mapPlaces:listMapPlaces", as: [MapPlace].self) {
+          for try await rows in backend.savedMapPlaces() {
             try Task.checkCancellation()
             saved = rows
           }
@@ -129,8 +120,10 @@ struct SavedPlacesMap: View {
           card = item
         } else {
           guard !Task.isCancelled else { return }
-          if let id = place.itemId { Analytics.capture("map_place_opened", ["card": false, "source": "own"]); open("/item/" + id) }
-          else {
+          if case let .saved(id) = place.source {
+            Analytics.capture("map_place_opened", ["card": false, "source": "own"])
+            open("/item/" + id)
+          } else {
             let item = MKMapItem(placemark: MKPlacemark(coordinate: place.coordinate))
             item.name = place.name
             Analytics.capture("map_place_opened", ["source": "discover", "card": true])

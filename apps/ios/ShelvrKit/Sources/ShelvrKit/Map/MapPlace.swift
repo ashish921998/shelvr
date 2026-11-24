@@ -2,20 +2,78 @@ import Combine
 import ConvexMobile
 import Foundation
 
-public struct MapPlace: Decodable, Hashable, Identifiable, Sendable {
-  public let _id, itemId, appleId, city, category, cuisine: String?
-  public let name: String
-  public let lat, lng: Double
-  public let kinds: [String]
-  public let features: [String]?
+public enum PlaceKind: String, CaseIterable, Sendable {
+  case food, coffee, dessert, drinks, dateNight, activities, shopping, stay
 
-  public var id: String {
-    if let _id { return "discover:\(_id)" }
-    if let appleId { return "saved-apple:\(appleId)" }
-    return "\(itemId ?? ""):\(name):\(lat):\(lng)"
+  public var labelKey: String {
+    switch self {
+    case .food: "map.kindFood"
+    case .coffee: "map.kindCoffee"
+    case .dessert: "map.kindDessert"
+    case .drinks: "map.kindDrinks"
+    case .dateNight: "map.kindDateNight"
+    case .activities: "map.kindActivities"
+    case .shopping: "map.kindShopping"
+    case .stay: "map.kindStay"
+    }
+  }
+}
+
+public struct MapPlace: Hashable, Identifiable, Sendable {
+  public enum Source: Hashable, Sendable {
+    case saved(itemID: String)
+    case discover(placeID: String, features: [String])
   }
 
-  public var isSaved: Bool { itemId != nil }
+  public let source: Source
+  public let name: String
+  public let lat, lng: Double
+  public let appleId, city, category, cuisine: String?
+  public let kinds: [PlaceKind]
+
+  public var id: String {
+    switch source {
+    case let .saved(itemID):
+      if let appleId { return "saved-apple:\(appleId)" }
+      return "\(itemID):\(name):\(lat):\(lng)"
+    case let .discover(placeID, _): return "discover:\(placeID)"
+    }
+  }
+
+  public var isSaved: Bool {
+    if case .saved = source { return true }
+    return false
+  }
+
+  private var features: [String] {
+    if case let .discover(_, features) = source { return features }
+    return []
+  }
+
+  struct SavedRow: Decodable {
+    let itemId, name: String
+    let lat, lng: Double
+    let appleId, city, category, cuisine: String?
+    let kinds: [String]
+
+    var place: MapPlace {
+      MapPlace(source: .saved(itemID: itemId), name: name, lat: lat, lng: lng, appleId: appleId,
+        city: city, category: category, cuisine: cuisine, kinds: kinds.compactMap(PlaceKind.init(rawValue:)))
+    }
+  }
+
+  struct DiscoverRow: Decodable {
+    let _id, name, appleId, city: String
+    let lat, lng: Double
+    let category, cuisine: String?
+    let kinds: [String]
+    let features: [String]?
+
+    var place: MapPlace {
+      MapPlace(source: .discover(placeID: _id, features: features ?? []), name: name, lat: lat, lng: lng,
+        appleId: appleId, city: city, category: category, cuisine: cuisine, kinds: kinds.compactMap(PlaceKind.init(rawValue:)))
+    }
+  }
 
   static func words(_ name: String) -> [String] {
     let scalars = name.decomposedStringWithCompatibilityMapping.unicodeScalars.filter {
@@ -40,18 +98,6 @@ public struct MapPlace: Decodable, Hashable, Identifiable, Sendable {
       .decimalNumber, .letterNumber, .otherNumber: true
     default: false
     }
-  }
-
-  public static func openingPins(saved: [Self]?, discover: [Self], visible: [Self], filtered: Bool) -> [Self]? {
-    guard let saved else { return nil }
-    if filtered { return visible.isEmpty ? nil : visible }
-    let anchors = saved.isEmpty ? discover : saved
-    guard !anchors.isEmpty else { return nil }
-    let groups = Dictionary(grouping: anchors) { ($0.city ?? "").lowercased() }
-    let city = anchors.compactMap { $0.city?.lowercased() }.filter { !$0.isEmpty }.max {
-      groups[$0, default: []].count < groups[$1, default: []].count
-    }
-    return city.flatMap { groups[$0] } ?? anchors
   }
 
   static func km(_ lat1: Double, _ lng1: Double, _ lat2: Double, _ lng2: Double) -> Double {
@@ -93,32 +139,34 @@ public struct MapPlace: Decodable, Hashable, Identifiable, Sendable {
     let phrase = words.joined(separator: " ")
     var groups = Array(repeating: [Self](), count: 4)
     for place in entries {
-      let text = folded(([place.name, place.city ?? ""] + (place.features ?? [])).joined(separator: " "))
+      let text = folded(([place.name, place.city ?? ""] + place.features).joined(separator: " "))
       guard words.allSatisfy({ text.contains($0) }) else { continue }
       let group = (place.isSaved ? 0 : 2) + (folded(place.name).hasPrefix(phrase) ? 0 : 1)
       groups[group].append(place)
     }
     return groups.flatMap { $0 }
   }
-
-  public static let kindOrder = ["food", "coffee", "dessert", "drinks", "dateNight", "activities", "shopping"]
-
-  public static func filterKinds(_ places: [Self], selected: Set<String>) -> [String] {
-    var counts: [String: Int] = [:]
-    for place in places {
-      for kind in Set(place.kinds) { counts[kind, default: 0] += 1 }
-    }
-    return kindOrder.filter { counts[$0, default: 0] >= 3 || selected.contains($0) }
-      .sorted { counts[$0, default: 0] > counts[$1, default: 0] }
-  }
 }
 
 extension DiscoverBox: ConvexEncodable {}
 
 extension Backend {
-  public struct AreaPlaces: Decodable { public let places: [MapPlace]; public let complete: Bool }
+  public struct AreaPlaces: Sendable {
+    public let places: [MapPlace]
+    public let complete: Bool
+  }
+
+  private struct AreaRows: Decodable {
+    let places: [MapPlace.DiscoverRow]
+    let complete: Bool
+  }
+
+  public func savedMapPlaces() -> some AsyncSequence<[MapPlace], any Error> {
+    query("mapPlaces:listMapPlaces", as: [MapPlace.SavedRow].self).map { $0.map(\.place) }
+  }
 
   public func discover(in box: DiscoverBox) -> some AsyncSequence<AreaPlaces, any Error> {
-    client.subscribe(to: "places:inArea", with: ["box": box], yielding: AreaPlaces.self).values
+    client.subscribe(to: "places:inArea", with: ["box": box], yielding: AreaRows.self).values
+      .map { AreaPlaces(places: $0.places.map(\.place), complete: $0.complete) }
   }
 }

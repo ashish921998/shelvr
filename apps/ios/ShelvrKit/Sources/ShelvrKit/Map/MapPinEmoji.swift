@@ -38,15 +38,15 @@ extension MapPlace {
     "Hotel": "🛏️",
   ]
 
-  private static let kindEmoji = [
-    "food": "🍽️",
-    "coffee": "☕",
-    "dessert": "🍰",
-    "drinks": "🍸",
-    "dateNight": "💕",
-    "activities": "🎟️",
-    "shopping": "🛍️",
-    "stay": "🛏️",
+  private static let kindEmoji: [PlaceKind: String] = [
+    .food: "🍽️",
+    .coffee: "☕",
+    .dessert: "🍰",
+    .drinks: "🍸",
+    .dateNight: "💕",
+    .activities: "🎟️",
+    .shopping: "🛍️",
+    .stay: "🛏️",
   ]
 
   private static let cuisines = [
@@ -122,7 +122,7 @@ extension MapPlace {
       if let first { return Self.cuisines[first.1] }
     }
     if let categoryEmoji { return categoryEmoji }
-    let order = ["coffee", "dessert", "drinks", "food", "stay", "shopping", "activities"]
+    let order: [PlaceKind] = [.coffee, .dessert, .drinks, .food, .stay, .shopping, .activities]
     return order.first(where: kinds.contains).flatMap { Self.kindEmoji[$0] }
   }
 }

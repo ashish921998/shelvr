@@ -5,7 +5,8 @@ public struct MapVisit: Decodable, Sendable {
     let lat, lng: Double
     let appleId: String?
   }
-  let key, name: String?
+  let key: String
+  let name: String?
   let spots: [Spot]?
 
   public static func visitedIDs(_ visits: [Self], among pins: [MapPlace]) -> Set<String> {
@@ -13,7 +14,7 @@ public struct MapVisit: Decodable, Sendable {
     var scoped: [String: [Spot]] = [:]
     let groups = Dictionary(grouping: pins) { MapPlace.key($0.name) }
     for visit in visits {
-      guard let key = visit.key else { continue }
+      let key = visit.key
       guard let spots = visit.spots else { names.insert(key); continue }
       for candidate in Set([key, visit.name.map(bareKey) ?? key]) where !candidate.isEmpty {
         scoped[candidate, default: []] += spots
