@@ -15,7 +15,7 @@ public struct Copy: Sendable {
   private let messages: [String: Message]
   private let numberLocale: Locale
 
-  public init(bundle: Bundle = .main, preferredLanguages: [String] = Locale.preferredLanguages) {
+  public init(bundle: Bundle = .main, preferredLanguages: [String] = Locale.preferredLanguages, formattingLocale: Locale = .current) {
     let selected = Self.resolve(preferredLanguages)
     locale = selected
     let language = selected.split(separator: "-").first.map(String.init) ?? selected
@@ -23,7 +23,10 @@ public struct Copy: Sendable {
       .first { $0.split(separator: "-").first?.lowercased() == language }
     let region = preferredLanguages.lazy.compactMap { Locale(identifier: $0).region?.identifier }.first
     let fallback = selected == "en" ? region.map { "en-" + $0 } ?? selected : selected
-    numberLocale = Locale(identifier: preferred ?? fallback)
+    let identifier = preferred ?? fallback
+    if Locale(identifier: identifier).region == nil, let region = formattingLocale.region?.identifier {
+      numberLocale = Locale(identifier: identifier + "-" + region)
+    } else { numberLocale = Locale(identifier: identifier) }
     let chain = ["en", language, selected].filter(Self.supportedLocales.contains)
     var visited = Set<String>()
     var loaded: [String: Message] = [:]
