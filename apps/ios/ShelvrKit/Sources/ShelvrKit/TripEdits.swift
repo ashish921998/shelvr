@@ -14,6 +14,11 @@ public struct TripSearchPlace: Codable, ConvexEncodable, Sendable {
   public let appleId: String?
   public let category: String?
   public let area: String?
+
+  public init(name: String, lat: Double, lng: Double, appleId: String? = nil, category: String? = nil, area: String? = nil) {
+    self.name = name; self.lat = lat; self.lng = lng
+    self.appleId = appleId; self.category = category; self.area = area
+  }
 }
 
 public struct TripMatches: Decodable, Sendable {
