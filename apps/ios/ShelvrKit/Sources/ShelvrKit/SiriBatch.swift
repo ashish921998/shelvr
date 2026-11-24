@@ -41,7 +41,6 @@ public enum SiriText {
     if let content {
       let body = String(content.characters).trimmingCharacters(in: .whitespacesAndNewlines)
       if !body.isEmpty {
-        if !body.contains(where: \.isWhitespace), let url = URL(string: body), isWebURL(url) { return url }
         if !title.isEmpty && body != title { return nil }
         if let link = wholeLink(content) { return link }
       }

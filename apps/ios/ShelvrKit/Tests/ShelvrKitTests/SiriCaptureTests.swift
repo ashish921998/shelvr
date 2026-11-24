@@ -159,5 +159,5 @@ private final class SiriNoteHTTPFixture: URLProtocol, @unchecked Sendable {
   #expect(SiriText.pageLink(name: heading, content: nil) == url)
   #expect(SiriText.pageLink(name: AttributedString("Article"), content: linked) == nil)
   #expect(SiriText.pageLink(name: AttributedString("restaurant"), content: linked) == url)
-  #expect(SiriText.pageLink(name: AttributedString("Article"), content: AttributedString(url.absoluteString)) == url)
+  #expect(SiriText.pageLink(name: AttributedString("Article"), content: AttributedString(url.absoluteString)) == nil)
 }
