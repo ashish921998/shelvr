@@ -21,11 +21,12 @@ public final class Backend {
   private let session: AuthSession
   @ObservationIgnored private var authWatch: AnyCancellable?
   @ObservationIgnored private var starting: Task<Void, Never>?
+  @ObservationIgnored private let deletion = AccountDeletion()
   private var signingOut = false
   private var connectedUserID: String?
   @ObservationIgnored private var signingIn = false
 
-  public var userID: String? { status == .signedIn && !signingOut ? connectedUserID : nil }
+  public var userID: String? { status == .signedIn && !signingOut && !deletion.isRunning ? connectedUserID : nil }
 
   public convenience init(environment: AppEnvironment) {
     let session = AuthSession(
@@ -55,6 +56,7 @@ public final class Backend {
   }
 
   public func start() async {
+    await deletion.wait()
     if let starting { return await starting.value }
     let task = Task { await resume() }
     starting = task
@@ -73,6 +75,7 @@ public final class Backend {
   }
 
   public func signIn(_ credential: SignInCredential) async throws {
+    await deletion.wait()
     guard status == .signedOut, !signingIn else { throw AuthSessionError.signInRefused }
     signingIn = true
     defer { signingIn = false }
@@ -81,17 +84,37 @@ public final class Backend {
   }
 
   public func startOAuth(provider: String) async throws -> OAuthStart {
-    try await session.startOAuth(provider: provider, redirectTo: environment.oauthRedirect)
+    await deletion.wait()
+    return try await session.startOAuth(provider: provider, redirectTo: environment.oauthRedirect)
   }
 
   public func signOut() async throws {
+    await deletion.wait()
     guard status == .signedIn, !signingOut else { return }
     signingOut = true
+    let siri = SiriCredential.current()
+    let authorization = KeychainTokenVault().read()?.token
     do {
-      try await session.signOut { await self.disconnect() }
+      try await session.signOut {
+        await siri?.removeIfCurrent()
+        await self.disconnect()
+        if let siri, let authorization {
+          try? await ConvexHTTPAuthTransport(deployment: self.environment.convexURL)
+            .revokeSiri(siri.token, authorization: authorization)
+        }
+      }
     } catch {
       signingOut = false
       throw error
+    }
+  }
+
+  public func deleteAccount() async throws {
+    try await deletion.perform(allowed: status == .signedIn && !signingOut) {
+      try await self.client.mutation("users:deleteCurrentUserAccount")
+    } afterAcceptance: {
+      await self.session.forgetDeletedAccount()
+      await self.disconnect()
     }
   }
 
@@ -102,8 +125,8 @@ public final class Backend {
     signingOut = false
   }
 
-  public func query<T: Decodable>(_ name: String, as type: T.Type) -> some AsyncSequence<T, any Error> {
-    client.subscribe(to: name, yielding: type).values
+  public func query<T: Decodable>(_ name: String, with args: [String: ConvexEncodable?] = [:], as type: T.Type) -> some AsyncSequence<T, any Error> {
+    client.subscribe(to: name, with: args, yielding: type).values
   }
 
   private func connect() async {
