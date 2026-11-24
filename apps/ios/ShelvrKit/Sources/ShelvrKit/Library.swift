@@ -63,6 +63,40 @@ public struct LibraryCity: Decodable, Identifiable, Sendable {
   public var id: String { city }
 }
 
+public enum LibrarySearchState: Sendable {
+  case loading, items(String, [LibrarySave]), failure(String)
+
+  public enum Display: Sendable {
+    case loading, items([LibrarySave]), failure
+  }
+
+  public func display(for query: String) -> Display {
+    switch self {
+    case let .items(term, rows) where term == query: .items(rows)
+    case let .failure(term) where term == query: .failure
+    default: .loading
+    }
+  }
+}
+
+extension LibraryCity {
+  public static func coverName(_ city: String) -> String {
+    let name = city.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+      .lowercased().replacingOccurrences(of: "ø", with: "o").split { !$0.isLetter && !$0.isNumber }.joined(separator: "-")
+    let aliases = ["nyc": "new-york", "new-york-city": "new-york", "la": "los-angeles", "sf": "san-francisco",
+      "lisboa": "lisbon", "praha": "prague", "roma": "rome", "milano": "milan", "firenze": "florence",
+      "kobenhavn": "copenhagen", "vegas": "las-vegas"]
+    return aliases[name] ?? name
+  }
+
+  public func coverCandidates(curated: URL?) -> [URL] {
+    let cover = self.cover.flatMap(URL.init(string:))
+    let photo = self.photo.flatMap(URL.init(string:))
+    var seen = Set<URL>()
+    return [cover != photo ? cover : nil, curated, photo ?? cover].compactMap { $0 }.filter { seen.insert($0).inserted }
+  }
+}
+
 extension Backend {
   public func searchLibrary(_ query: String) -> some AsyncSequence<[LibrarySave], any Error> {
     client.subscribe(to: "items:searchItems", with: ["query": query], yielding: [LibrarySave].self).values
