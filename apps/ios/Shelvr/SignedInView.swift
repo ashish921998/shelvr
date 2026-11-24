@@ -72,6 +72,24 @@ struct SignedInView: View {
             if path.last == link, let target = AppLink(route) { path = [target] }
           }
         case "passport-invite" where link.path.count == 2: FriendPassportView(token: link.path[1]).id(link.path[1])
+        case "already-been", "next-to-stamp":
+          StampPlacesView(city: link.path.first == "next-to-stamp" ? link.query.first { $0.name == "city" }?.value ?? "" : nil) {
+            guard path.last == link, let passport = AppLink("/passport") else { return }
+            if let i = path.lastIndex(of: passport) { path = Array(path.prefix(i + 1)) }
+            else { path = [passport] }
+          }.id(link)
+        case "city-stamps":
+          SocialQuery(query: "cityStamps:listCityStamps", type: [PassportCityStamp].self) { PassportCityPicker(cities: $0) }
+        case "city-card":
+          if let city = link.query.first(where: { $0.name == "city" })?.value { CityMapCardView(city: city).id(city) }
+          else { LibraryCitiesView() }
+        case "add-list-place":
+          if let id = link.query.first(where: { $0.name == "listId" })?.value {
+            SocialQuery(query: "sharedLists:getSharedList", arguments: ["listId": id], type: SharedListDetail?.self) { list in
+              if let list { AddListPlaceView(detail: list, initialCity: link.query.first { $0.name == "city" }?.value) }
+              else { ContentUnavailableView(copy("sharedLists.goneTitle"), systemImage: "person.2") }
+            }.id(link)
+          } else { SharedListsView() }
         case "passport-story": PassportStoryView()
         case "passport": PassportView()
         case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)

@@ -34,7 +34,11 @@ struct AddListPlaceView: View {
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.dismiss) private var dismiss
-  @State private var city = ""
+  @State private var city: String
+  init(detail: SharedListDetail, initialCity: String? = nil) {
+    self.detail = detail
+    _city = State(initialValue: initialCity.flatMap { detail.cities.contains($0) ? $0 : nil } ?? "")
+  }
   @State private var search = ""
   @State private var result: ListPlaceSearch?
   @State private var searchFailed = false

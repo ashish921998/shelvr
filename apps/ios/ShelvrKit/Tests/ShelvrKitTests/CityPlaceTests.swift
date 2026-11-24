@@ -83,3 +83,15 @@ import Testing
   let evening = try #require(vectors.date.evenings.first)
   #expect(vectors.rounds.map { vectors.date.swap(evening, first: true, tried: Set($0))?.first } == vectors.expected.swaps)
 }
+
+@Test func cityMapCardIncludesVisitedOutliersAndKeepsPinsInsideTheFrame() {
+  let pins = [(40.0, -72.0), (40.002, -72.0), (40.004, -72.0), (43.0, -74.0)].enumerated().map { i, point in
+    CityPlace(itemID: String(i), name: String(i), lat: point.0, lng: point.1, appleID: nil)
+  }
+  let nearby = CityPlace.cardPoints(pins, visited: [], width: 200, height: 300)
+  #expect(nearby.count == 3)
+  let marked = CityPlace.cardPoints(pins, visited: [pins[3]], width: 200, height: 300)
+  #expect(marked.first?.pin == pins[3])
+  #expect(marked.count == 4)
+  #expect(marked.allSatisfy { (15.99...184.01).contains($0.x) && (15.99...284.01).contains($0.y) })
+}
