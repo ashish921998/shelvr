@@ -50,6 +50,10 @@ Expo app keeps shipping until the Swift app passes final QA.
 | 11  | Platform               | Push through the Expo push service (APNs token exchanged for an `ExponentPushToken`, `notifications:registerDevice`), notification routing, the nine locales from `en.json`, PostHog events with the current names | Push to the dev build; locale snapshot in French and German                                                                                    |
 | 12  | Release                | Signed TestFlight build and store metadata                                                                                                                                                                         | TestFlight install over the current App Store build                                                                                            |
 
+Map follow-ups after milestone 6 are explicit camera commands, simulator verification of
+gesture handling, and shared Expo parity fixtures for the emoji tables, nearby reach and
+search ranking. Showing partial Discover coverage also remains a follow-up.
+
 ## Gates that wait for Ashish
 
 - **App Store submission** of the Swift build.
@@ -75,7 +79,7 @@ The Swift CI workflow runs the package tests and arm64 simulator build on change
   phone, and every push arrives twice. Milestone 11 reads the id the Expo build stored
   before registering: a Keychain generic password with service = bundle id and
   account = `EXDeviceInstallationUUIDKey` (expo-notifications 58.1.5).
-- **Duplicate saves.** Retries must reuse the same `operationId` (`share:<session>:<i>`,
+- **Duplicate saves.** Retries must reuse the same `operationId` (`share:<uuid>`,
   `link:<uuid>`, `image:<uuid>`, `siri:<uuid>`).
 - **Client copies of server rules drift.** Pin dedup, kinds and emoji, visited matching and vote
   tallies run on the client today. Each port gets golden vectors generated from the TypeScript

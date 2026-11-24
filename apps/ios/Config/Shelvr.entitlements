@@ -8,5 +8,7 @@
 	<array>
 		<string>Default</string>
 	</array>
+	<key>com.apple.security.application-groups</key>
+	<array><string>group.$(SHELVR_APP_ID)</string></array>
 </dict>
 </plist>

@@ -23,13 +23,21 @@ public final class Backend {
   @ObservationIgnored private var starting: Task<Void, Never>?
   @ObservationIgnored private let deletion = AccountDeletion()
   @ObservationIgnored private var registeringPush: Task<Void, Error>?
-  @ObservationIgnored private var signingOut = false
+  private var signingOut = false
+  private var connectedUserID: String?
+  @ObservationIgnored private var signingIn = false
 
-  public init(environment: AppEnvironment) {
+  public var userID: String? { status == .signedIn && !signingOut && !deletion.isRunning ? connectedUserID : nil }
+
+  public convenience init(environment: AppEnvironment) {
     let session = AuthSession(
       transport: ConvexHTTPAuthTransport(deployment: environment.convexURL),
       vault: KeychainTokenVault(),
       signOutMarker: SignOutMarker(url: URL.applicationSupportDirectory.appending(path: "pending-sign-out")))
+    self.init(environment: environment, session: session)
+  }
+
+  init(environment: AppEnvironment, session: AuthSession) {
     self.environment = environment
     self.session = session
     self.client = ConvexClientWithAuth(
@@ -42,6 +50,7 @@ public final class Backend {
           guard let self, self.status == .signedIn, !self.signingOut,
             case .unauthenticated = state
           else { return }
+          self.connectedUserID = nil
           self.status = .signedOut
         }
       }
@@ -73,6 +82,9 @@ public final class Backend {
 
   public func signIn(_ credential: SignInCredential) async throws {
     await deletion.wait()
+    guard status == .signedOut, !signingIn else { throw AuthSessionError.signInRefused }
+    signingIn = true
+    defer { signingIn = false }
     try await session.signIn(credential)
     await connect()
   }
@@ -169,6 +181,7 @@ public final class Backend {
 
   private func disconnect() async {
     await client.logout()
+    connectedUserID = nil
     status = .signedOut
     signingOut = false
   }
@@ -179,8 +192,12 @@ public final class Backend {
 
   private func connect() async {
     switch await client.login() {
-    case .success: status = .signedIn
-    case .failure: status = await session.isSignedIn ? .offline : .signedOut
+    case let .success(token):
+      connectedUserID = AuthTokens.ownerID(for: token)
+      status = .signedIn
+    case .failure:
+      connectedUserID = nil
+      status = await session.isSignedIn ? .offline : .signedOut
     }
   }
 }
