@@ -17,7 +17,7 @@ struct SignedInView: View {
             entry("/cities", "homePlaces.cities", "building.2")
           }
         } else {
-          Map()
+          SavedPlacesMap(open: open)
         }
       }
       .navigationTitle(copy(library ? "navigation.library" : "navigation.map"))
