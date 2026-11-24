@@ -15,6 +15,7 @@ public final class Backend {
   public private(set) var status = Status.starting
   public let environment: AppEnvironment
   public let client: ConvexClientWithAuth<String>
+  public let expoDeviceState: ExpoDeviceState
   private let session: AuthSession
   @ObservationIgnored private var authWatch: AnyCancellable?
   @ObservationIgnored private var starting: Task<Void, Never>?
@@ -26,6 +27,9 @@ public final class Backend {
       vault: KeychainTokenVault(),
       legacy: LegacyExpoSession(convexURL: environment.convexURL),
       signOutMarker: SignOutMarker(url: URL.applicationSupportDirectory.appending(path: "pending-sign-out")))
+    let bundleID = Bundle.main.bundleIdentifier ?? ""
+    expoDeviceState = ExpoDeviceState(bundleID: bundleID, deployment: environment.convexURL,
+      group: UserDefaults(suiteName: "group.\(bundleID)"))
     self.environment = environment
     self.session = session
     self.client = ConvexClientWithAuth(
