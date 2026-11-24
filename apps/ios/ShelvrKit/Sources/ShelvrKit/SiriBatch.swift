@@ -14,6 +14,13 @@ public struct SiriBatch: Sendable {
 }
 
 public enum SiriText {
+  public enum CaptureRoute: Equatable { case direct, inbox, tooLong }
+
+  public static func captureRoute(_ text: String) -> CaptureRoute {
+    if fitsCapture(text) { return .direct }
+    return fitsLibrary(text) ? .inbox : .tooLong
+  }
+
   public static func fitsLibrary(_ text: String) -> Bool { text.utf16.count <= 100_000 }
 
   public static func fitsCapture(_ text: String) -> Bool { text.utf16.count <= 20_000 }
