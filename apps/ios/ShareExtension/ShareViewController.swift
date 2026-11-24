@@ -51,10 +51,11 @@ final class ShareViewController: UIViewController {
       do {
         let stage = try inbox.stage(owner: owner)
         defer { try? FileManager.default.removeItem(at: stage) }
-        var payloads: [InboxPayload] = []
+        var attachments: [ShareAttachment] = []
         for provider in providers {
-          if let payload = try await load(provider, into: stage) { payloads.append(payload) }
+          if let attachment = try await load(provider, into: stage) { attachments.append(attachment) }
         }
+        let payloads = ShareAttachment.payloads(attachments)
         guard !payloads.isEmpty else { throw CocoaError(.fileReadUnsupportedScheme) }
         try inbox.publish(payloads, in: stage)
         close()
@@ -66,7 +67,7 @@ final class ShareViewController: UIViewController {
     }
   }
 
-  private func load(_ provider: NSItemProvider, into stage: URL) async throws -> InboxPayload? {
+  private func load(_ provider: NSItemProvider, into stage: URL) async throws -> ShareAttachment? {
     for type in [UTType.url, .image, .plainText] where provider.hasItemConformingToTypeIdentifier(type.identifier) {
       if type == .image {
         let name = UUID().uuidString
@@ -80,20 +81,21 @@ final class ShareViewController: UIViewController {
             } catch { continuation.resume(throwing: error) }
           }
         }
-        return InboxPayload(kind: .image, value: name)
+        return .payload(InboxPayload(kind: .image, value: name))
       }
-      let url: URL? = try await withCheckedThrowingContinuation { continuation in
+      let attachment: ShareAttachment? = try await withCheckedThrowingContinuation { continuation in
         provider.loadItem(forTypeIdentifier: type.identifier, options: nil) { item, error in
           if let error { continuation.resume(throwing: error); return }
-          if let url = item as? URL { continuation.resume(returning: url); return }
-          let text = item as? String ?? ""
-          let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
-          continuation.resume(returning: detector?.firstMatch(in: text, range: NSRange(text.startIndex..., in: text))?.url)
+          if let url = item as? URL, ["https", "http"].contains(url.scheme?.lowercased()) {
+            continuation.resume(returning: .payload(InboxPayload(kind: .link, value: url.absoluteString)))
+          } else if let text = item as? String {
+            if type == .url, let url = URL(string: text), ["https", "http"].contains(url.scheme?.lowercased()) {
+              continuation.resume(returning: .payload(InboxPayload(kind: .link, value: url.absoluteString)))
+            } else { continuation.resume(returning: .caption(text)) }
+          } else { continuation.resume(returning: nil) }
         }
       }
-      if let url, ["https", "http"].contains(url.scheme?.lowercased()) {
-        return InboxPayload(kind: .link, value: url.absoluteString)
-      }
+      if let attachment { return attachment }
     }
     return nil
   }

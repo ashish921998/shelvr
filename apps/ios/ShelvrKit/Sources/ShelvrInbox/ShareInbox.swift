@@ -14,6 +14,30 @@ public struct InboxPayload: Codable, Sendable {
   }
 }
 
+public enum ShareAttachment: Sendable {
+  case payload(InboxPayload)
+  case caption(String)
+
+  public static func payloads(_ attachments: [Self]) -> [InboxPayload] {
+    let explicit = attachments.compactMap { attachment -> String? in
+      guard case let .payload(item) = attachment, item.kind == .link else { return nil }
+      return item.value
+    }
+    let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+    return attachments.compactMap { attachment in
+      switch attachment {
+      case .payload(let item): return item
+      case .caption(let text):
+        guard let match = detector?.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+          let url = match.url, ["https", "http"].contains(url.scheme?.lowercased()),
+          let start = Range(match.range, in: text)?.lowerBound else { return nil }
+        let preserved = explicit.first { $0.hasPrefix(url.absoluteString) && text[start...].hasPrefix($0) }
+        return InboxPayload(kind: .link, value: preserved ?? url.absoluteString)
+      }
+    }
+  }
+}
+
 public struct ShareInbox: Sendable {
   public static let notification = "app.shelvr.share-inbox.ready"
   public let directory: URL

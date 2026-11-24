@@ -55,9 +55,10 @@ import Testing
   defer { try? FileManager.default.removeItem(at: inbox.directory) }
   try inbox.activate("first")
   let stage = try inbox.stage(owner: "first")
-  let first = InboxPayload(kind: .link, value: "https://example.com/reel")
-  try inbox.publish([first, InboxPayload(kind: .link, value: first.value),
-    InboxPayload(kind: .link, value: "https://example.com/other")], in: stage)
+  let first = InboxPayload(kind: .link, value: "https://example.com/reel!")
+  let incoming = ShareAttachment.payloads([.payload(first), .caption("Watch https://example.com/reel!"),
+    .caption("Another: https://example.com/reel-other")])
+  try inbox.publish(incoming, in: stage)
   let batch = try #require(inbox.batches().first)
   let manifests = try inbox.manifests(in: batch)
   #expect(manifests.count == 2)
