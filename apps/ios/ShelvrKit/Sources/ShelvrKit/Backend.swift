@@ -76,9 +76,8 @@ public final class Backend {
 
   private var pushTokens: PushTokenStore { PushTokenStore(serviceURL: environment.convexURL) }
 
-  public func registerPush(_ token: String, installation: PushInstallation, locale: String) async throws {
-    guard status == .signedIn, !signingOut, deletion == nil else { return }
-    let generation = sessionGeneration
+  public func registerPush(_ token: String, installation: PushInstallation, locale: String, generation: UUID) async throws {
+    guard mayRegisterPush(generation) else { return }
     let previous = registeringPush
     let task = Task {
       _ = await previous?.result
@@ -101,16 +100,21 @@ public final class Backend {
     try await task.value
   }
 
-  public func finishPushRevocation(installation: PushInstallation) async throws {
-    let generation = sessionGeneration
+  public func mayRegisterPush(_ generation: UUID) -> Bool {
+    status == .signedIn && sessionGeneration == generation && !signingOut && deletion == nil
+  }
+
+  public func finishPushRevocation(installation: PushInstallation, generation: UUID,
+    suspend: @escaping @MainActor () -> Void) async throws {
     let previous = registeringPush
     let task = Task {
       _ = await previous?.result
-      guard status == .signedOut, sessionGeneration == generation else { return }
-      for token in try pushTokens.read() {
-        try await unregisterInstallation(token, installation: installation)
+      guard sessionGeneration == generation, status == .signedOut || mayRegisterPush(generation) else {
+        throw CancellationError()
       }
-      if status == .signedOut, sessionGeneration == generation { try pushTokens.write([]) }
+      try await pushTokens.retireStale(keeping: status == .signedIn ? generation : nil, suspend: suspend) { record in
+        try await unregisterInstallation(record, installation: installation)
+      }
     }
     registeringPush = task
     try await task.value

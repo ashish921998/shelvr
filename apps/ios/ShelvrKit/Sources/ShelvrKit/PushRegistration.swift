@@ -76,11 +76,12 @@ struct PushRegistrationRecord: Codable, Equatable {
 
 struct PushTokenStore {
   let serviceURL: URL
+  var keychainService = "app:no-auth"
 
   private var query: [String: Any] {
     let normalized = serviceURL.absoluteString.replacing(/[^A-Za-z0-9._-]/, with: "_")
     let key = Data(("swift-notification-registrations-" + normalized).utf8)
-    return [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "app:no-auth",
+    return [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: keychainService,
       kSecAttrAccount as String: key, kSecAttrGeneric as String: key]
   }
 
@@ -92,7 +93,25 @@ struct PushTokenStore {
     return try JSONDecoder().decode([PushRegistrationRecord].self, from: data)
   }
 
+  @MainActor func retireStale(keeping generation: UUID?, suspend: () -> Void,
+    unregister: (PushRegistrationRecord) async throws -> Void) async throws {
+    var records: [PushRegistrationRecord]
+    do { records = try read() } catch { suspend(); throw error }
+    let stale = records.filter { $0.registrationId != generation?.uuidString }
+    guard !stale.isEmpty else { return }
+    suspend()
+    for record in stale {
+      try await unregister(record)
+      records.removeAll { $0 == record }
+      try write(records)
+    }
+  }
+
   func write(_ tokens: [PushRegistrationRecord]) throws {
+    if tokens.isEmpty {
+      guard Keychain.delete(query) else { throw CocoaError(.fileWriteNoPermission) }
+      return
+    }
     guard Keychain.write(try JSONEncoder().encode(tokens), to: query) else { throw CocoaError(.fileWriteNoPermission) }
   }
 }
