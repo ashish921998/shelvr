@@ -160,7 +160,10 @@ import Testing
   #expect(entry.route(item))
   #expect(disk?.invite == chosen && entry.accepted?.invite == chosen)
   #expect(entry.cancel() == item)
-  #expect(disk == nil)
+  #expect(disk == nil && entry.preview == nil)
+  #expect(entry.route(invitation))
+  #expect(!entry.route(item))
+  #expect(entry.preview == nil && disk == nil)
 
   let offline = InviteEntry(read: { throw CocoaError(.fileReadNoPermission) }, write: { _ in
     Issue.record("An ordinary route must not write invite storage")
