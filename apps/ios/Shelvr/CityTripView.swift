@@ -70,6 +70,7 @@ struct NewCityTripView: View {
 
 struct CityTripView: View {
   let id: String
+  var sharedOnly = false
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var trip: CityTrip?
@@ -80,6 +81,7 @@ struct CityTripView: View {
   var body: some View {
     Group {
       if failed { Button(copy("common.retry")) { attempt += 1 } }
+      else if let trip, sharedOnly && trip.listId == nil { PlanGateView() }
       else if let trip {
         List {
           ForEach(Array(trip.days.enumerated()), id: \.offset) { index, stops in

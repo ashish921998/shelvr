@@ -76,6 +76,7 @@ public struct CityTrip: Decodable, Sendable {
   }
 
   public let name: String?
+  public let listId: String?
   public let city: String
   public let days: [[Stop]]
   public let unplanned: [Stop]

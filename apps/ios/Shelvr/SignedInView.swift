@@ -3,6 +3,8 @@ import ShelvrKit
 import SwiftUI
 
 struct SignedInView: View {
+  @Environment(Backend.self) private var backend
+  @State private var access = PlanAccess()
   @Binding var pendingLink: AppLink?
   @Environment(\.copy) private var copy
   @State private var library = false
@@ -11,7 +13,7 @@ struct SignedInView: View {
   var body: some View {
     NavigationStack(path: $path) {
       Group {
-        if library {
+        if access.loading { loadingPlan } else if access.locked { PlanGateView() } else if library {
           LibraryView(screen: .home)
         } else {
           SavedPlacesMap(open: open)
@@ -26,7 +28,7 @@ struct SignedInView: View {
         }
       }
       .safeAreaInset(edge: .bottom) {
-        HStack {
+        if !access.loading && !access.locked { HStack {
           Button { library.toggle() } label: {
             Label(copy(library ? "navigation.map" : "navigation.library"),
               systemImage: library ? "map.fill" : "books.vertical.fill")
@@ -46,10 +48,12 @@ struct SignedInView: View {
         .font(.subheadline.weight(.medium))
         .padding(.horizontal, 20)
         .padding(.vertical, 6)
-        .background(.thinMaterial)
+        .background(.thinMaterial) }
       }
       .navigationDestination(for: AppLink.self) { link in
-        switch link.path.first {
+        if access.loading { loadingPlan }
+        else if access.locked && !allowedWhileLocked(link) { PlanGateView() }
+        else { switch link.path.first {
         case "settings": AccountSettingsView()
         case "profile": AccountView().navigationTitle(copy("navigation.profile"))
         case "add-spots":
@@ -97,13 +101,20 @@ struct SignedInView: View {
               }.id(link)
             } else { CityDateView(city: city, listID: listID).id(link) }
           } else { PlanCityView(trip: link.path.first == "new-trip") }
-        case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1]).id(link.path[1])
+        case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1], sharedOnly: access.locked).id(link.path[1])
         case "photo": PhotoSaveView()
         case "how-to-share": SaveInstructions(siri: false)
         case "save-with-siri": SaveInstructions(siri: true)
+        case "plan-gate", "paywall": PlanGateView()
+        case "share": PasteLinkView()
         default: ShellDestination(link: link)
-        }
+        } }
       }
+    }
+    .task(id: access.retry) { await access.readPlan(backend) }
+    .task(id: "\(access.retry):\(access.plan == nil):\(access.pro)") { await access.readAllowance(backend) }
+    .task(id: access.plan?.expiresAt) {
+      if let expiration = access.plan?.expiresAt, access.pro { await access.expire(at: expiration) }
     }
     .onChange(of: pendingLink, initial: true) { _, link in
       guard let link else { return }
@@ -114,6 +125,21 @@ struct SignedInView: View {
       case ["sign-in"]: break
       default: path = [link]
       }
+    }
+  }
+
+  @ViewBuilder private var loadingPlan: some View {
+    if access.failed { Button(copy("common.retry")) { access.retry += 1 } }
+    else { ProgressView(copy("pro.checking")) }
+  }
+
+  private func allowedWhileLocked(_ link: AppLink) -> Bool {
+    switch link.path.first {
+    case "profile", "settings", "list-invite", "passport-invite", "shared-lists", "shared-list", "trip-plan":
+      true
+    case "date-plan", "go-out", "new-trip", "add-list-place", "add-trip-stop":
+      link.query.contains { $0.name == "listId" && $0.value?.isEmpty == false }
+    default: false
     }
   }
 
