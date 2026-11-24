@@ -59,3 +59,27 @@ import Testing
   #expect(votes.isOpen(at: Date(timeIntervalSince1970: 0.9)))
   #expect(!votes.isOpen(at: Date(timeIntervalSince1970: 1)))
 }
+
+@Test func swiftUsesTheCityVoteAndDateResultsGeneratedByExpo() throws {
+  struct Vectors: Decodable {
+    struct Expected: Decodable {
+      let keys: [String]
+      let same: [Bool]
+      let swaps: [Int?]
+    }
+    let pins: [CityPlace]
+    let link: CityVotes
+    let cases: [[Int]]
+    let date: CityDate
+    let rounds: [[Int]]
+    let expected: Expected
+  }
+  let url = URL(filePath: #filePath).deletingLastPathComponent().appending(path: "../../../TestData/city-rules.json")
+  let vectors = try JSONDecoder().decode(Vectors.self, from: Data(contentsOf: url))
+  #expect(vectors.pins.map { CityPlace.key($0.name) } == vectors.expected.keys)
+  #expect(vectors.cases.map { indices in
+    vectors.link.sameSelection(indices.map { vectors.pins[$0] }, among: vectors.pins)
+  } == vectors.expected.same)
+  let evening = try #require(vectors.date.evenings.first)
+  #expect(vectors.rounds.map { vectors.date.swap(evening, first: true, tried: Set($0))?.first } == vectors.expected.swaps)
+}

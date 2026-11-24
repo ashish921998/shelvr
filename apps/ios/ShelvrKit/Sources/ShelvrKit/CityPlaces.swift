@@ -1,7 +1,7 @@
 import Combine
 import Foundation
 
-public struct CityPlace: Identifiable, Hashable, Sendable {
+public struct CityPlace: Decodable, Identifiable, Hashable, Sendable {
   public let itemID: String
   public let name: String
   public let lat: Double
@@ -10,7 +10,10 @@ public struct CityPlace: Identifiable, Hashable, Sendable {
   public var id: Self { self }
 
   static func key(_ name: String) -> String {
-    name.folding(options: [.diacriticInsensitive, .widthInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+    let trimmed = name.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    let clipped = trimmed.utf16.count > 80 ? String(decoding: trimmed.utf16.prefix(79), as: UTF16.self) : trimmed
+    let decomposed = clipped.decomposedStringWithCompatibilityMapping
+    return String(decomposed.unicodeScalars.filter { !CharacterSet.nonBaseCharacters.contains($0) })
       .lowercased().filter { $0.isLetter || $0.isNumber }
   }
 

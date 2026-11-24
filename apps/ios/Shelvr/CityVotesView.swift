@@ -22,7 +22,7 @@ struct CityVotesView: View {
         if let votes {
           if votes.isOpen(at: context.date) && votes.voters == 0 { Text(copy("plan.noVotesYet")) }
           ForEach(votes.places) { place in
-            if votes.voters > 0 {
+            if votes.isOpen(at: context.date) && votes.voters > 0 {
               HStack {
                 Text(place.name)
                 Spacer()
