@@ -54,10 +54,21 @@ struct SignedInView: View {
         case "add-spots":
           List {
             entry("/add", "addSheet.pasteLink", "link")
+            entry("/photo", "item.photo", "photo")
             entry("/how-to-share", "addSheet.howToShare", "square.and.arrow.up")
             entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
           }
           .navigationTitle(copy("addSheet.title"))
+        case "passport-story": PassportStoryView()
+        case "passport-invite" where link.path.count == 2: PassportInvitePreview(token: link.path[1]).id(link.path[1])
+        case "shared-lists": SharedListsView()
+        case "shared-list" where link.path.count == 2: SharedListView(id: link.path[1])
+        case "list-invite" where link.path.count == 2:
+          JoinListView(token: link.path[1]) { route in
+            if path.last == link, let target = AppLink(route) { path = [target] }
+          }
+        case "passport": PassportView()
+        case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)
         case "saves": LibraryView(screen: .saves)
         case "review-saves": LibraryView(screen: .review)
         case "city" where link.path.count == 2: CityPlacesView(city: link.path[1]).id(link.path[1])
@@ -84,7 +95,14 @@ struct SignedInView: View {
               }.id(link)
             } else { CityDateView(city: city, listID: listID).id(link) }
           } else { PlanCityView(trip: link.path.first == "new-trip") }
+        case "add-trip-stop":
+          if let id = link.query.first(where: { $0.name == "tripId" })?.value {
+            let day = link.query.first(where: { $0.name == "day" })?.value.flatMap(Int.init) ?? 1
+            AddTripStopView(id: id, initialDay: day).id(link)
+          } else { ShellDestination(link: link) }
         case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1]).id(link.path[1])
+        case "add": PasteLinkView()
+        case "photo": PhotoSaveView()
         default: ShellDestination(link: link)
         }
       }

@@ -1,0 +1,63 @@
+{
+  "now": 1000000,
+  "saves": [
+    {
+      "_id": "fixture",
+      "_creationTime": 0,
+      "status": "failed"
+    },
+    {
+      "_id": "fixture",
+      "_creationTime": 0,
+      "status": "failed",
+      "failureReason": "error"
+    },
+    {
+      "_id": "fixture",
+      "_creationTime": 0,
+      "status": "failed",
+      "failureReason": "not_found"
+    },
+    {
+      "_id": "fixture",
+      "_creationTime": 0,
+      "status": "failed",
+      "failureReason": "image_too_large"
+    },
+    {
+      "_id": "fixture",
+      "_creationTime": 0,
+      "status": "ready",
+      "enrichment": "partial"
+    },
+    {
+      "_id": "fixture",
+      "_creationTime": 0,
+      "status": "ready"
+    },
+    {
+      "_id": "fixture",
+      "_creationTime": 0,
+      "status": "processing",
+      "processingStartedAt": 99999
+    },
+    {
+      "_id": "fixture",
+      "_creationTime": 0,
+      "status": "processing",
+      "processingStartedAt": 100000
+    },
+    {
+      "_id": "fixture",
+      "_creationTime": 0,
+      "status": "processing",
+      "processingStartedAt": 100001
+    },
+    {
+      "_id": "fixture",
+      "_creationTime": 0,
+      "status": "processing"
+    }
+  ],
+  "expected": [true, true, false, false, true, false, true, false, false, true]
+}
