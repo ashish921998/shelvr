@@ -4,8 +4,8 @@ import SwiftUI
 struct RootView: View {
   @EnvironmentObject private var pushDevice: PushDevice
   @Environment(Backend.self) private var backend
-  @Environment(\.copy) private var copy
   @AppStorage("swift.appearance") private var appearance = "system"
+  @Environment(\.copy) private var copy
   @State private var pendingLink: AppLink?
 
   var body: some View {
@@ -13,7 +13,7 @@ struct RootView: View {
       switch backend.status {
       case .starting: ProgressView()
       case .signedOut: SignInView()
-      case .signedIn: OnboardingGate(pendingLink: $pendingLink).id(backend.sessionGeneration)
+      case .signedIn: OnboardingGate(pendingLink: $pendingLink)
       case .offline: OfflineView()
       }
     }
@@ -26,8 +26,10 @@ struct RootView: View {
     }
     .task(id: backend.sessionGeneration) {
       if backend.status == .signedOut { Analytics.identify(nil) }
-      if backend.status == .offline, let id = await backend.offlineAccountID(), !Task.isCancelled {
-        Analytics.identify(id)
+      if backend.status == .offline {
+        let id = await backend.offlineAccountID()
+        guard !Task.isCancelled, backend.status == .offline else { return }
+        Analytics.restoredOffline(accountID: id)
       }
       guard backend.status == .signedIn else { return }
       do {

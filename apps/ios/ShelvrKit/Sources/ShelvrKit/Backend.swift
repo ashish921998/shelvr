@@ -227,9 +227,12 @@ public final class Backend {
     try checkOwner()
     let transport = ConvexHTTPAuthTransport(deployment: environment.convexURL)
     var args = ["text": text, "operationId": operationID, "saveSource": SaveSource.siri.rawValue]
-    if let spaceID { args["spaceId"] = try await transport.siriFolder(spaceID, authorization: bearer) }
-    try checkOwner()
-    try await transport.saveSiriNote(args, authorization: bearer)
+    args["spaceId"] = spaceID
+    if case .folderUnavailable = try await transport.saveSiriNote(args, authorization: bearer) {
+      try checkOwner()
+      args["spaceId"] = nil
+      _ = try await transport.saveSiriNote(args, authorization: bearer)
+    }
     try checkOwner()
   }
 
