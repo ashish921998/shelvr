@@ -36,10 +36,11 @@ jobs:
           persist-credentials: false
 
       - name: Test ShelvrKit
-        run: swift test --package-path ShelvrKit --skip Live
+        run: swift test --package-path ShelvrKit --cache-path "$RUNNER_TEMP/swift-packages" --skip Live
 
       - name: Build the arm64 iOS simulator app
         run: >-
           xcodebuild -project Shelvr.xcodeproj -scheme Shelvr -configuration Debug
           -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData
+          -scmProvider system -packageCachePath "$RUNNER_TEMP/swift-packages"
           CODE_SIGNING_ALLOWED=NO ARCHS=arm64 -quiet build
