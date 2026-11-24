@@ -22,6 +22,7 @@ public final class Backend {
   @ObservationIgnored private var authWatch: AnyCancellable?
   @ObservationIgnored private var starting: Task<Void, Never>?
   @ObservationIgnored private var deletion: Task<Void, Error>?
+  @ObservationIgnored private var registeringPush: Task<Void, Error>?
   @ObservationIgnored private var signingOut = false
 
   public init(environment: AppEnvironment) {
@@ -73,11 +74,47 @@ public final class Backend {
     try await session.startOAuth(provider: provider, redirectTo: environment.oauthRedirect)
   }
 
+  private var pushTokens: PushTokenStore { PushTokenStore(serviceURL: environment.convexURL) }
+
+  public func registerPush(_ token: String, installation: PushInstallation, locale: String) async throws {
+    guard status == .signedIn, !signingOut else { return }
+    let generation = sessionGeneration
+    let previous = registeringPush
+    let task = Task {
+      _ = await previous?.result
+      guard generation == sessionGeneration, !signingOut else { return }
+      var tokens = try pushTokens.read()
+      if !tokens.contains(token) { tokens.append(token) }
+      try pushTokens.write(tokens)
+      try await client.mutation("notifications:registerDevice", with: [
+        "token": token, "installSecret": installation.secret, "platform": "ios",
+        "locale": locale, "timezone": TimeZone.current.identifier
+      ])
+      for old in tokens where old != token {
+        try await client.mutation("notifications:unregisterDevice", with: ["token": old])
+      }
+      try pushTokens.write([token])
+    }
+    registeringPush = task
+    try await task.value
+  }
+
+  private func revokePush() async throws {
+    _ = await registeringPush?.result
+    let saved = try pushTokens.read()
+    guard !saved.isEmpty else { return }
+    for token in saved {
+      try await client.mutation("notifications:unregisterDevice", with: ["token": token])
+    }
+    try pushTokens.write([])
+  }
+
   public func signOut() async throws {
     if let deletion { _ = await deletion.result }
     guard status == .signedIn, !signingOut else { return }
     signingOut = true
     do {
+      try await revokePush()
       try await session.signOut { await self.disconnect() }
     } catch {
       signingOut = false
@@ -89,6 +126,7 @@ public final class Backend {
     if let deletion { return try await deletion.value }
     guard status == .signedIn, !signingOut else { throw AuthSessionError.notSignedIn }
     let task = Task {
+      try await revokePush()
       try await client.mutation("users:deleteCurrentUserAccount")
       await session.forgetDeletedAccount()
       await disconnect()
