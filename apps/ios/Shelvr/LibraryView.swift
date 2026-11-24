@@ -11,6 +11,10 @@ struct LibraryView: View {
   @State private var failures: Set<Int> = []
   @State private var attempt = 0
   @State private var search = ""
+  @State private var searchState = LibrarySearchState.loading
+  @State private var searchAttempt = 0
+  private struct SearchRequest: Equatable { let query: String; let attempt: Int }
+  private var searchQuery: String { search.trimmingCharacters(in: .whitespacesAndNewlines) }
   @State private var unplacedID: String?
 
   private var rows: [LibrarySave] {
@@ -40,10 +44,21 @@ struct LibraryView: View {
           }
         }
       }
-      let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
-      if screen == .home && !query.isEmpty {
-        LibrarySearchResults(query: query).id(query)
+      if screen == .home && !searchQuery.isEmpty {
+        LibrarySearchResults(query: searchQuery, state: searchState) { searchAttempt += 1 }
       } else { libraryRows }
+    }
+    .task(id: SearchRequest(query: searchQuery, attempt: searchAttempt)) {
+      searchState = .loading
+      let term = searchQuery
+      guard !term.isEmpty else { return }
+      do {
+        try await Task.sleep(for: .milliseconds(250))
+        for try await items in backend.searchLibrary(term) {
+          guard !Task.isCancelled else { return }
+          searchState = .items(term, items)
+        }
+      } catch { if !Task.isCancelled { searchState = .failure(term) } }
     }
     .onChange(of: rows.map { Outcome(id: $0.id, status: $0.status, needsReview: $0.type == "link" && $0.needsReview) }) { previous, current in
       guard screen == .home else { return }
