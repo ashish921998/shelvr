@@ -113,6 +113,14 @@ struct SignedInView: View {
         case "add": PasteLinkView()
         case "saves": LibraryView(screen: .saves)
         case "review-saves": LibraryView(screen: .review)
+        case "spots" where link.path.count == 2:
+          SaveSpotRevealView(id: link.path[1]) { city in
+            guard path.last == link else { return }
+            library = false
+            if let city, let encoded = city.addingPercentEncoding(withAllowedCharacters: .alphanumerics),
+              let destination = AppLink("/city/" + encoded) { path = [destination] }
+            else { path = [] }
+          }.id(link)
         case "city" where link.path.count == 2: CityPlacesView(city: link.path[1]).id(link.path[1])
         case "cities": LibraryCitiesView()
         case "item" where link.path.count == 2: LibraryItemView(id: link.path[1])
@@ -171,6 +179,8 @@ struct SignedInView: View {
     .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
       Button(copy("common.close")) {}
     } message: { Text(stampMessage ?? "") }
+    .modifier(CancelSurveyCard(home: library && path.isEmpty))
+    .modifier(TrialReminderObserver(home: path.isEmpty))
     .onChange(of: pendingLink, initial: true) { _, link in
       guard let link else { return }
       pendingLink = nil
