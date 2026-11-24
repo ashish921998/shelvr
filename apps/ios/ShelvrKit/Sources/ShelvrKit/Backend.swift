@@ -100,22 +100,19 @@ public final class Backend {
 
   private var pushTokens: PushTokenStore { PushTokenStore(serviceURL: environment.convexURL) }
 
-  public func registerPush(_ token: String, installation: PushInstallation, locale: String) async throws {
-    guard status == .signedIn, !signingOut, !deletion.isRunning else { return }
-    let generation = sessionGeneration
+  public func registerPush(_ token: String, installation: PushInstallation, locale: String, generation: UUID) async throws {
+    guard mayRegisterPush(generation) else { return }
     let previous = registeringPush
     let task = Task {
       _ = await previous?.result
       guard let bearer = try await session.validToken(), generation == sessionGeneration,
         status == .signedIn, !signingOut, !deletion.isRunning else { return }
       var tokens = try pushTokens.read()
-      let record = PushRegistrationRecord(token: token, registrationId: generation.uuidString)
+      let identity = try PushTokenStore.registrationID(bearer: bearer, installSecret: installation.secret)
+      let record = PushRegistrationRecord(token: token, registrationId: identity.uuidString)
       if !tokens.contains(record) { tokens.append(record) }
       try pushTokens.write(tokens)
-      try await PushTransport(deployment: environment.convexURL).call("notifications:registerDevice", args: [
-        "token": token, "installSecret": installation.secret, "registrationId": record.registrationId, "platform": "ios",
-        "locale": locale, "timezone": TimeZone.current.identifier
-      ], bearer: bearer)
+      try await registerInstallation(record, installation: installation, locale: locale, bearer: bearer)
       for old in tokens where old != record {
         try await unregisterInstallation(old, installation: installation)
       }
@@ -125,19 +122,43 @@ public final class Backend {
     try await task.value
   }
 
-  public func finishPushRevocation(installation: PushInstallation) async throws {
-    let generation = sessionGeneration
+  public func mayRegisterPush(_ generation: UUID) -> Bool {
+    status == .signedIn && sessionGeneration == generation && !signingOut && !deletion.isRunning
+  }
+
+  public func finishPushRevocation(installation: PushInstallation, generation: UUID, locale: String,
+    suspend: @escaping @MainActor () -> Void) async throws {
     let previous = registeringPush
     let task = Task {
       _ = await previous?.result
-      guard status == .signedOut, sessionGeneration == generation else { return }
-      for token in try pushTokens.read() {
-        try await unregisterInstallation(token, installation: installation)
+      guard sessionGeneration == generation, status == .signedOut || mayRegisterPush(generation) else {
+        throw CancellationError()
       }
-      if status == .signedOut, sessionGeneration == generation { try pushTokens.write([]) }
+      let bearer = status == .signedIn ? try await session.validToken() : nil
+      guard sessionGeneration == generation, status == .signedOut || mayRegisterPush(generation) else {
+        throw CancellationError()
+      }
+      if status == .signedIn && bearer == nil { throw AuthSessionError.notSignedIn }
+      let identity = try bearer.map { try PushTokenStore.registrationID(bearer: $0, installSecret: installation.secret) }
+      try await pushTokens.retireStale(keeping: identity, suspend: suspend) { record in
+        try await unregisterInstallation(record, installation: installation)
+      }
+      if let identity, let bearer {
+        try await pushTokens.adoptLegacy(for: identity, suspend: suspend) { record in
+          guard mayRegisterPush(generation) else { throw CancellationError() }
+          try await registerInstallation(record, installation: installation, locale: locale, bearer: bearer)
+        }
+      }
     }
     registeringPush = task
     try await task.value
+  }
+
+  private func registerInstallation(_ record: PushRegistrationRecord, installation: PushInstallation, locale: String, bearer: String) async throws {
+    try await PushTransport(deployment: environment.convexURL).call("notifications:registerDevice", args: [
+      "token": record.token, "installSecret": installation.secret, "registrationId": record.registrationId, "platform": "ios",
+      "locale": locale, "timezone": TimeZone.current.identifier
+    ], bearer: bearer)
   }
 
   private func unregisterInstallation(_ record: PushRegistrationRecord, installation: PushInstallation) async throws {
