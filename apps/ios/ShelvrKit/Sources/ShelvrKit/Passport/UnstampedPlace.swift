@@ -1,12 +1,12 @@
 import ConvexMobile
 import Foundation
 
-public struct UnstampedPlace: Decodable, Identifiable {
-  public struct Spot: Codable, ConvexEncodable {
+public struct UnstampedPlace: Decodable, Identifiable, Sendable {
+  public struct Spot: Codable, ConvexEncodable, Sendable {
     let lat, lng: Double
     let appleId: String?
   }
-  public struct ID: Hashable {
+  public struct ID: Hashable, Sendable {
     let item: String
     let name: String
     let lat, lng: Double
@@ -27,8 +27,7 @@ extension Backend {
   }
 
   public func stampNow(_ place: UnstampedPlace) async throws {
-    var args = place.arguments
-    args["visited"] = true
-    try await client.mutation("placeVisits:setVisited", with: args)
+    try await client.mutation("placeVisits:setVisited",
+      with: ["itemId": place.itemId, "name": place.name, "spot": place.spot, "visited": true])
   }
 }
