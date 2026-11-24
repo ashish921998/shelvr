@@ -300,7 +300,7 @@ private struct OnboardingAccount: View {
   private func finish() {
     let spaces = ["date": "interests.vibeDateNights", "travel": "presets.travel", "food": "presets.restaurants"]
     let goal = ["date", "travel", "food"].first(where: progress.goals.contains)
-    let entry = PendingOnboarding(cities: progress.visitedCities.sorted(), url: progress.skippedShare ? nil : reel?.url,
+    let entry = OnboardingHandoff(cities: progress.visitedCities.sorted(), url: progress.skippedShare ? nil : reel?.url,
       operation: progress.demoOperationID, space: goal.flatMap { spaces[$0] }.map { copy($0) })
     do {
       try entry.save(account)
