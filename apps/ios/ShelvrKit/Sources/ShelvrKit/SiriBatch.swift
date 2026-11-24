@@ -12,3 +12,11 @@ public struct SiriBatch: Sendable {
 
   public func failed(of total: Int) -> Int { total - saved - queued }
 }
+
+public enum SiriText {
+  public static func fitsCapture(_ text: String) -> Bool { text.utf16.count <= 20_000 }
+
+  public static func entityContent(kind: String, value: String?, title: String, photoLabel: String) -> String {
+    kind == "image" ? photoLabel : value ?? title
+  }
+}
