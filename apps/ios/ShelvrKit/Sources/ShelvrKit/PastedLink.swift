@@ -6,9 +6,7 @@ public struct PastedLink: Sendable {
   public let operationID: String
 
   public static func requiresPro(_ error: Error) -> Bool {
-    struct Failure: Decodable { let code: String }
-    guard case let ClientError.ConvexError(data) = error else { return false }
-    return (try? JSONDecoder().decode(Failure.self, from: Data(data.utf8)))?.code == "pro_required"
+    saveErrorCode(error) == "pro_required"
   }
 
   public init?(_ input: String, retrying prior: PastedLink? = nil) {
@@ -37,4 +35,11 @@ public struct PastedLink: Sendable {
       operationID = "link:\(UUID().uuidString)"
     }
   }
+}
+
+
+func saveErrorCode(_ error: Error) -> String? {
+  struct Failure: Decodable { let code: String }
+  guard case let ClientError.ConvexError(data) = error else { return nil }
+  return (try? JSONDecoder().decode(Failure.self, from: Data(data.utf8)))?.code
 }

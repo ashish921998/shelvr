@@ -1281,6 +1281,7 @@
   "passportStory.tagline": "Save it now.\nActually go.",
   "passportStory.scan": "Scan to compare passports",
   "passportStory.shareLink": "Share as a link instead",
+  "passportStory.linkNotePassportMenu": "Sharing turns on your Passport link so the code opens it. You can stop sharing from your Passport menu.",
   "passportStory.linkNote": "Sharing turns on your passport link so the code opens it. You can stop sharing anytime in Settings.",
   "passport.shareCity": "Share %{city}",
   "passport.momentCityComplete": "%{city} complete",

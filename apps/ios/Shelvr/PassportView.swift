@@ -6,13 +6,13 @@ struct PassportView: View {
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var stamps: [PassportStamp]?
-  @State private var cities: [PassportCityStamp] = []
+  @State private var cities: [PassportCityStamp]?
   @State private var completion: [PassportCompletion] = []
   @State private var errors = Set<String>()
   @State private var retry = 0
 
   var body: some View {
-    let pages = PassportPages(stamps: stamps ?? [], completion: completion, cities: cities)
+    let pages = PassportPages(stamps: stamps ?? [], completion: completion, cities: cities ?? [])
     let sections = pages.sections
     Group {
       if let stamps {
@@ -22,7 +22,7 @@ struct PassportView: View {
           } else { Text(copy("passport.nextEmpty", ["city": cardCity])) }
         } else {
           List {
-            let counts = StampCity.counts(places: stamps, stamps: cities)
+            let counts = StampCity.counts(places: stamps, stamps: cities ?? [])
             HStack {
               count(stamps.count, "passport.places")
               count(counts.cities, "passport.cities")
@@ -60,7 +60,7 @@ struct PassportView: View {
                 }
               }
             }
-            if sections.isEmpty, cities.isEmpty {
+            if sections.isEmpty, cities?.isEmpty == true {
               ContentUnavailableView(copy("passport.beenSomewhere"), systemImage: "book.closed",
                 description: Text(copy("passport.beenBody")))
             }
@@ -72,10 +72,18 @@ struct PassportView: View {
       if !errors.isEmpty { Button(copy("common.retry")) { retry += 1 } }
     }
     .navigationTitle(cardCity ?? copy("passport.title"))
+    .toolbar {
+      if cardCity == nil {
+        ToolbarItem(placement: .topBarTrailing) {
+          PassportActions(cities: errors.contains("cityStamps:listCityStamps") ? nil : cities, hasPlaces: stamps?.isEmpty == false) { retry += 1 }
+        }
+      }
+    }
     .task(id: retry) {
       await watch("placeVisits:listPassportStamps", [PassportStamp].self) { stamps = $0 }
     }
     .task(id: retry) {
+      cities = nil
       await watch("cityStamps:listCityStamps", [PassportCityStamp].self) { cities = $0 }
     }
     .task(id: retry) {
