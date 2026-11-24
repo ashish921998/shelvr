@@ -12,6 +12,7 @@ struct SharedInboxReceiver: ViewModifier {
   @Environment(\.copy) private var copy
   @State private var failed = false
   @State private var failedFile: URL?
+  @State private var retainedFile: URL?
   @State private var failureCopy = "share.singleFailure"
   @State private var wake: AsyncStream<ScenePhase>.Continuation?
 
@@ -41,12 +42,12 @@ struct SharedInboxReceiver: ViewModifier {
         }
       }
       .alert(copy("share.singleFailure"), isPresented: $failed) {
-        if failureCopy == "share.longNoteRecovery" {
-          Button(copy("share.copyNote")) { copyRecoveredNote() }
+        if failureCopy == "share.longNoteRecovery", let selected = retainedFile {
+          Button(copy("share.copyNote")) { copyRecoveredNote(selected) }
         } else {
           Button(copy("common.tryAgain")) { failed = false; wake?.yield(phase) }
         }
-        if failedFile != nil {
+        if failedFile != nil && failureCopy != "share.longNoteRecovery" {
           Button(copy("common.delete"), role: .destructive) {
             if let file = failedFile { try? FileManager.default.removeItem(at: file) }
             failedFile = nil
@@ -72,12 +73,18 @@ struct SharedInboxReceiver: ViewModifier {
     }
   }
 
-  private func copyRecoveredNote() {
-    guard let file = failedFile, backend.status == .signedIn, let inbox = ShareInbox.system(),
-      let owner = inbox.activeOwner, (try? inbox.owner(of: file.deletingLastPathComponent())) == owner,
-      let data = try? Data(contentsOf: file), let note = try? JSONDecoder().decode(InboxPayload.self, from: data),
-      note.kind == .note, note.siri == true else { return }
-    UIPasteboard.general.setItems([[UTType.utf8PlainText.identifier: note.value]], options: [.localOnly: true])
+  private func copyRecoveredNote(_ file: URL) {
+    guard backend.status == .signedIn, let inbox = ShareInbox.system(), let owner = inbox.activeOwner else { return }
+    let succeeded = try? inbox.copyAndRemoveNote(file, owner: owner) { text in
+      guard !SiriText.fitsLibrary(text) else { return false }
+      UIPasteboard.general.setItems([[UTType.utf8PlainText.identifier: text]], options: [.localOnly: true])
+      return UIPasteboard.general.string == text
+    }
+    guard succeeded == true else { return }
+    retainedFile = nil
+    failedFile = nil
+    failed = false
+    wake?.yield(phase)
   }
 
   private func process(_ batch: URL, inbox: ShareInbox, owner: String) async throws {
@@ -89,7 +96,13 @@ struct SharedInboxReceiver: ViewModifier {
         let payload = try JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: file))
         if payload.siri == true, payload.kind == .note, !SiriText.fitsLibrary(payload.value) {
           retainedNote = true
-          failedFile = file
+          if let selected = retainedFile, FileManager.default.fileExists(atPath: selected.path),
+            (try? inbox.owner(of: selected.deletingLastPathComponent())) == owner {
+            failedFile = selected
+          } else {
+            retainedFile = file
+            failedFile = file
+          }
           failureCopy = "share.longNoteRecovery"
           failed = true
           continue

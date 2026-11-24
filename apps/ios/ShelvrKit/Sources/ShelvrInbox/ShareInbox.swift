@@ -117,6 +117,17 @@ public struct ShareInbox: Sendable {
     try String(contentsOf: batch.appending(path: "owner"), encoding: .utf8)
   }
 
+  public func copyAndRemoveNote(_ file: URL, owner: String, copy: (String) -> Bool) throws -> Bool {
+    let batch = file.deletingLastPathComponent()
+    guard activeOwner == owner, batch.pathExtension == "ready",
+      batch.deletingLastPathComponent().standardizedFileURL == directory.standardizedFileURL,
+      try self.owner(of: batch) == owner else { return false }
+    let payload = try JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: file))
+    guard payload.siri == true, payload.kind == .note, copy(payload.value) else { return false }
+    try FileManager.default.removeItem(at: file)
+    return true
+  }
+
   public func manifests(in batch: URL) throws -> [URL] {
     try FileManager.default.contentsOfDirectory(at: batch, includingPropertiesForKeys: nil)
       .filter { $0.pathExtension == "json" }.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
