@@ -728,6 +728,21 @@ http.route({
 });
 
 http.route({
+  path: "/app-intents/revoke",
+  method: "POST",
+  handler: httpAction(async (ctx, request) => {
+    const token = bearerToken(request.headers.get("authorization"));
+    if (token === undefined || !/^[a-f0-9]{64}$/.test(token)) {
+      return captureUnauthorized();
+    }
+    await ctx.runMutation(internal.appIntents.revokePresentedCaptureToken, {
+      tokenHash: await sha256Hex(token),
+    });
+    return new Response(null, { status: 204 });
+  }),
+});
+
+http.route({
   path: "/app-intents/capture",
   method: "POST",
   handler: httpAction(async (ctx, req) => {

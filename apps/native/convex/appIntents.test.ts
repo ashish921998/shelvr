@@ -248,6 +248,30 @@ describe("capture tokens", () => {
   });
 });
 
+describe("POST /app-intents/revoke", () => {
+  it("revokes only the presented device token without an account session", async () => {
+    const { base, t, token } = await setup();
+    const sibling = await t.action(api.appIntents.issueCaptureToken, {});
+    const other = await signedInUser(base, { pro: true });
+    const foreign = await other.t.action(api.appIntents.issueCaptureToken, {});
+    const revoke = (bearer?: string) =>
+      post(base, "/app-intents/revoke", { token: foreign }, bearer);
+    expect((await revoke()).status).toBe(401);
+    expect((await revoke("malformed")).status).toBe(401);
+    expect((await revoke("0".repeat(64))).status).toBe(204);
+    expect((await revoke(token)).status).toBe(204);
+    expect((await revoke(token)).status).toBe(204);
+    const hashes = await base.run(async (ctx) =>
+      (await ctx.db.query("captureTokens").collect()).map(
+        (row) => row.tokenHash,
+      ),
+    );
+    expect(hashes.sort()).toEqual(
+      (await Promise.all([sha256Hex(sibling), sha256Hex(foreign)])).sort(),
+    );
+  });
+});
+
 describe("POST /app-intents/capture", () => {
   it("rejects a missing or unknown token", async () => {
     const { t } = await setup();

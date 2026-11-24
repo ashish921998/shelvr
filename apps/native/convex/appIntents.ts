@@ -76,6 +76,27 @@ export const storeCaptureToken = internalMutation({
   },
 });
 
+async function removeCaptureToken(
+  ctx: MutationCtx,
+  tokenHash: string,
+  owner?: Id<"users">,
+): Promise<null> {
+  const row = await ctx.db
+    .query("captureTokens")
+    .withIndex("by_token_hash", (q) => q.eq("tokenHash", tokenHash))
+    .unique();
+  if (row !== null && (owner === undefined || row.userId === owner)) {
+    await ctx.db.delete(row._id);
+  }
+  return null;
+}
+
+export const revokePresentedCaptureToken = internalMutation({
+  args: { tokenHash: v.string() },
+  returns: v.null(),
+  handler: (ctx, { tokenHash }) => removeCaptureToken(ctx, tokenHash),
+});
+
 export const revokeCaptureToken = authedMutation({
   args: { token: v.string() },
   returns: v.null(),
@@ -87,15 +108,7 @@ export const revokeCaptureToken = authedMutation({
     ) {
       return null;
     }
-    const tokenHash = await sha256Hex(args.token);
-    const row = await ctx.db
-      .query("captureTokens")
-      .withIndex("by_token_hash", (q) => q.eq("tokenHash", tokenHash))
-      .first();
-    if (row !== null && row.userId === userId) {
-      await ctx.db.delete(row._id);
-    }
-    return null;
+    return await removeCaptureToken(ctx, await sha256Hex(args.token), userId);
   },
 });
 
