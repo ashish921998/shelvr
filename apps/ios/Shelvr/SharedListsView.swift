@@ -188,6 +188,9 @@ struct SharedListView: View {
         }
         .sheet(isPresented: $add) { AddListPlaceView(detail: detail, initialCity: city) }
         .navigationTitle(detail.name)
+        .onChange(of: city, initial: true) { _, value in
+          if selectedCity != value { selectedCity = value }
+        }
         .onDisappear {
           guard detail.places.contains(where: \.isNew), backend.status == .signedIn else { return }
           Task { try? await backend.listSeen(detail._id) }
