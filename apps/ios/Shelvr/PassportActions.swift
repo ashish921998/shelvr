@@ -4,6 +4,7 @@ import SwiftUI
 struct PassportActions: View {
   let cities: [PassportCityStamp]?
   let hasPlaces: Bool
+  let retryCities: () -> Void
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var showCities = false
@@ -35,7 +36,14 @@ struct PassportActions: View {
     }
     .disabled(busy)
     .sheet(isPresented: $showCities) {
-      if let cities { PassportCityPicker(cities: cities) } else { ProgressView() }
+      if let cities { PassportCityPicker(cities: cities) }
+      else {
+        VStack(spacing: 16) {
+          Text(copy("errors.connection"))
+          Button(copy("common.retry"), action: retryCities)
+          Button(copy("common.close")) { showCities = false }
+        }.padding()
+      }
     }
     .sheet(item: $share) { item in PassportShareSheet(url: item.url) }
     .confirmationDialog(copy("passportShare.stopTitle"), isPresented: $stopping, titleVisibility: .visible) {
