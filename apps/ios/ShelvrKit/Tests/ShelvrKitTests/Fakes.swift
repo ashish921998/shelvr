@@ -6,20 +6,27 @@ import Testing
 
 final class MemoryVault: TokenVault {
   private let stored: Mutex<AuthTokens?>
+  private let canDelete: Bool
 
-  init(_ tokens: AuthTokens? = nil) {
+  init(_ tokens: AuthTokens? = nil, canDelete: Bool = true) {
     stored = Mutex(tokens)
+    self.canDelete = canDelete
   }
 
   var tokens: AuthTokens? { stored.withLock { $0 } }
   func read() -> AuthTokens? { tokens }
-  func write(_ tokens: AuthTokens?) { stored.withLock { $0 = tokens } }
+  @discardableResult
+  func write(_ tokens: AuthTokens?) -> Bool {
+    guard tokens != nil || canDelete else { return false }
+    stored.withLock { $0 = tokens }
+    return true
+  }
 }
 
 struct ReadOnlyVault: TokenVault {
   let tokens: AuthTokens?
   func read() -> AuthTokens? { tokens }
-  func write(_ tokens: AuthTokens?) {}
+  func write(_ tokens: AuthTokens?) -> Bool { false }
 }
 
 final class Gate: Sendable {
@@ -64,12 +71,17 @@ final class FakeTransport: AuthTransport {
   private let delay: Duration
   private let gate: Gate?
   private let signOutGate: Gate?
+  private let failSignOut: Bool
 
-  init(_ replies: [Reply], delay: Duration = .zero, gate: Gate? = nil, signOutGate: Gate? = nil) {
+  init(
+    _ replies: [Reply], delay: Duration = .zero, gate: Gate? = nil, signOutGate: Gate? = nil,
+    failSignOut: Bool = false
+  ) {
     state = Mutex((replies, [], []))
     self.delay = delay
     self.gate = gate
     self.signOutGate = signOutGate
+    self.failSignOut = failSignOut
   }
 
   var requests: [SignInRequest] { state.withLock { $0.requests } }
@@ -91,6 +103,7 @@ final class FakeTransport: AuthTransport {
   func signOut(token: String) async throws {
     state.withLock { $0.signOuts.append(token) }
     await signOutGate?.wait()
+    if failSignOut { throw Offline() }
   }
 
   private func wait(_ delay: Duration) async {
@@ -104,13 +117,19 @@ final class FakeTransport: AuthTransport {
 
 final class LegacyStore: LegacySessionStore {
   private let token: Mutex<String?>
+  private let canForget: Bool
 
-  init(_ token: String?) {
+  init(_ token: String?, canForget: Bool = true) {
     self.token = Mutex(token)
+    self.canForget = canForget
   }
 
   func refreshToken() -> String? { token.withLock { $0 } }
-  func forget() { token.withLock { $0 = nil } }
+  func forget() -> Bool {
+    guard canForget else { return false }
+    token.withLock { $0 = nil }
+    return true
+  }
 }
 
 final class Clock: Sendable {

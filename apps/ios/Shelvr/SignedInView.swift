@@ -10,6 +10,7 @@ struct SignedInView: View {
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var user: CurrentUser?
+  @State private var signOutFailed = false
 
   var body: some View {
     VStack(spacing: 12) {
@@ -20,10 +21,21 @@ struct SignedInView: View {
         .font(.headline)
         .accessibilityIdentifier("signed-in-user")
       Button(copy("account.signOut")) {
-        Task { await backend.signOut() }
+        Task {
+          do {
+            try await backend.signOut()
+          } catch {
+            signOutFailed = true
+          }
+        }
       }
       .buttonStyle(.signIn)
       .padding(.top, 24)
+      if signOutFailed {
+        Text(copy("account.signOutFailed"))
+          .font(.footnote)
+          .foregroundStyle(.red)
+      }
     }
     .padding(24)
     .task {

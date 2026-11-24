@@ -3,7 +3,7 @@ import Security
 
 public protocol TokenVault: Sendable {
   func read() -> AuthTokens?
-  func write(_ tokens: AuthTokens?)
+  @discardableResult func write(_ tokens: AuthTokens?) -> Bool
 }
 
 public struct KeychainTokenVault: TokenVault {
@@ -19,12 +19,11 @@ public struct KeychainTokenVault: TokenVault {
     Keychain.read(query).flatMap { try? JSONDecoder().decode(AuthTokens.self, from: $0) }
   }
 
-  public func write(_ tokens: AuthTokens?) {
-    guard let tokens, let data = try? JSONEncoder().encode(tokens) else {
-      Keychain.delete(query)
-      return
-    }
-    Keychain.write(data, to: query)
+  @discardableResult
+  public func write(_ tokens: AuthTokens?) -> Bool {
+    guard let tokens else { return Keychain.delete(query) }
+    guard let data = try? JSONEncoder().encode(tokens) else { return false }
+    return Keychain.write(data, to: query)
   }
 
   private var query: [String: Any] {
@@ -46,21 +45,24 @@ enum Keychain {
     return result as? Data
   }
 
-  static func write(_ data: Data, to query: [String: Any]) {
+  static func write(_ data: Data, to query: [String: Any]) -> Bool {
     let attributes: [String: Any] = [
       kSecValueData as String: data,
       kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
     ]
-    if SecItemUpdate(query as CFDictionary, attributes as CFDictionary) == errSecItemNotFound {
-      SecItemAdd(query.merging(attributes) { $1 } as CFDictionary, nil)
+    let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+    if status == errSecItemNotFound {
+      return SecItemAdd(query.merging(attributes) { $1 } as CFDictionary, nil) == errSecSuccess
     }
+    return status == errSecSuccess
   }
 
-  static func delete(_ query: [String: Any]) {
-    SecItemDelete(query as CFDictionary)
+  static func delete(_ query: [String: Any]) -> Bool {
+    let status = SecItemDelete(query as CFDictionary)
+    return status == errSecSuccess || status == errSecItemNotFound
   }
 
-  static func accounts(service: String) -> [Data] {
+  static func accounts(service: String) -> [Data]? {
     let query: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: service,
@@ -68,9 +70,9 @@ enum Keychain {
       kSecMatchLimit as String: kSecMatchLimitAll,
     ]
     var result: AnyObject?
-    guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess,
-      let items = result as? [[String: Any]]
-    else { return [] }
+    let status = SecItemCopyMatching(query as CFDictionary, &result)
+    if status == errSecItemNotFound { return [] }
+    guard status == errSecSuccess, let items = result as? [[String: Any]] else { return nil }
     return items.compactMap { item in
       let account = item[kSecAttrAccount as String]
       return account as? Data ?? (account as? String).map { Data($0.utf8) }

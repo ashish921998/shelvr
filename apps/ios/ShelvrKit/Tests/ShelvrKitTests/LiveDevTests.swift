@@ -43,7 +43,7 @@ struct LiveDevTests {
     let session = AuthSession(transport: transport, vault: vault)
     try await session.signIn(.anonymous)
     let signedIn = try #require(vault.tokens)
-    await session.signOut()
+    try await session.signOut()
     let reply = try await transport.signIn(SignInRequest(refreshToken: signedIn.refreshToken))
     #expect(reply.tokens == nil)
   }

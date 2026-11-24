@@ -29,38 +29,53 @@ public enum AuthSessionError: Error, Equatable {
   case notSignedIn
   case signInRefused
   case missingRedirect
+  case sessionStorageUnavailable
 }
 
-public actor AuthSession {
+actor AuthSession {
   private let transport: any AuthTransport
   private let vault: any TokenVault
+  private let legacy: (any LegacySessionStore)?
+  private let signOutMarker: SignOutMarker?
   private let now: @Sendable () -> Date
+  private var waitingForStorage: Bool
   private var tokens: AuthTokens?
   private var freshUntil: Date?
   private var mintedAt: Date?
   private var refresh: Task<AuthTokens?, Error>?
   private var lastReconnect: (token: String, at: Date)?
 
-  public init(
+  init(
     transport: any AuthTransport,
     vault: any TokenVault,
+    legacy: (any LegacySessionStore)? = nil,
+    signOutMarker: SignOutMarker? = nil,
     now: @escaping @Sendable () -> Date = Date.init
   ) {
     self.transport = transport
     self.vault = vault
+    self.legacy = legacy
+    self.signOutMarker = signOutMarker
     self.now = now
-    self.tokens = vault.read()
+    let markerState = signOutMarker?.state ?? .absent
+    self.waitingForStorage = markerState == .inaccessible
+    self.tokens = markerState == .absent ? vault.read() : nil
   }
 
-  public var isSignedIn: Bool { tokens != nil }
+  var isSignedIn: Bool { tokens != nil }
 
-  public func signIn(_ credential: SignInCredential) async throws {
+  func signIn(_ credential: SignInCredential) async throws {
     let response = try await transport.signIn(credential.request)
     guard let fresh = response.tokens else { throw AuthSessionError.signInRefused }
-    store(fresh)
+    guard signOutMarker?.state != .inaccessible, legacy?.forget() != false, vault.write(fresh) else {
+      throw AuthSessionError.sessionStorageUnavailable
+    }
+    try signOutMarker?.clear()
+    waitingForStorage = false
+    setTokens(fresh)
   }
 
-  public func startOAuth(provider: String, redirectTo: URL) async throws -> OAuthStart {
+  func startOAuth(provider: String, redirectTo: URL) async throws -> OAuthStart {
     let response = try await transport.signIn(
       SignInRequest(provider: provider, params: ["redirectTo": redirectTo.absoluteString]))
     guard
@@ -70,16 +85,28 @@ public actor AuthSession {
     return OAuthStart(url: redirect, verifier: verifier)
   }
 
-  public func importLegacy(from legacy: some LegacySessionStore) {
-    guard let refreshToken = legacy.refreshToken() else { return }
+  func restore() {
+    switch signOutMarker?.state ?? .absent {
+    case .pending:
+      waitingForStorage = false
+      clearStoredSession()
+      return
+    case .inaccessible:
+      return
+    case .absent:
+      if waitingForStorage {
+        waitingForStorage = false
+        tokens = vault.read()
+      }
+    }
+    guard let legacy, let refreshToken = legacy.refreshToken() else { return }
     let handoff = AuthTokens(token: "", refreshToken: refreshToken)
-    vault.write(handoff)
-    guard vault.read() == handoff else { return }
-    store(handoff)
+    guard vault.write(handoff), vault.read() == handoff else { return }
+    setTokens(handoff)
     legacy.forget()
   }
 
-  public func validToken(minimumLifetime: TimeInterval = 300, reconnecting: Bool = false) async throws
+  func validToken(minimumLifetime: TimeInterval = 300, reconnecting: Bool = false) async throws
     -> String?
   {
     guard let current = tokens else { return nil }
@@ -112,13 +139,24 @@ public actor AuthSession {
     }
   }
 
-  public func signOut() async {
+  func signOut(onLocalSignOut: @Sendable () async -> Void = {}) async throws {
+    try signOutMarker?.record()
     let token = tokens?.token
     refresh?.cancel()
     refresh = nil
-    store(nil)
+    setTokens(nil)
+    clearStoredSession()
+    await onLocalSignOut()
     guard let token, !token.isEmpty else { return }
     try? await transport.signOut(token: token)
+  }
+
+  private func clearStoredSession() {
+    let clearedNative = vault.write(nil)
+    let clearedLegacy = legacy?.forget() ?? true
+    if clearedNative, clearedLegacy {
+      try? signOutMarker?.clear()
+    }
   }
 
   private func refreshed() async throws -> AuthTokens? {
@@ -127,7 +165,8 @@ public actor AuthSession {
     let task = Task { () async throws -> AuthTokens? in
       let fresh = try await transport.signIn(SignInRequest(refreshToken: refreshToken)).tokens
       guard tokens?.refreshToken == refreshToken else { return tokens }
-      store(fresh)
+      vault.write(fresh)
+      setTokens(fresh)
       return fresh
     }
     refresh = task
@@ -135,10 +174,9 @@ public actor AuthSession {
     return try await task.value
   }
 
-  private func store(_ fresh: AuthTokens?) {
+  private func setTokens(_ fresh: AuthTokens?) {
     tokens = fresh
     mintedAt = fresh.map { _ in now() }
     freshUntil = fresh?.lifetime.map { now().addingTimeInterval($0) }
-    vault.write(fresh)
   }
 }

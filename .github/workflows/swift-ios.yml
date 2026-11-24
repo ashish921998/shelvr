@@ -1,0 +1,45 @@
+name: Swift iOS
+
+on:
+  pull_request:
+    paths:
+      - "apps/ios/**"
+      - "apps/native/src/locales/*.json"
+      - ".github/workflows/swift-ios.yml"
+  push:
+    branches: [main]
+    paths:
+      - "apps/ios/**"
+      - "apps/native/src/locales/*.json"
+      - ".github/workflows/swift-ios.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: swift-ios-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  swift-ios:
+    name: Swift tests and simulator build
+    runs-on: macos-26
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/ios
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Test ShelvrKit
+        run: swift test --package-path ShelvrKit --skip Live
+
+      - name: Build the arm64 iOS simulator app
+        run: >-
+          xcodebuild -project Shelvr.xcodeproj -scheme Shelvr -configuration Debug
+          -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData
+          CODE_SIGNING_ALLOWED=NO ARCHS=arm64 -quiet build

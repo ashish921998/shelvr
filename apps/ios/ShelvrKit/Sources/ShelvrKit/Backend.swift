@@ -16,17 +16,18 @@ public final class Backend {
   public let environment: AppEnvironment
   public let client: ConvexClientWithAuth<String>
   private let session: AuthSession
-  private let legacy: LegacyExpoSession
   @ObservationIgnored private var authWatch: AnyCancellable?
   @ObservationIgnored private var starting: Task<Void, Never>?
+  @ObservationIgnored private var signingOut = false
 
   public init(environment: AppEnvironment) {
     let session = AuthSession(
       transport: ConvexHTTPAuthTransport(deployment: environment.convexURL),
-      vault: KeychainTokenVault())
+      vault: KeychainTokenVault(),
+      legacy: LegacyExpoSession(convexURL: environment.convexURL),
+      signOutMarker: SignOutMarker(url: URL.applicationSupportDirectory.appending(path: "pending-sign-out")))
     self.environment = environment
     self.session = session
-    self.legacy = LegacyExpoSession(convexURL: environment.convexURL)
     self.client = ConvexClientWithAuth(
       deploymentUrl: environment.convexURL.absoluteString,
       authProvider: SessionAuthProvider(session: session))
@@ -34,7 +35,9 @@ public final class Backend {
       .receive(on: DispatchQueue.main)
       .sink { [weak self] state in
         MainActor.assumeIsolated {
-          guard let self, self.status == .signedIn, case .unauthenticated = state else { return }
+          guard let self, self.status == .signedIn, !self.signingOut,
+            case .unauthenticated = state
+          else { return }
           self.status = .signedOut
         }
       }
@@ -50,7 +53,7 @@ public final class Backend {
 
   private func resume() async {
     guard status != .signedIn else { return }
-    await session.importLegacy(from: legacy)
+    await session.restore()
     guard await session.isSignedIn else {
       status = .signedOut
       return
@@ -60,7 +63,6 @@ public final class Backend {
 
   public func signIn(_ credential: SignInCredential) async throws {
     try await session.signIn(credential)
-    legacy.forget()
     await connect()
   }
 
@@ -68,12 +70,21 @@ public final class Backend {
     try await session.startOAuth(provider: provider, redirectTo: environment.oauthRedirect)
   }
 
-  public func signOut() async {
-    guard status != .signedOut else { return }
-    status = .signedOut
-    legacy.forget()
+  public func signOut() async throws {
+    guard status == .signedIn, !signingOut else { return }
+    signingOut = true
+    do {
+      try await session.signOut { await self.disconnect() }
+    } catch {
+      signingOut = false
+      throw error
+    }
+  }
+
+  private func disconnect() async {
     await client.logout()
-    await session.signOut()
+    status = .signedOut
+    signingOut = false
   }
 
   public func query<T: Decodable>(_ name: String, as type: T.Type) -> some AsyncSequence<T, any Error> {

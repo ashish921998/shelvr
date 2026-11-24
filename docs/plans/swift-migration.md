@@ -48,7 +48,7 @@ Expo app keeps shipping until the Swift app passes final QA.
 | 9   | City page and plans    | City page and map, Plan a date, Plan a trip, vote links and the Ask sheet                                                                                                                                                   | Golden vectors for the ported vote, date and stamp rules                                                                                       |
 | 10  | Social and Passport    | Shared lists and invites, Trips tab, Passport, city stamps, passport cards                                                                                                                                                  | Two simulator accounts join one list                                                                                                           |
 | 11  | Platform               | Push through the Expo push service (APNs token exchanged for an `ExponentPushToken`, `notifications:registerDevice`), notification routing, the nine locales from `en.json`, PostHog events with the current names          | Push to the dev build; locale snapshot in French and German                                                                                    |
-| 12  | Release                | CI job for `swift test` and an app build, TestFlight build, store metadata                                                                                                                                                  | TestFlight install over the current App Store build                                                                                            |
+| 12  | Release                | Signed TestFlight build and store metadata                                                                                                                                                                                  | TestFlight install over the current App Store build                                                                                            |
 
 ## Gates that wait for Ashish
 
@@ -57,8 +57,9 @@ Expo app keeps shipping until the Swift app passes final QA.
   no Expo bundle still calling an old function shape, remove `apps/native/src`, the Expo
   config, the OTA workflows and the fingerprint tools. The backend then moves to
   `apps/backend`.
-- **CI minutes.** A macOS runner costs about ten times a Linux one. Milestone 12 adds the job;
-  until then the Swift tests run locally and in each pull request's Verification section.
+
+The Swift CI workflow runs the package tests and arm64 simulator build on changes to
+`apps/ios`, the shared locale JSON files, or the workflow itself.
 
 ## Risks and how each milestone handles them
 

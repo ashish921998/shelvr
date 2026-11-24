@@ -3,7 +3,7 @@ import Security
 
 public protocol LegacySessionStore: Sendable {
   func refreshToken() -> String?
-  func forget()
+  @discardableResult func forget() -> Bool
 }
 
 public struct LegacyExpoSession: LegacySessionStore {
@@ -20,7 +20,7 @@ public struct LegacyExpoSession: LegacySessionStore {
   }
 
   public func refreshToken() -> String? {
-    for item in items() {
+    for item in Self.services.flatMap({ items(service: $0) ?? [] }) {
       guard
         let data = Keychain.read(item),
         let token = String(data: data, encoding: .utf8), !token.isEmpty
@@ -30,21 +30,24 @@ public struct LegacyExpoSession: LegacySessionStore {
     return nil
   }
 
-  public func forget() {
-    for item in items() { Keychain.delete(item) }
+  @discardableResult
+  public func forget() -> Bool {
+    let cleared = Self.services.map { service in
+      guard let items = items(service: service) else { return false }
+      return items.map { Keychain.delete($0) }.allSatisfy { $0 }
+    }
+    return cleared.allSatisfy { $0 }
   }
 
-  private func items() -> [[String: Any]] {
-    Self.services.flatMap { service in
-      Keychain.accounts(service: service)
-        .filter { String(data: $0, encoding: .utf8).map(matches(account:)) ?? false }
-        .map { account in
-          [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-          ]
-        }
-    }
+  private func items(service: String) -> [[String: Any]]? {
+    Keychain.accounts(service: service)?
+      .filter { String(data: $0, encoding: .utf8).map(matches(account:)) ?? false }
+      .map { account in
+        [
+          kSecClass as String: kSecClassGenericPassword,
+          kSecAttrService as String: service,
+          kSecAttrAccount as String: account,
+        ]
+      }
   }
 }
