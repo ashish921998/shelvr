@@ -230,6 +230,8 @@
   "pro.unlockShelvr": "Shelvr Pro freischalten",
   "share.openToFinish": "Öffnen Sie Shelvr nach dem Teilen, um das Speichern abzuschließen.",
   "share.openToSignIn": "Öffnen Sie Shelvr und melden Sie sich an, bevor Sie etwas teilen.",
+  "share.copyNote": "Notiz kopieren",
+  "share.longNoteRecovery": "Diese Notiz ist zu lang für Shelvr. Kopieren Sie den Text, bevor Sie die Notiz löschen.",
   "share.reading": "Geteilte Inhalte werden gelesen…",
   "share.empty": "Nichts zu speichern",
   "share.pending": "Einige Inhalte sind noch ausstehend.",
