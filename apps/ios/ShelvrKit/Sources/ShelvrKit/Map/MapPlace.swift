@@ -11,6 +11,7 @@ public struct MapPlace: Decodable, Hashable, Identifiable, Sendable {
 
   public var id: String {
     if let _id { return "discover:\(_id)" }
+    if let appleId { return "saved-apple:\(appleId)" }
     return "\(itemId ?? ""):\(name):\(lat):\(lng)"
   }
 

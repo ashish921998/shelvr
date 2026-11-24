@@ -27,3 +27,17 @@ import Testing
   let places = try JSONDecoder().decode([MapPlace].self, from: JSONSerialization.data(withJSONObject: rows))
   #expect(MapPlace.search(places, query: "cafe").prefix(5).compactMap(\.itemId) == ["6", "1", "2", "3", "4"])
 }
+
+@Test func separateAppleVenuesAtTheSameCoordinatesHaveIndependentVisitState() throws {
+  let rows = """
+    [{"itemId":"same","appleId":"A","name":"Market","lat":1,"lng":2,"kinds":[]},
+    {"itemId":"same","appleId":"B","name":"Market","lat":1,"lng":2,"kinds":[]}]
+    """
+  let marks = """
+    [{"key":"market","spots":[{"appleId":"A","lat":1,"lng":2}]}]
+    """
+  let places = try JSONDecoder().decode([MapPlace].self, from: Data(rows.utf8))
+  let visits = try JSONDecoder().decode([MapVisit].self, from: Data(marks.utf8))
+  #expect(places[0].id != places[1].id)
+  #expect(MapVisit.visitedIDs(visits, among: places) == [places[0].id])
+}
