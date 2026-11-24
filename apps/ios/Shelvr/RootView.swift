@@ -21,6 +21,16 @@ struct RootView: View {
     .onChange(of: pushDevice.link, initial: true) { _, link in
       if let link { pendingLink = link; pushDevice.link = nil }
     }
+    .task(id: backend.sessionGeneration) {
+      if backend.status == .signedOut { Analytics.identify(nil) }
+      guard backend.status == .signedIn else { return }
+      do {
+        for try await user in backend.query("users:getCurrentUser", as: AccountView.CurrentUser?.self) {
+          try Task.checkCancellation()
+          Analytics.identify(user?._id)
+        }
+      } catch { if !Task.isCancelled { Analytics.failure("analytics_identity_failed") } }
+    }
     .onOpenURL { url in
       if let link = AppLink(url.absoluteString), link.path != ["sign-in"] { pendingLink = link }
     }

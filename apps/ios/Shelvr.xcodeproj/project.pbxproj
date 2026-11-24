@@ -18,6 +18,7 @@
 		A10000000000000000000067 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
 		A10000000000000000000068 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
 B70000000000000000000001 = {isa = PBXBuildFile; productRef = B70000000000000000000002; };
+        B71000000000000000000001 = {isa = PBXBuildFile; productRef = B71000000000000000000002; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -53,6 +54,7 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 			files = (
 				A10000000000000000000014 /* ShelvrKit in Frameworks */,
                 B70000000000000000000001 /* RevenueCatUI in Frameworks */,
+                B71000000000000000000001 /* PostHog in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -128,6 +130,7 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 			packageProductDependencies = (
 				A10000000000000000000013 /* ShelvrKit */,
                 B70000000000000000000002 /* RevenueCatUI */,
+                B71000000000000000000002 /* PostHog */,
 			);
 			productName = Shelvr;
 			productReference = A10000000000000000000004 /* Shelvr.app */;
@@ -155,6 +158,7 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 			packageReferences = (
 				A10000000000000000000012 /* XCLocalSwiftPackageReference "ShelvrKit" */,
                 B70000000000000000000003 /* purchases-ios */,
+                B71000000000000000000003 /* posthog-ios */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000003 /* Products */;
@@ -258,6 +262,7 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 			productName = ShelvrKit;
 		};
         B70000000000000000000002 = {isa = XCSwiftPackageProductDependency; package = B70000000000000000000003; productName = RevenueCatUI; };
+        B71000000000000000000002 = {isa = XCSwiftPackageProductDependency; package = B71000000000000000000003; productName = PostHog; };
 /* End XCSwiftPackageProductDependency section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -266,6 +271,7 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
             repositoryURL = "https://github.com/RevenueCat/purchases-ios.git";
             requirement = {kind = exactVersion; version = 5.95.0; };
         };
+        B71000000000000000000003 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/PostHog/posthog-ios.git"; requirement = {kind = exactVersion; version = 3.83.0; }; };
 /* End XCRemoteSwiftPackageReference section */
 	};
 	rootObject = A10000000000000000000001 /* Project object */;

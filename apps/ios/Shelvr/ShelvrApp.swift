@@ -8,6 +8,8 @@ struct ShelvrApp: App {
   @State private var copy = Copy()
   @Environment(\.scenePhase) private var scenePhase
 
+  init() { Analytics.start() }
+
   var body: some Scene {
     WindowGroup {
       RootView()

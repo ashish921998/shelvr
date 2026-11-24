@@ -27,7 +27,14 @@ final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCente
     let info = response.notification.request.content.userInfo
     let data = info["body"] as? [String: Any]
     let path = data?["url"] as? String ?? info["url"] as? String
-    if let path, let parsed = AppLink(path) { Task { @MainActor in self.link = parsed } }
+    if let path, let parsed = AppLink(path) {
+      let kind = data?["kind"] as? String ?? info["kind"] as? String ?? "unknown"
+      let id = data?["notificationId"] as? String ?? info["notificationId"] as? String ?? ""
+      Task { @MainActor in
+        Analytics.capture("notification_opened", ["notification_kind": kind, "notification_id": id])
+        self.link = parsed
+      }
+    }
     completionHandler()
   }
 }
@@ -67,7 +74,7 @@ struct PushRegistrationView: ViewModifier {
           development: development).exchange()
         try Task.checkCancellation()
         try await backend.registerPush(expo, installation: install, locale: copy.locale)
-      } catch {}
+      } catch { if !Task.isCancelled { Analytics.failure("notification_registration_failed") } }
     }
   }
 }
