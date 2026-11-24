@@ -35,3 +35,12 @@ private func stamp(_ name: String, _ city: String?, _ country: String? = nil,
   #expect(section.cardPlaces.map(\.name) == ["1","2","3","4","5","6"])
   #expect(section.month == Date(timeIntervalSince1970: 1))
 }
+
+@Test func matchingCityStampsHeadSectionsAndNamesakesStaySeparate() {
+  let stamps = [stamp("A", "Lisboa", "PT"), stamp("B", "Paris", "US")]
+  let cities = [PassportCityStamp(city: "lisbon", country: "PT", stampedAt: 1),
+    PassportCityStamp(city: "paris", country: "FR", stampedAt: 1)]
+  let pages = PassportPages(stamps: stamps, completion: [], cities: cities)
+  #expect(pages.sections.map { $0.cityStamp?.id } == ["lisbon", nil])
+  #expect(pages.standalone.map(\.id) == ["paris"])
+}
