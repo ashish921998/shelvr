@@ -17,6 +17,7 @@
 		A10000000000000000000066 /* ja.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000046 /* ja.json */; };
 		A10000000000000000000067 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
 		A10000000000000000000068 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
+B70000000000000000000001 = {isa = PBXBuildFile; productRef = B70000000000000000000002; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -51,6 +52,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000014 /* ShelvrKit in Frameworks */,
+                B70000000000000000000001 /* RevenueCatUI in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -125,6 +127,7 @@
 			name = Shelvr;
 			packageProductDependencies = (
 				A10000000000000000000013 /* ShelvrKit */,
+                B70000000000000000000002 /* RevenueCatUI */,
 			);
 			productName = Shelvr;
 			productReference = A10000000000000000000004 /* Shelvr.app */;
@@ -151,6 +154,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A10000000000000000000012 /* XCLocalSwiftPackageReference "ShelvrKit" */,
+                B70000000000000000000003 /* purchases-ios */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000003 /* Products */;
@@ -253,7 +257,16 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = ShelvrKit;
 		};
+        B70000000000000000000002 = {isa = XCSwiftPackageProductDependency; package = B70000000000000000000003; productName = RevenueCatUI; };
 /* End XCSwiftPackageProductDependency section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+        B70000000000000000000003 = {
+            isa = XCRemoteSwiftPackageReference;
+            repositoryURL = "https://github.com/RevenueCat/purchases-ios.git";
+            requirement = {kind = exactVersion; version = 5.95.0; };
+        };
+/* End XCRemoteSwiftPackageReference section */
 	};
 	rootObject = A10000000000000000000001 /* Project object */;
 }
