@@ -39,9 +39,6 @@ struct InviteEntryView: View {
     .safeAreaInset(edge: .bottom) {
       if !entry.loaded, entry.failed { Button(copy("common.retry")) { entry.restore() } }
     }
-    .onChange(of: pendingLink) { previous, next in
-      if next == nil, let queued = entry.didNavigate(to: previous), !entry.route(queued) { pendingLink = queued }
-    }
     .sheet(item: $entry.preview) { invite in
       NavigationStack {
         Group {
