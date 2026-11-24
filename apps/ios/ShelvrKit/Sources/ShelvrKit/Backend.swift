@@ -144,7 +144,7 @@ public final class Backend {
         try await unregisterInstallation(record, installation: installation)
       }
       if let identity {
-        verified = Set(try pushTokens.read().filter { $0.registrationId == identity.uuidString }.compactMap(\.apnsDigest))
+        verified = try pushTokens.verifiedAPNSDigests(for: identity)
       }
     }
     registeringPush = task
