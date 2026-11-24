@@ -74,7 +74,6 @@ struct SignedInView: View {
             if path.last == link, let target = AppLink(route) { path = [target] }
           }
         case "passport-invite" where link.path.count == 2: FriendPassportView(token: link.path[1]).id(link.path[1])
-        case "passport-story": PassportStoryView()
         case "passport": PassportView()
         case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)
         case "add": PasteLinkView()
