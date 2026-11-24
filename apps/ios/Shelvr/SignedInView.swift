@@ -170,7 +170,7 @@ struct SignedInView: View {
             let day = link.query.first(where: { $0.name == "day" })?.value.flatMap(Int.init) ?? 1
             if access.restrictsPersonalAccess {
               SocialQuery(query: "tripPlannerData:getSharedTripPlan", arguments: ["tripId": id], type: CityTrip?.self) { trip in
-                if trip?.listId != nil { AddTripStopView(id: id, initialDay: day) }
+                if let trip, trip.listId != nil { AddTripStopView(id: id, initialDay: day, sharedTrip: trip).id(link) }
                 else if access.loading { loadingPlan }
                 else { PlanGateView() }
               }
