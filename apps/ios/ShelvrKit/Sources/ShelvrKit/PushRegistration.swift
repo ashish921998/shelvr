@@ -89,6 +89,46 @@ public struct ExpoPushRequest: Encodable, Sendable {
 struct PushRegistrationRecord: Codable, Equatable {
   let token: String
   let registrationId: String
+  var apnsDigest: String? = nil
+}
+
+public struct PushDeliveryState {
+  public private(set) var token: Data?
+  private var generation: UUID?
+  private var verified = Set<String>()
+  private var suspended = false
+
+  public init() {}
+
+  public var isProbing: Bool { generation != nil && suspended }
+  public var permitsPresentation: Bool { generation != nil && !suspended && !verified.isEmpty }
+
+  static func digest(_ data: Data) -> String { Data(SHA256.hash(data: data)).base64EncodedString() }
+
+  public mutating func prepare(generation: UUID, verified: Set<String>) -> Bool {
+    let changed = self.generation != generation
+    if changed { token = nil }
+    self.generation = generation
+    self.verified = verified
+    let unverifiedToken = token.map { !verified.contains(Self.digest($0)) } ?? false
+    if (changed && verified.isEmpty) || (unverifiedToken && !suspended) { suspended = true; return true }
+    return false
+  }
+
+  public mutating func receive(_ native: Data) -> Bool {
+    guard generation != nil else { return true }
+    token = native
+    suspended = !verified.contains(Self.digest(native))
+    return suspended
+  }
+
+  public mutating func confirm(_ native: Data, generation: UUID) -> Bool {
+    guard self.generation == generation, token == native else { return false }
+    verified.insert(Self.digest(native))
+    let resume = suspended
+    suspended = false
+    return resume
+  }
 }
 
 struct PushTokenStore {
@@ -131,27 +171,22 @@ struct PushTokenStore {
 
   func writeLegacy(_ tokens: [String], service: String? = nil) throws { try write(tokens, "notification-tokens-", service: service) }
 
-  @MainActor func adoptLegacy(for generation: UUID, deviceContinuity: Bool, suspend: () -> Void, register: (PushRegistrationRecord) async throws -> Void) async throws {
+  @MainActor func registerFresh(_ fresh: String, native: Data, for generation: UUID,
+    register: (PushRegistrationRecord) async throws -> Void,
+    unregister: (PushRegistrationRecord) async throws -> Void) async throws {
+    let record = PushRegistrationRecord(token: fresh, registrationId: generation.uuidString)
+    var records = try read()
+    records.removeAll { $0.token == fresh && $0.registrationId == record.registrationId }
+    records.append(record)
+    try write(records)
+    try await register(record)
+    for old in records where old != record { try await unregister(old) }
+    try write([PushRegistrationRecord(token: fresh, registrationId: record.registrationId, apnsDigest: PushDeliveryState.digest(native))])
     var services = [keychainService]
     if keychainService.hasSuffix(":no-auth") { services.append(String(keychainService.dropLast(":no-auth".count))) }
     for service in services {
-      var pending = try legacyTokens(service: service)
-      guard !pending.isEmpty else { continue }
-      suspend()
-      if !deviceContinuity {
-        try writeLegacy([], service: service)
-        continue
-      }
-      var records = try read()
-      for token in pending {
-        let record = PushRegistrationRecord(token: token, registrationId: generation.uuidString)
-        if !records.contains(record) {
-          records.append(record)
-          try write(records)
-        }
-        try await register(record)
-        pending.removeAll { $0 == token }
-        try writeLegacy(pending, service: service)
+      if let legacy = try? legacyTokens(service: service), legacy.contains(fresh) {
+        try? writeLegacy(legacy.filter { $0 != fresh }, service: service)
       }
     }
   }
@@ -171,6 +206,26 @@ struct PushTokenStore {
   }
 
   func write(_ tokens: [PushRegistrationRecord]) throws { try write(tokens, "swift-notification-registrations-") }
+}
+
+public enum PushRetry {
+  @MainActor public static func run<T>(while current: () -> Bool,
+    sleep: @MainActor (Int) async throws -> Void = { try await Task.sleep(for: .seconds($0)) },
+    attempt: @MainActor () async throws -> T) async throws -> T {
+    var delay = 2
+    while !Task.isCancelled, current() {
+      do { return try await attempt() }
+      catch is CancellationError { throw CancellationError() }
+      catch PushRegistrationError.ownedByAnotherAccount { throw PushRegistrationError.ownedByAnotherAccount }
+      catch {
+        try Task.checkCancellation()
+        guard current() else { throw CancellationError() }
+        try await sleep(delay)
+        delay = min(60, delay * 2)
+      }
+    }
+    throw CancellationError()
+  }
 }
 
 public enum PushRegistrationError: Error, Equatable { case ownedByAnotherAccount }
