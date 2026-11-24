@@ -40,7 +40,12 @@ struct RecentWidgetSync: ViewModifier {
         do {
           for try await account in backend.query("users:getCurrentUser", as: AccountView.CurrentUser?.self) {
             try Task.checkCancellation()
-            if owner != account?._id { owner = account?._id; plan = nil }
+            if owner != account?._id {
+              try ShareInbox.system()?.activate(account?._id)
+              owner = account?._id
+              plan = nil
+              publish(nil)
+            }
           }
         } catch {}
       }
@@ -67,7 +72,7 @@ struct RecentWidgetSync: ViewModifier {
               return RecentSavesSnapshot.Item(id: card._id, title: card.title ?? card.note?.components(separatedBy: .newlines).first ?? fallback,
                 kind: card.type)
             }
-            publish(RecentSavesSnapshot(owner: owner, items: items, expires: plan.status == "lifetime" ? nil : plan.expiration))
+            publish(RecentSavesSnapshot(owner: owner, items: items, expires: plan.status == "lifetime" ? nil : plan.expiration?.addingTimeInterval(7 * 24 * 3600)))
           }
         } catch {}
       }
