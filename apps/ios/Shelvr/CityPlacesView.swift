@@ -23,7 +23,7 @@ struct CityPlacesView: View {
                 Marker(pin.name, coordinate: .init(latitude: pin.lat, longitude: pin.lng)).tag(pin)
               }
             }.frame(height: 245).listRowInsets(.init())
-            if let selected, let link = AppLink("/item/" + selected.itemID) {
+            if let selected, pins.contains(selected), let link = AppLink("/item/" + selected.itemID) {
               NavigationLink(selected.name, value: link)
             }
             planLink("/date-plan", "homePlaces.planDate", "heart")
@@ -34,7 +34,7 @@ struct CityPlacesView: View {
               NavigationLink(value: link) { Label(pin.name, systemImage: "mappin") }
             }
           }
-          ForEach(saves.filter { ($0.placePins ?? []).isEmpty }) { save in
+          ForEach(CityPlace.remainingSaves(saves, pins: pins)) { save in
             if let link = AppLink("/item/" + save.id) {
               NavigationLink(value: link) { LibrarySaveRow(save: save) }
             }

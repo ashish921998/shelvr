@@ -21,6 +21,11 @@ public struct CityPlace: Identifiable, Hashable, Sendable {
     return 6371 * 2 * asin(sqrt(min(1, a)))
   }
 
+  public static func remainingSaves(_ saves: [LibrarySave], pins: [Self]) -> [LibrarySave] {
+    let represented = Set(pins.map(\.itemID))
+    return saves.filter { !represented.contains($0.id) }
+  }
+
   public static func pins(in saves: [LibrarySave]) -> [Self] {
     var kept = [Self]()
     var byName = [String: [Int]]()

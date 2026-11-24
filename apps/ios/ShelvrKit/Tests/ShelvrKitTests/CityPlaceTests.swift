@@ -14,3 +14,14 @@ import Testing
   #expect(pins.map(\.name) == ["Café", "Cafe", "Cafe"])
   #expect(pins.map(\.appleID) == ["a", "b", nil])
 }
+
+@Test func secondarySourceSaveIsReachableAfterVenueMerging() throws {
+  let data = Data("""
+    [{"_id":"a","_creationTime":0,"status":"ready","placePins":[{"name":"Cafe","lat":1,"lng":1}]},
+     {"_id":"b","_creationTime":0,"status":"ready","placePins":[{"name":"Cafe","lat":1,"lng":1}]}]
+    """.utf8)
+  let saves = try JSONDecoder().decode([LibrarySave].self, from: data)
+  let pins = CityPlace.pins(in: saves)
+  #expect(pins.map(\.itemID) == ["a"])
+  #expect(CityPlace.remainingSaves(saves, pins: pins).map(\.id) == ["b"])
+}
