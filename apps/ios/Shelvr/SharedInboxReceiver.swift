@@ -56,13 +56,13 @@ struct SharedInboxReceiver: ViewModifier {
   }
 
   private func copyRecoveredNote(_ file: URL) {
-    guard backend.status == .signedIn, let inbox = ShareInbox.system(),
-      let owner = inbox.activeOwner, (try? inbox.owner(of: file.deletingLastPathComponent())) == owner,
-      let data = try? Data(contentsOf: file), let note = try? JSONDecoder().decode(InboxPayload.self, from: data),
-      note.kind == .note, note.siri == true, !SiriText.fitsLibrary(note.value) else { return }
-    UIPasteboard.general.setItems([[UTType.utf8PlainText.identifier: note.value]], options: [.localOnly: true])
-    guard UIPasteboard.general.string == note.value else { return }
-    do { try FileManager.default.removeItem(at: file) } catch { return }
+    guard backend.status == .signedIn, let inbox = ShareInbox.system(), let owner = inbox.activeOwner else { return }
+    let succeeded = try? inbox.copyAndRemoveNote(file, owner: owner) { text in
+      guard !SiriText.fitsLibrary(text) else { return false }
+      UIPasteboard.general.setItems([[UTType.utf8PlainText.identifier: text]], options: [.localOnly: true])
+      return UIPasteboard.general.string == text
+    }
+    guard succeeded == true else { return }
     retainedFile = nil
     failedFile = nil
     attempt += 1
