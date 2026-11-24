@@ -12,6 +12,7 @@ struct PassportActions: View {
   @State private var stopping = false
   @State private var busy = false
   @State private var failed = false
+  @State private var subscriptionFailed = false
   @State private var subscriptions = 0
   @State private var retryOperation: (@MainActor () async throws -> Void)?
 
@@ -44,17 +45,19 @@ struct PassportActions: View {
     } message: { Text(copy("passportShare.stopBody")) }
     .alert(copy("errors.unexpectedTitle"), isPresented: $failed) {
       Button(copy("common.retry")) {
-        if let retryOperation { run(retryOperation) } else { subscriptions += 1 }
+        if let retryOperation { run(retryOperation) }
+        if subscriptionFailed { subscriptions += 1 }
       }
       Button(copy("common.close"), role: .cancel) {}
     }
     .task(id: subscriptions) {
+      subscriptionFailed = false
       do {
         for try await token in backend.query("passportShares:myPassportShare", as: String?.self) {
           try Task.checkCancellation()
           activeToken = token
         }
-      } catch { if !Task.isCancelled { retryOperation = nil; failed = true } }
+      } catch { if !Task.isCancelled { subscriptionFailed = true; failed = true } }
     }
   }
 
