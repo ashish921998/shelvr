@@ -19,6 +19,7 @@ public final class Backend {
   @ObservationIgnored private var authWatch: AnyCancellable?
   @ObservationIgnored private var starting: Task<Void, Never>?
   @ObservationIgnored private var signingOut = false
+  @ObservationIgnored var preparingSiri: (subject: String, task: Task<Void, Error>)?
 
   public init(environment: AppEnvironment) {
     let session = AuthSession(

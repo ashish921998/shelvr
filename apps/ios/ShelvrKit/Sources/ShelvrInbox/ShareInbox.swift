@@ -8,13 +8,17 @@ public struct InboxPayload: Codable, Sendable {
   public let operationID: String
   public let siri: Bool?
   public let spaceID: String?
+  public let context: String?
+  public let sticker: Bool?
 
-  public init(kind: Kind, value: String, operationID: String = "share:\(UUID().uuidString)", siri: Bool = false, spaceID: String? = nil) {
+  public init(kind: Kind, value: String, operationID: String = "share:\(UUID().uuidString)", siri: Bool = false, spaceID: String? = nil, context: String? = nil, sticker: Bool? = nil) {
     self.kind = kind
     self.value = value
     self.operationID = operationID
     self.siri = siri
     self.spaceID = spaceID
+    self.context = context.map { String($0.prefix(8000)) }
+    self.sticker = sticker
   }
 }
 

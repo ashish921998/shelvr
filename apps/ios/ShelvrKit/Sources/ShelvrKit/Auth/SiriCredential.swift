@@ -49,7 +49,16 @@ extension Backend {
 
   public func prepareSiri(owner: String) async throws {
     guard status == .signedIn, let subject = SiriCredential.currentSubject,
+      subject.split(separator: "|", maxSplits: 1).first.map(String.init) == owner,
       SiriCredential.current()?.owner != owner else { return }
+    if let preparingSiri, preparingSiri.subject == subject { return try await preparingSiri.task.value }
+    let task = Task { try await issueSiri(subject: subject, owner: owner) }
+    preparingSiri = (subject, task)
+    defer { if preparingSiri?.subject == subject { preparingSiri = nil } }
+    try await task.value
+  }
+
+  private func issueSiri(subject: String, owner: String) async throws {
     guard let authorization = KeychainTokenVault().read()?.token else { return }
     let token: String = try await client.action("appIntents:issueCaptureToken")
     guard !Task.isCancelled, status == .signedIn, SiriCredential.currentSubject == subject,

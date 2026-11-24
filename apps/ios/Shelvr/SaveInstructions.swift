@@ -10,9 +10,7 @@ struct SaveInstructions: View {
       if siri {
         Section(copy("siri.lead")) {
           LabeledContent(copy("siri.saveLinkTitle"), value: "Save this link to Shelvr")
-          if #available(iOS 27.0, *) {
-            LabeledContent(copy("siri.saveNoteTitle"), value: "Save a note in Shelvr")
-          }
+          LabeledContent(copy("siri.saveNoteTitle"), value: "Save a note in Shelvr")
         }
       } else {
         Section(copy("setup.tiktok")) { Text(copy("setup.tiktokBody")) }

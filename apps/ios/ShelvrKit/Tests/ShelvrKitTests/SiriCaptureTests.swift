@@ -33,3 +33,22 @@ import Testing
   try? await Backend.installSiri({}, revokeOnFailure: { revoked += 1 })
   #expect(revoked == 1)
 }
+
+@Test func partialSiriBatchPreservesTheFirstEntityAndEachOutcome() {
+  var batch = SiriBatch()
+  batch.accepted("queued:siri:one")
+  batch.accepted("item-two")
+  #expect(batch.firstID == "queued:siri:one")
+  #expect(batch.queued == 1)
+  #expect(batch.saved == 1)
+  #expect(batch.failed(of: 3) == 1)
+}
+
+@Test func stickerAndImageContextSurviveQueuedReplay() throws {
+  let old = InboxPayload(kind: .image, value: "image-file", operationID: "siri:image", siri: true,
+    spaceID: "chosen", context: "saved from the on-screen photo", sticker: true)
+  let restored = try JSONDecoder().decode(InboxPayload.self, from: JSONEncoder().encode(old))
+  #expect(restored.context == old.context)
+  #expect(restored.sticker == true)
+  #expect(restored.spaceID == "chosen")
+}

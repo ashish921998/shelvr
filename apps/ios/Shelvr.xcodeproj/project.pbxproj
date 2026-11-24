@@ -46,8 +46,10 @@
 		C83365D5E385935CC9BB0F49 /* ShelvrInbox in Frameworks */ = {isa = PBXBuildFile; productRef = 814A9A7E2E52D1FDE55288DD /* ShelvrInbox */; };
 		D0D3756AEAB2BF82F1D0F15D /* fr-CA.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000044 /* fr-CA.json */; };
 		D0F379AD41A0134F8BF645B5 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 985944D0E54B7A93E76B5970 /* ShareViewController.swift */; };
+		E11312F464E1E162FAB8F5E6 /* StickerCutter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43BC73B270D794356E1FFDC8 /* StickerCutter.swift */; };
 		F3ACA58CA747EE58F135F7D5 /* RecentSavesWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 166B641C1F5BF309C6A1F897 /* RecentSavesWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		F7096F0482F684FCB5458973 /* de.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* de.json */; };
+		FDF3BE8650F2D3C780A6D6A3 /* StickerTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1881F177AB278E4320B662A3 /* StickerTarget.swift */; };
 		FF2631930D85E358159BB28D /* es-MX.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000042 /* es-MX.json */; };
 /* End PBXBuildFile section */
 
@@ -85,6 +87,8 @@
 
 /* Begin PBXFileReference section */
 		166B641C1F5BF309C6A1F897 /* RecentSavesWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RecentSavesWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		1881F177AB278E4320B662A3 /* StickerTarget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StickerTarget.swift; path = "../native/app-intents/Support/StickerTarget.swift"; sourceTree = "<group>"; };
+		43BC73B270D794356E1FFDC8 /* StickerCutter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StickerCutter.swift; path = "../native/modules/subject-lift/ios/StickerCutter.swift"; sourceTree = "<group>"; };
 		4E32FCBAF6CA6438522A6AEF /* Copy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Copy.swift; path = ShelvrKit/Sources/ShelvrKit/Copy.swift; sourceTree = "<group>"; };
 		5410CC2A134EE5FF603E0659 /* NotesSchemaEntities.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NotesSchemaEntities.swift; path = "../native/app-intents/Entities/NotesSchemaEntities.swift"; sourceTree = "<group>"; };
 		704ED90EEF30D691A2613844 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -183,6 +187,8 @@
 				E9A6D3C46DD4BF20D5EF6596 /* ShelvrCapture.swift */,
 				5410CC2A134EE5FF603E0659 /* NotesSchemaEntities.swift */,
 				FBB070DB4AF7B8E26C57A1AB /* CaptureRouter.swift */,
+				1881F177AB278E4320B662A3 /* StickerTarget.swift */,
+				43BC73B270D794356E1FFDC8 /* StickerCutter.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -415,6 +421,8 @@
 				68A4312E5FCF2169CDE0B40B /* ShelvrCapture.swift in Sources */,
 				934C44EF78BEB1F64DD0B086 /* NotesSchemaEntities.swift in Sources */,
 				54B8E1BEDC6B0254EEE95BF9 /* CaptureRouter.swift in Sources */,
+				FDF3BE8650F2D3C780A6D6A3 /* StickerTarget.swift in Sources */,
+				E11312F464E1E162FAB8F5E6 /* StickerCutter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
