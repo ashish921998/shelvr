@@ -42,11 +42,28 @@ import Testing
   let staged = cache.appending(path: "widget-download-file-1.jpg")
   let untouched = cache.appending(path: "not-a-widget.jpg")
   for entry in [download, staged, untouched] { try Data().write(to: entry) }
-  try RecentSavesSnapshot.clear(file, cache: cache)
+  var invalidations = 0
+  try RecentSavesSnapshot.clear(file, cache: cache) { invalidations += 1 }
+  #expect(invalidations == 1)
   #expect(!FileManager.default.fileExists(atPath: download.path))
   #expect(!FileManager.default.fileExists(atPath: staged.path))
   #expect(FileManager.default.fileExists(atPath: untouched.path))
   #expect(!FileManager.default.fileExists(atPath: thumb.path))
   #expect(!FileManager.default.fileExists(atPath: file.path))
   #expect(FileManager.default.fileExists(atPath: unrelated.path))
+}
+
+@Test func invalidatesTheWidgetBeforeTryingFallibleThumbnailCleanup() throws {
+  let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+  try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+  defer { try? FileManager.default.removeItem(at: root) }
+  let snapshot = root.appending(path: "snapshot")
+  let cache = root.appending(path: "cache")
+  try Data().write(to: snapshot)
+  try Data().write(to: cache)
+  var clearedAtInvalidation = false
+  _ = try? RecentSavesSnapshot.clear(snapshot, cache: cache) {
+    clearedAtInvalidation = !FileManager.default.fileExists(atPath: snapshot.path)
+  }
+  #expect(clearedAtInvalidation)
 }
