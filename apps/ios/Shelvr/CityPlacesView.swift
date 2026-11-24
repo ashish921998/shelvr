@@ -30,6 +30,7 @@ struct CityPlacesView: View {
             if let selected, pins.contains(selected), let link = AppLink("/item/" + selected.itemID) {
               NavigationLink(selected.name, value: link)
             }
+            planLink("/city-card", "cityCard.share", "square.and.arrow.up")
             CityVotesView(city: city, pins: pins)
             planLink("/date-plan", "homePlaces.planDate", "heart")
             planLink("/new-trip", "homePlaces.planTrip", "suitcase")

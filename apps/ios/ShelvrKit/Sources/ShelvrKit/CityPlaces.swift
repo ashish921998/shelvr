@@ -84,3 +84,31 @@ extension Backend {
       with: ["itemId": pin.itemID, "name": pin.name, "visited": went, "spot": spot])
   }
 }
+
+extension CityPlace {
+  public struct CardPoint: Sendable {
+    public let pin: CityPlace
+    public let x, y: Double
+  }
+
+  public static func cardPoints(_ pins: [CityPlace], visited: Set<CityPlace>, width: Double, height: Double) -> [CardPoint] {
+    guard !pins.isEmpty else { return [] }
+    let mid = pins.count / 2
+    let middle = (pins.map(\.lat).sorted()[mid], pins.map(\.lng).sorted()[mid])
+    let distances = pins.map { km($0.lat, $0.lng, middle.0, middle.1) }
+    let reach = max(10, distances.sorted()[mid] * 3)
+    let nearby = zip(pins, distances).compactMap { pin, d in
+      !visited.contains(pin) && (pins.count < 3 || d <= reach) ? pin : nil
+    }
+    let shown = (pins.filter(visited.contains) + nearby).prefix(40)
+    let cosLat = cos(shown.map(\.lat).reduce(0, +) / Double(shown.count) * .pi / 180)
+    let xs = shown.map { $0.lng * cosLat }, ys = shown.map { -$0.lat }
+    guard let left = xs.min(), let right = xs.max(), let top = ys.min(), let bottom = ys.max() else { return [] }
+    let span = max((right - left) / max(1, width - 32), (bottom - top) / max(1, height - 32))
+    return shown.map { pin in
+      let x = width / 2 + (span > 0 ? (pin.lng * cosLat - (left + right) / 2) / span : 0)
+      let y = height / 2 + (span > 0 ? (-pin.lat - (top + bottom) / 2) / span : 0)
+      return CardPoint(pin: pin, x: x, y: y)
+    }
+  }
+}
