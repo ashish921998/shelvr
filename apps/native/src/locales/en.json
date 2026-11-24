@@ -228,6 +228,8 @@
   "account.deleting": "Deleting…",
   "pro.checking": "Checking subscription…",
   "pro.unlockShelvr": "Unlock Shelvr Pro",
+  "share.openToFinish": "Open Shelvr to finish saving after you share.",
+  "share.openToSignIn": "Open Shelvr and sign in before sharing.",
   "share.reading": "Reading shared content…",
   "share.empty": "Nothing to save",
   "share.pending": "Some items are still pending.",

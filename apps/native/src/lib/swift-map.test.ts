@@ -14,7 +14,6 @@ it("keeps the Swift map pin, filter and visit vectors current", () => {
       (place): DiscoverPlace => ({
         ...place,
         kinds: PLACE_KINDS.filter((kind) => place.kinds.includes(kind)),
-        city: "Lisbon",
         _id: place._id as Id<"places">,
       }),
     ),

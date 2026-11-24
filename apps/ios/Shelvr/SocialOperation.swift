@@ -15,7 +15,7 @@ final class SocialOperation {
       defer { busy = false }
       do { try await action() }
       catch {
-        if allowPurchase && PastedLink.requiresPro(error) {
+        if allowPurchase && SaveFailure(error) == .proRequired {
           resume = action
           billing = .paywall
         } else { failed = true }
