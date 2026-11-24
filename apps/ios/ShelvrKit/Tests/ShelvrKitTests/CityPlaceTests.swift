@@ -25,3 +25,22 @@ import Testing
   #expect(pins.map(\.itemID) == ["a"])
   #expect(CityPlace.remainingSaves(saves, pins: pins).map(\.id) == ["b"])
 }
+@Test func swappingStopsKeepsASavedAnchorAndCyclesNearestValidVenues() throws {
+  let data = Data("""
+    {"city":"City","status":"ready","kind":"classic","evenings":[{"first":0,"second":1}],"stops":[
+      {"name":"First","lat":0,"lng":0,"slot":"first","source":"save"},
+      {"name":"Second","lat":0,"lng":0.001,"slot":"second","source":"suggested"},
+      {"name":"Nearest","lat":0,"lng":0.002,"slot":"first","source":"save"},
+      {"name":"Further","lat":0,"lng":0.004,"slot":"first","source":"save"},
+      {"name":"Two suggestions","lat":0,"lng":0.001,"slot":"first","source":"suggested"},
+      {"name":"Too far","lat":0,"lng":1,"slot":"first","source":"save"}]}
+    """.utf8)
+  let date = try JSONDecoder().decode(CityDate.self, from: data)
+  let start = try #require(date.evenings.first)
+  #expect(date.swap(start, first: true, tried: [])?.first == 2)
+  #expect(date.swap(start, first: true, tried: [2])?.first == 3)
+  #expect(date.swap(start, first: true, tried: [2, 3])?.first == 2)
+  #expect(date.nextRound([0, 2], from: 3, to: 2).isEmpty)
+  #expect(date.nextRound([0], from: 2, to: 3) == [0, 2])
+  #expect(date.swap(start, first: false, tried: []) == nil)
+}
