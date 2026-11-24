@@ -45,7 +45,7 @@ struct SignedInView: View {
             Label(copy("plan.goOut"), systemImage: "figure.walk")
           }
         }
-        .labelStyle(.iconAndTitle)
+        .labelStyle(.titleAndIcon)
         .font(.subheadline.weight(.medium))
         .padding(.horizontal, 20)
         .padding(.vertical, 6)
