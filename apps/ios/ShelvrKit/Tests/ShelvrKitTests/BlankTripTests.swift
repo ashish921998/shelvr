@@ -18,3 +18,10 @@ import Testing
   #expect(BlankTrip.limitedName(prefix + "😀") == prefix)
   #expect(BlankTrip.limitedName(String(repeating: "a", count: 78) + "😀").utf16.count == 80)
 }
+
+@Test func generationUsesTheEditedDestinationIncludingReservedCharacters() throws {
+  let link = try #require(BlankTrip.generationLink(city: "  A & B  "))
+  #expect(link.path == ["new-trip"])
+  #expect(link.query.first { $0.name == "city" }?.value == "A & B")
+  #expect(link.query.first { $0.name == "mode" }?.value == "generate")
+}

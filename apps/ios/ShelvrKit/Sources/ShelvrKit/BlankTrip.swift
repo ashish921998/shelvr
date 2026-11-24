@@ -6,6 +6,14 @@ public enum BlankTrip {
     $0.count == 2 && !["EU", "EZ", "QO", "UN"].contains($0)
   }
 
+  public static func generationLink(city: String) -> AppLink? {
+    var url = URLComponents()
+    url.path = "/new-trip"
+    url.queryItems = [URLQueryItem(name: "mode", value: "generate"),
+      URLQueryItem(name: "city", value: city.trimmingCharacters(in: .whitespacesAndNewlines))]
+    return url.string.flatMap { AppLink($0) }
+  }
+
   public static func limitedName(_ name: String) -> String {
     var count = 0
     return String(name.prefix { character in

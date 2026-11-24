@@ -5,7 +5,7 @@ import ShelvrKit
 import SwiftUI
 
 struct BlankTripView: View {
-  let generate: () -> Void
+  let generate: (String) -> Void
   let created: (AppLink) -> Void
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
@@ -31,7 +31,7 @@ struct BlankTripView: View {
   @State private var busy = false
   @State private var request: Task<Void, Never>?
 
-  init(city: String, generate: @escaping () -> Void, created: @escaping (AppLink) -> Void) {
+  init(city: String, generate: @escaping (String) -> Void, created: @escaping (AppLink) -> Void) {
     _city = State(initialValue: city)
     _name = State(initialValue: city)
     self.generate = generate
@@ -62,7 +62,7 @@ struct BlankTripView: View {
           DatePicker(copy("tripSetup.endDate"), selection: $end, in: start...(Calendar.current.date(byAdding: .day, value: 14, to: start) ?? start), displayedComponents: .date)
         } else { Stepper(value: $days, in: 1...15) { LabeledContent(copy("trip.howManyDays"), value: days.formatted()) } }
         Button(copy("tripSetup.start")) { message = ""; stayStage = true }.disabled(!valid || loadingCover)
-        Button(copy("tripSetup.generate"), action: generate)
+        Button(copy("tripSetup.generate")) { generate(city) }
       }
       if !message.isEmpty { Text(message) }
     }
