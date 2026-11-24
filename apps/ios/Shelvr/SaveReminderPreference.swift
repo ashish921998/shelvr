@@ -5,6 +5,8 @@ import UserNotifications
 struct SaveReminderPreference: View {
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
+  @Environment(\.scenePhase) private var phase
+  @State private var permitted = false
   @State private var preferences: TrialNotificationPreferences?
   @State private var busy = false
   @State private var message = ""
@@ -13,16 +15,22 @@ struct SaveReminderPreference: View {
   var body: some View {
     VStack(alignment: .leading) {
       if let preferences {
-        Toggle(copy("notifications.toggleLabel"), isOn: Binding(get: { preferences.weeklyShelfEnabled }, set: { value in
+        Toggle(copy("notifications.toggleLabel"), isOn: Binding(get: { permitted && preferences.weeklyShelfEnabled }, set: { value in
           Task { await set(value, weekly: true) }
         })).disabled(busy)
-        Toggle(copy("notifications.remindersToggle"), isOn: Binding(get: { preferences.remindersEnabled }, set: { value in
+        Toggle(copy("notifications.remindersToggle"), isOn: Binding(get: { permitted && preferences.remindersEnabled }, set: { value in
           Task { await set(value, weekly: false) }
         })).disabled(busy)
       } else if !message.isEmpty {
         Button(copy("common.retry")) { attempt += 1 }
       }
       if !message.isEmpty { Text(message).font(.footnote).foregroundStyle(.secondary) }
+    }
+    .task(id: phase) {
+      guard phase == .active else { return }
+      let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+      guard !Task.isCancelled else { return }
+      permitted = [.authorized, .provisional, .ephemeral].contains(status)
     }
     .task(id: attempt) {
       message = ""
@@ -41,6 +49,7 @@ struct SaveReminderPreference: View {
     do {
       if enabled {
         let allowed = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
+        permitted = allowed
         guard allowed else { message = copy(weekly ? "notifications.disabledBody" : "notifications.remindersDisabledBody"); return }
       }
       guard backend.status == .signedIn, session == backend.sessionGeneration else { return }
