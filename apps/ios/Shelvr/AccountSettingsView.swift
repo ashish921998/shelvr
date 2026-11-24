@@ -23,9 +23,12 @@ struct AccountSettingsView: View {
                 await UIApplication.shared.open(url)
               }
             } else if (try? await center.requestAuthorization(options: [.alert, .badge, .sound])) == true {
-              pushDevice.authorizationRevision += 1
+              pushDevice.retryEnrollment()
             }
           }
+        }
+        if pushDevice.blockedSession == backend.sessionGeneration {
+          Text(copy("notifications.previousAccount")).foregroundStyle(.secondary)
         }
         Button(copy("pro.manage")) { manage = true }
         Link(copy("legal.terms"), destination: URL(string: "https://tryshelvr.app/terms")!)
