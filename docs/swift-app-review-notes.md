@@ -1,6 +1,6 @@
 # Review notes for the Swift iOS build
 
-Use these notes when selecting the Swift build for App Review. The existing [Expo review notes](app-review-notes.md) apply while the Expo build is selected.
+Use these notes with the integrated Swift release containing onboarding (#861), Profile (#869), and Settings restore (#870). Verify the walkthrough on the TestFlight build before copying the notes into App Store Connect. The existing [Expo review notes](app-review-notes.md) apply while the Expo build is selected.
 
 ## App Review Information
 
