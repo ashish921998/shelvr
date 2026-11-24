@@ -17,3 +17,19 @@ import Testing
   #expect(!PassportEntitlement(status: "pro", expiresAt: 10000).active(at: date))
   #expect(!PassportEntitlement(status: "pro", expiresAt: nil).active(at: date))
 }
+
+@Test func visibleBadgeRowsMatchExpo() throws {
+  struct Vector: Decodable {
+    struct Expected: Decodable { let id: String; let have: Int }
+    let stamps: [BadgeStamp]
+    let cities: [PassportCityStamp]
+    let completion: [PassportCompletion]
+    let expected: [Expected]
+  }
+  let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+    .deletingLastPathComponent().deletingLastPathComponent().appending(path: "TestData/passport-badges.json")
+  let row = try JSONDecoder().decode(Vector.self, from: Data(contentsOf: file))
+  let visible = PassportBadge.visible(stamps: row.stamps, cities: row.cities, completion: row.completion)
+  #expect(visible.map(\.id) == row.expected.map(\.id))
+  #expect(visible.map(\.have) == row.expected.map(\.have))
+}
