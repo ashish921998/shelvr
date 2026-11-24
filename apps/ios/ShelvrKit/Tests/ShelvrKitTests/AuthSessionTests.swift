@@ -58,6 +58,7 @@ struct AuthSessionTests {
     async let first = try? auth.validToken()
     try await eventually { transport.requests.count == 1 }
     async let second = try? auth.validToken()
+    try await Task.sleep(for: .milliseconds(10))
     await auth.signOut()
     gate.open()
     #expect(await [first, second] == [String?.none, String?.none])

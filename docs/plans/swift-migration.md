@@ -68,6 +68,8 @@ Expo app keeps shipping until the Swift app passes final QA.
   item and deletes the Expo copy once that item holds it, then exchanges it like any stored
   session, so an offline first launch tries again from its own item. An Expo token found at a
   later launch is a newer sign-in from a reinstalled Expo build, and replaces the Swift session.
+  A sign-out in a reinstalled Expo build does not reach the Swift session, which the next
+  Swift launch resumes; an Expo rollback build would have to delete the Swift item on sign-out.
   Milestone 2 proves this on a real Expo install.
 - **Push stops or doubles.** The backend sends only through Expo. The Swift app must register an
   `ExponentPushToken`, reuse the Expo installation id so the token does not change, and keep
