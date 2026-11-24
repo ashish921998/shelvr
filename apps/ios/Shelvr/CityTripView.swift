@@ -107,7 +107,7 @@ struct CityTripView: View {
             add(day: 0)
           }
           if let undo {
-            Button(copy("common.undo")) { change {
+            Button(copy("common.undo")) { change(clearPrevious: false) {
               _ = try await backend.moveTripStop(undo.0, day: undo.1.day, index: undo.1.index)
               self.undo = nil
             } }
@@ -196,11 +196,11 @@ struct CityTripView: View {
     change { offerUndo(stop, try await backend.moveTripStop(stop, day: day, index: index)) }
   }
 
-  private func change(_ operation: @escaping @MainActor () async throws -> Void) {
+  private func change(clearPrevious: Bool = true, _ operation: @escaping @MainActor () async throws -> Void) {
     guard !busy else { return }
     busy = true
     editFailed = false
-    undo = nil
+    if clearPrevious { undo = nil }
     Task {
       defer { busy = false }
       do { try await operation() } catch { editFailed = true }
