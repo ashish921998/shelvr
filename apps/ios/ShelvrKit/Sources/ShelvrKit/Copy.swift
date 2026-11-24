@@ -21,7 +21,9 @@ public struct Copy: Sendable {
     let language = selected.split(separator: "-").first.map(String.init) ?? selected
     let preferred = preferredLanguages.map { $0.replacingOccurrences(of: "_", with: "-") }
       .first { $0.split(separator: "-").first?.lowercased() == language }
-    numberLocale = Locale(identifier: preferred ?? selected)
+    let region = preferredLanguages.lazy.compactMap { Locale(identifier: $0).region?.identifier }.first
+    let fallback = selected == "en" ? region.map { "en-" + $0 } ?? selected : selected
+    numberLocale = Locale(identifier: preferred ?? fallback)
     let chain = ["en", language, selected].filter(Self.supportedLocales.contains)
     var visited = Set<String>()
     var loaded: [String: Message] = [:]

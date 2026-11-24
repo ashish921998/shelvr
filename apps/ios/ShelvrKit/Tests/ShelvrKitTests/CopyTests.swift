@@ -72,3 +72,8 @@ struct CopyTests {
     }
   }
 }
+
+@Test func keepsIndianNumberGroupingWhenFallingBackToEnglish() throws {
+  let copy = Copy(bundle: try #require(Bundle(url: CopyTests.locales)), preferredLanguages: ["hi-IN"])
+  #expect(copy("spaces.saveCount", count: 1_234_567) == "12,34,567 saves")
+}
