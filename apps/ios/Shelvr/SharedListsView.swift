@@ -20,7 +20,13 @@ struct SharedListsView: View {
         if rows.isEmpty { ContentUnavailableView(copy("sharedLists.title"), systemImage: "person.2",
           description: Text(copy("sharedLists.hint"))) }
       }
-    }.navigationTitle(copy("sharedLists.title"))
+    }
+    .navigationTitle(copy("sharedLists.title"))
+    .toolbar {
+      if let route = AppLink("/new-shared-list") {
+        NavigationLink(value: route) { Label(copy("sharedLists.newList"), systemImage: "plus") }
+      }
+    }
   }
 }
 
@@ -74,6 +80,15 @@ struct SharedListView: View {
   @Environment(\.copy) private var copy
   @State private var failed = false
   @State private var writing: Set<String> = []
+  @State private var add = false
+  @State private var removal: Removal?
+  @State private var operation = SocialOperation()
+  @Environment(\.dismiss) private var dismiss
+
+  private struct Removal {
+    let title, message, confirm: String
+    let apply: @MainActor () async throws -> Void
+  }
 
   var body: some View {
     SocialQuery(query: "sharedLists:getSharedList", arguments: ["listId": id], type: SharedListDetail?.self) { detail in
@@ -84,10 +99,21 @@ struct SharedListView: View {
               Label(copy("sharedLists.invite"), systemImage: "person.badge.plus")
             }
             ForEach(detail.members) { member in
-              Text(member.isYou ? copy("sharedLists.you") : member.firstName ?? copy("sharedLists.someone"))
+              let name = member.isYou ? copy("sharedLists.you") : member.firstName ?? copy("sharedLists.someone")
+              Text(name).swipeActions {
+                if detail.isOwner && !member.isYou {
+                  Button(copy("sharedLists.removeMember"), role: .destructive) {
+                    removal = Removal(title: copy("sharedLists.removeMemberTitle", ["name": name]),
+                      message: copy("sharedLists.removeMemberBody"), confirm: copy("sharedLists.removeMember")) {
+                      try await backend.removeMember(member.id, from: id)
+                    }
+                  }
+                }
+              }
             }
           } footer: { Text(copy("sharedLists.inviteHint")) }
           Section(copy("sharedLists.onList")) {
+            Button(copy("tripPlanner.addPlace")) { add = true }
             if detail.places.isEmpty { Text(copy("sharedLists.emptyBody")).foregroundStyle(.secondary) }
             ForEach(detail.places) { place in
               HStack {
@@ -114,9 +140,23 @@ struct SharedListView: View {
                   .accessibilityLabel(copy("passport.stampPlaceLabel", ["name": place.name]))
                   .accessibilityAddTraits(place.went ? .isSelected : [])
               }
+              .swipeActions {
+                Button(copy("sharedLists.removeFromList"), role: .destructive) {
+                  removal = Removal(title: place.name, message: copy("sharedLists.removeFromList"),
+                    confirm: copy("sharedLists.removeFromList")) { try await backend.removeListPlace(place.id) }
+                }
+              }
+            }
+          }
+          Button(copy("sharedLists.leave"), role: .destructive) {
+            removal = Removal(title: copy("sharedLists.leaveTitle", ["name": detail.name]),
+              message: copy("sharedLists.leaveBody"), confirm: copy("sharedLists.leave")) {
+              try await backend.leaveList(id)
+              dismiss()
             }
           }
         }
+        .sheet(isPresented: $add) { AddListPlaceView(detail: detail) }
         .navigationTitle(detail.name)
         .onDisappear {
           guard detail.places.contains(where: \.isNew), backend.status == .signedIn else { return }
@@ -127,6 +167,12 @@ struct SharedListView: View {
           description: Text(copy("sharedLists.goneBody")))
       }
     }
+    .confirmationDialog(removal?.title ?? "", isPresented: Binding(get: { removal != nil }, set: { if !$0 { removal = nil } }),
+      titleVisibility: .visible, presenting: removal) { action in
+      Button(action.confirm, role: .destructive) { operation.run(action.apply) }
+      Button(copy("common.cancel"), role: .cancel) {}
+    } message: { Text($0.message) }
+    .socialOperation(operation, failure: copy("sharedLists.failed"), close: copy("common.close"))
     .alert(copy("sharedLists.failed"), isPresented: $failed) { Button(copy("common.close")) {} }
   }
 }
