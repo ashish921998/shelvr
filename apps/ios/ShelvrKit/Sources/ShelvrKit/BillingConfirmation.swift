@@ -18,18 +18,22 @@ public final class BillingConfirmation {
 
   public init() {}
 
-  public func sync(for account: BillingAccount, current: () -> BillingAccount?,
-    synchronize: () async throws -> Bool, confirmed: () -> Void) async {
-    guard current() == account, state == .idle || state == .failed else { return }
+  @discardableResult public func sync(for account: BillingAccount, current: @escaping @MainActor () -> BillingAccount?,
+    synchronize: @escaping @MainActor () async throws -> Bool,
+    confirmed: @escaping @MainActor () -> Void) -> Task<Void, Never>? {
+    guard current() == account, state == .idle || state == .failed else { return nil }
     state = .syncing
-    do {
-      let active = try await synchronize()
+    return Task {
       guard current() == account else { state = .idle; return }
-      guard active else { state = .failed; return }
-      state = .confirmed
-      confirmed()
-    } catch {
-      state = current() == account ? .failed : .idle
+      do {
+        let active = try await synchronize()
+        guard current() == account else { state = .idle; return }
+        guard active else { state = .failed; return }
+        state = .confirmed
+        confirmed()
+      } catch {
+        state = current() == account ? .failed : .idle
+      }
     }
   }
 }

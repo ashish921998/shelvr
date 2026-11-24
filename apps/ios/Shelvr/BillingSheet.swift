@@ -103,16 +103,14 @@ struct BillingSheet: View {
   private func sync() {
     guard let session, let userID else { return }
     let expected = BillingAccount(session: session, userID: userID)
-    Task {
-      await confirmation.sync(for: expected, current: {
-        guard backend.status == .signedIn, Purchases.isConfigured else { return nil }
-        return BillingAccount(session: backend.sessionGeneration, userID: Purchases.shared.appUserID)
-      }, synchronize: {
-        try await backend.client.action("subscriptions:syncPurchase")
-      }, confirmed: {
-        confirmed()
-        dismiss()
-      })
-    }
+    confirmation.sync(for: expected, current: {
+      guard backend.status == .signedIn, Purchases.isConfigured else { return nil }
+      return BillingAccount(session: backend.sessionGeneration, userID: Purchases.shared.appUserID)
+    }, synchronize: {
+      try await backend.client.action("subscriptions:syncPurchase")
+    }, confirmed: {
+      confirmed()
+      dismiss()
+    })
   }
 }
