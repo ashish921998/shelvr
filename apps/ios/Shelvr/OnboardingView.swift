@@ -1,5 +1,7 @@
 import ConvexMobile
+import Charts
 import MapKit
+import WebKit
 import ShelvrKit
 import SwiftUI
 import UserNotifications
@@ -61,6 +63,7 @@ private struct OnboardingAccount: View {
   @State private var paywall = false
   @State private var purchased = false
   @State private var free = false
+  @State private var practiceShare = false
   @State private var carousel = 0
 
   init(account: String, pendingLink: Binding<AppLink?>) {
@@ -89,9 +92,9 @@ private struct OnboardingAccount: View {
           .frame(maxWidth: .infinity, alignment: .leading).padding(24)
         }
         .safeAreaInset(edge: .bottom) {
-          Button(copy(progress.step == .opener ? "opener.getStarted" :
+          Button(copy(progress.step == .ahaShare ? "common.share" : progress.step == .opener ? "opener.getStarted" :
             progress.step == .notifications ? "onboardingNotify.allow" : "common.continue")) {
-            proceed(skip: false)
+            if progress.step == .ahaShare { practiceShare = true } else { proceed(skip: false) }
           }
           .buttonStyle(.borderedProminent).controlSize(.large)
           .disabled(busy || (progress.step == .goal && progress.goals.isEmpty) ||
@@ -109,6 +112,17 @@ private struct OnboardingAccount: View {
           }
         }
         .disabled(busy)
+        .sheet(isPresented: $practiceShare) {
+          VStack(alignment: .leading, spacing: 20) {
+            Text(copy("aha.coachShelvr")).font(.title.bold())
+            Button {
+              practiceShare = false
+              proceed(skip: false)
+            } label: {
+              Label("Shelvr", systemImage: "bookmark.fill").frame(maxWidth: .infinity)
+            }.buttonStyle(.borderedProminent)
+          }.padding(24).presentationDetents([.height(180)])
+        }
         .sheet(isPresented: $paywall, onDismiss: {
           if purchased || free { finish() }
         }) { BillingSheet(destination: .paywall) { purchased = true } }
@@ -124,14 +138,14 @@ private struct OnboardingAccount: View {
     case .savedCount:
       title("onboardingQ.savedTitle")
       ForEach(["Few", "TenToFifty", "FiftyToTwoHundred", "Hundreds", "LostCount"], id: \.self) { count in
-        choice(copy("onboardingQ.saved" + count), selected: progress.savedCount == count) {
+        choice(copy("onboardingQ.saved\(count)"), selected: progress.savedCount == count) {
           progress.savedCount = count; persist()
         }
       }
     case .goal:
       title("onboardingQ.goalTitle")
       ForEach(["date", "travel", "food"], id: \.self) { goal in
-        choice(copy("onboardingQ.goal" + goal.capitalized), selected: progress.goals.contains(goal)) {
+        choice(copy("onboardingQ.goal\(goal.capitalized)"), selected: progress.goals.contains(goal)) {
           if !progress.goals.insert(goal).inserted { progress.goals.remove(goal) }; persist()
         }
       }
@@ -150,6 +164,12 @@ private struct OnboardingAccount: View {
       }
     case .chart:
       title("onboardingChart.title")
+      Chart {
+        ForEach(Array([0, 2, 3, 5, 9, 15, 22].enumerated()), id: \.offset) { day, value in
+          AreaMark(x: .value("Day", day), y: .value("Places", value)).interpolationMethod(.monotone)
+            .foregroundStyle(.linearGradient(colors: [.accentColor, .clear], startPoint: .top, endPoint: .bottom))
+        }
+      }.chartXAxis(.hidden).chartYAxis(.hidden).frame(height: 180).accessibilityHidden(true)
       Label(copy("onboardingChart.lost"), systemImage: "bookmark")
       Label(copy(progress.goals.contains("date") ? "onboardingChart.goalDate" :
         progress.goals.contains("travel") ? "onboardingChart.goalTrip" : "onboardingChart.goalWeekend"), systemImage: "calendar")
@@ -161,6 +181,7 @@ private struct OnboardingAccount: View {
     case .ahaShare:
       title("aha.shareTitle")
       if let reel {
+        PracticeReel(url: reel.url.appending(path: "embed/")).frame(height: 280)
         Link(destination: reel.url) { Label(copy("aha.reelBy", ["handle": reel.creator]), systemImage: "play.rectangle") }
         Text(copy("aha.coachShare"))
       }
@@ -274,4 +295,17 @@ private struct OnboardingAccount: View {
       } catch { errorKey = "errors.tryAgain" }
     }
   }
+}
+
+private struct PracticeReel: UIViewRepresentable {
+  let url: URL
+  func makeUIView(context: Context) -> WKWebView {
+    let config = WKWebViewConfiguration()
+    config.allowsInlineMediaPlayback = true
+    config.websiteDataStore = .nonPersistent()
+    let web = WKWebView(frame: .zero, configuration: config)
+    web.load(URLRequest(url: url))
+    return web
+  }
+  func updateUIView(_ view: WKWebView, context: Context) {}
 }
