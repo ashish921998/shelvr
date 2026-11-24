@@ -42,9 +42,15 @@ public struct RecentSavesSnapshot: Codable, Sendable {
     return snapshot.visible(to: owner, at: now)
   }
 
-  public static func clear(_ file: URL) throws {
+  public static func clear(_ file: URL, cache: URL = .cachesDirectory) throws {
     let manager = FileManager.default
     if manager.fileExists(atPath: file.path) { try manager.removeItem(at: file) }
+    if manager.fileExists(atPath: cache.path) {
+      for candidate in try manager.contentsOfDirectory(at: cache, includingPropertiesForKeys: nil)
+      where candidate.lastPathComponent.hasPrefix("widget-download-") {
+        try manager.removeItem(at: candidate)
+      }
+    }
     let previous = file.deletingLastPathComponent().appending(path: "ExpoWidgets")
     if manager.fileExists(atPath: previous.path) {
       for candidate in try manager.contentsOfDirectory(at: previous, includingPropertiesForKeys: nil)
