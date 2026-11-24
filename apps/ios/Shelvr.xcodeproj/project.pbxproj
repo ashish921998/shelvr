@@ -424,7 +424,7 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
             outputPaths = ();
             runOnlyForDeploymentPostprocessing = 1;
             shellPath = /bin/sh;
-            shellScript = "if [ \"$CONFIGURATION\" = Release ]; then\n  case \"$SHELVR_REVENUECAT_KEY\" in appl_?*) ;; *) echo 'error: Prepare the production RevenueCat SDK key before archiving'; exit 1 ;; esac\n  if [ -z \"$SHELVR_POSTHOG_TOKEN\" ] || [ -z \"$SHELVR_POSTHOG_HOST\" ]; then echo 'error: Prepare production analytics settings before archiving'; exit 1; fi\nfi\n";
+            shellScript = "if [ \"$CONFIGURATION\" = Release ]; then\n  case \"$SHELVR_REVENUECAT_KEY\" in *[!a-zA-Z0-9_]*|appl_) echo 'error: Invalid RevenueCat configuration'; exit 1 ;; appl_?*) ;; *) echo 'error: Prepare the production RevenueCat SDK key before archiving'; exit 1 ;; esac\n  case \"$SHELVR_POSTHOG_TOKEN\" in *[!a-zA-Z0-9_]*) echo 'error: Invalid analytics token'; exit 1 ;; esac\n  case \"$SHELVR_POSTHOG_HOST\" in https://[a-zA-Z0-9]*.*) ;; *) echo 'error: Invalid analytics host'; exit 1 ;; esac\n  if [ -z \"$SHELVR_POSTHOG_TOKEN\" ] || [ -z \"$SHELVR_POSTHOG_HOST\" ]; then echo 'error: Prepare production analytics settings before archiving'; exit 1; fi\nfi\n";
             showEnvVarsInLog = 0;
         };
 /* End PBXShellScriptBuildPhase section */

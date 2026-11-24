@@ -36,7 +36,7 @@ private enum BillingFailure: Error { case unavailable }
 struct BillingSheet: View {
   let destination: BillingDestination
   var goalVariables: [String: String] = [:]
-  var unavailable: () -> Void = {}
+  var availabilityChanged: (Bool) -> Void = { _ in }
   var confirmed: () -> Void = {}
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
@@ -77,6 +77,7 @@ struct BillingSheet: View {
     .task(id: attempt) {
       let generation = backend.sessionGeneration
       failed = false
+      availabilityChanged(true)
       do {
         for try await user in backend.query("users:getCurrentUser", as: AccountView.CurrentUser?.self) {
           guard let id = user?._id else { throw BillingFailure.unavailable }
@@ -92,7 +93,7 @@ struct BillingSheet: View {
           userID = id
           return
         }
-      } catch { if !Task.isCancelled { failed = true; unavailable() } }
+      } catch { if !Task.isCancelled { failed = true; availabilityChanged(false) } }
     }
   }
 
