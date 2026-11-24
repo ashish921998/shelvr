@@ -26,6 +26,21 @@ public enum ShareAttachment: Sendable {
   case payload(InboxPayload)
   case caption(String)
 
+  @MainActor public static func firstAvailable<T: Sendable>(_ offers: [T], read: @MainActor (T) async throws -> Self?) async throws -> Self? {
+    var failure: Error?
+    for offer in offers {
+      do { if let found = try await read(offer) { return found } }
+      catch { failure = error }
+    }
+    if let failure { throw failure }
+    return nil
+  }
+
+  public static func webLink(_ text: String) -> Self? {
+    guard let url = URL(string: text), ["https", "http"].contains(url.scheme?.lowercased()) else { return nil }
+    return .payload(InboxPayload(kind: .link, value: url.absoluteString))
+  }
+
   public static func payloads(_ attachments: [Self]) -> [InboxPayload] {
     let explicit = attachments.compactMap { attachment -> String? in
       guard case let .payload(item) = attachment, item.kind == .link else { return nil }
@@ -39,7 +54,8 @@ public enum ShareAttachment: Sendable {
         guard let match = detector?.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
           let url = match.url, ["https", "http"].contains(url.scheme?.lowercased()),
           let start = Range(match.range, in: text)?.lowerBound else { return nil }
-        let preserved = explicit.first { $0.hasPrefix(url.absoluteString) && text[start...].hasPrefix($0) }
+        let preserved = explicit.filter { $0.hasPrefix(url.absoluteString) && text[start...].hasPrefix($0) }
+          .max { $0.count < $1.count }
         return InboxPayload(kind: .link, value: preserved ?? url.absoluteString)
       }
     }
@@ -126,6 +142,27 @@ public struct ShareInbox: Sendable {
     guard payload.siri == true, payload.kind == .note, copy(payload.value) else { return false }
     try FileManager.default.removeItem(at: file)
     return true
+  }
+
+  @MainActor public func drain(_ batch: URL, owner: String, send: (URL) async throws -> Bool) async throws -> (file: URL, error: Error)? {
+    guard try self.owner(of: batch) == owner else { throw CancellationError() }
+    var firstFailure: (URL, Error)?
+    for file in try manifests(in: batch) {
+      try Task.checkCancellation()
+      guard activeOwner == owner else { throw CancellationError() }
+      do {
+        if try await send(file) {
+          try Task.checkCancellation()
+          try FileManager.default.removeItem(at: file)
+        }
+      } catch is CancellationError { throw CancellationError() }
+      catch {
+        try Task.checkCancellation()
+        if firstFailure == nil { firstFailure = (file, error) }
+      }
+    }
+    if try manifests(in: batch).isEmpty { try FileManager.default.removeItem(at: batch) }
+    return firstFailure
   }
 
   public func manifests(in batch: URL) throws -> [URL] {

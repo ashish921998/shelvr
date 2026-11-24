@@ -7,6 +7,11 @@ import UIKit
 import UniformTypeIdentifiers
 
 struct SharedInboxReceiver: ViewModifier {
+  private struct Failure {
+    let file: URL
+    let message: String
+  }
+
   @Environment(Backend.self) private var backend
   @Environment(\.scenePhase) private var phase
   @Environment(\.copy) private var copy
@@ -23,6 +28,7 @@ struct SharedInboxReceiver: ViewModifier {
       .task(id: backend.status) {
         failed = false
         failedFile = nil
+        retainedFile = nil
         failureCopy = "share.singleFailure"
         guard let inbox = ShareInbox.system() else { return }
         if backend.status == .signedOut { try? inbox.activate(nil); return }
@@ -37,6 +43,7 @@ struct SharedInboxReceiver: ViewModifier {
           failedFile = nil
           failureCopy = "share.retryHelp"
           do { try await drain(inbox) }
+          catch is CancellationError { continue }
           catch where !Task.isCancelled { failed = true }
           catch {}
         }
@@ -66,8 +73,15 @@ struct SharedInboxReceiver: ViewModifier {
       try Task.checkCancellation()
       guard let owner = user?._id else { try inbox.activate(nil); return }
       try inbox.activate(owner)
+      var firstFailure: Failure?
       for batch in try inbox.batches() where (try inbox.owner(of: batch)) == owner {
-        try await process(batch, inbox: inbox, owner: owner)
+        let failure = try await process(batch, inbox: inbox, owner: owner)
+        firstFailure = firstFailure ?? failure
+      }
+      if let firstFailure {
+        failedFile = firstFailure.file
+        failureCopy = firstFailure.message
+        failed = true
       }
       return
     }
@@ -75,6 +89,7 @@ struct SharedInboxReceiver: ViewModifier {
 
   private func copyRecoveredNote(_ file: URL) {
     guard backend.status == .signedIn, let inbox = ShareInbox.system(), let owner = inbox.activeOwner else { return }
+    do { try backend.requireShareOwner(owner) } catch { return }
     let succeeded = try? inbox.copyAndRemoveNote(file, owner: owner) { text in
       guard !SiriText.fitsLibrary(text) else { return false }
       UIPasteboard.general.setItems([[UTType.utf8PlainText.identifier: text]], options: [.localOnly: true])
@@ -87,48 +102,39 @@ struct SharedInboxReceiver: ViewModifier {
     wake?.yield(phase)
   }
 
-  private func process(_ batch: URL, inbox: ShareInbox, owner: String) async throws {
-    var retainedNote = false
-    for file in try inbox.manifests(in: batch) {
-      try Task.checkCancellation()
-      guard backend.status == .signedIn, inbox.activeOwner == owner else { return }
-      do {
-        let payload = try JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: file))
-        if payload.siri == true, payload.kind == .note, !SiriText.fitsLibrary(payload.value) {
-          retainedNote = true
-          if let selected = retainedFile, FileManager.default.fileExists(atPath: selected.path),
-            (try? inbox.owner(of: selected.deletingLastPathComponent())) == owner {
-            failedFile = selected
-          } else {
-            retainedFile = file
-            failedFile = file
-          }
-          failureCopy = "share.longNoteRecovery"
-          failed = true
-          continue
+  private func process(_ batch: URL, inbox: ShareInbox, owner: String) async throws -> Failure? {
+    let failure = try await inbox.drain(batch, owner: owner) { file in
+      try backend.requireShareOwner(owner)
+      let payload = try JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: file))
+      if payload.siri == true, payload.kind == .note, !SiriText.fitsLibrary(payload.value) {
+        if retainedFile == nil || !FileManager.default.fileExists(atPath: retainedFile?.path ?? "") {
+          retainedFile = file
         }
-        try await send(payload, batch: batch, inbox: inbox, owner: owner)
-      } catch {
-        if !Task.isCancelled {
-          failedFile = file
-          switch error as? ShelvrCapture.Failure {
-          case .proRequired: failureCopy = "freePlan.photosNeedPro"
-          case .refused("photo_limit"): failureCopy = "errors.photoLimit"
-          case .refused("image_too_large"): failureCopy = "errors.photoTooLarge"
-          case .refused("image_empty"): failureCopy = "errors.photoEmpty"
-          default: failureCopy = ImportPhoto.failureCopy(error)
-          }
-          if failureCopy == "errors.savePhoto" { failureCopy = "share.retryHelp" }
-          if failureCopy == "freePlan.photosNeedPro",
-            let payload = try? JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: file)),
-            payload.kind == .link { failureCopy = "freePlan.leftBody" }
-        }
-        throw error
+        failedFile = retainedFile
+        failureCopy = "share.longNoteRecovery"
+        failed = true
+        return false
       }
-      try Task.checkCancellation()
-      try FileManager.default.removeItem(at: file)
+      try await send(payload, batch: batch, inbox: inbox, owner: owner)
+      return true
     }
-    if !retainedNote { try FileManager.default.removeItem(at: batch) }
+    return failure.map { Failure(file: $0.file, message: refusal($0.error, at: $0.file)) }
+  }
+
+  private func refusal(_ error: Error, at file: URL) -> String {
+    let message: String
+    switch error as? ShelvrCapture.Failure {
+    case .proRequired: message = "freePlan.photosNeedPro"
+    case .refused("photo_limit"): message = "errors.photoLimit"
+    case .refused("image_too_large"): message = "errors.photoTooLarge"
+    case .refused("image_empty"): message = "errors.photoEmpty"
+    default: message = ImportPhoto.failureCopy(error)
+    }
+    if message == "errors.savePhoto" { return "share.retryHelp" }
+    if message == "freePlan.photosNeedPro",
+      let payload = try? JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: file)),
+      payload.kind == .link { return "freePlan.leftBody" }
+    return message
   }
 
   private func send(_ payload: InboxPayload, batch: URL, inbox: ShareInbox, owner: String) async throws {
@@ -145,6 +151,7 @@ struct SharedInboxReceiver: ViewModifier {
   }
 
   private func deliver(_ payload: InboxPayload, batch: URL, inbox: ShareInbox, owner: String) async throws {
+    try backend.requireShareOwner(owner)
     switch payload.kind {
     case .link, .note:
       let note = payload.kind == .note
@@ -173,7 +180,7 @@ struct SharedInboxReceiver: ViewModifier {
             credentials: credentials)
         }
       } else {
-        _ = try await backend.savePhoto(photo, operationID: payload.operationID, source: .share, analyticsSessionID: Analytics.sessionID)
+        _ = try await backend.savePhoto(photo, operationID: payload.operationID, source: .share, analyticsSessionID: Analytics.sessionID, owner: owner)
       }
     }
   }
@@ -189,12 +196,14 @@ struct SharedInboxReceiver: ViewModifier {
     }
     try Task.checkCancellation()
     guard backend.status == .signedIn, inbox.activeOwner == owner else { throw CancellationError() }
+    try backend.requireShareOwner(owner)
     let _: String = try await backend.client.mutation("items:createNoteItem", with: arguments)
   }
 
   private func withCaptureToken(owner: String, perform: (ShelvrCapture.Credentials) async throws -> Void) async throws {
     try await backend.prepareSiri(owner: owner)
     try Task.checkCancellation()
+    try backend.requireShareOwner(owner)
     guard let credential = SiriCredential.current(), credential.owner == owner else { throw ShelvrCapture.Failure.signedOut }
     do { try await perform(.init(siteUrl: credential.siteURL, token: credential.token)) }
     catch {

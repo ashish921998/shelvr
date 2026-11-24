@@ -66,7 +66,7 @@ public struct ImportPhoto: Sendable {
 public enum PhotoSource: String { case picker = "photo_import", share = "share_extension", siri }
 
 extension Backend {
-  public func savePhoto(_ photo: ImportPhoto, operationID: String, source: PhotoSource = .picker, spaceID: String? = nil, analyticsSessionID: String? = nil) async throws -> String {
+  public func savePhoto(_ photo: ImportPhoto, operationID: String, source: PhotoSource = .picker, spaceID: String? = nil, analyticsSessionID: String? = nil, owner: String? = nil) async throws -> String {
     struct Begin: Decodable {
       let kind: String
       let itemId: String?
@@ -75,8 +75,10 @@ extension Backend {
     struct Upload: Decodable { let storageId: String }
     struct Attachment: Decodable { let error: String? }
     try Task.checkCancellation()
+    if let owner { try requireShareOwner(owner) }
     let begin: Begin = try await client.mutation("items:beginImageImport", with: ["operationId": operationID])
     try Task.checkCancellation()
+    if let owner { try requireShareOwner(owner) }
     if begin.kind == "complete", let id = begin.itemId { return id }
     guard begin.kind == "upload", let url = begin.uploadUrl else { throw URLError(.badServerResponse) }
     var request = URLRequest(url: url)
@@ -86,11 +88,13 @@ extension Backend {
     try PhotoUploadFailure.check(response, body: body)
     let uploaded = try JSONDecoder().decode(Upload.self, from: body)
     try Task.checkCancellation()
+    if let owner { try requireShareOwner(owner) }
     let attached: Attachment = try await client.mutation("items:attachImageUpload", with: [
       "operationId": operationID, "storageId": uploaded.storageId
     ])
     guard attached.error == nil else { throw URLError(.badServerResponse) }
     try Task.checkCancellation()
+    if let owner { try requireShareOwner(owner) }
     var arguments: [String: ConvexEncodable?] = [
       "operationId": operationID, "aspectRatio": photo.aspectRatio,
       "saveSource": source.rawValue
