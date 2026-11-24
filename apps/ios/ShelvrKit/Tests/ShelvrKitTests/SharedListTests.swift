@@ -34,3 +34,23 @@ import Testing
     #expect(link?.query.first { $0.name == "listId" }?.value == "list")
   }
 }
+
+@Test func sharedListPickerUsesServerPlaceIdentity() throws {
+  struct Vector: Decodable {
+    struct Candidate: Decodable {
+      let name: String
+      let lat, lng: Double
+      let appleId, itemId: String?
+    }
+    let existing: SharedListDetail.Place
+    let candidate: Candidate
+    let matches: Bool
+  }
+  let url = URL(filePath: #filePath).deletingLastPathComponent().appending(path: "../../../TestData/shared-list-place-identity.json")
+  let vectors = try JSONDecoder().decode([Vector].self, from: Data(contentsOf: url))
+  for vector in vectors {
+    let candidate = vector.candidate
+    #expect(vector.existing.matches(name: candidate.name, lat: candidate.lat, lng: candidate.lng,
+      apple: candidate.appleId, item: candidate.itemId) == vector.matches)
+  }
+}

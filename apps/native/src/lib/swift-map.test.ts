@@ -1,5 +1,7 @@
 import { expect, it } from "vitest";
 import { visitMatcher } from "@convex/model/placeVisits";
+import { sameTripPlace } from "@convex/model/placeIdentity";
+import sharedListPlaceVectors from "../../../ios/TestData/shared-list-place-identity.json";
 import { discoverBeside, type DiscoverPlace } from "./map-discover";
 import { mapRowFilters } from "./map-filters";
 import { placeEmoji } from "./map-pin-emoji";
@@ -35,4 +37,10 @@ it("keeps the Swift map pin, filter and visit vectors current", () => {
       .filter(visitMatcher(vectors.visits, vectors.saved))
       .map((place) => place.itemId),
   ).toEqual(vectors.went);
+});
+
+it("keeps Swift shared-list picker identity in sync with the server", () => {
+  for (const { existing, candidate, matches } of sharedListPlaceVectors) {
+    expect(sameTripPlace(existing, candidate)).toBe(matches);
+  }
 });
