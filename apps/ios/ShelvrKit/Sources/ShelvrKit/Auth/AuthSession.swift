@@ -37,7 +37,9 @@ public actor AuthSession {
   private let now: @Sendable () -> Date
   private var tokens: AuthTokens?
   private var freshUntil: Date?
+  private var mintedAt: Date?
   private var refresh: Task<AuthTokens?, Error>?
+  private var lastReconnect: (token: String, at: Date)?
 
   public init(
     transport: any AuthTransport,
@@ -83,11 +85,29 @@ public actor AuthSession {
     guard try await refreshed() != nil else { throw AuthSessionError.signInRefused }
   }
 
-  public func validToken(minimumLifetime: TimeInterval = 300, forceRefresh: Bool = false) async throws
+  public func validToken(minimumLifetime: TimeInterval = 300, reconnecting: Bool = false) async throws
     -> String?
   {
     guard let current = tokens else { return nil }
-    if !forceRefresh, let freshUntil, freshUntil.timeIntervalSince(now()) > minimumLifetime {
+    let refresh = reconnecting && wasRefused(current.token)
+    let token = try await token(current, minimumLifetime: minimumLifetime, refresh: refresh)
+    if reconnecting { lastReconnect = token.map { ($0, now()) } }
+    return token
+  }
+
+  private func wasRefused(_ token: String) -> Bool {
+    guard let last = lastReconnect, last.token == token, now().timeIntervalSince(last.at) < 20 else {
+      return false
+    }
+    guard let mintedAt else { return true }
+    let age = now().timeIntervalSince(mintedAt)
+    return age > 60 || age < 0
+  }
+
+  private func token(_ current: AuthTokens, minimumLifetime: TimeInterval, refresh: Bool) async throws
+    -> String?
+  {
+    if !refresh, let freshUntil, freshUntil.timeIntervalSince(now()) > minimumLifetime {
       return current.token
     }
     do {
@@ -120,6 +140,7 @@ public actor AuthSession {
 
   private func store(_ fresh: AuthTokens?) {
     tokens = fresh
+    mintedAt = fresh.map { _ in now() }
     freshUntil = fresh?.lifetime.map { now().addingTimeInterval($0) }
     vault.write(fresh)
   }

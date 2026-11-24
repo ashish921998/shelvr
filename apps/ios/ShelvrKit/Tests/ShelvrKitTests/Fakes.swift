@@ -38,7 +38,12 @@ final class FakeTransport: AuthTransport {
       state.requests.append(request)
       return state.replies.isEmpty ? Reply.fail : state.replies.removeFirst()
     }
-    if delay > .zero { try await Task.sleep(for: delay) }
+    if delay > .zero {
+      let seconds = Double(delay.components.seconds) + Double(delay.components.attoseconds) / 1e18
+      await withCheckedContinuation { done in
+        DispatchQueue.global().asyncAfter(deadline: .now() + seconds) { done.resume() }
+      }
+    }
     switch reply {
     case let .respond(response): return response
     case .fail: throw Offline()

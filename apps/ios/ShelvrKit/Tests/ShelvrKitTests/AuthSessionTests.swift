@@ -50,30 +50,20 @@ struct AuthSessionTests {
     #expect(transport.requests.count == 1)
   }
 
-  @Test func theConvexClientsForcedRefreshAlwaysAsksTheBackend() async throws {
-    let transport = FakeTransport([
-      .respond(SignInResponse(tokens: tokens("a"))),
-      .respond(SignInResponse(tokens: tokens("b"))),
-    ])
-    let auth = session(transport)
-    try await auth.signIn(.anonymous)
-    let provider = SessionAuthProvider(session: auth)
-    #expect(try await provider.login(onIdToken: { _ in }) == tokens("a").token)
-    #expect(try await provider.loginFromCache(onIdToken: { _ in }) == tokens("b").token)
-    #expect(transport.requests.last == SignInRequest(refreshToken: "refresh-a"))
-  }
-
-  @Test func signingOutDuringARefreshKeepsTheSessionSignedOut() async throws {
+  @Test func signingOutDuringARefreshKeepsEveryCallerSignedOut() async throws {
     vault.write(tokens("a"))
     let transport = FakeTransport(
       [.respond(SignInResponse(tokens: tokens("b")))], delay: .milliseconds(50))
     let auth = session(transport)
-    async let refreshing = try? auth.validToken()
+    async let first = try? auth.validToken()
+    try await Task.sleep(for: .milliseconds(5))
+    async let second = try? auth.validToken()
     try await Task.sleep(for: .milliseconds(10))
     await auth.signOut()
-    _ = await refreshing
+    #expect(await [first, second] == [String?.none, String?.none])
     #expect(await auth.isSignedIn == false)
     #expect(vault.tokens == nil)
+    #expect(transport.requests.count == 1)
   }
 
   @Test func refusedRefreshSignsOut() async throws {

@@ -96,15 +96,15 @@ final class SessionAuthProvider: AuthProvider, Sendable {
   }
 
   func login(onIdToken: @Sendable @escaping (String?) -> Void) async throws -> String {
-    try await token(forceRefresh: false, onIdToken: onIdToken)
+    try await token(reconnecting: false, onIdToken: onIdToken)
   }
 
   func loginFromCache(onIdToken: @Sendable @escaping (String?) -> Void) async throws -> String {
-    try await token(forceRefresh: true, onIdToken: onIdToken)
+    try await token(reconnecting: true, onIdToken: onIdToken)
   }
 
-  private func token(forceRefresh: Bool, onIdToken: @Sendable (String?) -> Void) async throws -> String {
-    guard let token = try await session.validToken(forceRefresh: forceRefresh) else {
+  private func token(reconnecting: Bool, onIdToken: @Sendable (String?) -> Void) async throws -> String {
+    guard let token = try await session.validToken(reconnecting: reconnecting) else {
       onIdToken(nil)
       throw AuthSessionError.notSignedIn
     }
