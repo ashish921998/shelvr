@@ -18,6 +18,7 @@ struct NewCityTripView: View {
   @State private var message = ""
   @State private var gate = SocialOperation()
   @State private var generation: Task<Void, Never>?
+  @State private var visible = false
   private let options = ["food", "coffee", "drinks", "culture", "sights", "outdoors", "shopping"]
 
   var body: some View {
@@ -47,11 +48,17 @@ struct NewCityTripView: View {
       else { Button(copy("tripSetup.start")) { generation = Task { await generate() } } }
       if !message.isEmpty { Text(message) }
     }.socialOperation(gate, failure: copy("errors.tryAgain"), close: copy("common.close"))
-      .onDisappear { generation?.cancel() }.disabled(busy).navigationTitle(copy("tripPlanner.tripTitle", ["city": city]))
+      .onAppear { visible = true }
+      .onDisappear {
+        visible = false
+        generation?.cancel()
+        gate.dismissed()
+      }
+      .disabled(busy).navigationTitle(copy("tripPlanner.tripTitle", ["city": city]))
   }
 
   private func generate(canOffer: Bool = true) async {
-    guard !busy else { return }
+    guard visible, !busy, !Task.isCancelled else { return }
     busy = true
     defer { busy = false }
     message = ""
@@ -69,7 +76,12 @@ struct NewCityTripView: View {
     } catch {
       guard !Task.isCancelled else { return }
       if canOffer, listID != nil, SaveFailure(error) == .proRequired {
-        gate.askToPurchase { await generate(canOffer: false) }
+        gate.askToPurchase {
+          guard visible else { return }
+          let retry = Task { await generate(canOffer: false) }
+          generation = retry
+          await retry.value
+        }
       } else { message = copy("errors.retrySoon") }
     }
   }
