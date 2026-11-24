@@ -4,6 +4,7 @@ import SwiftUI
 struct PassportActions: View {
   let cities: [PassportCityStamp]?
   let hasPlaces: Bool
+  let retryCities: () -> Void
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var showCities = false
@@ -35,7 +36,14 @@ struct PassportActions: View {
     }
     .disabled(busy)
     .sheet(isPresented: $showCities) {
-      if let cities { PassportCityPicker(cities: cities) } else { ProgressView() }
+      if let cities { PassportCityPicker(cities: cities) }
+      else {
+        VStack(spacing: 16) {
+          Text(copy("errors.connection"))
+          Button(copy("common.retry"), action: retryCities)
+          Button(copy("common.close")) { showCities = false }
+        }.padding()
+      }
     }
     .sheet(item: $share) { item in PassportShareSheet(url: item.url) }
     .confirmationDialog(copy("passportShare.stopTitle"), isPresented: $stopping, titleVisibility: .visible) {
@@ -86,6 +94,7 @@ private struct PassportCityPicker: View {
   @Environment(\.copy) private var copy
   @Environment(\.dismiss) private var dismiss
   @State private var working: String?
+  @State private var failureKey = "cityStamps.saveFailed"
   @State private var failed = false
   @State private var search = ""
 
@@ -101,7 +110,10 @@ private struct PassportCityPicker: View {
           Task {
             defer { working = nil }
             do { _ = try await backend.changeCityStamp(city.id, add: !selected) }
-            catch { failed = true }
+            catch {
+              failureKey = PastedLink.requiresPro(error) ? "cityStamps.lockedHint" : "cityStamps.saveFailed"
+              failed = true
+            }
           }
         } label: {
           HStack {
@@ -120,7 +132,7 @@ private struct PassportCityPicker: View {
       .toolbar {
         ToolbarItem(placement: .confirmationAction) { Button(copy("common.close")) { dismiss() } }
       }
-      .alert(copy("cityStamps.saveFailed"), isPresented: $failed) { Button(copy("common.close")) {} }
+      .alert(copy(failureKey), isPresented: $failed) { Button(copy("common.close")) {} }
     }
   }
 }
