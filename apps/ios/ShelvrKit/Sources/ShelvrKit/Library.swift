@@ -9,6 +9,7 @@ public struct LibrarySave: Decodable, Identifiable, Sendable {
   public let siteName: String?
   public let url: String?
   public let cities: [String]?
+  public let type: String?
   public let status: String
   public let imageUrl: String?
   public let heroImageUrl: String?

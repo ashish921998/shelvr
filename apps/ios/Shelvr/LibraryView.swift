@@ -74,7 +74,7 @@ struct LibraryView: View {
         Button(copy("common.retry")) { failures.removeAll(); attempt += 1 }
       }
     }
-    .onChange(of: rows.map { Outcome(id: $0.id, status: $0.status, needsReview: $0.needsReview) }) { previous, current in
+    .onChange(of: rows.map { Outcome(id: $0.id, status: $0.status, needsReview: $0.type == "link" && $0.needsReview) }) { previous, current in
       guard screen == .home else { return }
       let reading = Set(previous.filter { $0.status == "processing" }.map(\.id))
       if let finished = current.first(where: { $0.needsReview && reading.contains($0.id) }) {
