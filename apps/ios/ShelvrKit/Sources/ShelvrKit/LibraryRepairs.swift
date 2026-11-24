@@ -18,8 +18,19 @@ public struct SavePlaces: Decodable, Sendable {
 }
 
 public struct PlaceMatches: Decodable, Sendable {
+  public struct Match: Decodable, Sendable {
+    public let place: EditablePlace
+    public let area: String?
+    private enum CodingKeys: String, CodingKey { case area }
+
+    public init(from decoder: Decoder) throws {
+      place = try EditablePlace(from: decoder)
+      area = try decoder.container(keyedBy: CodingKeys.self).decodeIfPresent(String.self, forKey: .area)
+    }
+  }
+
   public let available: Bool
-  public let places: [EditablePlace]
+  public let places: [Match]
 }
 
 extension LibrarySave {

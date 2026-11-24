@@ -83,6 +83,7 @@ struct PassportView: View {
       await watch("placeVisits:listPassportStamps", [PassportStamp].self) { stamps = $0 }
     }
     .task(id: retry) {
+      cities = nil
       await watch("cityStamps:listCityStamps", [PassportCityStamp].self) { cities = $0 }
     }
     .task(id: retry) {

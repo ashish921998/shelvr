@@ -44,34 +44,34 @@ struct BillingSheet: View {
   @State private var offer: PaywallOffer?
   @State private var failed = false
   @State private var attempt = 0
-  @State private var syncing = false
-  @State private var syncFailed = false
+  @State private var confirmation = BillingConfirmation()
 
   var body: some View {
     Group {
-      if failed || syncFailed {
+      if failed || confirmation.state == .failed {
         ContentUnavailableView {
           Label(copy("pro.loadFailed"), systemImage: "exclamationmark.circle")
         } actions: {
           Button(copy("common.retry")) {
-            if syncFailed { sync() } else { attempt += 1 }
+            if confirmation.state == .failed { sync() } else { attempt += 1 }
           }
         }
-      } else if syncing {
+      } else if confirmation.state == .syncing {
         ProgressView(copy("pro.checking"))
       } else if userID != nil, destination == .manage {
         CustomerCenterView()
+          .onCustomerCenterRestoreCompleted { info in finish(info) }
       } else if let offer, userID != nil {
         PaywallView(offering: offer.offering, displayCloseButton: true)
           .customPaywallVariables(offer.variables)
-          .onRequestedDismissal { if !syncing { dismiss() } }
+          .onRequestedDismissal { if confirmation.state != .syncing { dismiss() } }
           .onPurchaseCompleted { info in finish(info) }
           .onRestoreCompleted { info in finish(info) }
       } else {
         ProgressView()
       }
     }
-    .interactiveDismissDisabled(syncing)
+    .interactiveDismissDisabled(confirmation.state == .syncing)
     .task(id: attempt) {
       let generation = backend.sessionGeneration
       failed = false
@@ -101,20 +101,16 @@ struct BillingSheet: View {
   }
 
   private func sync() {
-    guard !syncing, backend.sessionGeneration == session, let userID, Purchases.shared.appUserID == userID else { return }
-    syncing = true
-    syncFailed = false
-    Task {
-      defer { syncing = false }
-      do {
-        guard backend.sessionGeneration == session else { return }
-        let active: Bool = try await backend.client.action("subscriptions:syncPurchase")
-        guard active, backend.sessionGeneration == session, backend.status == .signedIn, Purchases.shared.appUserID == userID else {
-          throw BillingFailure.unavailable
-        }
-        confirmed()
-        dismiss()
-      } catch { syncFailed = true }
-    }
+    guard let session, let userID else { return }
+    let expected = BillingAccount(session: session, userID: userID)
+    confirmation.sync(for: expected, current: {
+      guard backend.status == .signedIn, Purchases.isConfigured else { return nil }
+      return BillingAccount(session: backend.sessionGeneration, userID: Purchases.shared.appUserID)
+    }, synchronize: {
+      try await backend.client.action("subscriptions:syncPurchase")
+    }, confirmed: {
+      confirmed()
+      dismiss()
+    })
   }
 }

@@ -59,6 +59,7 @@ struct SignedInView: View {
             entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
           }
           .navigationTitle(copy("addSheet.title"))
+        case "passport-story": PassportStoryView()
         case "trips": TripsTabView()
         case "shared-lists": SharedListsView()
         case "new-shared-list":
@@ -79,6 +80,14 @@ struct SignedInView: View {
         case "add": PasteLinkView()
         case "saves": LibraryView(screen: .saves)
         case "review-saves": LibraryView(screen: .review)
+        case "spots" where link.path.count == 2:
+          SaveSpotRevealView(id: link.path[1]) { city in
+            guard path.last == link else { return }
+            library = false
+            if let city, let encoded = city.addingPercentEncoding(withAllowedCharacters: .alphanumerics),
+              let destination = AppLink("/city/" + encoded) { path = [destination] }
+            else { path = [] }
+          }.id(link)
         case "city" where link.path.count == 2: CityPlacesView(city: link.path[1]).id(link.path[1])
         case "cities": LibraryCitiesView()
         case "item" where link.path.count == 2: LibraryItemView(id: link.path[1])
@@ -87,15 +96,34 @@ struct SignedInView: View {
             LibraryPlaceEditor(id: id).id(id)
           } else { ShellDestination(link: link) }
         case "date-plan", "go-out", "new-trip":
-          if let city = link.query.first(where: { $0.name == "city" })?.value, !city.isEmpty {
+          if link.path == ["new-trip"], !link.query.contains(where: { $0.name == "listId" || ($0.name == "mode" && $0.value == "generate") }) {
+            let city = link.query.first(where: { $0.name == "city" })?.value ?? ""
+            BlankTripView(city: city) { selectedCity in
+              if let next = BlankTrip.generationLink(city: selectedCity) { path.append(next) }
+            } created: { result in
+              if path.last == link { path[path.count - 1] = result }
+            }
+          } else if let city = link.query.first(where: { $0.name == "city" })?.value, !city.isEmpty {
             let listID = link.query.first(where: { $0.name == "listId" })?.value
             if link.path.first == "new-trip" {
               NewCityTripView(city: city, listID: listID) { created in
                 guard path.last == link else { return }
                 path[path.count - 1] = created
               }.id(link)
+            } else if link.path == ["go-out"] {
+              GoOutView(city: city, listID: listID) { destination in
+                var parts = URLComponents()
+                parts.path = destination
+                parts.queryItems = link.query
+                if path.last == link, let next = parts.string.flatMap({ AppLink($0) }) { path[path.count - 1] = next }
+              }.id(link)
             } else { CityDateView(city: city, listID: listID).id(link) }
           } else { PlanCityView(trip: link.path.first == "new-trip") }
+        case "add-trip-stop":
+          if let id = link.query.first(where: { $0.name == "tripId" })?.value {
+            let day = link.query.first(where: { $0.name == "day" })?.value.flatMap(Int.init) ?? 1
+            AddTripStopView(id: id, initialDay: day).id(link)
+          } else { ShellDestination(link: link) }
         case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1]).id(link.path[1])
         case "photo": PhotoSaveView()
         default: ShellDestination(link: link)
@@ -161,8 +189,9 @@ private struct PlanCityView: View {
           List(cities, id: \.city) { city in
             var url: URLComponents {
               var parts = URLComponents()
-              parts.path = trip ? "/new-trip" : "/date-plan"
+              parts.path = trip ? "/new-trip" : "/go-out"
               parts.queryItems = [URLQueryItem(name: "city", value: city.city)]
+              if trip { parts.queryItems?.append(URLQueryItem(name: "mode", value: "generate")) }
               return parts
             }
             if let link = url.string.flatMap({ AppLink($0) }) {

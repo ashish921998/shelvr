@@ -61,6 +61,7 @@
   "discover": [
     {
       "_id": "on-site",
+      "city": "Lisbon",
       "name": "Locke de Cafe Joana",
       "appleId": "a",
       "lat": 38.701,
@@ -69,6 +70,7 @@
     },
     {
       "_id": "exact",
+      "city": "Lisbon",
       "name": "Other",
       "appleId": "hotel",
       "lat": 55,
@@ -77,6 +79,7 @@
     },
     {
       "_id": "different",
+      "city": "Lisbon",
       "name": "Another Park",
       "appleId": "b",
       "lat": 38.7,
@@ -85,6 +88,7 @@
     },
     {
       "_id": "far",
+      "city": "Lisbon",
       "name": "Cafe Joana",
       "appleId": "c",
       "lat": 50,
