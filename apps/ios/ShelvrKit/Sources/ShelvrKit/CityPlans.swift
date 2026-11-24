@@ -103,7 +103,8 @@ extension Backend {
     return result.tripId
   }
 
-  public func cityTrip(_ id: String) -> some AsyncSequence<CityTrip?, any Error> {
-    client.subscribe(to: "tripPlannerData:getTripPlan", with: ["tripId": id], yielding: CityTrip?.self).values
+  public func cityTrip(_ id: String, sharedOnly: Bool = false) -> some AsyncSequence<CityTrip?, any Error> {
+    let query = sharedOnly ? "tripPlannerData:getSharedTripPlan" : "tripPlannerData:getTripPlan"
+    return client.subscribe(to: query, with: ["tripId": id], yielding: CityTrip?.self).values
   }
 }
