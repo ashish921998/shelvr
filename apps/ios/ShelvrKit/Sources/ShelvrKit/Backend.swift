@@ -21,7 +21,7 @@ public final class Backend {
   private let session: AuthSession
   @ObservationIgnored private var authWatch: AnyCancellable?
   @ObservationIgnored private var starting: Task<Void, Never>?
-  @ObservationIgnored private var deletion: Task<Void, Error>?
+  @ObservationIgnored private let deletion = AccountDeletion()
   @ObservationIgnored private var registeringPush: Task<Void, Error>?
   @ObservationIgnored private var signingOut = false
   @ObservationIgnored var preparingSiri: (subject: String, task: Task<Void, Error>)?
@@ -58,7 +58,7 @@ public final class Backend {
   }
 
   public func start() async {
-    if let deletion { _ = await deletion.result }
+    await deletion.wait()
     retrySiriRevocations()
     if let starting { return await starting.value }
     let task = Task { await resume() }
@@ -80,12 +80,12 @@ public final class Backend {
   }
 
   public func requireShareOwner(_ owner: String) throws {
-    guard status == .signedIn, !signingOut, deletion == nil, KeychainTokenVault().read()?.belongs(to: owner) == true
+    guard status == .signedIn, !signingOut, !deletion.isRunning, KeychainTokenVault().read()?.belongs(to: owner) == true
     else { throw CancellationError() }
   }
 
   public func signIn(_ credential: SignInCredential) async throws {
-    if let deletion { _ = await deletion.result }
+    await deletion.wait()
     guard status == .signedOut, !signingIn else { throw AuthSessionError.signInRefused }
     signingIn = true
     defer { signingIn = false }
@@ -94,20 +94,20 @@ public final class Backend {
   }
 
   public func startOAuth(provider: String) async throws -> OAuthStart {
-    if let deletion { _ = await deletion.result }
+    await deletion.wait()
     return try await session.startOAuth(provider: provider, redirectTo: environment.oauthRedirect)
   }
 
   private var pushTokens: PushTokenStore { PushTokenStore(serviceURL: environment.convexURL) }
 
   public func registerPush(_ token: String, installation: PushInstallation, locale: String) async throws {
-    guard status == .signedIn, !signingOut, deletion == nil else { return }
+    guard status == .signedIn, !signingOut, !deletion.isRunning else { return }
     let generation = sessionGeneration
     let previous = registeringPush
     let task = Task {
       _ = await previous?.result
       guard let bearer = try await session.validToken(), generation == sessionGeneration,
-        status == .signedIn, !signingOut, deletion == nil else { return }
+        status == .signedIn, !signingOut, !deletion.isRunning else { return }
       var tokens = try pushTokens.read()
       let record = PushRegistrationRecord(token: token, registrationId: generation.uuidString)
       if !tokens.contains(record) { tokens.append(record) }
@@ -147,7 +147,7 @@ public final class Backend {
   }
 
   public func signOut() async throws {
-    if let deletion { _ = await deletion.result }
+    await deletion.wait()
     guard status == .signedIn, !signingOut else { return }
     signingOut = true
     let siri = SiriCredential.current()
@@ -169,16 +169,12 @@ public final class Backend {
   }
 
   public func deleteAccount() async throws {
-    if let deletion { return try await deletion.value }
-    guard status == .signedIn, !signingOut else { throw AuthSessionError.notSignedIn }
-    let task = Task {
-      try await client.mutation("users:deleteCurrentUserAccount")
-      await session.forgetDeletedAccount()
-      await disconnect()
+    try await deletion.perform(allowed: status == .signedIn && !signingOut) {
+      try await self.client.mutation("users:deleteCurrentUserAccount")
+    } afterAcceptance: {
+      await self.session.forgetDeletedAccount()
+      await self.disconnect()
     }
-    deletion = task
-    defer { deletion = nil }
-    try await task.value
   }
 
   private func retireSiri(_ credential: SiriCredential) {
