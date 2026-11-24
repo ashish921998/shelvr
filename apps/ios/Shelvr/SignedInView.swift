@@ -71,6 +71,10 @@ struct SignedInView: View {
         case "review-saves": LibraryView(screen: .review)
         case "cities": LibraryCitiesView()
         case "item" where link.path.count == 2: LibraryItemView(id: link.path[1])
+        case "edit-save-places":
+          if let id = link.query.first(where: { $0.name == "itemId" })?.value {
+            LibraryPlaceEditor(id: id).id(id)
+          } else { ShellDestination(link: link) }
         case "go-out": PlanCityView()
         case "add": PasteLinkView()
         case "photo": PhotoSaveView()

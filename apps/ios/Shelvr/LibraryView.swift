@@ -10,6 +10,7 @@ struct LibraryView: View {
   @State private var requested = 1
   @State private var failures: Set<Int> = []
   @State private var attempt = 0
+  @State private var unplacedID: String?
 
   private var rows: [LibrarySave] {
     var seen = Set<String>()
@@ -28,6 +29,16 @@ struct LibraryView: View {
   var body: some View {
     List {
       if screen == .home {
+        if let id = unplacedID, rows.contains(where: { $0.id == id && $0.needsReview }),
+          let destination = AppLink("/item/" + id) {
+          HStack {
+            NavigationLink(value: destination) {
+              Label(copy("homePlaces.toastNoPlace"), systemImage: "mappin.slash")
+            }
+            Button { unplacedID = nil } label: { Image(systemName: "xmark") }
+              .buttonStyle(.borderless).accessibilityLabel(copy("common.dismiss"))
+          }
+        }
         route("/saves", "homePlaces.allSaves", "bookmark")
         route("/cities", "homePlaces.cities", "building.2")
         route("/shared-lists", "sharedLists.title", "person.2")
@@ -65,6 +76,18 @@ struct LibraryView: View {
         Button(copy("common.retry")) { failures.removeAll(); attempt += 1 }
       }
     }
+    .onChange(of: rows.map { Outcome(id: $0.id, status: $0.status, needsReview: $0.type == "link" && $0.needsReview) }) { previous, current in
+      guard screen == .home else { return }
+      let reading = Set(previous.filter { $0.status == "processing" }.map(\.id))
+      if let finished = current.first(where: { $0.needsReview && reading.contains($0.id) }) {
+        unplacedID = finished.id
+      }
+    }
+    .task(id: unplacedID) {
+      guard unplacedID != nil else { return }
+      try? await Task.sleep(for: .seconds(8))
+      if !Task.isCancelled { unplacedID = nil }
+    }
     .background {
       ZStack {
         ForEach(Array(subscriptions.enumerated()), id: \.offset) { index, cursor in
@@ -75,6 +98,12 @@ struct LibraryView: View {
       }
     }
     .navigationTitle(copy(screen == .home ? "navigation.library" : screen == .saves ? "homePlaces.allSaves" : "homePlaces.reviewTitle"))
+  }
+
+  private struct Outcome: Equatable {
+    let id: String
+    let status: String
+    let needsReview: Bool
   }
 
   private struct Load: Hashable { let cursor: String?; let attempt: Int }
