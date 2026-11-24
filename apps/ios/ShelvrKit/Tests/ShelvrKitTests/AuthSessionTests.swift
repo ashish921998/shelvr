@@ -52,14 +52,14 @@ struct AuthSessionTests {
 
   @Test func signingOutDuringARefreshKeepsEveryCallerSignedOut() async throws {
     vault.write(tokens("a"))
-    let transport = FakeTransport(
-      [.respond(SignInResponse(tokens: tokens("b")))], delay: .milliseconds(50))
+    let gate = Gate()
+    let transport = FakeTransport([.respond(SignInResponse(tokens: tokens("b")))], gate: gate)
     let auth = session(transport)
     async let first = try? auth.validToken()
-    try await Task.sleep(for: .milliseconds(5))
+    try await eventually { transport.requests.count == 1 }
     async let second = try? auth.validToken()
-    try await Task.sleep(for: .milliseconds(10))
     await auth.signOut()
+    gate.open()
     #expect(await [first, second] == [String?.none, String?.none])
     #expect(await auth.isSignedIn == false)
     #expect(vault.tokens == nil)
@@ -81,32 +81,69 @@ struct AuthSessionTests {
     #expect(vault.tokens == tokens("a"))
   }
 
-  @Test func importingALegacyRefreshTokenExchangesItAndForgetsIt() async throws {
+  @Test func importingMovesTheExpoTokenIntoTheVaultBeforeExchangingIt() async throws {
     let transport = FakeTransport([.respond(SignInResponse(tokens: tokens("b")))])
     let legacy = LegacyStore("legacy")
     let auth = session(transport)
     await auth.importLegacy(from: legacy)
-    #expect(transport.requests == [SignInRequest(refreshToken: "legacy")])
-    #expect(try await auth.validToken() == tokens("b").token)
+    #expect(vault.tokens == AuthTokens(token: "", refreshToken: "legacy"))
     #expect(legacy.refreshToken() == nil)
+    #expect(transport.requests.isEmpty)
+    #expect(try await auth.validToken() == tokens("b").token)
+    #expect(transport.requests == [SignInRequest(refreshToken: "legacy")])
+    #expect(vault.tokens == tokens("b"))
   }
 
-  @Test func importingADeadLegacyTokenForgetsItAndLeavesNoSession() async throws {
+  @Test func importingADeadLegacyTokenLeavesNoSession() async throws {
     let legacy = LegacyStore("legacy")
     let auth = session(FakeTransport([.respond(SignInResponse(tokens: nil))]))
     await auth.importLegacy(from: legacy)
+    #expect(try await auth.validToken() == nil)
     #expect(vault.tokens == nil)
     #expect(await auth.isSignedIn == false)
     #expect(legacy.refreshToken() == nil)
   }
 
-  @Test func importingWhileOfflineKeepsTheLegacyTokenForTheNextTry() async throws {
+  @Test func anOfflineImportExchangesTheTokenFromTheVaultOnTheNextLaunch() async throws {
     let legacy = LegacyStore("legacy")
-    let auth = session(FakeTransport([.fail]))
+    let transport = FakeTransport([.fail, .respond(SignInResponse(tokens: tokens("b")))])
+    let auth = session(transport)
     await auth.importLegacy(from: legacy)
-    #expect(legacy.refreshToken() == "legacy")
-    #expect(vault.tokens?.refreshToken == "legacy")
     await #expect(throws: FakeTransport.Offline.self) { try await auth.validToken() }
+    let relaunched = session(transport)
+    await relaunched.importLegacy(from: legacy)
+    #expect(try await relaunched.validToken() == tokens("b").token)
+    #expect(transport.requests == [SignInRequest(refreshToken: "legacy"), SignInRequest(refreshToken: "legacy")])
+  }
+
+  @Test func anExpoSignInNewerThanTheNativeSessionReplacesIt() async throws {
+    vault.write(tokens("old"))
+    let transport = FakeTransport([.respond(SignInResponse(tokens: tokens("b")))])
+    let auth = session(transport)
+    await auth.importLegacy(from: LegacyStore("expo"))
+    #expect(try await auth.validToken() == tokens("b").token)
+    #expect(transport.requests == [SignInRequest(refreshToken: "expo")])
+  }
+
+  @Test func anUnfinishedImportGivesWayToANewerExpoToken() async throws {
+    let transport = FakeTransport([.fail, .respond(SignInResponse(tokens: tokens("b")))])
+    let auth = session(transport)
+    await auth.importLegacy(from: LegacyStore("expo-1"))
+    await #expect(throws: FakeTransport.Offline.self) { try await auth.validToken() }
+    let relaunched = session(transport)
+    await relaunched.importLegacy(from: LegacyStore("expo-3"))
+    #expect(try await relaunched.validToken() == tokens("b").token)
+    #expect(transport.requests.last == SignInRequest(refreshToken: "expo-3"))
+  }
+
+  @Test func aVaultThatCannotSaveLeavesTheExpoTokenAndTheSessionAlone() async throws {
+    let transport = FakeTransport([.respond(SignInResponse(tokens: tokens("b")))])
+    let legacy = LegacyStore("expo")
+    let auth = AuthSession(transport: transport, vault: ReadOnlyVault(tokens: tokens("a")))
+    await auth.importLegacy(from: legacy)
+    #expect(legacy.refreshToken() == "expo")
+    #expect(try await auth.validToken() == tokens("b").token)
+    #expect(transport.requests == [SignInRequest(refreshToken: "refresh-a")])
   }
 
   @Test func importingWithNoLegacyTokenSendsNothing() async {
@@ -121,6 +158,45 @@ struct AuthSessionTests {
     await auth.signOut()
     #expect(vault.tokens == nil)
     #expect(try await auth.validToken() == nil)
+  }
+
+  @Test func signingOutClearsTheSessionBeforeTellingTheServer() async throws {
+    let gate = Gate()
+    let transport = FakeTransport([.respond(SignInResponse(tokens: tokens("a")))], signOutGate: gate)
+    let auth = session(transport)
+    try await auth.signIn(.anonymous)
+    async let signedOut: Void = auth.signOut()
+    try await eventually { transport.signOuts.count == 1 }
+    #expect(await auth.isSignedIn == false)
+    #expect(vault.tokens == nil)
+    gate.open()
+    await signedOut
+    #expect(transport.signOuts == [tokens("a").token])
+  }
+
+  @Test func aSignInWhileTheServerSignsOutKeepsTheNewSession() async throws {
+    let gate = Gate()
+    let transport = FakeTransport(
+      [.respond(SignInResponse(tokens: tokens("a"))), .respond(SignInResponse(tokens: tokens("b")))],
+      signOutGate: gate)
+    let auth = session(transport)
+    try await auth.signIn(.anonymous)
+    async let signedOut: Void = auth.signOut()
+    try await eventually { transport.signOuts.count == 1 }
+    try await auth.signIn(.anonymous)
+    gate.open()
+    await signedOut
+    #expect(vault.tokens == tokens("b"))
+    #expect(await auth.isSignedIn)
+  }
+
+  @Test func signingOutBeforeTheFirstExchangeTellsTheServerNothing() async {
+    let transport = FakeTransport([])
+    let auth = session(transport)
+    await auth.importLegacy(from: LegacyStore("legacy"))
+    await auth.signOut()
+    #expect(vault.tokens == nil)
+    #expect(transport.signOuts.isEmpty)
   }
 
   @Test func refusedSignInThrows() async {

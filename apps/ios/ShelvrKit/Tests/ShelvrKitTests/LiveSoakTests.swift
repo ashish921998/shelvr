@@ -22,6 +22,7 @@ struct LiveSoakTests {
       if request.refreshToken != nil { refreshes.withLock { $0 += 1 } }
       return try await inner.signIn(request)
     }
+    func signOut(token: String) async throws { try await inner.signOut(token: token) }
   }
 
   @Test(.timeLimit(.minutes(120)))

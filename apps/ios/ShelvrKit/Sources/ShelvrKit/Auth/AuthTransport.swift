@@ -33,6 +33,7 @@ public struct SignInResponse: Decodable, Sendable, Equatable {
 
 public protocol AuthTransport: Sendable {
   func signIn(_ request: SignInRequest) async throws -> SignInResponse
+  func signOut(token: String) async throws
 }
 
 public enum ConvexCallError: Error, Equatable {
@@ -50,30 +51,46 @@ public struct ConvexHTTPAuthTransport: AuthTransport {
   }
 
   public func signIn(_ request: SignInRequest) async throws -> SignInResponse {
-    var http = URLRequest(url: endpoint)
-    http.httpMethod = "POST"
-    http.setValue("application/json", forHTTPHeaderField: "Content-Type")
-    http.httpBody = try JSONEncoder().encode(Call(path: "auth:signIn", args: request))
-    let (data, response) = try await session.data(for: http)
-    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-    guard let reply = try? JSONDecoder().decode(Reply.self, from: data) else {
-      throw ConvexCallError.badResponse(status)
-    }
-    guard reply.status == "success", let value = reply.value else {
-      throw ConvexCallError.server(reply.errorMessage ?? "status \(status)")
+    guard let value = try await call("auth:signIn", args: request, returning: SignInResponse.self) else {
+      throw ConvexCallError.server("empty reply")
     }
     return value
   }
 
-  private struct Call: Encodable {
+  public func signOut(token: String) async throws {
+    _ = try await call("auth:signOut", args: [String: String](), token: token, returning: Ignored.self)
+  }
+
+  private func call<Args: Encodable, Value: Decodable>(
+    _ path: String, args: Args, token: String? = nil, returning: Value.Type
+  ) async throws -> Value? {
+    var http = URLRequest(url: endpoint)
+    http.httpMethod = "POST"
+    http.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    if let token { http.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+    http.httpBody = try JSONEncoder().encode(Call(path: path, args: args))
+    let (data, response) = try await session.data(for: http)
+    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+    guard let reply = try? JSONDecoder().decode(Reply<Value>.self, from: data) else {
+      throw ConvexCallError.badResponse(status)
+    }
+    guard reply.status == "success" else {
+      throw ConvexCallError.server(reply.errorMessage ?? "status \(status)")
+    }
+    return reply.value
+  }
+
+  private struct Call<Args: Encodable>: Encodable {
     let path: String
-    let args: SignInRequest
+    let args: Args
     let format = "json"
   }
 
-  private struct Reply: Decodable {
+  private struct Reply<Value: Decodable>: Decodable {
     let status: String
-    let value: SignInResponse?
+    let value: Value?
     let errorMessage: String?
   }
+
+  private struct Ignored: Decodable {}
 }

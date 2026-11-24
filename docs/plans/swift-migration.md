@@ -38,7 +38,7 @@ Expo app keeps shipping until the Swift app passes final QA.
 | #   | Pull request           | What it delivers                                                                                                                                                                                                            | Proof                                                                                                                                          |
 | --- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Foundation             | Xcode project, `ShelvrKit`, Convex client, Convex Auth session (Apple, Google, anonymous in Debug), the Expo session import (code and unit tests; proven on a device in milestone 2), sign-in screen, signed-in placeholder | `swift test` (unit tests, a live test and a 65-minute token expiry soak on the dev deployment); simulator screenshots of sign-in and signed-in |
-| 2   | Upgrade continuity     | Read everything the Expo build left on the device: `shelvr.onboarded`, the push installation id, the Siri capture credentials, an in-flight share payload, queued Siri invocations                                          | Install the Swift Debug build over a signed-in Expo dev build on a cloned simulator. The person stays signed in and skips onboarding           |
+| 2   | Upgrade continuity     | Readers for what the Expo build left: the Convex Auth session (all its keys deleted once adopted), `shelvr.onboarded`, push installation id, Siri capture credentials, an in-flight share payload, queued Siri invocations  | Swift Debug with the Expo dev bundle id and app group, installed over a signed-in Expo dev build on a cloned simulator: same user signs in     |
 | 3   | App shell and links    | Map and Library tabs, the tab bar (+, Go out), one URL parser for every link shape old builds, pushes, widgets and Siri use (retired routes open Home)                                                                      | Table test ported from `home-href.test.ts` and `+native-intent` cases                                                                          |
 | 4   | Saving                 | Paste a link, native share extension, photo saves (Pro), App Intents and Siri, Recent Saves widget                                                                                                                          | Share a reel from Safari on the simulator; the save settles with a place                                                                       |
 | 5   | Library                | Home feed (paged `items:listItemsPage`), Recents, Cities, All saves, item detail, edit places, review and unplaced saves                                                                                                    | Screenshots against the Expo build with the same dev fixtures                                                                                  |
@@ -64,9 +64,11 @@ Expo app keeps shipping until the Swift app passes final QA.
 
 - **Signed-out users after the update.** The Expo build keeps the Convex Auth refresh token in
   the Keychain (service `app:no-auth`, account ending `__convexAuthRefreshToken_<deployment>`).
-  `LegacyExpoSession` finds it by that suffix, exchanges it once, and deletes it only after the
-  exchange succeeds or the backend refuses it. An offline first launch keeps it for the next
-  launch. Milestone 2 proves this on a real Expo install.
+  `LegacyExpoSession` finds it by that suffix. The Swift app moves it into its own Keychain
+  item and deletes the Expo copy once that item holds it, then exchanges it like any stored
+  session, so an offline first launch tries again from its own item. An Expo token found at a
+  later launch is a newer sign-in from a reinstalled Expo build, and replaces the Swift session.
+  Milestone 2 proves this on a real Expo install.
 - **Push stops or doubles.** The backend sends only through Expo. The Swift app must register an
   `ExponentPushToken`, reuse the Expo installation id so the token does not change, and keep
   revoking old tokens on sign-out.

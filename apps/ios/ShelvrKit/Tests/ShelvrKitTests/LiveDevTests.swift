@@ -35,4 +35,16 @@ struct LiveDevTests {
       .values.first { $0 != nil }
     #expect(user??._id.isEmpty == false)
   }
+
+  @Test func signingOutEndsTheSessionOnTheServer() async throws {
+    let environment = try AppEnvironment(variant: .development, convexURL: URL(string: liveURL!)!)
+    let transport = ConvexHTTPAuthTransport(deployment: environment.convexURL)
+    let vault = MemoryVault()
+    let session = AuthSession(transport: transport, vault: vault)
+    try await session.signIn(.anonymous)
+    let signedIn = try #require(vault.tokens)
+    await session.signOut()
+    let reply = try await transport.signIn(SignInRequest(refreshToken: signedIn.refreshToken))
+    #expect(reply.tokens == nil)
+  }
 }

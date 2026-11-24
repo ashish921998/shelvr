@@ -69,11 +69,11 @@ public final class Backend {
   }
 
   public func signOut() async {
-    try? await client.action("auth:signOut")
-    await session.signOut()
+    guard status != .signedOut else { return }
+    status = .signedOut
     legacy.forget()
     await client.logout()
-    status = .signedOut
+    await session.signOut()
   }
 
   public func query<T: Decodable>(_ name: String, as type: T.Type) -> some AsyncSequence<T, any Error> {

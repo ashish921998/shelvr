@@ -70,19 +70,13 @@ public actor AuthSession {
     return OAuthStart(url: redirect, verifier: verifier)
   }
 
-  public func importLegacy(from legacy: some LegacySessionStore) async {
+  public func importLegacy(from legacy: some LegacySessionStore) {
     guard let refreshToken = legacy.refreshToken() else { return }
-    do {
-      try await adopt(refreshToken: refreshToken)
-      legacy.forget()
-    } catch AuthSessionError.signInRefused {
-      legacy.forget()
-    } catch {}
-  }
-
-  func adopt(refreshToken: String) async throws {
-    store(AuthTokens(token: "", refreshToken: refreshToken))
-    guard try await refreshed() != nil else { throw AuthSessionError.signInRefused }
+    let handoff = AuthTokens(token: "", refreshToken: refreshToken)
+    vault.write(handoff)
+    guard vault.read() == handoff else { return }
+    store(handoff)
+    legacy.forget()
   }
 
   public func validToken(minimumLifetime: TimeInterval = 300, reconnecting: Bool = false) async throws
@@ -118,10 +112,13 @@ public actor AuthSession {
     }
   }
 
-  public func signOut() {
+  public func signOut() async {
+    let token = tokens?.token
     refresh?.cancel()
     refresh = nil
     store(nil)
+    guard let token, !token.isEmpty else { return }
+    try? await transport.signOut(token: token)
   }
 
   private func refreshed() async throws -> AuthTokens? {
