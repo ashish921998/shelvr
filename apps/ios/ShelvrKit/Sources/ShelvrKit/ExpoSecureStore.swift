@@ -4,11 +4,17 @@ import Security
 struct ExpoSecureStore: Sendable {
   let namespace: String
   let read: @Sendable ([String: Any]) -> Data?
+  let remove: @Sendable ([String: Any]) -> Bool
   private static let services = ["app:no-auth", "app"]
 
-  init(deployment: URL, read: @escaping @Sendable ([String: Any]) -> Data? = Keychain.read) {
+  init(
+    deployment: URL,
+    read: @escaping @Sendable ([String: Any]) -> Data? = Keychain.read,
+    remove: @escaping @Sendable ([String: Any]) -> Bool = Keychain.delete
+  ) {
     namespace = deployment.absoluteString.replacing(/[^A-Za-z0-9._-]/, with: "_")
     self.read = read
+    self.remove = remove
   }
 
   static func query(service: String, key: String) -> [String: Any] {
@@ -31,6 +37,6 @@ struct ExpoSecureStore: Sendable {
   }
 
   func delete(_ key: String) -> Bool {
-    Self.services.map { Keychain.delete(Self.query(service: $0, key: key)) }.allSatisfy { $0 }
+    Self.services.map { remove(Self.query(service: $0, key: key)) }.allSatisfy { $0 }
   }
 }

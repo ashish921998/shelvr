@@ -59,7 +59,7 @@ struct ExpoDeviceStateTests {
     let defaults = try #require(UserDefaults(suiteName: suite))
     defer { defaults.removePersistentDomain(forName: suite) }
     defaults.set("legacy-id", forKey: "EXDeviceInstallationUUIDKey")
-    let env = try AppEnvironment(variant: .development, convexURL: URL(string: "https://dev.convex.cloud")!)
+    let env = try AppEnvironment(variant: .development, convexURL: URL(string: "https://dev.convex.cloud")!, bundleID: "app.shelvr.save.preview")
     let state = ExpoDeviceState(environment: env, defaults: defaults, group: defaults) { query in
       switch query[kSecAttrService as String] as? String {
       case "app:no-auth": return Data()
@@ -73,5 +73,20 @@ struct ExpoDeviceStateTests {
     #expect(try state.pendingInvocations().isEmpty)
     defaults.set(Data("[{}]".utf8), forKey: "expo-sharing")
     #expect(throws: DecodingError.self) { try state.pendingSharePayloads() }
+  }
+
+  @Test func invocationParamsOfAnyJSONTypeDoNotBreakTheQueue() throws {
+    let suite = UUID().uuidString
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let queue = Data(
+      #"[{"id":"q","name":"saveText","params":{"text":"hi","id":7,"count":3,"meta":{"a":1}},"createdAt":1}]"#.utf8)
+    defaults.set(queue, forKey: "dev.expo.appintents.invocations.pending")
+    let env = try AppEnvironment(
+      variant: .development, convexURL: URL(string: "https://dev.convex.cloud")!, bundleID: "app.shelvr.save.preview")
+    let state = ExpoDeviceState(environment: env, defaults: defaults, group: defaults) { _ in nil }
+    let params = try #require(try state.pendingInvocations().first?.params)
+    #expect(params.text == "hi")
+    #expect(params.id == nil)
   }
 }

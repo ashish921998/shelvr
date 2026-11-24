@@ -42,6 +42,24 @@ extension ExpoDeviceState {
       public let paths: [String]?
       public let operationId: String?
       public let operationIds: [String]?
+
+      private enum CodingKeys: String, CodingKey {
+        case query, id, text, url, spaceId, paths, operationId, operationIds
+      }
+
+      public init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        func string(_ key: CodingKeys) -> String? { try? c.decodeIfPresent(String.self, forKey: key) }
+        func strings(_ key: CodingKeys) -> [String]? { try? c.decodeIfPresent([String].self, forKey: key) }
+        query = string(.query)
+        id = string(.id)
+        text = string(.text)
+        url = string(.url)
+        spaceId = string(.spaceId)
+        paths = strings(.paths)
+        operationId = string(.operationId)
+        operationIds = strings(.operationIds)
+      }
     }
   }
 }

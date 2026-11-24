@@ -17,9 +17,12 @@ public struct LegacyExpoSession: LegacySessionStore {
   private let deploymentNamespace: String
 
   public init(convexURL: URL) {
-    let url = convexURL.absoluteString
-    deploymentNamespace = url.replacing(/[^A-Za-z0-9]/, with: "")
-    store = ExpoSecureStore(deployment: convexURL)
+    self.init(convexURL: convexURL, store: ExpoSecureStore(deployment: convexURL))
+  }
+
+  init(convexURL: URL, store: ExpoSecureStore) {
+    deploymentNamespace = convexURL.absoluteString.replacing(/[^A-Za-z0-9]/, with: "")
+    self.store = store
   }
 
   func account(for entry: Entry) -> String {

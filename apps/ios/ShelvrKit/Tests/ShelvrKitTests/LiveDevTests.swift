@@ -11,7 +11,7 @@ struct LiveDevTests {
   struct CurrentUser: Decodable { let _id: String }
 
   @Test func anonymousSessionRefreshesAndAuthenticatesLiveQueries() async throws {
-    let environment = try AppEnvironment(variant: .development, convexURL: URL(string: liveURL!)!)
+    let environment = try AppEnvironment(variant: .development, convexURL: URL(string: liveURL!)!, bundleID: "app.shelvr.save.preview")
     let clock = Clock()
     let vault = MemoryVault()
     let session = AuthSession(
@@ -37,7 +37,7 @@ struct LiveDevTests {
   }
 
   @Test func signingOutEndsTheSessionOnTheServer() async throws {
-    let environment = try AppEnvironment(variant: .development, convexURL: URL(string: liveURL!)!)
+    let environment = try AppEnvironment(variant: .development, convexURL: URL(string: liveURL!)!, bundleID: "app.shelvr.save.preview")
     let transport = ConvexHTTPAuthTransport(deployment: environment.convexURL)
     let vault = MemoryVault()
     let session = AuthSession(transport: transport, vault: vault)

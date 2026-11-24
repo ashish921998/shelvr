@@ -27,7 +27,7 @@ struct LiveSoakTests {
 
   @Test(.timeLimit(.minutes(120)))
   func liveQueriesSurviveTheTokenExpiring() async throws {
-    let environment = try AppEnvironment(variant: .development, convexURL: URL(string: soakURL!)!)
+    let environment = try AppEnvironment(variant: .development, convexURL: URL(string: soakURL!)!, bundleID: "app.shelvr.save.preview")
     let transport = Counting(ConvexHTTPAuthTransport(deployment: environment.convexURL))
     let session = AuthSession(transport: transport, vault: MemoryVault())
     try await session.signIn(.anonymous)
