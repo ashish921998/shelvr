@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import Observation
 
 public struct PublicInvite: Codable, Equatable, Identifiable, Sendable {
   public enum Kind: String, Codable, Sendable { case list, passport }
@@ -17,10 +18,11 @@ public struct PublicInvite: Codable, Equatable, Identifiable, Sendable {
     token = link.path[1]
   }
 
-  public func destination(listID: String? = nil) -> AppLink? {
+  public func destination(listID: String? = nil, passportAvailable: Bool = true) -> AppLink? {
     if kind == .list {
       return listID.flatMap { AppLink("/shared-list/" + $0 + "?joined=1") }
     }
+    guard passportAvailable else { return nil }
     var components = URLComponents()
     var allowed = CharacterSet.urlPathAllowed
     allowed.remove(charactersIn: "/?#%")
@@ -62,5 +64,52 @@ public enum PendingInviteStore {
         accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
     } else { ok = Keychain.delete(key) }
     if !ok { throw CocoaError(.fileWriteUnknown) }
+  }
+}
+
+@MainActor @Observable
+public final class InviteEntry {
+  public var preview: PublicInvite?
+  public private(set) var accepted: AcceptedInvite?
+  public var expired: PublicInvite?
+  public var failed = false
+  public private(set) var loaded = false
+  private let read: () throws -> AcceptedInvite?
+  private let write: (AcceptedInvite?) throws -> Void
+
+  public init(read: @escaping () throws -> AcceptedInvite? = PendingInviteStore.read,
+    write: @escaping (AcceptedInvite?) throws -> Void = PendingInviteStore.set) {
+    self.read = read
+    self.write = write
+    restore()
+  }
+
+  public func restore() {
+    do { accepted = try read(); loaded = true; failed = false }
+    catch { failed = true }
+  }
+
+  public func accept(_ invite: PublicInvite) {
+    guard preview == invite, replace(with: AcceptedInvite(invite)) else { return }
+    preview = nil
+  }
+
+  public func route(_ link: AppLink) -> Bool {
+    if !loaded { restore() }
+    let next = PublicInvite(link)
+    if accepted != nil, !replace(with: nil) { return true }
+    expired = nil
+    preview = next
+    return next != nil
+  }
+
+  public func cancel() {
+    guard let current = accepted, replace(with: nil) else { return }
+    preview = current.invite
+  }
+
+  public func replace(with next: AcceptedInvite?) -> Bool {
+    do { try write(next); accepted = next; failed = false; return true }
+    catch { failed = true; return false }
   }
 }

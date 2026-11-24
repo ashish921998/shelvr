@@ -1,44 +1,6 @@
 import ShelvrKit
 import SwiftUI
 
-@MainActor @Observable
-final class InviteEntry {
-  var preview: PublicInvite?
-  private(set) var accepted: AcceptedInvite?
-  var expired: PublicInvite?
-  var failed = false
-  var loaded = false
-
-  func restore() {
-    do { accepted = try PendingInviteStore.read(); loaded = true; failed = false }
-    catch { failed = true }
-  }
-
-  func accept(_ invite: PublicInvite) {
-    guard preview == invite, replace(with: AcceptedInvite(invite)) else { return }
-    preview = nil
-  }
-
-  func route(_ link: AppLink) -> Bool {
-    if !loaded { restore() }
-    let next = PublicInvite(link)
-    if accepted != nil, !replace(with: nil) { return true }
-    expired = nil
-    preview = next
-    return next != nil
-  }
-
-  func cancel() {
-    guard let current = accepted, replace(with: nil) else { return }
-    preview = current.invite
-  }
-
-  func replace(with next: AcceptedInvite?) -> Bool {
-    do { try PendingInviteStore.set(next); accepted = next; failed = false; return true }
-    catch { failed = true; return false }
-  }
-}
-
 struct InviteEntryView: View {
   let entry: InviteEntry
   @Binding var pendingLink: AppLink?
@@ -49,9 +11,7 @@ struct InviteEntryView: View {
   var body: some View {
     @Bindable var entry = entry
     Group {
-      if !entry.loaded {
-        if entry.failed { Button(copy("common.retry")) { entry.restore() } } else { ProgressView() }
-      } else if let request = entry.accepted, backend.status == .signedIn {
+      if let request = entry.accepted, backend.status == .signedIn {
         VStack {
           if entry.failed { Button(copy("common.retry")) { attempt += 1 } } else { ProgressView() }
           Button(copy("common.cancel")) { entry.cancel() }
@@ -65,7 +25,9 @@ struct InviteEntryView: View {
         OnboardingGate(pendingLink: $pendingLink).id(backend.sessionGeneration)
       }
     }
-    .task { if !entry.loaded { entry.restore() } }
+    .safeAreaInset(edge: .bottom) {
+      if !entry.loaded, entry.failed { Button(copy("common.retry")) { entry.restore() } }
+    }
     .sheet(item: $entry.preview) { invite in
       NavigationStack {
         Group {
@@ -104,7 +66,7 @@ struct InviteEntryView: View {
         var rows = backend.socialQuery("passportShares:passportPreview", arguments: ["token": request.invite.token],
           as: FriendPassport?.self).makeAsyncIterator()
         guard let row = try await rows.next() else { throw CocoaError(.coderValueNotFound) }
-        destination = row == nil ? nil : request.invite.destination()
+        destination = request.invite.destination(passportAvailable: row != nil)
       }
       guard current(), entry.replace(with: nil) else { return }
       if let destination {
