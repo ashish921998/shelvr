@@ -1,3 +1,4 @@
+import ShelvrInbox
 import ShelvrKit
 import SwiftUI
 

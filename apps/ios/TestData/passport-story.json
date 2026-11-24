@@ -1,0 +1,63 @@
+{
+  "stamps": [
+    {
+      "name": "Casa",
+      "key": "Casa",
+      "city": "Lisboa",
+      "visitedAt": 100,
+      "cover": "a",
+      "source": "tiktok"
+    },
+    {
+      "name": "Rosa",
+      "key": "Rosa",
+      "city": "Porto",
+      "visitedAt": 300,
+      "cover": "b"
+    },
+    {
+      "name": "Luz",
+      "key": "Luz",
+      "city": "Porto",
+      "visitedAt": 400,
+      "cover": null
+    },
+    {
+      "name": "Alta",
+      "key": "Alta",
+      "city": "Paris",
+      "visitedAt": 200,
+      "cover": "c"
+    },
+    {
+      "name": "Bica",
+      "key": "Bica",
+      "city": "Lisboa",
+      "visitedAt": 10,
+      "cover": "d"
+    },
+    {
+      "name": "Rio",
+      "key": "Rio",
+      "city": "Porto",
+      "visitedAt": 1,
+      "cover": "e"
+    }
+  ],
+  "cities": [
+    {
+      "city": "lisbon",
+      "country": "PT",
+      "stampedAt": 1
+    }
+  ],
+  "expected": {
+    "places": 6,
+    "cities": 3,
+    "countries": 1,
+    "photos": ["Rosa", "Alta", "Casa", "Bica"],
+    "cityNames": ["Lisboa", "Porto"],
+    "more": 2,
+    "fromReels": true
+  }
+}
