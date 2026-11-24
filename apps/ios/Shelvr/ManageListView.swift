@@ -73,10 +73,12 @@ struct AddListPlaceView: View {
               }
             }
           }
-          ForEach((result?.places ?? []).filter { !alreadyIncluded($0.name, $0.lat, $0.lng, $0.appleId) }) { place in
+          ForEach(result?.places ?? []) { place in
+            let included = alreadyIncluded(place.name, place.lat, place.lng, place.appleId)
             Button(place.name) {
               operation.run { try await backend.addFoundPlace(place, city: selected, to: detail._id); dismiss() }
-            }
+            }.disabled(included)
+            if included { Text(copy("sharedLists.onList")).font(.caption).foregroundStyle(.secondary) }
           }
           if result?.available == false {
             Text(copy("tripPlanner.searchUnavailable")).foregroundStyle(.secondary)
@@ -105,11 +107,7 @@ struct AddListPlaceView: View {
   }
 
   private func alreadyIncluded(_ name: String, _ lat: Double, _ lng: Double, _ apple: String?, item: String? = nil) -> Bool {
-    detail.places.contains { place in
-      if let apple, let other = place.appleId { return apple == other }
-      guard place.name.localizedCaseInsensitiveCompare(name) == .orderedSame else { return false }
-      return (item != nil && place.itemId == item) || (place.lat == lat && place.lng == lng)
-    }
+    detail.places.contains { $0.matches(name: name, lat: lat, lng: lng, apple: apple, item: item) }
   }
 
   private struct SearchRequest: Equatable { let city, text: String; let retry: Int }
