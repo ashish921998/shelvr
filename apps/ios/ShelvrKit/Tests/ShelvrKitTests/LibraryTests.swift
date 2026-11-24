@@ -52,3 +52,11 @@ import Testing
   let fields = try #require(JSONSerialization.jsonObject(with: Data(try match.place.convexEncode().utf8)) as? [String: Any])
   #expect(fields["area"] == nil)
 }
+
+@Test func retryMatchesTheGeneratedExpoAndServerAnswers() throws {
+  struct Vectors: Decodable { let now: Double; let saves: [LibrarySave]; let expected: [Bool] }
+  let url = URL(filePath: #filePath).deletingLastPathComponent().appending(path: "../../../TestData/library-retry.json")
+  let rows = try JSONDecoder().decode(Vectors.self, from: Data(contentsOf: url))
+  let now = Date(timeIntervalSince1970: rows.now / 1000)
+  #expect(rows.saves.map { $0.canRetry(at: now) } == rows.expected)
+}
