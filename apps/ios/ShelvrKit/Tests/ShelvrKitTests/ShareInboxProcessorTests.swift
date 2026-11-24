@@ -10,6 +10,7 @@ import Testing
   let photoClient = RecordingPhotoMutations()
   var sentLinks: [String] = []
   var refuseLink = false
+  var onUpload: (() async -> Void)?
 
   func saveLink(_ url: String, operationID: String, source: SaveSource, checkpoint: () throws -> Void) throws {
     try checkpoint()
@@ -20,7 +21,7 @@ import Testing
 
   func savePhoto(_ photo: ImportPhoto, operationID: String, source: SaveSource, checkpoint: () throws -> Void) async throws -> String {
     try await photo.save(using: photoClient, operationID: operationID, source: source, checkpoint: checkpoint) { request, _ in
-      self.userID = "second"
+      await self.onUpload?()
       let url = try #require(request.url)
       let response = try #require(HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil))
       return (Data(#"{"storageId":"uploaded"}"#.utf8), response)
@@ -43,10 +44,11 @@ private final class RecordingPhotoMutations: PhotoMutationClient {
   try await withShareInbox { inbox in
     let stage = try inbox.stage(owner: "first")
     let stagedImage = inbox.newImage(in: stage)
-    let png = try #require(Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9XEAAAAASUVORK5CYII="))
+    let png = try tinyPNG()
     try png.write(to: stagedImage.file)
     try inbox.publish([stagedImage.payload], in: stage)
     let saver = RecordingShareSaver()
+    saver.onUpload = { [weak saver] in saver?.userID = "second" }
     let processor = ShareInboxProcessor(inbox: inbox, saver: saver)
     await #expect(throws: ShareInboxError.ownerChanged) { _ = try await processor.drain(owner: "first") }
     #expect(saver.photoClient.recorded == ["items:beginImageImport"])
@@ -96,4 +98,41 @@ private final class RecordingPhotoMutations: PhotoMutationClient {
   gate.open()
   await #expect(throws: AuthSessionError.signInRefused) { try await first.value }
   #expect(backend.userID == nil)
+}
+
+@MainActor @Test func markerChangesBeforeASuspendedUploadCanFinish() async throws {
+  try await withShareInbox { inbox in
+    let firstStage = try inbox.stage(owner: "first")
+    let stagedImage = inbox.newImage(in: firstStage)
+    try tinyPNG().write(to: stagedImage.file)
+    try inbox.publish([stagedImage.payload], in: firstStage)
+    let saver = RecordingShareSaver()
+    let entered = Gate(), release = Gate()
+    saver.onUpload = { entered.open(); await release.wait() }
+    let processor = ShareInboxProcessor(inbox: inbox, saver: saver)
+    let firstDrain = Task { try await processor.drain(owner: "first") }
+    defer { release.open() }
+
+    await entered.wait()
+    saver.userID = nil
+    try processor.updateOwner()
+    #expect(inbox.activeOwner == nil)
+    saver.userID = "second"
+    try processor.updateOwner()
+    #expect(inbox.activeOwner == "second")
+    let secondStage = try inbox.stage(owner: "second")
+    let link = InboxPayload(kind: .link, value: "https://example.com/second")
+    try inbox.publish([link], in: secondStage)
+
+    release.open()
+    await #expect(throws: ShareInboxError.ownerChanged) { _ = try await firstDrain.value }
+    #expect(saver.photoClient.recorded == ["items:beginImageImport"])
+    #expect(try await processor.drain(owner: "second") == nil)
+    #expect(saver.sentLinks == [link.value])
+    #expect(try inbox.batches().isEmpty)
+  }
+}
+
+private func tinyPNG() throws -> Data {
+  try #require(Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9XEAAAAASUVORK5CYII="))
 }

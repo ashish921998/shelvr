@@ -46,6 +46,21 @@ func withShareInbox(_ run: (ShareInbox) async throws -> Void) async throws {
   }
 }
 
+@MainActor @Test func activationExcludesAnExistingDirectoryFromBackupBeforePublishingItsOwner() async throws {
+  try await withShareInbox { inbox in
+    try inbox.activate(nil)
+    var directory = inbox.directory
+    var values = URLResourceValues()
+    values.isExcludedFromBackup = false
+    try directory.setResourceValues(values)
+    try inbox.activate("second")
+
+    let reloaded = URL(filePath: directory.path)
+    #expect(try reloaded.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup == true)
+    #expect(inbox.activeOwner == "second")
+  }
+}
+
 @MainActor @Test func preservesTheOrderOfDoubleDigitAttachmentIndexes() async throws {
   try await withShareInbox { inbox in
     let stage = try inbox.stage(owner: "first")
@@ -80,6 +95,16 @@ func withShareInbox(_ run: (ShareInbox) async throws -> Void) async throws {
   let explicit = InboxPayload(kind: .link, value: "https://example.com/b")
   let results = ShareAttachment.payloads([.caption("Watch \(other)! Then \(explicit.value)."), .payload(explicit)])
   #expect(results.map(\.value) == [other, explicit.value])
+}
+
+@Test func captionOnlySharesStillFindWebLinksWithoutAScheme() throws {
+  for host in ["www.apple.com", "apple.com"] {
+    let caption = "Try \(host)/maps!"
+    let share = try #require(ShareAttachment.payloads([.caption(caption)]).first)
+    let url = try #require(URL(string: share.value))
+    #expect(url.host == host)
+    #expect(url.path == "/maps")
+  }
 }
 
 @MainActor @Test func usesTheImageWhenAProvidersURLRepresentationThrows() async throws {

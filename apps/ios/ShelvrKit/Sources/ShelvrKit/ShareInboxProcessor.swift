@@ -33,13 +33,14 @@ public struct ShareInboxProcessor {
     self.saver = saver
   }
 
+  public func updateOwner() throws { try inbox.activate(saver.userID) }
+
   public func drain(owner: String) async throws -> Failure? {
     let checkpoint = {
       try Task.checkCancellation()
       guard saver.userID == owner else { throw ShareInboxError.ownerChanged }
     }
     try checkpoint()
-    try inbox.activate(owner)
     try inbox.prune(keeping: owner)
     let refusal = try await inbox.drain(owner: owner) { delivery in
       try checkpoint()

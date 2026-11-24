@@ -116,23 +116,22 @@ public struct ShareInbox: Sendable {
   public var activeOwner: String? { try? owner(of: directory) }
 
   public func activate(_ owner: String?) throws {
+    let marker = directory.appending(path: "owner")
+    guard let owner else { try removeIfPresent(marker); return }
+
     let manager = FileManager.default
-    if !manager.fileExists(atPath: directory.path) {
-      try manager.createDirectory(at: directory, withIntermediateDirectories: true)
-      var location = directory
+    try manager.createDirectory(at: directory, withIntermediateDirectories: true)
+    var location = directory
+    if try location.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup != true {
       var values = URLResourceValues()
       values.isExcludedFromBackup = true
       try location.setResourceValues(values)
     }
-    let marker = directory.appending(path: "owner")
-    if let owner {
-      if activeOwner != owner { try Data(owner.utf8).write(to: marker, options: .atomic) }
-    } else {
-      try removeIfPresent(marker)
-    }
+    if activeOwner != owner { try Data(owner.utf8).write(to: marker, options: .atomic) }
   }
 
   public func prune(keeping owner: String?) throws {
+    guard activeOwner == owner else { throw ShareInboxError.ownerChanged }
     let entries = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.creationDateKey])
     for batch in entries {
       switch batch.pathExtension {

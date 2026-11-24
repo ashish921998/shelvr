@@ -9,7 +9,7 @@ public struct PastedLink: Sendable {
   public init?(_ input: String, retrying prior: PastedLink? = nil) {
     let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
     if trimmed.contains(where: { $0.isWhitespace }) {
-      guard let link = SharedWebLink.first(in: trimmed) else { return nil }
+      guard let link = SharedWebLink.first(in: trimmed, requiringScheme: true) else { return nil }
       url = link
     } else {
       guard trimmed.contains(".") else { return nil }

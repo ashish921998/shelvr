@@ -12,8 +12,8 @@ struct SharedInboxReceiver: ViewModifier {
   func body(content: Content) -> some View {
     content
       .onChange(of: phase) { _, phase in InboxSignal.shared.updatePhase(phase) }
-      .onChange(of: backend.status) { InboxSignal.shared.wake() }
-      .onChange(of: backend.userID) { failure = nil; InboxSignal.shared.wake() }
+      .onChange(of: backend.status, initial: true) { syncOwner() }
+      .onChange(of: backend.userID) { failure = nil; syncOwner() }
       .task { await receive() }
       .alert(copy("share.singleFailure"), isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
         Button(copy("common.tryAgain")) { failure = nil; InboxSignal.shared.wake() }
@@ -30,13 +30,20 @@ struct SharedInboxReceiver: ViewModifier {
       }
   }
 
+  private func syncOwner() {
+    if let inbox = ShareInbox.system(), backend.status == .signedOut || backend.status == .signedIn {
+      do { try ShareInboxProcessor(inbox: inbox, backend: backend).updateOwner() }
+      catch { try? inbox.activate(nil) }
+    }
+    InboxSignal.shared.wake()
+  }
+
   private func receive() async {
     guard let inbox = ShareInbox.system() else { return }
     let processor = ShareInboxProcessor(inbox: inbox, backend: backend)
     for await currentPhase in InboxSignal.shared.events(initialPhase: phase) {
       guard !Task.isCancelled else { return }
       if backend.status == .signedOut {
-        try? inbox.activate(nil)
         try? inbox.prune(keeping: nil)
         continue
       }

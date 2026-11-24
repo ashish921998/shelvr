@@ -7,7 +7,8 @@ import Testing
     ("https://example.com/a!", "https://example.com/a!"),
     ("  bücher.de  ", "bücher.de"),
     ("Read this https://example.org/Function_(math)).", "https://example.org/Function_(math)"),
-    ("See https://example.org/x. https://example.org/y", "https://example.org/x")
+    ("See https://example.org/x. https://example.org/y", "https://example.org/x"),
+    ("See example.com or https://example.org/y", "https://example.org/y")
   ] {
     #expect(PastedLink(input)?.url == expected)
   }
