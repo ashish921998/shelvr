@@ -85,16 +85,17 @@ public final class Backend {
       guard let bearer = try await session.validToken(), generation == sessionGeneration,
         status == .signedIn, !signingOut, deletion == nil else { return }
       var tokens = try pushTokens.read()
-      if !tokens.contains(token) { tokens.append(token) }
+      let record = PushRegistrationRecord(token: token, registrationId: generation.uuidString)
+      if !tokens.contains(record) { tokens.append(record) }
       try pushTokens.write(tokens)
       try await PushTransport(deployment: environment.convexURL).call("notifications:registerDevice", args: [
-        "token": token, "installSecret": installation.secret, "platform": "ios",
+        "token": token, "installSecret": installation.secret, "registrationId": record.registrationId, "platform": "ios",
         "locale": locale, "timezone": TimeZone.current.identifier
       ], bearer: bearer)
-      for old in tokens where old != token {
+      for old in tokens where old != record {
         try await unregisterInstallation(old, installation: installation)
       }
-      try pushTokens.write([token])
+      try pushTokens.write([record])
     }
     registeringPush = task
     try await task.value
@@ -115,9 +116,9 @@ public final class Backend {
     try await task.value
   }
 
-  private func unregisterInstallation(_ token: String, installation: PushInstallation) async throws {
+  private func unregisterInstallation(_ record: PushRegistrationRecord, installation: PushInstallation) async throws {
     try await PushTransport(deployment: environment.convexURL).call("notifications:unregisterInstallation", args: [
-      "token": token, "installSecret": installation.secret
+      "token": record.token, "installSecret": installation.secret, "registrationId": record.registrationId
     ])
   }
 

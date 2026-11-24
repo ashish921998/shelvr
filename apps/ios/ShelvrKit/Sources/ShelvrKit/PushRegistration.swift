@@ -69,25 +69,30 @@ public struct ExpoPushRequest: Encodable, Sendable {
 }
 
 
+struct PushRegistrationRecord: Codable, Equatable {
+  let token: String
+  let registrationId: String
+}
+
 struct PushTokenStore {
   let serviceURL: URL
 
   private var query: [String: Any] {
     let normalized = serviceURL.absoluteString.replacing(/[^A-Za-z0-9._-]/, with: "_")
-    let key = Data(("notification-tokens-" + normalized).utf8)
+    let key = Data(("swift-notification-registrations-" + normalized).utf8)
     return [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "app:no-auth",
       kSecAttrAccount as String: key, kSecAttrGeneric as String: key]
   }
 
-  func read() throws -> [String] {
+  func read() throws -> [PushRegistrationRecord] {
     var result: CFTypeRef?
     let status = SecItemCopyMatching(query.merging([kSecReturnData as String: true]) { $1 } as CFDictionary, &result)
     if status == errSecItemNotFound { return [] }
     guard status == errSecSuccess, let data = result as? Data else { throw CocoaError(.fileReadNoPermission) }
-    return try JSONDecoder().decode([String].self, from: data)
+    return try JSONDecoder().decode([PushRegistrationRecord].self, from: data)
   }
 
-  func write(_ tokens: [String]) throws {
+  func write(_ tokens: [PushRegistrationRecord]) throws {
     guard Keychain.write(try JSONEncoder().encode(tokens), to: query) else { throw CocoaError(.fileWriteNoPermission) }
   }
 }
