@@ -12,7 +12,7 @@ struct RootView: View {
       switch backend.status {
       case .starting: ProgressView()
       case .signedOut: SignInView()
-      case .signedIn: SignedInView(pendingLink: $pendingLink)
+      case .signedIn: OnboardingGate(pendingLink: $pendingLink)
       case .offline: OfflineView()
       }
     }
