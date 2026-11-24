@@ -76,7 +76,9 @@ enum Analytics {
     capture("notification_opened", ready)
   }
 
-  static var sessionID: String? { enabled ? PostHogSDK.shared.getSessionId() : nil }
+  static var sessionID: String? {
+    enabled && !PostHogSDK.shared.isOptOut() ? PostHogSDK.shared.getSessionId() : nil
+  }
 
   static func active(_ active: Bool) {
     guard enabled, notificationOpens.reconciled, active != foreground else { return }
