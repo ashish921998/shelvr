@@ -35,7 +35,6 @@ public enum AuthSessionError: Error, Equatable {
 actor AuthSession {
   private let transport: any AuthTransport
   private let vault: any TokenVault
-  private let legacy: (any LegacySessionStore)?
   private let signOutMarker: SignOutMarker?
   private let now: @Sendable () -> Date
   private var held: (tokens: AuthTokens, receivedAt: Date?)?
@@ -45,13 +44,11 @@ actor AuthSession {
   init(
     transport: any AuthTransport,
     vault: any TokenVault,
-    legacy: (any LegacySessionStore)? = nil,
     signOutMarker: SignOutMarker? = nil,
     now: @escaping @Sendable () -> Date = Date.init
   ) {
     self.transport = transport
     self.vault = vault
-    self.legacy = legacy
     self.signOutMarker = signOutMarker
     self.now = now
   }
@@ -62,7 +59,7 @@ actor AuthSession {
   func signIn(_ credential: SignInCredential) async throws {
     let response = try await transport.signIn(credential.request)
     guard let fresh = response.tokens else { throw AuthSessionError.signInRefused }
-    guard signOutMarker?.state != .inaccessible, legacy?.forget() != false, vault.write(fresh) else {
+    guard signOutMarker?.state != .inaccessible, vault.write(fresh) else {
       throw AuthSessionError.sessionStorageUnavailable
     }
     try signOutMarker?.clear()
@@ -83,17 +80,11 @@ actor AuthSession {
     switch signOutMarker?.state ?? .absent {
     case .pending:
       forgetSession()
-      return
     case .inaccessible:
-      return
+      break
     case .absent:
       if held == nil { held = vault.read().map { ($0, nil) } }
     }
-    guard let legacy, let refreshToken = legacy.refreshToken() else { return }
-    let handoff = AuthTokens(token: "", refreshToken: refreshToken)
-    guard vault.write(handoff), vault.read() == handoff else { return }
-    setTokens(handoff)
-    legacy.forget()
   }
 
   func validToken(reconnecting: Bool = false) async throws -> String? {
@@ -124,7 +115,7 @@ actor AuthSession {
     do {
       return try await refreshed()?.token
     } catch {
-      guard let stale = tokens?.token, !stale.isEmpty else { throw error }
+      guard let stale = tokens?.token else { throw error }
       return stale
     }
   }
@@ -136,15 +127,13 @@ actor AuthSession {
     refresh = nil
     forgetSession()
     await onLocalSignOut()
-    guard let token, !token.isEmpty else { return }
+    guard let token else { return }
     try? await transport.signOut(token: token)
   }
 
   private func forgetSession() {
     setTokens(nil)
-    let clearedNative = vault.write(nil)
-    let clearedLegacy = legacy?.forget() ?? true
-    if clearedNative, clearedLegacy {
+    if vault.write(nil) {
       try? signOutMarker?.clear()
     }
   }
