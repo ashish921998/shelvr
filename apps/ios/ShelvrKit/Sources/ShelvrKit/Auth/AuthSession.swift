@@ -82,7 +82,7 @@ actor AuthSession {
   func restore() {
     switch signOutMarker?.state ?? .absent {
     case .pending:
-      clearStoredSession()
+      forgetSession()
       return
     case .inaccessible:
       return
@@ -134,14 +134,14 @@ actor AuthSession {
     let token = tokens?.token
     refresh?.cancel()
     refresh = nil
-    setTokens(nil)
-    clearStoredSession()
+    forgetSession()
     await onLocalSignOut()
     guard let token, !token.isEmpty else { return }
     try? await transport.signOut(token: token)
   }
 
-  private func clearStoredSession() {
+  private func forgetSession() {
+    setTokens(nil)
     let clearedNative = vault.write(nil)
     let clearedLegacy = legacy?.forget() ?? true
     if clearedNative, clearedLegacy {
@@ -155,6 +155,11 @@ actor AuthSession {
     let task = Task { () async throws -> AuthTokens? in
       let fresh = try await transport.signIn(SignInRequest(refreshToken: refreshToken)).tokens
       guard tokens?.refreshToken == refreshToken else { return tokens }
+      guard let fresh else {
+        try? signOutMarker?.record()
+        forgetSession()
+        return nil
+      }
       vault.write(fresh)
       setTokens(fresh)
       return fresh
