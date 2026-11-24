@@ -115,7 +115,7 @@ import Testing
     Issue.record("A missing folder must be handled separately")
     return
   }
-  await #expect(throws: ConvexCallError.self) {
+  await #expect(throws: (any Error).self) {
     _ = try await missing.saveSiriNote(["text": "fixture", "operationId": "siri:fixture"], authorization: "fixture-owner")
   }
   let pro = ConvexHTTPAuthTransport(deployment: URL(string: "https://paywall.convex.cloud")!, session: session)
@@ -135,7 +135,7 @@ private final class SiriNoteHTTPFixture: URLProtocol, @unchecked Sendable {
     #expect(url.path == "/api/mutation")
     #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer fixture-owner")
     let reply = url.host == "missing.convex.cloud"
-      ? #"{"status":"error","errorMessage":"Uncaught Error: Space not found\n    at saveIntoSpace"}"#
+      ? #"{"status":"error","errorMessage":"Server Error","errorData":{"code":"space_not_found"}}"#
       : #"{"status":"error","errorMessage":"Pro required","errorData":{"code":"pro_required"}}"#
     let response = HTTPURLResponse(url: url, statusCode: 560, httpVersion: nil, headerFields: nil)!
     client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)

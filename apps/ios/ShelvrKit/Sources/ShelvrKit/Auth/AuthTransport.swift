@@ -75,15 +75,13 @@ public struct ConvexHTTPAuthTransport: AuthTransport {
         throw ConvexCallError.server("empty reply")
       }
       return .saved
-    } catch let ConvexCallError.server(message) where args["spaceId"] != nil &&
-      message.split(whereSeparator: \.isNewline).contains(where: {
-        $0 == "Space not found" || $0 == "Uncaught Error: Space not found"
-      }) {
+    } catch SiriNoteRejection.folderUnavailable where args["spaceId"] != nil {
       return .folderUnavailable
     }
   }
 
   private enum Function: String { case action, mutation }
+  private enum SiriNoteRejection: Error { case folderUnavailable }
 
   private func call<Args: Encodable, Value: Decodable>(
     _ path: String, args: Args, token: String? = nil, returning: Value.Type, function: Function = .action
@@ -99,9 +97,12 @@ public struct ConvexHTTPAuthTransport: AuthTransport {
       throw ConvexCallError.badResponse(status)
     }
     guard reply.status == "success" else {
-      if path == "items:createNoteItem",
-        (try? JSONDecoder().decode(SaveRefusal.self, from: data))?.errorData.code == "pro_required" {
-        throw SaveFailure.proRequired
+      if path == "items:createNoteItem" {
+        switch (try? JSONDecoder().decode(SaveRefusal.self, from: data))?.errorData.code {
+        case "pro_required": throw SaveFailure.proRequired
+        case "space_not_found": throw SiriNoteRejection.folderUnavailable
+        default: break
+        }
       }
       throw ConvexCallError.server(reply.errorMessage ?? "status \(status)")
     }
