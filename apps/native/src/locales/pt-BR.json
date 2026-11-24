@@ -1332,6 +1332,7 @@
   "passportStory.tagline": "Salve agora.\nE vá de verdade.",
   "passportStory.scan": "Escaneie para comparar passaportes",
   "passportStory.shareLink": "Compartilhar como link",
+  "passportStory.linkNotePassportMenu": "Ao compartilhar, o link do seu passaporte é ativado para que o código possa abri-lo. Você pode parar de compartilhar pelo menu do passaporte.",
   "passportStory.linkNote": "Compartilhar ativa o link do seu passaporte para que o código o abra. Você pode parar de compartilhar quando quiser nos Ajustes.",
   "passport.shareCity": "Compartilhar %{city}",
   "passport.momentCityComplete": "Você completou %{city}",

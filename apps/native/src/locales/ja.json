@@ -1238,6 +1238,7 @@
   "passportStory.tagline": "今すぐ保存。\n本当に行こう。",
   "passportStory.scan": "スキャンしてパスポートを比べよう",
   "passportStory.shareLink": "リンクで共有する",
+  "passportStory.linkNotePassportMenu": "共有するとパスポートのリンクが有効になり、コードから開けるようになります。共有はパスポートのメニューから停止できます。",
   "passportStory.linkNote": "共有するとパスポートのリンクが有効になり、コードから開けます。共有は設定からいつでも停止できます。",
   "passport.shareCity": "%{city}を共有",
   "passport.momentCityComplete": "%{city}コンプリート",
