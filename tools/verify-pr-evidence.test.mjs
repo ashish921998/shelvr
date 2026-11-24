@@ -149,6 +149,7 @@ test("the owner paths cover billing, auth, release and CI", () => {
     "apps/ios/Config/Shelvr.entitlements",
     "apps/ios/ShelvrKit/Sources/ShelvrKit/Auth/AuthSession.swift",
     "apps/ios/ShelvrKit/Sources/ShelvrKit/Backend.swift",
+    "apps/ios/ShelvrKit/Sources/ShelvrKit/AppEnvironment.swift",
     "apps/ios/Shelvr.xcodeproj/project.pbxproj",
     ".github/workflows/ci.yml",
     ".github/actions/secure-review/action.yml",
