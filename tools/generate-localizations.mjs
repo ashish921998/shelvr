@@ -35,6 +35,8 @@ const notificationPlaceholders = {
   "reminder.cookBody": "%{title}",
   "reminder.tripEveTitle": "%{city}",
   "reminder.tripEveBody": "%{formattedCount}",
+  "reminder.tripWeekTitle": "%{city}",
+  "reminder.tripWeekBody": "%{formattedCount}",
   "plan.votePushTitle": "%{city}",
   "plan.wouldGo": "%{name}|%{place}",
   "plan.wouldPass": "%{name}|%{place}",
@@ -155,6 +157,10 @@ const notificationCopy = Object.fromEntries(
       tripEve: {
         title: messages["reminder.tripEveTitle"],
         body: messages["reminder.tripEveBody"],
+      },
+      tripWeek: {
+        title: messages["reminder.tripWeekTitle"],
+        body: messages["reminder.tripWeekBody"],
       },
       planVote: {
         title: messages["plan.votePushTitle"],

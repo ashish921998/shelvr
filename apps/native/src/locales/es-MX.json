@@ -669,6 +669,12 @@
     "many": "Guardaste %{formattedCount} de lugares para visitar.",
     "other": "Guardaste %{formattedCount} lugares para visitar."
   },
+  "reminder.tripWeekTitle": "Tu viaje a %{city} es en una semana",
+  "reminder.tripWeekBody": {
+    "one": "%{formattedCount} lugar guardado está en el plan. Échale un vistazo a tus días.",
+    "many": "%{formattedCount} de lugares guardados están en el plan. Échale un vistazo a tus días.",
+    "other": "%{formattedCount} lugares guardados están en el plan. Échale un vistazo a tus días."
+  },
   "search.noResults": "Ningún contenido coincide con «%{query}».",
   "spaces.addedTo": "Agregado a %{space}",
   "spaces.removedFrom": "Retirado de %{space}",

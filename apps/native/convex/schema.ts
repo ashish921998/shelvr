@@ -620,6 +620,7 @@ export default defineSchema({
   tripEveReminders: defineTable({
     userId: v.string(),
     tripId: v.id("tripPlans"),
+    kind: v.optional(v.literal("week")),
     createdAt: v.number(),
     deliveredAt: v.optional(v.number()),
     deliveryStatus: v.union(

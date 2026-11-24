@@ -36,6 +36,13 @@
         "other": "Du hast %{formattedCount} Orte zum Besuchen gespeichert."
       }
     },
+    "tripWeek": {
+      "title": "Deine Reise nach %{city} ist in einer Woche",
+      "body": {
+        "one": "%{formattedCount} gespeicherter Ort ist eingeplant. Schau dir deine Tage an.",
+        "other": "%{formattedCount} gespeicherte Orte sind eingeplant. Schau dir deine Tage an."
+      }
+    },
     "planVote": {
       "title": "Erste Stimme zu deiner Auswahl für %{city}",
       "pick": {
@@ -83,6 +90,13 @@
       "body": {
         "one": "You saved %{formattedCount} place to go.",
         "other": "You saved %{formattedCount} places to go."
+      }
+    },
+    "tripWeek": {
+      "title": "Your %{city} trip is in a week",
+      "body": {
+        "one": "%{formattedCount} saved place is on the plan. Take a look at your days.",
+        "other": "%{formattedCount} saved places are on the plan. Take a look at your days."
       }
     },
     "planVote": {
@@ -138,6 +152,14 @@
         "other": "Guardaste %{formattedCount} lugares para visitar."
       }
     },
+    "tripWeek": {
+      "title": "Tu viaje a %{city} es dentro de una semana",
+      "body": {
+        "one": "%{formattedCount} lugar guardado está en el plan. Echa un vistazo a tus días.",
+        "many": "%{formattedCount} de lugares guardados están en el plan. Echa un vistazo a tus días.",
+        "other": "%{formattedCount} lugares guardados están en el plan. Echa un vistazo a tus días."
+      }
+    },
     "planVote": {
       "title": "Primer voto en tu selección para %{city}",
       "pick": {
@@ -189,6 +211,14 @@
         "one": "Guardaste %{formattedCount} lugar para visitar.",
         "many": "Guardaste %{formattedCount} de lugares para visitar.",
         "other": "Guardaste %{formattedCount} lugares para visitar."
+      }
+    },
+    "tripWeek": {
+      "title": "Tu viaje a %{city} es en una semana",
+      "body": {
+        "one": "%{formattedCount} lugar guardado está en el plan. Échale un vistazo a tus días.",
+        "many": "%{formattedCount} de lugares guardados están en el plan. Échale un vistazo a tus días.",
+        "other": "%{formattedCount} lugares guardados están en el plan. Échale un vistazo a tus días."
       }
     },
     "planVote": {
@@ -244,6 +274,14 @@
         "other": "Vous avez enregistré %{formattedCount} lieux à visiter."
       }
     },
+    "tripWeek": {
+      "title": "Votre voyage à %{city} est dans une semaine",
+      "body": {
+        "one": "%{formattedCount} lieu enregistré est au programme. Jetez un œil à vos journées.",
+        "many": "%{formattedCount} de lieux enregistrés sont au programme. Jetez un œil à vos journées.",
+        "other": "%{formattedCount} lieux enregistrés sont au programme. Jetez un œil à vos journées."
+      }
+    },
     "planVote": {
       "title": "Premier vote sur votre sélection pour %{city}",
       "pick": {
@@ -297,6 +335,14 @@
         "other": "Vous avez enregistré %{formattedCount} lieux à visiter."
       }
     },
+    "tripWeek": {
+      "title": "Votre voyage à %{city} est dans une semaine",
+      "body": {
+        "one": "%{formattedCount} lieu enregistré est au programme. Jetez un œil à vos journées.",
+        "many": "%{formattedCount} de lieux enregistrés sont au programme. Jetez un œil à vos journées.",
+        "other": "%{formattedCount} lieux enregistrés sont au programme. Jetez un œil à vos journées."
+      }
+    },
     "planVote": {
       "title": "Premier vote sur votre sélection pour %{city}",
       "pick": {
@@ -342,6 +388,12 @@
         "other": "行きたい場所を%{formattedCount}件保存しています。"
       }
     },
+    "tripWeek": {
+      "title": "%{city}への旅行まであと1週間",
+      "body": {
+        "other": "保存した%{formattedCount}か所がプランに入っています。日ごとの予定を確認しましょう。"
+      }
+    },
     "planVote": {
       "title": "%{city}の候補リストに最初の投票が届きました",
       "pick": {
@@ -385,6 +437,12 @@
       "title": "%{city} 여행이 내일이에요",
       "body": {
         "other": "가 볼 장소를 %{formattedCount}곳 저장했어요."
+      }
+    },
+    "tripWeek": {
+      "title": "%{city} 여행이 일주일 남았어요",
+      "body": {
+        "other": "저장한 장소 %{formattedCount}곳이 일정에 있어요. 하루하루 일정을 확인해 보세요."
       }
     },
     "planVote": {
@@ -438,6 +496,14 @@
         "one": "Você salvou %{formattedCount} lugar para visitar.",
         "many": "Você salvou %{formattedCount} de lugares para visitar.",
         "other": "Você salvou %{formattedCount} lugares para visitar."
+      }
+    },
+    "tripWeek": {
+      "title": "Sua viagem para %{city} é daqui a uma semana",
+      "body": {
+        "one": "%{formattedCount} lugar salvo está no roteiro. Dê uma olhada nos seus dias.",
+        "many": "%{formattedCount} de lugares salvos estão no roteiro. Dê uma olhada nos seus dias.",
+        "other": "%{formattedCount} lugares salvos estão no roteiro. Dê uma olhada nos seus dias."
       }
     },
     "planVote": {

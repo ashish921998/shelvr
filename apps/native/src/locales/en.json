@@ -650,6 +650,11 @@
     "one": "You saved %{formattedCount} place to go.",
     "other": "You saved %{formattedCount} places to go."
   },
+  "reminder.tripWeekTitle": "Your %{city} trip is in a week",
+  "reminder.tripWeekBody": {
+    "one": "%{formattedCount} saved place is on the plan. Take a look at your days.",
+    "other": "%{formattedCount} saved places are on the plan. Take a look at your days."
+  },
   "search.noResults": "No saves match “%{query}”.",
   "spaces.addedTo": "Added to %{space}",
   "spaces.removedFrom": "Removed from %{space}",

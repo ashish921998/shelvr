@@ -650,6 +650,11 @@
     "one": "Du hast %{formattedCount} Ort zum Besuchen gespeichert.",
     "other": "Du hast %{formattedCount} Orte zum Besuchen gespeichert."
   },
+  "reminder.tripWeekTitle": "Deine Reise nach %{city} ist in einer Woche",
+  "reminder.tripWeekBody": {
+    "one": "%{formattedCount} gespeicherter Ort ist eingeplant. Schau dir deine Tage an.",
+    "other": "%{formattedCount} gespeicherte Orte sind eingeplant. Schau dir deine Tage an."
+  },
   "search.noResults": "Keine gespeicherten Inhalte passen zu „%{query}“.",
   "spaces.addedTo": "Zu %{space} hinzugefügt",
   "spaces.removedFrom": "Aus %{space} entfernt",

@@ -74,6 +74,13 @@ crons.interval(
 );
 
 crons.interval(
+  "prepare trip week reminders",
+  { hours: 1 },
+  internal.notifications.prepareDueTripWeeks,
+  {},
+);
+
+crons.interval(
   "recover notification deliveries",
   { minutes: 5 },
   internal.notificationDelivery.recover,
