@@ -55,7 +55,7 @@ struct SignedInView: View {
       }
       .navigationDestination(for: AppLink.self) { link in
         if access.loading { loadingPlan }
-        else if access.locked && !allowedWhileLocked(link) { PlanGateView() }
+        else if access.locked && !PlanRoutes.allowedWithoutPersonalAccess(link) { PlanGateView() }
         else { switch link.path.first {
         case "settings": AccountSettingsView()
         case "profile": AccountView().navigationTitle(copy("navigation.profile"))
@@ -197,16 +197,6 @@ struct SignedInView: View {
   @ViewBuilder private var loadingPlan: some View {
     if access.failed { Button(copy("common.retry")) { access.retry += 1 } }
     else { ProgressView(copy("pro.checking")) }
-  }
-
-  private func allowedWhileLocked(_ link: AppLink) -> Bool {
-    switch link.path.first {
-    case "add-trip-stop", "shared-trip-links", "profile", "settings", "list-invite", "passport-invite", "shared-lists", "shared-list", "trip-plan":
-      true
-    case "date-plan", "go-out", "new-trip", "add-list-place":
-      link.query.contains { $0.name == "listId" && $0.value?.isEmpty == false }
-    default: false
-    }
   }
 
   private func open(_ route: String) {
