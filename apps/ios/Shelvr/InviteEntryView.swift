@@ -22,7 +22,7 @@ struct InviteEntryView: View {
   var body: some View {
     @Bindable var entry = entry
     Group {
-      if let request = entry.accepted, backend.status == .signedIn {
+      if let request = entry.accepted, backend.status == .signedIn, activeDestination == nil {
         VStack {
           if entry.failed { Button(copy("common.retry")) { attempt += 1 } } else { ProgressView() }
           Button(copy("common.cancel")) { cancel() }.disabled(entry.dispatching != nil)
@@ -42,6 +42,14 @@ struct InviteEntryView: View {
     }
     .safeAreaInset(edge: .bottom) {
       if !entry.loaded, entry.failed { Button(copy("common.retry")) { entry.restore() } }
+      else if entry.failed, let link = activeDestination {
+        Button(copy("common.retry")) {
+          if let next = entry.didNavigate(to: link, account: backend.userID, session: backend.sessionGeneration),
+            !entry.route(next) {
+            pendingLink = next
+          }
+        }
+      }
     }
     .sheet(item: $entry.preview) { invite in
       NavigationStack {
@@ -67,6 +75,10 @@ struct InviteEntryView: View {
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button(copy("common.close")) { entry.preview = nil } } }
       }
     }
+  }
+
+  private var activeDestination: AppLink? {
+    entry.destination(account: backend.userID, session: backend.sessionGeneration)
   }
 
   private func cancel() {
@@ -131,7 +143,7 @@ struct InviteEntryView: View {
     entry.failed = false
     do {
       let account = try await currentAccount()
-      guard current() else { return }
+      guard current(), backend.userID == account else { return }
       guard let bound = request.bound(to: account) else {
         if let next = entry.cancel(keepPreview: false) { pendingLink = next }
         return
@@ -142,26 +154,34 @@ struct InviteEntryView: View {
       defer {
         if let next = entry.endDispatch(request.id, navigation: handoff), !entry.route(next) { pendingLink = next }
       }
-      let destination: AppLink?
-      if request.invite.kind == .list {
-        destination = request.invite.destination(listID: try await backend.joinList(token: request.invite.token))
-      } else {
-        destination = request.invite.destination(passportAvailable: try await passportAvailable(request.invite.token))
-      }
-      guard current(), entry.replace(with: nil) else { return }
-      if let destination {
-        let defaults = UserDefaults.standard
-        let completed = "swift.onboarded." + account
-        if !defaults.bool(forKey: completed) {
-          defaults.removeObject(forKey: "swift.onboarding." + account)
-          defaults.removeObject(forKey: OnboardingHandoff.key(account))
-          defaults.set(true, forKey: completed)
+      var resolved = bound
+      if bound.resolution == nil {
+        let result: AcceptedInvite.Resolution?
+        if request.invite.kind == .list {
+          result = try await backend.joinList(token: request.invite.token).map(AcceptedInvite.Resolution.joinedList)
+        } else {
+          result = try await passportAvailable(request.invite.token) ? .passportComparison : nil
         }
-        handoff = InviteNavigation(destination: destination, account: account, session: session)
-      } else {
-        entry.expired = request.invite
-        entry.preview = request.invite
+        guard current() else { return }
+        guard let result else {
+          if entry.replace(with: nil) {
+            entry.expired = request.invite
+            entry.preview = request.invite
+          }
+          return
+        }
+        resolved = bound.resolved(as: result)
+        guard entry.replace(with: resolved) else { return }
       }
+      guard let destination = resolved.destination else { entry.failed = true; return }
+      let defaults = UserDefaults.standard
+      let completed = "swift.onboarded." + account
+      if !defaults.bool(forKey: completed) {
+        defaults.removeObject(forKey: "swift.onboarding." + account)
+        defaults.removeObject(forKey: OnboardingHandoff.key(account))
+        defaults.set(true, forKey: completed)
+      }
+      handoff = InviteNavigation(destination: destination, account: account, session: session)
     } catch { if current() { entry.failed = true } }
   }
 }
