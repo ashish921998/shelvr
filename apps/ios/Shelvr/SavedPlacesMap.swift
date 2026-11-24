@@ -8,6 +8,7 @@ struct SavedPlacesMap: View {
   @Environment(\.copy) private var copy
   @State private var saved: [MapPlace]?
   @State private var discover: [MapPlace] = []
+  @State private var receivedDiscover = false
   @State private var visits: [MapVisit] = []
   @State private var area = DiscoverBox.world
   @State private var kinds: Set<String> = []
@@ -33,6 +34,14 @@ struct SavedPlacesMap: View {
     let visible = MapPlace.search(filtered, query: search)
     MapCanvas(places: visible, location: location.position, filterKey: [filter, search] + kinds.sorted(), opening: saved.map { $0.isEmpty ? discover : $0 }, visited: visited, onArea: { area = $0 },
       onPick: { selected = $0 }, onCluster: { cluster = $0 })
+      .overlay(alignment: .bottom) {
+        if saved?.isEmpty == true, receivedDiscover, discover.isEmpty, errors.isEmpty {
+          VStack(alignment: .leading) {
+            Text(copy("map.emptyTitle")).font(.headline)
+            Text(copy("map.emptyBody")).font(.subheadline)
+          }.padding().background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14)).padding()
+        }
+      }
       .safeAreaInset(edge: .top, spacing: 0) {
         VStack(alignment: .leading, spacing: 8) {
           HStack {
@@ -104,6 +113,7 @@ struct SavedPlacesMap: View {
         await subscribe("discover") {
           for try await page in backend.discover(in: area) {
             try Task.checkCancellation()
+            receivedDiscover = true
             discover = page.places
           }
         }
