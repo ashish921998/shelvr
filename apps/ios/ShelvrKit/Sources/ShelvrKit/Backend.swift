@@ -58,6 +58,11 @@ public final class Backend {
       }
   }
 
+  public func offlineAccountID() async -> String? {
+    guard status == .offline else { return nil }
+    return await session.cachedAccountID
+  }
+
   public func start() async {
     await deletion.wait()
     if let starting { return await starting.value }

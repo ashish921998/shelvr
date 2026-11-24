@@ -37,6 +37,7 @@
 		A10000000000000000000066 /* ja.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000046 /* ja.json */; };
 		A10000000000000000000067 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
 		A10000000000000000000068 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
+        B71000000000000000000001 = {isa = PBXBuildFile; productRef = B71000000000000000000002; };
 		ADE66479850612E8CD378F36 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
 		B70000000000000000000001 = {isa = PBXBuildFile; productRef = B70000000000000000000002; };
 		BFDDDAC65FD1EAF951C7A3DF /* fr.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000045 /* fr.json */; };
@@ -137,6 +138,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000014 /* ShelvrKit in Frameworks */,
+                B71000000000000000000001 /* PostHog in Frameworks */,
 				B70000000000000000000001 /* RevenueCatUI in Frameworks */,
 				36E6F3FD1E99DE50DC4D1A8D /* ShelvrInbox in Frameworks */,
 			);
@@ -294,6 +296,7 @@
 			buildPhases = (
 				A10000000000000000000009 /* Sources */,
 				A1000000000000000000000A /* Frameworks */,
+                B71000000000000000000100 /* Validate archive configuration */,
 				A1000000000000000000000B /* Resources */,
 				7125C30E27D125078F48F51C /* Embed App Extensions */,
 			);
@@ -309,6 +312,7 @@
 			name = Shelvr;
 			packageProductDependencies = (
 				A10000000000000000000013 /* ShelvrKit */,
+                B71000000000000000000002 /* PostHog */,
 				B70000000000000000000002 /* RevenueCatUI */,
 				58A93D31AFA3EEA34762477E /* ShelvrInbox */,
 			);
@@ -338,6 +342,7 @@
 			packageReferences = (
 				A10000000000000000000012 /* XCLocalSwiftPackageReference "ShelvrKit" */,
                 B70000000000000000000003 /* purchases-ios */,
+                B71000000000000000000003 /* posthog-ios */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000003 /* Products */;
@@ -401,6 +406,22 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+        B71000000000000000000100 /* Validate archive configuration */ = {
+            isa = PBXShellScriptBuildPhase;
+            alwaysOutOfDate = 1;
+            buildActionMask = 2147483647;
+            files = ();
+            inputPaths = ("$(SRCROOT)/Config/verify-release-settings.rb");
+            name = "Validate archive configuration";
+            outputPaths = ();
+            runOnlyForDeploymentPostprocessing = 1;
+            shellPath = /bin/sh;
+            shellScript = "/usr/bin/ruby \"$SCRIPT_INPUT_FILE_0\"";
+            showEnvVarsInLog = 0;
+        };
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		936926C3D4F242255038B2A8 /* Sources */ = {
@@ -622,6 +643,7 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = ShelvrKit;
 		};
+        B71000000000000000000002 = {isa = XCSwiftPackageProductDependency; package = B71000000000000000000003; productName = PostHog; };
 		B70000000000000000000002 = {isa = XCSwiftPackageProductDependency; package = B70000000000000000000003; productName = RevenueCatUI; };
 		C2944BC6B409C8A19EAD8916 /* ShelvrInbox */ = {
 			isa = XCSwiftPackageProductDependency;
@@ -635,6 +657,7 @@
             repositoryURL = "https://github.com/RevenueCat/purchases-ios.git";
             requirement = {kind = exactVersion; version = 5.95.0; };
         };
+        B71000000000000000000003 = {isa = XCRemoteSwiftPackageReference; repositoryURL = "https://github.com/PostHog/posthog-ios.git"; requirement = {kind = exactVersion; version = 3.83.0; }; };
 /* End XCRemoteSwiftPackageReference section */
 	};
 	rootObject = A10000000000000000000001 /* Project object */;

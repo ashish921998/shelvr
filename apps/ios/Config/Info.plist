@@ -4,6 +4,10 @@
 <dict>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+    <key>ShelvrPostHogToken</key>
+    <string>$(SHELVR_POSTHOG_TOKEN)</string>
+    <key>ShelvrPostHogHost</key>
+    <string>$(SHELVR_POSTHOG_HOST)</string>
   <key>ShelvrAPNsEnvironment</key>
   <string>$(SHELVR_APNS_ENVIRONMENT)</string>
 	<key>ShelvrAppGroup</key>
