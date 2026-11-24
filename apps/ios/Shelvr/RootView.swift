@@ -2,6 +2,7 @@ import ShelvrKit
 import SwiftUI
 
 struct RootView: View {
+  @EnvironmentObject private var pushDevice: PushDevice
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var pendingLink: AppLink?
@@ -18,6 +19,9 @@ struct RootView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(Color(.background))
     .foregroundStyle(Color(.foreground))
+    .onChange(of: pushDevice.link, initial: true) { _, link in
+      if let link { pendingLink = link; pushDevice.link = nil }
+    }
     .modifier(SharedInboxReceiver())
     .onOpenURL { url in
       if let link = AppLink(url.absoluteString), link.path != ["sign-in"] { pendingLink = link }
