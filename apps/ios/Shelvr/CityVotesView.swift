@@ -40,6 +40,7 @@ struct CityVotesView: View {
       else {
         Button(copy("plan.ask")) {
           let existing = openLink
+          Analytics.capture("plan_ask_opened", ["has_link": existing != nil])
           let mapped = pins.filter { existing?.match($0, among: pins) != nil }
           selection = Set((mapped.isEmpty ? pins : mapped).prefix(5))
           share = nil
@@ -99,6 +100,6 @@ struct CityVotesView: View {
       let origin = backend.environment.variant == .development ? devOrigin : nil
       share = (origin ?? URL(string: "https://tryshelvr.app")!).appendingPathComponent("p").appendingPathComponent(token)
       message = ""
-    } catch { message = copy("plan.askFailedTitle") }
+    } catch { Analytics.capture("plan_ask_failed", ["reason": "link"]); message = copy("plan.askFailedTitle") }
   }
 }

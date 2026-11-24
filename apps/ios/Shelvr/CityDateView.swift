@@ -66,6 +66,7 @@ struct CityDateView: View {
         Button(copy("datePlan.changeFor", ["name": spot.name])) {
           if first { triedFirst = date.nextRound(triedFirst, from: index, to: next.first); triedSecond = [] }
           else { triedSecond = date.nextRound(triedSecond, from: index, to: next.second); triedFirst = [] }
+          Analytics.capture("date_plan_swapped", ["slot": first ? "first" : "second", "swapped": true])
           evening = next
         }
       }
@@ -75,13 +76,15 @@ struct CityDateView: View {
   private func generate(_ kind: String) async {
     guard !busy else { return }
     busy = true
+    Analytics.capture("date_plan_started", ["kind": kind])
     defer { busy = false }
     failed = false
     do {
       let plan = try await backend.planDate(city: city, kind: kind, locale: copy.locale, listID: listID)
+      Analytics.capture("date_plan_made", ["kind": plan.kind, "asked": kind, "status": plan.status, "evenings": plan.evenings.count, "suggested": plan.stops.filter { $0.source == "suggested" }.count])
       result = plan
       evening = plan.evenings.first
       triedFirst = []; triedSecond = []
-    } catch { failed = true }
+    } catch { Analytics.capture("date_plan_failed", ["reason": PastedLink.requiresPro(error) ? "pro_required" : "error"]); failed = true }
   }
 }

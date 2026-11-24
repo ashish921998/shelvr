@@ -87,6 +87,7 @@ struct SharedInboxReceiver: ViewModifier {
         "saveSource": payload.siri == true ? "siri" : "share_extension"
       ]
       arguments["spaceId"] = payload.spaceID
+      arguments["analyticsSessionId"] = Analytics.sessionID
       let _: String = try await backend.client.mutation(note ? "items:createNoteItem" : "items:createLinkItem", with: arguments)
     case .image:
       guard UUID(uuidString: payload.value) != nil else { throw CocoaError(.fileReadCorruptFile) }

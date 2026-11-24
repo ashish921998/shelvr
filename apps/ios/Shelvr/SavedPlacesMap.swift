@@ -53,7 +53,7 @@ struct SavedPlacesMap: View {
           }
           if !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             ForEach(visible.prefix(5)) { place in
-              Button { selected = place } label: {
+              Button { Analytics.capture("map_search_result_opened"); selected = place } label: {
                 Label(place.name, systemImage: place.isSaved ? "bookmark" : "mappin")
                   .frame(maxWidth: .infinity, alignment: .leading)
               }
@@ -73,7 +73,7 @@ struct SavedPlacesMap: View {
                 ForEach(chips, id: \.self) { kind in
                   let key = "map.kind" + kind.prefix(1).uppercased() + kind.dropFirst()
                   Button(copy(key)) {
-                    if !kinds.insert(kind).inserted { kinds.remove(kind) }
+                    if kinds.insert(kind).inserted { Analytics.capture("map_filter_selected", ["kind": kind]) } else { kinds.remove(kind) }
                   }
                   .buttonStyle(.bordered).tint(kinds.contains(kind) ? .accentColor : .secondary)
                   .accessibilityAddTraits(kinds.contains(kind) ? .isSelected : [])
@@ -123,10 +123,11 @@ struct SavedPlacesMap: View {
         if let raw = place.appleId, let identifier = MKMapItem.Identifier(rawValue: raw),
           let item = try? await MKMapItemRequest(mapItemIdentifier: identifier).mapItem {
           guard !Task.isCancelled else { return }
+          Analytics.capture("map_place_opened", ["card": true, "source": place.isSaved ? "own" : "discover"])
           card = item
         } else {
           guard !Task.isCancelled else { return }
-          if let id = place.itemId { open("/item/" + id) }
+          if let id = place.itemId { Analytics.capture("map_place_opened", ["card": false, "source": "own"]); open("/item/" + id) }
           else {
             let item = MKMapItem(placemark: MKPlacemark(coordinate: place.coordinate))
             item.name = place.name

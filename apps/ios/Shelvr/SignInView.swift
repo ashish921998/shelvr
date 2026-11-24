@@ -9,6 +9,9 @@ struct SignInView: View {
   @Environment(\.colorScheme) private var colorScheme
   @State private var nonce = AppleNonce()
   @State private var busy = false
+  @State private var attemptID = ""
+  @State private var began = Date()
+  @State private var provider = ""
   @State private var failed = false
 
   var body: some View {
@@ -24,6 +27,7 @@ struct SignInView: View {
         .multilineTextAlignment(.center)
       Spacer()
       SignInWithAppleButton(.continue) { request in
+        begin("apple")
         nonce = AppleNonce()
         request.requestedScopes = [.fullName, .email]
         request.nonce = nonce.hashed
@@ -31,25 +35,28 @@ struct SignInView: View {
         switch result {
         case let .success(authorization):
           guard let credential = appleCredential(authorization) else {
-            failed = true
+            failed = true; outcome("auth_failed", ["stage": "exchange"])
             return
           }
           signIn { try await backend.signIn(credential) }
         case let .failure(error):
           failed = (error as? ASAuthorizationError)?.code != .canceled
+          if failed { outcome("auth_failed", ["stage": "request"]) } else { cancelled() }
         }
       }
       .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
       .frame(height: 52)
       Button(copy("account.google")) {
+        begin("google")
         signIn {
-          guard let credential = try await googleCredential() else { return }
+          guard let credential = try await googleCredential() else { cancelled(); return }
           try await backend.signIn(credential)
         }
       }
       .buttonStyle(.signIn)
       #if DEBUG
         Button(copy("account.anonymous")) {
+          begin("anonymous")
           signIn { try await backend.signIn(.anonymous) }
         }
         .buttonStyle(.signIn)
@@ -87,12 +94,39 @@ struct SignInView: View {
     return text
   }
 
+  private func begin(_ provider: String) {
+    self.provider = provider; began = .now; attemptID = UUID().uuidString
+    Analytics.capture("auth_started", authProperties)
+  }
+
+  private var authProperties: [String: Any] {
+    ["provider": provider, "method": provider == "google" ? "web" : "native",
+      "surface": "sign_in_view", "auth_attempt_id": attemptID]
+  }
+
+  private func outcome(_ name: String, _ fields: [String: Any] = [:]) {
+    guard !attemptID.isEmpty else { return }
+    var properties = authProperties.merging(fields) { $1 }
+    properties["elapsed_ms"] = max(0, Int(Date.now.timeIntervalSince(began) * 1000))
+    Analytics.capture(name, properties)
+    attemptID = ""
+  }
+
+  private func cancelled() {
+    outcome("auth_cancelled", ["result": "cancel", "browser_ms": max(0, Int(Date.now.timeIntervalSince(began) * 1000))])
+  }
+
   private func signIn(_ work: @escaping @MainActor () async throws -> Void) {
     busy = true
     failed = false
     Task {
       defer { busy = false }
-      do { try await work() } catch { failed = true }
+      do {
+        try await work()
+        if backend.status == .signedIn { outcome("auth_succeeded"); Analytics.capture("auth_completed") }
+      } catch {
+        outcome("auth_failed", ["stage": "exchange"]); failed = true
+      }
     }
   }
 
