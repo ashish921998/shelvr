@@ -50,6 +50,10 @@ Expo app keeps shipping until the Swift app passes final QA.
 | 11  | Platform               | Push through the Expo push service (APNs token exchanged for an `ExponentPushToken`, `notifications:registerDevice`), notification routing, the nine locales from `en.json`, PostHog events with the current names | Push to the dev build; locale snapshot in French and German                                                                                    |
 | 12  | Release                | Signed TestFlight build and store metadata                                                                                                                                                                         | TestFlight install over the current App Store build                                                                                            |
 
+Map follow-ups after milestone 6 are explicit camera commands, simulator verification of
+gesture handling, and shared Expo parity fixtures for the emoji tables, nearby reach and
+search ranking. Showing partial Discover coverage also remains a follow-up.
+
 ## Gates that wait for Ashish
 
 - **App Store submission** of the Swift build.

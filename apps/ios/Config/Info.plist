@@ -6,6 +6,8 @@
 	<string>$(SHELVR_CONVEX_URL)</string>
 	<key>ShelvrVariant</key>
 	<string>$(SHELVR_VARIANT)</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Shelvr shows where you are on the map so you can find the places you saved nearby.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

@@ -14,7 +14,7 @@ struct SignedInView: View {
         if library {
           LibraryView(screen: .home)
         } else {
-          Map()
+          SavedPlacesMap(open: open)
         }
       }
       .navigationTitle(copy(library ? "navigation.library" : "navigation.map"))
