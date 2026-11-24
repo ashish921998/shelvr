@@ -207,3 +207,43 @@ private final class OtherPushOwner: URLProtocol, @unchecked Sendable {
   }
   #expect(calls == 1)
 }
+
+@MainActor @Test func transientRefreshFailureKeepsTheLastConfirmedDigestAcrossRelaunch() async throws {
+  let endpoint = URL(string: "https://example.convex.cloud")!
+  let service = "test.refresh.\(UUID())"
+  let store = PushTokenStore(serviceURL: endpoint, keychainService: service)
+  defer { try? store.write([]) }
+  let session = UUID(), apns = Data([42])
+  let confirmed = PushRegistrationRecord(token: "current", registrationId: session.uuidString,
+    apnsDigest: PushDeliveryState.digest(apns))
+  try store.write([confirmed])
+  await #expect(throws: URLError(.timedOut)) {
+    try await store.registerFresh("current", native: apns, for: session, register: { _ in throw URLError(.timedOut) }) { _ in
+      Issue.record("Refreshing the same token must not revoke it")
+    }
+  }
+  let restored = try PushTokenStore(serviceURL: endpoint, keychainService: service).read()
+  #expect(restored == [confirmed])
+  var delivery = PushDeliveryState()
+  let paused = delivery.prepare(generation: UUID(), verified: Set(restored.compactMap(\.apnsDigest)))
+  let silenced = delivery.receive(apns)
+  #expect(!paused && !silenced && delivery.permitsPresentation)
+  await #expect(throws: PushRegistrationError.ownedByAnotherAccount) {
+    try await store.registerFresh("current", native: apns, for: session, register: { _ in
+      throw PushRegistrationError.ownedByAnotherAccount
+    }) { _ in Issue.record("An ownership refusal must not revoke anything") }
+  }
+  #expect(try store.read().first?.apnsDigest == nil)
+}
+
+@Test func aRetiredAPNsTokenMustBeProvedAgainAfterRotation() {
+  let session = UUID(), first = Data([1]), replacement = Data([2])
+  var delivery = PushDeliveryState()
+  _ = delivery.prepare(generation: session, verified: [PushDeliveryState.digest(first)])
+  _ = delivery.receive(first)
+  let replacementPaused = delivery.receive(replacement)
+  let replacementResumed = delivery.confirm(replacement, generation: session)
+  let lateFirstPaused = delivery.receive(first)
+  #expect(replacementPaused && replacementResumed && lateFirstPaused)
+  #expect(!delivery.permitsPresentation)
+}
