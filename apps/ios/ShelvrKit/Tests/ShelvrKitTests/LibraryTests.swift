@@ -60,3 +60,27 @@ import Testing
   let now = Date(timeIntervalSince1970: rows.now / 1000)
   #expect(rows.saves.map { $0.canRetry(at: now) } == rows.expected)
 }
+
+@Test func searchKeepsOnlyResultsAndFailuresForTheDisplayedQuery() throws {
+  let row = try JSONDecoder().decode(LibrarySave.self, from: Data(#"{"_id":"a","_creationTime":0,"status":"ready"}"#.utf8))
+  let cached = LibrarySearchState.items("coffee", [row])
+  guard case let .items(found) = cached.display(for: "coffee") else { Issue.record("Lost cached results"); return }
+  #expect(found.map(\.id) == ["a"])
+  guard case .loading = cached.display(for: "museum") else { Issue.record("Stale results"); return }
+  guard case .loading = LibrarySearchState.failure("museum").display(for: "coffee") else { Issue.record("Stale failure"); return }
+  guard case .failure = LibrarySearchState.failure("coffee").display(for: "coffee") else { Issue.record("Lost error"); return }
+}
+
+@Test func cityPhotosPreferTheSaveThenTheCuratedPhotoAndDeduplicateTheServerFallback() throws {
+  let own = URL(string: "https://example.com/save.jpg")!
+  let remote = URL(string: "https://example.com/city.jpg")!
+  let bundled = URL(fileURLWithPath: "/library-city-austin.jpg")
+  func city(_ cover: URL?, _ photo: URL?) -> LibraryCity {
+    .init(city: "Austin", count: 1, placeCount: 1, visitedCount: nil, cover: cover?.absoluteString, photo: photo?.absoluteString)
+  }
+  #expect(city(own, remote).coverCandidates(curated: bundled) == [own, bundled, remote])
+  #expect(city(remote, remote).coverCandidates(curated: bundled) == [bundled, remote])
+  #expect(city(own, nil).coverCandidates(curated: nil) == [own])
+  #expect(LibraryCity.coverName("København") == "copenhagen")
+  #expect(LibraryCity.coverName("New York City") == "new-york")
+}
