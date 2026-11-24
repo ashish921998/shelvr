@@ -176,6 +176,7 @@ type MessageParams = {
   "pro.openStore": undefined;
   "notifications.disabledTitle": undefined;
   "notifications.disabledBody": undefined;
+  "notifications.previousAccount": undefined;
   "notifications.updateFailed": undefined;
   "errors.trySoon": undefined;
   "pro.restoredTitle": undefined;

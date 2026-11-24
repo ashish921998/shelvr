@@ -177,6 +177,7 @@
   "pro.openStore": "App Storeを開く",
   "notifications.disabledTitle": "通知がオフです",
   "notifications.disabledBody": "今週のシェルフを有効にするには、端末の設定でShelvrの通知を許可してください。",
+  "notifications.previousAccount": "通知は別のShelvrアカウントに登録されています。このデバイスでそのアカウントにサインインしてからサインアウトし、ここで通知を有効にしてください。",
   "notifications.updateFailed": "通知を更新できませんでした",
   "errors.trySoon": "少し待ってからお試しください。",
   "pro.restoredTitle": "購入を復元しました",
