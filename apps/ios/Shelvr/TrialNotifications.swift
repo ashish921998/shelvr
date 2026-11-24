@@ -16,7 +16,9 @@ final class LocalTrialNotifications {
       await previous?.value
       guard current == revision else { return }
       let center = UNUserNotificationCenter.current()
-      center.removePendingNotificationRequests(withIdentifiers: TrialNotification.Kind.allCases.map(\.rawValue))
+      let ids = TrialNotification.Kind.allCases.map(\.rawValue)
+      center.removePendingNotificationRequests(withIdentifiers: ids)
+      if notices.isEmpty { center.removeDeliveredNotifications(withIdentifiers: ids) }
       let permission = await center.notificationSettings().authorizationStatus
       guard [.authorized, .provisional, .ephemeral].contains(permission) else { return }
       for notice in notices {
@@ -96,7 +98,8 @@ struct TrialReminderObserver: ViewModifier {
       .onChange(of: Inputs(subscription: subscription, nudges: preferences?.remindersEnabled, active: phase == .active, user: user)) { before, value in
         if before.user == value.user, before.subscription?.status != nil, before.subscription?.status != "trialing",
           value.subscription?.status == "trialing", let id = value.user {
-          UserDefaults.standard.set("owed", forKey: "trial-primer-" + id)
+          let key = "trial-primer-" + id
+          if UserDefaults.standard.string(forKey: key) != "asked" { UserDefaults.standard.set("owed", forKey: key) }
         }
         refresh(value)
       }
@@ -134,7 +137,13 @@ struct TrialReminderObserver: ViewModifier {
     guard home, mayAsk, phase == .active, let user, !primer else { return }
     let key = "trial-primer-" + user
     guard UserDefaults.standard.string(forKey: key) == "owed" else { return }
-    UserDefaults.standard.set("asked", forKey: key)
-    primer = true
+    Task {
+      let session = backend.sessionGeneration
+      let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+      guard session == backend.sessionGeneration, backend.status == .signedIn, self.user == user,
+        home, phase == .active, mayAsk, !primer, UserDefaults.standard.string(forKey: key) == "owed" else { return }
+      UserDefaults.standard.set("asked", forKey: key)
+      if status == .notDetermined { primer = true }
+    }
   }
 }
