@@ -32,7 +32,9 @@ struct SavedPlacesMap: View {
         (kinds.isEmpty || !kinds.isDisjoint(with: place.kinds))
     }
     let visible = MapPlace.search(filtered, query: search)
-    MapCanvas(places: visible, location: location.position, filterKey: [filter, search] + kinds.sorted(), opening: saved.map { $0.isEmpty ? discover : $0 }, visited: visited, onArea: { area = $0 },
+    let filtering = filter != "all" || !kinds.isEmpty || !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    let opening = MapPlace.openingPins(saved: saved, discover: discover, visible: visible, filtered: filtering)
+    MapCanvas(places: visible, location: location.position, filterKey: [filter, search] + kinds.sorted(), opening: opening, visited: visited, onArea: { area = $0 },
       onPick: { selected = $0 }, onCluster: { cluster = $0 })
       .overlay(alignment: .bottom) {
         if saved?.isEmpty == true, receivedDiscover, discover.isEmpty, errors.isEmpty {

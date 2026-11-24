@@ -22,13 +22,36 @@ public struct MapPlace: Decodable, Hashable, Identifiable, Sendable {
       !CharacterSet.nonBaseCharacters.contains($0)
     }
     let normalized = String(scalars).lowercased().replacing(/['’ʼ]/, with: "")
-    return normalized.split(whereSeparator: { !$0.isLetter && !$0.isNumber }).map(String.init)
+    return normalized.unicodeScalars.split(whereSeparator: { !letterOrNumber($0) }).map(String.init)
   }
 
   static func key(_ name: String) -> String {
     let trimmed = name.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     let clipped = trimmed.utf16.count > 80 ? String(decoding: trimmed.utf16.prefix(79), as: UTF16.self) : trimmed
-    return words(clipped).joined()
+    let scalars = clipped.decomposedStringWithCompatibilityMapping.unicodeScalars.filter {
+      !CharacterSet.nonBaseCharacters.contains($0)
+    }
+    return String(String(scalars).lowercased().unicodeScalars.filter(letterOrNumber))
+  }
+
+  private static func letterOrNumber(_ scalar: Unicode.Scalar) -> Bool {
+    switch scalar.properties.generalCategory {
+    case .uppercaseLetter, .lowercaseLetter, .titlecaseLetter, .modifierLetter, .otherLetter,
+      .decimalNumber, .letterNumber, .otherNumber: true
+    default: false
+    }
+  }
+
+  public static func openingPins(saved: [Self]?, discover: [Self], visible: [Self], filtered: Bool) -> [Self]? {
+    guard let saved else { return nil }
+    if filtered { return visible.isEmpty ? nil : visible }
+    let anchors = saved.isEmpty ? discover : saved
+    guard !anchors.isEmpty else { return nil }
+    let groups = Dictionary(grouping: anchors) { ($0.city ?? "").lowercased() }
+    let city = anchors.compactMap { $0.city?.lowercased() }.filter { !$0.isEmpty }.max {
+      groups[$0, default: []].count < groups[$1, default: []].count
+    }
+    return city.flatMap { groups[$0] } ?? anchors
   }
 
   static func km(_ lat1: Double, _ lng1: Double, _ lat2: Double, _ lng2: Double) -> Double {
