@@ -78,8 +78,12 @@ public struct ShareInboxProcessor {
   private static func copyKey(for refusal: ShareInbox.FailedShare) -> String {
     let failure = SaveFailure(refusal.error)
     if failure == .other { return "share.retryHelp" }
-    if failure == .proRequired, case .success(let delivery) = refusal.share.delivery,
-      case .link = delivery.content { return "freePlan.leftBody" }
+    if failure == .proRequired, case .success(let delivery) = refusal.share.delivery {
+      switch delivery.content {
+      case .link, .note: return "freePlan.leftBody"
+      case .image: break
+      }
+    }
     return failure.photoCopyKey
   }
 }
