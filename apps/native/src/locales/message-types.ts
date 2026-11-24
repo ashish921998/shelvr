@@ -229,6 +229,8 @@ type MessageParams = {
   "pro.unlockShelvr": undefined;
   "share.openToFinish": undefined;
   "share.openToSignIn": undefined;
+  "share.copyNote": undefined;
+  "share.longNoteRecovery": undefined;
   "share.reading": undefined;
   "share.empty": undefined;
   "share.pending": undefined;

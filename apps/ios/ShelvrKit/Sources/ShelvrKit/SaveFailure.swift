@@ -1,10 +1,11 @@
 import ConvexMobile
 import Foundation
 
-public enum SaveFailure: Equatable, Sendable {
+public enum SaveFailure: Error, Equatable, Sendable {
   case proRequired, photoLimit, photoTooLarge, photoEmpty, other
 
   public init(_ error: any Error) {
+    if let classified = error as? Self { self = classified; return }
     switch (error as? PhotoUploadFailure)?.rawValue ?? saveErrorCode(error) {
     case "pro_required": self = .proRequired
     case "photo_limit": self = .photoLimit

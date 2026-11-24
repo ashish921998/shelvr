@@ -13,12 +13,16 @@ extension Backend: ShareSaver {}
 
 @MainActor
 public struct ShareInboxProcessor {
+  public typealias SiriDelivery = @MainActor (PendingShare.Delivery, String, () throws -> Void) async throws -> Void
+
   public struct Failure: Sendable {
     public let share: PendingShare?
     public let copyKey: String
-    public init(share: PendingShare? = nil, copyKey: String = "share.retryHelp") {
+    public let canRecoverNote: Bool
+    public init(share: PendingShare? = nil, copyKey: String = "share.retryHelp", canRecoverNote: Bool = false) {
       self.share = share
       self.copyKey = copyKey
+      self.canRecoverNote = canRecoverNote
     }
   }
 
@@ -36,7 +40,7 @@ public struct ShareInboxProcessor {
 
   public func updateOwner() throws { try inbox.activate(saver.userID) }
 
-  public func drain(owner: String) async throws -> Failure? {
+  public func drain(owner: String, deliverSiri: SiriDelivery? = nil) async throws -> Failure? {
     let checkpoint = {
       try Task.checkCancellation()
       guard saver.userID == owner else { throw ShareInboxError.ownerChanged }
@@ -46,6 +50,11 @@ public struct ShareInboxProcessor {
     try inbox.prune(keeping: owner)
     let refusal = try await inbox.drain(owner: owner) { delivery in
       try checkpoint()
+      if delivery.siri, let deliverSiri {
+        try await deliverSiri(delivery, owner, checkpoint)
+        try checkpoint()
+        return
+      }
       let source: SaveSource = delivery.siri ? .siri : .shareExtension
       switch delivery.content {
       case .link(let url):
@@ -58,14 +67,23 @@ public struct ShareInboxProcessor {
       }
       try checkpoint()
     }
-    return refusal.map { Failure(share: $0.share, copyKey: Self.copyKey(for: $0)) }
+    return refusal.map {
+      if ($0.error as? ShareInboxError) == .longNoteNeedsRecovery {
+        return Failure(share: $0.share, copyKey: "share.longNoteRecovery", canRecoverNote: true)
+      }
+      return Failure(share: $0.share, copyKey: Self.copyKey(for: $0))
+    }
   }
 
   private static func copyKey(for refusal: ShareInbox.FailedShare) -> String {
     let failure = SaveFailure(refusal.error)
     if failure == .other { return "share.retryHelp" }
-    if failure == .proRequired, case .success(let delivery) = refusal.share.delivery,
-      case .link = delivery.content { return "freePlan.leftBody" }
+    if failure == .proRequired, case .success(let delivery) = refusal.share.delivery {
+      switch delivery.content {
+      case .link, .note: return "freePlan.leftBody"
+      case .image: break
+      }
+    }
     return failure.photoCopyKey
   }
 }
