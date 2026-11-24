@@ -34,21 +34,7 @@ enum Analytics {
     config.setBeforeSend { event in
       event.properties["environment"] = environment
       event.properties["analytics_version"] = 1
-      if event.event == "Application Opened" { event.properties.removeValue(forKey: "url") }
-      if event.event == "$exception" {
-        event.properties.removeValue(forKey: "$exception_message")
-        if let exceptions = event.properties["$exception_list"] as? [[String: Any]] {
-          event.properties["$exception_list"] = exceptions.map { info in
-            var safe = info
-            safe["value"] = info["type"] as? String ?? "Error"
-            if var mechanism = safe["mechanism"] as? [String: Any] {
-              mechanism.removeValue(forKey: "meta")
-              safe["mechanism"] = mechanism
-            }
-            return safe
-          }
-        }
-      }
+      event.properties = AnalyticsRedaction.properties(event.properties, event: event.event)
       return event
     }
     PostHogSDK.shared.setup(config)
