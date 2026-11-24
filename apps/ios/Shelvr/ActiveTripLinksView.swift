@@ -12,10 +12,12 @@ struct ActiveTripLinksView: View {
   }
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
-  @State private var cursor: String?
+  @State private var cursors: [String] = []
   @State private var page: Page?
   @State private var failed = false
   @State private var attempt = 0
+
+  private var cursor: String? { cursors.last }
 
   var body: some View {
     List {
@@ -24,8 +26,8 @@ struct ActiveTripLinksView: View {
         ForEach(page.page, id: \._id) { trip in
           NavigationLink(trip.name ?? trip.city) { TripRevocationView(id: trip._id) }
         }
-        if !page.isDone { Button(copy("tripShare.more")) { cursor = page.continueCursor } }
-        if cursor != nil { Button(copy("common.back")) { cursor = nil } }
+        if !page.isDone { Button(copy("tripShare.more")) { cursors.append(page.continueCursor) } }
+        if cursor != nil { Button(copy("common.back")) { _ = cursors.popLast() } }
       } else { ProgressView() }
     }
     .navigationTitle(copy("tripShare.manage"))

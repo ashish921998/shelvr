@@ -21,20 +21,27 @@ public final class Backend {
   private let session: AuthSession
   @ObservationIgnored private var authWatch: AnyCancellable?
   @ObservationIgnored private var starting: Task<Void, Never>?
-  @ObservationIgnored private let deletion = AccountDeletion()
-  @ObservationIgnored private var registeringPush: Task<Void, Error>?
-  @ObservationIgnored private var signingOut = false
   @ObservationIgnored var preparingSiri: (subject: String, task: Task<Void, Error>)?
   @ObservationIgnored var siriDrain: Task<Void, Never>?
   @ObservationIgnored var siriDrainRequested = false
   @ObservationIgnored var siriBacklog = SiriRevocationBacklog()
+  @ObservationIgnored private let deletion = AccountDeletion()
+  @ObservationIgnored private var registeringPush: Task<Void, Error>?
+  private var signingOut = false
+  private var connectedUserID: String?
   @ObservationIgnored private var signingIn = false
 
-  public init(environment: AppEnvironment) {
+  public var userID: String? { status == .signedIn && !signingOut && !deletion.isRunning ? connectedUserID : nil }
+
+  public convenience init(environment: AppEnvironment) {
     let session = AuthSession(
       transport: ConvexHTTPAuthTransport(deployment: environment.convexURL),
       vault: KeychainTokenVault(),
       signOutMarker: SignOutMarker(url: URL.applicationSupportDirectory.appending(path: "pending-sign-out")))
+    self.init(environment: environment, session: session)
+  }
+
+  init(environment: AppEnvironment, session: AuthSession) {
     self.environment = environment
     self.session = session
     self.client = ConvexClientWithAuth(
@@ -47,6 +54,7 @@ public final class Backend {
           guard let self, self.status == .signedIn, !self.signingOut,
             case .unauthenticated = state
           else { return }
+          self.connectedUserID = nil
           self.status = .signedOut
         }
       }
@@ -77,11 +85,6 @@ public final class Backend {
       return
     }
     await connect()
-  }
-
-  public func requireShareOwner(_ owner: String) throws {
-    guard status == .signedIn, !signingOut, !deletion.isRunning, KeychainTokenVault().read()?.belongs(to: owner) == true
-    else { throw CancellationError() }
   }
 
   public func signIn(_ credential: SignInCredential) async throws {
@@ -184,15 +187,6 @@ public final class Backend {
     }
   }
 
-  public func deleteAccount() async throws {
-    try await deletion.perform(allowed: status == .signedIn && !signingOut) {
-      try await self.client.mutation("users:deleteCurrentUserAccount")
-    } afterAcceptance: {
-      await self.session.forgetDeletedAccount()
-      await self.disconnect()
-    }
-  }
-
   private func retireSiri(_ credential: SiriCredential) {
     do {
       try credential.enqueueRevocation()
@@ -200,8 +194,20 @@ public final class Backend {
     } catch {}
   }
 
+  public func deleteAccount() async throws {
+    try await deletion.perform(allowed: status == .signedIn && !signingOut) {
+      try await self.client.mutation("users:deleteCurrentUserAccount")
+    } afterAcceptance: {
+      if let credential = SiriCredential.current() { self.retireSiri(credential) }
+      await self.session.forgetDeletedAccount()
+      await self.disconnect()
+      self.retrySiriRevocations()
+    }
+  }
+
   private func disconnect() async {
     await client.logout()
+    connectedUserID = nil
     status = .signedOut
     signingOut = false
   }
@@ -212,8 +218,12 @@ public final class Backend {
 
   private func connect() async {
     switch await client.login() {
-    case .success: status = .signedIn
-    case .failure: status = await session.isSignedIn ? .offline : .signedOut
+    case let .success(token):
+      connectedUserID = AuthTokens.ownerID(for: token)
+      status = .signedIn
+    case .failure:
+      connectedUserID = nil
+      status = await session.isSignedIn ? .offline : .signedOut
     }
   }
 }

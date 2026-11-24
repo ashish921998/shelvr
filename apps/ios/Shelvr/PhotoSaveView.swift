@@ -61,7 +61,7 @@ struct PhotoSaveView: View {
       if !Task.isCancelled, request == id { dismiss() }
     } catch {
       if !Task.isCancelled, request == id {
-        failure = ImportPhoto.failureCopy(error)
+        failure = SaveFailure(error).photoCopyKey
         if failure == "freePlan.photosNeedPro" && offered != operationID {
           offered = operationID; billing = .paywall
         }
