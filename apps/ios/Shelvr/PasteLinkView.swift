@@ -48,12 +48,10 @@ struct PasteLinkView: View {
     Task {
       defer { saving = false }
       do {
-        let _: String = try await backend.client.mutation("items:createLinkItem", with: [
-          "url": link.url, "operationId": link.operationID, "saveSource": "manual_link"
-        ])
+        try await backend.saveLink(link.url, operationID: link.operationID, source: .manualLink)
         if presented { dismiss() }
       } catch {
-        errorMessage = PastedLink.requiresPro(error) ? copy("freePlan.leftBody") : copy("errors.tryAgain")
+        errorMessage = SaveFailure(error) == .proRequired ? copy("freePlan.leftBody") : copy("errors.tryAgain")
       }
     }
   }

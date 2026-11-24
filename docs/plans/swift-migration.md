@@ -79,7 +79,7 @@ The Swift CI workflow runs the package tests and arm64 simulator build on change
   phone, and every push arrives twice. Milestone 11 reads the id the Expo build stored
   before registering: a Keychain generic password with service = bundle id and
   account = `EXDeviceInstallationUUIDKey` (expo-notifications 58.1.5).
-- **Duplicate saves.** Retries must reuse the same `operationId` (`share:<session>:<i>`,
+- **Duplicate saves.** Retries must reuse the same `operationId` (`share:<uuid>`,
   `link:<uuid>`, `image:<uuid>`, `siri:<uuid>`).
 - **Client copies of server rules drift.** Pin dedup, kinds and emoji, visited matching and vote
   tallies run on the client today. Each port gets golden vectors generated from the TypeScript

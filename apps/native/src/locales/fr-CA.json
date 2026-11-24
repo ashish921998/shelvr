@@ -229,6 +229,8 @@
   "account.deleting": "Suppression…",
   "pro.checking": "Vérification de l'abonnement…",
   "pro.unlockShelvr": "Débloquer Shelvr Pro",
+  "share.openToFinish": "Ouvrez Shelvr après le partage pour terminer l’enregistrement.",
+  "share.openToSignIn": "Ouvrez Shelvr et connectez-vous avant de partager.",
   "share.reading": "Lecture du contenu partagé…",
   "share.empty": "Rien à enregistrer",
   "share.pending": "Certains éléments sont encore en attente.",

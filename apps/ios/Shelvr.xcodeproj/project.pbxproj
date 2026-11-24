@@ -7,6 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		002D613616A1F5130CED2E9F /* ShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 704ED90EEF30D691A2613844 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		00BC345C0FB2E35A5207201C /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
+		127E857B903D1536FC1EDFF7 /* ja.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000046 /* ja.json */; };
+		36E6F3FD1E99DE50DC4D1A8D /* ShelvrInbox in Frameworks */ = {isa = PBXBuildFile; productRef = 58A93D31AFA3EEA34762477E /* ShelvrInbox */; };
+		3FBA7FAB0E3EEC03ACC0587D /* es-MX.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000042 /* es-MX.json */; };
+		5CC0282F2414B8ABB635621F /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000041 /* en.json */; };
+		700174B2654790807D78CA9D /* fr-CA.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000044 /* fr-CA.json */; };
+		77C4513B4C564D7A33CF2A02 /* ShelvrInbox in Frameworks */ = {isa = PBXBuildFile; productRef = C2944BC6B409C8A19EAD8916 /* ShelvrInbox */; };
+		7FD82543A4DD186B77BD3F7C /* es.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000043 /* es.json */; };
+		91DFB9C33EA2C3164F716C9B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 85CFCF465E33D985FBF666F9 /* Foundation.framework */; };
 		A10000000000000000000014 /* ShelvrKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000013 /* ShelvrKit */; };
 		A10000000000000000000060 /* de.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* de.json */; };
 		A10000000000000000000061 /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000041 /* en.json */; };
@@ -17,29 +27,62 @@
 		A10000000000000000000066 /* ja.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000046 /* ja.json */; };
 		A10000000000000000000067 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
 		A10000000000000000000068 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
+		BFDDDAC65FD1EAF951C7A3DF /* fr.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000045 /* fr.json */; };
+		C5EA489188B6CDB7DBC292F8 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
+		D0F379AD41A0134F8BF645B5 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 985944D0E54B7A93E76B5970 /* ShareViewController.swift */; };
+		F7096F0482F684FCB5458973 /* de.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* de.json */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		2C968323C99353A4C4EC0A54 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 692A26752848BB4E3AF88E47;
+			remoteInfo = ShareExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		7125C30E27D125078F48F51C /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				002D613616A1F5130CED2E9F /* ShareExtension.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		704ED90EEF30D691A2613844 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		85CFCF465E33D985FBF666F9 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		985944D0E54B7A93E76B5970 /* ShareViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		A10000000000000000000004 /* Shelvr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shelvr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000015 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 		A10000000000000000000016 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		A10000000000000000000017 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		A10000000000000000000018 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A10000000000000000000019 /* Shelvr.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Shelvr.entitlements; sourceTree = "<group>"; };
-		A10000000000000000000040 /* de.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "de.json"; sourceTree = "<group>"; };
-		A10000000000000000000041 /* en.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "en.json"; sourceTree = "<group>"; };
+		A10000000000000000000040 /* de.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = de.json; sourceTree = "<group>"; };
+		A10000000000000000000041 /* en.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = en.json; sourceTree = "<group>"; };
 		A10000000000000000000042 /* es-MX.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "es-MX.json"; sourceTree = "<group>"; };
-		A10000000000000000000043 /* es.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "es.json"; sourceTree = "<group>"; };
+		A10000000000000000000043 /* es.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = es.json; sourceTree = "<group>"; };
 		A10000000000000000000044 /* fr-CA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "fr-CA.json"; sourceTree = "<group>"; };
-		A10000000000000000000045 /* fr.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "fr.json"; sourceTree = "<group>"; };
-		A10000000000000000000046 /* ja.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "ja.json"; sourceTree = "<group>"; };
-		A10000000000000000000047 /* ko.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "ko.json"; sourceTree = "<group>"; };
+		A10000000000000000000045 /* fr.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = fr.json; sourceTree = "<group>"; };
+		A10000000000000000000046 /* ja.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ja.json; sourceTree = "<group>"; };
+		A10000000000000000000047 /* ko.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ko.json; sourceTree = "<group>"; };
 		A10000000000000000000048 /* pt-BR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "pt-BR.json"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A10000000000000000000005 /* Shelvr */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = Shelvr;
 			sourceTree = "<group>";
 		};
@@ -51,19 +94,47 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000014 /* ShelvrKit in Frameworks */,
+				36E6F3FD1E99DE50DC4D1A8D /* ShelvrInbox in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DD68E2D420F9385E7D083DE3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				91DFB9C33EA2C3164F716C9B /* Foundation.framework in Frameworks */,
+				77C4513B4C564D7A33CF2A02 /* ShelvrInbox in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		A10000000000000000000002 /* Shelvr project */ = {
+		115443435333965FC09C9DBA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				1CE72CC61C32F9DC2F527468 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		1CE72CC61C32F9DC2F527468 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				85CFCF465E33D985FBF666F9 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000002 = {
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000005 /* Shelvr */,
 				A10000000000000000000006 /* Config */,
 				A10000000000000000000007 /* Locales */,
 				A10000000000000000000003 /* Products */,
+				115443435333965FC09C9DBA /* Frameworks */,
+				ED02C96235AAAD4EC1E603D2 /* ShareExtension */,
 			);
 			sourceTree = "<group>";
 		};
@@ -71,6 +142,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000004 /* Shelvr.app */,
+				704ED90EEF30D691A2613844 /* ShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -104,9 +176,38 @@
 			path = ../native/src/locales;
 			sourceTree = "<group>";
 		};
+		ED02C96235AAAD4EC1E603D2 /* ShareExtension */ = {
+			isa = PBXGroup;
+			children = (
+				985944D0E54B7A93E76B5970 /* ShareViewController.swift */,
+			);
+			name = ShareExtension;
+			path = ShareExtension;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		692A26752848BB4E3AF88E47 /* ShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1EE9F721E7B70E2E2F9AB932 /* Build configuration list for PBXNativeTarget "ShareExtension" */;
+			buildPhases = (
+				936926C3D4F242255038B2A8 /* Sources */,
+				DD68E2D420F9385E7D083DE3 /* Frameworks */,
+				61F45FEDAAA896C767CDAE0C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ShareExtension;
+			packageProductDependencies = (
+				C2944BC6B409C8A19EAD8916 /* ShelvrInbox */,
+			);
+			productName = ShareExtension;
+			productReference = 704ED90EEF30D691A2613844 /* ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		A10000000000000000000008 /* Shelvr */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A1000000000000000000000D /* Build configuration list for PBXNativeTarget "Shelvr" */;
@@ -114,10 +215,12 @@
 				A10000000000000000000009 /* Sources */,
 				A1000000000000000000000A /* Frameworks */,
 				A1000000000000000000000B /* Resources */,
+				7125C30E27D125078F48F51C /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				96FBAA023029F6C285DD4A99 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A10000000000000000000005 /* Shelvr */,
@@ -125,6 +228,7 @@
 			name = Shelvr;
 			packageProductDependencies = (
 				A10000000000000000000013 /* ShelvrKit */,
+				58A93D31AFA3EEA34762477E /* ShelvrInbox */,
 			);
 			productName = Shelvr;
 			productReference = A10000000000000000000004 /* Shelvr.app */;
@@ -158,11 +262,28 @@
 			projectRoot = "";
 			targets = (
 				A10000000000000000000008 /* Shelvr */,
+				692A26752848BB4E3AF88E47 /* ShareExtension */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		61F45FEDAAA896C767CDAE0C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F7096F0482F684FCB5458973 /* de.json in Resources */,
+				5CC0282F2414B8ABB635621F /* en.json in Resources */,
+				3FBA7FAB0E3EEC03ACC0587D /* es-MX.json in Resources */,
+				7FD82543A4DD186B77BD3F7C /* es.json in Resources */,
+				700174B2654790807D78CA9D /* fr-CA.json in Resources */,
+				BFDDDAC65FD1EAF951C7A3DF /* fr.json in Resources */,
+				127E857B903D1536FC1EDFF7 /* ja.json in Resources */,
+				00BC345C0FB2E35A5207201C /* ko.json in Resources */,
+				C5EA489188B6CDB7DBC292F8 /* pt-BR.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A1000000000000000000000B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -182,6 +303,14 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		936926C3D4F242255038B2A8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D0F379AD41A0134F8BF645B5 /* ShareViewController.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A10000000000000000000009 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -191,7 +320,59 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		96FBAA023029F6C285DD4A99 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = ShareExtension;
+			target = 692A26752848BB4E3AF88E47 /* ShareExtension */;
+			targetProxy = 2C968323C99353A4C4EC0A54 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		2D6DBA980C3E5C50F71DED40 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000016 /* Debug.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = Config/Extension.entitlements;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/ShareExtension.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Shelvr;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SHELVR_APP_ID).expo-sharing-extension";
+				PRODUCT_NAME = ShareExtension;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		8625A556B7209EFDBE44A69F /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000017 /* Release.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = Config/Extension.entitlements;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/ShareExtension.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Shelvr;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SHELVR_APP_ID).expo-sharing-extension";
+				PRODUCT_NAME = ShareExtension;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		A1000000000000000000000E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -221,6 +402,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		1EE9F721E7B70E2E2F9AB932 /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8625A556B7209EFDBE44A69F /* Release */,
+				2D6DBA980C3E5C50F71DED40 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		A1000000000000000000000C /* Build configuration list for PBXProject "Shelvr" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -249,9 +439,17 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		58A93D31AFA3EEA34762477E /* ShelvrInbox */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ShelvrInbox;
+		};
 		A10000000000000000000013 /* ShelvrKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ShelvrKit;
+		};
+		C2944BC6B409C8A19EAD8916 /* ShelvrInbox */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ShelvrInbox;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
