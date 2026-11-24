@@ -3,6 +3,8 @@ import CoreFoundation
 import ShelvrInbox
 import ShelvrKit
 import SwiftUI
+import UIKit
+import UniformTypeIdentifiers
 
 struct SharedInboxReceiver: ViewModifier {
   @Environment(Backend.self) private var backend
@@ -39,7 +41,11 @@ struct SharedInboxReceiver: ViewModifier {
         }
       }
       .alert(copy("share.singleFailure"), isPresented: $failed) {
-        Button(copy("common.tryAgain")) { failed = false; wake?.yield(phase) }
+        if failureCopy == "share.longNoteRecovery" {
+          Button(copy("share.copyNote")) { copyRecoveredNote() }
+        } else {
+          Button(copy("common.tryAgain")) { failed = false; wake?.yield(phase) }
+        }
         if failedFile != nil {
           Button(copy("common.delete"), role: .destructive) {
             if let file = failedFile { try? FileManager.default.removeItem(at: file) }
@@ -66,12 +72,29 @@ struct SharedInboxReceiver: ViewModifier {
     }
   }
 
+  private func copyRecoveredNote() {
+    guard let file = failedFile, backend.status == .signedIn, let inbox = ShareInbox.system(),
+      let owner = inbox.activeOwner, (try? inbox.owner(of: file.deletingLastPathComponent())) == owner,
+      let data = try? Data(contentsOf: file), let note = try? JSONDecoder().decode(InboxPayload.self, from: data),
+      note.kind == .note, note.siri == true else { return }
+    UIPasteboard.general.setItems([[UTType.utf8PlainText.identifier: note.value]], options: [.localOnly: true])
+  }
+
   private func process(_ batch: URL, inbox: ShareInbox, owner: String) async throws {
+    var retainedNote = false
     for file in try inbox.manifests(in: batch) {
       try Task.checkCancellation()
       guard backend.status == .signedIn, inbox.activeOwner == owner else { return }
       do {
-        try await send(file: file, batch: batch, inbox: inbox, owner: owner)
+        let payload = try JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: file))
+        if payload.siri == true, payload.kind == .note, !SiriText.fitsLibrary(payload.value) {
+          retainedNote = true
+          failedFile = file
+          failureCopy = "share.longNoteRecovery"
+          failed = true
+          continue
+        }
+        try await send(payload, batch: batch, inbox: inbox, owner: owner)
       } catch {
         if !Task.isCancelled {
           failedFile = file
@@ -92,11 +115,10 @@ struct SharedInboxReceiver: ViewModifier {
       try Task.checkCancellation()
       try FileManager.default.removeItem(at: file)
     }
-    try FileManager.default.removeItem(at: batch)
+    if !retainedNote { try FileManager.default.removeItem(at: batch) }
   }
 
-  private func send(file: URL, batch: URL, inbox: ShareInbox, owner: String) async throws {
-    let payload = try JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: file))
+  private func send(_ payload: InboxPayload, batch: URL, inbox: ShareInbox, owner: String) async throws {
     let source = payload.siri == true ? "siri" : "share_extension"
     let properties = ["save_kind": payload.kind.rawValue, "save_source": source, "operation_id": payload.operationID]
     Analytics.capture("save_attempt_started", properties)
