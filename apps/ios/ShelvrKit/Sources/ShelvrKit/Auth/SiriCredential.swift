@@ -111,8 +111,10 @@ extension Backend {
 
   func revokeSiriToken(_ token: String, authorization: String) async {
     rememberSiriRevocation(token)
+    let transport = ConvexHTTPAuthTransport(deployment: environment.convexURL)
+    try? await transport.revokeSiri(token, authorization: authorization)
     do {
-      try await ConvexHTTPAuthTransport(deployment: environment.convexURL).revokeSiri(token, authorization: authorization)
+      try await transport.revokePresentedSiri(token)
       siriBacklog.confirmed(token)
       if siriRevocations?.delivered(token) == false { retrySiriRevocations() }
     } catch { retrySiriRevocations() }
