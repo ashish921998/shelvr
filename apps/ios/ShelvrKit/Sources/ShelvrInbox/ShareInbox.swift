@@ -169,7 +169,7 @@ public struct ShareInbox: Sendable {
 
     let manager = FileManager.default
     try manager.createDirectory(at: directory, withIntermediateDirectories: true)
-    var location = directory
+    var location = URL(filePath: directory.path, directoryHint: .isDirectory)
     var values = URLResourceValues()
     values.isExcludedFromBackup = true
     try location.setResourceValues(values)
