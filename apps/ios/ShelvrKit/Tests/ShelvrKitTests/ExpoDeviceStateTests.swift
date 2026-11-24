@@ -89,4 +89,20 @@ struct ExpoDeviceStateTests {
     #expect(params.text == "hi")
     #expect(params.id == nil)
   }
+
+  @Test func invocationParamsSkipBadListItemsInPlaceAndTreatEmptyAsMissing() throws {
+    let suite = UUID().uuidString
+    let defaults = try #require(UserDefaults(suiteName: suite))
+    defer { defaults.removePersistentDomain(forName: suite) }
+    let queue = Data(
+      #"[{"id":"q","name":"saveImages","params":{"paths":["a",3,""],"operationIds":["op1",null,"op3"],"operationId":""},"createdAt":1}]"#.utf8)
+    defaults.set(queue, forKey: "dev.expo.appintents.invocations.pending")
+    let env = try AppEnvironment(
+      variant: .development, convexURL: URL(string: "https://dev.convex.cloud")!, bundleID: "app.shelvr.save.preview")
+    let state = ExpoDeviceState(environment: env, defaults: defaults, group: defaults) { _ in nil }
+    let params = try #require(try state.pendingInvocations().first?.params)
+    #expect(params.paths == ["a", nil, nil])
+    #expect(params.operationIds == ["op1", nil, "op3"])
+    #expect(params.operationId == nil)
+  }
 }

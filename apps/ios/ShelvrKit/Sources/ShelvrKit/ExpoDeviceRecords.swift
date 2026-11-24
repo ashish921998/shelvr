@@ -39,9 +39,9 @@ extension ExpoDeviceState {
       public let text: String?
       public let url: String?
       public let spaceId: String?
-      public let paths: [String]?
+      public let paths: [String?]?
       public let operationId: String?
-      public let operationIds: [String]?
+      public let operationIds: [String?]?
 
       private enum CodingKeys: String, CodingKey {
         case query, id, text, url, spaceId, paths, operationId, operationIds
@@ -49,8 +49,12 @@ extension ExpoDeviceState {
 
       public init(from decoder: any Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        func string(_ key: CodingKeys) -> String? { try? c.decodeIfPresent(String.self, forKey: key) }
-        func strings(_ key: CodingKeys) -> [String]? { try? c.decodeIfPresent([String].self, forKey: key) }
+        func string(_ key: CodingKeys) -> String? {
+          (try? c.decodeIfPresent(String.self, forKey: key)).flatMap(Item.nonEmpty)
+        }
+        func strings(_ key: CodingKeys) -> [String?]? {
+          (try? c.decodeIfPresent([Item].self, forKey: key))?.map(\.value)
+        }
         query = string(.query)
         id = string(.id)
         text = string(.text)
@@ -59,6 +63,16 @@ extension ExpoDeviceState {
         paths = strings(.paths)
         operationId = string(.operationId)
         operationIds = strings(.operationIds)
+      }
+
+      private struct Item: Decodable {
+        let value: String?
+
+        static func nonEmpty(_ text: String) -> String? { text.isEmpty ? nil : text }
+
+        init(from decoder: any Decoder) throws {
+          value = (try? decoder.singleValueContainer().decode(String.self)).flatMap(Self.nonEmpty)
+        }
       }
     }
   }
