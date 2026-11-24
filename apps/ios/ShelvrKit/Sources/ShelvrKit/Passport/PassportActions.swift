@@ -8,7 +8,8 @@ extension Backend {
 
   public func sharePassport() async throws -> URL {
     let token: String = try await client.mutation("passportShares:sharePassport")
-    return URL(string: "https://tryshelvr.app")!.appending(component: "passport").appending(component: token)
+    let base = environment.variant == .development ? "shelvr-preview://passport-invite" : "https://tryshelvr.app/passport"
+    return URL(string: base)!.appending(component: token)
   }
 
   public func stopPassportSharing() async throws {
