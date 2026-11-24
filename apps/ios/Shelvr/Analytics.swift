@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import OSLog
 import PostHog
 import ShelvrKit
@@ -6,6 +7,9 @@ import ShelvrKit
 @MainActor
 enum Analytics {
   private static var enabled = false
+  private static var reconciled = false
+  private static var foreground = false
+  private static var opened = false
   private static let identifiedKey = "swift.analytics.identified"
 
   static func start() {
@@ -19,11 +23,15 @@ enum Analytics {
       return
     }
     let config = PostHogConfig(projectToken: token, host: host)
+    let environment = AppEnvironment.current.variant == .production ? "production" : "development"
+    config.captureApplicationLifecycleEvents = false
     config.captureScreenViews = false
     config.capturePushNotificationSubscriptions = false
     config.capturePushNotificationOpened = false
     config.errorTrackingConfig.autoCapture = AppEnvironment.current.variant == .production
     config.setBeforeSend { event in
+      event.properties["environment"] = environment
+      event.properties["analytics_version"] = 1
       if event.event == "Application Opened" { event.properties.removeValue(forKey: "url") }
       if event.event == "$exception" {
         event.properties.removeValue(forKey: "$exception_message")
@@ -31,6 +39,10 @@ enum Analytics {
           event.properties["$exception_list"] = exceptions.map { info in
             var safe = info
             safe["value"] = info["type"] as? String ?? "Error"
+            if var mechanism = safe["mechanism"] as? [String: Any] {
+              mechanism.removeValue(forKey: "meta")
+              safe["mechanism"] = mechanism
+            }
             return safe
           }
         }
@@ -51,6 +63,30 @@ enum Analytics {
       PostHogSDK.shared.reset()
       UserDefaults.standard.removeObject(forKey: identifiedKey)
       registerContext()
+    }
+    reconciled = true
+    if UIApplication.shared.applicationState == .active { active(true) }
+  }
+
+  static var sessionID: String? { enabled ? PostHogSDK.shared.getSessionId() : nil }
+
+  static func active(_ active: Bool) {
+    guard enabled, reconciled, active != foreground else { return }
+    foreground = active
+    let defaults = UserDefaults.standard
+    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+    let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+    let properties = ["build": build, "version": version]
+    if active {
+      let previous = defaults.string(forKey: "swift.analytics.build")
+      if previous != build {
+        capture(previous == nil ? "Application Installed" : "Application Updated", properties)
+        defaults.set(build, forKey: "swift.analytics.build")
+      }
+      capture("Application Opened", ["version": version, "build": build, "from_background": opened])
+      opened = true
+    } else {
+      capture("Application Backgrounded")
     }
   }
 
