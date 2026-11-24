@@ -1,39 +1,56 @@
+import CryptoKit
 import Foundation
 import Security
 
 public struct PushInstallation: Sendable {
   public let id: String
   public let secret: String
-  private static let expoKey = "EXDeviceInstallationUUIDKey"
+  public let hasExpoDeviceIdentity: Bool
 
   public init(bundleID: String) throws {
-    id = try Self.stored(Self.expoKey, service: bundleID,
-      fallback: UserDefaults.standard.string(forKey: Self.expoKey)).lowercased()
-    secret = try Self.stored("notification-install-secret", service: "app:no-auth", fallback: nil)
+    try self.init(bundleID: bundleID, expoSecretService: "app:no-auth", oldSecretService: "app")
   }
 
-  private static func stored(_ name: String, service: String, fallback: String?) throws -> String {
-    let key = Data(name.utf8)
-    let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
-      kSecAttrService as String: service, kSecAttrAccount as String: key, kSecAttrGeneric as String: key]
-    func read() throws -> String? {
-      var result: CFTypeRef?
-      let status = SecItemCopyMatching(query.merging([kSecReturnData as String: true]) { $1 } as CFDictionary, &result)
-      if status == errSecItemNotFound { return nil }
-      guard status == errSecSuccess, let data = result as? Data,
-        let stored = String(data: data, encoding: .utf8), !stored.isEmpty
-      else { throw CocoaError(.fileReadNoPermission) }
-      return stored
+  init(bundleID: String, expoSecretService: String, oldSecretService: String) throws {
+    if let original = try Self.read("EXDeviceInstallationUUIDKey", service: bundleID) {
+      id = original.lowercased()
+      secret = try Self.stored("notification-install-secret", service: expoSecretService, legacyService: oldSecretService)
+      hasExpoDeviceIdentity = true
+    } else {
+      id = try Self.stored("swift-notification-installation-id", service: bundleID).lowercased()
+      secret = try Self.stored("swift-notification-installation-secret", service: bundleID + ".push-secret")
+      hasExpoDeviceIdentity = false
     }
-    if let stored = try read() { return stored }
-    let value = fallback ?? UUID().uuidString
-    let record = query.merging([kSecValueData as String: Data(value.utf8),
+  }
+
+  private static func key(_ name: String, service: String) -> [String: Any] {
+    let encoded = Data(name.utf8)
+    return [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
+      kSecAttrAccount as String: encoded, kSecAttrGeneric as String: encoded]
+  }
+
+  private static func read(_ name: String, service: String) throws -> String? {
+    var result: CFTypeRef?
+    let lookup = key(name, service: service).merging([kSecReturnData as String: true]) { $1 }
+    let status = SecItemCopyMatching(lookup as CFDictionary, &result)
+    if status == errSecItemNotFound { return nil }
+    guard status == errSecSuccess, let data = result as? Data,
+      let value = String(data: data, encoding: .utf8), !value.isEmpty else { throw CocoaError(.fileReadNoPermission) }
+    return value
+  }
+
+  private static func stored(_ name: String, service: String, legacyService: String? = nil) throws -> String {
+    if let existing = try read(name, service: service) { return existing }
+    let prior = try legacyService.flatMap { try read(name, service: $0) }
+    let value = prior ?? UUID().uuidString
+    let item = key(name, service: service).merging([kSecValueData as String: Data(value.utf8),
       kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]) { $1 }
-    let status = SecItemAdd(record as CFDictionary, nil)
-    if status == errSecDuplicateItem, let stored = try read() { return stored }
+    let status = SecItemAdd(item as CFDictionary, nil)
+    if status == errSecDuplicateItem, let existing = try read(name, service: service) { return existing }
     guard status == errSecSuccess else { throw CocoaError(.fileWriteNoPermission) }
     return value
   }
+
 }
 
 public struct ExpoPushRequest: Encodable, Sendable {
@@ -49,7 +66,7 @@ public struct ExpoPushRequest: Encodable, Sendable {
     self.development = development
   }
 
-  public func exchange() async throws -> String {
+  public func exchange(session: URLSession = .shared) async throws -> String {
     struct Response: Decodable {
       struct Token: Decodable { let expoPushToken: String }
       let data: Token
@@ -58,7 +75,7 @@ public struct ExpoPushRequest: Encodable, Sendable {
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     request.httpBody = try JSONEncoder().encode(self)
-    let (data, response) = try await URLSession.shared.data(for: request)
+    let (data, response) = try await session.data(for: request)
     guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
       throw URLError(.badServerResponse)
     }
@@ -76,41 +93,110 @@ struct PushRegistrationRecord: Codable, Equatable {
 
 struct PushTokenStore {
   let serviceURL: URL
+  var keychainService = "app:no-auth"
 
-  private var query: [String: Any] {
+  static func registrationID(bearer: String, installSecret: String) throws -> UUID {
+    guard let subject = JWT.claims(of: bearer)?.sub, !subject.isEmpty else { throw AuthSessionError.notSignedIn }
+    let mac = HMAC<SHA256>.authenticationCode(for: Data(subject.utf8), using: SymmetricKey(data: Data(installSecret.utf8)))
+    var bytes = Array(mac.prefix(16))
+    bytes[6] = (bytes[6] & 0x0f) | 0x80
+    bytes[8] = (bytes[8] & 0x3f) | 0x80
+    return bytes.withUnsafeBytes { UUID(uuid: $0.loadUnaligned(as: uuid_t.self)) }
+  }
+
+  private func query(_ prefix: String, service: String? = nil) -> [String: Any] {
     let normalized = serviceURL.absoluteString.replacing(/[^A-Za-z0-9._-]/, with: "_")
-    let key = Data(("swift-notification-registrations-" + normalized).utf8)
-    return [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "app:no-auth",
+    let key = Data((prefix + normalized).utf8)
+    return [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service ?? keychainService,
       kSecAttrAccount as String: key, kSecAttrGeneric as String: key]
   }
 
-  func read() throws -> [PushRegistrationRecord] {
+  private func values<T: Decodable>(_ type: T.Type, _ prefix: String, service: String? = nil) throws -> [T] {
     var result: CFTypeRef?
-    let status = SecItemCopyMatching(query.merging([kSecReturnData as String: true]) { $1 } as CFDictionary, &result)
+    let status = SecItemCopyMatching(query(prefix, service: service).merging([kSecReturnData as String: true]) { $1 } as CFDictionary, &result)
     if status == errSecItemNotFound { return [] }
     guard status == errSecSuccess, let data = result as? Data else { throw CocoaError(.fileReadNoPermission) }
-    return try JSONDecoder().decode([PushRegistrationRecord].self, from: data)
+    return try JSONDecoder().decode([T].self, from: data)
   }
 
-  func write(_ tokens: [PushRegistrationRecord]) throws {
-    guard Keychain.write(try JSONEncoder().encode(tokens), to: query) else { throw CocoaError(.fileWriteNoPermission) }
+  private func write<T: Encodable>(_ entries: [T], _ prefix: String, service: String? = nil) throws {
+    let target = query(prefix, service: service)
+    let ok = entries.isEmpty ? Keychain.delete(target) : try Keychain.write(JSONEncoder().encode(entries), to: target, accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
+    if !ok { throw CocoaError(.fileWriteNoPermission) }
   }
+
+  func read() throws -> [PushRegistrationRecord] { try values(PushRegistrationRecord.self, "swift-notification-registrations-") }
+
+  func legacyTokens(service: String? = nil) throws -> [String] { try values(String.self, "notification-tokens-", service: service) }
+
+  func writeLegacy(_ tokens: [String], service: String? = nil) throws { try write(tokens, "notification-tokens-", service: service) }
+
+  @MainActor func adoptLegacy(for generation: UUID, deviceContinuity: Bool, suspend: () -> Void, register: (PushRegistrationRecord) async throws -> Void) async throws {
+    var services = [keychainService]
+    if keychainService.hasSuffix(":no-auth") { services.append(String(keychainService.dropLast(":no-auth".count))) }
+    for service in services {
+      var pending = try legacyTokens(service: service)
+      guard !pending.isEmpty else { continue }
+      suspend()
+      if !deviceContinuity {
+        try writeLegacy([], service: service)
+        continue
+      }
+      var records = try read()
+      for token in pending {
+        let record = PushRegistrationRecord(token: token, registrationId: generation.uuidString)
+        if !records.contains(record) {
+          records.append(record)
+          try write(records)
+        }
+        try await register(record)
+        pending.removeAll { $0 == token }
+        try writeLegacy(pending, service: service)
+      }
+    }
+  }
+
+  @MainActor func retireStale(keeping generation: UUID?, suspend: () -> Void,
+    unregister: (PushRegistrationRecord) async throws -> Void) async throws {
+    var records: [PushRegistrationRecord]
+    do { records = try read() } catch { suspend(); throw error }
+    let stale = records.filter { $0.registrationId != generation?.uuidString }
+    guard !stale.isEmpty else { return }
+    suspend()
+    for record in stale {
+      try await unregister(record)
+      records.removeAll { $0 == record }
+      try write(records)
+    }
+  }
+
+  func write(_ tokens: [PushRegistrationRecord]) throws { try write(tokens, "swift-notification-registrations-") }
 }
+
+public enum PushRegistrationError: Error, Equatable { case ownedByAnotherAccount }
 
 struct PushTransport {
   let deployment: URL
+  var session: URLSession = .shared
 
   func call(_ path: String, args: [String: String], bearer: String? = nil) async throws {
     struct Request: Encodable { let path: String; let args: [String: String]; let format = "json" }
-    struct Response: Decodable { let status: String }
+    struct Response: Decodable {
+      struct Rejection: Decodable { let code: String }
+      let status: String
+      let errorData: Rejection?
+    }
     var request = URLRequest(url: deployment.appending(path: "api/mutation"), timeoutInterval: 12)
     request.httpMethod = "POST"
     request.setValue("application/json", forHTTPHeaderField: "Content-Type")
     if let bearer { request.setValue("Bearer " + bearer, forHTTPHeaderField: "Authorization") }
     request.httpBody = try JSONEncoder().encode(Request(path: path, args: args))
-    let (data, response) = try await URLSession.shared.data(for: request)
-    guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
-      try JSONDecoder().decode(Response.self, from: data).status == "success" else {
+    let (data, response) = try await session.data(for: request)
+    let reply = try JSONDecoder().decode(Response.self, from: data)
+    if reply.status == "error", reply.errorData?.code == "notification_token_owned_by_another_account" {
+      throw PushRegistrationError.ownedByAnotherAccount
+    }
+    guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode), reply.status == "success" else {
       throw URLError(.badServerResponse)
     }
   }
