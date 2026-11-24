@@ -81,6 +81,7 @@ struct SharedListView: View {
   @Environment(MemberNamePrompts.self) private var prompts
   @State private var askingName = false
   @State private var selectedCity: String?
+  @State private var presentedNewPlaces: Set<String> = []
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var failed = false
@@ -191,8 +192,12 @@ struct SharedListView: View {
         .onChange(of: city, initial: true) { _, value in
           if selectedCity != value { selectedCity = value }
         }
+        .onChange(of: places.filter(\.isNew).map(\.id), initial: true) { _, visible in
+          presentedNewPlaces.formUnion(visible)
+        }
         .onDisappear {
-          guard detail.places.contains(where: \.isNew), backend.status == .signedIn else { return }
+          let newIDs = Set(detail.places.filter(\.isNew).map(\.id))
+          guard !newIDs.isEmpty, newIDs.isSubset(of: presentedNewPlaces), backend.status == .signedIn else { return }
           Task { try? await backend.listSeen(detail._id) }
         }
       } else {
