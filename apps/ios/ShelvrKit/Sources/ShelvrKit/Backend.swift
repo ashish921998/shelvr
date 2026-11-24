@@ -80,7 +80,6 @@ public final class Backend {
     guard status == .signedIn, !signingOut else { return }
     signingOut = true
     let siri = SiriCredential.current()
-    if let siri, siri.siteURL == siriRevocations?.site.absoluteString { rememberSiriRevocation(siri.token) }
     let authorization = KeychainTokenVault().read()?.token
     do {
       try await session.signOut {

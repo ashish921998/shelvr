@@ -5,14 +5,14 @@ import Testing
 @MainActor @Test func aRetryRemovesOnlyConfirmedRetiredTokensAndSkipsTheActiveDeviceCredential() async {
   var delivered: [String] = []
   var attempted: [String] = []
-  let failed = await SiriRevocations.drain(pending: ["failed", "current", "retired"], active: { "current" }) { token in
+  let failed = await SiriRevocations.drain(pending: ["failed", "current", "retired"], active: { .active("current") }) { token in
     attempted.append(token)
     if token == "failed" { throw URLError(.notConnectedToInternet) }
   } delivered: { delivered.append($0); return true }
   #expect(failed)
   #expect(attempted == ["failed", "retired"])
   #expect(delivered == ["retired"])
-  let retried = await SiriRevocations.drain(pending: ["failed", "current"], active: { "current" }) { _ in } delivered: {
+  let retried = await SiriRevocations.drain(pending: ["failed", "current"], active: { .active("current") }) { _ in } delivered: {
     delivered.append($0)
     return true
   }
@@ -71,4 +71,18 @@ private final class RevokeEndpointStub: URLProtocol, @unchecked Sendable {
   queue.remember("other") { _ in }
   #expect(queue.unpersisted.isEmpty)
   #expect(queue.candidates(stored: ["other"]) == ["other"])
+}
+
+@MainActor @Test func anUnreadableActiveSlotDoesNotRevokeAnyPendingCredential() async {
+  var revoked: [String] = []
+  let retry = await SiriRevocations.drain(pending: ["active", "retired"], active: { .unavailable }) {
+    revoked.append($0)
+  } delivered: { _ in true }
+  #expect(retry)
+  #expect(revoked.isEmpty)
+  let complete = await SiriRevocations.drain(pending: ["active", "retired"], active: { .active("active") }) {
+    revoked.append($0)
+  } delivered: { _ in true }
+  #expect(!complete)
+  #expect(revoked == ["retired"])
 }

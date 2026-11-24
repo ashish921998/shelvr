@@ -19,6 +19,22 @@ public struct SiriCredential: Codable, Sendable {
     return JWT.claims(of: tokens.token)?.sub
   }
 
+  static func activeForRevocation() -> SiriRevocationEligibility {
+    let marker = SignOutMarker(url: URL.applicationSupportDirectory.appending(path: "pending-sign-out"))
+    switch marker.state {
+    case .pending: return .absent
+    case .inaccessible: return .unavailable
+    case .absent: break
+    }
+    do {
+      guard let bytes = try Keychain.checkedData(query) else { return .absent }
+      let record = try JSONDecoder().decode(Self.self, from: bytes)
+      guard let auth = try KeychainTokenVault().checkedTokens() else { return .absent }
+      guard let subject = JWT.claims(of: auth.token)?.sub else { return .unavailable }
+      return subject == record.subject ? .active(record.token) : .absent
+    } catch { return .unavailable }
+  }
+
   static func stored() -> Self? {
     Keychain.read(query).flatMap { try? JSONDecoder().decode(Self.self, from: $0) }
   }
@@ -113,7 +129,7 @@ extension Backend {
         for token in siriBacklog.unpersisted { rememberSiriRevocation(token) }
         let stored = try? siriRevocations.pending()
         let candidates = siriBacklog.candidates(stored: stored)
-        let failed = await SiriRevocations.drain(pending: Array(candidates), active: { SiriCredential.current()?.token },
+        let failed = await SiriRevocations.drain(pending: Array(candidates), active: SiriCredential.activeForRevocation,
           revoke: transport.revokePresentedSiri) { token in
           siriBacklog.confirmed(token)
           return siriRevocations.delivered(token)

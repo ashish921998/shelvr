@@ -2,6 +2,12 @@ import CryptoKit
 import Foundation
 import Security
 
+enum SiriRevocationEligibility: Equatable {
+  case active(String)
+  case absent
+  case unavailable
+}
+
 struct SiriRevocationBacklog: Sendable {
   private(set) var unpersisted = Set<String>()
 
@@ -70,10 +76,15 @@ struct SiriRevocations: Sendable {
   }
 
   @MainActor static func drain(
-    pending: [String], active: () -> String?, revoke: (String) async throws -> Void, delivered: (String) -> Bool
+    pending: [String], active: () -> SiriRevocationEligibility, revoke: (String) async throws -> Void, delivered: (String) -> Bool
   ) async -> Bool {
     var needsRetry = false
-    for token in pending where token != active() {
+    for token in pending {
+      switch active() {
+      case .unavailable: return true
+      case .active(token): continue
+      default: break
+      }
       do {
         try await revoke(token)
         if !delivered(token) { needsRetry = true }
