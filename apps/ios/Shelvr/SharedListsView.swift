@@ -13,7 +13,7 @@ struct SharedListsView: View {
               Text(row.name).font(.headline)
               Text(row.cities.joined(separator: " · ")).font(.subheadline).foregroundStyle(.secondary)
             }
-          }
+          }.badge(row.newCount)
         }
       }
       .overlay {
@@ -80,7 +80,7 @@ struct SharedListView: View {
       if let detail {
         List {
           Section {
-            ShareLink(item: detail.inviteURL) {
+            ShareLink(item: detail.inviteURL(preview: backend.environment.variant == .development)) {
               Label(copy("sharedLists.invite"), systemImage: "person.badge.plus")
             }
             ForEach(detail.members) { member in
@@ -94,6 +94,10 @@ struct SharedListView: View {
                 VStack(alignment: .leading) {
                   Text(place.name)
                   Text(place.city).font(.caption).foregroundStyle(.secondary)
+                  if let line = place.visitors(copy: copy) { Text(line).font(.caption) }
+                  if place.isNew {
+                    Text(copy("sharedLists.newFrom", ["name": place.addedByName ?? copy("sharedLists.someone")])).font(.caption.bold())
+                  }
                 }
                 Spacer()
                 Button {
@@ -114,9 +118,9 @@ struct SharedListView: View {
           }
         }
         .navigationTitle(detail.name)
-        .task(id: detail._id) {
-          do { try await backend.listSeen(detail._id) }
-          catch { if !Task.isCancelled { failed = true } }
+        .onDisappear {
+          guard detail.places.contains(where: \.isNew), backend.status == .signedIn else { return }
+          Task { try? await backend.listSeen(detail._id) }
         }
       } else {
         ContentUnavailableView(copy("sharedLists.goneTitle"), systemImage: "person.2",

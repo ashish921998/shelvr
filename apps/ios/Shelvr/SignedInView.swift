@@ -67,7 +67,7 @@ struct SignedInView: View {
         case "shared-list" where link.path.count == 2: SharedListView(id: link.path[1])
         case "list-invite" where link.path.count == 2:
           JoinListView(token: link.path[1]) { route in
-            if let target = AppLink(route) { path = [target] }
+            if path.last == link, let target = AppLink(route) { path = [target] }
           }
         case "passport": PassportView()
         case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)
