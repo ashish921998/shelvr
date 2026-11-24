@@ -26,6 +26,7 @@ public struct PassportSection: Identifiable, Sendable {
   public let city: String?
   public let places: [PassportStamp]
   public let completion: PassportCompletion?
+  public var cityStamp: StampCity?
   public var cardPlaces: ArraySlice<PassportStamp> { places.prefix(6) }
   public var sourceLabel: String {
     let sources = Set(places.compactMap(\.source))
@@ -60,5 +61,31 @@ public struct PassportSection: Identifiable, Sendable {
       let places = groups[key] ?? [], row = totals[key]
       return Self(id: key, city: row?.city ?? places.first?.city, places: places, completion: row)
     }
+  }
+}
+
+public struct PassportPages: Sendable {
+  public var sections: [PassportSection]
+  public var standalone: [StampCity]
+
+  public init(stamps: [PassportStamp], completion: [PassportCompletion], cities: [PassportCityStamp]) {
+    var sections = PassportSection.sections(stamps: stamps, completion: completion)
+    var standalone: [StampCity] = []
+    var seen = Set<String>()
+    for stamp in cities {
+      guard seen.insert(stamp.city).inserted,
+        let city = StampCity.catalog.first(where: { $0.id == stamp.city }) else { continue }
+      let names = Set(city.names.map { PassportSection.cityKey($0) })
+      let index = sections.firstIndex { section in
+        guard section.cityStamp == nil, names.contains(section.id),
+          !section.places.isEmpty || (section.completion?.stamped ?? 0) > 0 else { return false }
+        return section.places.isEmpty || section.places.contains {
+          $0.countryCode == nil || $0.countryCode == stamp.country
+        }
+      }
+      if let index { sections[index].cityStamp = city } else { standalone.append(city) }
+    }
+    self.sections = sections
+    self.standalone = standalone
   }
 }

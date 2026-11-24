@@ -12,7 +12,8 @@ struct PassportView: View {
   @State private var retry = 0
 
   var body: some View {
-    let sections = PassportSection.sections(stamps: stamps ?? [], completion: completion)
+    let pages = PassportPages(stamps: stamps ?? [], completion: completion, cities: cities)
+    let sections = pages.sections
     Group {
       if let stamps {
         if let cardCity {
@@ -27,9 +28,9 @@ struct PassportView: View {
               count(counts.cities, "passport.cities")
               if counts.countries > 0 { count(counts.countries, "passport.countries") }
             }
-            if !cities.isEmpty {
+            if !pages.standalone.isEmpty {
               Section(copy("cityStamps.title")) {
-                ForEach(StampCity.catalog.filter { city in cities.contains { $0.city == city.id } }) { city in
+                ForEach(pages.standalone) { city in
                   Label(copy(city.labelKey), systemImage: "seal")
                 }
               }
@@ -50,6 +51,7 @@ struct PassportView: View {
                 }
               } header: {
                 HStack {
+                  if section.cityStamp != nil { Image(systemName: "seal.fill") }
                   Text(section.city ?? copy("passport.elsewhere"))
                   Spacer()
                   if let row = section.completion {
