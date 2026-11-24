@@ -5,6 +5,8 @@ public struct OnboardingProgress: Codable, Sendable {
     case opener, savedCount, goal, been, chart, city, cityEcho, ahaShare, firstSave, ahaSpots, carousel, notifications
   }
 
+  public var viewed: Set<Step>?
+  public var completed: Set<Step>?
   public var step: Step = .opener
   public var savedCount: String?
   public var goals: Set<String> = []

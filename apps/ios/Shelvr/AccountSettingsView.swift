@@ -61,7 +61,7 @@ struct AccountSettingsView: View {
     failure = false
     Task {
       defer { deleting = false }
-      do { try await backend.deleteAccount() } catch { failure = true }
+      do { try await backend.deleteAccount() } catch { Analytics.failure("account_deletion_failed"); failure = true }
     }
   }
 }

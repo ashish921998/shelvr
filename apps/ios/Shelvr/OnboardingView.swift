@@ -63,6 +63,7 @@ private struct OnboardingAccount: View {
   @State private var paywall = false
   @State private var purchased = false
   @State private var free = false
+  @State private var entered = Date()
   @State private var unavailable = false
   @State private var practiceShare = false
   @State private var carousel = 0
@@ -113,6 +114,13 @@ private struct OnboardingAccount: View {
           }
         }
         .disabled(busy)
+        .onChange(of: progress.step, initial: true) { _, step in
+          entered = Date()
+          if progress.viewed?.contains(step) != true {
+            progress.viewed = (progress.viewed ?? []).union([step]); persist()
+            Analytics.capture("onboarding_step_viewed", stepProperties(step))
+          }
+        }
         .task {
           if progress.step == .notifications,
             await UNUserNotificationCenter.current().notificationSettings().authorizationStatus != .notDetermined {
@@ -172,7 +180,7 @@ private struct OnboardingAccount: View {
         choice(copy(city.cityKey), selected: been ? progress.visitedCities.contains(city.id) : progress.city == city.id) {
           if been {
             if !progress.visitedCities.insert(city.id).inserted { progress.visitedCities.remove(city.id) }
-          } else { progress.city = city.id; progress.advance() }
+          } else { progress.city = city.id; proceed(skip: false) }
           persist()
         }
       }
@@ -244,38 +252,56 @@ private struct OnboardingAccount: View {
     }
   }
 
+  private func stepProperties(_ step: OnboardingProgress.Step) -> [String: Any] {
+    let ids: [OnboardingProgress.Step: String] = [.savedCount: "saved_count", .been: "been_cities",
+      .chart: "progress_chart", .cityEcho: "city_echo", .ahaShare: "aha_share", .firstSave: "first_save",
+      .ahaSpots: "aha_spots", .notifications: "notification_ask"]
+    return ["step_id": ids[step] ?? step.rawValue, "step_index": OnboardingProgress.Step.allCases.firstIndex(of: step) ?? 0,
+      "flow_version": 27]
+  }
+
+  private func recordCompletion(skipped skip: Bool) {
+    if progress.completed?.contains(progress.step) != true {
+      progress.completed = (progress.completed ?? []).union([progress.step]); persist()
+      var properties = stepProperties(progress.step)
+      properties["skipped"] = skip
+      properties["duration_ms"] = max(0, Int(Date().timeIntervalSince(entered) * 1000))
+      Analytics.capture("onboarding_step_completed", properties)
+    }
+  }
+
   private func proceed(skip: Bool) {
     guard !busy else { return }
     errorKey = nil
+    if progress.step == .carousel, !skip, carousel < 2 { carousel += 1; return }
     if progress.step == .notifications {
       busy = true
       Task {
         if !skip, (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])) == true {
           UIApplication.shared.registerForRemoteNotifications()
         }
-        await checkAccess()
+        await checkAccess(skipped: skip)
       }
     } else if progress.step == .carousel {
-      if !skip && carousel < 2 { carousel += 1; return }
       busy = true
       Task {
         let settings = await UNUserNotificationCenter.current().notificationSettings()
         if settings.authorizationStatus == .notDetermined {
-          progress.advance(); persist(); busy = false
-        } else { await checkAccess() }
+          recordCompletion(skipped: skip); progress.advance(); persist(); busy = false
+        } else { await checkAccess(skipped: skip) }
       }
-    } else { progress.advance(skipping: skip); persist() }
+    } else { recordCompletion(skipped: skip); progress.advance(skipping: skip); persist() }
   }
 
-  private func checkAccess() async {
+  private func checkAccess(skipped: Bool) async {
     defer { busy = false }
     do {
       for try await plan in backend.query("subscriptions:getEntitlement", as: ServerPlan.self) {
-        if plan.entitled { purchased = true; finish(); return }
+        if plan.entitled { recordCompletion(skipped: skipped); purchased = true; finish(); return }
         break
       }
       for try await open in backend.query("freeSaves:freePlanOpen", as: Bool.self) {
-        free = open; purchased = false; unavailable = false; paywall = true; return
+        recordCompletion(skipped: skipped); free = open; purchased = false; unavailable = false; paywall = true; return
       }
     } catch { errorKey = "errors.tryAgain" }
   }
