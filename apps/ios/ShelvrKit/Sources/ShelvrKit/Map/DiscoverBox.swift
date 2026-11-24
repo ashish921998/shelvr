@@ -21,6 +21,17 @@ public struct DiscoverBox: Codable, Equatable, Sendable {
       east: horizontal.upperBound, north: clamp(vertical.upperBound))
   }
 
+  public func includingNearby(latitude: Double, longitude: Double) -> Self {
+    let lat = Self.clamp(latitude)
+    let half = 50.0 / 111
+    let horizontal = Self.snapped(longitude, half / cos(lat * .pi / 180))
+    let vertical = Self.snapped(lat, half)
+    let left = min(west, horizontal.lowerBound), right = max(east, horizontal.upperBound)
+    guard right - left < 180 else { return .world }
+    return Self(west: left, south: Self.clamp(min(south, vertical.lowerBound)),
+      east: right, north: Self.clamp(max(north, vertical.upperBound)))
+  }
+
   private static func snapped(_ centre: Double, _ half: Double) -> ClosedRange<Double> {
     let step = pow(2.0, ceil(log2(max(half, 1.0 / 32) / 2)))
     let cell = floor(centre / step)

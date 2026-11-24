@@ -12,6 +12,7 @@ struct SavedPlacesMap: View {
   @State private var area = DiscoverBox.world
   @State private var kinds: Set<String> = []
   @State private var went = "all"
+  @State private var location = MapLocation()
   @State private var search = ""
   @State private var selected: MapPlace?
   @State private var card: MKMapItem?
@@ -25,16 +26,22 @@ struct SavedPlacesMap: View {
     let filter = visited.isEmpty ? "all" : went
     let entries = MapPlace.combined(saved: own, discover: filter == "all" ? discover : [])
     let chips = MapPlace.filterKinds(entries, selected: kinds)
-    let visible = entries.filter { place in
+    let filtered = entries.filter { place in
       (filter == "all" || visited.contains(place.id) == (filter == "went")) &&
-        (kinds.isEmpty || !kinds.isDisjoint(with: place.kinds)) && matches(place)
+        (kinds.isEmpty || !kinds.isDisjoint(with: place.kinds))
     }
-    MapCanvas(places: visible, opening: saved.map { $0.isEmpty ? discover : $0 }, visited: visited, onArea: { area = $0 },
+    let visible = MapPlace.search(filtered, query: search)
+    MapCanvas(places: visible, location: location.position, filterKey: [filter, search] + kinds.sorted(), opening: saved.map { $0.isEmpty ? discover : $0 }, visited: visited, onArea: { area = $0 },
       onPick: { selected = $0 }, onCluster: { cluster = $0 })
       .safeAreaInset(edge: .top, spacing: 0) {
         VStack(alignment: .leading, spacing: 8) {
-          TextField(copy("map.searchPlaceholder"), text: $search)
-            .textFieldStyle(.roundedBorder).submitLabel(.search)
+          HStack {
+            TextField(copy("map.searchPlaceholder"), text: $search)
+              .textFieldStyle(.roundedBorder).submitLabel(.search)
+            Button { location.locate() } label: {
+              Image(systemName: "location").frame(width: 44, height: 44)
+            }.accessibilityLabel(copy("map.showMyLocation"))
+          }
           if !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             ForEach(visible.prefix(5)) { place in
               Button { selected = place } label: {
@@ -67,6 +74,9 @@ struct SavedPlacesMap: View {
           }
           if !errors.isEmpty { Button(copy("common.retry")) { retry += 1 } }
         }.padding(.horizontal).padding(.vertical, 6).background(.thinMaterial)
+      }
+      .alert(copy("common.unavailable"), isPresented: $location.unavailable) {
+        Button(copy("common.close")) {}
       }
       .mapItemDetailSheet(item: $card, displaysMap: false)
       .sheet(isPresented: Binding(get: { !cluster.isEmpty }, set: { if !$0 { cluster = [] } })) {
@@ -120,13 +130,6 @@ struct SavedPlacesMap: View {
   private struct AreaRequest: Equatable {
     let area: DiscoverBox
     let retry: Int
-  }
-
-  private func matches(_ place: MapPlace) -> Bool {
-    let terms = search.split(whereSeparator: \.isWhitespace)
-    if terms.isEmpty { return true }
-    let text = ([place.name, place.city ?? ""] + (place.features ?? [])).joined(separator: " ")
-    return terms.allSatisfy { text.localizedStandardContains(String($0)) }
   }
 
   private func subscribe(_ key: String, _ update: () async throws -> Void) async {

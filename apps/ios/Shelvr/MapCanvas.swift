@@ -4,6 +4,8 @@ import SwiftUI
 
 struct MapCanvas: UIViewRepresentable {
   let places: [MapPlace]
+  let location: CLLocation?
+  let filterKey: [String]
   let opening: [MapPlace]?
   let visited: Set<String>
   let onArea: (DiscoverBox) -> Void
@@ -40,9 +42,12 @@ struct MapCanvas: UIViewRepresentable {
     var parent: MapCanvas
     var pins: [String: Pin] = [:]
     var opened = false
+    var queryingNearby = false
     init(_ parent: MapCanvas) { self.parent = parent }
 
     func update(_ parent: MapCanvas, map: MKMapView) {
+      let changedLocation = self.parent.location !== parent.location
+      let changedFilter = self.parent.filterKey != parent.filterKey
       self.parent = parent
       let ids = Set(parent.places.map(\.id))
       for (id, pin) in pins where !ids.contains(id) {
@@ -61,6 +66,17 @@ struct MapCanvas: UIViewRepresentable {
         added.append(pin)
       }
       map.addAnnotations(added)
+      if changedLocation, let location = parent.location {
+        opened = true
+        queryingNearby = true
+        map.showsUserLocation = true
+        map.setRegion(.init(center: location.coordinate, latitudinalMeters: 6000, longitudinalMeters: 6000),
+          animated: true)
+      }
+      if changedFilter, opened, !parent.places.isEmpty,
+        !parent.places.contains(where: { map.visibleMapRect.contains(MKMapPoint($0.coordinate)) }) {
+        fit(parent.places, on: map, animated: true)
+      }
       if !opened, let saved = parent.opening, !saved.isEmpty {
         opened = true
         let groups = Dictionary(grouping: saved) { ($0.city ?? "").lowercased() }
@@ -87,7 +103,7 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     func mapView(_ map: MKMapView, regionWillChangeAnimated animated: Bool) {
-      if hasActiveGesture(map) { opened = true }
+      if hasActiveGesture(map) { opened = true; queryingNearby = false }
     }
 
     private func hasActiveGesture(_ view: UIView) -> Bool {
@@ -102,7 +118,10 @@ struct MapCanvas: UIViewRepresentable {
       if let box = DiscoverBox.visible(latitude: region.center.latitude, longitude: region.center.longitude,
         latitudeDelta: region.span.latitudeDelta, longitudeDelta: region.span.longitudeDelta,
         width: map.bounds.width, height: map.bounds.height, tilted: map.camera.pitch > 0) {
-        Task { @MainActor in parent.onArea(box) }
+        let result = queryingNearby
+          ? box.includingNearby(latitude: region.center.latitude, longitude: region.center.longitude)
+          : box
+        Task { @MainActor in parent.onArea(result) }
       }
     }
 
