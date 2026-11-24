@@ -131,6 +131,13 @@ actor AuthSession {
     try? await transport.signOut(token: token)
   }
 
+  func forgetDeletedAccount() {
+    try? signOutMarker?.record()
+    refresh?.cancel()
+    refresh = nil
+    forgetSession()
+  }
+
   private func forgetSession() {
     setTokens(nil)
     if vault.write(nil) {
