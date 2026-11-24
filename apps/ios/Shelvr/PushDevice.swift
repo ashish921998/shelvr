@@ -30,8 +30,11 @@ final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCente
   }
 
   func currentToken(generation: UUID, verified: Set<String>) -> Data? {
+    let wasProbing = delivery.isProbing
     if delivery.prepare(generation: generation, verified: verified) { silence() }
-    if delivery.token == nil { UIApplication.shared.registerForRemoteNotifications() }
+    if delivery.token == nil || (wasProbing && delivery.permitsPresentation) {
+      UIApplication.shared.registerForRemoteNotifications()
+    }
     return delivery.token
   }
 
@@ -60,11 +63,14 @@ final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCente
 
   nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
     withCompletionHandler completionHandler: @escaping () -> Void) {
-    let info = response.notification.request.content.userInfo
-    let data = info["body"] as? [String: Any]
-    let path = data?["url"] as? String ?? info["url"] as? String
-    if let path, let parsed = AppLink(path) { Task { @MainActor in self.link = parsed } }
-    completionHandler()
+    defer { completionHandler() }
+    guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
+      let opened = PushNotificationOpen(userInfo: response.notification.request.content.userInfo)
+    else { return }
+    Task { @MainActor in
+      Analytics.notificationOpened(opened.properties)
+      self.link = opened.link
+    }
   }
 }
 

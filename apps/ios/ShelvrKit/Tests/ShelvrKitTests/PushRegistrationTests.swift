@@ -247,3 +247,16 @@ private final class OtherPushOwner: URLProtocol, @unchecked Sendable {
   #expect(replacementPaused && replacementResumed && lateFirstPaused)
   #expect(!delivery.permitsPresentation)
 }
+
+@Test func durableProofRestoresDeliveryAfterTheRegistrationTaskWasCancelled() {
+  let session = UUID(), native = Data([1]), other = Data([2])
+  var delivery = PushDeliveryState()
+  _ = delivery.prepare(generation: session, verified: [])
+  _ = delivery.receive(native)
+  _ = delivery.prepare(generation: session, verified: [PushDeliveryState.digest(other)])
+  #expect(delivery.isProbing && !delivery.permitsPresentation)
+
+  let needsSilence = delivery.prepare(generation: session, verified: [PushDeliveryState.digest(native)])
+  #expect(!needsSilence && !delivery.isProbing && delivery.permitsPresentation)
+  #expect(delivery.token == native)
+}
