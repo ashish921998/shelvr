@@ -62,6 +62,7 @@ struct SignedInView: View {
           }
           .navigationTitle(copy("addSheet.title"))
         case "go-out": PlanCityView()
+        case "add": PasteLinkView()
         default: ShellDestination(link: link)
         }
       }
