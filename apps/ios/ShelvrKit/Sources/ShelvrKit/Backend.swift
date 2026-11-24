@@ -100,23 +100,19 @@ public final class Backend {
 
   private var pushTokens: PushTokenStore { PushTokenStore(serviceURL: environment.convexURL) }
 
-  public func registerPush(_ token: String, installation: PushInstallation, locale: String, generation: UUID) async throws {
-    guard mayRegisterPush(generation) else { return }
+  public func registerPush(_ token: String, native: Data, installation: PushInstallation, locale: String, generation: UUID) async throws {
+    guard mayRegisterPush(generation) else { throw CancellationError() }
     let previous = registeringPush
     let task = Task {
       _ = await previous?.result
-      guard let bearer = try await session.validToken(), generation == sessionGeneration,
-        status == .signedIn, !signingOut, !deletion.isRunning else { return }
-      var tokens = try pushTokens.read()
+      guard let bearer = try await session.validToken() else { throw AuthSessionError.notSignedIn }
+      guard mayRegisterPush(generation) else { throw CancellationError() }
       let identity = try PushTokenStore.registrationID(bearer: bearer, installSecret: installation.secret)
-      let record = PushRegistrationRecord(token: token, registrationId: identity.uuidString)
-      if !tokens.contains(record) { tokens.append(record) }
-      try pushTokens.write(tokens)
-      try await registerInstallation(record, installation: installation, locale: locale, bearer: bearer)
-      for old in tokens where old != record {
+      try await pushTokens.registerFresh(token, native: native, for: identity) { record in
+        try await registerInstallation(record, installation: installation, locale: locale, bearer: bearer)
+      } unregister: { old in
         try await unregisterInstallation(old, installation: installation)
       }
-      try pushTokens.write([record])
     }
     registeringPush = task
     try await task.value
@@ -126,8 +122,9 @@ public final class Backend {
     status == .signedIn && sessionGeneration == generation && !signingOut && !deletion.isRunning
   }
 
-  public func finishPushRevocation(installation: PushInstallation, generation: UUID, locale: String,
-    suspend: @escaping @MainActor () -> Void) async throws {
+  public func finishPushRevocation(installation: PushInstallation, generation: UUID,
+    suspend: @escaping @MainActor () -> Void) async throws -> Set<String> {
+    var verified = Set<String>()
     let previous = registeringPush
     let task = Task {
       _ = await previous?.result
@@ -143,15 +140,13 @@ public final class Backend {
       try await pushTokens.retireStale(keeping: identity, suspend: suspend) { record in
         try await unregisterInstallation(record, installation: installation)
       }
-      if let identity, let bearer {
-        try await pushTokens.adoptLegacy(for: identity, deviceContinuity: installation.hasExpoDeviceIdentity, suspend: suspend) { record in
-          guard mayRegisterPush(generation) else { throw CancellationError() }
-          try await registerInstallation(record, installation: installation, locale: locale, bearer: bearer)
-        }
+      if let identity {
+        verified = Set(try pushTokens.read().filter { $0.registrationId == identity.uuidString }.compactMap(\.apnsDigest))
       }
     }
     registeringPush = task
     try await task.value
+    return verified
   }
 
   private func registerInstallation(_ record: PushRegistrationRecord, installation: PushInstallation, locale: String, bearer: String) async throws {
