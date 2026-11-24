@@ -60,6 +60,10 @@ import Testing
   #expect(!SiriText.fitsCapture(String(repeating: "😀", count: 10_001)))
   #expect(SiriText.fitsLibrary(String(repeating: "a", count: 100_000)))
   #expect(!SiriText.fitsLibrary(String(repeating: "a", count: 100_001)))
+  #expect(SiriText.captureRoute(String(repeating: "a", count: 20_000)) == .direct)
+  #expect(SiriText.captureRoute(String(repeating: "😀", count: 10_001)) == .inbox)
+  #expect(SiriText.captureRoute(String(repeating: "a", count: 100_000)) == .inbox)
+  #expect(SiriText.captureRoute(String(repeating: "a", count: 100_001)) == .tooLong)
 }
 
 @Test func resolvedLinksKeepTheirURLAndPhotosKeepTheirPhotoLabel() {
@@ -97,5 +101,43 @@ import Testing
     #expect(inbox.queuedSiriDelivery(operationID: note.operationID, owner: "other") == nil)
     try inbox.activate("second")
     #expect(inbox.queuedSiriDelivery(operationID: note.operationID, owner: "first") == nil)
+  }
+}
+
+
+@Test func queuedSiriNoteUsesItsOwnBearerForTheFolderAndSaveRequests() async throws {
+  let configuration = URLSessionConfiguration.ephemeral
+  configuration.protocolClasses = [SiriNoteHTTPFixture.self]
+  let transport = ConvexHTTPAuthTransport(deployment: URL(string: "https://fixture.convex.cloud")!,
+    session: URLSession(configuration: configuration))
+  let folder = try await transport.siriFolder("folder", authorization: "fixture-owner")
+  #expect(folder == "folder")
+  await #expect(throws: SaveFailure.proRequired) {
+    try await transport.saveSiriNote(["text": "fixture", "spaceId": "folder", "operationId": "siri:fixture"],
+      authorization: "fixture-owner")
+  }
+}
+
+private final class SiriNoteHTTPFixture: URLProtocol, @unchecked Sendable {
+  override class func canInit(with request: URLRequest) -> Bool { true }
+  override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+  override func stopLoading() {}
+
+  override func startLoading() {
+    let url = request.url!
+    #expect(request.httpMethod == "POST")
+    #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer fixture-owner")
+    let reply: (Int, String)
+    switch url.path {
+    case "/api/query": reply = (200, #"{"status":"success","value":{"_id":"folder"}}"#)
+    case "/api/mutation": reply = (560, #"{"status":"error","errorMessage":"Pro required","errorData":{"code":"pro_required"}}"#)
+    default:
+      Issue.record("Unexpected Convex HTTP endpoint")
+      reply = (404, #"{"status":"error"}"#)
+    }
+    let response = HTTPURLResponse(url: url, statusCode: reply.0, httpVersion: nil, headerFields: nil)!
+    client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+    client?.urlProtocol(self, didLoad: Data(reply.1.utf8))
+    client?.urlProtocolDidFinishLoading(self)
   }
 }
