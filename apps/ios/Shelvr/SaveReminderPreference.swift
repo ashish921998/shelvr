@@ -36,7 +36,7 @@ struct SaveReminderPreference: View {
       permitted = [.authorized, .provisional, .ephemeral].contains(status)
     }
     .task(id: attempt) {
-      readFailed = false""
+      readFailed = false
       do {
         for try await value in backend.query("notifications:getPreferences", as: TrialNotificationPreferences.self) { preferences = value }
       } catch { if !Task.isCancelled { readFailed = true } }
