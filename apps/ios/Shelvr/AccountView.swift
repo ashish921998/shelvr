@@ -21,6 +21,7 @@ struct AccountView: View {
       Text(user?.email ?? user?._id ?? " ")
         .font(.headline)
         .accessibilityIdentifier("signed-in-user")
+      SaveReminderPreference()
       Button(copy("pro.viewPlans")) { billing = .paywall }
       Button(copy("pro.manage")) { billing = .manage }
       Button(copy("account.signOut")) {

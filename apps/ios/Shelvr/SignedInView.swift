@@ -67,6 +67,7 @@ struct SignedInView: View {
         }
       }
     }
+    .modifier(TrialReminderObserver(home: path.isEmpty))
     .onChange(of: pendingLink, initial: true) { _, link in
       guard let link else { return }
       pendingLink = nil
