@@ -1,4 +1,8 @@
 // @vitest-environment jsdom
+import { writeFileSync } from "node:fs";
+import { placeKey } from "@convex/model/plan";
+import { swapStop, type DateStop } from "@convex/model/datePlan";
+import vectors from "../../../ios/TestData/city-rules.json";
 import type { CityPin } from "@/lib/city-pins";
 import { cityPinId } from "@/lib/city-pins";
 import { t } from "@/lib/i18n";
@@ -506,4 +510,44 @@ describe("useAskVotes", () => {
     expect(mocks.share).toHaveBeenCalledTimes(1);
     expect(mocks.capture).toHaveBeenCalledTimes(1);
   });
+});
+
+it("keeps Swift city vote and date vectors aligned with the Expo rules", () => {
+  const pins = vectors.pins.map((value) =>
+    pin(value.name, value.itemID, value.lat),
+  );
+  const link = voteLink({
+    ...vectors.link,
+    places: vectors.link.places.map((value) => ({
+      ...value,
+      itemId: value.itemId as Id<"items">,
+    })),
+  });
+  const stops: DateStop[] = vectors.date.stops.map((value) => ({
+    ...value,
+    slot: value.slot === "first" ? "first" : "second",
+    source: value.source === "save" ? "save" : "suggested",
+  }));
+  const expected = {
+    keys: pins.map((value) => placeKey(value.name)),
+    same: vectors.cases.map((row) =>
+      sameShortlist(
+        link,
+        row.map((index) => pins[index]!),
+        pins,
+      ),
+    ),
+    swaps: vectors.rounds.map(
+      (tried) =>
+        swapStop(stops, { first: 0, second: 1 }, "first", tried)?.first ?? null,
+    ),
+  };
+  if (process.env.SHELVR_RECORD_CITY_RULES === "1") {
+    writeFileSync(
+      "../../apps/ios/TestData/city-rules.json",
+      JSON.stringify({ ...vectors, expected }, null, 2) + "\n",
+    );
+  } else {
+    expect(expected).toEqual(vectors.expected);
+  }
 });
