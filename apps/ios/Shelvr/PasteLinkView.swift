@@ -8,6 +8,8 @@ struct PasteLinkView: View {
   @State private var input = ""
   @State private var pending: PastedLink?
   @State private var presented = false
+  @State private var billing: BillingDestination?
+  @State private var resumeSave = false
   @State private var saving = false
   @State private var errorMessage: String?
   @FocusState private var focused: Bool
@@ -32,6 +34,11 @@ struct PasteLinkView: View {
       Button(copy("common.save"), action: save)
         .disabled(saving || input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
+    .sheet(item: $billing, onDismiss: {
+      if resumeSave { resumeSave = false; save() }
+    }) { destination in
+      BillingSheet(destination: destination) { resumeSave = true }
+    }
     .onAppear { presented = true; focused = true }
     .onDisappear { presented = false }
   }
@@ -48,12 +55,14 @@ struct PasteLinkView: View {
     Task {
       defer { saving = false }
       do {
-        let _: String = try await backend.client.mutation("items:createLinkItem", with: [
-          "url": link.url, "operationId": link.operationID, "saveSource": "manual_link"
-        ])
+        try await backend.saveLink(link.url, operationID: link.operationID, source: .manualLink)
         if presented { dismiss() }
       } catch {
-        errorMessage = PastedLink.requiresPro(error) ? copy("freePlan.leftBody") : copy("errors.tryAgain")
+        guard presented else { return }
+        if SaveFailure(error) == .proRequired {
+          errorMessage = copy("freePlan.leftBody")
+          billing = .paywall
+        } else { errorMessage = copy("errors.tryAgain") }
       }
     }
   }

@@ -13,8 +13,8 @@ let package = Package(
     .target(name: "ShelvrInbox"),
     .target(
       name: "ShelvrKit",
-      dependencies: [.product(name: "ConvexMobile", package: "convex-swift")]
+      dependencies: ["ShelvrInbox", .product(name: "ConvexMobile", package: "convex-swift")]
     ),
-    .testTarget(name: "ShelvrKitTests", dependencies: ["ShelvrKit", "ShelvrInbox"]),
+    .testTarget(name: "ShelvrKitTests", dependencies: ["ShelvrKit", "ShelvrInbox"], resources: [.process("Fixtures")]),
   ]
 )

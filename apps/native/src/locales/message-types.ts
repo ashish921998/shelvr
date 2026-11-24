@@ -228,6 +228,8 @@ type MessageParams = {
   "pro.unlockShelvr": undefined;
   "share.openToFinish": undefined;
   "share.openToSignIn": undefined;
+  "share.copyNote": undefined;
+  "share.longNoteRecovery": undefined;
   "share.reading": undefined;
   "share.empty": undefined;
   "share.pending": undefined;
@@ -1143,6 +1145,7 @@ type MessageParams = {
   "passportStory.tagline": undefined;
   "passportStory.scan": undefined;
   "passportStory.shareLink": undefined;
+  "passportStory.linkNotePassportMenu": undefined;
   "passportStory.linkNote": undefined;
   "passport.shareCity": { city: string };
   "passport.momentCityComplete": { city: string };
