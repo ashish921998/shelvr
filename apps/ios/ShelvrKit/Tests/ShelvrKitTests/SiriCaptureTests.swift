@@ -105,16 +105,22 @@ import Testing
 }
 
 
-@Test func queuedSiriNoteUsesItsOwnBearerForTheFolderAndSaveRequests() async throws {
+@Test func queuedSiriNoteUsesItsOwnBearerAndRecognizesTheMissingFolder() async throws {
   let configuration = URLSessionConfiguration.ephemeral
   configuration.protocolClasses = [SiriNoteHTTPFixture.self]
-  let transport = ConvexHTTPAuthTransport(deployment: URL(string: "https://fixture.convex.cloud")!,
-    session: URLSession(configuration: configuration))
-  let folder = try await transport.siriFolder("folder", authorization: "fixture-owner")
-  #expect(folder == "folder")
+  let session = URLSession(configuration: configuration)
+  let missing = ConvexHTTPAuthTransport(deployment: URL(string: "https://missing.convex.cloud")!, session: session)
+  let args = ["text": "fixture", "spaceId": "folder", "operationId": "siri:fixture"]
+  guard case .folderUnavailable = try await missing.saveSiriNote(args, authorization: "fixture-owner") else {
+    Issue.record("A missing folder must be handled separately")
+    return
+  }
+  await #expect(throws: ConvexCallError.self) {
+    _ = try await missing.saveSiriNote(["text": "fixture", "operationId": "siri:fixture"], authorization: "fixture-owner")
+  }
+  let pro = ConvexHTTPAuthTransport(deployment: URL(string: "https://paywall.convex.cloud")!, session: session)
   await #expect(throws: SaveFailure.proRequired) {
-    try await transport.saveSiriNote(["text": "fixture", "spaceId": "folder", "operationId": "siri:fixture"],
-      authorization: "fixture-owner")
+    _ = try await pro.saveSiriNote(args, authorization: "fixture-owner")
   }
 }
 
@@ -126,22 +132,17 @@ private final class SiriNoteHTTPFixture: URLProtocol, @unchecked Sendable {
   override func startLoading() {
     let url = request.url!
     #expect(request.httpMethod == "POST")
+    #expect(url.path == "/api/mutation")
     #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer fixture-owner")
-    let reply: (Int, String)
-    switch url.path {
-    case "/api/query": reply = (200, #"{"status":"success","value":{"_id":"folder"}}"#)
-    case "/api/mutation": reply = (560, #"{"status":"error","errorMessage":"Pro required","errorData":{"code":"pro_required"}}"#)
-    default:
-      Issue.record("Unexpected Convex HTTP endpoint")
-      reply = (404, #"{"status":"error"}"#)
-    }
-    let response = HTTPURLResponse(url: url, statusCode: reply.0, httpVersion: nil, headerFields: nil)!
+    let reply = url.host == "missing.convex.cloud"
+      ? #"{"status":"error","errorMessage":"Uncaught Error: Space not found\n    at saveIntoSpace"}"#
+      : #"{"status":"error","errorMessage":"Pro required","errorData":{"code":"pro_required"}}"#
+    let response = HTTPURLResponse(url: url, statusCode: 560, httpVersion: nil, headerFields: nil)!
     client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-    client?.urlProtocol(self, didLoad: Data(reply.1.utf8))
+    client?.urlProtocol(self, didLoad: Data(reply.utf8))
     client?.urlProtocolDidFinishLoading(self)
   }
 }
-
 
 @Test func ordinaryRichNotesKeepTheirWordsAndDoNotRepeatTheirHeading() throws {
   let url = try #require(URL(string: "https://example.com/article"))
@@ -160,4 +161,6 @@ private final class SiriNoteHTTPFixture: URLProtocol, @unchecked Sendable {
   #expect(SiriText.pageLink(name: AttributedString("Article"), content: linked) == nil)
   #expect(SiriText.pageLink(name: AttributedString("restaurant"), content: linked) == url)
   #expect(SiriText.pageLink(name: AttributedString("Article"), content: AttributedString(url.absoluteString)) == nil)
+  #expect(SiriText.noteText(name: "Article", content: url.absoluteString) == "Article\n" + url.absoluteString)
+  #expect(SiriText.noteText(name: "", content: url.absoluteString) == url.absoluteString)
 }

@@ -66,21 +66,24 @@ public struct ConvexHTTPAuthTransport: AuthTransport {
       returning: Ignored.self, function: .mutation)
   }
 
-  func siriFolder(_ id: String, authorization: String) async throws -> String? {
-    struct Folder: Decodable { let _id: String }
-    let folder = try await call("spaces:getSpace", args: ["id": id], token: authorization,
-      returning: Folder.self, function: .query)
-    return folder?._id
-  }
+  enum SiriNoteResult { case saved, folderUnavailable }
 
-  func saveSiriNote(_ args: [String: String], authorization: String) async throws {
-    guard try await call("items:createNoteItem", args: args, token: authorization,
-      returning: String.self, function: .mutation) != nil else {
-      throw ConvexCallError.server("empty reply")
+  func saveSiriNote(_ args: [String: String], authorization: String) async throws -> SiriNoteResult {
+    do {
+      guard try await call("items:createNoteItem", args: args, token: authorization,
+        returning: String.self, function: .mutation) != nil else {
+        throw ConvexCallError.server("empty reply")
+      }
+      return .saved
+    } catch let ConvexCallError.server(message) where args["spaceId"] != nil &&
+      message.split(whereSeparator: \.isNewline).contains(where: {
+        $0 == "Space not found" || $0 == "Uncaught Error: Space not found"
+      }) {
+      return .folderUnavailable
     }
   }
 
-  private enum Function: String { case action, query, mutation }
+  private enum Function: String { case action, mutation }
 
   private func call<Args: Encodable, Value: Decodable>(
     _ path: String, args: Args, token: String? = nil, returning: Value.Type, function: Function = .action
