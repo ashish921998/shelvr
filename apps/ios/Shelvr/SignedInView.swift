@@ -129,12 +129,29 @@ struct SignedInView: View {
             LibraryPlaceEditor(id: id).id(id)
           } else { ShellDestination(link: link) }
         case "date-plan", "go-out", "new-trip":
-          if let city = link.query.first(where: { $0.name == "city" })?.value, !city.isEmpty {
+          if link.path == ["new-trip"], !link.query.contains(where: { $0.name == "listId" || ($0.name == "mode" && $0.value == "generate") }) {
+            let city = link.query.first(where: { $0.name == "city" })?.value ?? ""
+            BlankTripView(city: city) {
+              var parts = URLComponents()
+              parts.path = "/new-trip"
+              parts.queryItems = [URLQueryItem(name: "mode", value: "generate"), URLQueryItem(name: "city", value: city)]
+              if let next = parts.string.flatMap({ AppLink($0) }) { path.append(next) }
+            } created: { result in
+              if path.last == link { path[path.count - 1] = result }
+            }
+          } else if let city = link.query.first(where: { $0.name == "city" })?.value, !city.isEmpty {
             let listID = link.query.first(where: { $0.name == "listId" })?.value
             if link.path.first == "new-trip" {
               NewCityTripView(city: city, listID: listID) { created in
                 guard path.last == link else { return }
                 path[path.count - 1] = created
+              }.id(link)
+            } else if link.path == ["go-out"] {
+              GoOutView(city: city, listID: listID) { destination in
+                var parts = URLComponents()
+                parts.path = destination
+                parts.queryItems = link.query
+                if path.last == link, let next = parts.string.flatMap({ AppLink($0) }) { path[path.count - 1] = next }
               }.id(link)
             } else { CityDateView(city: city, listID: listID).id(link) }
           } else if let listID = link.query.first(where: { $0.name == "listId" })?.value {
@@ -246,8 +263,9 @@ private struct PlanCityView: View {
           List(cities, id: \.city) { city in
             var url: URLComponents {
               var parts = URLComponents()
-              parts.path = trip ? "/new-trip" : "/date-plan"
+              parts.path = trip ? "/new-trip" : "/go-out"
               parts.queryItems = [URLQueryItem(name: "city", value: city.city)]
+              if trip { parts.queryItems?.append(URLQueryItem(name: "mode", value: "generate")) }
               return parts
             }
             if let link = url.string.flatMap({ AppLink($0) }) {

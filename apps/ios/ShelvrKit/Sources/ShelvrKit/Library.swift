@@ -9,6 +9,7 @@ public struct LibrarySave: Decodable, Identifiable, Sendable {
   public let siteName: String?
   public let url: String?
   public let cities: [String]?
+  public let places: [String]?
   public let type: String?
   public let status: String
   public let imageUrl: String?
@@ -63,6 +64,10 @@ public struct LibraryCity: Decodable, Identifiable, Sendable {
 }
 
 extension Backend {
+  public func searchLibrary(_ query: String) -> some AsyncSequence<[LibrarySave], any Error> {
+    client.subscribe(to: "items:searchItems", with: ["query": query], yielding: [LibrarySave].self).values
+  }
+
   public func libraryPage(after cursor: String?) -> some AsyncSequence<LibraryPage, any Error> {
     let options: [String: ConvexEncodable?] = ["numItems": 40.0, "cursor": cursor]
     return client.subscribe(to: "items:listItemsPage", with: ["paginationOpts": options], yielding: LibraryPage.self).values
