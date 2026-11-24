@@ -138,18 +138,25 @@ public final class InviteEntry {
 
   public func route(_ link: AppLink) -> Bool {
     if dispatching != nil || awaitingNavigation != nil { queued = link; return true }
+    guard let incoming = PublicInvite(link) else {
+      if accepted != nil { queued = link; return true }
+      return false
+    }
+    queued = nil
     if !loaded || accepted != nil {
       discardUnread = true
       if !replace(with: nil) { accepted = nil; loaded = false; queued = link; preview = nil; return true }
     }
     expired = nil
-    preview = PublicInvite(link)
-    return preview != nil
+    preview = incoming
+    return true
   }
 
-  public func cancel() {
-    guard dispatching == nil, let current = accepted, replace(with: nil) else { return }
+  @discardableResult public func cancel() -> AppLink? {
+    guard dispatching == nil, let current = accepted, replace(with: nil) else { return nil }
     preview = current.invite
+    defer { queued = nil }
+    return queued
   }
 
   public func beginDispatch(_ id: UUID) -> Bool {
