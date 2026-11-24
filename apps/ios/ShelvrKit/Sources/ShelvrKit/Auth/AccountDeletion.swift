@@ -1,6 +1,7 @@
 import Foundation
+import Observation
 
-@MainActor
+@MainActor @Observable
 final class AccountDeletion {
   private var pending: Task<Void, Error>?
   var isRunning: Bool { pending != nil }

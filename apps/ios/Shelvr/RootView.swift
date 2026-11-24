@@ -21,6 +21,7 @@ struct RootView: View {
     .onChange(of: pushDevice.link, initial: true) { _, link in
       if let link { pendingLink = link; pushDevice.link = nil }
     }
+    .modifier(SharedInboxReceiver())
     .onOpenURL { url in
       if let link = AppLink(url.absoluteString), link.path != ["sign-in"] { pendingLink = link }
     }
