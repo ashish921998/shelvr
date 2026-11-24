@@ -66,3 +66,19 @@ import Testing
   #expect(SiriText.entityContent(kind: "link", value: "https://example.com", title: "New title", photoLabel: "Photo") == "https://example.com")
   #expect(SiriText.entityContent(kind: "image", value: "file name", title: "New title", photoLabel: "Photo") == "Photo")
 }
+
+@Test func copyingOneRetainedNoteRemovesOnlyItsManifestAfterTheCopySucceeds() throws {
+  let dir = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+  let inbox = ShareInbox(directory: dir)
+  defer { try? FileManager.default.removeItem(at: dir) }
+  try inbox.activate("owner")
+  let stage = try inbox.stage(owner: "owner")
+  try inbox.publish([InboxPayload(kind: .note, value: "first", siri: true), InboxPayload(kind: .note, value: "second", siri: true)], in: stage)
+  let batch = try #require(inbox.batches().first)
+  let files = try inbox.manifests(in: batch)
+  #expect(try !inbox.copyAndRemoveNote(files[1], owner: "owner") { _ in false })
+  var copied = ""
+  #expect(try inbox.copyAndRemoveNote(files[1], owner: "owner") { copied = $0; return true })
+  #expect(copied == "second")
+  #expect(try inbox.manifests(in: batch) == [files[0]])
+}
