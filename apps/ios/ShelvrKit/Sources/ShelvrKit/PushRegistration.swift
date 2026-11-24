@@ -110,8 +110,11 @@ public struct PushDeliveryState {
     if changed { token = nil }
     self.generation = generation
     self.verified = verified
-    let unverifiedToken = token.map { !verified.contains(Self.digest($0)) } ?? false
-    if (changed && verified.isEmpty) || (unverifiedToken && !suspended) { suspended = true; return true }
+    if let token, verified.contains(Self.digest(token)) {
+      suspended = false
+      return false
+    }
+    if (changed && verified.isEmpty) || (token != nil && !suspended) { suspended = true; return true }
     return false
   }
 
