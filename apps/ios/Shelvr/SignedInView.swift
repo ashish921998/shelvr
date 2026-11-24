@@ -53,7 +53,8 @@ struct SignedInView: View {
       }
       .navigationDestination(for: AppLink.self) { link in
         switch link.path.first {
-        case "profile", "settings": AccountView().navigationTitle(copy("navigation.profile"))
+        case "settings": AccountSettingsView()
+        case "profile": AccountView().navigationTitle(copy("navigation.profile"))
         case "add-spots":
           List {
             entry("/add", "addSheet.pasteLink", "link")

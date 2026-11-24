@@ -2,6 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <key>ShelvrPostHogToken</key>
+    <string>$(SHELVR_POSTHOG_TOKEN)</string>
+    <key>ShelvrPostHogHost</key>
+    <string>$(SHELVR_POSTHOG_HOST)</string>
+  <key>ShelvrAPNsEnvironment</key>
+  <string>$(SHELVR_APNS_ENVIRONMENT)</string>
 	<key>ShelvrRevenueCatKey</key>
     <string>$(SHELVR_REVENUECAT_KEY)</string>
     <key>ShelvrConvexURL</key>

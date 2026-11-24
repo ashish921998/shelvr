@@ -22,6 +22,7 @@ struct AccountView: View {
         .font(.headline)
         .accessibilityIdentifier("signed-in-user")
       SaveReminderPreference()
+      NavigationLink(copy("profile.settings")) { AccountSettingsView() }
       Button(copy("pro.viewPlans")) { billing = .paywall }
       Button(copy("pro.manage")) { billing = .manage }
       Button(copy("account.signOut")) {
