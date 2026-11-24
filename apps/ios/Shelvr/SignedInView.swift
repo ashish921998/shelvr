@@ -6,6 +6,7 @@ struct SignedInView: View {
   @Environment(Backend.self) private var backend
   @State private var access = PlanAccess()
   @Binding var pendingLink: AppLink?
+  @Environment(InviteEntry.self) private var invites
   @Environment(\.copy) private var copy
   @State private var library = false
   @State private var billing: BillingDestination?
@@ -206,6 +207,7 @@ struct SignedInView: View {
       case ["sign-in"]: break
       default: path = [link]
       }
+      if let queued = invites.didNavigate(to: link), !invites.route(queued) { pendingLink = queued }
     }
   }
 

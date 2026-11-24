@@ -18,6 +18,7 @@ struct RootView: View {
       case .offline: OfflineView()
       }
     }
+    .environment(invites)
     .environment(namePrompts)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(appearance == "neutralDark" ? Color(red: 17/255, green: 20/255, blue: 23/255) : Color(.background))

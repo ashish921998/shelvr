@@ -12,6 +12,10 @@ struct FriendPassportView: View {
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var compare = false
+  @State private var comparison: PassportComparison?
+  @State private var comparisonLoaded = false
+  @State private var comparisonFailed = false
+  @State private var compareAttempt = 0
   @State private var saved: Int?
   @State private var inactive = false
   @State private var operation = SocialOperation()
@@ -29,9 +33,8 @@ struct FriendPassportView: View {
             }
           }
           if compare {
-            SocialQuery(query: "passportShares:comparePassport", arguments: ["token": token],
-              type: PassportComparison?.self) { comparison in
-              if let comparison {
+            if comparisonFailed { Button(copy("common.retry")) { compareAttempt += 1 } }
+            else if let comparison {
                 places(comparison.both, title: copy("passportShare.both"))
                 places(comparison.onlyThem, title: comparison.ownerName.map { copy("passportShare.onlyThem", ["name": $0]) }
                   ?? copy("passportShare.onlyThemNoName"))
@@ -52,8 +55,7 @@ struct FriendPassportView: View {
                 if let saved {
                   Label("\(copy("passport.places")) · \(saved)", systemImage: "checkmark")
                 }
-              } else { dead }
-            }
+            } else if comparisonLoaded { dead } else { ProgressView() }
           } else {
             ForEach(passport.byCity.indices, id: \.self) { i in
               let group = passport.byCity[i]
@@ -66,8 +68,26 @@ struct FriendPassportView: View {
         .navigationTitle(passport.ownerName.map { copy("passportShare.title", ["name": $0]) } ?? copy("passportShare.titleNoName"))
       } else { dead }
     }
+    .background {
+      Color.clear.task(id: CompareRequest(token: token, compare: compare, attempt: compareAttempt)) {
+        comparison = nil
+        comparisonLoaded = false
+        comparisonFailed = false
+        guard compare, requestComparison == nil else { return }
+        do {
+          for try await value in backend.socialQuery("passportShares:comparePassport", arguments: ["token": token],
+            as: PassportComparison?.self) {
+            try Task.checkCancellation()
+            comparison = value
+            comparisonLoaded = true
+          }
+        } catch { if !Task.isCancelled { comparisonFailed = true } }
+      }
+    }
     .socialOperation(operation, failure: copy("errors.tryAgain"), close: copy("common.close"))
   }
+
+  private struct CompareRequest: Equatable { let token: String; let compare: Bool; let attempt: Int }
 
   @ViewBuilder private func places(_ rows: [PassportComparison.Place], title: String) -> some View {
     if !rows.isEmpty {
