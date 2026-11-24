@@ -61,6 +61,7 @@ struct SignedInView: View {
           .navigationTitle(copy("addSheet.title"))
         case "passport-story": PassportStoryView()
         case "passport-invite" where link.path.count == 2: PassportInvitePreview(token: link.path[1]).id(link.path[1])
+        case "trips": TripsTabView()
         case "shared-lists": SharedListsView()
         case "shared-list" where link.path.count == 2: SharedListView(id: link.path[1])
         case "list-invite" where link.path.count == 2:
