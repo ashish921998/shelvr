@@ -24,6 +24,7 @@ public final class Backend {
   @ObservationIgnored private var deletion: Task<Void, Error>?
   @ObservationIgnored private var registeringPush: Task<Void, Error>?
   @ObservationIgnored private var signingOut = false
+  @ObservationIgnored var preparingSiri: (subject: String, task: Task<Void, Error>)?
 
   public init(environment: AppEnvironment) {
     let session = AuthSession(
@@ -126,8 +127,17 @@ public final class Backend {
     if let deletion { _ = await deletion.result }
     guard status == .signedIn, !signingOut else { return }
     signingOut = true
+    let siri = SiriCredential.current()
+    let authorization = KeychainTokenVault().read()?.token
     do {
-      try await session.signOut { await self.disconnect() }
+      try await session.signOut {
+        await siri?.removeIfCurrent()
+        await self.disconnect()
+        if let siri, let authorization {
+          try? await ConvexHTTPAuthTransport(deployment: self.environment.convexURL)
+            .revokeSiri(siri.token, authorization: authorization)
+        }
+      }
     } catch {
       signingOut = false
       throw error
@@ -153,8 +163,8 @@ public final class Backend {
     signingOut = false
   }
 
-  public func query<T: Decodable>(_ name: String, as type: T.Type) -> some AsyncSequence<T, any Error> {
-    client.subscribe(to: name, yielding: type).values
+  public func query<T: Decodable>(_ name: String, with args: [String: ConvexEncodable?] = [:], as type: T.Type) -> some AsyncSequence<T, any Error> {
+    client.subscribe(to: name, with: args, yielding: type).values
   }
 
   private func connect() async {

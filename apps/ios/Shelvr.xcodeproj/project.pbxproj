@@ -7,6 +7,28 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		002D613616A1F5130CED2E9F /* ShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 704ED90EEF30D691A2613844 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		00BC345C0FB2E35A5207201C /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
+		0EE039217CCFE517DE3CAB42 /* ja.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000046 /* ja.json */; };
+		127E857B903D1536FC1EDFF7 /* ja.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000046 /* ja.json */; };
+		2223CF8734C8B7A45DD51119 /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000041 /* en.json */; };
+		36E6F3FD1E99DE50DC4D1A8D /* ShelvrInbox in Frameworks */ = {isa = PBXBuildFile; productRef = 58A93D31AFA3EEA34762477E /* ShelvrInbox */; };
+		3FBA7FAB0E3EEC03ACC0587D /* es-MX.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000042 /* es-MX.json */; };
+		54B8E1BEDC6B0254EEE95BF9 /* CaptureRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBB070DB4AF7B8E26C57A1AB /* CaptureRouter.swift */; };
+		561D659E3AC26DB26F694687 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 85CFCF465E33D985FBF666F9 /* Foundation.framework */; };
+		5CC0282F2414B8ABB635621F /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000041 /* en.json */; };
+		60E6972F174B5C189AF93387 /* Copy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E32FCBAF6CA6438522A6AEF /* Copy.swift */; };
+		65A2603C949AF7D1505203DF /* Copy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61C508B96C556DC218719EC /* Copy.swift */; };
+		68A4312E5FCF2169CDE0B40B /* ShelvrCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9A6D3C46DD4BF20D5EF6596 /* ShelvrCapture.swift */; };
+		6A6F1BC7446406EEF72B53E6 /* RecentSaves.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1BAFA60699E1B4641F3AA0A /* RecentSaves.swift */; };
+		700174B2654790807D78CA9D /* fr-CA.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000044 /* fr-CA.json */; };
+		76722A8B2833C8EEE203E542 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
+		77C4513B4C564D7A33CF2A02 /* ShelvrInbox in Frameworks */ = {isa = PBXBuildFile; productRef = C2944BC6B409C8A19EAD8916 /* ShelvrInbox */; };
+		7FD82543A4DD186B77BD3F7C /* es.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000043 /* es.json */; };
+		8A57E8C4E29B2CA34A103D7B /* fr.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000045 /* fr.json */; };
+		8AF2D457F0431CC1380DC3D5 /* de.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* de.json */; };
+		91DFB9C33EA2C3164F716C9B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 85CFCF465E33D985FBF666F9 /* Foundation.framework */; };
+		934C44EF78BEB1F64DD0B086 /* NotesSchemaEntities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5410CC2A134EE5FF603E0659 /* NotesSchemaEntities.swift */; };
 		A10000000000000000000014 /* ShelvrKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000013 /* ShelvrKit */; };
 		A10000000000000000000060 /* de.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* de.json */; };
 		A10000000000000000000061 /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000041 /* en.json */; };
@@ -19,35 +41,102 @@
 		A10000000000000000000068 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
 B70000000000000000000001 = {isa = PBXBuildFile; productRef = B70000000000000000000002; };
         B71000000000000000000001 = {isa = PBXBuildFile; productRef = B71000000000000000000002; };
+		ADE66479850612E8CD378F36 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
+		BFDDDAC65FD1EAF951C7A3DF /* fr.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000045 /* fr.json */; };
+		C3A19CA96D128BF82E080E8B /* es.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000043 /* es.json */; };
+		C5EA489188B6CDB7DBC292F8 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
+		C83365D5E385935CC9BB0F49 /* ShelvrInbox in Frameworks */ = {isa = PBXBuildFile; productRef = 814A9A7E2E52D1FDE55288DD /* ShelvrInbox */; };
+		D0D3756AEAB2BF82F1D0F15D /* fr-CA.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000044 /* fr-CA.json */; };
+		D0F379AD41A0134F8BF645B5 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 985944D0E54B7A93E76B5970 /* ShareViewController.swift */; };
+		E11312F464E1E162FAB8F5E6 /* StickerCutter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43BC73B270D794356E1FFDC8 /* StickerCutter.swift */; };
+		F3ACA58CA747EE58F135F7D5 /* RecentSavesWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 166B641C1F5BF309C6A1F897 /* RecentSavesWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F7096F0482F684FCB5458973 /* de.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* de.json */; };
+		FDF3BE8650F2D3C780A6D6A3 /* StickerTarget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1881F177AB278E4320B662A3 /* StickerTarget.swift */; };
+		FF2631930D85E358159BB28D /* es-MX.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000042 /* es-MX.json */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		0FFB809644B52D4ED1B06723 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3FEAC94671E1FF3FE6429239;
+			remoteInfo = RecentSavesWidget;
+		};
+		2C968323C99353A4C4EC0A54 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 692A26752848BB4E3AF88E47;
+			remoteInfo = ShareExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		7125C30E27D125078F48F51C /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				002D613616A1F5130CED2E9F /* ShareExtension.appex in Embed App Extensions */,
+				F3ACA58CA747EE58F135F7D5 /* RecentSavesWidget.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		166B641C1F5BF309C6A1F897 /* RecentSavesWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RecentSavesWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		1881F177AB278E4320B662A3 /* StickerTarget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StickerTarget.swift; path = "../native/app-intents/Support/StickerTarget.swift"; sourceTree = "<group>"; };
+		43BC73B270D794356E1FFDC8 /* StickerCutter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StickerCutter.swift; path = "../native/modules/subject-lift/ios/StickerCutter.swift"; sourceTree = "<group>"; };
+		4E32FCBAF6CA6438522A6AEF /* Copy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Copy.swift; path = ShelvrKit/Sources/ShelvrKit/Copy.swift; sourceTree = "<group>"; };
+		5410CC2A134EE5FF603E0659 /* NotesSchemaEntities.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NotesSchemaEntities.swift; path = "../native/app-intents/Entities/NotesSchemaEntities.swift"; sourceTree = "<group>"; };
+		704ED90EEF30D691A2613844 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		85CFCF465E33D985FBF666F9 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
+		985944D0E54B7A93E76B5970 /* ShareViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
 		A10000000000000000000004 /* Shelvr.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Shelvr.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000015 /* Shared.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Shared.xcconfig; sourceTree = "<group>"; };
 		A10000000000000000000016 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		A10000000000000000000017 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		A10000000000000000000018 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A10000000000000000000019 /* Shelvr.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Shelvr.entitlements; sourceTree = "<group>"; };
-		A10000000000000000000040 /* de.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "de.json"; sourceTree = "<group>"; };
-		A10000000000000000000041 /* en.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "en.json"; sourceTree = "<group>"; };
+		A10000000000000000000040 /* de.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = de.json; sourceTree = "<group>"; };
+		A10000000000000000000041 /* en.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = en.json; sourceTree = "<group>"; };
 		A10000000000000000000042 /* es-MX.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "es-MX.json"; sourceTree = "<group>"; };
-		A10000000000000000000043 /* es.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "es.json"; sourceTree = "<group>"; };
+		A10000000000000000000043 /* es.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = es.json; sourceTree = "<group>"; };
 		A10000000000000000000044 /* fr-CA.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "fr-CA.json"; sourceTree = "<group>"; };
-		A10000000000000000000045 /* fr.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "fr.json"; sourceTree = "<group>"; };
-		A10000000000000000000046 /* ja.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "ja.json"; sourceTree = "<group>"; };
-		A10000000000000000000047 /* ko.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "ko.json"; sourceTree = "<group>"; };
+		A10000000000000000000045 /* fr.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = fr.json; sourceTree = "<group>"; };
+		A10000000000000000000046 /* ja.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ja.json; sourceTree = "<group>"; };
+		A10000000000000000000047 /* ko.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ko.json; sourceTree = "<group>"; };
 		A10000000000000000000048 /* pt-BR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "pt-BR.json"; sourceTree = "<group>"; };
+		A61C508B96C556DC218719EC /* Copy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Copy.swift; path = ShelvrKit/Sources/ShelvrKit/Copy.swift; sourceTree = "<group>"; };
+		B1BAFA60699E1B4641F3AA0A /* RecentSaves.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecentSaves.swift; sourceTree = "<group>"; };
+		E9A6D3C46DD4BF20D5EF6596 /* ShelvrCapture.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ShelvrCapture.swift; path = "../native/app-intents/Support/ShelvrCapture.swift"; sourceTree = "<group>"; };
+		FBB070DB4AF7B8E26C57A1AB /* CaptureRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CaptureRouter.swift; path = "../native/app-intents/Support/CaptureRouter.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A10000000000000000000005 /* Shelvr */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
 			path = Shelvr;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		32385E25BB2EE3B377EA7466 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				561D659E3AC26DB26F694687 /* Foundation.framework in Frameworks */,
+				C83365D5E385935CC9BB0F49 /* ShelvrInbox in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A1000000000000000000000A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -55,19 +144,55 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 				A10000000000000000000014 /* ShelvrKit in Frameworks */,
                 B70000000000000000000001 /* RevenueCatUI in Frameworks */,
                 B71000000000000000000001 /* PostHog in Frameworks */,
+				36E6F3FD1E99DE50DC4D1A8D /* ShelvrInbox in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DD68E2D420F9385E7D083DE3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				91DFB9C33EA2C3164F716C9B /* Foundation.framework in Frameworks */,
+				77C4513B4C564D7A33CF2A02 /* ShelvrInbox in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		A10000000000000000000002 /* Shelvr project */ = {
+		115443435333965FC09C9DBA /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				1CE72CC61C32F9DC2F527468 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		1CE72CC61C32F9DC2F527468 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				85CFCF465E33D985FBF666F9 /* Foundation.framework */,
+			);
+			name = iOS;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000002 = {
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000005 /* Shelvr */,
 				A10000000000000000000006 /* Config */,
 				A10000000000000000000007 /* Locales */,
 				A10000000000000000000003 /* Products */,
+				115443435333965FC09C9DBA /* Frameworks */,
+				ED02C96235AAAD4EC1E603D2 /* ShareExtension */,
+				4E32FCBAF6CA6438522A6AEF /* Copy.swift */,
+				CE8BE5E4ADBEC96D790D62B3 /* RecentSavesWidget */,
+				A61C508B96C556DC218719EC /* Copy.swift */,
+				E9A6D3C46DD4BF20D5EF6596 /* ShelvrCapture.swift */,
+				5410CC2A134EE5FF603E0659 /* NotesSchemaEntities.swift */,
+				FBB070DB4AF7B8E26C57A1AB /* CaptureRouter.swift */,
+				1881F177AB278E4320B662A3 /* StickerTarget.swift */,
+				43BC73B270D794356E1FFDC8 /* StickerCutter.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -75,6 +200,8 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000004 /* Shelvr.app */,
+				704ED90EEF30D691A2613844 /* ShareExtension.appex */,
+				166B641C1F5BF309C6A1F897 /* RecentSavesWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -108,9 +235,67 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 			path = ../native/src/locales;
 			sourceTree = "<group>";
 		};
+		CE8BE5E4ADBEC96D790D62B3 /* RecentSavesWidget */ = {
+			isa = PBXGroup;
+			children = (
+				B1BAFA60699E1B4641F3AA0A /* RecentSaves.swift */,
+			);
+			name = RecentSavesWidget;
+			path = RecentSavesWidget;
+			sourceTree = "<group>";
+		};
+		ED02C96235AAAD4EC1E603D2 /* ShareExtension */ = {
+			isa = PBXGroup;
+			children = (
+				985944D0E54B7A93E76B5970 /* ShareViewController.swift */,
+			);
+			name = ShareExtension;
+			path = ShareExtension;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		3FEAC94671E1FF3FE6429239 /* RecentSavesWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8C153EF4F6D8EAFED5B4DC7F /* Build configuration list for PBXNativeTarget "RecentSavesWidget" */;
+			buildPhases = (
+				CDB5D0ED81936C94AD260CC1 /* Sources */,
+				32385E25BB2EE3B377EA7466 /* Frameworks */,
+				619278550B83FF8F12298F1F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RecentSavesWidget;
+			packageProductDependencies = (
+				814A9A7E2E52D1FDE55288DD /* ShelvrInbox */,
+			);
+			productName = RecentSavesWidget;
+			productReference = 166B641C1F5BF309C6A1F897 /* RecentSavesWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+		692A26752848BB4E3AF88E47 /* ShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1EE9F721E7B70E2E2F9AB932 /* Build configuration list for PBXNativeTarget "ShareExtension" */;
+			buildPhases = (
+				936926C3D4F242255038B2A8 /* Sources */,
+				DD68E2D420F9385E7D083DE3 /* Frameworks */,
+				61F45FEDAAA896C767CDAE0C /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ShareExtension;
+			packageProductDependencies = (
+				C2944BC6B409C8A19EAD8916 /* ShelvrInbox */,
+			);
+			productName = ShareExtension;
+			productReference = 704ED90EEF30D691A2613844 /* ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		A10000000000000000000008 /* Shelvr */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = A1000000000000000000000D /* Build configuration list for PBXNativeTarget "Shelvr" */;
@@ -118,10 +303,13 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 				A10000000000000000000009 /* Sources */,
 				A1000000000000000000000A /* Frameworks */,
 				A1000000000000000000000B /* Resources */,
+				7125C30E27D125078F48F51C /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				96FBAA023029F6C285DD4A99 /* PBXTargetDependency */,
+				8150F2AC90D39792EA215C47 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A10000000000000000000005 /* Shelvr */,
@@ -131,6 +319,7 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 				A10000000000000000000013 /* ShelvrKit */,
                 B70000000000000000000002 /* RevenueCatUI */,
                 B71000000000000000000002 /* PostHog */,
+				58A93D31AFA3EEA34762477E /* ShelvrInbox */,
 			);
 			productName = Shelvr;
 			productReference = A10000000000000000000004 /* Shelvr.app */;
@@ -166,11 +355,45 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 			projectRoot = "";
 			targets = (
 				A10000000000000000000008 /* Shelvr */,
+				692A26752848BB4E3AF88E47 /* ShareExtension */,
+				3FEAC94671E1FF3FE6429239 /* RecentSavesWidget */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		619278550B83FF8F12298F1F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8AF2D457F0431CC1380DC3D5 /* de.json in Resources */,
+				2223CF8734C8B7A45DD51119 /* en.json in Resources */,
+				FF2631930D85E358159BB28D /* es-MX.json in Resources */,
+				C3A19CA96D128BF82E080E8B /* es.json in Resources */,
+				D0D3756AEAB2BF82F1D0F15D /* fr-CA.json in Resources */,
+				8A57E8C4E29B2CA34A103D7B /* fr.json in Resources */,
+				0EE039217CCFE517DE3CAB42 /* ja.json in Resources */,
+				ADE66479850612E8CD378F36 /* ko.json in Resources */,
+				76722A8B2833C8EEE203E542 /* pt-BR.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		61F45FEDAAA896C767CDAE0C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				F7096F0482F684FCB5458973 /* de.json in Resources */,
+				5CC0282F2414B8ABB635621F /* en.json in Resources */,
+				3FBA7FAB0E3EEC03ACC0587D /* es-MX.json in Resources */,
+				7FD82543A4DD186B77BD3F7C /* es.json in Resources */,
+				700174B2654790807D78CA9D /* fr-CA.json in Resources */,
+				BFDDDAC65FD1EAF951C7A3DF /* fr.json in Resources */,
+				127E857B903D1536FC1EDFF7 /* ja.json in Resources */,
+				00BC345C0FB2E35A5207201C /* ko.json in Resources */,
+				C5EA489188B6CDB7DBC292F8 /* pt-BR.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A1000000000000000000000B /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -190,16 +413,118 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		936926C3D4F242255038B2A8 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				D0F379AD41A0134F8BF645B5 /* ShareViewController.swift in Sources */,
+				60E6972F174B5C189AF93387 /* Copy.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A10000000000000000000009 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				68A4312E5FCF2169CDE0B40B /* ShelvrCapture.swift in Sources */,
+				934C44EF78BEB1F64DD0B086 /* NotesSchemaEntities.swift in Sources */,
+				54B8E1BEDC6B0254EEE95BF9 /* CaptureRouter.swift in Sources */,
+				FDF3BE8650F2D3C780A6D6A3 /* StickerTarget.swift in Sources */,
+				E11312F464E1E162FAB8F5E6 /* StickerCutter.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		CDB5D0ED81936C94AD260CC1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6A6F1BC7446406EEF72B53E6 /* RecentSaves.swift in Sources */,
+				65A2603C949AF7D1505203DF /* Copy.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		8150F2AC90D39792EA215C47 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = RecentSavesWidget;
+			target = 3FEAC94671E1FF3FE6429239 /* RecentSavesWidget */;
+			targetProxy = 0FFB809644B52D4ED1B06723 /* PBXContainerItemProxy */;
+		};
+		96FBAA023029F6C285DD4A99 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = ShareExtension;
+			target = 692A26752848BB4E3AF88E47 /* ShareExtension */;
+			targetProxy = 2C968323C99353A4C4EC0A54 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		21FFABB920EA63C61765B8EC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000016 /* Debug.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = Config/Extension.entitlements;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/RecentSavesWidget.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Recent Saves";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SHELVR_APP_ID).ExpoWidgetsTarget";
+				PRODUCT_NAME = RecentSavesWidget;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		2D6DBA980C3E5C50F71DED40 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000016 /* Debug.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = Config/Extension.entitlements;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/ShareExtension.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Shelvr;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SHELVR_APP_ID).expo-sharing-extension";
+				PRODUCT_NAME = ShareExtension;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		8625A556B7209EFDBE44A69F /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000017 /* Release.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = Config/Extension.entitlements;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/ShareExtension.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Shelvr;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SHELVR_APP_ID).expo-sharing-extension";
+				PRODUCT_NAME = ShareExtension;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 		A1000000000000000000000E /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -226,9 +551,49 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 			};
 			name = Release;
 		};
+		FB1C6CB9D4E478211ED93CAC /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000017 /* Release.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = Config/Extension.entitlements;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/RecentSavesWidget.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Recent Saves";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SHELVR_APP_ID).ExpoWidgetsTarget";
+				PRODUCT_NAME = RecentSavesWidget;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		1EE9F721E7B70E2E2F9AB932 /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8625A556B7209EFDBE44A69F /* Release */,
+				2D6DBA980C3E5C50F71DED40 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8C153EF4F6D8EAFED5B4DC7F /* Build configuration list for PBXNativeTarget "RecentSavesWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FB1C6CB9D4E478211ED93CAC /* Release */,
+				21FFABB920EA63C61765B8EC /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		A1000000000000000000000C /* Build configuration list for PBXProject "Shelvr" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -257,12 +622,24 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		58A93D31AFA3EEA34762477E /* ShelvrInbox */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ShelvrInbox;
+		};
+		814A9A7E2E52D1FDE55288DD /* ShelvrInbox */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ShelvrInbox;
+		};
 		A10000000000000000000013 /* ShelvrKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ShelvrKit;
 		};
         B70000000000000000000002 = {isa = XCSwiftPackageProductDependency; package = B70000000000000000000003; productName = RevenueCatUI; };
         B71000000000000000000002 = {isa = XCSwiftPackageProductDependency; package = B71000000000000000000003; productName = PostHog; };
+		C2944BC6B409C8A19EAD8916 /* ShelvrInbox */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ShelvrInbox;
+		};
 /* End XCSwiftPackageProductDependency section */
 
 /* Begin XCRemoteSwiftPackageReference section */

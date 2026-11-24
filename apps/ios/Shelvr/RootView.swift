@@ -31,6 +31,9 @@ struct RootView: View {
         }
       } catch { if !Task.isCancelled { Analytics.failure("analytics_identity_failed") } }
     }
+    .modifier(SharedInboxReceiver())
+    .modifier(RecentWidgetSync())
+    .modifier(SiriSetup())
     .onOpenURL { url in
       if let link = AppLink(url.absoluteString), link.path != ["sign-in"] { pendingLink = link }
     }
