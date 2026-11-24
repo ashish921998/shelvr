@@ -20,7 +20,7 @@ struct SignedInView: View {
             entry("/passport", "passport.title", "book.closed")
           }
         } else {
-          Map()
+          SavedPlacesMap(open: open)
         }
       }
       .navigationTitle(copy(library ? "navigation.library" : "navigation.map"))
