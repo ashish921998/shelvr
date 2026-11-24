@@ -11,15 +11,18 @@ struct PaywallOffer {
     let offerings = try await Purchases.shared.offerings()
     guard let current = offerings.current else { return nil }
     let products = current.availablePackages.map(\.storeProduct)
-    var eligibleIDs = Set<String>()
-    if let other = offerings.all["weekly_annual_draft"], other.identifier != current.identifier {
-      let results = await Purchases.shared.checkTrialOrIntroDiscountEligibility(
-        productIdentifiers: products.map(\.productIdentifier))
-      eligibleIDs = Set(results.compactMap { $0.value.status == .eligible ? $0.key : nil })
-      if eligibleIDs.isEmpty, results.values.contains(where: { $0.status == .ineligible }) {
-        return Self(offering: other, variables: [:])
+    let alternate = offerings.all["weekly_annual_draft"].flatMap { $0.identifier == current.identifier ? nil : $0 }
+    let eligibility = await PaywallEligibility.check(products: products.map(\.productIdentifier), hasAlternate: alternate != nil) { ids in
+      let results = await Purchases.shared.checkTrialOrIntroDiscountEligibility(productIdentifiers: ids)
+      return results.mapValues { result in
+        switch result.status {
+        case .eligible: .eligible
+        case .ineligible: .ineligible
+        default: .unknown
+        }
       }
     }
+    if eligibility.useAlternate, let alternate { return Self(offering: alternate, variables: [:]) }
 
     let locale = Locale(identifier: copy.locale)
     var variables: [String: CustomVariableValue] = [:]
@@ -38,7 +41,7 @@ struct PaywallOffer {
       }
     }
     if let annual = products.first(where: {
-      eligibleIDs.contains($0.productIdentifier) && $0.subscriptionPeriod?.unit == .year && $0.subscriptionPeriod?.value == 1 && $0.introductoryDiscount?.price == 0
+      eligibility.eligible.contains($0.productIdentifier) && $0.subscriptionPeriod?.unit == .year && $0.subscriptionPeriod?.value == 1 && $0.introductoryDiscount?.price == 0
     }), let currency = annual.currencyCode {
       let zero = Decimal.zero.formatted(.currency(code: currency).locale(locale))
       variables["trial_offer"] = .string(copy("paywall.trialOffer", ["zero": zero, "price": annual.localizedPriceString]))

@@ -18,6 +18,7 @@ struct RootView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(Color(.background))
     .foregroundStyle(Color(.foreground))
+    .modifier(SharedInboxReceiver())
     .onOpenURL { url in
       if let link = AppLink(url.absoluteString), link.path != ["sign-in"] { pendingLink = link }
     }
