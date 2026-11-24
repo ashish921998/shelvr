@@ -50,7 +50,7 @@ struct BlankTripView: View {
         }
         TextField(copy("tripPlanner.nameLabel"), text: $name)
           .onChange(of: name) { _, value in
-            if value.utf16.count > 80 { name = String(decoding: value.utf16.prefix(80), as: UTF16.self) }
+            if value.utf16.count > 80 { name = BlankTrip.limitedName(value) }
           }
         Button { choosing = true } label: {
           LabeledContent(copy("tripSetup.chooseCountries"), value: countries.map(countryName).joined(separator: ", "))

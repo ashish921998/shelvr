@@ -12,3 +12,9 @@ import Testing
   let end = try #require(calendar.date(from: .init(year: 2026, month: 11, day: 2)))
   #expect(BlankTrip.dayCount(start: start, end: end, calendar: calendar) == 3)
 }
+
+@Test func limitingTripNamesPreservesWholeCharacters() {
+  let prefix = String(repeating: "a", count: 79)
+  #expect(BlankTrip.limitedName(prefix + "😀") == prefix)
+  #expect(BlankTrip.limitedName(String(repeating: "a", count: 78) + "😀").utf16.count == 80)
+}
