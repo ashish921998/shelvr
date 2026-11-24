@@ -34,10 +34,30 @@ public struct PublicInvite: Codable, Equatable, Identifiable, Sendable {
 }
 
 public struct AcceptedInvite: Codable, Equatable, Sendable {
+  public enum Resolution: Codable, Equatable, Sendable {
+    case joinedList(String)
+    case passportComparison
+  }
+
   public let id: UUID
   public let invite: PublicInvite
   public private(set) var account: String?
+  public private(set) var resolution: Resolution?
   public init(_ invite: PublicInvite) { self.invite = invite; id = UUID() }
+
+  public var destination: AppLink? {
+    switch (invite.kind, resolution) {
+    case (.list, .joinedList(let id)): return invite.destination(listID: id)
+    case (.passport, .passportComparison): return invite.destination()
+    default: return nil
+    }
+  }
+
+  public func resolved(as resolution: Resolution) -> Self {
+    var next = self
+    next.resolution = resolution
+    return next
+  }
 
   public func bound(to user: String) -> Self? {
     guard account == nil || account == user else { return nil }
@@ -200,7 +220,8 @@ public final class InviteEntry {
   }
 
   public func didNavigate(to link: AppLink, account: String?, session: UUID) -> AppLink? {
-    guard destination(account: account, session: session) == link else { return nil }
+    guard destination(account: account, session: session) == link,
+      accepted?.destination == link, replace(with: nil) else { return nil }
     awaitingNavigation = nil
     return takeQueuedLink()
   }

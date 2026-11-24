@@ -124,6 +124,8 @@ import Testing
   #expect(entry.beginDispatch(id, session: session))
   #expect(entry.route(b))
   let target = try #require(invite.destination(listID: "joined"))
+  let resolved = try #require(entry.accepted).resolved(as: .joinedList("joined"))
+  #expect(entry.replace(with: resolved))
   #expect(entry.endDispatch(id, navigation: .init(destination: target, account: "member", session: session)) == nil)
   #expect(entry.didNavigate(to: a, account: "member", session: session) == nil)
   #expect(entry.didNavigate(to: target, account: "member", session: session) == b)
@@ -184,7 +186,8 @@ import Testing
   let id = try #require(entry.accepted?.id)
   #expect(entry.beginDispatch(id, session: initial))
   #expect(entry.route(unrelated))
-  #expect(entry.replace(with: nil))
+  let resolved = try #require(entry.accepted).resolved(as: .passportComparison)
+  #expect(entry.replace(with: resolved))
   #expect(entry.endDispatch(id, navigation: .init(destination: target, account: "first", session: initial)) == nil)
   #expect(entry.destination(account: "first", session: initial) == target)
   #expect(entry.destination(account: "second", session: initial) == nil)
@@ -211,4 +214,44 @@ import Testing
   #expect(entry.accepted?.bound(to: "second") == nil)
   entry.cancel(keepPreview: false)
   #expect(entry.accepted == nil && entry.preview == nil)
+}
+
+
+@MainActor @Test func committedInviteSurvivesRelaunchUntilTheOwningShellAcknowledgesIt() throws {
+  var bytes: Data?
+  var canClear = true
+  func launch() -> InviteEntry {
+    InviteEntry(read: { try bytes.map { try JSONDecoder().decode(AcceptedInvite.self, from: $0) } }, write: { value in
+      guard value != nil || canClear else { throw CocoaError(.fileWriteNoPermission) }
+      bytes = try value.map { try JSONEncoder().encode($0) }
+    })
+  }
+  let link = try #require(AppLink("/list-invite/one"))
+  let invite = try #require(PublicInvite(link))
+  let first = launch()
+  #expect(first.route(link))
+  first.accept(invite, account: "member")
+  let resolved = try #require(first.accepted).resolved(as: .joinedList("joined"))
+  let id = resolved.id
+  #expect(first.replace(with: resolved))
+
+  let restored = launch()
+  #expect(restored.accepted == resolved)
+  #expect(restored.accepted?.bound(to: "other") == nil)
+  let target = try #require(restored.accepted?.destination)
+  let session = UUID()
+  #expect(restored.beginDispatch(id, session: session))
+  #expect(restored.endDispatch(id, navigation: .init(destination: target, account: "member", session: session)) == nil)
+
+  canClear = false
+  _ = restored.didNavigate(to: target, account: "member", session: session)
+  #expect(restored.failed)
+  #expect(restored.destination(account: "member", session: session) == target)
+  #expect(launch().accepted == resolved)
+
+  canClear = true
+  _ = restored.didNavigate(to: target, account: "member", session: session)
+  #expect(!restored.failed)
+  #expect(restored.destination(account: "member", session: session) == nil)
+  #expect(launch().accepted == nil)
 }
