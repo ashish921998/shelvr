@@ -21,10 +21,9 @@ final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCente
 
   private func silence() {
     UIApplication.shared.unregisterForRemoteNotifications()
-    let center = UNUserNotificationCenter.current()
-    center.getDeliveredNotifications { delivered in
+    UNUserNotificationCenter.current().getDeliveredNotifications { delivered in
       let ids = delivered.map(\.request).filter { !Self.isLocalTrial($0) }.map(\.identifier)
-      center.removeDeliveredNotifications(withIdentifiers: ids)
+      UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ids)
     }
   }
 
