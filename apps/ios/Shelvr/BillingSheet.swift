@@ -35,6 +35,8 @@ private enum BillingFailure: Error { case unavailable }
 
 struct BillingSheet: View {
   let destination: BillingDestination
+  var goalVariables: [String: String] = [:]
+  var unavailable: () -> Void = {}
   var confirmed: () -> Void = {}
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
@@ -63,7 +65,7 @@ struct BillingSheet: View {
         CustomerCenterView()
       } else if let offer, userID != nil {
         PaywallView(offering: offer.offering, displayCloseButton: true)
-          .customPaywallVariables(offer.variables)
+          .customPaywallVariables(offer.variables.merging(goalVariables.mapValues(CustomVariableValue.string)) { $1 })
           .onRequestedDismissal { if !syncing { dismiss() } }
           .onPurchaseCompleted { info in finish(info) }
           .onRestoreCompleted { info in finish(info) }
@@ -90,7 +92,7 @@ struct BillingSheet: View {
           userID = id
           return
         }
-      } catch { if !Task.isCancelled { failed = true } }
+      } catch { if !Task.isCancelled { failed = true; unavailable() } }
     }
   }
 
