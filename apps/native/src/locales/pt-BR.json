@@ -231,6 +231,8 @@
   "pro.unlockShelvr": "Desbloquear Shelvr Pro",
   "share.openToFinish": "Abra o Shelvr após compartilhar para concluir o salvamento.",
   "share.openToSignIn": "Abra o Shelvr e entre na sua conta antes de compartilhar.",
+  "share.copyNote": "Copiar nota",
+  "share.longNoteRecovery": "Esta nota é muito longa para o Shelvr. Copie o texto antes de excluí-la.",
   "share.reading": "Lendo conteúdo compartilhado…",
   "share.empty": "Nada para salvar",
   "share.pending": "Alguns itens ainda estão pendentes.",

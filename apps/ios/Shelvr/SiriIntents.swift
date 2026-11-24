@@ -5,7 +5,7 @@ import ShelvrKit
 import UniformTypeIdentifiers
 
 private struct SiriNoteTooLong: LocalizedError {
-  var errorDescription: String? { String(localized: "Use a note of 20,000 characters or fewer.") }
+  var errorDescription: String? { String(localized: "This note is too long. Shorten it and try again.") }
 }
 
 private enum SiriSave {

@@ -230,6 +230,8 @@
   "pro.unlockShelvr": "Unlock Shelvr Pro",
   "share.openToFinish": "Open Shelvr to finish saving after you share.",
   "share.openToSignIn": "Open Shelvr and sign in before sharing.",
+  "share.copyNote": "Copy note",
+  "share.longNoteRecovery": "This note is too long for Shelvr. Copy its text before deleting it.",
   "share.reading": "Reading shared content…",
   "share.empty": "Nothing to save",
   "share.pending": "Some items are still pending.",
