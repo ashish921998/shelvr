@@ -307,6 +307,9 @@ private struct OnboardingAccount: View {
       let label = "paywallGoal." + goal + suffix + (noCity ? "NoCity" : "")
       values[key] = cityName == nil && suffix == "AnswerTwo" ? "" : copy(label, ["city": cityName ?? ""])
     }
+    if !progress.visitedCities.isEmpty {
+      values["goal_headline"] = copy("passport.paywallHeadline", count: progress.visitedCities.count)
+    }
     return values
   }
 
