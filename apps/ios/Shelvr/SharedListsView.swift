@@ -2,6 +2,7 @@ import ShelvrKit
 import SwiftUI
 
 struct SharedListsView: View {
+  var collections = false
   @Environment(\.copy) private var copy
 
   var body: some View {
@@ -20,7 +21,13 @@ struct SharedListsView: View {
         if rows.isEmpty { ContentUnavailableView(copy("sharedLists.title"), systemImage: "person.2",
           description: Text(copy("sharedLists.hint"))) }
       }
-    }.navigationTitle(copy("sharedLists.title"))
+    }
+    .navigationTitle(copy(collections ? "homePlaces.collections" : "sharedLists.title"))
+    .toolbar {
+      if let route = AppLink("/new-shared-list") {
+        NavigationLink(value: route) { Label(copy(collections ? "homePlaces.newCollection" : "sharedLists.newList"), systemImage: "plus") }
+      }
+    }
   }
 }
 
@@ -51,7 +58,7 @@ struct JoinListView: View {
               Task {
                 defer { busy = false }
                 do {
-                  if let id = try await backend.joinList(token: token) { open("/shared-list/" + id) }
+                  if let id = try await backend.joinList(token: token) { open("/shared-list/" + id + "?joined=1") }
                   else { expired = true }
                 } catch { failed = true }
               }
@@ -70,26 +77,76 @@ struct JoinListView: View {
 
 struct SharedListView: View {
   let id: String
+  var joined = false
+  @Environment(MemberNamePrompts.self) private var prompts
+  @State private var askingName = false
+  @State private var selectedCity: String?
+  @State private var presentedNewPlaces: Set<String> = []
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var failed = false
   @State private var writing: Set<String> = []
+  @State private var add = false
+  @State private var removal: Removal?
+  @State private var operation = SocialOperation()
+  @Environment(\.dismiss) private var dismiss
+
+  private struct Removal {
+    let title, message, confirm: String
+    let apply: @MainActor () async throws -> Void
+  }
 
   var body: some View {
     SocialQuery(query: "sharedLists:getSharedList", arguments: ["listId": id], type: SharedListDetail?.self) { detail in
       if let detail {
+        let fresh = detail.cities.first { city in detail.places.contains { $0.isNew && PassportSection.cityKey($0.city) == PassportSection.cityKey(city) } }
+        let city = selectedCity.flatMap { detail.cities.contains($0) ? $0 : nil } ?? fresh ?? detail.cities.first ?? ""
+        let places = detail.places.filter { PassportSection.cityKey($0.city) == PassportSection.cityKey(city) }
         List {
           Section {
             ShareLink(item: detail.inviteURL(preview: backend.environment.variant == .development)) {
               Label(copy("sharedLists.invite"), systemImage: "person.badge.plus")
             }
             ForEach(detail.members) { member in
-              Text(member.isYou ? copy("sharedLists.you") : member.firstName ?? copy("sharedLists.someone"))
+              let name = member.isYou ? copy("sharedLists.you") : member.firstName ?? copy("sharedLists.someone")
+              Text(name).swipeActions {
+                if detail.isOwner && !member.isYou {
+                  Button(copy("sharedLists.removeMember"), role: .destructive) {
+                    removal = Removal(title: copy("sharedLists.removeMemberTitle", ["name": name]),
+                      message: copy("sharedLists.removeMemberBody"), confirm: copy("sharedLists.removeMember")) {
+                      try await backend.removeMember(member.id, from: id)
+                    }
+                  }
+                }
+              }
             }
           } footer: { Text(copy("sharedLists.inviteHint")) }
+          if detail.cities.count > 1 {
+            Picker(copy("homePlaces.cities"), selection: Binding(get: { city }, set: { selectedCity = $0 })) {
+              ForEach(detail.cities, id: \.self) { Text($0).tag($0) }
+            }
+          }
+          if !places.isEmpty {
+            Section {
+              plan(trip: false, city: city, title: "homePlaces.planDate")
+              if places.contains(where: { !($0.wentBy?.contains { $0.isYou } ?? ($0.visitedAt != nil)) }) {
+                plan(trip: true, city: city, title: "homePlaces.planTrip")
+              }
+            }
+          }
+          if let trips = detail.trips, !trips.isEmpty {
+            Section(copy("sharedLists.trips")) {
+              ForEach(trips) { trip in
+                if let link = AppLink("/trip-plan/" + trip.id) {
+                  NavigationLink(trip.name ?? copy("tripPlanner.tripTitle", ["city": trip.city]), value: link)
+                }
+              }
+            }
+          }
           Section(copy("sharedLists.onList")) {
-            if detail.places.isEmpty { Text(copy("sharedLists.emptyBody")).foregroundStyle(.secondary) }
-            ForEach(detail.places) { place in
+            Button(copy("tripPlanner.addPlace")) { add = true }
+            if places.isEmpty { Text(copy("sharedLists.emptyBody")).foregroundStyle(.secondary) }
+            ForEach(places) { place in
               HStack {
                 VStack(alignment: .leading) {
                   Text(place.name)
@@ -114,12 +171,33 @@ struct SharedListView: View {
                   .accessibilityLabel(copy("passport.stampPlaceLabel", ["name": place.name]))
                   .accessibilityAddTraits(place.went ? .isSelected : [])
               }
+              .swipeActions {
+                Button(copy("sharedLists.removeFromList"), role: .destructive) {
+                  removal = Removal(title: place.name, message: copy("sharedLists.removeFromList"),
+                    confirm: copy("sharedLists.removeFromList")) { try await backend.removeListPlace(place.id) }
+                }
+              }
+            }
+          }
+          Button(copy("sharedLists.leave"), role: .destructive) {
+            removal = Removal(title: copy("sharedLists.leaveTitle", ["name": detail.name]),
+              message: copy("sharedLists.leaveBody"), confirm: copy("sharedLists.leave")) {
+              try await backend.leaveList(id)
+              dismiss()
             }
           }
         }
+        .sheet(isPresented: $add) { AddListPlaceView(detail: detail, initialCity: city) }
         .navigationTitle(detail.name)
+        .onChange(of: city, initial: true) { _, value in
+          if selectedCity != value { selectedCity = value }
+        }
+        .onChange(of: places.filter(\.isNew).map(\.id), initial: true) { _, visible in
+          presentedNewPlaces.formUnion(visible)
+        }
         .onDisappear {
-          guard detail.places.contains(where: \.isNew), backend.status == .signedIn else { return }
+          let newIDs = Set(detail.places.filter(\.isNew).map(\.id))
+          guard !newIDs.isEmpty, newIDs.isSubset(of: presentedNewPlaces), backend.status == .signedIn else { return }
           Task { try? await backend.listSeen(detail._id) }
         }
       } else {
@@ -127,6 +205,28 @@ struct SharedListView: View {
           description: Text(copy("sharedLists.goneBody")))
       }
     }
+    .sheet(isPresented: $askingName) { MemberNamePrompt(creating: false) {} }
+    .task(id: id) {
+      guard joined else { return }
+      do {
+        for try await name in backend.query("users:getMyFirstName", as: String?.self) {
+          try Task.checkCancellation()
+          if name == nil { askingName = prompts.claim(for: backend.sessionGeneration) }
+          break
+        }
+      } catch {}
+    }
+    .confirmationDialog(removal?.title ?? "", isPresented: Binding(get: { removal != nil }, set: { if !$0 { removal = nil } }),
+      titleVisibility: .visible, presenting: removal) { action in
+      Button(action.confirm, role: .destructive) { operation.run(action.apply) }
+      Button(copy("common.cancel"), role: .cancel) {}
+    } message: { Text($0.message) }
+    .socialOperation(operation, failure: copy("sharedLists.failed"), close: copy("common.close"))
     .alert(copy("sharedLists.failed"), isPresented: $failed) { Button(copy("common.close")) {} }
+  }
+  @ViewBuilder private func plan(trip: Bool, city: String, title: String) -> some View {
+    if let link = SharedListDetail.planLink(trip: trip, city: city, list: id) {
+      NavigationLink(copy(title), value: link)
+    }
   }
 }

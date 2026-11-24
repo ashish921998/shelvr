@@ -15,3 +15,22 @@ import Testing
   #expect(row.places.map(\.went) == [false, true, false])
   #expect(AppLink(row.inviteURL(preview: false).absoluteString)?.path == ["list-invite", "abc"])
 }
+
+@Test func remoteSearchRecognizesANearbyNamesakeWithOneAppleID() throws {
+  let json = """
+    {"_id":"one","name":"Santa Joana","city":"Lisboa","addedByYou":true,"isNew":false,
+    "itemId":"save","lat":38.721,"lng":-9.14}
+    """
+  let place = try JSONDecoder().decode(SharedListDetail.Place.self, from: Data(json.utf8))
+  #expect(place.matches(name: "Locke de Santa Joana", lat: 38.72, lng: -9.14, apple: "A-1", item: nil))
+  #expect(!place.matches(name: "Santa Joana", lat: 38.8, lng: -9.14, apple: "A-1", item: nil))
+}
+
+@Test func listPlansCarryTheListAndChosenCityIntoBothPlanners() {
+  for trip in [false, true] {
+    let link = SharedListDetail.planLink(trip: trip, city: "Rio + São Paulo", list: "list")
+    #expect(link?.path == [trip ? "new-trip" : "go-out"])
+    #expect(link?.query.first { $0.name == "city" }?.value == "Rio + São Paulo")
+    #expect(link?.query.first { $0.name == "listId" }?.value == "list")
+  }
+}

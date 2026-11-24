@@ -3,11 +3,14 @@ import SwiftUI
 
 struct PassportView: View {
   var cardCity: String?
+  var open: ((String) -> Void)?
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var stamps: [PassportStamp]?
   @State private var cities: [PassportCityStamp]?
   @State private var completion: [PassportCompletion] = []
+  @State private var selected: PassportStamp?
+  @State private var afterStamp: String?
   @State private var errors = Set<String>()
   @State private var retry = 0
 
@@ -28,6 +31,9 @@ struct PassportView: View {
               count(counts.cities, "passport.cities")
               if counts.countries > 0 { count(counts.countries, "passport.countries") }
             }
+            if let cities, !errors.contains("placeVisits:cityCompletion") {
+              PassportBadgeView(cities: cities, completion: completion)
+            }
             if !pages.standalone.isEmpty {
               Section(copy("cityStamps.title")) {
                 ForEach(pages.standalone) { city in
@@ -35,12 +41,24 @@ struct PassportView: View {
                 }
               }
             }
+            if let already = AppLink("/already-been") {
+              NavigationLink(value: already) { Label(copy("passport.beenSomewhere"), systemImage: "checkmark.seal") }
+            }
             ForEach(sections) { section in
               Section {
                 ForEach(section.places) { stamp in
-                  if let item = stamp.itemId, let link = AppLink("/item/" + item) {
-                    NavigationLink(value: link) { stampRow(stamp) }
-                  } else { stampRow(stamp) }
+                  Button { selected = stamp } label: { stampRow(stamp) }.buttonStyle(.plain)
+                }
+                if let city = section.city, let counts = section.completion, counts.stamped < counts.total {
+                  var url: URLComponents {
+                    var parts = URLComponents()
+                    parts.path = "/next-to-stamp"
+                    parts.queryItems = [URLQueryItem(name: "city", value: city)]
+                    return parts
+                  }
+                  if let link = url.string.flatMap({ AppLink($0) }) {
+                    NavigationLink(copy("passport.nextTitle"), value: link)
+                  }
                 }
                 if let city = section.city, !section.places.isEmpty {
                   NavigationLink {
@@ -70,6 +88,15 @@ struct PassportView: View {
     }
     .safeAreaInset(edge: .bottom) {
       if !errors.isEmpty { Button(copy("common.retry")) { retry += 1 } }
+    }
+    .sheet(item: $selected, onDismiss: {
+      if let afterStamp { self.afterStamp = nil; open?(afterStamp) }
+    }) { stamp in
+      StampDetail(stamp: stamp) { route in
+        guard selected?.id == stamp.id else { return }
+        afterStamp = route
+        selected = nil
+      }
     }
     .navigationTitle(cardCity ?? copy("passport.title"))
     .toolbar {
