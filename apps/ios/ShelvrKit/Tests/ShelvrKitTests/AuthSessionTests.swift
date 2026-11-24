@@ -36,7 +36,9 @@ struct AuthSessionTests {
   @Test func storedTokensAreRefreshedBeforeFirstUse() async throws {
     vault.write(tokens("a"))
     let transport = FakeTransport([.respond(SignInResponse(tokens: tokens("b")))])
-    #expect(try await session(transport).validToken() == tokens("b").token)
+    let auth = session(transport)
+    await auth.restore()
+    #expect(try await auth.validToken() == tokens("b").token)
   }
 
   @Test func concurrentCallersShareOneRefresh() async throws {
@@ -44,6 +46,7 @@ struct AuthSessionTests {
     let transport = FakeTransport(
       [.respond(SignInResponse(tokens: tokens("b")))], delay: .milliseconds(50))
     let auth = session(transport)
+    await auth.restore()
     async let first = auth.validToken()
     async let second = auth.validToken()
     #expect(try await [first, second] == [tokens("b").token, tokens("b").token])
@@ -55,6 +58,7 @@ struct AuthSessionTests {
     let gate = Gate()
     let transport = FakeTransport([.respond(SignInResponse(tokens: tokens("b")))], gate: gate)
     let auth = session(transport)
+    await auth.restore()
     async let first = try? auth.validToken()
     try await eventually { transport.requests.count == 1 }
     async let second = try? auth.validToken()
@@ -70,6 +74,7 @@ struct AuthSessionTests {
   @Test func refusedRefreshSignsOut() async throws {
     vault.write(tokens("a"))
     let auth = session(FakeTransport([.respond(SignInResponse(tokens: nil))]))
+    await auth.restore()
     #expect(try await auth.validToken() == nil)
     #expect(await auth.isSignedIn == false)
     #expect(vault.tokens == nil)
@@ -78,6 +83,7 @@ struct AuthSessionTests {
   @Test func offlineRefreshFallsBackToTheStoredTokenAndKeepsTheSession() async throws {
     vault.write(tokens("a"))
     let auth = session(FakeTransport([.fail]))
+    await auth.restore()
     #expect(try await auth.validToken() == tokens("a").token)
     #expect(vault.tokens == tokens("a"))
   }
@@ -168,16 +174,18 @@ struct AuthSessionTests {
     let marker = temporarySignOutMarker()
     defer { try? marker.clear() }
     let vault = MemoryVault(tokens("a"), canDelete: canDeleteNative)
-    let legacy = LegacyStore("expo", canForget: canDeleteLegacy)
+    let legacy = LegacyStore(nil, canForget: canDeleteLegacy)
+    let expoAtRelaunch = LegacyStore("expo", canForget: canDeleteLegacy)
     let transport = FakeTransport([], failSignOut: true)
     let auth = AuthSession(transport: transport, vault: vault, legacy: legacy, signOutMarker: marker)
+    await auth.restore()
     #expect(await auth.isSignedIn)
     try await auth.signOut()
     #expect(await auth.isSignedIn == false)
     #expect(transport.signOuts == [tokens("a").token])
     #expect(marker.state == .pending)
 
-    let relaunched = AuthSession(transport: transport, vault: vault, legacy: legacy, signOutMarker: marker)
+    let relaunched = AuthSession(transport: transport, vault: vault, legacy: expoAtRelaunch, signOutMarker: marker)
     await relaunched.restore()
     #expect(await relaunched.isSignedIn == false)
     #expect(try await relaunched.validToken() == nil)
@@ -206,6 +214,7 @@ struct AuthSessionTests {
     let vault = MemoryVault(tokens("old"), canDelete: false)
     let transport = FakeTransport([.respond(SignInResponse(tokens: tokens("new")))], failSignOut: true)
     let auth = AuthSession(transport: transport, vault: vault, signOutMarker: marker)
+    await auth.restore()
     try await auth.signOut()
     #expect(marker.state == .pending)
 
@@ -213,6 +222,7 @@ struct AuthSessionTests {
     #expect(marker.state == .absent)
     #expect(vault.tokens == tokens("new"))
     let relaunched = AuthSession(transport: transport, vault: vault, signOutMarker: marker)
+    await relaunched.restore()
     #expect(await relaunched.isSignedIn)
   }
 

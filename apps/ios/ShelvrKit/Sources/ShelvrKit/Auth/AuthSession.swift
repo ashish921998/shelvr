@@ -38,10 +38,7 @@ actor AuthSession {
   private let legacy: (any LegacySessionStore)?
   private let signOutMarker: SignOutMarker?
   private let now: @Sendable () -> Date
-  private var waitingForStorage: Bool
-  private var tokens: AuthTokens?
-  private var freshUntil: Date?
-  private var mintedAt: Date?
+  private var held: (tokens: AuthTokens, receivedAt: Date?)?
   private var refresh: Task<AuthTokens?, Error>?
   private var lastReconnect: (token: String, at: Date)?
 
@@ -57,12 +54,10 @@ actor AuthSession {
     self.legacy = legacy
     self.signOutMarker = signOutMarker
     self.now = now
-    let markerState = signOutMarker?.state ?? .absent
-    self.waitingForStorage = markerState == .inaccessible
-    self.tokens = markerState == .absent ? vault.read() : nil
   }
 
-  var isSignedIn: Bool { tokens != nil }
+  private var tokens: AuthTokens? { held?.tokens }
+  var isSignedIn: Bool { held != nil }
 
   func signIn(_ credential: SignInCredential) async throws {
     let response = try await transport.signIn(credential.request)
@@ -71,7 +66,6 @@ actor AuthSession {
       throw AuthSessionError.sessionStorageUnavailable
     }
     try signOutMarker?.clear()
-    waitingForStorage = false
     setTokens(fresh)
   }
 
@@ -88,16 +82,12 @@ actor AuthSession {
   func restore() {
     switch signOutMarker?.state ?? .absent {
     case .pending:
-      waitingForStorage = false
       clearStoredSession()
       return
     case .inaccessible:
       return
     case .absent:
-      if waitingForStorage {
-        waitingForStorage = false
-        tokens = vault.read()
-      }
+      if held == nil { held = vault.read().map { ($0, nil) } }
     }
     guard let legacy, let refreshToken = legacy.refreshToken() else { return }
     let handoff = AuthTokens(token: "", refreshToken: refreshToken)
@@ -106,12 +96,10 @@ actor AuthSession {
     legacy.forget()
   }
 
-  func validToken(minimumLifetime: TimeInterval = 300, reconnecting: Bool = false) async throws
-    -> String?
-  {
-    guard let current = tokens else { return nil }
-    let refresh = reconnecting && wasRefused(current.token)
-    let token = try await token(current, minimumLifetime: minimumLifetime, refresh: refresh)
+  func validToken(reconnecting: Bool = false) async throws -> String? {
+    guard let current = held else { return nil }
+    let refresh = reconnecting && wasRefused(current.tokens.token)
+    let token = try await token(current, refresh: refresh)
     if reconnecting { lastReconnect = token.map { ($0, now()) } }
     return token
   }
@@ -120,16 +108,18 @@ actor AuthSession {
     guard let last = lastReconnect, last.token == token, now().timeIntervalSince(last.at) < 20 else {
       return false
     }
-    guard let mintedAt else { return true }
-    let age = now().timeIntervalSince(mintedAt)
+    guard let receivedAt = held?.receivedAt else { return true }
+    let age = now().timeIntervalSince(receivedAt)
     return age > 60 || age < 0
   }
 
-  private func token(_ current: AuthTokens, minimumLifetime: TimeInterval, refresh: Bool) async throws
+  private func token(_ current: (tokens: AuthTokens, receivedAt: Date?), refresh: Bool) async throws
     -> String?
   {
-    if !refresh, let freshUntil, freshUntil.timeIntervalSince(now()) > minimumLifetime {
-      return current.token
+    if !refresh, let receivedAt = current.receivedAt, let lifetime = current.tokens.lifetime,
+      receivedAt.addingTimeInterval(lifetime).timeIntervalSince(now()) > 300
+    {
+      return current.tokens.token
     }
     do {
       return try await refreshed()?.token
@@ -175,8 +165,6 @@ actor AuthSession {
   }
 
   private func setTokens(_ fresh: AuthTokens?) {
-    tokens = fresh
-    mintedAt = fresh.map { _ in now() }
-    freshUntil = fresh?.lifetime.map { now().addingTimeInterval($0) }
+    held = fresh.map { ($0, now()) }
   }
 }
