@@ -39,8 +39,10 @@ public struct ImportPhoto: Sendable {
   }
 }
 
+public enum PhotoSource: String { case picker = "photo_import", share = "share_extension", siri }
+
 extension Backend {
-  public func savePhoto(_ photo: ImportPhoto, operationID: String, fromShare: Bool = false) async throws -> String {
+  public func savePhoto(_ photo: ImportPhoto, operationID: String, source: PhotoSource = .picker) async throws -> String {
     struct Begin: Decodable {
       let kind: String
       let itemId: String?
@@ -64,7 +66,7 @@ extension Backend {
     guard attached.error == nil else { throw URLError(.badServerResponse) }
     return try await client.mutation("items:finalizeImageImport", with: [
       "operationId": operationID, "aspectRatio": photo.aspectRatio,
-      "saveSource": fromShare ? "share_extension" : "photo_import"
+      "saveSource": source.rawValue
     ])
   }
 }

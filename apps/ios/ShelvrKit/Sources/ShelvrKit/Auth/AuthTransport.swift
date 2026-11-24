@@ -61,10 +61,15 @@ public struct ConvexHTTPAuthTransport: AuthTransport {
     _ = try await call("auth:signOut", args: [String: String](), token: token, returning: Ignored.self)
   }
 
+  func revokeSiri(_ capture: String, authorization: String) async throws {
+    _ = try await call("appIntents:revokeCaptureToken", args: ["token": capture], token: authorization,
+      returning: Ignored.self, mutation: true)
+  }
+
   private func call<Args: Encodable, Value: Decodable>(
-    _ path: String, args: Args, token: String? = nil, returning: Value.Type
+    _ path: String, args: Args, token: String? = nil, returning: Value.Type, mutation: Bool = false
   ) async throws -> Value? {
-    var http = URLRequest(url: endpoint)
+    var http = URLRequest(url: mutation ? endpoint.deletingLastPathComponent().appending(path: "mutation") : endpoint)
     http.httpMethod = "POST"
     http.setValue("application/json", forHTTPHeaderField: "Content-Type")
     if let token { http.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }

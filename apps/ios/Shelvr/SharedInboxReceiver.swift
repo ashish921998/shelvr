@@ -76,7 +76,11 @@ struct SharedInboxReceiver: ViewModifier {
     switch payload.kind {
     case .link:
       let _: String = try await backend.client.mutation("items:createLinkItem", with: [
-        "url": payload.value, "operationId": payload.operationID, "saveSource": "share_extension"
+        "url": payload.value, "operationId": payload.operationID, "saveSource": payload.siri == true ? "siri" : "share_extension"
+      ])
+    case .note:
+      let _: String = try await backend.client.mutation("items:createNoteItem", with: [
+        "text": payload.value, "operationId": payload.operationID, "saveSource": "siri"
       ])
     case .image:
       guard UUID(uuidString: payload.value) != nil else { throw CocoaError(.fileReadCorruptFile) }
@@ -84,7 +88,7 @@ struct SharedInboxReceiver: ViewModifier {
       let photo = try await Task.detached { try ImportPhoto(Data(contentsOf: imageURL, options: .mappedIfSafe)) }.value
       try Task.checkCancellation()
       guard backend.status == .signedIn, inbox.activeOwner == owner else { throw CancellationError() }
-      _ = try await backend.savePhoto(photo, operationID: payload.operationID, fromShare: true)
+      _ = try await backend.savePhoto(photo, operationID: payload.operationID, source: payload.siri == true ? .siri : .share)
     }
   }
 }

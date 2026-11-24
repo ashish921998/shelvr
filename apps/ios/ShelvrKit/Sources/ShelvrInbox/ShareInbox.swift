@@ -2,15 +2,17 @@ import CoreFoundation
 import Foundation
 
 public struct InboxPayload: Codable, Sendable {
-  public enum Kind: String, Codable, Sendable { case link, image }
+  public enum Kind: String, Codable, Sendable { case link, image, note }
   public let kind: Kind
   public let value: String
   public let operationID: String
+  public let siri: Bool?
 
-  public init(kind: Kind, value: String) {
+  public init(kind: Kind, value: String, operationID: String = "share:\(UUID().uuidString)", siri: Bool = false) {
     self.kind = kind
     self.value = value
-    self.operationID = "share:\(UUID().uuidString)"
+    self.operationID = operationID
+    self.siri = siri
   }
 }
 

@@ -94,13 +94,13 @@ enum ShelvrCapture {
   /// Pass the same `operationId` to the app when queuing a failed save, so a save the server
   /// committed before its reply was lost is recognized instead of saved again.
   static func save(
-    kind: String, text: String? = nil, url: String? = nil, spaceId: String? = nil, operationId: String
+    kind: String, text: String? = nil, url: String? = nil, spaceId: String? = nil, operationId: String, credentials: Credentials? = nil
   ) async throws -> String {
     var body: [String: Any] = ["kind": kind, "operationId": operationId]
     body["text"] = text
     body["url"] = url
     body["spaceId"] = spaceId
-    let json = try await post(path: "/app-intents/capture", body: body)
+    let json = try await post(path: "/app-intents/capture", body: body, credentials: credentials)
     guard let itemId = json["itemId"] as? String else {
       throw Failure.badResponse
     }
@@ -111,9 +111,9 @@ enum ShelvrCapture {
   /// pixels (the user's words, text read on the device); it steers the classifier only.
   static func saveImage(
     _ data: Data, contentType: String, aspectRatio: Double?, isSticker: Bool = false,
-    spaceId: String? = nil, context: String? = nil, operationId: String
+    spaceId: String? = nil, context: String? = nil, operationId: String, credentials: Credentials? = nil
   ) async throws -> String {
-    let begin = try await post(path: "/app-intents/image/begin", body: ["operationId": operationId])
+    let begin = try await post(path: "/app-intents/image/begin", body: ["operationId": operationId], credentials: credentials)
     if let itemId = begin["itemId"] as? String {
       return itemId
     }
@@ -139,7 +139,7 @@ enum ShelvrCapture {
     body["isSticker"] = isSticker ? true : nil
     body["spaceId"] = spaceId
     body["context"] = context?.isEmpty == false ? context : nil
-    let finish = try await post(path: "/app-intents/image/finish", body: body)
+    let finish = try await post(path: "/app-intents/image/finish", body: body, credentials: credentials)
     guard let itemId = finish["itemId"] as? String else {
       throw Failure.badResponse
     }
@@ -147,8 +147,8 @@ enum ShelvrCapture {
   }
 
   /// POSTs JSON to a capture endpoint with the device's token and returns the JSON reply.
-  private static func post(path: String, body: [String: Any]) async throws -> [String: Any] {
-    guard let credentials = load(), isAllowedOrigin(credentials.siteUrl),
+  private static func post(path: String, body: [String: Any], credentials explicit: Credentials?) async throws -> [String: Any] {
+    guard let credentials = explicit ?? load(), isAllowedOrigin(credentials.siteUrl),
       let endpoint = URL(string: credentials.siteUrl.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + path) else {
       throw Failure.signedOut
     }
@@ -169,7 +169,7 @@ enum ShelvrCapture {
       return json
     case 401:
       // The token was revoked (sign-out, account deletion) or never existed server-side.
-      clear()
+      if explicit == nil, load()?.token == credentials.token { clear() }
       throw Failure.signedOut
     case 402:
       throw Failure.proRequired

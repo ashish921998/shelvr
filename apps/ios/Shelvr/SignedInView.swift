@@ -65,6 +65,8 @@ struct SignedInView: View {
         case "go-out": PlanCityView()
         case "add": PasteLinkView()
         case "photo": PhotoSaveView()
+        case "how-to-share": SaveInstructions(siri: false)
+        case "save-with-siri": SaveInstructions(siri: true)
         default: ShellDestination(link: link)
         }
       }

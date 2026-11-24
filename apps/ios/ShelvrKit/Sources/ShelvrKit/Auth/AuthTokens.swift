@@ -14,6 +14,7 @@ public struct AuthTokens: Codable, Sendable, Equatable {
 
 enum JWT {
   struct Claims: Decodable {
+    let sub: String?
     let iat: TimeInterval
     let exp: TimeInterval
   }
