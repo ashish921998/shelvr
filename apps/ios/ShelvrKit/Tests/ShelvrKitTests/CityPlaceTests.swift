@@ -44,3 +44,42 @@ import Testing
   #expect(date.nextRound([0], from: 2, to: 3) == [0, 2])
   #expect(date.swap(start, first: false, tried: []) == nil)
 }
+
+@Test func voteReuseRequiresTheSameUniquePlacesAndAnUnexpiredLink() throws {
+  let data = Data("""
+    {"token":"sample","voters":1,"expiresAt":1000,"places":[
+      {"key":"p0","name":"Café","itemId":"a","picks":1,"passes":0}]}
+    """.utf8)
+  let votes = try JSONDecoder().decode(CityVotes.self, from: data)
+  let exact = CityPlace(itemID: "a", name: "Cafe", lat: 0, lng: 0)
+  let replacement = CityPlace(itemID: "b", name: "Cafe", lat: 0, lng: 0)
+  #expect(votes.sameSelection([exact, exact], among: [exact]))
+  #expect(votes.sameSelection([replacement], among: [replacement]))
+  #expect(!votes.sameSelection([replacement], among: [exact, replacement]))
+  #expect(votes.isOpen(at: Date(timeIntervalSince1970: 0.9)))
+  #expect(!votes.isOpen(at: Date(timeIntervalSince1970: 1)))
+}
+
+@Test func swiftUsesTheCityVoteAndDateResultsGeneratedByExpo() throws {
+  struct Vectors: Decodable {
+    struct Expected: Decodable {
+      let keys: [String]
+      let same: [Bool]
+      let swaps: [Int?]
+    }
+    let pins: [CityPlace]
+    let link: CityVotes
+    let cases: [[Int]]
+    let date: CityDate
+    let rounds: [[Int]]
+    let expected: Expected
+  }
+  let url = URL(filePath: #filePath).deletingLastPathComponent().appending(path: "../../../TestData/city-rules.json")
+  let vectors = try JSONDecoder().decode(Vectors.self, from: Data(contentsOf: url))
+  #expect(vectors.pins.map { CityPlace.key($0.name) } == vectors.expected.keys)
+  #expect(vectors.cases.map { indices in
+    vectors.link.sameSelection(indices.map { vectors.pins[$0] }, among: vectors.pins)
+  } == vectors.expected.same)
+  let evening = try #require(vectors.date.evenings.first)
+  #expect(vectors.rounds.map { vectors.date.swap(evening, first: true, tried: Set($0))?.first } == vectors.expected.swaps)
+}
