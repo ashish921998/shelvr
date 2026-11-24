@@ -77,14 +77,12 @@ struct PassportActions: View {
   }
 }
 
-private struct PassportCityPicker: View {
+struct PassportCityPicker: View {
   let cities: [PassportCityStamp]
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.dismiss) private var dismiss
-  @State private var working: String?
-  @State private var failureKey = "cityStamps.saveFailed"
-  @State private var failed = false
+  @State private var operation = SocialOperation()
   @State private var search = ""
 
   var body: some View {
@@ -94,26 +92,16 @@ private struct PassportCityPicker: View {
       List(choices) { city in
         let selected = held.contains(city.id)
         Button {
-          guard working == nil else { return }
-          working = city.id
-          Task {
-            defer { working = nil }
-            do { _ = try await backend.changeCityStamp(city.id, add: !selected) }
-            catch {
-              failureKey = SaveFailure(error) == .proRequired ? "cityStamps.lockedHint" : "cityStamps.saveFailed"
-              failed = true
-            }
-          }
+          operation.run { _ = try await backend.changeCityStamp(city.id, add: !selected) }
         } label: {
           HStack {
             Text(copy(city.labelKey))
             Spacer()
-            if working == city.id { ProgressView() }
-            else if selected { Image(systemName: "checkmark.seal.fill") }
+            if selected { Image(systemName: "checkmark.seal.fill") }
           }
         }
         .accessibilityAddTraits(selected ? .isSelected : [])
-        .disabled(working != nil)
+        .disabled(operation.busy)
       }
       .overlay { if choices.isEmpty { Text(copy("cityStamps.noMatch")) } }
       .searchable(text: $search)
@@ -121,7 +109,7 @@ private struct PassportCityPicker: View {
       .toolbar {
         ToolbarItem(placement: .confirmationAction) { Button(copy("common.close")) { dismiss() } }
       }
-      .alert(copy(failureKey), isPresented: $failed) { Button(copy("common.close")) {} }
+      .socialOperation(operation, failure: copy("cityStamps.saveFailed"), close: copy("common.close"))
     }
   }
 }
