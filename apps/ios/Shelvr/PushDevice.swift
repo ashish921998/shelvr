@@ -6,6 +6,13 @@ import UserNotifications
 final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate, ObservableObject {
   @Published var token: Data?
   @Published var link: AppLink?
+  @Published var authorizationRevision = 0
+
+  func suspendEnrollment() {
+    UIApplication.shared.unregisterForRemoteNotifications()
+    UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+    if token != nil { token = nil }
+  }
 
   func application(_ application: UIApplication,
     didFinishLaunchingWithOptions options: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
@@ -49,32 +56,50 @@ struct PushRegistrationView: ViewModifier {
     let token: Data?
     let session: UUID
     let active: Bool
+    let authorizationRevision: Int
   }
 
   func body(content: Content) -> some View {
-    content.task(id: Request(token: device.token, session: backend.sessionGeneration, active: phase == .active)) {
-      guard let bundle = Bundle.main.bundleIdentifier else { return }
-      if backend.status == .signedOut {
-        UIApplication.shared.unregisterForRemoteNotifications()
-        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
-        if let installation = try? PushInstallation(bundleID: bundle) {
-          try? await backend.finishPushRevocation(installation: installation)
-        }
-        return
-      }
-      guard phase == .active, backend.status == .signedIn else { return }
+    content.task(id: Request(token: device.token, session: backend.sessionGeneration, active: phase == .active,
+      authorizationRevision: device.authorizationRevision)) {
+      let generation = backend.sessionGeneration
+      if backend.status == .signedOut { device.suspendEnrollment() }
+      guard backend.status == .signedOut || (phase == .active && backend.mayRegisterPush(generation)),
+        let bundle = Bundle.main.bundleIdentifier,
+        let installation = await cleanInstallation(bundle, generation: generation),
+        backend.mayRegisterPush(generation) else { return }
+
       let settings = await UNUserNotificationCenter.current().notificationSettings()
-      guard [.authorized, .provisional, .ephemeral].contains(settings.authorizationStatus) else { return }
+      guard [.authorized, .provisional, .ephemeral].contains(settings.authorizationStatus),
+        !Task.isCancelled, backend.mayRegisterPush(generation) else { return }
       UIApplication.shared.registerForRemoteNotifications()
       guard let token = device.token else { return }
       do {
-        let install = try PushInstallation(bundleID: bundle)
         let development = Bundle.main.object(forInfoDictionaryKey: "ShelvrAPNsEnvironment") as? String == "development"
-        let expo = try await ExpoPushRequest(bundleID: bundle, apns: token, installation: install.id,
+        let expo = try await ExpoPushRequest(bundleID: bundle, apns: token, installation: installation.id,
           development: development).exchange()
         try Task.checkCancellation()
-        try await backend.registerPush(expo, installation: install, locale: copy.locale)
+        try await backend.registerPush(expo, installation: installation, locale: copy.locale, generation: generation)
       } catch { if !Task.isCancelled { Analytics.failure("notification_registration_failed") } }
     }
+  }
+
+  private func cleanInstallation(_ bundle: String, generation: UUID) async -> PushInstallation? {
+    var delay = 2
+    while !Task.isCancelled, backend.sessionGeneration == generation {
+      do {
+        let installation = try PushInstallation(bundleID: bundle)
+        try await backend.finishPushRevocation(installation: installation, generation: generation, locale: copy.locale, suspend: device.suspendEnrollment)
+        try Task.checkCancellation()
+        return installation
+      } catch is CancellationError { return nil }
+      catch {
+        guard !Task.isCancelled, backend.sessionGeneration == generation else { return nil }
+        device.suspendEnrollment()
+        do { try await Task.sleep(for: .seconds(delay)) } catch { return nil }
+        delay = min(60, delay * 2)
+      }
+    }
+    return nil
   }
 }
