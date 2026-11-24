@@ -63,6 +63,9 @@ private struct OnboardingAccount: View {
   @State private var paywall = false
   @State private var purchased = false
   @State private var free = false
+  @State private var entered = Date()
+  @State private var viewed = Set<OnboardingProgress.Step>()
+  @State private var completed = Set<OnboardingProgress.Step>()
   @State private var practiceShare = false
   @State private var carousel = 0
 
@@ -112,6 +115,10 @@ private struct OnboardingAccount: View {
           }
         }
         .disabled(busy)
+        .onChange(of: progress.step, initial: true) { _, step in
+          entered = Date()
+          if viewed.insert(step).inserted { Analytics.capture("onboarding_step_viewed", stepProperties(step)) }
+        }
         .sheet(isPresented: $practiceShare) {
           VStack(alignment: .leading, spacing: 20) {
             Text(copy("aha.coachShelvr")).font(.title.bold())
@@ -230,9 +237,23 @@ private struct OnboardingAccount: View {
     }
   }
 
+  private func stepProperties(_ step: OnboardingProgress.Step) -> [String: Any] {
+    let ids: [OnboardingProgress.Step: String] = [.savedCount: "saved_count", .been: "been_cities",
+      .chart: "progress_chart", .cityEcho: "city_echo", .ahaShare: "aha_share", .firstSave: "first_save",
+      .ahaSpots: "aha_spots", .notifications: "notification_ask"]
+    return ["step_id": ids[step] ?? step.rawValue, "step_index": OnboardingProgress.Step.allCases.firstIndex(of: step) ?? 0,
+      "flow_version": 27]
+  }
+
   private func proceed(skip: Bool) {
     guard !busy else { return }
     errorKey = nil
+    if completed.insert(progress.step).inserted {
+      var properties = stepProperties(progress.step)
+      properties["skipped"] = skip
+      properties["duration_ms"] = max(0, Int(Date().timeIntervalSince(entered) * 1000))
+      Analytics.capture("onboarding_step_completed", properties)
+    }
     if progress.step == .notifications {
       busy = true
       Task {
