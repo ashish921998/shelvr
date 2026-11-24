@@ -68,7 +68,8 @@ final class ShareViewController: UIViewController {
   }
 
   private func load(_ provider: NSItemProvider, into stage: URL) async throws -> ShareAttachment? {
-    for type in [UTType.url, .image, .plainText] where provider.hasItemConformingToTypeIdentifier(type.identifier) {
+    let offers = [UTType.url, .image, .plainText].filter { provider.hasItemConformingToTypeIdentifier($0.identifier) }
+    return try await ShareAttachment.firstAvailable(offers) { type in
       if type == .image {
         let name = UUID().uuidString
         let target = stage.appending(path: name)
@@ -86,17 +87,14 @@ final class ShareViewController: UIViewController {
       let attachment: ShareAttachment? = try await withCheckedThrowingContinuation { continuation in
         provider.loadItem(forTypeIdentifier: type.identifier, options: nil) { item, error in
           if let error { continuation.resume(throwing: error); return }
-          if let url = item as? URL, ["https", "http"].contains(url.scheme?.lowercased()) {
-            continuation.resume(returning: .payload(InboxPayload(kind: .link, value: url.absoluteString)))
+          if let url = item as? URL {
+            continuation.resume(returning: ShareAttachment.webLink(url.absoluteString))
           } else if let text = item as? String {
-            if type == .url, let url = URL(string: text), ["https", "http"].contains(url.scheme?.lowercased()) {
-              continuation.resume(returning: .payload(InboxPayload(kind: .link, value: url.absoluteString)))
-            } else { continuation.resume(returning: .caption(text)) }
+            continuation.resume(returning: type == .url ? ShareAttachment.webLink(text) : .caption(text))
           } else { continuation.resume(returning: nil) }
         }
       }
-      if let attachment { return attachment }
+      return attachment
     }
-    return nil
   }
 }

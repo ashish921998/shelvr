@@ -28,6 +28,7 @@ public final class Backend {
   @ObservationIgnored var siriDrain: Task<Void, Never>?
   @ObservationIgnored var siriDrainRequested = false
   @ObservationIgnored var siriBacklog = SiriRevocationBacklog()
+  @ObservationIgnored private var signingIn = false
 
   public init(environment: AppEnvironment) {
     let session = AuthSession(
@@ -78,8 +79,16 @@ public final class Backend {
     await connect()
   }
 
+  public func requireShareOwner(_ owner: String) throws {
+    guard status == .signedIn, !signingOut, deletion == nil, KeychainTokenVault().read()?.belongs(to: owner) == true
+    else { throw CancellationError() }
+  }
+
   public func signIn(_ credential: SignInCredential) async throws {
     if let deletion { _ = await deletion.result }
+    guard status == .signedOut, !signingIn else { throw AuthSessionError.signInRefused }
+    signingIn = true
+    defer { signingIn = false }
     try await session.signIn(credential)
     await connect()
   }
