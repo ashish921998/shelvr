@@ -6,7 +6,8 @@ import Testing
   for path in ["/map", "/item/abc", "/list-invite", "/passport-invite/one/two"] {
     #expect(try PublicInvite(#require(AppLink(path))) == nil)
   }
-  let invite = try #require(PublicInvite(#require(AppLink("https://tryshelvr.app/l/token"))))
+  let link = try #require(AppLink("https://tryshelvr.app/l/token"))
+  let invite = try #require(PublicInvite(link))
   #expect(invite.kind == .list)
   #expect(invite.destination() == nil)
   let joined = try #require(invite.destination(listID: "list"))
@@ -15,7 +16,8 @@ import Testing
 }
 
 @Test func anAcceptedComparisonSurvivesRestartAndKeepsItsOriginalAccount() throws {
-  let invite = try #require(PublicInvite(#require(AppLink("shelvr-preview://passport-invite/a%2Fb"))))
+  let link = try #require(AppLink("shelvr-preview://passport-invite/a%2Fb"))
+  let invite = try #require(PublicInvite(link))
   let accepted = AcceptedInvite(invite)
   #expect(AcceptedInvite(invite).id != accepted.id)
   let data = try JSONEncoder().encode(accepted)
