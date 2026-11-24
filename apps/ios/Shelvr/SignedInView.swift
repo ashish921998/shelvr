@@ -50,7 +50,8 @@ struct SignedInView: View {
       }
       .navigationDestination(for: AppLink.self) { link in
         switch link.path.first {
-        case "profile", "settings": AccountView().navigationTitle(copy("navigation.profile"))
+        case "settings": AccountSettingsView()
+        case "profile": AccountView().navigationTitle(copy("navigation.profile"))
         case "add-spots":
           List {
             entry("/add", "addSheet.pasteLink", "link")
@@ -125,6 +126,8 @@ struct SignedInView: View {
         }
       }
     }
+    .modifier(CancelSurveyCard(home: library && path.isEmpty))
+    .modifier(TrialReminderObserver(home: path.isEmpty))
     .onChange(of: pendingLink, initial: true) { _, link in
       guard let link else { return }
       pendingLink = nil

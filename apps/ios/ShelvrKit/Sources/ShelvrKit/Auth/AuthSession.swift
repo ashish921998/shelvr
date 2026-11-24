@@ -53,6 +53,10 @@ actor AuthSession {
     self.now = now
   }
 
+  var cachedAccountID: String? {
+    tokens.flatMap { JWT.claims(of: $0.token)?.sub }?.split(separator: "|", maxSplits: 1).first.map(String.init)
+  }
+
   private var tokens: AuthTokens? { held?.tokens }
   var isSignedIn: Bool { held != nil }
 
@@ -129,6 +133,13 @@ actor AuthSession {
     await onLocalSignOut()
     guard let token else { return }
     try? await transport.signOut(token: token)
+  }
+
+  func forgetDeletedAccount() {
+    try? signOutMarker?.record()
+    refresh?.cancel()
+    refresh = nil
+    forgetSession()
   }
 
   private func forgetSession() {

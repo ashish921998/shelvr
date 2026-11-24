@@ -9,7 +9,7 @@ enum BillingDestination: String, Identifiable {
 }
 
 @MainActor
-private enum BillingIdentity {
+enum BillingIdentity {
   static var currentLogin: Task<Void, Error>?
 
   static func select(_ id: String, environment: AppEnvironment) async throws {
@@ -35,6 +35,8 @@ private enum BillingFailure: Error { case unavailable }
 
 struct BillingSheet: View {
   let destination: BillingDestination
+  var goalVariables: [String: String] = [:]
+  var availabilityChanged: (Bool) -> Void = { _ in }
   var confirmed: () -> Void = {}
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
@@ -63,7 +65,7 @@ struct BillingSheet: View {
           .onCustomerCenterRestoreCompleted { info in finish(info) }
       } else if let offer, userID != nil {
         PaywallView(offering: offer.offering, displayCloseButton: true)
-          .customPaywallVariables(offer.variables)
+          .customPaywallVariables(offer.variables.merging(goalVariables.mapValues(CustomVariableValue.string)) { $1 })
           .onRequestedDismissal { if confirmation.state != .syncing { dismiss() } }
           .onPurchaseCompleted { info in finish(info) }
           .onRestoreCompleted { info in finish(info) }
@@ -75,6 +77,7 @@ struct BillingSheet: View {
     .task(id: attempt) {
       let generation = backend.sessionGeneration
       failed = false
+      availabilityChanged(true)
       do {
         for try await user in backend.query("users:getCurrentUser", as: AccountView.CurrentUser?.self) {
           guard let id = user?._id else { throw BillingFailure.unavailable }
@@ -90,7 +93,7 @@ struct BillingSheet: View {
           userID = id
           return
         }
-      } catch { if !Task.isCancelled { failed = true } }
+      } catch { if !Task.isCancelled { failed = true; availabilityChanged(false) } }
     }
   }
 

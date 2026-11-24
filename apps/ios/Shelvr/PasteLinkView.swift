@@ -37,7 +37,7 @@ struct PasteLinkView: View {
     .sheet(item: $billing, onDismiss: {
       if resumeSave { resumeSave = false; save() }
     }) { destination in
-      BillingSheet(destination: destination) { resumeSave = true }
+      BillingSheet(destination: destination, confirmed: { resumeSave = true })
     }
     .onAppear { presented = true; focused = true }
     .onDisappear { presented = false }
@@ -49,15 +49,20 @@ struct PasteLinkView: View {
       errorMessage = copy("errors.notALink")
       return
     }
+    let properties = ["save_source": "manual_link", "save_kind": "link", "operation_id": link.operationID]
+    Analytics.capture("save_attempt_started", properties)
     pending = link
     saving = true
     errorMessage = nil
     Task {
       defer { saving = false }
       do {
-        try await backend.saveLink(link.url, operationID: link.operationID, source: .manualLink)
+        try await backend.saveLink(link.url, operationID: link.operationID, source: .manualLink,
+          analyticsSessionID: Analytics.sessionID)
+        Analytics.capture("article_saved")
         if presented { dismiss() }
       } catch {
+        Analytics.capture("save_failed", properties.merging(["stage": SaveFailure(error) == .proRequired ? "pro_required" : "other"]) { $1 })
         guard presented else { return }
         if SaveFailure(error) == .proRequired {
           errorMessage = copy("freePlan.leftBody")
