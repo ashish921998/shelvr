@@ -10,3 +10,10 @@ import Testing
     #expect(PlanRoutes.allowedWithoutPersonalAccess(try #require(AppLink(path))))
   }
 }
+
+@Test func accountRecoveryStaysAvailableWhilePlanReadsFail() throws {
+  for path in ["/settings", "/profile", "/paywall"] {
+    #expect(!PlanRoutes.needsLoadedPlan(try #require(AppLink(path))))
+  }
+  #expect(PlanRoutes.needsLoadedPlan(try #require(AppLink("/trip-plan/a"))))
+}
