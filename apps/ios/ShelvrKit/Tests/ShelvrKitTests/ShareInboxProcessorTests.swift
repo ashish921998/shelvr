@@ -136,3 +136,24 @@ private final class RecordingPhotoMutations: PhotoMutationClient {
 private func tinyPNG() throws -> Data {
   try #require(Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a9XEAAAAASUVORK5CYII="))
 }
+
+@MainActor @Test func aDrainRetriesActivationAfterTheOwnerMarkerWriteRecovers() async throws {
+  try await withShareInbox { inbox in
+    let stage = try inbox.stage(owner: "first")
+    let link = InboxPayload(kind: .link, value: "https://example.com/retry-owner")
+    try inbox.publish([link], in: stage)
+
+    let saver = RecordingShareSaver()
+    let processor = ShareInboxProcessor(inbox: inbox, saver: saver)
+    try inbox.activate(nil)
+    let marker = inbox.directory.appending(path: "owner")
+    try FileManager.default.createDirectory(at: marker, withIntermediateDirectories: false)
+    #expect(throws: (any Error).self) { try processor.updateOwner() }
+    try inbox.activate(nil)
+    #expect(inbox.activeOwner == nil)
+
+    #expect(try await processor.drain(owner: "first") == nil)
+    #expect(inbox.activeOwner == "first")
+    #expect(saver.sentLinks == [link.value])
+  }
+}

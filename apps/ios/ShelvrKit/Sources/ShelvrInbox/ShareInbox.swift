@@ -104,6 +104,13 @@ public struct PendingShare: Sendable {
   }
 
   public func discard() throws {
+    try removeManifest()
+    if case let .success(upload) = delivery, case let .image(file) = upload.content {
+      inbox.removeUnreferencedImage(file, in: manifest.deletingLastPathComponent())
+    }
+  }
+
+  fileprivate func removeManifest() throws {
     try inbox.checkOwner(owner, of: manifest.deletingLastPathComponent())
     try FileManager.default.removeItem(at: manifest)
   }
@@ -198,7 +205,7 @@ public struct ShareInbox: Sendable {
         do {
           try await send(share.delivery.get())
           try Task.checkCancellation()
-          try share.discard()
+          try share.removeManifest()
         } catch is CancellationError { throw CancellationError() }
         catch ShareInboxError.ownerChanged { throw ShareInboxError.ownerChanged }
         catch {
@@ -230,6 +237,15 @@ public struct ShareInbox: Sendable {
   func manifests(in batch: URL) throws -> [URL] {
     try FileManager.default.contentsOfDirectory(at: batch, includingPropertiesForKeys: nil)
       .filter { $0.pathExtension == "json" }.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
+  }
+
+  fileprivate func removeUnreferencedImage(_ file: URL, in batch: URL) {
+    guard let id = UUID(uuidString: file.lastPathComponent) else { return }
+    let referenced = try? manifests(in: batch).contains { manifest in
+      let item = try JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: manifest))
+      return item.kind == .image && UUID(uuidString: item.value) == id
+    }
+    if referenced == false { try? removeIfPresent(file) }
   }
 
   private func removeIfPresent(_ file: URL) throws {

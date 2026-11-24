@@ -169,11 +169,32 @@ func withShareInbox(_ run: (ShareInbox) async throws -> Void) async throws {
   #expect(attachment == nil)
 }
 
-
 @MainActor @Test func urlItemProviderRetainsItsExplicitURL() async throws {
   let value = "https://example.com/coffee!"
   let url = try #require(URL(string: value))
   let provider = NSItemProvider(item: url as NSURL, typeIdentifier: UTType.url.identifier)
   let attachment = try #require(await ShareAttachment.loadLink(from: provider, type: .url))
   #expect(ShareAttachment.payloads([attachment]).map(\.value) == [value])
+}
+
+@MainActor @Test func discardingAFailedPhotoOnlyRemovesAnUnreferencedImage() async throws {
+  try await withShareInbox { inbox in
+    let stage = try inbox.stage(owner: "first")
+    let image = inbox.newImage(in: stage)
+    try Data([42]).write(to: image.file)
+    let duplicate = InboxPayload(kind: .image, value: image.payload.value)
+    let remaining = InboxPayload(kind: .link, value: "https://example.com/other-failure")
+    try inbox.publish([image.payload, duplicate, remaining], in: stage)
+
+    let batch = try #require(inbox.batches().first)
+    let photo = batch.appending(path: image.payload.value)
+    let first = try #require(await inbox.drain(owner: "first") { _ in throw CocoaError(.fileReadNoPermission) })
+    try first.share.discard()
+    #expect(FileManager.default.fileExists(atPath: photo.path))
+
+    let second = try #require(await inbox.drain(owner: "first") { _ in throw CocoaError(.fileReadNoPermission) })
+    try second.share.discard()
+    #expect(!FileManager.default.fileExists(atPath: photo.path))
+    #expect(try inbox.manifests(in: batch).count == 1)
+  }
 }
