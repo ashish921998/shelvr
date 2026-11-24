@@ -1,3 +1,4 @@
+import Combine
 import ConvexMobile
 import Foundation
 import ShelvrKit
@@ -11,12 +12,7 @@ struct ServerPlan: Decodable {
   }
 }
 
-struct PendingOnboarding: Codable {
-  var cities: [String]
-  let url: URL?
-  let operation: String
-  let space: String?
-
+extension OnboardingHandoff {
   static func key(_ account: String) -> String { "swift.onboarding.pending." + account }
 
   func save(_ account: String) throws {
@@ -30,47 +26,58 @@ struct OnboardingReplay: ViewModifier {
   @Environment(\.scenePhase) private var phase
 
   func body(content: Content) -> some View {
-    content.task(id: phase) {
-      guard phase == .active else { return }
-      let key = PendingOnboarding.key(account)
-      let generation = backend.sessionGeneration
-      var delay = 2
-      while !Task.isCancelled, generation == backend.sessionGeneration,
-        let data = UserDefaults.standard.data(forKey: key),
-        var entry = try? JSONDecoder().decode(PendingOnboarding.self, from: data)
-      {
-        do {
-          if !entry.cities.isEmpty {
-            let _: Double = try await backend.client.mutation("cityStamps:claimOnboardingCityStamps",
-              with: ["cities": entry.cities.map { $0 as (any ConvexEncodable)? }])
+    content
+      .task(id: phase) { await replay(stamps: true) }
+      .task(id: phase) { await replay(stamps: false) }
+  }
+
+  private func replay(stamps: Bool) async {
+    guard phase == .active else { return }
+    let key = OnboardingHandoff.key(account)
+    let generation = backend.sessionGeneration
+    var delay = 2
+    func read() -> OnboardingHandoff? {
+      UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode(OnboardingHandoff.self, from: $0) }
+    }
+    while !Task.isCancelled, generation == backend.sessionGeneration, let entry = read() {
+      do {
+        if stamps {
+          guard !entry.cities.isEmpty else { return }
+          let _: Double = try await backend.client.mutation("cityStamps:claimOnboardingCityStamps",
+            with: ["cities": entry.cities.map { $0 as (any ConvexEncodable)? }])
+        } else if let url = entry.url {
+          var saved = false
+          struct FreeSaves: Decodable { let open: Bool; let left: Int }
+          let plans = backend.client.subscribe(to: "subscriptions:getEntitlement", yielding: ServerPlan.self)
+          let counts = backend.client.subscribe(to: "freeSaves:getFreeSaves", yielding: FreeSaves?.self)
+          for try await (plan, freeSaves) in plans.combineLatest(counts).values {
+            guard OnboardingHandoff.canSave(pro: plan.entitled, freeOpen: freeSaves?.open == true,
+              remaining: freeSaves?.left ?? 0) else { continue }
             try Task.checkCancellation()
-            entry.cities = []
-            try entry.save(account)
-          }
-          if let url = entry.url {
-            for try await plan in backend.query("subscriptions:getEntitlement", as: ServerPlan.self) where plan.entitled {
-              try Task.checkCancellation()
-              guard generation == backend.sessionGeneration else { return }
-              var args: [String: (any ConvexEncodable)?] = [
-                "url": url.absoluteString, "operationId": entry.operation, "saveSource": "onboarding_demo"]
-              if let name = entry.space {
-                let id: String = try await backend.client.mutation("spaces:createSpace", with: ["name": name, "dynamic": true])
-                args["spaceId"] = id
-              }
-              try Task.checkCancellation()
-              guard generation == backend.sessionGeneration else { return }
-              let _: String = try await backend.client.mutation("items:createLinkItem", with: args)
-              break
+            guard generation == backend.sessionGeneration else { return }
+            var args: [String: (any ConvexEncodable)?] = [
+              "url": url.absoluteString, "operationId": entry.operation, "saveSource": "onboarding_demo"]
+            if plan.entitled, let name = entry.space {
+              let id: String = try await backend.client.mutation("spaces:createSpace", with: ["name": name, "dynamic": true])
+              args["spaceId"] = id
             }
             try Task.checkCancellation()
+            guard generation == backend.sessionGeneration else { return }
+            let _: String = try await backend.client.mutation("items:createLinkItem", with: args)
+            saved = true
+            break
           }
-          UserDefaults.standard.removeObject(forKey: key)
-          return
-        } catch {
-          if Task.isCancelled { return }
-          try? await Task.sleep(for: .seconds(delay))
-          delay = min(60, delay * 2)
-        }
+          guard saved else { return }
+        } else { return }
+        try Task.checkCancellation()
+        guard generation == backend.sessionGeneration, let latest = read(), latest.operation == entry.operation else { return }
+        if let pending = latest.remaining(afterStamps: stamps) { try pending.save(account) }
+        else { UserDefaults.standard.removeObject(forKey: key) }
+        return
+      } catch {
+        if Task.isCancelled { return }
+        try? await Task.sleep(for: .seconds(delay))
+        delay = min(60, delay * 2)
       }
     }
   }

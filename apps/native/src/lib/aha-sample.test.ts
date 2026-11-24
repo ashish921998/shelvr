@@ -80,3 +80,21 @@ describe("ahaReel", () => {
     );
   });
 });
+
+it("ships the same practice reels and mapped places in Swift", async () => {
+  const { default: swift } =
+    await import("../../../ios/Shelvr/OnboardingReels.json");
+  expect(swift).toEqual(
+    [...SAMPLE_CITY_IDS].sort().map((id) => {
+      const reel = ahaReel(id);
+      return {
+        id,
+        url: ahaReelUrl(reel),
+        creator: `@${reel.handle}`,
+        places: reel.places
+          .slice(0, AHA_SPOTS)
+          .map(([, name, lat, lng]) => ({ name, lat, lng })),
+      };
+    }),
+  );
+});

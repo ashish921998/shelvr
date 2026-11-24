@@ -24,6 +24,9 @@ struct RootView: View {
     }
     .task(id: backend.sessionGeneration) {
       if backend.status == .signedOut { Analytics.identify(nil) }
+      if backend.status == .offline, let id = await backend.offlineAccountID(), !Task.isCancelled {
+        Analytics.identify(id)
+      }
       guard backend.status == .signedIn else { return }
       do {
         for try await user in backend.query("users:getCurrentUser", as: AccountView.CurrentUser?.self) {
@@ -32,6 +35,7 @@ struct RootView: View {
         }
       } catch { if !Task.isCancelled { Analytics.failure("analytics_identity_failed") } }
     }
+    .modifier(SharedInboxReceiver())
     .onOpenURL { url in
       if let link = AppLink(url.absoluteString), link.path != ["sign-in"] { pendingLink = link }
     }

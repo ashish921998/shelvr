@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import ShelvrKit
+@testable import ShelvrInbox
 
 struct CopyTests {
   static let locales = URL(filePath: #filePath)
@@ -56,7 +56,7 @@ struct CopyTests {
 @Test func rendersPluralFormsFromTheShippedCatalogs() throws {
   let bundle = try #require(Bundle(url: CopyTests.locales))
   for locale in Copy.supportedLocales {
-    let copy = Copy(bundle: bundle, preferredLanguages: [locale])
+    let copy = Copy(bundle: bundle, preferredLanguages: [locale], formattingLocale: Locale(identifier: locale))
     let key = "spaces.saveCount"
     let forms = try #require(Copy.catalog(locale, in: bundle)[key]?.forms)
     for (count, base) in [(0, "other"), (1, "one"), (2, "other"), (1_000_000, "other")] {
@@ -76,4 +76,16 @@ struct CopyTests {
 @Test func keepsIndianNumberGroupingWhenFallingBackToEnglish() throws {
   let copy = Copy(bundle: try #require(Bundle(url: CopyTests.locales)), preferredLanguages: ["hi-IN"])
   #expect(copy("spaces.saveCount", count: 1_234_567) == "12,34,567 saves")
+}
+
+@Test func spanishMillionUsesTheDistinctManyForm() throws {
+  let bundle = try #require(Bundle(url: CopyTests.locales))
+  let copy = Copy(bundle: bundle, preferredLanguages: ["es-ES"])
+  let forms = try #require(Copy.catalog("es", in: bundle)["reminder.tripEveBody"]?.forms)
+  #expect(forms["other"] != forms["many"])
+  let expected = try #require(forms["many"])
+  let values = ["city": "Madrid"]
+  #expect(copy("reminder.tripEveBody", count: 1_000_000, values) == expected
+    .replacingOccurrences(of: "%{formattedCount}", with: 1_000_000.formatted(.number.locale(Locale(identifier: "es-ES"))))
+    .replacingOccurrences(of: "%{city}", with: "Madrid"))
 }

@@ -57,15 +57,14 @@ struct PasteLinkView: View {
     Task {
       defer { saving = false }
       do {
-        let _: String = try await backend.client.mutation("items:createLinkItem", with: [
-          "url": link.url, "operationId": link.operationID, "saveSource": "manual_link"
-        ])
+        try await backend.saveLink(link.url, operationID: link.operationID, source: .manualLink,
+          analyticsSessionID: Analytics.sessionID)
         Analytics.capture("article_saved")
         if presented { dismiss() }
       } catch {
-        Analytics.capture("save_failed", properties.merging(["stage": PastedLink.requiresPro(error) ? "pro_required" : "other"]) { $1 })
+        Analytics.capture("save_failed", properties.merging(["stage": SaveFailure(error) == .proRequired ? "pro_required" : "other"]) { $1 })
         guard presented else { return }
-        if PastedLink.requiresPro(error) {
+        if SaveFailure(error) == .proRequired {
           errorMessage = copy("freePlan.leftBody")
           billing = .paywall
         } else { errorMessage = copy("errors.tryAgain") }

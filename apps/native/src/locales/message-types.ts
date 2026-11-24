@@ -176,6 +176,7 @@ type MessageParams = {
   "pro.openStore": undefined;
   "notifications.disabledTitle": undefined;
   "notifications.disabledBody": undefined;
+  "notifications.previousAccount": undefined;
   "notifications.updateFailed": undefined;
   "errors.trySoon": undefined;
   "pro.restoredTitle": undefined;
@@ -226,6 +227,8 @@ type MessageParams = {
   "account.deleting": undefined;
   "pro.checking": undefined;
   "pro.unlockShelvr": undefined;
+  "share.openToFinish": undefined;
+  "share.openToSignIn": undefined;
   "share.reading": undefined;
   "share.empty": undefined;
   "share.pending": undefined;
@@ -1141,6 +1144,7 @@ type MessageParams = {
   "passportStory.tagline": undefined;
   "passportStory.scan": undefined;
   "passportStory.shareLink": undefined;
+  "passportStory.linkNotePassportMenu": undefined;
   "passportStory.linkNote": undefined;
   "passport.shareCity": { city: string };
   "passport.momentCityComplete": { city: string };

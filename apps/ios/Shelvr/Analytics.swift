@@ -1,4 +1,5 @@
 import Foundation
+import UIKit
 import OSLog
 import PostHog
 import ShelvrKit
@@ -6,6 +7,9 @@ import ShelvrKit
 @MainActor
 enum Analytics {
   private static var enabled = false
+  private static var foreground = false
+  private static var opened = false
+  private static var notificationOpens = PushNotificationOpenBuffer()
   private static let identifiedKey = "swift.analytics.identified"
 
   static var available: Bool { enabled && !PostHogSDK.shared.isOptOut() }
@@ -21,22 +25,16 @@ enum Analytics {
       return
     }
     let config = PostHogConfig(projectToken: token, host: host)
+    let environment = AppEnvironment.current.variant == .production ? "production" : "development"
+    config.captureApplicationLifecycleEvents = false
     config.captureScreenViews = false
     config.capturePushNotificationSubscriptions = false
     config.capturePushNotificationOpened = false
     config.errorTrackingConfig.autoCapture = AppEnvironment.current.variant == .production
     config.setBeforeSend { event in
-      if event.event == "Application Opened" { event.properties.removeValue(forKey: "url") }
-      if event.event == "$exception" {
-        event.properties.removeValue(forKey: "$exception_message")
-        if let exceptions = event.properties["$exception_list"] as? [[String: Any]] {
-          event.properties["$exception_list"] = exceptions.map { info in
-            var safe = info
-            safe["value"] = info["type"] as? String ?? "Error"
-            return safe
-          }
-        }
-      }
+      event.properties["environment"] = environment
+      event.properties["analytics_version"] = 1
+      event.properties = AnalyticsRedaction.properties(event.properties, event: event.event)
       return event
     }
     PostHogSDK.shared.setup(config)
@@ -53,6 +51,38 @@ enum Analytics {
       PostHogSDK.shared.reset()
       UserDefaults.standard.removeObject(forKey: identifiedKey)
       registerContext()
+    }
+    let pendingOpens = notificationOpens.reconcile()
+    if UIApplication.shared.applicationState == .active { active(true) }
+    for properties in pendingOpens { capture("notification_opened", properties) }
+  }
+
+  static func notificationOpened(_ properties: [String: String]) {
+    guard enabled, let ready = notificationOpens.record(properties) else { return }
+    capture("notification_opened", ready)
+  }
+
+  static var sessionID: String? { enabled ? PostHogSDK.shared.getSessionId() : nil }
+
+  static func active(_ active: Bool) {
+    guard enabled, notificationOpens.reconciled, active != foreground else { return }
+    foreground = active
+    let defaults = UserDefaults.standard
+    let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
+    let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+    let properties = ["build": build, "version": version]
+    if active {
+      let previous = defaults.string(forKey: "swift.analytics.build")
+      if previous != build {
+        let expoStorage = URL.documentsDirectory.appending(path: ".posthog-rn.json")
+        let updated = previous != nil || FileManager.default.fileExists(atPath: expoStorage.path)
+        capture(updated ? "Application Updated" : "Application Installed", properties)
+        defaults.set(build, forKey: "swift.analytics.build")
+      }
+      capture("Application Opened", ["version": version, "build": build, "from_background": opened])
+      opened = true
+    } else {
+      capture("Application Backgrounded")
     }
   }
 
