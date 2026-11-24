@@ -149,3 +149,21 @@ import Testing
   let relaunched = InviteEntry(read: storage.read, write: storage.set)
   #expect(relaunched.accepted == nil && key == nil)
 }
+
+@MainActor @Test func ordinaryLinksNeitherRevokeConsentNorDisappearWhenInviteStorageIsUnavailable() throws {
+  let invitation = try #require(AppLink("/list-invite/one")), item = try #require(AppLink("/item/saved"))
+  let chosen = try #require(PublicInvite(invitation))
+  var disk: AcceptedInvite?
+  let entry = InviteEntry(read: { disk }, write: { disk = $0 })
+  #expect(entry.route(invitation))
+  entry.accept(chosen)
+  #expect(entry.route(item))
+  #expect(disk?.invite == chosen && entry.accepted?.invite == chosen)
+  #expect(entry.cancel() == item)
+  #expect(disk == nil)
+
+  let offline = InviteEntry(read: { throw CocoaError(.fileReadNoPermission) }, write: { _ in
+    Issue.record("An ordinary route must not write invite storage")
+  })
+  #expect(!offline.route(item))
+}
