@@ -17,6 +17,11 @@ final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCente
     token = deviceToken
   }
 
+  nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+    completionHandler([.banner, .list])
+  }
+
   nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
     withCompletionHandler completionHandler: @escaping () -> Void) {
     let info = response.notification.request.content.userInfo
@@ -41,11 +46,20 @@ struct PushRegistrationView: ViewModifier {
 
   func body(content: Content) -> some View {
     content.task(id: Request(token: device.token, session: backend.sessionGeneration, active: phase == .active)) {
+      guard let bundle = Bundle.main.bundleIdentifier else { return }
+      if backend.status == .signedOut {
+        UIApplication.shared.unregisterForRemoteNotifications()
+        UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+        if let installation = try? PushInstallation(bundleID: bundle) {
+          try? await backend.finishPushRevocation(installation: installation)
+        }
+        return
+      }
       guard phase == .active, backend.status == .signedIn else { return }
       let settings = await UNUserNotificationCenter.current().notificationSettings()
       guard [.authorized, .provisional, .ephemeral].contains(settings.authorizationStatus) else { return }
       UIApplication.shared.registerForRemoteNotifications()
-      guard let token = device.token, let bundle = Bundle.main.bundleIdentifier else { return }
+      guard let token = device.token else { return }
       do {
         let install = try PushInstallation(bundleID: bundle)
         let development = Bundle.main.object(forInfoDictionaryKey: "ShelvrAPNsEnvironment") as? String == "development"

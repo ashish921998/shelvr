@@ -77,7 +77,7 @@ public final class Backend {
   private var pushTokens: PushTokenStore { PushTokenStore(serviceURL: environment.convexURL) }
 
   public func registerPush(_ token: String, installation: PushInstallation, locale: String) async throws {
-    guard status == .signedIn, !signingOut else { return }
+    guard status == .signedIn, !signingOut, deletion == nil else { return }
     let generation = sessionGeneration
     let previous = registeringPush
     let task = Task {
@@ -91,7 +91,7 @@ public final class Backend {
         "locale": locale, "timezone": TimeZone.current.identifier
       ])
       for old in tokens where old != token {
-        try await client.mutation("notifications:unregisterDevice", with: ["token": old])
+        try await unregisterInstallation(old, installation: installation)
       }
       try pushTokens.write([token])
     }
@@ -99,14 +99,25 @@ public final class Backend {
     try await task.value
   }
 
-  private func revokePush() async throws {
-    _ = await registeringPush?.result
-    let saved = try pushTokens.read()
-    guard !saved.isEmpty else { return }
-    for token in saved {
-      try await client.mutation("notifications:unregisterDevice", with: ["token": token])
+  public func finishPushRevocation(installation: PushInstallation) async throws {
+    let generation = sessionGeneration
+    let previous = registeringPush
+    let task = Task {
+      _ = await previous?.result
+      guard status == .signedOut, sessionGeneration == generation else { return }
+      for token in try pushTokens.read() {
+        try await unregisterInstallation(token, installation: installation)
+      }
+      if status == .signedOut, sessionGeneration == generation { try pushTokens.write([]) }
     }
-    try pushTokens.write([])
+    registeringPush = task
+    try await task.value
+  }
+
+  private func unregisterInstallation(_ token: String, installation: PushInstallation) async throws {
+    try await client.mutation("notifications:unregisterInstallation", with: [
+      "token": token, "installSecret": installation.secret
+    ])
   }
 
   public func signOut() async throws {
@@ -114,7 +125,6 @@ public final class Backend {
     guard status == .signedIn, !signingOut else { return }
     signingOut = true
     do {
-      try await revokePush()
       try await session.signOut { await self.disconnect() }
     } catch {
       signingOut = false
@@ -126,7 +136,6 @@ public final class Backend {
     if let deletion { return try await deletion.value }
     guard status == .signedIn, !signingOut else { throw AuthSessionError.notSignedIn }
     let task = Task {
-      try await revokePush()
       try await client.mutation("users:deleteCurrentUserAccount")
       await session.forgetDeletedAccount()
       await disconnect()

@@ -1,5 +1,6 @@
 import ShelvrKit
 import SwiftUI
+import UserNotifications
 
 struct AccountSettingsView: View {
   @Environment(Backend.self) private var backend
@@ -12,6 +13,19 @@ struct AccountSettingsView: View {
   var body: some View {
     List {
       Section {
+        Button(copy("onboardingNotify.allow")) {
+          Task {
+            let center = UNUserNotificationCenter.current()
+            let settings = await center.notificationSettings()
+            if settings.authorizationStatus == .denied {
+              if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                await UIApplication.shared.open(url)
+              }
+            } else if (try? await center.requestAuthorization(options: [.alert, .badge, .sound])) == true {
+              UIApplication.shared.registerForRemoteNotifications()
+            }
+          }
+        }
         Button(copy("pro.manage")) { manage = true }
         Link(copy("legal.terms"), destination: URL(string: "https://tryshelvr.app/terms")!)
         Link(copy("legal.privacy"), destination: URL(string: "https://tryshelvr.app/privacy")!)
