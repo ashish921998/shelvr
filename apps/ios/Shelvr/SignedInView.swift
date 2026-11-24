@@ -12,13 +12,7 @@ struct SignedInView: View {
     NavigationStack(path: $path) {
       Group {
         if library {
-          List {
-            entry("/saves", "homePlaces.allSaves", "bookmark")
-            entry("/cities", "homePlaces.cities", "building.2")
-            entry("/trips", "navigation.trips", "airplane")
-            entry("/shared-lists", "sharedLists.title", "person.2")
-            entry("/passport", "passport.title", "book.closed")
-          }
+          LibraryView(screen: .home)
         } else {
           SavedPlacesMap(open: open)
         }
@@ -80,8 +74,27 @@ struct SignedInView: View {
         case "passport-invite" where link.path.count == 2: FriendPassportView(token: link.path[1]).id(link.path[1])
         case "passport": PassportView()
         case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)
-        case "go-out": PlanCityView()
         case "add": PasteLinkView()
+        case "saves": LibraryView(screen: .saves)
+        case "review-saves": LibraryView(screen: .review)
+        case "city" where link.path.count == 2: CityPlacesView(city: link.path[1]).id(link.path[1])
+        case "cities": LibraryCitiesView()
+        case "item" where link.path.count == 2: LibraryItemView(id: link.path[1])
+        case "edit-save-places":
+          if let id = link.query.first(where: { $0.name == "itemId" })?.value {
+            LibraryPlaceEditor(id: id).id(id)
+          } else { ShellDestination(link: link) }
+        case "date-plan", "go-out", "new-trip":
+          if let city = link.query.first(where: { $0.name == "city" })?.value, !city.isEmpty {
+            let listID = link.query.first(where: { $0.name == "listId" })?.value
+            if link.path.first == "new-trip" {
+              NewCityTripView(city: city, listID: listID) { created in
+                guard path.last == link else { return }
+                path[path.count - 1] = created
+              }.id(link)
+            } else { CityDateView(city: city, listID: listID).id(link) }
+          } else { PlanCityView(trip: link.path.first == "new-trip") }
+        case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1]).id(link.path[1])
         default: ShellDestination(link: link)
         }
       }
@@ -122,6 +135,7 @@ private struct ShellDestination: View {
 }
 
 private struct PlanCityView: View {
+  let trip: Bool
   struct City: Decodable {
     let city: String
     let placeCount: Int?
@@ -144,7 +158,7 @@ private struct PlanCityView: View {
           List(cities, id: \.city) { city in
             var url: URLComponents {
               var parts = URLComponents()
-              parts.path = "/date-plan"
+              parts.path = trip ? "/new-trip" : "/date-plan"
               parts.queryItems = [URLQueryItem(name: "city", value: city.city)]
               return parts
             }
@@ -157,7 +171,7 @@ private struct PlanCityView: View {
         ProgressView()
       }
     }
-    .navigationTitle(copy("plan.goOut"))
+    .navigationTitle(copy(trip ? "homePlaces.planTrip" : "plan.goOut"))
     .task(id: attempt) {
       failed = false
       do {

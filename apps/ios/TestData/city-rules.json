@@ -1,0 +1,121 @@
+{
+  "pins": [
+    {
+      "itemID": "a",
+      "name": "Café",
+      "lat": 1,
+      "lng": 1
+    },
+    {
+      "itemID": "b",
+      "name": "Cafe",
+      "lat": 1,
+      "lng": 1
+    },
+    {
+      "itemID": "c",
+      "name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+      "lat": 2,
+      "lng": 2
+    },
+    {
+      "itemID": "d",
+      "name": "ﬁeld",
+      "lat": 3,
+      "lng": 3
+    }
+  ],
+  "link": {
+    "token": "sample",
+    "voters": 1,
+    "expiresAt": 1000,
+    "places": [
+      {
+        "key": "p0",
+        "itemId": "a",
+        "name": "Café",
+        "picks": 1,
+        "passes": 0
+      },
+      {
+        "key": "p1",
+        "itemId": "c",
+        "name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+        "picks": 0,
+        "passes": 1
+      },
+      {
+        "key": "p2",
+        "itemId": "d",
+        "name": "field",
+        "picks": 1,
+        "passes": 0
+      }
+    ]
+  },
+  "cases": [
+    [0, 2, 3],
+    [0, 0, 2, 3],
+    [1, 2, 3],
+    [0, 2]
+  ],
+  "date": {
+    "status": "ready",
+    "city": "City",
+    "kind": "classic",
+    "stops": [
+      {
+        "slot": "first",
+        "source": "save",
+        "name": "First",
+        "lat": 0,
+        "lng": 0
+      },
+      {
+        "slot": "second",
+        "source": "suggested",
+        "name": "Second",
+        "lat": 0,
+        "lng": 0.001
+      },
+      {
+        "slot": "first",
+        "source": "save",
+        "name": "Nearest",
+        "lat": 0,
+        "lng": 0.002
+      },
+      {
+        "slot": "first",
+        "source": "save",
+        "name": "Further",
+        "lat": 0,
+        "lng": 0.004
+      },
+      {
+        "slot": "first",
+        "source": "suggested",
+        "name": "Invalid",
+        "lat": 0,
+        "lng": 0.001
+      }
+    ],
+    "evenings": [
+      {
+        "first": 0,
+        "second": 1
+      }
+    ]
+  },
+  "rounds": [[], [2], [2, 3]],
+  "expected": {
+    "keys": [
+      "cafe",
+      "cafe",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "field"
+    ],
+    "same": [true, true, false, false],
+    "swaps": [2, 3, 2]
+  }
+}
