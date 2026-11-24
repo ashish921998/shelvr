@@ -30,8 +30,11 @@ final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCente
   }
 
   func currentToken(generation: UUID, verified: Set<String>) -> Data? {
+    let wasProbing = delivery.isProbing
     if delivery.prepare(generation: generation, verified: verified) { silence() }
-    if delivery.token == nil { UIApplication.shared.registerForRemoteNotifications() }
+    if delivery.token == nil || (wasProbing && delivery.permitsPresentation) {
+      UIApplication.shared.registerForRemoteNotifications()
+    }
     return delivery.token
   }
 
