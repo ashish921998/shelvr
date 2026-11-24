@@ -59,6 +59,8 @@ struct SignedInView: View {
             entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
           }
           .navigationTitle(copy("addSheet.title"))
+        case "passport": PassportView()
+        case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)
         case "saves": LibraryView(screen: .saves)
         case "review-saves": LibraryView(screen: .review)
         case "cities": LibraryCitiesView()
