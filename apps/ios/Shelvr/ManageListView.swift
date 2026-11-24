@@ -38,6 +38,7 @@ struct AddListPlaceView: View {
   @State private var search = ""
   @State private var result: ListPlaceSearch?
   @State private var searchFailed = false
+  @State private var noAddition = false
   @State private var retry = 0
   @State private var operation = SocialOperation()
 
@@ -60,20 +61,30 @@ struct AddListPlaceView: View {
             Section(copy("tripPlanner.fromSaves")) {
               ForEach(places.filter { place in
                 PassportSection.cityKey(place.city) == PassportSection.cityKey(selected) &&
-                  words.allSatisfy { place.name.localizedStandardContains(String($0)) }
+                  words.allSatisfy { place.name.localizedStandardContains(String($0)) } &&
+                  !alreadyIncluded(place.name, place.lat, place.lng, place.appleId, item: place.itemId)
               }) { place in
                 Button(place.name) {
-                  operation.run { try await backend.addSavedPlace(place, to: detail._id); dismiss() }
+                  operation.run {
+                    if try await backend.addSavedPlace(place, to: detail._id) { dismiss() }
+                    else { noAddition = true }
+                  }
                 }
               }
             }
           }
-          ForEach(result?.places ?? []) { place in
+          ForEach((result?.places ?? []).filter { !alreadyIncluded($0.name, $0.lat, $0.lng, $0.appleId) }) { place in
             Button(place.name) {
               operation.run { try await backend.addFoundPlace(place, city: selected, to: detail._id); dismiss() }
             }
           }
-          if searchFailed { Button(copy("common.retry")) { retry += 1 } }
+          if result?.available == false {
+            Text(copy("tripPlanner.searchUnavailable")).foregroundStyle(.secondary)
+          }
+          if result?.available == true && result?.places.isEmpty == true {
+            Text(copy("tripPlanner.searchEmpty")).foregroundStyle(.secondary)
+          }
+          if searchFailed || result?.available == false { Button(copy("common.retry")) { retry += 1 } }
         }
         .disabled(operation.busy)
         .task(id: SearchRequest(city: selected, text: search, retry: retry)) {
@@ -90,6 +101,15 @@ struct AddListPlaceView: View {
       }
     }
     .socialOperation(operation, failure: copy("sharedLists.failed"), close: copy("common.close"))
+    .alert(copy("tripPlanner.addFailed"), isPresented: $noAddition) { Button(copy("common.close")) {} }
+  }
+
+  private func alreadyIncluded(_ name: String, _ lat: Double, _ lng: Double, _ apple: String?, item: String? = nil) -> Bool {
+    detail.places.contains { place in
+      if let apple, let other = place.appleId { return apple == other }
+      guard place.name.localizedCaseInsensitiveCompare(name) == .orderedSame else { return false }
+      return (item != nil && place.itemId == item) || (place.lat == lat && place.lng == lng)
+    }
   }
 
   private struct SearchRequest: Equatable { let city, text: String; let retry: Int }

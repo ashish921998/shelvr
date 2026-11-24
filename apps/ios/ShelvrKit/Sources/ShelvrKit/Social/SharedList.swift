@@ -26,13 +26,14 @@ public struct SharedListDetail: Decodable {
   public struct Place: Decodable, Identifiable {
     public struct Visitor: Decodable { public let isYou: Bool; public let firstName: String? }
     public let _id, name, city: String
-    public let itemId, addedByName: String?
+    public let itemId, addedByName, appleId: String?
+    public let lat, lng: Double?
     public let isNew: Bool
     public let visitedAt: Double?
     public let addedByYou: Bool
     public let wentBy: [Visitor]?
     public var id: String { _id }
-    public var went: Bool { wentBy?.contains { $0.isYou } ?? (visitedAt != nil) }
+    public var went: Bool { wentBy?.contains { $0.isYou } == true }
     public func visitors(copy: Copy) -> String? {
       guard let group = wentBy, !group.isEmpty else { return visitedAt == nil ? nil : copy("plan.weWent") }
       return group.map { person in

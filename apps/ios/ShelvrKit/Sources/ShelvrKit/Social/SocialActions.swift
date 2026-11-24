@@ -43,10 +43,11 @@ extension Backend {
     try await client.action("tripPlanner:searchListPlaces", with: ["listId": list, "city": city, "query": text, "locale": locale])
   }
 
-  public func addSavedPlace(_ place: ListSavePlace, to list: String) async throws {
+  public func addSavedPlace(_ place: ListSavePlace, to list: String) async throws -> Bool {
     var args: [String: ConvexEncodable?] = ["listId": list, "itemId": place.itemId, "name": place.name]
     if let city = place.city { args["city"] = city }
-    let _: Double = try await client.mutation("sharedLists:addSavePlaces", with: args)
+    let inserted: Double = try await client.mutation("sharedLists:addSavePlaces", with: args)
+    return inserted > 0
   }
 
   public func addFoundPlace(_ place: ListPlaceSearch.Place, city: String, to list: String) async throws {
