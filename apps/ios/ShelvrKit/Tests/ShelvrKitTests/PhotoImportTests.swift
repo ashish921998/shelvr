@@ -82,3 +82,12 @@ private func outputPixel(_ photo: ImportPhoto, x: Int, y: Int) throws -> [UInt8]
   #expect(try outputPixel(photo, x: 10, y: 10)[0] > 220)
   #expect(try outputPixel(photo, x: 10, y: 30)[2] > 220)
 }
+
+@Test func uploadRefusalsKeepTheirActionableCopy() throws {
+  let response = try #require(HTTPURLResponse(url: URL(string: "https://example.com")!, statusCode: 413, httpVersion: nil, headerFields: nil))
+  #expect(throws: PhotoUploadFailure.tooLarge) {
+    try PhotoUploadFailure.check(response, body: Data(#"{"error":"image_too_large"}"#.utf8))
+  }
+  #expect(ImportPhoto.failureCopy(PhotoUploadFailure.tooLarge) == "errors.photoTooLarge")
+  #expect(ImportPhoto.failureCopy(PhotoUploadFailure.empty) == "errors.photoEmpty")
+}
