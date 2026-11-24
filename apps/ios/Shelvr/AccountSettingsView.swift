@@ -3,32 +3,25 @@ import SwiftUI
 import UserNotifications
 
 struct AccountSettingsView: View {
-  @EnvironmentObject private var pushDevice: PushDevice
+  @Environment(\.scenePhase) private var phase
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var confirming = false
   @State private var deleting = false
   @State private var failure = false
   @State private var billing: BillingDestination?
+  @State private var denied = false
+  @State private var restored = false
 
   var body: some View {
     List {
       Section {
         SaveReminderPreference()
-        Button(copy("onboardingNotify.allow")) {
-          Task {
-            let center = UNUserNotificationCenter.current()
-            let settings = await center.notificationSettings()
-            if settings.authorizationStatus == .denied {
-              if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
-                await UIApplication.shared.open(url)
-              }
-            } else if (try? await center.requestAuthorization(options: [.alert, .badge, .sound])) == true {
-              pushDevice.authorizationRevision += 1
-            }
-          }
+        if denied, let settings = URL(string: UIApplication.openNotificationSettingsURLString) {
+          Link(copy("permissions.openSettings"), destination: settings)
         }
-        Button(copy("pro.restore")) { billing = .restore }
+        Button(copy("pro.restore")) { restored = false; billing = .restore }
+        if restored { Text(copy("pro.restoredTitle")).foregroundStyle(.secondary) }
         Button(copy("pro.manage")) { billing = .manage }
         Link(copy("support.contact"), destination: URL(string: "mailto:ashish921998@zohomail.in?subject=Shelvr%20Support")!)
         Link(copy("legal.terms"), destination: URL(string: "https://tryshelvr.app/terms")!)
@@ -43,7 +36,12 @@ struct AccountSettingsView: View {
       }
     }
     .navigationTitle(copy("profile.settings"))
-    .sheet(item: $billing) { BillingSheet(destination: $0) }
+    .task(id: phase) {
+      if phase == .active { denied = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .denied }
+    }
+    .sheet(item: $billing) { destination in
+      BillingSheet(destination: destination, confirmed: { if destination == .restore { restored = true } })
+    }
     .alert(copy("account.deleteTitle"), isPresented: $confirming) {
       Button(copy("common.cancel"), role: .cancel) {}
       Button(copy("pro.manage")) { billing = .manage }
