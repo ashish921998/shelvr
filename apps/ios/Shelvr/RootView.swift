@@ -23,6 +23,9 @@ struct RootView: View {
     }
     .task(id: backend.sessionGeneration) {
       if backend.status == .signedOut { Analytics.identify(nil) }
+      if backend.status == .offline, let id = await backend.offlineAccountID(), !Task.isCancelled {
+        Analytics.identify(id)
+      }
       guard backend.status == .signedIn else { return }
       do {
         for try await user in backend.query("users:getCurrentUser", as: AccountView.CurrentUser?.self) {
