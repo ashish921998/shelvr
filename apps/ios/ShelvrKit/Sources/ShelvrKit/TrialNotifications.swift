@@ -10,6 +10,20 @@ public struct TrialNotification: Equatable, Sendable {
   public let kind: Kind
   public let date: Date
 
+  public struct ObserverSession: Equatable, Sendable {
+    public let generation: UUID
+    public let account: String?
+
+    public init(generation: UUID, account: String?) {
+      self.generation = generation
+      self.account = account
+    }
+
+    public func canContinue(generation: UUID, account: String?) -> Bool {
+      self.account != nil && self.generation == generation && (account == nil || account == self.account)
+    }
+  }
+
   public static func shouldArmPrimer(
     previousAccount: String?, previousStatus: String?, account: String, status: String?
   ) -> Bool {

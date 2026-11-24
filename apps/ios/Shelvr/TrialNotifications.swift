@@ -70,8 +70,7 @@ struct TrialReminderObserver: ViewModifier {
     let user: String?
   }
   private struct PrimerInputs: Equatable {
-    let user: String?
-    let session: UUID
+    let session: TrialNotification.ObserverSession
     let canPresent: Bool
   }
 
@@ -85,12 +84,13 @@ struct TrialReminderObserver: ViewModifier {
   let home: Bool
 
   func body(content: Content) -> some View {
+    let session = TrialNotification.ObserverSession(generation: backend.sessionGeneration, account: backend.userID)
     content
-      .task(id: backend.sessionGeneration) {
-        await observe("subscriptions:getEntitlement", as: Subscription.self) { subscription = $0 }
+      .task(id: session) {
+        await observe("subscriptions:getEntitlement", as: Subscription.self, session: session) { subscription = $0 }
       }
-      .task(id: backend.sessionGeneration) {
-        await observe("notifications:getPreferences", as: TrialNotificationPreferences.self) { preferences = $0 }
+      .task(id: session) {
+        await observe("notifications:getPreferences", as: TrialNotificationPreferences.self, session: session) { preferences = $0 }
       }
       .onChange(of: Inputs(subscription: subscription, nudges: preferences?.remindersEnabled,
         active: phase == .active, user: backend.userID), initial: true) { before, value in
@@ -103,8 +103,7 @@ struct TrialReminderObserver: ViewModifier {
         }
         refresh(value)
       }
-      .task(id: PrimerInputs(user: backend.userID, session: backend.sessionGeneration,
-        canPresent: home && mayAsk && phase == .active && !primer)) {
+      .task(id: PrimerInputs(session: session, canPresent: home && mayAsk && phase == .active && !primer)) {
         await presentIfPossible()
       }
       .alert(copy("notifications.trialPrimerTitle"), isPresented: $primer) {
@@ -121,16 +120,19 @@ struct TrialReminderObserver: ViewModifier {
       } message: { Text(copy("notifications.trialPrimerBody")) }
   }
 
-  private func observe<Value: Decodable>(_ name: String, as type: Value.Type, receive: (Value) -> Void) async {
-    guard let owner = backend.userID else { return }
-    let session = backend.sessionGeneration
-    func current() -> Bool { backend.userID == owner && backend.sessionGeneration == session }
+  private func observe<Value: Decodable>(_ name: String, as type: Value.Type,
+    session: TrialNotification.ObserverSession, receive: (Value) -> Void) async {
+    guard let owner = session.account else { return }
+    func current() -> Bool {
+      backend.status == .signedIn && session.canContinue(generation: backend.sessionGeneration, account: backend.userID)
+    }
     do {
       try await PushRetry.run(while: current) {
+        guard backend.userID == owner else { throw URLError(.userAuthenticationRequired) }
         for try await value in backend.query(name, as: type) {
           try Task.checkCancellation()
           guard current() else { throw CancellationError() }
-          receive(value)
+          if backend.userID == owner { receive(value) }
         }
         throw URLError(.networkConnectionLost)
       }

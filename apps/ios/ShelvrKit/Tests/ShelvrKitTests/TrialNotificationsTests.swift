@@ -37,3 +37,17 @@ import Testing
   #expect(!TrialNotification.shouldArmPrimer(
     previousAccount: nil, previousStatus: nil, account: "fixture", status: nil))
 }
+
+
+@Test func trialObservationRestartsWhenAFailedSignOutRestoresTheSameAccount() {
+  let generation = UUID()
+  let original = TrialNotification.ObserverSession(generation: generation, account: "fixture")
+  let unavailable = TrialNotification.ObserverSession(generation: generation, account: nil)
+  let restored = TrialNotification.ObserverSession(generation: generation, account: "fixture")
+  #expect(original != unavailable && unavailable != restored && original == restored)
+  #expect(original.canContinue(generation: generation, account: nil))
+  #expect(original.canContinue(generation: generation, account: "fixture"))
+  #expect(!unavailable.canContinue(generation: generation, account: "fixture"))
+  #expect(!original.canContinue(generation: generation, account: "another"))
+  #expect(!original.canContinue(generation: UUID(), account: "fixture"))
+}
