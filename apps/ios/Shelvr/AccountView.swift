@@ -62,6 +62,7 @@ struct AccountView: View {
           Link(copy("support.contact"), destination: FeedbackView.support)
         }
         NavigationLink(copy("profile.settings")) { AccountSettingsView() }
+        SaveReminderPreference()
       }
       .listRowBackground(rowSurface)
       Section {
