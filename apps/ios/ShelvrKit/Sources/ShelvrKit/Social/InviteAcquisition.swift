@@ -69,7 +69,10 @@ public enum PendingInviteStore {
 
 @MainActor @Observable
 public final class InviteEntry {
-  public var preview: PublicInvite?
+  public private(set) var previewRevision = UUID()
+  public var preview: PublicInvite? {
+    didSet { if oldValue != preview { previewRevision = UUID() } }
+  }
   public private(set) var accepted: AcceptedInvite?
   public var expired: PublicInvite?
   public var failed = false

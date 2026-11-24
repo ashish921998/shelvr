@@ -10,11 +10,12 @@ struct InviteEntryView: View {
   @State private var attempt = 0
   @State private var preparing = false
   @State private var naming: Naming?
+  @State private var approvedName: Naming?
   private struct Naming: Identifiable {
     let id = UUID()
     let invite: PublicInvite
     let account: String
-    let session: UUID
+    let session, revision: UUID
   }
 
   var body: some View {
@@ -48,11 +49,14 @@ struct InviteEntryView: View {
           } else { FriendPassportView(token: invite.token, requestComparison: { choose(invite) }) }
         }
         .disabled(preparing)
-        .sheet(item: $naming) { offer in
-          MemberNamePrompt(creating: false) {
-            guard backend.status == .signedIn, backend.sessionGeneration == offer.session else { return }
-            entry.accept(offer.invite, account: offer.account)
-          }
+        .sheet(item: $naming, onDismiss: {
+          guard let offer = approvedName else { return }
+          approvedName = nil
+          guard backend.status == .signedIn, backend.sessionGeneration == offer.session,
+            entry.previewRevision == offer.revision else { return }
+          entry.accept(offer.invite, account: offer.account)
+        }) { offer in
+          MemberNamePrompt(creating: false) { approvedName = offer }
         }
         .safeAreaInset(edge: .bottom) { if entry.failed { Text(copy("errors.tryAgain")).foregroundStyle(.secondary) } }
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button(copy("common.close")) { entry.preview = nil } } }
@@ -64,22 +68,38 @@ struct InviteEntryView: View {
     if backend.status == .signedOut { entry.accept(invite); return }
     guard backend.status == .signedIn, !preparing else { return }
     let session = backend.sessionGeneration
+    let revision = entry.previewRevision
     preparing = true
     Task {
       defer { preparing = false }
       do {
         let account = try await currentAccount()
-        var ask = false
-        if invite.kind == .list {
-          for try await first in backend.query("users:getMyFirstName", as: String?.self) {
-            ask = first == nil
-            break
-          }
+        let ask = invite.kind == .list ? await askForMissingName() : false
+        guard entry.previewRevision == revision, entry.preview == invite, backend.status == .signedIn,
+          backend.sessionGeneration == session else { return }
+        if ask && names.claim(for: session) {
+          naming = Naming(invite: invite, account: account, session: session, revision: revision)
         }
-        guard entry.preview == invite, backend.status == .signedIn, backend.sessionGeneration == session else { return }
-        if ask && names.claim(for: session) { naming = Naming(invite: invite, account: account, session: session) }
         else { entry.accept(invite, account: account) }
       } catch { if entry.preview == invite { entry.failed = true } }
+    }
+  }
+
+  private func askForMissingName() async -> Bool {
+    await withTaskGroup(of: Bool.self) { tasks in
+      tasks.addTask { @MainActor [backend] in
+        do {
+          for try await name in backend.query("users:getMyFirstName", as: String?.self) { return name == nil }
+        } catch {}
+        return false
+      }
+      tasks.addTask {
+        try? await Task.sleep(for: .seconds(3))
+        return false
+      }
+      let ask = await tasks.next() ?? false
+      tasks.cancelAll()
+      return ask
     }
   }
 
