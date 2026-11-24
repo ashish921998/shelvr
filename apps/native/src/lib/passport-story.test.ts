@@ -119,3 +119,17 @@ describe("darkRuns", () => {
     expect(darkRuns([false, false])).toEqual([]);
   });
 });
+
+it("keeps the native Passport story vector in sync", async () => {
+  const { default: vector } =
+    await import("../../../ios/TestData/passport-story.json");
+  const story = passportStoryOf(vector.stamps, vector.cities, () => "Lisboa");
+  expect({
+    places: story.places,
+    cities: story.cities,
+    countries: story.countries,
+    more: story.more,
+    photos: story.photos.map((place) => place.name),
+    cityNames: story.cityStamps.map((city) => city.name),
+  }).toEqual(vector.expected);
+});
