@@ -7,6 +7,9 @@ struct CityPlacesView: View {
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var saves: [LibrarySave]?
+  @State private var marks: [MapVisit]?
+  @State private var visitFailure = false
+  @State private var operation = SocialOperation()
   @State private var selected: CityPlace?
   @State private var attempt = 0
   @State private var failed = false
@@ -16,6 +19,7 @@ struct CityPlacesView: View {
       if failed { Button(copy("common.retry")) { attempt += 1 } }
       else if let saves {
         let pins = CityPlace.pins(in: saves)
+        let went = CityPlace.visited(marks ?? [], among: pins)
         List {
           if !pins.isEmpty {
             Map(selection: $selected) {
@@ -32,9 +36,22 @@ struct CityPlacesView: View {
           }
           ForEach(pins) { pin in
             if let link = AppLink("/item/" + pin.itemID) {
-              NavigationLink(value: link) { Label(pin.name, systemImage: "mappin") }
+              HStack {
+                NavigationLink(value: link) { Label(pin.name, systemImage: "mappin") }
+                if marks != nil, !visitFailure {
+                  Button {
+                    let next = !went.contains(pin)
+                    operation.run { try await backend.changeVisit(pin, went: next) }
+                  } label: {
+                    Image(systemName: went.contains(pin) ? "checkmark.seal.fill" : "seal").frame(width: 44, height: 44)
+                  }.buttonStyle(.borderless).disabled(operation.busy)
+                    .accessibilityLabel(went.contains(pin) ? copy("cityProgress.unmarkVisited", ["name": pin.name]) : copy("passport.stampPlaceLabel", ["name": pin.name]))
+                    .accessibilityAddTraits(went.contains(pin) ? .isSelected : [])
+                }
+              }
             }
           }
+          if visitFailure { Button(copy("common.retry")) { attempt += 1 } }
           ForEach(CityPlace.remainingSaves(saves, pins: pins)) { save in
             if let link = AppLink("/item/" + save.id) {
               NavigationLink(value: link) { LibrarySaveRow(save: save) }
@@ -48,6 +65,17 @@ struct CityPlacesView: View {
       } else { ProgressView() }
     }
     .navigationTitle(city)
+    .socialOperation(operation, failure: copy("errors.tryAgain"), close: copy("common.close"))
+    .task(id: attempt) {
+      marks = nil
+      visitFailure = false
+      do {
+        for try await next in backend.query("placeVisits:listVisits", as: [MapVisit].self) {
+          try Task.checkCancellation()
+          marks = next
+        }
+      } catch { if !Task.isCancelled { visitFailure = true } }
+    }
     .task(id: attempt) {
       failed = false
       do {

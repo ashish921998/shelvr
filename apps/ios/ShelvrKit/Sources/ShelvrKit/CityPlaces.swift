@@ -1,3 +1,4 @@
+import ConvexMobile
 import Combine
 import Foundation
 
@@ -61,5 +62,25 @@ public struct CityPlace: Decodable, Identifiable, Hashable, Sendable {
 extension Backend {
   public func citySaves(_ city: String) -> some AsyncSequence<[LibrarySave], any Error> {
     client.subscribe(to: "items:listCityItems", with: ["city": city], yielding: [LibrarySave].self).values
+  }
+}
+
+extension CityPlace {
+  public static func visited(_ visits: [MapVisit], among pins: [Self]) -> Set<Self> {
+    let mapped = pins.map { pin in
+      MapPlace(source: .saved(itemID: pin.itemID), name: pin.name, lat: pin.lat, lng: pin.lng,
+        appleId: pin.appleID, city: nil, category: nil, cuisine: nil, kinds: [])
+    }
+    let ids = MapVisit.visitedIDs(visits, among: mapped)
+    return Set(zip(pins, mapped).compactMap { pin, place in ids.contains(place.id) ? pin : nil })
+  }
+}
+
+extension Backend {
+  public func changeVisit(_ pin: CityPlace, went: Bool) async throws {
+    var spot: [String: ConvexEncodable?] = ["lat": pin.lat, "lng": pin.lng]
+    if let apple = pin.appleID { spot["appleId"] = apple }
+    try await client.mutation("placeVisits:setVisited",
+      with: ["itemId": pin.itemID, "name": pin.name, "visited": went, "spot": spot])
   }
 }

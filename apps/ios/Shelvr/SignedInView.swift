@@ -77,6 +77,7 @@ struct SignedInView: View {
         case "passport-invite" where link.path.count == 2: FriendPassportView(token: link.path[1]).id(link.path[1])
         case "passport": PassportView()
         case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)
+        case "add": PasteLinkView()
         case "saves": LibraryView(screen: .saves)
         case "review-saves": LibraryView(screen: .review)
         case "spots" where link.path.count == 2:
@@ -124,7 +125,6 @@ struct SignedInView: View {
             AddTripStopView(id: id, initialDay: day).id(link)
           } else { ShellDestination(link: link) }
         case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1]).id(link.path[1])
-        case "add": PasteLinkView()
         case "photo": PhotoSaveView()
         case "how-to-share": SaveInstructions(siri: false)
         case "save-with-siri": SaveInstructions(siri: true)
