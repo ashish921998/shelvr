@@ -88,7 +88,9 @@ enum Analytics {
     if active {
       let previous = defaults.string(forKey: "swift.analytics.build")
       if previous != build {
-        capture(previous == nil ? "Application Installed" : "Application Updated", properties)
+        let expoStorage = URL.documentsDirectory.appending(path: ".posthog-rn.json")
+        let updated = previous != nil || FileManager.default.fileExists(atPath: expoStorage.path)
+        capture(updated ? "Application Updated" : "Application Installed", properties)
         defaults.set(build, forKey: "swift.analytics.build")
       }
       capture("Application Opened", ["version": version, "build": build, "from_background": opened])
