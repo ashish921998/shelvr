@@ -53,6 +53,7 @@ struct PlanGateView: View {
       Text(copy("planGate.title")).font(.largeTitle.bold())
       Text(copy("planGate.body")).foregroundStyle(.secondary)
       Button(copy("planGate.seePlans")) { sheet = .paywall }.buttonStyle(.borderedProminent)
+      Button(copy("pro.restore")) { sheet = .restore }
       if let route = AppLink("/shared-lists") { NavigationLink(copy("sharedLists.title"), value: route) }
       if let route = AppLink("/shared-trip-links") { NavigationLink(copy("tripShare.manage"), value: route) }
       if let route = AppLink("/profile") { NavigationLink(copy("navigation.profile"), value: route) }

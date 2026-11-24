@@ -77,13 +77,8 @@ struct MapCanvas: UIViewRepresentable {
         !parent.places.contains(where: { map.visibleMapRect.contains(MKMapPoint($0.coordinate)) }) {
         fit(parent.places, on: map, animated: true)
       }
-      if !opened, let saved = parent.opening, !saved.isEmpty {
+      if !opened, let places = parent.opening {
         opened = true
-        let groups = Dictionary(grouping: saved) { ($0.city ?? "").lowercased() }
-        let city = saved.compactMap { $0.city?.lowercased() }.max {
-          groups[$0, default: []].count < groups[$1, default: []].count
-        }
-        let places = city.flatMap { groups[$0] } ?? saved
         fit(places, on: map, animated: false)
       }
     }

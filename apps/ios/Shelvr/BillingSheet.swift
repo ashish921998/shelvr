@@ -4,7 +4,7 @@ import ShelvrKit
 import SwiftUI
 
 enum BillingDestination: String, Identifiable {
-  case paywall, manage
+  case paywall, manage, restore
   var id: Self { self }
 }
 
@@ -46,14 +46,18 @@ struct BillingSheet: View {
   @State private var offer: PaywallOffer?
   @State private var failed = false
   @State private var attempt = 0
+  @State private var noPurchase = false
   @State private var syncing = false
   @State private var syncFailed = false
 
   var body: some View {
     Group {
-      if failed || syncFailed {
+      if noPurchase {
+        ContentUnavailableView(copy("pro.notFoundTitle"), systemImage: "creditcard",
+          description: Text(copy("pro.notFoundBody", ["store": "App Store"])))
+      } else if failed || syncFailed {
         ContentUnavailableView {
-          Label(copy("pro.loadFailed"), systemImage: "exclamationmark.circle")
+          Label(copy(destination == .restore ? "pro.restoreFailed" : "pro.loadFailed"), systemImage: "exclamationmark.circle")
         } actions: {
           Button(copy("common.retry")) {
             if syncFailed { sync() } else { attempt += 1 }
@@ -90,6 +94,13 @@ struct BillingSheet: View {
           guard backend.sessionGeneration == generation else { return }
           session = generation
           userID = id
+          if destination == .restore {
+            let info = try await Purchases.shared.restorePurchases()
+            try Task.checkCancellation()
+            guard backend.sessionGeneration == generation, Purchases.shared.appUserID == id else { return }
+            let key = backend.environment.variant == .production ? "Shelvr Pro" : "shelvr_pro"
+            if info.entitlements.active[key] == nil { noPurchase = true } else { sync() }
+          }
           return
         }
       } catch { if !Task.isCancelled { failed = true; unavailable() } }
