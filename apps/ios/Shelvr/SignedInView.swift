@@ -54,6 +54,7 @@ struct SignedInView: View {
         case "add-spots":
           List {
             entry("/add", "addSheet.pasteLink", "link")
+            entry("/photo", "item.photo", "photo")
             entry("/how-to-share", "addSheet.howToShare", "square.and.arrow.up")
             entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
           }
@@ -64,6 +65,7 @@ struct SignedInView: View {
         case "item" where link.path.count == 2: LibraryItemView(id: link.path[1])
         case "go-out": PlanCityView()
         case "add": PasteLinkView()
+        case "photo": PhotoSaveView()
         default: ShellDestination(link: link)
         }
       }
