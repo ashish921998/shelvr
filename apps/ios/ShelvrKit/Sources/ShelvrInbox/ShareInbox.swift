@@ -50,7 +50,7 @@ public struct ShareInbox: Sendable {
     where ["ready", "staging"].contains(batch.pathExtension) {
       let stale = (try? batch.resourceValues(forKeys: [.creationDateKey]).creationDate)
         .map { Date().timeIntervalSince($0) > 86400 } ?? false
-      if (try? self.owner(of: batch)) != owner || (batch.pathExtension == "staging" && stale) {
+      if batch.pathExtension == "staging" ? stale : (try? self.owner(of: batch)) != owner {
         try manager.removeItem(at: batch)
       }
     }
@@ -85,6 +85,6 @@ public struct ShareInbox: Sendable {
 
   public func manifests(in batch: URL) throws -> [URL] {
     try FileManager.default.contentsOfDirectory(at: batch, includingPropertiesForKeys: nil)
-      .filter { $0.pathExtension == "json" }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+      .filter { $0.pathExtension == "json" }.sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
   }
 }
