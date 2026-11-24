@@ -7,6 +7,7 @@ struct SignedInView: View {
   @Environment(\.copy) private var copy
   @State private var library = false
   @State private var path: [AppLink] = []
+  @State private var namePrompts = MemberNamePrompts()
   @State private var stampMessage: String?
 
   var body: some View {
@@ -70,7 +71,8 @@ struct SignedInView: View {
             path.removeLast()
             path.append(target)
           }
-        case "shared-list" where link.path.count == 2: SharedListView(id: link.path[1])
+        case "shared-list" where link.path.count == 2:
+          SharedListView(id: link.path[1], joined: link.query.contains { $0.name == "joined" && $0.value == "1" }).id(link)
         case "list-invite" where link.path.count == 2:
           JoinListView(token: link.path[1]) { route in
             if path.last == link, let target = AppLink(route) { path = [target] }
@@ -152,6 +154,7 @@ struct SignedInView: View {
         }
       }
     }
+    .environment(namePrompts)
     .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
       Button(copy("common.close")) {}
     } message: { Text(stampMessage ?? "") }
