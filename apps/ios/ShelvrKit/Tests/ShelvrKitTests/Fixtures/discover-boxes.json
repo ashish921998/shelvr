@@ -1,0 +1,107 @@
+[
+  {
+    "latitude": 38.72,
+    "longitude": -9.14,
+    "latitudeDelta": 0.09,
+    "longitudeDelta": 0.05,
+    "width": 400,
+    "height": 860,
+    "tilt": 0,
+    "box": {
+      "west": -9.171875,
+      "south": 38.65625,
+      "east": -9.09375,
+      "north": 38.8125
+    }
+  },
+  {
+    "latitude": 38.7204,
+    "longitude": -9.1404,
+    "latitudeDelta": 0.09,
+    "longitudeDelta": 0.05,
+    "width": 400,
+    "height": 860,
+    "tilt": 0,
+    "box": {
+      "west": -9.171875,
+      "south": 38.65625,
+      "east": -9.09375,
+      "north": 38.8125
+    }
+  },
+  {
+    "latitude": -34.6,
+    "longitude": -58.4,
+    "latitudeDelta": 4,
+    "longitudeDelta": 8,
+    "width": 860,
+    "height": 400,
+    "tilt": 0,
+    "box": {
+      "west": -80,
+      "south": -40,
+      "east": -40,
+      "north": -30
+    }
+  },
+  {
+    "latitude": 82,
+    "longitude": 179.9,
+    "latitudeDelta": 1,
+    "longitudeDelta": 2,
+    "width": 400,
+    "height": 860,
+    "tilt": 45,
+    "box": {
+      "west": 174,
+      "south": 80,
+      "east": 184,
+      "north": 85
+    }
+  },
+  {
+    "latitude": 0,
+    "longitude": 0,
+    "latitudeDelta": 90,
+    "longitudeDelta": 180,
+    "width": 400,
+    "height": 860,
+    "tilt": 0,
+    "box": {
+      "west": -180,
+      "south": -85,
+      "east": 180,
+      "north": 85
+    }
+  },
+  {
+    "latitude": 45,
+    "longitude": -122,
+    "latitudeDelta": 0.001,
+    "longitudeDelta": 0.001,
+    "width": 390,
+    "height": 844,
+    "tilt": 0,
+    "box": {
+      "west": -122.015625,
+      "south": 44.984375,
+      "east": -121.96875,
+      "north": 45.03125
+    }
+  },
+  {
+    "latitude": 89,
+    "longitude": -10,
+    "latitudeDelta": 2,
+    "longitudeDelta": 9,
+    "width": 390,
+    "height": 844,
+    "tilt": 0,
+    "box": {
+      "west": -180,
+      "south": -85,
+      "east": 180,
+      "north": 85
+    }
+  }
+]

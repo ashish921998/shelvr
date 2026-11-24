@@ -200,3 +200,14 @@ describe("sameBox", () => {
     expect(sameBox(WORLD_BOX, undefined)).toBe(false);
   });
 });
+
+it("keeps the Swift MapKit area vectors current", async () => {
+  const { default: vectors } =
+    await import("../../../ios/ShelvrKit/Tests/ShelvrKitTests/Fixtures/discover-boxes.json");
+  for (const { box, width, height, ...camera } of vectors) {
+    const zoom = Math.log2(360 / camera.longitudeDelta);
+    expect(
+      visibleBox({ ...camera, zoom }, { width, height, apple: true }),
+    ).toEqual(box);
+  }
+});

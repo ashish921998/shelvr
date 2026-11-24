@@ -13,6 +13,6 @@ let package = Package(
       name: "ShelvrKit",
       dependencies: [.product(name: "ConvexMobile", package: "convex-swift")]
     ),
-    .testTarget(name: "ShelvrKitTests", dependencies: ["ShelvrKit"]),
+    .testTarget(name: "ShelvrKitTests", dependencies: ["ShelvrKit"], resources: [.process("Fixtures")]),
   ]
 )
