@@ -57,9 +57,11 @@ struct PasteLinkView: View {
     Task {
       defer { saving = false }
       do {
-        let _: String = try await backend.client.mutation("items:createLinkItem", with: [
+        var args = [
           "url": link.url, "operationId": link.operationID, "saveSource": "manual_link"
-        ])
+        ]
+        args["analyticsSessionId"] = Analytics.sessionID
+        let _: String = try await backend.client.mutation("items:createLinkItem", with: args)
         Analytics.capture("article_saved")
         if presented { dismiss() }
       } catch {
