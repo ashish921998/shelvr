@@ -1,0 +1,40 @@
+[
+  {
+    "existing": {
+      "_id": "pin",
+      "name": "Cafe Aʼ",
+      "city": "Lisbon",
+      "addedByYou": true,
+      "isNew": false,
+      "itemId": "save",
+      "lat": 38.721,
+      "lng": -9.14
+    },
+    "candidate": {
+      "name": "Cafe A",
+      "itemId": "save",
+      "lat": 38.8,
+      "lng": -9.14
+    },
+    "matches": false
+  },
+  {
+    "existing": {
+      "_id": "pin",
+      "name": "Cafe Aʼ",
+      "city": "Lisbon",
+      "addedByYou": true,
+      "isNew": false,
+      "itemId": "save",
+      "lat": 38.721,
+      "lng": -9.14
+    },
+    "candidate": {
+      "name": "Café A",
+      "itemId": "save",
+      "lat": 38.7211,
+      "lng": -9.14
+    },
+    "matches": true
+  }
+]

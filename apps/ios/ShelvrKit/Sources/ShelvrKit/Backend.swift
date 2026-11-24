@@ -132,7 +132,7 @@ public final class Backend {
         try await unregisterInstallation(record, installation: installation)
       }
       if let identity {
-        verified = Set(try pushTokens.read().filter { $0.registrationId == identity.uuidString }.compactMap(\.apnsDigest))
+        verified = try pushTokens.verifiedAPNSDigests(for: identity)
       }
     }
     registeringPush = task
@@ -157,8 +157,17 @@ public final class Backend {
     await deletion.wait()
     guard status == .signedIn, !signingOut else { return }
     signingOut = true
+    let siri = SiriCredential.current()
+    let authorization = KeychainTokenVault().read()?.token
     do {
-      try await session.signOut { await self.disconnect() }
+      try await session.signOut {
+        await siri?.removeIfCurrent()
+        await self.disconnect()
+        if let siri, let authorization {
+          try? await ConvexHTTPAuthTransport(deployment: self.environment.convexURL)
+            .revokeSiri(siri.token, authorization: authorization)
+        }
+      }
     } catch {
       signingOut = false
       throw error
@@ -181,8 +190,8 @@ public final class Backend {
     signingOut = false
   }
 
-  public func query<T: Decodable>(_ name: String, as type: T.Type) -> some AsyncSequence<T, any Error> {
-    client.subscribe(to: name, yielding: type).values
+  public func query<T: Decodable>(_ name: String, with args: [String: ConvexEncodable?] = [:], as type: T.Type) -> some AsyncSequence<T, any Error> {
+    client.subscribe(to: name, with: args, yielding: type).values
   }
 
   private func connect() async {

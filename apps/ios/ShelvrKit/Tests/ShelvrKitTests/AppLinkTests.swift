@@ -39,3 +39,13 @@ import Testing
     #expect(AppLink(input) == nil)
   }
 }
+
+@Test func passportAndListActionLinksKeepTheirDestinationArguments() {
+  let routes = ["already-been", "next-to-stamp", "city-stamps", "city-card", "add-list-place"]
+  for route in routes {
+    let link = AppLink("shelvr-preview:///" + route + "?city=New%20York&listId=ref")
+    #expect(link?.path == [route])
+    #expect(link?.query.first { $0.name == "city" }?.value == "New York")
+    #expect(link?.query.first { $0.name == "listId" }?.value == "ref")
+  }
+}
