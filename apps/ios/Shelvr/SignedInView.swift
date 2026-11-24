@@ -76,7 +76,7 @@ struct SignedInView: View {
           JoinListView(token: link.path[1]) { route in
             if path.last == link, let target = AppLink(route) { path = [target] }
           }
-        case "passport-invite" where link.path.count == 2: FriendPassportView(token: link.path[1]).id(link.path[1])
+        case "passport-invite" where link.path.count == 2: FriendPassportView(token: link.path[1], compareInitially: link.query.contains { $0.name == "compare" && $0.value == "1" }).id(link)
         case "already-been", "next-to-stamp":
           StampPlacesView(city: link.path.first == "next-to-stamp" ? link.query.first { $0.name == "city" }?.value ?? "" : nil) { message in
             guard path.last == link, let passport = AppLink("/passport") else { return }

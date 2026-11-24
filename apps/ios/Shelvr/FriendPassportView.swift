@@ -3,6 +3,12 @@ import SwiftUI
 
 struct FriendPassportView: View {
   let token: String
+  var requestComparison: (() -> Void)?
+  init(token: String, compareInitially: Bool = false, requestComparison: (() -> Void)? = nil) {
+    self.token = token
+    self.requestComparison = requestComparison
+    _compare = State(initialValue: compareInitially)
+  }
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var compare = false
@@ -18,7 +24,9 @@ struct FriendPassportView: View {
             LabeledContent(copy("passport.places"), value: passport.places.formatted())
             LabeledContent(copy("passport.cities"), value: passport.cities.formatted())
             if let countries = passport.countries { LabeledContent(copy("passport.countries"), value: countries.formatted()) }
-            Button(copy("passportShare.compare")) { compare.toggle() }
+            Button(copy("passportShare.compare")) {
+              if let requestComparison { requestComparison() } else { compare.toggle() }
+            }
           }
           if compare {
             SocialQuery(query: "passportShares:comparePassport", arguments: ["token": token],
