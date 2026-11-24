@@ -93,6 +93,7 @@ struct PassportView: View {
       if let afterStamp { self.afterStamp = nil; open?(afterStamp) }
     }) { stamp in
       StampDetail(stamp: stamp) { route in
+        guard selected?.id == stamp.id else { return }
         afterStamp = route
         selected = nil
       }
