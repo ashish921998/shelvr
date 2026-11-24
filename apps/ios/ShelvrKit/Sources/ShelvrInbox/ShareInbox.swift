@@ -18,6 +18,16 @@ public enum ShareAttachment: Sendable {
   case payload(InboxPayload)
   case caption(String)
 
+  @MainActor public static func firstAvailable<T>(_ offers: [T], read: (T) async throws -> Self?) async throws -> Self? {
+    var failure: Error?
+    for offer in offers {
+      do { if let found = try await read(offer) { return found } }
+      catch { failure = error }
+    }
+    if let failure { throw failure }
+    return nil
+  }
+
   public static func webLink(_ text: String) -> Self? {
     guard let url = URL(string: text), ["https", "http"].contains(url.scheme?.lowercased()) else { return nil }
     return .payload(InboxPayload(kind: .link, value: url.absoluteString))
@@ -113,6 +123,27 @@ public struct ShareInbox: Sendable {
 
   public func owner(of batch: URL) throws -> String {
     try String(contentsOf: batch.appending(path: "owner"), encoding: .utf8)
+  }
+
+  @MainActor public func drain(_ batch: URL, owner: String, send: (URL) async throws -> Bool) async throws -> (file: URL, error: Error)? {
+    guard try self.owner(of: batch) == owner else { throw CancellationError() }
+    var firstFailure: (URL, Error)?
+    for file in try manifests(in: batch) {
+      try Task.checkCancellation()
+      guard activeOwner == owner else { throw CancellationError() }
+      do {
+        if try await send(file) {
+          try Task.checkCancellation()
+          try FileManager.default.removeItem(at: file)
+        }
+      } catch is CancellationError { throw CancellationError() }
+      catch {
+        try Task.checkCancellation()
+        if firstFailure == nil { firstFailure = (file, error) }
+      }
+    }
+    if try manifests(in: batch).isEmpty { try FileManager.default.removeItem(at: batch) }
+    return firstFailure
   }
 
   public func manifests(in batch: URL) throws -> [URL] {

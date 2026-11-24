@@ -68,7 +68,8 @@ final class ShareViewController: UIViewController {
   }
 
   private func load(_ provider: NSItemProvider, into stage: URL) async throws -> ShareAttachment? {
-    for type in [UTType.url, .image, .plainText] where provider.hasItemConformingToTypeIdentifier(type.identifier) {
+    let offers = [UTType.url, .image, .plainText].filter { provider.hasItemConformingToTypeIdentifier($0.identifier) }
+    return try await ShareAttachment.firstAvailable(offers) { type in
       if type == .image {
         let name = UUID().uuidString
         let target = stage.appending(path: name)
@@ -93,8 +94,7 @@ final class ShareViewController: UIViewController {
           } else { continuation.resume(returning: nil) }
         }
       }
-      if let attachment { return attachment }
+      return attachment
     }
-    return nil
   }
 }

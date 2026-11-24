@@ -5,6 +5,11 @@ import ShelvrKit
 import SwiftUI
 
 struct SharedInboxReceiver: ViewModifier {
+  private struct Failure {
+    let file: URL
+    let message: String
+  }
+
   @Environment(Backend.self) private var backend
   @Environment(\.scenePhase) private var phase
   @Environment(\.copy) private var copy
@@ -34,6 +39,7 @@ struct SharedInboxReceiver: ViewModifier {
           failedFile = nil
           failureCopy = "share.retryHelp"
           do { try await drain(inbox) }
+          catch is CancellationError { continue }
           catch where !Task.isCancelled { failed = true }
           catch {}
         }
@@ -59,40 +65,43 @@ struct SharedInboxReceiver: ViewModifier {
       try Task.checkCancellation()
       guard let owner = user?._id else { try inbox.activate(nil); return }
       try inbox.activate(owner)
+      var firstFailure: Failure?
       for batch in try inbox.batches() where (try inbox.owner(of: batch)) == owner {
-        try await process(batch, inbox: inbox, owner: owner)
+        let failure = try await process(batch, inbox: inbox, owner: owner)
+        firstFailure = firstFailure ?? failure
+      }
+      if let firstFailure {
+        failedFile = firstFailure.file
+        failureCopy = firstFailure.message
+        failed = true
       }
       return
     }
   }
 
-  private func process(_ batch: URL, inbox: ShareInbox, owner: String) async throws {
-    for file in try inbox.manifests(in: batch) {
-      try Task.checkCancellation()
-      guard backend.status == .signedIn, inbox.activeOwner == owner else { return }
-      do {
-        try await send(file: file, batch: batch, inbox: inbox, owner: owner)
-      } catch {
-        if !Task.isCancelled {
-          failedFile = file
-          failureCopy = ImportPhoto.failureCopy(error)
-          if failureCopy == "errors.savePhoto" { failureCopy = "share.retryHelp" }
-          if failureCopy == "freePlan.photosNeedPro",
-            let payload = try? JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: file)),
-            payload.kind == .link { failureCopy = "freePlan.leftBody" }
-        }
-        throw error
-      }
-      try Task.checkCancellation()
-      try FileManager.default.removeItem(at: file)
+  private func process(_ batch: URL, inbox: ShareInbox, owner: String) async throws -> Failure? {
+    let refusal = try await inbox.drain(batch, owner: owner) { file in
+      try backend.requireShareOwner(owner)
+      try await send(file: file, batch: batch, inbox: inbox, owner: owner)
+      return true
     }
-    try FileManager.default.removeItem(at: batch)
+    return refusal.map { Failure(file: $0.file, message: self.refusal($0.error, at: $0.file)) }
+  }
+
+  private func refusal(_ error: Error, at file: URL) -> String {
+    let message = ImportPhoto.failureCopy(error)
+    if message == "errors.savePhoto" { return "share.retryHelp" }
+    if message == "freePlan.photosNeedPro",
+      let payload = try? JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: file)),
+      payload.kind == .link { return "freePlan.leftBody" }
+    return message
   }
 
   private func send(file: URL, batch: URL, inbox: ShareInbox, owner: String) async throws {
     let payload = try JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: file))
     switch payload.kind {
     case .link:
+      try backend.requireShareOwner(owner)
       let _: String = try await backend.client.mutation("items:createLinkItem", with: [
         "url": payload.value, "operationId": payload.operationID, "saveSource": "share_extension"
       ])
@@ -102,7 +111,7 @@ struct SharedInboxReceiver: ViewModifier {
       let photo = try await Task.detached { try ImportPhoto(Data(contentsOf: imageURL, options: .mappedIfSafe)) }.value
       try Task.checkCancellation()
       guard backend.status == .signedIn, inbox.activeOwner == owner else { throw CancellationError() }
-      _ = try await backend.savePhoto(photo, operationID: payload.operationID, fromShare: true)
+      _ = try await backend.savePhoto(photo, operationID: payload.operationID, fromShare: true, owner: owner)
     }
   }
 }

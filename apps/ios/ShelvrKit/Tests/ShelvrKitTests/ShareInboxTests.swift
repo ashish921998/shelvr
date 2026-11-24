@@ -74,3 +74,34 @@ import Testing
   #expect(result.map(\.value) == [longer, shorter, longer])
   #expect(ShareAttachment.webLink("file:///fixture.png") == nil)
 }
+
+@MainActor @Test func usesTheImageWhenAProvidersURLRepresentationThrows() async throws {
+  var attempted: [String] = []
+  let value = try await ShareAttachment.firstAvailable(["url", "image"]) { type in
+    attempted.append(type)
+    if type == "url" { throw CocoaError(.fileReadCorruptFile) }
+    return .payload(InboxPayload(kind: .image, value: "fixture.png"))
+  }
+  #expect(attempted == ["url","image"])
+  if case let .payload(payload) = value { #expect(payload.kind == .image) }
+  else { Issue.record("Expected the image representation") }
+}
+
+@MainActor @Test func aRefusedPhotoDoesNotBlockAnotherShare() async throws {
+  let inbox = ShareInbox(directory: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString))
+  defer { try? FileManager.default.removeItem(at: inbox.directory) }
+  try inbox.activate("first")
+  let stage = try inbox.stage(owner: "first")
+  try inbox.publish([InboxPayload(kind: .image, value: "photo"), InboxPayload(kind: .link, value: "https://example.com")], in: stage)
+  let batch = try #require(inbox.batches().first)
+  let original = try inbox.manifests(in: batch)
+  var attempted: [URL] = []
+  let failure = try await inbox.drain(batch, owner: "first") { file in
+    attempted.append(file)
+    if file == original[0] { throw CocoaError(.fileReadNoPermission) }
+    return true
+  }
+  #expect(attempted == original)
+  #expect(failure?.file == original[0])
+  #expect(try inbox.manifests(in: batch) == [original[0]])
+}
