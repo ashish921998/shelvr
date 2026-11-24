@@ -16,6 +16,8 @@ export const PUBLIC_ON_PURPOSE: Readonly<Record<string, string>> = {
     "Answers false, not an error, to a signed-out caller or a non-development account, so the dev-only reset button can hide.",
   "freeSaves:freePlanOpen":
     "Onboarding's paywall opens before sign-in, so it answers a signed-out caller whether closing it leads to free saves; it reads only a deployment switch.",
+  "notifications:unregisterInstallation":
+    "A phone that has already signed out can finish disabling its own push token by proving possession of the installation secret recorded at registration.",
   "passportShares:passportPreview":
     "A shared passport link opens before sign-in, so it answers a signed-out caller; the random token is the capability, it returns only first name, counts, place names, cities and city-level dots, and a stopped share or a gone or deleting owner answers null.",
   "sharedLists:invitePreview":

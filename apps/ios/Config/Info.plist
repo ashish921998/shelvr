@@ -2,9 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>ShelvrAppGroup</key>
+	<string>group.$(SHELVR_APP_ID)</string>
 	<key>ShelvrRevenueCatKey</key>
-    <string>$(SHELVR_REVENUECAT_KEY)</string>
-    <key>ShelvrConvexURL</key>
+	<string>$(SHELVR_REVENUECAT_KEY)</string>
+	<key>ShelvrConvexURL</key>
 	<string>$(SHELVR_CONVEX_URL)</string>
 	<key>ShelvrVariant</key>
 	<string>$(SHELVR_VARIANT)</string>
