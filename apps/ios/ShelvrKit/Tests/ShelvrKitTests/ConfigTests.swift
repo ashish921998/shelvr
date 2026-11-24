@@ -22,11 +22,17 @@ struct ConfigTests {
   }
 
   @Test func infoDictionaryWithoutAVariantIsTreatedAsDevelopment() throws {
-    let env = try AppEnvironment(infoDictionary: ["ShelvrConvexURL": dev.absoluteString])
+    let env = try AppEnvironment(infoDictionary: ["CFBundleIdentifier": "app.shelvr.save.dev", "ShelvrConvexURL": dev.absoluteString])
     #expect(env.variant == .development)
     #expect(env.oauthRedirect.absoluteString == "shelvr-preview://auth/callback")
     #expect(throws: AppEnvironment.ConfigError.developmentUsesProduction) {
       try AppEnvironment(infoDictionary: ["ShelvrConvexURL": "https://amiable-setter-120.convex.cloud"])
+    }
+  }
+
+  @Test func missingBundleIdentityIsAConfigError() {
+    #expect(throws: AppEnvironment.ConfigError.missingBundleID) {
+      try AppEnvironment(infoDictionary: ["ShelvrConvexURL": dev.absoluteString])
     }
   }
 

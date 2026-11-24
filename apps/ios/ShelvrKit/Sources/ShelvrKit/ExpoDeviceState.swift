@@ -7,62 +7,60 @@ public struct ExpoDeviceState {
     public let token: String
   }
 
-  let bundleID: String
-  let deployment: URL
-  let defaults: UserDefaults
-  let group: UserDefaults?
-  let read: ([String: Any]) -> Data?
+  private let environment: AppEnvironment
+  private let defaults: UserDefaults
+  private let group: UserDefaults?
+  private let store: ExpoSecureStore
 
-  init(bundleID: String, deployment: URL, defaults: UserDefaults = .standard,
-       group: UserDefaults?, read: @escaping ([String: Any]) -> Data? = Keychain.read) {
-    self.bundleID = bundleID
-    self.deployment = deployment
+  public init(environment: AppEnvironment) {
+    self.init(environment: environment, defaults: .standard, group: UserDefaults(suiteName: environment.appGroup))
+  }
+
+  init(environment: AppEnvironment, defaults: UserDefaults, group: UserDefaults?,
+       read: @escaping @Sendable ([String: Any]) -> Data? = Keychain.read) {
+    self.environment = environment
     self.defaults = defaults
     self.group = group
-    self.read = read
+    store = ExpoSecureStore(deployment: environment.convexURL, read: read)
   }
 
-  public var onboarded: Bool { secureString("shelvr.onboarded") == "true" }
-  public var installSecret: String? { secureString("notification-install-secret") }
-  public var hasPendingShare: Bool { secureString("shelvr.pending.share") == "1" }
-  public var discardedShare: String? { secureString("shelvr.discarded.share") }
-  public var pendingSharePayloads: Data? { group?.data(forKey: "expo-sharing") }
-  public var pendingInvocations: Data? { defaults.data(forKey: "dev.expo.appintents.invocations.pending") }
+  public var onboarded: Bool { store.string("shelvr.onboarded") == "true" }
+  public var installSecret: String? { store.string("notification-install-secret") }
+  public var hasPendingShare: Bool { store.string("shelvr.pending.share") == "1" }
+  public var discardedShare: String? { store.string("shelvr.discarded.share") }
+  public func pendingSharePayloads() throws -> [SharePayload] {
+    try decode([SharePayload].self, group?.data(forKey: "expo-sharing")) ?? []
+  }
+
+  public func pendingInvocations() throws -> [Invocation] {
+    try decode([Invocation].self, defaults.data(forKey: "dev.expo.appintents.invocations.pending")) ?? []
+  }
 
   public var installationID: String? {
-    notificationValue("EXDeviceInstallationUUIDKey") ?? defaults.string(forKey: "EXDeviceInstallationUUIDKey")
+    notificationData("EXDeviceInstallationUUIDKey").flatMap { String(data: $0, encoding: .utf8) } ?? defaults.string(forKey: "EXDeviceInstallationUUIDKey")
   }
 
-  public var registrationInfo: String? { notificationValue("EXNotificationRegistrationInfoKey") }
+  public func registrationInfo() throws -> RegistrationInfo? {
+    try decode(RegistrationInfo.self, notificationData("EXNotificationRegistrationInfoKey"))
+  }
 
   public func notificationTokens() throws -> [String] {
-    let namespace = deployment.absoluteString.replacing(/[^A-Za-z0-9._-]/, with: "_")
-    guard let stored = secureString("notification-tokens-\(namespace)") else { return [] }
-    return try JSONDecoder().decode([String].self, from: Data(stored.utf8))
+    try decode([String].self, store.data("notification-tokens-\(store.namespace)")) ?? []
   }
 
   public func captureCredentials() throws -> CaptureCredentials? {
-    guard let data = read([kSecClass as String: kSecClassGenericPassword,
-                           kSecAttrService as String: "shelvr.app-intents.capture",
-                           kSecAttrAccount as String: "credentials"]) else { return nil }
-    return try JSONDecoder().decode(CaptureCredentials.self, from: data)
+    try decode(CaptureCredentials.self, store.read([
+      kSecClass as String: kSecClassGenericPassword,
+      kSecAttrService as String: "shelvr.app-intents.capture",
+      kSecAttrAccount as String: "credentials",
+    ]))
   }
 
-  private func notificationValue(_ key: String) -> String? {
-    string(service: bundleID, key: key)
+  private func notificationData(_ key: String) -> Data? {
+    store.read(ExpoSecureStore.query(service: environment.bundleID, key: key))
   }
 
-  private func secureString(_ key: String) -> String? {
-    for service in LegacyExpoSession.services {
-      if let value = string(service: service, key: key) { return value.isEmpty ? nil : value }
-    }
-    return nil
-  }
-
-  private func string(service: String, key: String) -> String? {
-    let account = Data(key.utf8)
-    return read([kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
-                 kSecAttrAccount as String: account, kSecAttrGeneric as String: account])
-      .flatMap { String(data: $0, encoding: .utf8) }
+  private func decode<T: Decodable>(_ type: T.Type, _ data: Data?) throws -> T? {
+    try data.map { try JSONDecoder().decode(type, from: $0) }
   }
 }

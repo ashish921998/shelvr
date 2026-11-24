@@ -7,12 +7,16 @@ public struct AppEnvironment: Sendable, Equatable {
   }
 
   public enum ConfigError: Error, Equatable {
+    case missingBundleID
     case missingConvexURL
     case developmentUsesProduction
     case productionUsesOtherDeployment(String)
   }
 
   public static let productionConvexURL = URL(string: "https://amiable-setter-120.convex.cloud")!
+
+  public private(set) var bundleID: String
+  public var appGroup: String { "group.\(bundleID)" }
 
   public let variant: Variant
   public let convexURL: URL
@@ -27,6 +31,7 @@ public struct AppEnvironment: Sendable, Equatable {
     default:
       break
     }
+    bundleID = variant == .production ? "app.shelvr.save" : "app.shelvr.save.preview"
     self.variant = variant
     self.convexURL = convexURL
   }
@@ -38,6 +43,8 @@ public struct AppEnvironment: Sendable, Equatable {
     else { throw .missingConvexURL }
     let variant = Variant(rawValue: infoDictionary["ShelvrVariant"] as? String ?? "") ?? .development
     try self.init(variant: variant, convexURL: url)
+    guard let id = infoDictionary["CFBundleIdentifier"] as? String, !id.isEmpty else { throw .missingBundleID }
+    bundleID = id
   }
 
   public var urlScheme: String {
