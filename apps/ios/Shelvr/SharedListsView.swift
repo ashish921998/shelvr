@@ -2,6 +2,7 @@ import ShelvrKit
 import SwiftUI
 
 struct SharedListsView: View {
+  var collections = false
   @Environment(\.copy) private var copy
 
   var body: some View {
@@ -21,10 +22,10 @@ struct SharedListsView: View {
           description: Text(copy("sharedLists.hint"))) }
       }
     }
-    .navigationTitle(copy("sharedLists.title"))
+    .navigationTitle(copy(collections ? "homePlaces.collections" : "sharedLists.title"))
     .toolbar {
       if let route = AppLink("/new-shared-list") {
-        NavigationLink(value: route) { Label(copy("sharedLists.newList"), systemImage: "plus") }
+        NavigationLink(value: route) { Label(copy(collections ? "homePlaces.newCollection" : "sharedLists.newList"), systemImage: "plus") }
       }
     }
   }

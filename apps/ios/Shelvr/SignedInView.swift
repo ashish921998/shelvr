@@ -59,7 +59,7 @@ struct SignedInView: View {
           }
           .navigationTitle(copy("addSheet.title"))
         case "trips": TripsTabView()
-        case "shared-lists": SharedListsView()
+        case "shared-lists", "collections": SharedListsView(collections: link.path.first == "collections")
         case "new-shared-list":
           CreateListView { id in
             guard path.last == link, let target = AppLink("/shared-list/" + id) else { return }
