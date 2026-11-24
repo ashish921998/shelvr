@@ -3,15 +3,17 @@ import Foundation
 import UniformTypeIdentifiers
 
 public struct InboxPayload: Codable, Sendable {
-  public enum Kind: String, Codable, Sendable { case link, image }
+  public enum Kind: String, Codable, Sendable { case link, image, note }
   public let kind: Kind
   public let value: String
   public let operationID: String
+  public let siri: Bool?
 
-  public init(kind: Kind, value: String) {
+  public init(kind: Kind, value: String, operationID: String = "share:\(UUID().uuidString)", siri: Bool = false) {
     self.kind = kind
     self.value = value
-    self.operationID = "share:\(UUID().uuidString)"
+    self.operationID = operationID
+    self.siri = siri
   }
 }
 
@@ -73,11 +75,13 @@ public struct PendingShare: Sendable {
   public enum Content: Sendable {
     case link(String)
     case image(URL)
+    case note(String)
   }
 
   public struct Delivery: Sendable {
     public let content: Content
     public let operationID: String
+    public let siri: Bool
   }
 
   public let delivery: Result<Delivery, any Error>
@@ -95,11 +99,13 @@ public struct PendingShare: Sendable {
       switch payload.kind {
       case .link:
         content = .link(payload.value)
+      case .note:
+        content = .note(payload.value)
       case .image:
         guard UUID(uuidString: payload.value) != nil else { throw CocoaError(.fileReadCorruptFile) }
         content = .image(manifest.deletingLastPathComponent().appending(path: payload.value))
       }
-      return Delivery(content: content, operationID: payload.operationID)
+      return Delivery(content: content, operationID: payload.operationID, siri: payload.siri == true)
     }
   }
 
@@ -143,12 +149,10 @@ public struct ShareInbox: Sendable {
 
     let manager = FileManager.default
     try manager.createDirectory(at: directory, withIntermediateDirectories: true)
-    var location = directory
-    if try location.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup != true {
-      var values = URLResourceValues()
-      values.isExcludedFromBackup = true
-      try location.setResourceValues(values)
-    }
+    var location = URL(filePath: directory.path, directoryHint: .isDirectory)
+    var values = URLResourceValues()
+    values.isExcludedFromBackup = true
+    try location.setResourceValues(values)
     if activeOwner != owner { try Data(owner.utf8).write(to: marker, options: .atomic) }
   }
 
