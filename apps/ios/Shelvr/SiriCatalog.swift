@@ -71,7 +71,8 @@ protocol AppIntentEntityRecordConvertible {
             guard let bytes = try? Data(contentsOf: file), let payload = try? JSONDecoder().decode(InboxPayload.self, from: bytes),
               payload.operationID == operation, payload.siri == true else { continue }
             let text = payload.kind == .image ? Copy()("item.photo") : payload.value
-            return AppIntentEntityRecord(id: id, title: text, metadata: ["kind": "note", "text": text])
+            let firstLine = text.split(separator: "\n", maxSplits: 1).first.map(String.init) ?? text
+            return AppIntentEntityRecord(id: id, title: String(firstLine.prefix(80)), metadata: ["kind": "note", "text": text])
           }
         }
         return nil
