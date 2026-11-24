@@ -65,10 +65,10 @@ struct StampPlacesView: View {
         }
         .safeAreaInset(edge: .bottom) {
           if city == nil {
-            Button(copy.count("passport.stampCount", chosen.count)) {
+            Button(copy("passport.stampCount", count: chosen.count)) {
               operation.run {
                 let count = try await backend.stampBefore(chosen)
-                finished(copy.count("passport.momentBulk", count))
+                finished(copy("passport.momentBulk", count: count))
               }
             }.disabled(chosen.isEmpty || operation.busy).buttonStyle(.borderedProminent).padding()
           }

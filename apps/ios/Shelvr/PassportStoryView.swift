@@ -19,14 +19,18 @@ struct PassportStoryView: View {
   private struct Output: Identifiable { let id = UUID(); let items: [Any] }
 
   var body: some View {
-    ScrollView {
+    GeometryReader { geometry in
+      ScrollView {
       if let stamps {
         let cityReady = cities != nil || failed.contains("cityStamps:listCityStamps")
         let togetherReady = together != nil || failed.contains("placeVisits:passportTogether")
         let totalTogether = min(together ?? 0, stamps.count)
         let story = PassportStory(places: stamps, cities: cities ?? []) { copy($0.labelKey) }
         VStack(spacing: 16) {
+          let width = min(360, max(1, geometry.size.width - 32))
           card(story, together: totalTogether, images: photos, code: nil)
+            .scaleEffect(width / 360, anchor: .topLeading)
+            .frame(width: width, height: width * 16 / 9, alignment: .topLeading)
           Button(copy("common.share")) { export(story, together: totalTogether, asLink: false) }
             .buttonStyle(.borderedProminent)
             .disabled(story.places == 0 || !cityReady || !togetherReady || loadedPhotos != story.photos.compactMap(\.cover))
@@ -44,6 +48,7 @@ struct PassportStoryView: View {
           }
       } else if failed.isEmpty { ProgressView() }
       if !failed.isEmpty { Button(copy("common.retry")) { retry += 1 } }
+      }.frame(maxWidth: .infinity)
     }
     .navigationTitle(copy("passportStory.screenTitle"))
     .sheet(item: $share) { output in PassportActivity(items: output.items) }
@@ -65,6 +70,7 @@ struct PassportStoryView: View {
 
   private func export(_ story: PassportStory, together: Int, asLink: Bool) {
     guard !busy, asLink || story.places > 0 else { return }
+    let selectedPhotos = photos
     busy = true
     Task {
       defer { busy = false }
@@ -76,7 +82,7 @@ struct PassportStoryView: View {
         filter.correctionLevel = "M"
         guard let qr = filter.outputImage,
           let cg = CIContext().createCGImage(qr, from: qr.extent) else { shareFailed = true; return }
-        let renderer = ImageRenderer(content: card(story, together: together, images: photos, code: UIImage(cgImage: cg)))
+        let renderer = ImageRenderer(content: card(story, together: together, images: selectedPhotos, code: UIImage(cgImage: cg)))
         renderer.scale = 3
         guard let image = renderer.uiImage else { shareFailed = true; return }
         share = Output(items: [image])
@@ -100,11 +106,11 @@ struct PassportStoryView: View {
     VStack(alignment: .leading, spacing: 18) {
       Text(copy("passportStory.kicker", ["year": String(Calendar.current.component(.year, from: Date()))])).font(.caption.bold())
       Text(story.places.formatted()).font(.system(size: 60, weight: .black, design: .rounded))
-      Text(copy.count(story.fromReels ? "passportStory.titleReels" : "passportStory.titleSaved", story.places))
+      Text(copy(story.fromReels ? "passportStory.titleReels" : "passportStory.titleSaved", count: story.places))
         .font(.title2.bold())
       HStack {
-        Text(copy.count("passport.citiesCount", story.cities))
-        if story.countries > 0 { Text(copy.count("passport.countriesCount", story.countries)) }
+        Text(copy("passport.citiesCount", count: story.cities))
+        if story.countries > 0 { Text(copy("passport.countriesCount", count: story.countries)) }
       }.font(.subheadline)
       if !story.cityNames.isEmpty { Text(story.cityNames.joined(separator: " · ")).font(.title3.bold()) }
       if !images.isEmpty {
