@@ -15,9 +15,13 @@ public struct KeychainTokenVault: TokenVault {
     self.account = account
   }
 
-  public func read() -> AuthTokens? {
-    Keychain.read(query).flatMap { try? JSONDecoder().decode(AuthTokens.self, from: $0) }
+  var isAbsent: Bool { SecItemCopyMatching(query as CFDictionary, nil) == errSecItemNotFound }
+
+  func checkedTokens() throws -> AuthTokens? {
+    try Keychain.checkedData(query).map { try JSONDecoder().decode(AuthTokens.self, from: $0) }
   }
+
+  public func read() -> AuthTokens? { try? checkedTokens() }
 
   @discardableResult
   public func write(_ tokens: AuthTokens?) -> Bool {
@@ -36,19 +40,24 @@ public struct KeychainTokenVault: TokenVault {
 }
 
 enum Keychain {
-  static func read(_ query: [String: Any]) -> Data? {
+  static func read(_ query: [String: Any]) -> Data? { try? checkedData(query) }
+
+  static func checkedData(_ query: [String: Any]) throws -> Data? {
     var lookup = query
     lookup[kSecReturnData as String] = true
     lookup[kSecMatchLimit as String] = kSecMatchLimitOne
     var result: AnyObject?
-    guard SecItemCopyMatching(lookup as CFDictionary, &result) == errSecSuccess else { return nil }
-    return result as? Data
+    let status = SecItemCopyMatching(lookup as CFDictionary, &result)
+    if status == errSecItemNotFound { return nil }
+    guard status == errSecSuccess else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
+    guard let bytes = result as? Data else { throw CocoaError(.coderReadCorrupt) }
+    return bytes
   }
 
-  static func write(_ data: Data, to query: [String: Any]) -> Bool {
+  static func write(_ data: Data, to query: [String: Any], accessibility: CFString = kSecAttrAccessibleAfterFirstUnlock) -> Bool {
     let attributes: [String: Any] = [
       kSecValueData as String: data,
-      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+      kSecAttrAccessible as String: accessibility,
     ]
     let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
     if status == errSecItemNotFound {

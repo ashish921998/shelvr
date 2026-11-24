@@ -11,3 +11,4 @@ VALIDATE_PRODUCT = YES
 
 #include? "Secrets.xcconfig"
 SHELVR_REVENUECAT_KEY = $(EXPO_PUBLIC_REVENUECAT_IOS_KEY)
+CODE_SIGN_ENTITLEMENTS = Config/Release.entitlements

@@ -2,6 +2,8 @@ import CoreFoundation
 import ShelvrInbox
 import ShelvrKit
 import SwiftUI
+import UIKit
+import UniformTypeIdentifiers
 
 struct SharedInboxReceiver: ViewModifier {
   @Environment(Backend.self) private var backend
@@ -16,18 +18,32 @@ struct SharedInboxReceiver: ViewModifier {
       .onChange(of: backend.userID) { failure = nil; syncOwner() }
       .task { await receive() }
       .alert(copy("share.singleFailure"), isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
-        Button(copy("common.tryAgain")) { failure = nil; InboxSignal.shared.wake() }
-        if let share = failure?.share {
-          Button(copy("common.delete"), role: .destructive) {
-            try? share.discard()
-            failure = nil
-            InboxSignal.shared.wake()
+        if let failure, failure.canRecoverNote, let share = failure.share {
+          Button(copy("share.copyNote")) { copyRecoveredNote(share) }
+        } else {
+          Button(copy("common.tryAgain")) { failure = nil; InboxSignal.shared.wake() }
+          if let share = failure?.share {
+            Button(copy("common.delete"), role: .destructive) {
+              try? share.discard()
+              failure = nil
+              InboxSignal.shared.wake()
+            }
           }
         }
         Button(copy("common.close"), role: .cancel) {}
       } message: {
         if let failure { Text(copy(failure.copyKey)) }
       }
+  }
+
+  private func copyRecoveredNote(_ share: PendingShare) {
+    guard let owner = backend.userID else { return }
+    let copied = try? share.copyAndRemoveNote(for: owner) { text in
+      guard !SiriText.fitsLibrary(text) else { return false }
+      UIPasteboard.general.setItems([[UTType.utf8PlainText.identifier: text]], options: [.localOnly: true])
+      return UIPasteboard.general.string == text
+    }
+    if copied == true { failure = nil; InboxSignal.shared.wake() }
   }
 
   private func syncOwner() {
@@ -49,7 +65,7 @@ struct SharedInboxReceiver: ViewModifier {
       }
       guard currentPhase == .active, failure == nil, let owner = backend.userID else { continue }
       do {
-        let result = try await processor.drain(owner: owner)
+        let result = try await processor.drain(owner: owner, deliverSiri: SiriInboxDelivery(backend: backend).send)
         if !Task.isCancelled, backend.userID == owner { failure = result }
       }
       catch ShareInboxError.ownerChanged {}

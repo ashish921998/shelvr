@@ -248,6 +248,30 @@ describe("capture tokens", () => {
   });
 });
 
+describe("POST /app-intents/revoke", () => {
+  it("revokes only the presented device token without an account session", async () => {
+    const { base, t, token } = await setup();
+    const sibling = await t.action(api.appIntents.issueCaptureToken, {});
+    const other = await signedInUser(base, { pro: true });
+    const foreign = await other.t.action(api.appIntents.issueCaptureToken, {});
+    const revoke = (bearer?: string) =>
+      post(base, "/app-intents/revoke", { token: foreign }, bearer);
+    expect((await revoke()).status).toBe(401);
+    expect((await revoke("malformed")).status).toBe(401);
+    expect((await revoke("0".repeat(64))).status).toBe(204);
+    expect((await revoke(token)).status).toBe(204);
+    expect((await revoke(token)).status).toBe(204);
+    const hashes = await base.run(async (ctx) =>
+      (await ctx.db.query("captureTokens").collect()).map(
+        (row) => row.tokenHash,
+      ),
+    );
+    expect(hashes.sort()).toEqual(
+      (await Promise.all([sha256Hex(sibling), sha256Hex(foreign)])).sort(),
+    );
+  });
+});
+
 describe("POST /app-intents/capture", () => {
   it("rejects a missing or unknown token", async () => {
     const { t } = await setup();
@@ -335,6 +359,29 @@ describe("POST /app-intents/capture", () => {
     );
     expect(memberships).toHaveLength(1);
     expect(memberships[0]).toMatchObject({ spaceId: mine, status: "saved" });
+  });
+
+  it("remains idempotent when a queued Siri link's folder disappeared", async () => {
+    const { t, userId, token } = await setup();
+    const spaceId = await t.run(async (ctx) => {
+      const folder = await ctx.db.insert("spaces", { userId, name: "Removed" });
+      await ctx.db.delete(folder);
+      return folder;
+    });
+    const body = {
+      kind: "link",
+      url: "https://example.com",
+      operationId: OP,
+      spaceId,
+    };
+    const first = await post(t, "/app-intents/capture", body, token);
+    const retry = await post(t, "/app-intents/capture", body, token);
+    expect(first.status).toBe(200);
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toEqual(await first.json());
+    expect(
+      await t.run((ctx) => ctx.db.query("spaceItems").collect()),
+    ).toHaveLength(0);
   });
 
   it("refuses a link the URL policy rejects instead of failing", async () => {

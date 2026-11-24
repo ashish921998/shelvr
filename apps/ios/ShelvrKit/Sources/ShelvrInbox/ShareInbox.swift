@@ -3,15 +3,23 @@ import Foundation
 import UniformTypeIdentifiers
 
 public struct InboxPayload: Codable, Sendable {
-  public enum Kind: String, Codable, Sendable { case link, image }
+  public enum Kind: String, Codable, Sendable { case link, image, note }
   public let kind: Kind
   public let value: String
   public let operationID: String
+  public let siri: Bool?
+  public let spaceID: String?
+  public let context: String?
+  public let sticker: Bool?
 
-  public init(kind: Kind, value: String) {
+  public init(kind: Kind, value: String, operationID: String = "share:\(UUID().uuidString)", siri: Bool = false, spaceID: String? = nil, context: String? = nil, sticker: Bool? = nil) {
     self.kind = kind
     self.value = value
-    self.operationID = "share:\(UUID().uuidString)"
+    self.operationID = operationID
+    self.siri = siri
+    self.spaceID = spaceID
+    self.context = context.map { String($0.prefix(8000)) }
+    self.sticker = sticker
   }
 }
 
@@ -66,18 +74,22 @@ public enum ShareAttachment: Sendable {
 }
 
 public enum ShareInboxError: Error, Equatable, Sendable {
-  case ownerChanged, nothingToSave
+  case ownerChanged, nothingToSave, longNoteNeedsRecovery
 }
 
 public struct PendingShare: Sendable {
   public enum Content: Sendable {
     case link(String)
     case image(URL)
+    case note(String)
   }
 
   public struct Delivery: Sendable {
     public let content: Content
     public let operationID: String
+    public let siri: Bool
+    public let spaceID, context: String?
+    public let sticker: Bool
   }
 
   public let delivery: Result<Delivery, any Error>
@@ -95,11 +107,14 @@ public struct PendingShare: Sendable {
       switch payload.kind {
       case .link:
         content = .link(payload.value)
+      case .note:
+        content = .note(payload.value)
       case .image:
         guard UUID(uuidString: payload.value) != nil else { throw CocoaError(.fileReadCorruptFile) }
         content = .image(manifest.deletingLastPathComponent().appending(path: payload.value))
       }
-      return Delivery(content: content, operationID: payload.operationID)
+      return Delivery(content: content, operationID: payload.operationID, siri: payload.siri == true,
+        spaceID: payload.spaceID, context: payload.context, sticker: payload.sticker == true)
     }
   }
 
@@ -108,6 +123,17 @@ public struct PendingShare: Sendable {
     if case let .success(upload) = delivery, case let .image(file) = upload.content {
       inbox.removeUnreferencedImage(file, in: manifest.deletingLastPathComponent())
     }
+  }
+
+  public func copyAndRemoveNote(for owner: String, _ copy: (String) -> Bool) throws -> Bool {
+    guard owner == self.owner else { throw ShareInboxError.ownerChanged }
+    let batch = manifest.deletingLastPathComponent()
+    try inbox.checkOwner(owner, of: batch)
+    let current = try PendingShare(manifest: manifest, inbox: inbox, owner: owner).delivery.get()
+    guard case .success(let expected) = delivery, current.operationID == expected.operationID,
+      current.siri, case let .note(text) = current.content, copy(text) else { return false }
+    try removeManifest()
+    return true
   }
 
   fileprivate func removeManifest() throws {
@@ -144,11 +170,9 @@ public struct ShareInbox: Sendable {
     let manager = FileManager.default
     try manager.createDirectory(at: directory, withIntermediateDirectories: true)
     var location = directory
-    if try location.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup != true {
-      var values = URLResourceValues()
-      values.isExcludedFromBackup = true
-      try location.setResourceValues(values)
-    }
+    var values = URLResourceValues()
+    values.isExcludedFromBackup = true
+    try location.setResourceValues(values)
     if activeOwner != owner { try Data(owner.utf8).write(to: marker, options: .atomic) }
   }
 
@@ -192,6 +216,19 @@ public struct ShareInbox: Sendable {
     try FileManager.default.moveItem(at: stage, to: stage.deletingPathExtension().appendingPathExtension("ready"))
     CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
       CFNotificationName(Self.notification as CFString), nil, nil, true)
+  }
+
+  public func queuedSiriDelivery(operationID: String, owner: String) -> PendingShare.Delivery? {
+    guard activeOwner == owner else { return nil }
+    for batch in (try? batches()) ?? [] where (try? self.owner(of: batch)) == owner {
+      for manifest in (try? manifests(in: batch)) ?? [] {
+        let share = PendingShare(manifest: manifest, inbox: self, owner: owner)
+        guard case let .success(delivery) = share.delivery,
+          delivery.siri, delivery.operationID == operationID else { continue }
+        return activeOwner == owner ? delivery : nil
+      }
+    }
+    return nil
   }
 
   @MainActor public func drain(owner: String, send: (PendingShare.Delivery) async throws -> Void) async throws -> FailedShare? {
