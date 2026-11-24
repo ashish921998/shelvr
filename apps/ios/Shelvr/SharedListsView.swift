@@ -98,7 +98,8 @@ struct SharedListView: View {
   var body: some View {
     SocialQuery(query: "sharedLists:getSharedList", arguments: ["listId": id], type: SharedListDetail?.self) { detail in
       if let detail {
-        let city = selectedCity.flatMap { detail.cities.contains($0) ? $0 : nil } ?? detail.cities.first ?? ""
+        let fresh = detail.cities.first { city in detail.places.contains { $0.isNew && PassportSection.cityKey($0.city) == PassportSection.cityKey(city) } }
+        let city = selectedCity.flatMap { detail.cities.contains($0) ? $0 : nil } ?? fresh ?? detail.cities.first ?? ""
         let places = detail.places.filter { PassportSection.cityKey($0.city) == PassportSection.cityKey(city) }
         List {
           Section {
