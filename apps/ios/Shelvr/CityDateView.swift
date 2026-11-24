@@ -31,10 +31,14 @@ struct CityDateView: View {
           }
         } else {
           let noPair = result.status == "no_pair"
-          ContentUnavailableView(copy(noPair ? "datePlan.noPairTitle" : "datePlan.noAnchorTitle"), systemImage: "mappin.slash",
-            description: Text(copy(noPair ? "datePlan.noPairBody" : result.kind == "classic" ? "datePlan.noAnchorClassic" : "datePlan.noAnchorLowkey", ["city": city])))
+          ContentUnavailableView(copy(lockedFirst ? "datePlan.tryAnotherFirst" : noPair ? "datePlan.noPairTitle" : "datePlan.noAnchorTitle"), systemImage: "mappin.slash",
+            description: Text(copy(lockedFirst ? "datePlan.firstUnavailable" : noPair ? "datePlan.noPairBody" : result.kind == "classic" ? "datePlan.noAnchorClassic" : "datePlan.noAnchorLowkey", ["city": city])))
         }
-        Button(copy("datePlan.changeKind")) { self.result = nil; self.evening = nil }
+        Button(copy(lockedFirst && evening == nil ? "datePlan.pickFirst" : "datePlan.changeKind")) {
+          if lockedFirst && evening == nil { picking = true }
+          self.result = nil; self.evening = nil
+          lockedFirst = false
+        }
       } else {
         Button(copy("datePlan.pickFirst")) { picking = true }
         ForEach([
