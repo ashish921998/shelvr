@@ -185,7 +185,7 @@ struct SignedInView: View {
       }
     }
     .modifier(CancelSurveyCard(home: library && path.isEmpty))
-    .modifier(TrialReminderObserver(home: path.isEmpty))
+    .modifier(TrialReminderObserver(home: library && path.isEmpty))
     .environment(access)
     .sheet(item: $billing) { BillingSheet(destination: $0, confirmed: { access.retry += 1 }) }
     .task(id: access.retry) { await access.readPlan(backend) }

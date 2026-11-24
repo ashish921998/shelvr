@@ -16,7 +16,8 @@ struct SiriInboxDelivery {
     case .note(let text):
       if !SiriText.fitsLibrary(text) { throw ShareInboxError.longNoteNeedsRecovery }
       if !SiriText.fitsCapture(text) {
-        try await saveLongNote(text, delivery: delivery, checkpoint: checkpoint)
+        try await backend.saveQueuedSiriNote(text, operationID: delivery.operationID, spaceID: delivery.spaceID,
+          owner: owner, checkpoint: checkpoint)
       } else {
         try await withToken(owner: owner, checkpoint: checkpoint) { credentials in
           _ = try await ShelvrCapture.save(kind: "note", text: text, url: nil,
@@ -31,20 +32,6 @@ struct SiriInboxDelivery {
           operationId: delivery.operationID, credentials: credentials)
       }
     }
-  }
-
-  private func saveLongNote(_ text: String, delivery: PendingShare.Delivery, checkpoint: () throws -> Void) async throws {
-    var arguments = ["text": text, "operationId": delivery.operationID, "saveSource": SaveSource.siri.rawValue]
-    if let id = delivery.spaceID {
-      struct Folder: Decodable { let _id: String }
-      try checkpoint()
-      for try await folder in backend.query("spaces:getSpace", with: ["id": id], as: Folder?.self) {
-        arguments["spaceId"] = folder?._id
-        break
-      }
-    }
-    try checkpoint()
-    let _: String = try await backend.client.mutation("items:createNoteItem", with: arguments)
   }
 
   private func withToken(owner: String, checkpoint: () throws -> Void,
