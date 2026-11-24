@@ -58,6 +58,7 @@ struct SignedInView: View {
             entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
           }
           .navigationTitle(copy("addSheet.title"))
+        case "passport-invite" where link.path.count == 2: PassportInvitePreview(token: link.path[1]).id(link.path[1])
         case "passport": PassportView()
         case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)
         case "saves": LibraryView(screen: .saves)
