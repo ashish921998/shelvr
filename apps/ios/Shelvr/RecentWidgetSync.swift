@@ -47,11 +47,12 @@ struct RecentWidgetSync: ViewModifier {
           for try await account in backend.query("users:getCurrentUser", as: AccountView.CurrentUser?.self) {
             try Task.checkCancellation()
             if owner != account?._id {
-              try ShareInbox.system()?.activate(account?._id)
               owner = account?._id
               plan = nil
               if let file = RecentSavesSnapshot.location,
                 !RecentSavesSnapshot.canKeep(file, owner: owner) { publish(nil) }
+              try? ShareInbox.system()?.activate(owner)
+              WidgetCenter.shared.reloadTimelines(ofKind: "RecentSaves")
             }
           }
         } catch {}
