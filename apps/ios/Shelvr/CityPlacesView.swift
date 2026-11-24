@@ -45,7 +45,7 @@ struct CityPlacesView: View {
                   } label: {
                     Image(systemName: went.contains(pin) ? "checkmark.seal.fill" : "seal").frame(width: 44, height: 44)
                   }.buttonStyle(.borderless).disabled(operation.busy)
-                    .accessibilityLabel(copy("passport.stampPlaceLabel", ["name": pin.name]))
+                    .accessibilityLabel(went.contains(pin) ? copy("cityProgress.unmarkVisited") : copy("passport.stampPlaceLabel", ["name": pin.name]))
                     .accessibilityAddTraits(went.contains(pin) ? .isSelected : [])
                 }
               }
@@ -67,6 +67,7 @@ struct CityPlacesView: View {
     .navigationTitle(city)
     .socialOperation(operation, failure: copy("errors.tryAgain"), close: copy("common.close"))
     .task(id: attempt) {
+      marks = nil
       visitFailure = false
       do {
         for try await next in backend.query("placeVisits:listVisits", as: [MapVisit].self) {
