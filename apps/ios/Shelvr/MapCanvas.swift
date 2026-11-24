@@ -87,9 +87,14 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     func mapView(_ map: MKMapView, regionWillChangeAnimated animated: Bool) {
-      if map.subviews.flatMap({ $0.gestureRecognizers ?? [] }).contains(where: {
-        $0.state == .began || $0.state == .changed
-      }) { opened = true }
+      if hasActiveGesture(map) { opened = true }
+    }
+
+    private func hasActiveGesture(_ view: UIView) -> Bool {
+      for gesture in view.gestureRecognizers ?? [] {
+        if gesture.state == .began || gesture.state == .changed { return true }
+      }
+      return view.subviews.contains(where: hasActiveGesture)
     }
 
     func mapView(_ map: MKMapView, regionDidChangeAnimated animated: Bool) {
