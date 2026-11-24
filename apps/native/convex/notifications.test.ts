@@ -199,7 +199,7 @@ describe("weekly shelf notifications", () => {
     for (let retry = 0; retry < 2; retry++) {
       expect(
         await t.mutation(api.notifications.unregisterInstallation, {
-          token: "token-a",
+          token: " token-a ",
           installSecret: "install-a",
           registrationId,
         }),

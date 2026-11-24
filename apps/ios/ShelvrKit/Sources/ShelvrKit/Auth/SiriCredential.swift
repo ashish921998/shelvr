@@ -50,9 +50,12 @@ public struct SiriCredential: Codable, Sendable {
     try SiriRevocations(site: url).remember(token)
   }
 
-  static func store(_ value: Self) throws {
-    if let old = stored(), old.token != value.token { try old.enqueueRevocation() }
-    guard Keychain.write(try JSONEncoder().encode(value), to: query, accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly) else { throw AuthSessionError.sessionStorageUnavailable }
+  static func store(_ value: Self, in target: [String: Any] = query) throws {
+    if let bytes = try Keychain.checkedData(target) {
+      let old = try JSONDecoder().decode(Self.self, from: bytes)
+      if old.token != value.token { try old.enqueueRevocation() }
+    }
+    guard Keychain.write(try JSONEncoder().encode(value), to: target, accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly) else { throw AuthSessionError.sessionStorageUnavailable }
   }
 
   @MainActor public func removeIfCurrent() {

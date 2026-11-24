@@ -49,3 +49,19 @@ import Testing
   let batch = try #require(inbox.batches().first)
   #expect(try inbox.manifests(in: batch).map(\.lastPathComponent) == (0..<12).map { "\($0).json" })
 }
+
+@Test func aURLAndItsCaptionInOneShareCreateOneLinkOperation() throws {
+  let inbox = ShareInbox(directory: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString))
+  defer { try? FileManager.default.removeItem(at: inbox.directory) }
+  try inbox.activate("first")
+  let stage = try inbox.stage(owner: "first")
+  let first = InboxPayload(kind: .link, value: "https://example.com/reel!")
+  let incoming = ShareAttachment.payloads([.payload(first), .caption("Watch https://example.com/reel!"),
+    .caption("Another: https://example.com/reel-other")])
+  try inbox.publish(incoming, in: stage)
+  let batch = try #require(inbox.batches().first)
+  let manifests = try inbox.manifests(in: batch)
+  #expect(manifests.count == 2)
+  let restored = try JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: manifests[0]))
+  #expect(restored.operationID == first.operationID)
+}
