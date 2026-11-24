@@ -101,7 +101,7 @@ struct SignedInView: View {
           if let city = link.query.first(where: { $0.name == "city" })?.value { CityMapCardView(city: city).id(city) }
           else { LibraryCitiesView() }
         case "add-list-place":
-          if let id = link.query.first(where: { $0.name == "listId" })?.value {
+          if let id = PlanRoutes.listID(link) {
             SocialQuery(query: "sharedLists:getSharedList", arguments: ["listId": id], type: SharedListDetail?.self) { list in
               if let list { AddListPlaceView(detail: list, initialCity: link.query.first { $0.name == "city" }?.value) }
               else { ContentUnavailableView(copy("sharedLists.goneTitle"), systemImage: "person.2") }
@@ -137,7 +137,7 @@ struct SignedInView: View {
               if path.last == link { path[path.count - 1] = result }
             }
           } else if let city = link.query.first(where: { $0.name == "city" })?.value, !city.isEmpty {
-            let listID = link.query.first(where: { $0.name == "listId" })?.value
+            let listID = PlanRoutes.listID(link)
             if link.path.first == "new-trip" {
               NewCityTripView(city: city, listID: listID) { created in
                 guard path.last == link else { return }
@@ -151,7 +151,7 @@ struct SignedInView: View {
                 if path.last == link, let next = parts.string.flatMap({ AppLink($0) }) { path[path.count - 1] = next }
               }.id(link)
             } else { CityDateView(city: city, listID: listID).id(link) }
-          } else if let listID = link.query.first(where: { $0.name == "listId" })?.value {
+          } else if let listID = PlanRoutes.listID(link) {
             SocialQuery(query: "sharedLists:getSharedList", arguments: ["listId": listID], type: SharedListDetail?.self) { list in
               List(list?.cities ?? [], id: \.self) { city in
                 var route: URLComponents {

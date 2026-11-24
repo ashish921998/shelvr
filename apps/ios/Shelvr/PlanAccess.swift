@@ -15,7 +15,7 @@ final class PlanAccess {
   var locked: Bool { !loading && !pro && allowance == nil }
 
   func readPlan(_ backend: Backend) async {
-    failed = false
+    plan = nil; pro = false; receivedAllowance = false; failed = false
     do {
       for try await row in backend.query("subscriptions:getEntitlement", as: ServerPlan.self) {
         try Task.checkCancellation()
@@ -33,11 +33,13 @@ final class PlanAccess {
   }
 
   func readAllowance(_ backend: Backend) async {
+    let reading = retry
     receivedAllowance = false
     guard plan != nil, !pro else { return }
     do {
       for try await row in backend.query("freeSaves:getFreeSaves", as: Allowance?.self) {
         try Task.checkCancellation()
+        guard reading == retry, plan != nil, !pro else { return }
         allowance = row; receivedAllowance = true
       }
     } catch { if !Task.isCancelled { failed = true } }
