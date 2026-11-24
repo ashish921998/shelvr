@@ -177,6 +177,7 @@
   "pro.openStore": "App Store 열기",
   "notifications.disabledTitle": "알림이 꺼져 있어요",
   "notifications.disabledBody": "주간 책장을 켜려면 기기 설정에서 Shelvr 알림을 허용하세요.",
+  "notifications.previousAccount": "알림이 다른 Shelvr 계정에 등록되어 있습니다. 이 기기에서 해당 계정으로 로그인한 뒤 로그아웃하고 여기에서 알림을 켜세요.",
   "notifications.updateFailed": "알림을 업데이트하지 못했어요",
   "errors.trySoon": "잠시 후 다시 시도하세요.",
   "pro.restoredTitle": "구매 복원 완료",

@@ -178,6 +178,7 @@
   "pro.openStore": "Open App Store",
   "notifications.disabledTitle": "Notifications are off",
   "notifications.disabledBody": "Allow notifications for Shelvr in your device settings to turn on the weekly shelf.",
+  "notifications.previousAccount": "Notifications are still registered to another Shelvr account. Sign in to that account on this device and sign out, then enable notifications here.",
   "notifications.updateFailed": "Couldn’t update notifications",
   "errors.trySoon": "Try again in a moment.",
   "pro.restoredTitle": "Purchases restored",
