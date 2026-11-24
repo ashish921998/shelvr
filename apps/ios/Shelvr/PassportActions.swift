@@ -2,7 +2,7 @@ import ShelvrKit
 import SwiftUI
 
 struct PassportActions: View {
-  let cities: [PassportCityStamp]
+  let cities: [PassportCityStamp]?
   let hasPlaces: Bool
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
@@ -13,12 +13,13 @@ struct PassportActions: View {
   @State private var busy = false
   @State private var failed = false
   @State private var subscriptions = 0
+  @State private var retryOperation: (@MainActor () async throws -> Void)?
 
   private struct ShareURL: Identifiable { let url: URL; var id: URL { url } }
 
   var body: some View {
     Menu {
-      Button(copy("cityStamps.add")) { showCities = true }
+      Button(copy("cityStamps.add")) { showCities = true }.disabled(cities == nil)
       if hasPlaces {
         Button(copy("passportShare.share")) {
           run { share = ShareURL(url: try await backend.sharePassport()) }
@@ -31,7 +32,9 @@ struct PassportActions: View {
       Image(systemName: "ellipsis.circle").accessibilityLabel(copy("passport.title"))
     }
     .disabled(busy)
-    .sheet(isPresented: $showCities) { PassportCityPicker(cities: cities) }
+    .sheet(isPresented: $showCities) {
+      if let cities { PassportCityPicker(cities: cities) } else { ProgressView() }
+    }
     .sheet(item: $share) { item in PassportShareSheet(url: item.url) }
     .confirmationDialog(copy("passportShare.stopTitle"), isPresented: $stopping, titleVisibility: .visible) {
       Button(copy("passportShare.stop"), role: .destructive) {
@@ -40,7 +43,9 @@ struct PassportActions: View {
       Button(copy("common.cancel"), role: .cancel) {}
     } message: { Text(copy("passportShare.stopBody")) }
     .alert(copy("errors.unexpectedTitle"), isPresented: $failed) {
-      Button(copy("common.retry")) { subscriptions += 1 }
+      Button(copy("common.retry")) {
+        if let retryOperation { run(retryOperation) } else { subscriptions += 1 }
+      }
       Button(copy("common.close"), role: .cancel) {}
     }
     .task(id: subscriptions) {
@@ -49,7 +54,7 @@ struct PassportActions: View {
           try Task.checkCancellation()
           activeToken = token
         }
-      } catch { if !Task.isCancelled { failed = true } }
+      } catch { if !Task.isCancelled { retryOperation = nil; failed = true } }
     }
   }
 
@@ -58,7 +63,8 @@ struct PassportActions: View {
     busy = true
     Task {
       defer { busy = false }
-      do { try await action() } catch { failed = true }
+      do { try await action(); retryOperation = nil }
+      catch { retryOperation = action; failed = true }
     }
   }
 }
