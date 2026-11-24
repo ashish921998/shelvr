@@ -39,7 +39,7 @@ public struct PassportBadge: Identifiable, Equatable, Sendable {
     public var id: String { badge.id }
   }
 
-  public static func visible(stamps: [BadgeStamp], cities: [PassportCityStamp], completion: [PassportCompletion]) -> [Progress] {
+  public static func visible(stamps: [BadgeStamp], cities: [PassportCityStamp], completion: [PassportCompletion], locked: Bool = false) -> [Progress] {
     let counts = StampCity.counts(places: stamps, stamps: cities)
     var totals = ["places": stamps.count, "cities": counts.cities, "countries": counts.countries,
       "completeCities": completion.filter { $0.total > 0 && $0.stamped >= $0.total }.count]
@@ -49,6 +49,7 @@ public struct PassportBadge: Identifiable, Equatable, Sendable {
       }
     }
     let states = all.map { Progress(badge: $0, have: min(totals[$0.measure, default: 0], $0.goal)) }
+    if locked { return states }
     var seen = Set<String>(), next: Progress?
     for progress in states where !progress.earned && seen.insert(progress.badge.measure).inserted {
       if let current = next, progress.have * current.badge.goal <= current.have * progress.badge.goal { continue }

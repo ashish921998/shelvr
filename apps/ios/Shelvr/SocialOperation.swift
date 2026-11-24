@@ -23,7 +23,10 @@ final class SocialOperation {
     }
   }
 
-  func askToPurchase() { billing = .paywall }
+  func askToPurchase(then action: (@MainActor () async throws -> Void)? = nil) {
+    resume = action
+    billing = .paywall
+  }
 
   func confirmed() {
     let next = resume
