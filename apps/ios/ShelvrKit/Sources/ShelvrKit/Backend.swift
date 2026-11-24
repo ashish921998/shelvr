@@ -12,7 +12,10 @@ public final class Backend {
     case offline
   }
 
-  public private(set) var status = Status.starting
+  public private(set) var sessionGeneration = UUID()
+  public private(set) var status = Status.starting {
+    didSet { if status != oldValue { sessionGeneration = UUID() } }
+  }
   public let environment: AppEnvironment
   public let client: ConvexClientWithAuth<String>
   private let session: AuthSession

@@ -74,6 +74,7 @@ struct SignedInView: View {
         case "passport": PassportView()
         case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)
         case "go-out": PlanCityView()
+        case "add": PasteLinkView()
         default: ShellDestination(link: link)
         }
       }
