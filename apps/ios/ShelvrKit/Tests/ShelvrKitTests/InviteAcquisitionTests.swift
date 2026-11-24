@@ -236,6 +236,9 @@ import Testing
   #expect(first.replace(with: resolved))
 
   let restored = launch()
+  let laterInvite = try #require(AppLink("/passport-invite/two"))
+  #expect(restored.route(laterInvite))
+  #expect(restored.preview == nil)
   #expect(restored.accepted == resolved)
   #expect(restored.accepted?.bound(to: "other") == nil)
   let target = try #require(restored.accepted?.destination)
@@ -250,7 +253,7 @@ import Testing
   #expect(launch().accepted == resolved)
 
   canClear = true
-  _ = restored.didNavigate(to: target, account: "member", session: session)
+  #expect(restored.didNavigate(to: target, account: "member", session: session) == laterInvite)
   #expect(!restored.failed)
   #expect(restored.destination(account: "member", session: session) == nil)
   #expect(launch().accepted == nil)

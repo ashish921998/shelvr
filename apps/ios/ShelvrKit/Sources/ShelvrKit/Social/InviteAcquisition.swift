@@ -170,7 +170,10 @@ public final class InviteEntry {
   }
 
   public func route(_ link: AppLink) -> Bool {
-    if dispatching != nil || awaitingNavigation != nil { queued = link; return true }
+    if dispatching != nil || awaitingNavigation != nil || accepted?.resolution != nil {
+      queued = link
+      return true
+    }
     guard let incoming = PublicInvite(link) else {
       if accepted != nil { queued = link; return true }
       preview = nil
