@@ -9,10 +9,24 @@ struct AccountView: View {
   private struct Plan: Decodable {
     let status: String
     let expiresAt: Double?
+    func active(at date: Date) -> Bool {
+      status == "lifetime" || (["pro", "trialing"].contains(status) && (expiresAt ?? 0) > date.timeIntervalSince1970 * 1000)
+    }
+    func title(at date: Date, copy: Copy) -> String {
+      if active(at: date) {
+        switch status {
+        case "trialing": return copy("pro.trial")
+        case "lifetime": return copy("pro.lifetime")
+        default: return "Pro"
+        }
+      }
+      return copy(status == "none" ? "pro.viewPlans" : "pro.lapsed")
+    }
   }
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var user: CurrentUser?
+  @State private var userLoaded = false
   @State private var billing: BillingDestination?
   @State private var plan: Plan?
   @State private var planFailed = false
@@ -27,24 +41,29 @@ struct AccountView: View {
         Label(user?.email ?? copy("account.signedIn"), systemImage: "person.crop.circle")
           .accessibilityIdentifier("signed-in-user")
         if let plan {
-          let live = plan.status == "lifetime" || (["pro", "trialing"].contains(plan.status)
-            && (plan.expiresAt ?? 0) > Date.now.timeIntervalSince1970 * 1000)
-          Button { billing = live ? .manage : .paywall } label: {
-            Label(copy(live ? plan.status == "trialing" ? "pro.trial" :
-              plan.status == "lifetime" ? "pro.lifetime" : "pro.manage" : "pro.viewPlans"), systemImage: "sparkles")
+          TimelineView(.periodic(from: .now, by: 60)) { context in
+            Button { billing = plan.active(at: .now) ? .manage : .paywall } label: {
+              Label(plan.title(at: context.date, copy: copy), systemImage: "sparkles")
+            }
           }
         } else if planFailed { Button(copy("common.retry")) { retry += 1 } }
         else { ProgressView(copy("pro.checking")) }
       }
+      .listRowBackground(rowSurface)
       Section {
         Picker(copy("profile.appearance"), selection: $appearance) {
           ForEach(["system", "light", "warmDark", "neutralDark"], id: \.self) { mode in
             Text(copy("appearance.\(mode)")).tag(mode)
           }
         }
-        NavigationLink(copy("feedback.open")) { FeedbackView() }
+        if user != nil {
+          NavigationLink(copy("feedback.open")) { FeedbackView() }
+        } else if userLoaded {
+          Link(copy("support.contact"), destination: FeedbackView.support)
+        }
         NavigationLink(copy("profile.settings")) { AccountSettingsView() }
       }
+      .listRowBackground(rowSurface)
       Section {
         Button(copy(signingOut ? "account.signingOut" : "account.signOut")) {
           guard !signingOut else { return }
@@ -55,21 +74,31 @@ struct AccountView: View {
           }
         }.disabled(signingOut)
         if signOutFailed { Text(copy("account.signOutFailed")).foregroundStyle(.red) }
-      }
+      }.listRowBackground(rowSurface)
     }
+    .scrollContentBackground(appearance.hasSuffix("Dark") ? .hidden : .visible)
+    .background(appearance == "neutralDark" ? Color(red: 17/255, green: 20/255, blue: 23/255) : Color(.background))
     .sheet(item: $billing) { BillingSheet(destination: $0) }
     .task {
       do {
-        for try await user in backend.query("users:getCurrentUser", as: CurrentUser?.self) { self.user = user }
-      } catch {}
+        for try await user in backend.query("users:getCurrentUser", as: CurrentUser?.self) { self.user = user; userLoaded = true }
+      } catch { if !Task.isCancelled { userLoaded = true } }
     }
     .task(id: retry) {
       planFailed = false
       do {
         for try await plan in backend.query("subscriptions:getEntitlement", as: Plan.self) { self.plan = plan }
-      } catch { if !Task.isCancelled { planFailed = true } }
+      } catch { if !Task.isCancelled { planFailed = true; plan = nil } }
     }
   }
+  private var rowSurface: Color? {
+    switch appearance {
+    case "warmDark": Color(red: 35/255, green: 30/255, blue: 22/255)
+    case "neutralDark": Color(red: 27/255, green: 31/255, blue: 36/255)
+    default: nil
+    }
+  }
+
 }
 
 private struct FeedbackView: View {
@@ -87,10 +116,12 @@ private struct FeedbackView: View {
         Section {
           TextField(copy("feedback.placeholder"), text: $message, axis: .vertical)
             .lineLimit(4...10)
+            .disabled(sending)
             .accessibilityLabel(copy("feedback.messageLabel"))
         } header: { Text(copy("feedback.prompt")) } footer: { Text(copy("feedback.replyNotice")) }
         Button(copy(sending ? "feedback.sending" : "feedback.send"), action: submit)
           .disabled(sending || message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || message.utf16.count > 1000)
+        Text("\(message.utf16.count) / 1000").font(.caption).foregroundStyle(.secondary)
         if failed {
           Text(copy("feedback.sendFailedContact"))
           Link(copy("support.contact"), destination: Self.support)
