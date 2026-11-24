@@ -18,7 +18,7 @@ public struct AppEnvironment: Sendable, Equatable {
   public let convexURL: URL
 
   public init(variant: Variant, convexURL: URL) throws(ConfigError) {
-    let isProductionURL = convexURL.host() == Self.productionConvexURL.host()
+    let isProductionURL = convexURL.host()?.lowercased() == Self.productionConvexURL.host()
     switch variant {
     case .development where isProductionURL:
       throw .developmentUsesProduction

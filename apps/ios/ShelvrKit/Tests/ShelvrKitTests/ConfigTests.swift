@@ -10,6 +10,9 @@ struct ConfigTests {
     #expect(throws: AppEnvironment.ConfigError.developmentUsesProduction) {
       try AppEnvironment(variant: .development, convexURL: AppEnvironment.productionConvexURL)
     }
+    #expect(throws: AppEnvironment.ConfigError.developmentUsesProduction) {
+      try AppEnvironment(variant: .development, convexURL: URL(string: "https://AMIABLE-SETTER-120.convex.cloud")!)
+    }
   }
 
   @Test func productionBuildsRefuseAnyOtherDeployment() {
