@@ -52,3 +52,28 @@ struct CopyTests {
     }
   }
 }
+
+@Test func rendersPluralFormsFromTheShippedCatalogs() throws {
+  let bundle = try #require(Bundle(url: CopyTests.locales))
+  for locale in Copy.supportedLocales {
+    let copy = Copy(bundle: bundle, preferredLanguages: [locale])
+    let key = "spaces.saveCount"
+    let forms = try #require(Copy.catalog(locale, in: bundle)[key]?.forms)
+    for (count, base) in [(0, "other"), (1, "one"), (2, "other"), (1_000_000, "other")] {
+      let form = switch locale {
+      case "ja", "ko": "other"
+      case "fr", "fr-CA", "pt-BR": count == 0 ? "one" : base
+      default: base
+      }
+      let million = ["es", "es-MX", "fr", "fr-CA", "pt-BR"].contains(locale) && count == 1_000_000
+      let expected = try #require(forms[million ? "many" : form])
+      let formatted = count.formatted(.number.locale(Locale(identifier: locale)))
+      #expect(copy(key, count: count) == expected.replacingOccurrences(of: "%{formattedCount}", with: formatted))
+    }
+  }
+}
+
+@Test func keepsIndianNumberGroupingWhenFallingBackToEnglish() throws {
+  let copy = Copy(bundle: try #require(Bundle(url: CopyTests.locales)), preferredLanguages: ["hi-IN"])
+  #expect(copy("spaces.saveCount", count: 1_234_567) == "12,34,567 saves")
+}
