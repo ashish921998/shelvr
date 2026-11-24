@@ -2,6 +2,21 @@ import CryptoKit
 import Foundation
 import Security
 
+struct SiriRevocationBacklog: Sendable {
+  private(set) var unpersisted = Set<String>()
+
+  mutating func remember(_ token: String, persist: (String) throws -> Void) {
+    do {
+      try persist(token)
+      unpersisted.remove(token)
+    } catch { unpersisted.insert(token) }
+  }
+
+  mutating func confirmed(_ token: String) { unpersisted.remove(token) }
+
+  func candidates(stored: [String]?) -> Set<String> { unpersisted.union(stored ?? []) }
+}
+
 struct SiriRevocations: Sendable {
   let site: URL
 
@@ -26,29 +41,44 @@ struct SiriRevocations: Sendable {
     else { throw AuthSessionError.sessionStorageUnavailable }
   }
 
-  func delivered(_ token: String) { _ = Keychain.delete(item(token)) }
+  @discardableResult
+  func delivered(_ token: String) -> Bool { Keychain.delete(item(token)) }
 
-  private func pending() -> [String] {
-    var query = base
-    query[kSecReturnData as String] = true
-    query[kSecMatchLimit as String] = kSecMatchLimitAll
+  private func matches(_ query: [String: Any]) throws -> CFTypeRef? {
     var result: CFTypeRef?
-    guard SecItemCopyMatching(query as CFDictionary, &result) == errSecSuccess else { return [] }
-    return (result as? [Data] ?? []).compactMap { String(data: $0, encoding: .utf8) }
+    let status = SecItemCopyMatching(query as CFDictionary, &result)
+    if status == errSecItemNotFound { return nil }
+    guard status == errSecSuccess else { throw NSError(domain: NSOSStatusErrorDomain, code: Int(status)) }
+    return result
   }
 
-  func drain(revoke: (String) async throws -> Void) async -> Bool {
-    await Self.drain(pending: pending(), active: { SiriCredential.current()?.token }, revoke: revoke, delivered: delivered)
-    let active = SiriCredential.current()?.token
-    return pending().contains { $0 != active }
+  func pending() throws -> [String] {
+    var query = base
+    query[kSecReturnAttributes as String] = true
+    query[kSecMatchLimit as String] = kSecMatchLimitAll
+    guard let records = try matches(query) else { return [] }
+    guard let rows = records as? [[String: Any]] else { throw CocoaError(.coderReadCorrupt) }
+    return try rows.compactMap { row in
+      guard let account = row[kSecAttrAccount as String] as? String else { throw CocoaError(.coderReadCorrupt) }
+      var read = base
+      read[kSecAttrAccount as String] = account
+      read[kSecReturnData as String] = true
+      guard let value = try matches(read) else { return nil }
+      guard let data = value as? Data, let token = String(data: data, encoding: .utf8) else { throw CocoaError(.coderReadCorrupt) }
+      return token
+    }
   }
 
-  static func drain(pending: [String], active: () -> String?, revoke: (String) async throws -> Void, delivered: (String) -> Void) async {
+  @MainActor static func drain(
+    pending: [String], active: () -> String?, revoke: (String) async throws -> Void, delivered: (String) -> Bool
+  ) async -> Bool {
+    var needsRetry = false
     for token in pending where token != active() {
       do {
         try await revoke(token)
-        delivered(token)
-      } catch {}
+        if !delivered(token) { needsRetry = true }
+      } catch { needsRetry = true }
     }
+    return needsRetry
   }
 }

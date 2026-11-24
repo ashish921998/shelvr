@@ -2,18 +2,21 @@ import Foundation
 import Testing
 @testable import ShelvrKit
 
-@Test func aRetryRemovesOnlyConfirmedRetiredTokensAndSkipsTheActiveDeviceCredential() async {
+@MainActor @Test func aRetryRemovesOnlyConfirmedRetiredTokensAndSkipsTheActiveDeviceCredential() async {
   var delivered: [String] = []
   var attempted: [String] = []
-  await SiriRevocations.drain(pending: ["failed", "current", "retired"], active: { "current" }) { token in
+  let failed = await SiriRevocations.drain(pending: ["failed", "current", "retired"], active: { "current" }) { token in
     attempted.append(token)
     if token == "failed" { throw URLError(.notConnectedToInternet) }
-  } delivered: { delivered.append($0) }
+  } delivered: { delivered.append($0); return true }
+  #expect(failed)
   #expect(attempted == ["failed", "retired"])
   #expect(delivered == ["retired"])
-  await SiriRevocations.drain(pending: ["failed", "current"], active: { "current" }) { _ in } delivered: {
+  let retried = await SiriRevocations.drain(pending: ["failed", "current"], active: { "current" }) { _ in } delivered: {
     delivered.append($0)
+    return true
   }
+  #expect(!retried)
   #expect(delivered == ["retired", "failed"])
 }
 
@@ -45,4 +48,27 @@ private final class RevokeEndpointStub: URLProtocol, @unchecked Sendable {
   await #expect(throws: ConvexCallError.badResponse(404)) {
     try await transport.revokePresentedSiri("other-token")
   }
+}
+
+@Test func readsEveryQueuedKeychainCredentialIndividually() throws {
+  let site = URL(string: "https://test-\(UUID().uuidString).convex.site")!
+  let queue = SiriRevocations(site: site)
+  defer { queue.delivered("a"); queue.delivered("b") }
+  try queue.remember("a")
+  try queue.remember("b")
+  #expect(Set(try queue.pending()) == ["a", "b"])
+  #expect(queue.delivered("a"))
+  #expect(try queue.pending() == ["b"])
+}
+
+@Test func retainsThePresentedTokenUntilPersistenceOrRemoteRevocationSucceeds() {
+  var queue = SiriRevocationBacklog()
+  queue.remember("old") { _ in throw AuthSessionError.sessionStorageUnavailable }
+  #expect(queue.candidates(stored: nil) == ["old"])
+  queue.remember("other") { _ in throw AuthSessionError.sessionStorageUnavailable }
+  queue.confirmed("old")
+  #expect(queue.candidates(stored: ["disk"]) == ["other", "disk"])
+  queue.remember("other") { _ in }
+  #expect(queue.unpersisted.isEmpty)
+  #expect(queue.candidates(stored: ["other"]) == ["other"])
 }

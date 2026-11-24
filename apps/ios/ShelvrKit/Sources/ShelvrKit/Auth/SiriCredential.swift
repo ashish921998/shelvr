@@ -78,6 +78,7 @@ extension Backend {
     let site = "https://" + host.dropLast(".cloud".count) + ".site"
     try await Self.installSiri({
       try SiriCredential.store(SiriCredential(owner: owner, token: token, siteURL: site, subject: subject))
+      retrySiriRevocations()
     }, revokeOnFailure: {
       await revokeSiriToken(token, authorization: authorization)
     })
@@ -87,11 +88,17 @@ extension Backend {
 extension Backend {
   var siriRevocations: SiriRevocations? { SiriRevocations.site(for: environment.convexURL).map(SiriRevocations.init(site:)) }
 
+  func rememberSiriRevocation(_ token: String) {
+    guard let siriRevocations else { return }
+    siriBacklog.remember(token, persist: siriRevocations.remember)
+  }
+
   func revokeSiriToken(_ token: String, authorization: String) async {
-    try? siriRevocations?.remember(token)
+    rememberSiriRevocation(token)
     do {
       try await ConvexHTTPAuthTransport(deployment: environment.convexURL).revokeSiri(token, authorization: authorization)
-      siriRevocations?.delivered(token)
+      siriBacklog.confirmed(token)
+      if siriRevocations?.delivered(token) == false { retrySiriRevocations() }
     } catch { retrySiriRevocations() }
   }
 
@@ -103,7 +110,15 @@ extension Backend {
       var delay = 5
       while !Task.isCancelled {
         siriDrainRequested = false
-        let pending = await siriRevocations.drain(revoke: transport.revokePresentedSiri)
+        for token in siriBacklog.unpersisted { rememberSiriRevocation(token) }
+        let stored = try? siriRevocations.pending()
+        let candidates = siriBacklog.candidates(stored: stored)
+        let failed = await SiriRevocations.drain(pending: Array(candidates), active: { SiriCredential.current()?.token },
+          revoke: transport.revokePresentedSiri) { token in
+          siriBacklog.confirmed(token)
+          return siriRevocations.delivered(token)
+        }
+        let pending = failed || stored == nil
         if pending {
           do { try await Task.sleep(for: .seconds(delay)) } catch { break }
           delay = min(300, delay * 2)

@@ -22,6 +22,7 @@ public final class Backend {
   @ObservationIgnored var preparingSiri: (subject: String, task: Task<Void, Error>)?
   @ObservationIgnored var siriDrain: Task<Void, Never>?
   @ObservationIgnored var siriDrainRequested = false
+  @ObservationIgnored var siriBacklog = SiriRevocationBacklog()
 
   public init(environment: AppEnvironment) {
     let session = AuthSession(
@@ -79,7 +80,7 @@ public final class Backend {
     guard status == .signedIn, !signingOut else { return }
     signingOut = true
     let siri = SiriCredential.current()
-    if let siri { try? siri.enqueueRevocation() }
+    if let siri, siri.siteURL == siriRevocations?.site.absoluteString { rememberSiriRevocation(siri.token) }
     let authorization = KeychainTokenVault().read()?.token
     do {
       try await session.signOut {
