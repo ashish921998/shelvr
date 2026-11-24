@@ -66,7 +66,9 @@ public struct ShareInbox: Sendable {
 
   public func publish(_ payloads: [InboxPayload], in stage: URL) throws {
     guard !payloads.isEmpty, activeOwner == (try owner(of: stage)) else { throw CocoaError(.userCancelled) }
+    var links = Set<String>()
     for (index, payload) in payloads.enumerated() {
+      if payload.kind == .link && !links.insert(payload.value).inserted { continue }
       try JSONEncoder().encode(payload).write(to: stage.appending(path: "\(index).json"))
     }
     try FileManager.default.moveItem(at: stage, to: stage.deletingPathExtension().appendingPathExtension("ready"))
