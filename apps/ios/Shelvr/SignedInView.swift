@@ -57,12 +57,14 @@ struct SignedInView: View {
         case "add-spots":
           List {
             entry("/add", "addSheet.pasteLink", "link")
+            entry("/photo", "item.photo", "photo")
             entry("/how-to-share", "addSheet.howToShare", "square.and.arrow.up")
             entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
           }
           .navigationTitle(copy("addSheet.title"))
         case "go-out": PlanCityView()
         case "add": PasteLinkView()
+        case "photo": PhotoSaveView()
         default: ShellDestination(link: link)
         }
       }
