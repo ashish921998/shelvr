@@ -77,7 +77,7 @@ struct PassportActions: View {
   }
 }
 
-private struct PassportCityPicker: View {
+struct PassportCityPicker: View {
   let cities: [PassportCityStamp]
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
