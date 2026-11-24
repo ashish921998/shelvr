@@ -9,7 +9,7 @@ enum BillingDestination: String, Identifiable {
 }
 
 @MainActor
-private enum BillingIdentity {
+enum BillingIdentity {
   static var currentLogin: Task<Void, Error>?
 
   static func select(_ id: String, environment: AppEnvironment) async throws {

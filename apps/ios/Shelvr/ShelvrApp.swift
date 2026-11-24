@@ -9,6 +9,8 @@ struct ShelvrApp: App {
   @State private var copy = Copy()
   @Environment(\.scenePhase) private var scenePhase
 
+  init() { Analytics.start() }
+
   var body: some Scene {
     WindowGroup {
       RootView()
@@ -18,6 +20,7 @@ struct ShelvrApp: App {
         .environment(\.copy, copy)
         .task { await backend.start() }
         .onChange(of: scenePhase) { _, phase in
+          if phase == .active || phase == .background { Analytics.active(phase == .active) }
           if phase == .active { Task { await backend.start() } }
         }
     }

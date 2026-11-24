@@ -21,7 +21,10 @@ final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCente
 
   private func silence() {
     UIApplication.shared.unregisterForRemoteNotifications()
-    UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+    UNUserNotificationCenter.current().getDeliveredNotifications { delivered in
+      let ids = delivered.map(\.request).filter { !Self.isLocalTrial($0) }.map(\.identifier)
+      UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: ids)
+    }
   }
 
   func suspendEnrollment() {
@@ -58,16 +61,24 @@ final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCente
 
   nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification)
     async -> UNNotificationPresentationOptions {
-    await MainActor.run { delivery.permitsPresentation ? [.banner, .list] : [] }
+    if Self.isLocalTrial(notification.request) { return [.banner, .list] }
+    return await MainActor.run { delivery.permitsPresentation ? [.banner, .list] : [] }
+  }
+
+  private nonisolated static func isLocalTrial(_ request: UNNotificationRequest) -> Bool {
+    request.trigger is UNCalendarNotificationTrigger && TrialNotification.Kind(rawValue: request.identifier) != nil
   }
 
   nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
     withCompletionHandler completionHandler: @escaping () -> Void) {
-    let info = response.notification.request.content.userInfo
-    let data = info["body"] as? [String: Any]
-    let path = data?["url"] as? String ?? info["url"] as? String
-    if let path, let parsed = AppLink(path) { Task { @MainActor in self.link = parsed } }
-    completionHandler()
+    defer { completionHandler() }
+    guard response.actionIdentifier == UNNotificationDefaultActionIdentifier,
+      let opened = PushNotificationOpen(userInfo: response.notification.request.content.userInfo)
+    else { return }
+    Task { @MainActor in
+      Analytics.notificationOpened(opened.properties)
+      self.link = opened.link
+    }
   }
 }
 
@@ -97,9 +108,19 @@ struct PushRegistrationView: ViewModifier {
       let settings = await UNUserNotificationCenter.current().notificationSettings()
       guard [.authorized, .provisional, .ephemeral].contains(settings.authorizationStatus),
         !Task.isCancelled, backend.mayRegisterPush(generation) else { return }
+      var reportedFailure = false
       do {
         try await PushRetry.run(while: { backend.mayRegisterPush(generation) && device.blockedSession != generation }) {
-          try await submit(bundle, installation: installation, verified: verified, generation: generation)
+          do {
+            try await submit(bundle, installation: installation, verified: verified, generation: generation)
+          } catch {
+            if !reportedFailure, !Task.isCancelled, backend.mayRegisterPush(generation),
+               device.delivery.token != nil, !(error is CancellationError) {
+              reportedFailure = true
+              Analytics.failure("notification_registration_failed")
+            }
+            throw error
+          }
         }
       } catch {}
     }
