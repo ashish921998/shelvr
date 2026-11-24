@@ -30,7 +30,7 @@ struct LibraryView: View {
       if screen == .home {
         route("/saves", "homePlaces.allSaves", "bookmark")
         route("/cities", "homePlaces.cities", "building.2")
-        if rows.contains(where: \.needsReview) {
+        if rows.contains(where: \.needsReview) || pages.last?.isDone == false {
           route("/review-saves", "homePlaces.withoutPlace", "exclamationmark.circle")
         }
       }
@@ -38,7 +38,9 @@ struct LibraryView: View {
       if !pages.isEmpty {
         let visible = screen == .review ? rows.filter(\.needsReview) :
           (screen == .home ? Array(rows.filter { !$0.needsReview }.prefix(8)) : rows)
-        if rows.isEmpty || (screen == .review && visible.isEmpty) {
+        if screen == .review && visible.isEmpty && pages.last?.isDone == true {
+          ContentUnavailableView(copy("digest.emptyTitle"), systemImage: "checkmark.circle")
+        } else if rows.isEmpty && screen != .review {
           ContentUnavailableView(copy("homePlaces.emptyTitle"), systemImage: "bookmark",
             description: Text(copy("homePlaces.emptyBody")))
         }
