@@ -82,7 +82,9 @@ struct SharedInboxReceiver: ViewModifier {
     switch payload.kind {
     case .link, .note:
       let note = payload.kind == .note
-      if payload.siri == true {
+      if note && payload.siri == true && !SiriText.fitsCapture(payload.value) {
+        try await recoverLongNote(payload, owner: owner, inbox: inbox)
+      } else if payload.siri == true {
         try await withCaptureToken(owner: owner) { credentials in
           _ = try await ShelvrCapture.save(kind: note ? "note" : "link", text: note ? payload.value : nil,
             url: note ? nil : payload.value, spaceId: payload.spaceID, operationId: payload.operationID, credentials: credentials)
@@ -108,6 +110,20 @@ struct SharedInboxReceiver: ViewModifier {
         _ = try await backend.savePhoto(photo, operationID: payload.operationID, source: .share)
       }
     }
+  }
+
+  private func recoverLongNote(_ payload: InboxPayload, owner: String, inbox: ShareInbox) async throws {
+    var arguments = ["text": payload.value, "operationId": payload.operationID, "saveSource": "siri"]
+    if let id = payload.spaceID {
+      struct Folder: Decodable { let _id: String }
+      for try await folder in backend.query("spaces:getSpace", with: ["id": id], as: Folder?.self) {
+        arguments["spaceId"] = folder?._id
+        break
+      }
+    }
+    try Task.checkCancellation()
+    guard backend.status == .signedIn, inbox.activeOwner == owner else { throw CancellationError() }
+    let _: String = try await backend.client.mutation("items:createNoteItem", with: arguments)
   }
 
   private func withCaptureToken(owner: String, perform: (ShelvrCapture.Credentials) async throws -> Void) async throws {
