@@ -58,12 +58,15 @@ protocol AppIntentEntityRecordConvertible {
         let isDone: Bool
       }
       var cursor: String?
-      for _ in 0..<3 {
-        let pagination: [String: ConvexEncodable?] = ["numItems": 100.0, "cursor": cursor]
+      var scanned = 0
+      var seenCursors = Set<String>()
+      while scanned < 300 {
+        let pagination: [String: ConvexEncodable?] = ["numItems": Double(min(100, 300 - scanned)), "cursor": cursor]
         guard let page: Page = await first("items:listItemsPage", args: ["paginationOpts": pagination]) else { break }
         records += page.page.filter { $0.type == "note" && $0.status == "ready" }
           .map { record($0, as: $0._id, fullContent: false) }
-        if page.isDone || page.continueCursor == cursor { break }
+        scanned += page.page.count
+        if page.isDone || !seenCursors.insert(page.continueCursor).inserted { break }
         cursor = page.continueCursor
       }
     }
@@ -83,7 +86,7 @@ protocol AppIntentEntityRecordConvertible {
           for file in (try? inbox.manifests(in: batch)) ?? [] {
             guard let bytes = try? Data(contentsOf: file), let payload = try? JSONDecoder().decode(InboxPayload.self, from: bytes),
               payload.operationID == operation, payload.siri == true else { continue }
-            let text = payload.kind == .image ? Copy()("item.photo") : payload.value
+            let text = SiriText.entityContent(kind: payload.kind.rawValue, value: payload.value, title: "", photoLabel: Copy()("item.photo"))
             let firstLine = text.split(separator: "\n", maxSplits: 1).first.map(String.init) ?? text
             return AppIntentEntityRecord(id: id, title: String(firstLine.prefix(80)), metadata: ["kind": "note", "text": text])
           }
@@ -97,7 +100,8 @@ protocol AppIntentEntityRecordConvertible {
 
   private static func record(_ save: Save, as identifier: String, fullContent: Bool) -> AppIntentEntityRecord {
     let title = save.title ?? save.note ?? save.url ?? Copy()("item.savedItem")
-    let content = save.note ?? title
+    let value = save.type == "link" ? save.url : save.note
+    let content = SiriText.entityContent(kind: save.type, value: value, title: title, photoLabel: Copy()("item.photo"))
     return AppIntentEntityRecord(id: identifier, title: String(title.prefix(80)),
       metadata: ["kind": "note", "text": fullContent ? content : String(content.prefix(600)), "savedAt": String(save._creationTime)])
   }

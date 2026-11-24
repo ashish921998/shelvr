@@ -4,12 +4,17 @@ import ShelvrInbox
 import ShelvrKit
 import UniformTypeIdentifiers
 
+private struct SiriNoteTooLong: LocalizedError {
+  var errorDescription: String? { String(localized: "Use a note of 20,000 characters or fewer.") }
+}
+
 private enum SiriSave {
   case link(URL)
   case note(String)
   case image(ImportPhoto, context: String?, sticker: Bool = false)
 
   func capture(spaceID: String? = nil, account: SiriCredential? = SiriCredential.current()) async throws -> (id: String, dialog: IntentDialog) {
+    if case let .note(text) = self, !SiriText.fitsCapture(text) { throw SiriNoteTooLong() }
     guard let account, SiriCredential.current()?.token == account.token else { throw ShelvrCapture.Failure.signedOut }
     let credential = ShelvrCapture.Credentials(siteUrl: account.siteURL, token: account.token)
     let operation = ShelvrCapture.newOperationId()
@@ -88,7 +93,7 @@ struct SaveNoteIntent {
       entityText = text
       result = try await SiriSave.note(text).capture(spaceID: folder?.id, account: account)
     case .images(let images):
-      entityText = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Copy()("item.photo") : text
+      entityText = SiriText.entityContent(kind: "image", value: nil, title: "", photoLabel: Copy()("item.photo"))
       result = try await captureImages(images, total: files.filter(CaptureRouter.isImage).count, words: text, account: account)
 
     }

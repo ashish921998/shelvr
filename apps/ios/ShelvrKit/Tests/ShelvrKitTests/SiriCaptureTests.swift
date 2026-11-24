@@ -53,3 +53,14 @@ import Testing
   #expect(restored.sticker == true)
   #expect(restored.spaceID == "chosen")
 }
+
+@Test func noteCaptureLimitUsesTheServersUTF16Length() {
+  #expect(SiriText.fitsCapture(String(repeating: "a", count: 20_000)))
+  #expect(!SiriText.fitsCapture(String(repeating: "a", count: 20_001)))
+  #expect(!SiriText.fitsCapture(String(repeating: "😀", count: 10_001)))
+}
+
+@Test func resolvedLinksKeepTheirURLAndPhotosKeepTheirPhotoLabel() {
+  #expect(SiriText.entityContent(kind: "link", value: "https://example.com", title: "New title", photoLabel: "Photo") == "https://example.com")
+  #expect(SiriText.entityContent(kind: "image", value: "file name", title: "New title", photoLabel: "Photo") == "Photo")
+}
