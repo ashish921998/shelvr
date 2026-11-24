@@ -44,10 +44,7 @@ struct InviteEntryView: View {
       if !entry.loaded, entry.failed { Button(copy("common.retry")) { entry.restore() } }
       else if entry.failed, let link = activeDestination {
         Button(copy("common.retry")) {
-          if let next = entry.didNavigate(to: link, account: backend.userID, session: backend.sessionGeneration),
-            !entry.route(next) {
-            pendingLink = next
-          }
+          forward(entry.didNavigate(to: link, account: backend.userID, session: backend.sessionGeneration))
         }
       }
     }
@@ -82,7 +79,11 @@ struct InviteEntryView: View {
   }
 
   private func cancel() {
-    if let next = entry.cancel() { pendingLink = next }
+    forward(entry.cancel())
+  }
+
+  private func forward(_ link: AppLink?) {
+    if let link, !entry.route(link) { pendingLink = link }
   }
 
   private func choose(_ invite: PublicInvite) {
@@ -145,14 +146,14 @@ struct InviteEntryView: View {
       let account = try await currentAccount()
       guard current(), backend.userID == account else { return }
       guard let bound = request.bound(to: account) else {
-        if let next = entry.cancel(keepPreview: false) { pendingLink = next }
+        forward(entry.cancel(keepPreview: false))
         return
       }
       if bound != request, !entry.replace(with: bound) { return }
       guard entry.beginDispatch(request.id, session: session) else { return }
       var handoff: InviteNavigation?
       defer {
-        if let next = entry.endDispatch(request.id, navigation: handoff), !entry.route(next) { pendingLink = next }
+        forward(entry.endDispatch(request.id, navigation: handoff))
       }
       var resolved = bound
       if bound.resolution == nil {
