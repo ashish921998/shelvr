@@ -54,7 +54,7 @@ struct SignedInView: View {
         .background(.thinMaterial) }
       }
       .navigationDestination(for: AppLink.self) { link in
-        if access.loading { loadingPlan }
+        if access.loading && PlanRoutes.needsLoadedPlan(link) { loadingPlan }
         else if access.locked && !PlanRoutes.allowedWithoutPersonalAccess(link) { PlanGateView() }
         else { switch link.path.first {
         case "settings": AccountSettingsView()
