@@ -79,7 +79,14 @@ struct SignedInView: View {
             LibraryPlaceEditor(id: id).id(id)
           } else { ShellDestination(link: link) }
         case "date-plan", "go-out", "new-trip":
-          if let city = link.query.first(where: { $0.name == "city" })?.value, !city.isEmpty {
+          if link.path == ["new-trip"], !link.query.contains(where: { $0.name == "listId" || ($0.name == "mode" && $0.value == "generate") }) {
+            let city = link.query.first(where: { $0.name == "city" })?.value ?? ""
+            BlankTripView(city: city) { selectedCity in
+              if let next = BlankTrip.generationLink(city: selectedCity) { path.append(next) }
+            } created: { result in
+              if path.last == link { path[path.count - 1] = result }
+            }
+          } else if let city = link.query.first(where: { $0.name == "city" })?.value, !city.isEmpty {
             let listID = link.query.first(where: { $0.name == "listId" })?.value
             if link.path.first == "new-trip" {
               NewCityTripView(city: city, listID: listID) { created in
@@ -161,6 +168,7 @@ private struct PlanCityView: View {
               var parts = URLComponents()
               parts.path = trip ? "/new-trip" : "/date-plan"
               parts.queryItems = [URLQueryItem(name: "city", value: city.city)]
+              if trip { parts.queryItems?.append(URLQueryItem(name: "mode", value: "generate")) }
               return parts
             }
             if let link = url.string.flatMap({ AppLink($0) }) {
