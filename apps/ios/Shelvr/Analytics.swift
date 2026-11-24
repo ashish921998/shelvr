@@ -8,6 +8,8 @@ enum Analytics {
   private static var enabled = false
   private static let identifiedKey = "swift.analytics.identified"
 
+  static var available: Bool { enabled && !PostHogSDK.shared.isOptOut() }
+
   static func start() {
     guard !enabled else { return }
     guard let token = Bundle.main.object(forInfoDictionaryKey: "ShelvrPostHogToken") as? String,

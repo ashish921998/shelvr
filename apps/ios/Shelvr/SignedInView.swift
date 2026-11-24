@@ -68,6 +68,7 @@ struct SignedInView: View {
         }
       }
     }
+    .modifier(CancelSurveyCard(home: library && path.isEmpty))
     .modifier(TrialReminderObserver(home: path.isEmpty))
     .onChange(of: pendingLink, initial: true) { _, link in
       guard let link else { return }
