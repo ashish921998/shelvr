@@ -5,12 +5,14 @@ on:
     paths:
       - "apps/ios/**"
       - "apps/native/src/locales/*.json"
+      - "apps/native/assets/onboarding/**"
       - ".github/workflows/swift-ios.yml"
   push:
     branches: [main]
     paths:
       - "apps/ios/**"
       - "apps/native/src/locales/*.json"
+      - "apps/native/assets/onboarding/**"
       - ".github/workflows/swift-ios.yml"
   workflow_dispatch:
 
