@@ -74,21 +74,21 @@ struct SharedInboxReceiver: ViewModifier {
   private func send(file: URL, batch: URL, inbox: ShareInbox, owner: String) async throws {
     let payload = try JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: file))
     switch payload.kind {
-    case .link:
-      let _: String = try await backend.client.mutation("items:createLinkItem", with: [
-        "url": payload.value, "operationId": payload.operationID, "saveSource": payload.siri == true ? "siri" : "share_extension"
-      ])
-    case .note:
-      let _: String = try await backend.client.mutation("items:createNoteItem", with: [
-        "text": payload.value, "operationId": payload.operationID, "saveSource": "siri"
-      ])
+    case .link, .note:
+      let note = payload.kind == .note
+      var arguments = [
+        note ? "text" : "url": payload.value, "operationId": payload.operationID,
+        "saveSource": payload.siri == true ? "siri" : "share_extension"
+      ]
+      arguments["spaceId"] = payload.spaceID
+      let _: String = try await backend.client.mutation(note ? "items:createNoteItem" : "items:createLinkItem", with: arguments)
     case .image:
       guard UUID(uuidString: payload.value) != nil else { throw CocoaError(.fileReadCorruptFile) }
       let imageURL = batch.appending(path: payload.value)
       let photo = try await Task.detached { try ImportPhoto(Data(contentsOf: imageURL, options: .mappedIfSafe)) }.value
       try Task.checkCancellation()
       guard backend.status == .signedIn, inbox.activeOwner == owner else { throw CancellationError() }
-      _ = try await backend.savePhoto(photo, operationID: payload.operationID, source: payload.siri == true ? .siri : .share)
+      _ = try await backend.savePhoto(photo, operationID: payload.operationID, source: payload.siri == true ? .siri : .share, spaceID: payload.spaceID)
     }
   }
 }

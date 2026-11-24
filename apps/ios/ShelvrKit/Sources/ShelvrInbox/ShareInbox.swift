@@ -7,12 +7,14 @@ public struct InboxPayload: Codable, Sendable {
   public let value: String
   public let operationID: String
   public let siri: Bool?
+  public let spaceID: String?
 
-  public init(kind: Kind, value: String, operationID: String = "share:\(UUID().uuidString)", siri: Bool = false) {
+  public init(kind: Kind, value: String, operationID: String = "share:\(UUID().uuidString)", siri: Bool = false, spaceID: String? = nil) {
     self.kind = kind
     self.value = value
     self.operationID = operationID
     self.siri = siri
+    self.spaceID = spaceID
   }
 }
 

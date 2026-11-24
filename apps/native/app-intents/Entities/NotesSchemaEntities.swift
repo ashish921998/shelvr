@@ -1,5 +1,7 @@
 import AppIntents
+#if canImport(ExpoAppIntents)
 internal import ExpoAppIntents
+#endif
 import Foundation
 
 // Shelvr speaks Apple's iOS 27 `notes` schema so the new Siri can create notes in Shelvr and

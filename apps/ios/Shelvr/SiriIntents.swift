@@ -7,23 +7,24 @@ import UniformTypeIdentifiers
 private enum SiriSave {
   case link(URL)
   case note(String)
-  case image(ImportPhoto)
+  case image(ImportPhoto, context: String?)
 
-  func capture() async throws -> IntentDialog {
+  func capture(spaceID: String? = nil) async throws -> (id: String, dialog: IntentDialog) {
     guard let account = SiriCredential.current() else { throw ShelvrCapture.Failure.signedOut }
     let credential = ShelvrCapture.Credentials(siteUrl: account.siteURL, token: account.token)
     let operation = ShelvrCapture.newOperationId()
     do {
+      let id: String
       switch self {
       case .link(let url):
-        _ = try await ShelvrCapture.save(kind: "link", url: url.absoluteString, operationId: operation, credentials: credential)
+        id = try await ShelvrCapture.save(kind: "link", url: url.absoluteString, spaceId: spaceID, operationId: operation, credentials: credential)
       case .note(let text):
-        _ = try await ShelvrCapture.save(kind: "note", text: text, operationId: operation, credentials: credential)
-      case .image(let image):
-        _ = try await ShelvrCapture.saveImage(image.data, contentType: image.contentType, aspectRatio: image.aspectRatio,
-          operationId: operation, credentials: credential)
+        id = try await ShelvrCapture.save(kind: "note", text: text, spaceId: spaceID, operationId: operation, credentials: credential)
+      case .image(let image, let context):
+        id = try await ShelvrCapture.saveImage(image.data, contentType: image.contentType, aspectRatio: image.aspectRatio,
+          spaceId: spaceID, context: context, operationId: operation, credentials: credential)
       }
-      return "Saved to Shelvr."
+      return (id, "Saved to Shelvr.")
     } catch {
       if case ShelvrCapture.Failure.signedOut = error { await account.removeIfCurrent() }
       if let failure = error as? ShelvrCapture.Failure, !failure.isRetryableInApp { throw failure }
@@ -33,16 +34,16 @@ private enum SiriSave {
       let payload: InboxPayload
       switch self {
       case .link(let url):
-        payload = InboxPayload(kind: .link, value: url.absoluteString, operationID: operation, siri: true)
+        payload = InboxPayload(kind: .link, value: url.absoluteString, operationID: operation, siri: true, spaceID: spaceID)
       case .note(let text):
-        payload = InboxPayload(kind: .note, value: text, operationID: operation, siri: true)
-      case .image(let image):
+        payload = InboxPayload(kind: .note, value: text, operationID: operation, siri: true, spaceID: spaceID)
+      case .image(let image, _):
         let name = UUID().uuidString
         try image.data.write(to: stage.appending(path: name))
-        payload = InboxPayload(kind: .image, value: name, operationID: operation, siri: true)
+        payload = InboxPayload(kind: .image, value: name, operationID: operation, siri: true, spaceID: spaceID)
       }
       try inbox.publish([payload], in: stage)
-      return "Open Shelvr to finish saving."
+      return ("queued:" + operation, "Open Shelvr to finish saving.")
     }
   }
 }
@@ -52,23 +53,56 @@ struct SaveLinkIntent: AppIntent {
   @Parameter(title: "Link") var url: URL
   func perform() async throws -> some IntentResult & ProvidesDialog {
     guard ["https", "http"].contains(url.scheme?.lowercased()) else { throw URLError(.badURL) }
-    return .result(dialog: try await SiriSave.link(url).capture())
+    return .result(dialog: try await SiriSave.link(url).capture().dialog)
   }
 }
 
-struct SaveNoteIntent: AppIntent {
-  static let title: LocalizedStringResource = "Save a Note"
-  @Parameter(title: "Text") var text: String
-  func perform() async throws -> some IntentResult & ProvidesDialog {
-    return .result(dialog: try await SiriSave.note(text).capture())
+#if compiler(>=6.4)
+@available(iOS 27.0, *)
+@AppIntent(schema: .notes.createNote)
+struct SaveNoteIntent {
+  var name: AttributedString
+  var content: AttributedString?
+  var attachments: [IntentFile]
+  var isPinned: Bool
+  var folder: SpaceEntity?
+
+  @MainActor func perform() async throws -> some IntentResult & ReturnsValue<NoteEntity> & ProvidesDialog {
+    let nameText = String(name.characters)
+    let contentText = content.map { String($0.characters) }
+    let text = [nameText, contentText].compactMap { $0 }.filter { !$0.isEmpty }
+      .reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }.joined(separator: "\n")
+    let files = attachments.map { CaptureRouter.Attachment(data: $0.data, type: $0.type, filename: $0.filename) }
+    let links = CaptureRouter.linkAttributes(in: [name] + (content.map { [$0] } ?? []))
+    let result: (id: String, dialog: IntentDialog)
+    switch CaptureRouter.route(text: text, linkAttributes: links, attachments: files) {
+    case .link(let url):
+      result = try await SiriSave.link(url).capture(spaceID: folder?.id)
+    case .note:
+      guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        throw $name.needsValueError("What should the note say?")
+      }
+      result = try await SiriSave.note(text).capture(spaceID: folder?.id)
+    case .images(let images):
+      var last: (id: String, dialog: IntentDialog)?
+      for image in images {
+        guard let prepared = await CaptureRouter.prepare(image) else { throw CocoaError(.fileReadCorruptFile) }
+        let context = [text, prepared.recognizedText].filter { !$0.isEmpty }.joined(separator: "\n")
+        last = try await SiriSave.image(ImportPhoto(prepared.data), context: context).capture(spaceID: folder?.id)
+      }
+      guard let last else { throw CocoaError(.fileReadCorruptFile) }
+      result = last
+    }
+    return .result(value: NoteEntity(id: result.id, text: text, folder: folder), dialog: result.dialog)
   }
 }
+#endif
 
 struct SaveImageIntent: AppIntent {
   static let title: LocalizedStringResource = "Save an Image"
   @Parameter(title: "Image", supportedContentTypes: [.image]) var image: IntentFile
   func perform() async throws -> some IntentResult & ProvidesDialog {
-    return .result(dialog: try await SiriSave.image(ImportPhoto(image.data)).capture())
+    return .result(dialog: try await SiriSave.image(ImportPhoto(image.data), context: nil).capture().dialog)
   }
 }
 
@@ -76,7 +110,11 @@ struct ShelvrShortcuts: AppShortcutsProvider {
   static var appShortcuts: [AppShortcut] {
     AppShortcut(intent: SaveLinkIntent(), phrases: ["Save this page to \(.applicationName)", "Save this link to \(.applicationName)"],
       shortTitle: "Save a Link", systemImageName: "link")
-    AppShortcut(intent: SaveNoteIntent(), phrases: ["Save a note in \(.applicationName)", "Add a note to \(.applicationName)"],
-      shortTitle: "Save a Note", systemImageName: "square.and.pencil")
+    #if compiler(>=6.4)
+    if #available(iOS 27.0, *) {
+      AppShortcut(intent: SaveNoteIntent(), phrases: ["Save a note in \(.applicationName)", "Add a note to \(.applicationName)",
+        "Save a note to \(\.$folder) in \(.applicationName)"], shortTitle: "Save a Note", systemImageName: "square.and.pencil")
+    }
+    #endif
   }
 }

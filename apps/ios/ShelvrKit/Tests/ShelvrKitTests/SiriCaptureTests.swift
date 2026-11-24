@@ -4,13 +4,16 @@ import Testing
 @testable import ShelvrKit
 
 @Test func siriRetryKeepsTheOriginalOperationAndSource() throws {
-  let pending = InboxPayload(kind: .note, value: "test note", operationID: "siri:fixture", siri: true)
+  let pending = InboxPayload(kind: .note, value: "test note", operationID: "siri:fixture", siri: true, spaceID: "chosen-folder")
   let saved = try JSONDecoder().decode(InboxPayload.self, from: JSONEncoder().encode(pending))
   #expect(saved.operationID == "siri:fixture")
   #expect(saved.kind == .note)
+  #expect(saved.spaceID == "chosen-folder")
   #expect(saved.siri == true)
   let old = Data(#"{"kind":"link","value":"https://example.com","operationID":"share:old"}"#.utf8)
-  #expect(try JSONDecoder().decode(InboxPayload.self, from: old).siri == nil)
+  let restored = try JSONDecoder().decode(InboxPayload.self, from: old)
+  #expect(restored.siri == nil)
+  #expect(restored.spaceID == nil)
 }
 
 @Test func captureCredentialsFollowTheAuthenticatedSessionSubject() throws {

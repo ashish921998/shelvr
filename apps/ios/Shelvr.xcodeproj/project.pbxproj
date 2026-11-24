@@ -14,6 +14,7 @@
 		2223CF8734C8B7A45DD51119 /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000041 /* en.json */; };
 		36E6F3FD1E99DE50DC4D1A8D /* ShelvrInbox in Frameworks */ = {isa = PBXBuildFile; productRef = 58A93D31AFA3EEA34762477E /* ShelvrInbox */; };
 		3FBA7FAB0E3EEC03ACC0587D /* es-MX.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000042 /* es-MX.json */; };
+		54B8E1BEDC6B0254EEE95BF9 /* CaptureRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBB070DB4AF7B8E26C57A1AB /* CaptureRouter.swift */; };
 		561D659E3AC26DB26F694687 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 85CFCF465E33D985FBF666F9 /* Foundation.framework */; };
 		5CC0282F2414B8ABB635621F /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000041 /* en.json */; };
 		60E6972F174B5C189AF93387 /* Copy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E32FCBAF6CA6438522A6AEF /* Copy.swift */; };
@@ -27,6 +28,7 @@
 		8A57E8C4E29B2CA34A103D7B /* fr.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000045 /* fr.json */; };
 		8AF2D457F0431CC1380DC3D5 /* de.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* de.json */; };
 		91DFB9C33EA2C3164F716C9B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 85CFCF465E33D985FBF666F9 /* Foundation.framework */; };
+		934C44EF78BEB1F64DD0B086 /* NotesSchemaEntities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5410CC2A134EE5FF603E0659 /* NotesSchemaEntities.swift */; };
 		A10000000000000000000014 /* ShelvrKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000013 /* ShelvrKit */; };
 		A10000000000000000000060 /* de.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* de.json */; };
 		A10000000000000000000061 /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000041 /* en.json */; };
@@ -84,6 +86,7 @@
 /* Begin PBXFileReference section */
 		166B641C1F5BF309C6A1F897 /* RecentSavesWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RecentSavesWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		4E32FCBAF6CA6438522A6AEF /* Copy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Copy.swift; path = ShelvrKit/Sources/ShelvrKit/Copy.swift; sourceTree = "<group>"; };
+		5410CC2A134EE5FF603E0659 /* NotesSchemaEntities.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NotesSchemaEntities.swift; path = "../native/app-intents/Entities/NotesSchemaEntities.swift"; sourceTree = "<group>"; };
 		704ED90EEF30D691A2613844 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		85CFCF465E33D985FBF666F9 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		985944D0E54B7A93E76B5970 /* ShareViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
@@ -105,6 +108,7 @@
 		A61C508B96C556DC218719EC /* Copy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Copy.swift; path = ShelvrKit/Sources/ShelvrKit/Copy.swift; sourceTree = "<group>"; };
 		B1BAFA60699E1B4641F3AA0A /* RecentSaves.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecentSaves.swift; sourceTree = "<group>"; };
 		E9A6D3C46DD4BF20D5EF6596 /* ShelvrCapture.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ShelvrCapture.swift; path = "../native/app-intents/Support/ShelvrCapture.swift"; sourceTree = "<group>"; };
+		FBB070DB4AF7B8E26C57A1AB /* CaptureRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CaptureRouter.swift; path = "../native/app-intents/Support/CaptureRouter.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -177,6 +181,8 @@
 				CE8BE5E4ADBEC96D790D62B3 /* RecentSavesWidget */,
 				A61C508B96C556DC218719EC /* Copy.swift */,
 				E9A6D3C46DD4BF20D5EF6596 /* ShelvrCapture.swift */,
+				5410CC2A134EE5FF603E0659 /* NotesSchemaEntities.swift */,
+				FBB070DB4AF7B8E26C57A1AB /* CaptureRouter.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -407,6 +413,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				68A4312E5FCF2169CDE0B40B /* ShelvrCapture.swift in Sources */,
+				934C44EF78BEB1F64DD0B086 /* NotesSchemaEntities.swift in Sources */,
+				54B8E1BEDC6B0254EEE95BF9 /* CaptureRouter.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
