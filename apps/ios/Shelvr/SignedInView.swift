@@ -169,7 +169,7 @@ struct SignedInView: View {
           if let id = link.query.first(where: { $0.name == "tripId" })?.value {
             let day = link.query.first(where: { $0.name == "day" })?.value.flatMap(Int.init) ?? 1
             if access.restrictsPersonalAccess {
-              SocialQuery(query: "tripPlannerData:getTripPlan", arguments: ["tripId": id], type: CityTrip?.self) { trip in
+              SocialQuery(query: "tripPlannerData:getSharedTripPlan", arguments: ["tripId": id], type: CityTrip?.self) { trip in
                 if trip?.listId != nil { AddTripStopView(id: id, initialDay: day) }
                 else if access.loading { loadingPlan }
                 else { PlanGateView() }
@@ -211,13 +211,12 @@ struct SignedInView: View {
   }
 
   @ViewBuilder private var loadingPlan: some View {
-    if access.failed {
-      VStack(spacing: 16) {
-        Button(copy("common.retry")) { access.retry += 1 }
-        entry("/shared-lists", "sharedLists.title", "person.2")
-        entry("/shared-trip-links", "tripShare.manage", "link")
-      }
-    } else { ProgressView(copy("pro.checking")) }
+    VStack(spacing: 16) {
+      if access.failed { Button(copy("common.retry")) { access.retry += 1 } }
+      else { ProgressView(copy("pro.checking")) }
+      entry("/shared-lists", "sharedLists.title", "person.2")
+      entry("/shared-trip-links", "tripShare.manage", "link")
+    }
   }
 
   private func open(_ route: String) {
