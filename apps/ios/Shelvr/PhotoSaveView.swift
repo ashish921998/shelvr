@@ -9,6 +9,8 @@ struct PhotoSaveView: View {
   @State private var selection: PhotosPickerItem?
   @State private var operationID = UUID().uuidString
   @State private var request: UUID?
+  @State private var billing: BillingDestination?
+  @State private var offered: String?
   @State private var failure: String?
 
   var body: some View {
@@ -19,12 +21,22 @@ struct PhotoSaveView: View {
         Label(title, systemImage: icon)
       }
       .disabled(request != nil)
-      if let failure { Text(copy(failure)).foregroundStyle(.red) }
+      if let failure {
+        Text(copy(failure)).foregroundStyle(.red)
+        if failure == "freePlan.photosNeedPro" {
+          Button(copy("freePlan.seePlans")) { offered = operationID; billing = .paywall }
+        }
+      }
     }
     .navigationTitle(title)
     .toolbar {
       Button(copy("common.save")) { request = UUID() }
         .disabled(selection == nil || request != nil)
+    }
+    .sheet(item: $billing) { destination in
+      BillingSheet(destination: destination, confirmed: {
+        if offered == operationID, selection != nil { request = UUID() }
+      })
     }
     .onChange(of: selection) {
       operationID = UUID().uuidString
@@ -54,6 +66,9 @@ struct PhotoSaveView: View {
       if !Task.isCancelled, request == id {
         failure = ImportPhoto.failureCopy(error)
         Analytics.capture("save_failed", properties.merging(["stage": ImportPhoto.failureStage(error)]) { $1 })
+        if failure == "freePlan.photosNeedPro" && offered != operationID {
+          offered = operationID; billing = .paywall
+        }
       }
     }
   }

@@ -15,6 +15,7 @@ struct SharedInboxReceiver: ViewModifier {
   @Environment(Backend.self) private var backend
   @Environment(\.scenePhase) private var phase
   @Environment(\.copy) private var copy
+  @State private var billing: BillingDestination?
   @State private var failed = false
   @State private var failedFile: URL?
   @State private var retainedFile: URL?
@@ -48,8 +49,13 @@ struct SharedInboxReceiver: ViewModifier {
           catch {}
         }
       }
+      .sheet(item: $billing) { destination in
+        BillingSheet(destination: destination, confirmed: { failed = false; wake?.yield(phase) })
+      }
       .alert(copy("share.singleFailure"), isPresented: $failed) {
-        if failureCopy == "share.longNoteRecovery", let selected = retainedFile {
+        if failureCopy == "freePlan.leftBody" || failureCopy == "freePlan.photosNeedPro" {
+          Button(copy("freePlan.seePlans")) { billing = .paywall }
+        } else if failureCopy == "share.longNoteRecovery", let selected = retainedFile {
           Button(copy("share.copyNote")) { copyRecoveredNote(selected) }
         } else {
           Button(copy("common.tryAgain")) { failed = false; wake?.yield(phase) }
