@@ -5,7 +5,7 @@ import SwiftUI
 @main
 struct ShelvrApp: App {
   @UIApplicationDelegateAdaptor(PushDevice.self) private var pushDevice
-  @State private var backend = Backend(environment: .current)
+  @State private var backend = AppEnvironment.sharedBackend
   @State private var copy = Copy()
   @Environment(\.scenePhase) private var scenePhase
 
@@ -25,6 +25,7 @@ struct ShelvrApp: App {
 }
 
 extension AppEnvironment {
+  @MainActor static let sharedBackend = Backend(environment: .current)
   static let current: AppEnvironment = {
     do {
       return try AppEnvironment(infoDictionary: Bundle.main.infoDictionary ?? [:])

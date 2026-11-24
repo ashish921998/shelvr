@@ -68,9 +68,17 @@ public struct SharedListDetail: Decodable {
 
   public let _id, name, inviteToken: String
   public let isOwner, covered: Bool
+  public let trips: [TripsPage.Trip]?
   public let members: [Member]
   public let places: [Place]
   public let cities: [String]
+
+  public static func planLink(trip: Bool, city: String, list: String) -> AppLink? {
+    var route = URLComponents()
+    route.path = trip ? "/new-trip" : "/go-out"
+    route.queryItems = [.init(name: "city", value: city), .init(name: "listId", value: list)]
+    return route.string.flatMap { AppLink($0) }
+  }
 
   public func inviteURL(preview: Bool) -> URL {
     if preview {

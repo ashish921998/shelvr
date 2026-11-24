@@ -46,7 +46,7 @@ public struct ConvexHTTPAuthTransport: AuthTransport {
   let session: URLSession
 
   public init(deployment: URL, session: URLSession = .shared) {
-    self.endpoint = deployment.appending(path: "api/action")
+    self.endpoint = deployment.appending(path: "api")
     self.session = session
   }
 
@@ -61,15 +61,44 @@ public struct ConvexHTTPAuthTransport: AuthTransport {
     _ = try await call("auth:signOut", args: [String: String](), token: token, returning: Ignored.self)
   }
 
-  func revokeSiri(_ capture: String, authorization: String) async throws {
-    _ = try await call("appIntents:revokeCaptureToken", args: ["token": capture], token: authorization,
-      returning: Ignored.self, mutation: true)
+  func revokePresentedSiri(_ capture: String) async throws {
+    guard let site = SiriRevocations.site(for: endpoint)?.appending(path: "app-intents/revoke") else {
+      throw URLError(.badURL)
+    }
+    var request = URLRequest(url: site, timeoutInterval: 12)
+    request.httpMethod = "POST"
+    request.setValue("Bearer " + capture, forHTTPHeaderField: "Authorization")
+    let (_, response) = try await session.data(for: request)
+    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+    guard status == 204 else { throw ConvexCallError.badResponse(status) }
   }
 
+  func revokeSiri(_ capture: String, authorization: String) async throws {
+    _ = try await call("appIntents:revokeCaptureToken", args: ["token": capture], token: authorization,
+      returning: Ignored.self, function: .mutation)
+  }
+
+  enum SiriNoteResult { case saved, folderUnavailable }
+
+  func saveSiriNote(_ args: [String: String], authorization: String) async throws -> SiriNoteResult {
+    do {
+      guard try await call("items:createNoteItem", args: args, token: authorization,
+        returning: String.self, function: .mutation) != nil else {
+        throw ConvexCallError.server("empty reply")
+      }
+      return .saved
+    } catch SiriNoteRejection.folderUnavailable where args["spaceId"] != nil {
+      return .folderUnavailable
+    }
+  }
+
+  private enum Function: String { case action, mutation }
+  private enum SiriNoteRejection: Error { case folderUnavailable }
+
   private func call<Args: Encodable, Value: Decodable>(
-    _ path: String, args: Args, token: String? = nil, returning: Value.Type, mutation: Bool = false
+    _ path: String, args: Args, token: String? = nil, returning: Value.Type, function: Function = .action
   ) async throws -> Value? {
-    var http = URLRequest(url: mutation ? endpoint.deletingLastPathComponent().appending(path: "mutation") : endpoint)
+    var http = URLRequest(url: endpoint.appending(path: function.rawValue))
     http.httpMethod = "POST"
     http.setValue("application/json", forHTTPHeaderField: "Content-Type")
     if let token { http.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
@@ -80,6 +109,13 @@ public struct ConvexHTTPAuthTransport: AuthTransport {
       throw ConvexCallError.badResponse(status)
     }
     guard reply.status == "success" else {
+      if path == "items:createNoteItem" {
+        switch (try? JSONDecoder().decode(SaveRefusal.self, from: data))?.errorData.code {
+        case "pro_required": throw SaveFailure.proRequired
+        case "space_not_found": throw SiriNoteRejection.folderUnavailable
+        default: break
+        }
+      }
       throw ConvexCallError.server(reply.errorMessage ?? "status \(status)")
     }
     return reply.value
@@ -95,6 +131,11 @@ public struct ConvexHTTPAuthTransport: AuthTransport {
     let status: String
     let value: Value?
     let errorMessage: String?
+  }
+
+  private struct SaveRefusal: Decodable {
+    struct Details: Decodable { let code: String }
+    let errorData: Details
   }
 
   private struct Ignored: Decodable {}

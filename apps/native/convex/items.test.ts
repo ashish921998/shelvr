@@ -838,6 +838,26 @@ describe("similarItems", () => {
   });
 });
 
+it("returns a stable refusal for a deleted Siri folder and allows the same operation to retry", async () => {
+  const { t } = await as();
+  const spaceId = await t.mutation(api.spaces.createSpace, {
+    name: "Siri capture fixture",
+  });
+  await t.mutation(api.spaces.deleteSpace, { id: spaceId });
+  const note = {
+    text: "Long note fixture",
+    operationId: "siri:deleted-folder-retry",
+    saveSource: "siri" as const,
+  };
+
+  await expect(
+    t.mutation(api.items.createNoteItem, { ...note, spaceId }),
+  ).rejects.toMatchObject({ data: { code: "space_not_found" } });
+
+  const save = await t.mutation(api.items.createNoteItem, note);
+  expect(await t.mutation(api.items.createNoteItem, note)).toBe(save);
+});
+
 describe("canonical save telemetry", () => {
   it("schedules one event per item, keeps the original session on retry, and excludes content", async () => {
     const { t, userId } = await as();

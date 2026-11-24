@@ -250,3 +250,17 @@ describe("nextBadge", () => {
     expect(nextBadge(badgeTotals(all, [{ stamped: 1, total: 1 }]))).toBe(null);
   });
 });
+
+it("keeps the Swift badge display vector current", async () => {
+  const { default: vector } =
+    await import("../../../ios/TestData/passport-badges.json");
+  const totals = badgeTotals(vector.stamps, vector.completion, vector.cities);
+  const earned = badgeStates(totals).filter((state) => state.earned);
+  const next = nextBadge(totals);
+  expect(
+    [...earned, ...(next ? [next] : [])].map((state) => ({
+      id: state.badge.id,
+      have: state.have,
+    })),
+  ).toEqual(vector.expected);
+});
