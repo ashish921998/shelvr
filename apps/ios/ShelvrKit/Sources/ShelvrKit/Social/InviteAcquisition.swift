@@ -140,6 +140,8 @@ public final class InviteEntry {
     if dispatching != nil || awaitingNavigation != nil { queued = link; return true }
     guard let incoming = PublicInvite(link) else {
       if accepted != nil { queued = link; return true }
+      preview = nil
+      expired = nil
       return false
     }
     queued = nil
@@ -154,7 +156,7 @@ public final class InviteEntry {
 
   @discardableResult public func cancel() -> AppLink? {
     guard dispatching == nil, let current = accepted, replace(with: nil) else { return nil }
-    preview = current.invite
+    preview = queued == nil ? current.invite : nil
     defer { queued = nil }
     return queued
   }
