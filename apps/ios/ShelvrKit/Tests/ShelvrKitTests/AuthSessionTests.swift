@@ -243,6 +243,24 @@ struct AuthSessionTests {
     #expect(transport.requests == [SignInRequest(refreshToken: "refresh-old")])
   }
 
+  @Test func aRefusedSessionStaysSignedOutWhenItsKeychainCopyCannotBeDeleted() async throws {
+    let marker = temporarySignOutMarker()
+    defer { try? marker.clear() }
+    let vault = MemoryVault(tokens("a"), canDelete: false)
+    let transport = FakeTransport([.respond(SignInResponse(tokens: nil)), .fail])
+    let auth = AuthSession(transport: transport, vault: vault, signOutMarker: marker)
+    await auth.restore()
+    #expect(try await auth.validToken() == nil)
+
+    await auth.restore()
+    #expect(try await auth.validToken() == nil)
+    #expect(await auth.isSignedIn == false)
+    let relaunched = AuthSession(transport: transport, vault: vault, signOutMarker: marker)
+    await relaunched.restore()
+    #expect(await relaunched.isSignedIn == false)
+    #expect(transport.requests.count == 1)
+  }
+
   private func temporarySignOutMarker() -> SignOutMarker {
     SignOutMarker(url: FileManager.default.temporaryDirectory.appending(path: UUID().uuidString))
   }
