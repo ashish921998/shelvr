@@ -33,36 +33,73 @@ private struct RecentSavesView: View {
   let entry: Entry
   private let copy = Copy()
 
-  private func open(_ path: String) -> URL? {
-    guard let scheme = Bundle.main.object(forInfoDictionaryKey: "ShelvrScheme") as? String else { return nil }
-    return URL(string: "\(scheme)://\(path)")
-  }
-
   var body: some View {
-    VStack(alignment: .leading, spacing: 7) {
-      Text(copy("widget.title")).font(.caption.bold()).foregroundStyle(.secondary)
-      if let snapshot = entry.snapshot {
-        if snapshot.items.isEmpty {
-          Text(copy("widget.emptyTitle")).font(.headline)
-          Text(copy("widget.emptyBody")).font(.caption)
-        } else {
-          ForEach(snapshot.items.prefix(family == .systemSmall ? 2 : 4)) { item in
-            if let url = open("item/\(item.id)") {
-              Link(destination: url) {
-                Label(item.title, systemImage: item.kind == "image" ? "photo" : item.kind == "link" ? "link" : "note.text")
-                  .lineLimit(1).font(.subheadline)
+    Group {
+      if let snapshot = entry.snapshot, !snapshot.items.isEmpty {
+        let items = Array(snapshot.displayed(small: family == .systemSmall))
+        if family == .systemSmall {
+          Grid(horizontalSpacing: 5, verticalSpacing: 5) {
+            ForEach(0..<2, id: \.self) { row in
+              GridRow {
+                ForEach(0..<2, id: \.self) { column in
+                  let index = row * 2 + column
+                  if items.indices.contains(index) { tile(items[index], featured: false) }
+                  else { Color.clear }
+                }
               }
             }
           }
+        } else {
+          HStack(spacing: 8) {
+            tile(items[0], featured: true)
+            VStack(alignment: .leading, spacing: 5) {
+              ForEach(items.dropFirst()) { item in
+                HStack(spacing: 6) {
+                  artwork(item).frame(width: 26, height: 26).clipShape(.rect(cornerRadius: 5))
+                  VStack(alignment: .leading, spacing: 1) {
+                    Text(item.title).font(.caption2.bold()).lineLimit(1)
+                    Text(item.subtitle ?? "").font(.system(size: 9)).lineLimit(1).foregroundStyle(.secondary)
+                  }
+                }
+              }
+            }.frame(maxWidth: .infinity, alignment: .leading)
+          }
         }
       } else {
-        Label(copy("widget.proTitle"), systemImage: "lock").font(.headline)
-        Text(copy("widget.proBody")).font(.caption)
+        let locked = entry.snapshot == nil
+        VStack(spacing: 5) {
+          Image(systemName: locked ? "lock.fill" : "tray")
+          Text(copy(locked ? "widget.proTitle" : "widget.emptyTitle")).font(.caption.bold())
+          Text(copy(locked ? "widget.proBody" : "widget.emptyBody")).font(.caption2).foregroundStyle(.secondary)
+        }.multilineTextAlignment(.center)
       }
     }
-    .frame(maxWidth: .infinity, alignment: .leading)
     .containerBackground(.background, for: .widget)
-    .widgetURL(open(entry.snapshot?.items.first.map { "item/\($0.id)" } ?? "home"))
+    .widgetURL(RecentSavesSnapshot.destination(scheme: Bundle.main.object(forInfoDictionaryKey: "ShelvrScheme") as? String ?? "shelvr", snapshot: entry.snapshot))
+  }
+
+  private func tile(_ item: RecentSavesSnapshot.Item, featured: Bool) -> some View {
+    GeometryReader { geometry in
+      ZStack(alignment: .bottomLeading) {
+        artwork(item).frame(width: geometry.size.width, height: geometry.size.height).clipped()
+        if featured || item.thumbnail == nil {
+          Text(item.title).lineLimit(2).font(.caption2.bold()).padding(5)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.thinMaterial)
+        }
+      }.clipShape(.rect(cornerRadius: 8))
+    }
+  }
+
+  @ViewBuilder private func artwork(_ item: RecentSavesSnapshot.Item) -> some View {
+    if let bytes = item.thumbnail, let image = UIImage(data: bytes) {
+      Image(uiImage: image).resizable().scaledToFill()
+    } else {
+      ZStack {
+        Color.secondary.opacity(0.12)
+        Image(systemName: item.kind == "image" ? "photo" : item.kind == "link" ? "link" : "note.text").foregroundStyle(.orange)
+      }
+    }
   }
 }
 
