@@ -51,3 +51,15 @@ import Testing
   #expect(!original.canContinue(generation: generation, account: "another"))
   #expect(!original.canContinue(generation: UUID(), account: "fixture"))
 }
+
+
+@Test func trialWarningsDoNotWaitForTheNudgePreference() throws {
+  var calendar = Calendar(identifier: .gregorian)
+  calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+  let format = ISO8601DateFormatter()
+  let now = try #require(format.date(from: "2026-09-10T17:00:00Z"))
+  let expiration = try #require(format.date(from: "2026-09-17T17:00:00Z"))
+  let warnings = TrialNotification.schedule(expiration: expiration, now: now, nudges: nil, calendar: calendar)
+  #expect(warnings.map(\.kind) == [.ending, .lastDay])
+  #expect(warnings == TrialNotification.schedule(expiration: expiration, now: now, nudges: false, calendar: calendar))
+}

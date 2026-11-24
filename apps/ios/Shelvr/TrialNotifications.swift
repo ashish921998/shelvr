@@ -147,8 +147,9 @@ struct TrialReminderObserver: ViewModifier {
       LocalTrialNotifications.shared.replace([], copy: copy)
       return
     }
-    guard inputs.active, let nudges = inputs.nudges else { return }
-    let notices = TrialNotification.schedule(expiration: Date(timeIntervalSince1970: end / 1000), now: .now, nudges: nudges)
+    guard inputs.active else { return }
+    let notices = TrialNotification.schedule(expiration: Date(timeIntervalSince1970: end / 1000), now: .now,
+      nudges: inputs.nudges)
     mayAsk = notices.contains { $0.kind == .ending }
     LocalTrialNotifications.shared.replace(notices, copy: copy)
   }
