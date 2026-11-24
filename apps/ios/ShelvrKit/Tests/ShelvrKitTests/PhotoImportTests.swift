@@ -89,15 +89,14 @@ private func outputPixel(_ photo: ImportPhoto, x: Int, y: Int) throws -> [UInt8]
   #expect(throws: PhotoUploadFailure.tooLarge) {
     try PhotoUploadFailure.check(response, body: Data(#"{"error":"image_too_large"}"#.utf8))
   }
-  #expect(ImportPhoto.failureCopy(PhotoUploadFailure.tooLarge) == "errors.photoTooLarge")
-  #expect(ImportPhoto.failureCopy(PhotoUploadFailure.empty) == "errors.photoEmpty")
+  #expect(SaveFailure(PhotoUploadFailure.tooLarge).photoCopyKey == "errors.photoTooLarge")
+  #expect(SaveFailure(PhotoUploadFailure.empty).photoCopyKey == "errors.photoEmpty")
 }
 
 @Test func ownerBoundShareChecksTheAuthenticatedSubject() {
   let claims = Data(#"{"sub":"first|session","exp":2,"iat":1}"#.utf8).base64EncodedString()
   let session = AuthTokens(token: "header." + claims + ".signature", refreshToken: "fixture")
-  #expect(session.belongs(to: "first"))
-  #expect(!session.belongs(to: "second"))
+  #expect(AuthTokens.ownerID(for: session.token) == "first")
 }
 
 @Test func captureAndPlanningFailuresUseOnlyStableCategories() {
@@ -107,9 +106,9 @@ private func outputPixel(_ photo: ImportPhoto, x: Int, y: Int) throws -> [UInt8]
   #expect(PastedLink.planningFailure(pro) == "pro_required")
   #expect(PastedLink.planningFailure(throttle) == "rate_limited")
   #expect(PastedLink.planningFailure(network) == "error")
-  #expect(ImportPhoto.failureStage(pro) == "pro_required")
-  #expect(ImportPhoto.failureStage(PhotoUploadFailure.tooLarge) == "image_too_large")
-  #expect(ImportPhoto.failureStage(PhotoUploadFailure.empty) == "image_empty")
-  #expect(ImportPhoto.failureStage(network, captureCode: "photo_limit") == "photo_limit")
-  #expect(ImportPhoto.failureStage(network, captureCode: "arbitrary private string") == "other")
+  #expect(SaveFailure(pro).stage == "pro_required")
+  #expect(SaveFailure(PhotoUploadFailure.tooLarge).stage == "image_too_large")
+  #expect(SaveFailure(PhotoUploadFailure.empty).stage == "image_empty")
+  #expect(SaveFailure.photoLimit.stage == "photo_limit")
+  #expect(SaveFailure(ClientError.ConvexError(data: #"{"code":"arbitrary private string"}"#)).stage == "other")
 }

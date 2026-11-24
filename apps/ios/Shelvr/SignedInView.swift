@@ -72,6 +72,7 @@ struct SignedInView: View {
             }
           }
           .navigationTitle(copy("addSheet.title"))
+        case "passport-story": PassportStoryView()
         case "trips": TripsTabView()
         case "shared-trip-links": ActiveTripLinksView()
         case "shared-lists", "collections": SharedListsView(collections: link.path.first == "collections")
@@ -107,7 +108,6 @@ struct SignedInView: View {
               else { ContentUnavailableView(copy("sharedLists.goneTitle"), systemImage: "person.2") }
             }.id(link)
           } else { SharedListsView() }
-        case "passport-story": PassportStoryView()
         case "passport": PassportView(open: open)
         case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)
         case "add": PasteLinkView()
@@ -184,6 +184,8 @@ struct SignedInView: View {
         } }
       }
     }
+    .modifier(CancelSurveyCard(home: library && path.isEmpty))
+    .modifier(TrialReminderObserver(home: path.isEmpty))
     .environment(access)
     .sheet(item: $billing) { BillingSheet(destination: $0, confirmed: { access.retry += 1 }) }
     .task(id: access.retry) { await access.readPlan(backend) }
@@ -194,19 +196,29 @@ struct SignedInView: View {
     .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
       Button(copy("common.close")) {}
     } message: { Text(stampMessage ?? "") }
-    .modifier(CancelSurveyCard(home: library && path.isEmpty))
-    .modifier(TrialReminderObserver(home: path.isEmpty))
     .onChange(of: pendingLink, initial: true) { _, link in
       guard let link else { return }
       pendingLink = nil
-      switch link.path {
-      case ["map"], ["share"], ["plan-gate"]: library = false; path = []
-      case ["home"]: library = true; path = []
-      case ["paywall"]: billing = .paywall
-      case ["sign-in"]: break
-      default: path = [link]
+      navigate(to: link)
+    }
+    .onChange(of: invites.destination(account: backend.userID, session: backend.sessionGeneration), initial: true) { _, link in
+      let account = backend.userID
+      let session = backend.sessionGeneration
+      guard let link, invites.destination(account: account, session: session) == link else { return }
+      navigate(to: link)
+      if let queued = invites.didNavigate(to: link, account: account, session: session), !invites.route(queued) {
+        pendingLink = queued
       }
-      if let queued = invites.didNavigate(to: link), !invites.route(queued) { pendingLink = queued }
+    }
+  }
+
+  private func navigate(to link: AppLink) {
+    switch link.path {
+    case ["map"], ["share"], ["plan-gate"]: library = false; path = []
+    case ["home"]: library = true; path = []
+    case ["paywall"]: billing = .paywall
+    case ["sign-in"]: break
+    default: path = [link]
     }
   }
 

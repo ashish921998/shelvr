@@ -134,20 +134,27 @@ private struct FeedbackView: View {
   static let support = URL(string: "mailto:ashish921998@zohomail.in?subject=Shelvr%20Support")!
 
   private func submit() {
-    guard !sending else { return }
+    guard !sending, let owner = backend.userID else { return }
+    let session = backend.sessionGeneration
     sending = true; failed = false
     let content = message.trimmingCharacters(in: .whitespacesAndNewlines)
     Task {
       defer { sending = false }
+      guard backend.userID == owner, backend.sessionGeneration == session else { return }
       do {
         struct Receipt: Decodable { let deliveryState: String }
         let receipt: Receipt = try await backend.client.mutation("feedback:submitFeedback", with: [
           "message": content, "platform": "ios", "surface": "profile",
           "buildVariant": backend.environment.variant.rawValue,
           "appVersion": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String])
+        guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
         Analytics.capture("feedback_submitted", ["surface": "profile", "char_count": content.utf16.count, "delivery": receipt.deliveryState])
         sent = true; message = ""
-      } catch { Analytics.failure("feedback_submit_failed"); failed = true }
+      } catch {
+        guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
+        Analytics.failure("feedback_submit_failed")
+        failed = true
+      }
     }
   }
 }

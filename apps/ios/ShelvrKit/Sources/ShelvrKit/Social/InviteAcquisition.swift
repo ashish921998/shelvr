@@ -91,6 +91,18 @@ struct InviteStorage {
   }
 }
 
+public struct InviteNavigation: Sendable {
+  public let destination: AppLink
+  public let account: String
+  public let session: UUID
+
+  public init(destination: AppLink, account: String, session: UUID) {
+    self.destination = destination
+    self.account = account
+    self.session = session
+  }
+}
+
 @MainActor @Observable
 public final class InviteEntry {
   public private(set) var previewRevision = UUID()
@@ -102,8 +114,9 @@ public final class InviteEntry {
   public var failed = false
   public private(set) var loaded = false
   public private(set) var dispatching: UUID?
+  private var dispatchSession: UUID?
   private var queued: AppLink?
-  private var awaitingNavigation: AppLink?
+  private var awaitingNavigation: InviteNavigation?
   private var discardUnread = false
   private let read: () throws -> AcceptedInvite?
   private let write: (AcceptedInvite?) throws -> Void
@@ -154,30 +167,51 @@ public final class InviteEntry {
     return true
   }
 
-  @discardableResult public func cancel() -> AppLink? {
+  @discardableResult public func cancel(keepPreview: Bool = true) -> AppLink? {
     guard dispatching == nil, let current = accepted, replace(with: nil) else { return nil }
-    preview = queued == nil ? current.invite : nil
+    preview = keepPreview && queued == nil ? current.invite : nil
     defer { queued = nil }
     return queued
   }
 
-  public func beginDispatch(_ id: UUID) -> Bool {
+  public func waitsForDispatch(from session: UUID) -> Bool {
+    guard let dispatchSession else { return false }
+    return dispatchSession != session
+  }
+
+  public func beginDispatch(_ id: UUID, session: UUID) -> Bool {
     guard accepted?.id == id, dispatching == nil else { return false }
     dispatching = id
+    dispatchSession = session
     return true
   }
 
-  public func endDispatch(_ id: UUID, destination: AppLink? = nil) -> AppLink? {
+  public func endDispatch(_ id: UUID, navigation: InviteNavigation? = nil) -> AppLink? {
     guard dispatching == id else { return nil }
     dispatching = nil
-    if let destination { awaitingNavigation = destination; return nil }
-    defer { queued = nil }
-    return queued
+    dispatchSession = nil
+    if let navigation { awaitingNavigation = navigation; return nil }
+    return takeQueuedLink()
   }
 
-  public func didNavigate(to destination: AppLink?) -> AppLink? {
-    guard let destination, awaitingNavigation == destination else { return nil }
+  public func destination(account: String?, session: UUID) -> AppLink? {
+    guard let navigation = awaitingNavigation, navigation.account == account, navigation.session == session else { return nil }
+    return navigation.destination
+  }
+
+  public func didNavigate(to link: AppLink, account: String?, session: UUID) -> AppLink? {
+    guard destination(account: account, session: session) == link else { return nil }
     awaitingNavigation = nil
+    return takeQueuedLink()
+  }
+
+  public func discardNavigation(unless session: UUID) -> AppLink? {
+    guard let navigation = awaitingNavigation, navigation.session != session else { return nil }
+    awaitingNavigation = nil
+    return takeQueuedLink()
+  }
+
+  private func takeQueuedLink() -> AppLink? {
     defer { queued = nil }
     return queued
   }

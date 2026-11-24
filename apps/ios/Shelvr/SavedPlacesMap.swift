@@ -113,13 +113,15 @@ struct SavedPlacesMap: View {
       }
       .task(id: selected) {
         guard let place = selected else { return }
+        guard let owner = backend.userID else { return }
+        let session = backend.sessionGeneration
         if let raw = place.appleId, let identifier = MKMapItem.Identifier(rawValue: raw),
           let item = try? await MKMapItemRequest(mapItemIdentifier: identifier).mapItem {
-          guard !Task.isCancelled else { return }
+          guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
           Analytics.capture("map_place_opened", ["card": true, "source": place.isSaved ? "own" : "discover"])
           card = item
         } else {
-          guard !Task.isCancelled else { return }
+          guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
           if case let .saved(id) = place.source {
             Analytics.capture("map_place_opened", ["card": false, "source": "own"])
             open("/item/" + id)

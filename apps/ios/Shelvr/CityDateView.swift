@@ -108,21 +108,24 @@ struct CityDateView: View {
   }
 
   private func generate(_ kind: String, firstSpot: DateStart? = nil, canOffer: Bool = true) async {
-    guard !busy else { return }
+    guard !busy, let owner = backend.userID else { return }
+    let session = backend.sessionGeneration
     busy = true
     Analytics.capture("date_plan_started", ["kind": kind])
     defer { busy = false }
     failed = false
     do {
       let plan = try await backend.planDate(city: city, kind: kind, locale: copy.locale, listID: listID, firstSpot: firstSpot)
+      guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
       lockedFirst = firstSpot != nil
       Analytics.capture("date_plan_made", ["kind": plan.kind, "asked": kind, "status": plan.status, "evenings": plan.evenings.count, "suggested": plan.stops.filter { $0.source == "suggested" }.count])
       result = plan
       evening = plan.evenings.first
       triedFirst = []; triedSecond = []
     } catch {
+      guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
       Analytics.capture("date_plan_failed", ["reason": PastedLink.planningFailure(error)])
-      if canOffer, listID != nil, PastedLink.requiresPro(error) {
+      if canOffer, listID != nil, SaveFailure(error) == .proRequired {
         gate.askToPurchase { await generate(kind, firstSpot: firstSpot, canOffer: false) }
       } else { failed = true }
     }

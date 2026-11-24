@@ -68,7 +68,7 @@ struct NewCityTripView: View {
       else { message = copy("tripPlanner.emptyResult", ["city": city]) }
     } catch {
       guard !Task.isCancelled else { return }
-      if canOffer, listID != nil, PastedLink.requiresPro(error) {
+      if canOffer, listID != nil, SaveFailure(error) == .proRequired {
         gate.askToPurchase { await generate(canOffer: false) }
       } else { message = copy("errors.retrySoon") }
     }

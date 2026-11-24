@@ -4,8 +4,8 @@ import SwiftUI
 struct RootView: View {
   @EnvironmentObject private var pushDevice: PushDevice
   @Environment(Backend.self) private var backend
-  @AppStorage("swift.appearance") private var appearance = "system"
   @Environment(\.copy) private var copy
+  @AppStorage("swift.appearance") private var appearance = "system"
   @State private var namePrompts = MemberNamePrompts()
   @State private var invites = InviteEntry()
   @State private var pendingLink: AppLink?
@@ -27,6 +27,9 @@ struct RootView: View {
     .onChange(of: pushDevice.link, initial: true) { _, link in
       if let link { route(link); pushDevice.link = nil }
     }
+    .onChange(of: backend.sessionGeneration) { _, session in
+      if let queued = invites.discardNavigation(unless: session) { route(queued) }
+    }
     .task(id: backend.sessionGeneration) {
       if backend.status == .signedOut { Analytics.identify(nil) }
       if backend.status == .offline, let id = await backend.offlineAccountID(), !Task.isCancelled {
@@ -36,7 +39,10 @@ struct RootView: View {
       do {
         for try await user in backend.query("users:getCurrentUser", as: AccountView.CurrentUser?.self) {
           try Task.checkCancellation()
-          Analytics.identify(user?._id)
+          if let user {
+            guard backend.userID == user._id else { return }
+            Analytics.identify(user._id, authenticated: true)
+          } else if backend.userID == nil { Analytics.identify(nil) }
         }
       } catch { if !Task.isCancelled { Analytics.failure("analytics_identity_failed") } }
     }
