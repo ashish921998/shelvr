@@ -25,12 +25,12 @@ struct InviteEntryView: View {
       if let request = entry.accepted, backend.status == .signedIn {
         VStack {
           if entry.failed { Button(copy("common.retry")) { attempt += 1 } } else { ProgressView() }
-          Button(copy("common.cancel")) { entry.cancel() }.disabled(entry.dispatching != nil)
+          Button(copy("common.cancel")) { cancel() }.disabled(entry.dispatching != nil)
         }
         .task(id: Work(request: request.id, session: backend.sessionGeneration, attempt: attempt)) { await resolve(request) }
       } else if backend.status == .signedOut {
         SignInView().overlay(alignment: .topLeading) {
-          if entry.accepted != nil { Button(copy("common.cancel")) { entry.cancel() }.padding() }
+          if entry.accepted != nil { Button(copy("common.cancel")) { cancel() }.padding() }
         }
       } else {
         OnboardingGate(pendingLink: $pendingLink).id(backend.sessionGeneration)
@@ -63,6 +63,10 @@ struct InviteEntryView: View {
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button(copy("common.close")) { entry.preview = nil } } }
       }
     }
+  }
+
+  private func cancel() {
+    if let next = entry.cancel() { pendingLink = next }
   }
 
   private func choose(_ invite: PublicInvite) {
@@ -120,7 +124,7 @@ struct InviteEntryView: View {
     do {
       let account = try await currentAccount()
       guard current() else { return }
-      guard let bound = request.bound(to: account) else { entry.cancel(); return }
+      guard let bound = request.bound(to: account) else { cancel(); return }
       if bound != request, !entry.replace(with: bound) { return }
       guard entry.beginDispatch(request.id) else { return }
       var handoff: AppLink?
