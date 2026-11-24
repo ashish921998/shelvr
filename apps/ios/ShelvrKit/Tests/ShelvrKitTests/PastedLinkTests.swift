@@ -21,6 +21,6 @@ import Testing
 }
 
 @Test func distinguishesPlanDenialsFromTransientFailures() {
-  #expect(PastedLink.requiresPro(ClientError.ConvexError(data: #"{"code":"pro_required","message":"Pro required"}"#)))
-  #expect(!PastedLink.requiresPro(ClientError.ServerError(msg: "network")))
+  #expect(SaveFailure(ClientError.ConvexError(data: #"{"code":"pro_required","message":"Pro required"}"#)) == .proRequired)
+  #expect(SaveFailure(ClientError.ServerError(msg: "network")) == .other)
 }

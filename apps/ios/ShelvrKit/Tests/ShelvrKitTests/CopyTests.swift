@@ -1,7 +1,7 @@
 import Foundation
 import Testing
 
-@testable import ShelvrKit
+@testable import ShelvrInbox
 
 struct CopyTests {
   static let locales = URL(filePath: #filePath)

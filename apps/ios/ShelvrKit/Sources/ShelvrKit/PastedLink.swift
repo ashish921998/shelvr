@@ -1,30 +1,16 @@
 import ConvexMobile
 import Foundation
+import ShelvrInbox
 
 public struct PastedLink: Sendable {
   public let url: String
   public let operationID: String
 
-  public static func requiresPro(_ error: Error) -> Bool {
-    saveErrorCode(error) == "pro_required"
-  }
-
   public init?(_ input: String, retrying prior: PastedLink? = nil) {
     let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
     if trimmed.contains(where: { $0.isWhitespace }) {
-      guard let range = trimmed.range(of: #"https?://[^\s<>"]+"#,
-        options: [.regularExpression, .caseInsensitive]) else { return nil }
-      var match = String(trimmed[range])
-      while let last = match.last {
-        if ".,;:!?'".contains(last) {
-          match.removeLast()
-        } else if (last == ")" || last == "]"),
-          match.filter({ $0 == last }).count > match.filter({ $0 == (last == ")" ? "(" : "[") }).count
-        {
-          match.removeLast()
-        } else { break }
-      }
-      url = match
+      guard let link = SharedWebLink.first(in: trimmed) else { return nil }
+      url = link
     } else {
       guard trimmed.contains(".") else { return nil }
       url = trimmed
@@ -35,11 +21,4 @@ public struct PastedLink: Sendable {
       operationID = "link:\(UUID().uuidString)"
     }
   }
-}
-
-
-func saveErrorCode(_ error: Error) -> String? {
-  struct Failure: Decodable { let code: String }
-  guard case let ClientError.ConvexError(data) = error else { return nil }
-  return (try? JSONDecoder().decode(Failure.self, from: Data(data.utf8)))?.code
 }

@@ -18,14 +18,21 @@ public final class Backend {
   private let session: AuthSession
   @ObservationIgnored private var authWatch: AnyCancellable?
   @ObservationIgnored private var starting: Task<Void, Never>?
-  @ObservationIgnored private var signingOut = false
+  private var signingOut = false
+  private var connectedUserID: String?
   @ObservationIgnored private var signingIn = false
 
-  public init(environment: AppEnvironment) {
+  public var userID: String? { status == .signedIn && !signingOut ? connectedUserID : nil }
+
+  public convenience init(environment: AppEnvironment) {
     let session = AuthSession(
       transport: ConvexHTTPAuthTransport(deployment: environment.convexURL),
       vault: KeychainTokenVault(),
       signOutMarker: SignOutMarker(url: URL.applicationSupportDirectory.appending(path: "pending-sign-out")))
+    self.init(environment: environment, session: session)
+  }
+
+  init(environment: AppEnvironment, session: AuthSession) {
     self.environment = environment
     self.session = session
     self.client = ConvexClientWithAuth(
@@ -38,6 +45,7 @@ public final class Backend {
           guard let self, self.status == .signedIn, !self.signingOut,
             case .unauthenticated = state
           else { return }
+          self.connectedUserID = nil
           self.status = .signedOut
         }
       }
@@ -59,11 +67,6 @@ public final class Backend {
       return
     }
     await connect()
-  }
-
-  public func requireShareOwner(_ owner: String) throws {
-    guard status == .signedIn, !signingOut, KeychainTokenVault().read()?.belongs(to: owner) == true
-    else { throw CancellationError() }
   }
 
   public func signIn(_ credential: SignInCredential) async throws {
@@ -91,6 +94,7 @@ public final class Backend {
 
   private func disconnect() async {
     await client.logout()
+    connectedUserID = nil
     status = .signedOut
     signingOut = false
   }
@@ -101,8 +105,12 @@ public final class Backend {
 
   private func connect() async {
     switch await client.login() {
-    case .success: status = .signedIn
-    case .failure: status = await session.isSignedIn ? .offline : .signedOut
+    case let .success(token):
+      connectedUserID = AuthTokens.ownerID(for: token)
+      status = .signedIn
+    case .failure:
+      connectedUserID = nil
+      status = await session.isSignedIn ? .offline : .signedOut
     }
   }
 }
