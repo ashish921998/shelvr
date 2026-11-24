@@ -9,13 +9,20 @@
 /* Begin PBXBuildFile section */
 		002D613616A1F5130CED2E9F /* ShareExtension.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 704ED90EEF30D691A2613844 /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		00BC345C0FB2E35A5207201C /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
+		0EE039217CCFE517DE3CAB42 /* ja.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000046 /* ja.json */; };
 		127E857B903D1536FC1EDFF7 /* ja.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000046 /* ja.json */; };
+		2223CF8734C8B7A45DD51119 /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000041 /* en.json */; };
 		36E6F3FD1E99DE50DC4D1A8D /* ShelvrInbox in Frameworks */ = {isa = PBXBuildFile; productRef = 58A93D31AFA3EEA34762477E /* ShelvrInbox */; };
 		3FBA7FAB0E3EEC03ACC0587D /* es-MX.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000042 /* es-MX.json */; };
+		561D659E3AC26DB26F694687 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 85CFCF465E33D985FBF666F9 /* Foundation.framework */; };
 		5CC0282F2414B8ABB635621F /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000041 /* en.json */; };
+		6A6F1BC7446406EEF72B53E6 /* RecentSaves.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1BAFA60699E1B4641F3AA0A /* RecentSaves.swift */; };
 		700174B2654790807D78CA9D /* fr-CA.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000044 /* fr-CA.json */; };
+		76722A8B2833C8EEE203E542 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
 		77C4513B4C564D7A33CF2A02 /* ShelvrInbox in Frameworks */ = {isa = PBXBuildFile; productRef = C2944BC6B409C8A19EAD8916 /* ShelvrInbox */; };
 		7FD82543A4DD186B77BD3F7C /* es.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000043 /* es.json */; };
+		8A57E8C4E29B2CA34A103D7B /* fr.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000045 /* fr.json */; };
+		8AF2D457F0431CC1380DC3D5 /* de.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* de.json */; };
 		91DFB9C33EA2C3164F716C9B /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 85CFCF465E33D985FBF666F9 /* Foundation.framework */; };
 		A10000000000000000000014 /* ShelvrKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000013 /* ShelvrKit */; };
 		A10000000000000000000060 /* de.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* de.json */; };
@@ -27,14 +34,27 @@
 		A10000000000000000000066 /* ja.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000046 /* ja.json */; };
 		A10000000000000000000067 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
 		A10000000000000000000068 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
+		ADE66479850612E8CD378F36 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
 		B70000000000000000000001 = {isa = PBXBuildFile; productRef = B70000000000000000000002; };
 		BFDDDAC65FD1EAF951C7A3DF /* fr.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000045 /* fr.json */; };
+		C3A19CA96D128BF82E080E8B /* es.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000043 /* es.json */; };
 		C5EA489188B6CDB7DBC292F8 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
+		C83365D5E385935CC9BB0F49 /* ShelvrInbox in Frameworks */ = {isa = PBXBuildFile; productRef = 814A9A7E2E52D1FDE55288DD /* ShelvrInbox */; };
+		D0D3756AEAB2BF82F1D0F15D /* fr-CA.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000044 /* fr-CA.json */; };
 		D0F379AD41A0134F8BF645B5 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 985944D0E54B7A93E76B5970 /* ShareViewController.swift */; };
+		F3ACA58CA747EE58F135F7D5 /* RecentSavesWidget.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 166B641C1F5BF309C6A1F897 /* RecentSavesWidget.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		F7096F0482F684FCB5458973 /* de.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* de.json */; };
+		FF2631930D85E358159BB28D /* es-MX.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000042 /* es-MX.json */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		0FFB809644B52D4ED1B06723 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A10000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 3FEAC94671E1FF3FE6429239;
+			remoteInfo = RecentSavesWidget;
+		};
 		2C968323C99353A4C4EC0A54 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A10000000000000000000001 /* Project object */;
@@ -52,6 +72,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				002D613616A1F5130CED2E9F /* ShareExtension.appex in Embed App Extensions */,
+				F3ACA58CA747EE58F135F7D5 /* RecentSavesWidget.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -59,6 +80,7 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		166B641C1F5BF309C6A1F897 /* RecentSavesWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RecentSavesWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		704ED90EEF30D691A2613844 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		85CFCF465E33D985FBF666F9 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		985944D0E54B7A93E76B5970 /* ShareViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
@@ -77,6 +99,7 @@
 		A10000000000000000000046 /* ja.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ja.json; sourceTree = "<group>"; };
 		A10000000000000000000047 /* ko.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ko.json; sourceTree = "<group>"; };
 		A10000000000000000000048 /* pt-BR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "pt-BR.json"; sourceTree = "<group>"; };
+		B1BAFA60699E1B4641F3AA0A /* RecentSaves.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecentSaves.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -90,6 +113,15 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		32385E25BB2EE3B377EA7466 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				561D659E3AC26DB26F694687 /* Foundation.framework in Frameworks */,
+				C83365D5E385935CC9BB0F49 /* ShelvrInbox in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A1000000000000000000000A /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -137,6 +169,7 @@
 				A10000000000000000000003 /* Products */,
 				115443435333965FC09C9DBA /* Frameworks */,
 				ED02C96235AAAD4EC1E603D2 /* ShareExtension */,
+				CE8BE5E4ADBEC96D790D62B3 /* RecentSavesWidget */,
 			);
 			sourceTree = "<group>";
 		};
@@ -145,6 +178,7 @@
 			children = (
 				A10000000000000000000004 /* Shelvr.app */,
 				704ED90EEF30D691A2613844 /* ShareExtension.appex */,
+				166B641C1F5BF309C6A1F897 /* RecentSavesWidget.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -178,6 +212,15 @@
 			path = ../native/src/locales;
 			sourceTree = "<group>";
 		};
+		CE8BE5E4ADBEC96D790D62B3 /* RecentSavesWidget */ = {
+			isa = PBXGroup;
+			children = (
+				B1BAFA60699E1B4641F3AA0A /* RecentSaves.swift */,
+			);
+			name = RecentSavesWidget;
+			path = RecentSavesWidget;
+			sourceTree = "<group>";
+		};
 		ED02C96235AAAD4EC1E603D2 /* ShareExtension */ = {
 			isa = PBXGroup;
 			children = (
@@ -190,6 +233,26 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		3FEAC94671E1FF3FE6429239 /* RecentSavesWidget */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8C153EF4F6D8EAFED5B4DC7F /* Build configuration list for PBXNativeTarget "RecentSavesWidget" */;
+			buildPhases = (
+				CDB5D0ED81936C94AD260CC1 /* Sources */,
+				32385E25BB2EE3B377EA7466 /* Frameworks */,
+				619278550B83FF8F12298F1F /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = RecentSavesWidget;
+			packageProductDependencies = (
+				814A9A7E2E52D1FDE55288DD /* ShelvrInbox */,
+			);
+			productName = RecentSavesWidget;
+			productReference = 166B641C1F5BF309C6A1F897 /* RecentSavesWidget.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		692A26752848BB4E3AF88E47 /* ShareExtension */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 1EE9F721E7B70E2E2F9AB932 /* Build configuration list for PBXNativeTarget "ShareExtension" */;
@@ -223,6 +286,7 @@
 			);
 			dependencies = (
 				96FBAA023029F6C285DD4A99 /* PBXTargetDependency */,
+				8150F2AC90D39792EA215C47 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A10000000000000000000005 /* Shelvr */,
@@ -267,11 +331,28 @@
 			targets = (
 				A10000000000000000000008 /* Shelvr */,
 				692A26752848BB4E3AF88E47 /* ShareExtension */,
+				3FEAC94671E1FF3FE6429239 /* RecentSavesWidget */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		619278550B83FF8F12298F1F /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8AF2D457F0431CC1380DC3D5 /* de.json in Resources */,
+				2223CF8734C8B7A45DD51119 /* en.json in Resources */,
+				FF2631930D85E358159BB28D /* es-MX.json in Resources */,
+				C3A19CA96D128BF82E080E8B /* es.json in Resources */,
+				D0D3756AEAB2BF82F1D0F15D /* fr-CA.json in Resources */,
+				8A57E8C4E29B2CA34A103D7B /* fr.json in Resources */,
+				0EE039217CCFE517DE3CAB42 /* ja.json in Resources */,
+				ADE66479850612E8CD378F36 /* ko.json in Resources */,
+				76722A8B2833C8EEE203E542 /* pt-BR.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		61F45FEDAAA896C767CDAE0C /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -322,9 +403,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		CDB5D0ED81936C94AD260CC1 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6A6F1BC7446406EEF72B53E6 /* RecentSaves.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		8150F2AC90D39792EA215C47 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = RecentSavesWidget;
+			target = 3FEAC94671E1FF3FE6429239 /* RecentSavesWidget */;
+			targetProxy = 0FFB809644B52D4ED1B06723 /* PBXContainerItemProxy */;
+		};
 		96FBAA023029F6C285DD4A99 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			name = ShareExtension;
@@ -334,6 +429,27 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		21FFABB920EA63C61765B8EC /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000016 /* Debug.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = Config/Extension.entitlements;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/RecentSavesWidget.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Recent Saves";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SHELVR_APP_ID).ExpoWidgetsTarget";
+				PRODUCT_NAME = RecentSavesWidget;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
 		2D6DBA980C3E5C50F71DED40 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = A10000000000000000000016 /* Debug.xcconfig */;
@@ -403,6 +519,28 @@
 			};
 			name = Release;
 		};
+		FB1C6CB9D4E478211ED93CAC /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000017 /* Release.xcconfig */;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = "";
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = Config/Extension.entitlements;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Config/RecentSavesWidget.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = "Recent Saves";
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(SHELVR_APP_ID).ExpoWidgetsTarget";
+				PRODUCT_NAME = RecentSavesWidget;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -411,6 +549,15 @@
 			buildConfigurations = (
 				8625A556B7209EFDBE44A69F /* Release */,
 				2D6DBA980C3E5C50F71DED40 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		8C153EF4F6D8EAFED5B4DC7F /* Build configuration list for PBXNativeTarget "RecentSavesWidget" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FB1C6CB9D4E478211ED93CAC /* Release */,
+				21FFABB920EA63C61765B8EC /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -444,6 +591,10 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		58A93D31AFA3EEA34762477E /* ShelvrInbox */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ShelvrInbox;
+		};
+		814A9A7E2E52D1FDE55288DD /* ShelvrInbox */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ShelvrInbox;
 		};

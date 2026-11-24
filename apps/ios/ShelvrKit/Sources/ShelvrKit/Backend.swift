@@ -102,8 +102,8 @@ public final class Backend {
     signingOut = false
   }
 
-  public func query<T: Decodable>(_ name: String, as type: T.Type) -> some AsyncSequence<T, any Error> {
-    client.subscribe(to: name, yielding: type).values
+  public func query<T: Decodable>(_ name: String, with args: [String: ConvexEncodable?] = [:], as type: T.Type) -> some AsyncSequence<T, any Error> {
+    client.subscribe(to: name, with: args, yielding: type).values
   }
 
   private func connect() async {
