@@ -31,13 +31,17 @@ struct CityDateView: View {
         }
         Button(copy("datePlan.changeKind")) { self.result = nil; self.evening = nil }
       } else {
-        ForEach(["classic", "lowkey", "surprise"], id: \.self) { kind in
+        ForEach([
+          ("classic", copy("datePlan.classic"), copy("datePlan.classicHint")),
+          ("lowkey", copy("datePlan.lowkey"), copy("datePlan.lowkeyHint")),
+          ("surprise", copy("datePlan.surprise"), copy("datePlan.surpriseHint")),
+        ], id: \.0) { kind, title, hint in
           Button {
             Task { await generate(kind) }
           } label: {
             VStack(alignment: .leading) {
-              Text(copy("datePlan." + kind)).font(.headline)
-              Text(copy("datePlan." + kind + "Hint")).font(.caption)
+              Text(title).font(.headline)
+              Text(hint).font(.caption)
             }
           }
         }

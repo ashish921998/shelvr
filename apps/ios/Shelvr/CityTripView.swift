@@ -23,12 +23,12 @@ struct NewCityTripView: View {
       Stepper(value: $days, in: 1...15) { LabeledContent(copy("trip.howManyDays"), value: days.formatted()) }
       Picker(copy("trip.pace"), selection: $pace) {
         ForEach(["easy", "balanced", "packed"], id: \.self) { value in
-          Text(copy("trip.pace" + value.capitalized)).tag(value)
+          Text(copy("trip.pace\(value.capitalized)")).tag(value)
         }
       }
       Section(copy("tripPlanner.interests")) {
         ForEach(options, id: \.self) { value in
-          Toggle(copy("tripPlanner.interest" + value.capitalized), isOn: Binding(
+          Toggle(copy("tripPlanner.interest\(value.capitalized)"), isOn: Binding(
             get: { interests.contains(value) },
             set: { on in
               if on { interests.insert(value) }
