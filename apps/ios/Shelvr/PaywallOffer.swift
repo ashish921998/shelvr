@@ -11,12 +11,12 @@ struct PaywallOffer {
     let offerings = try await Purchases.shared.offerings()
     guard let current = offerings.current else { return nil }
     let products = current.availablePackages.map(\.storeProduct)
-    var eligible = false
+    var eligibleIDs = Set<String>()
     if let other = offerings.all["weekly_annual_draft"], other.identifier != current.identifier {
       let results = await Purchases.shared.checkTrialOrIntroDiscountEligibility(
         productIdentifiers: products.map(\.productIdentifier))
-      eligible = results.values.contains { $0.status == .eligible }
-      if !eligible, results.values.contains(where: { $0.status == .ineligible }) {
+      eligibleIDs = Set(results.compactMap { $0.value.status == .eligible ? $0.key : nil })
+      if eligibleIDs.isEmpty, results.values.contains(where: { $0.status == .ineligible }) {
         return Self(offering: other, variables: [:])
       }
     }
@@ -37,8 +37,8 @@ struct PaywallOffer {
         variables[name] = .string(String(Int((date.timeIntervalSince(dates.start) / 86_400).rounded())))
       }
     }
-    if eligible, let annual = products.first(where: {
-      $0.subscriptionPeriod?.unit == .year && $0.subscriptionPeriod?.value == 1 && $0.introductoryDiscount?.price == 0
+    if let annual = products.first(where: {
+      eligibleIDs.contains($0.productIdentifier) && $0.subscriptionPeriod?.unit == .year && $0.subscriptionPeriod?.value == 1 && $0.introductoryDiscount?.price == 0
     }), let currency = annual.currencyCode {
       let zero = Decimal.zero.formatted(.currency(code: currency).locale(locale))
       variables["trial_offer"] = .string(copy("paywall.trialOffer", ["zero": zero, "price": annual.localizedPriceString]))

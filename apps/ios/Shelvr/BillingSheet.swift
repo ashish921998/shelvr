@@ -39,6 +39,7 @@ struct BillingSheet: View {
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.dismiss) private var dismiss
+  @State private var session: UUID?
   @State private var userID: String?
   @State private var offer: PaywallOffer?
   @State private var failed = false
@@ -63,13 +64,16 @@ struct BillingSheet: View {
       } else if let offer, userID != nil {
         PaywallView(offering: offer.offering, displayCloseButton: true)
           .customPaywallVariables(offer.variables)
+          .onRequestedDismissal { if !syncing { dismiss() } }
           .onPurchaseCompleted { info in finish(info) }
           .onRestoreCompleted { info in finish(info) }
       } else {
         ProgressView()
       }
     }
+    .interactiveDismissDisabled(syncing)
     .task(id: attempt) {
+      let generation = backend.sessionGeneration
       failed = false
       do {
         for try await user in backend.query("users:getCurrentUser", as: AccountView.CurrentUser?.self) {
@@ -81,6 +85,8 @@ struct BillingSheet: View {
             offer = current
           }
           try Task.checkCancellation()
+          guard backend.sessionGeneration == generation else { return }
+          session = generation
           userID = id
           return
         }
@@ -95,14 +101,15 @@ struct BillingSheet: View {
   }
 
   private func sync() {
-    guard !syncing, let userID, Purchases.shared.appUserID == userID else { return }
+    guard !syncing, backend.sessionGeneration == session, let userID, Purchases.shared.appUserID == userID else { return }
     syncing = true
     syncFailed = false
     Task {
       defer { syncing = false }
       do {
+        guard backend.sessionGeneration == session else { return }
         let active: Bool = try await backend.client.action("subscriptions:syncPurchase")
-        guard active, backend.status == .signedIn, Purchases.shared.appUserID == userID else {
+        guard active, backend.sessionGeneration == session, backend.status == .signedIn, Purchases.shared.appUserID == userID else {
           throw BillingFailure.unavailable
         }
         confirmed()
