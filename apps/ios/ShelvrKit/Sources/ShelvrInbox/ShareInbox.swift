@@ -18,7 +18,7 @@ public enum ShareAttachment: Sendable {
   case payload(InboxPayload)
   case caption(String)
 
-  @MainActor public static func firstAvailable<T>(_ offers: [T], read: (T) async throws -> Self?) async throws -> Self? {
+  @MainActor public static func firstAvailable<T: Sendable>(_ offers: [T], read: @MainActor (T) async throws -> Self?) async throws -> Self? {
     var failure: Error?
     for offer in offers {
       do { if let found = try await read(offer) { return found } }
