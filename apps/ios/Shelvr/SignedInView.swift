@@ -97,7 +97,7 @@ struct SignedInView: View {
               else { ContentUnavailableView(copy("sharedLists.goneTitle"), systemImage: "person.2") }
             }.id(link)
           } else { SharedListsView() }
-        case "passport": PassportView()
+        case "passport": PassportView(open: open)
         case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)
         case "add": PasteLinkView()
         case "saves": LibraryView(screen: .saves)
