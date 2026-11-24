@@ -32,7 +32,7 @@ struct CityPlacesView: View {
             }
             planLink("/city-card", "cityCard.share", "square.and.arrow.up")
             CityVotesView(city: city, pins: pins)
-            planLink("/date-plan", "homePlaces.planDate", "heart")
+            planLink("/go-out", "plan.goOut", "figure.walk")
             planLink("/new-trip", "homePlaces.planTrip", "suitcase")
           }
           ForEach(pins) { pin in
