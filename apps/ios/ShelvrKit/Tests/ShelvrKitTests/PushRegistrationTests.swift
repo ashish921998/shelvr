@@ -62,34 +62,33 @@ import Testing
   #expect(try PushTokenStore.registrationID(bearer: bearer("another|session2", expiration: 40), installSecret: "installation") != first)
 }
 
-@MainActor @Test func anExpoUpgradeTransfersTheCachedTokenBeforeExchangeAndKeepsItOnFailure() async throws {
-  let baseService = "test.shelvr.upgrade.\(UUID().uuidString)"
+@MainActor @Test func aRestoredArrayWithTwoPhonesOnlyRegistersTheFreshExchangeMatch() async throws {
+  let baseService = "test.shelvr.upgrade.\(UUID())"
   let store = PushTokenStore(serviceURL: URL(string: "https://test.convex.cloud")!, keychainService: baseService + ":no-auth")
-  defer { try? store.write([]); try? store.writeLegacy([], service: baseService); try? store.writeLegacy([]) }
+  defer { try? store.write([]); try? store.writeLegacy([], service: baseService) }
+  try store.writeLegacy(["original-phone", "replacement-phone"], service: baseService)
   let generation = UUID()
-  try store.writeLegacy(["old-expo"], service: baseService)
-  #expect(try store.read().isEmpty)
-  var events: [String] = []
-  await #expect(throws: URLError.self) {
-    try await store.adoptLegacy(for: generation, deviceContinuity: true, suspend: { events.append("suspend") }) { record in
-      #expect(try store.read().contains(record))
-      events.append("authenticated adoption")
-      throw URLError(.notConnectedToInternet)
-    }
-  }
-  #expect(try store.legacyTokens(service: baseService) == ["old-expo"])
-  #expect(events == ["suspend", "authenticated adoption"])
-  try await store.adoptLegacy(for: generation, deviceContinuity: true, suspend: { events.append("suspend") }) { record in
-    #expect(record == PushRegistrationRecord(token: "old-expo", registrationId: generation.uuidString))
-    events.append("authenticated adoption")
-  }
+  let apns = Data([1])
+  var delivery = PushDeliveryState()
+  let pauseBeforeProbe = delivery.prepare(generation: generation, verified: [])
+  let pauseAfterCallback = delivery.receive(apns)
+  #expect(pauseBeforeProbe && pauseAfterCallback)
+  #expect(!delivery.permitsPresentation)
   let config = URLSessionConfiguration.ephemeral
   config.protocolClasses = [UnavailableExpo.self]
-  let exchange = ExpoPushRequest(bundleID: "app.shelvr.save.preview", apns: Data([1]), installation: "install", development: true)
+  let exchange = ExpoPushRequest(bundleID: "app.shelvr.save.preview", apns: apns, installation: "install", development: true)
   await #expect(throws: URLError(.badServerResponse)) { try await exchange.exchange(session: URLSession(configuration: config)) }
-  #expect(try store.legacyTokens(service: baseService).isEmpty)
-  #expect(try store.read() == [PushRegistrationRecord(token: "old-expo", registrationId: generation.uuidString)])
-  #expect(events == ["suspend", "authenticated adoption", "suspend", "authenticated adoption"])
+  #expect(try store.read().isEmpty)
+  #expect(try store.legacyTokens(service: baseService) == ["original-phone", "replacement-phone"])
+  var registered: [String] = []
+  try await store.registerFresh("replacement-phone", native: apns, for: generation, register: { registered.append($0.token) }) { _ in
+    Issue.record("The original phone must not be revoked")
+  }
+  #expect(registered == ["replacement-phone"])
+  #expect(try store.legacyTokens(service: baseService) == ["original-phone"])
+  #expect(try store.read().first?.apnsDigest == PushDeliveryState.digest(apns))
+  let resumed = delivery.confirm(apns, generation: generation)
+  #expect(resumed && delivery.permitsPresentation)
 }
 
 private final class UnavailableExpo: URLProtocol, @unchecked Sendable {
@@ -131,11 +130,9 @@ private func expoKey(_ value: String, service: String) -> [String: Any] {
   #expect(!restored.hasExpoDeviceIdentity && restored.id != "original" && restored.secret != "copied-secret")
   let reopened = try PushInstallation(bundleID: newDevice, expoSecretService: secretService, oldSecretService: oldService)
   #expect(!reopened.hasExpoDeviceIdentity && reopened.id == restored.id && reopened.secret == restored.secret)
-  try await store.adoptLegacy(for: UUID(), deviceContinuity: reopened.hasExpoDeviceIdentity, suspend: {}) { _ in
-    Issue.record("A copied token must never be registered on a restored phone")
-  }
-  #expect(try store.legacyTokens().isEmpty)
+  #expect(try store.legacyTokens() == ["old-phone-token"])
   #expect(try store.read().isEmpty)
+  try store.writeLegacy([])
   let same = try PushInstallation(bundleID: oldDevice, expoSecretService: secretService, oldSecretService: oldService)
   #expect(same.hasExpoDeviceIdentity && same.id == "original" && same.secret == "copied-secret")
 }
@@ -162,10 +159,51 @@ private final class OtherPushOwner: URLProtocol, @unchecked Sendable {
   config.protocolClasses = [OtherPushOwner.self]
   let transport = PushTransport(deployment: endpoint, session: URLSession(configuration: config))
   await #expect(throws: PushRegistrationError.ownedByAnotherAccount) {
-    try await store.adoptLegacy(for: UUID(), deviceContinuity: true, suspend: {}) { record in
-      try await transport.call("notifications:registerDevice", args: ["token": record.token,
-        "installSecret": "fixture", "registrationId": record.registrationId, "platform": "ios"], bearer: "new-account")
+    try await PushRetry.run(while: { true }, sleep: { _ in Issue.record("Permanent ownership refusals must not retry") }) {
+      try await store.registerFresh("original", native: Data([1]), for: UUID(), register: { record in
+        try await transport.call("notifications:registerDevice", args: ["token": record.token,
+          "installSecret": "fixture", "registrationId": record.registrationId, "platform": "ios"], bearer: "new-account")
+      }) { _ in Issue.record("A refused token cannot be revoked as a confirmed registration") }
     }
   }
+  #expect(try store.read().allSatisfy { $0.apnsDigest == nil })
   #expect(try store.legacyTokens(service: legacy) == ["original"])
+}
+
+@Test func tokenRotationAndLateSessionCallbacksCannotResumeDelivery() {
+  let a = UUID(), b = UUID(), previous = Data([1]), rotated = Data([2])
+  var delivery = PushDeliveryState()
+  let coldStartPaused = delivery.prepare(generation: a, verified: [PushDeliveryState.digest(previous)])
+  let confirmedTokenPaused = delivery.receive(previous)
+  #expect(!coldStartPaused && !confirmedTokenPaused && delivery.permitsPresentation)
+  let rotationPaused = delivery.receive(rotated)
+  let staleTokenResumed = delivery.confirm(previous, generation: a)
+  #expect(rotationPaused && !staleTokenResumed && !delivery.permitsPresentation)
+  delivery = PushDeliveryState()
+  let lateCallbackPaused = delivery.receive(rotated)
+  #expect(lateCallbackPaused && delivery.token == nil)
+  let newAccountPaused = delivery.prepare(generation: b, verified: [])
+  let newTokenPaused = delivery.receive(rotated)
+  let oldAccountResumed = delivery.confirm(rotated, generation: a)
+  let newAccountResumed = delivery.confirm(rotated, generation: b)
+  #expect(newAccountPaused && newTokenPaused && !oldAccountResumed && newAccountResumed)
+  #expect(delivery.permitsPresentation)
+}
+
+@MainActor @Test func transientRegistrationFailureBacksOffAndRecoversOrStopsOnAccountChange() async throws {
+  var waits: [Int] = [], count = 0
+  try await PushRetry.run(while: { true }, sleep: { waits.append($0) }) {
+    count += 1
+    if count < 8 { throw URLError(.notConnectedToInternet) }
+  }
+  #expect(waits == [2, 4, 8, 16, 32, 60, 60])
+  var sameSession = true
+  var calls = 0
+  await #expect(throws: CancellationError.self) {
+    try await PushRetry.run(while: { sameSession }, sleep: { _ in sameSession = false }) {
+      calls += 1
+      throw URLError(.notConnectedToInternet)
+    }
+  }
+  #expect(calls == 1)
 }
