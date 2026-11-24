@@ -141,3 +141,23 @@ private final class SiriNoteHTTPFixture: URLProtocol, @unchecked Sendable {
     client?.urlProtocolDidFinishLoading(self)
   }
 }
+
+
+@Test func ordinaryRichNotesKeepTheirWordsAndDoNotRepeatTheirHeading() throws {
+  let url = try #require(URL(string: "https://example.com/article"))
+  var heading = AttributedString("Read later")
+  heading.link = url
+  var body = AttributedString("Read later\nTry this ")
+  var linked = AttributedString("restaurant")
+  linked.link = url
+  body.append(linked)
+  body.append(AttributedString(" on Friday."))
+  #expect(SiriText.pageLink(name: heading, content: body) == nil)
+  #expect(SiriText.noteText(name: String(heading.characters), content: String(body.characters))
+    == "Read later\nTry this restaurant on Friday.")
+  #expect(SiriText.noteText(name: "Trip", content: "Trip planning starts Friday") == "Trip\nTrip planning starts Friday")
+  #expect(SiriText.pageLink(name: heading, content: nil) == url)
+  #expect(SiriText.pageLink(name: AttributedString("Article"), content: linked) == nil)
+  #expect(SiriText.pageLink(name: AttributedString("restaurant"), content: linked) == url)
+  #expect(SiriText.pageLink(name: AttributedString("Article"), content: AttributedString(url.absoluteString)) == nil)
+}

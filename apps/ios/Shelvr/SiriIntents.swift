@@ -89,13 +89,13 @@ struct SaveNoteIntent {
     guard let account = SiriCredential.current() else { throw ShelvrCapture.Failure.signedOut }
     let nameText = String(name.characters)
     let contentText = content.map { String($0.characters) }
-    let text = [nameText, contentText].compactMap { $0 }.filter { !$0.isEmpty }
-      .reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }.joined(separator: "\n")
+    let text = SiriText.noteText(name: nameText, content: contentText)
     let files = attachments.map { CaptureRouter.Attachment(data: $0.data, type: $0.type, filename: $0.filename) }
-    let links = CaptureRouter.linkAttributes(in: [name] + (content.map { [$0] } ?? []))
+    let links = SiriText.pageLink(name: name, content: content).map { [$0] } ?? []
+    let routeText = contentText.flatMap(CaptureRouter.bareURL)?.absoluteString ?? text
     let result: (id: String, dialog: IntentDialog)
     let entityText: String
-    switch CaptureRouter.route(text: text, linkAttributes: links, attachments: files) {
+    switch CaptureRouter.route(text: routeText, linkAttributes: links, attachments: files) {
     case .link(let url):
       entityText = url.absoluteString
       result = try await SiriSave.link(url).capture(spaceID: folder?.id, account: account)
