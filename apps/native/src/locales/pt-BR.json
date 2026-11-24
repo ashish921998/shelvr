@@ -179,6 +179,7 @@
   "pro.openStore": "Abrir App Store",
   "notifications.disabledTitle": "As notificações estão desativadas",
   "notifications.disabledBody": "Permita notificações do Shelvr nas configurações do dispositivo para ativar a estante semanal.",
+  "notifications.previousAccount": "As notificações ainda estão vinculadas a outra conta do Shelvr. Entre nessa conta neste dispositivo e saia dela. Depois, ative as notificações aqui.",
   "notifications.updateFailed": "Não foi possível atualizar as notificações",
   "errors.trySoon": "Tente novamente em instantes.",
   "pro.restoredTitle": "Compras restauradas",

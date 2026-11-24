@@ -179,6 +179,7 @@
   "pro.openStore": "Ouvrir l'App Store",
   "notifications.disabledTitle": "Les notifications sont désactivées",
   "notifications.disabledBody": "Autorisez les notifications de Shelvr dans les réglages de votre appareil pour activer l'étagère hebdomadaire.",
+  "notifications.previousAccount": "Les notifications sont encore liées à un autre compte Shelvr. Sur cet appareil, connectez-vous à ce compte puis déconnectez-vous. Activez ensuite les notifications ici.",
   "notifications.updateFailed": "Impossible de modifier les notifications",
   "errors.trySoon": "Réessayez dans un instant.",
   "pro.restoredTitle": "Achats restaurés",
