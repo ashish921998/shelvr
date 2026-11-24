@@ -198,8 +198,10 @@ public final class Backend {
     try await deletion.perform(allowed: status == .signedIn && !signingOut) {
       try await self.client.mutation("users:deleteCurrentUserAccount")
     } afterAcceptance: {
+      if let credential = SiriCredential.current() { self.retireSiri(credential) }
       await self.session.forgetDeletedAccount()
       await self.disconnect()
+      self.retrySiriRevocations()
     }
   }
 
