@@ -27,6 +27,14 @@ public struct Copy: Sendable {
     }
   }
 
+  public func count(_ key: String, _ n: Int) -> String {
+    let language = locale.split(separator: "-").first ?? ""
+    let one = !["ja", "ko"].contains(language) && (n == 1 || (n == 0 && ["fr", "pt"].contains(language)))
+    let form = one && messages[key + ".one"] != nil ? "one" : "other"
+    let count = n.formatted(.number.locale(Locale(identifier: locale)))
+    return self(key + "." + form, ["formattedCount": count, "count": count])
+  }
+
   static func resolve(_ languageTags: [String]) -> String {
     for tag in languageTags {
       let base = tag.replacing("_", with: "-").split(separator: /-[uUxX]-/).first.map(String.init) ?? ""
@@ -48,6 +56,12 @@ public struct Copy: Sendable {
       let data = try? Data(contentsOf: url),
       let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
     else { return [:] }
-    return object.compactMapValues { $0 as? String }
+    var messages = object.compactMapValues { $0 as? String }
+    for (key, value) in object {
+      if let forms = value as? [String: String] {
+        for (form, text) in forms { messages[key + "." + form] = text }
+      }
+    }
+    return messages
   }
 }
