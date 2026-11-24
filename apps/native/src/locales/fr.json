@@ -1330,6 +1330,7 @@
   "passportStory.tagline": "Enregistrez maintenant.\nAllez-y vraiment.",
   "passportStory.scan": "Scannez pour comparer vos passeports",
   "passportStory.shareLink": "Partager plutôt un lien",
+  "passportStory.linkNotePassportMenu": "Le partage active le lien de votre passeport pour que le code permette de l’ouvrir. Vous pouvez arrêter le partage depuis le menu du passeport.",
   "passportStory.linkNote": "Partager active le lien de votre passeport pour que le code l’ouvre. Vous pouvez arrêter à tout moment dans les Réglages.",
   "passport.shareCity": "Partager %{city}",
   "passport.momentCityComplete": "%{city} au complet",
