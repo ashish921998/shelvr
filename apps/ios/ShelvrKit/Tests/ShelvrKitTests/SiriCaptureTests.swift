@@ -84,3 +84,18 @@ import Testing
     #expect(try remaining.share.delivery.get().operationID == first.operationID)
   }
 }
+
+@MainActor @Test func queuedSiriLookupRequiresExactOperationAndActiveOwner() async throws {
+  try await withShareInbox { inbox in
+    let stage = try inbox.stage(owner: "first")
+    let note = InboxPayload(kind: .note, value: "fixture", operationID: "siri:lookup", siri: true)
+    let share = InboxPayload(kind: .link, value: "https://example.com")
+    try inbox.publish([note, share], in: stage)
+
+    #expect(inbox.queuedSiriDelivery(operationID: note.operationID, owner: "first")?.operationID == note.operationID)
+    #expect(inbox.queuedSiriDelivery(operationID: share.operationID, owner: "first") == nil)
+    #expect(inbox.queuedSiriDelivery(operationID: note.operationID, owner: "other") == nil)
+    try inbox.activate("second")
+    #expect(inbox.queuedSiriDelivery(operationID: note.operationID, owner: "first") == nil)
+  }
+}
