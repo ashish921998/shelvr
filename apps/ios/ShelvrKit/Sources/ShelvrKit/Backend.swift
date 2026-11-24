@@ -57,6 +57,7 @@ public final class Backend {
   }
 
   public func start() async {
+    if let deletion { _ = await deletion.result }
     retrySiriRevocations()
     if let starting { return await starting.value }
     let task = Task { await resume() }
@@ -78,12 +79,14 @@ public final class Backend {
   }
 
   public func signIn(_ credential: SignInCredential) async throws {
+    if let deletion { _ = await deletion.result }
     try await session.signIn(credential)
     await connect()
   }
 
   public func startOAuth(provider: String) async throws -> OAuthStart {
-    try await session.startOAuth(provider: provider, redirectTo: environment.oauthRedirect)
+    if let deletion { _ = await deletion.result }
+    return try await session.startOAuth(provider: provider, redirectTo: environment.oauthRedirect)
   }
 
   private var pushTokens: PushTokenStore { PushTokenStore(serviceURL: environment.convexURL) }
