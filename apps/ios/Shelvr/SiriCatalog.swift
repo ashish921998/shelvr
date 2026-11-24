@@ -81,17 +81,16 @@ protocol AppIntentEntityRecordConvertible {
       let completed: Operation? = await first("items:getImportOperation", args: ["operationId": operation])
       if let realID = completed?.itemId { itemID = realID }
       else {
-        guard let inbox = ShareInbox.system(), inbox.activeOwner == owner else { return nil }
-        for batch in (try? inbox.batches()) ?? [] where (try? inbox.owner(of: batch)) == owner {
-          for file in (try? inbox.manifests(in: batch)) ?? [] {
-            guard let bytes = try? Data(contentsOf: file), let payload = try? JSONDecoder().decode(InboxPayload.self, from: bytes),
-              payload.operationID == operation, payload.siri == true else { continue }
-            let text = SiriText.entityContent(kind: payload.kind.rawValue, value: payload.value, title: "", photoLabel: Copy()("item.photo"))
-            let firstLine = text.split(separator: "\n", maxSplits: 1).first.map(String.init) ?? text
-            return AppIntentEntityRecord(id: id, title: String(firstLine.prefix(80)), metadata: ["kind": "note", "text": text])
-          }
+        guard let delivery = ShareInbox.system()?.queuedSiriDelivery(operationID: operation, owner: owner)
+        else { return nil }
+        let text: String
+        switch delivery.content {
+        case .link(let url): text = url
+        case .note(let note): text = note
+        case .image: text = Copy()("item.photo")
         }
-        return nil
+        let firstLine = text.split(separator: "\n", maxSplits: 1).first.map(String.init) ?? text
+        return AppIntentEntityRecord(id: id, title: String(firstLine.prefix(80)), metadata: ["kind": "note", "text": text])
       }
     }
     guard let item: Save = await first("items:getItem", args: ["id": itemID]) else { return nil }

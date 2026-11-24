@@ -36,7 +36,7 @@ public struct SharedListDetail: Decodable {
     public var went: Bool { wentBy?.contains { $0.isYou } == true }
     public func matches(name candidate: String, lat: Double, lng: Double, apple: String?, item: String?) -> Bool {
       if let apple, let appleId { return apple == appleId }
-      let key = Self.words(name).joined(), next = Self.words(candidate).joined()
+      let key = CityPlace.key(name), next = CityPlace.key(candidate)
       if let item, itemId == item, key == next { return true }
       guard let a = self.lat, let b = self.lng else { return false }
       let r = Double.pi / 180

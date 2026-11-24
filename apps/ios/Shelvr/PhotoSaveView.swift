@@ -48,7 +48,7 @@ struct PhotoSaveView: View {
       _ = try await backend.savePhoto(photo, operationID: "image:\(operationID)")
       if !Task.isCancelled, request == id { dismiss() }
     } catch {
-      if !Task.isCancelled, request == id { failure = ImportPhoto.failureCopy(error) }
+      if !Task.isCancelled, request == id { failure = SaveFailure(error).photoCopyKey }
     }
   }
 }

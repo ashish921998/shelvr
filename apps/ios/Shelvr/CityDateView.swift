@@ -118,7 +118,7 @@ struct CityDateView: View {
       evening = plan.evenings.first
       triedFirst = []; triedSecond = []
     } catch {
-      if canOffer, listID != nil, PastedLink.requiresPro(error) {
+      if canOffer, listID != nil, SaveFailure(error) == .proRequired {
         gate.askToPurchase { await generate(kind, firstSpot: firstSpot, canOffer: false) }
       } else { failed = true }
     }

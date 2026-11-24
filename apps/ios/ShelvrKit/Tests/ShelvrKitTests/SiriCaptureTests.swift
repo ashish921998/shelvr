@@ -67,18 +67,35 @@ import Testing
   #expect(SiriText.entityContent(kind: "image", value: "file name", title: "New title", photoLabel: "Photo") == "Photo")
 }
 
-@Test func copyingOneRetainedNoteRemovesOnlyItsManifestAfterTheCopySucceeds() throws {
-  let dir = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
-  let inbox = ShareInbox(directory: dir)
-  defer { try? FileManager.default.removeItem(at: dir) }
-  try inbox.activate("owner")
-  let stage = try inbox.stage(owner: "owner")
-  try inbox.publish([InboxPayload(kind: .note, value: "first", siri: true), InboxPayload(kind: .note, value: "second", siri: true)], in: stage)
-  let batch = try #require(inbox.batches().first)
-  let files = try inbox.manifests(in: batch)
-  #expect(try !inbox.copyAndRemoveNote(files[1], owner: "owner") { _ in false })
-  var copied = ""
-  #expect(try inbox.copyAndRemoveNote(files[1], owner: "owner") { copied = $0; return true })
-  #expect(copied == "second")
-  #expect(try inbox.manifests(in: batch) == [files[0]])
+@MainActor @Test func copyingOneRetainedNoteRemovesOnlyItsManifestAfterTheCopySucceeds() async throws {
+  try await withShareInbox { inbox in
+    let stage = try inbox.stage(owner: "first")
+    let second = InboxPayload(kind: .note, value: "second", siri: true)
+    let first = InboxPayload(kind: .note, value: "first", siri: true)
+    try inbox.publish([second, first], in: stage)
+
+    let target = try #require(await inbox.drain(owner: "first") { _ in throw ShareInboxError.longNoteNeedsRecovery })
+    #expect(try !target.share.copyAndRemoveNote(for: "first") { _ in false })
+    var copied = ""
+    #expect(try target.share.copyAndRemoveNote(for: "first") { copied = $0; return true })
+    #expect(copied == "second")
+
+    let remaining = try #require(await inbox.drain(owner: "first") { _ in throw ShareInboxError.longNoteNeedsRecovery })
+    #expect(try remaining.share.delivery.get().operationID == first.operationID)
+  }
+}
+
+@MainActor @Test func queuedSiriLookupRequiresExactOperationAndActiveOwner() async throws {
+  try await withShareInbox { inbox in
+    let stage = try inbox.stage(owner: "first")
+    let note = InboxPayload(kind: .note, value: "fixture", operationID: "siri:lookup", siri: true)
+    let share = InboxPayload(kind: .link, value: "https://example.com")
+    try inbox.publish([note, share], in: stage)
+
+    #expect(inbox.queuedSiriDelivery(operationID: note.operationID, owner: "first")?.operationID == note.operationID)
+    #expect(inbox.queuedSiriDelivery(operationID: share.operationID, owner: "first") == nil)
+    #expect(inbox.queuedSiriDelivery(operationID: note.operationID, owner: "other") == nil)
+    try inbox.activate("second")
+    #expect(inbox.queuedSiriDelivery(operationID: note.operationID, owner: "first") == nil)
+  }
 }

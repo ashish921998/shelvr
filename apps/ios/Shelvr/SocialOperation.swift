@@ -15,7 +15,7 @@ final class SocialOperation {
       defer { busy = false }
       do { try await action() }
       catch {
-        if allowPurchase && PastedLink.requiresPro(error) {
+        if allowPurchase && SaveFailure(error) == .proRequired {
           resume = action
           billing = .paywall
         } else { failed = true }
@@ -42,7 +42,7 @@ extension View {
   func socialOperation(_ operation: SocialOperation, failure: String, close: String) -> some View {
     @Bindable var operation = operation
     return sheet(item: $operation.billing, onDismiss: { operation.dismissed() }) { destination in
-      BillingSheet(destination: destination) { operation.confirmed() }
+      BillingSheet(destination: destination, confirmed: { operation.confirmed() })
     }
     .alert(failure, isPresented: $operation.failed) { Button(close) {} }
   }
