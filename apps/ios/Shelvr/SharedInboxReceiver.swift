@@ -11,12 +11,12 @@ struct SharedInboxReceiver: ViewModifier {
   @State private var failed = false
   @State private var failedFile: URL?
   @State private var failureCopy = "share.singleFailure"
-  @State private var wake: AsyncStream<Void>.Continuation?
+  @State private var wake: AsyncStream<ScenePhase>.Continuation?
 
   func body(content: Content) -> some View {
     content
-      .onReceive(InboxSignal.shared.publisher) { _ in wake?.yield(()) }
-      .onChange(of: phase) { _, phase in if phase == .active { wake?.yield(()) } }
+      .onReceive(InboxSignal.shared.publisher) { _ in wake?.yield(phase) }
+      .onChange(of: phase) { _, phase in wake?.yield(phase) }
       .task(id: backend.status) {
         failed = false
         failedFile = nil
@@ -24,13 +24,13 @@ struct SharedInboxReceiver: ViewModifier {
         guard let inbox = ShareInbox.system() else { return }
         if backend.status == .signedOut { try? inbox.activate(nil); return }
         guard backend.status == .signedIn else { return }
-        let (events, continuation) = AsyncStream<Void>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        let (events, continuation) = AsyncStream<ScenePhase>.makeStream(bufferingPolicy: .bufferingNewest(1))
         wake = continuation
         defer { continuation.finish() }
-        continuation.yield(())
-        for await _ in events {
+        continuation.yield(phase)
+        for await currentPhase in events {
           guard !Task.isCancelled else { return }
-          guard phase == .active, !failed else { continue }
+          guard currentPhase == .active, !failed else { continue }
           failedFile = nil
           failureCopy = "share.retryHelp"
           do { try await drain(inbox) }
@@ -39,13 +39,13 @@ struct SharedInboxReceiver: ViewModifier {
         }
       }
       .alert(copy("share.singleFailure"), isPresented: $failed) {
-        Button(copy("common.tryAgain")) { failed = false; wake?.yield(()) }
+        Button(copy("common.tryAgain")) { failed = false; wake?.yield(phase) }
         if failedFile != nil {
           Button(copy("common.delete"), role: .destructive) {
             if let file = failedFile { try? FileManager.default.removeItem(at: file) }
             failedFile = nil
             failed = false
-            wake?.yield(())
+            wake?.yield(phase)
           }
         }
         Button(copy("common.close"), role: .cancel) {}
