@@ -3,7 +3,7 @@ import {
   notificationLocale,
 } from "./model/notificationFields";
 import { ConvexError, v } from "convex/values";
-import { internalMutation, type QueryCtx } from "./_generated/server";
+import { internalMutation, mutation, type QueryCtx } from "./_generated/server";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { enrichItems, enrichedItemValidator } from "./items";
@@ -341,6 +341,32 @@ export const unregisterDevice = authedMutation({
       .unique();
     if (device?.userId === userId)
       await ctx.db.patch(device._id, { enabled: false });
+    return null;
+  },
+});
+
+export const unregisterInstallation = mutation({
+  args: { token: v.string(), installSecret: v.string() },
+  returns: v.null(),
+  handler: async (ctx, { token, installSecret }) => {
+    if (
+      !token ||
+      token.length > 4096 ||
+      !installSecret ||
+      installSecret.length > MAX_CAPTURE_TOKEN_LENGTH
+    ) {
+      return null;
+    }
+    const device = await ctx.db
+      .query("notificationDevices")
+      .withIndex("by_token", (q) => q.eq("token", token))
+      .unique();
+    if (
+      device?.enabled &&
+      device.installSecretHash === (await sha256Hex(installSecret))
+    ) {
+      await ctx.db.patch(device._id, { enabled: false });
+    }
     return null;
   },
 });
