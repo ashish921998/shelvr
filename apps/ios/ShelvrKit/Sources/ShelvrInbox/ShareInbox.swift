@@ -170,11 +170,9 @@ public struct ShareInbox: Sendable {
     let manager = FileManager.default
     try manager.createDirectory(at: directory, withIntermediateDirectories: true)
     var location = directory
-    if try location.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup != true {
-      var values = URLResourceValues()
-      values.isExcludedFromBackup = true
-      try location.setResourceValues(values)
-    }
+    var values = URLResourceValues()
+    values.isExcludedFromBackup = true
+    try location.setResourceValues(values)
     if activeOwner != owner { try Data(owner.utf8).write(to: marker, options: .atomic) }
   }
 
