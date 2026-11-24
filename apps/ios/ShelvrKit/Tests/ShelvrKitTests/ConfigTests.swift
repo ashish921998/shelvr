@@ -38,21 +38,12 @@ struct ConfigTests {
 
   @Test func legacyExpoKeyMatchesTheConvexAuthStorageLayout() {
     let legacy = LegacyExpoSession(convexURL: AppEnvironment.productionConvexURL)
-    #expect(
-      legacy.matches(
-        account:
-          "https___amiable-setter-120.convex.cloud___convexAuthRefreshToken_httpsamiablesetter120convexcloud"
-      ))
-    #expect(
-      legacy.matches(
-        account:
-          "https___amiable-setter-120.convex.cloud___convexAuthJWT_httpsamiablesetter120convexcloud"
-      ) == false)
-    #expect(
-      legacy.matches(
-        account:
-          "https___amicable-antelope-639.convex.cloud___convexAuthRefreshToken_httpsamicableantelope639convexcloud"
-      ) == false)
+    let prefix = "https___amiable-setter-120.convex.cloud"
+    let namespace = "httpsamiablesetter120convexcloud"
+    #expect(legacy.account(for: .refreshToken) == "\(prefix)___convexAuthRefreshToken_\(namespace)")
+    #expect(legacy.account(for: .jwt) == "\(prefix)___convexAuthJWT_\(namespace)")
+    #expect(legacy.account(for: .oauthVerifier) == "\(prefix)___convexAuthOAuthVerifier_\(namespace)")
+    #expect(legacy.account(for: .serverStateFetchTime) == "\(prefix)___convexAuthServerStateFetchTime_\(namespace)")
   }
 
   @Test func jwtLifetimeComesFromItsClaims() {

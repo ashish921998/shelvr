@@ -61,21 +61,4 @@ enum Keychain {
     let status = SecItemDelete(query as CFDictionary)
     return status == errSecSuccess || status == errSecItemNotFound
   }
-
-  static func accounts(service: String) -> [Data]? {
-    let query: [String: Any] = [
-      kSecClass as String: kSecClassGenericPassword,
-      kSecAttrService as String: service,
-      kSecReturnAttributes as String: true,
-      kSecMatchLimit as String: kSecMatchLimitAll,
-    ]
-    var result: AnyObject?
-    let status = SecItemCopyMatching(query as CFDictionary, &result)
-    if status == errSecItemNotFound { return [] }
-    guard status == errSecSuccess, let items = result as? [[String: Any]] else { return nil }
-    return items.compactMap { item in
-      let account = item[kSecAttrAccount as String]
-      return account as? Data ?? (account as? String).map { Data($0.utf8) }
-    }
-  }
 }

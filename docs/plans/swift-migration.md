@@ -65,10 +65,11 @@ The Swift CI workflow runs the package tests and arm64 simulator build on change
 
 - **Signed-out users after the update.** The Expo build keeps the Convex Auth refresh token in
   the Keychain (service `app:no-auth`, account ending `__convexAuthRefreshToken_<deployment>`).
-  `LegacyExpoSession` finds it by that suffix. The Swift app moves it into its own Keychain
-  item and deletes the Expo copy once that item holds it, then exchanges it like any stored
-  session, so an offline first launch tries again from its own item. An Expo token found at a
-  later launch is a newer sign-in from a reinstalled Expo build, and replaces the Swift session.
+  `LegacyExpoSession` looks up the full SecureStore key for that deployment. The Swift app
+  copies the refresh token into its own Keychain item, reads it back, and clears the old
+  Convex Auth keys for that deployment. An offline first launch retries from the Swift
+  item. If the person signs in again on a reinstalled Expo build, that token replaces the
+  Swift session at the next launch.
   A sign-out in a reinstalled Expo build does not reach the Swift session, which the next
   Swift launch resumes; an Expo rollback build would have to delete the Swift item on sign-out.
   Milestone 2 proves this on a real Expo install.
