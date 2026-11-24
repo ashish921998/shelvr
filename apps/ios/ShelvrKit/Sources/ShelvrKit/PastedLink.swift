@@ -5,6 +5,16 @@ public struct PastedLink: Sendable {
   public let url: String
   public let operationID: String
 
+  public static func planningFailure(_ error: Error) -> String {
+    if requiresPro(error) { return "pro_required" }
+    struct Failure: Decodable { let kind: String? }
+    if case let ClientError.ConvexError(data) = error,
+      (try? JSONDecoder().decode(Failure.self, from: Data(data.utf8)))?.kind == "RateLimited" {
+      return "rate_limited"
+    }
+    return "error"
+  }
+
   public static func requiresPro(_ error: Error) -> Bool {
     saveErrorCode(error) == "pro_required"
   }

@@ -88,7 +88,7 @@ struct CityDateView: View {
       evening = plan.evenings.first
       triedFirst = []; triedSecond = []
     } catch {
-      Analytics.capture("date_plan_failed", ["reason": PastedLink.requiresPro(error) ? "pro_required" : "error"])
+      Analytics.capture("date_plan_failed", ["reason": PastedLink.planningFailure(error)])
       if canOffer, listID != nil, PastedLink.requiresPro(error) {
         gate.askToPurchase { await generate(kind, canOffer: false) }
       } else { failed = true }
