@@ -44,3 +44,25 @@ private func stamp(_ name: String, _ city: String?, _ country: String? = nil,
   #expect(pages.sections.map { $0.cityStamp?.id } == ["lisbon", nil])
   #expect(pages.standalone.map(\.id) == ["paris"])
 }
+
+@Test func passportStoryMatchesExpoVector() throws {
+  struct Vector: Decodable {
+    struct Expected: Decodable {
+      let places, cities, countries, more: Int
+      let photos, cityNames: [String]
+    }
+    let stamps: [PassportStamp]
+    let cities: [PassportCityStamp]
+    let expected: Expected
+  }
+  let file = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+    .deletingLastPathComponent().deletingLastPathComponent().appending(path: "TestData/passport-story.json")
+  let vector = try JSONDecoder().decode(Vector.self, from: Data(contentsOf: file))
+  let story = PassportStory(places: vector.stamps, cities: vector.cities) { _ in "Lisboa" }
+  #expect(story.places == vector.expected.places)
+  #expect(story.cities == vector.expected.cities)
+  #expect(story.countries == vector.expected.countries)
+  #expect(story.photos.map(\.name) == vector.expected.photos)
+  #expect(story.cityNames == vector.expected.cityNames)
+  #expect(story.more == vector.expected.more)
+}
