@@ -48,7 +48,9 @@ extension Backend {
     }
     struct Upload: Decodable { let storageId: String }
     struct Attachment: Decodable { let error: String? }
+    try Task.checkCancellation()
     let begin: Begin = try await client.mutation("items:beginImageImport", with: ["operationId": operationID])
+    try Task.checkCancellation()
     if begin.kind == "complete", let id = begin.itemId { return id }
     guard begin.kind == "upload", let url = begin.uploadUrl else { throw URLError(.badServerResponse) }
     var request = URLRequest(url: url)
@@ -58,10 +60,12 @@ extension Backend {
     guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode)
     else { throw URLError(.badServerResponse) }
     let uploaded = try JSONDecoder().decode(Upload.self, from: body)
+    try Task.checkCancellation()
     let attached: Attachment = try await client.mutation("items:attachImageUpload", with: [
       "operationId": operationID, "storageId": uploaded.storageId
     ])
     guard attached.error == nil else { throw URLError(.badServerResponse) }
+    try Task.checkCancellation()
     return try await client.mutation("items:finalizeImageImport", with: [
       "operationId": operationID, "aspectRatio": photo.aspectRatio,
       "saveSource": fromShare ? "share_extension" : "photo_import"

@@ -28,3 +28,18 @@ import UniformTypeIdentifiers
 @Test func corruptPhotoFailsBeforeUpload() {
   #expect(throws: CocoaError.self) { try ImportPhoto(Data([1, 2])) }
 }
+
+@MainActor @Test func cancelledPickerCannotSubmitToTheCurrentBackendAccount() async throws {
+  let context = try #require(CGContext(data: nil, width: 2, height: 2, bitsPerComponent: 8, bytesPerRow: 0,
+    space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+  let image = try #require(context.makeImage())
+  let data = NSMutableData()
+  let output = try #require(CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil))
+  CGImageDestinationAddImage(output, image, nil)
+  #expect(CGImageDestinationFinalize(output))
+  let photo = try ImportPhoto(data as Data)
+  let backend = Backend(environment: try AppEnvironment(variant: .development, convexURL: URL(string: "http://127.0.0.1:1")!))
+  let submission = Task { try await backend.savePhoto(photo, operationID: "image:cancelled") }
+  submission.cancel()
+  await #expect(throws: CancellationError.self) { try await submission.value }
+}
