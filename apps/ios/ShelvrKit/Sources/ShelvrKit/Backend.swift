@@ -21,15 +21,23 @@ public final class Backend {
   private let session: AuthSession
   @ObservationIgnored private var authWatch: AnyCancellable?
   @ObservationIgnored private var starting: Task<Void, Never>?
-  @ObservationIgnored private var deletion: Task<Void, Error>?
+  @ObservationIgnored private let deletion = AccountDeletion()
   @ObservationIgnored private var registeringPush: Task<Void, Error>?
-  @ObservationIgnored private var signingOut = false
+  private var signingOut = false
+  private var connectedUserID: String?
+  @ObservationIgnored private var signingIn = false
 
-  public init(environment: AppEnvironment) {
+  public var userID: String? { status == .signedIn && !signingOut && !deletion.isRunning ? connectedUserID : nil }
+
+  public convenience init(environment: AppEnvironment) {
     let session = AuthSession(
       transport: ConvexHTTPAuthTransport(deployment: environment.convexURL),
       vault: KeychainTokenVault(),
       signOutMarker: SignOutMarker(url: URL.applicationSupportDirectory.appending(path: "pending-sign-out")))
+    self.init(environment: environment, session: session)
+  }
+
+  init(environment: AppEnvironment, session: AuthSession) {
     self.environment = environment
     self.session = session
     self.client = ConvexClientWithAuth(
@@ -42,12 +50,19 @@ public final class Backend {
           guard let self, self.status == .signedIn, !self.signingOut,
             case .unauthenticated = state
           else { return }
+          self.connectedUserID = nil
           self.status = .signedOut
         }
       }
   }
 
+  public func offlineAccountID() async -> String? {
+    guard status == .offline else { return nil }
+    return await session.cachedAccountID
+  }
+
   public func start() async {
+    await deletion.wait()
     if let starting { return await starting.value }
     let task = Task { await resume() }
     starting = task
@@ -66,54 +81,75 @@ public final class Backend {
   }
 
   public func signIn(_ credential: SignInCredential) async throws {
+    await deletion.wait()
+    guard status == .signedOut, !signingIn else { throw AuthSessionError.signInRefused }
+    signingIn = true
+    defer { signingIn = false }
     try await session.signIn(credential)
     await connect()
   }
 
   public func startOAuth(provider: String) async throws -> OAuthStart {
-    try await session.startOAuth(provider: provider, redirectTo: environment.oauthRedirect)
+    await deletion.wait()
+    return try await session.startOAuth(provider: provider, redirectTo: environment.oauthRedirect)
   }
 
   private var pushTokens: PushTokenStore { PushTokenStore(serviceURL: environment.convexURL) }
 
-  public func registerPush(_ token: String, installation: PushInstallation, locale: String) async throws {
-    guard status == .signedIn, !signingOut, deletion == nil else { return }
-    let generation = sessionGeneration
+  public func registerPush(_ token: String, native: Data, installation: PushInstallation, locale: String, generation: UUID) async throws {
+    guard mayRegisterPush(generation) else { throw CancellationError() }
     let previous = registeringPush
     let task = Task {
       _ = await previous?.result
-      guard let bearer = try await session.validToken(), generation == sessionGeneration,
-        status == .signedIn, !signingOut, deletion == nil else { return }
-      var tokens = try pushTokens.read()
-      let record = PushRegistrationRecord(token: token, registrationId: generation.uuidString)
-      if !tokens.contains(record) { tokens.append(record) }
-      try pushTokens.write(tokens)
-      try await PushTransport(deployment: environment.convexURL).call("notifications:registerDevice", args: [
-        "token": token, "installSecret": installation.secret, "registrationId": record.registrationId, "platform": "ios",
-        "locale": locale, "timezone": TimeZone.current.identifier
-      ], bearer: bearer)
-      for old in tokens where old != record {
+      guard let bearer = try await session.validToken() else { throw AuthSessionError.notSignedIn }
+      guard mayRegisterPush(generation) else { throw CancellationError() }
+      let identity = try PushTokenStore.registrationID(bearer: bearer, installSecret: installation.secret)
+      try await pushTokens.registerFresh(token, native: native, for: identity) { record in
+        try await registerInstallation(record, installation: installation, locale: locale, bearer: bearer)
+      } unregister: { old in
         try await unregisterInstallation(old, installation: installation)
       }
-      try pushTokens.write([record])
     }
     registeringPush = task
     try await task.value
   }
 
-  public func finishPushRevocation(installation: PushInstallation) async throws {
-    let generation = sessionGeneration
+  public func mayRegisterPush(_ generation: UUID) -> Bool {
+    status == .signedIn && sessionGeneration == generation && !signingOut && !deletion.isRunning
+  }
+
+  public func finishPushRevocation(installation: PushInstallation, generation: UUID,
+    suspend: @escaping @MainActor () -> Void) async throws -> Set<String> {
+    var verified = Set<String>()
     let previous = registeringPush
     let task = Task {
       _ = await previous?.result
-      guard status == .signedOut, sessionGeneration == generation else { return }
-      for token in try pushTokens.read() {
-        try await unregisterInstallation(token, installation: installation)
+      guard sessionGeneration == generation, status == .signedOut || mayRegisterPush(generation) else {
+        throw CancellationError()
       }
-      if status == .signedOut, sessionGeneration == generation { try pushTokens.write([]) }
+      let bearer = status == .signedIn ? try await session.validToken() : nil
+      guard sessionGeneration == generation, status == .signedOut || mayRegisterPush(generation) else {
+        throw CancellationError()
+      }
+      if status == .signedIn && bearer == nil { throw AuthSessionError.notSignedIn }
+      let identity = try bearer.map { try PushTokenStore.registrationID(bearer: $0, installSecret: installation.secret) }
+      try await pushTokens.retireStale(keeping: identity, suspend: suspend) { record in
+        try await unregisterInstallation(record, installation: installation)
+      }
+      if let identity {
+        verified = Set(try pushTokens.read().filter { $0.registrationId == identity.uuidString }.compactMap(\.apnsDigest))
+      }
     }
     registeringPush = task
     try await task.value
+    return verified
+  }
+
+  private func registerInstallation(_ record: PushRegistrationRecord, installation: PushInstallation, locale: String, bearer: String) async throws {
+    try await PushTransport(deployment: environment.convexURL).call("notifications:registerDevice", args: [
+      "token": record.token, "installSecret": installation.secret, "registrationId": record.registrationId, "platform": "ios",
+      "locale": locale, "timezone": TimeZone.current.identifier
+    ], bearer: bearer)
   }
 
   private func unregisterInstallation(_ record: PushRegistrationRecord, installation: PushInstallation) async throws {
@@ -123,7 +159,7 @@ public final class Backend {
   }
 
   public func signOut() async throws {
-    if let deletion { _ = await deletion.result }
+    await deletion.wait()
     guard status == .signedIn, !signingOut else { return }
     signingOut = true
     do {
@@ -135,20 +171,17 @@ public final class Backend {
   }
 
   public func deleteAccount() async throws {
-    if let deletion { return try await deletion.value }
-    guard status == .signedIn, !signingOut else { throw AuthSessionError.notSignedIn }
-    let task = Task {
-      try await client.mutation("users:deleteCurrentUserAccount")
-      await session.forgetDeletedAccount()
-      await disconnect()
+    try await deletion.perform(allowed: status == .signedIn && !signingOut) {
+      try await self.client.mutation("users:deleteCurrentUserAccount")
+    } afterAcceptance: {
+      await self.session.forgetDeletedAccount()
+      await self.disconnect()
     }
-    deletion = task
-    defer { deletion = nil }
-    try await task.value
   }
 
   private func disconnect() async {
     await client.logout()
+    connectedUserID = nil
     status = .signedOut
     signingOut = false
   }
@@ -159,8 +192,12 @@ public final class Backend {
 
   private func connect() async {
     switch await client.login() {
-    case .success: status = .signedIn
-    case .failure: status = await session.isSignedIn ? .offline : .signedOut
+    case let .success(token):
+      connectedUserID = AuthTokens.ownerID(for: token)
+      status = .signedIn
+    case .failure:
+      connectedUserID = nil
+      status = await session.isSignedIn ? .offline : .signedOut
     }
   }
 }

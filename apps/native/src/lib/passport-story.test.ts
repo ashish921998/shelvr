@@ -119,3 +119,23 @@ describe("darkRuns", () => {
     expect(darkRuns([false, false])).toEqual([]);
   });
 });
+
+it("keeps the native Passport story vector in sync", async () => {
+  const { default: vector } =
+    await import("../../../ios/TestData/passport-story.json");
+  const sources = ["instagram", "tiktok"] as const;
+  const stamps = vector.stamps.map((place) => ({
+    ...place,
+    source: sources.find((source) => source === place.source),
+  }));
+  const story = passportStoryOf(stamps, vector.cities, () => "Lisboa");
+  expect({
+    places: story.places,
+    cities: story.cities,
+    countries: story.countries,
+    fromReels: story.fromReels,
+    more: story.more,
+    photos: story.photos.map((place) => place.name),
+    cityNames: story.cityStamps.map((city) => city.name),
+  }).toEqual(vector.expected);
+});

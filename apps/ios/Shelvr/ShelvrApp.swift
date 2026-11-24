@@ -1,3 +1,4 @@
+import ShelvrInbox
 import ShelvrKit
 import SwiftUI
 
@@ -19,6 +20,7 @@ struct ShelvrApp: App {
         .environment(\.copy, copy)
         .task { await backend.start() }
         .onChange(of: scenePhase) { _, phase in
+          if phase == .active || phase == .background { Analytics.active(phase == .active) }
           if phase == .active { Task { await backend.start() } }
         }
     }
