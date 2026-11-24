@@ -7,10 +7,9 @@ import ShelvrKit
 @MainActor
 enum Analytics {
   private static var enabled = false
-  private static var reconciled = false
   private static var foreground = false
   private static var opened = false
-  private static var pendingNotificationOpen: [String: String]?
+  private static var notificationOpens = PushNotificationOpenBuffer()
   private static let identifiedKey = "swift.analytics.identified"
 
   static func start() {
@@ -51,24 +50,20 @@ enum Analytics {
       UserDefaults.standard.removeObject(forKey: identifiedKey)
       registerContext()
     }
-    reconciled = true
+    let pendingOpens = notificationOpens.reconcile()
     if UIApplication.shared.applicationState == .active { active(true) }
-    if let pendingNotificationOpen {
-      self.pendingNotificationOpen = nil
-      notificationOpened(pendingNotificationOpen)
-    }
+    for properties in pendingOpens { capture("notification_opened", properties) }
   }
 
   static func notificationOpened(_ properties: [String: String]) {
-    guard enabled else { return }
-    if reconciled { capture("notification_opened", properties) }
-    else { pendingNotificationOpen = properties }
+    guard enabled, let ready = notificationOpens.record(properties) else { return }
+    capture("notification_opened", ready)
   }
 
   static var sessionID: String? { enabled ? PostHogSDK.shared.getSessionId() : nil }
 
   static func active(_ active: Bool) {
-    guard enabled, reconciled, active != foreground else { return }
+    guard enabled, notificationOpens.reconciled, active != foreground else { return }
     foreground = active
     let defaults = UserDefaults.standard
     let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? ""
