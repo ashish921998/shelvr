@@ -1,0 +1,9 @@
+#include "Shared.xcconfig"
+
+PRODUCT_BUNDLE_IDENTIFIER = app.shelvr.save
+SHELVR_VARIANT = production
+SHELVR_CONVEX_URL = https:/$()/amiable-setter-120.convex.cloud
+SHELVR_URL_SCHEME = shelvr
+SWIFT_COMPILATION_MODE = wholemodule
+DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+VALIDATE_PRODUCT = YES
