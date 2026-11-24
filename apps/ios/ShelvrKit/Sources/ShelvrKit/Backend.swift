@@ -82,14 +82,15 @@ public final class Backend {
     let previous = registeringPush
     let task = Task {
       _ = await previous?.result
-      guard generation == sessionGeneration, !signingOut else { return }
+      guard let bearer = try await session.validToken(), generation == sessionGeneration,
+        status == .signedIn, !signingOut, deletion == nil else { return }
       var tokens = try pushTokens.read()
       if !tokens.contains(token) { tokens.append(token) }
       try pushTokens.write(tokens)
-      try await client.mutation("notifications:registerDevice", with: [
+      try await PushTransport(deployment: environment.convexURL).call("notifications:registerDevice", args: [
         "token": token, "installSecret": installation.secret, "platform": "ios",
         "locale": locale, "timezone": TimeZone.current.identifier
-      ])
+      ], bearer: bearer)
       for old in tokens where old != token {
         try await unregisterInstallation(old, installation: installation)
       }
@@ -115,7 +116,7 @@ public final class Backend {
   }
 
   private func unregisterInstallation(_ token: String, installation: PushInstallation) async throws {
-    try await client.mutation("notifications:unregisterInstallation", with: [
+    try await PushTransport(deployment: environment.convexURL).call("notifications:unregisterInstallation", args: [
       "token": token, "installSecret": installation.secret
     ])
   }

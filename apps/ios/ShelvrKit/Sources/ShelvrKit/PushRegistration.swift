@@ -91,3 +91,22 @@ struct PushTokenStore {
     guard Keychain.write(try JSONEncoder().encode(tokens), to: query) else { throw CocoaError(.fileWriteNoPermission) }
   }
 }
+
+struct PushTransport {
+  let deployment: URL
+
+  func call(_ path: String, args: [String: String], bearer: String? = nil) async throws {
+    struct Request: Encodable { let path: String; let args: [String: String]; let format = "json" }
+    struct Response: Decodable { let status: String }
+    var request = URLRequest(url: deployment.appending(path: "api/mutation"), timeoutInterval: 12)
+    request.httpMethod = "POST"
+    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+    if let bearer { request.setValue("Bearer " + bearer, forHTTPHeaderField: "Authorization") }
+    request.httpBody = try JSONEncoder().encode(Request(path: path, args: args))
+    let (data, response) = try await URLSession.shared.data(for: request)
+    guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
+      try JSONDecoder().decode(Response.self, from: data).status == "success" else {
+      throw URLError(.badServerResponse)
+    }
+  }
+}
