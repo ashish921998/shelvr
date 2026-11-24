@@ -1,3 +1,4 @@
+import ConvexMobile
 import Testing
 @testable import ShelvrKit
 
@@ -17,4 +18,9 @@ import Testing
   let first = try #require(PastedLink("example.com"))
   #expect(PastedLink(" example.com ", retrying: first)?.operationID == first.operationID)
   #expect(PastedLink("example.org", retrying: first)?.operationID != first.operationID)
+}
+
+@Test func distinguishesPlanDenialsFromTransientFailures() {
+  #expect(PastedLink.requiresPro(ClientError.ConvexError(data: #"{"code":"pro_required","message":"Pro required"}"#)))
+  #expect(!PastedLink.requiresPro(ClientError.ServerError(msg: "network")))
 }

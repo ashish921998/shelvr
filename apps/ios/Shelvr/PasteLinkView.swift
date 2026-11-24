@@ -7,6 +7,7 @@ struct PasteLinkView: View {
   @Environment(\.dismiss) private var dismiss
   @State private var input = ""
   @State private var pending: PastedLink?
+  @State private var presented = false
   @State private var saving = false
   @State private var errorMessage: String?
   @FocusState private var focused: Bool
@@ -27,12 +28,12 @@ struct PasteLinkView: View {
       if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
     }
     .navigationTitle(copy("capture.articleTitle"))
-    .navigationBarBackButtonHidden(saving)
     .toolbar {
       Button(copy("common.save"), action: save)
         .disabled(saving || input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
-    .onAppear { focused = true }
+    .onAppear { presented = true; focused = true }
+    .onDisappear { presented = false }
   }
 
   private func save() {
@@ -50,9 +51,9 @@ struct PasteLinkView: View {
         let _: String = try await backend.client.mutation("items:createLinkItem", with: [
           "url": link.url, "operationId": link.operationID, "saveSource": "manual_link"
         ])
-        dismiss()
+        if presented { dismiss() }
       } catch {
-        errorMessage = copy("errors.tryAgain")
+        errorMessage = PastedLink.requiresPro(error) ? copy("freePlan.leftBody") : copy("errors.tryAgain")
       }
     }
   }

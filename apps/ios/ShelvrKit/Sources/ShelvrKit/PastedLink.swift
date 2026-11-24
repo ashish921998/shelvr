@@ -1,8 +1,15 @@
+import ConvexMobile
 import Foundation
 
 public struct PastedLink: Sendable {
   public let url: String
   public let operationID: String
+
+  public static func requiresPro(_ error: Error) -> Bool {
+    struct Failure: Decodable { let code: String }
+    guard case let ClientError.ConvexError(data) = error else { return false }
+    return (try? JSONDecoder().decode(Failure.self, from: Data(data.utf8)))?.code == "pro_required"
+  }
 
   public init?(_ input: String, retrying prior: PastedLink? = nil) {
     let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
