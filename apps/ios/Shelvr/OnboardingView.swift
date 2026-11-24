@@ -135,7 +135,10 @@ private struct OnboardingAccount: View {
           else if progress.step == .notifications { progress.step = .carousel; carousel = 2; persist() }
         }) {
           BillingSheet(destination: .paywall, goalVariables: goalVariables,
-            availabilityChanged: { unavailable = !$0 }, confirmed: { purchased = true })
+            availabilityChanged: { available in
+              unavailable = !available
+              if !available { paywall = false }
+            }, confirmed: { purchased = true })
         }
       }
     }
