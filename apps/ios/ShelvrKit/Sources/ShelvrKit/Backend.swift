@@ -84,13 +84,11 @@ public final class Backend {
       guard let bearer = try await session.validToken(), generation == sessionGeneration,
         status == .signedIn, !signingOut, deletion == nil else { return }
       var tokens = try pushTokens.read()
-      let record = PushRegistrationRecord(token: token, registrationId: generation.uuidString)
+      let identity = try PushTokenStore.registrationID(bearer: bearer, installSecret: installation.secret)
+      let record = PushRegistrationRecord(token: token, registrationId: identity.uuidString)
       if !tokens.contains(record) { tokens.append(record) }
       try pushTokens.write(tokens)
-      try await PushTransport(deployment: environment.convexURL).call("notifications:registerDevice", args: [
-        "token": token, "installSecret": installation.secret, "registrationId": record.registrationId, "platform": "ios",
-        "locale": locale, "timezone": TimeZone.current.identifier
-      ], bearer: bearer)
+      try await registerInstallation(record, installation: installation, locale: locale, bearer: bearer)
       for old in tokens where old != record {
         try await unregisterInstallation(old, installation: installation)
       }
@@ -104,7 +102,7 @@ public final class Backend {
     status == .signedIn && sessionGeneration == generation && !signingOut && deletion == nil
   }
 
-  public func finishPushRevocation(installation: PushInstallation, generation: UUID,
+  public func finishPushRevocation(installation: PushInstallation, generation: UUID, locale: String,
     suspend: @escaping @MainActor () -> Void) async throws {
     let previous = registeringPush
     let task = Task {
@@ -112,12 +110,31 @@ public final class Backend {
       guard sessionGeneration == generation, status == .signedOut || mayRegisterPush(generation) else {
         throw CancellationError()
       }
-      try await pushTokens.retireStale(keeping: status == .signedIn ? generation : nil, suspend: suspend) { record in
+      let bearer = status == .signedIn ? try await session.validToken() : nil
+      guard sessionGeneration == generation, status == .signedOut || mayRegisterPush(generation) else {
+        throw CancellationError()
+      }
+      if status == .signedIn && bearer == nil { throw AuthSessionError.notSignedIn }
+      let identity = try bearer.map { try PushTokenStore.registrationID(bearer: $0, installSecret: installation.secret) }
+      try await pushTokens.retireStale(keeping: identity, suspend: suspend) { record in
         try await unregisterInstallation(record, installation: installation)
+      }
+      if let identity, let bearer {
+        try await pushTokens.adoptLegacy(for: identity, suspend: suspend) { record in
+          guard mayRegisterPush(generation) else { throw CancellationError() }
+          try await registerInstallation(record, installation: installation, locale: locale, bearer: bearer)
+        }
       }
     }
     registeringPush = task
     try await task.value
+  }
+
+  private func registerInstallation(_ record: PushRegistrationRecord, installation: PushInstallation, locale: String, bearer: String) async throws {
+    try await PushTransport(deployment: environment.convexURL).call("notifications:registerDevice", args: [
+      "token": record.token, "installSecret": installation.secret, "registrationId": record.registrationId, "platform": "ios",
+      "locale": locale, "timezone": TimeZone.current.identifier
+    ], bearer: bearer)
   }
 
   private func unregisterInstallation(_ record: PushRegistrationRecord, installation: PushInstallation) async throws {

@@ -82,7 +82,7 @@ struct PushRegistrationView: ViewModifier {
     while !Task.isCancelled, backend.sessionGeneration == generation {
       do {
         let installation = try PushInstallation(bundleID: bundle)
-        try await backend.finishPushRevocation(installation: installation, generation: generation, suspend: device.suspendEnrollment)
+        try await backend.finishPushRevocation(installation: installation, generation: generation, locale: copy.locale, suspend: device.suspendEnrollment)
         try Task.checkCancellation()
         return installation
       } catch is CancellationError { return nil }
