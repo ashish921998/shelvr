@@ -11,9 +11,13 @@ import Testing
   }
 }
 
-@Test func accountRecoveryStaysAvailableWhilePlanReadsFail() throws {
-  for path in ["/settings", "/profile", "/paywall"] {
+@Test func planReadsGatePersonalRoutesWhileSharedAccessRemainsAvailable() throws {
+  for path in ["/settings", "/profile", "/paywall", "/collections", "/shared-list/a",
+    "/list-invite/t", "/passport-invite/t", "/shared-trip-links", "/date-plan?listId=a",
+    "/trip-plan/a", "/add-trip-stop?tripId=a"] {
     #expect(!PlanRoutes.needsLoadedPlan(try #require(AppLink(path))))
   }
-  #expect(PlanRoutes.needsLoadedPlan(try #require(AppLink("/trip-plan/a"))))
+  for path in ["/saves", "/item/a", "/new-trip", "/date-plan?listId&listId=a", "/add-list-place?listId="] {
+    #expect(PlanRoutes.needsLoadedPlan(try #require(AppLink(path))))
+  }
 }

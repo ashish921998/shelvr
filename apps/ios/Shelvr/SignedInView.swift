@@ -164,13 +164,15 @@ struct SignedInView: View {
               }
             }
           } else { PlanCityView(trip: link.path.first == "new-trip") }
-        case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1], sharedOnly: access.locked).id(link.path[1])
+        case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1], sharedOnly: access.restrictsPersonalAccess).id(link.path[1])
         case "add-trip-stop":
           if let id = link.query.first(where: { $0.name == "tripId" })?.value {
             let day = link.query.first(where: { $0.name == "day" })?.value.flatMap(Int.init) ?? 1
-            if access.locked {
+            if access.restrictsPersonalAccess {
               SocialQuery(query: "tripPlannerData:getTripPlan", arguments: ["tripId": id], type: CityTrip?.self) { trip in
-                if trip?.listId != nil { AddTripStopView(id: id, initialDay: day) } else { PlanGateView() }
+                if trip?.listId != nil { AddTripStopView(id: id, initialDay: day) }
+                else if access.loading { loadingPlan }
+                else { PlanGateView() }
               }
             } else { AddTripStopView(id: id, initialDay: day).id(link) }
           } else { ShellDestination(link: link) }
@@ -209,8 +211,13 @@ struct SignedInView: View {
   }
 
   @ViewBuilder private var loadingPlan: some View {
-    if access.failed { Button(copy("common.retry")) { access.retry += 1 } }
-    else { ProgressView(copy("pro.checking")) }
+    if access.failed {
+      VStack(spacing: 16) {
+        Button(copy("common.retry")) { access.retry += 1 }
+        entry("/shared-lists", "sharedLists.title", "person.2")
+        entry("/shared-trip-links", "tripShare.manage", "link")
+      }
+    } else { ProgressView(copy("pro.checking")) }
   }
 
   private func open(_ route: String) {

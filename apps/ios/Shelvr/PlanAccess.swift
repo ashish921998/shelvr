@@ -13,6 +13,7 @@ final class PlanAccess {
   private(set) var pro = false
   var loading: Bool { failed || plan == nil || (!pro && !receivedAllowance) }
   var locked: Bool { !loading && !pro && allowance == nil }
+  var restrictsPersonalAccess: Bool { loading || locked }
 
   func readPlan(_ backend: Backend) async {
     plan = nil; pro = false; receivedAllowance = false; failed = false
