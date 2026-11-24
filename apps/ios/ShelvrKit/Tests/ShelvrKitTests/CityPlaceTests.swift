@@ -95,3 +95,28 @@ import Testing
   #expect(marked.count == 4)
   #expect(marked.allSatisfy { (15.99...184.01).contains($0.x) && (15.99...284.01).contains($0.y) })
 }
+
+@Test func rollAvoidsThePriorChoiceAndUsesTheCityAndCategory() throws {
+  let data = Data("""
+    [{"name":"Coffee","city":" CITY ","lat":0,"lng":0,"kinds":["coffee"]},
+     {"name":"Store","city":"City","lat":1,"lng":1,"category":"Store"},
+     {"name":"Away","city":"Other","lat":1,"lng":1,"kinds":["food"]}]
+    """.utf8)
+  let places = GoOutPlace.distinct(try JSONDecoder().decode([GoOutPlace].self, from: data), city: "City")
+  #expect(places.map(\.name) == ["Coffee", "Store"])
+  #expect(places.filter { $0.matches("food") }.map(\.name) == ["Coffee"])
+  #expect(GoOutPlace.rolled(places, previous: places[0]) == places[1])
+}
+
+@Test func legacyPinsUseCityScopedLibraryMembershipForQuickPicks() throws {
+  let decoder = JSONDecoder()
+  let mapped = try decoder.decode([GoOutPlace].self, from: Data("""
+    [{"name":"Legacy cafe","lat":1,"lng":2},{"name":"Other location","lat":3,"lng":4}]
+    """.utf8))
+  let cityRows = try decoder.decode([LibrarySave].self, from: Data("""
+    [{"_id":"fixture","_creationTime":0,"status":"ready","cities":["Austin"],
+      "placePins":[{"name":"Legacy cafe","lat":1,"lng":2}]}]
+    """.utf8))
+  #expect(GoOutPlace.distinct(mapped, city: "Austin", citySaves: cityRows).map(\.name) == ["Legacy cafe"])
+  #expect(GoOutPlace.distinct(mapped, city: "Houston").isEmpty)
+}

@@ -66,10 +66,12 @@ public struct CityDate: Decodable, Sendable {
 public struct CityTrip: Decodable, Sendable {
   public struct Stop: Decodable, Identifiable, Sendable {
     public let _id: String
+    public let appleId: String?
     public let name: String
     public let area: String?
     public let why: String?
     public let time: String?
+    public let note: String?
     public let lat: Double
     public let lng: Double
     public var id: String { _id }
@@ -82,9 +84,10 @@ public struct CityTrip: Decodable, Sendable {
 }
 
 extension Backend {
-  public func planDate(city: String, kind: String, locale: String, listID: String? = nil) async throws -> CityDate {
+  public func planDate(city: String, kind: String, locale: String, listID: String? = nil, firstSpot: DateStart? = nil) async throws -> CityDate {
     var args: [String: ConvexEncodable?] = ["city": city, "kind": kind, "locale": locale]
     if let listID { args["listId"] = listID }
+    if let firstSpot { args["firstSpot"] = firstSpot }
     return try await client.action("datePlans:makeDatePlan", with: args)
   }
 
