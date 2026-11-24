@@ -14,10 +14,18 @@ private enum SiriSave {
   case image(ImportPhoto, context: String?, sticker: Bool = false)
 
   func capture(spaceID: String? = nil, account: SiriCredential? = SiriCredential.current()) async throws -> (id: String, dialog: IntentDialog) {
-    if case let .note(text) = self, !SiriText.fitsCapture(text) { throw SiriNoteTooLong() }
     guard let account, SiriCredential.current()?.token == account.token else { throw ShelvrCapture.Failure.signedOut }
     let credential = ShelvrCapture.Credentials(siteUrl: account.siteURL, token: account.token)
     let operation = ShelvrCapture.newOperationId()
+    if case let .note(text) = self {
+      switch SiriText.captureRoute(text) {
+      case .tooLong: throw SiriNoteTooLong()
+      case .inbox:
+        return try queue(operation: operation, spaceID: spaceID, owner: account.owner,
+          unavailable: ShelvrCapture.Failure.signedOut)
+      case .direct: break
+      }
+    }
     do {
       let id: String
       switch self {
@@ -33,23 +41,28 @@ private enum SiriSave {
     } catch {
       if case ShelvrCapture.Failure.signedOut = error { await account.removeIfCurrent() }
       if let failure = error as? ShelvrCapture.Failure, !failure.isRetryableInApp { throw failure }
-      guard let inbox = ShareInbox.system(), inbox.activeOwner == account.owner else { throw error }
-      let stage = try inbox.stage(owner: account.owner)
-      defer { try? FileManager.default.removeItem(at: stage) }
-      let payload: InboxPayload
-      switch self {
-      case .link(let url):
-        payload = InboxPayload(kind: .link, value: url.absoluteString, operationID: operation, siri: true, spaceID: spaceID)
-      case .note(let text):
-        payload = InboxPayload(kind: .note, value: text, operationID: operation, siri: true, spaceID: spaceID)
-      case .image(let image, let context, let sticker):
-        let name = UUID().uuidString
-        try image.data.write(to: stage.appending(path: name))
-        payload = InboxPayload(kind: .image, value: name, operationID: operation, siri: true, spaceID: spaceID, context: context, sticker: sticker)
-      }
-      try inbox.publish([payload], in: stage)
-      return ("queued:" + operation, "Open Shelvr to finish saving.")
+      return try queue(operation: operation, spaceID: spaceID, owner: account.owner, unavailable: error)
     }
+  }
+
+  private func queue(operation: String, spaceID: String?, owner: String, unavailable: any Error)
+    throws -> (id: String, dialog: IntentDialog) {
+    guard let inbox = ShareInbox.system(), inbox.activeOwner == owner else { throw unavailable }
+    let stage = try inbox.stage(owner: owner)
+    defer { try? FileManager.default.removeItem(at: stage) }
+    let payload: InboxPayload
+    switch self {
+    case .link(let url):
+      payload = InboxPayload(kind: .link, value: url.absoluteString, operationID: operation, siri: true, spaceID: spaceID)
+    case .note(let text):
+      payload = InboxPayload(kind: .note, value: text, operationID: operation, siri: true, spaceID: spaceID)
+    case .image(let image, let context, let sticker):
+      let name = UUID().uuidString
+      try image.data.write(to: stage.appending(path: name))
+      payload = InboxPayload(kind: .image, value: name, operationID: operation, siri: true, spaceID: spaceID, context: context, sticker: sticker)
+    }
+    try inbox.publish([payload], in: stage)
+    return ("queued:" + operation, "Open Shelvr to finish saving.")
   }
 }
 
