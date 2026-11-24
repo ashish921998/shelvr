@@ -51,7 +51,7 @@ struct SaveReminderPreference: View {
       if enabled {
         let allowed = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
         permitted = allowed
-        if allowed { pushDevice.authorizationRevision += 1 }
+        if allowed { pushDevice.retryEnrollment() }
         guard allowed else { message = copy(weekly ? "notifications.disabledBody" : "notifications.remindersDisabledBody"); return }
       }
       guard backend.status == .signedIn, session == backend.sessionGeneration else { return }

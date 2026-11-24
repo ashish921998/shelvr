@@ -4,6 +4,7 @@ import UserNotifications
 
 struct AccountSettingsView: View {
   @Environment(\.scenePhase) private var phase
+  @EnvironmentObject private var pushDevice: PushDevice
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var confirming = false
@@ -23,6 +24,9 @@ struct AccountSettingsView: View {
         Button(copy("pro.restore")) { restored = false; billing = .restore }
         if restored { Text(copy("pro.restoredTitle")).foregroundStyle(.secondary) }
         Button(copy("pro.manage")) { billing = .manage }
+        if pushDevice.blockedSession == backend.sessionGeneration {
+          Text(copy("notifications.previousAccount")).foregroundStyle(.secondary)
+        }
         Link(copy("support.contact"), destination: URL(string: "mailto:ashish921998@zohomail.in?subject=Shelvr%20Support")!)
         Link(copy("legal.terms"), destination: URL(string: "https://tryshelvr.app/terms")!)
         Link(copy("legal.privacy"), destination: URL(string: "https://tryshelvr.app/privacy")!)

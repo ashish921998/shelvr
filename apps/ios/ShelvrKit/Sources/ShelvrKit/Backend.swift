@@ -144,7 +144,7 @@ public final class Backend {
         try await unregisterInstallation(record, installation: installation)
       }
       if let identity, let bearer {
-        try await pushTokens.adoptLegacy(for: identity, suspend: suspend) { record in
+        try await pushTokens.adoptLegacy(for: identity, deviceContinuity: installation.hasExpoDeviceIdentity, suspend: suspend) { record in
           guard mayRegisterPush(generation) else { throw CancellationError() }
           try await registerInstallation(record, installation: installation, locale: locale, bearer: bearer)
         }
