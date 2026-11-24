@@ -9,7 +9,13 @@ struct GoOutView: View {
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var picking = false
-  @State private var places: [GoOutPlace]?
+  @State private var mapped: [GoOutPlace]?
+  @State private var citySaves: [LibrarySave]?
+  private var places: [GoOutPlace]? {
+    guard let mapped else { return nil }
+    if listID == nil && !city.isEmpty && mapped.contains(where: { $0.city == nil }) && citySaves == nil { return nil }
+    return GoOutPlace.distinct(mapped, city: city, citySaves: citySaves ?? [])
+  }
   @State private var kind: String?
   @State private var current: GoOutPlace?
   @State private var failed = false
@@ -18,7 +24,7 @@ struct GoOutView: View {
   var body: some View {
     List {
       if picking {
-        if failed { Button(copy("common.retry")) { attempt += 1 } }
+        if failed { Button(copy("common.retry")) { failed = false; attempt += 1 } }
         else if let places {
           let candidates = places.filter { $0.matches(kind) }
           Picker(copy("map.filters"), selection: $kind) {
@@ -47,13 +53,18 @@ struct GoOutView: View {
     }
     .navigationTitle(copy(picking ? "goOut.question" : "plan.goOut"))
     .task(id: attempt) {
-      failed = false
+      guard listID == nil, !city.isEmpty else { return }
+      do {
+        for try await saves in backend.citySaves(city) { citySaves = saves }
+      } catch { if !Task.isCancelled { failed = true } }
+    }
+    .task(id: attempt) {
       do {
         if let listID {
-          for try await list in backend.goOutList(listID) { places = GoOutPlace.distinct(list?.places ?? [], city: city) }
+          for try await list in backend.goOutList(listID) { mapped = list?.places ?? [] }
         } else {
           for try await all in backend.query("mapPlaces:listMapPlaces", as: [GoOutPlace].self) {
-            places = GoOutPlace.distinct(all, city: city)
+            mapped = all
           }
         }
       } catch { if !Task.isCancelled { failed = true } }

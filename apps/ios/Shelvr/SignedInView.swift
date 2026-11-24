@@ -131,11 +131,8 @@ struct SignedInView: View {
         case "date-plan", "go-out", "new-trip":
           if link.path == ["new-trip"], !link.query.contains(where: { $0.name == "listId" || ($0.name == "mode" && $0.value == "generate") }) {
             let city = link.query.first(where: { $0.name == "city" })?.value ?? ""
-            BlankTripView(city: city) {
-              var parts = URLComponents()
-              parts.path = "/new-trip"
-              parts.queryItems = [URLQueryItem(name: "mode", value: "generate"), URLQueryItem(name: "city", value: city)]
-              if let next = parts.string.flatMap({ AppLink($0) }) { path.append(next) }
+            BlankTripView(city: city) { selectedCity in
+              if let next = BlankTrip.generationLink(city: selectedCity) { path.append(next) }
             } created: { result in
               if path.last == link { path[path.count - 1] = result }
             }
