@@ -295,10 +295,15 @@ export function evidenceProblems(
   return problems;
 }
 
-function changedFilesSince(base, head) {
-  return execFileSync("git", ["diff", "--name-only", `${base}...${head}`], {
-    encoding: "utf8",
-  })
+export function changedFilesSince(base, head, cwd) {
+  return execFileSync(
+    "git",
+    ["diff", "--name-only", "--no-renames", `${base}...${head}`],
+    {
+      cwd,
+      encoding: "utf8",
+    },
+  )
     .split("\n")
     .filter(Boolean);
 }
