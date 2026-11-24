@@ -33,7 +33,7 @@ public struct StampCity: Identifiable, Sendable {
     Self(id: "vancouver", country: "CA", names: ["Vancouver"]),
   ]
 
-  public static func counts(places: [PassportStamp], stamps: [PassportCityStamp]) -> (cities: Int, countries: Int) {
+  public static func counts<Place: PassportLocation>(places: [Place], stamps: [PassportCityStamp]) -> (cities: Int, countries: Int) {
     let keys = Set(places.map { PassportSection.cityKey($0.city) }.filter { !$0.isEmpty })
     var countries = Set(places.compactMap(\.countryCode).filter { !$0.isEmpty })
     var cities = keys.count
