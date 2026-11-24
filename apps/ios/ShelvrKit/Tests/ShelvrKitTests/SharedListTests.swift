@@ -8,7 +8,7 @@ import Testing
     "cities":["Lisbon"],"members":[],"places":[
     {"_id":"a","name":"A","city":"Lisbon","isNew":false,"addedByYou":false,"wentBy":[{"isYou":false}]},
     {"_id":"b","name":"B","city":"Lisbon","isNew":false,"addedByYou":true,"wentBy":[{"isYou":true}]},
-    {"_id":"c","name":"C","city":"Lisbon","isNew":false,"addedByYou":false}]}
+    {"_id":"c","name":"C","city":"Lisbon","visitedAt":1,"isNew":false,"addedByYou":false}]}
     """
   let row = try JSONDecoder().decode(SharedListDetail.self, from: Data(json.utf8))
   #expect(row.inviteURL(preview: true).absoluteString == "shelvr-preview://list-invite/abc")

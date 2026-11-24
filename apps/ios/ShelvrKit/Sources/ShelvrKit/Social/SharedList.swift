@@ -32,7 +32,7 @@ public struct SharedListDetail: Decodable {
     public let addedByYou: Bool
     public let wentBy: [Visitor]?
     public var id: String { _id }
-    public var went: Bool { wentBy?.contains { $0.isYou } ?? (visitedAt != nil) }
+    public var went: Bool { wentBy?.contains { $0.isYou } == true }
     public func visitors(copy: Copy) -> String? {
       guard let group = wentBy, !group.isEmpty else { return visitedAt == nil ? nil : copy("plan.weWent") }
       return group.map { person in
