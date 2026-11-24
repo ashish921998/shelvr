@@ -21,7 +21,6 @@ struct BlankTripView: View {
   @State private var stayStage = false
   @State private var hotel = ""
   @State private var hotels = [TripSearchPlace]()
-  @State private var stay: TripSearchPlace?
   @State private var pickingPin = false
   @State private var picked: PhotosPickerItem?
   @State private var cover: Data?
@@ -40,10 +39,12 @@ struct BlankTripView: View {
   var body: some View {
     Form {
       if stayStage { stayForm } else {
+        let selectedCover = cover
+        let coverLabel = copy("tripSetup.cover")
         PhotosPicker(selection: $picked, matching: .images) {
-          if let cover, let image = UIImage(data: cover) {
+          if let selectedCover, let image = UIImage(data: selectedCover) {
             Image(uiImage: image).resizable().scaledToFit().frame(maxHeight: 150)
-          } else { Label(copy("tripSetup.cover"), systemImage: "photo") }
+          } else { Label(coverLabel, systemImage: "photo") }
         }
         TextField(copy("tripPlanner.nameLabel"), text: $name)
         Button { choosing = true } label: {
