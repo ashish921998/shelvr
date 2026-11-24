@@ -6,7 +6,18 @@ import UserNotifications
 final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate, ObservableObject {
   @Published var token: Data?
   @Published var link: AppLink?
-  @Published var authorizationRevision = 0
+  @Published private(set) var authorizationRevision = 0
+  @Published private(set) var blockedSession: UUID?
+
+  func retryEnrollment() {
+    blockedSession = nil
+    authorizationRevision += 1
+  }
+
+  func rejectOwnership(for session: UUID) {
+    blockedSession = session
+    suspendEnrollment()
+  }
 
   func suspendEnrollment() {
     UIApplication.shared.unregisterForRemoteNotifications()
@@ -64,7 +75,7 @@ struct PushRegistrationView: ViewModifier {
       authorizationRevision: device.authorizationRevision)) {
       let generation = backend.sessionGeneration
       if backend.status == .signedOut { device.suspendEnrollment() }
-      guard backend.status == .signedOut || (phase == .active && backend.mayRegisterPush(generation)),
+      guard backend.status == .signedOut || (phase == .active && device.blockedSession != generation && backend.mayRegisterPush(generation)),
         let bundle = Bundle.main.bundleIdentifier,
         let installation = await cleanInstallation(bundle, generation: generation),
         backend.mayRegisterPush(generation) else { return }
@@ -80,6 +91,8 @@ struct PushRegistrationView: ViewModifier {
           development: development).exchange()
         try Task.checkCancellation()
         try await backend.registerPush(expo, installation: installation, locale: copy.locale, generation: generation)
+      } catch PushRegistrationError.ownedByAnotherAccount {
+        if backend.mayRegisterPush(generation) { device.rejectOwnership(for: generation) }
       } catch { if !Task.isCancelled { Analytics.failure("notification_registration_failed") } }
     }
   }
@@ -92,6 +105,9 @@ struct PushRegistrationView: ViewModifier {
         try await backend.finishPushRevocation(installation: installation, generation: generation, locale: copy.locale, suspend: device.suspendEnrollment)
         try Task.checkCancellation()
         return installation
+      } catch PushRegistrationError.ownedByAnotherAccount {
+        if backend.mayRegisterPush(generation) { device.rejectOwnership(for: generation) }
+        return nil
       } catch is CancellationError { return nil }
       catch {
         guard !Task.isCancelled, backend.sessionGeneration == generation else { return nil }

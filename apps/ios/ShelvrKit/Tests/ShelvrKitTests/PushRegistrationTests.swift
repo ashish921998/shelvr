@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import Testing
 @testable import ShelvrKit
 
@@ -70,7 +71,7 @@ import Testing
   #expect(try store.read().isEmpty)
   var events: [String] = []
   await #expect(throws: URLError.self) {
-    try await store.adoptLegacy(for: generation, suspend: { events.append("suspend") }) { record in
+    try await store.adoptLegacy(for: generation, deviceContinuity: true, suspend: { events.append("suspend") }) { record in
       #expect(try store.read().contains(record))
       events.append("authenticated adoption")
       throw URLError(.notConnectedToInternet)
@@ -78,7 +79,7 @@ import Testing
   }
   #expect(try store.legacyTokens(service: baseService) == ["old-expo"])
   #expect(events == ["suspend", "authenticated adoption"])
-  try await store.adoptLegacy(for: generation, suspend: { events.append("suspend") }) { record in
+  try await store.adoptLegacy(for: generation, deviceContinuity: true, suspend: { events.append("suspend") }) { record in
     #expect(record == PushRegistrationRecord(token: "old-expo", registrationId: generation.uuidString))
     events.append("authenticated adoption")
   }
@@ -100,4 +101,71 @@ private final class UnavailableExpo: URLProtocol, @unchecked Sendable {
     client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
     client?.urlProtocolDidFinishLoading(self)
   }
+}
+
+private func expoKey(_ value: String, service: String) -> [String: Any] {
+  let bytes = Data(value.utf8)
+  return [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service,
+    kSecAttrGeneric as String: bytes, kSecAttrAccount as String: bytes]
+}
+
+@MainActor @Test func backupRestoredExpoTokensCannotBeAssignedToTheNewPhonesAccount() async throws {
+  let oldDevice = "test.original.\(UUID())"
+  let newDevice = "test.restored.\(UUID())"
+  let oldService = "test.secure.\(UUID())"
+  let secretService = oldService + ":no-auth"
+  let store = PushTokenStore(serviceURL: URL(string: "https://example.convex.cloud")!, keychainService: secretService)
+  let deviceKey = expoKey("EXDeviceInstallationUUIDKey", service: oldDevice)
+  let secretKey = expoKey("notification-install-secret", service: oldService)
+  let restoredTokens = expoKey("notification-tokens-https___example.convex.cloud", service: secretService)
+  defer {
+    for item in [deviceKey, secretKey, restoredTokens, expoKey("notification-install-secret", service: secretService),
+      expoKey("swift-notification-installation-id", service: newDevice),
+      expoKey("swift-notification-installation-secret", service: newDevice + ".push-secret")] { _ = Keychain.delete(item) }
+    try? store.write([])
+  }
+  #expect(Keychain.write(Data("ORIGINAL".utf8), to: deviceKey, accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly))
+  #expect(Keychain.write(Data("copied-secret".utf8), to: secretKey))
+  #expect(Keychain.write(Data(#"["old-phone-token"]"#.utf8), to: restoredTokens))
+  let restored = try PushInstallation(bundleID: newDevice, expoSecretService: secretService, oldSecretService: oldService)
+  #expect(!restored.hasExpoDeviceIdentity && restored.id != "original" && restored.secret != "copied-secret")
+  let reopened = try PushInstallation(bundleID: newDevice, expoSecretService: secretService, oldSecretService: oldService)
+  #expect(!reopened.hasExpoDeviceIdentity && reopened.id == restored.id && reopened.secret == restored.secret)
+  try await store.adoptLegacy(for: UUID(), deviceContinuity: reopened.hasExpoDeviceIdentity, suspend: {}) { _ in
+    Issue.record("A copied token must never be registered on a restored phone")
+  }
+  #expect(try store.legacyTokens().isEmpty)
+  #expect(try store.read().isEmpty)
+  let same = try PushInstallation(bundleID: oldDevice, expoSecretService: secretService, oldSecretService: oldService)
+  #expect(same.hasExpoDeviceIdentity && same.id == "original" && same.secret == "copied-secret")
+}
+
+private final class OtherPushOwner: URLProtocol, @unchecked Sendable {
+  override class func canInit(with request: URLRequest) -> Bool { true }
+  override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+  override func stopLoading() {}
+  override func startLoading() {
+    let response = HTTPURLResponse(url: request.url!, statusCode: 560, httpVersion: nil, headerFields: nil)!
+    client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+    client?.urlProtocol(self, didLoad: Data(#"{"status":"error","errorData":{"code":"notification_token_owned_by_another_account"}}"#.utf8))
+    client?.urlProtocolDidFinishLoading(self)
+  }
+}
+
+@MainActor @Test func permanentOwnershipRefusalKeepsTheLegacyRecordForAccountRecovery() async throws {
+  let endpoint = URL(string: "https://example.convex.cloud")!
+  let legacy = "test.ownership.\(UUID())"
+  let store = PushTokenStore(serviceURL: endpoint, keychainService: legacy + ":no-auth")
+  defer { try? store.write([]); try? store.writeLegacy([], service: legacy) }
+  try store.writeLegacy(["original"], service: legacy)
+  let config = URLSessionConfiguration.ephemeral
+  config.protocolClasses = [OtherPushOwner.self]
+  let transport = PushTransport(deployment: endpoint, session: URLSession(configuration: config))
+  await #expect(throws: PushRegistrationError.ownedByAnotherAccount) {
+    try await store.adoptLegacy(for: UUID(), deviceContinuity: true, suspend: {}) { record in
+      try await transport.call("notifications:registerDevice", args: ["token": record.token,
+        "installSecret": "fixture", "registrationId": record.registrationId, "platform": "ios"], bearer: "new-account")
+    }
+  }
+  #expect(try store.legacyTokens(service: legacy) == ["original"])
 }
