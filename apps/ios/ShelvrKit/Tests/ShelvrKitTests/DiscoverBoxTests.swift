@@ -14,3 +14,9 @@ import Testing
       width: row.width, height: row.height, tilted: row.tilt > 0) == row.box)
   }
 }
+
+@Test func nearbyReachMatchesExpo() {
+  let box = DiscoverBox(west: -9.3, south: 38.65, east: -9, north: 38.8)
+  #expect(box.includingNearby(latitude: 38.72, longitude: -9.14)
+    == DiscoverBox(west: -10.5, south: 38, east: -8, north: 39.25))
+}

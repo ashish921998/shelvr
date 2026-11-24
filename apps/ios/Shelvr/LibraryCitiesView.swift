@@ -19,15 +19,20 @@ struct LibraryCitiesView: View {
           ScrollView {
             LazyVGrid(columns: [.init(.adaptive(minimum: 145))], spacing: 16) {
               ForEach(cities) { city in
-                VStack(alignment: .leading) {
-                  AsyncImage(url: (city.cover ?? city.photo).flatMap(URL.init(string:))) { image in
-                    image.resizable().scaledToFill()
-                  } placeholder: { Color.secondary.opacity(0.12) }
-                  .frame(maxWidth: .infinity).frame(height: 140).clipped().clipShape(.rect(cornerRadius: 10))
-                  Text(city.city).font(.headline)
-                  if let count = city.placeCount {
-                    Label(count.formatted(), systemImage: "mappin").font(.caption)
-                  }
+                if let path = city.city.addingPercentEncoding(withAllowedCharacters: .alphanumerics),
+                  let link = AppLink("/city/" + path) {
+                  NavigationLink(value: link) {
+                    VStack(alignment: .leading) {
+                      Color.secondary.opacity(0.12)
+                        .frame(height: 140)
+                        .overlay { LibraryCityPhoto(city: city) }
+                        .clipShape(.rect(cornerRadius: 10))
+                      Text(city.city).font(.headline)
+                      if let count = city.placeCount {
+                        Label(count.formatted(), systemImage: "mappin").font(.caption)
+                      }
+                    }
+                  }.buttonStyle(.plain)
                 }
               }
             }.padding()

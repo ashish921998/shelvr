@@ -551,41 +551,53 @@ async function liveSaves(
   );
 }
 
+async function tripDetails(ctx: QueryCtx, plan: Doc<"tripPlans">) {
+  const days: TripPlanStop[][] = Array.from(
+    { length: plan.dayCount },
+    () => [],
+  );
+  const unplanned: TripPlanStop[] = [];
+  // The index orders stops by day, then by their order within it.
+  const stops = await stopsOf(ctx, plan._id);
+  const live = await liveSaves(ctx, stops, plan.userId);
+  for (const stop of stops) {
+    if (stop.day === UNPLANNED_DAY) unplanned.push(stopView(stop, live));
+    else days[stop.day - 1]?.push(stopView(stop, live));
+  }
+  return {
+    _id: plan._id,
+    ...(plan.listId !== undefined ? { listId: plan.listId } : {}),
+    ...(plan.name !== undefined ? { name: plan.name } : {}),
+    ...(plan.countries !== undefined ? { countries: plan.countries } : {}),
+    ...(plan.cover !== undefined ? { cover: plan.cover } : {}),
+    city: plan.city,
+    ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
+    dayCount: plan.dayCount,
+    pace: plan.pace,
+    interests: plan.interests,
+    ...(plan.stay !== undefined ? { stay: plan.stay } : {}),
+    createdAt: plan._creationTime,
+    days,
+    unplanned,
+  };
+}
+
 /** The trip with its days and unplanned stops. Stops carry their own name and pin, so a deleted save never breaks it. */
 export const getTripPlan = authedQuery({
   args: { tripId: v.id("tripPlans") },
   returns: v.union(v.null(), tripPlanDetailValidator),
   handler: async (ctx, args) => {
     const plan = await ownedPlan(ctx, args.tripId, ctx.userId);
-    if (plan === null) return null;
-    const days: TripPlanStop[][] = Array.from(
-      { length: plan.dayCount },
-      () => [],
-    );
-    const unplanned: TripPlanStop[] = [];
-    // The index orders stops by day, then by their order within it.
-    const stops = await stopsOf(ctx, plan._id);
-    const live = await liveSaves(ctx, stops, ctx.userId);
-    for (const stop of stops) {
-      if (stop.day === UNPLANNED_DAY) unplanned.push(stopView(stop, live));
-      else days[stop.day - 1]?.push(stopView(stop, live));
-    }
-    return {
-      _id: plan._id,
-      ...(plan.listId !== undefined ? { listId: plan.listId } : {}),
-      ...(plan.name !== undefined ? { name: plan.name } : {}),
-      ...(plan.countries !== undefined ? { countries: plan.countries } : {}),
-      ...(plan.cover !== undefined ? { cover: plan.cover } : {}),
-      city: plan.city,
-      ...(plan.startDate !== undefined ? { startDate: plan.startDate } : {}),
-      dayCount: plan.dayCount,
-      pace: plan.pace,
-      interests: plan.interests,
-      ...(plan.stay !== undefined ? { stay: plan.stay } : {}),
-      createdAt: plan._creationTime,
-      days,
-      unplanned,
-    };
+    return plan === null ? null : await tripDetails(ctx, plan);
+  },
+});
+
+export const getSharedTripPlan = authedQuery({
+  args: { tripId: v.id("tripPlans") },
+  returns: v.union(v.null(), tripPlanDetailValidator),
+  handler: async (ctx, args) => {
+    const plan = await ownedPlan(ctx, args.tripId, ctx.userId);
+    return plan?.listId === undefined ? null : await tripDetails(ctx, plan);
   },
 });
 
