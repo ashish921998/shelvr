@@ -23,3 +23,17 @@ import Testing
   #expect(!result.map(\.kind).contains(.lastDay))
   #expect(result.filter { $0.kind == .dayOne || $0.kind == .dayThree }.allSatisfy { cal.component(.hour, from: $0.date) == 10 })
 }
+
+
+@Test func theFirstLoadedTrialCanOfferTheLibraryPermissionPrimer() {
+  #expect(TrialNotification.shouldArmPrimer(
+    previousAccount: nil, previousStatus: nil, account: "fixture", status: "trialing"))
+  #expect(TrialNotification.shouldArmPrimer(
+    previousAccount: "fixture", previousStatus: nil, account: "fixture", status: "trialing"))
+  #expect(TrialNotification.shouldArmPrimer(
+    previousAccount: "fixture", previousStatus: "none", account: "fixture", status: "trialing"))
+  #expect(!TrialNotification.shouldArmPrimer(
+    previousAccount: "fixture", previousStatus: "trialing", account: "fixture", status: "trialing"))
+  #expect(!TrialNotification.shouldArmPrimer(
+    previousAccount: nil, previousStatus: nil, account: "fixture", status: nil))
+}

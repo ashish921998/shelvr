@@ -80,37 +80,30 @@ struct TrialReminderObserver: ViewModifier {
   @Environment(\.scenePhase) private var phase
   @State private var subscription: Subscription?
   @State private var preferences: TrialNotificationPreferences?
-  @State private var user: String?
   @State private var mayAsk = false
   @State private var primer = false
   let home: Bool
 
   func body(content: Content) -> some View {
     content
-      .task {
-        do {
-          for try await entry in backend.query("users:getCurrentUser", as: AccountView.CurrentUser?.self) { user = entry?._id }
-        } catch {}
+      .task(id: backend.sessionGeneration) {
+        await observe("subscriptions:getEntitlement", as: Subscription.self) { subscription = $0 }
       }
-      .task {
-        do {
-          for try await value in backend.query("subscriptions:getEntitlement", as: Subscription.self) { subscription = value }
-        } catch {}
+      .task(id: backend.sessionGeneration) {
+        await observe("notifications:getPreferences", as: TrialNotificationPreferences.self) { preferences = $0 }
       }
-      .task {
-        do {
-          for try await value in backend.query("notifications:getPreferences", as: TrialNotificationPreferences.self) { preferences = value }
-        } catch { preferences = .init(weeklyShelfEnabled: false, remindersEnabled: false) }
-      }
-      .onChange(of: Inputs(subscription: subscription, nudges: preferences?.remindersEnabled, active: phase == .active, user: user)) { before, value in
-        if before.user == value.user, before.subscription?.status != nil, before.subscription?.status != "trialing",
-          value.subscription?.status == "trialing", let id = value.user {
+      .onChange(of: Inputs(subscription: subscription, nudges: preferences?.remindersEnabled,
+        active: phase == .active, user: backend.userID), initial: true) { before, value in
+        if let id = value.user, TrialNotification.shouldArmPrimer(
+          previousAccount: before.user, previousStatus: before.subscription?.status,
+          account: id, status: value.subscription?.status
+        ) {
           let key = "trial-primer-" + id
           if UserDefaults.standard.string(forKey: key) != "asked" { UserDefaults.standard.set("owed", forKey: key) }
         }
         refresh(value)
       }
-      .task(id: PrimerInputs(user: user, session: backend.sessionGeneration,
+      .task(id: PrimerInputs(user: backend.userID, session: backend.sessionGeneration,
         canPresent: home && mayAsk && phase == .active && !primer)) {
         await presentIfPossible()
       }
@@ -120,7 +113,7 @@ struct TrialReminderObserver: ViewModifier {
           Task {
             _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
             if backend.status == .signedIn && backend.sessionGeneration == session {
-              refresh(.init(subscription: subscription, nudges: preferences?.remindersEnabled, active: true, user: user))
+              refresh(.init(subscription: subscription, nudges: preferences?.remindersEnabled, active: true, user: backend.userID))
             }
           }
         }
@@ -128,22 +121,38 @@ struct TrialReminderObserver: ViewModifier {
       } message: { Text(copy("notifications.trialPrimerBody")) }
   }
 
+  private func observe<Value: Decodable>(_ name: String, as type: Value.Type, receive: (Value) -> Void) async {
+    guard let owner = backend.userID else { return }
+    let session = backend.sessionGeneration
+    func current() -> Bool { backend.userID == owner && backend.sessionGeneration == session }
+    do {
+      try await PushRetry.run(while: current) {
+        for try await value in backend.query(name, as: type) {
+          try Task.checkCancellation()
+          guard current() else { throw CancellationError() }
+          receive(value)
+        }
+        throw URLError(.networkConnectionLost)
+      }
+    } catch {}
+  }
+
   private func refresh(_ inputs: Inputs) {
-    guard inputs.active, let sub = inputs.subscription, inputs.user != nil else { return }
+    guard let sub = inputs.subscription, let user = inputs.user, backend.userID == user else { return }
     guard sub.status == "trialing", let end = sub.expiresAt else {
       mayAsk = false
       primer = false
       LocalTrialNotifications.shared.replace([], copy: copy)
       return
     }
-    guard let nudges = inputs.nudges else { return }
+    guard inputs.active, let nudges = inputs.nudges else { return }
     let notices = TrialNotification.schedule(expiration: Date(timeIntervalSince1970: end / 1000), now: .now, nudges: nudges)
     mayAsk = notices.contains { $0.kind == .ending }
     LocalTrialNotifications.shared.replace(notices, copy: copy)
   }
 
   private func presentIfPossible() async {
-    guard home, mayAsk, phase == .active, let user, !primer else { return }
+    guard home, mayAsk, phase == .active, let user = backend.userID, !primer else { return }
     let key = "trial-primer-" + user
     guard UserDefaults.standard.string(forKey: key) == "owed" else { return }
     let session = backend.sessionGeneration

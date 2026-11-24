@@ -10,6 +10,12 @@ public struct TrialNotification: Equatable, Sendable {
   public let kind: Kind
   public let date: Date
 
+  public static func shouldArmPrimer(
+    previousAccount: String?, previousStatus: String?, account: String, status: String?
+  ) -> Bool {
+    status == "trialing" && (previousAccount != account || previousStatus != "trialing")
+  }
+
   public static func schedule(expiration: Date, now: Date, nudges: Bool, calendar: Calendar = .current) -> [Self] {
     var notices = [Self]()
     if let warning = TrialDates.reminder(before: expiration, now: now, calendar: calendar) {
