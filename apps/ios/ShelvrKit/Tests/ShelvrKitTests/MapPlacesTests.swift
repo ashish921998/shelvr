@@ -45,5 +45,20 @@ import Testing
 @Test func modifierLetterApostrophesRemainInLegacyVisitKeys() throws {
   #expect(MapPlace.key("Kaʼa Café") == "kaʼacafe")
   #expect(MapPlace.key("L’Atelier") == "latelier")
+  #expect(MapPlace.key("a\u{200C}b") == "ab")
   #expect(MapPlace.words("Kaʼa Café") == ["kaa", "cafe"])
+}
+
+@Test func openingWithAnActiveSearchFitsTheMatchingCityWhenSavedDataArrives() throws {
+  let data = """
+    [{"itemId":"one","name":"A","city":"Paris","lat":48,"lng":2,"kinds":[]},
+    {"itemId":"two","name":"B","city":"Paris","lat":48,"lng":2,"kinds":[]},
+    {"itemId":"three","name":"C","city":"Tokyo","lat":35,"lng":139,"kinds":[]}]
+    """
+  let saved = try JSONDecoder().decode([MapPlace].self, from: Data(data.utf8))
+  let matches = MapPlace.search(saved, query: "Tokyo")
+  #expect(MapPlace.openingPins(saved: nil, discover: [], visible: [], filtered: true) == nil)
+  #expect(MapPlace.openingPins(saved: saved, discover: [], visible: matches, filtered: true) == matches)
+  #expect(MapPlace.openingPins(saved: saved, discover: [], visible: [], filtered: true) == nil)
+  #expect(MapPlace.openingPins(saved: saved, discover: [], visible: saved, filtered: false)?.map(\.city) == ["Paris", "Paris"])
 }
