@@ -8,6 +8,9 @@ import Testing
   #expect(rows.filter(\.earned).map(\.id) == ["firstStamp", "completionist", "coffeeCrawler"])
   #expect(rows.last?.id == "explorer")
   #expect(rows.last?.have == 5)
+  let locked = PassportBadge.visible(stamps: stamps, cities: [], completion: [], locked: true)
+  #expect(locked.count == PassportBadge.all.count)
+  #expect(locked.first { $0.id == "coffeeCrawler" }?.have == 5)
 }
 
 @Test func expiredOrMissingSubscriptionExpiryDoesNotUnlockMilestones() {
