@@ -111,3 +111,41 @@ import Testing
   entry.restore()
   #expect(entry.accepted == nil && disk == nil)
 }
+
+@MainActor @Test func aCommittedJoinIsConsumedByNavigationBeforeAReplacementPreviewAppears() throws {
+  var disk: AcceptedInvite?
+  let entry = InviteEntry(read: { disk }, write: { disk = $0 })
+  let a = try #require(AppLink("/list-invite/a")), b = try #require(AppLink("/passport-invite/b"))
+  let invite = try #require(PublicInvite(a))
+  #expect(entry.route(a))
+  entry.accept(invite, account: "member")
+  let id = try #require(entry.accepted?.id)
+  #expect(entry.beginDispatch(id))
+  #expect(entry.route(b))
+  let target = try #require(invite.destination(listID: "joined"))
+  #expect(entry.endDispatch(id, destination: target) == nil)
+  #expect(entry.didNavigate(to: a) == nil)
+  #expect(entry.didNavigate(to: target) == b)
+}
+
+@MainActor @Test func replacementCannotReviveAnOldInviteAfterRestartWithLockedKeychain() throws {
+  let url = URL.temporaryDirectory.appending(path: UUID().uuidString)
+  defer { try? FileManager.default.removeItem(at: url) }
+  let old = try #require(AppLink("/list-invite/old"))
+  let replacement = try #require(AppLink("/passport-invite/new"))
+  let first = try #require(PublicInvite(old))
+  var key = try JSONEncoder().encode(AcceptedInvite(first)) as Data?
+  var accessible = false
+  let storage = InviteStorage(marker: SignOutMarker(url: url), readKey: {
+    guard accessible else { throw CocoaError(.fileReadNoPermission) }; return key
+  }, writeKey: { key = $0; return true }, deleteKey: {
+    guard accessible else { return false }; key = nil; return true
+  })
+  let original = InviteEntry(read: storage.read, write: storage.set)
+  #expect(original.route(replacement))
+  #expect(original.preview == PublicInvite(replacement))
+  original.preview = nil
+  accessible = true
+  let relaunched = InviteEntry(read: storage.read, write: storage.set)
+  #expect(relaunched.accepted == nil && key == nil)
+}

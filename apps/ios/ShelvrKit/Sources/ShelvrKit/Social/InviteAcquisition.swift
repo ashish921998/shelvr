@@ -53,17 +53,41 @@ public enum PendingInviteStore {
       kSecAttrAccount as String: "accepted"]
   }
 
-  public static func read() throws -> AcceptedInvite? {
-    try Keychain.checkedData(key).map { try JSONDecoder().decode(AcceptedInvite.self, from: $0) }
+  private static var storage: InviteStorage {
+    InviteStorage(marker: SignOutMarker(url: URL.applicationSupportDirectory.appending(path: "discarded-invite")),
+      readKey: { try Keychain.checkedData(key) },
+      writeKey: { Keychain.write($0, to: key, accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly) },
+      deleteKey: { Keychain.delete(key) })
+  }
+  public static func read() throws -> AcceptedInvite? { try storage.read() }
+  public static func set(_ request: AcceptedInvite?) throws { try storage.set(request) }
+}
+
+struct InviteStorage {
+  let marker: SignOutMarker
+  let readKey: () throws -> Data?
+  let writeKey: (Data) -> Bool
+  let deleteKey: () -> Bool
+
+  func read() throws -> AcceptedInvite? {
+    switch marker.state {
+    case .inaccessible: throw CocoaError(.fileReadNoPermission)
+    case .pending:
+      if deleteKey() { try marker.clear() }
+      return nil
+    case .absent:
+      return try readKey().map { try JSONDecoder().decode(AcceptedInvite.self, from: $0) }
+    }
   }
 
-  public static func set(_ request: AcceptedInvite?) throws {
-    let ok: Bool
+  func set(_ request: AcceptedInvite?) throws {
     if let request {
-      ok = Keychain.write(try JSONEncoder().encode(request), to: key,
-        accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
-    } else { ok = Keychain.delete(key) }
-    if !ok { throw CocoaError(.fileWriteUnknown) }
+      guard writeKey(try JSONEncoder().encode(request)) else { throw CocoaError(.fileWriteUnknown) }
+      try marker.clear()
+    } else {
+      try marker.record()
+      if deleteKey() { try marker.clear() }
+    }
   }
 }
 
@@ -79,6 +103,7 @@ public final class InviteEntry {
   public private(set) var loaded = false
   public private(set) var dispatching: UUID?
   private var queued: AppLink?
+  private var awaitingNavigation: AppLink?
   private var discardUnread = false
   private let read: () throws -> AcceptedInvite?
   private let write: (AcceptedInvite?) throws -> Void
@@ -92,7 +117,12 @@ public final class InviteEntry {
 
   public func restore() {
     do {
-      if discardUnread { try write(nil); accepted = nil; discardUnread = false }
+      if discardUnread {
+        try write(nil)
+        accepted = nil
+        discardUnread = false
+        if let queued { preview = PublicInvite(queued); self.queued = nil }
+      }
       else { accepted = try read() }
       loaded = true
       failed = false
@@ -107,10 +137,10 @@ public final class InviteEntry {
   }
 
   public func route(_ link: AppLink) -> Bool {
-    if dispatching != nil { queued = link; return true }
+    if dispatching != nil || awaitingNavigation != nil { queued = link; return true }
     if !loaded || accepted != nil {
       discardUnread = true
-      if !replace(with: nil) { accepted = nil; loaded = false }
+      if !replace(with: nil) { accepted = nil; loaded = false; queued = link; preview = nil; return true }
     }
     expired = nil
     preview = PublicInvite(link)
@@ -128,9 +158,17 @@ public final class InviteEntry {
     return true
   }
 
-  public func endDispatch(_ id: UUID) -> AppLink? {
+  public func endDispatch(_ id: UUID, destination: AppLink? = nil) -> AppLink? {
     guard dispatching == id else { return nil }
     dispatching = nil
+    if let destination { awaitingNavigation = destination; return nil }
+    defer { queued = nil }
+    return queued
+  }
+
+  public func didNavigate(to destination: AppLink?) -> AppLink? {
+    guard let destination, awaitingNavigation == destination else { return nil }
+    awaitingNavigation = nil
     defer { queued = nil }
     return queued
   }

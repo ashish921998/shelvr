@@ -39,6 +39,9 @@ struct InviteEntryView: View {
     .safeAreaInset(edge: .bottom) {
       if !entry.loaded, entry.failed { Button(copy("common.retry")) { entry.restore() } }
     }
+    .onChange(of: pendingLink) { previous, next in
+      if next == nil, let queued = entry.didNavigate(to: previous), !entry.route(queued) { pendingLink = queued }
+    }
     .sheet(item: $entry.preview) { invite in
       NavigationStack {
         Group {
@@ -123,10 +126,9 @@ struct InviteEntryView: View {
       guard let bound = request.bound(to: account) else { entry.cancel(); return }
       if bound != request, !entry.replace(with: bound) { return }
       guard entry.beginDispatch(request.id) else { return }
+      var handoff: AppLink?
       defer {
-        if let next = entry.endDispatch(request.id) {
-          if entry.route(next) { pendingLink = nil } else { pendingLink = next }
-        }
+        if let next = entry.endDispatch(request.id, destination: handoff), !entry.route(next) { pendingLink = next }
       }
       let destination: AppLink?
       if request.invite.kind == .list {
@@ -143,6 +145,7 @@ struct InviteEntryView: View {
           defaults.removeObject(forKey: OnboardingHandoff.key(account))
           defaults.set(true, forKey: completed)
         }
+        handoff = destination
         pendingLink = destination
       } else {
         entry.expired = request.invite

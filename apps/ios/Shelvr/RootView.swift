@@ -51,8 +51,7 @@ struct RootView: View {
     .animation(.default, value: backend.status)
   }
   private func route(_ link: AppLink) {
-    if invites.route(link) { pendingLink = nil }
-    else { pendingLink = link }
+    if !invites.route(link) { pendingLink = link }
   }
 
 }
