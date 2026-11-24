@@ -9,7 +9,7 @@ struct LibraryCityPhoto: View {
     let cover = city.cover.flatMap(URL.init(string:))
     let photo = city.photo.flatMap(URL.init(string:))
     let name = city.city.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "en_US_POSIX"))
-      .lowercased().split { !$0.isLetter && !$0.isNumber }.joined(separator: "-")
+      .lowercased().replacingOccurrences(of: "ø", with: "o").split { !$0.isLetter && !$0.isNumber }.joined(separator: "-")
     let aliases = ["nyc": "new-york", "new-york-city": "new-york", "la": "los-angeles", "sf": "san-francisco",
       "lisboa": "lisbon", "praha": "prague", "roma": "rome", "milano": "milan", "firenze": "florence",
       "kobenhavn": "copenhagen", "vegas": "las-vegas"]
