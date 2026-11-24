@@ -29,7 +29,7 @@ struct CityMapCardView: View {
       ProgressView(value: Double(went.count), total: Double(max(1, pins.count))).tint(.orange)
       Canvas { context, size in
         let points = CityPlace.cardPoints(pins, visited: went, width: size.width, height: size.height)
-        for point in points {
+        for point in points.reversed() {
           let dot = CGRect(x: point.x - 7, y: point.y - 7, width: 14, height: 14)
           let mark = Path(ellipseIn: dot)
           context.fill(mark, with: .color(went.contains(point.pin) ? .orange : .white))

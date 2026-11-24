@@ -3,7 +3,7 @@ import SwiftUI
 
 struct StampPlacesView: View {
   let city: String?
-  let finished: () -> Void
+  let finished: (String) -> Void
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var picked: Set<UnstampedPlace.ID> = []
@@ -19,16 +19,26 @@ struct StampPlacesView: View {
       } else {
         List {
           ForEach(groups(places), id: \.0) { key, rows in
+            let similar = Dictionary(grouping: rows) { [$0.name.lowercased(), ($0.title ?? "").lowercased()] }
             Section(key) {
               ForEach(rows) { place in
                 Button {
                   if city != nil {
-                    operation.run { try await backend.stampNow(place); finished() }
+                    operation.run {
+                      try await backend.stampNow(place)
+                      finished(copy("passport.momentStamped", ["name": place.name]))
+                    }
                   } else if picked.contains(place.id) { picked.remove(place.id) }
                   else if chosen.count < 60 { picked.insert(place.id) }
                 } label: {
                   HStack {
-                    Text(place.name)
+                    VStack(alignment: .leading) {
+                      Text(place.name)
+                      if let title = place.title, !title.isEmpty { Text(title).font(.caption).foregroundStyle(.secondary) }
+                      if similar[[place.name.lowercased(), (place.title ?? "").lowercased()]]?.count ?? 0 > 1 {
+                        Text(place.coordinates).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                      }
+                    }
                     Spacer()
                     Image(systemName: city != nil ? "seal" : picked.contains(place.id) ? "checkmark.circle.fill" : "circle")
                   }
@@ -42,8 +52,8 @@ struct StampPlacesView: View {
           if city == nil {
             Button(copy.count("passport.stampCount", chosen.count)) {
               operation.run {
-                _ = try await backend.stampBefore(chosen)
-                finished()
+                let count = try await backend.stampBefore(chosen)
+                finished(copy.count("passport.momentBulk", count))
               }
             }.disabled(chosen.isEmpty || operation.busy).buttonStyle(.borderedProminent).padding()
           }

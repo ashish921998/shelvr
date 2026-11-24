@@ -14,7 +14,8 @@ public struct UnstampedPlace: Decodable, Identifiable, Sendable {
   }
   public let itemId, name, city: String
   public let spot: Spot
-  public let cover: String?
+  public let cover, title: String?
+  public var coordinates: String { String(format: "%.5f°, %.5f°", spot.lat, spot.lng) }
   public var id: ID { ID(item: itemId, name: name, lat: spot.lat, lng: spot.lng, apple: spot.appleId) }
 
   var arguments: [String: ConvexEncodable?] { ["itemId": itemId, "name": name, "spot": spot] }

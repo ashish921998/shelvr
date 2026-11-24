@@ -7,6 +7,7 @@ struct SignedInView: View {
   @Environment(\.copy) private var copy
   @State private var library = false
   @State private var path: [AppLink] = []
+  @State private var stampMessage: String?
 
   var body: some View {
     NavigationStack(path: $path) {
@@ -73,10 +74,11 @@ struct SignedInView: View {
           }
         case "passport-invite" where link.path.count == 2: FriendPassportView(token: link.path[1]).id(link.path[1])
         case "already-been", "next-to-stamp":
-          StampPlacesView(city: link.path.first == "next-to-stamp" ? link.query.first { $0.name == "city" }?.value ?? "" : nil) {
+          StampPlacesView(city: link.path.first == "next-to-stamp" ? link.query.first { $0.name == "city" }?.value ?? "" : nil) { message in
             guard path.last == link, let passport = AppLink("/passport") else { return }
             if let i = path.lastIndex(of: passport) { path = Array(path.prefix(i + 1)) }
             else { path = [passport] }
+            stampMessage = message
           }.id(link)
         case "city-stamps":
           SocialQuery(query: "cityStamps:listCityStamps", type: [PassportCityStamp].self) { PassportCityPicker(cities: $0) }
@@ -118,6 +120,9 @@ struct SignedInView: View {
         }
       }
     }
+    .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
+      Button(copy("common.close")) {}
+    } message: { Text(stampMessage ?? "") }
     .onChange(of: pendingLink, initial: true) { _, link in
       guard let link else { return }
       pendingLink = nil
