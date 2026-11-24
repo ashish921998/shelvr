@@ -4,6 +4,8 @@
 <dict>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+  <key>ShelvrAPNsEnvironment</key>
+  <string>$(SHELVR_APNS_ENVIRONMENT)</string>
 	<key>ShelvrAppGroup</key>
 	<string>group.$(SHELVR_APP_ID)</string>
 	<key>ShelvrRevenueCatKey</key>

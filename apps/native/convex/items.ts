@@ -837,7 +837,10 @@ async function saveIntoSpace(
 ): Promise<void> {
   const space = await ctx.db.get(spaceId);
   if (space === null || space.userId !== userId) {
-    throw new Error("Space not found");
+    throw new ConvexError({
+      code: "space_not_found",
+      message: "Space not found",
+    });
   }
   await insertMembership(ctx, {
     userId,
