@@ -72,6 +72,10 @@ public struct Copy: Sendable {
     }
   }
 
+  public func count(_ key: String, _ n: Int) -> String {
+    self(key, count: n)
+  }
+
   static func resolve(_ languageTags: [String]) -> String {
     for tag in languageTags {
       let base = tag.replacing("_", with: "-").split(separator: /-[uUxX]-/).first.map(String.init) ?? ""

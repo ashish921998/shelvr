@@ -28,7 +28,10 @@ public struct MapPlace: Decodable, Hashable, Identifiable, Sendable {
   static func key(_ name: String) -> String {
     let trimmed = name.split(whereSeparator: \.isWhitespace).joined(separator: " ")
     let clipped = trimmed.utf16.count > 80 ? String(decoding: trimmed.utf16.prefix(79), as: UTF16.self) : trimmed
-    return words(clipped).joined()
+    let scalars = clipped.decomposedStringWithCompatibilityMapping.unicodeScalars.filter {
+      !CharacterSet.nonBaseCharacters.contains($0)
+    }
+    return String(scalars).lowercased().filter { $0.isLetter || $0.isNumber }
   }
 
   static func km(_ lat1: Double, _ lng1: Double, _ lat2: Double, _ lng2: Double) -> Double {
