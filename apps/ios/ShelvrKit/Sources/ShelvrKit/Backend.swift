@@ -21,7 +21,7 @@ public final class Backend {
   private let session: AuthSession
   @ObservationIgnored private var authWatch: AnyCancellable?
   @ObservationIgnored private var starting: Task<Void, Never>?
-  @ObservationIgnored private var deletion: Task<Void, Error>?
+  @ObservationIgnored private let deletion = AccountDeletion()
   @ObservationIgnored private var signingOut = false
 
   public init(environment: AppEnvironment) {
@@ -47,7 +47,7 @@ public final class Backend {
   }
 
   public func start() async {
-    if let deletion { _ = await deletion.result }
+    await deletion.wait()
     if let starting { return await starting.value }
     let task = Task { await resume() }
     starting = task
@@ -66,18 +66,18 @@ public final class Backend {
   }
 
   public func signIn(_ credential: SignInCredential) async throws {
-    if let deletion { _ = await deletion.result }
+    await deletion.wait()
     try await session.signIn(credential)
     await connect()
   }
 
   public func startOAuth(provider: String) async throws -> OAuthStart {
-    if let deletion { _ = await deletion.result }
+    await deletion.wait()
     return try await session.startOAuth(provider: provider, redirectTo: environment.oauthRedirect)
   }
 
   public func signOut() async throws {
-    if let deletion { _ = await deletion.result }
+    await deletion.wait()
     guard status == .signedIn, !signingOut else { return }
     signingOut = true
     do {
@@ -89,16 +89,12 @@ public final class Backend {
   }
 
   public func deleteAccount() async throws {
-    if let deletion { return try await deletion.value }
-    guard status == .signedIn, !signingOut else { throw AuthSessionError.notSignedIn }
-    let task = Task {
-      try await client.mutation("users:deleteCurrentUserAccount")
-      await session.forgetDeletedAccount()
-      await disconnect()
+    try await deletion.perform(allowed: status == .signedIn && !signingOut) {
+      try await self.client.mutation("users:deleteCurrentUserAccount")
+    } afterAcceptance: {
+      await self.session.forgetDeletedAccount()
+      await self.disconnect()
     }
-    deletion = task
-    defer { deletion = nil }
-    try await task.value
   }
 
   private func disconnect() async {
