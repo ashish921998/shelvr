@@ -5,6 +5,11 @@ struct CreateListView: View {
   let created: (String) -> Void
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
+  @Environment(MemberNamePrompts.self) private var prompts
+  @State private var canAskName: Bool?
+  @State private var waitingForName = false
+  @State private var askingName = false
+  @State private var continueCreation = false
   @State private var name = ""
   @State private var cities = ""
   @State private var operation = SocialOperation()
@@ -16,17 +21,48 @@ struct CreateListView: View {
       Section { TextField(copy("sharedLists.cityPlaceholder"), text: $cities) }
         header: { Text(copy("sharedLists.startWith")) } footer: { Text(copy("sharedLists.startWithHint")) }
       Button(copy("sharedLists.start")) {
-        let title = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        operation.run {
-          let id = try await backend.createList(name: title, cities: options)
-          created(id)
-        }
+        if canAskName == nil { waitingForName = true } else { decide(options) }
       }.disabled(operation.busy || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
         name.utf16.count > 60 || options.isEmpty || options.count > 5)
     }
+    .disabled(waitingForName)
+    .onChange(of: canAskName) { _, result in
+      if waitingForName, result != nil { waitingForName = false; decide(options) }
+    }
+    .task(id: waitingForName) {
+      guard waitingForName else { return }
+      try? await Task.sleep(for: .seconds(3))
+      guard !Task.isCancelled, waitingForName else { return }
+      waitingForName = false
+      decide(options)
+    }
     .navigationTitle(copy("sharedLists.newTitle"))
+    .task {
+      do {
+        for try await first in backend.query("users:getMyFirstName", as: String?.self) {
+          try Task.checkCancellation()
+          canAskName = first == nil
+        }
+      } catch { if !Task.isCancelled { canAskName = false } }
+    }
+    .sheet(isPresented: $askingName, onDismiss: {
+      if continueCreation { continueCreation = false; create(options) }
+    }) { MemberNamePrompt(creating: true) { continueCreation = true } }
     .socialOperation(operation, failure: copy("sharedLists.createFailed"), close: copy("common.close"))
   }
+  private func decide(_ cities: [String]) {
+    if canAskName == true && prompts.claim(for: backend.sessionGeneration) { askingName = true }
+    else { create(cities) }
+  }
+
+  private func create(_ cities: [String]) {
+    let title = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    operation.run {
+      let id = try await backend.createList(name: title, cities: cities)
+      created(id)
+    }
+  }
+
 }
 
 struct AddListPlaceView: View {
