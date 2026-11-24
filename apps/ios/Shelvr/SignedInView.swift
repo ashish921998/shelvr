@@ -120,6 +120,8 @@ struct SignedInView: View {
         case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1]).id(link.path[1])
         case "add": PasteLinkView()
         case "photo": PhotoSaveView()
+        case "how-to-share": SaveInstructions(siri: false)
+        case "save-with-siri": SaveInstructions(siri: true)
         default: ShellDestination(link: link)
         }
       }

@@ -16,6 +16,7 @@
 		3FBA7FAB0E3EEC03ACC0587D /* es-MX.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000042 /* es-MX.json */; };
 		561D659E3AC26DB26F694687 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 85CFCF465E33D985FBF666F9 /* Foundation.framework */; };
 		5CC0282F2414B8ABB635621F /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000041 /* en.json */; };
+		68A4312E5FCF2169CDE0B40B /* ShelvrCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9A6D3C46DD4BF20D5EF6596 /* ShelvrCapture.swift */; };
 		6A6F1BC7446406EEF72B53E6 /* RecentSaves.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1BAFA60699E1B4641F3AA0A /* RecentSaves.swift */; };
 		700174B2654790807D78CA9D /* fr-CA.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000044 /* fr-CA.json */; };
 		76722A8B2833C8EEE203E542 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
@@ -100,6 +101,7 @@
 		A10000000000000000000047 /* ko.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ko.json; sourceTree = "<group>"; };
 		A10000000000000000000048 /* pt-BR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "pt-BR.json"; sourceTree = "<group>"; };
 		B1BAFA60699E1B4641F3AA0A /* RecentSaves.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecentSaves.swift; sourceTree = "<group>"; };
+		E9A6D3C46DD4BF20D5EF6596 /* ShelvrCapture.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ShelvrCapture.swift; path = "../native/app-intents/Support/ShelvrCapture.swift"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -170,6 +172,7 @@
 				115443435333965FC09C9DBA /* Frameworks */,
 				ED02C96235AAAD4EC1E603D2 /* ShareExtension */,
 				CE8BE5E4ADBEC96D790D62B3 /* RecentSavesWidget */,
+				E9A6D3C46DD4BF20D5EF6596 /* ShelvrCapture.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -400,6 +403,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				68A4312E5FCF2169CDE0B40B /* ShelvrCapture.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

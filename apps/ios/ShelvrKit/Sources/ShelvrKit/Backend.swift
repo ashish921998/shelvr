@@ -92,8 +92,17 @@ public final class Backend {
     await deletion.wait()
     guard status == .signedIn, !signingOut else { return }
     signingOut = true
+    let siri = SiriCredential.current()
+    let authorization = KeychainTokenVault().read()?.token
     do {
-      try await session.signOut { await self.disconnect() }
+      try await session.signOut {
+        await siri?.removeIfCurrent()
+        await self.disconnect()
+        if let siri, let authorization {
+          try? await ConvexHTTPAuthTransport(deployment: self.environment.convexURL)
+            .revokeSiri(siri.token, authorization: authorization)
+        }
+      }
     } catch {
       signingOut = false
       throw error

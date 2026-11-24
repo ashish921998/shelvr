@@ -19,6 +19,7 @@ struct RootView: View {
     .foregroundStyle(Color(.foreground))
     .modifier(SharedInboxReceiver())
     .modifier(RecentWidgetSync())
+    .modifier(SiriSetup())
     .onOpenURL { url in
       if let link = AppLink(url.absoluteString), link.path != ["sign-in"] { pendingLink = link }
     }
