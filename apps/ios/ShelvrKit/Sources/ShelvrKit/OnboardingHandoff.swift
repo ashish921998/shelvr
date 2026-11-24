@@ -13,6 +13,10 @@ public struct OnboardingHandoff: Codable, Sendable {
     self.space = space
   }
 
+  public static func canSave(pro: Bool, freeOpen: Bool, remaining: Int) -> Bool {
+    pro || (freeOpen && remaining > 0)
+  }
+
   public func remaining(afterStamps: Bool) -> Self? {
     var next = self
     if afterStamps { next.cities = [] } else { next.url = nil }
