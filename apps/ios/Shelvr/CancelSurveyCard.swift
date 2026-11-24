@@ -72,7 +72,7 @@ struct CancelSurveyCard: ViewModifier {
         checked = true
         return
       }
-    } catch { if !Task.isCancelled { checked = false; Analytics.failure("cancel_survey_status_failed") } }
+    } catch { if !Task.isCancelled { checked = false; Analytics.failure("cancel_survey_eligibility_check_failed") } }
   }
 
   private func claim() async {
