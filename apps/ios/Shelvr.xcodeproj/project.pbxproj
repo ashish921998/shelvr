@@ -13,7 +13,6 @@
 		36E6F3FD1E99DE50DC4D1A8D /* ShelvrInbox in Frameworks */ = {isa = PBXBuildFile; productRef = 58A93D31AFA3EEA34762477E /* ShelvrInbox */; };
 		3FBA7FAB0E3EEC03ACC0587D /* es-MX.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000042 /* es-MX.json */; };
 		5CC0282F2414B8ABB635621F /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000041 /* en.json */; };
-		60E6972F174B5C189AF93387 /* Copy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E32FCBAF6CA6438522A6AEF /* Copy.swift */; };
 		700174B2654790807D78CA9D /* fr-CA.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000044 /* fr-CA.json */; };
 		77C4513B4C564D7A33CF2A02 /* ShelvrInbox in Frameworks */ = {isa = PBXBuildFile; productRef = C2944BC6B409C8A19EAD8916 /* ShelvrInbox */; };
 		7FD82543A4DD186B77BD3F7C /* es.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000043 /* es.json */; };
@@ -59,7 +58,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		4E32FCBAF6CA6438522A6AEF /* Copy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Copy.swift; path = ShelvrKit/Sources/ShelvrKit/Copy.swift; sourceTree = "<group>"; };
 		704ED90EEF30D691A2613844 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		85CFCF465E33D985FBF666F9 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
 		985944D0E54B7A93E76B5970 /* ShareViewController.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
@@ -137,7 +135,6 @@
 				A10000000000000000000003 /* Products */,
 				115443435333965FC09C9DBA /* Frameworks */,
 				ED02C96235AAAD4EC1E603D2 /* ShareExtension */,
-				4E32FCBAF6CA6438522A6AEF /* Copy.swift */,
 			);
 			sourceTree = "<group>";
 		};
@@ -311,7 +308,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				D0F379AD41A0134F8BF645B5 /* ShareViewController.swift in Sources */,
-				60E6972F174B5C189AF93387 /* Copy.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
