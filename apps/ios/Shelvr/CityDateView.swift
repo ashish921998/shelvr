@@ -13,6 +13,7 @@ struct CityDateView: View {
   @State private var triedSecond = Set<Int>()
   @State private var busy = false
   @State private var failed = false
+  @State private var gate = SocialOperation()
 
   var body: some View {
     List {
@@ -48,6 +49,7 @@ struct CityDateView: View {
         if failed { Text(copy("datePlan.failed")) }
       }
     }.navigationTitle(city)
+      .socialOperation(gate, failure: copy("datePlan.failed"), close: copy("common.close"))
   }
 
   private func stop(_ date: CityDate, _ current: Evening, first: Bool) -> some View {
@@ -73,7 +75,7 @@ struct CityDateView: View {
     }.buttonStyle(.borderless)
   }
 
-  private func generate(_ kind: String) async {
+  private func generate(_ kind: String, canOffer: Bool = true) async {
     guard !busy else { return }
     busy = true
     Analytics.capture("date_plan_started", ["kind": kind])
@@ -85,6 +87,11 @@ struct CityDateView: View {
       result = plan
       evening = plan.evenings.first
       triedFirst = []; triedSecond = []
-    } catch { Analytics.capture("date_plan_failed", ["reason": PastedLink.requiresPro(error) ? "pro_required" : "error"]); failed = true }
+    } catch {
+      Analytics.capture("date_plan_failed", ["reason": PastedLink.requiresPro(error) ? "pro_required" : "error"])
+      if canOffer, listID != nil, PastedLink.requiresPro(error) {
+        gate.askToPurchase { await generate(kind, canOffer: false) }
+      } else { failed = true }
+    }
   }
 }

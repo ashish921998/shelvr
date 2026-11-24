@@ -25,6 +25,9 @@ public final class Backend {
   @ObservationIgnored private var registeringPush: Task<Void, Error>?
   @ObservationIgnored private var signingOut = false
   @ObservationIgnored var preparingSiri: (subject: String, task: Task<Void, Error>)?
+  @ObservationIgnored var siriDrain: Task<Void, Never>?
+  @ObservationIgnored var siriDrainRequested = false
+  @ObservationIgnored var siriBacklog = SiriRevocationBacklog()
 
   public init(environment: AppEnvironment) {
     let session = AuthSession(
@@ -49,6 +52,7 @@ public final class Backend {
   }
 
   public func start() async {
+    retrySiriRevocations()
     if let starting { return await starting.value }
     let task = Task { await resume() }
     starting = task
@@ -60,6 +64,8 @@ public final class Backend {
     guard status != .signedIn else { return }
     await session.restore()
     guard await session.isSignedIn else {
+      if KeychainTokenVault().isAbsent, let old = SiriCredential.stored() { retireSiri(old) }
+      retrySiriRevocations()
       status = .signedOut
       return
     }
@@ -131,12 +137,13 @@ public final class Backend {
     let authorization = KeychainTokenVault().read()?.token
     do {
       try await session.signOut {
-        await siri?.removeIfCurrent()
+        if let siri { await self.retireSiri(siri) }
         await self.disconnect()
-        if let siri, let authorization {
-          try? await ConvexHTTPAuthTransport(deployment: self.environment.convexURL)
-            .revokeSiri(siri.token, authorization: authorization)
-        }
+        if let siri, let authorization,
+          siri.siteURL == SiriRevocations.site(for: self.environment.convexURL)?.absoluteString,
+          JWT.claims(of: authorization)?.sub == siri.subject {
+          await self.revokeSiriToken(siri.token, authorization: authorization)
+        } else { await self.retrySiriRevocations() }
       }
     } catch {
       signingOut = false
@@ -155,6 +162,13 @@ public final class Backend {
     deletion = task
     defer { deletion = nil }
     try await task.value
+  }
+
+  private func retireSiri(_ credential: SiriCredential) {
+    do {
+      try credential.enqueueRevocation()
+      credential.removeIfCurrent()
+    } catch {}
   }
 
   private func disconnect() async {

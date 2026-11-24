@@ -11,7 +11,7 @@ struct LibraryPlaceEditor: View {
   @State private var city = ""
   @State private var query = ""
   @State private var replacing: Int?
-  @State private var matches: [EditablePlace] = []
+  @State private var matches: [PlaceMatches.Match] = []
   @State private var busy = false
   @State private var message = ""
   @State private var attempt = 0
@@ -45,10 +45,17 @@ struct LibraryPlaceEditor: View {
             TextField(copy("placeCorrection.search"), text: $query)
             Button(copy("placeCorrection.search")) { Task { await search() } }
               .disabled(city.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || query.trimmingCharacters(in: .whitespacesAndNewlines).count < 2)
-            ForEach(Array(matches.enumerated()), id: \.offset) { _, place in
-              Button(place.name) {
+            ForEach(Array(matches.enumerated()), id: \.offset) { _, match in
+              Button {
+                var place = match.place
+                place.city = city.trimmingCharacters(in: .whitespacesAndNewlines)
                 if let index = replacing { places[index] = place } else { places.append(place) }
                 clearSearch()
+              } label: {
+                VStack(alignment: .leading) {
+                  Text(match.place.name)
+                  if let area = match.area { Text(area).font(.caption) }
+                }
               }
             }
             if replacing != nil { Button(copy("common.cancel")) { clearSearch() } }
@@ -97,11 +104,7 @@ struct LibraryPlaceEditor: View {
     message = ""
     do {
       let result = try await backend.findPlace(query, city: city, id: id)
-      matches = result.places.map { candidate in
-        var place = candidate
-        place.city = city.trimmingCharacters(in: .whitespacesAndNewlines)
-        return place
-      }
+      matches = result.places
       if matches.isEmpty {
         message = copy(result.available ? "tripPlanner.searchEmpty" : "tripPlanner.searchUnavailable")
       }

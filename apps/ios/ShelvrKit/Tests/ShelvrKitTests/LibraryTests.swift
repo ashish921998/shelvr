@@ -43,3 +43,12 @@ import Testing
   #expect(value["category"] as? String == "Cafe")
   #expect(value["lat"] as? Double == 1)
 }
+
+@Test func placeSearchKeepsTheAreaForDisplayOnly() throws {
+  let json = #"{"available":true,"places":[{"name":"Cafe","area":"Downtown","lat":1,"lng":2}]}"#
+  let result = try JSONDecoder().decode(PlaceMatches.self, from: Data(json.utf8))
+  let match = try #require(result.places.first)
+  #expect(match.area == "Downtown")
+  let fields = try #require(JSONSerialization.jsonObject(with: Data(try match.place.convexEncode().utf8)) as? [String: Any])
+  #expect(fields["area"] == nil)
+}
