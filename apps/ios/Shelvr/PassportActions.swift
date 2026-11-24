@@ -26,6 +26,7 @@ struct PassportActions: View {
           run { share = ShareURL(url: try await backend.sharePassport()) }
         }
       }
+      if subscriptionFailed { Button(copy("common.retry")) { subscriptions += 1 } }
       if activeToken != nil {
         Button(copy("passportShare.stopSetting"), role: .destructive) { stopping = true }
       }
@@ -46,9 +47,8 @@ struct PassportActions: View {
     .alert(copy("errors.unexpectedTitle"), isPresented: $failed) {
       Button(copy("common.retry")) {
         if let retryOperation { run(retryOperation) }
-        if subscriptionFailed { subscriptions += 1 }
       }
-      Button(copy("common.close"), role: .cancel) {}
+      Button(copy("common.close"), role: .cancel) { retryOperation = nil }
     }
     .task(id: subscriptions) {
       subscriptionFailed = false
@@ -57,7 +57,7 @@ struct PassportActions: View {
           try Task.checkCancellation()
           activeToken = token
         }
-      } catch { if !Task.isCancelled { subscriptionFailed = true; failed = true } }
+      } catch { if !Task.isCancelled { subscriptionFailed = true } }
     }
   }
 
