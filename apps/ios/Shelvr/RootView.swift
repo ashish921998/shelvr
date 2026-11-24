@@ -25,8 +25,10 @@ struct RootView: View {
     }
     .task(id: backend.sessionGeneration) {
       if backend.status == .signedOut { Analytics.identify(nil) }
-      if backend.status == .offline, let id = await backend.offlineAccountID(), !Task.isCancelled {
-        Analytics.identify(id)
+      if backend.status == .offline {
+        let id = await backend.offlineAccountID()
+        guard !Task.isCancelled, backend.status == .offline else { return }
+        Analytics.restoredOffline(accountID: id)
       }
       guard backend.status == .signedIn else { return }
       do {
