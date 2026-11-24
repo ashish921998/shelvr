@@ -12,7 +12,7 @@ public struct BadgeStamp: Decodable, PassportLocation {
   public let kinds: [String]
 }
 
-public struct PassportBadge: Identifiable, Equatable {
+public struct PassportBadge: Identifiable, Equatable, Sendable {
   public let id: String
   public let measure: String
   public let goal: Int
