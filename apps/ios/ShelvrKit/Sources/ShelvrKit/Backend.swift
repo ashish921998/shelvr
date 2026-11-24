@@ -24,7 +24,6 @@ public final class Backend {
     let session = AuthSession(
       transport: ConvexHTTPAuthTransport(deployment: environment.convexURL),
       vault: KeychainTokenVault(),
-      legacy: LegacyExpoSession(convexURL: environment.convexURL),
       signOutMarker: SignOutMarker(url: URL.applicationSupportDirectory.appending(path: "pending-sign-out")))
     self.environment = environment
     self.session = session

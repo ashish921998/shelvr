@@ -23,12 +23,6 @@ final class MemoryVault: TokenVault {
   }
 }
 
-struct ReadOnlyVault: TokenVault {
-  let tokens: AuthTokens?
-  func read() -> AuthTokens? { tokens }
-  func write(_ tokens: AuthTokens?) -> Bool { false }
-}
-
 final class Gate: Sendable {
   private let state = Mutex<(isOpen: Bool, waiting: [CheckedContinuation<Void, Never>])>((false, []))
 
@@ -112,23 +106,6 @@ final class FakeTransport: AuthTransport {
     await withCheckedContinuation { done in
       DispatchQueue.global().asyncAfter(deadline: .now() + seconds) { done.resume() }
     }
-  }
-}
-
-final class LegacyStore: LegacySessionStore {
-  private let token: Mutex<String?>
-  private let canForget: Bool
-
-  init(_ token: String?, canForget: Bool = true) {
-    self.token = Mutex(token)
-    self.canForget = canForget
-  }
-
-  func refreshToken() -> String? { token.withLock { $0 } }
-  func forget() -> Bool {
-    guard canForget else { return false }
-    token.withLock { $0 = nil }
-    return true
   }
 }
 
