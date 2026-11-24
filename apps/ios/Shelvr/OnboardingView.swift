@@ -66,6 +66,7 @@ private struct OnboardingAccount: View {
   @State private var entered = Date()
   @State private var viewed = Set<OnboardingProgress.Step>()
   @State private var completed = Set<OnboardingProgress.Step>()
+  @State private var unavailable = false
   @State private var practiceShare = false
   @State private var carousel = 0
 
@@ -84,7 +85,7 @@ private struct OnboardingAccount: View {
 
   var body: some View {
     if complete {
-      SignedInView(pendingLink: $pendingLink)
+      SignedInView(pendingLink: $pendingLink).modifier(OnboardingReplay(account: account))
     } else {
       NavigationStack {
         ScrollView {
@@ -101,7 +102,7 @@ private struct OnboardingAccount: View {
           }
           .buttonStyle(.borderedProminent).controlSize(.large)
           .disabled(busy || (progress.step == .goal && progress.goals.isEmpty) ||
-            (progress.step == .savedCount && progress.savedCount == nil) || (progress.step == .city && progress.city == nil))
+            (progress.step == .savedCount && progress.savedCount == nil) || (progress.step == .been && progress.visitedCities.isEmpty) || (progress.step == .city && progress.city == nil))
           .padding()
         }
         .toolbar {
@@ -131,8 +132,11 @@ private struct OnboardingAccount: View {
           }.padding(24).presentationDetents([.height(180)])
         }
         .sheet(isPresented: $paywall, onDismiss: {
-          if purchased || free { finish() }
-        }) { BillingSheet(destination: .paywall) { purchased = true } }
+          if purchased || free || unavailable { finish() }
+        }) {
+          BillingSheet(destination: .paywall, goalVariables: goalVariables,
+            unavailable: { unavailable = true }, confirmed: { purchased = true })
+        }
       }
     }
   }
@@ -165,7 +169,7 @@ private struct OnboardingAccount: View {
         choice(copy(city.cityKey), selected: been ? progress.visitedCities.contains(city.id) : progress.city == city.id) {
           if been {
             if !progress.visitedCities.insert(city.id).inserted { progress.visitedCities.remove(city.id) }
-          } else { progress.city = city.id }
+          } else { progress.city = city.id; progress.advance() }
           persist()
         }
       }
@@ -262,59 +266,58 @@ private struct OnboardingAccount: View {
         }
         await checkAccess()
       }
-    } else {
-      let from = progress.step
-      progress.advance(skipping: skip); persist()
-      if from == .carousel {
-        busy = true
-        Task {
-          let settings = await UNUserNotificationCenter.current().notificationSettings()
-          if settings.authorizationStatus == .notDetermined { busy = false }
-          else { await checkAccess() }
-        }
+    } else if progress.step == .carousel {
+      if !skip && carousel < 2 { carousel += 1; return }
+      busy = true
+      Task {
+        let settings = await UNUserNotificationCenter.current().notificationSettings()
+        if settings.authorizationStatus == .notDetermined {
+          progress.advance(); persist(); busy = false
+        } else { await checkAccess() }
       }
-    }
+    } else { progress.advance(skipping: skip); persist() }
   }
 
   private func checkAccess() async {
     defer { busy = false }
-    struct Plan: Decodable { let status: String; let expiresAt: Double? }
     do {
-      for try await plan in backend.query("subscriptions:getEntitlement", as: Plan.self) {
-        let entitled = plan.status == "lifetime" || (["pro", "trialing"].contains(plan.status)
-          && (plan.expiresAt ?? 0) > Date().timeIntervalSince1970 * 1000)
-        if entitled { purchased = true; finish(); return }
+      for try await plan in backend.query("subscriptions:getEntitlement", as: ServerPlan.self) {
+        if plan.entitled { purchased = true; finish(); return }
         break
       }
       for try await open in backend.query("freeSaves:freePlanOpen", as: Bool.self) {
-        free = open; purchased = false; paywall = true; return
+        free = open; purchased = false; unavailable = false; paywall = true; return
       }
     } catch { errorKey = "errors.tryAgain" }
   }
 
-  private func finish() {
-    let session = backend.sessionGeneration
-    busy = true
-    Task {
-      defer { busy = false }
-      do {
-        if !progress.visitedCities.isEmpty {
-          let _: Double = try await backend.client.mutation("cityStamps:claimOnboardingCityStamps",
-            with: ["cities": progress.visitedCities.sorted().map { $0 as (any ConvexEncodable)? }])
-        }
-        guard backend.sessionGeneration == session else { return }
-        if !progress.skippedShare, let reel {
-          do {
-            let _: String = try await backend.client.mutation("items:createLinkItem", with: [
-              "url": reel.url.absoluteString, "operationId": progress.demoOperationID, "saveSource": "onboarding_demo"
-            ])
-          } catch where PastedLink.requiresPro(error) && free { }
-        }
-        guard backend.sessionGeneration == session else { return }
-        complete = true
-        UserDefaults.standard.removeObject(forKey: "swift.onboarding." + account)
-      } catch { errorKey = "errors.tryAgain" }
+  private var goalVariables: [String: String] {
+    guard let goal = ["date", "travel", "food"].first(where: progress.goals.contains) else { return [:] }
+    let cityName = progress.city.flatMap { id in SampleReel.all.first { $0.id == id } }.map { copy($0.cityKey) }
+    var values = ["goal": goal, "goal_city": progress.city ?? ""]
+    for (key, suffix) in [
+      ("goal_headline", "Headline"), ("goal_subline", "Subline"), ("goal_photo_tag", "PhotoTag"),
+      ("goal_answer_1", "AnswerOne"), ("goal_answer_2", "AnswerTwo"), ("goal_today", "Today"),
+      ("goal_plan_title", "PlanTitle"), ("goal_benefit_title", "BenefitTitle"), ("goal_benefit_body", "BenefitBody")
+    ] {
+      let noCity = cityName == nil && ((goal == "travel" && ["Headline", "Today", "PlanTitle"].contains(suffix))
+        || (goal == "food" && suffix == "Today"))
+      let label = "paywallGoal." + goal + suffix + (noCity ? "NoCity" : "")
+      values[key] = cityName == nil && suffix == "AnswerTwo" ? "" : copy(label, ["city": cityName ?? ""])
     }
+    return values
+  }
+
+  private func finish() {
+    let spaces = ["date": "interests.vibeDateNights", "travel": "presets.travel", "food": "presets.restaurants"]
+    let goal = ["date", "travel", "food"].first(where: progress.goals.contains)
+    let entry = PendingOnboarding(cities: progress.visitedCities.sorted(), url: progress.skippedShare ? nil : reel?.url,
+      operation: progress.demoOperationID, space: goal.flatMap { spaces[$0] }.map { copy($0) })
+    do {
+      try entry.save(account)
+      complete = true
+      UserDefaults.standard.removeObject(forKey: "swift.onboarding." + account)
+    } catch { errorKey = "errors.tryAgain" }
   }
 }
 

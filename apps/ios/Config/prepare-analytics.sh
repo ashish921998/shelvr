@@ -6,7 +6,7 @@ case "${1:-}" in
   Release) envfile=/dev/null ;;
   *) echo 'Usage: prepare-analytics.sh Debug|Release' >&2; exit 2 ;;
 esac
-node --env-file-if-exists="$envfile" --input-type=module - "$dir" <<'JS'
+node --env-file-if-exists="$envfile" --input-type=module - "$dir" "$1" <<'JS'
 import fs from "node:fs";
 import path from "node:path";
 const token = process.env.POSTHOG_PROJECT_TOKEN;
@@ -17,7 +17,8 @@ if (!token || !/^[a-zA-Z0-9_]+$/.test(token) || host.protocol !== "https:" ||
 }
 const file = path.join(process.argv[2], "Secrets.xcconfig");
 const old = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";
-const other = old.split("\n").filter(line => line && !/^POSTHOG_(PROJECT_TOKEN|HOST)\s*=/.test(line));
-other.push("POSTHOG_PROJECT_TOKEN = " + token, "POSTHOG_HOST = https:/$()/" + host.host, "");
+const prefix = process.argv[3].toUpperCase() + "_POSTHOG_";
+const other = old.split("\n").filter(line => line && !line.startsWith(prefix));
+other.push(prefix + "TOKEN = " + token, prefix + "HOST = https:/$()/" + host.host, "");
 fs.writeFileSync(file, other.join("\n"), {mode: 0o600});
 JS

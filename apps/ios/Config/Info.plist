@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
     <key>ShelvrPostHogToken</key>
-    <string>$(POSTHOG_PROJECT_TOKEN)</string>
+    <string>$(SHELVR_POSTHOG_TOKEN)</string>
     <key>ShelvrPostHogHost</key>
-    <string>$(POSTHOG_HOST)</string>
+    <string>$(SHELVR_POSTHOG_HOST)</string>
   <key>ShelvrAPNsEnvironment</key>
   <string>$(SHELVR_APNS_ENVIRONMENT)</string>
 	<key>ShelvrRevenueCatKey</key>
