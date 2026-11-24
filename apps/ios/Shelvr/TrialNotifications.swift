@@ -57,6 +57,7 @@ final class LocalTrialNotifications {
 }
 
 struct TrialNotificationPreferences: Decodable, Equatable {
+  let weeklyShelfEnabled: Bool
   let remindersEnabled: Bool
 }
 
@@ -93,7 +94,7 @@ struct TrialReminderObserver: ViewModifier {
       .task {
         do {
           for try await value in backend.query("notifications:getPreferences", as: TrialNotificationPreferences.self) { preferences = value }
-        } catch { preferences = .init(remindersEnabled: false) }
+        } catch { preferences = .init(weeklyShelfEnabled: false, remindersEnabled: false) }
       }
       .onChange(of: Inputs(subscription: subscription, nudges: preferences?.remindersEnabled, active: phase == .active, user: user)) { before, value in
         if before.user == value.user, before.subscription?.status != nil, before.subscription?.status != "trialing",

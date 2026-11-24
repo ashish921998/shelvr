@@ -22,6 +22,8 @@ struct BlankTripView: View {
   @State private var hotel = ""
   @State private var hotels = [TripSearchPlace]()
   @State private var pickingPin = false
+  @State private var savedCenter: CLLocationCoordinate2D?
+  @State private var cityCenter: CLLocationCoordinate2D?
   @State private var picked: PhotosPickerItem?
   @State private var cover: Data?
   @State private var loadingCover = false
@@ -47,13 +49,16 @@ struct BlankTripView: View {
           } else { Label(coverLabel, systemImage: "photo") }
         }
         TextField(copy("tripPlanner.nameLabel"), text: $name)
+          .onChange(of: name) { _, value in
+            if value.utf16.count > 80 { name = String(decoding: value.utf16.prefix(80), as: UTF16.self) }
+          }
         Button { choosing = true } label: {
           LabeledContent(copy("tripSetup.chooseCountries"), value: countries.map(countryName).joined(separator: ", "))
         }
         TextField(copy("tripSetup.baseCity"), text: $city)
         Toggle(copy("tripSetup.useDates"), isOn: $dated)
         if dated {
-          DatePicker(copy("tripSetup.startDate"), selection: $start, displayedComponents: .date)
+          DatePicker(copy("tripSetup.startDate"), selection: $start, in: Calendar.current.startOfDay(for: .now)..., displayedComponents: .date)
           DatePicker(copy("tripSetup.endDate"), selection: $end, in: start...(Calendar.current.date(byAdding: .day, value: 14, to: start) ?? start), displayedComponents: .date)
         } else { Stepper(value: $days, in: 1...15) { LabeledContent(copy("trip.howManyDays"), value: days.formatted()) } }
         Button(copy("tripSetup.start")) { message = ""; stayStage = true }.disabled(!valid || loadingCover)
@@ -75,6 +80,29 @@ struct BlankTripView: View {
         guard !Task.isCancelled else { return }
         cover = image; message = ""
       } catch { if !Task.isCancelled { message = copy("tripSetup.coverFailed") } }
+    }
+    .task(id: stayStage) {
+      guard stayStage else { return }
+      savedCenter = nil; cityCenter = nil
+      let selectedCity = city.trimmingCharacters(in: .whitespacesAndNewlines)
+      guard !selectedCity.isEmpty else { return }
+      do {
+        for try await saves in backend.citySaves(selectedCity) {
+          let points = CityPlace.pins(in: saves)
+          if !points.isEmpty {
+            let count = Double(points.count)
+            savedCenter = .init(latitude: points.map(\.lat).reduce(0, +) / count, longitude: points.map(\.lng).reduce(0, +) / count)
+          } else {
+            struct Location: Decodable { let lat: Double; let lng: Double }
+            struct Match: Decodable { let locality: String; let location: Location? }
+            let matches: [Match] = try await backend.client.action("tripPlanner:searchTripCities", with: ["query": selectedCity, "locale": copy.locale])
+            if !Task.isCancelled, let point = matches.first(where: { $0.locality.localizedCaseInsensitiveCompare(selectedCity) == .orderedSame })?.location {
+              cityCenter = .init(latitude: point.lat, longitude: point.lng)
+            }
+          }
+          return
+        }
+      } catch {}
     }
     .onDisappear { request?.cancel() }
     .sheet(isPresented: $choosing) {
@@ -112,11 +140,14 @@ struct BlankTripView: View {
         if let area = place.area { Text(area).font(.caption) }
       } }
     }
+    if let savedCenter {
+      Button(copy("tripSetup.stayNearSaves")) { submit(.init(name: city, lat: savedCenter.latitude, lng: savedCenter.longitude)) }
+    }
     Button(copy("tripSetup.dropPin")) { pickingPin = true }
     Button(copy("tripSetup.decideLater")) { submit(nil) }
     Button(copy("common.back")) { stayStage = false }
     .sheet(isPresented: $pickingPin) {
-      TripStayPin { place in pickingPin = false; submit(place) }
+      TripStayPin(center: savedCenter ?? cityCenter) { place in pickingPin = false; submit(place) }
     }
   }
 
@@ -154,13 +185,14 @@ struct BlankTripView: View {
 }
 
 private struct TripStayPin: View {
+  let center: CLLocationCoordinate2D?
   let choose: (TripSearchPlace) -> Void
   @Environment(\.copy) private var copy
   @State private var point: CLLocationCoordinate2D?
   var body: some View {
     NavigationStack {
       MapReader { proxy in
-        Map {
+        Map(initialPosition: center.map { .region(MKCoordinateRegion(center: $0, latitudinalMeters: 9_000, longitudinalMeters: 9_000)) } ?? .automatic) {
           if let point { Marker(copy("tripSetup.mapPin"), coordinate: point) }
         }.onTapGesture { location in point = proxy.convert(location, from: .local) }
       }
