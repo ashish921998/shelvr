@@ -70,6 +70,7 @@ public struct CityTrip: Decodable, Sendable {
     public let area: String?
     public let why: String?
     public let time: String?
+    public let note: String?
     public let lat: Double
     public let lng: Double
     public var id: String { _id }

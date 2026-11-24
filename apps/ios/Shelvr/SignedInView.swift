@@ -77,6 +77,11 @@ struct SignedInView: View {
               }.id(link)
             } else { CityDateView(city: city, listID: listID).id(link) }
           } else { PlanCityView(trip: link.path.first == "new-trip") }
+        case "add-trip-stop":
+          if let id = link.query.first(where: { $0.name == "tripId" })?.value {
+            let day = link.query.first(where: { $0.name == "day" })?.value.flatMap(Int.init) ?? 1
+            AddTripStopView(id: id, initialDay: day).id(link)
+          } else { ShellDestination(link: link) }
         case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1]).id(link.path[1])
         default: ShellDestination(link: link)
         }
