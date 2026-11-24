@@ -60,6 +60,14 @@ struct SignedInView: View {
           .navigationTitle(copy("addSheet.title"))
         case "saves": LibraryView(screen: .saves)
         case "review-saves": LibraryView(screen: .review)
+        case "spots" where link.path.count == 2:
+          SaveSpotRevealView(id: link.path[1]) { city in
+            guard path.last == link else { return }
+            library = false
+            if let city, let encoded = city.addingPercentEncoding(withAllowedCharacters: .alphanumerics),
+              let destination = AppLink("/city/" + encoded) { path = [destination] }
+            else { path = [] }
+          }.id(link)
         case "city" where link.path.count == 2: CityPlacesView(city: link.path[1]).id(link.path[1])
         case "cities": LibraryCitiesView()
         case "item" where link.path.count == 2: LibraryItemView(id: link.path[1])
