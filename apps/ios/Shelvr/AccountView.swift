@@ -10,6 +10,7 @@ struct AccountView: View {
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var user: CurrentUser?
+  @State private var billing: BillingDestination?
   @State private var signOutFailed = false
 
   var body: some View {
@@ -20,6 +21,8 @@ struct AccountView: View {
       Text(user?.email ?? user?._id ?? " ")
         .font(.headline)
         .accessibilityIdentifier("signed-in-user")
+      Button(copy("pro.viewPlans")) { billing = .paywall }
+      Button(copy("pro.manage")) { billing = .manage }
       Button(copy("account.signOut")) {
         Task {
           do {
@@ -37,6 +40,7 @@ struct AccountView: View {
           .foregroundStyle(.red)
       }
     }
+    .sheet(item: $billing) { BillingSheet(destination: $0) }
     .padding(24)
     .task {
       do {

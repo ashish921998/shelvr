@@ -107,6 +107,34 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+it("returns only owned list trips from the shared-only read", async () => {
+  const { base, t, tripId } = await setup([{ name: "Market", day: 1 }]);
+  expect(
+    await t.query(api.tripPlannerData.getSharedTripPlan, { tripId }),
+  ).toBeNull();
+  expect(
+    await t.query(api.tripPlannerData.getTripPlan, { tripId }),
+  ).toMatchObject({
+    days: [[{ name: "Market" }], []],
+  });
+
+  const { listId } = await t.mutation(api.sharedLists.createSharedList, {
+    name: "Lisbon plans",
+    cities: ["Lisbon"],
+  });
+  await base.run((ctx) => ctx.db.patch(tripId, { listId }));
+  expect(
+    await t.query(api.tripPlannerData.getSharedTripPlan, { tripId }),
+  ).toMatchObject({
+    listId,
+    days: [[{ name: "Market" }], []],
+  });
+  const other = await signedInUser(base, { pro: true });
+  expect(
+    await other.t.query(api.tripPlannerData.getSharedTripPlan, { tripId }),
+  ).toBeNull();
+});
+
 describe("blank trip setup", () => {
   it("persists countries, dates, cover, and empty days, and accepts a saved stop", async () => {
     const { base, t, itemId } = await setup([]);
