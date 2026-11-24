@@ -1,12 +1,6 @@
 import ShelvrKit
 import SwiftUI
 
-enum LibrarySearchState {
-  case loading
-  case items(String, [LibrarySave])
-  case failure(String)
-}
-
 struct LibrarySearchResults: View {
   let query: String
   let state: LibrarySearchState
@@ -14,11 +8,11 @@ struct LibrarySearchResults: View {
   @Environment(\.copy) private var copy
   var body: some View {
     Group {
-      switch state {
-      case let .failure(term) where term == query:
+      switch state.display(for: query) {
+      case .failure:
         Text(copy("errors.searchTitle"))
         Button(copy("common.retry"), action: retry)
-      case let .items(term, items) where term == query:
+      case let .items(items):
         if items.isEmpty { Text(copy("search.noResults", ["query": query])) }
         if items.count >= 50 { Text(copy("search.resultLimit")).font(.caption) }
         ForEach(items) { item in
@@ -33,7 +27,7 @@ struct LibrarySearchResults: View {
             }
           }
         }
-      default: ProgressView(copy("common.loading"))
+      case .loading: ProgressView(copy("common.loading"))
       }
     }
   }
