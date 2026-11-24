@@ -1,4 +1,4 @@
-import Darwin
+import CoreFoundation
 import Foundation
 
 public struct InboxPayload: Codable, Sendable {
@@ -70,7 +70,8 @@ public struct ShareInbox: Sendable {
       try JSONEncoder().encode(payload).write(to: stage.appending(path: "\(index).json"))
     }
     try FileManager.default.moveItem(at: stage, to: stage.deletingPathExtension().appendingPathExtension("ready"))
-    notify_post(Self.notification)
+    CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
+      CFNotificationName(Self.notification as CFString), nil, nil, true)
   }
 
   public func batches() throws -> [URL] {

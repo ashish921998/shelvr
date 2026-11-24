@@ -1,4 +1,5 @@
-import Darwin
+import Combine
+import CoreFoundation
 import ShelvrInbox
 import ShelvrKit
 import SwiftUI
@@ -11,20 +12,10 @@ struct SharedInboxReceiver: ViewModifier {
   @State private var failedFile: URL?
   @State private var failureCopy = "share.singleFailure"
   @State private var attempt = 0
-  @State private var notificationToken: Int32?
 
   func body(content: Content) -> some View {
     content
-      .onAppear {
-        var token: Int32 = 0
-        if notify_register_dispatch(ShareInbox.notification, &token, .main, { _ in
-          MainActor.assumeIsolated { attempt += 1 }
-        }) == NOTIFY_STATUS_OK { notificationToken = token }
-      }
-      .onDisappear {
-        if let notificationToken { notify_cancel(notificationToken) }
-        notificationToken = nil
-      }
+      .onReceive(InboxSignal.shared.publisher) { _ in attempt += 1 }
       .task(id: "\(phase)-\(backend.status)-\(attempt)") {
         guard let inbox = ShareInbox.system() else { return }
         if backend.status == .signedOut { try? inbox.activate(nil); return }
@@ -95,5 +86,21 @@ struct SharedInboxReceiver: ViewModifier {
       guard backend.status == .signedIn, inbox.activeOwner == owner else { throw CancellationError() }
       _ = try await backend.savePhoto(photo, operationID: payload.operationID, fromShare: true)
     }
+  }
+}
+
+
+@MainActor private final class InboxSignal {
+  static let shared = InboxSignal()
+  private let name = Notification.Name(ShareInbox.notification)
+  var publisher: NotificationCenter.Publisher { NotificationCenter.default.publisher(for: name) }
+
+  private init() {
+    CFNotificationCenterAddObserver(CFNotificationCenterGetDarwinNotifyCenter(),
+      Unmanaged.passUnretained(self).toOpaque(), { _, _, _, _, _ in
+        DispatchQueue.main.async {
+          NotificationCenter.default.post(name: Notification.Name(ShareInbox.notification), object: nil)
+        }
+      }, ShareInbox.notification as CFString, nil, .deliverImmediately)
   }
 }
