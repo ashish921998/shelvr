@@ -7,15 +7,12 @@ public enum PlanRoutes {
   }
 
   public static func needsLoadedPlan(_ link: AppLink) -> Bool {
-    switch link.path.first {
-    case "settings", "profile", "paywall": false
-    default: true
-    }
+    !allowedWithoutPersonalAccess(link)
   }
 
   public static func allowedWithoutPersonalAccess(_ link: AppLink) -> Bool {
     switch link.path.first {
-    case "add-trip-stop", "shared-trip-links", "profile", "settings", "list-invite", "passport-invite",
+    case "add-trip-stop", "shared-trip-links", "profile", "settings", "paywall", "list-invite", "passport-invite",
       "shared-lists", "shared-list", "collections", "trip-plan":
       true
     case "date-plan", "go-out", "new-trip", "add-list-place":
