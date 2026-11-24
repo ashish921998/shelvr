@@ -92,9 +92,10 @@ struct SaveNoteIntent {
     let text = SiriText.noteText(name: nameText, content: contentText)
     let files = attachments.map { CaptureRouter.Attachment(data: $0.data, type: $0.type, filename: $0.filename) }
     let links = SiriText.pageLink(name: name, content: content).map { [$0] } ?? []
+    let routeText = contentText.flatMap(CaptureRouter.bareURL)?.absoluteString ?? text
     let result: (id: String, dialog: IntentDialog)
     let entityText: String
-    switch CaptureRouter.route(text: text, linkAttributes: links, attachments: files) {
+    switch CaptureRouter.route(text: routeText, linkAttributes: links, attachments: files) {
     case .link(let url):
       entityText = url.absoluteString
       result = try await SiriSave.link(url).capture(spaceID: folder?.id, account: account)
