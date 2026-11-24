@@ -4,8 +4,8 @@ import SwiftUI
 struct RootView: View {
   @EnvironmentObject private var pushDevice: PushDevice
   @Environment(Backend.self) private var backend
-  @Environment(\.copy) private var copy
   @AppStorage("swift.appearance") private var appearance = "system"
+  @Environment(\.copy) private var copy
   @State private var pendingLink: AppLink?
 
   var body: some View {

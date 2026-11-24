@@ -69,6 +69,12 @@ struct TrialReminderObserver: ViewModifier {
     let active: Bool
     let user: String?
   }
+  private struct PrimerInputs: Equatable {
+    let user: String?
+    let session: UUID
+    let canPresent: Bool
+  }
+
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.scenePhase) private var phase
@@ -104,7 +110,10 @@ struct TrialReminderObserver: ViewModifier {
         }
         refresh(value)
       }
-      .onChange(of: home) { _, _ in presentIfPossible() }
+      .task(id: PrimerInputs(user: user, session: backend.sessionGeneration,
+        canPresent: home && mayAsk && phase == .active && !primer)) {
+        await presentIfPossible()
+      }
       .alert(copy("notifications.trialPrimerTitle"), isPresented: $primer) {
         Button(copy("notifications.trialPrimerAllow")) {
           let session = backend.sessionGeneration
@@ -131,20 +140,17 @@ struct TrialReminderObserver: ViewModifier {
     let notices = TrialNotification.schedule(expiration: Date(timeIntervalSince1970: end / 1000), now: .now, nudges: nudges)
     mayAsk = notices.contains { $0.kind == .ending }
     LocalTrialNotifications.shared.replace(notices, copy: copy)
-    presentIfPossible()
   }
 
-  private func presentIfPossible() {
+  private func presentIfPossible() async {
     guard home, mayAsk, phase == .active, let user, !primer else { return }
     let key = "trial-primer-" + user
     guard UserDefaults.standard.string(forKey: key) == "owed" else { return }
-    Task {
-      let session = backend.sessionGeneration
-      let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
-      guard session == backend.sessionGeneration, backend.status == .signedIn, self.user == user,
-        home, phase == .active, mayAsk, !primer, UserDefaults.standard.string(forKey: key) == "owed" else { return }
-      UserDefaults.standard.set("asked", forKey: key)
-      if status == .notDetermined { primer = true }
-    }
+    let session = backend.sessionGeneration
+    let status = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+    guard !Task.isCancelled, session == backend.sessionGeneration, backend.userID == user,
+      UserDefaults.standard.string(forKey: key) == "owed" else { return }
+    UserDefaults.standard.set("asked", forKey: key)
+    if status == .notDetermined { primer = true }
   }
 }

@@ -152,7 +152,7 @@ struct SignedInView: View {
         }
       }
     }
-    .modifier(TrialReminderObserver(home: path.isEmpty))
+    .modifier(TrialReminderObserver(home: library && path.isEmpty))
     .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
       Button(copy("common.close")) {}
     } message: { Text(stampMessage ?? "") }
