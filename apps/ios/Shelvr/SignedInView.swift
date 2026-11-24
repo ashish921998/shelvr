@@ -66,6 +66,12 @@ struct SignedInView: View {
           .navigationTitle(copy("addSheet.title"))
         case "trips": TripsTabView()
         case "shared-lists": SharedListsView()
+        case "new-shared-list":
+          CreateListView { id in
+            guard path.last == link, let target = AppLink("/shared-list/" + id) else { return }
+            path.removeLast()
+            path.append(target)
+          }
         case "shared-list" where link.path.count == 2: SharedListView(id: link.path[1])
         case "list-invite" where link.path.count == 2:
           JoinListView(token: link.path[1]) { route in
