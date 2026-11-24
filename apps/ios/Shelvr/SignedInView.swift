@@ -62,6 +62,7 @@ struct SignedInView: View {
             entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
           }
           .navigationTitle(copy("addSheet.title"))
+        case "passport-story": PassportStoryView()
         case "trips": TripsTabView()
         case "shared-lists", "collections": SharedListsView(collections: link.path.first == "collections")
         case "new-shared-list":
@@ -96,7 +97,6 @@ struct SignedInView: View {
               else { ContentUnavailableView(copy("sharedLists.goneTitle"), systemImage: "person.2") }
             }.id(link)
           } else { SharedListsView() }
-        case "passport-story": PassportStoryView()
         case "passport": PassportView(open: open)
         case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)
         case "add": PasteLinkView()
@@ -120,11 +120,8 @@ struct SignedInView: View {
         case "date-plan", "go-out", "new-trip":
           if link.path == ["new-trip"], !link.query.contains(where: { $0.name == "listId" || ($0.name == "mode" && $0.value == "generate") }) {
             let city = link.query.first(where: { $0.name == "city" })?.value ?? ""
-            BlankTripView(city: city) {
-              var parts = URLComponents()
-              parts.path = "/new-trip"
-              parts.queryItems = [URLQueryItem(name: "mode", value: "generate"), URLQueryItem(name: "city", value: city)]
-              if let next = parts.string.flatMap({ AppLink($0) }) { path.append(next) }
+            BlankTripView(city: city) { selectedCity in
+              if let next = BlankTrip.generationLink(city: selectedCity) { path.append(next) }
             } created: { result in
               if path.last == link { path[path.count - 1] = result }
             }
@@ -157,12 +154,12 @@ struct SignedInView: View {
         }
       }
     }
+    .modifier(CancelSurveyCard(home: library && path.isEmpty))
+    .modifier(TrialReminderObserver(home: path.isEmpty))
     .environment(namePrompts)
     .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
       Button(copy("common.close")) {}
     } message: { Text(stampMessage ?? "") }
-    .modifier(CancelSurveyCard(home: library && path.isEmpty))
-    .modifier(TrialReminderObserver(home: path.isEmpty))
     .onChange(of: pendingLink, initial: true) { _, link in
       guard let link else { return }
       pendingLink = nil

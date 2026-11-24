@@ -3,6 +3,7 @@ import SwiftUI
 import UserNotifications
 
 struct AccountSettingsView: View {
+  @EnvironmentObject private var pushDevice: PushDevice
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var confirming = false
@@ -13,7 +14,6 @@ struct AccountSettingsView: View {
   var body: some View {
     List {
       Section {
-        SaveReminderPreference()
         Button(copy("onboardingNotify.allow")) {
           Task {
             let center = UNUserNotificationCenter.current()
@@ -23,9 +23,12 @@ struct AccountSettingsView: View {
                 await UIApplication.shared.open(url)
               }
             } else if (try? await center.requestAuthorization(options: [.alert, .badge, .sound])) == true {
-              UIApplication.shared.registerForRemoteNotifications()
+              pushDevice.retryEnrollment()
             }
           }
+        }
+        if pushDevice.blockedSession == backend.sessionGeneration {
+          Text(copy("notifications.previousAccount")).foregroundStyle(.secondary)
         }
         Button(copy("pro.manage")) { manage = true }
         Link(copy("support.contact"), destination: URL(string: "mailto:ashish921998@zohomail.in?subject=Shelvr%20Support")!)

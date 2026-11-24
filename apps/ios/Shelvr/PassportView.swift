@@ -102,7 +102,7 @@ struct PassportView: View {
     .toolbar {
       if cardCity == nil {
         ToolbarItem(placement: .topBarTrailing) {
-          PassportActions(cities: errors.contains("cityStamps:listCityStamps") ? nil : cities, hasPlaces: stamps?.isEmpty == false)
+          PassportActions(cities: errors.contains("cityStamps:listCityStamps") ? nil : cities, hasPlaces: stamps?.isEmpty == false) { retry += 1 }
         }
       }
     }
@@ -110,6 +110,7 @@ struct PassportView: View {
       await watch("placeVisits:listPassportStamps", [PassportStamp].self) { stamps = $0 }
     }
     .task(id: retry) {
+      cities = nil
       await watch("cityStamps:listCityStamps", [PassportCityStamp].self) { cities = $0 }
     }
     .task(id: retry) {

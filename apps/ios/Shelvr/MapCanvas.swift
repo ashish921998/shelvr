@@ -5,7 +5,7 @@ import SwiftUI
 struct MapCanvas: UIViewRepresentable {
   let places: [MapPlace]
   let location: CLLocation?
-  let filterKey: [String]
+  let filters: MapFilters
   let opening: [MapPlace]?
   let visited: Set<String>
   let onArea: (DiscoverBox) -> Void
@@ -47,7 +47,7 @@ struct MapCanvas: UIViewRepresentable {
 
     func update(_ parent: MapCanvas, map: MKMapView) {
       let changedLocation = self.parent.location !== parent.location
-      let changedFilter = self.parent.filterKey != parent.filterKey
+      let changedFilter = self.parent.filters != parent.filters
       self.parent = parent
       let ids = Set(parent.places.map(\.id))
       for (id, pin) in pins where !ids.contains(id) {
