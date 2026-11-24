@@ -95,7 +95,7 @@ struct SignedInView: View {
             }.id(link)
           } else { SharedListsView() }
         case "passport-story": PassportStoryView()
-        case "passport": PassportView()
+        case "passport": PassportView(open: open)
         case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)
         case "add": PasteLinkView()
         case "saves": LibraryView(screen: .saves)
