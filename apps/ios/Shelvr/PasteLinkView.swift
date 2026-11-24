@@ -37,7 +37,7 @@ struct PasteLinkView: View {
     .sheet(item: $billing, onDismiss: {
       if resumeSave { resumeSave = false; save() }
     }) { destination in
-      BillingSheet(destination: destination) { resumeSave = true }
+      BillingSheet(destination: destination, confirmed: { resumeSave = true })
     }
     .onAppear { presented = true; focused = true }
     .onDisappear { presented = false }
