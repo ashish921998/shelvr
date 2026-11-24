@@ -220,6 +220,19 @@ public struct ShareInbox: Sendable {
       CFNotificationName(Self.notification as CFString), nil, nil, true)
   }
 
+  public func queuedSiriDelivery(operationID: String, owner: String) -> PendingShare.Delivery? {
+    guard activeOwner == owner else { return nil }
+    for batch in (try? batches()) ?? [] where (try? self.owner(of: batch)) == owner {
+      for manifest in (try? manifests(in: batch)) ?? [] {
+        let share = PendingShare(manifest: manifest, inbox: self, owner: owner)
+        guard case let .success(delivery) = share.delivery,
+          delivery.siri, delivery.operationID == operationID else { continue }
+        return activeOwner == owner ? delivery : nil
+      }
+    }
+    return nil
+  }
+
   @MainActor public func drain(owner: String, send: (PendingShare.Delivery) async throws -> Void) async throws -> FailedShare? {
     guard activeOwner == owner else { throw ShareInboxError.ownerChanged }
     var firstFailure: FailedShare?
