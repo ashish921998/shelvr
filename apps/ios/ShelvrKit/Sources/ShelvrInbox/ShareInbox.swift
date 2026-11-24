@@ -18,6 +18,11 @@ public enum ShareAttachment: Sendable {
   case payload(InboxPayload)
   case caption(String)
 
+  public static func webLink(_ text: String) -> Self? {
+    guard let url = URL(string: text), ["https", "http"].contains(url.scheme?.lowercased()) else { return nil }
+    return .payload(InboxPayload(kind: .link, value: url.absoluteString))
+  }
+
   public static func payloads(_ attachments: [Self]) -> [InboxPayload] {
     let explicit = attachments.compactMap { attachment -> String? in
       guard case let .payload(item) = attachment, item.kind == .link else { return nil }
@@ -31,7 +36,8 @@ public enum ShareAttachment: Sendable {
         guard let match = detector?.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
           let url = match.url, ["https", "http"].contains(url.scheme?.lowercased()),
           let start = Range(match.range, in: text)?.lowerBound else { return nil }
-        let preserved = explicit.first { $0.hasPrefix(url.absoluteString) && text[start...].hasPrefix($0) }
+        let preserved = explicit.filter { $0.hasPrefix(url.absoluteString) && text[start...].hasPrefix($0) }
+          .max { $0.count < $1.count }
         return InboxPayload(kind: .link, value: preserved ?? url.absoluteString)
       }
     }

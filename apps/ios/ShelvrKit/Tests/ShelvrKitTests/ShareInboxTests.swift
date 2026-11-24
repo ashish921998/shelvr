@@ -65,3 +65,12 @@ import Testing
   let restored = try JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: manifests[0]))
   #expect(restored.operationID == first.operationID)
 }
+
+@Test func captionKeepsItsLongerExplicitURLAndUnsupportedURLAllowsImageFallback() {
+  let shorter = "https://example.com/reel"
+  let longer = shorter + "!"
+  let result = ShareAttachment.payloads([.caption("Watch " + longer),
+    .payload(InboxPayload(kind: .link, value: shorter)), .payload(InboxPayload(kind: .link, value: longer))])
+  #expect(result.map(\.value) == [longer, shorter, longer])
+  #expect(ShareAttachment.webLink("file:///fixture.png") == nil)
+}
