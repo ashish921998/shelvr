@@ -1,6 +1,11 @@
 import Foundation
 
 public enum PlanRoutes {
+  public static func listID(_ link: AppLink) -> String? {
+    guard let value = link.query.first(where: { $0.name == "listId" })?.value, !value.isEmpty else { return nil }
+    return value
+  }
+
   public static func needsLoadedPlan(_ link: AppLink) -> Bool {
     switch link.path.first {
     case "settings", "profile", "paywall": false
@@ -14,7 +19,7 @@ public enum PlanRoutes {
       "shared-lists", "shared-list", "collections", "trip-plan":
       true
     case "date-plan", "go-out", "new-trip", "add-list-place":
-      link.query.contains { $0.name == "listId" && $0.value?.isEmpty == false }
+      listID(link) != nil
     default: false
     }
   }
