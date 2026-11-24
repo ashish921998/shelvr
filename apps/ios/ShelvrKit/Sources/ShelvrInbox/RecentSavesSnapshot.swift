@@ -36,6 +36,24 @@ public struct RecentSavesSnapshot: Codable, Sendable {
 
   public func displayed(small: Bool) -> ArraySlice<Item> { items.prefix(small ? 4 : 5) }
 
+  public static func canKeep(_ file: URL, owner: String?, now: Date = Date()) -> Bool {
+    guard let data = try? Data(contentsOf: file),
+      let snapshot = try? JSONDecoder().decode(Self.self, from: data) else { return false }
+    return snapshot.visible(to: owner, at: now)
+  }
+
+  public static func clear(_ file: URL) throws {
+    let manager = FileManager.default
+    if manager.fileExists(atPath: file.path) { try manager.removeItem(at: file) }
+    let previous = file.deletingLastPathComponent().appending(path: "ExpoWidgets")
+    if manager.fileExists(atPath: previous.path) {
+      for candidate in try manager.contentsOfDirectory(at: previous, includingPropertiesForKeys: nil)
+      where candidate.lastPathComponent.hasPrefix("recent-saves-") && candidate.pathExtension == "jpg" {
+        try manager.removeItem(at: candidate)
+      }
+    }
+  }
+
   public static var location: URL? {
     guard let group = Bundle.main.object(forInfoDictionaryKey: "ShelvrAppGroup") as? String,
       let root = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group)

@@ -6,7 +6,7 @@ import SwiftUI
 import WidgetKit
 
 struct RecentWidgetSync: ViewModifier {
-  private struct Plan: Decodable {
+  private struct Plan: Decodable, Equatable {
     let status: String
     let expiresAt: Double?
 
@@ -28,6 +28,7 @@ struct RecentWidgetSync: ViewModifier {
   }
 
   @Environment(Backend.self) private var backend
+  @Environment(\.scenePhase) private var phase
   @Environment(\.copy) private var copy
   @State private var owner: String?
   @State private var plan: Plan?
@@ -49,7 +50,8 @@ struct RecentWidgetSync: ViewModifier {
               try ShareInbox.system()?.activate(account?._id)
               owner = account?._id
               plan = nil
-              publish(nil)
+              if let file = RecentSavesSnapshot.location,
+                !RecentSavesSnapshot.canKeep(file, owner: owner) { publish(nil) }
             }
           }
         } catch {}
@@ -65,12 +67,20 @@ struct RecentWidgetSync: ViewModifier {
           }
         } catch {}
       }
+      .task(id: "\(phase)-\(owner ?? "")-\(plan?.status ?? "")-\(plan?.expiresAt ?? 0)") {
+        guard phase == .active, let plan, plan.status != "lifetime", let expiry = plan.expiration else { return }
+        do {
+          try await Task.sleep(for: .seconds(max(0, expiry.timeIntervalSinceNow)))
+          try Task.checkCancellation()
+          if self.plan == plan && !plan.entitled { publish(nil) }
+        } catch {}
+      }
       .task(id: "\(owner ?? "")-\(plan?.status ?? "")-\(plan?.expiresAt ?? 0)") {
         guard let owner, let plan, plan.entitled else { return }
         do {
           for try await cards in backend.query("items:listRecentItems", with: ["limit": 5.0], as: [Card].self) {
             try Task.checkCancellation()
-            guard self.owner == owner, backend.status == .signedIn, plan.entitled else { return }
+            guard self.owner == owner, self.plan == plan, backend.status == .signedIn, plan.entitled else { return }
             var items: [RecentSavesSnapshot.Item] = []
             for card in cards.prefix(5) {
               let host = card.url.flatMap { URL(string: $0)?.host() }
@@ -81,7 +91,7 @@ struct RecentWidgetSync: ViewModifier {
               items.append(.init(id: card._id, title: title, kind: card.type,
                 subtitle: card.siteName ?? host ?? type, thumbnail: thumbnail))
             }
-            guard self.owner == owner, backend.status == .signedIn, plan.entitled else { return }
+            guard self.owner == owner, self.plan == plan, backend.status == .signedIn, plan.entitled else { return }
             publish(RecentSavesSnapshot(owner: owner, items: items, expires: plan.status == "lifetime" ? nil : plan.expiration?.addingTimeInterval(7 * 24 * 3600)))
           }
         } catch {}
@@ -93,7 +103,9 @@ struct RecentWidgetSync: ViewModifier {
     do {
       if let snapshot {
         try JSONEncoder().encode(snapshot).write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
-      } else if FileManager.default.fileExists(atPath: file.path) { try FileManager.default.removeItem(at: file) }
+      } else {
+        try RecentSavesSnapshot.clear(file)
+      }
       WidgetCenter.shared.reloadTimelines(ofKind: "RecentSaves")
     } catch {}
   }

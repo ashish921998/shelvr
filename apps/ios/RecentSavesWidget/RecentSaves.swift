@@ -83,7 +83,10 @@ private struct RecentSavesView: View {
       ZStack(alignment: .bottomLeading) {
         artwork(item).frame(width: geometry.size.width, height: geometry.size.height).clipped()
         if featured || item.thumbnail == nil {
-          Text(item.title).lineLimit(2).font(.caption2.bold()).padding(5)
+          VStack(alignment: .leading, spacing: 1) {
+            Text(item.title).lineLimit(2).font(.caption2.bold())
+            if featured, let subtitle = item.subtitle { Text(subtitle).lineLimit(1).font(.system(size: 9)) }
+          }.padding(5)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(.thinMaterial)
         }

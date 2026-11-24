@@ -22,3 +22,22 @@ import Testing
   #expect(populated.displayed(small: true).map(\.id) == ["0","1","2","3"])
   #expect(populated.displayed(small: false).map(\.id) == ["0","1","2","3","4"])
 }
+
+@Test func preservesAValidColdStartSnapshotAndClearsOnlyOwnedThumbnails() throws {
+  let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+  defer { try? FileManager.default.removeItem(at: root) }
+  let old = root.appending(path: "ExpoWidgets")
+  try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
+  let file = root.appending(path: "SwiftRecentSaves.json")
+  try JSONEncoder().encode(RecentSavesSnapshot(owner: "a", items: [], expires: nil)).write(to: file)
+  #expect(RecentSavesSnapshot.canKeep(file, owner: "a"))
+  #expect(!RecentSavesSnapshot.canKeep(file, owner: "b"))
+  let thumb = old.appending(path: "recent-saves-test.jpg")
+  let unrelated = old.appending(path: "other.jpg")
+  try Data().write(to: thumb)
+  try Data().write(to: unrelated)
+  try RecentSavesSnapshot.clear(file)
+  #expect(!FileManager.default.fileExists(atPath: thumb.path))
+  #expect(!FileManager.default.fileExists(atPath: file.path))
+  #expect(FileManager.default.fileExists(atPath: unrelated.path))
+}
