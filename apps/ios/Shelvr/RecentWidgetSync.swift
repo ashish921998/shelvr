@@ -99,14 +99,15 @@ struct RecentWidgetSync: ViewModifier {
   }
 
   private func publish(_ snapshot: RecentSavesSnapshot?) {
-    guard let file = RecentSavesSnapshot.location else { return }
+    let invalidate = { WidgetCenter.shared.reloadTimelines(ofKind: "RecentSaves") }
+    guard let file = RecentSavesSnapshot.location else { invalidate(); return }
     do {
       if let snapshot {
         try JSONEncoder().encode(snapshot).write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
+        invalidate()
       } else {
-        try RecentSavesSnapshot.clear(file)
+        try RecentSavesSnapshot.clear(file, invalidate: invalidate)
       }
-      WidgetCenter.shared.reloadTimelines(ofKind: "RecentSaves")
     } catch {}
   }
 }
