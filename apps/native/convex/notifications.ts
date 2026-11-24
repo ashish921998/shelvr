@@ -360,7 +360,8 @@ export const unregisterInstallation = mutation({
     registrationId: v.string(),
   },
   returns: v.null(),
-  handler: async (ctx, { token, installSecret, registrationId }) => {
+  handler: async (ctx, { token: rawToken, installSecret, registrationId }) => {
+    const token = rawToken.trim();
     if (
       !token ||
       token.length > 4096 ||
