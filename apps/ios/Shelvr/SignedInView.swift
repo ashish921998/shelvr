@@ -10,7 +10,6 @@ struct SignedInView: View {
   @State private var library = false
   @State private var billing: BillingDestination?
   @State private var path: [AppLink] = []
-  @State private var namePrompts = MemberNamePrompts()
   @State private var stampMessage: String?
 
   var body: some View {
@@ -87,7 +86,7 @@ struct SignedInView: View {
           JoinListView(token: link.path[1]) { route in
             if path.last == link, let target = AppLink(route) { path = [target] }
           }
-        case "passport-invite" where link.path.count == 2: FriendPassportView(token: link.path[1]).id(link.path[1])
+        case "passport-invite" where link.path.count == 2: FriendPassportView(token: link.path[1], compareInitially: link.query.contains { $0.name == "compare" && $0.value == "1" }).id(link)
         case "already-been", "next-to-stamp":
           StampPlacesView(city: link.path.first == "next-to-stamp" ? link.query.first { $0.name == "city" }?.value ?? "" : nil) { message in
             guard path.last == link, let passport = AppLink("/passport") else { return }
@@ -192,7 +191,6 @@ struct SignedInView: View {
     .task(id: access.plan?.expiresAt) {
       if let expiration = access.plan?.expiresAt, access.pro { await access.expire(at: expiration) }
     }
-    .environment(namePrompts)
     .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
       Button(copy("common.close")) {}
     } message: { Text(stampMessage ?? "") }
