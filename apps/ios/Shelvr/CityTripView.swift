@@ -72,6 +72,8 @@ struct CityTripView: View {
   let id: String
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
+  @Environment(\.dismiss) private var dismiss
+  @State private var confirmingDeletion = false
   @State private var trip: CityTrip?
   @State private var editing: CityTrip.Stop?
   @State private var editFailed = false
@@ -111,7 +113,19 @@ struct CityTripView: View {
           }
           if editFailed { Text(copy("tripPlanner.editFailed")) }
         }.disabled(busy)
-        .toolbar { Button(copy("tripPlanner.nameLabel")) { newName = trip.name ?? ""; renaming = true } }
+         .toolbar {
+          Menu {
+            Button(copy("tripPlanner.nameLabel")) { newName = trip.name ?? ""; renaming = true }
+            Button(copy("tripPlanner.delete"), role: .destructive) { confirmingDeletion = true }
+          } label: { Label(copy("tripPlanner.tripActions"), systemImage: "ellipsis.circle") }
+        }
+        .confirmationDialog(copy("tripPlanner.deleteTitle"), isPresented: $confirmingDeletion, titleVisibility: .visible) {
+          Button(copy("tripPlanner.delete"), role: .destructive) { change {
+            try await backend.client.mutation("tripPlannerData:deleteTripPlan", with: ["tripId": id])
+            dismiss()
+          } }
+          Button(copy("common.cancel"), role: .cancel) {}
+        } message: { Text(copy("tripPlanner.deleteBody")) }
         .alert(copy("tripPlanner.nameLabel"), isPresented: $renaming) {
           TextField(copy("tripPlanner.nameLabel"), text: $newName)
           Button(copy("common.save")) { change { try await backend.renameTrip(id, name: newName) } }
