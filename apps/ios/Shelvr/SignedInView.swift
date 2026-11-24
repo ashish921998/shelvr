@@ -54,10 +54,19 @@ struct SignedInView: View {
         case "add-spots":
           List {
             entry("/add", "addSheet.pasteLink", "link")
+            entry("/photo", "item.photo", "photo")
             entry("/how-to-share", "addSheet.howToShare", "square.and.arrow.up")
             entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
           }
           .navigationTitle(copy("addSheet.title"))
+        case "shared-lists": SharedListsView()
+        case "shared-list" where link.path.count == 2: SharedListView(id: link.path[1])
+        case "list-invite" where link.path.count == 2:
+          JoinListView(token: link.path[1]) { route in
+            if path.last == link, let target = AppLink(route) { path = [target] }
+          }
+        case "passport": PassportView()
+        case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)
         case "saves": LibraryView(screen: .saves)
         case "review-saves": LibraryView(screen: .review)
         case "city" where link.path.count == 2: CityPlacesView(city: link.path[1]).id(link.path[1])
@@ -68,6 +77,8 @@ struct SignedInView: View {
             LibraryPlaceEditor(id: id).id(id)
           } else { ShellDestination(link: link) }
         case "go-out": PlanCityView()
+        case "add": PasteLinkView()
+        case "photo": PhotoSaveView()
         default: ShellDestination(link: link)
         }
       }

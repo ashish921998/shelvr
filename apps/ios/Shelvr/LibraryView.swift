@@ -100,6 +100,8 @@ struct LibraryView: View {
       }
       route("/saves", "homePlaces.allSaves", "bookmark")
       route("/cities", "homePlaces.cities", "building.2")
+      route("/shared-lists", "sharedLists.title", "person.2")
+      route("/passport", "passport.title", "book.closed")
       if rows.contains(where: \.needsReview) || pages.last?.isDone == false {
         route("/review-saves", "homePlaces.withoutPlace", "exclamationmark.circle")
       }
