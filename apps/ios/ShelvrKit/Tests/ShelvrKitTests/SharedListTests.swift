@@ -26,6 +26,15 @@ import Testing
   #expect(!place.matches(name: "Santa Joana", lat: 38.8, lng: -9.14, apple: "A-1", item: nil))
 }
 
+@Test func listPlansCarryTheListAndChosenCityIntoBothPlanners() {
+  for trip in [false, true] {
+    let link = SharedListDetail.planLink(trip: trip, city: "Rio + São Paulo", list: "list")
+    #expect(link?.path == [trip ? "new-trip" : "go-out"])
+    #expect(link?.query.first { $0.name == "city" }?.value == "Rio + São Paulo")
+    #expect(link?.query.first { $0.name == "listId" }?.value == "list")
+  }
+}
+
 @Test func sharedListPickerUsesServerPlaceIdentity() throws {
   struct Vector: Decodable {
     struct Candidate: Decodable {
