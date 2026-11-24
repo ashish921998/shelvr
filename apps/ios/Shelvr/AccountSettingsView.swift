@@ -8,7 +8,7 @@ struct AccountSettingsView: View {
   @State private var confirming = false
   @State private var deleting = false
   @State private var failure = false
-  @State private var manage = false
+  @State private var billing: BillingDestination?
 
   var body: some View {
     List {
@@ -27,7 +27,8 @@ struct AccountSettingsView: View {
             }
           }
         }
-        Button(copy("pro.manage")) { manage = true }
+        Button(copy("pro.restore")) { billing = .restore }
+        Button(copy("pro.manage")) { billing = .manage }
         Link(copy("support.contact"), destination: URL(string: "mailto:ashish921998@zohomail.in?subject=Shelvr%20Support")!)
         Link(copy("legal.terms"), destination: URL(string: "https://tryshelvr.app/terms")!)
         Link(copy("legal.privacy"), destination: URL(string: "https://tryshelvr.app/privacy")!)
@@ -41,10 +42,10 @@ struct AccountSettingsView: View {
       }
     }
     .navigationTitle(copy("profile.settings"))
-    .sheet(isPresented: $manage) { BillingSheet(destination: .manage) }
+    .sheet(item: $billing) { BillingSheet(destination: $0) }
     .alert(copy("account.deleteTitle"), isPresented: $confirming) {
       Button(copy("common.cancel"), role: .cancel) {}
-      Button(copy("pro.manage")) { manage = true }
+      Button(copy("pro.manage")) { billing = .manage }
       Button(copy("account.delete"), role: .destructive, action: deleteAccount)
     } message: {
       Text(["account.deleteIntro", "account.deleteItems", "account.deleteSpaces",
