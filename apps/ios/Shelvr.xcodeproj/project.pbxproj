@@ -302,6 +302,7 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 			buildPhases = (
 				A10000000000000000000009 /* Sources */,
 				A1000000000000000000000A /* Frameworks */,
+                B71000000000000000000100 /* Validate archive configuration */,
 				A1000000000000000000000B /* Resources */,
 				7125C30E27D125078F48F51C /* Embed App Extensions */,
 			);
@@ -411,6 +412,22 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+        B71000000000000000000100 /* Validate archive configuration */ = {
+            isa = PBXShellScriptBuildPhase;
+            alwaysOutOfDate = 1;
+            buildActionMask = 2147483647;
+            files = ();
+            inputPaths = ();
+            name = "Validate archive configuration";
+            outputPaths = ();
+            runOnlyForDeploymentPostprocessing = 1;
+            shellPath = /bin/sh;
+            shellScript = "if [ \"$CONFIGURATION\" = Release ]; then\n  case \"$SHELVR_REVENUECAT_KEY\" in appl_?*) ;; *) echo 'error: Prepare the production RevenueCat SDK key before archiving'; exit 1 ;; esac\n  if [ -z \"$SHELVR_POSTHOG_TOKEN\" ] || [ -z \"$SHELVR_POSTHOG_HOST\" ]; then echo 'error: Prepare production analytics settings before archiving'; exit 1; fi\nfi\n";
+            showEnvVarsInLog = 0;
+        };
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		936926C3D4F242255038B2A8 /* Sources */ = {
