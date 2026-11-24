@@ -8,12 +8,18 @@ public struct InboxPayload: Codable, Sendable {
   public let value: String
   public let operationID: String
   public let siri: Bool?
+  public let spaceID: String?
+  public let context: String?
+  public let sticker: Bool?
 
-  public init(kind: Kind, value: String, operationID: String = "share:\(UUID().uuidString)", siri: Bool = false) {
+  public init(kind: Kind, value: String, operationID: String = "share:\(UUID().uuidString)", siri: Bool = false, spaceID: String? = nil, context: String? = nil, sticker: Bool? = nil) {
     self.kind = kind
     self.value = value
     self.operationID = operationID
     self.siri = siri
+    self.spaceID = spaceID
+    self.context = context.map { String($0.prefix(8000)) }
+    self.sticker = sticker
   }
 }
 
@@ -68,7 +74,7 @@ public enum ShareAttachment: Sendable {
 }
 
 public enum ShareInboxError: Error, Equatable, Sendable {
-  case ownerChanged, nothingToSave
+  case ownerChanged, nothingToSave, longNoteNeedsRecovery
 }
 
 public struct PendingShare: Sendable {
@@ -82,6 +88,8 @@ public struct PendingShare: Sendable {
     public let content: Content
     public let operationID: String
     public let siri: Bool
+    public let spaceID, context: String?
+    public let sticker: Bool
   }
 
   public let delivery: Result<Delivery, any Error>
@@ -105,7 +113,8 @@ public struct PendingShare: Sendable {
         guard UUID(uuidString: payload.value) != nil else { throw CocoaError(.fileReadCorruptFile) }
         content = .image(manifest.deletingLastPathComponent().appending(path: payload.value))
       }
-      return Delivery(content: content, operationID: payload.operationID, siri: payload.siri == true)
+      return Delivery(content: content, operationID: payload.operationID, siri: payload.siri == true,
+        spaceID: payload.spaceID, context: payload.context, sticker: payload.sticker == true)
     }
   }
 
@@ -114,6 +123,17 @@ public struct PendingShare: Sendable {
     if case let .success(upload) = delivery, case let .image(file) = upload.content {
       inbox.removeUnreferencedImage(file, in: manifest.deletingLastPathComponent())
     }
+  }
+
+  public func copyAndRemoveNote(for owner: String, _ copy: (String) -> Bool) throws -> Bool {
+    guard owner == self.owner else { throw ShareInboxError.ownerChanged }
+    let batch = manifest.deletingLastPathComponent()
+    try inbox.checkOwner(owner, of: batch)
+    let current = try PendingShare(manifest: manifest, inbox: inbox, owner: owner).delivery.get()
+    guard case .success(let expected) = delivery, current.operationID == expected.operationID,
+      current.siri, case let .note(text) = current.content, copy(text) else { return false }
+    try removeManifest()
+    return true
   }
 
   fileprivate func removeManifest() throws {
@@ -196,6 +216,19 @@ public struct ShareInbox: Sendable {
     try FileManager.default.moveItem(at: stage, to: stage.deletingPathExtension().appendingPathExtension("ready"))
     CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
       CFNotificationName(Self.notification as CFString), nil, nil, true)
+  }
+
+  public func queuedSiriDelivery(operationID: String, owner: String) -> PendingShare.Delivery? {
+    guard activeOwner == owner else { return nil }
+    for batch in (try? batches()) ?? [] where (try? self.owner(of: batch)) == owner {
+      for manifest in (try? manifests(in: batch)) ?? [] {
+        let share = PendingShare(manifest: manifest, inbox: self, owner: owner)
+        guard case let .success(delivery) = share.delivery,
+          delivery.siri, delivery.operationID == operationID else { continue }
+        return activeOwner == owner ? delivery : nil
+      }
+    }
+    return nil
   }
 
   @MainActor public func drain(owner: String, send: (PendingShare.Delivery) async throws -> Void) async throws -> FailedShare? {

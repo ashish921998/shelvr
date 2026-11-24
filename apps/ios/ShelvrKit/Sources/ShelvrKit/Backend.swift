@@ -2,6 +2,7 @@ import Combine
 import ConvexMobile
 import Foundation
 import Observation
+import ShelvrInbox
 
 @MainActor @Observable
 public final class Backend {
@@ -21,6 +22,7 @@ public final class Backend {
   private let session: AuthSession
   @ObservationIgnored private var authWatch: AnyCancellable?
   @ObservationIgnored private var starting: Task<Void, Never>?
+  @ObservationIgnored var preparingSiri: (subject: String, task: Task<Void, Error>)?
   @ObservationIgnored private let deletion = AccountDeletion()
   @ObservationIgnored private var registeringPush: Task<Void, Error>?
   private var signingOut = false
@@ -188,6 +190,29 @@ public final class Backend {
     connectedUserID = nil
     status = .signedOut
     signingOut = false
+  }
+
+  public func saveQueuedSiriNote(_ text: String, operationID: String, spaceID: String?, owner: String,
+    checkpoint: () throws -> Void) async throws {
+    let generation = sessionGeneration
+    func checkOwner() throws {
+      try checkpoint()
+      guard userID == owner, sessionGeneration == generation else { throw ShareInboxError.ownerChanged }
+    }
+    try checkOwner()
+    guard let bearer = try await session.validToken(), AuthTokens.ownerID(for: bearer) == owner else {
+      throw ShareInboxError.ownerChanged
+    }
+    try checkOwner()
+    let transport = ConvexHTTPAuthTransport(deployment: environment.convexURL)
+    var args = ["text": text, "operationId": operationID, "saveSource": SaveSource.siri.rawValue]
+    args["spaceId"] = spaceID
+    if case .folderUnavailable = try await transport.saveSiriNote(args, authorization: bearer) {
+      try checkOwner()
+      args["spaceId"] = nil
+      _ = try await transport.saveSiriNote(args, authorization: bearer)
+    }
+    try checkOwner()
   }
 
   public func query<T: Decodable>(_ name: String, with args: [String: ConvexEncodable?] = [:], as type: T.Type) -> some AsyncSequence<T, any Error> {

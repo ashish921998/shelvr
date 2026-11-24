@@ -232,6 +232,8 @@
   "pro.unlockShelvr": "Desbloquear Shelvr Pro",
   "share.openToFinish": "Abre Shelvr para terminar de guardar después de compartir.",
   "share.openToSignIn": "Abre Shelvr e inicia sesión antes de compartir.",
+  "share.copyNote": "Copiar y quitar la nota",
+  "share.longNoteRecovery": "Esta nota es demasiado larga para Shelvr. Cópiala al portapapeles y quítala de los guardados pendientes.",
   "share.reading": "Leyendo contenido compartido…",
   "share.empty": "Nada que guardar",
   "share.pending": "Algunos elementos siguen pendientes.",
