@@ -50,6 +50,7 @@ private func stamp(_ name: String, _ city: String?, _ country: String? = nil,
     struct Expected: Decodable {
       let places, cities, countries, more: Int
       let photos, cityNames: [String]
+      let fromReels: Bool
     }
     let stamps: [PassportStamp]
     let cities: [PassportCityStamp]
@@ -65,4 +66,5 @@ private func stamp(_ name: String, _ city: String?, _ country: String? = nil,
   #expect(story.photos.map(\.name) == vector.expected.photos)
   #expect(story.cityNames == vector.expected.cityNames)
   #expect(story.more == vector.expected.more)
+  #expect(story.fromReels == vector.expected.fromReels)
 }

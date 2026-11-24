@@ -5,7 +5,8 @@
       "key": "Casa",
       "city": "Lisboa",
       "visitedAt": 100,
-      "cover": "a"
+      "cover": "a",
+      "source": "tiktok"
     },
     {
       "name": "Rosa",
@@ -56,6 +57,7 @@
     "countries": 1,
     "photos": ["Rosa", "Alta", "Casa", "Bica"],
     "cityNames": ["Lisboa", "Porto"],
-    "more": 2
+    "more": 2,
+    "fromReels": true
   }
 }
