@@ -44,13 +44,19 @@ struct PasteLinkView: View {
   }
 
   private func save() {
-    guard !saving else { return }
+    guard !saving, let owner = backend.userID else { return }
     guard let link = PastedLink(input, retrying: pending) else {
       errorMessage = copy("errors.notALink")
       return
     }
+    let generation = backend.sessionGeneration
+    func ownsSaveSession() -> Bool {
+      !Task.isCancelled && backend.userID == owner && backend.sessionGeneration == generation
+    }
     let properties = ["save_source": "manual_link", "save_kind": "link", "operation_id": link.operationID]
-    Analytics.capture("save_attempt_started", properties)
+    Analytics.capture("save_attempt_started", properties, distinctId: owner)
+    let analyticsSessionID = Analytics.sessionID
+    let sessionProperties = analyticsSessionID.map { ["$session_id": $0] } ?? [:]
     pending = link
     saving = true
     errorMessage = nil
@@ -58,11 +64,18 @@ struct PasteLinkView: View {
       defer { saving = false }
       do {
         try await backend.saveLink(link.url, operationID: link.operationID, source: .manualLink,
-          analyticsSessionID: Analytics.sessionID)
-        Analytics.capture("article_saved")
+          analyticsSessionID: analyticsSessionID) {
+          guard ownsSaveSession() else { throw CancellationError() }
+        }
+        guard ownsSaveSession() else { return }
+        Analytics.capture("article_saved", sessionProperties, distinctId: owner)
         if presented { dismiss() }
       } catch {
-        Analytics.capture("save_failed", properties.merging(["stage": SaveFailure(error) == .proRequired ? "pro_required" : "other"]) { $1 })
+        guard ownsSaveSession() else { return }
+        var failure = properties
+        failure["$session_id"] = analyticsSessionID
+        failure["stage"] = SaveFailure(error) == .proRequired ? "pro_required" : "other"
+        Analytics.capture("save_failed", failure, distinctId: owner)
         guard presented else { return }
         if SaveFailure(error) == .proRequired {
           errorMessage = copy("freePlan.leftBody")
