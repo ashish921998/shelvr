@@ -27,6 +27,7 @@
 		A10000000000000000000066 /* ja.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000046 /* ja.json */; };
 		A10000000000000000000067 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
 		A10000000000000000000068 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
+		B70000000000000000000001 = {isa = PBXBuildFile; productRef = B70000000000000000000002; };
 		BFDDDAC65FD1EAF951C7A3DF /* fr.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000045 /* fr.json */; };
 		C5EA489188B6CDB7DBC292F8 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
 		D0F379AD41A0134F8BF645B5 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 985944D0E54B7A93E76B5970 /* ShareViewController.swift */; };
@@ -94,6 +95,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000014 /* ShelvrKit in Frameworks */,
+				B70000000000000000000001 /* RevenueCatUI in Frameworks */,
 				36E6F3FD1E99DE50DC4D1A8D /* ShelvrInbox in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -228,6 +230,7 @@
 			name = Shelvr;
 			packageProductDependencies = (
 				A10000000000000000000013 /* ShelvrKit */,
+				B70000000000000000000002 /* RevenueCatUI */,
 				58A93D31AFA3EEA34762477E /* ShelvrInbox */,
 			);
 			productName = Shelvr;
@@ -255,6 +258,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A10000000000000000000012 /* XCLocalSwiftPackageReference "ShelvrKit" */,
+                B70000000000000000000003 /* purchases-ios */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000003 /* Products */;
@@ -447,11 +451,20 @@
 			isa = XCSwiftPackageProductDependency;
 			productName = ShelvrKit;
 		};
+		B70000000000000000000002 = {isa = XCSwiftPackageProductDependency; package = B70000000000000000000003; productName = RevenueCatUI; };
 		C2944BC6B409C8A19EAD8916 /* ShelvrInbox */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ShelvrInbox;
 		};
 /* End XCSwiftPackageProductDependency section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+        B70000000000000000000003 = {
+            isa = XCRemoteSwiftPackageReference;
+            repositoryURL = "https://github.com/RevenueCat/purchases-ios.git";
+            requirement = {kind = exactVersion; version = 5.95.0; };
+        };
+/* End XCRemoteSwiftPackageReference section */
 	};
 	rootObject = A10000000000000000000001 /* Project object */;
 }

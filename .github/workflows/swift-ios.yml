@@ -38,6 +38,12 @@ jobs:
       - name: Test ShelvrKit
         run: swift test --package-path ShelvrKit --cache-path "$RUNNER_TEMP/swift-packages" --skip Live
 
+      - name: Configure the dev RevenueCat store
+        env:
+          EXPO_PUBLIC_REVENUECAT_TEST_KEY: ${{ secrets.SHELVR_REVENUECAT_TEST_KEY }}
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        run: Config/prepare-billing.sh Debug
+
       - name: Build the arm64 iOS simulator app
         run: >-
           xcodebuild -project Shelvr.xcodeproj -scheme Shelvr -configuration Debug
