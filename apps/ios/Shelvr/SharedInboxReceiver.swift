@@ -79,6 +79,19 @@ struct SharedInboxReceiver: ViewModifier {
 
   private func send(file: URL, batch: URL, inbox: ShareInbox, owner: String) async throws {
     let payload = try JSONDecoder().decode(InboxPayload.self, from: Data(contentsOf: file))
+    let source = payload.siri == true ? "siri" : "share_extension"
+    let properties = ["save_kind": payload.kind.rawValue, "save_source": source, "operation_id": payload.operationID]
+    Analytics.capture("save_attempt_started", properties)
+    do { try await deliver(payload, batch: batch, inbox: inbox, owner: owner) }
+    catch {
+      if !Task.isCancelled {
+        Analytics.capture("save_failed", properties.merging(["stage": ImportPhoto.failureStage(error)]) { $1 })
+      }
+      throw error
+    }
+  }
+
+  private func deliver(_ payload: InboxPayload, batch: URL, inbox: ShareInbox, owner: String) async throws {
     switch payload.kind {
     case .link, .note:
       let note = payload.kind == .note
@@ -108,7 +121,7 @@ struct SharedInboxReceiver: ViewModifier {
           throw error
         }
       } else {
-        _ = try await backend.savePhoto(photo, operationID: payload.operationID, source: .share)
+        _ = try await backend.savePhoto(photo, operationID: payload.operationID, source: .share, analyticsSessionID: Analytics.sessionID)
       }
     }
   }

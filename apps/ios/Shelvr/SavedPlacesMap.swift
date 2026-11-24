@@ -133,6 +133,7 @@ struct SavedPlacesMap: View {
           else {
             let item = MKMapItem(placemark: MKPlacemark(coordinate: place.coordinate))
             item.name = place.name
+            Analytics.capture("map_place_opened", ["source": "discover", "card": true])
             card = item
           }
         }

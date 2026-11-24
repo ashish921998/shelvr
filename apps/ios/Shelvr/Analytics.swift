@@ -7,6 +7,7 @@ import ShelvrKit
 @MainActor
 enum Analytics {
   private static var enabled = false
+  private static var identifiedUser: String?
   private static var reconciled = false
   private static var foreground = false
   private static var opened = false
@@ -59,9 +60,14 @@ enum Analytics {
   static func identify(_ id: String?) {
     guard enabled else { return }
     if let id {
-      PostHogSDK.shared.identify(id)
+      if identifiedUser != id {
+        PostHogSDK.shared.identify(id)
+        identifiedUser = id
+        capture("auth_completed")
+      }
       UserDefaults.standard.set(true, forKey: identifiedKey)
     } else if UserDefaults.standard.bool(forKey: identifiedKey) {
+      identifiedUser = nil
       PostHogSDK.shared.reset()
       UserDefaults.standard.removeObject(forKey: identifiedKey)
       registerContext()

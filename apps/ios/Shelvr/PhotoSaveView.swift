@@ -8,50 +8,52 @@ struct PhotoSaveView: View {
   @Environment(\.dismiss) private var dismiss
   @State private var selection: PhotosPickerItem?
   @State private var operationID = UUID().uuidString
-  @State private var saving = false
-  @State private var presented = false
+  @State private var request: UUID?
   @State private var failure: String?
 
   var body: some View {
     let title = copy("item.photo")
-    let symbol = selection == nil ? "photo" : "checkmark.circle"
+    let icon = selection == nil ? "photo" : "checkmark.circle"
     Form {
       PhotosPicker(selection: $selection, matching: .images) {
-        Label(title, systemImage: symbol)
+        Label(title, systemImage: icon)
       }
-      .disabled(saving)
+      .disabled(request != nil)
       if let failure { Text(copy(failure)).foregroundStyle(.red) }
     }
-    .navigationTitle(copy("item.photo"))
+    .navigationTitle(title)
     .toolbar {
-      Button(copy("common.save"), action: save)
-        .disabled(selection == nil || saving)
+      Button(copy("common.save")) { request = UUID() }
+        .disabled(selection == nil || request != nil)
     }
     .onChange(of: selection) {
       operationID = UUID().uuidString
       failure = nil
     }
-    .onAppear { presented = true }
-    .onDisappear { presented = false }
+    .onDisappear { request = nil }
+    .task(id: request) {
+      if let request, let selection { await save(selection, request: request) }
+    }
   }
 
-  private func save() {
-    guard !saving, let selection else { return }
-    saving = true
+  private func save(_ selection: PhotosPickerItem, request id: UUID) async {
+    defer { if request == id { request = nil } }
     failure = nil
-    Analytics.capture("save_attempt_started", ["save_source": "photo_import", "save_kind": "image", "operation_id": "image:\(operationID)"])
-    Task {
-      defer { saving = false }
-      do {
-        guard let data = try await selection.loadTransferable(type: Data.self) else {
-          throw CocoaError(.fileReadCorruptFile)
-        }
-        let photo = try await Task.detached { try ImportPhoto(data) }.value
-        _ = try await backend.savePhoto(photo, operationID: "image:\(operationID)")
-        Analytics.capture("images_saved", ["image_count": 1])
-        if presented { dismiss() }
-      } catch {
+    let properties = ["save_source": "photo_import", "save_kind": "image", "operation_id": "image:\(operationID)"]
+    Analytics.capture("save_attempt_started", properties)
+    do {
+      guard let data = try await selection.loadTransferable(type: Data.self) else {
+        throw CocoaError(.fileReadCorruptFile)
+      }
+      try Task.checkCancellation()
+      let photo = try await Task.detached { try ImportPhoto(data) }.value
+      _ = try await backend.savePhoto(photo, operationID: "image:\(operationID)", analyticsSessionID: Analytics.sessionID)
+      Analytics.capture("images_saved", ["image_count": 1])
+      if !Task.isCancelled, request == id { dismiss() }
+    } catch {
+      if !Task.isCancelled, request == id {
         failure = ImportPhoto.failureCopy(error)
+        Analytics.capture("save_failed", properties.merging(["stage": ImportPhoto.failureStage(error)]) { $1 })
       }
     }
   }
