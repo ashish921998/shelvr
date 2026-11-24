@@ -35,6 +35,21 @@ public enum TripEdit {
     (0...max(0, count)).contains(requested) ? requested : min(1, max(0, count))
   }
 
+  public static func alreadyOnTrip(_ place: TripSearchPlace, trip: CityTrip) -> Bool {
+    (trip.days.flatMap { $0 } + trip.unplanned).contains { stop in
+      if let first = stop.appleId, let second = place.appleId { return first == second }
+      guard CityPlace.km(stop.lat, stop.lng, place.lat, place.lng) <= 0.3 else { return false }
+      if CityPlace.key(stop.name) == CityPlace.key(place.name) { return true }
+      func words(_ name: String) -> [Substring] {
+        name.folding(options: [.widthInsensitive, .diacriticInsensitive], locale: nil)
+          .lowercased().filter { !"'’ʼ".contains($0) }.split { !$0.isLetter && !$0.isNumber }
+      }
+      let a = words(stop.name), b = words(place.name)
+      let (short, long) = a.count <= b.count ? (a, b) : (b, a)
+      return !short.isEmpty && (0...(long.count - short.count)).contains { long[$0...].starts(with: short) }
+    }
+  }
+
   public static func validTime(_ input: String) -> Bool {
     input.isEmpty || input.range(of: #"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"#, options: .regularExpression) != nil
   }

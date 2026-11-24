@@ -79,6 +79,7 @@ struct CityTripView: View {
   @State private var editFailed = false
   @State private var busy = false
   @State private var undo: (String, TripPosition)?
+  @State private var undoGeneration = 0
   @State private var renaming = false
   @State private var newName = ""
   @State private var loaded = false
@@ -132,10 +133,16 @@ struct CityTripView: View {
             .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || newName.utf16.count > 80)
           Button(copy("common.cancel"), role: .cancel) {}
         }
-        .sheet(item: $editing) { stop in TripStopEditor(stop: stop) }
+        .sheet(item: $editing) { stop in TripStopEditor(stop: stop) { undo = nil } }
         .navigationTitle(trip.name ?? copy("tripPlanner.tripTitle", ["city": trip.city]))
       } else if loaded { ContentUnavailableView(copy("tripPlanner.goneTitle"), systemImage: "suitcase") }
       else { ProgressView() }
+    }
+    .onDisappear { undo = nil }
+    .task(id: undoGeneration) {
+      guard undo != nil else { return }
+      try? await Task.sleep(for: .seconds(10))
+      if !Task.isCancelled { undo = nil }
     }
     .task(id: attempt) {
       failed = false
@@ -159,7 +166,7 @@ struct CityTripView: View {
       row(stop)
       Spacer()
       Menu {
-        Button(copy("tripPlanner.edit")) { editing = stop }
+        Button(copy("tripPlanner.stopDetails")) { editing = stop }
         if index > 0 { Button(copy("tripPlanner.moveUp")) { move(stop.id, day: day, index: index - 1) } }
         if index + 1 < count { Button(copy("tripPlanner.moveDown")) { move(stop.id, day: day, index: index + 1) } }
         ForEach(0...trip.days.count, id: \.self) { target in
@@ -172,22 +179,28 @@ struct CityTripView: View {
         }
         if day != 0 {
           Button(copy("tripPlanner.removeStop", ["name": stop.name]), role: .destructive) {
-            change { undo = (stop.id, try await backend.removeTripStop(stop.id)) }
+            change { offerUndo(stop.id, try await backend.removeTripStop(stop.id)) }
           }
         }
       } label: { Image(systemName: "ellipsis.circle") }
-      .accessibilityLabel(copy("tripPlanner.moveStop", ["name": stop.name]))
+      .accessibilityLabel(copy("tripPlanner.stopActions", ["name": stop.name]))
     }
   }
 
+  private func offerUndo(_ id: String, _ position: TripPosition) {
+    undoGeneration += 1
+    undo = (id, position)
+  }
+
   private func move(_ stop: String, day: Int, index: Int) {
-    change { undo = (stop, try await backend.moveTripStop(stop, day: day, index: index)) }
+    change { offerUndo(stop, try await backend.moveTripStop(stop, day: day, index: index)) }
   }
 
   private func change(_ operation: @escaping @MainActor () async throws -> Void) {
     guard !busy else { return }
     busy = true
     editFailed = false
+    undo = nil
     Task {
       defer { busy = false }
       do { try await operation() } catch { editFailed = true }

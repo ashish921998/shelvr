@@ -33,6 +33,7 @@ struct AddTripStopView: View {
           ForEach(Array(found.enumerated()), id: \.offset) { _, place in
             Button { add(.search(place)) } label: { VStack(alignment: .leading) {
               Text(place.name)
+              if TripEdit.alreadyOnTrip(place, trip: trip) { Text(copy("tripPlanner.onTrip")).font(.caption) }
               if let area = place.area { Text(area).font(.caption) }
             } }
           }

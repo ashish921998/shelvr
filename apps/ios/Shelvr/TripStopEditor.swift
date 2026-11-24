@@ -3,6 +3,7 @@ import SwiftUI
 
 struct TripStopEditor: View {
   let stop: CityTrip.Stop
+  let changed: () -> Void
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.dismiss) private var dismiss
@@ -11,7 +12,8 @@ struct TripStopEditor: View {
   @State private var busy = false
   @State private var failed = false
 
-  init(stop: CityTrip.Stop) {
+  init(stop: CityTrip.Stop, changed: @escaping () -> Void) {
+    self.changed = changed
     self.stop = stop
     _time = State(initialValue: stop.time ?? "")
     _note = State(initialValue: stop.note ?? "")
@@ -40,7 +42,7 @@ struct TripStopEditor: View {
     guard !busy else { return }
     busy = true
     defer { busy = false }
-    do { try await backend.updateStop(stop, time: time, note: note); dismiss() }
+    do { try await backend.updateStop(stop, time: time, note: note); changed(); dismiss() }
     catch { failed = true }
   }
 }
