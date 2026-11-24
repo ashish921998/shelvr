@@ -59,9 +59,14 @@ struct SignedInView: View {
         case "add-spots":
           List {
             entry("/add", "addSheet.pasteLink", "link")
+            entry("/add", "addSheet.googleMapsList", "map")
+            entry("/new-shared-list", "sharedLists.newTitle", "person.2")
+            entry("/new-trip", "homePlaces.planTrip", "suitcase")
             entry("/photo", "item.photo", "photo")
             entry("/how-to-share", "addSheet.howToShare", "square.and.arrow.up")
-            entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
+            if Locale.preferredLanguages.first?.hasPrefix("en") == true {
+              entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
+            }
           }
           .navigationTitle(copy("addSheet.title"))
         case "trips": TripsTabView()
@@ -106,7 +111,6 @@ struct SignedInView: View {
         case "how-to-share": SaveInstructions(siri: false)
         case "save-with-siri": SaveInstructions(siri: true)
         case "plan-gate", "paywall": PlanGateView()
-        case "share": PasteLinkView()
         default: ShellDestination(link: link)
         } }
       }
@@ -120,7 +124,7 @@ struct SignedInView: View {
       guard let link else { return }
       pendingLink = nil
       switch link.path {
-      case ["map"]: library = false; path = []
+      case ["map"], ["share"]: library = false; path = []
       case ["home"]: library = true; path = []
       case ["sign-in"]: break
       default: path = [link]
