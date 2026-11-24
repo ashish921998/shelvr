@@ -22,18 +22,16 @@ public struct ImportPhoto: Sendable {
   public let contentType: String
   public let aspectRatio: Double
 
-  public static func failureStage(_ error: Error) -> String {
-    switch failureCopy(error) {
-    case "freePlan.photosNeedPro": "pro_required"
-    case "errors.photoLimit": "photo_limit"
-    case "errors.photoTooLarge": "image_too_large"
-    case "errors.photoEmpty": "image_empty"
-    default: "other"
+  public static func failureStage(_ error: Error, captureCode: String? = nil) -> String {
+    let code = captureCode ?? (error as? PhotoUploadFailure)?.rawValue ?? saveErrorCode(error)
+    switch code {
+    case "pro_required", "photo_limit", "image_too_large", "image_empty": return code ?? "other"
+    default: return "other"
     }
   }
 
   public static func failureCopy(_ error: Error) -> String {
-    switch (error as? PhotoUploadFailure)?.rawValue ?? saveErrorCode(error) {
+    switch failureStage(error) {
     case "pro_required": "freePlan.photosNeedPro"
     case "photo_limit": "errors.photoLimit"
     case "image_too_large": "errors.photoTooLarge"

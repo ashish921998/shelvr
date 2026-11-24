@@ -150,7 +150,12 @@ struct SharedInboxReceiver: ViewModifier {
     do { try await deliver(payload, batch: batch, inbox: inbox, owner: owner) }
     catch {
       if !Task.isCancelled {
-        Analytics.capture("save_failed", properties.merging(["stage": ImportPhoto.failureStage(error)]) { $1 })
+        let code: String? = switch error as? ShelvrCapture.Failure {
+        case .proRequired: "pro_required"
+        case let .refused(reason): reason
+        default: nil
+        }
+        Analytics.capture("save_failed", properties.merging(["stage": ImportPhoto.failureStage(error, captureCode: code)]) { $1 })
       }
       throw error
     }
