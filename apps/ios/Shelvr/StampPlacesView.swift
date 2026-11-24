@@ -1,3 +1,4 @@
+import MapKit
 import ShelvrKit
 import SwiftUI
 
@@ -6,6 +7,9 @@ struct StampPlacesView: View {
   let finished: (String) -> Void
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
+  @State private var inspect: String?
+  @State private var card: MKMapItem?
+  @State private var lookupFailed = false
   @State private var picked: Set<UnstampedPlace.ID> = []
   @State private var operation = SocialOperation()
 
@@ -22,7 +26,9 @@ struct StampPlacesView: View {
             let similar = Dictionary(grouping: rows) { [$0.name.lowercased(), ($0.title ?? "").lowercased()] }
             Section(key) {
               ForEach(rows) { place in
-                Button {
+                let twins = similar[[place.name.lowercased(), (place.title ?? "").lowercased()]] ?? []
+                HStack {
+                  Button {
                   if city != nil {
                     operation.run {
                       try await backend.stampNow(place)
@@ -35,7 +41,7 @@ struct StampPlacesView: View {
                     VStack(alignment: .leading) {
                       Text(place.name)
                       if let title = place.title, !title.isEmpty { Text(title).font(.caption).foregroundStyle(.secondary) }
-                      if similar[[place.name.lowercased(), (place.title ?? "").lowercased()]]?.count ?? 0 > 1 {
+                      if twins.count > 1 {
                         Text(place.coordinates).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
                       }
                     }
@@ -44,6 +50,15 @@ struct StampPlacesView: View {
                   }
                 }.disabled(operation.busy || (city == nil && !picked.contains(place.id) && chosen.count >= 60))
                   .accessibilityAddTraits(picked.contains(place.id) ? .isSelected : [])
+                  .buttonStyle(.borderless)
+                  if twins.count > 1, let appleId = place.appleId {
+                    Button { inspect = appleId } label: {
+                      Image(systemName: "map").frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(copy("plan.openMapsFor", ["name": place.name]))
+                  }
+                }
               }
             }
           }
@@ -60,6 +75,17 @@ struct StampPlacesView: View {
         }
       }
     }
+    .mapItemDetailSheet(item: $card, displaysMap: true)
+    .task(id: inspect) {
+      guard let inspect, let id = MKMapItem.Identifier(rawValue: inspect) else { return }
+      do {
+        let item = try await MKMapItemRequest(mapItemIdentifier: id).mapItem
+        try Task.checkCancellation()
+        card = item
+      } catch { if !Task.isCancelled { lookupFailed = true } }
+      if !Task.isCancelled { self.inspect = nil }
+    }
+    .alert(copy("common.unavailable"), isPresented: $lookupFailed) { Button(copy("common.close")) {} }
     .navigationTitle(copy(city == nil ? "passport.beenTitle" : "passport.nextTitle"))
     .socialOperation(operation, failure: copy("errors.tryAgain"), close: copy("common.close"))
   }
