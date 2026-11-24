@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import Testing
 @testable import ShelvrKit
 
@@ -85,4 +86,17 @@ private final class RevokeEndpointStub: URLProtocol, @unchecked Sendable {
   } delivered: { _ in true }
   #expect(!complete)
   #expect(revoked == ["retired"])
+}
+
+@Test func anUnreadableExistingCredentialCannotBeOverwritten() throws {
+  let query: [String: Any] = [
+    kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: "test.shelvr.\(UUID().uuidString)",
+    kSecAttrAccount as String: "capture"
+  ]
+  defer { _ = Keychain.delete(query) }
+  let original = Data("malformed fixture".utf8)
+  #expect(Keychain.write(original, to: query))
+  let replacement = SiriCredential(owner: "b", token: "new", siteURL: "https://example.convex.site", subject: "b|session")
+  #expect(throws: DecodingError.self) { try SiriCredential.store(replacement, in: query) }
+  #expect(try Keychain.checkedData(query) == original)
 }
