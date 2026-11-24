@@ -1,3 +1,4 @@
+import Combine
 import ShelvrKit
 import SwiftUI
 
@@ -86,21 +87,11 @@ struct InviteEntryView: View {
   }
 
   private func askForMissingName() async -> Bool {
-    await withTaskGroup(of: Bool.self) { tasks in
-      tasks.addTask { @MainActor [backend] in
-        do {
-          for try await name in backend.query("users:getMyFirstName", as: String?.self) { return name == nil }
-        } catch {}
-        return false
-      }
-      tasks.addTask {
-        try? await Task.sleep(for: .seconds(3))
-        return false
-      }
-      let ask = await tasks.next() ?? false
-      tasks.cancelAll()
-      return ask
-    }
+    let timeout = Just(false).delay(for: .seconds(3), scheduler: DispatchQueue.main)
+    let lookup = backend.client.subscribe(to: "users:getMyFirstName", yielding: String?.self)
+      .map { $0 == nil }.replaceError(with: false)
+    for await ask in lookup.merge(with: timeout).prefix(1).values { return ask }
+    return false
   }
 
   private func currentAccount() async throws -> String {
