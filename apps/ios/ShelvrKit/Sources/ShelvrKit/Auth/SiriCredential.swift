@@ -19,14 +19,23 @@ public struct SiriCredential: Codable, Sendable {
     return JWT.claims(of: tokens.token)?.sub
   }
 
+  static func stored() -> Self? {
+    Keychain.read(query).flatMap { try? JSONDecoder().decode(Self.self, from: $0) }
+  }
+
   public static func current() -> Self? {
-    guard let subject = currentSubject, let bytes = Keychain.read(query),
-      let record = try? JSONDecoder().decode(Self.self, from: bytes), record.subject == subject
+    guard let subject = currentSubject, let record = stored(), record.subject == subject
     else { return nil }
     return record
   }
 
+  func enqueueRevocation() throws {
+    guard let url = URL(string: siteURL), url.scheme == "https" else { throw URLError(.badURL) }
+    try SiriRevocations(site: url).remember(token)
+  }
+
   static func store(_ value: Self) throws {
+    if let old = stored(), old.token != value.token { try old.enqueueRevocation() }
     guard Keychain.write(try JSONEncoder().encode(value), to: query, accessibility: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly) else { throw AuthSessionError.sessionStorageUnavailable }
   }
 
@@ -63,14 +72,44 @@ extension Backend {
     let token: String = try await client.action("appIntents:issueCaptureToken")
     guard !Task.isCancelled, status == .signedIn, SiriCredential.currentSubject == subject,
       let host = environment.convexURL.host(), host.hasSuffix(".convex.cloud") else {
-      try? await ConvexHTTPAuthTransport(deployment: environment.convexURL).revokeSiri(token, authorization: authorization)
+      await revokeSiriToken(token, authorization: authorization)
       return
     }
     let site = "https://" + host.dropLast(".cloud".count) + ".site"
     try await Self.installSiri({
       try SiriCredential.store(SiriCredential(owner: owner, token: token, siteURL: site, subject: subject))
     }, revokeOnFailure: {
-      try? await ConvexHTTPAuthTransport(deployment: environment.convexURL).revokeSiri(token, authorization: authorization)
+      await revokeSiriToken(token, authorization: authorization)
     })
+  }
+}
+
+extension Backend {
+  var siriRevocations: SiriRevocations? { SiriRevocations.site(for: environment.convexURL).map(SiriRevocations.init(site:)) }
+
+  func revokeSiriToken(_ token: String, authorization: String) async {
+    try? siriRevocations?.remember(token)
+    do {
+      try await ConvexHTTPAuthTransport(deployment: environment.convexURL).revokeSiri(token, authorization: authorization)
+      siriRevocations?.delivered(token)
+    } catch { retrySiriRevocations() }
+  }
+
+  func retrySiriRevocations() {
+    siriDrainRequested = true
+    guard siriDrain == nil, let siriRevocations else { return }
+    siriDrain = Task {
+      let transport = ConvexHTTPAuthTransport(deployment: environment.convexURL)
+      var delay = 5
+      while !Task.isCancelled {
+        siriDrainRequested = false
+        let pending = await siriRevocations.drain(revoke: transport.revokePresentedSiri)
+        if pending {
+          do { try await Task.sleep(for: .seconds(delay)) } catch { break }
+          delay = min(300, delay * 2)
+        } else if !siriDrainRequested { break }
+      }
+      siriDrain = nil
+    }
   }
 }

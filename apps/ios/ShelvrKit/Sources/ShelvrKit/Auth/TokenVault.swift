@@ -15,6 +15,8 @@ public struct KeychainTokenVault: TokenVault {
     self.account = account
   }
 
+  var isAbsent: Bool { SecItemCopyMatching(query as CFDictionary, nil) == errSecItemNotFound }
+
   public func read() -> AuthTokens? {
     Keychain.read(query).flatMap { try? JSONDecoder().decode(AuthTokens.self, from: $0) }
   }

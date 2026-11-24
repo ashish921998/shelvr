@@ -61,6 +61,18 @@ public struct ConvexHTTPAuthTransport: AuthTransport {
     _ = try await call("auth:signOut", args: [String: String](), token: token, returning: Ignored.self)
   }
 
+  func revokePresentedSiri(_ capture: String) async throws {
+    guard let site = SiriRevocations.site(for: endpoint)?.appending(path: "app-intents/revoke") else {
+      throw URLError(.badURL)
+    }
+    var request = URLRequest(url: site, timeoutInterval: 12)
+    request.httpMethod = "POST"
+    request.setValue("Bearer " + capture, forHTTPHeaderField: "Authorization")
+    let (_, response) = try await session.data(for: request)
+    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+    guard status == 204 else { throw ConvexCallError.badResponse(status) }
+  }
+
   func revokeSiri(_ capture: String, authorization: String) async throws {
     _ = try await call("appIntents:revokeCaptureToken", args: ["token": capture], token: authorization,
       returning: Ignored.self, mutation: true)
