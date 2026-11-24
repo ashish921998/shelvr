@@ -45,13 +45,15 @@ struct LibraryView: View {
         }
       }
       if screen == .home && !searchQuery.isEmpty {
-        LibrarySearchResults(query: searchQuery, state: searchState) { searchAttempt += 1 }
+        LibrarySearchResults(query: searchQuery, state: searchState) {
+          searchState = .loading
+          searchAttempt += 1
+        }
       } else { libraryRows }
     }
     .task(id: SearchRequest(query: searchQuery, attempt: searchAttempt)) {
-      searchState = .loading
       let term = searchQuery
-      guard !term.isEmpty else { return }
+      guard !term.isEmpty else { searchState = .loading; return }
       do {
         try await Task.sleep(for: .milliseconds(250))
         for try await items in backend.searchLibrary(term) {

@@ -143,7 +143,10 @@ private struct OnboardingAccount: View {
           else if progress.step == .notifications { progress.step = .carousel; carousel = 2; persist() }
         }) {
           BillingSheet(destination: .paywall, goalVariables: goalVariables,
-            availabilityChanged: { unavailable = !$0 }, confirmed: { purchased = true })
+            availabilityChanged: { available in
+              unavailable = !available
+              if !available { paywall = false }
+            }, confirmed: { purchased = true })
         }
       }
     }
@@ -324,10 +327,8 @@ private struct OnboardingAccount: View {
   }
 
   private func finish() {
-    let spaces = ["date": "interests.vibeDateNights", "travel": "presets.travel", "food": "presets.restaurants"]
-    let goal = ["date", "travel", "food"].first(where: progress.goals.contains)
     let entry = OnboardingHandoff(cities: progress.visitedCities.sorted(), url: progress.skippedShare ? nil : reel?.url,
-      operation: progress.demoOperationID, space: goal.flatMap { spaces[$0] }.map { copy($0) })
+      operation: progress.demoOperationID, space: nil)
     do {
       try entry.save(account)
       complete = true

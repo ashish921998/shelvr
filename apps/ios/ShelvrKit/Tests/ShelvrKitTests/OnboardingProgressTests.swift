@@ -36,3 +36,10 @@ import Testing
   #expect(afterSave.cities == original.cities && afterSave.url == nil)
   #expect(afterSave.remaining(afterStamps: true) == nil)
 }
+
+@Test func practiceReelUsesAnAvailableFreeSaveOrWaitsForAccess() {
+  #expect(OnboardingHandoff.canSave(pro: false, freeOpen: true, remaining: 1))
+  #expect(!OnboardingHandoff.canSave(pro: false, freeOpen: true, remaining: 0))
+  #expect(!OnboardingHandoff.canSave(pro: false, freeOpen: false, remaining: 1))
+  #expect(OnboardingHandoff.canSave(pro: true, freeOpen: false, remaining: 0))
+}

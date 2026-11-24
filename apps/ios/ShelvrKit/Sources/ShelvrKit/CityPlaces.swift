@@ -68,8 +68,8 @@ extension Backend {
 extension CityPlace {
   public static func visited(_ visits: [MapVisit], among pins: [Self]) -> Set<Self> {
     let mapped = pins.map { pin in
-      MapPlace(_id: nil, itemId: pin.itemID, appleId: pin.appleID, city: nil, category: nil, cuisine: nil,
-        name: pin.name, lat: pin.lat, lng: pin.lng, kinds: [], features: nil)
+      MapPlace(source: .saved(itemID: pin.itemID), name: pin.name, lat: pin.lat, lng: pin.lng,
+        appleId: pin.appleID, city: nil, category: nil, cuisine: nil, kinds: [])
     }
     let ids = MapVisit.visitedIDs(visits, among: mapped)
     return Set(zip(pins, mapped).compactMap { pin, place in ids.contains(place.id) ? pin : nil })

@@ -27,7 +27,11 @@ struct InviteEntryView: View {
           if entry.failed { Button(copy("common.retry")) { attempt += 1 } } else { ProgressView() }
           Button(copy("common.cancel")) { cancel() }.disabled(entry.dispatching != nil)
         }
-        .task(id: Work(request: request.id, session: backend.sessionGeneration, attempt: attempt)) { await resolve(request) }
+        .task(id: Work(request: request.id, session: backend.sessionGeneration, attempt: attempt,
+          waiting: entry.waitsForDispatch(from: backend.sessionGeneration))) {
+          guard !entry.waitsForDispatch(from: backend.sessionGeneration) else { return }
+          await resolve(request)
+        }
       } else if backend.status == .signedOut {
         SignInView().overlay(alignment: .topLeading) {
           if entry.accepted != nil { Button(copy("common.cancel")) { cancel() }.padding() }
@@ -112,7 +116,11 @@ struct InviteEntryView: View {
     throw CocoaError(.coderValueNotFound)
   }
 
-  private struct Work: Equatable { let request, session: UUID; let attempt: Int }
+  private struct Work: Equatable {
+    let request, session: UUID
+    let attempt: Int
+    let waiting: Bool
+  }
 
   private func resolve(_ request: AcceptedInvite) async {
     let session = backend.sessionGeneration
@@ -124,12 +132,15 @@ struct InviteEntryView: View {
     do {
       let account = try await currentAccount()
       guard current() else { return }
-      guard let bound = request.bound(to: account) else { cancel(); return }
+      guard let bound = request.bound(to: account) else {
+        if let next = entry.cancel(keepPreview: false) { pendingLink = next }
+        return
+      }
       if bound != request, !entry.replace(with: bound) { return }
-      guard entry.beginDispatch(request.id) else { return }
-      var handoff: AppLink?
+      guard entry.beginDispatch(request.id, session: session) else { return }
+      var handoff: InviteNavigation?
       defer {
-        if let next = entry.endDispatch(request.id, destination: handoff), !entry.route(next) { pendingLink = next }
+        if let next = entry.endDispatch(request.id, navigation: handoff), !entry.route(next) { pendingLink = next }
       }
       let destination: AppLink?
       if request.invite.kind == .list {
@@ -146,8 +157,7 @@ struct InviteEntryView: View {
           defaults.removeObject(forKey: OnboardingHandoff.key(account))
           defaults.set(true, forKey: completed)
         }
-        handoff = destination
-        pendingLink = destination
+        handoff = InviteNavigation(destination: destination, account: account, session: session)
       } else {
         entry.expired = request.invite
         entry.preview = request.invite
