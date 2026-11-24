@@ -24,13 +24,31 @@ public struct GoOutPlace: Decodable, Hashable, Sendable {
     return kind == "food" ? types.contains { ["food", "coffee", "dessert"].contains($0) } : types.contains(kind)
   }
 
-  public static func distinct(_ places: [Self], city: String) -> [Self] {
+  private struct LegacyPin: Hashable {
+    let name: String
+    let lat: Double
+    let lng: Double
+  }
+
+  public static func distinct(_ places: [Self], city: String, citySaves: [LibrarySave] = []) -> [Self] {
+    let scoped = citySaves.flatMap { $0.placePins ?? [] }.filter { $0.city == nil }
+    let appleIDs = Set(scoped.compactMap(\.appleId))
+    let legacy = Set(scoped.compactMap { place -> LegacyPin? in
+      guard let lat = place.lat, let lng = place.lng else { return nil }
+      return LegacyPin(name: CityPlace.key(place.name), lat: lat, lng: lng)
+    })
+    func belongs(_ place: Self) -> Bool {
+      if city.isEmpty { return true }
+      if let named = place.city { return tidy(named) == tidy(city) }
+      if let id = place.appleId, appleIDs.contains(id) { return true }
+      return legacy.contains(LegacyPin(name: CityPlace.key(place.name), lat: place.lat, lng: place.lng))
+    }
     func tidy(_ name: String) -> String { name.split(whereSeparator: \.isWhitespace).joined(separator: " ").lowercased() }
     var result: [Self] = []
     var names = [String: [Int]]()
     var ids = [String: Int]()
     var knownApple = [Int: String]()
-    for pin in places where city.isEmpty || tidy(pin.city ?? "") == tidy(city) {
+    for pin in places where belongs(pin) {
       let key = CityPlace.key(pin.name)
       if let id = pin.appleId, let index = ids[id] {
         if !(names[key] ?? []).contains(index) { names[key, default: []].append(index) }

@@ -56,3 +56,16 @@ import Testing
   #expect(places.filter { $0.matches("food") }.map(\.name) == ["Coffee"])
   #expect(GoOutPlace.rolled(places, previous: places[0]) == places[1])
 }
+
+@Test func legacyPinsUseCityScopedLibraryMembershipForQuickPicks() throws {
+  let decoder = JSONDecoder()
+  let mapped = try decoder.decode([GoOutPlace].self, from: Data("""
+    [{"name":"Legacy cafe","lat":1,"lng":2},{"name":"Other location","lat":3,"lng":4}]
+    """.utf8))
+  let cityRows = try decoder.decode([LibrarySave].self, from: Data("""
+    [{"_id":"fixture","_creationTime":0,"status":"ready","cities":["Austin"],
+      "placePins":[{"name":"Legacy cafe","lat":1,"lng":2}]}]
+    """.utf8))
+  #expect(GoOutPlace.distinct(mapped, city: "Austin", citySaves: cityRows).map(\.name) == ["Legacy cafe"])
+  #expect(GoOutPlace.distinct(mapped, city: "Houston").isEmpty)
+}
