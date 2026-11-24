@@ -41,3 +41,9 @@ import Testing
   #expect(places[0].id != places[1].id)
   #expect(MapVisit.visitedIDs(visits, among: places) == [places[0].id])
 }
+
+@Test func modifierLetterApostrophesRemainInLegacyVisitKeys() throws {
+  #expect(MapPlace.key("Kaʼa Café") == "kaʼacafe")
+  #expect(MapPlace.key("L’Atelier") == "latelier")
+  #expect(MapPlace.words("Kaʼa Café") == ["kaa", "cafe"])
+}
