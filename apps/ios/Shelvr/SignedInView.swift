@@ -15,6 +15,7 @@ struct SignedInView: View {
           List {
             entry("/saves", "homePlaces.allSaves", "bookmark")
             entry("/cities", "homePlaces.cities", "building.2")
+            entry("/passport", "passport.title", "book.closed")
           }
         } else {
           Map()
@@ -62,6 +63,9 @@ struct SignedInView: View {
             entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
           }
           .navigationTitle(copy("addSheet.title"))
+        case "passport-story": PassportStoryView()
+        case "passport": PassportView()
+        case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)
         case "go-out": PlanCityView()
         case "add": PasteLinkView()
         default: ShellDestination(link: link)
