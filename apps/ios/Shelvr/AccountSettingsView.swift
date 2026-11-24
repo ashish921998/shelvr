@@ -3,34 +3,30 @@ import SwiftUI
 import UserNotifications
 
 struct AccountSettingsView: View {
+  @Environment(\.scenePhase) private var phase
   @EnvironmentObject private var pushDevice: PushDevice
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var confirming = false
   @State private var deleting = false
   @State private var failure = false
-  @State private var manage = false
+  @State private var billing: BillingDestination?
+  @State private var denied = false
+  @State private var restored = false
 
   var body: some View {
     List {
       Section {
-        Button(copy("onboardingNotify.allow")) {
-          Task {
-            let center = UNUserNotificationCenter.current()
-            let settings = await center.notificationSettings()
-            if settings.authorizationStatus == .denied {
-              if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
-                await UIApplication.shared.open(url)
-              }
-            } else if (try? await center.requestAuthorization(options: [.alert, .badge, .sound])) == true {
-              pushDevice.retryEnrollment()
-            }
-          }
+        SaveReminderPreference()
+        if denied, let settings = URL(string: UIApplication.openNotificationSettingsURLString) {
+          Link(copy("permissions.openSettings"), destination: settings)
         }
+        Button(copy("pro.restore")) { restored = false; billing = .restore }
+        if restored { Text(copy("pro.restoredTitle")).foregroundStyle(.secondary) }
+        Button(copy("pro.manage")) { billing = .manage }
         if pushDevice.blockedSession == backend.sessionGeneration {
           Text(copy("notifications.previousAccount")).foregroundStyle(.secondary)
         }
-        Button(copy("pro.manage")) { manage = true }
         Link(copy("support.contact"), destination: URL(string: "mailto:ashish921998@zohomail.in?subject=Shelvr%20Support")!)
         Link(copy("legal.terms"), destination: URL(string: "https://tryshelvr.app/terms")!)
         Link(copy("legal.privacy"), destination: URL(string: "https://tryshelvr.app/privacy")!)
@@ -44,10 +40,15 @@ struct AccountSettingsView: View {
       }
     }
     .navigationTitle(copy("profile.settings"))
-    .sheet(isPresented: $manage) { BillingSheet(destination: .manage) }
+    .task(id: phase) {
+      if phase == .active { denied = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus == .denied }
+    }
+    .sheet(item: $billing) { destination in
+      BillingSheet(destination: destination, confirmed: { if destination == .restore { restored = true } })
+    }
     .alert(copy("account.deleteTitle"), isPresented: $confirming) {
       Button(copy("common.cancel"), role: .cancel) {}
-      Button(copy("pro.manage")) { manage = true }
+      Button(copy("pro.manage")) { billing = .manage }
       Button(copy("account.delete"), role: .destructive, action: deleteAccount)
     } message: {
       Text(["account.deleteIntro", "account.deleteItems", "account.deleteSpaces",

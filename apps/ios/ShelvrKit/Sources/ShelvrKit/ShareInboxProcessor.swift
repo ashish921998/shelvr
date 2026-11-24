@@ -19,10 +19,18 @@ public struct ShareInboxProcessor {
     public let share: PendingShare?
     public let copyKey: String
     public let canRecoverNote: Bool
-    public init(share: PendingShare? = nil, copyKey: String = "share.retryHelp", canRecoverNote: Bool = false) {
+    public let requiresPro: Bool
+
+    public init(
+      share: PendingShare? = nil,
+      copyKey: String = "share.retryHelp",
+      canRecoverNote: Bool = false,
+      requiresPro: Bool = false
+    ) {
       self.share = share
       self.copyKey = copyKey
       self.canRecoverNote = canRecoverNote
+      self.requiresPro = requiresPro
     }
   }
 
@@ -71,14 +79,15 @@ public struct ShareInboxProcessor {
       if ($0.error as? ShareInboxError) == .longNoteNeedsRecovery {
         return Failure(share: $0.share, copyKey: "share.longNoteRecovery", canRecoverNote: true)
       }
-      return Failure(share: $0.share, copyKey: Self.copyKey(for: $0))
+      let failure = SaveFailure($0.error)
+      return Failure(share: $0.share, copyKey: Self.copyKey(for: $0.share, failure: failure),
+        requiresPro: failure == .proRequired)
     }
   }
 
-  private static func copyKey(for refusal: ShareInbox.FailedShare) -> String {
-    let failure = SaveFailure(refusal.error)
+  private static func copyKey(for share: PendingShare, failure: SaveFailure) -> String {
     if failure == .other { return "share.retryHelp" }
-    if failure == .proRequired, case .success(let delivery) = refusal.share.delivery {
+    if failure == .proRequired, case .success(let delivery) = share.delivery {
       switch delivery.content {
       case .link, .note: return "freePlan.leftBody"
       case .image: break

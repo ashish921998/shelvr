@@ -3,6 +3,7 @@ import SwiftUI
 import UserNotifications
 
 struct SaveReminderPreference: View {
+  @EnvironmentObject private var pushDevice: PushDevice
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.scenePhase) private var phase
@@ -53,6 +54,7 @@ struct SaveReminderPreference: View {
       if enabled {
         let allowed = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
         permitted = allowed
+        if allowed { pushDevice.retryEnrollment() }
         guard allowed else { message = copy(weekly ? "notifications.disabledBody" : "notifications.remindersDisabledBody"); return }
       }
       guard backend.status == .signedIn, session == backend.sessionGeneration else { return }

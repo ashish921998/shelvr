@@ -3,13 +3,13 @@ import SwiftUI
 
 struct AddTripStopView: View {
   let id: String
-  let initialDay: Int
+  private let sharedTrip: CityTrip?
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.dismiss) private var dismiss
   @State private var trip: CityTrip?
   @State private var saves: [TripSavePlace]?
-  @State private var day = 1
+  @State private var day: Int
   @State private var query = ""
   @State private var found: [TripSearchPlace] = []
   @State private var session = 0
@@ -18,10 +18,18 @@ struct AddTripStopView: View {
   @State private var busy = false
   @State private var adding: Task<Void, Never>?
 
+  init(id: String, initialDay: Int, sharedTrip: CityTrip? = nil) {
+    self.id = id
+    self.sharedTrip = sharedTrip
+    _day = State(initialValue: initialDay)
+  }
+
   var body: some View {
+    let visibleTrip = sharedTrip ?? trip
+    let visibleSaves = sharedTrip == nil ? saves : []
     Group {
       if failed { Button(copy("common.retry")) { session += 1 } }
-      else if let trip, let saves {
+      else if let trip = visibleTrip, let saves = visibleSaves {
         List {
           Picker(copy("tripPlanner.addTo"), selection: $day) {
             ForEach(0...trip.days.count, id: \.self) { day in Text(dayLabel(day)).tag(day) }
@@ -42,19 +50,28 @@ struct AddTripStopView: View {
       } else { ProgressView() }
     }
     .navigationTitle(copy("tripPlanner.addPlace"))
+    .onChange(of: sharedTrip?.days.count, initial: true) { _, count in
+      if let count { day = TripEdit.day(day, count: count) }
+    }
     .task(id: session) {
+      guard sharedTrip == nil else { return }
       failed = false
       do {
         for try await data in backend.cityTrip(id) {
+          try Task.checkCancellation()
           guard let data else { failed = true; return }
-          day = TripEdit.day(trip == nil ? initialDay : day, count: data.days.count)
+          day = TripEdit.day(day, count: data.days.count)
           trip = data
         }
       } catch { if !Task.isCancelled { failed = true } }
     }
     .task(id: session) {
+      guard sharedTrip == nil else { return }
       do {
-        for try await saves in backend.tripSavePlaces(id) { self.saves = saves }
+        for try await saves in backend.tripSavePlaces(id) {
+          try Task.checkCancellation()
+          self.saves = saves
+        }
       } catch { if !Task.isCancelled { failed = true } }
     }
     .task(id: query) {
