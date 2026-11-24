@@ -1,3 +1,6 @@
+import { writeFileSync } from "node:fs";
+import { isStaleProcessing } from "@convex/model/itemFields";
+import vectors from "../../../ios/TestData/library-retry.json";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -109,4 +112,26 @@ describe("cityCountLine", () => {
       "2 saves, no place yet",
     );
   });
+});
+
+it("keeps Swift save retry eligibility aligned with Expo and the server", () => {
+  const statuses = ["failed", "ready", "processing"] as const;
+  const failures = ["not_found", "image_too_large", "error"] as const;
+  const expected = vectors.saves.map((row) => {
+    const status = statuses.find((value) => value === row.status);
+    if (!status) throw new Error("Invalid fixture status");
+    const failureReason = failures.find((value) => value === row.failureReason);
+    return (
+      canRetrySave({ ...row, status, failureReason }) ||
+      isStaleProcessing(row, vectors.now)
+    );
+  });
+  if (process.env.SHELVR_RECORD_RETRY_VECTORS === "1") {
+    writeFileSync(
+      "../../apps/ios/TestData/library-retry.json",
+      JSON.stringify({ ...vectors, expected }, null, 2) + "\n",
+    );
+  } else {
+    expect(expected).toEqual(vectors.expected);
+  }
 });

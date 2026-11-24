@@ -19,6 +19,7 @@ struct RootView: View {
     .background(appearance == "neutralDark" ? Color(red: 17/255, green: 20/255, blue: 23/255) : Color(.background))
     .preferredColorScheme(appearance == "system" ? nil : appearance == "light" ? .light : .dark)
     .foregroundStyle(Color(.foreground))
+    .modifier(SharedInboxReceiver())
     .onOpenURL { url in
       if let link = AppLink(url.absoluteString), link.path != ["sign-in"] { pendingLink = link }
     }
