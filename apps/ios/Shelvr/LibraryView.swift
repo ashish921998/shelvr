@@ -41,6 +41,8 @@ struct LibraryView: View {
         }
         route("/saves", "homePlaces.allSaves", "bookmark")
         route("/cities", "homePlaces.cities", "building.2")
+        route("/shared-lists", "sharedLists.title", "person.2")
+        route("/passport", "passport.title", "book.closed")
         if rows.contains(where: \.needsReview) || pages.last?.isDone == false {
           route("/review-saves", "homePlaces.withoutPlace", "exclamationmark.circle")
         }
@@ -110,6 +112,7 @@ struct LibraryView: View {
     do {
       for try await page in backend.libraryPage(after: cursor) {
         guard !Task.isCancelled, subscriptions.indices.contains(index), subscriptions[index] == cursor else { return }
+        failures.remove(index)
         if pages.count == index {
           pages.append(page)
         } else {
@@ -121,7 +124,9 @@ struct LibraryView: View {
         }
       }
     } catch {
-      if !Task.isCancelled { failures.insert(index) }
+      if !Task.isCancelled, subscriptions.indices.contains(index), subscriptions[index] == cursor {
+        failures.insert(index)
+      }
     }
   }
 
