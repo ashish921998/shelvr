@@ -67,7 +67,14 @@ struct SignedInView: View {
           if let id = link.query.first(where: { $0.name == "itemId" })?.value {
             LibraryPlaceEditor(id: id).id(id)
           } else { ShellDestination(link: link) }
-        case "go-out": PlanCityView()
+        case "date-plan", "go-out", "new-trip":
+          if let city = link.query.first(where: { $0.name == "city" })?.value, !city.isEmpty {
+            let listID = link.query.first(where: { $0.name == "listId" })?.value
+            if link.path.first == "new-trip" {
+              NewCityTripView(city: city, listID: listID) { path.append($0) }.id(link)
+            } else { CityDateView(city: city, listID: listID).id(link) }
+          } else { PlanCityView(trip: link.path.first == "new-trip") }
+        case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1]).id(link.path[1])
         default: ShellDestination(link: link)
         }
       }
@@ -108,6 +115,7 @@ private struct ShellDestination: View {
 }
 
 private struct PlanCityView: View {
+  let trip: Bool
   struct City: Decodable {
     let city: String
     let placeCount: Int?
@@ -130,7 +138,7 @@ private struct PlanCityView: View {
           List(cities, id: \.city) { city in
             var url: URLComponents {
               var parts = URLComponents()
-              parts.path = "/date-plan"
+              parts.path = trip ? "/new-trip" : "/date-plan"
               parts.queryItems = [URLQueryItem(name: "city", value: city.city)]
               return parts
             }
@@ -143,7 +151,7 @@ private struct PlanCityView: View {
         ProgressView()
       }
     }
-    .navigationTitle(copy("plan.goOut"))
+    .navigationTitle(copy(trip ? "homePlaces.planTrip" : "plan.goOut"))
     .task(id: attempt) {
       failed = false
       do {
