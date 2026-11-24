@@ -12,6 +12,7 @@ struct CancelSurveyCard: ViewModifier {
   @Environment(\.scenePhase) private var phase
   @State private var userID: String?
   @State private var visible = false
+  @State private var checked = false
   @State private var claimed = false
   @State private var delivering = false
   @State private var error = false
@@ -19,7 +20,7 @@ struct CancelSurveyCard: ViewModifier {
   func body(content: Content) -> some View {
     content
       .safeAreaInset(edge: .top) {
-        if visible && home && phase == .active {
+        if visible && checked && home && phase == .active {
           VStack(alignment: .leading, spacing: 6) {
             Text(copy("cancelSurvey.title")).font(.headline)
             Text(copy("cancelSurvey.body")).font(.caption)
@@ -36,12 +37,13 @@ struct CancelSurveyCard: ViewModifier {
       .task {
         do {
           for try await user in backend.query("users:getCurrentUser", as: AccountView.CurrentUser?.self) { userID = user?._id }
-        } catch { if !Task.isCancelled { Analytics.failure("cancel_survey_claim_failed") } }
+        } catch { if !Task.isCancelled { Analytics.failure("cancel_survey_user_load_failed") } }
       }
+      .onChange(of: phase) { _, next in if next != .active { checked = false } }
       .task(id: Episode(home: home, active: phase == .active, user: userID)) {
         guard phase == .active, let id = userID, Analytics.available else { return }
         await deliver(id)
-        guard home, !visible, !Task.isCancelled else { return }
+        guard home, !checked, !Task.isCancelled else { return }
         await consider(id)
       }
   }
@@ -60,15 +62,17 @@ struct CancelSurveyCard: ViewModifier {
     let session = backend.sessionGeneration
     do {
       for try await status in backend.query("cancelSurvey:getStatus", as: Status.self) {
-        guard !status.asked, !Task.isCancelled, backend.sessionGeneration == session else { return }
+        guard !Task.isCancelled, backend.sessionGeneration == session else { return }
+        if status.asked && !claimed { visible = false; checked = true; return }
         try await BillingIdentity.select(id, environment: backend.environment)
         guard !Task.isCancelled, Purchases.shared.appUserID == id, backend.sessionGeneration == session else { return }
         let info = try await Purchases.shared.customerInfo(fetchPolicy: .fetchCurrent)
         guard !Task.isCancelled, Purchases.shared.appUserID == id, backend.sessionGeneration == session, Analytics.available else { return }
-        if info.entitlements.active.values.contains(where: { $0.periodType == .trial && !$0.willRenew }) { visible = true }
+        visible = info.entitlements.active.values.contains(where: { $0.periodType == .trial && !$0.willRenew })
+        checked = true
         return
       }
-    } catch { if !Task.isCancelled { Analytics.failure("cancel_survey_claim_failed") } }
+    } catch { if !Task.isCancelled { checked = false; Analytics.failure("cancel_survey_status_failed") } }
   }
 
   private func claim() async {
