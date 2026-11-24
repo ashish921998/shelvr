@@ -8,3 +8,12 @@ import Testing
   #expect(CancelSurveyResponse.skipped.outcome == "dismissed")
   #expect(CancelSurveyResponse(rawValue: "unknown") == nil)
 }
+
+@Test func libraryReentryRequiresFreshCancellationEligibilityEvenWhenTheSceneStayedActive() {
+  var state = CancelSurveyEligibility.cancelled
+  #expect(state.forVisit(home: true, active: true) == .cancelled)
+  state = state.forVisit(home: false, active: true)
+  #expect(state == .unchecked)
+  #expect(state.forVisit(home: true, active: true) == .unchecked)
+  #expect(CancelSurveyEligibility.ineligible.forVisit(home: true, active: false) == .unchecked)
+}
