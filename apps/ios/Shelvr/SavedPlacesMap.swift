@@ -46,7 +46,7 @@ struct SavedPlacesMap: View {
         VStack(alignment: .leading, spacing: 8) {
           HStack {
             TextField(copy("map.searchPlaceholder"), text: $search)
-              .textFieldStyle(.roundedBorder).submitLabel(.search)
+              .textFieldStyle(.roundedBorder).submitLabel(.search).autocorrectionDisabled()
             Button { location.locate() } label: {
               Image(systemName: "location").frame(width: 44, height: 44)
             }.accessibilityLabel(copy("map.showMyLocation"))
