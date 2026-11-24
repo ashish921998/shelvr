@@ -361,6 +361,29 @@ describe("POST /app-intents/capture", () => {
     expect(memberships[0]).toMatchObject({ spaceId: mine, status: "saved" });
   });
 
+  it("remains idempotent when a queued Siri link's folder disappeared", async () => {
+    const { t, userId, token } = await setup();
+    const spaceId = await t.run(async (ctx) => {
+      const folder = await ctx.db.insert("spaces", { userId, name: "Removed" });
+      await ctx.db.delete(folder);
+      return folder;
+    });
+    const body = {
+      kind: "link",
+      url: "https://example.com",
+      operationId: OP,
+      spaceId,
+    };
+    const first = await post(t, "/app-intents/capture", body, token);
+    const retry = await post(t, "/app-intents/capture", body, token);
+    expect(first.status).toBe(200);
+    expect(retry.status).toBe(200);
+    expect(await retry.json()).toEqual(await first.json());
+    expect(
+      await t.run((ctx) => ctx.db.query("spaceItems").collect()),
+    ).toHaveLength(0);
+  });
+
   it("refuses a link the URL policy rejects instead of failing", async () => {
     const { t, token } = await setup();
     const response = await post(
