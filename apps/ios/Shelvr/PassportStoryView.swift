@@ -100,11 +100,11 @@ struct PassportStoryView: View {
     VStack(alignment: .leading, spacing: 18) {
       Text(copy("passportStory.kicker", ["year": String(Calendar.current.component(.year, from: Date()))])).font(.caption.bold())
       Text(story.places.formatted()).font(.system(size: 60, weight: .black, design: .rounded))
-      Text(copy.count(story.fromReels ? "passportStory.titleReels" : "passportStory.titleSaved", story.places))
+      Text(copy(story.fromReels ? "passportStory.titleReels" : "passportStory.titleSaved", count: story.places))
         .font(.title2.bold())
       HStack {
-        Text(copy.count("passport.citiesCount", story.cities))
-        if story.countries > 0 { Text(copy.count("passport.countriesCount", story.countries)) }
+        Text(copy("passport.citiesCount", count: story.cities))
+        if story.countries > 0 { Text(copy("passport.countriesCount", count: story.countries)) }
       }.font(.subheadline)
       if !story.cityNames.isEmpty { Text(story.cityNames.joined(separator: " · ")).font(.title3.bold()) }
       if !images.isEmpty {
