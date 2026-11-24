@@ -12,10 +12,7 @@ struct SignedInView: View {
     NavigationStack(path: $path) {
       Group {
         if library {
-          List {
-            entry("/saves", "homePlaces.allSaves", "bookmark")
-            entry("/cities", "homePlaces.cities", "building.2")
-          }
+          LibraryView(screen: .home)
         } else {
           SavedPlacesMap(open: open)
         }
@@ -61,7 +58,12 @@ struct SignedInView: View {
             entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
           }
           .navigationTitle(copy("addSheet.title"))
+        case "saves": LibraryView(screen: .saves)
+        case "review-saves": LibraryView(screen: .review)
+        case "cities": LibraryCitiesView()
+        case "item" where link.path.count == 2: LibraryItemView(id: link.path[1])
         case "go-out": PlanCityView()
+        case "add": PasteLinkView()
         default: ShellDestination(link: link)
         }
       }
