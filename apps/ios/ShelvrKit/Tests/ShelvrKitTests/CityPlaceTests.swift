@@ -40,5 +40,7 @@ import Testing
   #expect(date.swap(start, first: true, tried: [])?.first == 2)
   #expect(date.swap(start, first: true, tried: [2])?.first == 3)
   #expect(date.swap(start, first: true, tried: [2, 3])?.first == 2)
+  #expect(date.nextRound([0, 2], from: 3, to: 2).isEmpty)
+  #expect(date.nextRound([0], from: 2, to: 3) == [0, 2])
   #expect(date.swap(start, first: false, tried: []) == nil)
 }

@@ -71,7 +71,10 @@ struct SignedInView: View {
           if let city = link.query.first(where: { $0.name == "city" })?.value, !city.isEmpty {
             let listID = link.query.first(where: { $0.name == "listId" })?.value
             if link.path.first == "new-trip" {
-              NewCityTripView(city: city, listID: listID) { path.append($0) }.id(link)
+              NewCityTripView(city: city, listID: listID) { created in
+                guard path.last == link else { return }
+                path[path.count - 1] = created
+              }.id(link)
             } else { CityDateView(city: city, listID: listID).id(link) }
           } else { PlanCityView(trip: link.path.first == "new-trip") }
         case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1]).id(link.path[1])

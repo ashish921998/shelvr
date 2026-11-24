@@ -15,7 +15,8 @@ struct NewCityTripView: View {
   @State private var start = Date()
   @State private var stay = ""
   @State private var busy = false
-  @State private var error = ""
+  @State private var message = ""
+  @State private var generation: Task<Void, Never>?
   private let options = ["food", "coffee", "drinks", "culture", "sights", "outdoors", "shopping"]
 
   var body: some View {
@@ -42,16 +43,16 @@ struct NewCityTripView: View {
         TextField(copy("tripPlanner.stayPlaceholder"), text: $stay)
       }
       if busy { ProgressView() }
-      else { Button(copy("tripSetup.start")) { Task { await generate() } } }
-      if !error.isEmpty { Text(error) }
-    }.disabled(busy).navigationTitle(copy("tripPlanner.tripTitle", ["city": city]))
+      else { Button(copy("tripSetup.start")) { generation = Task { await generate() } } }
+      if !message.isEmpty { Text(message) }
+    }.onDisappear { generation?.cancel() }.disabled(busy).navigationTitle(copy("tripPlanner.tripTitle", ["city": city]))
   }
 
   private func generate() async {
     guard !busy else { return }
     busy = true
     defer { busy = false }
-    error = ""
+    message = ""
     let format = DateFormatter()
     format.locale = Locale(identifier: "en_US_POSIX")
     format.calendar = Calendar(identifier: .gregorian)
@@ -60,9 +61,10 @@ struct NewCityTripView: View {
       let id = try await backend.planTrip(city: city, days: days, pace: pace, interests: options.filter(interests.contains),
         start: dated ? format.string(from: start) : nil, stay: stay.trimmingCharacters(in: .whitespacesAndNewlines),
         locale: copy.locale, listID: listID)
+      guard !Task.isCancelled else { return }
       if let id, let route = AppLink("/trip-plan/" + id) { open(route) }
-      else { error = copy("tripPlanner.emptyResult", ["city": city]) }
-    } catch { error = copy("errors.retrySoon") }
+      else { message = copy("tripPlanner.emptyResult", ["city": city]) }
+    } catch { message = copy("errors.retrySoon") }
   }
 }
 

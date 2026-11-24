@@ -64,8 +64,8 @@ struct CityDateView: View {
       }
       if let next {
         Button(copy("datePlan.changeFor", ["name": spot.name])) {
-          if first { triedFirst.insert(index); triedSecond = [] }
-          else { triedSecond.insert(index); triedFirst = [] }
+          if first { triedFirst = date.nextRound(triedFirst, from: index, to: next.first); triedSecond = [] }
+          else { triedSecond = date.nextRound(triedSecond, from: index, to: next.second); triedFirst = [] }
           evening = next
         }
       }

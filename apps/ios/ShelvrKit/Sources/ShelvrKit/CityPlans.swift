@@ -41,6 +41,11 @@ public struct CityDate: Decodable, Sendable {
   public let stops: [EveningStop]
   public let evenings: [Evening]
 
+  public func nextRound(_ tried: Set<Int>, from current: Int, to next: Int) -> Set<Int> {
+    let shown = tried.union([current])
+    return shown.contains(next) ? [] : shown
+  }
+
   public func swap(_ evening: Evening, first: Bool, tried: Set<Int>) -> Evening? {
     let keptIndex = first ? evening.second : evening.first
     let currentIndex = first ? evening.first : evening.second
