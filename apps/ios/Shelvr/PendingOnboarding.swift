@@ -1,3 +1,4 @@
+import Combine
 import ConvexMobile
 import Foundation
 import ShelvrKit
@@ -46,12 +47,17 @@ struct OnboardingReplay: ViewModifier {
             with: ["cities": entry.cities.map { $0 as (any ConvexEncodable)? }])
         } else if let url = entry.url {
           var saved = false
-          for try await plan in backend.query("subscriptions:getEntitlement", as: ServerPlan.self) where plan.entitled {
+          struct FreeSaves: Decodable { let open: Bool; let left: Int }
+          let plans = backend.client.subscribe(to: "subscriptions:getEntitlement", yielding: ServerPlan.self)
+          let counts = backend.client.subscribe(to: "freeSaves:getFreeSaves", yielding: FreeSaves?.self)
+          for try await (plan, freeSaves) in plans.combineLatest(counts).values {
+            guard OnboardingHandoff.canSave(pro: plan.entitled, freeOpen: freeSaves?.open == true,
+              remaining: freeSaves?.left ?? 0) else { continue }
             try Task.checkCancellation()
             guard generation == backend.sessionGeneration else { return }
             var args: [String: (any ConvexEncodable)?] = [
               "url": url.absoluteString, "operationId": entry.operation, "saveSource": "onboarding_demo"]
-            if let name = entry.space {
+            if plan.entitled, let name = entry.space {
               let id: String = try await backend.client.mutation("spaces:createSpace", with: ["name": name, "dynamic": true])
               args["spaceId"] = id
             }
