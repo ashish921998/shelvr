@@ -124,7 +124,7 @@ public struct PushDeliveryState {
 
   public mutating func confirm(_ native: Data, generation: UUID) -> Bool {
     guard self.generation == generation, token == native else { return false }
-    verified.insert(Self.digest(native))
+    verified = [Self.digest(native)]
     let resume = suspended
     suspended = false
     return resume
@@ -175,13 +175,21 @@ struct PushTokenStore {
     register: (PushRegistrationRecord) async throws -> Void,
     unregister: (PushRegistrationRecord) async throws -> Void) async throws {
     let record = PushRegistrationRecord(token: fresh, registrationId: generation.uuidString)
-    var records = try read()
-    records.removeAll { $0.token == fresh && $0.registrationId == record.registrationId }
-    records.append(record)
-    try write(records)
-    try await register(record)
-    for old in records where old != record { try await unregister(old) }
-    try write([PushRegistrationRecord(token: fresh, registrationId: record.registrationId, apnsDigest: PushDeliveryState.digest(native))])
+    let digest = PushDeliveryState.digest(native)
+    let records = try read()
+    let previous = records.first { $0.token == fresh && $0.registrationId == record.registrationId }
+    let other = records.filter { $0.token != fresh || $0.registrationId != record.registrationId }
+    try write(other + [record])
+    do {
+      try await register(record)
+    } catch PushRegistrationError.ownedByAnotherAccount {
+      throw PushRegistrationError.ownedByAnotherAccount
+    } catch {
+      if let previous, previous.apnsDigest == digest { try write(other + [previous]) }
+      throw error
+    }
+    for old in other { try await unregister(old) }
+    try write([PushRegistrationRecord(token: fresh, registrationId: record.registrationId, apnsDigest: digest)])
     var services = [keychainService]
     if keychainService.hasSuffix(":no-auth") { services.append(String(keychainService.dropLast(":no-auth".count))) }
     for service in services {
