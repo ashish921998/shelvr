@@ -18,7 +18,7 @@ struct PassportBadgeView: View {
             SocialQuery(query: "placeVisits:listBadgeStamps", type: [BadgeStamp].self) { stamps in
               let shown = PassportBadge.visible(stamps: stamps, cities: cities, completion: completion)
               ForEach(shown) { state in
-                let title = copy("badges." + state.badge.id)
+                let title = copy("badges.\(state.badge.id)")
                 if state.earned {
                   let message = copy("badges.shareMessage", ["badge": title])
                   if let token {
@@ -32,7 +32,7 @@ struct PassportBadgeView: View {
           } else {
             ForEach(PassportBadge.all) { badge in
               Button { operation.askToPurchase() } label: {
-                Label(copy("badges." + badge.id), systemImage: "lock")
+                Label(copy("badges.\(badge.id)"), systemImage: "lock")
               }.accessibilityHint(copy("badges.lockedHint"))
             }
           }

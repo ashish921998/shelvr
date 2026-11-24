@@ -1,0 +1,66 @@
+{
+  "stamps": [
+    {
+      "city": "Lisbon",
+      "countryCode": "PT",
+      "kinds": ["coffee", "coffee", "food"]
+    },
+    {
+      "city": "Lisbon",
+      "countryCode": "PT",
+      "kinds": ["coffee", "coffee", "food"]
+    },
+    {
+      "city": "Lisbon",
+      "countryCode": "PT",
+      "kinds": ["coffee", "coffee", "food"]
+    },
+    {
+      "city": "Lisbon",
+      "countryCode": "PT",
+      "kinds": ["coffee", "coffee", "food"]
+    },
+    {
+      "city": "Lisbon",
+      "countryCode": "PT",
+      "kinds": ["coffee", "coffee", "food"]
+    }
+  ],
+  "cities": [
+    {
+      "city": "lisbon",
+      "country": "PT",
+      "stampedAt": 1
+    },
+    {
+      "city": "paris",
+      "country": "FR",
+      "stampedAt": 2
+    }
+  ],
+  "completion": [
+    {
+      "city": "Lisbon",
+      "stamped": 5,
+      "total": 5
+    }
+  ],
+  "expected": [
+    {
+      "id": "firstStamp",
+      "have": 1
+    },
+    {
+      "id": "completionist",
+      "have": 1
+    },
+    {
+      "id": "coffeeCrawler",
+      "have": 5
+    },
+    {
+      "id": "passportHolder",
+      "have": 2
+    }
+  ]
+}
