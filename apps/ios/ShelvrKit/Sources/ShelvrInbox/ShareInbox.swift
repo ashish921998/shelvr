@@ -1,0 +1,89 @@
+import Darwin
+import Foundation
+
+public struct InboxPayload: Codable, Sendable {
+  public enum Kind: String, Codable, Sendable { case link, image }
+  public let kind: Kind
+  public let value: String
+  public let operationID: String
+
+  public init(kind: Kind, value: String) {
+    self.kind = kind
+    self.value = value
+    self.operationID = "share:\(UUID().uuidString)"
+  }
+}
+
+public struct ShareInbox: Sendable {
+  public static let notification = "app.shelvr.share-inbox.ready"
+  public let directory: URL
+
+  public init(directory: URL) { self.directory = directory }
+
+  public static func system() -> ShareInbox? {
+    guard let group = Bundle.main.object(forInfoDictionaryKey: "ShelvrAppGroup") as? String,
+      let root = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group)
+    else { return nil }
+    return ShareInbox(directory: root.appending(path: "SwiftShareInbox"))
+  }
+
+  public var activeOwner: String? {
+    guard let value = try? String(contentsOf: directory.appending(path: "owner"), encoding: .utf8),
+      !value.isEmpty else { return nil }
+    return value
+  }
+
+  public func activate(_ owner: String?) throws {
+    let manager = FileManager.default
+    try manager.createDirectory(at: directory, withIntermediateDirectories: true)
+    var location = directory
+    var values = URLResourceValues()
+    values.isExcludedFromBackup = true
+    try location.setResourceValues(values)
+    let marker = directory.appending(path: "owner")
+    if let owner {
+      try Data(owner.utf8).write(to: marker, options: .atomic)
+    } else if manager.fileExists(atPath: marker.path) {
+      try manager.removeItem(at: marker)
+    }
+    for batch in try manager.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.creationDateKey])
+    where ["ready", "staging"].contains(batch.pathExtension) {
+      let stale = (try? batch.resourceValues(forKeys: [.creationDateKey]).creationDate)
+        .map { Date().timeIntervalSince($0) > 86400 } ?? false
+      if (try? self.owner(of: batch)) != owner || (batch.pathExtension == "staging" && stale) {
+        try manager.removeItem(at: batch)
+      }
+    }
+  }
+
+  public func stage(owner: String) throws -> URL {
+    guard activeOwner == owner else { throw CocoaError(.userCancelled) }
+    let folder = directory.appending(path: UUID().uuidString + ".staging")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+    try Data(owner.utf8).write(to: folder.appending(path: "owner"))
+    return folder
+  }
+
+  public func publish(_ payloads: [InboxPayload], in stage: URL) throws {
+    guard !payloads.isEmpty, activeOwner == (try owner(of: stage)) else { throw CocoaError(.userCancelled) }
+    for (index, payload) in payloads.enumerated() {
+      try JSONEncoder().encode(payload).write(to: stage.appending(path: "\(index).json"))
+    }
+    try FileManager.default.moveItem(at: stage, to: stage.deletingPathExtension().appendingPathExtension("ready"))
+    notify_post(Self.notification)
+  }
+
+  public func batches() throws -> [URL] {
+    try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+      .filter { $0.pathExtension == "ready" }
+  }
+
+  public func owner(of batch: URL) throws -> String {
+    try String(contentsOf: batch.appending(path: "owner"), encoding: .utf8)
+  }
+
+  public func manifests(in batch: URL) throws -> [URL] {
+    try FileManager.default.contentsOfDirectory(at: batch, includingPropertiesForKeys: nil)
+      .filter { $0.pathExtension == "json" }.sorted { $0.lastPathComponent < $1.lastPathComponent }
+  }
+}

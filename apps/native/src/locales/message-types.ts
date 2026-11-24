@@ -226,6 +226,8 @@ type MessageParams = {
   "account.deleting": undefined;
   "pro.checking": undefined;
   "pro.unlockShelvr": undefined;
+  "share.openToFinish": undefined;
+  "share.openToSignIn": undefined;
   "share.reading": undefined;
   "share.empty": undefined;
   "share.pending": undefined;

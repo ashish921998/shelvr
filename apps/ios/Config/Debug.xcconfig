@@ -1,6 +1,7 @@
 #include "Shared.xcconfig"
 
-PRODUCT_BUNDLE_IDENTIFIER = app.shelvr.save.preview
+PRODUCT_BUNDLE_IDENTIFIER = $(SHELVR_APP_ID)
+SHELVR_APP_ID = app.shelvr.save.preview
 INFOPLIST_KEY_CFBundleDisplayName = Shelvr Preview
 SHELVR_VARIANT = development
 SHELVR_CONVEX_URL = https:/$()/amicable-antelope-639.convex.cloud

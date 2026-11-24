@@ -227,6 +227,8 @@
   "account.deleting": "削除中…",
   "pro.checking": "サブスクリプションを確認中…",
   "pro.unlockShelvr": "Shelvr Proを利用する",
+  "share.openToFinish": "共有後、Shelvrを開いて保存を完了してください。",
+  "share.openToSignIn": "共有する前にShelvrを開いてサインインしてください。",
   "share.reading": "共有コンテンツを読み取り中…",
   "share.empty": "保存するものがありません",
   "share.pending": "まだ処理中の項目があります。",
