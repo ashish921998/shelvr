@@ -17,8 +17,6 @@
 		54B8E1BEDC6B0254EEE95BF9 /* CaptureRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBB070DB4AF7B8E26C57A1AB /* CaptureRouter.swift */; };
 		561D659E3AC26DB26F694687 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 85CFCF465E33D985FBF666F9 /* Foundation.framework */; };
 		5CC0282F2414B8ABB635621F /* en.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000041 /* en.json */; };
-		60E6972F174B5C189AF93387 /* Copy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E32FCBAF6CA6438522A6AEF /* Copy.swift */; };
-		65A2603C949AF7D1505203DF /* Copy.swift in Sources */ = {isa = PBXBuildFile; fileRef = A61C508B96C556DC218719EC /* Copy.swift */; };
 		68A4312E5FCF2169CDE0B40B /* ShelvrCapture.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9A6D3C46DD4BF20D5EF6596 /* ShelvrCapture.swift */; };
 		6A6F1BC7446406EEF72B53E6 /* RecentSaves.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1BAFA60699E1B4641F3AA0A /* RecentSaves.swift */; };
 		700174B2654790807D78CA9D /* fr-CA.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000044 /* fr-CA.json */; };
@@ -39,9 +37,9 @@
 		A10000000000000000000066 /* ja.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000046 /* ja.json */; };
 		A10000000000000000000067 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
 		A10000000000000000000068 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
-B70000000000000000000001 = {isa = PBXBuildFile; productRef = B70000000000000000000002; };
-        B71000000000000000000001 = {isa = PBXBuildFile; productRef = B71000000000000000000002; };
 		ADE66479850612E8CD378F36 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
+        B71000000000000000000001 = {isa = PBXBuildFile; productRef = B71000000000000000000002; };
+		B70000000000000000000001 = {isa = PBXBuildFile; productRef = B70000000000000000000002; };
 		BFDDDAC65FD1EAF951C7A3DF /* fr.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000045 /* fr.json */; };
 		C3A19CA96D128BF82E080E8B /* es.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000043 /* es.json */; };
 		C5EA489188B6CDB7DBC292F8 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
@@ -91,7 +89,6 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 		166B641C1F5BF309C6A1F897 /* RecentSavesWidget.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = RecentSavesWidget.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		1881F177AB278E4320B662A3 /* StickerTarget.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StickerTarget.swift; path = "../native/app-intents/Support/StickerTarget.swift"; sourceTree = "<group>"; };
 		43BC73B270D794356E1FFDC8 /* StickerCutter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = StickerCutter.swift; path = "../native/modules/subject-lift/ios/StickerCutter.swift"; sourceTree = "<group>"; };
-		4E32FCBAF6CA6438522A6AEF /* Copy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Copy.swift; path = ShelvrKit/Sources/ShelvrKit/Copy.swift; sourceTree = "<group>"; };
 		5410CC2A134EE5FF603E0659 /* NotesSchemaEntities.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = NotesSchemaEntities.swift; path = "../native/app-intents/Entities/NotesSchemaEntities.swift"; sourceTree = "<group>"; };
 		704ED90EEF30D691A2613844 /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		85CFCF465E33D985FBF666F9 /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS18.0.sdk/System/Library/Frameworks/Foundation.framework; sourceTree = DEVELOPER_DIR; };
@@ -111,7 +108,6 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 		A10000000000000000000046 /* ja.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ja.json; sourceTree = "<group>"; };
 		A10000000000000000000047 /* ko.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ko.json; sourceTree = "<group>"; };
 		A10000000000000000000048 /* pt-BR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "pt-BR.json"; sourceTree = "<group>"; };
-		A61C508B96C556DC218719EC /* Copy.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = Copy.swift; path = ShelvrKit/Sources/ShelvrKit/Copy.swift; sourceTree = "<group>"; };
 		B1BAFA60699E1B4641F3AA0A /* RecentSaves.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecentSaves.swift; sourceTree = "<group>"; };
 		E9A6D3C46DD4BF20D5EF6596 /* ShelvrCapture.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ShelvrCapture.swift; path = "../native/app-intents/Support/ShelvrCapture.swift"; sourceTree = "<group>"; };
 		FBB070DB4AF7B8E26C57A1AB /* CaptureRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CaptureRouter.swift; path = "../native/app-intents/Support/CaptureRouter.swift"; sourceTree = "<group>"; };
@@ -142,8 +138,8 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000014 /* ShelvrKit in Frameworks */,
-                B70000000000000000000001 /* RevenueCatUI in Frameworks */,
                 B71000000000000000000001 /* PostHog in Frameworks */,
+				B70000000000000000000001 /* RevenueCatUI in Frameworks */,
 				36E6F3FD1E99DE50DC4D1A8D /* ShelvrInbox in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -185,9 +181,7 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 				A10000000000000000000003 /* Products */,
 				115443435333965FC09C9DBA /* Frameworks */,
 				ED02C96235AAAD4EC1E603D2 /* ShareExtension */,
-				4E32FCBAF6CA6438522A6AEF /* Copy.swift */,
 				CE8BE5E4ADBEC96D790D62B3 /* RecentSavesWidget */,
-				A61C508B96C556DC218719EC /* Copy.swift */,
 				E9A6D3C46DD4BF20D5EF6596 /* ShelvrCapture.swift */,
 				5410CC2A134EE5FF603E0659 /* NotesSchemaEntities.swift */,
 				FBB070DB4AF7B8E26C57A1AB /* CaptureRouter.swift */,
@@ -318,8 +312,8 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 			name = Shelvr;
 			packageProductDependencies = (
 				A10000000000000000000013 /* ShelvrKit */,
-                B70000000000000000000002 /* RevenueCatUI */,
                 B71000000000000000000002 /* PostHog */,
+				B70000000000000000000002 /* RevenueCatUI */,
 				58A93D31AFA3EEA34762477E /* ShelvrInbox */,
 			);
 			productName = Shelvr;
@@ -435,7 +429,6 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 			buildActionMask = 2147483647;
 			files = (
 				D0F379AD41A0134F8BF645B5 /* ShareViewController.swift in Sources */,
-				60E6972F174B5C189AF93387 /* Copy.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -456,7 +449,6 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 			buildActionMask = 2147483647;
 			files = (
 				6A6F1BC7446406EEF72B53E6 /* RecentSaves.swift in Sources */,
-				65A2603C949AF7D1505203DF /* Copy.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -651,8 +643,8 @@ B70000000000000000000001 = {isa = PBXBuildFile; productRef = B700000000000000000
 			isa = XCSwiftPackageProductDependency;
 			productName = ShelvrKit;
 		};
-        B70000000000000000000002 = {isa = XCSwiftPackageProductDependency; package = B70000000000000000000003; productName = RevenueCatUI; };
         B71000000000000000000002 = {isa = XCSwiftPackageProductDependency; package = B71000000000000000000003; productName = PostHog; };
+		B70000000000000000000002 = {isa = XCSwiftPackageProductDependency; package = B70000000000000000000003; productName = RevenueCatUI; };
 		C2944BC6B409C8A19EAD8916 /* ShelvrInbox */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ShelvrInbox;

@@ -14,7 +14,6 @@ struct AccountSettingsView: View {
   var body: some View {
     List {
       Section {
-        SaveReminderPreference()
         Button(copy("onboardingNotify.allow")) {
           Task {
             let center = UNUserNotificationCenter.current()

@@ -51,7 +51,6 @@ struct RecentWidgetSync: ViewModifier {
               plan = nil
               if let file = RecentSavesSnapshot.location,
                 !RecentSavesSnapshot.canKeep(file, owner: owner) { publish(nil) }
-              try? ShareInbox.system()?.activate(owner)
               WidgetCenter.shared.reloadTimelines(ofKind: "RecentSaves")
             }
           }

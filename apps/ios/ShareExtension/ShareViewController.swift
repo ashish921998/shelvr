@@ -53,12 +53,15 @@ final class ShareViewController: UIViewController {
         defer { try? FileManager.default.removeItem(at: stage) }
         var attachments: [ShareAttachment] = []
         for provider in providers {
-          if let attachment = try await load(provider, into: stage) { attachments.append(attachment) }
+          if let attachment = try await load(provider, inbox: inbox, stage: stage) { attachments.append(attachment) }
         }
         let payloads = ShareAttachment.payloads(attachments)
-        guard !payloads.isEmpty else { throw CocoaError(.fileReadUnsupportedScheme) }
         try inbox.publish(payloads, in: stage)
         close()
+      } catch ShareInboxError.ownerChanged {
+        message.text = copy("share.openToSignIn")
+        save.isHidden = true
+        cancel.isEnabled = true
       } catch {
         message.text = copy("share.itemFailure")
         save.isEnabled = true
@@ -67,34 +70,27 @@ final class ShareViewController: UIViewController {
     }
   }
 
-  private func load(_ provider: NSItemProvider, into stage: URL) async throws -> ShareAttachment? {
+  private func load(_ provider: NSItemProvider, inbox: ShareInbox, stage: URL) async throws -> ShareAttachment? {
     let offers = [UTType.url, .image, .plainText].filter { provider.hasItemConformingToTypeIdentifier($0.identifier) }
     return try await ShareAttachment.firstAvailable(offers) { type in
       if type == .image {
-        let name = UUID().uuidString
-        let target = stage.appending(path: name)
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-          _ = provider.loadFileRepresentation(forTypeIdentifier: type.identifier) { url, error in
-            do {
-              guard let url else { throw error ?? CocoaError(.fileReadCorruptFile) }
-              try FileManager.default.copyItem(at: url, to: target)
-              continuation.resume()
-            } catch { continuation.resume(throwing: error) }
-          }
-        }
-        return .payload(InboxPayload(kind: .image, value: name))
+        let image = inbox.newImage(in: stage)
+        try await loadImage(from: provider, into: image.file)
+        return .payload(image.payload)
       }
-      let attachment: ShareAttachment? = try await withCheckedThrowingContinuation { continuation in
-        provider.loadItem(forTypeIdentifier: type.identifier, options: nil) { item, error in
-          if let error { continuation.resume(throwing: error); return }
-          if let url = item as? URL {
-            continuation.resume(returning: ShareAttachment.webLink(url.absoluteString))
-          } else if let text = item as? String {
-            continuation.resume(returning: type == .url ? ShareAttachment.webLink(text) : .caption(text))
-          } else { continuation.resume(returning: nil) }
-        }
+      return try await ShareAttachment.loadLink(from: provider, type: type)
+    }
+  }
+
+  private func loadImage(from provider: NSItemProvider, into file: URL) async throws {
+    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+      _ = provider.loadFileRepresentation(forTypeIdentifier: UTType.image.identifier) { url, error in
+        do {
+          guard let url else { throw error ?? CocoaError(.fileReadCorruptFile) }
+          try FileManager.default.copyItem(at: url, to: file)
+          continuation.resume()
+        } catch { continuation.resume(throwing: error) }
       }
-      return attachment
     }
   }
 }

@@ -21,7 +21,11 @@ final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCente
 
   private func silence() {
     UIApplication.shared.unregisterForRemoteNotifications()
-    UNUserNotificationCenter.current().removeAllDeliveredNotifications()
+    let center = UNUserNotificationCenter.current()
+    center.getDeliveredNotifications { delivered in
+      let ids = delivered.map(\.request).filter { !Self.isLocalTrial($0) }.map(\.identifier)
+      center.removeDeliveredNotifications(withIdentifiers: ids)
+    }
   }
 
   func suspendEnrollment() {
@@ -58,7 +62,12 @@ final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCente
 
   nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification)
     async -> UNNotificationPresentationOptions {
-    await MainActor.run { delivery.permitsPresentation ? [.banner, .list] : [] }
+    if Self.isLocalTrial(notification.request) { return [.banner, .list] }
+    return await MainActor.run { delivery.permitsPresentation ? [.banner, .list] : [] }
+  }
+
+  private nonisolated static func isLocalTrial(_ request: UNNotificationRequest) -> Bool {
+    request.trigger is UNCalendarNotificationTrigger && TrialNotification.Kind(rawValue: request.identifier) != nil
   }
 
   nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
