@@ -75,3 +75,39 @@ import Testing
   entry.accept(target)
   #expect(entry.failed && entry.preview == target && entry.accepted == nil)
 }
+
+@MainActor @Test func consentFromAnAuthenticatedAccountBindsBeforeDispatchAndCompletesBeforeReplacement() throws {
+  var disk: AcceptedInvite?
+  let entry = InviteEntry(read: { disk }, write: { disk = $0 })
+  let first = try #require(AppLink("/list-invite/a")), second = try #require(AppLink("/passport-invite/b"))
+  let invite = try #require(PublicInvite(first))
+  #expect(entry.route(first))
+  entry.accept(invite, account: "a")
+  let saved = try #require(disk)
+  #expect(saved.bound(to: "b") == nil)
+  #expect(entry.beginDispatch(saved.id))
+  entry.cancel()
+  #expect(entry.accepted == saved)
+  #expect(entry.route(second))
+  #expect(entry.accepted == saved && entry.preview == nil)
+  #expect(entry.endDispatch(saved.id) == second)
+}
+
+@MainActor @Test func retryingAnUnavailableKeychainCannotReviveAnInviteReplacedDuringTheOutage() throws {
+  let first = try #require(AppLink("/list-invite/old")), second = try #require(AppLink("/passport-invite/new"))
+  let old = try #require(PublicInvite(first))
+  var disk: AcceptedInvite? = AcceptedInvite(old)
+  var accessible = false
+  let entry = InviteEntry(read: {
+    guard accessible else { throw CocoaError(.fileReadNoPermission) }
+    return disk
+  }, write: { value in
+    guard accessible else { throw CocoaError(.fileWriteNoPermission) }
+    disk = value
+  })
+  #expect(entry.route(second))
+  entry.preview = nil
+  accessible = true
+  entry.restore()
+  #expect(entry.accepted == nil && disk == nil)
+}

@@ -74,6 +74,9 @@ public final class InviteEntry {
   public var expired: PublicInvite?
   public var failed = false
   public private(set) var loaded = false
+  public private(set) var dispatching: UUID?
+  private var queued: AppLink?
+  private var discardUnread = false
   private let read: () throws -> AcceptedInvite?
   private let write: (AcceptedInvite?) throws -> Void
 
@@ -85,31 +88,52 @@ public final class InviteEntry {
   }
 
   public func restore() {
-    do { accepted = try read(); loaded = true; failed = false }
-    catch { failed = true }
+    do {
+      if discardUnread { try write(nil); accepted = nil; discardUnread = false }
+      else { accepted = try read() }
+      loaded = true
+      failed = false
+    } catch { failed = true }
   }
 
-  public func accept(_ invite: PublicInvite) {
-    guard preview == invite, replace(with: AcceptedInvite(invite)) else { return }
+  public func accept(_ invite: PublicInvite, account: String? = nil) {
+    guard preview == invite, dispatching == nil else { return }
+    let consent = AcceptedInvite(invite)
+    guard replace(with: account.flatMap { consent.bound(to: $0) } ?? consent) else { return }
     preview = nil
   }
 
   public func route(_ link: AppLink) -> Bool {
-    if !loaded { restore() }
-    let next = PublicInvite(link)
-    if accepted != nil, !replace(with: nil) { return true }
+    if dispatching != nil { queued = link; return true }
+    if !loaded || accepted != nil {
+      discardUnread = true
+      if !replace(with: nil) { accepted = nil; loaded = false }
+    }
     expired = nil
-    preview = next
-    return next != nil
+    preview = PublicInvite(link)
+    return preview != nil
   }
 
   public func cancel() {
-    guard let current = accepted, replace(with: nil) else { return }
+    guard dispatching == nil, let current = accepted, replace(with: nil) else { return }
     preview = current.invite
   }
 
+  public func beginDispatch(_ id: UUID) -> Bool {
+    guard accepted?.id == id, dispatching == nil else { return false }
+    dispatching = id
+    return true
+  }
+
+  public func endDispatch(_ id: UUID) -> AppLink? {
+    guard dispatching == id else { return nil }
+    dispatching = nil
+    defer { queued = nil }
+    return queued
+  }
+
   public func replace(with next: AcceptedInvite?) -> Bool {
-    do { try write(next); accepted = next; failed = false; return true }
+    do { try write(next); accepted = next; discardUnread = false; loaded = true; failed = false; return true }
     catch { failed = true; return false }
   }
 }

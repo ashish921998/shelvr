@@ -7,7 +7,6 @@ struct SignedInView: View {
   @Environment(\.copy) private var copy
   @State private var library = false
   @State private var path: [AppLink] = []
-  @State private var namePrompts = MemberNamePrompts()
   @State private var stampMessage: String?
 
   var body: some View {
@@ -157,7 +156,6 @@ struct SignedInView: View {
         }
       }
     }
-    .environment(namePrompts)
     .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
       Button(copy("common.close")) {}
     } message: { Text(stampMessage ?? "") }

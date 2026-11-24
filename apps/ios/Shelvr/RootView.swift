@@ -6,6 +6,7 @@ struct RootView: View {
   @Environment(Backend.self) private var backend
   @AppStorage("swift.appearance") private var appearance = "system"
   @Environment(\.copy) private var copy
+  @State private var namePrompts = MemberNamePrompts()
   @State private var invites = InviteEntry()
   @State private var pendingLink: AppLink?
 
@@ -17,6 +18,7 @@ struct RootView: View {
       case .offline: OfflineView()
       }
     }
+    .environment(namePrompts)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(appearance == "neutralDark" ? Color(red: 17/255, green: 20/255, blue: 23/255) : Color(.background))
     .preferredColorScheme(appearance == "system" ? nil : appearance == "light" ? .light : .dark)
