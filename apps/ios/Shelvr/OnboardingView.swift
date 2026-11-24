@@ -113,6 +113,12 @@ private struct OnboardingAccount: View {
           }
         }
         .disabled(busy)
+        .task {
+          if progress.step == .notifications,
+            await UNUserNotificationCenter.current().notificationSettings().authorizationStatus != .notDetermined {
+            progress.step = .carousel; carousel = 2; persist()
+          }
+        }
         .sheet(isPresented: $practiceShare) {
           VStack(alignment: .leading, spacing: 20) {
             Text(copy("aha.coachShelvr")).font(.title.bold())
@@ -126,9 +132,10 @@ private struct OnboardingAccount: View {
         }
         .sheet(isPresented: $paywall, onDismiss: {
           if purchased || free || unavailable { finish() }
+          else if progress.step == .notifications { progress.step = .carousel; carousel = 2; persist() }
         }) {
           BillingSheet(destination: .paywall, goalVariables: goalVariables,
-            unavailable: { unavailable = true }, confirmed: { purchased = true })
+            availabilityChanged: { unavailable = !$0 }, confirmed: { purchased = true })
         }
       }
     }
