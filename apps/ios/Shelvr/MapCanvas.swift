@@ -16,6 +16,10 @@ struct MapCanvas: UIViewRepresentable {
       pending = action
     }
 
+    func cancel() {
+      pending = nil
+    }
+
     func consume() -> Action? {
       defer { pending = nil }
       return pending

@@ -41,7 +41,7 @@ struct SavedPlacesMap: View {
     MapCanvas(places: scene.visible, cameraCommand: cameraCommand, filters: scene.filters, opening: scene.opening,
       visited: scene.visited, selectedLabelID: selectedLabelID, copy: copy, topControlsHeight: topControlsHeight,
       bottomControlsHeight: bottomControlsHeight, onArea: { updateDiscoverArea($0); viewport = $1 },
-      onUserMove: location.cancel, onPick: selectPlace, onCluster: { cluster = $0 })
+      onUserMove: cancelCameraRequests, onPick: selectPlace, onCluster: { cluster = $0 })
       .ignoresSafeArea(.container)
       .overlay(alignment: .top) {
         Group {
@@ -57,7 +57,7 @@ struct SavedPlacesMap: View {
       }
       .onChange(of: viewport?.city(among: personalPlaces), initial: true) { _, city in cityInView = city }
       .onChange(of: location.latestFix?.id) {
-        if let fix = location.latestFix { cameraCommand = .init(action: .locate(fix.coordinate)) }
+        if let fix = location.latestFix { moveCamera(.locate(fix.coordinate)) }
       }
       .onChange(of: focusedSearch) { _, focused in searchFocusChanged(focused) }
       .onDisappear { searchFocusChanged(false) }
@@ -135,7 +135,7 @@ struct SavedPlacesMap: View {
           }) {
             roundButton("chevron.left", label: copy("map.showAllCities"), palette: palette) {
               location.cancel()
-              cameraCommand = .init(action: .overview(overviewPlaces))
+              moveCamera(.overview(overviewPlaces))
             }
           }
           Button {
@@ -305,6 +305,16 @@ struct SavedPlacesMap: View {
     }
   }
 
+  private func cancelCameraRequests() {
+    location.cancel()
+    cameraCommand?.cancel()
+  }
+
+  private func moveCamera(_ action: MapCanvas.CameraCommand.Action) {
+    cameraCommand?.cancel()
+    cameraCommand = .init(action: action)
+  }
+
   private func updateSearch(_ text: String) {
     var next = filters
     next.search = text
@@ -316,7 +326,7 @@ struct SavedPlacesMap: View {
     location.cancel()
     filters = next
     selectedLabelID = nil
-    cameraCommand = .init(action: .fitFilteredPlaces)
+    moveCamera(.fitFilteredPlaces)
   }
 
   private func filterChip(_ title: String, selected: Bool, palette: HomeChromePalette, color: Color? = nil,
