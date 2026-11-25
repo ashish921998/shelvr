@@ -54,23 +54,7 @@ struct SpotlightSync: ViewModifier {
         SpotlightFeed(owner: granted).id(granted)
       }
     }
-    .task(id: session) {
-      apply(nil)
-      failed = false
-      guard let account = session.owner else { return }
-      do {
-        for try await plan in backend.query("subscriptions:getEntitlement", as: ServerPlan.self) {
-          guard !Task.isCancelled, backend.userID == account, backend.sessionGeneration == session.generation else { return }
-          let expires = plan.status == "lifetime" ? nil : plan.expiresAt.map { Date(timeIntervalSince1970: $0 / 1000) }
-          apply(plan.entitled ? .init(account: account, session: session.generation, expiresAt: expires) : nil)
-        }
-      } catch {
-        guard !Task.isCancelled, backend.sessionGeneration == session.generation else { return }
-        apply(nil)
-        failed = true
-        Analytics.failure("spotlight_entitlement_failed")
-      }
-    }
+    .task(id: session) { await watchAccess(session) }
     .task(id: granted) {
       guard let current = granted, let end = current.expiresAt else { return }
       do { try await Task.sleep(for: .seconds(max(0, end.timeIntervalSinceNow))) } catch { return }
@@ -80,6 +64,33 @@ struct SpotlightSync: ViewModifier {
       guard phase == .active else { return }
       if let granted, !granted.active { apply(nil) }
       if failed { attempt += 1 }
+    }
+  }
+
+  private func watchAccess(_ session: Session) async {
+    apply(nil)
+    failed = false
+    guard let account = session.owner else { return }
+    var delay = 2
+    while !Task.isCancelled && backend.sessionGeneration == session.generation && backend.userID == account {
+      do {
+        for try await plan in backend.query("subscriptions:getEntitlement", as: ServerPlan.self) {
+          guard !Task.isCancelled, backend.userID == account, backend.sessionGeneration == session.generation else { return }
+          let expires = plan.status == "lifetime" ? nil : plan.expiresAt.map { Date(timeIntervalSince1970: $0 / 1000) }
+          apply(plan.entitled ? .init(account: account, session: session.generation, expiresAt: expires) : nil)
+          delay = 2
+          failed = false
+        }
+        if Task.isCancelled { return }
+      } catch {
+        if Task.isCancelled { return }
+      }
+      guard backend.sessionGeneration == session.generation, backend.userID == account else { return }
+      apply(nil)
+      if !failed { Analytics.failure("spotlight_entitlement_failed") }
+      failed = true
+      do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+      delay = min(delay * 2, 60)
     }
   }
 
