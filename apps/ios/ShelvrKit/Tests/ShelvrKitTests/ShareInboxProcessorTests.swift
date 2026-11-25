@@ -9,6 +9,7 @@ import Testing
   var userID: String? = "first"
   let photoClient = RecordingPhotoMutations()
   var sentLinks: [String] = []
+  var linkSessions: [String?] = []
   var sentNotes: [String] = []
   var refuseLink = false
   var onUpload: (() async -> Void)?
@@ -18,6 +19,7 @@ import Testing
     if refuseLink { throw ClientError.ConvexError(data: #"{"code":"pro_required"}"#) }
     #expect(source == .shareExtension)
     sentLinks.append(url)
+    linkSessions.append(analyticsSessionID)
   }
 
   func saveNote(_ text: String, operationID: String, checkpoint: () throws -> Void) throws {
@@ -25,8 +27,9 @@ import Testing
     sentNotes.append(operationID + ":" + text)
   }
 
-  func savePhoto(_ photo: ImportPhoto, operationID: String, source: SaveSource, checkpoint: () throws -> Void) async throws -> String {
-    try await photo.save(using: photoClient, operationID: operationID, source: source, checkpoint: checkpoint) { request, _ in
+  func savePhoto(_ photo: ImportPhoto, operationID: String, source: SaveSource, analyticsSessionID: String?, checkpoint: () throws -> Void) async throws -> String {
+    try await photo.save(using: photoClient, operationID: operationID, source: source,
+      analyticsSessionID: analyticsSessionID, checkpoint: checkpoint) { request, _ in
       await self.onUpload?()
       let url = try #require(request.url)
       let response = try #require(HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil))
@@ -76,14 +79,20 @@ private final class RecordingPhotoMutations: PhotoMutationClient {
     let saver = RecordingShareSaver()
     let processor = ShareInboxProcessor(inbox: inbox, saver: saver)
     saver.refuseLink = true
-    let refusal = try #require(await processor.drain(owner: "first"))
+    var events: [ShareInboxProcessor.Event] = []
+    let refusal = try #require(await processor.drain(owner: "first", observe: { events.append($0) }))
     #expect(refusal.copyKey == "freePlan.leftBody")
     #expect(refusal.requiresPro)
-    #expect(try refusal.share?.delivery.get().operationID == link.operationID)
+    let delivery = try #require(refusal.share).delivery.get()
+    #expect(delivery.operationID == link.operationID)
+    let attempt = ShareInboxProcessor.Attempt(delivery)
+    #expect(events == [.started(attempt), .failed(attempt, .proRequired)])
+    #expect(attempt.kind == "link" && attempt.source == .shareExtension)
 
     saver.refuseLink = false
-    #expect(try await processor.drain(owner: "first") == nil)
+    #expect(try await processor.drain(owner: "first", analyticsSessionID: "fixture") == nil)
     #expect(saver.sentLinks == [link.value])
+    #expect(saver.linkSessions == ["fixture"])
     #expect(try inbox.batches().isEmpty)
   }
 }

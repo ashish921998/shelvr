@@ -51,7 +51,7 @@ extension ConvexClient: PhotoMutationClient {}
 
 extension ImportPhoto {
   @MainActor func save(using client: any PhotoMutationClient, operationID: String, source: SaveSource,
-    checkpoint: () throws -> Void, upload: (URLRequest, Data) async throws -> (Data, URLResponse)) async throws -> String {
+    analyticsSessionID: String? = nil, checkpoint: () throws -> Void, upload: (URLRequest, Data) async throws -> (Data, URLResponse)) async throws -> String {
     struct Begin: Decodable {
       let kind: String
       let itemId: String?
@@ -76,17 +76,20 @@ extension ImportPhoto {
     ])
     guard attached.error == nil else { throw URLError(.badServerResponse) }
     try checkpoint()
-    return try await client.mutation("items:finalizeImageImport", with: [
+    var args: [String: ConvexEncodable?] = [
       "operationId": operationID, "aspectRatio": aspectRatio,
       "saveSource": source.rawValue
-    ])
+    ]
+    if let analyticsSessionID { args["analyticsSessionId"] = analyticsSessionID }
+    return try await client.mutation("items:finalizeImageImport", with: args)
   }
 }
 
 extension Backend {
   public func savePhoto(_ photo: ImportPhoto, operationID: String, source: SaveSource = .photoImport,
-    checkpoint: () throws -> Void = { try Task.checkCancellation() }) async throws -> String {
-    try await photo.save(using: client, operationID: operationID, source: source, checkpoint: checkpoint) { request, bytes in
+    analyticsSessionID: String? = nil, checkpoint: () throws -> Void = { try Task.checkCancellation() }) async throws -> String {
+    try await photo.save(using: client, operationID: operationID, source: source,
+      analyticsSessionID: analyticsSessionID, checkpoint: checkpoint) { request, bytes in
       try await URLSession.shared.upload(for: request, from: bytes)
     }
   }

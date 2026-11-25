@@ -15,6 +15,16 @@ public enum SaveFailure: Error, Equatable, Sendable {
     }
   }
 
+  public var stage: String {
+    switch self {
+    case .proRequired: "pro_required"
+    case .photoLimit: "photo_limit"
+    case .photoTooLarge: "image_too_large"
+    case .photoEmpty: "image_empty"
+    case .other: "other"
+    }
+  }
+
   public var photoCopyKey: String {
     switch self {
     case .proRequired: "freePlan.photosNeedPro"

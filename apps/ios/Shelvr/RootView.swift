@@ -41,7 +41,10 @@ struct RootView: View {
       do {
         for try await user in backend.query("users:getCurrentUser", as: AccountView.CurrentUser?.self) {
           try Task.checkCancellation()
-          Analytics.identify(user?._id)
+          if let user {
+            guard backend.userID == user._id else { return }
+            Analytics.identify(user._id, authenticated: true)
+          } else if backend.userID == nil { Analytics.identify(nil) }
         }
       } catch { if !Task.isCancelled { Analytics.failure("analytics_identity_failed") } }
     }

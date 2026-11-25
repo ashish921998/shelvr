@@ -7,6 +7,7 @@ import ShelvrKit
 @MainActor
 enum Analytics {
   private static var enabled = false
+  private static var identity = AnalyticsIdentity()
   private static var foreground = false
   private static var opened = false
   private static var unidentifiedOfflineID: String?
@@ -43,11 +44,13 @@ enum Analytics {
     registerContext()
   }
 
-  static func identify(_ id: String?) {
+  static func identify(_ id: String?, authenticated: Bool = false) {
     guard enabled else { return }
     unidentifiedOfflineID = nil
+    let result = identity.update(id, authenticated: authenticated)
     if let id {
-      PostHogSDK.shared.identify(id)
+      if result.identify { PostHogSDK.shared.identify(id) }
+      if result.complete { capture("auth_completed") }
       UserDefaults.standard.set(true, forKey: identifiedKey)
     } else if UserDefaults.standard.bool(forKey: identifiedKey) {
       PostHogSDK.shared.reset()
@@ -78,9 +81,7 @@ enum Analytics {
     capture("notification_opened", ready)
   }
 
-  static var sessionID: String? {
-    enabled && !PostHogSDK.shared.isOptOut() ? PostHogSDK.shared.getSessionId() : nil
-  }
+  static var sessionID: String? { available ? PostHogSDK.shared.getSessionId() : nil }
 
   static func active(_ active: Bool) {
     guard enabled, notificationOpens.reconciled, active != foreground else { return }

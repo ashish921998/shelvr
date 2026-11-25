@@ -42,7 +42,10 @@ struct SavedPlacesMap: View {
           }
           if scene.filters.hasSearch {
             ForEach(scene.visible.prefix(5)) { place in
-              Button { selected = place } label: {
+              Button {
+                Analytics.capture("map_search_result_opened")
+                selected = place
+              } label: {
                 Label(place.name, systemImage: place.isSaved ? "bookmark" : "mappin")
                   .frame(maxWidth: .infinity, alignment: .leading)
               }
@@ -61,7 +64,9 @@ struct SavedPlacesMap: View {
               HStack {
                 ForEach(scene.chips, id: \.self) { kind in
                   Button(copy(kind.labelKey)) {
-                    if !filters.kinds.insert(kind).inserted { filters.kinds.remove(kind) }
+                    if filters.kinds.insert(kind).inserted {
+                      Analytics.capture("map_filter_selected", ["kind": kind.rawValue])
+                    } else { filters.kinds.remove(kind) }
                   }
                   .buttonStyle(.bordered).tint(filters.kinds.contains(kind) ? .accentColor : .secondary)
                   .accessibilityAddTraits(filters.kinds.contains(kind) ? .isSelected : [])
@@ -108,16 +113,22 @@ struct SavedPlacesMap: View {
       }
       .task(id: selected) {
         guard let place = selected else { return }
+        guard let owner = backend.userID else { return }
+        let session = backend.sessionGeneration
         if let raw = place.appleId, let identifier = MKMapItem.Identifier(rawValue: raw),
           let item = try? await MKMapItemRequest(mapItemIdentifier: identifier).mapItem {
-          guard !Task.isCancelled else { return }
+          guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
+          Analytics.capture("map_place_opened", ["card": true, "source": place.isSaved ? "own" : "discover"])
           card = item
         } else {
-          guard !Task.isCancelled else { return }
-          if case let .saved(id) = place.source { open("/item/" + id) }
-          else {
+          guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
+          if case let .saved(id) = place.source {
+            Analytics.capture("map_place_opened", ["card": false, "source": "own"])
+            open("/item/" + id)
+          } else {
             let item = MKMapItem(placemark: MKPlacemark(coordinate: place.coordinate))
             item.name = place.name
+            Analytics.capture("map_place_opened", ["source": "discover", "card": true])
             card = item
           }
         }

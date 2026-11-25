@@ -50,18 +50,31 @@ struct PhotoSaveView: View {
 
   private func save(_ selection: PhotosPickerItem, request id: UUID) async {
     defer { if request == id { request = nil } }
+    guard let owner = backend.userID else { return }
+    let session = backend.sessionGeneration
+    let saveOperation = "image:\(operationID)"
+    let analyticsSessionID = Analytics.sessionID
     failure = nil
+    let properties = ["save_source": "photo_import", "save_kind": "image", "operation_id": saveOperation]
+    Analytics.capture("save_attempt_started", properties)
     do {
       guard let data = try await selection.loadTransferable(type: Data.self) else {
         throw CocoaError(.fileReadCorruptFile)
       }
       try Task.checkCancellation()
       let photo = try await Task.detached { try ImportPhoto(data) }.value
-      _ = try await backend.savePhoto(photo, operationID: "image:\(operationID)")
-      if !Task.isCancelled, request == id { dismiss() }
+      _ = try await backend.savePhoto(photo, operationID: saveOperation, analyticsSessionID: analyticsSessionID) {
+        try Task.checkCancellation()
+        guard backend.userID == owner, backend.sessionGeneration == session else { throw CancellationError() }
+      }
+      guard !Task.isCancelled, request == id, backend.userID == owner, backend.sessionGeneration == session else { return }
+      Analytics.capture("images_saved", ["image_count": 1])
+      dismiss()
     } catch {
-      if !Task.isCancelled, request == id {
-        failure = SaveFailure(error).photoCopyKey
+      if !Task.isCancelled, request == id, backend.userID == owner, backend.sessionGeneration == session {
+        let saveFailure = SaveFailure(error)
+        failure = saveFailure.photoCopyKey
+        Analytics.capture("save_failed", properties.merging(["stage": saveFailure.stage]) { $1 })
         if failure == "freePlan.photosNeedPro" && offered != operationID {
           offered = operationID; billing = .paywall
         }

@@ -40,6 +40,7 @@ struct CityVotesView: View {
       else {
         Button(copy("plan.ask")) {
           let existing = openLink
+          Analytics.capture("plan_ask_opened", ["has_link": existing != nil])
           let mapped = pins.filter { existing?.match($0, among: pins) != nil }
           selection = Set((mapped.isEmpty ? pins : mapped).prefix(5))
           share = nil
@@ -88,17 +89,23 @@ struct CityVotesView: View {
   private var chosen: [CityPlace] { pins.filter(selection.contains) }
 
   private func prepare() async {
-    guard !busy, !chosen.isEmpty else { return }
+    guard !busy, !chosen.isEmpty, let owner = backend.userID else { return }
+    let session = backend.sessionGeneration
     busy = true
     defer { busy = false }
     do {
       let token: String
       if let link = openLink, link.sameSelection(chosen, among: pins) { token = link.token }
       else { token = try await backend.shareCityPlaces(city: city, selected: chosen) }
+      guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
       let devOrigin = ProcessInfo.processInfo.environment["SHELVR_WEB_URL"].flatMap(URL.init(string:))
       let origin = backend.environment.variant == .development ? devOrigin : nil
       share = (origin ?? URL(string: "https://tryshelvr.app")!).appendingPathComponent("p").appendingPathComponent(token)
       message = ""
-    } catch { message = copy("plan.askFailedTitle") }
+    } catch {
+      guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
+      Analytics.capture("plan_ask_failed", ["reason": "link"])
+      message = copy("plan.askFailedTitle")
+    }
   }
 }

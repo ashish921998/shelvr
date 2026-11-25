@@ -1,3 +1,4 @@
+import ConvexMobile
 import CoreGraphics
 import Foundation
 import ImageIO
@@ -96,4 +97,18 @@ private func outputPixel(_ photo: ImportPhoto, x: Int, y: Int) throws -> [UInt8]
   let claims = Data(#"{"sub":"first|session","exp":2,"iat":1}"#.utf8).base64EncodedString()
   let session = AuthTokens(token: "header." + claims + ".signature", refreshToken: "fixture")
   #expect(AuthTokens.ownerID(for: session.token) == "first")
+}
+
+@Test func captureAndPlanningFailuresUseOnlyStableCategories() {
+  let pro = ClientError.ConvexError(data: #"{"code":"pro_required"}"#)
+  let throttle = ClientError.ConvexError(data: #"{"kind":"RateLimited"}"#)
+  let network = URLError(.notConnectedToInternet)
+  #expect(PastedLink.planningFailure(pro) == "pro_required")
+  #expect(PastedLink.planningFailure(throttle) == "rate_limited")
+  #expect(PastedLink.planningFailure(network) == "error")
+  #expect(SaveFailure(pro).stage == "pro_required")
+  #expect(SaveFailure(PhotoUploadFailure.tooLarge).stage == "image_too_large")
+  #expect(SaveFailure(PhotoUploadFailure.empty).stage == "image_empty")
+  #expect(SaveFailure.photoLimit.stage == "photo_limit")
+  #expect(SaveFailure(ClientError.ConvexError(data: #"{"code":"arbitrary private string"}"#)).stage == "other")
 }

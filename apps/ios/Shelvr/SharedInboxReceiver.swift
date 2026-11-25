@@ -70,6 +70,17 @@ struct SharedInboxReceiver: ViewModifier {
     InboxSignal.shared.wake()
   }
 
+  private func capture(_ event: ShareInboxProcessor.Event) {
+    switch event {
+    case .started(let attempt):
+      Analytics.capture("save_attempt_started", ["save_kind": attempt.kind, "save_source": attempt.source.rawValue,
+        "operation_id": attempt.operationID])
+    case .failed(let attempt, let failure):
+      Analytics.capture("save_failed", ["save_kind": attempt.kind, "save_source": attempt.source.rawValue,
+        "operation_id": attempt.operationID, "stage": failure.stage])
+    }
+  }
+
   private func receive() async {
     guard let inbox = ShareInbox.system() else { return }
     let processor = ShareInboxProcessor(inbox: inbox, backend: backend)
@@ -81,7 +92,8 @@ struct SharedInboxReceiver: ViewModifier {
       }
       guard currentPhase == .active, failure == nil, billing == nil, let owner = backend.userID else { continue }
       do {
-        let result = try await processor.drain(owner: owner, deliverSiri: SiriInboxDelivery(backend: backend).send)
+        let result = try await processor.drain(owner: owner, analyticsSessionID: Analytics.sessionID,
+          deliverSiri: SiriInboxDelivery(backend: backend).send, observe: capture)
         if !Task.isCancelled, backend.userID == owner { failure = result }
       }
       catch ShareInboxError.ownerChanged {}
