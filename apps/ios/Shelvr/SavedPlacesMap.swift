@@ -270,7 +270,10 @@ struct SavedPlacesMap: View {
   @ViewBuilder
   private func retryControl(_ palette: HomeChromePalette) -> some View {
     if !errors.isEmpty {
-      Button(copy("common.retry")) { retry += 1; discoverRequest = AreaRequest(area: discoverRequest.area) }
+      Button(copy("common.retry")) {
+        retry += 1
+        discoverRequest = AreaRequest(area: discoverRequest.area)
+      }
         .padding(.horizontal, 12).frame(minHeight: 44)
         .background(palette.surface, in: Capsule())
     }
