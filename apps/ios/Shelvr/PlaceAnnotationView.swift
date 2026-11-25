@@ -1,4 +1,5 @@
 import MapKit
+import ShelvrKit
 
 final class PlaceAnnotationView: MKAnnotationView {
   static let placeIdentifier = "shelvr-place"
@@ -12,6 +13,7 @@ final class PlaceAnnotationView: MKAnnotationView {
   private let glyph = UILabel()
   private let symbol = UIImageView()
   private let check = UIImageView()
+  private var copy: Copy?
 
   override init(annotation: (any MKAnnotation)?, reuseIdentifier: String?) {
     super.init(annotation: annotation, reuseIdentifier: reuseIdentifier)
@@ -45,6 +47,32 @@ final class PlaceAnnotationView: MKAnnotationView {
 
   required init?(coder: NSCoder) { nil }
 
+  func configure(copy: Copy) {
+    self.copy = copy
+    updatePresentation()
+  }
+
+  override func prepareForDisplay() {
+    super.prepareForDisplay()
+    updatePresentation()
+  }
+
+  private func updatePresentation() {
+    guard let copy else { return }
+    if let pin = annotation as? MapCanvas.Pin {
+      let source = copy(pin.place.isSaved ? "share.savedFragment" : "tripPlanner.badgeSuggested")
+      let status = pin.visited ? source + ", " + copy("passport.wentNoDate") : source
+      showPlace(emoji: pin.place.emoji, saved: pin.place.isSaved, visited: pin.visited,
+        title: pin.place.name, status: status)
+    } else if let cluster = annotation as? MKClusterAnnotation {
+      let count = cluster.memberAnnotations.count
+      let savedCount = cluster.memberAnnotations.count { ($0 as? MapCanvas.Pin)?.place.isSaved == true }
+      let status = savedCount == 0 ? copy("tripPlanner.badgeSuggested") :
+        copy("share.savedFragment") + ": " + savedCount.formatted()
+      showCluster(count: count, label: copy("passport.placesCount", count: count), status: status, saved: savedCount > 0)
+    }
+  }
+
   private func badge(diameter: CGFloat, fill: UIColor, rim: UIColor, border: CGFloat) {
     disc.bounds = CGRect(x: 0, y: 0, width: diameter, height: diameter)
     disc.center = CGPoint(x: bounds.midX, y: bounds.midY)
@@ -58,7 +86,7 @@ final class PlaceAnnotationView: MKAnnotationView {
     check.frame = CGRect(x: disc.frame.maxX - 10, y: disc.frame.minY - 1, width: 14, height: 14)
   }
 
-  func showPlace(emoji: String?, saved: Bool, visited: Bool, title: String, status: String) {
+  private func showPlace(emoji: String?, saved: Bool, visited: Bool, title: String, status: String) {
     displayPriority = saved ? .defaultHigh : .defaultLow
     clusteringIdentifier = "places"
     badge(diameter: saved ? 31 : 24, fill: saved ? Self.paper : Self.discoverPaper,
@@ -76,7 +104,7 @@ final class PlaceAnnotationView: MKAnnotationView {
     accessibilityValue = status
   }
 
-  func showCluster(count: Int, label: String, status: String, saved: Bool) {
+  private func showCluster(count: Int, label: String, status: String, saved: Bool) {
     displayPriority = saved ? .defaultHigh : .defaultLow
     clusteringIdentifier = nil
     badge(diameter: 32, fill: Self.ink, rim: saved ? Self.amber : Self.discoverPaper, border: 2)

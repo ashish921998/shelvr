@@ -138,27 +138,15 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     func mapView(_ map: MKMapView, viewFor annotation: any MKAnnotation) -> MKAnnotationView? {
-      if let pin = annotation as? Pin,
-        let view = map.dequeueReusableAnnotationView(withIdentifier: PlaceAnnotationView.placeIdentifier, for: pin)
-          as? PlaceAnnotationView {
-        let source = parent.copy(pin.place.isSaved ? "share.savedFragment" : "tripPlanner.badgeSuggested")
-        let status = pin.visited ? source + ", " + parent.copy("passport.wentNoDate") : source
-        view.showPlace(emoji: pin.place.emoji, saved: pin.place.isSaved, visited: pin.visited,
-          title: pin.place.name, status: status)
-        return view
+      let identifier: String
+      switch annotation {
+      case is Pin: identifier = PlaceAnnotationView.placeIdentifier
+      case is MKClusterAnnotation: identifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
+      default: return nil
       }
-      if let cluster = annotation as? MKClusterAnnotation,
-        let view = map.dequeueReusableAnnotationView(withIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier,
-          for: cluster) as? PlaceAnnotationView {
-        let count = cluster.memberAnnotations.count
-        let savedCount = cluster.memberAnnotations.count { ($0 as? Pin)?.place.isSaved == true }
-        let status = savedCount == 0 ? parent.copy("tripPlanner.badgeSuggested") :
-          parent.copy("share.savedFragment") + ": " + savedCount.formatted()
-        view.showCluster(count: count, label: parent.copy("passport.placesCount", count: count),
-          status: status, saved: savedCount > 0)
-        return view
-      }
-      return nil
+      let view = map.dequeueReusableAnnotationView(withIdentifier: identifier, for: annotation) as? PlaceAnnotationView
+      view?.configure(copy: parent.copy)
+      return view
     }
 
     func mapView(_ map: MKMapView, didSelect view: MKAnnotationView) {
