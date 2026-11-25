@@ -132,16 +132,25 @@ public struct MapPlace: Hashable, Identifiable, Sendable {
 
   public static func search(_ entries: [Self], query: String) -> [Self] {
     func folded(_ text: String) -> String {
-      text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+      let unmarked = text.decomposedStringWithCanonicalMapping.unicodeScalars.filter { scalar in
+        switch scalar.properties.generalCategory {
+        case .nonspacingMark, .spacingMark, .enclosingMark: false
+        default: true
+        }
+      }
+      return String(unmarked).lowercased(with: Locale(identifier: "und"))
     }
     let words = folded(query).split(whereSeparator: \.isWhitespace)
-    guard !words.isEmpty else { return entries }
+    guard !words.isEmpty else {
+      return query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? entries : []
+    }
     let phrase = words.joined(separator: " ")
     var groups = Array(repeating: [Self](), count: 4)
     for place in entries {
       let text = folded(([place.name, place.city ?? ""] + place.features).joined(separator: " "))
-      guard words.allSatisfy({ text.contains($0) }) else { continue }
-      let group = (place.isSaved ? 0 : 2) + (folded(place.name).hasPrefix(phrase) ? 0 : 1)
+      guard words.allSatisfy({ text.range(of: $0, options: .literal) != nil }) else { continue }
+      let startsWithQuery = folded(place.name).range(of: phrase, options: [.literal, .anchored]) != nil
+      let group = (place.isSaved ? 0 : 2) + (startsWithQuery ? 0 : 1)
       groups[group].append(place)
     }
     return groups.flatMap { $0 }
