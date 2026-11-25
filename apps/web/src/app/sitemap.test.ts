@@ -11,6 +11,7 @@ describe("sitemap and robots", () => {
     expect(urls).toContain("https://tryshelvr.app/trip-planner");
     expect(urls).toContain("https://tryshelvr.app/save-places-from-reels");
     expect(urls).toContain("https://tryshelvr.app/privacy");
+    expect(urls).toContain("https://tryshelvr.app/copyright");
     expect(
       urls.some((url) => /\/(i|p|l|m|api|auth|waitlist)\//.test(url)),
     ).toBe(false);
