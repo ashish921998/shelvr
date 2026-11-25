@@ -293,7 +293,7 @@ private final class OtherPushOwner: URLProtocol, @unchecked Sendable {
   #expect(try reopened.verifiedAPNSDigests(for: registration).isEmpty)
 }
 
-@Test func aLiveRegistrationWithAnAccountBoundProofIsCheckedWithoutRetiringItsToken() {
+@Test func anExistingRegistrationWithAnAccountBoundProofIsCheckedWithoutRetiringItsToken() {
   var delivery = PushDeliveryState()
   let native = Data([10]), session = UUID()
   let pause = delivery.prepare(generation: session, verified: [PushDeliveryState.digest(native)], alreadyRegistered: true)
