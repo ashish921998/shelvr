@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/LegalPage";
 import { SUPPORT_EMAIL } from "@/lib/support";
@@ -11,7 +12,7 @@ export const metadata: Metadata = pageMetadata(
 
 export default function TermsPage() {
   return (
-    <LegalPage title="Terms of Service" lastUpdated="October 26, 2026">
+    <LegalPage title="Terms of Service" lastUpdated="November 25, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">1. The service</h2>
         <p className="mt-2">
@@ -79,11 +80,13 @@ export default function TermsPage() {
           6. Copyright and takedown
         </h2>
         <p className="mt-2">
-          If you believe content on a Shelvr share page infringes your copyright
-          or is otherwise abusive, email <strong>{SUPPORT_EMAIL}</strong>.
-          Include the address of the page, what the content is, why you believe
-          it is infringing or abusive, and how to reach you. We remove reported
-          share pages promptly.
+          Read our{" "}
+          <Link className="underline" href="/copyright">
+            copyright policy
+          </Link>{" "}
+          to report infringement or respond to a removal. To report other abuse,
+          email <strong>{SUPPORT_EMAIL}</strong> with the share page address and
+          a description of the problem.
         </p>
       </section>
 
