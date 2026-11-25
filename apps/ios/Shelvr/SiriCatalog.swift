@@ -67,25 +67,11 @@ protocol AppIntentEntityRecordConvertible {
   }
 
   private static func readySaves(account: SiriCredential) async -> [Save] {
-    struct Page: Decodable {
-      let page: [Save]
-      let continueCursor: String
-      let isDone: Bool
-    }
-    var saves: [Save] = []
-    var cursor: String?
-    var scanned = 0
-    var seenCursors = Set<String>()
-    while scanned < 300 {
-      guard !Task.isCancelled, SiriCredential.current()?.token == account.token else { return [] }
-      let pagination: [String: ConvexEncodable?] = ["numItems": Double(min(100, 300 - scanned)), "cursor": cursor]
-      guard let page: Page = await first("items:listItemsPage", args: ["paginationOpts": pagination]) else { break }
-      saves += page.page.filter { $0.status == "ready" }
-      scanned += page.page.count
-      if page.isDone || !seenCursors.insert(page.continueCursor).inserted { break }
-      cursor = page.continueCursor
-    }
-    return saves
+    await SearchableSavePage.latestReady { cursor in
+      guard SiriCredential.current()?.token == account.token else { return nil }
+      let pagination: [String: ConvexEncodable?] = ["numItems": 100.0, "cursor": cursor]
+      return await first("items:listItemsPage", args: ["paginationOpts": pagination])
+    } ?? []
   }
 
   private static func resolve(_ id: String, owner: String) async -> AppIntentEntityRecord? {

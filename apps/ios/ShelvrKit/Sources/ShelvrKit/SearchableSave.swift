@@ -49,3 +49,23 @@ public struct SearchableSave: Decodable, Sendable {
     return result
   }
 }
+
+public struct SearchableSavePage: Decodable, Sendable {
+  public let page: [SearchableSave]
+  public let continueCursor: String
+  public let isDone: Bool
+
+  public static func latestReady(fetch: (String?) async -> Self?) async -> [SearchableSave]? {
+    var saves: [SearchableSave] = []
+    var cursor: String?
+    var visited = Set<String>()
+    while !Task.isCancelled {
+      guard let batch = await fetch(cursor), !Task.isCancelled else { return nil }
+      saves += batch.page.lazy.filter { $0.status == "ready" }.prefix(300 - saves.count)
+      if batch.isDone || saves.count == 300 { return saves }
+      guard visited.insert(batch.continueCursor).inserted else { return nil }
+      cursor = batch.continueCursor
+    }
+    return nil
+  }
+}

@@ -30,6 +30,7 @@ import Testing
     return try #require(navigation.pending)
   }
   let valid = try request()
+  #expect(navigation.pendingLibrary == nil && navigation.pendingSave == valid)
   #expect(navigation.consume(valid, owner: "alice", session: session)?.path == ["item", "save123"])
   let switched = try request()
   #expect(navigation.consume(switched, owner: "bob", session: session) == nil)
@@ -37,4 +38,21 @@ import Testing
   #expect(navigation.consume(replaced, owner: "alice", session: UUID()) == nil)
   navigation.requestSave(id: "../settings", owner: "alice", session: session)
   #expect(navigation.pending == nil)
+}
+
+@Test func systemSearchKeepsTheNewestThreeHundredReadySavesAcrossPageBoundaries() async throws {
+  func row(_ id: Int, _ status: String) throws -> SearchableSave {
+    let data = try JSONSerialization.data(withJSONObject: ["_id": String(id), "_creationTime": id, "type": "link", "status": status])
+    return try JSONDecoder().decode(SearchableSave.self, from: data)
+  }
+  let first = try (0..<300).map { try row($0, $0 == 0 ? "processing" : "ready") }
+  let second = try [row(300, "ready"), row(301, "ready")]
+  let saves = await SearchableSavePage.latestReady { cursor in
+    cursor == nil ? SearchableSavePage(page: first, continueCursor: "next", isDone: false) :
+      SearchableSavePage(page: second, continueCursor: "", isDone: true)
+  }
+  #expect(saves?.count == 300)
+  #expect(saves?.first?._id == "1" && saves?.last?._id == "300")
+  let repeated = await SearchableSavePage.latestReady { _ in SearchableSavePage(page: [], continueCursor: "same", isDone: false) }
+  #expect(repeated == nil)
 }

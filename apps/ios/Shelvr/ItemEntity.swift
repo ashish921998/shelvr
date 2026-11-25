@@ -78,19 +78,16 @@ extension ItemEntity: Transferable {
       guard let url = row.url.flatMap(URL.init(string:)) else { throw CocoaError(.fileNoSuchFile) }
       return url.dataRepresentation
     }.exportingCondition { $0.url != nil }
-    FileRepresentation(exportedContentType: .image) { (item: ItemEntity) in
+    DataRepresentation(exportedContentType: .image) { (item: ItemEntity) in
       let row = try await item.authorizedSave()
       guard row.type == "image", let source = (row.imageUrl ?? row.heroImageUrl).flatMap(URL.init(string:)),
         source.scheme?.lowercased() == "https" else { throw CocoaError(.fileNoSuchFile) }
       let (temporary, response) = try await URLSession.shared.download(from: source)
       defer { try? FileManager.default.removeItem(at: temporary) }
       guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
-        let mime = response.mimeType, let type = UTType(mimeType: mime), type.conforms(to: .image),
-        let ext = type.preferredFilenameExtension else { throw CocoaError(.fileReadCorruptFile) }
+        let mime = response.mimeType, let type = UTType(mimeType: mime), type.conforms(to: .image) else { throw CocoaError(.fileReadCorruptFile) }
       _ = try await item.authorizedSave()
-      let file = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString).appendingPathExtension(ext)
-      try FileManager.default.moveItem(at: temporary, to: file)
-      return SentTransferredFile(file)
+      return try Data(contentsOf: temporary, options: .alwaysMapped)
     }.exportingCondition { $0.kind == "image" }
     DataRepresentation(exportedContentType: .utf8PlainText) { (item: ItemEntity) in
       let row = try await item.authorizedSave()

@@ -187,6 +187,11 @@ struct SignedInView: View {
     .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
       Button(copy("common.close")) {}
     } message: { Text(stampMessage ?? "") }
+    .onChange(of: SiriNavigation.shared.pendingSave, initial: true) { _, request in
+      if let request, let link = SiriNavigation.shared.consume(request, owner: backend.userID, session: backend.sessionGeneration) {
+        navigate(to: link)
+      }
+    }
     .onChange(of: pendingLink, initial: true) { _, link in
       guard let link else { return }
       pendingLink = nil

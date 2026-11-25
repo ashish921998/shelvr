@@ -3,6 +3,8 @@ import Observation
 
 @MainActor @Observable public final class SiriNavigationRequests {
   public private(set) var pending: UUID?
+  public var pendingLibrary: UUID? { save == nil ? pending : nil }
+  public var pendingSave: UUID? { save == nil ? nil : pending }
   private var save: (id: String, owner: String, session: UUID)?
 
   public init() {}
