@@ -237,7 +237,10 @@ struct MapCanvas: UIViewRepresentable {
       default: return nil
       }
       let view = map.dequeueReusableAnnotationView(withIdentifier: identifier, for: annotation) as? PlaceAnnotationView
-      view?.configure(copy: parent.copy, compact: compactPins)
+      if let view {
+        addedViews.add(view)
+        view.configure(copy: parent.copy, compact: compactPins)
+      }
       return view
     }
 

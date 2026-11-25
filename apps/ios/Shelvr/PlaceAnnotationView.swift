@@ -15,6 +15,7 @@ final class PlaceAnnotationView: MKAnnotationView {
   private let check = UIImageView()
   private let nameBadge = UIView()
   private let nameLabel = UILabel()
+  private static let nameFont = UIFont(name: "Satoshi-Bold", size: 12) ?? .systemFont(ofSize: 12, weight: .semibold)
   private var copy: Copy?
   private var compact = false
 
@@ -53,7 +54,7 @@ final class PlaceAnnotationView: MKAnnotationView {
     nameBadge.isUserInteractionEnabled = false
     nameBadge.accessibilityElementsHidden = true
     nameLabel.textColor = Self.ink
-    nameLabel.font = UIFont(name: "Satoshi-Bold", size: 12) ?? .systemFont(ofSize: 12, weight: .semibold)
+    nameLabel.font = Self.nameFont
     nameLabel.lineBreakMode = .byTruncatingTail
     nameBadge.addSubview(nameLabel)
     addSubview(nameBadge)
@@ -79,6 +80,8 @@ final class PlaceAnnotationView: MKAnnotationView {
 
   func nameFrame(onRight: Bool) -> CGRect? {
     guard !compact, annotation is MapCanvas.Pin, let text = nameLabel.text, !text.isEmpty else { return nil }
+    nameLabel.font = UIFontMetrics(forTextStyle: .caption1)
+      .scaledFont(for: Self.nameFont, maximumPointSize: 18, compatibleWith: traitCollection)
     let width = min(150, ceil(nameLabel.intrinsicContentSize.width) + 12)
     let height = ceil(nameLabel.font.lineHeight) + 6
     let x = onRight ? bounds.maxX + 3 : bounds.minX - width - 3
