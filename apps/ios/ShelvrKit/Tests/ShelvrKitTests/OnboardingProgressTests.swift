@@ -43,3 +43,77 @@ import Testing
   #expect(!OnboardingHandoff.canSave(pro: false, freeOpen: false, remaining: 1))
   #expect(OnboardingHandoff.canSave(pro: true, freeOpen: false, remaining: 0))
 }
+
+@Test func aWelcomeDraftFollowsOnlyTheNewAccountThatFinishedTheQuestions() throws {
+  let suite = UUID().uuidString
+  let defaults = try #require(UserDefaults(suiteName: suite))
+  defer { defaults.removePersistentDomain(forName: suite) }
+  var progress = OnboardingProgress()
+  progress.city = "lisbon"
+  progress.step = .notifications
+  progress.awaitingAccountAccess = true
+  let data = try JSONEncoder().encode(progress)
+  defaults.set(data, forKey: WelcomeHandoff.progressKey(nil))
+  WelcomeHandoff.apply(.afterQuestions, to: "chosen", defaults: defaults)
+  let stored = try #require(defaults.data(forKey: WelcomeHandoff.progressKey("chosen")))
+  let resumed = try JSONDecoder().decode(OnboardingProgress.self, from: stored)
+  #expect(resumed.city == "lisbon" && resumed.awaitingAccountAccess == true)
+  #expect(defaults.data(forKey: WelcomeHandoff.progressKey(nil)) == nil)
+  #expect(defaults.data(forKey: WelcomeHandoff.progressKey("other")) == nil)
+  #expect(!defaults.bool(forKey: "swift.onboarded.chosen"))
+}
+
+@Test func existingAccountSignInSkipsQuestionsWithoutClaimingAnotherAccountsDraft() throws {
+  let suite = UUID().uuidString
+  let defaults = try #require(UserDefaults(suiteName: suite))
+  defer { defaults.removePersistentDomain(forName: suite) }
+  for account: String? in [nil, "chosen", "other"] {
+    defaults.set(Data([1]), forKey: WelcomeHandoff.progressKey(account))
+  }
+  WelcomeHandoff.apply(.existing, to: "chosen", defaults: defaults)
+  #expect(defaults.bool(forKey: "swift.onboarded.chosen") && defaults.bool(forKey: WelcomeHandoff.finishedKey))
+  #expect(defaults.data(forKey: WelcomeHandoff.progressKey("chosen")) == nil)
+  #expect(defaults.data(forKey: WelcomeHandoff.progressKey(nil)) == nil)
+  #expect(defaults.data(forKey: WelcomeHandoff.progressKey("other")) == Data([1]))
+  defaults.set(Data([2]), forKey: WelcomeHandoff.progressKey(nil))
+  WelcomeHandoff.apply(.afterQuestions, to: "chosen", defaults: defaults)
+  #expect(defaults.data(forKey: WelcomeHandoff.progressKey("chosen")) == nil)
+}
+
+@Test func aRestoredLoginConsumesOnlyTheWelcomeChoiceForItsVerifiedSession() throws {
+  let suite = UUID().uuidString
+  let before = try #require(UserDefaults(suiteName: suite))
+  defer { before.removePersistentDomain(forName: suite) }
+  let after = try #require(UserDefaults(suiteName: suite))
+  let draft = WelcomeHandoff.progressKey(nil)
+  before.set(Data([1]), forKey: draft)
+  WelcomeHandoff.stage(.afterQuestions, subject: "a|old", defaults: before)
+  WelcomeHandoff.consume(subject: "a|different", account: "a", defaults: after)
+  #expect(after.data(forKey: WelcomeHandoff.progressKey("a")) == nil)
+  #expect(after.data(forKey: draft) == Data([1]))
+  WelcomeHandoff.stage(.afterQuestions, subject: "b|new", defaults: before)
+  WelcomeHandoff.consume(subject: "b|new", account: "b", defaults: after)
+  #expect(after.data(forKey: WelcomeHandoff.progressKey("b")) == Data([1]))
+  after.set(Data([2]), forKey: draft)
+  WelcomeHandoff.consume(subject: "b|new", account: "b", defaults: after)
+  #expect(after.data(forKey: draft) == Data([2]))
+  WelcomeHandoff.stage(.existing, subject: "a|returning", defaults: before)
+  WelcomeHandoff.consume(subject: "a|returning", account: "a", defaults: after)
+  #expect(after.bool(forKey: "swift.onboarded.a"))
+}
+
+@Test func signingInFromACompletedInstallKeepsOnboardingScopedToTheAccount() throws {
+  let suite = UUID().uuidString
+  let defaults = try #require(UserDefaults(suiteName: suite))
+  defer { defaults.removePersistentDomain(forName: suite) }
+  defaults.set(true, forKey: WelcomeHandoff.finishedKey)
+  defaults.set(true, forKey: "swift.onboarded.returning")
+  defaults.set(Data([1]), forKey: WelcomeHandoff.progressKey("new"))
+  for account in ["returning", "new"] {
+    WelcomeHandoff.stage(nil, subject: account + "|session", defaults: defaults)
+    WelcomeHandoff.consume(subject: account + "|session", account: account, defaults: defaults)
+  }
+  #expect(defaults.bool(forKey: "swift.onboarded.returning"))
+  #expect(!defaults.bool(forKey: "swift.onboarded.new"))
+  #expect(defaults.data(forKey: WelcomeHandoff.progressKey("new")) == Data([1]))
+}

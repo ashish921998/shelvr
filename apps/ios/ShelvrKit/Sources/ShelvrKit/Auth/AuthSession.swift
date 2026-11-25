@@ -60,9 +60,10 @@ actor AuthSession {
   private var tokens: AuthTokens? { held?.tokens }
   var isSignedIn: Bool { held != nil }
 
-  func signIn(_ credential: SignInCredential) async throws {
+  func signIn(_ credential: SignInCredential, beforeStoring: @Sendable (AuthTokens) -> Void = { _ in }) async throws {
     let response = try await transport.signIn(credential.request)
     guard let fresh = response.tokens else { throw AuthSessionError.signInRefused }
+    beforeStoring(fresh)
     guard signOutMarker?.state != .inaccessible, vault.write(fresh) else {
       throw AuthSessionError.sessionStorageUnavailable
     }

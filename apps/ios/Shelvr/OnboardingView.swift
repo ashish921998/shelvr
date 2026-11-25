@@ -27,7 +27,9 @@ struct OnboardingGate: View {
       do {
         for try await user in backend.query("users:getCurrentUser", as: AccountView.CurrentUser?.self) {
           try Task.checkCancellation()
-          account = user?._id
+          if let id = user?._id, backend.userID == id {
+            account = id
+          } else { account = nil }
           failed = account == nil
         }
       } catch { if !Task.isCancelled { failed = true } }
@@ -52,9 +54,34 @@ private struct SampleReel: Decodable, Identifiable {
 }
 
 private struct OnboardingAccount: View {
-  @EnvironmentObject private var pushDevice: PushDevice
   let account: String
   @Binding var pendingLink: AppLink?
+  @AppStorage private var complete: Bool
+
+  init(account: String, pendingLink: Binding<AppLink?>) {
+    self.account = account
+    _pendingLink = pendingLink
+    _complete = AppStorage(wrappedValue: false, "swift.onboarded." + account)
+  }
+
+  var body: some View {
+    if complete {
+      SignedInView(pendingLink: $pendingLink).modifier(OnboardingReplay(account: account))
+        .onAppear { UserDefaults.standard.set(true, forKey: WelcomeHandoff.finishedKey) }
+    } else {
+      OnboardingForm(account: account, onSignIn: nil) {
+        UserDefaults.standard.set(true, forKey: WelcomeHandoff.finishedKey)
+        complete = true
+      }
+    }
+  }
+}
+
+struct OnboardingForm: View {
+  @EnvironmentObject private var pushDevice: PushDevice
+  let account: String?
+  let onSignIn: ((WelcomeHandoff.Purpose) -> Void)?
+  let onFinished: () -> Void
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var progress: OnboardingProgress
@@ -62,7 +89,6 @@ private struct OnboardingAccount: View {
   @Environment(\.dynamicTypeSize) private var type
   @AppStorage("swift.appearance") private var appearance = "system"
   private var palette: HomeChromePalette { HomeChromePalette(scheme, appearance: appearance) }
-  @AppStorage private var complete: Bool
   @State private var busy = false
   @State private var errorKey: String?
   @State private var paywall = false
@@ -74,11 +100,11 @@ private struct OnboardingAccount: View {
   @State private var practiceShare = false
   @State private var carousel = 0
 
-  init(account: String, pendingLink: Binding<AppLink?>) {
+  init(account: String?, onSignIn: ((WelcomeHandoff.Purpose) -> Void)?, onFinished: @escaping () -> Void = {}) {
     self.account = account
-    _pendingLink = pendingLink
-    _complete = AppStorage(wrappedValue: false, "swift.onboarded." + account)
-    let data = UserDefaults.standard.data(forKey: "swift.onboarding." + account)
+    self.onSignIn = onSignIn
+    self.onFinished = onFinished
+    let data = UserDefaults.standard.data(forKey: WelcomeHandoff.progressKey(account))
     _progress = State(initialValue: data.flatMap { try? JSONDecoder().decode(OnboardingProgress.self, from: $0) }
       ?? OnboardingProgress())
   }
@@ -88,89 +114,109 @@ private struct OnboardingAccount: View {
   }
 
   var body: some View {
-    if complete {
-      SignedInView(pendingLink: $pendingLink).modifier(OnboardingReplay(account: account))
-    } else {
-      NavigationStack {
-        ScrollView {
-          VStack(alignment: .leading, spacing: 14) {
-            content
-            if let errorKey { Text(copy(errorKey)).foregroundStyle(.red) }
+    NavigationStack {
+      Group {
+        if progress.step == .opener {
+          ViewThatFits(in: .vertical) {
+            OnboardingOpener(palette: palette)
+            ScrollView { OnboardingOpener(palette: palette).fixedSize(horizontal: false, vertical: true) }
           }
-          .frame(maxWidth: .infinity, alignment: .leading).padding(24)
+          .padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 8)
+        } else {
+          ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+              content
+              if let errorKey { Text(copy(errorKey)).foregroundStyle(.red) }
+            }.frame(maxWidth: .infinity, alignment: .leading).padding(24)
+          }
         }
-        .background(palette.background.ignoresSafeArea())
-        .foregroundStyle(palette.foreground)
-        .safeAreaInset(edge: .bottom) {
+      }
+      .background(palette.background.ignoresSafeArea())
+      .foregroundStyle(palette.foreground)
+      .safeAreaInset(edge: .bottom) {
+        VStack(spacing: 0) {
           Button {
             if progress.step == .ahaShare { practiceShare = true } else { proceed(skip: false) }
           } label: {
             Text(copy(progress.step == .ahaShare ? "common.share" : progress.step == .opener ? "opener.getStarted" :
               progress.step == .notifications ? "onboardingNotify.allow" : "common.continue"))
               .font(.custom("Satoshi-Bold", size: 17, relativeTo: .headline))
-              .frame(maxWidth: .infinity, minHeight: 56).foregroundStyle(palette.background)
+              .frame(maxWidth: .infinity, minHeight: progress.step == .opener ? 52 : 56).foregroundStyle(palette.background)
               .background(palette.foreground, in: Capsule())
           }
           .buttonStyle(FirstRunPillStyle())
           .disabled(busy || (progress.step == .goal && progress.goals.isEmpty) ||
             (progress.step == .savedCount && progress.savedCount == nil) || (progress.step == .been && progress.visitedCities.isEmpty) || (progress.step == .city && progress.city == nil))
-          .padding(.horizontal, 24).padding(.vertical, 8).background(palette.background)
-        }
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-          if progress.step != .opener {
-            ToolbarItem(placement: .topBarLeading) {
-              Button { progress.back(); persist() } label: { Label(copy("common.back"), systemImage: "chevron.left") }
-            }
-            ToolbarItem(placement: .principal) {
-              let steps = OnboardingProgress.Step.allCases
-              ProgressView(value: Double(steps.firstIndex(of: progress.step) ?? 0), total: Double(steps.count - 1))
-                .tint(palette.primaryText).frame(width: 128)
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-              Button(copy("onboardingQ.skip")) { proceed(skip: true) }
-            }
+          if progress.step == .opener, let onSignIn {
+            WelcomeInviteOffer(palette: palette)
+            Button { onSignIn(.existing) } label: {
+              (Text(copy("onboarding.haveAccount") + " ").foregroundStyle(palette.muted)
+                + Text(copy("onboarding.signIn")).fontWeight(.bold).foregroundStyle(palette.foreground))
+                .font(.custom("Satoshi-Regular", size: 14, relativeTo: .subheadline))
+                .frame(maxWidth: .infinity, minHeight: 44)
+            }.buttonStyle(.plain)
           }
         }
-        .disabled(busy)
-        .onChange(of: progress.step, initial: true) { _, step in
-          cityQuery = ""
-          entered = Date()
-          if progress.viewed?.contains(step) != true {
-            progress.viewed = (progress.viewed ?? []).union([step]); persist()
-            Analytics.capture("onboarding_step_viewed", stepProperties(step))
+        .padding(.horizontal, progress.step == .opener ? 16 : 24)
+        .padding(.vertical, 8).background(palette.background)
+      }
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar(progress.step == .opener ? .hidden : .visible, for: .navigationBar)
+      .toolbar {
+        if progress.step != .opener {
+          ToolbarItem(placement: .topBarLeading) {
+            Button { progress.back(); persist() } label: { Label(copy("common.back"), systemImage: "chevron.left") }
+          }
+          ToolbarItem(placement: .principal) {
+            let steps = OnboardingProgress.Step.allCases
+            ProgressView(value: Double(steps.firstIndex(of: progress.step) ?? 0), total: Double(steps.count - 1))
+              .tint(palette.primaryText).frame(width: 128)
+          }
+          ToolbarItem(placement: .topBarTrailing) {
+            Button(copy("onboardingQ.skip")) { proceed(skip: true) }
           }
         }
-        .task {
-          if progress.step == .notifications,
-            await UNUserNotificationCenter.current().notificationSettings().authorizationStatus != .notDetermined {
-            progress.step = .carousel; carousel = 2; persist()
-          }
+      }
+      .disabled(busy)
+      .onChange(of: progress.step, initial: true) { _, step in
+        cityQuery = ""
+        entered = Date()
+        if progress.viewed?.contains(step) != true {
+          progress.viewed = (progress.viewed ?? []).union([step]); persist()
+          Analytics.capture("onboarding_step_viewed", stepProperties(step))
         }
-        .sheet(isPresented: $practiceShare) {
-          PracticeShareGuide {
-            practiceShare = false
-            proceed(skip: false)
-          }
+      }
+      .task {
+        if account != nil, progress.awaitingAccountAccess == true {
+          busy = true
+          await checkAccess(skipped: false)
+        } else if progress.step == .notifications,
+          await UNUserNotificationCenter.current().notificationSettings().authorizationStatus != .notDetermined {
+          progress.step = .carousel; carousel = 2; persist()
         }
-        .sheet(isPresented: $paywall, onDismiss: {
-          if purchased || free || unavailable { finish() }
-          else if progress.step == .notifications { progress.step = .carousel; carousel = 2; persist() }
-        }) {
-          BillingSheet(destination: .paywall, goalVariables: goalVariables,
-            availabilityChanged: { available in
-              unavailable = !available
-              if !available { paywall = false }
-            }, confirmed: { purchased = true })
+      }
+      .sheet(isPresented: $practiceShare) {
+        PracticeShareGuide {
+          practiceShare = false
+          proceed(skip: false)
         }
+      }
+      .sheet(isPresented: $paywall, onDismiss: {
+        if purchased || free || unavailable { finish() }
+        else if progress.step == .notifications { progress.step = .carousel; carousel = 2; persist() }
+      }) {
+        BillingSheet(destination: .paywall, goalVariables: goalVariables,
+          availabilityChanged: { available in
+            unavailable = !available
+            if !available { paywall = false }
+          }, confirmed: { purchased = true })
       }
     }
   }
 
   @ViewBuilder private var content: some View {
     switch progress.step {
-    case .opener:
-      OnboardingOpener(palette: palette)
+    case .opener: EmptyView()
     case .savedCount:
       title("onboardingQ.savedTitle")
       ForEach(["Few", "TenToFifty", "FiftyToTwoHundred", "Hundreds", "LostCount"], id: \.self) { count in
@@ -364,7 +410,7 @@ private struct OnboardingAccount: View {
 
   private func persist() {
     if let data = try? JSONEncoder().encode(progress) {
-      UserDefaults.standard.set(data, forKey: "swift.onboarding." + account)
+      UserDefaults.standard.set(data, forKey: WelcomeHandoff.progressKey(account))
     }
   }
 
@@ -411,12 +457,26 @@ private struct OnboardingAccount: View {
 
   private func checkAccess(skipped: Bool) async {
     defer { busy = false }
+    guard let account else {
+      recordCompletion(skipped: skipped)
+      progress.awaitingAccountAccess = true
+      persist()
+      onSignIn?(.afterQuestions)
+      return
+    }
+    guard backend.userID == account, !Task.isCancelled else { return }
     do {
       for try await plan in backend.query("subscriptions:getEntitlement", as: ServerPlan.self) {
+        try Task.checkCancellation()
+        guard backend.userID == account else { return }
         if plan.entitled { recordCompletion(skipped: skipped); purchased = true; finish(); return }
         break
       }
       for try await open in backend.query("freeSaves:freePlanOpen", as: Bool.self) {
+        try Task.checkCancellation()
+        guard backend.userID == account else { return }
+        progress.awaitingAccountAccess = nil
+        persist()
         recordCompletion(skipped: skipped); free = open; purchased = false; unavailable = false; paywall = true; return
       }
     } catch { errorKey = "errors.tryAgain" }
@@ -443,12 +503,13 @@ private struct OnboardingAccount: View {
   }
 
   private func finish() {
+    guard let account, backend.userID == account else { return }
     let entry = OnboardingHandoff(cities: progress.visitedCities.sorted(), url: progress.skippedShare ? nil : reel?.url,
       operation: progress.demoOperationID, space: nil)
     do {
       try entry.save(account)
-      complete = true
-      UserDefaults.standard.removeObject(forKey: "swift.onboarding." + account)
+      onFinished()
+      UserDefaults.standard.removeObject(forKey: WelcomeHandoff.progressKey(account))
     } catch { errorKey = "errors.tryAgain" }
   }
 }

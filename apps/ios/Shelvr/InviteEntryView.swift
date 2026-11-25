@@ -8,6 +8,8 @@ struct InviteEntryView: View {
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(MemberNamePrompts.self) private var names
+  @State private var welcomePurpose: WelcomeHandoff.Purpose?
+  @AppStorage(WelcomeHandoff.finishedKey) private var finishedWelcome = false
   @State private var attempt = 0
   @State private var preparing = false
   @State private var naming: Naming?
@@ -33,12 +35,19 @@ struct InviteEntryView: View {
           await resolve(request)
         }
       } else if backend.status == .signedOut {
-        SignInView().overlay(alignment: .topLeading) {
-          if entry.accepted != nil { Button(copy("common.cancel")) { cancel() }.padding() }
+        if entry.accepted != nil {
+          SignInView(back: cancel)
+        } else if welcomePurpose != nil || finishedWelcome {
+          SignInView(back: finishedWelcome ? nil : { welcomePurpose = nil }, welcome: welcomePurpose)
+        } else {
+          OnboardingForm(account: nil, onSignIn: { welcomePurpose = $0 })
         }
       } else {
         OnboardingGate(pendingLink: $pendingLink).id(backend.sessionGeneration)
       }
+    }
+    .onChange(of: backend.userID, initial: true) { _, account in
+      if account != nil { welcomePurpose = nil }
     }
     .safeAreaInset(edge: .bottom) {
       if !entry.loaded, entry.failed { Button(copy("common.retry")) { entry.restore() } }
@@ -87,7 +96,7 @@ struct InviteEntryView: View {
   }
 
   private func choose(_ invite: PublicInvite) {
-    if backend.status == .signedOut { entry.accept(invite); return }
+    if backend.status == .signedOut { welcomePurpose = nil; entry.accept(invite); return }
     guard backend.status == .signedIn, !preparing else { return }
     let session = backend.sessionGeneration
     let revision = entry.previewRevision
@@ -181,6 +190,7 @@ struct InviteEntryView: View {
         defaults.removeObject(forKey: "swift.onboarding." + account)
         defaults.removeObject(forKey: OnboardingHandoff.key(account))
         defaults.set(true, forKey: completed)
+        defaults.set(true, forKey: WelcomeHandoff.finishedKey)
       }
       handoff = InviteNavigation(destination: destination, account: account, session: session)
     } catch { if current() { entry.failed = true } }
