@@ -4,7 +4,8 @@ import SwiftUI
 
 struct SavedPlacesMap: View {
   let open: (String) -> Void
-  let tabBar: HomeTabBar
+  @Binding var cityInView: String?
+  let searchFocusChanged: (Bool) -> Void
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.colorScheme) private var scheme
@@ -24,7 +25,7 @@ struct SavedPlacesMap: View {
   @State private var viewport: MapViewport?
   @State private var overview = 0
   @State private var topControlsHeight: CGFloat = 50
-  @State private var bottomControlsHeight: CGFloat = 104
+  @State private var bottomControlsHeight: CGFloat = 48
   @State private var searching = false
   @State private var resultsOpen = true
   @FocusState private var focusedSearch: Bool
@@ -51,6 +52,9 @@ struct SavedPlacesMap: View {
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bottomControlsHeight = $0 }
         }
       }
+      .onChange(of: viewport?.city(among: personalPlaces), initial: true) { _, city in cityInView = city }
+      .onChange(of: focusedSearch) { _, focused in searchFocusChanged(focused) }
+      .onDisappear { searchFocusChanged(false) }
       .alert(copy("common.unavailable"), isPresented: $location.unavailable) {
         Button(copy("common.close")) {}
       }
@@ -164,8 +168,8 @@ struct SavedPlacesMap: View {
         }
         filterStrip(scene, palette: palette).padding(.horizontal, 20)
       }
-      tabBar
     }
+    .padding(.bottom, 36)
     .buttonStyle(HomeChromePressStyle())
   }
 

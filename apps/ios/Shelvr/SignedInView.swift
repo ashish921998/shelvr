@@ -8,17 +8,72 @@ struct SignedInView: View {
   @Binding var pendingLink: AppLink?
   @Environment(InviteEntry.self) private var invites
   @Environment(\.copy) private var copy
-  @State private var library = false
+  @Environment(\.dynamicTypeSize) private var toolbarTextSize
+  @ScaledMetric(relativeTo: .caption2) private var preferredActionWidth: CGFloat = 76
+  @State private var tab = HomeTab.map
+  @State private var mapSearchFocused = false
+  @State private var mapCity: String?
   @State private var librarySearchFocused = false
   @State private var librarySearchSeed: LibraryView.SearchSeed?
   @State private var billing: BillingDestination?
   @State private var path: [AppLink] = []
   @State private var stampMessage: String?
 
-  private var showsMap: Bool { !access.loading && !access.locked && !library }
-  private var tabBar: HomeTabBar {
-    HomeTabBar(library: library, switchTab: { library.toggle() },
-      add: { open("/add-spots") }, plan: { open("/go-out") })
+  private enum HomeTab {
+    case map, library
+  }
+
+  private var homeViews: some View {
+    TabView(selection: $tab) {
+      Tab(value: HomeTab.map) {
+        SavedPlacesMap(open: open, cityInView: $mapCity, searchFocusChanged: { mapSearchFocused = $0 })
+          .toolbar(.hidden, for: .tabBar)
+      }
+      Tab(value: HomeTab.library) {
+        LibraryView(screen: .home, searchSeed: access.pro ? $librarySearchSeed : .constant(nil), searchFocusChanged: { librarySearchFocused = $0 })
+          .toolbar(.hidden, for: .tabBar)
+      }
+    }
+  }
+
+  private var showHomeActions: Bool {
+    !access.loading && !access.locked && path.isEmpty && !(tab == .map ? mapSearchFocused : librarySearchFocused)
+  }
+
+  private func homeAction(_ key: String, symbol: String, highlighted: Bool = false, action: @escaping () -> Void) -> some View {
+    let title = copy(key)
+    let icon = Image(systemName: symbol)
+      .symbolRenderingMode(highlighted ? .palette : .monochrome)
+      .foregroundStyle(highlighted ? Color.black : Color.primary, Color("AccentColor"))
+    return Button(action: action) {
+      Group {
+        if !toolbarTextSize.isAccessibilitySize {
+          VStack(spacing: 2) {
+            icon.font(highlighted ? .title3.weight(.medium) : .subheadline)
+              .dynamicTypeSize(...DynamicTypeSize.xLarge).frame(height: 24)
+            Text(title).font(.caption2).lineLimit(1).minimumScaleFactor(0.8)
+          }
+        } else if highlighted {
+          icon.font(.system(size: 28, weight: .medium))
+        } else {
+          Text(title).font(.headline).lineLimit(1).minimumScaleFactor(0.45)
+        }
+      }
+      .frame(width: min(96, max(76, preferredActionWidth)), height: 44)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(title)
+    .accessibilityShowsLargeContentViewer { Label(title, systemImage: symbol) }
+  }
+
+  private func goOut() {
+    var route = URLComponents()
+    route.path = "/go-out"
+    if tab == .map, let mapCity {
+      route.queryItems = [URLQueryItem(name: "city", value: mapCity)]
+    }
+    if let url = route.string { open(url) }
   }
 
   private var readyPersonalRequest: UUID? {
@@ -27,26 +82,33 @@ struct SignedInView: View {
   }
 
   var body: some View {
-    NavigationStack(path: $path) {
+    NavigationStack(path: Binding(get: { path }, set: { next in setPath(next) })) {
       Group {
-        if access.loading { loadingPlan } else if access.locked { PlanGateView() } else if library {
-          LibraryView(screen: .home, searchSeed: access.pro ? $librarySearchSeed : .constant(nil), searchFocusChanged: { librarySearchFocused = $0 })
-        } else {
-          SavedPlacesMap(open: open, tabBar: tabBar)
-        }
+        if access.loading { loadingPlan }
+        else if access.locked { PlanGateView() }
+        else { homeViews }
       }
-      .navigationTitle(copy(library ? "navigation.library" : "navigation.map"))
-      .toolbar(showsMap ? .hidden : .visible, for: .navigationBar)
+      .navigationTitle(copy(tab == .map ? "navigation.map" : "navigation.library"))
+      .toolbar(!access.loading && !access.locked && tab == .map ? .hidden : .visible, for: .navigationBar)
+      .toolbar(showHomeActions ? .visible : .hidden, for: .bottomBar)
       .toolbar {
+        if showHomeActions {
+          ToolbarItem(placement: .bottomBar) {
+            HStack(spacing: 0) {
+              homeAction(tab == .map ? "navigation.library" : "navigation.map",
+                symbol: tab == .map ? "books.vertical" : "map") {
+                tab = tab == .map ? .library : .map
+              }
+              homeAction("common.add", symbol: "plus.circle.fill", highlighted: true) { open("/add-spots") }
+              homeAction("plan.goOut", symbol: "figure.walk", action: goOut)
+            }
+            .foregroundStyle(.primary)
+          }
+        }
         ToolbarItem(placement: .topBarTrailing) {
           Button { open("/profile") } label: {
             Label(copy("navigation.profile"), systemImage: "person.crop.circle")
           }
-        }
-      }
-      .safeAreaInset(edge: .bottom) {
-        if library && !librarySearchFocused && !access.loading && !access.locked {
-          tabBar
         }
       }
       .navigationDestination(for: AppLink.self) { link in
@@ -55,19 +117,7 @@ struct SignedInView: View {
         else { switch link.path.first {
         case "settings": AccountSettingsView()
         case "profile": AccountView().navigationTitle(copy("navigation.profile"))
-        case "add-spots":
-          List {
-            entry("/add", "addSheet.pasteLink", "link")
-            entry("/add", "addSheet.googleMapsList", "map")
-            entry("/new-shared-list", "sharedLists.newTitle", "person.2")
-            entry("/new-trip", "homePlaces.planTrip", "suitcase")
-            entry("/photo", "item.photo", "photo")
-            entry("/how-to-share", "addSheet.howToShare", "square.and.arrow.up")
-            if Locale.preferredLanguages.first?.hasPrefix("en") == true {
-              entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
-            }
-          }
-          .navigationTitle(copy("addSheet.title"))
+        case "add-spots": addSpots
         case "passport-story": PassportStoryView()
         case "trips": TripsTabView()
         case "shared-trip-links": ActiveTripLinksView()
@@ -88,7 +138,7 @@ struct SignedInView: View {
         case "already-been", "next-to-stamp":
           StampPlacesView(city: link.path.first == "next-to-stamp" ? link.query.first { $0.name == "city" }?.value ?? "" : nil) { message in
             guard path.last == link, let passport = AppLink("/passport") else { return }
-            if let i = path.lastIndex(of: passport) { path = Array(path.prefix(i + 1)) }
+            if let index = path.lastIndex(of: passport) { path = Array(path.prefix(index + 1)) }
             else { path = [passport] }
             stampMessage = message
           }.id(link)
@@ -112,7 +162,7 @@ struct SignedInView: View {
         case "spots" where link.path.count == 2:
           SaveSpotRevealView(id: link.path[1]) { city in
             guard path.last == link else { return }
-            library = false
+            tab = .map
             if let city, let encoded = city.addingPercentEncoding(withAllowedCharacters: .alphanumerics),
               let destination = AppLink("/city/" + encoded) { path = [destination] }
             else { path = [] }
@@ -159,7 +209,11 @@ struct SignedInView: View {
                 if let target = route.string.flatMap({ AppLink($0) }) { NavigationLink(city, value: target) }
               }
             }
-          } else { PlanCityView(trip: link.path.first == "new-trip") }
+          } else {
+            PlanCityView(trip: link.path.first == "new-trip") { target in
+              if link.path == ["go-out"], path.last == link { path[path.count - 1] = target }
+            }
+          }
         case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1], sharedOnly: access.restrictsPersonalAccess).id(link.path[1])
         case "add-trip-stop":
           if let id = link.query.first(where: { $0.name == "tripId" })?.value {
@@ -180,8 +234,8 @@ struct SignedInView: View {
         } }
       }
     }
-    .modifier(CancelSurveyCard(home: library && path.isEmpty))
-    .modifier(TrialReminderObserver(home: library && path.isEmpty))
+    .modifier(CancelSurveyCard(home: tab == .library && path.isEmpty))
+    .modifier(TrialReminderObserver(home: tab == .library && path.isEmpty))
     .modifier(SiriFolderRefresh(entitled: access.pro))
     .environment(access)
     .sheet(item: $billing) { BillingSheet(destination: $0, confirmed: { access.retry += 1 }) }
@@ -204,8 +258,8 @@ struct SignedInView: View {
     .onChange(of: path) { _, path in
       if !path.isEmpty { librarySearchSeed = nil }
     }
-    .onChange(of: library) { _, showingLibrary in
-      if !showingLibrary { librarySearchSeed = nil }
+    .onChange(of: tab) { _, destination in
+      if destination != .library { librarySearchSeed = nil }
     }
     .onChange(of: pendingLink, initial: true) { _, link in
       guard let link else { return }
@@ -230,12 +284,27 @@ struct SignedInView: View {
       librarySearchSeed = LibraryView.SearchSeed(term: term)
     }
     switch link.path {
-    case ["map"], ["share"], ["plan-gate"]: library = false; path = []
-    case ["home"]: library = true; path = []
+    case ["map"], ["share"], ["plan-gate"]: tab = .map; path = []
+    case ["home"]: tab = .library; path = []
     case ["paywall"]: billing = .paywall
     case ["sign-in"]: break
-    default: path = [link]
+    default: setPath([link])
     }
+  }
+
+  private var addSpots: some View {
+    List {
+      entry("/add", "addSheet.pasteLink", "link")
+      entry("/add", "addSheet.googleMapsList", "map")
+      entry("/new-shared-list", "sharedLists.newTitle", "person.2")
+      entry("/new-trip", "homePlaces.planTrip", "suitcase")
+      entry("/photo", "item.photo", "photo")
+      entry("/how-to-share", "addSheet.howToShare", "square.and.arrow.up")
+      if Locale.preferredLanguages.first?.hasPrefix("en") == true {
+        entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
+      }
+    }
+    .navigationTitle(copy("addSheet.title"))
   }
 
   @ViewBuilder private var loadingPlan: some View {
@@ -247,9 +316,18 @@ struct SignedInView: View {
     }
   }
 
+  private func setPath(_ next: [AppLink]) {
+    if let link = next.last, link.query.isEmpty, link.path == ["map"] || link.path == ["home"] {
+      tab = link.path == ["map"] ? .map : .library
+      path = []
+    } else {
+      path = next
+    }
+  }
+
   private func open(_ route: String) {
     librarySearchSeed = nil
-    if let link = AppLink(route) { path.append(link) }
+    if let link = AppLink(route) { setPath(path + [link]) }
   }
 
   private func entry(_ route: String, _ title: String, _ symbol: String) -> some View {
@@ -273,6 +351,7 @@ private struct ShellDestination: View {
 
 private struct PlanCityView: View {
   let trip: Bool
+  let singleCity: (AppLink) -> Void
   struct City: Decodable {
     let city: String
     let placeCount: Int?
@@ -302,6 +381,9 @@ private struct PlanCityView: View {
             }
             if let link = url.string.flatMap({ AppLink($0) }) {
               NavigationLink(city.city, value: link)
+                .task(id: cities.count == 1 ? link : nil) {
+                  if cities.count == 1 { singleCity(link) }
+                }
             }
           }
         }

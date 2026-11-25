@@ -6,12 +6,6 @@ struct LibraryItemContents: View {
   @Environment(\.copy) private var copy
 
   var body: some View {
-    if save.status == "processing" { Label(copy("item.reading"), systemImage: "clock") }
-    if save.status == "failed" { Text(copy("homePlaces.reviewFailed")) }
-    if save.enrichment == "partial" { Text(copy("item.partial")).font(.callout) }
-    ForEach(Array((save.placePins ?? []).enumerated()), id: \.offset) { _, place in
-      Label([place.name, place.city].compactMap { $0 }.joined(separator: " · "), systemImage: "mappin")
-    }
     if let recipe = save.recipe {
       if let name = recipe.name { Text(name).font(.headline) }
       if !recipe.ingredients.isEmpty {
