@@ -11,6 +11,7 @@ final class PlaceAnnotationView: MKAnnotationView {
 
   private let disc = UIView()
   private let glyph = UILabel()
+  private let backPin = UIImageView()
   private let symbol = UIImageView()
   private let check = UIImageView()
   private var copy: Copy?
@@ -30,6 +31,10 @@ final class PlaceAnnotationView: MKAnnotationView {
     glyph.adjustsFontSizeToFitWidth = true
     glyph.minimumScaleFactor = 0.6
     glyph.textColor = Self.ink
+    backPin.contentMode = .center
+    backPin.image = UIImage(systemName: "mappin",
+      withConfiguration: UIImage.SymbolConfiguration(pointSize: 9, weight: .semibold))
+    backPin.tintColor = Self.paper.withAlphaComponent(0.6)
     symbol.contentMode = .center
     check.contentMode = .center
     check.image = UIImage(systemName: "checkmark",
@@ -41,6 +46,7 @@ final class PlaceAnnotationView: MKAnnotationView {
     check.layer.borderColor = Self.paper.cgColor
     addSubview(disc)
     disc.addSubview(glyph)
+    disc.addSubview(backPin)
     disc.addSubview(symbol)
     addSubview(check)
   }
@@ -73,14 +79,14 @@ final class PlaceAnnotationView: MKAnnotationView {
     }
   }
 
-  private func badge(diameter: CGFloat, fill: UIColor, rim: UIColor, border: CGFloat) {
-    disc.bounds = CGRect(x: 0, y: 0, width: diameter, height: diameter)
+  private func badge(width: CGFloat, height: CGFloat, fill: UIColor, rim: UIColor, border: CGFloat) {
+    disc.bounds = CGRect(x: 0, y: 0, width: width, height: height)
     disc.center = CGPoint(x: bounds.midX, y: bounds.midY)
     disc.backgroundColor = fill
-    disc.layer.cornerRadius = diameter / 2
+    disc.layer.cornerRadius = height / 2
     disc.layer.borderWidth = border
     disc.layer.borderColor = rim.cgColor
-    disc.layer.shadowPath = UIBezierPath(ovalIn: disc.bounds).cgPath
+    disc.layer.shadowPath = UIBezierPath(roundedRect: disc.bounds, cornerRadius: height / 2).cgPath
     glyph.frame = disc.bounds.insetBy(dx: 3, dy: 2)
     symbol.frame = disc.bounds
     check.frame = CGRect(x: disc.frame.maxX - 10, y: disc.frame.minY - 1, width: 14, height: 14)
@@ -89,12 +95,16 @@ final class PlaceAnnotationView: MKAnnotationView {
   private func showPlace(emoji: String?, saved: Bool, visited: Bool, title: String, status: String) {
     displayPriority = saved ? .defaultHigh : .defaultLow
     clusteringIdentifier = "places"
-    badge(diameter: saved ? 31 : 24, fill: saved ? Self.paper : Self.discoverPaper,
+    bounds.size = CGSize(width: 34, height: 34)
+    collisionMode = .circle
+    let diameter: CGFloat = saved ? 31 : 24
+    badge(width: diameter, height: diameter, fill: saved ? Self.paper : Self.discoverPaper,
       rim: saved ? Self.amber : Self.discoverRim, border: saved ? 1.5 : 1)
     glyph.font = .systemFont(ofSize: saved ? 17 : 13)
     glyph.textColor = Self.ink
     glyph.text = emoji
     glyph.isHidden = emoji == nil
+    backPin.isHidden = true
     symbol.isHidden = emoji != nil
     symbol.tintColor = saved ? Self.ink : Self.discoverRim
     symbol.image = UIImage(systemName: saved ? "bookmark.fill" : "mappin",
@@ -107,12 +117,24 @@ final class PlaceAnnotationView: MKAnnotationView {
   private func showCluster(count: Int, label: String, status: String, saved: Bool) {
     displayPriority = saved ? .defaultHigh : .defaultLow
     clusteringIdentifier = nil
-    badge(diameter: 32, fill: Self.ink, rim: saved ? Self.amber : Self.discoverPaper, border: 2)
     glyph.font = .monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
     glyph.textColor = Self.paper
     glyph.text = count.formatted()
     glyph.isHidden = false
-    symbol.isHidden = true
+    let countWidth = ceil(glyph.intrinsicContentSize.width)
+    let width = max(47, countWidth + 38)
+    bounds.size = CGSize(width: width, height: 34)
+    collisionMode = .rectangle
+    badge(width: width, height: 30, fill: Self.ink, rim: saved ? Self.amber : Self.discoverPaper, border: 2)
+    let contentX = (width - countWidth - 23) / 2
+    glyph.frame = CGRect(x: contentX + 23, y: 0, width: countWidth, height: 30)
+    backPin.frame = CGRect(x: contentX, y: 5, width: 10, height: 16)
+    backPin.isHidden = false
+    symbol.frame = CGRect(x: contentX + 6, y: 6, width: 14, height: 19)
+    symbol.image = UIImage(systemName: "mappin.and.ellipse",
+      withConfiguration: UIImage.SymbolConfiguration(pointSize: 13, weight: .semibold))
+    symbol.tintColor = Self.paper
+    symbol.isHidden = false
     check.isHidden = true
     accessibilityLabel = label
     accessibilityValue = status
