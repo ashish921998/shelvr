@@ -35,8 +35,8 @@ struct LisbonSignInHero: View {
           Text(copy("signInScene.fromReels")).font(.caption2).foregroundStyle(palette.muted)
         }
         Text(copy("signInScene.dateTitle")).font(.custom("Satoshi-Bold", size: 15))
-        ForEach(["Miradouro", "TimeOut", "Pasteis"], id: \.self) { key in
-          Text(copy("onboarding.scene" + key)).font(.caption)
+        ForEach(["onboarding.sceneMiradouro", "onboarding.sceneTimeOut", "onboarding.scenePasteis"], id: \.self) { key in
+          Text(copy(key)).font(.caption)
         }
       }
       .padding(13).frame(width: min(254, bounds.size.width))
