@@ -13,16 +13,23 @@ struct SignedInView: View {
   @State private var path: [AppLink] = []
   @State private var stampMessage: String?
 
+  private var showsMap: Bool { !access.loading && !access.locked && !library }
+  private var tabBar: HomeTabBar {
+    HomeTabBar(library: library, switchTab: { library.toggle() },
+      add: { open("/add-spots") }, plan: { open("/go-out") })
+  }
+
   var body: some View {
     NavigationStack(path: $path) {
       Group {
         if access.loading { loadingPlan } else if access.locked { PlanGateView() } else if library {
           LibraryView(screen: .home)
         } else {
-          SavedPlacesMap(open: open)
+          SavedPlacesMap(open: open, tabBar: tabBar)
         }
       }
       .navigationTitle(copy(library ? "navigation.library" : "navigation.map"))
+      .toolbar(showsMap ? .hidden : .visible, for: .navigationBar)
       .toolbar {
         ToolbarItem(placement: .topBarTrailing) {
           Button { open("/profile") } label: {
@@ -31,27 +38,9 @@ struct SignedInView: View {
         }
       }
       .safeAreaInset(edge: .bottom) {
-        if !access.loading && !access.locked { HStack {
-          Button { library.toggle() } label: {
-            Label(copy(library ? "navigation.map" : "navigation.library"),
-              systemImage: library ? "map.fill" : "books.vertical.fill")
-          }
-          Spacer()
-          Button { open("/add-spots") } label: {
-            Image(systemName: "plus").font(.title2.bold()).frame(width: 54, height: 54)
-              .background(.regularMaterial, in: Circle())
-          }
-          .accessibilityLabel(copy("common.add"))
-          Spacer()
-          Button { open("/go-out") } label: {
-            Label(copy("plan.goOut"), systemImage: "figure.walk")
-          }
+        if library && !access.loading && !access.locked {
+          tabBar
         }
-        .labelStyle(.titleAndIcon)
-        .font(.subheadline.weight(.medium))
-        .padding(.horizontal, 20)
-        .padding(.vertical, 6)
-        .background(.thinMaterial) }
       }
       .navigationDestination(for: AppLink.self) { link in
         if access.loading && PlanRoutes.needsLoadedPlan(link) { loadingPlan }
