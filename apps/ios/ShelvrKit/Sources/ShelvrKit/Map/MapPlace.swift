@@ -138,7 +138,7 @@ public struct MapPlace: Hashable, Identifiable, Sendable {
         default: true
         }
       }
-      return String(unmarked).lowercased()
+      return String(unmarked).lowercased(with: Locale(identifier: "und"))
     }
     let words = folded(query).split(whereSeparator: \.isWhitespace)
     guard !words.isEmpty else { return entries }

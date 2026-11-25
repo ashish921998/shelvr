@@ -110,7 +110,8 @@
     {"source": "discover", "name": "The Arcade", "city": "Café Town", "features": ["rooftop"]},
     {"source": "discover", "name": "Café Marais", "city": "Paris"},
     {"source": "own", "name": "ガーデン", "city": "東京"},
-    {"source": "own", "name": "Straße", "city": "Berlin"}
+    {"source": "own", "name": "Straße", "city": "Berlin"},
+    {"source": "own", "name": "ΒΟΛΟΣ", "city": "Greece"}
   ],
   "search": [
     {"query": "  CAFÉ  ", "names": ["Café Aurora", "Café Atlas", "North Pier", "Luna Café", "Café Garden", "Café Marais", "The Arcade"]},
@@ -121,7 +122,8 @@
     {"query": "absent", "names": []},
     {"query": "カ", "names": ["ガーデン"]},
     {"query": "strasse", "names": []},
-    {"query": "straße", "names": ["Straße"]}
+    {"query": "straße", "names": ["Straße"]},
+    {"query": "βολος", "names": ["ΒΟΛΟΣ"]}
   ],
   "reach": [
     {"latitude": 38.72, "longitude": -9.14, "box": {"west": -9.3, "south": 38.65, "east": -9, "north": 38.8}, "expected": {"west": -10.5, "south": 38, "east": -8, "north": 39.25}},
