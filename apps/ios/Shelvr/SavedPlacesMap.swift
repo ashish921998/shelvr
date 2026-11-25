@@ -13,7 +13,7 @@ struct SavedPlacesMap: View {
   @State private var saved: [MapPlace]?
   @State private var discoverResponse: AreaResponse?
   @State private var visits: [MapVisit] = []
-  @State private var area = DiscoverBox.world
+  @State private var discoverRequest = AreaRequest(area: .world)
   @State private var filters = MapFilters()
   @State private var location = MapLocation()
   @State private var selected: MapPlace?
@@ -31,7 +31,7 @@ struct SavedPlacesMap: View {
   @FocusState private var focusedSearch: Bool
 
   var body: some View {
-    let request = AreaRequest(area: area, retry: retry)
+    let request = discoverRequest
     let discover = discoverResponse?.places ?? []
     let complete = discoverResponse?.request == request ? discoverResponse?.complete : nil
     let scene = MapScene(saved: saved, discover: discover, visits: visits, filters: filters)
@@ -40,7 +40,7 @@ struct SavedPlacesMap: View {
     let overviewPlaces = scene.visible.filter(\.isSaved)
     MapCanvas(places: scene.visible, location: location.position, filters: scene.filters, opening: scene.opening,
       visited: scene.visited, selectedLabelID: selectedLabelID, copy: copy, overview: overview, overviewPlaces: overviewPlaces, topControlsHeight: topControlsHeight,
-      bottomControlsHeight: bottomControlsHeight, onArea: { area = $0; viewport = $1 },
+      bottomControlsHeight: bottomControlsHeight, onArea: { updateDiscoverArea($0); viewport = $1 },
       onPick: selectPlace, onCluster: { cluster = $0 })
       .ignoresSafeArea(.container)
       .overlay(alignment: .top) {
@@ -270,7 +270,7 @@ struct SavedPlacesMap: View {
   @ViewBuilder
   private func retryControl(_ palette: HomeChromePalette) -> some View {
     if !errors.isEmpty {
-      Button(copy("common.retry")) { retry += 1 }
+      Button(copy("common.retry")) { retry += 1; discoverRequest = AreaRequest(area: discoverRequest.area) }
         .padding(.horizontal, 12).frame(minHeight: 44)
         .background(palette.surface, in: Capsule())
     }
@@ -312,9 +312,14 @@ struct SavedPlacesMap: View {
     }.accessibilityAddTraits(selected ? .isSelected : [])
   }
 
+  private func updateDiscoverArea(_ area: DiscoverBox) {
+    guard area != discoverRequest.area else { return }
+    discoverRequest = AreaRequest(area: area)
+  }
+
   private struct AreaRequest: Equatable {
     let area: DiscoverBox
-    let retry: Int
+    let generation = UUID()
   }
 
   private struct AreaResponse {
