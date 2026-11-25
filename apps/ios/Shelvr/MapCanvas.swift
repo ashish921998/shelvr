@@ -8,6 +8,7 @@ struct MapCanvas: UIViewRepresentable {
   let filters: MapFilters
   let opening: [MapPlace]?
   let visited: Set<String>
+  let copy: Copy
   let overview: Int
   let overviewPlaces: [MapPlace]
   let topControlsHeight: CGFloat
@@ -21,7 +22,8 @@ struct MapCanvas: UIViewRepresentable {
   func makeUIView(context: Context) -> MKMapView {
     let map = MKMapView()
     map.delegate = context.coordinator
-    map.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: "place")
+    map.register(PlaceAnnotationView.self, forAnnotationViewWithReuseIdentifier: PlaceAnnotationView.placeIdentifier)
+    map.register(PlaceAnnotationView.self, forAnnotationViewWithReuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
     map.pointOfInterestFilter = .excludingAll
     return map
   }
@@ -136,14 +138,14 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     func mapView(_ map: MKMapView, viewFor annotation: any MKAnnotation) -> MKAnnotationView? {
-      guard let pin = annotation as? Pin else { return nil }
-      guard let view = map.dequeueReusableAnnotationView(withIdentifier: "place", for: pin)
-        as? MKMarkerAnnotationView else { return nil }
-      view.clusteringIdentifier = "places"
-      view.markerTintColor = pin.place.isSaved ? .systemOrange : .systemTeal
-      view.glyphImage = nil
-      view.glyphText = pin.visited ? "✓" : pin.place.emoji
-      view.displayPriority = pin.place.isSaved ? .defaultHigh : .defaultLow
+      let identifier: String
+      switch annotation {
+      case is Pin: identifier = PlaceAnnotationView.placeIdentifier
+      case is MKClusterAnnotation: identifier = MKMapViewDefaultClusterAnnotationViewReuseIdentifier
+      default: return nil
+      }
+      let view = map.dequeueReusableAnnotationView(withIdentifier: identifier, for: annotation) as? PlaceAnnotationView
+      view?.configure(copy: parent.copy)
       return view
     }
 
