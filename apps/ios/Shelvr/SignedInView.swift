@@ -8,6 +8,7 @@ struct SignedInView: View {
   @Binding var pendingLink: AppLink?
   @Environment(InviteEntry.self) private var invites
   @Environment(\.copy) private var copy
+  @ScaledMetric(relativeTo: .title3) private var toolbarIconHeight: CGFloat = 24
   @State private var tab = HomeTab.map
   @State private var mapSearchFocused = false
   @State private var mapCity: String?
@@ -40,14 +41,13 @@ struct SignedInView: View {
   private func homeAction(_ key: String, symbol: String, highlighted: Bool = false, action: @escaping () -> Void) -> some View {
     Button(action: action) {
       VStack(spacing: 2) {
-        if highlighted {
-          Image(systemName: symbol).symbolRenderingMode(.palette).foregroundStyle(.black, Color("AccentColor"))
-        } else {
-          Image(systemName: symbol)
-        }
+        Image(systemName: symbol)
+          .font(highlighted ? .title3.weight(.medium) : .subheadline)
+          .symbolRenderingMode(highlighted ? .palette : .monochrome)
+          .foregroundStyle(highlighted ? Color.black : Color.primary, Color("AccentColor"))
+          .frame(height: toolbarIconHeight)
         Text(copy(key)).font(.caption2)
       }
-      .font(.title3.weight(.medium))
       .frame(minWidth: 76, minHeight: 44)
       .contentShape(Rectangle())
     }
