@@ -25,6 +25,7 @@ struct MapCanvas: UIViewRepresentable {
     map.register(PlaceAnnotationView.self, forAnnotationViewWithReuseIdentifier: PlaceAnnotationView.placeIdentifier)
     map.register(PlaceAnnotationView.self, forAnnotationViewWithReuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
     map.pointOfInterestFilter = .excludingAll
+    context.coordinator.installNames(on: map)
     return map
   }
 
@@ -52,8 +53,16 @@ struct MapCanvas: UIViewRepresentable {
     private var compactPins = true
     private var nameLayout: Task<Void, Never>?
     private let addedViews = NSHashTable<PlaceAnnotationView>.weakObjects()
-    private var namedPins: [PlaceAnnotationView] = []
+    private let nameOverlay = UIView()
     init(_ parent: MapCanvas) { self.parent = parent }
+
+    func installNames(on map: MKMapView) {
+      nameOverlay.frame = map.bounds
+      nameOverlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+      nameOverlay.isUserInteractionEnabled = false
+      nameOverlay.accessibilityElementsHidden = true
+      map.addSubview(nameOverlay)
+    }
 
     func update(_ parent: MapCanvas, map: MKMapView) {
       let changedLocation = self.parent.location !== parent.location
@@ -167,7 +176,7 @@ struct MapCanvas: UIViewRepresentable {
       guard !compactPins, nameLayout == nil else { return }
       nameLayout = Task { @MainActor [weak self, weak map] in
         do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
-        guard let self else { return }
+        guard !Task.isCancelled, let self else { return }
         nameLayout = nil
         guard let map, !compactPins else { return }
         layoutNames(on: map)
@@ -175,8 +184,7 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     private func clearNames() {
-      for view in namedPins { view.showName(in: nil) }
-      namedPins.removeAll(keepingCapacity: true)
+      for label in nameOverlay.subviews { label.removeFromSuperview() }
     }
 
     private func layoutNames(on map: MKMapView) {
@@ -204,17 +212,20 @@ struct MapCanvas: UIViewRepresentable {
         if $0.distance != $1.distance { return $0.distance < $1.distance }
         return $0.pin.place.id < $1.pin.place.id
       }
+      map.bringSubviewToFront(nameOverlay)
       for candidate in candidates {
         let view = candidate.view
-        for onRight in [true, false] {
-          guard let local = view.nameFrame(onRight: onRight) else { break }
-          let frame = view.convert(local, to: map)
+        let marker = view.convert(view.bounds, to: map)
+        let badge = MapPlaceNameBadge(title: candidate.pin.place.name, traits: map.traitCollection)
+        for x in [marker.maxX + 3, marker.minX - badge.bounds.width - 3] {
+          let frame = CGRect(x: x, y: marker.midY - badge.bounds.height / 2,
+            width: badge.bounds.width, height: badge.bounds.height)
           guard usable.contains(frame),
             !targets.contains(where: { $0.view !== view && $0.frame.intersects(frame) }),
             !occupied.contains(where: { $0.intersects(frame) }) else { continue }
-          view.showName(in: local)
+          badge.frame = frame
+          nameOverlay.addSubview(badge)
           occupied.append(frame.insetBy(dx: -3, dy: -3))
-          namedPins.append(view)
           break
         }
       }

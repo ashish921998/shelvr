@@ -13,9 +13,6 @@ final class PlaceAnnotationView: MKAnnotationView {
   private let glyph = UILabel()
   private let symbol = UIImageView()
   private let check = UIImageView()
-  private let nameBadge = UIView()
-  private let nameLabel = UILabel()
-  private static let nameFont = UIFont(name: "Satoshi-Bold", size: 12) ?? .systemFont(ofSize: 12, weight: .semibold)
   private var copy: Copy?
   private var compact = false
 
@@ -47,17 +44,7 @@ final class PlaceAnnotationView: MKAnnotationView {
     disc.addSubview(glyph)
     disc.addSubview(symbol)
     addSubview(check)
-    nameBadge.backgroundColor = Self.paper
-    nameBadge.layer.borderColor = Self.ink.withAlphaComponent(0.16).cgColor
-    nameBadge.layer.borderWidth = 0.5
-    nameBadge.isHidden = true
-    nameBadge.isUserInteractionEnabled = false
-    nameBadge.accessibilityElementsHidden = true
-    nameLabel.textColor = Self.ink
-    nameLabel.font = Self.nameFont
-    nameLabel.lineBreakMode = .byTruncatingTail
-    nameBadge.addSubview(nameLabel)
-    addSubview(nameBadge)
+
   }
 
   required init?(coder: NSCoder) { nil }
@@ -71,29 +58,6 @@ final class PlaceAnnotationView: MKAnnotationView {
   override func prepareForDisplay() {
     super.prepareForDisplay()
     updatePresentation()
-  }
-
-  override func prepareForReuse() {
-    super.prepareForReuse()
-    showName(in: nil)
-  }
-
-  func nameFrame(onRight: Bool) -> CGRect? {
-    guard !compact, annotation is MapCanvas.Pin, let text = nameLabel.text, !text.isEmpty else { return nil }
-    nameLabel.font = UIFontMetrics(forTextStyle: .caption1)
-      .scaledFont(for: Self.nameFont, maximumPointSize: 18, compatibleWith: traitCollection)
-    let width = min(150, ceil(nameLabel.intrinsicContentSize.width) + 12)
-    let height = ceil(nameLabel.font.lineHeight) + 6
-    let x = onRight ? bounds.maxX + 3 : bounds.minX - width - 3
-    return CGRect(x: x, y: bounds.midY - height / 2, width: width, height: height)
-  }
-
-  func showName(in frame: CGRect?) {
-    nameBadge.isHidden = frame == nil
-    guard let frame else { return }
-    nameBadge.frame = frame
-    nameBadge.layer.cornerRadius = frame.height / 2
-    nameLabel.frame = nameBadge.bounds.insetBy(dx: 6, dy: 0)
   }
 
   private func updatePresentation() {
@@ -162,8 +126,6 @@ final class PlaceAnnotationView: MKAnnotationView {
       check.layer.borderWidth = 1
       check.isHidden = !visited
     }
-    nameLabel.text = title
-    if compact { showName(in: nil) }
     accessibilityLabel = title
     accessibilityValue = status
   }
@@ -181,7 +143,6 @@ final class PlaceAnnotationView: MKAnnotationView {
     badge(width: width, height: 26, fill: Self.ink, rim: saved ? Self.amber : Self.discoverPaper, border: 1.5)
     symbol.isHidden = true
     check.isHidden = true
-    showName(in: nil)
     accessibilityLabel = label
     accessibilityValue = status
   }
