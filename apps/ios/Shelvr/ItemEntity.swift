@@ -73,11 +73,11 @@ struct ItemQuery: EntityStringQuery, EnumerableEntityQuery {
 
 extension ItemEntity: Transferable {
   static var transferRepresentation: some TransferRepresentation {
-    ProxyRepresentation(exporting: { (item: ItemEntity) async throws -> URL in
+    DataRepresentation(exportedContentType: .url) { (item: ItemEntity) in
       let row = try await item.authorizedSave()
       guard let url = row.url.flatMap(URL.init(string:)) else { throw CocoaError(.fileNoSuchFile) }
-      return url
-    }).exportingCondition { $0.url != nil }
+      return url.dataRepresentation
+    }.exportingCondition { $0.url != nil }
     FileRepresentation(exportedContentType: .image) { (item: ItemEntity) in
       let row = try await item.authorizedSave()
       guard row.type == "image", let source = (row.imageUrl ?? row.heroImageUrl).flatMap(URL.init(string:)),
@@ -92,12 +92,12 @@ extension ItemEntity: Transferable {
       try FileManager.default.moveItem(at: temporary, to: file)
       return SentTransferredFile(file)
     }.exportingCondition { $0.kind == "image" }
-    ProxyRepresentation(exporting: { (item: ItemEntity) async throws -> String in
+    DataRepresentation(exportedContentType: .utf8PlainText) { (item: ItemEntity) in
       let row = try await item.authorizedSave()
       let title = row.displayTitle(copy: Copy())
-      if let url = row.url { return title + "\n" + url }
-      return row.excerpt ?? title
-    })
+      let text = row.url.map { title + "\n" + $0 } ?? row.excerpt ?? title
+      return Data(text.utf8)
+    }
   }
 }
 
