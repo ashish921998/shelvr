@@ -17,40 +17,31 @@ import SwiftUI
     }
     let session = backend.sessionGeneration
     let initial = publication.revision
+    func currentPlan() async throws -> ServerPlan {
+      for try await plan in backend.query("subscriptions:getEntitlement", as: ServerPlan.self) {
+        try Task.checkCancellation()
+        guard backend.userID == account && backend.sessionGeneration == session else { throw CancellationError() }
+        return plan
+      }
+      throw URLError(.cannotParseResponse)
+    }
     func deny() async throws {
       publication.activate(nil)
       try await publication.confirmed()
     }
-    func currentPlan() async throws -> ServerPlan {
-      do {
-        for try await plan in backend.query("subscriptions:getEntitlement", as: ServerPlan.self) {
-          try Task.checkCancellation()
-          guard backend.userID == account && backend.sessionGeneration == session else { throw CancellationError() }
-          return plan
-        }
-        throw URLError(.cannotParseResponse)
-      } catch {
-        if !Task.isCancelled && backend.sessionGeneration == session { try await deny() }
-        throw error
-      }
-    }
     guard try await currentPlan().entitled else { try await deny(); return }
     guard let rows = await SearchableSavePage.latestReady(fetch: { cursor in
-      await firstPage(backend, cursor: cursor, session: session)
+      guard await backend.sessionGeneration == session else { return nil }
+      do {
+        for try await page in await backend.spotlightPage(after: cursor) { return page }
+      } catch {}
+      return nil
     }) else { throw URLError(.cannotLoadFromNetwork) }
     let plan = try await currentPlan()
     guard plan.entitled else { try await deny(); return }
     let expiry = plan.status == "lifetime" ? nil : plan.expiresAt.map { Date(timeIntervalSince1970: $0 / 1000) }
     let owner = SpotlightPublication.Owner(account: account, session: session, expiresAt: expiry)
     try await publication.reindex(rows, for: owner, observedRevision: initial)
-  }
-
-  private static func firstPage(_ backend: Backend, cursor: String?, session: UUID) async -> SearchableSavePage? {
-    guard backend.sessionGeneration == session else { return nil }
-    do {
-      for try await page in backend.spotlightPage(after: cursor) { return page }
-    } catch {}
-    return nil
   }
 
   private static func prepare() async throws {
