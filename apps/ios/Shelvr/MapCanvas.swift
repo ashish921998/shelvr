@@ -94,10 +94,18 @@ struct MapCanvas: UIViewRepresentable {
       scheduleNames(on: map)
     }
 
-    private func synchronizePins(on map: MKMapView, rebuild: Bool = false) {
+    private var usesOverviewDensity: Bool {
       let filters = parent.filters
-      let useOverviewDensity = compactPins && !filters.hasSearch && filters.kinds.isEmpty && filters.went == .all
-      let places = useOverviewDensity ? pinDensity.representatives(from: parent.places) : parent.places
+      return compactPins && !filters.hasSearch && filters.kinds.isEmpty && filters.went == .all
+    }
+
+    private func synchronizePins(on map: MKMapView, rebuild: Bool = false) {
+      let places: [MapPlace]
+      if usesOverviewDensity {
+        places = pinDensity.representatives(from: parent.places) { place in
+          map.bounds.contains(map.convert(place.coordinate, toPointTo: map))
+        }
+      } else { places = parent.places }
       let ids = Set(places.map(\.id))
       let removed = pins.keys.filter { !ids.contains($0) }
       map.removeAnnotations(removed.compactMap { pins.removeValue(forKey: $0) })
@@ -249,12 +257,13 @@ struct MapCanvas: UIViewRepresentable {
       let end = CLLocation(latitude: east.latitude, longitude: east.longitude)
       let metersPerPoint = start.distance(from: end) / (2 * halfSample)
       let nextCompact = compactPins ? metersPerPoint > 8 : metersPerPoint >= 10
-      let nextDensity = MapPinDensity(mapPointsPerScreenPoint: metersPerPoint *
-        MKMapPointsPerMeterAtLatitude(map.region.center.latitude))
       let changedStyle = nextCompact != compactPins
-      guard changedStyle || (nextCompact && nextDensity != pinDensity) else { return }
       compactPins = nextCompact
-      pinDensity = nextDensity
+      if usesOverviewDensity {
+        pinDensity = MapPinDensity(projectedStart: MKMapPoint(west), projectedEnd: MKMapPoint(east),
+          screenDistance: 2 * halfSample)
+      }
+      guard changedStyle || usesOverviewDensity else { return }
       clearNames()
       synchronizePins(on: map, rebuild: changedStyle)
     }
