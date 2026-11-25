@@ -183,10 +183,13 @@ final class PlaceAnnotationView: MKAnnotationView {
     accessibilityValue = status
   }
 
-  override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+  var pinHitBounds: CGRect {
     let horizontal = max(0, (44 - bounds.width) / 2)
     let vertical = max(0, (44 - bounds.height) / 2)
-    return bounds.insetBy(dx: -horizontal, dy: -vertical).contains(point) ||
-      (!nameBadge.isHidden && nameBadge.frame.contains(point))
+    return bounds.insetBy(dx: -horizontal, dy: -vertical)
+  }
+
+  override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+    pinHitBounds.contains(point) || (!nameBadge.isHidden && nameBadge.frame.contains(point))
   }
 }

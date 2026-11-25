@@ -177,7 +177,8 @@ struct MapCanvas: UIViewRepresentable {
         return map.view(for: annotation) === view && !view.isHidden &&
           map.bounds.intersects(view.convert(view.bounds, to: map))
       }
-      var occupied = visible.map { $0.convert($0.bounds, to: map).insetBy(dx: -2, dy: -2) }
+      let targets = visible.map { (view: $0, frame: $0.convert($0.pinHitBounds, to: map)) }
+      var occupied: [CGRect] = []
       if let location = map.view(for: map.userLocation) {
         occupied.append(location.convert(location.bounds, to: map).insetBy(dx: -2, dy: -2))
       }
@@ -197,7 +198,9 @@ struct MapCanvas: UIViewRepresentable {
         for onRight in [true, false] {
           guard let local = view.nameFrame(onRight: onRight) else { break }
           let frame = view.convert(local, to: map)
-          guard usable.contains(frame), !occupied.contains(where: { $0.intersects(frame) }) else { continue }
+          guard usable.contains(frame),
+            !targets.contains(where: { $0.view !== view && $0.frame.intersects(frame) }),
+            !occupied.contains(where: { $0.intersects(frame) }) else { continue }
           view.showName(in: local)
           occupied.append(frame.insetBy(dx: -3, dy: -3))
           namedPins.append(view)
