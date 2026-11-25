@@ -87,7 +87,9 @@ struct OnboardingOpener: View {
   @Environment(\.accessibilityReduceMotion) private var reduced
   @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
   @Environment(\.dynamicTypeSize) private var type
-  @State private var page = 0
+  @Environment(\.scenePhase) private var phase
+  @State private var position: Int? = 0
+  private var page: Int { ((position ?? 0) + photos.count) % photos.count }
   @State private var interacted = false
   private let photos = ["your-cities", "san-francisco-places", "san-francisco-date", "san-francisco-trip"]
   private var captions: [String] {
@@ -103,32 +105,57 @@ struct OnboardingOpener: View {
       }.foregroundStyle(palette.primaryText).accessibilityElement(children: .combine).accessibilityAddTraits(.isHeader)
       Text(copy("opener.tagline")).font(.custom("Satoshi-Regular", size: 15, relativeTo: .subheadline))
         .foregroundStyle(palette.muted).multilineTextAlignment(.center).frame(maxWidth: 285)
-      TabView(selection: $page) {
-        ForEach(photos.indices, id: \.self) { i in
-          FirstRunPicture(name: photos[i], ext: "webp").scaledToFit()
-            .clipShape(.rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).strokeBorder(palette.foreground, lineWidth: 3) }
-            .aspectRatio(640/1391.0, contentMode: .fit).padding(.vertical, 5).frame(maxWidth: .infinity)
-            .tag(i).accessibilityLabel(captions[i])
-            .accessibilityValue(i == 0 ? "" : copy(["", "onboarding.openerFileBody", "opener.datePreviewDescription", "opener.tripPreviewDescription"][i]))
+      GeometryReader { bounds in
+        let stride = min(bounds.size.width * 0.68, bounds.size.height * 0.49)
+        ScrollView(.horizontal) {
+          HStack(spacing: 0) {
+            ForEach(-1...photos.count, id: \.self) { slot in
+              let i = (slot + photos.count) % photos.count
+              FirstRunPicture(name: photos[i], ext: "webp").scaledToFit()
+                .clipShape(.rect(cornerRadius: 22))
+                .overlay { RoundedRectangle(cornerRadius: 22).strokeBorder(palette.foreground, lineWidth: 3) }
+                .aspectRatio(640/1391.0, contentMode: .fit).padding(4)
+                .frame(width: stride, height: bounds.size.height)
+                .scrollTransition(.interactive, axis: .horizontal) { card, phase in
+                  card.opacity(1 - abs(phase.value) * 0.72)
+                    .rotation3DEffect(.degrees(phase.value * 16), axis: (x: 0, y: 1, z: 0))
+                }
+                .id(slot)
+            }
+          }.scrollTargetLayout()
+        }.scrollIndicators(.hidden)
+          .contentMargins(.horizontal, (bounds.size.width - stride)/2, for: .scrollContent)
+          .scrollTargetBehavior(.viewAligned(limitBehavior: .alwaysByOne)).scrollPosition(id: $position, anchor: .center)
+          .onScrollPhaseChange { _, next in
+            if next == .idle, let position, !photos.indices.contains(position) { self.position = page }
+          }
+          .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in interacted = true })
+      }.frame(height: min(UIScreen.main.bounds.height * 0.46, 420))
+        .accessibilityElement(children: .ignore).accessibilityLabel(captions[page])
+        .accessibilityValue(page == 0 ? "" : copy(["", "onboarding.openerFileBody", "opener.datePreviewDescription", "opener.tripPreviewDescription"][page]))
+        .accessibilityAdjustableAction { direction in
+          interacted = true
+          switch direction {
+          case .increment: position = (page + 1) % photos.count
+          case .decrement: position = (page + photos.count - 1) % photos.count
+          @unknown default: break
+          }
         }
-      }.tabViewStyle(.page(indexDisplayMode: .never))
-        .frame(height: min(UIScreen.main.bounds.height * 0.46, 420))
-        .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in interacted = true })
       Text(captions[page]).font(.custom("Satoshi-Bold", size: 23, relativeTo: .title2)).multilineTextAlignment(.center)
-      HStack(spacing: 6) {
+      HStack(spacing: 0) {
         ForEach(photos.indices, id: \.self) { i in
-          Button { interacted = true; page = i } label: {
+          Button { interacted = true; position = i } label: {
             Capsule().fill(i == page ? palette.foreground : palette.border).frame(width: i == page ? 18 : 7, height: 6)
-              .padding(.vertical, 8)
+              .frame(width: 44, height: 44).contentShape(Rectangle())
           }.accessibilityLabel(captions[i]).accessibilityAddTraits(i == page ? .isSelected : [])
         }
       }
     }.frame(maxWidth: .infinity)
-    .task(id: !interacted && !reduced && !voiceOver && !type.isAccessibilitySize) {
-      guard !interacted && !reduced && !voiceOver && !type.isAccessibilitySize else { return }
+    .task(id: phase == .active && !interacted && !reduced && !voiceOver && !type.isAccessibilitySize) {
+      guard phase == .active && !interacted && !reduced && !voiceOver && !type.isAccessibilitySize else { return }
       while !Task.isCancelled {
         do { try await Task.sleep(for: .seconds(3)) } catch { return }
-        withAnimation(.easeInOut(duration: 0.3)) { page = (page + 1) % photos.count }
+        withAnimation(.easeInOut(duration: 0.3)) { position = page + 1 }
       }
     }
   }
