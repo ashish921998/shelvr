@@ -52,6 +52,7 @@ private struct SampleReel: Decodable, Identifiable {
 }
 
 private struct OnboardingAccount: View {
+  @EnvironmentObject private var pushDevice: PushDevice
   let account: String
   @Binding var pendingLink: AppLink?
   @Environment(Backend.self) private var backend
@@ -393,7 +394,7 @@ private struct OnboardingAccount: View {
       busy = true
       Task {
         if !skip, (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])) == true {
-          UIApplication.shared.registerForRemoteNotifications()
+          pushDevice.retryEnrollment()
         }
         await checkAccess(skipped: skip)
       }

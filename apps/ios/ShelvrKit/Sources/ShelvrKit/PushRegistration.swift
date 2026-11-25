@@ -98,6 +98,9 @@ public struct PushDeliveryState {
   private var generation: UUID?
   private var verified = Set<String>()
   private var suspended = false
+  private var requestedResume: Data?
+  private var wasBackgrounded = false
+  public private(set) var rotationDeferred = false
 
   public init() {}
 
@@ -106,31 +109,60 @@ public struct PushDeliveryState {
 
   static func digest(_ data: Data) -> String { Data(SHA256.hash(data: data)).base64EncodedString() }
 
-  public mutating func prepare(generation: UUID, verified: Set<String>) -> Bool {
+  public mutating func enteredBackground() { wasBackgrounded = true }
+
+  public mutating func resumeAfterBackground() -> Bool {
+    defer { wasBackgrounded = false }
+    guard wasBackgrounded, rotationDeferred else { return false }
+    self = PushDeliveryState()
+    return true
+  }
+
+  public func defersEnrollment(for generation: UUID) -> Bool {
+    self.generation == generation && rotationDeferred
+  }
+
+  public mutating func prepare(generation: UUID, verified: Set<String>, alreadyRegistered: Bool = false) -> Bool {
+    let restoreLiveRegistration = self.generation == nil && alreadyRegistered && !verified.isEmpty
     let changed = self.generation != generation
-    if changed { token = nil }
+    if changed {
+      token = nil
+      requestedResume = nil
+      rotationDeferred = false
+    }
+    guard !rotationDeferred else { return false }
     self.generation = generation
     self.verified = verified
     if let token, verified.contains(Self.digest(token)) {
+      if suspended { requestedResume = token }
       suspended = false
       return false
     }
     let needsSilence = changed || !suspended
     suspended = true
-    return needsSilence
+    return needsSilence && !restoreLiveRegistration
   }
 
   public mutating func receive(_ native: Data) -> Bool {
-    guard generation != nil else { return true }
+    guard generation != nil, !rotationDeferred else { return true }
+    if let requestedResume, requestedResume != native {
+      self.requestedResume = nil
+      token = nil
+      suspended = true
+      rotationDeferred = true
+      return true
+    }
+    requestedResume = nil
     token = native
     suspended = !verified.contains(Self.digest(native))
     return suspended
   }
 
   public mutating func confirm(_ native: Data, generation: UUID) -> Bool {
-    guard self.generation == generation, token == native else { return false }
+    guard self.generation == generation, !rotationDeferred, token == native else { return false }
     verified = [Self.digest(native)]
     let resume = suspended
+    if resume { requestedResume = native }
     suspended = false
     return resume
   }
