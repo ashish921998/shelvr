@@ -165,6 +165,10 @@ struct ShelvrShortcuts: AppShortcutsProvider {
     if #available(iOS 27.0, *) {
       AppShortcut(intent: SaveNoteIntent(), phrases: ["Save a note in \(.applicationName)", "Add a note to \(.applicationName)",
         "Save a note to \(\.$folder) in \(.applicationName)"], shortTitle: "Save a Note", systemImageName: "square.and.pencil")
+      AppShortcut(intent: SearchShelvrIntent(), phrases: ["Search \(.applicationName)", "Find something in \(.applicationName)"],
+        shortTitle: "Search Shelvr", systemImageName: "magnifyingglass")
+      AppShortcut(intent: OpenSpaceIntent(), phrases: ["Open \(\.$target) in \(.applicationName)", "Show my \(\.$target) space in \(.applicationName)"],
+        shortTitle: "Open a Space", systemImageName: "square.stack")
     }
     #endif
   }
