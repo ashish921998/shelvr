@@ -51,12 +51,13 @@ import ShelvrKit
     }) else { throw URLError(.cannotLoadFromNetwork) }
     try await verify(request, account: account, session: session)
     do {
-      try await publication.finishReindex(rows, request: request)
+      try await publication.finishReindex(rows, request: request) {
+        try await self.access(account: account, session: session)
+      }
     } catch {
       retryViewIfRevoked(request, account: account, session: session)
       throw error
     }
-    try await verify(request, account: account, session: session)
   }
 
   private func verify(_ request: SpotlightPublication.ReindexRequest, account: String, session: UUID) async throws {

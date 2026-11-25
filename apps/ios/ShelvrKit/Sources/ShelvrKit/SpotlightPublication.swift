@@ -142,7 +142,8 @@ import Foundation
     }
   }
 
-  public func finishReindex(_ rows: [SearchableSave], request: ReindexRequest) async throws {
+  public func finishReindex(_ rows: [SearchableSave], request: ReindexRequest,
+    confirmGrant: @MainActor () async throws -> Owner?) async throws {
     guard current(request) && request.owner.active && isCurrent(request.owner)
     else { throw CancellationError() }
     if request.snapshotRevision == snapshotRevision { publish(rows, for: request.owner) }
@@ -150,6 +151,10 @@ import Foundation
     schedule()
     do {
       try await confirmSystemWrite()
+      try Task.checkCancellation()
+      let grant = try await confirmGrant()
+      try Task.checkCancellation()
+      try await validate(request, grant: grant)
     } catch {
       if current(request) {
         activate(nil)

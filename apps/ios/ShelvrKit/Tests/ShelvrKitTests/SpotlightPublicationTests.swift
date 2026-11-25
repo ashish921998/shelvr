@@ -172,7 +172,7 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   let owner = SpotlightPublication.Owner(account: "a", session: UUID())
   let request = try await index.beginReindex(for: owner)
   index.activate(owner)
-  try await index.finishReindex([try spotlightRow("valid")], request: request)
+  try await index.finishReindex([try spotlightRow("valid")], request: request, confirmGrant: { owner })
   #expect(Set(os.items.keys) == ["valid"])
 }
 
@@ -181,11 +181,11 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   let owner = SpotlightPublication.Owner(account: "a", session: UUID())
   let request = try await index.beginReindex(for: owner)
   index.publish([], for: owner)
-  try await index.finishReindex([try spotlightRow("stale")], request: request)
+  try await index.finishReindex([try spotlightRow("stale")], request: request, confirmGrant: { owner })
   #expect(os.items.isEmpty)
   let next = try await index.beginReindex(for: owner)
   index.publish([try spotlightRow("new")], for: owner)
-  try await index.finishReindex([try spotlightRow("stale")], request: next)
+  try await index.finishReindex([try spotlightRow("stale")], request: next, confirmGrant: { owner })
   #expect(Set(os.items.keys) == ["new"])
 }
 
@@ -197,7 +197,7 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   let owner = SpotlightPublication.Owner(account: "a", session: UUID())
   let request = try await index.beginReindex(for: owner)
   os.willBlock = true
-  let job = Task { try await index.finishReindex([try spotlightRow("old")], request: request) }
+  let job = Task { try await index.finishReindex([try spotlightRow("old")], request: request, confirmGrant: { owner }) }
   let started = await observed { os.blocked != nil }
   try #require(started)
   gate.allowed = false
@@ -210,7 +210,7 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   #expect(os.items.isEmpty)
   gate.allowed = true
   index.activate(owner)
-  await #expect(throws: CancellationError.self) { try await index.finishReindex([try spotlightRow("old")], request: request) }
+  await #expect(throws: CancellationError.self) { try await index.finishReindex([try spotlightRow("old")], request: request, confirmGrant: { owner }) }
 }
 
 @MainActor @Test func failedSystemWritesAreReportedToTheReindexCaller() async throws {
@@ -218,7 +218,7 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   let owner = SpotlightPublication.Owner(account: "a", session: UUID())
   let request = try await index.beginReindex(for: owner)
   os.fail = true
-  await #expect(throws: CocoaError.self) { try await index.finishReindex([try spotlightRow("partial")], request: request) }
+  await #expect(throws: CocoaError.self) { try await index.finishReindex([try spotlightRow("partial")], request: request, confirmGrant: { owner }) }
   await index.settled()
   #expect(os.items.isEmpty && index.needsReauthorization(after: request))
   os.fail = false
@@ -232,8 +232,8 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   let owner = SpotlightPublication.Owner(account: "a", session: UUID())
   let older = try await index.beginReindex(for: owner)
   let newer = try await index.beginReindex(for: owner)
-  await #expect(throws: CancellationError.self) { try await index.finishReindex([try spotlightRow("deleted")], request: older) }
-  try await index.finishReindex([], request: newer)
+  await #expect(throws: CancellationError.self) { try await index.finishReindex([try spotlightRow("deleted")], request: older, confirmGrant: { owner }) }
+  try await index.finishReindex([], request: newer, confirmGrant: { owner })
   #expect(os.items.isEmpty)
 }
 
@@ -243,7 +243,7 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   let short = SpotlightPublication.Owner(account: owner.account, session: owner.session, expiresAt: Date().addingTimeInterval(3600))
   for grant: SpotlightPublication.Owner? in [short, nil] {
     let request = try await index.beginReindex(for: owner)
-    try await index.finishReindex([try spotlightRow("private")], request: request)
+    try await index.finishReindex([try spotlightRow("private")], request: request, confirmGrant: { owner })
     #expect(os.items.count == 1)
     await #expect(throws: CancellationError.self) { try await index.validate(request, grant: grant) }
     #expect(os.items.isEmpty)
@@ -270,4 +270,25 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   await #expect(throws: URLError.self) { try await older.value }
   try await newer.value
   #expect(events == ["older read", "older cleanup", "newer read and write"])
+}
+
+@MainActor @Test func cancellingThePostWriteGrantReadPurgesTheAcknowledgedWrite() async throws {
+  let os = TestSearchIndex(), index = os.make()
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let request = try await index.beginReindex(for: owner)
+  var checking = false
+  let rebuild = Task {
+    try await index.finishReindex([try spotlightRow("sensitive")], request: request) {
+      checking = true
+      try await Task.sleep(for: .seconds(30))
+      return owner
+    }
+  }
+  let reached = await observed { checking }
+  try #require(reached)
+  #expect(Set(os.items.keys) == ["sensitive"])
+  rebuild.cancel()
+  await #expect(throws: CancellationError.self) { try await rebuild.value }
+  await index.settled()
+  #expect(os.items.isEmpty && index.needsReauthorization(after: request))
 }
