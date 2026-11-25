@@ -130,7 +130,7 @@ struct OnboardingOpener: View {
             if next == .idle, let position, !photos.indices.contains(position) { self.position = page }
           }
           .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in interacted = true })
-      }.containerRelativeFrame(.vertical) { length, _ in min(max(305, length * 0.76), 580) }
+      }.containerRelativeFrame(.vertical) { length, _ in min(max(305, length * 0.67), 520) }
         .padding(.horizontal, -24)
         .accessibilityElement(children: .ignore).accessibilityLabel(captions[page])
         .accessibilityValue(page == 0 ? "" : copy(["", "onboarding.openerFileBody", "opener.datePreviewDescription", "opener.tripPreviewDescription"][page]))
