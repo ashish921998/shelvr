@@ -9,58 +9,59 @@ struct SignedInView: View {
   @Environment(InviteEntry.self) private var invites
   @Environment(\.copy) private var copy
   @State private var tab = HomeTab.map
+  @State private var mapSearchFocused = false
+  @State private var mapCity: String?
   @State private var librarySearchFocused = false
   @State private var billing: BillingDestination?
   @State private var path: [AppLink] = []
   @State private var stampMessage: String?
 
   private enum HomeTab {
-    case map, library, add, plan, passport
+    case map, library
+  }
 
-    init?(root link: AppLink) {
-      guard link.query.isEmpty else { return nil }
-      switch link.path {
-      case ["map"]: self = .map
-      case ["home"]: self = .library
-      case ["add-spots"]: self = .add
-      case ["go-out"]: self = .plan
-      case ["passport"]: self = .passport
-      default: return nil
+  private var homeViews: some View {
+    TabView(selection: $tab) {
+      Tab(value: HomeTab.map) {
+        SavedPlacesMap(open: open, cityInView: $mapCity, searchFocusChanged: { mapSearchFocused = $0 })
+          .toolbar(.hidden, for: .tabBar)
       }
-    }
-
-    var titleKey: String {
-      switch self {
-      case .map: "navigation.map"
-      case .library: "navigation.library"
-      case .add: "addSheet.title"
-      case .plan: "plan.goOut"
-      case .passport: "passport.title"
+      Tab(value: HomeTab.library) {
+        LibraryView(screen: .home, searchFocusChanged: { librarySearchFocused = $0 })
+          .toolbar(.hidden, for: .tabBar)
       }
     }
   }
 
-  private var homeTabs: some View {
-    TabView(selection: $tab) {
-      Tab(copy("navigation.map"), systemImage: "map", value: HomeTab.map) {
-        SavedPlacesMap(open: open)
-      }
-      Tab(copy("navigation.library"), systemImage: "books.vertical", value: HomeTab.library) {
-        LibraryView(screen: .home, searchFocusChanged: { librarySearchFocused = $0 })
-          .toolbar(librarySearchFocused ? .hidden : .visible, for: .tabBar)
-      }
-      Tab(value: HomeTab.add) { addSpots } label: {
-        Label {
-          Text(copy("common.add"))
-        } icon: {
-          Image(systemName: "plus.circle.fill")
-            .symbolRenderingMode(.palette)
-            .foregroundStyle(.black, Color("AccentColor"))
+  private var showHomeActions: Bool {
+    !access.loading && !access.locked && path.isEmpty && !(tab == .map ? mapSearchFocused : librarySearchFocused)
+  }
+
+  private func homeAction(_ key: String, symbol: String, highlighted: Bool = false, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      VStack(spacing: 2) {
+        if highlighted {
+          Image(systemName: symbol).symbolRenderingMode(.palette).foregroundStyle(.black, Color("AccentColor"))
+        } else {
+          Image(systemName: symbol)
         }
+        Text(copy(key)).font(.caption2)
       }
-      Tab(copy("plan.goOut"), systemImage: "shoeprints.fill", value: HomeTab.plan) { PlanCityView(trip: false) }
-      Tab(copy("passport.title"), systemImage: "book.closed", value: HomeTab.passport) { PassportView(open: open) }
+      .font(.title3.weight(.medium))
+      .frame(minWidth: 76, minHeight: 44)
+      .contentShape(Rectangle())
     }
+    .buttonStyle(.plain)
+    .accessibilityLabel(copy(key))
+  }
+
+  private func goOut() {
+    var route = URLComponents()
+    route.path = "/go-out"
+    if tab == .map, let mapCity {
+      route.queryItems = [URLQueryItem(name: "city", value: mapCity)]
+    }
+    if let url = route.string { open(url) }
   }
 
   var body: some View {
@@ -68,11 +69,25 @@ struct SignedInView: View {
       Group {
         if access.loading { loadingPlan }
         else if access.locked { PlanGateView() }
-        else { homeTabs }
+        else { homeViews }
       }
-      .navigationTitle(copy(tab.titleKey))
+      .navigationTitle(copy(tab == .map ? "navigation.map" : "navigation.library"))
       .toolbar(!access.loading && !access.locked && tab == .map ? .hidden : .visible, for: .navigationBar)
+      .toolbar(showHomeActions ? .visible : .hidden, for: .bottomBar)
       .toolbar {
+        if showHomeActions {
+          ToolbarItem(placement: .bottomBar) {
+            HStack(spacing: 0) {
+              homeAction(tab == .map ? "navigation.library" : "navigation.map",
+                symbol: tab == .map ? "books.vertical" : "map") {
+                tab = tab == .map ? .library : .map
+              }
+              homeAction("common.add", symbol: "plus.circle.fill", highlighted: true) { open("/add-spots") }
+              homeAction("plan.goOut", symbol: "figure.walk", action: goOut)
+            }
+            .foregroundStyle(.primary)
+          }
+        }
         ToolbarItem(placement: .topBarTrailing) {
           Button { open("/profile") } label: {
             Label(copy("navigation.profile"), systemImage: "person.crop.circle")
@@ -105,9 +120,9 @@ struct SignedInView: View {
         case "passport-invite" where link.path.count == 2: FriendPassportView(token: link.path[1], compareInitially: link.query.contains { $0.name == "compare" && $0.value == "1" }).id(link)
         case "already-been", "next-to-stamp":
           StampPlacesView(city: link.path.first == "next-to-stamp" ? link.query.first { $0.name == "city" }?.value ?? "" : nil) { message in
-            guard path.last == link else { return }
-            tab = .passport
-            path = []
+            guard path.last == link, let passport = AppLink("/passport") else { return }
+            if let index = path.lastIndex(of: passport) { path = Array(path.prefix(index + 1)) }
+            else { path = [passport] }
             stampMessage = message
           }.id(link)
         case "city-stamps":
@@ -177,7 +192,11 @@ struct SignedInView: View {
                 if let target = route.string.flatMap({ AppLink($0) }) { NavigationLink(city, value: target) }
               }
             }
-          } else { PlanCityView(trip: link.path.first == "new-trip") }
+          } else {
+            PlanCityView(trip: link.path.first == "new-trip") { target in
+              if link.path == ["go-out"], path.last == link { path[path.count - 1] = target }
+            }
+          }
         case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1], sharedOnly: access.restrictsPersonalAccess).id(link.path[1])
         case "add-trip-stop":
           if let id = link.query.first(where: { $0.name == "tripId" })?.value {
@@ -261,8 +280,8 @@ struct SignedInView: View {
   }
 
   private func setPath(_ next: [AppLink]) {
-    if let link = next.last, let destination = HomeTab(root: link) {
-      tab = destination
+    if let link = next.last, link.query.isEmpty, link.path == ["map"] || link.path == ["home"] {
+      tab = link.path == ["map"] ? .map : .library
       path = []
     } else {
       path = next
@@ -294,6 +313,7 @@ private struct ShellDestination: View {
 
 private struct PlanCityView: View {
   let trip: Bool
+  let singleCity: (AppLink) -> Void
   struct City: Decodable {
     let city: String
     let placeCount: Int?
@@ -323,6 +343,9 @@ private struct PlanCityView: View {
             }
             if let link = url.string.flatMap({ AppLink($0) }) {
               NavigationLink(city.city, value: link)
+                .task(id: cities.count == 1 ? link : nil) {
+                  if cities.count == 1 { singleCity(link) }
+                }
             }
           }
         }

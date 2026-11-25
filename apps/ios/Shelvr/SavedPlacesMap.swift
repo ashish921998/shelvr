@@ -4,6 +4,8 @@ import SwiftUI
 
 struct SavedPlacesMap: View {
   let open: (String) -> Void
+  @Binding var cityInView: String?
+  let searchFocusChanged: (Bool) -> Void
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.colorScheme) private var scheme
@@ -50,7 +52,9 @@ struct SavedPlacesMap: View {
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bottomControlsHeight = $0 }
         }
       }
-      .toolbar(focusedSearch ? .hidden : .visible, for: .tabBar)
+      .onChange(of: viewport?.city(among: personalPlaces), initial: true) { _, city in cityInView = city }
+      .onChange(of: focusedSearch) { _, focused in searchFocusChanged(focused) }
+      .onDisappear { searchFocusChanged(false) }
       .alert(copy("common.unavailable"), isPresented: $location.unavailable) {
         Button(copy("common.close")) {}
       }
