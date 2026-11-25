@@ -226,7 +226,9 @@ struct SavedPlacesMap: View {
       HStack(spacing: 8) {
         HStack(spacing: 8) {
           Image(systemName: "magnifyingglass").accessibilityHidden(true)
-          TextField(copy("map.searchPlaceholder"), text: Binding(get: { filters.search }, set: updateSearch))
+          TextField(copy("map.searchPlaceholder"), text: Binding(
+            get: { filters.search },
+            set: { updateSearch($0) }))
             .focused($focusedSearch).submitLabel(.search).autocorrectionDisabled()
             .onSubmit { focusedSearch = false }
             .onChange(of: focusedSearch) { if focusedSearch { resultsOpen = true } }
