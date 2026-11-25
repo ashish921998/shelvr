@@ -10,8 +10,13 @@ final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCente
   @Published private(set) var blockedSession: UUID?
 
   func retryEnrollment() {
+    retryRotationOnReturn()
     blockedSession = nil
     authorizationRevision += 1
+  }
+
+  func retryRotationOnReturn() {
+    if delivery.rotationDeferred { delivery = PushDeliveryState() }
   }
 
   func rejectOwnership(for session: UUID) {
@@ -34,7 +39,8 @@ final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCente
 
   func currentToken(generation: UUID, verified: Set<String>) -> Data? {
     let wasProbing = delivery.isProbing
-    if delivery.prepare(generation: generation, verified: verified) { silence() }
+    if delivery.prepare(generation: generation, verified: verified,
+      alreadyRegistered: UIApplication.shared.isRegisteredForRemoteNotifications) { silence() }
     if delivery.token == nil || (wasProbing && delivery.permitsPresentation) {
       UIApplication.shared.registerForRemoteNotifications()
     }
@@ -52,7 +58,11 @@ final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCente
   }
 
   func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+    let previouslyDeferred = delivery.rotationDeferred
     if delivery.receive(deviceToken) { silence() }
+    if !previouslyDeferred && delivery.rotationDeferred {
+      Analytics.failure("notification_apns_token_rotated_on_resume")
+    }
   }
 
   func applicationDidEnterBackground(_ application: UIApplication) {
@@ -96,7 +106,9 @@ struct PushRegistrationView: ViewModifier {
   }
 
   func body(content: Content) -> some View {
-    content.task(id: Request(token: device.delivery.token, session: backend.sessionGeneration, active: phase == .active,
+    content.onChange(of: phase) { _, phase in
+      if phase == .background { device.retryRotationOnReturn() }
+    }.task(id: Request(token: device.delivery.token, session: backend.sessionGeneration, active: phase == .active,
       authorizationRevision: device.authorizationRevision)) {
       let generation = backend.sessionGeneration
       if backend.status == .signedOut { device.suspendEnrollment() }
@@ -110,7 +122,7 @@ struct PushRegistrationView: ViewModifier {
         !Task.isCancelled, backend.mayRegisterPush(generation) else { return }
       var reportedFailure = false
       do {
-        try await PushRetry.run(while: { backend.mayRegisterPush(generation) && device.blockedSession != generation }) {
+        try await PushRetry.run(while: { backend.mayRegisterPush(generation) && device.blockedSession != generation && !device.delivery.defersEnrollment(for: generation) }) {
           do {
             try await submit(bundle, installation: installation, verified: verified, generation: generation)
           } catch {

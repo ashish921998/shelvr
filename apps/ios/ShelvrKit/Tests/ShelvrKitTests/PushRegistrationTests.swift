@@ -292,3 +292,33 @@ private final class OtherPushOwner: URLProtocol, @unchecked Sendable {
   let reopened = PushTokenStore(serviceURL: endpoint, keychainService: service)
   #expect(try reopened.verifiedAPNSDigests(for: registration).isEmpty)
 }
+
+@Test func aLiveRegistrationWithAnAccountBoundProofIsCheckedWithoutRetiringItsToken() {
+  var delivery = PushDeliveryState()
+  let native = Data([10]), session = UUID()
+  let pause = delivery.prepare(generation: session, verified: [PushDeliveryState.digest(native)], alreadyRegistered: true)
+  #expect(!pause && !delivery.permitsPresentation)
+  let quarantine = delivery.receive(native)
+  #expect(!quarantine && delivery.permitsPresentation)
+  let replacement = delivery.receive(Data([11]))
+  #expect(replacement && !delivery.permitsPresentation)
+}
+
+@Test func aDifferentCallbackAfterResumingStopsTheReenrollmentLoop() {
+  var delivery = PushDeliveryState()
+  let session = UUID(), native = Data([20]), changed = Data([21])
+  _ = delivery.prepare(generation: session, verified: [])
+  let quarantined = delivery.receive(native)
+  let resume = delivery.confirm(native, generation: session)
+  #expect(quarantined && resume)
+  let quarantineReplacement = delivery.receive(changed)
+  #expect(quarantineReplacement && delivery.defersEnrollment(for: session))
+  #expect(!delivery.permitsPresentation)
+  _ = delivery.prepare(generation: session, verified: [PushDeliveryState.digest(native)])
+  let stale = delivery.receive(native)
+  let lateProof = delivery.confirm(changed, generation: session)
+  #expect(stale && !lateProof && delivery.rotationDeferred)
+  let next = UUID()
+  _ = delivery.prepare(generation: next, verified: [])
+  #expect(!delivery.rotationDeferred && !delivery.permitsPresentation)
+}
