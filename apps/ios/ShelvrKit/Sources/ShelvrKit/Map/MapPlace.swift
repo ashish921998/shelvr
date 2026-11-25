@@ -130,16 +130,28 @@ public struct MapPlace: Hashable, Identifiable, Sendable {
     }
   }
 
-  public static func search(_ entries: [Self], query: String) -> [Self] {
-    func folded(_ text: String) -> String {
-      let unmarked = text.decomposedStringWithCanonicalMapping.unicodeScalars.filter { scalar in
-        switch scalar.properties.generalCategory {
-        case .nonspacingMark, .spacingMark, .enclosingMark: false
-        default: true
-        }
+  public enum LabelPriority: Int {
+    case selected, exactMatch, saved
+  }
+
+  public func labelPriority(selectedID: String?, query: String) -> LabelPriority? {
+    if id == selectedID { return .selected }
+    let terms = Self.folded(query).split(whereSeparator: \.isWhitespace)
+    if !terms.isEmpty, terms == Self.folded(name).split(whereSeparator: \.isWhitespace) { return .exactMatch }
+    return isSaved ? .saved : nil
+  }
+
+  private static func folded(_ text: String) -> String {
+    let unmarked = text.decomposedStringWithCanonicalMapping.unicodeScalars.filter { scalar in
+      switch scalar.properties.generalCategory {
+      case .nonspacingMark, .spacingMark, .enclosingMark: false
+      default: true
       }
-      return String(unmarked).lowercased(with: Locale(identifier: "und"))
     }
+    return String(unmarked).lowercased(with: Locale(identifier: "und"))
+  }
+
+  public static func search(_ entries: [Self], query: String) -> [Self] {
     let words = folded(query).split(whereSeparator: \.isWhitespace)
     guard !words.isEmpty else {
       return query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? entries : []
