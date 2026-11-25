@@ -115,6 +115,7 @@ private struct OnboardingAccount: View {
             (progress.step == .savedCount && progress.savedCount == nil) || (progress.step == .been && progress.visitedCities.isEmpty) || (progress.step == .city && progress.city == nil))
           .padding(.horizontal, 24).padding(.vertical, 8).background(palette.background)
         }
+        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
           if progress.step != .opener {
             ToolbarItem(placement: .topBarLeading) {
@@ -123,7 +124,7 @@ private struct OnboardingAccount: View {
             ToolbarItem(placement: .principal) {
               let steps = OnboardingProgress.Step.allCases
               ProgressView(value: Double(steps.firstIndex(of: progress.step) ?? 0), total: Double(steps.count - 1))
-                .tint(palette.primaryText).frame(maxWidth: 155)
+                .tint(palette.primaryText).frame(width: 128)
             }
             ToolbarItem(placement: .topBarTrailing) {
               Button(copy("onboardingQ.skip")) { proceed(skip: true) }
