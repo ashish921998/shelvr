@@ -23,7 +23,7 @@ struct SavedPlacesMap: View {
   @State private var errors = Set<String>()
   @State private var retry = 0
   @State private var viewport: MapViewport?
-  @State private var cameraCommand: MapCanvas.CameraCommand?
+  @State private var cameraCommand: MapCameraCommand?
   @State private var topControlsHeight: CGFloat = 50
   @State private var bottomControlsHeight: CGFloat = 48
   @State private var searching = false
@@ -312,7 +312,7 @@ struct SavedPlacesMap: View {
     cameraCommand?.cancel()
   }
 
-  private func moveCamera(_ action: MapCanvas.CameraCommand.Action) {
+  private func moveCamera(_ action: MapCameraCommand.Action) {
     cameraCommand?.cancel()
     cameraCommand = .init(action: action)
   }

@@ -1,16 +1,12 @@
 import CoreLocation
 import Observation
+import ShelvrKit
 
 @MainActor @Observable
 final class MapLocation: NSObject, CLLocationManagerDelegate {
-  struct Fix {
-    let id = UUID()
-    let coordinate: CLLocationCoordinate2D
-  }
-
   private let manager = CLLocationManager()
-  private var wanted = false
-  private(set) var latestFix: Fix?
+  private var request = MapLocationRequest()
+  var latestFix: MapLocationRequest.Fix? { request.latestFix }
   var unavailable = false
 
   override init() {
@@ -20,38 +16,36 @@ final class MapLocation: NSObject, CLLocationManagerDelegate {
   }
 
   func locate() {
-    wanted = true
+    request.begin()
     switch manager.authorizationStatus {
     case .notDetermined: manager.requestWhenInUseAuthorization()
     case .authorizedWhenInUse, .authorizedAlways: manager.requestLocation()
-    default: wanted = false; unavailable = true
+    default: cancel(); unavailable = true
     }
   }
 
   func cancel() {
-    wanted = false
-    latestFix = nil
+    if request.isPending || request.latestFix != nil { request.cancel() }
   }
 
   nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
     Task { @MainActor in
-      guard self.wanted, self.manager.authorizationStatus != .notDetermined else { return }
+      guard self.request.isPending, self.manager.authorizationStatus != .notDetermined else { return }
       self.locate()
     }
   }
 
   nonisolated func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
     Task { @MainActor in
-      guard self.wanted, let fix = locations.last else { return }
-      self.wanted = false
-      self.latestFix = Fix(coordinate: fix.coordinate)
+      guard self.request.isPending, let fix = locations.last else { return }
+      self.request.resolve(fix.coordinate)
     }
   }
 
   nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: any Error) {
     Task { @MainActor in
-      guard self.wanted else { return }
-      self.wanted = false
+      guard self.request.isPending else { return }
+      self.cancel()
       self.unavailable = true
     }
   }

@@ -3,31 +3,8 @@ import ShelvrKit
 import SwiftUI
 
 struct MapCanvas: UIViewRepresentable {
-  @MainActor final class CameraCommand {
-    enum Action {
-      case locate(CLLocationCoordinate2D)
-      case overview([MapPlace])
-      case fitFilteredPlaces
-    }
-
-    private var pending: Action?
-
-    init(action: Action) {
-      pending = action
-    }
-
-    func cancel() {
-      pending = nil
-    }
-
-    func consume() -> Action? {
-      defer { pending = nil }
-      return pending
-    }
-  }
-
   let places: [MapPlace]
-  let cameraCommand: CameraCommand?
+  let cameraCommand: MapCameraCommand?
   let filters: MapFilters
   let opening: [MapPlace]?
   let visited: Set<String>
@@ -104,7 +81,7 @@ struct MapCanvas: UIViewRepresentable {
       }
     }
 
-    private func apply(_ action: CameraCommand.Action, on map: MKMapView) {
+    private func apply(_ action: MapCameraCommand.Action, on map: MKMapView) {
       switch action {
       case let .locate(coordinate):
         opened = true
