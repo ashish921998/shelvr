@@ -41,6 +41,15 @@ public struct SearchableSave: Decodable, Sendable, Equatable {
     return labels.flatMap(Self.words).filter { $0.count > 2 && text.contains($0) }.count
   }
 
+  @concurrent public static func textMatches(in rows: [Self], term: String, copy: Copy) async -> [Self] {
+    Array(rows.lazy.filter { $0.matches(term, copy: copy) }.prefix(30))
+  }
+
+  @concurrent public static func visualMatches(in rows: [Self], labels: [String], copy: Copy) async -> [Self] {
+    rows.map { ($0, $0.visualScore(labels: labels, copy: copy)) }
+      .filter { $0.1 > 0 }.sorted { $0.1 > $1.1 }.prefix(12).map(\.0)
+  }
+
   private func searchableText(copy: Copy) -> String {
     let fields = [displayTitle(copy: copy), summary, excerpt, siteName, url].compactMap { $0 } + keywords
     return Self.words(fields.joined(separator: " ")).joined(separator: " ")

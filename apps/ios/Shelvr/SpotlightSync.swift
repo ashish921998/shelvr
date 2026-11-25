@@ -117,15 +117,31 @@ private struct SpotlightFeed: View {
     }.allowsHitTesting(false).accessibilityHidden(true)
       .task(id: phase == .active ? pages.snapshot.map(SpotlightThumbnail.candidates(in:)) : nil) {
         guard phase == .active, let rows = pages.snapshot else { return }
-        for request in SpotlightThumbnail.candidates(in: rows) {
-          guard !Task.isCancelled, owner.active, backend.sessionGeneration == owner.session else { return }
-          guard ShelvrSpotlight.publication.needsThumbnail(request, for: owner) else { continue }
-          if let data = await SavedThumbnail.load(request.url, pixels: 256, session: Self.imageSession),
-            !Task.isCancelled, backend.sessionGeneration == owner.session {
-            ShelvrSpotlight.publication.acceptThumbnail(data, for: request, owner: owner)
-          }
+        await loadThumbnails(SpotlightThumbnail.candidates(in: rows))
+      }
+  }
+
+  private func loadThumbnails(_ requests: [SpotlightThumbnail]) async {
+    var pending = requests
+    var delay = 2
+    while !pending.isEmpty {
+      var retry: [SpotlightThumbnail] = []
+      for request in pending {
+        guard !Task.isCancelled, owner.active, backend.sessionGeneration == owner.session else { return }
+        guard ShelvrSpotlight.publication.needsThumbnail(request, for: owner) else { continue }
+        let result = await SavedThumbnail.fetch(request.url, pixels: 256, session: Self.imageSession)
+        guard !Task.isCancelled, backend.sessionGeneration == owner.session else { return }
+        switch result {
+        case let .image(data): ShelvrSpotlight.publication.acceptThumbnail(data, for: request, owner: owner)
+        case .retry: retry.append(request)
+        case .unavailable: break
         }
       }
+      guard !retry.isEmpty else { return }
+      pending = retry
+      do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+      delay = min(delay * 2, 60)
+    }
   }
 
   private func watch(_ cursor: SpotlightPages.Cursor) async {

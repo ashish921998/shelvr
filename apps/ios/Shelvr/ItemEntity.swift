@@ -70,8 +70,10 @@ struct ItemQuery: EntityStringQuery, EnumerableEntityQuery {
   }
 
   @MainActor func entities(matching string: String) async throws -> [ItemEntity] {
-    let copy = Copy()
-    return await ShelvrCatalog.searchSaves().filter { $0.matches(string, copy: copy) }.prefix(30).map { ItemEntity($0) }
+    guard let account = SiriCredential.current() else { return [] }
+    let rows = await SearchableSave.textMatches(in: ShelvrCatalog.searchSaves(), term: string, copy: Copy())
+    guard await ShelvrCatalog.permits(account) else { return [] }
+    return rows.map { ItemEntity($0) }
   }
 
   @MainActor func allEntities() async throws -> [ItemEntity] {
