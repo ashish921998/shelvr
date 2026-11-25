@@ -25,7 +25,7 @@ struct RootView: View {
     .preferredColorScheme(appearance == "system" ? nil : appearance == "light" ? .light : .dark)
     .foregroundStyle(Color(.foreground))
     .onChange(of: SiriNavigation.shared.pending, initial: true) { _, request in
-      if let request, let link = SiriNavigation.shared.consume(request) { route(link) }
+      if let request, let link = SiriNavigation.shared.consume(request, owner: backend.userID, session: backend.sessionGeneration) { route(link) }
     }
     .onChange(of: pushDevice.link, initial: true) { _, link in
       if let link { route(link); pushDevice.link = nil }
