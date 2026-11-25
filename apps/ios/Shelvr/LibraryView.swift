@@ -6,6 +6,9 @@ struct LibraryView: View {
   let screen: Screen
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
+  @Environment(\.colorScheme) private var scheme
+  @Environment(\.dynamicTypeSize) private var dynamicType
+  @AppStorage("swift.appearance") private var appearance = "system"
   @State private var pages: [LibraryPage] = []
   @State private var requested = 1
   @State private var failures: Set<Int> = []
@@ -32,24 +35,9 @@ struct LibraryView: View {
   }
 
   var body: some View {
-    List {
-      if screen == .home {
-        HStack {
-          Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-          TextField(copy("search.placeholder"), text: $search)
-            .textInputAutocapitalization(.never).autocorrectionDisabled()
-          if !search.isEmpty {
-            Button { search = "" } label: { Image(systemName: "xmark.circle.fill") }
-              .buttonStyle(.borderless).accessibilityLabel(copy("search.clear"))
-          }
-        }
-      }
-      if screen == .home && !searchQuery.isEmpty {
-        LibrarySearchResults(query: searchQuery, state: searchState) {
-          searchState = .loading
-          searchAttempt += 1
-        }
-      } else { libraryRows }
+    Group {
+      if screen == .home { libraryHome }
+      else { List { libraryRows } }
     }
     .task(id: SearchRequest(query: searchQuery, attempt: searchAttempt)) {
       let term = searchQuery
@@ -86,38 +74,112 @@ struct LibraryView: View {
     .navigationTitle(copy(screen == .home ? "navigation.library" : screen == .saves ? "homePlaces.allSaves" : "homePlaces.reviewTitle"))
   }
 
-  @ViewBuilder private var libraryRows: some View {
-    if screen == .home {
-      if let id = unplacedID, rows.contains(where: { $0.id == id && $0.needsReview }),
-        let destination = AppLink("/item/" + id) {
-        HStack {
-          NavigationLink(value: destination) {
-            Label(copy("homePlaces.toastNoPlace"), systemImage: "mappin.slash")
+  private var libraryHome: some View {
+    let palette = HomeChromePalette(scheme, appearance: appearance)
+    return ScrollView {
+      LazyVStack(alignment: .leading, spacing: 18) {
+        HStack(spacing: 8) {
+          Image(systemName: "magnifyingglass").foregroundStyle(palette.muted).accessibilityHidden(true)
+          TextField(copy("search.placeholder"), text: $search)
+            .textInputAutocapitalization(.never).autocorrectionDisabled().submitLabel(.search)
+            .font(.custom("Satoshi-Regular", size: 16, relativeTo: .body))
+          if !search.isEmpty {
+            Button { search = "" } label: {
+              Image(systemName: "xmark.circle.fill").frame(width: 44, height: 44)
+            }.accessibilityLabel(copy("search.clear"))
           }
-          Button { unplacedID = nil } label: { Image(systemName: "xmark") }
-            .buttonStyle(.borderless).accessibilityLabel(copy("common.dismiss"))
+        }
+        .padding(.leading, 16).padding(.trailing, 6).frame(minHeight: 52)
+        .background(palette.surface, in: Capsule())
+        .overlay { Capsule().strokeBorder(palette.border, lineWidth: 0.5) }
+
+        if searchQuery.isEmpty { homeSections(palette) }
+        else {
+          LibrarySearchResults(query: searchQuery, state: searchState, palette: palette) {
+            searchState = .loading
+            searchAttempt += 1
+          }
         }
       }
-      route("/saves", "homePlaces.allSaves", "bookmark")
-      route("/cities", "homePlaces.cities", "building.2")
-      route("/trips", "navigation.trips", "airplane")
-      route("/collections", "homePlaces.collections", "person.2")
-      route("/passport", "passport.title", "book.closed")
-      if rows.contains(where: \.needsReview) || pages.last?.isDone == false {
-        route("/review-saves", "homePlaces.withoutPlace", "exclamationmark.circle")
+      .padding(.horizontal, 20).padding(.vertical, 12)
+    }
+    .foregroundStyle(palette.foreground)
+    .background(palette.background.ignoresSafeArea())
+    .scrollDismissesKeyboard(.interactively)
+    .buttonStyle(HomeChromePressStyle())
+  }
+
+  @ViewBuilder private func homeSections(_ palette: HomeChromePalette) -> some View {
+    if let id = unplacedID, rows.contains(where: { $0.id == id && $0.needsReview }),
+      let destination = AppLink("/item/" + id) {
+      HStack {
+        NavigationLink(value: destination) {
+          Label(copy("homePlaces.toastNoPlace"), systemImage: "mappin.slash")
+        }
+        Spacer()
+        Button { unplacedID = nil } label: {
+          Image(systemName: "xmark").frame(width: 44, height: 44)
+        }.accessibilityLabel(copy("common.dismiss"))
+      }
+      .padding(.leading, 12)
+      .background(palette.surface, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    LazyVGrid(columns: homeColumns(2), spacing: 8) {
+      homeShortcut("/saves", "homePlaces.allSaves", "bookmark", palette: palette, prominent: true)
+      homeShortcut("/cities", "homePlaces.cities", "building.2", palette: palette, prominent: true)
+    }
+    LazyVGrid(columns: homeColumns(3), spacing: 8) {
+      homeShortcut("/trips", "navigation.trips", "airplane", palette: palette)
+      homeShortcut("/collections", "homePlaces.collections", "person.2", palette: palette)
+      homeShortcut("/passport", "passport.title", "book.closed", palette: palette)
+    }
+    if rows.contains(where: \.needsReview) || pages.last?.isDone == false {
+      homeShortcut("/review-saves", "homePlaces.withoutPlace", "mappin.slash", palette: palette, horizontal: true)
+    }
+
+    if pages.isEmpty && failures.isEmpty { ProgressView(copy("common.loading")) }
+    if !pages.isEmpty && rows.isEmpty {
+      ContentUnavailableView(copy("homePlaces.emptyTitle"), systemImage: "bookmark",
+        description: Text(copy("homePlaces.emptyBody")))
+    }
+
+    let recents = Array(rows.filter { !$0.needsReview }.prefix(8))
+    if !recents.isEmpty {
+      VStack(alignment: .leading, spacing: 10) {
+        Text(copy("homePlaces.recents"))
+          .font(.custom("Satoshi-Bold", size: 22, relativeTo: .title3))
+          .accessibilityAddTraits(.isHeader)
+        ForEach(LibrarySave.days(recents), id: \.0) { day, saves in
+          Text(dayTitle(day)).font(.custom("Satoshi-Bold", size: 13, relativeTo: .footnote))
+            .foregroundStyle(palette.muted).accessibilityAddTraits(.isHeader)
+          ForEach(saves) { save in
+            if let link = AppLink("/item/" + save.id) {
+              NavigationLink(value: link) {
+                LibrarySaveRow(save: save, featured: true)
+                  .padding(10)
+                  .frame(maxWidth: .infinity, alignment: .leading)
+                  .background(palette.frame, in: RoundedRectangle(cornerRadius: 16))
+                  .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(palette.border, lineWidth: 0.5) }
+              }
+            }
+          }
+        }
       }
     }
+    if !failures.isEmpty { retryButton }
+  }
+
+  @ViewBuilder private var libraryRows: some View {
     if pages.isEmpty && failures.isEmpty { ProgressView() }
     if !pages.isEmpty {
-      let visible = screen == .review ? rows.filter(\.needsReview) :
-        (screen == .home ? Array(rows.filter { !$0.needsReview }.prefix(8)) : rows)
+      let visible = screen == .review ? rows.filter(\.needsReview) : rows
       if screen == .review && visible.isEmpty && pages.last?.isDone == true {
         ContentUnavailableView(copy("digest.emptyTitle"), systemImage: "checkmark.circle")
       } else if rows.isEmpty && screen != .review {
         ContentUnavailableView(copy("homePlaces.emptyTitle"), systemImage: "bookmark",
           description: Text(copy("homePlaces.emptyBody")))
       }
-      if screen == .home && !visible.isEmpty { Text(copy("homePlaces.recents")).font(.headline) }
       ForEach(LibrarySave.days(visible), id: \.0) { day, saves in
         Section(dayTitle(day)) {
           ForEach(saves) { save in
@@ -127,13 +189,41 @@ struct LibraryView: View {
           }
         }
       }
-      if screen != .home, let last = pages.last, !last.isDone, failures.isEmpty {
+      if let last = pages.last, !last.isDone, failures.isEmpty {
         ProgressView().onAppear { requested = pages.count + 1 }
           .id(last.continueCursor)
       }
     }
-    if !failures.isEmpty {
-      Button(copy("common.retry")) { failures.removeAll(); attempt += 1 }
+    if !failures.isEmpty { retryButton }
+  }
+
+  private var retryButton: some View {
+    Button(copy("common.retry")) { failures.removeAll(); attempt += 1 }
+  }
+
+  private func homeColumns(_ count: Int) -> [GridItem] {
+    Array(repeating: GridItem(.flexible(), spacing: 8), count: dynamicType.isAccessibilitySize ? 1 : count)
+  }
+
+  @ViewBuilder
+  private func homeShortcut(_ path: String, _ title: String, _ symbol: String, palette: HomeChromePalette,
+    prominent: Bool = false, horizontal: Bool = false) -> some View {
+    if let destination = AppLink(path) {
+      let layout = horizontal ? AnyLayout(HStackLayout(spacing: 8)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+      NavigationLink(value: destination) {
+        layout {
+          Image(systemName: symbol)
+            .font(.system(size: prominent ? 22 : 17, weight: .medium))
+            .foregroundStyle(palette.primaryText).accessibilityHidden(true)
+          Text(copy(title))
+            .font(.custom("Satoshi-Bold", size: prominent ? 19 : 14, relativeTo: prominent ? .headline : .subheadline))
+            .multilineTextAlignment(.leading)
+        }
+        .frame(maxWidth: .infinity, minHeight: prominent ? 76 : 52, alignment: .leading)
+        .padding(.horizontal, 12).padding(.vertical, 6)
+        .background(palette.surface, in: RoundedRectangle(cornerRadius: 16))
+        .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(palette.border, lineWidth: 0.5) }
+      }
     }
   }
 
@@ -173,25 +263,29 @@ struct LibraryView: View {
     return day.formatted(date: .abbreviated, time: .omitted)
   }
 
-  private func route(_ path: String, _ title: String, _ symbol: String) -> some View {
-    Group {
-      if let link = AppLink(path) { NavigationLink(value: link) { Label(copy(title), systemImage: symbol) } }
-    }
-  }
 }
 
 struct LibrarySaveRow: View {
   let save: LibrarySave
+  var featured = false
   @Environment(\.copy) private var copy
   var body: some View {
-    HStack {
+    HStack(spacing: featured ? 12 : nil) {
       if let source = save.imageUrl ?? save.heroImageUrl, let url = URL(string: source) {
         AsyncImage(url: url) { image in image.resizable().scaledToFill() } placeholder: { Color.secondary.opacity(0.1) }
-          .frame(width: 48, height: 48).clipShape(.rect(cornerRadius: 8))
+          .frame(width: featured ? 62 : 48, height: featured ? 62 : 48)
+          .clipShape(.rect(cornerRadius: featured ? 12 : 8))
+          .accessibilityHidden(true)
+      } else if featured {
+        Image(systemName: "bookmark").font(.title3).foregroundStyle(Color(.muted))
+          .frame(width: 62, height: 62).background(Color(.background), in: RoundedRectangle(cornerRadius: 12))
+          .accessibilityHidden(true)
       }
-      VStack(alignment: .leading) {
+      VStack(alignment: .leading, spacing: featured ? 4 : nil) {
         Text(save.name(copy: copy)).lineLimit(2)
-        Text(subtitle).font(.caption).foregroundStyle(.secondary)
+          .font(featured ? .custom("Satoshi-Bold", size: 16, relativeTo: .body) : .body)
+        Text(subtitle).font(featured ? .custom("Satoshi-Regular", size: 13, relativeTo: .caption) : .caption)
+          .foregroundStyle(.secondary)
       }
     }
   }
