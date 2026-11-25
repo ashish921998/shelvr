@@ -250,7 +250,7 @@ private struct OnboardingAccount: View {
         Text(copy("aha.cityPlaces", ["city": copy(reel.cityKey)])).font(.largeTitle.bold())
         sampleMap(reel)
         ForEach(Array(reel.places.enumerated()), id: \.offset) { i, place in
-          HStack { Text(String(i+1)).font(.caption.bold()).padding(7).background(palette.primary, in: Circle()).foregroundStyle(palette.onPrimary)
+          HStack { Text(String(i+1)).font(.caption.bold()).padding(7).background(Color("AccentColor"), in: Circle()).foregroundStyle(Color.black)
             Text(place.name).font(.custom("Satoshi-Bold", size: 16, relativeTo: .body))
           }
         }
@@ -339,9 +339,9 @@ private struct OnboardingAccount: View {
         .background(palette.muted)
         .overlay(alignment: .topTrailing) {
           if selected { Image(systemName: "checkmark.circle.fill").symbolRenderingMode(.palette)
-            .foregroundStyle(palette.onPrimary, palette.primary).padding(8).accessibilityHidden(true) }
+            .foregroundStyle(Color.black, Color("AccentColor")).padding(8).accessibilityHidden(true) }
         }.clipShape(.rect(cornerRadius: 14))
-        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(selected ? palette.primary : palette.border, lineWidth: selected ? 3 : 1) }
+        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(selected ? Color("AccentColor") : palette.border, lineWidth: selected ? 3 : 1) }
         .contentShape(Rectangle())
     }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
   }
@@ -356,7 +356,7 @@ private struct OnboardingAccount: View {
         }
         Spacer()
         Image(systemName: selected ? "checkmark.circle.fill" : "circle").foregroundStyle(selected ? palette.primaryText : palette.muted)
-      }.padding(13).frame(minHeight: 54).background(selected ? palette.primary.opacity(0.13) : palette.surface, in: .rect(cornerRadius: 16))
+      }.padding(13).frame(minHeight: 54).background(selected ? Color("AccentColor").opacity(0.13) : palette.surface, in: .rect(cornerRadius: 16))
         .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(selected ? palette.primaryText : palette.border, lineWidth: 1.5) }
     }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
   }

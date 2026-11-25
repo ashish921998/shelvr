@@ -73,8 +73,8 @@ struct LisbonSignInHero: View {
           p.addQuadCurve(to: pins[2], control: CGPoint(x: w*0.79,y: h*0.42))
         }.trim(from: 0, to: drawn || reduced ? 1 : 0).stroke(palette.primaryText, lineWidth: 2)
         ForEach(pins.indices, id: \.self) { i in
-          Text(String(i+1)).font(.caption2.bold()).foregroundStyle(palette.onPrimary).frame(width: 18,height: 18)
-            .background(palette.primary, in: Circle()).position(pins[i])
+          Text(String(i+1)).font(.caption2.bold()).foregroundStyle(Color.black).frame(width: 18,height: 18)
+            .background(Color("AccentColor"), in: Circle()).position(pins[i])
         }
       }.clipShape(.rect(cornerRadius: 10))
     }
@@ -107,29 +107,36 @@ struct OnboardingOpener: View {
         .foregroundStyle(palette.muted).multilineTextAlignment(.center).frame(maxWidth: 285)
       GeometryReader { bounds in
         let stride = min(bounds.size.width * 0.68, bounds.size.height * 0.49)
-        ScrollView(.horizontal) {
-          HStack(spacing: 0) {
-            ForEach(-1...photos.count, id: \.self) { slot in
-              let i = (slot + photos.count) % photos.count
-              FirstRunPicture(name: photos[i], ext: "webp").scaledToFit()
-                .clipShape(.rect(cornerRadius: 22))
-                .overlay { RoundedRectangle(cornerRadius: 22).strokeBorder(palette.foreground, lineWidth: 3) }
-                .aspectRatio(640/1391.0, contentMode: .fit).padding(4)
-                .frame(width: stride, height: bounds.size.height)
-                .scrollTransition(.interactive, axis: .horizontal) { card, phase in
-                  card.opacity(1 - abs(phase.value) * 0.72)
-                    .rotation3DEffect(.degrees(phase.value * 16), axis: (x: 0, y: 1, z: 0))
-                }
-                .id(slot)
+        ScrollViewReader { reader in
+          ScrollView(.horizontal) {
+            HStack(spacing: 0) {
+              ForEach(-1...photos.count, id: \.self) { slot in
+                let i = (slot + photos.count) % photos.count
+                FirstRunPicture(name: photos[i], ext: "webp").scaledToFit()
+                  .clipShape(.rect(cornerRadius: 22))
+                  .overlay { RoundedRectangle(cornerRadius: 22).strokeBorder(palette.foreground, lineWidth: 3) }
+                  .aspectRatio(640/1391.0, contentMode: .fit).padding(4)
+                  .frame(width: stride, height: bounds.size.height)
+                  .scrollTransition(.interactive, axis: .horizontal) { card, phase in
+                    card.opacity(1 - abs(phase.value) * 0.72)
+                      .rotation3DEffect(.degrees(phase.value * 16), axis: (x: 0, y: 1, z: 0))
+                  }
+                  .id(slot)
+              }
+            }.scrollTargetLayout()
+          }.scrollIndicators(.hidden)
+            .contentMargins(.horizontal, (bounds.size.width - stride)/2, for: .scrollContent)
+            .scrollTargetBehavior(.viewAligned(limitBehavior: .alwaysByOne)).scrollPosition(id: $position, anchor: .center)
+            .onScrollPhaseChange { _, next in
+              if next == .idle, let position, !photos.indices.contains(position) { self.position = page }
             }
-          }.scrollTargetLayout()
-        }.scrollIndicators(.hidden)
-          .contentMargins(.horizontal, (bounds.size.width - stride)/2, for: .scrollContent)
-          .scrollTargetBehavior(.viewAligned(limitBehavior: .alwaysByOne)).scrollPosition(id: $position, anchor: .center)
-          .onScrollPhaseChange { _, next in
-            if next == .idle, let position, !photos.indices.contains(position) { self.position = page }
-          }
-          .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in interacted = true })
+            .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in interacted = true })
+            .task(id: bounds.size) {
+              guard bounds.size.width > 0 else { return }
+              await Task.yield()
+              reader.scrollTo(position ?? 0, anchor: .center)
+            }
+        }
       }.containerRelativeFrame(.vertical) { length, _ in min(max(305, length * 0.67), 520) }
         .padding(.horizontal, -24)
         .accessibilityElement(children: .ignore).accessibilityLabel(captions[page])
