@@ -188,12 +188,10 @@ private struct OnboardingAccount: View {
       title(been ? "cityStamps.onboardingTitle" :
         progress.goals.contains("travel") && !progress.goals.contains("date") ? "onboardingQ.cityTitleTrip" : "onboardingQ.cityTitleOut")
       Text(copy(been ? "cityStamps.onboardingBody" : "onboardingQ.cityBody"))
-      if !been {
-        HStack {
+      HStack {
           Image(systemName: "magnifyingglass").accessibilityHidden(true)
           TextField(copy("goal.citySearch"), text: $cityQuery).autocorrectionDisabled()
         }.padding(12).background(palette.surface, in: .rect(cornerRadius: 14))
-      }
       let cities = SampleReel.all.filter { cityQuery.isEmpty || copy($0.cityKey).localizedStandardContains(cityQuery) ||
         $0.id.replacingOccurrences(of: "-", with: " ").localizedStandardContains(cityQuery) }
       LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: type.isAccessibilitySize ? 1 : 2), spacing: 12) {
@@ -316,17 +314,22 @@ private struct OnboardingAccount: View {
 
   private func cityChoice(_ city: SampleReel, selected: Bool, action: @escaping () -> Void) -> some View {
     Button(action: action) {
-      VStack(alignment: .leading, spacing: 0) {
-        Color.clear.frame(height: 80).overlay {
-          FirstRunPicture(name: "library-city-" + city.id, ext: "jpg").scaledToFill()
-        }.clipped()
-        HStack {
-          Text(copy(city.cityKey)).font(.custom("Satoshi-Bold", size: 15, relativeTo: .subheadline))
-          Spacer()
-          if selected { Image(systemName: "checkmark.circle.fill").foregroundStyle(palette.primaryText) }
-        }.padding(10)
-      }.background(palette.surface).clipShape(.rect(cornerRadius: 14))
-        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(selected ? palette.primaryText : palette.border) }
+      Text(copy(city.cityKey)).font(.custom("Satoshi-Bold", size: 17, relativeTo: .headline))
+        .foregroundStyle(.white).shadow(radius: 2).padding(12)
+        .frame(maxWidth: .infinity, minHeight: type.isAccessibilitySize ? 116 : 100, alignment: .bottomLeading)
+        .background {
+          GeometryReader { geometry in
+            FirstRunPicture(name: "library-city-" + city.id, ext: "jpg").scaledToFill()
+              .frame(width: geometry.size.width, height: geometry.size.height).clipped().accessibilityHidden(true)
+          }.overlay { LinearGradient(colors: [.clear, .black.opacity(0.68)], startPoint: .center, endPoint: .bottom) }
+        }
+        .background(palette.muted)
+        .overlay(alignment: .topTrailing) {
+          if selected { Image(systemName: "checkmark.circle.fill").symbolRenderingMode(.palette)
+            .foregroundStyle(palette.onPrimary, palette.primary).padding(8).accessibilityHidden(true) }
+        }.clipShape(.rect(cornerRadius: 14))
+        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(selected ? palette.primary : palette.border, lineWidth: selected ? 3 : 1) }
+        .contentShape(Rectangle())
     }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
   }
 
