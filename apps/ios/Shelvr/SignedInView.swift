@@ -8,6 +8,7 @@ struct SignedInView: View {
   @Binding var pendingLink: AppLink?
   @Environment(InviteEntry.self) private var invites
   @Environment(\.copy) private var copy
+  @Environment(\.dynamicTypeSize) private var toolbarTextSize
   @ScaledMetric(relativeTo: .caption2) private var preferredActionWidth: CGFloat = 76
   @State private var tab = HomeTab.map
   @State private var mapSearchFocused = false
@@ -45,13 +46,14 @@ struct SignedInView: View {
       .symbolRenderingMode(highlighted ? .palette : .monochrome)
       .foregroundStyle(highlighted ? Color.black : Color.primary, Color("AccentColor"))
     return Button(action: action) {
-      ViewThatFits(in: .vertical) {
-        VStack(spacing: 2) {
-          icon.font(highlighted ? .title3.weight(.medium) : .subheadline).frame(minHeight: 24)
-          Text(title).font(.caption2).lineLimit(1)
-        }.fixedSize(horizontal: false, vertical: true)
-        if highlighted {
-          icon.font(.title2.weight(.medium)).imageScale(.small)
+      Group {
+        if toolbarTextSize <= .xxLarge {
+          VStack(spacing: 2) {
+            icon.font(highlighted ? .title3.weight(.medium) : .subheadline).frame(height: 24)
+            Text(title).font(.caption2).lineLimit(1).minimumScaleFactor(0.8)
+          }
+        } else if highlighted {
+          icon.font(.system(size: 28, weight: .medium))
         } else {
           Text(title).font(.headline).lineLimit(1).minimumScaleFactor(0.45)
         }
