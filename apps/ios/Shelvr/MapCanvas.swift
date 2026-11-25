@@ -25,9 +25,6 @@ struct MapCanvas: UIViewRepresentable {
     map.register(PlaceAnnotationView.self, forAnnotationViewWithReuseIdentifier: PlaceAnnotationView.placeIdentifier)
     map.register(PlaceAnnotationView.self, forAnnotationViewWithReuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
     map.pointOfInterestFilter = .excludingAll
-    let nameTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.didTapName(_:)))
-    nameTap.delegate = context.coordinator
-    map.addGestureRecognizer(nameTap)
     return map
   }
 
@@ -47,7 +44,7 @@ struct MapCanvas: UIViewRepresentable {
     }
   }
 
-  final class Coordinator: NSObject, MKMapViewDelegate, UIGestureRecognizerDelegate {
+  final class Coordinator: NSObject, MKMapViewDelegate {
     var parent: MapCanvas
     var pins: [String: Pin] = [:]
     var opened = false
@@ -250,34 +247,6 @@ struct MapCanvas: UIViewRepresentable {
         view.configure(copy: parent.copy, compact: compactPins)
       }
       return view
-    }
-
-    func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
-      guard let map = gestureRecognizer.view as? MKMapView else { return false }
-      return placeName(at: gestureRecognizer.location(in: map), on: map) != nil
-    }
-
-    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
-      shouldRequireFailureOf otherGestureRecognizer: UIGestureRecognizer) -> Bool {
-      guard let map = gestureRecognizer.view as? MKMapView,
-        let other = otherGestureRecognizer as? UITapGestureRecognizer,
-        let view = other.view, view === map || view.isDescendant(of: map) else { return false }
-      return other.numberOfTouchesRequired == 1 && other.numberOfTapsRequired > 1
-    }
-
-    @objc func didTapName(_ gesture: UITapGestureRecognizer) {
-      guard let map = gesture.view as? MKMapView,
-        let place = placeName(at: gesture.location(in: map), on: map) else { return }
-      parent.onPick(place)
-    }
-
-    private func placeName(at point: CGPoint, on map: MKMapView) -> MapPlace? {
-      for view in namedPins {
-        guard let pin = view.annotation as? Pin, map.view(for: pin) === view,
-          view.containsName(at: view.convert(point, from: map)) else { continue }
-        return pin.place
-      }
-      return nil
     }
 
     func mapView(_ map: MKMapView, didSelect view: MKAnnotationView) {
