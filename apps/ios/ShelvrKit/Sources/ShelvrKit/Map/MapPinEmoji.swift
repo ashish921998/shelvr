@@ -105,6 +105,12 @@ extension MapPlace {
     (["chicken", "wings"], "chicken"),
   ]
 
+  private static let pinKindOrder: [PlaceKind] = [.coffee, .dessert, .drinks, .food, .stay, .shopping, .activities]
+
+  public var preferredPinKind: PlaceKind? {
+    Self.pinKindOrder.first(where: kinds.contains)
+  }
+
   public var emoji: String? {
     let categoryEmoji = category.flatMap { Self.categories[$0] }
     if category == nil || ["Restaurant", "Cafe", "Bakery", "Nightlife"].contains(category ?? "") {
@@ -122,7 +128,6 @@ extension MapPlace {
       if let first { return Self.cuisines[first.1] }
     }
     if let categoryEmoji { return categoryEmoji }
-    let order: [PlaceKind] = [.coffee, .dessert, .drinks, .food, .stay, .shopping, .activities]
-    return order.first(where: kinds.contains).flatMap { Self.kindEmoji[$0] }
+    return preferredPinKind.flatMap { Self.kindEmoji[$0] }
   }
 }

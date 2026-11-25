@@ -65,3 +65,10 @@ private struct MapParity: Decodable {
     #expect(row.box.includingNearby(latitude: row.latitude, longitude: row.longitude) == row.expected)
   }
 }
+
+@Test func multiCategoryPinSharesItsPreferredKindWithItsFallbackGlyph() {
+  let venue = MapPlace(source: .saved(itemID: "fixture"), name: "Harbor House", lat: 0, lng: 0,
+    appleId: nil, city: nil, category: nil, cuisine: nil, kinds: [.activities, .stay])
+  #expect(venue.preferredPinKind == .stay)
+  #expect(venue.emoji == "🛏️")
+}

@@ -277,7 +277,12 @@ struct SavedPlacesMap: View {
     action: @escaping () -> Void) -> some View {
     Button(action: action) {
       HStack(spacing: 5) {
-        if let color { Circle().fill(color).frame(width: 7, height: 7).accessibilityHidden(true) }
+        if let color {
+          Circle().fill(color)
+            .overlay { Circle().strokeBorder(palette.background.opacity(0.8), lineWidth: 0.5) }
+            .frame(width: 8, height: 8)
+            .accessibilityHidden(true)
+        }
         Text(title).font(.custom("Satoshi-Bold", size: 13, relativeTo: .footnote))
       }
         .foregroundStyle(selected ? palette.background : palette.foreground)

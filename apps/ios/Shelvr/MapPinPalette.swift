@@ -2,10 +2,8 @@ import ShelvrKit
 import UIKit
 
 enum MapPinPalette {
-  private static let order: [PlaceKind] = [.coffee, .dessert, .drinks, .food, .activities, .shopping, .stay, .dateNight]
-
   static func primaryKind(for place: MapPlace) -> PlaceKind? {
-    order.first(where: place.kinds.contains)
+    place.preferredPinKind ?? (place.kinds.contains(.dateNight) ? .dateNight : nil)
   }
 
   static func color(for kind: PlaceKind?) -> UIColor {
