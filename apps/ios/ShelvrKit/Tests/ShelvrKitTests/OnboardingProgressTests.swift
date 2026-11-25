@@ -101,3 +101,19 @@ import Testing
   WelcomeHandoff.consume(subject: "a|returning", account: "a", defaults: after)
   #expect(after.bool(forKey: "swift.onboarded.a"))
 }
+
+@Test func signingInFromACompletedInstallKeepsOnboardingScopedToTheAccount() throws {
+  let suite = UUID().uuidString
+  let defaults = try #require(UserDefaults(suiteName: suite))
+  defer { defaults.removePersistentDomain(forName: suite) }
+  defaults.set(true, forKey: WelcomeHandoff.finishedKey)
+  defaults.set(true, forKey: "swift.onboarded.returning")
+  defaults.set(Data([1]), forKey: WelcomeHandoff.progressKey("new"))
+  for account in ["returning", "new"] {
+    WelcomeHandoff.stage(nil, subject: account + "|session", defaults: defaults)
+    WelcomeHandoff.consume(subject: account + "|session", account: account, defaults: defaults)
+  }
+  #expect(defaults.bool(forKey: "swift.onboarded.returning"))
+  #expect(!defaults.bool(forKey: "swift.onboarded.new"))
+  #expect(defaults.data(forKey: WelcomeHandoff.progressKey("new")) == Data([1]))
+}

@@ -38,7 +38,7 @@ struct InviteEntryView: View {
         if entry.accepted != nil {
           SignInView(back: cancel)
         } else if welcomePurpose != nil || finishedWelcome {
-          SignInView(back: finishedWelcome ? nil : { welcomePurpose = nil }, welcome: welcomePurpose ?? .existing)
+          SignInView(back: finishedWelcome ? nil : { welcomePurpose = nil }, welcome: welcomePurpose)
         } else {
           OnboardingForm(account: nil, onSignIn: { welcomePurpose = $0 })
         }

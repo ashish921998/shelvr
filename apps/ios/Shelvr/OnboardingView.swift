@@ -67,6 +67,7 @@ private struct OnboardingAccount: View {
   var body: some View {
     if complete {
       SignedInView(pendingLink: $pendingLink).modifier(OnboardingReplay(account: account))
+        .onAppear { UserDefaults.standard.set(true, forKey: WelcomeHandoff.finishedKey) }
     } else {
       OnboardingForm(account: account, onSignIn: nil) {
         UserDefaults.standard.set(true, forKey: WelcomeHandoff.finishedKey)
