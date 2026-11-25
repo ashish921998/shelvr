@@ -58,7 +58,7 @@ final class PlaceAnnotationView: MKAnnotationView {
     check.frame = CGRect(x: disc.frame.maxX - 10, y: disc.frame.minY - 1, width: 14, height: 14)
   }
 
-  func showPlace(emoji: String?, saved: Bool, visited: Bool, title: String, visitedLabel: String) {
+  func showPlace(emoji: String?, saved: Bool, visited: Bool, title: String, status: String) {
     displayPriority = saved ? .defaultHigh : .defaultLow
     clusteringIdentifier = "places"
     badge(diameter: saved ? 31 : 24, fill: saved ? Self.paper : Self.discoverPaper,
@@ -73,10 +73,10 @@ final class PlaceAnnotationView: MKAnnotationView {
       withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
     check.isHidden = !visited
     accessibilityLabel = title
-    accessibilityValue = visited ? visitedLabel : nil
+    accessibilityValue = status
   }
 
-  func showCluster(count: Int, label: String, saved: Bool) {
+  func showCluster(count: Int, label: String, status: String, saved: Bool) {
     displayPriority = saved ? .defaultHigh : .defaultLow
     clusteringIdentifier = nil
     badge(diameter: 32, fill: Self.ink, rim: saved ? Self.amber : Self.discoverPaper, border: 2)
@@ -87,7 +87,7 @@ final class PlaceAnnotationView: MKAnnotationView {
     symbol.isHidden = true
     check.isHidden = true
     accessibilityLabel = label
-    accessibilityValue = nil
+    accessibilityValue = status
   }
 
   override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {

@@ -141,16 +141,21 @@ struct MapCanvas: UIViewRepresentable {
       if let pin = annotation as? Pin,
         let view = map.dequeueReusableAnnotationView(withIdentifier: PlaceAnnotationView.placeIdentifier, for: pin)
           as? PlaceAnnotationView {
+        let source = parent.copy(pin.place.isSaved ? "share.savedFragment" : "tripPlanner.badgeSuggested")
+        let status = pin.visited ? source + ", " + parent.copy("passport.wentNoDate") : source
         view.showPlace(emoji: pin.place.emoji, saved: pin.place.isSaved, visited: pin.visited,
-          title: pin.place.name, visitedLabel: parent.copy("passport.wentNoDate"))
+          title: pin.place.name, status: status)
         return view
       }
       if let cluster = annotation as? MKClusterAnnotation,
         let view = map.dequeueReusableAnnotationView(withIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier,
           for: cluster) as? PlaceAnnotationView {
         let count = cluster.memberAnnotations.count
-        let includesSavedPlace = cluster.memberAnnotations.contains { ($0 as? Pin)?.place.isSaved == true }
-        view.showCluster(count: count, label: parent.copy("passport.placesCount", count: count), saved: includesSavedPlace)
+        let savedCount = cluster.memberAnnotations.count { ($0 as? Pin)?.place.isSaved == true }
+        let status = savedCount == 0 ? parent.copy("tripPlanner.badgeSuggested") :
+          parent.copy("share.savedFragment") + ": " + savedCount.formatted()
+        view.showCluster(count: count, label: parent.copy("passport.placesCount", count: count),
+          status: status, saved: savedCount > 0)
         return view
       }
       return nil
