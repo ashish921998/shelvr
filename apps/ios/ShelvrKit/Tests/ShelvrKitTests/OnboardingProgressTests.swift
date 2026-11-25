@@ -79,3 +79,25 @@ import Testing
   WelcomeHandoff.apply(.afterQuestions, to: "chosen", defaults: defaults)
   #expect(defaults.data(forKey: WelcomeHandoff.progressKey("chosen")) == nil)
 }
+
+@Test func aRestoredLoginConsumesOnlyTheWelcomeChoiceForItsVerifiedSession() throws {
+  let suite = UUID().uuidString
+  let before = try #require(UserDefaults(suiteName: suite))
+  defer { before.removePersistentDomain(forName: suite) }
+  let after = try #require(UserDefaults(suiteName: suite))
+  let draft = WelcomeHandoff.progressKey(nil)
+  before.set(Data([1]), forKey: draft)
+  WelcomeHandoff.stage(.afterQuestions, subject: "a|old", defaults: before)
+  WelcomeHandoff.consume(subject: "a|different", account: "a", defaults: after)
+  #expect(after.data(forKey: WelcomeHandoff.progressKey("a")) == nil)
+  #expect(after.data(forKey: draft) == Data([1]))
+  WelcomeHandoff.stage(.afterQuestions, subject: "b|new", defaults: before)
+  WelcomeHandoff.consume(subject: "b|new", account: "b", defaults: after)
+  #expect(after.data(forKey: WelcomeHandoff.progressKey("b")) == Data([1]))
+  after.set(Data([2]), forKey: draft)
+  WelcomeHandoff.consume(subject: "b|new", account: "b", defaults: after)
+  #expect(after.data(forKey: draft) == Data([2]))
+  WelcomeHandoff.stage(.existing, subject: "a|returning", defaults: before)
+  WelcomeHandoff.consume(subject: "a|returning", account: "a", defaults: after)
+  #expect(after.bool(forKey: "swift.onboarded.a"))
+}

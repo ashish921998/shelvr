@@ -88,12 +88,14 @@ public final class Backend {
     await connect()
   }
 
-  public func signIn(_ credential: SignInCredential) async throws {
+  public func signIn(_ credential: SignInCredential, welcome: WelcomeHandoff.Purpose? = nil) async throws {
     await deletion.wait()
     guard status == .signedOut, !signingIn else { throw AuthSessionError.signInRefused }
     signingIn = true
     defer { signingIn = false }
-    try await session.signIn(credential)
+    try await session.signIn(credential) { tokens in
+      WelcomeHandoff.stage(welcome, subject: JWT.claims(of: tokens.token)?.sub, defaults: .standard)
+    }
     await connect()
   }
 
@@ -244,6 +246,9 @@ public final class Backend {
     switch await client.login() {
     case let .success(token):
       connectedUserID = AuthTokens.ownerID(for: token)
+      if let account = connectedUserID, let subject = JWT.claims(of: token)?.sub {
+        WelcomeHandoff.consume(subject: subject, account: account, defaults: .standard)
+      }
       status = .signedIn
     case .failure:
       connectedUserID = nil

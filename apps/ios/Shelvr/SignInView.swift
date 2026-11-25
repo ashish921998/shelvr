@@ -4,6 +4,7 @@ import SwiftUI
 
 struct SignInView: View {
   var back: (() -> Void)? = nil
+  var welcome: WelcomeHandoff.Purpose? = nil
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.webAuthenticationSession) private var webAuthenticationSession
@@ -67,7 +68,7 @@ struct SignInView: View {
             return
           }
           stage = "exchange"
-          signIn { try await backend.signIn(credential) }
+          signIn { try await backend.signIn(credential, welcome: welcome) }
         case let .failure(error):
           failed = (error as? ASAuthorizationError)?.code != .canceled
           if failed { outcome("auth_failed", ["stage": "browser"]) } else { cancelled() }
@@ -80,7 +81,7 @@ struct SignInView: View {
         signIn {
           guard let credential = try await googleCredential() else { cancelled(); return }
           stage = "exchange"
-          try await backend.signIn(credential)
+          try await backend.signIn(credential, welcome: welcome)
         }
       } label: {
         Text(copy("account.google")).font(.custom("Satoshi-Bold", size: 16, relativeTo: .headline))
@@ -91,7 +92,7 @@ struct SignInView: View {
       #if DEBUG
         Button {
           begin("anonymous")
-          signIn { try await backend.signIn(.anonymous) }
+          signIn { try await backend.signIn(.anonymous, welcome: welcome) }
         } label: {
           Text(copy("account.anonymous")).font(.custom("Satoshi-Regular", size: 14, relativeTo: .subheadline))
             .foregroundStyle(palette.muted).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())

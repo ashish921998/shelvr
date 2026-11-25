@@ -38,20 +38,16 @@ struct InviteEntryView: View {
         if entry.accepted != nil {
           SignInView(back: cancel)
         } else if welcomePurpose != nil || finishedWelcome {
-          SignInView(back: finishedWelcome ? nil : { welcomePurpose = nil })
+          SignInView(back: finishedWelcome ? nil : { welcomePurpose = nil }, welcome: welcomePurpose)
         } else {
           OnboardingForm(account: nil, onSignIn: { welcomePurpose = $0 })
         }
-      } else if welcomePurpose != nil {
-        ProgressView()
       } else {
         OnboardingGate(pendingLink: $pendingLink).id(backend.sessionGeneration)
       }
     }
     .onChange(of: backend.userID, initial: true) { _, account in
-      guard let account, let purpose = welcomePurpose else { return }
-      if entry.accepted == nil { WelcomeHandoff.apply(purpose, to: account, defaults: .standard) }
-      welcomePurpose = nil
+      if account != nil { welcomePurpose = nil }
     }
     .safeAreaInset(edge: .bottom) {
       if !entry.loaded, entry.failed { Button(copy("common.retry")) { entry.restore() } }
