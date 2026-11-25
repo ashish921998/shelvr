@@ -184,7 +184,8 @@ struct SavedPlacesMap: View {
             wentChip(.went, "passport.wentNoDate", palette: palette)
           }
           ForEach(scene.chips, id: \.self) { kind in
-            filterChip(copy(kind.labelKey), selected: filters.kinds.contains(kind), palette: palette) {
+            filterChip(copy(kind.labelKey), selected: filters.kinds.contains(kind), palette: palette,
+              color: Color(uiColor: MapPinPalette.color(for: kind))) {
               if filters.kinds.insert(kind).inserted {
                 Analytics.capture("map_filter_selected", ["kind": kind.rawValue])
               } else { filters.kinds.remove(kind) }
@@ -272,10 +273,13 @@ struct SavedPlacesMap: View {
     filterChip(copy(title), selected: filters.went == value, palette: palette) { filters.went = value }
   }
 
-  private func filterChip(_ title: String, selected: Bool, palette: HomeChromePalette,
+  private func filterChip(_ title: String, selected: Bool, palette: HomeChromePalette, color: Color? = nil,
     action: @escaping () -> Void) -> some View {
     Button(action: action) {
-      Text(title).font(.custom("Satoshi-Bold", size: 13, relativeTo: .footnote))
+      HStack(spacing: 5) {
+        if let color { Circle().fill(color).frame(width: 7, height: 7).accessibilityHidden(true) }
+        Text(title).font(.custom("Satoshi-Bold", size: 13, relativeTo: .footnote))
+      }
         .foregroundStyle(selected ? palette.background : palette.foreground)
         .padding(.horizontal, 11).padding(.vertical, 6)
         .background(selected ? palette.foreground : palette.frame, in: Capsule())

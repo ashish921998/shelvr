@@ -62,10 +62,14 @@ final class PlaceAnnotationView: MKAnnotationView {
   private func updatePresentation() {
     guard let copy else { return }
     if let pin = annotation as? MapCanvas.Pin {
+      let kind = MapPinPalette.primaryKind(for: pin.place)
       let source = copy(pin.place.isSaved ? "share.savedFragment" : "tripPlanner.badgeSuggested")
-      let status = pin.visited ? source + ", " + copy("passport.wentNoDate") : source
+      let category = kind.map { copy($0.labelKey) }
+      let visit = pin.visited ? copy("passport.wentNoDate") : nil
+      let status = [source, category, visit].compactMap { $0 }.joined(separator: ", ")
+      let color = kind == nil && !pin.place.isSaved ? Self.discoverRim : MapPinPalette.color(for: kind)
       showPlace(emoji: pin.place.emoji, saved: pin.place.isSaved, visited: pin.visited,
-        title: pin.place.name, status: status)
+        title: pin.place.name, status: status, color: color)
     } else if let cluster = annotation as? MKClusterAnnotation {
       let count = cluster.memberAnnotations.count
       let savedCount = cluster.memberAnnotations.count { ($0 as? MapCanvas.Pin)?.place.isSaved == true }
@@ -88,24 +92,27 @@ final class PlaceAnnotationView: MKAnnotationView {
     check.frame = CGRect(x: disc.frame.maxX - 10, y: disc.frame.minY - 1, width: 14, height: 14)
   }
 
-  private func showPlace(emoji: String?, saved: Bool, visited: Bool, title: String, status: String) {
+  private func showPlace(emoji: String?, saved: Bool, visited: Bool, title: String, status: String, color: UIColor) {
     displayPriority = saved ? .defaultHigh : .defaultLow
     clusteringIdentifier = "places"
     collisionMode = .circle
+    let accent = saved ? color : color.withAlphaComponent(0.66)
     if compact {
       bounds.size = CGSize(width: 15, height: 15)
       let diameter: CGFloat = saved ? 12 : 9
-      badge(width: diameter, height: diameter, fill: saved ? Self.amber : Self.discoverRim,
+      badge(width: diameter, height: diameter, fill: accent,
         rim: Self.paper, border: 1.5)
       glyph.isHidden = true
       symbol.isHidden = true
       check.frame = bounds
+      check.backgroundColor = .clear
+      check.layer.borderWidth = 0
       check.isHidden = !visited
     } else {
       bounds.size = CGSize(width: 34, height: 34)
       let diameter: CGFloat = saved ? 31 : 24
       badge(width: diameter, height: diameter, fill: saved ? Self.paper : Self.discoverPaper,
-        rim: saved ? Self.amber : Self.discoverRim, border: saved ? 1.5 : 1)
+        rim: accent, border: saved ? 1.5 : 1)
       glyph.font = .systemFont(ofSize: saved ? 17 : 13)
       glyph.textColor = Self.ink
       glyph.text = emoji
@@ -114,6 +121,8 @@ final class PlaceAnnotationView: MKAnnotationView {
       symbol.tintColor = saved ? Self.ink : Self.discoverRim
       symbol.image = UIImage(systemName: saved ? "bookmark.fill" : "mappin",
         withConfiguration: UIImage.SymbolConfiguration(pointSize: 11, weight: .semibold))
+      check.backgroundColor = Self.ink
+      check.layer.borderWidth = 1
       check.isHidden = !visited
     }
     accessibilityLabel = title
