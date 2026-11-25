@@ -109,6 +109,7 @@ struct OnboardingOpener: View {
             .clipShape(.rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).strokeBorder(palette.foreground, lineWidth: 3) }
             .aspectRatio(640/1391.0, contentMode: .fit).padding(.vertical, 5).frame(maxWidth: .infinity)
             .tag(i).accessibilityLabel(captions[i])
+            .accessibilityValue(i == 0 ? "" : copy(["", "onboarding.openerFileBody", "opener.datePreviewDescription", "opener.tripPreviewDescription"][i]))
         }
       }.tabViewStyle(.page(indexDisplayMode: .never))
         .frame(height: min(UIScreen.main.bounds.height * 0.46, 420))

@@ -69,6 +69,7 @@ private struct OnboardingAccount: View {
   @State private var free = false
   @State private var entered = Date()
   @State private var unavailable = false
+  @State private var cityQuery = ""
   @State private var practiceShare = false
   @State private var carousel = 0
 
@@ -109,7 +110,7 @@ private struct OnboardingAccount: View {
               .frame(maxWidth: .infinity, minHeight: 56).foregroundStyle(palette.background)
               .background(palette.foreground, in: Capsule())
           }
-          .buttonStyle(.plain)
+          .buttonStyle(FirstRunPillStyle())
           .disabled(busy || (progress.step == .goal && progress.goals.isEmpty) ||
             (progress.step == .savedCount && progress.savedCount == nil) || (progress.step == .been && progress.visitedCities.isEmpty) || (progress.step == .city && progress.city == nil))
           .padding(.horizontal, 24).padding(.vertical, 8).background(palette.background)
@@ -126,6 +127,7 @@ private struct OnboardingAccount: View {
         }
         .disabled(busy)
         .onChange(of: progress.step, initial: true) { _, step in
+          cityQuery = ""
           entered = Date()
           if progress.viewed?.contains(step) != true {
             progress.viewed = (progress.viewed ?? []).union([step]); persist()
@@ -139,15 +141,10 @@ private struct OnboardingAccount: View {
           }
         }
         .sheet(isPresented: $practiceShare) {
-          VStack(alignment: .leading, spacing: 14) {
-            Text(copy("aha.coachShelvr")).font(.title.bold())
-            Button {
-              practiceShare = false
-              proceed(skip: false)
-            } label: {
-              Label("Shelvr", systemImage: "bookmark.fill").frame(maxWidth: .infinity)
-            }.buttonStyle(.borderedProminent)
-          }.padding(24).presentationDetents([.height(180)])
+          PracticeShareGuide {
+            practiceShare = false
+            proceed(skip: false)
+          }
         }
         .sheet(isPresented: $paywall, onDismiss: {
           if purchased || free || unavailable { finish() }
@@ -181,13 +178,26 @@ private struct OnboardingAccount: View {
           if !progress.goals.insert(goal).inserted { progress.goals.remove(goal) }; persist()
         }
       }
+      let everyGoal: Set<String> = ["date", "travel", "food"]
+      choice(copy("onboardingQ.goalEverything"), emoji: "✨", selected: progress.goals == everyGoal) {
+        progress.goals = progress.goals == everyGoal ? [] : everyGoal
+        persist()
+      }
     case .been, .city:
       let been = progress.step == .been
       title(been ? "cityStamps.onboardingTitle" :
         progress.goals.contains("travel") && !progress.goals.contains("date") ? "onboardingQ.cityTitleTrip" : "onboardingQ.cityTitleOut")
       Text(copy(been ? "cityStamps.onboardingBody" : "onboardingQ.cityBody"))
+      if !been {
+        HStack {
+          Image(systemName: "magnifyingglass").accessibilityHidden(true)
+          TextField(copy("goal.citySearch"), text: $cityQuery).autocorrectionDisabled()
+        }.padding(12).background(palette.surface, in: .rect(cornerRadius: 14))
+      }
+      let cities = SampleReel.all.filter { cityQuery.isEmpty || copy($0.cityKey).localizedStandardContains(cityQuery) ||
+        $0.id.replacingOccurrences(of: "-", with: " ").localizedStandardContains(cityQuery) }
       LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: type.isAccessibilitySize ? 1 : 2), spacing: 12) {
-        ForEach(SampleReel.all) { city in
+        ForEach(cities.sorted { copy($0.cityKey).localizedStandardCompare(copy($1.cityKey)) == .orderedAscending }) { city in
           let selected = been ? progress.visitedCities.contains(city.id) : progress.city == city.id
           cityChoice(city, selected: selected) {
             if been {
@@ -260,18 +270,19 @@ private struct OnboardingAccount: View {
   }
 
   @ViewBuilder private func featurePreview(_ kind: String, reel: SampleReel) -> some View {
+    let trip = progress.goals.contains("travel") && !progress.goals.contains("date")
     if kind == "map" {
       Label(copy("map.searchPlaceholder"), systemImage: "magnifyingglass").foregroundStyle(palette.muted)
       sampleMap(reel)
     } else {
       VStack(alignment: .leading, spacing: 14) {
-        Text(copy(kind == "together" ? reel.cityKey : progress.goals.contains("travel") ? "homePlaces.planTrip" : "homePlaces.planDate"))
+        Text(copy(kind == "together" ? reel.cityKey : trip ? "homePlaces.planTrip" : "homePlaces.planDate"))
           .font(.custom("Satoshi-Bold", size: 21, relativeTo: .title2))
         if kind == "together" { Label(copy("sharedLists.invite"), systemImage: "person.2") }
         ForEach(Array(reel.places.prefix(kind == "eat" ? 2 : reel.places.count).enumerated()), id: \.offset) { _, place in
           Label(place.name, systemImage: "mappin.circle.fill").font(.subheadline)
         }
-        if kind == "eat" { Label(copy("common.share"), systemImage: "square.and.arrow.up") }
+        if kind == "eat" { Label(copy(trip ? "common.share" : "datePlan.send"), systemImage: "square.and.arrow.up") }
       }.frame(maxWidth: .infinity, alignment: .leading).padding(18)
         .background(palette.surface, in: .rect(cornerRadius: 20))
         .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(palette.border) }
