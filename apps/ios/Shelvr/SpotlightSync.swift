@@ -14,8 +14,14 @@ import SwiftUI
     try await CSSearchableIndex.default().deleteSearchableItems(withDomainIdentifiers: ["ItemEntity", "shelvr.item"])
   }, remove: { ids in
     try await CSSearchableIndex.default().deleteAppEntities(identifiedBy: ids, ofType: ItemEntity.self)
-  }, index: { rows in
-    try await CSSearchableIndex.default().indexAppEntities(rows.map(ItemEntity.init))
+  }, index: { rows, expiration in
+    var items: [CSSearchableItem] = []
+    for row in rows {
+      let item = CSSearchableItem(appEntity: ItemEntity(row))
+      item.expirationDate = expiration ?? .distantFuture
+      items.append(item)
+    }
+    try await CSSearchableIndex.default().indexSearchableItems(items)
   }, failure: { Analytics.failure("spotlight_sync_failed") })
 }
 
@@ -93,14 +99,14 @@ private struct SpotlightFeed: View {
       do {
         for try await page in backend.spotlightPage(after: cursor.value) {
           guard !Task.isCancelled, owner.session == backend.sessionGeneration, owner.active else { return }
-          if pages.receive(page, for: cursor) { ShelvrSpotlight.publication.publish(pages.saves, for: owner) }
+          if pages.receive(page, for: cursor), pages.isComplete { ShelvrSpotlight.publication.publish(pages.saves, for: owner) }
           delay = 2
         }
         return
       } catch {
         guard !Task.isCancelled, owner.session == backend.sessionGeneration else { return }
         pages.invalidate(cursor)
-        ShelvrSpotlight.publication.publish(pages.saves, for: owner)
+        ShelvrSpotlight.publication.publish([], for: owner)
         if delay == 2 { Analytics.failure("spotlight_page_failed") }
         do { try await Task.sleep(for: .seconds(delay)) } catch { return }
         delay = min(delay * 2, 60)

@@ -12,10 +12,10 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   let a = try spotlightRow("a"), b = try spotlightRow("b"), c = try spotlightRow("c")
   _ = pages.receive(.init(page: [a], continueCursor: "tail", isDone: false), for: .start)
   _ = pages.receive(.init(page: [a, b], continueCursor: "end", isDone: true), for: .after("tail"))
-  #expect(pages.saves.map(\._id) == ["a", "b"])
+  #expect(pages.isComplete && pages.saves.map(\._id) == ["a", "b"])
   _ = pages.receive(.init(page: [c], continueCursor: "new", isDone: false), for: .start)
   #expect(pages.cursors == [.start, .after("new")])
-  #expect(pages.saves == [c])
+  #expect(!pages.isComplete && pages.saves == [c])
   let late = pages.receive(.init(page: [a, b], continueCursor: "end", isDone: true), for: .after("tail"))
   #expect(!late && pages.saves == [c])
   pages.invalidate(.start)
@@ -26,6 +26,7 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   var items = [String: SearchableSave]()
   var cleared = 0
   var indexed = [[String]]()
+  var expirations: [Date?] = []
   var removed = [[String]]()
   var prepareCount = 0
   var fail = false
@@ -40,7 +41,8 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
     }, remove: { ids in
       self.removed.append(ids)
       for id in ids { self.items.removeValue(forKey: id) }
-    }, index: { rows in
+    }, index: { rows, expiration in
+      self.expirations.append(expiration)
       if self.willBlock {
         self.willBlock = false
         await withCheckedContinuation { self.blocked = $0 }
@@ -102,4 +104,14 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   index.publish([try spotlightRow("new")], for: a)
   await index.settled()
   #expect(Set(os.items.keys) == ["new"] && os.cleared == 2)
+}
+
+@MainActor @Test func theSystemReceivesTheEntitlementDeadlineWithEachIndexedBatch() async throws {
+  let os = TestSearchIndex(), deadline = Date().addingTimeInterval(3600)
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID(), expiresAt: deadline)
+  let index = os.make()
+  index.activate(owner)
+  index.publish([try spotlightRow("1")], for: owner)
+  await index.settled()
+  #expect(os.expirations == [deadline])
 }

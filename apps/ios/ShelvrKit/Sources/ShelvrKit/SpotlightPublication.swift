@@ -15,7 +15,7 @@ import Foundation
 
   public typealias Clear = @MainActor () async throws -> Void
   public typealias Remove = @MainActor ([String]) async throws -> Void
-  public typealias Index = @MainActor ([SearchableSave]) async throws -> Void
+  public typealias Index = @MainActor ([SearchableSave], Date?) async throws -> Void
 
   private let prepare: Clear
   private let clear: Clear
@@ -129,7 +129,7 @@ import Foundation
       guard owner.active else { activate(nil); return }
       let batch = Array(changed[offset..<min(offset+100, changed.count)])
       mayHaveIndexedItems = true
-      try await index(batch)
+      try await index(batch, owner.expiresAt)
       for row in batch { applied[row._id] = row }
     }
     if applied.isEmpty { mayHaveIndexedItems = false }

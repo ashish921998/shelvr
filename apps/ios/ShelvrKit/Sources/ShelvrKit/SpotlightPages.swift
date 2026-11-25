@@ -13,6 +13,7 @@ public struct SpotlightPages {
 
   private var pages: [Cursor: SearchableSavePage] = [:]
   public private(set) var cursors: [Cursor] = [.start]
+  public private(set) var isComplete = false
   public private(set) var saves: [SearchableSave] = []
 
   public init() {}
@@ -33,6 +34,7 @@ public struct SpotlightPages {
   private mutating func rebuild() {
     var wanted: [Cursor] = [.start]
     var visited: Set<Cursor> = [.start]
+    isComplete = false
     var rows: [SearchableSave] = []
     var ids = Set<String>()
     while let key = wanted.last, let current = pages[key] {
@@ -40,7 +42,7 @@ public struct SpotlightPages {
         rows.append(row)
         if rows.count == 300 { break }
       }
-      guard rows.count < 300, !current.isDone else { break }
+      if rows.count == 300 || current.isDone { isComplete = true; break }
       let next = Cursor.after(current.continueCursor)
       guard visited.insert(next).inserted else { break }
       wanted.append(next)
