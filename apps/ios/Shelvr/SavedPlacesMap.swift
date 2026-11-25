@@ -163,26 +163,31 @@ struct SavedPlacesMap: View {
           .background(palette.surface, in: RoundedRectangle(cornerRadius: 16))
           .padding(.horizontal, 20)
         }
-        if scene.showsWentSwitch || !scene.chips.isEmpty {
-          ScrollView(.horizontal) {
-            HStack(spacing: 8) {
-              if scene.showsWentSwitch {
-                wentChip(.all, "map.filterAll", palette: palette)
-                wentChip(.want, "passport.wantToGo", palette: palette)
-                wentChip(.went, "passport.wentNoDate", palette: palette)
-              }
-              ForEach(scene.chips, id: \.self) { kind in
-                filterChip(copy(kind.labelKey), selected: filters.kinds.contains(kind), palette: palette) {
-                  if filters.kinds.insert(kind).inserted {
-                    Analytics.capture("map_filter_selected", ["kind": kind.rawValue])
-                  } else { filters.kinds.remove(kind) }
-                }
-              }
-            }.padding(.horizontal, 20)
-          }.scrollIndicators(.hidden)
-        }
+        filterStrip(scene, palette: palette).padding(.horizontal, 20)
         tabBar.mapDock(search: { searching = true; resultsOpen = true }, palette: palette)
       }.buttonStyle(HomeChromePressStyle())
+    }
+  }
+
+  @ViewBuilder
+  private func filterStrip(_ scene: MapScene, palette: HomeChromePalette) -> some View {
+    if scene.showsWentSwitch || !scene.chips.isEmpty {
+      ScrollView(.horizontal) {
+        HStack(spacing: 8) {
+          if scene.showsWentSwitch {
+            wentChip(.all, "map.filterAll", palette: palette)
+            wentChip(.want, "passport.wantToGo", palette: palette)
+            wentChip(.went, "passport.wentNoDate", palette: palette)
+          }
+          ForEach(scene.chips, id: \.self) { kind in
+            filterChip(copy(kind.labelKey), selected: filters.kinds.contains(kind), palette: palette) {
+              if filters.kinds.insert(kind).inserted {
+                Analytics.capture("map_filter_selected", ["kind": kind.rawValue])
+              } else { filters.kinds.remove(kind) }
+            }
+          }
+        }
+      }.scrollIndicators(.hidden)
     }
   }
 
@@ -210,12 +215,12 @@ struct SavedPlacesMap: View {
         .background(palette.surface, in: RoundedRectangle(cornerRadius: 16))
         .shadow(color: palette.shadow.opacity(0.12), radius: 4, y: 2)
       }
+      filterStrip(scene, palette: palette)
       HStack(spacing: 8) {
         HStack(spacing: 8) {
           Image(systemName: "magnifyingglass").accessibilityHidden(true)
           TextField(copy("map.searchPlaceholder"), text: $filters.search)
             .focused($focusedSearch).submitLabel(.search).autocorrectionDisabled()
-            .onChange(of: filters.search) { resultsOpen = true }
             .onChange(of: focusedSearch) { if focusedSearch { resultsOpen = true } }
         }
         .padding(.horizontal, 16).frame(minHeight: 52)
@@ -233,6 +238,7 @@ struct SavedPlacesMap: View {
     .foregroundStyle(palette.foreground)
     .buttonStyle(HomeChromePressStyle())
     .padding(.horizontal, 20).padding(.bottom, focusedSearch ? 8 : 32)
+    .onChange(of: filters) { resultsOpen = true }
     .task { focusedSearch = true }
   }
 
