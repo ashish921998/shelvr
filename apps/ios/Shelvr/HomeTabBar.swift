@@ -18,9 +18,9 @@ struct HomeTabBar: View {
       Button(action: add) {
         Image(systemName: "plus")
           .font(.system(size: 27, weight: .bold))
-          .foregroundStyle(palette.foreground)
+          .foregroundStyle(palette.onPrimary)
           .frame(width: 64, height: 64)
-          .background(palette.frame, in: Circle())
+          .background(palette.primary, in: Circle())
           .overlay { Circle().strokeBorder(palette.border, lineWidth: 0.5) }
           .shadow(color: palette.shadow.opacity(0.18), radius: 7, y: 4)
       }
@@ -41,44 +41,6 @@ struct HomeTabBar: View {
         }
       }
     }
-  }
-
-  func mapDock(search: @escaping () -> Void, palette: HomeChromePalette) -> some View {
-    HStack(spacing: 8) {
-      mapAction(copy("navigation.library"), symbol: "books.vertical", palette: palette, action: switchTab)
-      Button(action: search) {
-        Label(copy("map.searchPlaceholder"), systemImage: "magnifyingglass")
-          .font(.custom("Satoshi-Regular", size: 16, relativeTo: .body))
-          .foregroundStyle(palette.foreground)
-          .lineLimit(1)
-          .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-          .padding(.horizontal, 16)
-          .background(palette.surface, in: Capsule())
-          .overlay { Capsule().strokeBorder(palette.border, lineWidth: 0.5) }
-      }
-      .accessibilityLabel(copy("map.searchPlaceholder"))
-      mapAction(copy("plan.goOut"), symbol: "shoeprints.fill", palette: palette, action: plan)
-    }
-    .padding(.horizontal, 20)
-    .padding(.bottom, 32)
-    .buttonStyle(HomeChromePressStyle())
-  }
-
-  private func mapAction(_ label: String, symbol: String, palette: HomeChromePalette,
-    action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      VStack(spacing: 2) {
-        Image(systemName: symbol).font(.system(size: 18, weight: .medium))
-          .foregroundStyle(palette.primaryText)
-        Text(label).font(.custom("Satoshi-Regular", size: 11, relativeTo: .caption2))
-          .foregroundStyle(palette.foreground).lineLimit(1)
-      }
-      .frame(minWidth: 58, minHeight: 52)
-      .padding(.horizontal, 4)
-      .background(palette.surface, in: RoundedRectangle(cornerRadius: 18))
-      .overlay { RoundedRectangle(cornerRadius: 18).strokeBorder(palette.border, lineWidth: 0.5) }
-    }
-    .accessibilityLabel(label)
   }
 
   private func destination(_ label: String, symbol: String, palette: HomeChromePalette,
@@ -112,9 +74,13 @@ struct HomeChromePressStyle: ButtonStyle {
 
 struct HomeChromePalette {
   let background, frame, surface, foreground, muted, primaryText, border: Color
+  let primary, onPrimary: Color
   let shadow = Color(rgb: 0x2b2418)
 
   init(_ scheme: ColorScheme, appearance: String) {
+    let neutralDark = scheme == .dark && appearance == "neutralDark"
+    primary = neutralDark ? Color(rgb: 0xffd60a) : Color("AccentColor")
+    onPrimary = Color(rgb: neutralDark ? 0x111417 : 0x2b2418)
     if scheme == .light {
       background = Color(.background)
       frame = .white
@@ -123,7 +89,7 @@ struct HomeChromePalette {
       muted = Color(.muted)
       primaryText = Color(rgb: 0x935d09)
       border = Color(rgb: 0xece3d1)
-    } else if appearance == "neutralDark" {
+    } else if neutralDark {
       background = Color(rgb: 0x111417)
       frame = Color(rgb: 0x1b1f24)
       surface = frame

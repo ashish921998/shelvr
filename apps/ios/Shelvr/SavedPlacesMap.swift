@@ -40,12 +40,16 @@ struct SavedPlacesMap: View {
       onPick: { selected = $0 }, onCluster: { cluster = $0 })
       .ignoresSafeArea(.container)
       .overlay(alignment: .top) {
-        mapHeader(personalPlaces: personalPlaces, overviewPlaces: overviewPlaces, palette: palette)
-          .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topControlsHeight = $0 }
+        Group {
+          if searching { searchPanel(scene, palette: palette) }
+          else { mapHeader(personalPlaces: personalPlaces, overviewPlaces: overviewPlaces, palette: palette) }
+        }.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topControlsHeight = $0 }
       }
       .overlay(alignment: .bottom) {
-        mapFooter(scene, palette: palette)
-          .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bottomControlsHeight = $0 }
+        if !focusedSearch {
+          mapFooter(scene, palette: palette)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bottomControlsHeight = $0 }
+        }
       }
       .alert(copy("common.unavailable"), isPresented: $location.unavailable) {
         Button(copy("common.close")) {}
@@ -129,30 +133,25 @@ struct SavedPlacesMap: View {
           Text("shelvr").font(.custom("CrimsonProRoman-Regular", size: 28, relativeTo: .title2))
             .tracking(0.5).frame(maxWidth: .infinity, alignment: .leading)
         }
+        roundButton("magnifyingglass", label: copy("map.searchPlaceholder"), palette: palette) {
+          searching = true
+          resultsOpen = true
+        }
         roundButton("person", label: copy("navigation.profile"), palette: palette) { open("/profile") }
-        roundButton("plus", label: copy("common.add"), palette: palette, action: tabBar.add)
       }
       .frame(minHeight: 50)
-      if !searching {
-        roundButton("location", label: copy("map.showMyLocation"), palette: palette) { location.locate() }
-          .frame(maxWidth: .infinity, alignment: .trailing)
-      }
-      if !errors.isEmpty {
-        Button(copy("common.retry")) { retry += 1 }
-          .padding(8).background(palette.surface, in: Capsule())
-      }
+      roundButton("location", label: copy("map.showMyLocation"), palette: palette) { location.locate() }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+      retryControl(palette)
     }
     .padding(.horizontal, 20)
     .foregroundStyle(palette.foreground)
     .buttonStyle(HomeChromePressStyle())
   }
 
-  @ViewBuilder
   private func mapFooter(_ scene: MapScene, palette: HomeChromePalette) -> some View {
-    if searching {
-      searchPanel(scene, palette: palette)
-    } else {
-      VStack(spacing: 6) {
+    VStack(spacing: 6) {
+      if !searching {
         if saved?.isEmpty == true, receivedDiscover, discover.isEmpty, errors.isEmpty {
           VStack(alignment: .leading) {
             Text(copy("map.emptyTitle")).font(.custom("Satoshi-Bold", size: 16, relativeTo: .headline))
@@ -164,9 +163,10 @@ struct SavedPlacesMap: View {
           .padding(.horizontal, 20)
         }
         filterStrip(scene, palette: palette).padding(.horizontal, 20)
-        tabBar.mapDock(search: { searching = true; resultsOpen = true }, palette: palette)
-      }.buttonStyle(HomeChromePressStyle())
+      }
+      tabBar
     }
+    .buttonStyle(HomeChromePressStyle())
   }
 
   @ViewBuilder
@@ -193,7 +193,27 @@ struct SavedPlacesMap: View {
 
   private func searchPanel(_ scene: MapScene, palette: HomeChromePalette) -> some View {
     VStack(spacing: 8) {
-      if scene.filters.hasSearch && resultsOpen {
+      HStack(spacing: 8) {
+        HStack(spacing: 8) {
+          Image(systemName: "magnifyingglass").accessibilityHidden(true)
+          TextField(copy("map.searchPlaceholder"), text: $filters.search)
+            .focused($focusedSearch).submitLabel(.search).autocorrectionDisabled()
+            .onSubmit { focusedSearch = false }
+            .onChange(of: focusedSearch) { if focusedSearch { resultsOpen = true } }
+        }
+        .padding(.horizontal, 16).frame(minHeight: 52)
+        .background(palette.surface, in: Capsule())
+        .overlay { Capsule().strokeBorder(palette.border, lineWidth: 0.5) }
+        Button(copy("common.cancel")) {
+          searching = false
+          focusedSearch = false
+          filters.search = ""
+        }.padding(.horizontal, 12).frame(minHeight: 44)
+          .background(palette.surface, in: Capsule())
+      }
+      filterStrip(scene, palette: palette)
+      retryControl(palette)
+      if scene.filters.hasSearch && resultsOpen && (!scene.visible.isEmpty || errors.isEmpty) {
         VStack(alignment: .leading, spacing: 0) {
           ForEach(scene.visible.prefix(5)) { place in
             Button {
@@ -215,31 +235,22 @@ struct SavedPlacesMap: View {
         .background(palette.surface, in: RoundedRectangle(cornerRadius: 16))
         .shadow(color: palette.shadow.opacity(0.12), radius: 4, y: 2)
       }
-      filterStrip(scene, palette: palette)
-      HStack(spacing: 8) {
-        HStack(spacing: 8) {
-          Image(systemName: "magnifyingglass").accessibilityHidden(true)
-          TextField(copy("map.searchPlaceholder"), text: $filters.search)
-            .focused($focusedSearch).submitLabel(.search).autocorrectionDisabled()
-            .onChange(of: focusedSearch) { if focusedSearch { resultsOpen = true } }
-        }
-        .padding(.horizontal, 16).frame(minHeight: 52)
-        .background(palette.surface, in: Capsule())
-        .overlay { Capsule().strokeBorder(palette.border, lineWidth: 0.5) }
-        Button(copy("common.cancel")) {
-          searching = false
-          focusedSearch = false
-          filters.search = ""
-        }.padding(.horizontal, 12).frame(minHeight: 44)
-          .background(palette.surface, in: Capsule())
-      }
     }
     .font(.custom("Satoshi-Regular", size: 16, relativeTo: .body))
     .foregroundStyle(palette.foreground)
     .buttonStyle(HomeChromePressStyle())
-    .padding(.horizontal, 20).padding(.bottom, focusedSearch ? 8 : 32)
+    .padding(.horizontal, 20)
     .onChange(of: filters) { resultsOpen = true }
     .task { focusedSearch = true }
+  }
+
+  @ViewBuilder
+  private func retryControl(_ palette: HomeChromePalette) -> some View {
+    if !errors.isEmpty {
+      Button(copy("common.retry")) { retry += 1 }
+        .padding(.horizontal, 12).frame(minHeight: 44)
+        .background(palette.surface, in: Capsule())
+    }
   }
 
   private func roundButton(_ symbol: String, label: String, palette: HomeChromePalette,
