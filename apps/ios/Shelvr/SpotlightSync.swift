@@ -68,6 +68,8 @@ struct SpotlightSync: ViewModifier {
   }
 
   private func watchAccess(_ session: Session) async {
+    guard !Task.isCancelled, backend.sessionGeneration == session.generation,
+      (backend.status == .signedIn ? backend.userID : nil) == session.owner else { return }
     apply(nil)
     failed = false
     guard let account = session.owner else { return }
