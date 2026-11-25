@@ -126,7 +126,7 @@ struct MapCanvas: UIViewRepresentable {
 
     func mapView(_ map: MKMapView, regionDidChangeAnimated animated: Bool) {
       let region = map.region
-      updatePinScale(on: map, latitude: region.center.latitude)
+      updatePinScale(on: map)
       if let box = DiscoverBox.visible(latitude: region.center.latitude, longitude: region.center.longitude,
         latitudeDelta: region.span.latitudeDelta, longitudeDelta: region.span.longitudeDelta,
         width: map.bounds.width, height: map.bounds.height, tilted: map.camera.pitch > 0) {
@@ -139,9 +139,17 @@ struct MapCanvas: UIViewRepresentable {
       }
     }
 
-    private func updatePinScale(on map: MKMapView, latitude: CLLocationDegrees) {
-      guard map.bounds.width > 0 else { return }
-      let metersPerPoint = map.visibleMapRect.width / MKMapPointsPerMeterAtLatitude(latitude) / map.bounds.width
+    private func updatePinScale(on map: MKMapView) {
+      let halfSample = min(24, map.bounds.width / 4)
+      guard halfSample > 0, map.bounds.height > 0 else { return }
+      let left = CGPoint(x: map.bounds.midX - halfSample, y: map.bounds.midY)
+      let right = CGPoint(x: map.bounds.midX + halfSample, y: map.bounds.midY)
+      let west = map.convert(left, toCoordinateFrom: map)
+      let east = map.convert(right, toCoordinateFrom: map)
+      guard CLLocationCoordinate2DIsValid(west), CLLocationCoordinate2DIsValid(east) else { return }
+      let start = CLLocation(latitude: west.latitude, longitude: west.longitude)
+      let end = CLLocation(latitude: east.latitude, longitude: east.longitude)
+      let metersPerPoint = start.distance(from: end) / (2 * halfSample)
       let next = compactPins ? metersPerPoint > 8 : metersPerPoint >= 10
       guard next != compactPins else { return }
       compactPins = next
