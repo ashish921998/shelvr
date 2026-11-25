@@ -4,7 +4,7 @@ import ShelvrKit
 import SwiftUI
 
 @MainActor enum ShelvrSpotlight {
-  static let publication = SpotlightPublication(defaults: .standard, prepare: {
+  static let publication = SpotlightPublication(prepare: {
     guard let catalogs = UserDefaults(suiteName: "dev.expo.appintents") else { throw CocoaError(.fileReadNoPermission) }
     let legacy = LegacySearchCleanup(defaults: .standard, catalogs: catalogs, documents: .documentsDirectory, caches: .cachesDirectory)
     try await legacy.run { domains in

@@ -17,13 +17,12 @@ import Foundation
   public typealias Remove = @MainActor ([String]) async throws -> Void
   public typealias Index = @MainActor ([SearchableSave]) async throws -> Void
 
-  private let defaults: UserDefaults
   private let prepare: Clear
   private let clear: Clear
   private let remove: Remove
   private let index: Index
   private let failure: @MainActor () -> Void
-  private static let dirtyKey = "swift.spotlight.mayContainSaves"
+  private var mayHaveIndexedItems = true
   private var owner: Owner?
   private var desired: [SearchableSave] = []
   private var applied: [String: SearchableSave] = [:]
@@ -34,9 +33,8 @@ import Foundation
   private var retry: Task<Void, Never>?
   private var backoff = 2
 
-  public init(defaults: UserDefaults, prepare: @escaping Clear, clear: @escaping Clear,
+  public init(prepare: @escaping Clear, clear: @escaping Clear,
     remove: @escaping Remove, index: @escaping Index, failure: @escaping @MainActor () -> Void) {
-    self.defaults = defaults
     self.prepare = prepare
     self.clear = clear
     self.remove = remove
@@ -53,7 +51,7 @@ import Foundation
       needsReset = true
     }
     let urgent: Task<Void, Never>?
-    if changing && tail != nil && defaults.bool(forKey: Self.dirtyKey) {
+    if changing && tail != nil && mayHaveIndexedItems {
       urgent = Task { try? await self.clear() }
     } else { urgent = nil }
     schedule(after: urgent)
@@ -111,9 +109,9 @@ import Foundation
     }
     guard job == revision else { return }
     if needsReset {
-      if defaults.bool(forKey: Self.dirtyKey) { try await clear() }
+      if mayHaveIndexedItems { try await clear() }
       applied = [:]
-      defaults.removeObject(forKey: Self.dirtyKey)
+      mayHaveIndexedItems = false
       guard job == revision else { return }
       needsReset = false
     }
@@ -130,10 +128,10 @@ import Foundation
       guard job == revision else { return }
       guard owner.active else { activate(nil); return }
       let batch = Array(changed[offset..<min(offset+100, changed.count)])
-      defaults.set(true, forKey: Self.dirtyKey)
+      mayHaveIndexedItems = true
       try await index(batch)
       for row in batch { applied[row._id] = row }
     }
-    if applied.isEmpty { defaults.removeObject(forKey: Self.dirtyKey) }
+    if applied.isEmpty { mayHaveIndexedItems = false }
   }
 }

@@ -33,8 +33,8 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   var willBlock = false
   var failures = 0
 
-  func make(_ defaults: UserDefaults) -> SpotlightPublication {
-    SpotlightPublication(defaults: defaults, prepare: { self.prepareCount += 1 }, clear: {
+  func make() -> SpotlightPublication {
+    SpotlightPublication(prepare: { self.prepareCount += 1 }, clear: {
       self.cleared += 1
       self.items.removeAll()
     }, remove: { ids in
@@ -53,12 +53,9 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
 }
 
 @MainActor @Test func spotlightUpdatesOnlyChangedRowsAndClearsOldSessionsAcrossRelaunch() async throws {
-  let suite = "spotlight.changes." + UUID().uuidString
-  let defaults = try #require(UserDefaults(suiteName: suite))
-  defer { defaults.removePersistentDomain(forName: suite) }
   let os = TestSearchIndex(), a = SpotlightPublication.Owner(account: "a", session: UUID())
   let b = SpotlightPublication.Owner(account: "b", session: UUID())
-  let index = os.make(defaults)
+  let index = os.make()
   let one = try spotlightRow("1"), two = try spotlightRow("2"), edited = try spotlightRow("2", "Edited")
   index.activate(a)
   index.publish([one, two], for: a)
@@ -73,35 +70,29 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   #expect(os.items.isEmpty)
   index.publish([two], for: b)
   await index.settled()
-  let relaunched = os.make(defaults)
+  let relaunched = os.make()
   relaunched.activate(nil)
   await relaunched.settled()
   #expect(os.items.isEmpty && os.prepareCount == 2)
 }
 
 @MainActor @Test func revocationClearsBeforeAndAfterAPreviousWriteFinishes() async throws {
-  let suite = "spotlight.ordering." + UUID().uuidString
-  let defaults = try #require(UserDefaults(suiteName: suite))
-  defer { defaults.removePersistentDomain(forName: suite) }
   let os = TestSearchIndex(), a = SpotlightPublication.Owner(account: "a", session: UUID())
-  let index = os.make(defaults)
+  let index = os.make()
   os.willBlock = true
   index.activate(a)
   index.publish([try spotlightRow("1")], for: a)
   while os.blocked == nil { await Task.yield() }
   index.activate(nil)
-  while os.cleared == 0 { await Task.yield() }
+  while os.cleared < 2 { await Task.yield() }
   os.blocked?.resume()
   await index.settled()
-  #expect(os.cleared == 2 && os.items.isEmpty)
+  #expect(os.cleared == 3 && os.items.isEmpty)
 }
 
 @MainActor @Test func aPartiallyFailedIndexIsErasedBeforeTheNextSnapshotIsPublished() async throws {
-  let suite = "spotlight.partial." + UUID().uuidString
-  let defaults = try #require(UserDefaults(suiteName: suite))
-  defer { defaults.removePersistentDomain(forName: suite) }
   let os = TestSearchIndex(), a = SpotlightPublication.Owner(account: "a", session: UUID())
-  let index = os.make(defaults)
+  let index = os.make()
   os.fail = true
   index.activate(a)
   index.publish([try spotlightRow("old")], for: a)
@@ -110,5 +101,5 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   os.fail = false
   index.publish([try spotlightRow("new")], for: a)
   await index.settled()
-  #expect(Set(os.items.keys) == ["new"] && os.cleared == 1)
+  #expect(Set(os.items.keys) == ["new"] && os.cleared == 2)
 }
