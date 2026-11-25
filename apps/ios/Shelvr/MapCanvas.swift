@@ -32,6 +32,7 @@ struct MapCanvas: UIViewRepresentable {
   let topControlsHeight: CGFloat
   let bottomControlsHeight: CGFloat
   let onArea: (DiscoverBox, MapViewport) -> Void
+  let onUserMove: () -> Void
   let onPick: (MapPlace) -> Void
   let onCluster: ([MapPlace]) -> Void
 
@@ -168,7 +169,11 @@ struct MapCanvas: UIViewRepresentable {
       clearNames()
       nameLayout?.cancel()
       nameLayout = nil
-      if hasActiveGesture(map) { opened = true; queryingNearby = false }
+      if hasActiveGesture(map) {
+        opened = true
+        queryingNearby = false
+        parent.onUserMove()
+      }
     }
 
     private func hasActiveGesture(_ view: UIView) -> Bool {

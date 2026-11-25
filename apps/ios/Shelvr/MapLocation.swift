@@ -28,6 +28,11 @@ final class MapLocation: NSObject, CLLocationManagerDelegate {
     }
   }
 
+  func cancel() {
+    wanted = false
+    latestFix = nil
+  }
+
   nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
     Task { @MainActor in
       guard self.wanted, self.manager.authorizationStatus != .notDetermined else { return }

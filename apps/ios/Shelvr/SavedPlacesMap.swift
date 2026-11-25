@@ -41,7 +41,7 @@ struct SavedPlacesMap: View {
     MapCanvas(places: scene.visible, cameraCommand: cameraCommand, filters: scene.filters, opening: scene.opening,
       visited: scene.visited, selectedLabelID: selectedLabelID, copy: copy, topControlsHeight: topControlsHeight,
       bottomControlsHeight: bottomControlsHeight, onArea: { updateDiscoverArea($0); viewport = $1 },
-      onPick: selectPlace, onCluster: { cluster = $0 })
+      onUserMove: location.cancel, onPick: selectPlace, onCluster: { cluster = $0 })
       .ignoresSafeArea(.container)
       .overlay(alignment: .top) {
         Group {
@@ -133,7 +133,10 @@ struct SavedPlacesMap: View {
             guard let other = place.city, !other.isEmpty else { return false }
             return other.caseInsensitiveCompare(city) != .orderedSame
           }) {
-            roundButton("chevron.left", label: copy("map.showAllCities"), palette: palette) { cameraCommand = .init(action: .overview(overviewPlaces)) }
+            roundButton("chevron.left", label: copy("map.showAllCities"), palette: palette) {
+              location.cancel()
+              cameraCommand = .init(action: .overview(overviewPlaces))
+            }
           }
           Button {
             if let encoded = city.addingPercentEncoding(withAllowedCharacters: .alphanumerics) { open("/city/" + encoded) }
@@ -310,6 +313,7 @@ struct SavedPlacesMap: View {
 
   private func applyFilters(_ next: MapFilters) {
     guard filters != next else { return }
+    location.cancel()
     filters = next
     selectedLabelID = nil
     cameraCommand = .init(action: .fitFilteredPlaces)
