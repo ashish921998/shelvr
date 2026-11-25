@@ -210,6 +210,13 @@ private struct OnboardingAccount: View {
           }
         }
       }
+      if been && cities.isEmpty { Text(copy("cityStamps.noMatch")).foregroundStyle(palette.muted) }
+      if !been {
+        Button(copy(progress.goals.contains("travel") && !progress.goals.contains("date") ? "interests.cityNotSure" : "goal.citySomewhere")) {
+          progress.city = nil
+          proceed(skip: true)
+        }.buttonStyle(.bordered)
+      }
     case .chart:
       title("onboardingChart.title")
       Chart {
