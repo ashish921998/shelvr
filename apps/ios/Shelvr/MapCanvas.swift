@@ -3,15 +3,23 @@ import ShelvrKit
 import SwiftUI
 
 struct MapCanvas: UIViewRepresentable {
-  struct CameraCommand {
+  @MainActor final class CameraCommand {
     enum Action {
       case locate(CLLocationCoordinate2D)
       case overview([MapPlace])
       case fitFilteredPlaces
     }
 
-    let id = UUID()
-    let action: Action
+    private var pending: Action?
+
+    init(action: Action) {
+      pending = action
+    }
+
+    func consume() -> Action? {
+      defer { pending = nil }
+      return pending
+    }
   }
 
   let places: [MapPlace]
@@ -65,12 +73,7 @@ struct MapCanvas: UIViewRepresentable {
     private var nameLayout: Task<Void, Never>?
     private let addedViews = NSHashTable<PlaceAnnotationView>.weakObjects()
     private let nameOverlay = UIView()
-    private var consumedCameraCommand: UUID?
-
-    init(_ parent: MapCanvas) {
-      self.parent = parent
-      consumedCameraCommand = parent.cameraCommand?.id
-    }
+    init(_ parent: MapCanvas) { self.parent = parent }
 
     func installNames(on map: MKMapView) {
       nameOverlay.frame = map.bounds
@@ -83,15 +86,17 @@ struct MapCanvas: UIViewRepresentable {
     func update(_ parent: MapCanvas, map: MKMapView) {
       self.parent = parent
       synchronizePins(on: map)
-      if let command = parent.cameraCommand, command.id != consumedCameraCommand {
-        consumedCameraCommand = command.id
-        apply(command.action, on: map)
-      }
+      applyPendingCamera(on: map)
+      scheduleNames(on: map)
+    }
+
+    private func applyPendingCamera(on map: MKMapView) {
+      guard !map.bounds.isEmpty else { return }
+      if let action = parent.cameraCommand?.consume() { apply(action, on: map) }
       if !opened, let places = parent.opening {
         opened = true
         fit(places, on: map, animated: false)
       }
-      scheduleNames(on: map)
     }
 
     private func apply(_ action: CameraCommand.Action, on map: MKMapView) {
@@ -202,6 +207,7 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     func mapViewDidFinishRenderingMap(_ map: MKMapView, fullyRendered: Bool) {
+      applyPendingCamera(on: map)
       scheduleNames(on: map)
     }
 
