@@ -8,7 +8,7 @@ struct SignedInView: View {
   @Binding var pendingLink: AppLink?
   @Environment(InviteEntry.self) private var invites
   @Environment(\.copy) private var copy
-  @ScaledMetric(relativeTo: .title3) private var toolbarIconHeight: CGFloat = 24
+  @ScaledMetric(relativeTo: .caption2) private var preferredActionWidth: CGFloat = 76
   @State private var tab = HomeTab.map
   @State private var mapSearchFocused = false
   @State private var mapCity: String?
@@ -40,20 +40,28 @@ struct SignedInView: View {
   }
 
   private func homeAction(_ key: String, symbol: String, highlighted: Bool = false, action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      VStack(spacing: 2) {
-        Image(systemName: symbol)
-          .font(highlighted ? .title3.weight(.medium) : .subheadline)
-          .symbolRenderingMode(highlighted ? .palette : .monochrome)
-          .foregroundStyle(highlighted ? Color.black : Color.primary, Color("AccentColor"))
-          .frame(height: toolbarIconHeight)
-        Text(copy(key)).font(.caption2)
+    let title = copy(key)
+    let icon = Image(systemName: symbol)
+      .symbolRenderingMode(highlighted ? .palette : .monochrome)
+      .foregroundStyle(highlighted ? Color.black : Color.primary, Color("AccentColor"))
+    return Button(action: action) {
+      ViewThatFits(in: .vertical) {
+        VStack(spacing: 2) {
+          icon.font(highlighted ? .title3.weight(.medium) : .subheadline).frame(minHeight: 24)
+          Text(title).font(.caption2).lineLimit(1)
+        }.fixedSize(horizontal: false, vertical: true)
+        if highlighted {
+          icon.font(.title2.weight(.medium)).imageScale(.small)
+        } else {
+          Text(title).font(.headline).lineLimit(1).minimumScaleFactor(0.45)
+        }
       }
-      .frame(minWidth: 76, minHeight: 44)
+      .frame(width: min(96, max(76, preferredActionWidth)), height: 44)
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .accessibilityLabel(copy(key))
+    .accessibilityLabel(title)
+    .accessibilityShowsLargeContentViewer { Label(title, systemImage: symbol) }
   }
 
   private func goOut() {
