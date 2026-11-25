@@ -5,7 +5,10 @@ import SwiftUI
 
 @MainActor enum ShelvrSpotlight {
   static let publication = SpotlightPublication(prepare: prepare, clear: clear, remove: remove, index: index,
-    failure: { Analytics.failure("spotlight_sync_failed") })
+    isCurrent: { owner in
+      let backend = AppEnvironment.sharedBackend
+      return backend.status == .signedIn && backend.userID == owner.account && backend.sessionGeneration == owner.session
+    }, failure: { Analytics.failure("spotlight_sync_failed") })
 
   private static func prepare() async throws {
     guard let catalogs = UserDefaults(suiteName: "dev.expo.appintents") else { throw CocoaError(.fileReadNoPermission) }
@@ -45,10 +48,11 @@ struct SpotlightSync: ViewModifier {
     let generation: UUID
     let owner: String?
     let attempt: Int
+    let systemRetry: Int
   }
 
   func body(content: Content) -> some View {
-    let session = Session(generation: backend.sessionGeneration, owner: backend.status == .signedIn ? backend.userID : nil, attempt: attempt)
+    let session = Session(generation: backend.sessionGeneration, owner: backend.status == .signedIn ? backend.userID : nil, attempt: attempt, systemRetry: SpotlightSystemRequests.shared.accessRetry)
     content.background {
       if let granted, granted.account == session.owner, granted.session == session.generation {
         SpotlightFeed(owner: granted).id(granted)
@@ -68,6 +72,7 @@ struct SpotlightSync: ViewModifier {
   }
 
   private func watchAccess(_ session: Session) async {
+    SpotlightSystemRequests.shared.monitorIdentity()
     guard !Task.isCancelled, backend.sessionGeneration == session.generation,
       (backend.status == .signedIn ? backend.userID : nil) == session.owner else { return }
     apply(nil)

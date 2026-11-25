@@ -43,7 +43,7 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   var willBlock = false
   var failures = 0
 
-  func make() -> SpotlightPublication {
+  func make(isCurrent: @escaping @MainActor (SpotlightPublication.Owner) -> Bool = { _ in true }) -> SpotlightPublication {
     SpotlightPublication(prepare: { self.prepareCount += 1 }, clear: {
       self.cleared += 1
       self.items.removeAll()
@@ -63,7 +63,7 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
         self.thumbnails[entry.save._id] = entry.thumbnail
       }
       if self.fail { throw URLError(.cannotWriteToFile) }
-    }, failure: { self.failures += 1 })
+    }, isCurrent: isCurrent, failure: { self.failures += 1 })
   }
 }
 
@@ -162,4 +162,64 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   await index.settled()
   #expect(os.thumbnails.isEmpty && os.items.isEmpty)
   #expect(!index.needsThumbnail(newer, for: user))
+}
+
+@MainActor @Test func headlessColdPreparationErasesOrphansBeforeRequestingAnyData() async throws {
+  let os = TestSearchIndex(), index = os.make()
+  os.items["orphan"] = try spotlightRow("orphan")
+  try await index.prepareForSystemRequest()
+  #expect(os.cleared == 1 && os.items.isEmpty)
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let request = try await index.beginReindex(for: owner)
+  index.activate(owner)
+  try await index.finishReindex([try spotlightRow("valid")], request: request)
+  #expect(Set(os.items.keys) == ["valid"])
+}
+
+@MainActor @Test func aNewerCompleteSnapshotWinsEvenWhenTheCatalogIsEmpty() async throws {
+  let os = TestSearchIndex(), index = os.make()
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let request = try await index.beginReindex(for: owner)
+  index.publish([], for: owner)
+  try await index.finishReindex([try spotlightRow("stale")], request: request)
+  #expect(os.items.isEmpty)
+  let next = try await index.beginReindex(for: owner)
+  index.publish([try spotlightRow("new")], for: owner)
+  try await index.finishReindex([try spotlightRow("stale")], request: next)
+  #expect(Set(os.items.keys) == ["new"])
+}
+
+@MainActor @Test func aRevokedReindexCannotRestoreRowsWhileTheViewIsAbsent() async throws {
+  let os = TestSearchIndex()
+  final class Gate { var allowed = true }
+  let gate = Gate()
+  let index = os.make(isCurrent: { _ in gate.allowed })
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let request = try await index.beginReindex(for: owner)
+  os.willBlock = true
+  let job = Task { try await index.finishReindex([try spotlightRow("old")], request: request) }
+  let started = await observed { os.blocked != nil }
+  try #require(started)
+  gate.allowed = false
+  index.verifyIdentity()
+  let revoked = await observed { os.cleared >= 2 }
+  #expect(revoked)
+  os.blocked?.resume()
+  await #expect(throws: CancellationError.self) { try await job.value }
+  await index.settled()
+  #expect(os.items.isEmpty)
+  gate.allowed = true
+  index.activate(owner)
+  await #expect(throws: CancellationError.self) { try await index.finishReindex([try spotlightRow("old")], request: request) }
+}
+
+@MainActor @Test func failedSystemWritesAreReportedToTheReindexCaller() async throws {
+  let os = TestSearchIndex(), index = os.make()
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let request = try await index.beginReindex(for: owner)
+  os.fail = true
+  await #expect(throws: CocoaError.self) { try await index.finishReindex([try spotlightRow("partial")], request: request) }
+  index.activate(nil)
+  await index.settled()
+  #expect(os.items.isEmpty)
 }

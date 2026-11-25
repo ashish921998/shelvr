@@ -13,10 +13,17 @@ import Foundation
     public var active: Bool { expiresAt.map { $0 > .now } ?? true }
   }
 
+  public struct ReindexRequest: Sendable {
+    fileprivate let owner: Owner
+    fileprivate let authorization: UUID
+    fileprivate let snapshotRevision: UInt64
+  }
+
   public typealias Clear = @MainActor () async throws -> Void
   public typealias Remove = @MainActor ([String]) async throws -> Void
   public typealias Index = @MainActor ([SpotlightEntry], Date?) async throws -> Void
 
+  private let isCurrent: @MainActor (Owner) -> Bool
   private let prepare: Clear
   private let clear: Clear
   private let remove: Remove
@@ -31,12 +38,16 @@ import Foundation
   private var needsReset = true
   private var prepared = false
   private var revision: UInt64 = 0
+  private var authorization = UUID()
+  private var snapshotRevision: UInt64 = 0
   private var tail: Task<Void, Never>?
   private var retry: Task<Void, Never>?
   private var backoff = 2
 
   public init(prepare: @escaping Clear, clear: @escaping Clear,
-    remove: @escaping Remove, index: @escaping Index, failure: @escaping @MainActor () -> Void) {
+    remove: @escaping Remove, index: @escaping Index, isCurrent: @escaping @MainActor (Owner) -> Bool = { _ in true },
+    failure: @escaping @MainActor () -> Void) {
+    self.isCurrent = isCurrent
     self.prepare = prepare
     self.clear = clear
     self.remove = remove
@@ -48,6 +59,7 @@ import Foundation
     if next == owner && prepared && !needsReset { return }
     let changing = next != owner
     if changing {
+      authorization = UUID()
       owner = next
       desired = []
       wantedImages = []
@@ -62,7 +74,9 @@ import Foundation
   }
 
   public func publish(_ rows: [SearchableSave], for source: Owner) {
-    guard source == owner, rows != desired || needsReset else { return }
+    guard source == owner else { return }
+    snapshotRevision += 1
+    guard rows != desired || needsReset else { return }
     desired = rows
     wantedImages = Set(SpotlightThumbnail.candidates(in: rows))
     images = images.filter { wantedImages.contains($0.key) }
@@ -83,6 +97,47 @@ import Foundation
     guard let owner, owner.account == account, owner.session == session, owner.active,
       let request = SpotlightThumbnail(row) else { return nil }
     return images[request]
+  }
+
+  public func verifyIdentity() {
+    if let owner, !owner.active || !isCurrent(owner) { activate(nil) }
+  }
+
+  public func prepareForSystemRequest() async throws {
+    verifyIdentity()
+    if !prepared || needsReset {
+      if tail == nil { schedule() }
+      try await confirmSystemWrite()
+    }
+  }
+
+  public func beginReindex(for source: Owner) async throws -> ReindexRequest {
+    guard source.active && isCurrent(source) else { throw CancellationError() }
+    activate(source)
+    let identity = authorization
+    try await confirmSystemWrite()
+    guard identity == authorization && owner == source && source.active && isCurrent(source) else { throw CancellationError() }
+    return ReindexRequest(owner: source, authorization: identity, snapshotRevision: snapshotRevision)
+  }
+
+  public func finishReindex(_ rows: [SearchableSave], request: ReindexRequest) async throws {
+    guard request.authorization == authorization && owner == request.owner && request.owner.active && isCurrent(request.owner)
+    else { throw CancellationError() }
+    if request.snapshotRevision == snapshotRevision { publish(rows, for: request.owner) }
+    needsReset = true
+    schedule()
+    try await confirmSystemWrite()
+    guard request.authorization == authorization && request.owner.active && isCurrent(request.owner) else { throw CancellationError() }
+  }
+
+  public func confirmSystemWrite() async throws {
+    let deadline = ContinuousClock.now.advanced(by: .seconds(20))
+    while tail != nil {
+      try Task.checkCancellation()
+      guard ContinuousClock.now < deadline else { throw URLError(.timedOut) }
+      try await Task.sleep(for: .milliseconds(50))
+    }
+    if retry != nil { throw CocoaError(.fileWriteUnknown) }
   }
 
   public func settled() async {
@@ -133,7 +188,7 @@ import Foundation
       needsReset = false
     }
     guard let owner else { return }
-    guard owner.active else { activate(nil); return }
+    guard owner.active && isCurrent(owner) else { activate(nil); return }
     let removed = Set(applied.keys).subtracting(desired.map(\._id))
     if !removed.isEmpty {
       try await remove(Array(removed))
@@ -147,10 +202,11 @@ import Foundation
     }
     for offset in stride(from: 0, to: changed.count, by: 100) {
       guard job == revision else { return }
-      guard owner.active else { activate(nil); return }
+      guard owner.active && isCurrent(owner) else { activate(nil); return }
       let batch = Array(changed[offset..<min(offset+100, changed.count)])
       mayHaveIndexedItems = true
       try await index(batch, owner.expiresAt)
+      if self.owner == owner && (!owner.active || !isCurrent(owner)) { activate(nil); return }
       for entry in batch { applied[entry.save._id] = entry }
     }
     if applied.isEmpty { mayHaveIndexedItems = false }
