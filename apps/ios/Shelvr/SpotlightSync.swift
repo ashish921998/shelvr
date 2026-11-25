@@ -115,7 +115,6 @@ private struct SpotlightFeed: View {
       } catch {
         guard !Task.isCancelled, owner.session == backend.sessionGeneration else { return }
         pages.invalidate(cursor)
-        ShelvrSpotlight.publication.publish([], for: owner)
         if delay == 2 { Analytics.failure("spotlight_page_failed") }
         do { try await Task.sleep(for: .seconds(delay)) } catch { return }
         delay = min(delay * 2, 60)
