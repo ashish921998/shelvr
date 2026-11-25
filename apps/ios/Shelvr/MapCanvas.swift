@@ -259,7 +259,7 @@ struct MapCanvas: UIViewRepresentable {
       let nextCompact = compactPins ? metersPerPoint > 8 : metersPerPoint >= 10
       let changedStyle = nextCompact != compactPins
       compactPins = nextCompact
-      if usesOverviewDensity {
+      if nextCompact {
         pinDensity = MapPinDensity(projectedStart: MKMapPoint(west), projectedEnd: MKMapPoint(east),
           screenDistance: 2 * halfSample)
       }
