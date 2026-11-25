@@ -50,7 +50,6 @@ struct MapCanvas: UIViewRepresentable {
     var opened = false
     var queryingNearby = false
     private var compactPins = true
-    private var cameraMoving = false
     private var nameLayout: Task<Void, Never>?
     private let addedViews = NSHashTable<PlaceAnnotationView>.weakObjects()
     private var namedPins: [PlaceAnnotationView] = []
@@ -119,8 +118,9 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     func mapView(_ map: MKMapView, regionWillChangeAnimated animated: Bool) {
-      cameraMoving = true
       clearNames()
+      nameLayout?.cancel()
+      nameLayout = nil
       if hasActiveGesture(map) { opened = true; queryingNearby = false }
     }
 
@@ -132,7 +132,6 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     func mapView(_ map: MKMapView, regionDidChangeAnimated animated: Bool) {
-      cameraMoving = false
       let region = map.region
       updatePinScale(on: map)
       scheduleNames(on: map)
@@ -148,6 +147,13 @@ struct MapCanvas: UIViewRepresentable {
       }
     }
 
+    func mapViewDidChangeVisibleRegion(_ map: MKMapView) {
+      clearNames()
+      nameLayout?.cancel()
+      nameLayout = nil
+      scheduleNames(on: map)
+    }
+
     func mapView(_ map: MKMapView, didAdd views: [MKAnnotationView]) {
       for case let view as PlaceAnnotationView in views { addedViews.add(view) }
       scheduleNames(on: map)
@@ -158,12 +164,12 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     private func scheduleNames(on map: MKMapView) {
-      guard !cameraMoving, !compactPins, nameLayout == nil else { return }
+      guard !compactPins, nameLayout == nil else { return }
       nameLayout = Task { @MainActor [weak self, weak map] in
-        try? await Task.sleep(for: .milliseconds(60))
+        do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
         guard let self else { return }
         nameLayout = nil
-        guard let map, !cameraMoving, !compactPins else { return }
+        guard let map, !compactPins else { return }
         layoutNames(on: map)
       }
     }
