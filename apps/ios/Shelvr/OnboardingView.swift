@@ -214,7 +214,7 @@ private struct OnboardingAccount: View {
       if !been {
         Button(copy(progress.goals.contains("travel") && !progress.goals.contains("date") ? "interests.cityNotSure" : "goal.citySomewhere")) {
           progress.city = nil
-          proceed(skip: true)
+          proceed(skip: false)
         }.buttonStyle(.bordered)
       }
     case .chart:
