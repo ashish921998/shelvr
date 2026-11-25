@@ -9,6 +9,7 @@ struct SignedInView: View {
   @Environment(InviteEntry.self) private var invites
   @Environment(\.copy) private var copy
   @State private var library = false
+  @State private var librarySearchFocused = false
   @State private var billing: BillingDestination?
   @State private var path: [AppLink] = []
   @State private var stampMessage: String?
@@ -23,7 +24,7 @@ struct SignedInView: View {
     NavigationStack(path: $path) {
       Group {
         if access.loading { loadingPlan } else if access.locked { PlanGateView() } else if library {
-          LibraryView(screen: .home)
+          LibraryView(screen: .home, searchFocusChanged: { librarySearchFocused = $0 })
         } else {
           SavedPlacesMap(open: open, tabBar: tabBar)
         }
@@ -38,7 +39,7 @@ struct SignedInView: View {
         }
       }
       .safeAreaInset(edge: .bottom) {
-        if library && !access.loading && !access.locked {
+        if library && !librarySearchFocused && !access.loading && !access.locked {
           tabBar
         }
       }

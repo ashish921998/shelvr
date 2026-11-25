@@ -4,6 +4,7 @@ import SwiftUI
 struct LibraryView: View {
   enum Screen { case home, saves, review }
   let screen: Screen
+  var searchFocusChanged: (Bool) -> Void = { _ in }
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.colorScheme) private var scheme
@@ -16,6 +17,7 @@ struct LibraryView: View {
   @State private var search = ""
   @State private var searchState = LibrarySearchState.loading
   @State private var searchAttempt = 0
+  @FocusState private var searchFocused: Bool
   private struct SearchRequest: Equatable { let query: String; let attempt: Int }
   private var searchQuery: String { search.trimmingCharacters(in: .whitespacesAndNewlines) }
   @State private var unplacedID: String?
@@ -82,6 +84,7 @@ struct LibraryView: View {
           Image(systemName: "magnifyingglass").foregroundStyle(palette.muted).accessibilityHidden(true)
           TextField(copy("search.placeholder"), text: $search)
             .textInputAutocapitalization(.never).autocorrectionDisabled().submitLabel(.search)
+            .focused($searchFocused).onSubmit { searchFocused = false }
             .font(.custom("Satoshi-Regular", size: 16, relativeTo: .body))
           if !search.isEmpty {
             Button { search = "" } label: {
@@ -107,6 +110,8 @@ struct LibraryView: View {
     .background(palette.background.ignoresSafeArea())
     .scrollDismissesKeyboard(.interactively)
     .buttonStyle(HomeChromePressStyle())
+    .onChange(of: searchFocused, initial: true) { searchFocusChanged(searchFocused) }
+    .onDisappear { searchFocusChanged(false) }
   }
 
   @ViewBuilder private func homeSections(_ palette: HomeChromePalette) -> some View {
