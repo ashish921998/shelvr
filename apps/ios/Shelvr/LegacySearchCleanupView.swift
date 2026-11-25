@@ -8,7 +8,7 @@ struct LegacySearchCleanupView: ViewModifier {
   func body(content: Content) -> some View {
     content.task(id: phase == .active) {
       guard phase == .active, let catalogs = UserDefaults(suiteName: "dev.expo.appintents") else { return }
-      let cleanup = LegacySearchCleanup(defaults: .standard, catalogs: catalogs, documents: .documentsDirectory)
+      let cleanup = LegacySearchCleanup(defaults: .standard, catalogs: catalogs, documents: .documentsDirectory, caches: .cachesDirectory)
       var delay = 2
       while !Task.isCancelled {
         do {
