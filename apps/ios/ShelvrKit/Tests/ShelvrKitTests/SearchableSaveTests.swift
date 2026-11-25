@@ -31,7 +31,7 @@ import Testing
     return try #require(navigation.pending)
   }
   let valid = try request()
-  #expect(navigation.pendingLibrary == nil && navigation.pendingSave == valid)
+  #expect(navigation.pendingLibrary == nil && navigation.pendingPersonal == valid)
   #expect(navigation.consume(valid, owner: "alice", session: session)?.path == ["item", "save123"])
   let switched = try request()
   #expect(navigation.consume(switched, owner: "bob", session: session) == nil)
@@ -56,4 +56,18 @@ import Testing
   #expect(saves?.first?._id == "1" && saves?.last?._id == "300")
   let repeated = await SearchableSavePage.latestReady { _ in SearchableSavePage(page: [], continueCursor: "same", isDone: false) }
   #expect(repeated == nil)
+}
+
+@MainActor @Test func visualLabelsOnlySeedTheRequestingSessionsLibrary() throws {
+  let navigation = SiriNavigationRequests(), session = UUID()
+  let labels = [" ", " coffee ", "A&B", "São Paulo", "unrelated"]
+  navigation.requestVisualSearch(labels: labels, owner: "a", session: session)
+  let request = try #require(navigation.pendingPersonal)
+  #expect(navigation.pendingLibrary == nil)
+  let link = try #require(navigation.consume(request, owner: "a", session: session))
+  #expect(link.path == ["home"])
+  #expect(link.query == [URLQueryItem(name: "query", value: "coffee A&B São Paulo")])
+  navigation.requestVisualSearch(labels: labels, owner: "a", session: session)
+  let stale = try #require(navigation.pendingPersonal)
+  #expect(navigation.consume(stale, owner: "b", session: session) == nil)
 }

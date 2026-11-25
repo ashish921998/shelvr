@@ -10,6 +10,7 @@ struct SignedInView: View {
   @Environment(\.copy) private var copy
   @State private var library = false
   @State private var librarySearchFocused = false
+  @State private var librarySearchSeed: LibraryView.SearchSeed?
   @State private var billing: BillingDestination?
   @State private var path: [AppLink] = []
   @State private var stampMessage: String?
@@ -24,7 +25,7 @@ struct SignedInView: View {
     NavigationStack(path: $path) {
       Group {
         if access.loading { loadingPlan } else if access.locked { PlanGateView() } else if library {
-          LibraryView(screen: .home, searchFocusChanged: { librarySearchFocused = $0 })
+          LibraryView(screen: .home, searchSeed: librarySearchSeed, searchFocusChanged: { librarySearchFocused = $0 })
         } else {
           SavedPlacesMap(open: open, tabBar: tabBar)
         }
@@ -187,8 +188,11 @@ struct SignedInView: View {
     .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
       Button(copy("common.close")) {}
     } message: { Text(stampMessage ?? "") }
-    .onChange(of: SiriNavigation.shared.pendingSave, initial: true) { _, request in
+    .onChange(of: SiriNavigation.shared.pendingPersonal, initial: true) { _, request in
       if let request, let link = SiriNavigation.shared.consume(request, owner: backend.userID, session: backend.sessionGeneration) {
+        if link.path == ["home"], let term = link.query.first(where: { $0.name == "query" })?.value {
+          librarySearchSeed = LibraryView.SearchSeed(term: term)
+        }
         navigate(to: link)
       }
     }

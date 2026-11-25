@@ -10,7 +10,14 @@ struct VisualSearchIntent {
   var semanticContent: SemanticContentDescriptor
 
   @MainActor func perform() async throws -> some IntentResult {
-    SiriNavigation.shared.requestLibrary()
+    let backend = AppEnvironment.sharedBackend
+    await backend.start()
+    guard let owner = backend.userID, let account = SiriCredential.current(), account.owner == owner else {
+      throw CocoaError(.userCancelled)
+    }
+    let session = backend.sessionGeneration
+    guard await ShelvrCatalog.permits(account), backend.sessionGeneration == session else { throw CocoaError(.userCancelled) }
+    SiriNavigation.shared.requestVisualSearch(labels: semanticContent.labels, owner: owner, session: session)
     return .result()
   }
 }

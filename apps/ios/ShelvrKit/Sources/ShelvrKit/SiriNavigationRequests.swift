@@ -3,30 +3,41 @@ import Observation
 
 @MainActor @Observable public final class SiriNavigationRequests {
   public private(set) var pending: UUID?
-  public var pendingLibrary: UUID? { save == nil ? pending : nil }
-  public var pendingSave: UUID? { save == nil ? nil : pending }
-  private var save: (id: String, owner: String, session: UUID)?
+  public var pendingLibrary: UUID? { personal == nil ? pending : nil }
+  public var pendingPersonal: UUID? { personal == nil ? nil : pending }
+  private var personal: (link: AppLink, owner: String, session: UUID)?
 
   public init() {}
 
   public func requestLibrary() {
-    save = nil
+    personal = nil
     pending = UUID()
   }
 
   public func requestSave(id: String, owner: String, session: UUID) {
-    guard id.wholeMatch(of: /[A-Za-z0-9_-]+/) != nil else { return }
-    save = (id, owner, session)
+    guard id.wholeMatch(of: /[A-Za-z0-9_-]+/) != nil, let link = AppLink("/item/" + id) else { return }
+    personal = (link, owner, session)
+    pending = UUID()
+  }
+
+  public func requestVisualSearch(labels: [String], owner: String, session: UUID) {
+    let term = labels.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+      .filter { !$0.isEmpty }.prefix(3).joined(separator: " ")
+    var route = URLComponents()
+    route.path = "/home"
+    if !term.isEmpty { route.queryItems = [URLQueryItem(name: "query", value: term)] }
+    guard let encoded = route.string, let link = AppLink(encoded) else { return }
+    personal = (link, owner, session)
     pending = UUID()
   }
 
   public func consume(_ request: UUID, owner: String? = nil, session: UUID? = nil) -> AppLink? {
     guard pending == request else { return nil }
     pending = nil
-    defer { save = nil }
-    if let save {
-      guard save.owner == owner, save.session == session else { return nil }
-      return AppLink("/item/" + save.id)
+    defer { personal = nil }
+    if let personal {
+      guard personal.owner == owner, personal.session == session else { return nil }
+      return personal.link
     }
     return AppLink("/home")
   }

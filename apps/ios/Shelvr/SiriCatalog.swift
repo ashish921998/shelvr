@@ -111,7 +111,7 @@ protocol AppIntentEntityRecordConvertible {
     return query.split(whereSeparator: \.isWhitespace).allSatisfy { text.localizedCaseInsensitiveContains(String($0)) }
   }
 
-  private static func permits(_ account: SiriCredential) async -> Bool {
+  static func permits(_ account: SiriCredential) async -> Bool {
     guard let plan: Plan = await first("subscriptions:getEntitlement") else { return false }
     return !Task.isCancelled && plan.entitled && AppEnvironment.sharedBackend.userID == account.owner && SiriCredential.current()?.token == account.token
   }
