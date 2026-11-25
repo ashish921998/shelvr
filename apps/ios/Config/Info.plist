@@ -20,6 +20,12 @@
 	<string>$(SHELVR_VARIANT)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Shelvr shows where you are on the map so you can find the places you saved nearby.</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>CrimsonProRoman-Regular.ttf</string>
+		<string>Satoshi-Bold.otf</string>
+		<string>Satoshi-Regular.otf</string>
+	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

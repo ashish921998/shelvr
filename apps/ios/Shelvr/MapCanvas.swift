@@ -8,7 +8,11 @@ struct MapCanvas: UIViewRepresentable {
   let filters: MapFilters
   let opening: [MapPlace]?
   let visited: Set<String>
-  let onArea: (DiscoverBox) -> Void
+  let overview: Int
+  let overviewPlaces: [MapPlace]
+  let topControlsHeight: CGFloat
+  let bottomControlsHeight: CGFloat
+  let onArea: (DiscoverBox, MapViewport) -> Void
   let onPick: (MapPlace) -> Void
   let onCluster: ([MapPlace]) -> Void
 
@@ -48,6 +52,7 @@ struct MapCanvas: UIViewRepresentable {
     func update(_ parent: MapCanvas, map: MKMapView) {
       let changedLocation = self.parent.location !== parent.location
       let changedFilter = self.parent.filters != parent.filters
+      let changedOverview = self.parent.overview != parent.overview
       self.parent = parent
       let ids = Set(parent.places.map(\.id))
       for (id, pin) in pins where !ids.contains(id) {
@@ -77,6 +82,11 @@ struct MapCanvas: UIViewRepresentable {
         !parent.places.contains(where: { map.visibleMapRect.contains(MKMapPoint($0.coordinate)) }) {
         fit(parent.places, on: map, animated: true)
       }
+      if changedOverview {
+        opened = true
+        queryingNearby = false
+        fit(parent.overviewPlaces, on: map, animated: true)
+      }
       if !opened, let places = parent.opening {
         opened = true
         fit(places, on: map, animated: false)
@@ -93,8 +103,11 @@ struct MapCanvas: UIViewRepresentable {
         rect = rect.union(MKMapRect(x: point.x, y: point.y, width: 1, height: 1))
       }
       let pad = 700 * MKMapPointsPerMeterAtLatitude(first.lat)
+      let maxInset = map.bounds.height * 0.35
       map.setVisibleMapRect(rect.insetBy(dx: -pad, dy: -pad), edgePadding:
-        .init(top: 38, left: 32, bottom: 38, right: 32), animated: animated)
+        .init(top: min(maxInset, map.safeAreaInsets.top + parent.topControlsHeight + 8), left: 32,
+          bottom: min(maxInset, map.safeAreaInsets.bottom + parent.bottomControlsHeight + 8), right: 32),
+        animated: animated)
     }
 
     func mapView(_ map: MKMapView, regionWillChangeAnimated animated: Bool) {
@@ -116,7 +129,9 @@ struct MapCanvas: UIViewRepresentable {
         let result = queryingNearby
           ? box.includingNearby(latitude: region.center.latitude, longitude: region.center.longitude)
           : box
-        Task { @MainActor in parent.onArea(result) }
+        let viewport = MapViewport(center: region.center,
+          cityScale: region.span.longitudeDelta <= map.bounds.width * 360 / (256 * 512))
+        Task { @MainActor in parent.onArea(result, viewport) }
       }
     }
 
@@ -144,5 +159,31 @@ struct MapCanvas: UIViewRepresentable {
         } else { fit(places, on: map, animated: true) }
       }
     }
+  }
+}
+
+struct MapViewport: Equatable {
+  let center: CLLocationCoordinate2D
+  let cityScale: Bool
+
+  static func == (lhs: Self, rhs: Self) -> Bool {
+    lhs.center.latitude == rhs.center.latitude && lhs.center.longitude == rhs.center.longitude &&
+      lhs.cityScale == rhs.cityScale
+  }
+
+  func city(among places: [MapPlace]) -> String? {
+    guard cityScale else { return nil }
+    let point = MKMapPoint(center)
+    var nearest: String?
+    var closest: CLLocationDistance = 50_000
+    for place in places {
+      guard let city = place.city, !city.isEmpty else { continue }
+      let distance = point.distance(to: MKMapPoint(place.coordinate))
+      if distance <= closest {
+        closest = distance
+        nearest = city
+      }
+    }
+    return nearest
   }
 }

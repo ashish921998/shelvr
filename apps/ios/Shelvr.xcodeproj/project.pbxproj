@@ -37,6 +37,9 @@
 		A10000000000000000000066 /* ja.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000046 /* ja.json */; };
 		A10000000000000000000067 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
 		A10000000000000000000068 /* pt-BR.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000048 /* pt-BR.json */; };
+		A10000000000000000000069 /* CrimsonProRoman-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000051 /* CrimsonProRoman-Regular.ttf */; };
+		A1000000000000000000006A /* Satoshi-Bold.otf in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000052 /* Satoshi-Bold.otf */; };
+		A1000000000000000000006B /* Satoshi-Regular.otf in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000053 /* Satoshi-Regular.otf */; };
         B71000000000000000000001 = {isa = PBXBuildFile; productRef = B71000000000000000000002; };
 		ADE66479850612E8CD378F36 /* ko.json in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000047 /* ko.json */; };
 		B70000000000000000000001 = {isa = PBXBuildFile; productRef = B70000000000000000000002; };
@@ -108,6 +111,9 @@
 		A10000000000000000000046 /* ja.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ja.json; sourceTree = "<group>"; };
 		A10000000000000000000047 /* ko.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = ko.json; sourceTree = "<group>"; };
 		A10000000000000000000048 /* pt-BR.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "pt-BR.json"; sourceTree = "<group>"; };
+		A10000000000000000000051 /* CrimsonProRoman-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CrimsonProRoman-Regular.ttf"; sourceTree = "<group>"; };
+		A10000000000000000000052 /* Satoshi-Bold.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Satoshi-Bold.otf"; sourceTree = "<group>"; };
+		A10000000000000000000053 /* Satoshi-Regular.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Satoshi-Regular.otf"; sourceTree = "<group>"; };
 		B1BAFA60699E1B4641F3AA0A /* RecentSaves.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RecentSaves.swift; sourceTree = "<group>"; };
 		E9A6D3C46DD4BF20D5EF6596 /* ShelvrCapture.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ShelvrCapture.swift; path = "../native/app-intents/Support/ShelvrCapture.swift"; sourceTree = "<group>"; };
 		FBB070DB4AF7B8E26C57A1AB /* CaptureRouter.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = CaptureRouter.swift; path = "../native/app-intents/Support/CaptureRouter.swift"; sourceTree = "<group>"; };
@@ -178,6 +184,7 @@
 				A10000000000000000000005 /* Shelvr */,
 				A10000000000000000000006 /* Config */,
 				A10000000000000000000007 /* Locales */,
+				A10000000000000000000050 /* Fonts */,
 				A10000000000000000000003 /* Products */,
 				115443435333965FC09C9DBA /* Frameworks */,
 				ED02C96235AAAD4EC1E603D2 /* ShareExtension */,
@@ -227,6 +234,17 @@
 			);
 			name = Locales;
 			path = ../native/src/locales;
+			sourceTree = "<group>";
+		};
+		A10000000000000000000050 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000051 /* CrimsonProRoman-Regular.ttf */,
+				A10000000000000000000052 /* Satoshi-Bold.otf */,
+				A10000000000000000000053 /* Satoshi-Regular.otf */,
+			);
+			name = Fonts;
+			path = ../native/assets/fonts;
 			sourceTree = "<group>";
 		};
 		CE8BE5E4ADBEC96D790D62B3 /* RecentSavesWidget */ = {
@@ -402,6 +420,9 @@
 				A10000000000000000000066 /* ja.json in Resources */,
 				A10000000000000000000067 /* ko.json in Resources */,
 				A10000000000000000000068 /* pt-BR.json in Resources */,
+				A10000000000000000000069 /* CrimsonProRoman-Regular.ttf in Resources */,
+				A1000000000000000000006A /* Satoshi-Bold.otf in Resources */,
+				A1000000000000000000006B /* Satoshi-Regular.otf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
