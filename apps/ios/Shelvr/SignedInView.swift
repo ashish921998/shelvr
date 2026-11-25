@@ -176,6 +176,7 @@ struct SignedInView: View {
     }
     .modifier(CancelSurveyCard(home: library && path.isEmpty))
     .modifier(TrialReminderObserver(home: library && path.isEmpty))
+    .modifier(SiriFolderRefresh(entitled: access.pro))
     .environment(access)
     .sheet(item: $billing) { BillingSheet(destination: $0, confirmed: { access.retry += 1 }) }
     .task(id: access.retry) { await access.readPlan(backend) }

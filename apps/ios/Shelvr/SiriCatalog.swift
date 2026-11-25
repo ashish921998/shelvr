@@ -14,7 +14,7 @@ protocol AppIntentEntityRecordConvertible {
 }
 
 @MainActor enum ShelvrCatalog {
-  private struct Folder: Decodable {
+  struct Folder: Decodable {
     let _id: String
     let name: String
   }
