@@ -79,12 +79,13 @@ struct SignInView: View {
       }
       .buttonStyle(.plain)
       #if DEBUG
-        Button(copy("account.anonymous")) {
+        Button {
           begin("anonymous")
           signIn { try await backend.signIn(.anonymous) }
-        }
-        .buttonStyle(.plain).font(.custom("Satoshi-Regular", size: 14, relativeTo: .subheadline))
-        .foregroundStyle(palette.muted).frame(minHeight: 44)
+        } label: {
+          Text(copy("account.anonymous")).font(.custom("Satoshi-Regular", size: 14, relativeTo: .subheadline))
+            .foregroundStyle(palette.muted).frame(maxWidth: .infinity, minHeight: 44).contentShape(Rectangle())
+        }.buttonStyle(.plain)
       #endif
       if busy {
         ProgressView()

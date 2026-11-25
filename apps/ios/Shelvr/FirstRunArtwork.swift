@@ -41,7 +41,7 @@ struct LisbonSignInHero: View {
       }
       .padding(13).frame(width: min(254, bounds.size.width))
       .background(palette.surface, in: .rect(cornerRadius: 31))
-      .overlay { RoundedRectangle(cornerRadius: 31).strokeBorder(palette.foreground, lineWidth: 3) }
+      .overlay { RoundedRectangle(cornerRadius: 31).strokeBorder(palette.foreground, lineWidth: 6) }
       .frame(maxWidth: .infinity)
     }
     .clipped()
@@ -130,7 +130,8 @@ struct OnboardingOpener: View {
             if next == .idle, let position, !photos.indices.contains(position) { self.position = page }
           }
           .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in interacted = true })
-      }.frame(height: min(UIScreen.main.bounds.height * 0.46, 420))
+      }.containerRelativeFrame(.vertical) { length, _ in min(max(305, length * 0.54), 440) }
+        .padding(.horizontal, -24)
         .accessibilityElement(children: .ignore).accessibilityLabel(captions[page])
         .accessibilityValue(page == 0 ? "" : copy(["", "onboarding.openerFileBody", "opener.datePreviewDescription", "opener.tripPreviewDescription"][page]))
         .accessibilityAdjustableAction { direction in

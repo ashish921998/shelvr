@@ -118,7 +118,12 @@ private struct OnboardingAccount: View {
         .toolbar {
           if progress.step != .opener {
             ToolbarItem(placement: .topBarLeading) {
-              Button(copy("common.back")) { progress.back(); persist() }
+              Button { progress.back(); persist() } label: { Label(copy("common.back"), systemImage: "chevron.left") }
+            }
+            ToolbarItem(placement: .principal) {
+              let steps = OnboardingProgress.Step.allCases
+              ProgressView(value: Double(steps.firstIndex(of: progress.step) ?? 0), total: Double(steps.count - 1))
+                .tint(palette.primaryText).frame(maxWidth: 155)
             }
             ToolbarItem(placement: .topBarTrailing) {
               Button(copy("onboardingQ.skip")) { proceed(skip: true) }
