@@ -252,6 +252,14 @@ struct MapCanvas: UIViewRepresentable {
       return placeName(at: gestureRecognizer.location(in: map), on: map) != nil
     }
 
+    func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+      shouldRequireFailureOf otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+      guard let map = gestureRecognizer.view as? MKMapView,
+        let other = otherGestureRecognizer as? UITapGestureRecognizer,
+        let view = other.view, view === map || view.isDescendant(of: map) else { return false }
+      return other.numberOfTouchesRequired == 1 && other.numberOfTapsRequired > 1
+    }
+
     @objc func didTapName(_ gesture: UITapGestureRecognizer) {
       guard let map = gesture.view as? MKMapView,
         let place = placeName(at: gesture.location(in: map), on: map) else { return }
