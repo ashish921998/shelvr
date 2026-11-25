@@ -7,6 +7,7 @@ import ShelvrKit
   static let shared = SpotlightSystemRequests()
   private(set) var accessRetry = 0
   @ObservationIgnored private var monitoring = false
+  private let queue = SpotlightReindexQueue()
   private let backend = AppEnvironment.sharedBackend
   private var publication: SpotlightPublication { ShelvrSpotlight.publication }
 
@@ -28,6 +29,10 @@ import ShelvrKit
   }
 
   func reindex() async throws {
+    try await queue.run { try await self.rebuild() }
+  }
+
+  private func rebuild() async throws {
     monitorIdentity()
     try await publication.prepareForSystemRequest()
     await backend.start()
@@ -45,7 +50,12 @@ import ShelvrKit
       await self.page(after: cursor, owner: owner)
     }) else { throw URLError(.cannotLoadFromNetwork) }
     try await verify(request, account: account, session: session)
-    try await publication.finishReindex(rows, request: request)
+    do {
+      try await publication.finishReindex(rows, request: request)
+    } catch {
+      retryViewIfRevoked(request, account: account, session: session)
+      throw error
+    }
     try await verify(request, account: account, session: session)
   }
 
@@ -53,8 +63,14 @@ import ShelvrKit
     let grant = try await access(account: account, session: session)
     do { try await publication.validate(request, grant: grant) }
     catch {
-      if backend.userID == account && backend.sessionGeneration == session { accessRetry += 1 }
+      retryViewIfRevoked(request, account: account, session: session)
       throw error
+    }
+  }
+
+  private func retryViewIfRevoked(_ request: SpotlightPublication.ReindexRequest, account: String, session: UUID) {
+    if backend.userID == account && backend.sessionGeneration == session && publication.needsReauthorization(after: request) {
+      accessRetry += 1
     }
   }
 

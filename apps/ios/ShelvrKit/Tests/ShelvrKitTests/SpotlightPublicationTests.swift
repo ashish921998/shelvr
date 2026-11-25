@@ -219,7 +219,10 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   let request = try await index.beginReindex(for: owner)
   os.fail = true
   await #expect(throws: CocoaError.self) { try await index.finishReindex([try spotlightRow("partial")], request: request) }
-  index.activate(nil)
+  await index.settled()
+  #expect(os.items.isEmpty && index.needsReauthorization(after: request))
+  os.fail = false
+  index.publish([try spotlightRow("stale retry")], for: owner)
   await index.settled()
   #expect(os.items.isEmpty)
 }
@@ -245,4 +248,26 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
     await #expect(throws: CancellationError.self) { try await index.validate(request, grant: grant) }
     #expect(os.items.isEmpty)
   }
+}
+
+@MainActor @Test func systemRequestsSerializeEntitlementReadsAsWellAsWrites() async throws {
+  let queue = SpotlightReindexQueue()
+  var release: CheckedContinuation<Void, Never>?
+  var events: [String] = []
+  let older = Task {
+    try await queue.run {
+      events.append("older read")
+      await withCheckedContinuation { release = $0 }
+      events.append("older cleanup")
+      throw URLError(.notConnectedToInternet)
+    }
+  }
+  let started = await observed { release != nil }
+  try #require(started)
+  let newer = Task { try await queue.run { events.append("newer read and write") } }
+  await Task.yield()
+  release?.resume()
+  await #expect(throws: URLError.self) { try await older.value }
+  try await newer.value
+  #expect(events == ["older read", "older cleanup", "newer read and write"])
 }

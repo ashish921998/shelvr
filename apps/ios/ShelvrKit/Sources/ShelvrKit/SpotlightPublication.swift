@@ -129,6 +129,10 @@ import Foundation
     request.sequence == reindexSequence && request.authorization == authorization && owner == request.owner
   }
 
+  public func needsReauthorization(after request: ReindexRequest) -> Bool {
+    request.sequence == reindexSequence && owner == nil
+  }
+
   public func validate(_ request: ReindexRequest, grant: Owner?) async throws {
     guard current(request) else { throw CancellationError() }
     guard grant == request.owner && request.owner.active && isCurrent(request.owner) else {
@@ -144,7 +148,15 @@ import Foundation
     if request.snapshotRevision == snapshotRevision { publish(rows, for: request.owner) }
     needsReset = true
     schedule()
-    try await confirmSystemWrite()
+    do {
+      try await confirmSystemWrite()
+    } catch {
+      if current(request) {
+        activate(nil)
+        try? await confirmSystemWrite()
+      }
+      throw error
+    }
     guard current(request) && request.owner.active && isCurrent(request.owner) else { throw CancellationError() }
   }
 
