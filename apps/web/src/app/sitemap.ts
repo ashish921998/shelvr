@@ -18,6 +18,7 @@ const PAGES = [
   "/support",
   "/privacy",
   "/terms",
+  "/copyright",
 ] as const;
 
 export default function sitemap(): MetadataRoute.Sitemap {

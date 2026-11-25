@@ -13,6 +13,7 @@ struct SignedInView: View {
   @State private var mapSearchFocused = false
   @State private var mapCity: String?
   @State private var librarySearchFocused = false
+  @State private var librarySearchSeed: LibraryView.SearchSeed?
   @State private var billing: BillingDestination?
   @State private var path: [AppLink] = []
   @State private var stampMessage: String?
@@ -28,7 +29,7 @@ struct SignedInView: View {
           .toolbar(.hidden, for: .tabBar)
       }
       Tab(value: HomeTab.library) {
-        LibraryView(screen: .home, searchFocusChanged: { librarySearchFocused = $0 })
+        LibraryView(screen: .home, searchSeed: access.pro ? $librarySearchSeed : .constant(nil), searchFocusChanged: { librarySearchFocused = $0 })
           .toolbar(.hidden, for: .tabBar)
       }
     }
@@ -62,6 +63,11 @@ struct SignedInView: View {
       route.queryItems = [URLQueryItem(name: "city", value: mapCity)]
     }
     if let url = route.string { open(url) }
+  }
+
+  private var readyPersonalRequest: UUID? {
+    guard !invites.holdsNavigation, pendingLink == nil else { return nil }
+    return SiriNavigation.shared.pendingPersonal
   }
 
   var body: some View {
@@ -219,6 +225,7 @@ struct SignedInView: View {
     }
     .modifier(CancelSurveyCard(home: tab == .library && path.isEmpty))
     .modifier(TrialReminderObserver(home: tab == .library && path.isEmpty))
+    .modifier(SiriFolderRefresh(entitled: access.pro))
     .environment(access)
     .sheet(item: $billing) { BillingSheet(destination: $0, confirmed: { access.retry += 1 }) }
     .task(id: access.retry) { await access.readPlan(backend) }
@@ -229,6 +236,20 @@ struct SignedInView: View {
     .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
       Button(copy("common.close")) {}
     } message: { Text(stampMessage ?? "") }
+    .onChange(of: readyPersonalRequest, initial: true) { _, request in
+      if let request, readyPersonalRequest == request, let link = SiriNavigation.shared.consume(request, owner: backend.userID, session: backend.sessionGeneration) {
+        navigate(to: link, fromPersonalIntent: true)
+      }
+    }
+    .onChange(of: access.loading || access.pro) { _, canSeed in
+      if !canSeed { librarySearchSeed = nil }
+    }
+    .onChange(of: path) { _, path in
+      if !path.isEmpty { librarySearchSeed = nil }
+    }
+    .onChange(of: tab) { _, destination in
+      if destination != .library { librarySearchSeed = nil }
+    }
     .onChange(of: pendingLink, initial: true) { _, link in
       guard let link else { return }
       pendingLink = nil
@@ -245,7 +266,12 @@ struct SignedInView: View {
     }
   }
 
-  private func navigate(to link: AppLink) {
+  private func navigate(to link: AppLink, fromPersonalIntent: Bool = false) {
+    librarySearchSeed = nil
+    if fromPersonalIntent, access.pro || access.loading, link.path == ["home"],
+      let term = link.query.first(where: { $0.name == "query" })?.value {
+      librarySearchSeed = LibraryView.SearchSeed(term: term)
+    }
     switch link.path {
     case ["map"], ["share"], ["plan-gate"]: tab = .map; path = []
     case ["home"]: tab = .library; path = []
@@ -289,6 +315,7 @@ struct SignedInView: View {
   }
 
   private func open(_ route: String) {
+    librarySearchSeed = nil
     if let link = AppLink(route) { setPath(path + [link]) }
   }
 

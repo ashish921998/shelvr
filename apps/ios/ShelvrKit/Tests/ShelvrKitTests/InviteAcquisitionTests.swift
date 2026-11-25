@@ -127,8 +127,15 @@ import Testing
   let resolved = try #require(entry.accepted).resolved(as: .joinedList("joined"))
   #expect(entry.replace(with: resolved))
   #expect(entry.endDispatch(id, navigation: .init(destination: target, account: "member", session: session)) == nil)
+  let navigation = SiriNavigationRequests()
+  navigation.requestSave(id: "mySave", owner: "member", session: session)
+  #expect(entry.holdsNavigation)
   #expect(entry.didNavigate(to: a, account: "member", session: session) == nil)
   #expect(entry.didNavigate(to: target, account: "member", session: session) == b)
+  #expect(!entry.holdsNavigation)
+  let pending = try #require(navigation.pendingPersonal)
+  #expect(navigation.consume(pending, owner: "member", session: session)?.path == ["item", "mySave"])
+
 }
 
 @MainActor @Test func replacementCannotReviveAnOldInviteAfterRestartWithLockedKeychain() throws {
