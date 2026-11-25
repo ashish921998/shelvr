@@ -23,3 +23,43 @@ import Testing
   #expect(!result.map(\.kind).contains(.lastDay))
   #expect(result.filter { $0.kind == .dayOne || $0.kind == .dayThree }.allSatisfy { cal.component(.hour, from: $0.date) == 10 })
 }
+
+
+@Test func theFirstLoadedTrialCanOfferTheLibraryPermissionPrimer() {
+  #expect(TrialNotification.shouldArmPrimer(
+    previousAccount: nil, previousStatus: nil, account: "fixture", status: "trialing"))
+  #expect(TrialNotification.shouldArmPrimer(
+    previousAccount: "fixture", previousStatus: nil, account: "fixture", status: "trialing"))
+  #expect(TrialNotification.shouldArmPrimer(
+    previousAccount: "fixture", previousStatus: "none", account: "fixture", status: "trialing"))
+  #expect(!TrialNotification.shouldArmPrimer(
+    previousAccount: "fixture", previousStatus: "trialing", account: "fixture", status: "trialing"))
+  #expect(!TrialNotification.shouldArmPrimer(
+    previousAccount: nil, previousStatus: nil, account: "fixture", status: nil))
+}
+
+
+@Test func trialObservationRestartsWhenAFailedSignOutRestoresTheSameAccount() {
+  let generation = UUID()
+  let original = TrialNotification.ObserverSession(generation: generation, account: "fixture")
+  let unavailable = TrialNotification.ObserverSession(generation: generation, account: nil)
+  let restored = TrialNotification.ObserverSession(generation: generation, account: "fixture")
+  #expect(original != unavailable && unavailable != restored && original == restored)
+  #expect(original.canContinue(generation: generation, account: nil))
+  #expect(original.canContinue(generation: generation, account: "fixture"))
+  #expect(!unavailable.canContinue(generation: generation, account: "fixture"))
+  #expect(!original.canContinue(generation: generation, account: "another"))
+  #expect(!original.canContinue(generation: UUID(), account: "fixture"))
+}
+
+
+@Test func trialWarningsDoNotWaitForTheNudgePreference() throws {
+  var calendar = Calendar(identifier: .gregorian)
+  calendar.timeZone = try #require(TimeZone(secondsFromGMT: 0))
+  let format = ISO8601DateFormatter()
+  let now = try #require(format.date(from: "2026-09-10T17:00:00Z"))
+  let expiration = try #require(format.date(from: "2026-09-17T17:00:00Z"))
+  let warnings = TrialNotification.schedule(expiration: expiration, now: now, nudges: nil, calendar: calendar)
+  #expect(warnings.map(\.kind) == [.ending, .lastDay])
+  #expect(warnings == TrialNotification.schedule(expiration: expiration, now: now, nudges: false, calendar: calendar))
+}
