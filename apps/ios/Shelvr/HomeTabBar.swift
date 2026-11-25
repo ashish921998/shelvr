@@ -12,57 +12,65 @@ struct HomeTabBar: View {
 
   var body: some View {
     let palette = HomeChromePalette(scheme, appearance: appearance)
-    HStack(alignment: .bottom, spacing: 0) {
-      destination(copy(library ? "navigation.map" : "navigation.library"),
-        symbol: library ? "map" : "books.vertical", palette: palette, action: switchTab)
+    HStack(spacing: 6) {
+      HStack(spacing: 0) {
+        viewControl(false, palette: palette)
+        viewControl(true, palette: palette)
+      }
+      .frame(maxWidth: .infinity)
       Button(action: add) {
         Image(systemName: "plus")
-          .font(.system(size: 27, weight: .bold))
+          .font(.system(size: 24, weight: .semibold))
           .foregroundStyle(palette.onPrimary)
-          .frame(width: 64, height: 64)
+          .frame(width: 50, height: 50)
           .background(palette.primary, in: Circle())
-          .overlay { Circle().strokeBorder(palette.border, lineWidth: 0.5) }
-          .shadow(color: palette.shadow.opacity(0.18), radius: 7, y: 4)
       }
       .accessibilityLabel(copy("common.add"))
-      .padding(.bottom, 8)
       destination(copy("plan.goOut"), symbol: "shoeprints.fill", palette: palette, action: plan)
     }
     .buttonStyle(HomeChromePressStyle())
-    .frame(maxWidth: .infinity)
-    .padding(.top, library ? 16 : 0)
-    .padding(.bottom, 32)
-    .background {
-      if library {
-        palette.background.ignoresSafeArea(edges: .bottom)
-        VStack {
-          Rectangle().fill(palette.border).frame(height: 0.5)
-          Spacer(minLength: 0)
-        }
-      }
+    .padding(.horizontal, 8)
+    .padding(.vertical, 6)
+    .frame(maxWidth: 352)
+    .background(palette.surface, in: RoundedRectangle(cornerRadius: 32, style: .continuous))
+    .overlay {
+      RoundedRectangle(cornerRadius: 32, style: .continuous).strokeBorder(palette.border, lineWidth: 0.75)
+        .allowsHitTesting(false)
     }
+    .shadow(color: palette.shadow.opacity(0.16), radius: 8, y: 3)
+    .padding(.horizontal, 16)
+    .frame(maxWidth: .infinity)
+    .padding(.top, library ? 8 : 0)
+    .padding(.bottom, 32)
+  }
+
+  private func viewControl(_ opensLibrary: Bool, palette: HomeChromePalette) -> some View {
+    let selected = library == opensLibrary
+    return destination(copy(opensLibrary ? "navigation.library" : "navigation.map"),
+      symbol: opensLibrary ? "books.vertical" : "map", palette: palette, selected: selected) {
+        if !selected { switchTab() }
+      }
   }
 
   private func destination(_ label: String, symbol: String, palette: HomeChromePalette,
-    action: @escaping () -> Void) -> some View {
+    selected: Bool = false, action: @escaping () -> Void) -> some View {
     Button(action: action) {
-      VStack(spacing: 5) {
+      VStack(spacing: 3) {
         Image(systemName: symbol)
-          .font(.system(size: 26, weight: .medium))
-          .foregroundStyle(palette.primaryText)
-          .frame(width: 44, height: 44)
-          .background(palette.frame, in: RoundedRectangle(cornerRadius: 16))
-          .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(palette.border, lineWidth: 0.5) }
-          .shadow(color: palette.shadow.opacity(0.10), radius: 2.5, y: 2)
+          .font(.system(size: 18, weight: selected ? .semibold : .medium))
+          .accessibilityHidden(true)
         Text(label)
-          .font(.custom("Satoshi-Regular", size: 11, relativeTo: .caption2))
-          .foregroundStyle(palette.muted)
-          .lineLimit(1)
+          .font(.custom("Satoshi-Bold", size: 12, relativeTo: .caption))
+          .multilineTextAlignment(.center)
+          .fixedSize(horizontal: false, vertical: true)
       }
-      .frame(maxWidth: 100)
+      .foregroundStyle(selected ? palette.background : palette.foreground)
+      .frame(maxWidth: .infinity, minHeight: 48)
+      .background(selected ? palette.foreground : .clear, in: RoundedRectangle(cornerRadius: 21))
       .contentShape(Rectangle())
     }
     .accessibilityLabel(label)
+    .accessibilityAddTraits(selected ? .isSelected : [])
   }
 }
 
