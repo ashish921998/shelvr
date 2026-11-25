@@ -154,6 +154,7 @@ struct SignedInView: View {
         }
       }
     }
+    .modifier(CancelSurveyCard(home: library && path.isEmpty))
     .modifier(TrialReminderObserver(home: library && path.isEmpty))
     .environment(namePrompts)
     .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
