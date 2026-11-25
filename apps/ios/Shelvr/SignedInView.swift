@@ -49,7 +49,15 @@ struct SignedInView: View {
         LibraryView(screen: .home, searchFocusChanged: { librarySearchFocused = $0 })
           .toolbar(librarySearchFocused ? .hidden : .visible, for: .tabBar)
       }
-      Tab(copy("common.add"), systemImage: "plus", value: HomeTab.add) { addSpots }
+      Tab(value: HomeTab.add) { addSpots } label: {
+        Label {
+          Text(copy("common.add"))
+        } icon: {
+          Image(systemName: "plus.circle.fill")
+            .symbolRenderingMode(.palette)
+            .foregroundStyle(.black, Color("AccentColor"))
+        }
+      }
       Tab(copy("plan.goOut"), systemImage: "shoeprints.fill", value: HomeTab.plan) { PlanCityView(trip: false) }
       Tab(copy("passport.title"), systemImage: "book.closed", value: HomeTab.passport) { PassportView(open: open) }
     }
