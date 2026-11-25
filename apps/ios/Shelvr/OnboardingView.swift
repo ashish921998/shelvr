@@ -285,7 +285,7 @@ private struct OnboardingAccount: View {
         ForEach(Array(reel.places.prefix(kind == "eat" ? 2 : reel.places.count).enumerated()), id: \.offset) { _, place in
           Label(place.name, systemImage: "mappin.circle.fill").font(.subheadline)
         }
-        if kind == "eat" { Label(copy(trip ? "common.share" : "datePlan.send"), systemImage: "square.and.arrow.up") }
+        if kind == "eat" { Label(copy(progress.goals.contains("date") ? "datePlan.send" : "common.share"), systemImage: "square.and.arrow.up") }
       }.frame(maxWidth: .infinity, alignment: .leading).padding(18)
         .background(palette.surface, in: .rect(cornerRadius: 20))
         .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(palette.border) }
