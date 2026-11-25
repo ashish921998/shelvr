@@ -1,6 +1,6 @@
 import Foundation
 
-public struct SearchableSave: Decodable, Sendable {
+public struct SearchableSave: Decodable, Sendable, Equatable {
   public let _id: String
   public let _creationTime: Double
   public let note, title, url, siteName, description, imageUrl, heroImageUrl: String?
