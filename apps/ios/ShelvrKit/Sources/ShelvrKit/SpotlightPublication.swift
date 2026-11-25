@@ -63,11 +63,6 @@ import Foundation
     schedule()
   }
 
-  public func refresh() {
-    needsReset = true
-    schedule()
-  }
-
   public func settled() async {
     while let tail { await tail.value }
   }
