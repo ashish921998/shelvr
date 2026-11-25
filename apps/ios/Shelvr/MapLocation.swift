@@ -3,9 +3,14 @@ import Observation
 
 @MainActor @Observable
 final class MapLocation: NSObject, CLLocationManagerDelegate {
+  struct Fix {
+    let id = UUID()
+    let coordinate: CLLocationCoordinate2D
+  }
+
   private let manager = CLLocationManager()
   private var wanted = false
-  private(set) var position: CLLocation?
+  private(set) var latestFix: Fix?
   var unavailable = false
 
   override init() {
@@ -34,7 +39,7 @@ final class MapLocation: NSObject, CLLocationManagerDelegate {
     Task { @MainActor in
       guard self.wanted, let fix = locations.last else { return }
       self.wanted = false
-      self.position = fix
+      self.latestFix = Fix(coordinate: fix.coordinate)
     }
   }
 

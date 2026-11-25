@@ -23,7 +23,7 @@ struct SavedPlacesMap: View {
   @State private var errors = Set<String>()
   @State private var retry = 0
   @State private var viewport: MapViewport?
-  @State private var overview = 0
+  @State private var cameraCommand: MapCanvas.CameraCommand?
   @State private var topControlsHeight: CGFloat = 50
   @State private var bottomControlsHeight: CGFloat = 48
   @State private var searching = false
@@ -38,8 +38,8 @@ struct SavedPlacesMap: View {
     let palette = HomeChromePalette(scheme, appearance: appearance)
     let personalPlaces = saved ?? []
     let overviewPlaces = scene.visible.filter(\.isSaved)
-    MapCanvas(places: scene.visible, location: location.position, filters: scene.filters, opening: scene.opening,
-      visited: scene.visited, selectedLabelID: selectedLabelID, copy: copy, overview: overview, overviewPlaces: overviewPlaces, topControlsHeight: topControlsHeight,
+    MapCanvas(places: scene.visible, cameraCommand: cameraCommand, filters: scene.filters, opening: scene.opening,
+      visited: scene.visited, selectedLabelID: selectedLabelID, copy: copy, topControlsHeight: topControlsHeight,
       bottomControlsHeight: bottomControlsHeight, onArea: { updateDiscoverArea($0); viewport = $1 },
       onPick: selectPlace, onCluster: { cluster = $0 })
       .ignoresSafeArea(.container)
@@ -56,7 +56,9 @@ struct SavedPlacesMap: View {
         }
       }
       .onChange(of: viewport?.city(among: personalPlaces), initial: true) { _, city in cityInView = city }
-      .onChange(of: filters) { selectedLabelID = nil }
+      .onChange(of: location.latestFix?.id) {
+        if let fix = location.latestFix { cameraCommand = .init(action: .locate(fix.coordinate)) }
+      }
       .onChange(of: focusedSearch) { _, focused in searchFocusChanged(focused) }
       .onDisappear { searchFocusChanged(false) }
       .alert(copy("common.unavailable"), isPresented: $location.unavailable) {
@@ -131,7 +133,7 @@ struct SavedPlacesMap: View {
             guard let other = place.city, !other.isEmpty else { return false }
             return other.caseInsensitiveCompare(city) != .orderedSame
           }) {
-            roundButton("chevron.left", label: copy("map.showAllCities"), palette: palette) { overview += 1 }
+            roundButton("chevron.left", label: copy("map.showAllCities"), palette: palette) { cameraCommand = .init(action: .overview(overviewPlaces)) }
           }
           Button {
             if let encoded = city.addingPercentEncoding(withAllowedCharacters: .alphanumerics) { open("/city/" + encoded) }
@@ -204,9 +206,11 @@ struct SavedPlacesMap: View {
           ForEach(scene.chips, id: \.self) { kind in
             filterChip(copy(kind.labelKey), selected: filters.kinds.contains(kind), palette: palette,
               color: Color(uiColor: MapPinPalette.color(for: kind))) {
-              if filters.kinds.insert(kind).inserted {
+              var next = filters
+              if next.kinds.insert(kind).inserted {
                 Analytics.capture("map_filter_selected", ["kind": kind.rawValue])
-              } else { filters.kinds.remove(kind) }
+              } else { next.kinds.remove(kind) }
+              applyFilters(next)
             }
           }
         }
@@ -219,7 +223,7 @@ struct SavedPlacesMap: View {
       HStack(spacing: 8) {
         HStack(spacing: 8) {
           Image(systemName: "magnifyingglass").accessibilityHidden(true)
-          TextField(copy("map.searchPlaceholder"), text: $filters.search)
+          TextField(copy("map.searchPlaceholder"), text: Binding(get: { filters.search }, set: updateSearch))
             .focused($focusedSearch).submitLabel(.search).autocorrectionDisabled()
             .onSubmit { focusedSearch = false }
             .onChange(of: focusedSearch) { if focusedSearch { resultsOpen = true } }
@@ -230,7 +234,7 @@ struct SavedPlacesMap: View {
         Button(copy("common.cancel")) {
           searching = false
           focusedSearch = false
-          filters.search = ""
+          updateSearch("")
         }.padding(.horizontal, 12).frame(minHeight: 44)
           .background(palette.surface, in: Capsule())
       }
@@ -291,7 +295,24 @@ struct SavedPlacesMap: View {
   }
 
   private func wentChip(_ value: WentFilter, _ title: String, palette: HomeChromePalette) -> some View {
-    filterChip(copy(title), selected: filters.went == value, palette: palette) { filters.went = value }
+    filterChip(copy(title), selected: filters.went == value, palette: palette) {
+      var next = filters
+      next.went = value
+      applyFilters(next)
+    }
+  }
+
+  private func updateSearch(_ text: String) {
+    var next = filters
+    next.search = text
+    applyFilters(next)
+  }
+
+  private func applyFilters(_ next: MapFilters) {
+    guard filters != next else { return }
+    filters = next
+    selectedLabelID = nil
+    cameraCommand = .init(action: .fitFilteredPlaces)
   }
 
   private func filterChip(_ title: String, selected: Bool, palette: HomeChromePalette, color: Color? = nil,

@@ -3,15 +3,24 @@ import ShelvrKit
 import SwiftUI
 
 struct MapCanvas: UIViewRepresentable {
+  struct CameraCommand {
+    enum Action {
+      case locate(CLLocationCoordinate2D)
+      case overview([MapPlace])
+      case fitFilteredPlaces
+    }
+
+    let id = UUID()
+    let action: Action
+  }
+
   let places: [MapPlace]
-  let location: CLLocation?
+  let cameraCommand: CameraCommand?
   let filters: MapFilters
   let opening: [MapPlace]?
   let visited: Set<String>
   let selectedLabelID: String?
   let copy: Copy
-  let overview: Int
-  let overviewPlaces: [MapPlace]
   let topControlsHeight: CGFloat
   let bottomControlsHeight: CGFloat
   let onArea: (DiscoverBox, MapViewport) -> Void
@@ -56,7 +65,12 @@ struct MapCanvas: UIViewRepresentable {
     private var nameLayout: Task<Void, Never>?
     private let addedViews = NSHashTable<PlaceAnnotationView>.weakObjects()
     private let nameOverlay = UIView()
-    init(_ parent: MapCanvas) { self.parent = parent }
+    private var consumedCameraCommand: UUID?
+
+    init(_ parent: MapCanvas) {
+      self.parent = parent
+      consumedCameraCommand = parent.cameraCommand?.id
+    }
 
     func installNames(on map: MKMapView) {
       nameOverlay.frame = map.bounds
@@ -67,32 +81,36 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     func update(_ parent: MapCanvas, map: MKMapView) {
-      let changedLocation = self.parent.location !== parent.location
-      let changedFilter = self.parent.filters != parent.filters
-      let changedOverview = self.parent.overview != parent.overview
       self.parent = parent
       synchronizePins(on: map)
-      if changedLocation, let location = parent.location {
-        opened = true
-        queryingNearby = true
-        map.showsUserLocation = true
-        map.setRegion(.init(center: location.coordinate, latitudinalMeters: 6000, longitudinalMeters: 6000),
-          animated: true)
-      }
-      if changedFilter, opened, !parent.places.isEmpty,
-        !parent.places.contains(where: { map.visibleMapRect.contains(MKMapPoint($0.coordinate)) }) {
-        fit(parent.places, on: map, animated: true)
-      }
-      if changedOverview {
-        opened = true
-        queryingNearby = false
-        fit(parent.overviewPlaces, on: map, animated: true)
+      if let command = parent.cameraCommand, command.id != consumedCameraCommand {
+        consumedCameraCommand = command.id
+        apply(command.action, on: map)
       }
       if !opened, let places = parent.opening {
         opened = true
         fit(places, on: map, animated: false)
       }
       scheduleNames(on: map)
+    }
+
+    private func apply(_ action: CameraCommand.Action, on map: MKMapView) {
+      switch action {
+      case let .locate(coordinate):
+        opened = true
+        queryingNearby = true
+        map.showsUserLocation = true
+        map.setRegion(.init(center: coordinate, latitudinalMeters: 6000, longitudinalMeters: 6000), animated: true)
+      case let .overview(places):
+        opened = true
+        queryingNearby = false
+        fit(places, on: map, animated: true)
+      case .fitFilteredPlaces:
+        guard opened, !parent.places.isEmpty,
+          !parent.places.contains(where: { map.visibleMapRect.contains(MKMapPoint($0.coordinate)) })
+        else { return }
+        fit(parent.places, on: map, animated: true)
+      }
     }
 
     private var usesOverviewDensity: Bool {
