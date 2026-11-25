@@ -6,6 +6,7 @@ import VisualIntelligence
 @available(iOS 26.0, *)
 @AppIntent(schema: .visualIntelligence.semanticContentSearch)
 struct VisualSearchIntent {
+  static let supportedModes: IntentModes = .foreground(.immediate)
   var semanticContent: SemanticContentDescriptor
 
   @MainActor func perform() async throws -> some IntentResult {
