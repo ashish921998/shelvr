@@ -30,23 +30,25 @@ public struct MapLocationRequest {
     public let coordinate: CLLocationCoordinate2D
   }
 
-  public private(set) var isPending = false
+  public private(set) var pendingID: UUID?
   public private(set) var latestFix: Fix?
 
   public init() {}
 
-  public mutating func begin() {
-    isPending = true
+  public mutating func begin() -> UUID {
+    let id = UUID()
+    pendingID = id
+    return id
   }
 
-  public mutating func resolve(_ coordinate: CLLocationCoordinate2D) {
-    guard isPending else { return }
-    isPending = false
+  public mutating func resolve(_ coordinate: CLLocationCoordinate2D, for id: UUID) {
+    guard pendingID == id else { return }
+    pendingID = nil
     latestFix = Fix(coordinate: coordinate)
   }
 
   public mutating func cancel() {
-    isPending = false
+    pendingID = nil
     latestFix = nil
   }
 }

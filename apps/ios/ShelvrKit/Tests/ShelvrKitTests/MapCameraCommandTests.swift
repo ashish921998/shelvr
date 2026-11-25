@@ -26,17 +26,21 @@ import Testing
 @Test func cancelledLocationRequestIgnoresALateFixAndCanStartAgain() {
   var request = MapLocationRequest()
   let coordinate = CLLocationCoordinate2D(latitude: 37.77, longitude: -122.42)
-  request.begin()
+  let old = request.begin()
   request.cancel()
-  request.resolve(coordinate)
+  request.resolve(coordinate, for: old)
   #expect(request.latestFix == nil)
 
-  request.begin()
-  request.resolve(coordinate)
+  let current = request.begin()
+  request.resolve(.init(latitude: 35, longitude: 139), for: old)
+  #expect(request.pendingID == current)
+  #expect(request.latestFix == nil)
+
+  request.resolve(coordinate, for: current)
   let firstFix = request.latestFix
   #expect(firstFix?.coordinate.longitude == coordinate.longitude)
-  #expect(!request.isPending)
-  request.begin()
-  request.resolve(coordinate)
+  #expect(request.pendingID == nil)
+  let next = request.begin()
+  request.resolve(coordinate, for: next)
   #expect(request.latestFix?.id != firstFix?.id)
 }
