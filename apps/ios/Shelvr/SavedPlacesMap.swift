@@ -18,6 +18,7 @@ struct SavedPlacesMap: View {
   @State private var filters = MapFilters()
   @State private var location = MapLocation()
   @State private var selected: MapPlace?
+  @State private var selectedLabelID: String?
   @State private var card: MKMapItem?
   @State private var cluster: [MapPlace] = []
   @State private var errors = Set<String>()
@@ -36,9 +37,9 @@ struct SavedPlacesMap: View {
     let personalPlaces = saved ?? []
     let overviewPlaces = scene.visible.filter(\.isSaved)
     MapCanvas(places: scene.visible, location: location.position, filters: scene.filters, opening: scene.opening,
-      visited: scene.visited, copy: copy, overview: overview, overviewPlaces: overviewPlaces, topControlsHeight: topControlsHeight,
+      visited: scene.visited, selectedLabelID: selectedLabelID, copy: copy, overview: overview, overviewPlaces: overviewPlaces, topControlsHeight: topControlsHeight,
       bottomControlsHeight: bottomControlsHeight, onArea: { area = $0; viewport = $1 },
-      onPick: { selected = $0 }, onCluster: { cluster = $0 })
+      onPick: selectPlace, onCluster: { cluster = $0 })
       .ignoresSafeArea(.container)
       .overlay(alignment: .top) {
         Group {
@@ -53,6 +54,7 @@ struct SavedPlacesMap: View {
         }
       }
       .onChange(of: viewport?.city(among: personalPlaces), initial: true) { _, city in cityInView = city }
+      .onChange(of: filters) { selectedLabelID = nil }
       .onChange(of: focusedSearch) { _, focused in searchFocusChanged(focused) }
       .onDisappear { searchFocusChanged(false) }
       .alert(copy("common.unavailable"), isPresented: $location.unavailable) {
@@ -61,7 +63,7 @@ struct SavedPlacesMap: View {
       .mapItemDetailSheet(item: $card, displaysMap: false)
       .sheet(isPresented: Binding(get: { !cluster.isEmpty }, set: { if !$0 { cluster = [] } })) {
         List(cluster) { place in
-          Button(place.name) { cluster = []; selected = place }
+          Button(place.name) { cluster = []; selectPlace(place) }
         }.presentationDetents([.medium, .large])
       }
       .task(id: retry) {
@@ -112,6 +114,11 @@ struct SavedPlacesMap: View {
         }
         selected = nil
       }
+  }
+
+  private func selectPlace(_ place: MapPlace) {
+    selectedLabelID = place.id
+    selected = place
   }
 
   private func mapHeader(personalPlaces: [MapPlace], overviewPlaces: [MapPlace], palette: HomeChromePalette) -> some View {
@@ -225,7 +232,7 @@ struct SavedPlacesMap: View {
               Analytics.capture("map_search_result_opened")
               focusedSearch = false
               resultsOpen = false
-              selected = place
+              selectPlace(place)
             } label: {
               Label(place.name, systemImage: place.isSaved ? "bookmark" : "mappin")
                 .lineLimit(1).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)

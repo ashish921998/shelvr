@@ -8,6 +8,7 @@ struct MapCanvas: UIViewRepresentable {
   let filters: MapFilters
   let opening: [MapPlace]?
   let visited: Set<String>
+  let selectedLabelID: String?
   let copy: Copy
   let overview: Int
   let overviewPlaces: [MapPlace]
@@ -215,25 +216,36 @@ struct MapCanvas: UIViewRepresentable {
       if let location = map.view(for: map.userLocation) {
         occupied.append(location.convert(location.bounds, to: map).insetBy(dx: -2, dy: -2))
       }
-      let candidates = visible.compactMap { view -> (view: PlaceAnnotationView, pin: Pin, distance: CGFloat)? in
-        guard let pin = view.annotation as? Pin else { return nil }
+      let candidates = visible.compactMap { view
+        -> (view: PlaceAnnotationView, pin: Pin, priority: MapPlace.LabelPriority, distance: CGFloat)? in
+        guard let pin = view.annotation as? Pin,
+          let priority = pin.place.labelPriority(selectedID: parent.selectedLabelID, query: parent.filters.search)
+        else { return nil }
         let center = view.convert(CGPoint(x: view.bounds.midX, y: view.bounds.midY), to: map)
         guard usable.contains(center) else { return nil }
         let distance = hypot(center.x - usable.midX, center.y - usable.midY)
-        return (view, pin, distance)
+        return (view, pin, priority, distance)
       }.sorted {
-        if $0.pin.place.isSaved != $1.pin.place.isSaved { return $0.pin.place.isSaved }
+        if $0.priority != $1.priority { return $0.priority.rawValue < $1.priority.rawValue }
         if $0.distance != $1.distance { return $0.distance < $1.distance }
         return $0.pin.place.id < $1.pin.place.id
       }
       map.bringSubviewToFront(nameOverlay)
       for candidate in candidates {
+        guard nameOverlay.subviews.count < 3 else { break }
         let view = candidate.view
         let marker = view.convert(view.bounds, to: map)
         let badge = MapPlaceNameBadge(title: candidate.pin.place.name, traits: map.traitCollection)
-        for x in [marker.maxX + 3, marker.minX - badge.bounds.width - 3] {
-          let frame = CGRect(x: x, y: marker.midY - badge.bounds.height / 2,
-            width: badge.bounds.width, height: badge.bounds.height)
+        let size = badge.bounds.size
+        let y = marker.midY - size.height / 2
+        var positions = [CGPoint(x: marker.maxX + 3, y: y), CGPoint(x: marker.minX - size.width - 3, y: y)]
+        if candidate.priority != .saved {
+          let x = marker.midX - size.width / 2
+          positions.append(CGPoint(x: x, y: marker.minY - size.height - 3))
+          positions.append(CGPoint(x: x, y: marker.maxY + 3))
+        }
+        for position in positions {
+          let frame = CGRect(origin: position, size: size)
           guard usable.contains(frame),
             !targets.contains(where: { $0.view !== view && $0.frame.intersects(frame) }),
             !occupied.contains(where: { $0.intersects(frame) }) else { continue }

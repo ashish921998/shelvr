@@ -72,3 +72,17 @@ private struct MapParity: Decodable {
   #expect(venue.preferredPinKind == .stay)
   #expect(venue.emoji == "🛏️")
 }
+
+@Test func mapLabelsPreferTheSelectionThenAnExactNameThenSavedPlaces() {
+  let saved = MapPlace(source: .saved(itemID: "saved"), name: "Café Roma", lat: 0, lng: 0,
+    appleId: nil, city: "Rome", category: nil, cuisine: nil, kinds: [.coffee])
+  let discover = MapPlace(source: .discover(placeID: "discover", features: ["terrace"]), name: "Café Roma East", lat: 0,
+    lng: 0, appleId: nil, city: "Rome", category: nil, cuisine: nil, kinds: [.coffee])
+  #expect(saved.labelPriority(selectedID: nil, query: "CAFE  Roma") == .exactMatch)
+  #expect(saved.labelPriority(selectedID: saved.id, query: "CAFE Roma") == .selected)
+  #expect(saved.labelPriority(selectedID: nil, query: "Roma") == .saved)
+  #expect(discover.labelPriority(selectedID: nil, query: "Café Roma") == nil)
+  #expect(discover.labelPriority(selectedID: nil, query: "Café Roma East") == .exactMatch)
+  #expect(discover.labelPriority(selectedID: discover.id, query: "") == .selected)
+  #expect(discover.labelPriority(selectedID: nil, query: "terrace") == nil)
+}
