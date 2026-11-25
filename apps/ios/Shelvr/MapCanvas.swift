@@ -51,6 +51,7 @@ struct MapCanvas: UIViewRepresentable {
     var opened = false
     var queryingNearby = false
     private var compactPins = true
+    private var pinDensity = MapPinDensity(mapPointsPerScreenPoint: MKMapRect.world.width / 390)
     private var nameLayout: Task<Void, Never>?
     private let addedViews = NSHashTable<PlaceAnnotationView>.weakObjects()
     private let nameOverlay = UIView()
@@ -69,23 +70,7 @@ struct MapCanvas: UIViewRepresentable {
       let changedFilter = self.parent.filters != parent.filters
       let changedOverview = self.parent.overview != parent.overview
       self.parent = parent
-      let ids = Set(parent.places.map(\.id))
-      for (id, pin) in pins where !ids.contains(id) {
-        pins.removeValue(forKey: id)
-        map.removeAnnotation(pin)
-      }
-      var added: [Pin] = []
-      for place in parent.places {
-        let went = parent.visited.contains(place.id)
-        if let current = pins[place.id] {
-          if current.place == place && current.visited == went { continue }
-          map.removeAnnotation(current)
-        }
-        let pin = Pin(place, visited: went)
-        pins[place.id] = pin
-        added.append(pin)
-      }
-      map.addAnnotations(added)
+      synchronizePins(on: map)
       if changedLocation, let location = parent.location {
         opened = true
         queryingNearby = true
@@ -107,6 +92,35 @@ struct MapCanvas: UIViewRepresentable {
         fit(places, on: map, animated: false)
       }
       scheduleNames(on: map)
+    }
+
+    private var usesOverviewDensity: Bool {
+      let filters = parent.filters
+      return compactPins && !filters.hasSearch && filters.kinds.isEmpty && filters.went == .all
+    }
+
+    private func synchronizePins(on map: MKMapView, rebuild: Bool = false) {
+      let places: [MapPlace]
+      if usesOverviewDensity {
+        places = pinDensity.representatives(from: parent.places) { place in
+          map.bounds.contains(map.convert(place.coordinate, toPointTo: map))
+        }
+      } else { places = parent.places }
+      let ids = Set(places.map(\.id))
+      let removed = pins.keys.filter { !ids.contains($0) }
+      map.removeAnnotations(removed.compactMap { pins.removeValue(forKey: $0) })
+      var added: [Pin] = []
+      for place in places {
+        let went = parent.visited.contains(place.id)
+        if let current = pins[place.id] {
+          if !rebuild, current.place == place && current.visited == went { continue }
+          map.removeAnnotation(current)
+        }
+        let pin = Pin(place, visited: went)
+        pins[place.id] = pin
+        added.append(pin)
+      }
+      map.addAnnotations(added)
     }
 
     private func fit(_ places: [MapPlace], on map: MKMapView, animated: Bool) {
@@ -242,13 +256,16 @@ struct MapCanvas: UIViewRepresentable {
       let start = CLLocation(latitude: west.latitude, longitude: west.longitude)
       let end = CLLocation(latitude: east.latitude, longitude: east.longitude)
       let metersPerPoint = start.distance(from: end) / (2 * halfSample)
-      let next = compactPins ? metersPerPoint > 8 : metersPerPoint >= 10
-      guard next != compactPins else { return }
-      compactPins = next
+      let nextCompact = compactPins ? metersPerPoint > 8 : metersPerPoint >= 10
+      let changedStyle = nextCompact != compactPins
+      compactPins = nextCompact
+      if nextCompact {
+        pinDensity = MapPinDensity(projectedStart: MKMapPoint(west), projectedEnd: MKMapPoint(east),
+          screenDistance: 2 * halfSample)
+      }
+      guard changedStyle || usesOverviewDensity else { return }
       clearNames()
-      let annotations = Array(pins.values)
-      map.removeAnnotations(annotations)
-      map.addAnnotations(annotations)
+      synchronizePins(on: map, rebuild: changedStyle)
     }
 
     func mapView(_ map: MKMapView, viewFor annotation: any MKAnnotation) -> MKAnnotationView? {
