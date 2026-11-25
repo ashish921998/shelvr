@@ -48,9 +48,10 @@ struct SignedInView: View {
         Text(copy(key)).font(.caption2)
       }
       .font(.title3.weight(.medium))
-      .frame(maxWidth: .infinity, minHeight: 44)
+      .frame(minWidth: 76, minHeight: 44)
       .contentShape(Rectangle())
     }
+    .buttonStyle(.plain)
     .accessibilityLabel(copy(key))
   }
 
