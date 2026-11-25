@@ -67,6 +67,8 @@ import Foundation
     if revision == observedRevision {
       activate(source)
       publish(rows, for: source)
+    } else if owner != source {
+      throw CancellationError()
     }
     needsReset = true
     schedule()
