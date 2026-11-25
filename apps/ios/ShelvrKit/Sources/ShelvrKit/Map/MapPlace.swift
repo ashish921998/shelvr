@@ -132,7 +132,13 @@ public struct MapPlace: Hashable, Identifiable, Sendable {
 
   public static func search(_ entries: [Self], query: String) -> [Self] {
     func folded(_ text: String) -> String {
-      text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+      let unmarked = text.decomposedStringWithCanonicalMapping.unicodeScalars.filter { scalar in
+        switch scalar.properties.generalCategory {
+        case .nonspacingMark, .spacingMark, .enclosingMark: false
+        default: true
+        }
+      }
+      return String(unmarked).lowercased()
     }
     let words = folded(query).split(whereSeparator: \.isWhitespace)
     guard !words.isEmpty else { return entries }
