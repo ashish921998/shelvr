@@ -91,9 +91,7 @@ extension ItemEntity: Transferable {
     }.exportingCondition { $0.kind == "image" }
     DataRepresentation(exportedContentType: .utf8PlainText) { (item: ItemEntity) in
       let row = try await item.authorizedSave()
-      let title = row.displayTitle(copy: Copy())
-      let text = row.url.map { title + "\n" + $0 } ?? row.excerpt ?? title
-      return Data(text.utf8)
+      return Data(row.exportText(copy: Copy()).utf8)
     }
   }
 }

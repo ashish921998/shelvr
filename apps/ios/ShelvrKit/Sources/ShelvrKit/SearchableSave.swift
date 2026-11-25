@@ -17,6 +17,13 @@ public struct SearchableSave: Decodable, Sendable {
     return copy(type == "link" ? "item.link" : type == "image" ? "item.photo" : "item.note")
   }
 
+  public func exportText(copy: Copy) -> String {
+    let name = displayTitle(copy: copy)
+    if let url, !url.isEmpty { return name + "\n" + url }
+    if let note, !note.isEmpty { return note }
+    return name
+  }
+
   public var summary: String? { trimmed(description) ?? siteName }
   public var excerpt: String? { note.map { String($0.prefix(600)) } }
   public var keywords: [String] {

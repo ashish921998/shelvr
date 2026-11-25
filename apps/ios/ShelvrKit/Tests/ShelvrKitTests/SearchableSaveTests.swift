@@ -20,6 +20,7 @@ import Testing
   let save = try JSONDecoder().decode(SearchableSave.self, from: data)
   #expect(save.displayTitle(copy: Copy()) == String(repeating: "a", count: 80))
   #expect(save.excerpt?.count == 600)
+  #expect(save.exportText(copy: Copy()) == note)
 }
 
 @MainActor @Test func openingAResolvedSaveRequiresTheSameAccountAndSessionAtConsumption() throws {
