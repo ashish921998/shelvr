@@ -17,31 +17,38 @@ struct LisbonSignInHero: View {
   let palette: HomeChromePalette
   @Environment(\.copy) private var copy
   @Environment(\.accessibilityReduceMotion) private var reduced
+  @Environment(\.colorScheme) private var scheme
   @State private var drawn = false
 
   var body: some View {
     GeometryReader { bounds in
       VStack(alignment: .leading, spacing: 5) {
-        Capsule().fill(palette.foreground).frame(width: 57, height: 13)
-          .frame(maxWidth: .infinity).padding(.bottom, 8)
+        Capsule().fill(bezel).frame(width: 64, height: 18)
+          .frame(maxWidth: .infinity).padding(.bottom, 6)
         Text(copy("onboarding.sceneLisbon")).font(.custom("Satoshi-Bold", size: 22))
         Text(copy("onboarding.sceneSpaceMeta")).font(.caption2).foregroundStyle(palette.muted)
-        route.frame(height: 112)
-        HStack(spacing: 4) {
+        route.frame(height: 120)
+        HStack(spacing: 6) {
           ForEach(["library-city-lisbon", "city-lisbon-food", "library-city-prague"], id: \.self) { photo in
-            FirstRunPicture(name: photo, ext: "jpg").scaledToFill().frame(width: 31, height: 34)
+            FirstRunPicture(name: photo, ext: "jpg").scaledToFill().frame(width: 32, height: 40)
               .clipShape(.rect(cornerRadius: 6))
           }
           Text(copy("signInScene.fromReels")).font(.caption2).foregroundStyle(palette.muted)
         }
+        .padding(.vertical, 4)
         Text(copy("signInScene.dateTitle")).font(.custom("Satoshi-Bold", size: 15))
-        ForEach(["onboarding.sceneMiradouro", "onboarding.sceneTimeOut", "onboarding.scenePasteis"], id: \.self) { key in
-          Text(copy(key)).font(.caption)
+        ForEach(Array(zip(["signInScene.sunset", "signInScene.dinner", "signInScene.dessert"],
+          ["onboarding.sceneMiradouro", "onboarding.sceneTimeOut", "onboarding.scenePasteis"])), id: \.0) { slot, stop in
+          HStack {
+            Text(copy(slot)).font(.custom("Satoshi-Bold", size: 11))
+            Text(copy(stop)).font(.custom("Satoshi-Regular", size: 12))
+          }
         }
       }
-      .padding(13).frame(width: min(254, bounds.size.width))
-      .background(palette.surface, in: .rect(cornerRadius: 31))
-      .overlay { RoundedRectangle(cornerRadius: 31).strokeBorder(palette.foreground, lineWidth: 6) }
+      .padding(.horizontal, 23).padding(.top, 17)
+      .frame(width: min(236, bounds.size.width * 0.82), height: bounds.size.height + 40, alignment: .top)
+      .background(palette.background, in: .rect(cornerRadius: 46))
+      .overlay { RoundedRectangle(cornerRadius: 46).strokeBorder(bezel, lineWidth: 9) }
       .frame(maxWidth: .infinity)
     }
     .clipped()
@@ -50,6 +57,8 @@ struct LisbonSignInHero: View {
     .accessibilityHidden(true)
     .onAppear { withAnimation(reduced ? nil : .easeInOut(duration: 1.4)) { drawn = true } }
   }
+
+  private var bezel: Color { scheme == .dark ? Color(white: 0.055) : palette.foreground }
 
   private var route: some View {
     GeometryReader { proxy in
@@ -98,27 +107,29 @@ struct OnboardingOpener: View {
   }
 
   var body: some View {
-    VStack(spacing: 9) {
+    VStack(spacing: 6) {
       HStack(spacing: 6) {
         FirstRunPicture(name: "first-run-icon", ext: "png").frame(width: 25, height: 25).clipShape(.rect(cornerRadius: 6))
-        Text("shelvr").font(.custom("CrimsonProRoman-Regular", size: 34, relativeTo: .largeTitle))
-      }.foregroundStyle(palette.primaryText).accessibilityElement(children: .combine).accessibilityAddTraits(.isHeader)
-      Text(copy("opener.tagline")).font(.custom("Satoshi-Regular", size: 15, relativeTo: .subheadline))
+        Text("shelvr").font(.custom("CrimsonProRoman-Regular", size: 32, relativeTo: .largeTitle))
+      }.foregroundStyle(palette.foreground).accessibilityElement(children: .combine).accessibilityAddTraits(.isHeader)
+      Text(copy("opener.tagline")).font(.custom("Satoshi-Regular", size: 14, relativeTo: .subheadline))
         .foregroundStyle(palette.muted).multilineTextAlignment(.center).frame(maxWidth: 285)
       GeometryReader { bounds in
-        let stride = min(bounds.size.width * 0.68, bounds.size.height * 0.49)
+        let stride = bounds.size.width * 0.68
+        let phoneWidth = min(bounds.size.width * 0.64, bounds.size.height * 0.98 * 236 / 490)
         ScrollViewReader { reader in
           ScrollView(.horizontal) {
             HStack(spacing: 0) {
               ForEach(-1...photos.count, id: \.self) { slot in
                 let i = (slot + photos.count) % photos.count
-                FirstRunPicture(name: photos[i], ext: "webp").scaledToFit()
-                  .clipShape(.rect(cornerRadius: 22))
-                  .overlay { RoundedRectangle(cornerRadius: 22).strokeBorder(palette.foreground, lineWidth: 3) }
-                  .aspectRatio(640/1391.0, contentMode: .fit).padding(4)
+                FirstRunPicture(name: photos[i], ext: "webp").scaledToFill()
+                  .frame(width: max(1, phoneWidth - 8), height: max(1, phoneWidth * 490 / 236 - 8))
+                  .clipShape(.rect(cornerRadius: phoneWidth * 0.15)).padding(4)
+                  .background(Color(white: 0.12), in: .rect(cornerRadius: phoneWidth * 0.17))
                   .frame(width: stride, height: bounds.size.height)
                   .scrollTransition(.interactive, axis: .horizontal) { card, phase in
-                    card.opacity(1 - abs(phase.value) * 0.72)
+                    card.opacity(1 - abs(phase.value) * 0.84)
+                      .scaleEffect(1 - abs(phase.value) * 0.04)
                       .rotation3DEffect(.degrees(phase.value * 16), axis: (x: 0, y: 1, z: 0))
                   }
                   .id(slot)
@@ -137,7 +148,7 @@ struct OnboardingOpener: View {
               reader.scrollTo(position ?? 0, anchor: .center)
             }
         }
-      }.containerRelativeFrame(.vertical) { length, _ in min(max(305, length * 0.67), 520) }
+      }.frame(minHeight: 304)
         .padding(.horizontal, -24)
         .accessibilityElement(children: .ignore).accessibilityLabel(captions[page])
         .accessibilityValue(page == 0 ? "" : copy(["", "onboarding.openerFileBody", "opener.datePreviewDescription", "opener.tripPreviewDescription"][page]))
@@ -150,14 +161,12 @@ struct OnboardingOpener: View {
           }
         }
       Text(captions[page]).font(.custom("Satoshi-Bold", size: 23, relativeTo: .title2)).multilineTextAlignment(.center)
-      HStack(spacing: 0) {
+      HStack(spacing: 5) {
         ForEach(photos.indices, id: \.self) { i in
-          Button { interacted = true; position = i } label: {
-            Capsule().fill(i == page ? palette.foreground : palette.border).frame(width: i == page ? 18 : 7, height: 6)
-              .frame(width: 44, height: 44).contentShape(Rectangle())
-          }.accessibilityLabel(captions[i]).accessibilityAddTraits(i == page ? .isSelected : [])
+          Capsule().fill(i == page ? palette.primaryText : palette.muted.opacity(0.28))
+            .frame(width: i == page ? 14 : 5, height: 5)
         }
-      }
+      }.accessibilityHidden(true)
     }.frame(maxWidth: .infinity)
     .task(id: phase == .active && !interacted && !reduced && !voiceOver && !type.isAccessibilitySize) {
       guard phase == .active && !interacted && !reduced && !voiceOver && !type.isAccessibilitySize else { return }

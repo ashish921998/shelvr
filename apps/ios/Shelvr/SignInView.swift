@@ -3,6 +3,7 @@ import ShelvrKit
 import SwiftUI
 
 struct SignInView: View {
+  var back: (() -> Void)? = nil
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.webAuthenticationSession) private var webAuthenticationSession
@@ -35,15 +36,24 @@ struct SignInView: View {
               .font(.custom("Satoshi-Regular", size: 16, relativeTo: .body)).foregroundStyle(palette.muted)
           }.multilineTextAlignment(.center)
           providerButtons(palette)
+          if back == nil { WelcomeInviteOffer(palette: palette) }
           Text(consent).font(.custom("Satoshi-Regular", size: 12, relativeTo: .caption))
             .foregroundStyle(palette.muted).multilineTextAlignment(.center).tint(palette.foreground)
         }.padding(.horizontal, 20).padding(.vertical, 12).frame(maxWidth: .infinity, minHeight: proxy.size.height)
+      }
+      .overlay(alignment: .topLeading) {
+        if let back {
+          Button(action: back) {
+            Image(systemName: "chevron.left").font(.system(size: 20))
+              .frame(width: 44, height: 44)
+          }.accessibilityLabel(copy("common.back")).padding(.leading, 8)
+        }
       }
     }.background(palette.background.ignoresSafeArea()).foregroundStyle(palette.foreground).disabled(busy)
   }
 
   private func providerButtons(_ palette: HomeChromePalette) -> some View {
-    VStack(spacing: 12) {
+    VStack(spacing: 16) {
       SignInWithAppleButton(.continue) { request in
         begin("apple"); stage = "browser"; browserBegan = .now
         nonce = AppleNonce()
@@ -101,8 +111,8 @@ struct SignInView: View {
     let terms = "\u{E000}", privacy = "\u{E001}"
     var text = AttributedString(copy("legal.consent", ["terms": terms, "privacy": privacy]))
     for (marker, key, url) in [
-      (terms, "legal.terms", "https://tryshelvr.app/terms"),
-      (privacy, "legal.privacy", "https://tryshelvr.app/privacy"),
+      (terms, "legal.termsShort", "https://tryshelvr.app/terms"),
+      (privacy, "legal.privacyShort", "https://tryshelvr.app/privacy"),
     ] {
       guard let range = text.range(of: marker) else { continue }
       var link = AttributedString(copy(key))
