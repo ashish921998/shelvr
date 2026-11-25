@@ -4,25 +4,31 @@ import SwiftUI
 struct RootView: View {
   @EnvironmentObject private var pushDevice: PushDevice
   @Environment(Backend.self) private var backend
-  @AppStorage("swift.appearance") private var appearance = "system"
   @Environment(\.copy) private var copy
+  @AppStorage("swift.appearance") private var appearance = "system"
+  @State private var namePrompts = MemberNamePrompts()
+  @State private var invites = InviteEntry()
   @State private var pendingLink: AppLink?
 
   var body: some View {
     Group {
       switch backend.status {
       case .starting: ProgressView()
-      case .signedOut: SignInView()
-      case .signedIn: OnboardingGate(pendingLink: $pendingLink)
+      case .signedOut, .signedIn: InviteEntryView(entry: invites, pendingLink: $pendingLink)
       case .offline: OfflineView()
       }
     }
+    .environment(invites)
+    .environment(namePrompts)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .background(appearance == "neutralDark" ? Color(red: 17/255, green: 20/255, blue: 23/255) : Color(.background))
     .preferredColorScheme(appearance == "system" ? nil : appearance == "light" ? .light : .dark)
     .foregroundStyle(Color(.foreground))
     .onChange(of: pushDevice.link, initial: true) { _, link in
-      if let link { pendingLink = link; pushDevice.link = nil }
+      if let link { route(link); pushDevice.link = nil }
+    }
+    .onChange(of: backend.sessionGeneration) { _, session in
+      if let queued = invites.discardNavigation(unless: session) { route(queued) }
     }
     .task(id: backend.sessionGeneration) {
       if backend.status == .signedOut { Analytics.identify(nil) }
@@ -43,11 +49,15 @@ struct RootView: View {
     .modifier(RecentWidgetSync())
     .modifier(SiriSetup())
     .onOpenURL { url in
-      if let link = AppLink(url.absoluteString), link.path != ["sign-in"] { pendingLink = link }
+      if let link = AppLink(url.absoluteString), link.path != ["sign-in"] { route(link) }
     }
     .onChange(of: backend.status, initial: true) { _, status in
       if status == .signedOut { LocalTrialNotifications.shared.replace([], copy: copy) }
     }
     .animation(.default, value: backend.status)
   }
+  private func route(_ link: AppLink) {
+    if !invites.route(link) { pendingLink = link }
+  }
+
 }

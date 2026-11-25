@@ -33,6 +33,7 @@ struct SharedListsView: View {
 
 struct JoinListView: View {
   let token: String
+  var requestJoin: (() -> Void)?
   let open: (String) -> Void
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
@@ -53,6 +54,7 @@ struct JoinListView: View {
           }
           Section {
             Button(copy("sharedLists.join")) {
+              if let requestJoin { requestJoin(); return }
               guard !busy else { return }
               busy = true
               Task {

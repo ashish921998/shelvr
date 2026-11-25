@@ -4,10 +4,11 @@ import SwiftUI
 
 struct SignedInView: View {
   @Binding var pendingLink: AppLink?
+  @Environment(Backend.self) private var backend
+  @Environment(InviteEntry.self) private var invites
   @Environment(\.copy) private var copy
   @State private var library = false
   @State private var path: [AppLink] = []
-  @State private var namePrompts = MemberNamePrompts()
   @State private var stampMessage: String?
 
   var body: some View {
@@ -77,7 +78,7 @@ struct SignedInView: View {
           JoinListView(token: link.path[1]) { route in
             if path.last == link, let target = AppLink(route) { path = [target] }
           }
-        case "passport-invite" where link.path.count == 2: FriendPassportView(token: link.path[1]).id(link.path[1])
+        case "passport-invite" where link.path.count == 2: FriendPassportView(token: link.path[1], compareInitially: link.query.contains { $0.name == "compare" && $0.value == "1" }).id(link)
         case "already-been", "next-to-stamp":
           StampPlacesView(city: link.path.first == "next-to-stamp" ? link.query.first { $0.name == "city" }?.value ?? "" : nil) { message in
             guard path.last == link, let passport = AppLink("/passport") else { return }
@@ -156,19 +157,31 @@ struct SignedInView: View {
     }
     .modifier(CancelSurveyCard(home: library && path.isEmpty))
     .modifier(TrialReminderObserver(home: library && path.isEmpty))
-    .environment(namePrompts)
     .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
       Button(copy("common.close")) {}
     } message: { Text(stampMessage ?? "") }
     .onChange(of: pendingLink, initial: true) { _, link in
       guard let link else { return }
       pendingLink = nil
-      switch link.path {
-      case ["map"]: library = false; path = []
-      case ["home"]: library = true; path = []
-      case ["sign-in"]: break
-      default: path = [link]
+      navigate(to: link)
+    }
+    .onChange(of: invites.destination(account: backend.userID, session: backend.sessionGeneration), initial: true) { _, link in
+      let account = backend.userID
+      let session = backend.sessionGeneration
+      guard let link, invites.destination(account: account, session: session) == link else { return }
+      navigate(to: link)
+      if let queued = invites.didNavigate(to: link, account: account, session: session), !invites.route(queued) {
+        pendingLink = queued
       }
+    }
+  }
+
+  private func navigate(to link: AppLink) {
+    switch link.path {
+    case ["map"]: library = false; path = []
+    case ["home"]: library = true; path = []
+    case ["sign-in"]: break
+    default: path = [link]
     }
   }
 
