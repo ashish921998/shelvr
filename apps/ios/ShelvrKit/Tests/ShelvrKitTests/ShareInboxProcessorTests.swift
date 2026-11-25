@@ -78,6 +78,7 @@ private final class RecordingPhotoMutations: PhotoMutationClient {
     saver.refuseLink = true
     let refusal = try #require(await processor.drain(owner: "first"))
     #expect(refusal.copyKey == "freePlan.leftBody")
+    #expect(refusal.requiresPro)
     #expect(try refusal.share?.delivery.get().operationID == link.operationID)
 
     saver.refuseLink = false

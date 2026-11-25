@@ -3,18 +3,20 @@ import ShelvrKit
 import SwiftUI
 
 struct SignedInView: View {
-  @Binding var pendingLink: AppLink?
   @Environment(Backend.self) private var backend
+  @State private var access = PlanAccess()
+  @Binding var pendingLink: AppLink?
   @Environment(InviteEntry.self) private var invites
   @Environment(\.copy) private var copy
   @State private var library = false
+  @State private var billing: BillingDestination?
   @State private var path: [AppLink] = []
   @State private var stampMessage: String?
 
   var body: some View {
     NavigationStack(path: $path) {
       Group {
-        if library {
+        if access.loading { loadingPlan } else if access.locked { PlanGateView() } else if library {
           LibraryView(screen: .home)
         } else {
           SavedPlacesMap(open: open)
@@ -29,7 +31,7 @@ struct SignedInView: View {
         }
       }
       .safeAreaInset(edge: .bottom) {
-        HStack {
+        if !access.loading && !access.locked { HStack {
           Button { library.toggle() } label: {
             Label(copy(library ? "navigation.map" : "navigation.library"),
               systemImage: library ? "map.fill" : "books.vertical.fill")
@@ -49,22 +51,30 @@ struct SignedInView: View {
         .font(.subheadline.weight(.medium))
         .padding(.horizontal, 20)
         .padding(.vertical, 6)
-        .background(.thinMaterial)
+        .background(.thinMaterial) }
       }
       .navigationDestination(for: AppLink.self) { link in
-        switch link.path.first {
+        if access.loading && PlanRoutes.needsLoadedPlan(link) { loadingPlan }
+        else if access.locked && !PlanRoutes.allowedWithoutPersonalAccess(link) { PlanGateView() }
+        else { switch link.path.first {
         case "settings": AccountSettingsView()
         case "profile": AccountView().navigationTitle(copy("navigation.profile"))
         case "add-spots":
           List {
             entry("/add", "addSheet.pasteLink", "link")
+            entry("/add", "addSheet.googleMapsList", "map")
+            entry("/new-shared-list", "sharedLists.newTitle", "person.2")
+            entry("/new-trip", "homePlaces.planTrip", "suitcase")
             entry("/photo", "item.photo", "photo")
             entry("/how-to-share", "addSheet.howToShare", "square.and.arrow.up")
-            entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
+            if Locale.preferredLanguages.first?.hasPrefix("en") == true {
+              entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
+            }
           }
           .navigationTitle(copy("addSheet.title"))
         case "passport-story": PassportStoryView()
         case "trips": TripsTabView()
+        case "shared-trip-links": ActiveTripLinksView()
         case "shared-lists", "collections": SharedListsView(collections: link.path.first == "collections")
         case "new-shared-list":
           CreateListView { id in
@@ -92,7 +102,7 @@ struct SignedInView: View {
           if let city = link.query.first(where: { $0.name == "city" })?.value { CityMapCardView(city: city).id(city) }
           else { LibraryCitiesView() }
         case "add-list-place":
-          if let id = link.query.first(where: { $0.name == "listId" })?.value {
+          if let id = PlanRoutes.listID(link) {
             SocialQuery(query: "sharedLists:getSharedList", arguments: ["listId": id], type: SharedListDetail?.self) { list in
               if let list { AddListPlaceView(detail: list, initialCity: link.query.first { $0.name == "city" }?.value) }
               else { ContentUnavailableView(copy("sharedLists.goneTitle"), systemImage: "person.2") }
@@ -127,7 +137,7 @@ struct SignedInView: View {
               if path.last == link { path[path.count - 1] = result }
             }
           } else if let city = link.query.first(where: { $0.name == "city" })?.value, !city.isEmpty {
-            let listID = link.query.first(where: { $0.name == "listId" })?.value
+            let listID = PlanRoutes.listID(link)
             if link.path.first == "new-trip" {
               NewCityTripView(city: city, listID: listID) { created in
                 guard path.last == link else { return }
@@ -141,22 +151,48 @@ struct SignedInView: View {
                 if path.last == link, let next = parts.string.flatMap({ AppLink($0) }) { path[path.count - 1] = next }
               }.id(link)
             } else { CityDateView(city: city, listID: listID).id(link) }
+          } else if let listID = PlanRoutes.listID(link) {
+            SocialQuery(query: "sharedLists:getSharedList", arguments: ["listId": listID], type: SharedListDetail?.self) { list in
+              List(list?.cities ?? [], id: \.self) { city in
+                var route: URLComponents {
+                  var parts = URLComponents()
+                  parts.path = link.path.first == "new-trip" ? "/new-trip" : "/date-plan"
+                  parts.queryItems = [URLQueryItem(name: "city", value: city), URLQueryItem(name: "listId", value: listID)]
+                  return parts
+                }
+                if let target = route.string.flatMap({ AppLink($0) }) { NavigationLink(city, value: target) }
+              }
+            }
           } else { PlanCityView(trip: link.path.first == "new-trip") }
+        case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1], sharedOnly: access.restrictsPersonalAccess).id(link.path[1])
         case "add-trip-stop":
           if let id = link.query.first(where: { $0.name == "tripId" })?.value {
             let day = link.query.first(where: { $0.name == "day" })?.value.flatMap(Int.init) ?? 1
-            AddTripStopView(id: id, initialDay: day).id(link)
+            if access.restrictsPersonalAccess {
+              SocialQuery(query: "tripPlannerData:getSharedTripPlan", arguments: ["tripId": id], type: CityTrip?.self) { trip in
+                if let trip, trip.listId != nil { AddTripStopView(id: id, initialDay: day, sharedTrip: trip).id(link) }
+                else if access.loading { loadingPlan }
+                else { PlanGateView() }
+              }
+            } else { AddTripStopView(id: id, initialDay: day).id(link) }
           } else { ShellDestination(link: link) }
-        case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1]).id(link.path[1])
         case "photo": PhotoSaveView()
         case "how-to-share": SaveInstructions(siri: false)
         case "save-with-siri": SaveInstructions(siri: true)
+        case "plan-gate", "paywall": PlanGateView()
         default: ShellDestination(link: link)
-        }
+        } }
       }
     }
     .modifier(CancelSurveyCard(home: library && path.isEmpty))
     .modifier(TrialReminderObserver(home: library && path.isEmpty))
+    .environment(access)
+    .sheet(item: $billing) { BillingSheet(destination: $0, confirmed: { access.retry += 1 }) }
+    .task(id: access.retry) { await access.readPlan(backend) }
+    .task(id: "\(access.retry):\(access.plan == nil):\(access.pro)") { await access.readAllowance(backend) }
+    .task(id: access.plan?.expiresAt) {
+      if let expiration = access.plan?.expiresAt, access.pro { await access.expire(at: expiration) }
+    }
     .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
       Button(copy("common.close")) {}
     } message: { Text(stampMessage ?? "") }
@@ -178,10 +214,20 @@ struct SignedInView: View {
 
   private func navigate(to link: AppLink) {
     switch link.path {
-    case ["map"]: library = false; path = []
+    case ["map"], ["share"], ["plan-gate"]: library = false; path = []
     case ["home"]: library = true; path = []
+    case ["paywall"]: billing = .paywall
     case ["sign-in"]: break
     default: path = [link]
+    }
+  }
+
+  @ViewBuilder private var loadingPlan: some View {
+    VStack(spacing: 16) {
+      if access.failed { Button(copy("common.retry")) { access.retry += 1 } }
+      else { ProgressView(copy("pro.checking")) }
+      entry("/shared-lists", "sharedLists.title", "person.2")
+      entry("/shared-trip-links", "tripShare.manage", "link")
     }
   }
 

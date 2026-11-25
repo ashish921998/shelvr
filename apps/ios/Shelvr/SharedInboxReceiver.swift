@@ -10,24 +10,40 @@ struct SharedInboxReceiver: ViewModifier {
   @Environment(\.scenePhase) private var phase
   @Environment(\.copy) private var copy
   @State private var failure: ShareInboxProcessor.Failure?
+  @State private var billing: BillingDestination?
+  @State private var retryAfterBilling = false
 
   func body(content: Content) -> some View {
     content
       .onChange(of: phase) { _, phase in InboxSignal.shared.updatePhase(phase) }
       .onChange(of: backend.status, initial: true) { syncOwner() }
-      .onChange(of: backend.userID) { failure = nil; syncOwner() }
+      .onChange(of: backend.userID) {
+        failure = nil
+        retryAfterBilling = false
+        billing = nil
+        syncOwner()
+      }
       .task { await receive() }
+      .sheet(item: $billing, onDismiss: {
+        if retryAfterBilling {
+          retryAfterBilling = false
+          InboxSignal.shared.wake()
+        }
+      }) { destination in
+        BillingSheet(destination: destination, confirmed: { retryAfterBilling = true })
+      }
       .alert(copy("share.singleFailure"), isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
-        if let failure, failure.canRecoverNote, let share = failure.share {
+        if failure?.requiresPro == true {
+          Button(copy("freePlan.seePlans")) { billing = .paywall }
+        } else if let failure, failure.canRecoverNote, let share = failure.share {
           Button(copy("share.copyNote")) { copyRecoveredNote(share) }
         } else {
           Button(copy("common.tryAgain")) { failure = nil; InboxSignal.shared.wake() }
-          if let share = failure?.share {
-            Button(copy("common.delete"), role: .destructive) {
-              try? share.discard()
-              failure = nil
-              InboxSignal.shared.wake()
-            }
+        }
+        if let failure, !failure.canRecoverNote, let share = failure.share {
+          Button(copy("common.delete"), role: .destructive) {
+            try? share.discard()
+            InboxSignal.shared.wake()
           }
         }
         Button(copy("common.close"), role: .cancel) {}
@@ -63,7 +79,7 @@ struct SharedInboxReceiver: ViewModifier {
         try? inbox.prune(keeping: nil)
         continue
       }
-      guard currentPhase == .active, failure == nil, let owner = backend.userID else { continue }
+      guard currentPhase == .active, failure == nil, billing == nil, let owner = backend.userID else { continue }
       do {
         let result = try await processor.drain(owner: owner, deliverSiri: SiriInboxDelivery(backend: backend).send)
         if !Task.isCancelled, backend.userID == owner { failure = result }

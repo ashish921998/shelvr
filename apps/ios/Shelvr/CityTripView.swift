@@ -89,6 +89,7 @@ struct NewCityTripView: View {
 
 struct CityTripView: View {
   let id: String
+  var sharedOnly = false
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.dismiss) private var dismiss
@@ -108,6 +109,7 @@ struct CityTripView: View {
   var body: some View {
     Group {
       if failed { Button(copy("common.retry")) { attempt += 1 } }
+      else if loaded && sharedOnly && trip?.listId == nil { TripRevocationView(id: id) }
       else if let trip {
         List {
           ForEach(Array(trip.days.enumerated()), id: \.offset) { index, stops in
@@ -163,10 +165,16 @@ struct CityTripView: View {
       try? await Task.sleep(for: .seconds(10))
       if !Task.isCancelled { undo = nil }
     }
-    .task(id: attempt) {
+    .task(id: "\(attempt):\(sharedOnly)") {
       failed = false
+      loaded = false
+      trip = nil
       do {
-        for try await trip in backend.cityTrip(id) { self.trip = trip; loaded = true }
+        for try await trip in backend.cityTrip(id, sharedOnly: sharedOnly) {
+          try Task.checkCancellation()
+          self.trip = trip
+          loaded = true
+        }
       } catch { if !Task.isCancelled { failed = true } }
     }
   }
