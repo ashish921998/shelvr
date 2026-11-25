@@ -25,6 +25,7 @@ struct MapCanvas: UIViewRepresentable {
     map.register(PlaceAnnotationView.self, forAnnotationViewWithReuseIdentifier: PlaceAnnotationView.placeIdentifier)
     map.register(PlaceAnnotationView.self, forAnnotationViewWithReuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
     map.pointOfInterestFilter = .excludingAll
+    context.coordinator.installNames(on: map)
     return map
   }
 
@@ -50,7 +51,18 @@ struct MapCanvas: UIViewRepresentable {
     var opened = false
     var queryingNearby = false
     private var compactPins = true
+    private var nameLayout: Task<Void, Never>?
+    private let addedViews = NSHashTable<PlaceAnnotationView>.weakObjects()
+    private let nameOverlay = UIView()
     init(_ parent: MapCanvas) { self.parent = parent }
+
+    func installNames(on map: MKMapView) {
+      nameOverlay.frame = map.bounds
+      nameOverlay.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+      nameOverlay.isUserInteractionEnabled = false
+      nameOverlay.accessibilityElementsHidden = true
+      map.addSubview(nameOverlay)
+    }
 
     func update(_ parent: MapCanvas, map: MKMapView) {
       let changedLocation = self.parent.location !== parent.location
@@ -94,6 +106,7 @@ struct MapCanvas: UIViewRepresentable {
         opened = true
         fit(places, on: map, animated: false)
       }
+      scheduleNames(on: map)
     }
 
     private func fit(_ places: [MapPlace], on map: MKMapView, animated: Bool) {
@@ -114,6 +127,9 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     func mapView(_ map: MKMapView, regionWillChangeAnimated animated: Bool) {
+      clearNames()
+      nameLayout?.cancel()
+      nameLayout = nil
       if hasActiveGesture(map) { opened = true; queryingNearby = false }
     }
 
@@ -127,6 +143,7 @@ struct MapCanvas: UIViewRepresentable {
     func mapView(_ map: MKMapView, regionDidChangeAnimated animated: Bool) {
       let region = map.region
       updatePinScale(on: map)
+      scheduleNames(on: map)
       if let box = DiscoverBox.visible(latitude: region.center.latitude, longitude: region.center.longitude,
         latitudeDelta: region.span.latitudeDelta, longitudeDelta: region.span.longitudeDelta,
         width: map.bounds.width, height: map.bounds.height, tilted: map.camera.pitch > 0) {
@@ -136,6 +153,81 @@ struct MapCanvas: UIViewRepresentable {
         let viewport = MapViewport(center: region.center,
           cityScale: region.span.longitudeDelta <= map.bounds.width * 360 / (256 * 512))
         Task { @MainActor in parent.onArea(result, viewport) }
+      }
+    }
+
+    func mapViewDidChangeVisibleRegion(_ map: MKMapView) {
+      clearNames()
+      nameLayout?.cancel()
+      nameLayout = nil
+      scheduleNames(on: map)
+    }
+
+    func mapView(_ map: MKMapView, didAdd views: [MKAnnotationView]) {
+      for case let view as PlaceAnnotationView in views { addedViews.add(view) }
+      scheduleNames(on: map)
+    }
+
+    func mapViewDidFinishRenderingMap(_ map: MKMapView, fullyRendered: Bool) {
+      scheduleNames(on: map)
+    }
+
+    private func scheduleNames(on map: MKMapView) {
+      guard !compactPins, nameLayout == nil else { return }
+      nameLayout = Task { @MainActor [weak self, weak map] in
+        do { try await Task.sleep(for: .milliseconds(100)) } catch { return }
+        guard !Task.isCancelled, let self else { return }
+        nameLayout = nil
+        guard let map, !compactPins else { return }
+        layoutNames(on: map)
+      }
+    }
+
+    private func clearNames() {
+      for label in nameOverlay.subviews { label.removeFromSuperview() }
+    }
+
+    private func layoutNames(on map: MKMapView) {
+      clearNames()
+      let usable = map.bounds.inset(by: UIEdgeInsets(top: map.safeAreaInsets.top + parent.topControlsHeight + 8,
+        left: 8, bottom: map.safeAreaInsets.bottom + parent.bottomControlsHeight + 8, right: 8))
+      let visible = addedViews.allObjects.filter { view in
+        guard let annotation = view.annotation else { return false }
+        return map.view(for: annotation) === view && !view.isHidden &&
+          map.bounds.intersects(view.convert(view.bounds, to: map))
+      }
+      let targets = visible.map { (view: $0, frame: $0.convert($0.pinHitBounds, to: map)) }
+      var occupied: [CGRect] = []
+      if let location = map.view(for: map.userLocation) {
+        occupied.append(location.convert(location.bounds, to: map).insetBy(dx: -2, dy: -2))
+      }
+      let candidates = visible.compactMap { view -> (view: PlaceAnnotationView, pin: Pin, distance: CGFloat)? in
+        guard let pin = view.annotation as? Pin else { return nil }
+        let center = view.convert(CGPoint(x: view.bounds.midX, y: view.bounds.midY), to: map)
+        guard usable.contains(center) else { return nil }
+        let distance = hypot(center.x - usable.midX, center.y - usable.midY)
+        return (view, pin, distance)
+      }.sorted {
+        if $0.pin.place.isSaved != $1.pin.place.isSaved { return $0.pin.place.isSaved }
+        if $0.distance != $1.distance { return $0.distance < $1.distance }
+        return $0.pin.place.id < $1.pin.place.id
+      }
+      map.bringSubviewToFront(nameOverlay)
+      for candidate in candidates {
+        let view = candidate.view
+        let marker = view.convert(view.bounds, to: map)
+        let badge = MapPlaceNameBadge(title: candidate.pin.place.name, traits: map.traitCollection)
+        for x in [marker.maxX + 3, marker.minX - badge.bounds.width - 3] {
+          let frame = CGRect(x: x, y: marker.midY - badge.bounds.height / 2,
+            width: badge.bounds.width, height: badge.bounds.height)
+          guard usable.contains(frame),
+            !targets.contains(where: { $0.view !== view && $0.frame.intersects(frame) }),
+            !occupied.contains(where: { $0.intersects(frame) }) else { continue }
+          badge.frame = frame
+          nameOverlay.addSubview(badge)
+          occupied.append(frame.insetBy(dx: -3, dy: -3))
+          break
+        }
       }
     }
 
@@ -153,6 +245,7 @@ struct MapCanvas: UIViewRepresentable {
       let next = compactPins ? metersPerPoint > 8 : metersPerPoint >= 10
       guard next != compactPins else { return }
       compactPins = next
+      clearNames()
       let annotations = Array(pins.values)
       map.removeAnnotations(annotations)
       map.addAnnotations(annotations)
@@ -166,7 +259,10 @@ struct MapCanvas: UIViewRepresentable {
       default: return nil
       }
       let view = map.dequeueReusableAnnotationView(withIdentifier: identifier, for: annotation) as? PlaceAnnotationView
-      view?.configure(copy: parent.copy, compact: compactPins)
+      if let view {
+        addedViews.add(view)
+        view.configure(copy: parent.copy, compact: compactPins)
+      }
       return view
     }
 
