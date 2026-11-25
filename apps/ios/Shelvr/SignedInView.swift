@@ -47,9 +47,10 @@ struct SignedInView: View {
       .foregroundStyle(highlighted ? Color.black : Color.primary, Color("AccentColor"))
     return Button(action: action) {
       Group {
-        if toolbarTextSize <= .xxLarge {
+        if !toolbarTextSize.isAccessibilitySize {
           VStack(spacing: 2) {
-            icon.font(highlighted ? .title3.weight(.medium) : .subheadline).frame(height: 24)
+            icon.font(highlighted ? .title3.weight(.medium) : .subheadline)
+              .dynamicTypeSize(...DynamicTypeSize.xLarge).frame(height: 24)
             Text(title).font(.caption2).lineLimit(1).minimumScaleFactor(0.8)
           }
         } else if highlighted {
