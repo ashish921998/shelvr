@@ -331,3 +331,13 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   try await next.value
   #expect(nextRan)
 }
+
+@MainActor @Test func aReadReturningAfterTheDeadlineCannotWinAgainstADelayedTimer() async {
+  let deadline = ContinuousClock.now.advanced(by: .milliseconds(30))
+  await #expect(throws: URLError(.timedOut)) {
+    try await SpotlightReindexRead.value(before: deadline) {
+      _ = DispatchSemaphore(value: 0).wait(timeout: .now() + .milliseconds(50))
+      return "late grant"
+    }
+  }
+}

@@ -54,6 +54,7 @@ import Foundation
         pending.reader = Task { [weak pending] in
           do {
             let value = try await read()
+            guard ContinuousClock.now < deadline else { throw URLError(.timedOut) }
             pending?.finish(.success(value))
           } catch { pending?.finish(.failure(error)) }
         }
