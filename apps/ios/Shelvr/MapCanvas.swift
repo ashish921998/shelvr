@@ -156,9 +156,14 @@ struct MapCanvas: UIViewRepresentable {
       scheduleNames(on: map)
     }
 
+    func mapViewDidFinishRenderingMap(_ map: MKMapView, fullyRendered: Bool) {
+      scheduleNames(on: map)
+    }
+
     private func scheduleNames(on map: MKMapView) {
       guard !cameraMoving, !compactPins, nameLayout == nil else { return }
       nameLayout = Task { @MainActor [weak self, weak map] in
+        try? await Task.sleep(for: .milliseconds(60))
         guard let self else { return }
         nameLayout = nil
         guard let map, !cameraMoving, !compactPins else { return }
