@@ -292,3 +292,42 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   await index.settled()
   #expect(os.items.isEmpty && index.needsReauthorization(after: request))
 }
+
+@MainActor @Test func reindexRetainsKnownGoodRowsWhileAnUpsertIsInFlight() async throws {
+  let os = TestSearchIndex(), index = os.make()
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let existing = try spotlightRow("existing"), added = try spotlightRow("new")
+  index.activate(owner)
+  index.publish([existing], for: owner)
+  await index.settled()
+  let initialClears = os.cleared
+  let ticket = try await index.beginReindex(for: owner)
+  os.willBlock = true
+  let task = Task { try await index.finishReindex([existing, added], request: ticket, confirmGrant: { owner }) }
+  let blocked = await observed { os.blocked != nil }
+  try #require(blocked)
+  #expect(os.items["existing"] == existing && os.cleared == initialClears)
+  os.blocked?.resume()
+  try await task.value
+  #expect(Set(os.items.keys) == ["existing", "new"])
+}
+
+@MainActor @Test func aReadThatDoesNotHonorCancellationCannotBlockTheNextRebuild() async throws {
+  let queue = SpotlightReindexQueue()
+  var release: CheckedContinuation<String, Never>?
+  let stuck = Task {
+    try await queue.run {
+      _ = try await SpotlightReindexRead.value(before: .now.advanced(by: .milliseconds(150))) {
+        await withCheckedContinuation { release = $0 }
+      }
+    }
+  }
+  let started = await observed { release != nil }
+  try #require(started)
+  defer { release?.resume(returning: "late result") }
+  var nextRan = false
+  let next = Task { try await queue.run { nextRan = true } }
+  await #expect(throws: URLError(.timedOut)) { try await stuck.value }
+  try await next.value
+  #expect(nextRan)
+}

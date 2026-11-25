@@ -35,24 +35,28 @@ import ShelvrKit
   private func rebuild() async throws {
     monitorIdentity()
     try await publication.prepareForSystemRequest()
-    await backend.start()
+    let deadline = ContinuousClock.now.advanced(by: .seconds(30))
+    try await SpotlightReindexRead.value(before: deadline) { await self.backend.start() }
     let session = backend.sessionGeneration
     guard backend.status == .signedIn, let account = backend.userID else {
+      let signedOut = backend.status == .signedOut
       try await deny(account: backend.userID, session: session)
+      if !signedOut { throw URLError(.notConnectedToInternet) }
       return
     }
-    guard let owner = try await access(account: account, session: session) else {
+    guard let owner = try await access(account: account, session: session, deadline: deadline) else {
       try await deny(account: account, session: session)
       return
     }
     let request = try await publication.beginReindex(for: owner)
-    guard let rows = await SearchableSavePage.latestReady(fetch: { cursor in
-      await self.page(after: cursor, owner: owner)
-    }) else { throw URLError(.cannotLoadFromNetwork) }
-    try await verify(request, account: account, session: session)
+    let snapshot = try await SpotlightReindexRead.value(before: deadline) {
+      await SearchableSavePage.latestReady { cursor in await self.page(after: cursor, owner: owner) }
+    }
+    guard let rows = snapshot else { throw URLError(.cannotLoadFromNetwork) }
+    try await verify(request, account: account, session: session, deadline: deadline)
     do {
       try await publication.finishReindex(rows, request: request) {
-        try await self.access(account: account, session: session)
+        try await self.access(account: account, session: session, deadline: deadline)
       }
     } catch {
       retryViewIfRevoked(request, account: account, session: session)
@@ -60,8 +64,9 @@ import ShelvrKit
     }
   }
 
-  private func verify(_ request: SpotlightPublication.ReindexRequest, account: String, session: UUID) async throws {
-    let grant = try await access(account: account, session: session)
+  private func verify(_ request: SpotlightPublication.ReindexRequest, account: String, session: UUID,
+    deadline: ContinuousClock.Instant) async throws {
+    let grant = try await access(account: account, session: session, deadline: deadline)
     do { try await publication.validate(request, grant: grant) }
     catch {
       retryViewIfRevoked(request, account: account, session: session)
@@ -75,16 +80,17 @@ import ShelvrKit
     }
   }
 
-  private func access(account: String, session: UUID) async throws -> SpotlightPublication.Owner? {
+  private func access(account: String, session: UUID, deadline: ContinuousClock.Instant) async throws -> SpotlightPublication.Owner? {
     do {
-      for try await plan in backend.query("subscriptions:getEntitlement", as: ServerPlan.self) {
-        try Task.checkCancellation()
-        guard backend.userID == account, backend.sessionGeneration == session else { throw CancellationError() }
-        guard plan.entitled else { return nil }
-        let expiry = plan.status == "lifetime" ? nil : plan.expiresAt.map { Date(timeIntervalSince1970: $0 / 1000) }
-        return .init(account: account, session: session, expiresAt: expiry)
+      let plan = try await SpotlightReindexRead.value(before: deadline) {
+        for try await plan in self.backend.query("subscriptions:getEntitlement", as: ServerPlan.self) { return plan }
+        throw URLError(.cannotParseResponse)
       }
-      throw URLError(.cannotParseResponse)
+      try Task.checkCancellation()
+      guard backend.userID == account, backend.sessionGeneration == session else { throw CancellationError() }
+      guard plan.entitled else { return nil }
+      let expiry = plan.status == "lifetime" ? nil : plan.expiresAt.map { Date(timeIntervalSince1970: $0 / 1000) }
+      return .init(account: account, session: session, expiresAt: expiry)
     } catch {
       if !Task.isCancelled && backend.userID == account && backend.sessionGeneration == session {
         try await deny(account: account, session: session)

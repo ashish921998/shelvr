@@ -37,6 +37,7 @@ import Foundation
   private var wantedImages = Set<SpotlightThumbnail>()
   private var images: [SpotlightThumbnail: Data] = [:]
   private var needsReset = true
+  private var rewriteAll = false
   private var prepared = false
   private var revision: UInt64 = 0
   private var authorization = UUID()
@@ -147,7 +148,7 @@ import Foundation
     guard current(request) && request.owner.active && isCurrent(request.owner)
     else { throw CancellationError() }
     if request.snapshotRevision == snapshotRevision { publish(rows, for: request.owner) }
-    needsReset = true
+    rewriteAll = true
     schedule()
     do {
       try await confirmSystemWrite()
@@ -233,7 +234,7 @@ import Foundation
     let changed = desired.compactMap { row -> SpotlightEntry? in
       let thumbnail = SpotlightThumbnail(row).flatMap { images[$0] }
       let entry = SpotlightEntry(save: row, thumbnail: thumbnail)
-      return entry == applied[row._id] ? nil : entry
+      return !rewriteAll && entry == applied[row._id] ? nil : entry
     }
     for offset in stride(from: 0, to: changed.count, by: 100) {
       guard job == revision else { return }
@@ -244,6 +245,7 @@ import Foundation
       if self.owner == owner && (!owner.active || !isCurrent(owner)) { activate(nil); return }
       for entry in batch { applied[entry.save._id] = entry }
     }
+    if job == revision { rewriteAll = false }
     if applied.isEmpty { mayHaveIndexedItems = false }
   }
 }
