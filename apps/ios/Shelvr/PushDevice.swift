@@ -10,13 +10,14 @@ final class PushDevice: NSObject, UIApplicationDelegate, UNUserNotificationCente
   @Published private(set) var blockedSession: UUID?
 
   func retryEnrollment() {
-    retryRotationOnReturn()
+    if delivery.rotationDeferred { delivery = PushDeliveryState() }
     blockedSession = nil
     authorizationRevision += 1
   }
 
-  func retryRotationOnReturn() {
-    if delivery.rotationDeferred { delivery = PushDeliveryState() }
+  func observePhase(_ phase: ScenePhase) {
+    if phase == .background { delivery.enteredBackground() }
+    if phase == .active, delivery.resumeAfterBackground() { authorizationRevision += 1 }
   }
 
   func rejectOwnership(for session: UUID) {
@@ -107,7 +108,7 @@ struct PushRegistrationView: ViewModifier {
 
   func body(content: Content) -> some View {
     content.onChange(of: phase) { _, phase in
-      if phase == .background { device.retryRotationOnReturn() }
+      device.observePhase(phase)
     }.task(id: Request(token: device.delivery.token, session: backend.sessionGeneration, active: phase == .active,
       authorizationRevision: device.authorizationRevision)) {
       let generation = backend.sessionGeneration

@@ -322,3 +322,18 @@ private final class OtherPushOwner: URLProtocol, @unchecked Sendable {
   _ = delivery.prepare(generation: next, verified: [])
   #expect(!delivery.rotationDeferred && !delivery.permitsPresentation)
 }
+
+@Test func rotationCallbackWhileBackgroundedRetriesAtTheNextForegroundVisit() {
+  let session = UUID(), native = Data([30])
+  var delivery = PushDeliveryState()
+  _ = delivery.prepare(generation: session, verified: [])
+  _ = delivery.receive(native)
+  _ = delivery.confirm(native, generation: session)
+  delivery.enteredBackground()
+  _ = delivery.receive(Data([31]))
+  #expect(delivery.defersEnrollment(for: session))
+  let restarted = delivery.resumeAfterBackground()
+  #expect(restarted && !delivery.rotationDeferred && !delivery.permitsPresentation)
+  let duplicate = delivery.resumeAfterBackground()
+  #expect(!duplicate)
+}
