@@ -29,10 +29,15 @@ struct SiriFolderRefresh: ViewModifier {
   @Environment(Backend.self) private var backend
   @Environment(\.scenePhase) private var phase
 
+  private struct Eligibility: Equatable {
+    let entitled: Bool
+    let active: Bool
+  }
+
   func body(content: Content) -> some View {
     #if compiler(>=6.4)
       if #available(iOS 27.0, *) {
-        content.task(id: entitled && phase == .active) {
+        content.task(id: Eligibility(entitled: entitled, active: phase == .active)) {
           guard entitled else {
             ShelvrShortcuts.updateAppShortcutParameters()
             return
