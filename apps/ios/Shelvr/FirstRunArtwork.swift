@@ -132,3 +132,48 @@ struct OnboardingOpener: View {
     }
   }
 }
+
+struct FirstRunPillStyle: ButtonStyle {
+  @Environment(\.isEnabled) private var enabled
+
+  func makeBody(configuration: Configuration) -> some View {
+    configuration.label.opacity(enabled ? (configuration.isPressed ? 0.78 : 1) : 0.4)
+  }
+}
+
+struct PracticeShareGuide: View {
+  let complete: () -> Void
+  @Environment(\.copy) private var copy
+  @State private var stage = 0
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 18) {
+      Text(copy(["aha.coachShare", "aha.coachMore", "aha.coachShelvr"][stage]))
+        .font(.custom("Satoshi-Bold", size: 24, relativeTo: .title2)).accessibilityAddTraits(.isHeader)
+      if stage == 2 {
+        Text(copy("aha.sheetApps")).font(.title2.weight(.bold))
+        Button(action: complete) {
+          HStack {
+            FirstRunPicture(name: "first-run-icon", ext: "png").frame(width: 40, height: 40).clipShape(.rect(cornerRadius: 10))
+            Text("Shelvr").font(.headline)
+          }.frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+        }.buttonStyle(.plain)
+      } else {
+        let items = stage == 0 ? [("aha.sheetStory","plus"), ("aha.shareMessages","message"), ("aha.sheetShareTo","square.and.arrow.up")] :
+          [("aha.sheetMail","envelope"), ("aha.sheetNotes","note.text"), ("aha.sheetMore","ellipsis")]
+        HStack(alignment: .top) {
+          ForEach(items.indices, id: \.self) { i in
+            let tile = VStack(spacing: 6) {
+              Image(systemName: items[i].1).font(.title2).frame(width: 50, height: 50)
+                .background(.thinMaterial, in: .rect(cornerRadius: 12))
+              Text(copy(items[i].0)).font(.caption)
+            }.frame(maxWidth: .infinity)
+            if i == 2 { Button { stage += 1 } label: { tile }.buttonStyle(.plain) }
+            else { tile.opacity(0.6).accessibilityHidden(true) }
+          }
+        }
+      }
+    }.padding(24).frame(maxWidth: .infinity, alignment: .leading)
+      .presentationDetents([.medium, .large]).presentationDragIndicator(.visible)
+  }
+}
