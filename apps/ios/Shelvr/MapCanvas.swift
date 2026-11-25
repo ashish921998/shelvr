@@ -52,6 +52,7 @@ struct MapCanvas: UIViewRepresentable {
     private var compactPins = true
     private var cameraMoving = false
     private var nameLayout: Task<Void, Never>?
+    private let addedViews = NSHashTable<PlaceAnnotationView>.weakObjects()
     private var namedPins: [PlaceAnnotationView] = []
     init(_ parent: MapCanvas) { self.parent = parent }
 
@@ -148,6 +149,7 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     func mapView(_ map: MKMapView, didAdd views: [MKAnnotationView]) {
+      for case let view as PlaceAnnotationView in views { addedViews.add(view) }
       scheduleNames(on: map)
     }
 
@@ -170,13 +172,15 @@ struct MapCanvas: UIViewRepresentable {
       clearNames()
       let usable = map.bounds.inset(by: UIEdgeInsets(top: map.safeAreaInsets.top + parent.topControlsHeight + 8,
         left: 8, bottom: map.safeAreaInsets.bottom + parent.bottomControlsHeight + 8, right: 8))
-      let visible = map.annotations(in: map.visibleMapRect).compactMap { element -> PlaceAnnotationView? in
-        guard let annotation = element as? any MKAnnotation,
-          let view = map.view(for: annotation) as? PlaceAnnotationView,
-          view.superview != nil, !view.isHidden else { return nil }
-        return view
+      let visible = addedViews.allObjects.filter { view in
+        guard let annotation = view.annotation else { return false }
+        return map.view(for: annotation) === view && !view.isHidden &&
+          map.bounds.intersects(view.convert(view.bounds, to: map))
       }
       var occupied = visible.map { $0.convert($0.bounds, to: map).insetBy(dx: -2, dy: -2) }
+      if let location = map.view(for: map.userLocation) {
+        occupied.append(location.convert(location.bounds, to: map).insetBy(dx: -2, dy: -2))
+      }
       let candidates = visible.compactMap { view -> (view: PlaceAnnotationView, pin: Pin, distance: CGFloat)? in
         guard let pin = view.annotation as? Pin else { return nil }
         let center = view.convert(CGPoint(x: view.bounds.midX, y: view.bounds.midY), to: map)
