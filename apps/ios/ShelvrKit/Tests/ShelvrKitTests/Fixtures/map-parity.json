@@ -111,7 +111,9 @@
     {"source": "discover", "name": "Café Marais", "city": "Paris"},
     {"source": "own", "name": "ガーデン", "city": "東京"},
     {"source": "own", "name": "Straße", "city": "Berlin"},
-    {"source": "own", "name": "ΒΟΛΟΣ", "city": "Greece"}
+    {"source": "own", "name": "ΒΟΛΟΣ", "city": "Greece"},
+    {"source": "own", "name": "서울", "city": "Korea"},
+    {"source": "discover", "name": "👩‍🍳 Kitchen", "city": "New York"}
   ],
   "search": [
     {"query": "  CAFÉ  ", "names": ["Café Aurora", "Café Atlas", "North Pier", "Luna Café", "Café Garden", "Café Marais", "The Arcade"]},
@@ -123,7 +125,10 @@
     {"query": "カ", "names": ["ガーデン"]},
     {"query": "strasse", "names": []},
     {"query": "straße", "names": ["Straße"]},
-    {"query": "βολος", "names": ["ΒΟΛΟΣ"]}
+    {"query": "βολος", "names": ["ΒΟΛΟΣ"]},
+    {"query": "\u3099", "names": []},
+    {"query": "ᄉ", "names": ["서울"]},
+    {"query": "👩", "names": ["👩‍🍳 Kitchen"]}
   ],
   "reach": [
     {"latitude": 38.72, "longitude": -9.14, "box": {"west": -9.3, "south": 38.65, "east": -9, "north": 38.8}, "expected": {"west": -10.5, "south": 38, "east": -8, "north": 39.25}},
