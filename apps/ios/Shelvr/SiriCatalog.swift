@@ -14,19 +14,11 @@ protocol AppIntentEntityRecordConvertible {
 }
 
 @MainActor enum ShelvrCatalog {
-  private struct Folder: Decodable {
+  struct Folder: Decodable {
     let _id: String
     let name: String
   }
-  private struct Save: Decodable {
-    let _id: String
-    let _creationTime: Double
-    let note: String?
-    let title: String?
-    let type: String
-    let status: String
-    let url: String?
-  }
+  private typealias Save = SearchableSave
 
   private struct Plan: Decodable {
     let status: String
@@ -52,25 +44,34 @@ protocol AppIntentEntityRecordConvertible {
         if let record = await resolve(id, owner: account.owner) { records.append(record) }
       }
     } else {
-      struct Page: Decodable {
-        let page: [Save]
-        let continueCursor: String
-        let isDone: Bool
-      }
-      var cursor: String?
-      var scanned = 0
-      var seenCursors = Set<String>()
-      while scanned < 300 {
-        let pagination: [String: ConvexEncodable?] = ["numItems": Double(min(100, 300 - scanned)), "cursor": cursor]
-        guard let page: Page = await first("items:listItemsPage", args: ["paginationOpts": pagination]) else { break }
-        records += page.page.filter { $0.type == "note" && $0.status == "ready" }
-          .map { record($0, as: $0._id, fullContent: false) }
-        scanned += page.page.count
-        if page.isDone || !seenCursors.insert(page.continueCursor).inserted { break }
-        cursor = page.continueCursor
-      }
+      records = await readySaves(account: account).filter { $0.type == "note" }
+        .map { record($0, as: $0._id, fullContent: false) }
     }
     return await permits(account) ? records : []
+  }
+
+  static func searchSaves(matching ids: [String]? = nil) async -> [SearchableSave] {
+    guard let account = SiriCredential.current(), await permits(account) else { return [] }
+    let saves: [Save]
+    if let ids {
+      var found: [Save] = []
+      for id in ids {
+        guard !Task.isCancelled, SiriCredential.current()?.token == account.token else { return [] }
+        if let save: Save = await first("items:getItem", args: ["id": id]), save.status == "ready" { found.append(save) }
+      }
+      saves = found
+    } else {
+      saves = await readySaves(account: account)
+    }
+    return await permits(account) ? saves : []
+  }
+
+  private static func readySaves(account: SiriCredential) async -> [Save] {
+    await SearchableSavePage.latestReady { cursor in
+      guard SiriCredential.current()?.token == account.token else { return nil }
+      let pagination: [String: ConvexEncodable?] = ["numItems": 100.0, "cursor": cursor]
+      return await first("items:listItemsPage", args: ["paginationOpts": pagination])
+    } ?? []
   }
 
   private static func resolve(_ id: String, owner: String) async -> AppIntentEntityRecord? {
@@ -110,9 +111,9 @@ protocol AppIntentEntityRecordConvertible {
     return query.split(whereSeparator: \.isWhitespace).allSatisfy { text.localizedCaseInsensitiveContains(String($0)) }
   }
 
-  private static func permits(_ account: SiriCredential) async -> Bool {
+  static func permits(_ account: SiriCredential) async -> Bool {
     guard let plan: Plan = await first("subscriptions:getEntitlement") else { return false }
-    return plan.entitled && SiriCredential.current()?.token == account.token
+    return !Task.isCancelled && plan.entitled && AppEnvironment.sharedBackend.userID == account.owner && SiriCredential.current()?.token == account.token
   }
 
   private static func first<T: Decodable>(_ query: String, args: [String: ConvexEncodable?] = [:]) async -> T? {

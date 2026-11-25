@@ -197,6 +197,10 @@ public final class InviteEntry {
     return queued
   }
 
+  public var holdsNavigation: Bool {
+    !loaded || preview != nil || accepted != nil || dispatching != nil || awaitingNavigation != nil
+  }
+
   public func waitsForDispatch(from session: UUID) -> Bool {
     guard let dispatchSession else { return false }
     return dispatchSession != session

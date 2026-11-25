@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 
 import Header from "@/components/Header";
@@ -64,8 +65,12 @@ export default function SupportPage() {
               Copyright and abuse reports
             </h2>
             <p className="mt-2">
-              To report a Shelvr share page, email {SUPPORT_EMAIL} with the page
-              address and the reason.
+              Read our{" "}
+              <Link className="underline" href="/copyright">
+                copyright policy
+              </Link>{" "}
+              to report infringement or respond to a removal. For other abuse,
+              email {SUPPORT_EMAIL} with the page address and the reason.
             </p>
           </section>
         </div>
