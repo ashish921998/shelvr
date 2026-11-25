@@ -84,9 +84,9 @@ export default function CopyrightPage() {
         <p className="mt-2">
           If you believe Shelvr removed or disabled your material because of a
           mistake or misidentification, you can email a counter-notice to the
-          copyright contact above. We will send a copy of a compliant counter-
-          notice, including your contact details, to the person who sent the
-          original notice. Include all of the following.
+          copyright contact above. We will send a copy of a compliant
+          counter-notice, including your contact details, to the person who sent
+          the original notice. Include all of the following.
         </p>
         <ol className="mt-2 list-decimal space-y-2 pl-6">
           <li>

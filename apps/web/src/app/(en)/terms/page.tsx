@@ -86,7 +86,8 @@ export default function TermsPage() {
           </Link>{" "}
           to report infringement or respond to a removal. To report other abuse,
           email <strong>{SUPPORT_EMAIL}</strong> with the share page address and
-          a description of the problem.
+          a description of the problem. We remove share pages reported for other
+          abuse promptly.
         </p>
       </section>
 
