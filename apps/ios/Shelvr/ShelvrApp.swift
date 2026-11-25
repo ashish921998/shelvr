@@ -14,7 +14,7 @@ struct ShelvrApp: App {
   var body: some Scene {
     WindowGroup {
       RootView()
-        .modifier(LegacySearchCleanupView())
+        .modifier(SpotlightSync())
         .environmentObject(pushDevice)
         .modifier(PushRegistrationView(device: pushDevice))
         .environment(backend)
