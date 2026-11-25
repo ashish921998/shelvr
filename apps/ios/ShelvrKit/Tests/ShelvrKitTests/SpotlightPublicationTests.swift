@@ -223,3 +223,26 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   await index.settled()
   #expect(os.items.isEmpty)
 }
+
+@MainActor @Test func concurrentSystemCallbacksCannotRestoreARowMissingFromTheNewerRead() async throws {
+  let os = TestSearchIndex(), index = os.make()
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let older = try await index.beginReindex(for: owner)
+  let newer = try await index.beginReindex(for: owner)
+  await #expect(throws: CancellationError.self) { try await index.finishReindex([try spotlightRow("deleted")], request: older) }
+  try await index.finishReindex([], request: newer)
+  #expect(os.items.isEmpty)
+}
+
+@MainActor @Test func aShortenedOrRevokedGrantClearsPreviouslyWrittenRowsBeforeReturning() async throws {
+  let os = TestSearchIndex(), index = os.make()
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let short = SpotlightPublication.Owner(account: owner.account, session: owner.session, expiresAt: Date().addingTimeInterval(3600))
+  for grant: SpotlightPublication.Owner? in [short, nil] {
+    let request = try await index.beginReindex(for: owner)
+    try await index.finishReindex([try spotlightRow("private")], request: request)
+    #expect(os.items.count == 1)
+    await #expect(throws: CancellationError.self) { try await index.validate(request, grant: grant) }
+    #expect(os.items.isEmpty)
+  }
+}

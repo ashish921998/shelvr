@@ -31,19 +31,31 @@ import ShelvrKit
     monitorIdentity()
     try await publication.prepareForSystemRequest()
     await backend.start()
+    let session = backend.sessionGeneration
     guard backend.status == .signedIn, let account = backend.userID else {
-      try await deny()
+      try await deny(account: backend.userID, session: session)
       return
     }
-    let session = backend.sessionGeneration
-    guard let owner = try await access(account: account, session: session) else { try await deny(); return }
+    guard let owner = try await access(account: account, session: session) else {
+      try await deny(account: account, session: session)
+      return
+    }
     let request = try await publication.beginReindex(for: owner)
     guard let rows = await SearchableSavePage.latestReady(fetch: { cursor in
       await self.page(after: cursor, owner: owner)
     }) else { throw URLError(.cannotLoadFromNetwork) }
-    guard let final = try await access(account: account, session: session) else { try await deny(); return }
-    guard final == owner else { accessRetry += 1; throw CancellationError() }
+    try await verify(request, account: account, session: session)
     try await publication.finishReindex(rows, request: request)
+    try await verify(request, account: account, session: session)
+  }
+
+  private func verify(_ request: SpotlightPublication.ReindexRequest, account: String, session: UUID) async throws {
+    let grant = try await access(account: account, session: session)
+    do { try await publication.validate(request, grant: grant) }
+    catch {
+      if backend.userID == account && backend.sessionGeneration == session { accessRetry += 1 }
+      throw error
+    }
   }
 
   private func access(account: String, session: UUID) async throws -> SpotlightPublication.Owner? {
@@ -57,12 +69,15 @@ import ShelvrKit
       }
       throw URLError(.cannotParseResponse)
     } catch {
-      if !Task.isCancelled && backend.userID == account && backend.sessionGeneration == session { try await deny() }
+      if !Task.isCancelled && backend.userID == account && backend.sessionGeneration == session {
+        try await deny(account: account, session: session)
+      }
       throw error
     }
   }
 
-  private func deny() async throws {
+  private func deny(account: String?, session: UUID) async throws {
+    guard backend.userID == account && backend.sessionGeneration == session else { throw CancellationError() }
     publication.activate(nil)
     accessRetry += 1
     try await publication.confirmSystemWrite()

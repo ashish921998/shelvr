@@ -15,6 +15,7 @@ import Foundation
 
   public struct ReindexRequest: Sendable {
     fileprivate let owner: Owner
+    fileprivate let sequence: UInt64
     fileprivate let authorization: UUID
     fileprivate let snapshotRevision: UInt64
   }
@@ -40,6 +41,7 @@ import Foundation
   private var revision: UInt64 = 0
   private var authorization = UUID()
   private var snapshotRevision: UInt64 = 0
+  private var reindexSequence: UInt64 = 0
   private var tail: Task<Void, Never>?
   private var retry: Task<Void, Never>?
   private var backoff = 2
@@ -115,19 +117,35 @@ import Foundation
     guard source.active && isCurrent(source) else { throw CancellationError() }
     activate(source)
     let identity = authorization
+    reindexSequence += 1
+    let sequence = reindexSequence
     try await confirmSystemWrite()
-    guard identity == authorization && owner == source && source.active && isCurrent(source) else { throw CancellationError() }
-    return ReindexRequest(owner: source, authorization: identity, snapshotRevision: snapshotRevision)
+    guard sequence == reindexSequence && identity == authorization && owner == source && source.active && isCurrent(source)
+    else { throw CancellationError() }
+    return ReindexRequest(owner: source, sequence: sequence, authorization: identity, snapshotRevision: snapshotRevision)
+  }
+
+  private func current(_ request: ReindexRequest) -> Bool {
+    request.sequence == reindexSequence && request.authorization == authorization && owner == request.owner
+  }
+
+  public func validate(_ request: ReindexRequest, grant: Owner?) async throws {
+    guard current(request) else { throw CancellationError() }
+    guard grant == request.owner && request.owner.active && isCurrent(request.owner) else {
+      activate(nil)
+      try await confirmSystemWrite()
+      throw CancellationError()
+    }
   }
 
   public func finishReindex(_ rows: [SearchableSave], request: ReindexRequest) async throws {
-    guard request.authorization == authorization && owner == request.owner && request.owner.active && isCurrent(request.owner)
+    guard current(request) && request.owner.active && isCurrent(request.owner)
     else { throw CancellationError() }
     if request.snapshotRevision == snapshotRevision { publish(rows, for: request.owner) }
     needsReset = true
     schedule()
     try await confirmSystemWrite()
-    guard request.authorization == authorization && request.owner.active && isCurrent(request.owner) else { throw CancellationError() }
+    guard current(request) && request.owner.active && isCurrent(request.owner) else { throw CancellationError() }
   }
 
   public func confirmSystemWrite() async throws {
