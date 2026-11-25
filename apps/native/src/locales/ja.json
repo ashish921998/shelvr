@@ -513,6 +513,7 @@
   "loading.places": "保存した場所を読み込み中",
   "map.emptyTitle": "まだ地図に場所がありません",
   "map.emptyBody": "場所が紹介されているリールやTikTokを共有すると、ここに表示されます。",
+  "map.discoverZoomHint": "拡大すると、ほかのおすすめスポットが表示されます。",
   "navigation.searchHeader": "検索",
   "search.placeholder": "保存した項目を検索",
   "search.clear": "検索をクリア",
