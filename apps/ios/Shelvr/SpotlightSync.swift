@@ -7,6 +7,43 @@ import SwiftUI
   static let publication = SpotlightPublication(prepare: prepare, clear: clear, remove: remove, index: index,
     failure: { Analytics.failure("spotlight_sync_failed") })
 
+  static func reindex() async throws {
+    let backend = AppEnvironment.sharedBackend
+    await backend.start()
+    guard backend.status == .signedIn, let account = backend.userID else {
+      publication.activate(nil)
+      try await publication.confirmed()
+      return
+    }
+    let session = backend.sessionGeneration
+    let initial = publication.revision
+    func currentPlan() async throws -> ServerPlan {
+      for try await plan in backend.query("subscriptions:getEntitlement", as: ServerPlan.self) {
+        try Task.checkCancellation()
+        guard backend.userID == account && backend.sessionGeneration == session else { throw CancellationError() }
+        return plan
+      }
+      throw URLError(.cannotParseResponse)
+    }
+    func deny() async throws {
+      publication.activate(nil)
+      try await publication.confirmed()
+    }
+    guard try await currentPlan().entitled else { try await deny(); return }
+    guard let rows = await SearchableSavePage.latestReady(fetch: { cursor in
+      guard await backend.sessionGeneration == session else { return nil }
+      do {
+        for try await page in await backend.spotlightPage(after: cursor) { return page }
+      } catch {}
+      return nil
+    }) else { throw URLError(.cannotLoadFromNetwork) }
+    let plan = try await currentPlan()
+    guard plan.entitled else { try await deny(); return }
+    let expiry = plan.status == "lifetime" ? nil : plan.expiresAt.map { Date(timeIntervalSince1970: $0 / 1000) }
+    let owner = SpotlightPublication.Owner(account: account, session: session, expiresAt: expiry)
+    try await publication.reindex(rows, for: owner, observedRevision: initial)
+  }
+
   private static func prepare() async throws {
     guard let catalogs = UserDefaults(suiteName: "dev.expo.appintents") else { throw CocoaError(.fileReadNoPermission) }
     let legacy = LegacySearchCleanup(defaults: .standard, catalogs: catalogs, documents: .documentsDirectory, caches: .cachesDirectory)
@@ -124,3 +161,16 @@ private struct SpotlightFeed: View {
     }
   }
 }
+
+#if compiler(>=6.4)
+@available(iOS 27.0, *)
+extension ItemQuery: IndexedEntityQuery {
+  func reindexEntities(for identifiers: [String], indexDescription: CSSearchableIndexDescription) async throws {
+    try await ShelvrSpotlight.reindex()
+  }
+
+  func reindexAllEntities(indexDescription: CSSearchableIndexDescription) async throws {
+    try await ShelvrSpotlight.reindex()
+  }
+}
+#endif

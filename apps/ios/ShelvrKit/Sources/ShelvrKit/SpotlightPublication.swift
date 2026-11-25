@@ -28,7 +28,7 @@ import Foundation
   private var applied: [String: SearchableSave] = [:]
   private var needsReset = true
   private var prepared = false
-  private var revision: UInt64 = 0
+  public private(set) var revision: UInt64 = 0
   private var tail: Task<Void, Never>?
   private var retry: Task<Void, Never>?
   private var backoff = 2
@@ -63,9 +63,19 @@ import Foundation
     schedule()
   }
 
-  public func refresh() {
+  public func reindex(_ rows: [SearchableSave], for source: Owner, observedRevision: UInt64) async throws {
+    if revision == observedRevision {
+      activate(source)
+      publish(rows, for: source)
+    }
     needsReset = true
     schedule()
+    try await confirmed()
+  }
+
+  public func confirmed() async throws {
+    await settled()
+    if retry != nil { throw CocoaError(.fileWriteUnknown) }
   }
 
   public func settled() async {
