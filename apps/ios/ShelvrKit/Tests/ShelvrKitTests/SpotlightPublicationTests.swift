@@ -43,7 +43,7 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   var willBlock = false
   var failures = 0
 
-  func make() -> SpotlightPublication {
+  func make(isCurrent: @escaping @MainActor (SpotlightPublication.Owner) -> Bool = { _ in true }) -> SpotlightPublication {
     SpotlightPublication(prepare: { self.prepareCount += 1 }, clear: {
       self.cleared += 1
       self.items.removeAll()
@@ -63,7 +63,7 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
         self.thumbnails[entry.save._id] = entry.thumbnail
       }
       if self.fail { throw URLError(.cannotWriteToFile) }
-    }, failure: { self.failures += 1 })
+    }, isCurrent: isCurrent, failure: { self.failures += 1 })
   }
 }
 
@@ -162,4 +162,206 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   await index.settled()
   #expect(os.thumbnails.isEmpty && os.items.isEmpty)
   #expect(!index.needsThumbnail(newer, for: user))
+}
+
+@MainActor @Test func headlessColdPreparationErasesOrphansBeforeRequestingAnyData() async throws {
+  let os = TestSearchIndex(), index = os.make()
+  os.items["orphan"] = try spotlightRow("orphan")
+  try await index.prepareForSystemRequest()
+  #expect(os.cleared == 1 && os.items.isEmpty)
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let request = try await index.beginReindex(for: owner)
+  index.activate(owner)
+  try await index.finishReindex([try spotlightRow("valid")], request: request, confirmGrant: { owner })
+  #expect(Set(os.items.keys) == ["valid"])
+}
+
+@MainActor @Test func aNewerCompleteSnapshotWinsEvenWhenTheCatalogIsEmpty() async throws {
+  let os = TestSearchIndex(), index = os.make()
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let request = try await index.beginReindex(for: owner)
+  index.publish([], for: owner)
+  try await index.finishReindex([try spotlightRow("stale")], request: request, confirmGrant: { owner })
+  #expect(os.items.isEmpty)
+  let next = try await index.beginReindex(for: owner)
+  index.publish([try spotlightRow("new")], for: owner)
+  try await index.finishReindex([try spotlightRow("stale")], request: next, confirmGrant: { owner })
+  #expect(Set(os.items.keys) == ["new"])
+}
+
+@MainActor @Test func aRevokedReindexCannotRestoreRowsWhileTheViewIsAbsent() async throws {
+  let os = TestSearchIndex()
+  final class Gate { var allowed = true }
+  let gate = Gate()
+  let index = os.make(isCurrent: { _ in gate.allowed })
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let request = try await index.beginReindex(for: owner)
+  os.willBlock = true
+  let job = Task { try await index.finishReindex([try spotlightRow("old")], request: request, confirmGrant: { owner }) }
+  let started = await observed { os.blocked != nil }
+  try #require(started)
+  gate.allowed = false
+  index.verifyIdentity()
+  let revoked = await observed { os.cleared >= 2 }
+  #expect(revoked)
+  os.blocked?.resume()
+  await #expect(throws: CancellationError.self) { try await job.value }
+  await index.settled()
+  #expect(os.items.isEmpty)
+  gate.allowed = true
+  index.activate(owner)
+  await #expect(throws: CancellationError.self) { try await index.finishReindex([try spotlightRow("old")], request: request, confirmGrant: { owner }) }
+}
+
+@MainActor @Test func failedSystemWritesAreReportedToTheReindexCaller() async throws {
+  let os = TestSearchIndex(), index = os.make()
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let request = try await index.beginReindex(for: owner)
+  os.fail = true
+  await #expect(throws: CocoaError.self) { try await index.finishReindex([try spotlightRow("partial")], request: request, confirmGrant: { owner }) }
+  await index.settled()
+  #expect(os.items.isEmpty && index.needsReauthorization(after: request))
+  os.fail = false
+  index.publish([try spotlightRow("stale retry")], for: owner)
+  await index.settled()
+  #expect(os.items.isEmpty)
+}
+
+@MainActor @Test func concurrentSystemCallbacksCannotRestoreARowMissingFromTheNewerRead() async throws {
+  let os = TestSearchIndex(), index = os.make()
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let older = try await index.beginReindex(for: owner)
+  let newer = try await index.beginReindex(for: owner)
+  await #expect(throws: CancellationError.self) { try await index.finishReindex([try spotlightRow("deleted")], request: older, confirmGrant: { owner }) }
+  try await index.finishReindex([], request: newer, confirmGrant: { owner })
+  #expect(os.items.isEmpty)
+}
+
+@MainActor @Test func aShortenedOrRevokedGrantClearsPreviouslyWrittenRowsBeforeReturning() async throws {
+  let os = TestSearchIndex(), index = os.make()
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let short = SpotlightPublication.Owner(account: owner.account, session: owner.session, expiresAt: Date().addingTimeInterval(3600))
+  for grant: SpotlightPublication.Owner? in [short, nil] {
+    let request = try await index.beginReindex(for: owner)
+    try await index.finishReindex([try spotlightRow("private")], request: request, confirmGrant: { owner })
+    #expect(os.items.count == 1)
+    await #expect(throws: CancellationError.self) { try await index.validate(request, grant: grant) }
+    #expect(os.items.isEmpty)
+  }
+}
+
+@MainActor @Test func systemRequestsSerializeEntitlementReadsAsWellAsWrites() async throws {
+  let queue = SpotlightReindexQueue()
+  var release: CheckedContinuation<Void, Never>?
+  var events: [String] = []
+  let older = Task {
+    try await queue.run {
+      events.append("older read")
+      await withCheckedContinuation { release = $0 }
+      events.append("older cleanup")
+      throw URLError(.notConnectedToInternet)
+    }
+  }
+  let started = await observed { release != nil }
+  try #require(started)
+  var entering = false
+  let newer = Task {
+    entering = true
+    try await queue.run { events.append("newer read and write") }
+  }
+  let entered = await observed { entering }
+  try #require(entered)
+  release?.resume()
+  await #expect(throws: URLError.self) { try await older.value }
+  try await newer.value
+  #expect(events == ["older read", "older cleanup", "newer read and write"])
+}
+
+@MainActor @Test func cancellingThePostWriteGrantReadPurgesTheAcknowledgedWrite() async throws {
+  let os = TestSearchIndex(), index = os.make()
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let request = try await index.beginReindex(for: owner)
+  var checking = false
+  let rebuild = Task {
+    try await index.finishReindex([try spotlightRow("sensitive")], request: request) {
+      checking = true
+      try await Task.sleep(for: .seconds(30))
+      return owner
+    }
+  }
+  let reached = await observed { checking }
+  try #require(reached)
+  #expect(Set(os.items.keys) == ["sensitive"])
+  rebuild.cancel()
+  await #expect(throws: CancellationError.self) { try await rebuild.value }
+  await index.settled()
+  #expect(os.items.isEmpty && index.needsReauthorization(after: request))
+}
+
+@MainActor @Test func reindexRetainsKnownGoodRowsWhileAnUpsertIsInFlight() async throws {
+  let os = TestSearchIndex(), index = os.make()
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let existing = try spotlightRow("existing"), added = try spotlightRow("new")
+  index.activate(owner)
+  index.publish([existing], for: owner)
+  await index.settled()
+  let initialClears = os.cleared
+  let ticket = try await index.beginReindex(for: owner)
+  os.willBlock = true
+  let task = Task { try await index.finishReindex([existing, added], request: ticket, confirmGrant: { owner }) }
+  let blocked = await observed { os.blocked != nil }
+  try #require(blocked)
+  #expect(os.items["existing"] == existing && os.cleared == initialClears)
+  os.blocked?.resume()
+  try await task.value
+  #expect(Set(os.items.keys) == ["existing", "new"])
+}
+
+@MainActor @Test func aReadThatDoesNotHonorCancellationCannotBlockTheNextRebuild() async throws {
+  let queue = SpotlightReindexQueue()
+  var release: CheckedContinuation<String, Never>?
+  let stuck = Task {
+    try await queue.run {
+      _ = try await SpotlightReindexRead.value(before: .now.advanced(by: .milliseconds(150))) {
+        await withCheckedContinuation { release = $0 }
+      }
+    }
+  }
+  let started = await observed { release != nil }
+  try #require(started)
+  defer { release?.resume(returning: "late result") }
+  var nextRan = false
+  let next = Task { try await queue.run { nextRan = true } }
+  await #expect(throws: URLError(.timedOut)) { try await stuck.value }
+  try await next.value
+  #expect(nextRan)
+}
+
+@MainActor @Test func aReadReturningAfterTheDeadlineCannotWinAgainstADelayedTimer() async {
+  func delayMainActor() {
+    _ = DispatchSemaphore(value: 0).wait(timeout: .now() + .milliseconds(50))
+  }
+  let deadline = ContinuousClock.now.advanced(by: .milliseconds(30))
+  await #expect(throws: URLError(.timedOut)) {
+    try await SpotlightReindexRead.value(before: deadline) {
+      delayMainActor()
+      return "late grant"
+    }
+  }
+}
+
+@MainActor @Test func aNewerFlushCannotHideAPartialSystemWriteFailure() async throws {
+  let os = TestSearchIndex(), index = os.make()
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let request = try await index.beginReindex(for: owner)
+  os.willBlock = true
+  os.fail = true
+  let job = Task { try await index.finishReindex([try spotlightRow("a")], request: request, confirmGrant: { owner }) }
+  let started = await observed { os.blocked != nil }
+  try #require(started)
+  index.publish([try spotlightRow("b")], for: owner)
+  os.blocked?.resume()
+  await #expect(throws: CocoaError.self) { try await job.value }
+  await index.settled()
+  #expect(os.indexed == [["a"]] && os.items.isEmpty && index.needsReauthorization(after: request))
 }
