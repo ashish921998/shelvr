@@ -78,7 +78,7 @@ import Foundation
     revision += 1
     let job = revision
     let prior = tail
-    tail = Task {
+    tail = Task { [self] in
       await prior?.value
       await urgent?.value
       guard job == revision else { return }

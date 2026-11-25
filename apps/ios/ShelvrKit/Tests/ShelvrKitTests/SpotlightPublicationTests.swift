@@ -22,6 +22,14 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   #expect(pages.cursors == [.start] && pages.saves.isEmpty)
 }
 
+@MainActor private func observed(_ predicate: () -> Bool) async -> Bool {
+  let until = ContinuousClock.now.advanced(by: .seconds(5))
+  while !predicate() && ContinuousClock.now < until {
+    try? await Task.sleep(for: .milliseconds(5))
+  }
+  return predicate()
+}
+
 @MainActor private final class TestSearchIndex {
   var items = [String: SearchableSave]()
   var cleared = 0
@@ -84,9 +92,11 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   os.willBlock = true
   index.activate(a)
   index.publish([try spotlightRow("1")], for: a)
-  while os.blocked == nil { await Task.yield() }
+  let started = await observed { os.blocked != nil }
+  try #require(started)
   index.activate(nil)
-  while os.cleared < 2 { await Task.yield() }
+  let revoked = await observed { os.cleared >= 2 }
+  #expect(revoked)
   os.blocked?.resume()
   await index.settled()
   #expect(os.cleared == 3 && os.items.isEmpty)

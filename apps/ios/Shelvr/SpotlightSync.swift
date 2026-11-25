@@ -4,25 +4,34 @@ import ShelvrKit
 import SwiftUI
 
 @MainActor enum ShelvrSpotlight {
-  static let publication = SpotlightPublication(prepare: {
+  static let publication = SpotlightPublication(prepare: prepare, clear: clear, remove: remove, index: index,
+    failure: { Analytics.failure("spotlight_sync_failed") })
+
+  private static func prepare() async throws {
     guard let catalogs = UserDefaults(suiteName: "dev.expo.appintents") else { throw CocoaError(.fileReadNoPermission) }
     let legacy = LegacySearchCleanup(defaults: .standard, catalogs: catalogs, documents: .documentsDirectory, caches: .cachesDirectory)
     try await legacy.run { domains in
       try await CSSearchableIndex.default().deleteSearchableItems(withDomainIdentifiers: domains)
     }
-  }, clear: {
+  }
+
+  private static func clear() async throws {
     try await CSSearchableIndex.default().deleteSearchableItems(withDomainIdentifiers: ["ItemEntity", "shelvr.item"])
-  }, remove: { ids in
+  }
+
+  private static func remove(_ ids: [String]) async throws {
     try await CSSearchableIndex.default().deleteAppEntities(identifiedBy: ids, ofType: ItemEntity.self)
-  }, index: { rows, expiration in
-    var items: [CSSearchableItem] = []
-    for row in rows {
+  }
+
+  private static func index(_ rows: [SearchableSave], expiration: Date?) async throws {
+    let items = rows.map { row in
       let item = CSSearchableItem(appEntity: ItemEntity(row))
       item.expirationDate = expiration ?? .distantFuture
-      items.append(item)
+      return item
     }
     try await CSSearchableIndex.default().indexSearchableItems(items)
-  }, failure: { Analytics.failure("spotlight_sync_failed") })
+  }
+
 }
 
 struct SpotlightSync: ViewModifier {
