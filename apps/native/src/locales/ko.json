@@ -513,6 +513,7 @@
   "loading.places": "저장한 장소 불러오는 중",
   "map.emptyTitle": "아직 지도에 장소가 없어요",
   "map.emptyBody": "장소가 나오는 릴스나 TikTok을 공유하면 여기에 표시돼요.",
+  "map.discoverZoomHint": "확대하면 더 많은 추천 장소를 볼 수 있어요.",
   "navigation.searchHeader": "검색",
   "search.placeholder": "저장한 항목 검색",
   "search.clear": "검색 지우기",

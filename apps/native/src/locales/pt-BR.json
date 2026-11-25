@@ -531,6 +531,7 @@
   "loading.places": "Carregando lugares salvos",
   "map.emptyTitle": "Ainda não há lugares no seu mapa",
   "map.emptyBody": "Compartilhe um reel ou TikTok que cite lugares e eles aparecem aqui.",
+  "map.discoverZoomHint": "Amplie o mapa para ver mais sugestões.",
   "navigation.searchHeader": "buscar",
   "search.placeholder": "Busque seus conteúdos",
   "search.clear": "Limpar busca",

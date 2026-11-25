@@ -11,10 +11,9 @@ struct SavedPlacesMap: View {
   @Environment(\.colorScheme) private var scheme
   @AppStorage("swift.appearance") private var appearance = "system"
   @State private var saved: [MapPlace]?
-  @State private var discover: [MapPlace] = []
-  @State private var receivedDiscover = false
+  @State private var discoverResponse: AreaResponse?
   @State private var visits: [MapVisit] = []
-  @State private var area = DiscoverBox.world
+  @State private var discoverRequest = AreaRequest(area: .world)
   @State private var filters = MapFilters()
   @State private var location = MapLocation()
   @State private var selected: MapPlace?
@@ -32,13 +31,16 @@ struct SavedPlacesMap: View {
   @FocusState private var focusedSearch: Bool
 
   var body: some View {
+    let request = discoverRequest
+    let discover = discoverResponse?.places ?? []
+    let complete = discoverResponse?.request == request ? discoverResponse?.complete : nil
     let scene = MapScene(saved: saved, discover: discover, visits: visits, filters: filters)
     let palette = HomeChromePalette(scheme, appearance: appearance)
     let personalPlaces = saved ?? []
     let overviewPlaces = scene.visible.filter(\.isSaved)
     MapCanvas(places: scene.visible, location: location.position, filters: scene.filters, opening: scene.opening,
       visited: scene.visited, selectedLabelID: selectedLabelID, copy: copy, overview: overview, overviewPlaces: overviewPlaces, topControlsHeight: topControlsHeight,
-      bottomControlsHeight: bottomControlsHeight, onArea: { area = $0; viewport = $1 },
+      bottomControlsHeight: bottomControlsHeight, onArea: { updateDiscoverArea($0); viewport = $1 },
       onPick: selectPlace, onCluster: { cluster = $0 })
       .ignoresSafeArea(.container)
       .overlay(alignment: .top) {
@@ -49,7 +51,7 @@ struct SavedPlacesMap: View {
       }
       .overlay(alignment: .bottom) {
         if !focusedSearch {
-          mapFooter(scene, palette: palette)
+          mapFooter(scene, complete: complete, discoverIsEmpty: discover.isEmpty, palette: palette)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bottomControlsHeight = $0 }
         }
       }
@@ -82,12 +84,11 @@ struct SavedPlacesMap: View {
           }
         }
       }
-      .task(id: AreaRequest(area: area, retry: retry)) {
+      .task(id: request) {
         await subscribe("discover") {
-          for try await page in backend.discover(in: area) {
+          for try await page in backend.discover(in: request.area) {
             try Task.checkCancellation()
-            receivedDiscover = true
-            discover = page.places
+            discoverResponse = AreaResponse(request: request, places: page.places, complete: page.complete)
           }
         }
       }
@@ -160,10 +161,20 @@ struct SavedPlacesMap: View {
     .buttonStyle(HomeChromePressStyle())
   }
 
-  private func mapFooter(_ scene: MapScene, palette: HomeChromePalette) -> some View {
+  private func mapFooter(_ scene: MapScene, complete: Bool?, discoverIsEmpty: Bool,
+    palette: HomeChromePalette) -> some View {
     VStack(spacing: 6) {
       if !searching {
-        if saved?.isEmpty == true, receivedDiscover, discover.isEmpty, errors.isEmpty {
+        if complete == false, scene.filters.went == .all, !errors.contains("discover") {
+          Text(copy("map.discoverZoomHint"))
+            .font(.custom("Satoshi-Bold", size: 13, relativeTo: .footnote))
+            .multilineTextAlignment(.center)
+            .foregroundStyle(palette.foreground)
+            .padding(.horizontal, 12).padding(.vertical, 7)
+            .background(palette.frame, in: Capsule())
+            .overlay { Capsule().strokeBorder(palette.border, lineWidth: 0.5) }
+            .padding(.horizontal, 20)
+        } else if saved?.isEmpty == true, complete == true, discoverIsEmpty, errors.isEmpty {
           VStack(alignment: .leading) {
             Text(copy("map.emptyTitle")).font(.custom("Satoshi-Bold", size: 16, relativeTo: .headline))
             Text(copy("map.emptyBody")).font(.custom("Satoshi-Regular", size: 14, relativeTo: .subheadline))
@@ -259,7 +270,10 @@ struct SavedPlacesMap: View {
   @ViewBuilder
   private func retryControl(_ palette: HomeChromePalette) -> some View {
     if !errors.isEmpty {
-      Button(copy("common.retry")) { retry += 1 }
+      Button(copy("common.retry")) {
+        retry += 1
+        discoverRequest = AreaRequest(area: discoverRequest.area)
+      }
         .padding(.horizontal, 12).frame(minHeight: 44)
         .background(palette.surface, in: Capsule())
     }
@@ -301,9 +315,20 @@ struct SavedPlacesMap: View {
     }.accessibilityAddTraits(selected ? .isSelected : [])
   }
 
+  private func updateDiscoverArea(_ area: DiscoverBox) {
+    guard area != discoverRequest.area else { return }
+    discoverRequest = AreaRequest(area: area)
+  }
+
   private struct AreaRequest: Equatable {
     let area: DiscoverBox
-    let retry: Int
+    let generation = UUID()
+  }
+
+  private struct AreaResponse {
+    let request: AreaRequest
+    let places: [MapPlace]
+    let complete: Bool
   }
 
   private func subscribe(_ key: String, _ update: () async throws -> Void) async {

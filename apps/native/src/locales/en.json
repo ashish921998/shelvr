@@ -521,6 +521,7 @@
   "loading.places": "Loading saved places",
   "map.emptyTitle": "No places on your map yet",
   "map.emptyBody": "Share a reel or TikTok that names places, and they show up here.",
+  "map.discoverZoomHint": "Zoom in to see more suggestions.",
   "navigation.searchHeader": "search",
   "search.placeholder": "Search your saves",
   "search.clear": "Clear search",

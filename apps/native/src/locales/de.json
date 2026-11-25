@@ -521,6 +521,7 @@
   "loading.places": "Gespeicherte Orte werden geladen",
   "map.emptyTitle": "Noch keine Orte auf deiner Karte",
   "map.emptyBody": "Teile ein Reel oder TikTok, das Orte nennt, und sie erscheinen hier.",
+  "map.discoverZoomHint": "Zoome näher heran, um weitere Vorschläge zu sehen.",
   "navigation.searchHeader": "suche",
   "search.placeholder": "Deine Inhalte durchsuchen",
   "search.clear": "Suche löschen",

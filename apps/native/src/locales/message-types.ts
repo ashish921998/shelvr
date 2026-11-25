@@ -492,6 +492,7 @@ type MessageParams = {
   "loading.places": undefined;
   "map.emptyTitle": undefined;
   "map.emptyBody": undefined;
+  "map.discoverZoomHint": undefined;
   "navigation.searchHeader": undefined;
   "search.placeholder": undefined;
   "search.clear": undefined;

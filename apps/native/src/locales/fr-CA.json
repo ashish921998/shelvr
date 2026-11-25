@@ -531,6 +531,7 @@
   "loading.places": "Chargement des lieux enregistrés",
   "map.emptyTitle": "Aucun lieu sur votre carte pour l’instant",
   "map.emptyBody": "Partagez un reel ou un TikTok qui nomme des lieux, et ils apparaîtront ici.",
+  "map.discoverZoomHint": "Zoomez pour voir d’autres suggestions.",
   "navigation.searchHeader": "recherche",
   "search.placeholder": "Rechercher dans vos contenus",
   "search.clear": "Effacer la recherche",
