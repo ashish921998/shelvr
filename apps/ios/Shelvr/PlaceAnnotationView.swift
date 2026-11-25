@@ -192,7 +192,11 @@ final class PlaceAnnotationView: MKAnnotationView {
     return bounds.insetBy(dx: -horizontal, dy: -vertical)
   }
 
+  func containsName(at point: CGPoint) -> Bool {
+    !nameBadge.isHidden && nameBadge.frame.contains(point)
+  }
+
   override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
-    pinHitBounds.contains(point) || (!nameBadge.isHidden && nameBadge.frame.contains(point))
+    pinHitBounds.contains(point)
   }
 }
