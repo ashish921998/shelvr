@@ -101,18 +101,6 @@ extension ItemEntity: Transferable {
   }
 }
 
-#if compiler(>=6.4)
-@available(iOS 27.0, *)
-@AppIntent(schema: .system.open)
-struct OpenItemIntent {
-  static let supportedModes: IntentModes = .foreground(.immediate)
-  var target: ItemEntity
-  func perform() async throws -> some IntentResult {
-    try await target.open()
-    return .result()
-  }
-}
-#else
 struct OpenItemIntent: OpenIntent {
   static let title: LocalizedStringResource = "Open Save"
   static let openAppWhenRun = true
@@ -122,7 +110,6 @@ struct OpenItemIntent: OpenIntent {
     return .result()
   }
 }
-#endif
 
 private extension ItemEntity {
   @MainActor func open() async throws {
