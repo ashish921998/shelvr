@@ -21,6 +21,11 @@ struct SignedInView: View {
       add: { open("/add-spots") }, plan: { open("/go-out") })
   }
 
+  private var readyPersonalRequest: UUID? {
+    guard !invites.holdsNavigation, pendingLink == nil else { return nil }
+    return SiriNavigation.shared.pendingPersonal
+  }
+
   var body: some View {
     NavigationStack(path: $path) {
       Group {
@@ -188,8 +193,8 @@ struct SignedInView: View {
     .alert(copy("passport.stampedTitle"), isPresented: Binding(get: { stampMessage != nil }, set: { if !$0 { stampMessage = nil } })) {
       Button(copy("common.close")) {}
     } message: { Text(stampMessage ?? "") }
-    .onChange(of: SiriNavigation.shared.pendingPersonal, initial: true) { _, request in
-      if let request, let link = SiriNavigation.shared.consume(request, owner: backend.userID, session: backend.sessionGeneration) {
+    .onChange(of: readyPersonalRequest, initial: true) { _, request in
+      if let request, readyPersonalRequest == request, let link = SiriNavigation.shared.consume(request, owner: backend.userID, session: backend.sessionGeneration) {
         navigate(to: link, fromPersonalIntent: true)
       }
     }
