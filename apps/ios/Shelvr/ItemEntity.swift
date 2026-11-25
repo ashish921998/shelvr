@@ -10,6 +10,7 @@ struct ItemEntity: AppEntity, IndexedEntity {
   static let defaultQuery = ItemQuery()
 
   let id: String
+  let thumbnail: Data?
   @Property(title: "Title") var title: String
   @Property(title: "Summary") var summary: String?
   @Property(title: "Kind") var kind: String
@@ -18,7 +19,13 @@ struct ItemEntity: AppEntity, IndexedEntity {
   @Property(title: "Tags") var tags: [String]
   @Property(title: "Saved") var savedAt: Date?
 
-  init(_ row: SearchableSave) {
+  @MainActor init(_ row: SearchableSave) {
+    let backend = AppEnvironment.sharedBackend
+    self.init(row, thumbnail: ShelvrSpotlight.publication.thumbnail(for: row, account: backend.userID, session: backend.sessionGeneration))
+  }
+
+  init(_ row: SearchableSave, thumbnail: Data?) {
+    self.thumbnail = thumbnail
     id = row._id
     title = row.displayTitle(copy: Copy())
     summary = row.summary
@@ -31,11 +38,12 @@ struct ItemEntity: AppEntity, IndexedEntity {
 
   var displayRepresentation: DisplayRepresentation {
     let symbol = kind == "link" ? "link" : kind == "image" ? "photo" : "note.text"
-    return DisplayRepresentation(title: "\(title)", subtitle: "\(summary ?? kind.capitalized)", image: .init(systemName: symbol))
+    return DisplayRepresentation(title: "\(title)", subtitle: "\(summary ?? kind.capitalized)", image: thumbnail.map { .init(data: $0) } ?? .init(systemName: symbol))
   }
 
   var attributeSet: CSSearchableItemAttributeSet {
     let result = defaultAttributeSet
+    result.thumbnailData = thumbnail
     result.title = title
     result.displayName = title
     result.contentDescription = summary ?? text
@@ -53,21 +61,23 @@ struct ItemEntity: AppEntity, IndexedEntity {
 }
 
 struct ItemQuery: EntityStringQuery, EnumerableEntityQuery {
-  func entities(for identifiers: [String]) async throws -> [ItemEntity] {
-    await ShelvrCatalog.searchSaves(matching: identifiers).map(ItemEntity.init)
+  @MainActor func entities(for identifiers: [String]) async throws -> [ItemEntity] {
+    await ShelvrCatalog.searchSaves(matching: identifiers).map { ItemEntity($0) }
   }
 
-  func suggestedEntities() async throws -> [ItemEntity] {
-    await ShelvrCatalog.searchSaves().prefix(20).map(ItemEntity.init)
+  @MainActor func suggestedEntities() async throws -> [ItemEntity] {
+    await ShelvrCatalog.searchSaves().prefix(20).map { ItemEntity($0) }
   }
 
-  func entities(matching string: String) async throws -> [ItemEntity] {
-    let copy = Copy()
-    return await ShelvrCatalog.searchSaves().filter { $0.matches(string, copy: copy) }.prefix(30).map(ItemEntity.init)
+  @MainActor func entities(matching string: String) async throws -> [ItemEntity] {
+    guard let account = SiriCredential.current() else { return [] }
+    let rows = await SearchableSave.textMatches(in: ShelvrCatalog.searchSaves(), term: string, copy: Copy())
+    guard await ShelvrCatalog.permits(account) else { return [] }
+    return rows.map { ItemEntity($0) }
   }
 
-  func allEntities() async throws -> [ItemEntity] {
-    await ShelvrCatalog.searchSaves().map(ItemEntity.init)
+  @MainActor func allEntities() async throws -> [ItemEntity] {
+    await ShelvrCatalog.searchSaves().map { ItemEntity($0) }
   }
 }
 

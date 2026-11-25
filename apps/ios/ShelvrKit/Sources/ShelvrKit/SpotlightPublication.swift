@@ -15,7 +15,7 @@ import Foundation
 
   public typealias Clear = @MainActor () async throws -> Void
   public typealias Remove = @MainActor ([String]) async throws -> Void
-  public typealias Index = @MainActor ([SearchableSave], Date?) async throws -> Void
+  public typealias Index = @MainActor ([SpotlightEntry], Date?) async throws -> Void
 
   private let prepare: Clear
   private let clear: Clear
@@ -25,7 +25,9 @@ import Foundation
   private var mayHaveIndexedItems = true
   private var owner: Owner?
   private var desired: [SearchableSave] = []
-  private var applied: [String: SearchableSave] = [:]
+  private var applied: [String: SpotlightEntry] = [:]
+  private var wantedImages = Set<SpotlightThumbnail>()
+  private var images: [SpotlightThumbnail: Data] = [:]
   private var needsReset = true
   private var prepared = false
   private var revision: UInt64 = 0
@@ -48,6 +50,8 @@ import Foundation
     if changing {
       owner = next
       desired = []
+      wantedImages = []
+      images = [:]
       needsReset = true
     }
     let urgent: Task<Void, Never>?
@@ -60,7 +64,25 @@ import Foundation
   public func publish(_ rows: [SearchableSave], for source: Owner) {
     guard source == owner, rows != desired || needsReset else { return }
     desired = rows
+    wantedImages = Set(SpotlightThumbnail.candidates(in: rows))
+    images = images.filter { wantedImages.contains($0.key) }
     schedule()
+  }
+
+  public func needsThumbnail(_ request: SpotlightThumbnail, for source: Owner) -> Bool {
+    owner == source && source.active && wantedImages.contains(request) && images[request] == nil
+  }
+
+  public func acceptThumbnail(_ data: Data, for request: SpotlightThumbnail, owner source: Owner) {
+    guard !data.isEmpty, needsThumbnail(request, for: source) else { return }
+    images[request] = data
+    schedule()
+  }
+
+  public func thumbnail(for row: SearchableSave, account: String?, session: UUID) -> Data? {
+    guard let owner, owner.account == account, owner.session == session, owner.active,
+      let request = SpotlightThumbnail(row) else { return nil }
+    return images[request]
   }
 
   public func settled() async {
@@ -118,14 +140,18 @@ import Foundation
       for id in removed { applied.removeValue(forKey: id) }
     }
     guard job == revision else { return }
-    let changed = desired.filter { applied[$0._id] != $0 }
+    let changed = desired.compactMap { row -> SpotlightEntry? in
+      let thumbnail = SpotlightThumbnail(row).flatMap { images[$0] }
+      let entry = SpotlightEntry(save: row, thumbnail: thumbnail)
+      return entry == applied[row._id] ? nil : entry
+    }
     for offset in stride(from: 0, to: changed.count, by: 100) {
       guard job == revision else { return }
       guard owner.active else { activate(nil); return }
       let batch = Array(changed[offset..<min(offset+100, changed.count)])
       mayHaveIndexedItems = true
       try await index(batch, owner.expiresAt)
-      for row in batch { applied[row._id] = row }
+      for entry in batch { applied[entry.save._id] = entry }
     }
     if applied.isEmpty { mayHaveIndexedItems = false }
   }

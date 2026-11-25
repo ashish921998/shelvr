@@ -23,9 +23,9 @@ import SwiftUI
     try await CSSearchableIndex.default().deleteAppEntities(identifiedBy: ids, ofType: ItemEntity.self)
   }
 
-  private static func index(_ rows: [SearchableSave], expiration: Date?) async throws {
+  private static func index(_ rows: [SpotlightEntry], expiration: Date?) async throws {
     let items = rows.map { row in
-      let item = CSSearchableItem(appEntity: ItemEntity(row))
+      let item = CSSearchableItem(appEntity: ItemEntity(row.save, thumbnail: row.thumbnail))
       item.expirationDate = expiration ?? .distantFuture
       return item
     }
@@ -105,7 +105,9 @@ struct SpotlightSync: ViewModifier {
 private struct SpotlightFeed: View {
   let owner: SpotlightPublication.Owner
   @Environment(Backend.self) private var backend
+  @Environment(\.scenePhase) private var phase
   @State private var pages = SpotlightPages()
+  private static let imageSession = URLSession(configuration: .ephemeral)
 
   var body: some View {
     ZStack {
@@ -113,6 +115,33 @@ private struct SpotlightFeed: View {
         Color.clear.task { await watch(cursor) }
       }
     }.allowsHitTesting(false).accessibilityHidden(true)
+      .task(id: phase == .active ? pages.snapshot.map(SpotlightThumbnail.candidates(in:)) : nil) {
+        guard phase == .active, let rows = pages.snapshot else { return }
+        await loadThumbnails(SpotlightThumbnail.candidates(in: rows))
+      }
+  }
+
+  private func loadThumbnails(_ requests: [SpotlightThumbnail]) async {
+    var pending = requests
+    var delay = 2
+    while !pending.isEmpty {
+      var retry: [SpotlightThumbnail] = []
+      for request in pending {
+        guard !Task.isCancelled, owner.active, backend.sessionGeneration == owner.session else { return }
+        guard ShelvrSpotlight.publication.needsThumbnail(request, for: owner) else { continue }
+        let result = await SavedThumbnail.fetch(request.url, pixels: 256, session: Self.imageSession)
+        guard !Task.isCancelled, backend.sessionGeneration == owner.session else { return }
+        switch result {
+        case let .image(data): ShelvrSpotlight.publication.acceptThumbnail(data, for: request, owner: owner)
+        case .retry: retry.append(request)
+        case .unavailable: break
+        }
+      }
+      guard !retry.isEmpty else { return }
+      pending = retry
+      do { try await Task.sleep(for: .seconds(delay)) } catch { return }
+      delay = min(delay * 2, 60)
+    }
   }
 
   private func watch(_ cursor: SpotlightPages.Cursor) async {
