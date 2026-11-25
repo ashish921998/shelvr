@@ -25,7 +25,7 @@ struct SignedInView: View {
     NavigationStack(path: $path) {
       Group {
         if access.loading { loadingPlan } else if access.locked { PlanGateView() } else if library {
-          LibraryView(screen: .home, searchSeed: librarySearchSeed, searchFocusChanged: { librarySearchFocused = $0 })
+          LibraryView(screen: .home, searchSeed: $librarySearchSeed, searchFocusChanged: { librarySearchFocused = $0 })
         } else {
           SavedPlacesMap(open: open, tabBar: tabBar)
         }
