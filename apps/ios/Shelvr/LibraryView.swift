@@ -130,13 +130,14 @@ struct LibraryView: View {
       .background(palette.surface, in: RoundedRectangle(cornerRadius: 12))
     }
 
-    LazyVGrid(columns: homeColumns, spacing: 8) {
+    LazyVGrid(columns: homeColumns(2), spacing: 8) {
       homeShortcut("/saves", "homePlaces.allSaves", "bookmark", palette: palette, prominent: true)
       homeShortcut("/cities", "homePlaces.cities", "building.2", palette: palette, prominent: true)
     }
-    LazyVGrid(columns: homeColumns, spacing: 8) {
+    LazyVGrid(columns: homeColumns(3), spacing: 8) {
       homeShortcut("/trips", "navigation.trips", "airplane", palette: palette)
       homeShortcut("/collections", "homePlaces.collections", "person.2", palette: palette)
+      homeShortcut("/passport", "passport.title", "book.closed", palette: palette)
     }
     if rows.contains(where: \.needsReview) || pages.last?.isDone == false {
       homeShortcut("/review-saves", "homePlaces.withoutPlace", "mappin.slash", palette: palette, horizontal: true)
@@ -205,8 +206,8 @@ struct LibraryView: View {
     Button(copy("common.retry")) { failures.removeAll(); attempt += 1 }
   }
 
-  private var homeColumns: [GridItem] {
-    Array(repeating: GridItem(.flexible(), spacing: 8), count: dynamicType.isAccessibilitySize ? 1 : 2)
+  private func homeColumns(_ count: Int) -> [GridItem] {
+    Array(repeating: GridItem(.flexible(), spacing: 8), count: dynamicType.isAccessibilitySize ? 1 : count)
   }
 
   @ViewBuilder
