@@ -25,7 +25,7 @@ struct SignedInView: View {
     NavigationStack(path: $path) {
       Group {
         if access.loading { loadingPlan } else if access.locked { PlanGateView() } else if library {
-          LibraryView(screen: .home, searchSeed: $librarySearchSeed, searchFocusChanged: { librarySearchFocused = $0 })
+          LibraryView(screen: .home, searchSeed: access.pro ? $librarySearchSeed : .constant(nil), searchFocusChanged: { librarySearchFocused = $0 })
         } else {
           SavedPlacesMap(open: open, tabBar: tabBar)
         }
@@ -190,11 +190,17 @@ struct SignedInView: View {
     } message: { Text(stampMessage ?? "") }
     .onChange(of: SiriNavigation.shared.pendingPersonal, initial: true) { _, request in
       if let request, let link = SiriNavigation.shared.consume(request, owner: backend.userID, session: backend.sessionGeneration) {
-        if link.path == ["home"], let term = link.query.first(where: { $0.name == "query" })?.value {
-          librarySearchSeed = LibraryView.SearchSeed(term: term)
-        }
-        navigate(to: link)
+        navigate(to: link, fromPersonalIntent: true)
       }
+    }
+    .onChange(of: access.loading || access.pro) { _, canSeed in
+      if !canSeed { librarySearchSeed = nil }
+    }
+    .onChange(of: path) { _, path in
+      if !path.isEmpty { librarySearchSeed = nil }
+    }
+    .onChange(of: library) { _, showingLibrary in
+      if !showingLibrary { librarySearchSeed = nil }
     }
     .onChange(of: pendingLink, initial: true) { _, link in
       guard let link else { return }
@@ -212,7 +218,12 @@ struct SignedInView: View {
     }
   }
 
-  private func navigate(to link: AppLink) {
+  private func navigate(to link: AppLink, fromPersonalIntent: Bool = false) {
+    librarySearchSeed = nil
+    if fromPersonalIntent, access.pro || access.loading, link.path == ["home"],
+      let term = link.query.first(where: { $0.name == "query" })?.value {
+      librarySearchSeed = LibraryView.SearchSeed(term: term)
+    }
     switch link.path {
     case ["map"], ["share"], ["plan-gate"]: library = false; path = []
     case ["home"]: library = true; path = []
@@ -232,6 +243,7 @@ struct SignedInView: View {
   }
 
   private func open(_ route: String) {
+    librarySearchSeed = nil
     if let link = AppLink(route) { path.append(link) }
   }
 

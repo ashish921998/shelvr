@@ -25,7 +25,7 @@ import Observation
       .filter { !$0.isEmpty }.prefix(3).joined(separator: " ")
     var route = URLComponents()
     route.path = "/home"
-    if !term.isEmpty { route.queryItems = [URLQueryItem(name: "query", value: term)] }
+    route.queryItems = [URLQueryItem(name: "query", value: term)]
     guard let encoded = route.string, let link = AppLink(encoded) else { return }
     personal = (link, owner, session)
     pending = UUID()

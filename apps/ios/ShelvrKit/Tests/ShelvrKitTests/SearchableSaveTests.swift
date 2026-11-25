@@ -70,4 +70,7 @@ import Testing
   navigation.requestVisualSearch(labels: labels, owner: "a", session: session)
   let stale = try #require(navigation.pendingPersonal)
   #expect(navigation.consume(stale, owner: "b", session: session) == nil)
+  navigation.requestVisualSearch(labels: [" "], owner: "a", session: session)
+  let cleared = try #require(navigation.pendingPersonal)
+  #expect(navigation.consume(cleared, owner: "a", session: session)?.query == [URLQueryItem(name: "query", value: "")])
 }
