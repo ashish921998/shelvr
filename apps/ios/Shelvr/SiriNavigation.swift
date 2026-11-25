@@ -1,10 +1,8 @@
 import AppIntents
-import Foundation
-import Observation
+import ShelvrKit
 
-@MainActor @Observable final class SiriNavigation {
-  static let shared = SiriNavigation()
-  var libraryRequest: UUID?
+@MainActor enum SiriNavigation {
+  static let shared = SiriNavigationRequests()
 }
 
 #if compiler(>=6.4)
@@ -16,7 +14,7 @@ struct SearchShelvrIntent {
   var criteria: StringSearchCriteria
 
   @MainActor func perform() async throws -> some IntentResult {
-    SiriNavigation.shared.libraryRequest = UUID()
+    SiriNavigation.shared.requestLibrary()
     return .result()
   }
 }
@@ -28,7 +26,7 @@ struct OpenSpaceIntent {
   var target: SpaceEntity
 
   @MainActor func perform() async throws -> some IntentResult {
-    SiriNavigation.shared.libraryRequest = UUID()
+    SiriNavigation.shared.requestLibrary()
     return .result()
   }
 }

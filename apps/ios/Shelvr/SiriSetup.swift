@@ -29,29 +29,21 @@ struct SiriFolderRefresh: ViewModifier {
   @Environment(Backend.self) private var backend
   @Environment(\.scenePhase) private var phase
 
-  private struct Eligibility: Equatable {
-    let entitled: Bool
-    let active: Bool
-  }
-
   func body(content: Content) -> some View {
     #if compiler(>=6.4)
       if #available(iOS 27.0, *) {
-        content.task(id: Eligibility(entitled: entitled, active: phase == .active)) {
+        content.task(id: SiriFolderAccess(entitled: entitled, active: phase == .active)) {
           guard entitled else {
             ShelvrShortcuts.updateAppShortcutParameters()
             return
           }
           guard phase == .active, let owner = backend.userID else { return }
           do {
-            var previous: [String: String]?
+            var suggestions = SiriFolderSuggestions()
             for try await rows in backend.query("spaces:listSpaces", as: [ShelvrCatalog.Folder].self) {
               guard !Task.isCancelled, backend.userID == owner else { return }
               let names = Dictionary(uniqueKeysWithValues: rows.map { ($0._id, $0.name) })
-              if previous != names {
-                previous = names
-                ShelvrShortcuts.updateAppShortcutParameters()
-              }
+              if suggestions.changed(to: names) { ShelvrShortcuts.updateAppShortcutParameters() }
             }
           } catch { if !Task.isCancelled { Analytics.failure("siri_folder_refresh_failed") } }
         }
