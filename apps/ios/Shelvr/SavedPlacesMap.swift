@@ -36,7 +36,7 @@ struct SavedPlacesMap: View {
     let personalPlaces = saved ?? []
     let overviewPlaces = scene.visible.filter(\.isSaved)
     MapCanvas(places: scene.visible, location: location.position, filters: scene.filters, opening: scene.opening,
-      visited: scene.visited, overview: overview, overviewPlaces: overviewPlaces, topControlsHeight: topControlsHeight,
+      visited: scene.visited, copy: copy, overview: overview, overviewPlaces: overviewPlaces, topControlsHeight: topControlsHeight,
       bottomControlsHeight: bottomControlsHeight, onArea: { area = $0; viewport = $1 },
       onPick: { selected = $0 }, onCluster: { cluster = $0 })
       .ignoresSafeArea(.container)

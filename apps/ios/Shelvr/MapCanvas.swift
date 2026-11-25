@@ -8,6 +8,7 @@ struct MapCanvas: UIViewRepresentable {
   let filters: MapFilters
   let opening: [MapPlace]?
   let visited: Set<String>
+  let copy: Copy
   let overview: Int
   let overviewPlaces: [MapPlace]
   let topControlsHeight: CGFloat
@@ -21,7 +22,8 @@ struct MapCanvas: UIViewRepresentable {
   func makeUIView(context: Context) -> MKMapView {
     let map = MKMapView()
     map.delegate = context.coordinator
-    map.register(MKMarkerAnnotationView.self, forAnnotationViewWithReuseIdentifier: "place")
+    map.register(PlaceAnnotationView.self, forAnnotationViewWithReuseIdentifier: PlaceAnnotationView.placeIdentifier)
+    map.register(PlaceAnnotationView.self, forAnnotationViewWithReuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
     map.pointOfInterestFilter = .excludingAll
     return map
   }
@@ -136,15 +138,22 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     func mapView(_ map: MKMapView, viewFor annotation: any MKAnnotation) -> MKAnnotationView? {
-      guard let pin = annotation as? Pin else { return nil }
-      guard let view = map.dequeueReusableAnnotationView(withIdentifier: "place", for: pin)
-        as? MKMarkerAnnotationView else { return nil }
-      view.clusteringIdentifier = "places"
-      view.markerTintColor = pin.place.isSaved ? .systemOrange : .systemTeal
-      view.glyphImage = nil
-      view.glyphText = pin.visited ? "✓" : pin.place.emoji
-      view.displayPriority = pin.place.isSaved ? .defaultHigh : .defaultLow
-      return view
+      if let pin = annotation as? Pin,
+        let view = map.dequeueReusableAnnotationView(withIdentifier: PlaceAnnotationView.placeIdentifier, for: pin)
+          as? PlaceAnnotationView {
+        view.showPlace(emoji: pin.place.emoji, saved: pin.place.isSaved, visited: pin.visited,
+          title: pin.place.name, visitedLabel: parent.copy("passport.wentNoDate"))
+        return view
+      }
+      if let cluster = annotation as? MKClusterAnnotation,
+        let view = map.dequeueReusableAnnotationView(withIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier,
+          for: cluster) as? PlaceAnnotationView {
+        let count = cluster.memberAnnotations.count
+        let includesSavedPlace = cluster.memberAnnotations.contains { ($0 as? Pin)?.place.isSaved == true }
+        view.showCluster(count: count, label: parent.copy("passport.placesCount", count: count), saved: includesSavedPlace)
+        return view
+      }
+      return nil
     }
 
     func mapView(_ map: MKMapView, didSelect view: MKAnnotationView) {
