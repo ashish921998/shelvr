@@ -3,8 +3,20 @@ import SwiftUI
 
 struct LibraryView: View {
   enum Screen { case home, saves, review }
+  struct SearchSeed: Equatable {
+    let id = UUID()
+    let term: String
+  }
   let screen: Screen
-  var searchFocusChanged: (Bool) -> Void = { _ in }
+  @Binding var searchSeed: SearchSeed?
+  let searchFocusChanged: (Bool) -> Void
+
+  init(screen: Screen, searchSeed: Binding<SearchSeed?> = .constant(nil), searchFocusChanged: @escaping (Bool) -> Void = { _ in }) {
+    self.screen = screen
+    _searchSeed = searchSeed
+    self.searchFocusChanged = searchFocusChanged
+  }
+
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.colorScheme) private var scheme
@@ -40,6 +52,12 @@ struct LibraryView: View {
     Group {
       if screen == .home { libraryHome }
       else { List { libraryRows } }
+    }
+    .onChange(of: searchSeed, initial: true) { _, seed in
+      if let seed, searchSeed == seed {
+        search = seed.term
+        searchSeed = nil
+      }
     }
     .task(id: SearchRequest(query: searchQuery, attempt: searchAttempt)) {
       let term = searchQuery
