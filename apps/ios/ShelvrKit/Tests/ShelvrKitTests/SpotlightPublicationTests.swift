@@ -264,8 +264,13 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   }
   let started = await observed { release != nil }
   try #require(started)
-  let newer = Task { try await queue.run { events.append("newer read and write") } }
-  await Task.yield()
+  var entering = false
+  let newer = Task {
+    entering = true
+    try await queue.run { events.append("newer read and write") }
+  }
+  let entered = await observed { entering }
+  try #require(entered)
   release?.resume()
   await #expect(throws: URLError.self) { try await older.value }
   try await newer.value
@@ -333,11 +338,30 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
 }
 
 @MainActor @Test func aReadReturningAfterTheDeadlineCannotWinAgainstADelayedTimer() async {
+  func delayMainActor() {
+    _ = DispatchSemaphore(value: 0).wait(timeout: .now() + .milliseconds(50))
+  }
   let deadline = ContinuousClock.now.advanced(by: .milliseconds(30))
   await #expect(throws: URLError(.timedOut)) {
     try await SpotlightReindexRead.value(before: deadline) {
-      _ = DispatchSemaphore(value: 0).wait(timeout: .now() + .milliseconds(50))
+      delayMainActor()
       return "late grant"
     }
   }
+}
+
+@MainActor @Test func aNewerFlushCannotHideAPartialSystemWriteFailure() async throws {
+  let os = TestSearchIndex(), index = os.make()
+  let owner = SpotlightPublication.Owner(account: "a", session: UUID())
+  let request = try await index.beginReindex(for: owner)
+  os.willBlock = true
+  os.fail = true
+  let job = Task { try await index.finishReindex([try spotlightRow("a")], request: request, confirmGrant: { owner }) }
+  let started = await observed { os.blocked != nil }
+  try #require(started)
+  index.publish([try spotlightRow("b")], for: owner)
+  os.blocked?.resume()
+  await #expect(throws: CocoaError.self) { try await job.value }
+  await index.settled()
+  #expect(os.indexed == [["a"]] && os.items.isEmpty && index.needsReauthorization(after: request))
 }

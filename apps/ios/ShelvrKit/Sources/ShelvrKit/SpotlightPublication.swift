@@ -43,6 +43,8 @@ import Foundation
   private var authorization = UUID()
   private var snapshotRevision: UInt64 = 0
   private var reindexSequence: UInt64 = 0
+  private var systemWrite: ReindexRequest?
+  private var failedSystemWrite: UInt64?
   private var tail: Task<Void, Never>?
   private var retry: Task<Void, Never>?
   private var backoff = 2
@@ -147,11 +149,14 @@ import Foundation
     confirmGrant: @MainActor () async throws -> Owner?) async throws {
     guard current(request) && request.owner.active && isCurrent(request.owner)
     else { throw CancellationError() }
+    systemWrite = request
+    defer { if systemWrite?.sequence == request.sequence { systemWrite = nil } }
     if request.snapshotRevision == snapshotRevision { publish(rows, for: request.owner) }
     rewriteAll = true
     schedule()
     do {
       try await confirmSystemWrite()
+      if failedSystemWrite == request.sequence { throw CocoaError(.fileWriteUnknown) }
       try Task.checkCancellation()
       let grant = try await confirmGrant()
       try Task.checkCancellation()
@@ -190,12 +195,17 @@ import Foundation
       await prior?.value
       await urgent?.value
       guard job == revision else { return }
+      let identity = authorization
       do {
         try await flush(job)
         if revision == job { backoff = 2 }
       } catch {
         needsReset = true
-        if job == revision {
+        if let request = systemWrite, identity == authorization && current(request) {
+          failedSystemWrite = request.sequence
+          failure()
+          activate(nil)
+        } else if job == revision {
           if backoff == 2 { failure() }
           let delay = backoff
           backoff = min(backoff * 2, 60)
