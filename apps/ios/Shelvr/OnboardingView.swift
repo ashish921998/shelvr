@@ -57,6 +57,10 @@ private struct OnboardingAccount: View {
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var progress: OnboardingProgress
+  @Environment(\.colorScheme) private var scheme
+  @Environment(\.dynamicTypeSize) private var type
+  @AppStorage("swift.appearance") private var appearance = "system"
+  private var palette: HomeChromePalette { HomeChromePalette(scheme, appearance: appearance) }
   @AppStorage private var complete: Bool
   @State private var busy = false
   @State private var errorKey: String?
@@ -87,21 +91,28 @@ private struct OnboardingAccount: View {
     } else {
       NavigationStack {
         ScrollView {
-          VStack(alignment: .leading, spacing: 20) {
+          VStack(alignment: .leading, spacing: 14) {
             content
             if let errorKey { Text(copy(errorKey)).foregroundStyle(.red) }
           }
           .frame(maxWidth: .infinity, alignment: .leading).padding(24)
         }
+        .background(palette.background.ignoresSafeArea())
+        .foregroundStyle(palette.foreground)
         .safeAreaInset(edge: .bottom) {
-          Button(copy(progress.step == .ahaShare ? "common.share" : progress.step == .opener ? "opener.getStarted" :
-            progress.step == .notifications ? "onboardingNotify.allow" : "common.continue")) {
+          Button {
             if progress.step == .ahaShare { practiceShare = true } else { proceed(skip: false) }
+          } label: {
+            Text(copy(progress.step == .ahaShare ? "common.share" : progress.step == .opener ? "opener.getStarted" :
+              progress.step == .notifications ? "onboardingNotify.allow" : "common.continue"))
+              .font(.custom("Satoshi-Bold", size: 17, relativeTo: .headline))
+              .frame(maxWidth: .infinity, minHeight: 56).foregroundStyle(palette.background)
+              .background(palette.foreground, in: Capsule())
           }
-          .buttonStyle(.borderedProminent).controlSize(.large)
+          .buttonStyle(.plain)
           .disabled(busy || (progress.step == .goal && progress.goals.isEmpty) ||
             (progress.step == .savedCount && progress.savedCount == nil) || (progress.step == .been && progress.visitedCities.isEmpty) || (progress.step == .city && progress.city == nil))
-          .padding()
+          .padding(.horizontal, 24).padding(.vertical, 8).background(palette.background)
         }
         .toolbar {
           if progress.step != .opener {
@@ -128,7 +139,7 @@ private struct OnboardingAccount: View {
           }
         }
         .sheet(isPresented: $practiceShare) {
-          VStack(alignment: .leading, spacing: 20) {
+          VStack(alignment: .leading, spacing: 14) {
             Text(copy("aha.coachShelvr")).font(.title.bold())
             Button {
               practiceShare = false
@@ -155,19 +166,18 @@ private struct OnboardingAccount: View {
   @ViewBuilder private var content: some View {
     switch progress.step {
     case .opener:
-      title("onboarding.openerSaveTitle"); title("onboarding.openerSaveAccent")
-      Text(copy("opener.tagline"))
+      OnboardingOpener(palette: palette)
     case .savedCount:
       title("onboardingQ.savedTitle")
       ForEach(["Few", "TenToFifty", "FiftyToTwoHundred", "Hundreds", "LostCount"], id: \.self) { count in
-        choice(copy("onboardingQ.saved\(count)"), selected: progress.savedCount == count) {
+        choice(copy("onboardingQ.saved\(count)"), emoji: ["Few": "🌱", "TenToFifty": "📌", "FiftyToTwoHundred": "🗂️", "Hundreds": "🏔️", "LostCount": "🌀"][count], selected: progress.savedCount == count) {
           progress.savedCount = count; persist()
         }
       }
     case .goal:
       title("onboardingQ.goalTitle")
       ForEach(["date", "travel", "food"], id: \.self) { goal in
-        choice(copy("onboardingQ.goal\(goal.capitalized)"), selected: progress.goals.contains(goal)) {
+        choice(copy("onboardingQ.goal\(goal.capitalized)"), emoji: ["date": "🍷", "travel": "✈️", "food": "🍜"][goal], detail: copy("onboardingQ.goal\(goal.capitalized)Body"), selected: progress.goals.contains(goal)) {
           if !progress.goals.insert(goal).inserted { progress.goals.remove(goal) }; persist()
         }
       }
@@ -176,12 +186,15 @@ private struct OnboardingAccount: View {
       title(been ? "cityStamps.onboardingTitle" :
         progress.goals.contains("travel") && !progress.goals.contains("date") ? "onboardingQ.cityTitleTrip" : "onboardingQ.cityTitleOut")
       Text(copy(been ? "cityStamps.onboardingBody" : "onboardingQ.cityBody"))
-      ForEach(SampleReel.all) { city in
-        choice(copy(city.cityKey), selected: been ? progress.visitedCities.contains(city.id) : progress.city == city.id) {
-          if been {
-            if !progress.visitedCities.insert(city.id).inserted { progress.visitedCities.remove(city.id) }
-          } else { progress.city = city.id; proceed(skip: false) }
-          persist()
+      LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: type.isAccessibilitySize ? 1 : 2), spacing: 12) {
+        ForEach(SampleReel.all) { city in
+          let selected = been ? progress.visitedCities.contains(city.id) : progress.city == city.id
+          cityChoice(city, selected: selected) {
+            if been {
+              if !progress.visitedCities.insert(city.id).inserted { progress.visitedCities.remove(city.id) }
+            } else { progress.city = city.id; proceed(skip: false) }
+            persist()
+          }
         }
       }
     case .chart:
@@ -198,7 +211,8 @@ private struct OnboardingAccount: View {
     case .cityEcho:
       if let reel {
         Text(copy(progress.city == nil ? "onboardingStatement.cityStart" : "onboardingStatement.cityPicked",
-          ["city": copy(reel.cityKey)])).font(.largeTitle.bold())
+          ["city": copy(reel.cityKey)])).font(.custom("Satoshi-Bold", size: 39, relativeTo: .largeTitle))
+          .frame(minHeight: 280).accessibilityAddTraits(.isHeader)
       }
     case .ahaShare:
       title("aha.shareTitle")
@@ -207,26 +221,73 @@ private struct OnboardingAccount: View {
         Link(destination: reel.url) { Label(copy("aha.reelBy", ["handle": reel.creator]), systemImage: "play.rectangle") }
         Text(copy("aha.coachShare"))
       }
-    case .firstSave: title("onboardingStatement.firstSave")
+    case .firstSave:
+      Text(copy("onboardingStatement.firstSave")).font(.custom("Satoshi-Bold", size: 39, relativeTo: .largeTitle))
+        .multilineTextAlignment(.center).frame(maxWidth: .infinity, minHeight: 300).accessibilityAddTraits(.isHeader)
     case .ahaSpots:
       if let reel {
         Text(copy("aha.cityPlaces", ["city": copy(reel.cityKey)])).font(.largeTitle.bold())
         sampleMap(reel)
-        ForEach(reel.places, id: \.name) { Text($0.name) }
+        ForEach(Array(reel.places.enumerated()), id: \.offset) { i, place in
+          HStack { Text(String(i+1)).font(.caption.bold()).padding(7).background(palette.primary, in: Circle()).foregroundStyle(palette.onPrimary)
+            Text(place.name).font(.custom("Satoshi-Bold", size: 16, relativeTo: .body))
+          }
+        }
         Text(copy("aha.fromReel", ["handle": reel.creator])).font(.footnote)
       }
     case .carousel:
       TabView(selection: $carousel) {
         ForEach(Array(["together", "eat", "map"].enumerated()), id: \.offset) { index, key in
-          VStack {
-            title("onboardingCarousel." + key)
-            if let reel { sampleMap(reel) }
-          }.padding().tag(index)
+          ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+              title("onboardingCarousel." + key)
+              if let reel { featurePreview(key, reel: reel) }
+            }.frame(maxWidth: .infinity, alignment: .leading).padding(8)
+          }.tag(index)
         }
-      }.tabViewStyle(.page).frame(height: 380)
+      }.tabViewStyle(.page).frame(height: type.isAccessibilitySize ? 550 : 410)
     case .notifications:
-      title("onboardingNotify.title"); Text(copy("onboardingNotify.sub"))
+      title("onboardingNotify.title")
+      Text(copy("onboardingNotify.sub")).foregroundStyle(palette.muted)
+      if let reel {
+        notificationPreview(copy("reminder.tripEveTitle", ["city": copy(reel.cityKey)]),
+          message: copy("reminder.tripEveBody", count: reel.places.count))
+        if let first = reel.places.first {
+          notificationPreview(copy("reminder.visitTitle"), message: copy("reminder.visitBody", ["title": first.name]))
+        }
+      }
     }
+  }
+
+  @ViewBuilder private func featurePreview(_ kind: String, reel: SampleReel) -> some View {
+    if kind == "map" {
+      Label(copy("map.searchPlaceholder"), systemImage: "magnifyingglass").foregroundStyle(palette.muted)
+      sampleMap(reel)
+    } else {
+      VStack(alignment: .leading, spacing: 14) {
+        Text(copy(kind == "together" ? reel.cityKey : progress.goals.contains("travel") ? "homePlaces.planTrip" : "homePlaces.planDate"))
+          .font(.custom("Satoshi-Bold", size: 21, relativeTo: .title2))
+        if kind == "together" { Label(copy("sharedLists.invite"), systemImage: "person.2") }
+        ForEach(Array(reel.places.prefix(kind == "eat" ? 2 : reel.places.count).enumerated()), id: \.offset) { _, place in
+          Label(place.name, systemImage: "mappin.circle.fill").font(.subheadline)
+        }
+        if kind == "eat" { Label(copy("common.share"), systemImage: "square.and.arrow.up") }
+      }.frame(maxWidth: .infinity, alignment: .leading).padding(18)
+        .background(palette.surface, in: .rect(cornerRadius: 20))
+        .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(palette.border) }
+    }
+  }
+
+  private func notificationPreview(_ title: String, message: String) -> some View {
+    HStack(alignment: .top, spacing: 12) {
+      FirstRunPicture(name: "first-run-icon", ext: "png").frame(width: 38, height: 38).clipShape(.rect(cornerRadius: 9))
+      VStack(alignment: .leading, spacing: 4) {
+        Text(title).font(.custom("Satoshi-Bold", size: 16, relativeTo: .headline))
+        Text(message).font(.subheadline)
+      }
+    }.padding(16).frame(maxWidth: .infinity, alignment: .leading)
+      .background(palette.surface, in: .rect(cornerRadius: 20))
+      .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(palette.border) }
   }
 
   private func sampleMap(_ reel: SampleReel) -> some View {
@@ -237,13 +298,40 @@ private struct OnboardingAccount: View {
     }.frame(height: 240).clipShape(.rect(cornerRadius: 16))
   }
 
-  private func title(_ key: String) -> some View { Text(copy(key)).font(.largeTitle.bold()) }
+  private func title(_ key: String) -> some View {
+    Text(copy(key)).font(.custom("Satoshi-Bold", size: 30, relativeTo: .largeTitle))
+      .tracking(-0.6).accessibilityAddTraits(.isHeader)
+  }
 
-  private func choice(_ text: String, selected: Bool, action: @escaping () -> Void) -> some View {
+  private func cityChoice(_ city: SampleReel, selected: Bool, action: @escaping () -> Void) -> some View {
     Button(action: action) {
-      HStack { Text(text); Spacer(); Image(systemName: selected ? "checkmark.circle.fill" : "circle") }
-        .padding().background(.thinMaterial, in: .rect(cornerRadius: 12))
-    }.accessibilityAddTraits(selected ? .isSelected : [])
+      VStack(alignment: .leading, spacing: 0) {
+        Color.clear.frame(height: 80).overlay {
+          FirstRunPicture(name: "library-city-" + city.id, ext: "jpg").scaledToFill()
+        }.clipped()
+        HStack {
+          Text(copy(city.cityKey)).font(.custom("Satoshi-Bold", size: 15, relativeTo: .subheadline))
+          Spacer()
+          if selected { Image(systemName: "checkmark.circle.fill").foregroundStyle(palette.primaryText) }
+        }.padding(10)
+      }.background(palette.surface).clipShape(.rect(cornerRadius: 14))
+        .overlay { RoundedRectangle(cornerRadius: 14).strokeBorder(selected ? palette.primaryText : palette.border) }
+    }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
+  }
+
+  private func choice(_ text: String, emoji: String? = nil, detail: String? = nil, selected: Bool, action: @escaping () -> Void) -> some View {
+    Button(action: action) {
+      HStack(spacing: 12) {
+        if let emoji { Text(emoji).font(.title2).accessibilityHidden(true) }
+        VStack(alignment: .leading, spacing: 3) {
+          Text(text).font(.custom("Satoshi-Bold", size: 17, relativeTo: .headline))
+          if let detail { Text(detail).font(.subheadline).foregroundStyle(palette.muted) }
+        }
+        Spacer()
+        Image(systemName: selected ? "checkmark.circle.fill" : "circle").foregroundStyle(selected ? palette.primaryText : palette.muted)
+      }.padding(13).frame(minHeight: 54).background(selected ? palette.primary.opacity(0.13) : palette.surface, in: .rect(cornerRadius: 16))
+        .overlay { RoundedRectangle(cornerRadius: 16).strokeBorder(selected ? palette.primaryText : palette.border, lineWidth: 1.5) }
+    }.buttonStyle(.plain).accessibilityAddTraits(selected ? .isSelected : [])
   }
 
   private func persist() {

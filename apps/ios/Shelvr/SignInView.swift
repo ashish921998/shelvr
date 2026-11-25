@@ -7,6 +7,8 @@ struct SignInView: View {
   @Environment(\.copy) private var copy
   @Environment(\.webAuthenticationSession) private var webAuthenticationSession
   @Environment(\.colorScheme) private var colorScheme
+  @Environment(\.dynamicTypeSize) private var type
+  @AppStorage("swift.appearance") private var appearance = "system"
   @State private var nonce = AppleNonce()
   @State private var busy = false
   @State private var attemptID = ""
@@ -17,17 +19,31 @@ struct SignInView: View {
   @State private var failed = false
 
   var body: some View {
-    VStack(spacing: 16) {
-      Spacer()
-      Text("Shelvr")
-        .font(.system(size: 48, weight: .bold))
-      Text(copy("opener.tagline"))
-        .font(.title3.weight(.semibold))
-        .multilineTextAlignment(.center)
-      Text(copy("account.signInTitle"))
-        .foregroundStyle(Color(.muted))
-        .multilineTextAlignment(.center)
-      Spacer()
+    let palette = HomeChromePalette(colorScheme, appearance: appearance)
+    GeometryReader { proxy in
+      ScrollView {
+        VStack(spacing: 16) {
+          if !type.isAccessibilitySize {
+            LisbonSignInHero(palette: palette)
+              .frame(height: max(145, min(345, proxy.size.height - 375)))
+          }
+          VStack(spacing: 6) {
+            Text("shelvr").font(.custom("CrimsonProRoman-Regular", size: 32, relativeTo: .title))
+              .foregroundStyle(palette.primaryText).accessibilityAddTraits(.isHeader)
+            Text(copy("opener.tagline")).font(.custom("CrimsonProRoman-Regular", size: 30, relativeTo: .title))
+            Text(copy("account.signInTitle"))
+              .font(.custom("Satoshi-Regular", size: 16, relativeTo: .body)).foregroundStyle(palette.muted)
+          }.multilineTextAlignment(.center)
+          providerButtons(palette)
+          Text(consent).font(.custom("Satoshi-Regular", size: 12, relativeTo: .caption))
+            .foregroundStyle(palette.muted).multilineTextAlignment(.center).tint(palette.foreground)
+        }.padding(.horizontal, 20).padding(.vertical, 12).frame(maxWidth: .infinity, minHeight: proxy.size.height)
+      }
+    }.background(palette.background.ignoresSafeArea()).foregroundStyle(palette.foreground).disabled(busy)
+  }
+
+  private func providerButtons(_ palette: HomeChromePalette) -> some View {
+    VStack(spacing: 12) {
       SignInWithAppleButton(.continue) { request in
         begin("apple"); stage = "browser"; browserBegan = .now
         nonce = AppleNonce()
@@ -48,22 +64,27 @@ struct SignInView: View {
         }
       }
       .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
-      .frame(height: 52)
-      Button(copy("account.google")) {
+      .frame(height: 52).clipShape(Capsule())
+      Button {
         begin("google")
         signIn {
           guard let credential = try await googleCredential() else { cancelled(); return }
           stage = "exchange"
           try await backend.signIn(credential)
         }
+      } label: {
+        Text(copy("account.google")).font(.custom("Satoshi-Bold", size: 16, relativeTo: .headline))
+          .frame(maxWidth: .infinity, minHeight: 52)
+          .background(palette.surface, in: Capsule()).overlay { Capsule().strokeBorder(palette.border) }
       }
-      .buttonStyle(.signIn)
+      .buttonStyle(.plain)
       #if DEBUG
         Button(copy("account.anonymous")) {
           begin("anonymous")
           signIn { try await backend.signIn(.anonymous) }
         }
-        .buttonStyle(.signIn)
+        .buttonStyle(.plain).font(.custom("Satoshi-Regular", size: 14, relativeTo: .subheadline))
+        .foregroundStyle(palette.muted).frame(minHeight: 44)
       #endif
       if busy {
         ProgressView()
@@ -72,14 +93,7 @@ struct SignInView: View {
           .font(.footnote)
           .foregroundStyle(.red)
       }
-      Text(consent)
-        .font(.caption)
-        .foregroundStyle(Color(.muted))
-        .multilineTextAlignment(.center)
-        .tint(Color(.foreground))
     }
-    .padding(24)
-    .disabled(busy)
   }
 
   private var consent: AttributedString {

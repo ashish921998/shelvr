@@ -1,0 +1,134 @@
+import ShelvrKit
+import SwiftUI
+
+struct FirstRunPicture: View {
+  let name: String
+  let ext: String
+
+  var body: some View {
+    if let url = Bundle.main.url(forResource: name, withExtension: ext),
+      let image = UIImage(contentsOfFile: url.path) {
+      Image(uiImage: image).resizable()
+    }
+  }
+}
+
+struct LisbonSignInHero: View {
+  let palette: HomeChromePalette
+  @Environment(\.copy) private var copy
+  @Environment(\.accessibilityReduceMotion) private var reduced
+  @State private var drawn = false
+
+  var body: some View {
+    GeometryReader { bounds in
+      VStack(alignment: .leading, spacing: 5) {
+        Capsule().fill(palette.foreground).frame(width: 57, height: 13)
+          .frame(maxWidth: .infinity).padding(.bottom, 8)
+        Text(copy("onboarding.sceneLisbon")).font(.custom("Satoshi-Bold", size: 22))
+        Text(copy("onboarding.sceneSpaceMeta")).font(.caption2).foregroundStyle(palette.muted)
+        route.frame(height: 112)
+        HStack(spacing: 4) {
+          ForEach(["library-city-lisbon", "city-lisbon-food", "library-city-prague"], id: \.self) { photo in
+            FirstRunPicture(name: photo, ext: "jpg").scaledToFill().frame(width: 31, height: 34)
+              .clipShape(.rect(cornerRadius: 6))
+          }
+          Text(copy("signInScene.fromReels")).font(.caption2).foregroundStyle(palette.muted)
+        }
+        Text(copy("signInScene.dateTitle")).font(.custom("Satoshi-Bold", size: 15))
+        ForEach(["Miradouro", "TimeOut", "Pasteis"], id: \.self) { key in
+          Text(copy("onboarding.scene" + key)).font(.caption)
+        }
+      }
+      .padding(13).frame(width: min(254, bounds.size.width))
+      .background(palette.surface, in: .rect(cornerRadius: 31))
+      .overlay { RoundedRectangle(cornerRadius: 31).strokeBorder(palette.foreground, lineWidth: 3) }
+      .frame(maxWidth: .infinity)
+    }
+    .clipped()
+    .mask(LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: 0.79),
+      .init(color: .clear, location: 1)], startPoint: .top, endPoint: .bottom))
+    .accessibilityHidden(true)
+    .onAppear { withAnimation(reduced ? nil : .easeInOut(duration: 1.4)) { drawn = true } }
+  }
+
+  private var route: some View {
+    GeometryReader { proxy in
+      let w = proxy.size.width, h = proxy.size.height
+      let pins = [CGPoint(x: 0.24*w, y: 0.32*h), CGPoint(x: 0.62*w, y: 0.22*h), CGPoint(x: 0.70*w, y: 0.68*h)]
+      ZStack {
+        palette.border.opacity(0.6)
+        Canvas { ctx, size in
+          for block in [CGRect(x: 0.06,y: 0.08,width: 0.26,height: 0.18), CGRect(x: 0.4,y: 0.06,width: 0.32,height: 0.14),
+            CGRect(x: 0.08,y: 0.4,width: 0.2,height: 0.24), CGRect(x: 0.5,y: 0.36,width: 0.4,height: 0.18),
+            CGRect(x: 0.32,y: 0.52,width: 0.14,height: 0.16)] {
+            ctx.fill(Path(roundedRect: block.applying(.init(scaleX: size.width, y: size.height)), cornerRadius: 5), with: .color(palette.frame))
+          }
+          var river = Path()
+          river.move(to: CGPoint(x: -8, y: 0.68*h))
+          river.addQuadCurve(to: CGPoint(x: w+8,y: 0.84*h), control: CGPoint(x: 0.5*w,y: h))
+          ctx.stroke(river, with: .color(Color.cyan.opacity(0.24)), lineWidth: 12)
+        }
+        Path { p in
+          p.move(to: pins[0]); p.addQuadCurve(to: pins[1], control: CGPoint(x: w*0.42,y: h*0.09))
+          p.addQuadCurve(to: pins[2], control: CGPoint(x: w*0.79,y: h*0.42))
+        }.trim(from: 0, to: drawn || reduced ? 1 : 0).stroke(palette.primaryText, lineWidth: 2)
+        ForEach(pins.indices, id: \.self) { i in
+          Text(String(i+1)).font(.caption2.bold()).foregroundStyle(palette.onPrimary).frame(width: 18,height: 18)
+            .background(palette.primary, in: Circle()).position(pins[i])
+        }
+      }.clipShape(.rect(cornerRadius: 10))
+    }
+  }
+}
+
+struct OnboardingOpener: View {
+  let palette: HomeChromePalette
+  @Environment(\.copy) private var copy
+  @Environment(\.accessibilityReduceMotion) private var reduced
+  @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+  @Environment(\.dynamicTypeSize) private var type
+  @State private var page = 0
+  @State private var interacted = false
+  private let photos = ["your-cities", "san-francisco-places", "san-francisco-date", "san-francisco-trip"]
+  private var captions: [String] {
+    [copy("opener.yourCities"), copy("onboarding.openerFileTitle") + " " + copy("onboarding.openerFileAccent"),
+      copy("plan.dateNight"), copy("trip.yourTripNoCity")]
+  }
+
+  var body: some View {
+    VStack(spacing: 9) {
+      HStack(spacing: 6) {
+        FirstRunPicture(name: "first-run-icon", ext: "png").frame(width: 25, height: 25).clipShape(.rect(cornerRadius: 6))
+        Text("shelvr").font(.custom("CrimsonProRoman-Regular", size: 34, relativeTo: .largeTitle))
+      }.foregroundStyle(palette.primaryText).accessibilityElement(children: .combine).accessibilityAddTraits(.isHeader)
+      Text(copy("opener.tagline")).font(.custom("Satoshi-Regular", size: 15, relativeTo: .subheadline))
+        .foregroundStyle(palette.muted).multilineTextAlignment(.center).frame(maxWidth: 285)
+      TabView(selection: $page) {
+        ForEach(photos.indices, id: \.self) { i in
+          FirstRunPicture(name: photos[i], ext: "webp").scaledToFit()
+            .clipShape(.rect(cornerRadius: 22)).overlay { RoundedRectangle(cornerRadius: 22).strokeBorder(palette.foreground, lineWidth: 3) }
+            .aspectRatio(640/1391.0, contentMode: .fit).padding(.vertical, 5).frame(maxWidth: .infinity)
+            .tag(i).accessibilityLabel(captions[i])
+        }
+      }.tabViewStyle(.page(indexDisplayMode: .never))
+        .frame(height: min(UIScreen.main.bounds.height * 0.46, 420))
+        .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in interacted = true })
+      Text(captions[page]).font(.custom("Satoshi-Bold", size: 23, relativeTo: .title2)).multilineTextAlignment(.center)
+      HStack(spacing: 6) {
+        ForEach(photos.indices, id: \.self) { i in
+          Button { interacted = true; page = i } label: {
+            Capsule().fill(i == page ? palette.foreground : palette.border).frame(width: i == page ? 18 : 7, height: 6)
+              .padding(.vertical, 8)
+          }.accessibilityLabel(captions[i]).accessibilityAddTraits(i == page ? .isSelected : [])
+        }
+      }
+    }.frame(maxWidth: .infinity)
+    .task(id: !interacted && !reduced && !voiceOver && !type.isAccessibilitySize) {
+      guard !interacted && !reduced && !voiceOver && !type.isAccessibilitySize else { return }
+      while !Task.isCancelled {
+        do { try await Task.sleep(for: .seconds(3)) } catch { return }
+        withAnimation(.easeInOut(duration: 0.3)) { page = (page + 1) % photos.count }
+      }
+    }
+  }
+}
