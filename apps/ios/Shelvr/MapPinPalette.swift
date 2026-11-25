@@ -16,7 +16,7 @@ enum MapPinPalette {
     case .shopping: 0x336C9F
     case .stay: 0x555F9A
     case .dateNight: 0xAA4860
-    case nil: 0xC78D37
+    case nil: 0xB47824
     }
     return UIColor(red: CGFloat((rgb >> 16) & 255) / 255, green: CGFloat((rgb >> 8) & 255) / 255,
       blue: CGFloat(rgb & 255) / 255, alpha: 1)
