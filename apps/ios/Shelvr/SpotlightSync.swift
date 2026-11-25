@@ -108,7 +108,9 @@ private struct SpotlightFeed: View {
       do {
         for try await page in backend.spotlightPage(after: cursor.value) {
           guard !Task.isCancelled, owner.session == backend.sessionGeneration, owner.active else { return }
-          if pages.receive(page, for: cursor), pages.isComplete { ShelvrSpotlight.publication.publish(pages.saves, for: owner) }
+          if pages.receive(page, for: cursor), let snapshot = pages.snapshot {
+            ShelvrSpotlight.publication.publish(snapshot, for: owner)
+          }
           delay = 2
         }
         return

@@ -12,14 +12,14 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   let a = try spotlightRow("a"), b = try spotlightRow("b"), c = try spotlightRow("c")
   _ = pages.receive(.init(page: [a], continueCursor: "tail", isDone: false), for: .start)
   _ = pages.receive(.init(page: [a, b], continueCursor: "end", isDone: true), for: .after("tail"))
-  #expect(pages.isComplete && pages.saves.map(\._id) == ["a", "b"])
+  #expect(pages.snapshot?.map(\._id) == ["a", "b"])
   _ = pages.receive(.init(page: [c], continueCursor: "new", isDone: false), for: .start)
   #expect(pages.cursors == [.start, .after("new")])
-  #expect(!pages.isComplete && pages.saves == [c])
+  #expect(pages.snapshot == nil)
   let late = pages.receive(.init(page: [a, b], continueCursor: "end", isDone: true), for: .after("tail"))
-  #expect(!late && pages.saves == [c])
+  #expect(!late && pages.snapshot == nil)
   pages.invalidate(.start)
-  #expect(pages.cursors == [.start] && pages.saves.isEmpty)
+  #expect(pages.cursors == [.start] && pages.snapshot == nil)
 }
 
 @MainActor private func observed(_ predicate: () -> Bool) async -> Bool {
