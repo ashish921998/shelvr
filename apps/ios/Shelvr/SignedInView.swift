@@ -65,7 +65,7 @@ struct SignedInView: View {
   }
 
   var body: some View {
-    NavigationStack(path: Binding(get: { path }, set: setPath)) {
+    NavigationStack(path: Binding(get: { path }, set: { next in setPath(next) })) {
       Group {
         if access.loading { loadingPlan }
         else if access.locked { PlanGateView() }
