@@ -30,7 +30,7 @@ import Foundation
     }
   }
 
-  public func run(removeDomain: (String) async throws -> Void) async throws {
+  public func run(removeDomains: ([String]) async throws -> Void) async throws {
     let files = FileManager.default
     let hasThumbnails = files.fileExists(atPath: thumbnails.path)
     let staged = Result { try stagedDownloads() }
@@ -42,7 +42,7 @@ import Foundation
     Self.catalogKeys.forEach(catalogs.removeObject(forKey:))
     let thumbnailResult = Result { if hasThumbnails { try files.removeItem(at: thumbnails) } }
     let downloadResult = Result { for url in try staged.get() { try files.removeItem(at: url) } }
-    try await removeDomain("shelvr.item")
+    try await removeDomains(["shelvr.item", "ItemEntity"])
     try Task.checkCancellation()
     defaults.removeObject(forKey: Self.indexedIDs)
     try thumbnailResult.get()

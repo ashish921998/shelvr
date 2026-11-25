@@ -45,14 +45,14 @@ import Testing
   #expect(FileManager.default.fileExists(atPath: directory.path))
   #expect(try Data(contentsOf: unrelated) == Data([4]))
   #expect(try Data(contentsOf: otherFile) == Data([2]))
-  var domains: [String] = []
-  try await cleanup.run { domains.append($0) }
-  try await cleanup.run { domains.append($0) }
-  #expect(domains == ["shelvr.item"])
+  var removals: [[String]] = []
+  try await cleanup.run { removals.append($0) }
+  try await cleanup.run { removals.append($0) }
+  #expect(removals == [["shelvr.item", "ItemEntity"]])
   #expect(defaults.object(forKey: ids) == nil)
   defaults.set(["written-by-older-build"], forKey: ids)
-  try await cleanup.run { domains.append($0) }
-  #expect(domains == ["shelvr.item", "shelvr.item"])
+  try await cleanup.run { removals.append($0) }
+  #expect(removals == [["shelvr.item", "ItemEntity"], ["shelvr.item", "ItemEntity"]])
 }
 
 @MainActor @Test func upgradeClearsAnInterruptedExpoIndexEvenWithoutARecordedIdentifierList() async throws {
@@ -61,7 +61,7 @@ import Testing
   defer { defaults.removePersistentDomain(forName: suite) }
   let documents = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
   let cleanup = LegacySearchCleanup(defaults: defaults, catalogs: defaults, documents: documents, caches: documents.appending(path: "Caches"))
-  var domains: [String] = []
-  try await cleanup.run { domains.append($0) }
-  #expect(domains == ["shelvr.item"])
+  var removals: [[String]] = []
+  try await cleanup.run { removals.append($0) }
+  #expect(removals == [["shelvr.item", "ItemEntity"]])
 }

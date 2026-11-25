@@ -12,8 +12,8 @@ struct LegacySearchCleanupView: ViewModifier {
       var delay = 2
       while !Task.isCancelled {
         do {
-          try await cleanup.run { domain in
-            try await CSSearchableIndex.default().deleteSearchableItems(withDomainIdentifiers: [domain])
+          try await cleanup.run { domains in
+            try await CSSearchableIndex.default().deleteSearchableItems(withDomainIdentifiers: domains)
           }
           return
         } catch {
