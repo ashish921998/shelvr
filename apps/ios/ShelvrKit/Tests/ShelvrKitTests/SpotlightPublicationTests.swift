@@ -35,6 +35,7 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   var cleared = 0
   var indexed = [[String]]()
   var expirations: [Date?] = []
+  var thumbnails = [String: Data]()
   var removed = [[String]]()
   var prepareCount = 0
   var fail = false
@@ -46,17 +47,21 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
     SpotlightPublication(prepare: { self.prepareCount += 1 }, clear: {
       self.cleared += 1
       self.items.removeAll()
+      self.thumbnails.removeAll()
     }, remove: { ids in
       self.removed.append(ids)
-      for id in ids { self.items.removeValue(forKey: id) }
+      for id in ids { self.items.removeValue(forKey: id); self.thumbnails.removeValue(forKey: id) }
     }, index: { rows, expiration in
       self.expirations.append(expiration)
       if self.willBlock {
         self.willBlock = false
         await withCheckedContinuation { self.blocked = $0 }
       }
-      self.indexed.append(rows.map(\._id))
-      for row in rows { self.items[row._id] = row }
+      self.indexed.append(rows.map(\.save._id))
+      for entry in rows {
+        self.items[entry.save._id] = entry.save
+        self.thumbnails[entry.save._id] = entry.thumbnail
+      }
       if self.fail { throw URLError(.cannotWriteToFile) }
     }, failure: { self.failures += 1 })
   }
@@ -124,4 +129,37 @@ private func spotlightRow(_ id: String, _ title: String = "Fixture", status: Str
   index.publish([try spotlightRow("1")], for: owner)
   await index.settled()
   #expect(os.expirations == [deadline])
+}
+
+@MainActor @Test func thumbnailsOnlyEnrichCurrentImagesInTheCurrentAccount() async throws {
+  func image(_ id: String, _ source: String) throws -> SearchableSave {
+    let fields: [String: Any] = ["_id": id, "_creationTime": 0, "type": "image", "status": "ready", "imageUrl": source]
+    return try JSONDecoder().decode(SearchableSave.self, from: JSONSerialization.data(withJSONObject: fields))
+  }
+  let rows = try (0...60).map { try image(String($0), "https://example.org/\($0)") }
+  let requests = SpotlightThumbnail.candidates(in: rows)
+  #expect(requests.count == 60 && requests.last?.id == "59")
+  let os = TestSearchIndex(), index = os.make()
+  let user = SpotlightPublication.Owner(account: "a", session: UUID())
+  index.activate(user)
+  index.publish(rows, for: user)
+  await index.settled()
+  #expect(os.items.count == 61 && os.thumbnails.isEmpty)
+  let first = requests[0], bytes = Data([1, 2])
+  index.acceptThumbnail(bytes, for: first, owner: user)
+  await index.settled()
+  #expect(os.thumbnails == ["0": bytes])
+  #expect(index.thumbnail(for: rows[0], account: "a", session: user.session) == bytes)
+  #expect(index.thumbnail(for: rows[0], account: "b", session: user.session) == nil)
+  let replacement = try image("0", "https://example.org/new")
+  index.publish([replacement], for: user)
+  index.acceptThumbnail(bytes, for: first, owner: user)
+  await index.settled()
+  #expect(os.thumbnails.isEmpty)
+  let newer = try #require(SpotlightThumbnail(replacement))
+  index.activate(nil)
+  index.acceptThumbnail(bytes, for: newer, owner: user)
+  await index.settled()
+  #expect(os.thumbnails.isEmpty && os.items.isEmpty)
+  #expect(!index.needsThumbnail(newer, for: user))
 }

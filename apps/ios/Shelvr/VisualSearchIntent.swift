@@ -24,7 +24,7 @@ struct VisualSearchIntent {
 
 @available(iOS 26.0, *)
 struct ItemVisualQuery: IntentValueQuery {
-  func values(for input: SemanticContentDescriptor) async throws -> [ItemEntity] {
+  @MainActor func values(for input: SemanticContentDescriptor) async throws -> [ItemEntity] {
     let labels = input.labels
     guard !labels.isEmpty else { return [] }
     let copy = Copy()
