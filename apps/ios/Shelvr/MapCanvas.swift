@@ -50,6 +50,9 @@ struct MapCanvas: UIViewRepresentable {
     var opened = false
     var queryingNearby = false
     private var compactPins = true
+    private var cameraMoving = false
+    private var nameLayout: Task<Void, Never>?
+    private var namedPins: [PlaceAnnotationView] = []
     init(_ parent: MapCanvas) { self.parent = parent }
 
     func update(_ parent: MapCanvas, map: MKMapView) {
@@ -94,6 +97,7 @@ struct MapCanvas: UIViewRepresentable {
         opened = true
         fit(places, on: map, animated: false)
       }
+      scheduleNames(on: map)
     }
 
     private func fit(_ places: [MapPlace], on map: MKMapView, animated: Bool) {
@@ -114,6 +118,8 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     func mapView(_ map: MKMapView, regionWillChangeAnimated animated: Bool) {
+      cameraMoving = true
+      clearNames()
       if hasActiveGesture(map) { opened = true; queryingNearby = false }
     }
 
@@ -125,8 +131,10 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     func mapView(_ map: MKMapView, regionDidChangeAnimated animated: Bool) {
+      cameraMoving = false
       let region = map.region
       updatePinScale(on: map)
+      scheduleNames(on: map)
       if let box = DiscoverBox.visible(latitude: region.center.latitude, longitude: region.center.longitude,
         latitudeDelta: region.span.latitudeDelta, longitudeDelta: region.span.longitudeDelta,
         width: map.bounds.width, height: map.bounds.height, tilted: map.camera.pitch > 0) {
@@ -136,6 +144,61 @@ struct MapCanvas: UIViewRepresentable {
         let viewport = MapViewport(center: region.center,
           cityScale: region.span.longitudeDelta <= map.bounds.width * 360 / (256 * 512))
         Task { @MainActor in parent.onArea(result, viewport) }
+      }
+    }
+
+    func mapView(_ map: MKMapView, didAdd views: [MKAnnotationView]) {
+      scheduleNames(on: map)
+    }
+
+    private func scheduleNames(on map: MKMapView) {
+      guard !cameraMoving, !compactPins, nameLayout == nil else { return }
+      nameLayout = Task { @MainActor [weak self, weak map] in
+        guard let self else { return }
+        nameLayout = nil
+        guard let map, !cameraMoving, !compactPins else { return }
+        layoutNames(on: map)
+      }
+    }
+
+    private func clearNames() {
+      for view in namedPins { view.showName(in: nil) }
+      namedPins.removeAll(keepingCapacity: true)
+    }
+
+    private func layoutNames(on map: MKMapView) {
+      clearNames()
+      let usable = map.bounds.inset(by: UIEdgeInsets(top: map.safeAreaInsets.top + parent.topControlsHeight + 8,
+        left: 8, bottom: map.safeAreaInsets.bottom + parent.bottomControlsHeight + 8, right: 8))
+      let visible = map.annotations(in: map.visibleMapRect).compactMap { element -> PlaceAnnotationView? in
+        guard let annotation = element as? any MKAnnotation,
+          let view = map.view(for: annotation) as? PlaceAnnotationView,
+          view.superview != nil, !view.isHidden else { return nil }
+        return view
+      }
+      var occupied = visible.map { $0.convert($0.bounds, to: map).insetBy(dx: -2, dy: -2) }
+      let candidates = visible.compactMap { view -> (view: PlaceAnnotationView, pin: Pin, distance: CGFloat)? in
+        guard let pin = view.annotation as? Pin else { return nil }
+        let center = view.convert(CGPoint(x: view.bounds.midX, y: view.bounds.midY), to: map)
+        guard usable.contains(center) else { return nil }
+        let distance = hypot(center.x - usable.midX, center.y - usable.midY)
+        return (view, pin, distance)
+      }.sorted {
+        if $0.pin.place.isSaved != $1.pin.place.isSaved { return $0.pin.place.isSaved }
+        if $0.distance != $1.distance { return $0.distance < $1.distance }
+        return $0.pin.place.id < $1.pin.place.id
+      }
+      for candidate in candidates {
+        let view = candidate.view
+        for onRight in [true, false] {
+          guard let local = view.nameFrame(onRight: onRight) else { break }
+          let frame = view.convert(local, to: map)
+          guard usable.contains(frame), !occupied.contains(where: { $0.intersects(frame) }) else { continue }
+          view.showName(in: local)
+          occupied.append(frame.insetBy(dx: -3, dy: -3))
+          namedPins.append(view)
+          break
+        }
       }
     }
 
@@ -153,6 +216,7 @@ struct MapCanvas: UIViewRepresentable {
       let next = compactPins ? metersPerPoint > 8 : metersPerPoint >= 10
       guard next != compactPins else { return }
       compactPins = next
+      clearNames()
       let annotations = Array(pins.values)
       map.removeAnnotations(annotations)
       map.addAnnotations(annotations)
