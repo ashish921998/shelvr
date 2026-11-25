@@ -8,39 +8,67 @@ struct SignedInView: View {
   @Binding var pendingLink: AppLink?
   @Environment(InviteEntry.self) private var invites
   @Environment(\.copy) private var copy
-  @State private var library = false
+  @State private var tab = HomeTab.map
   @State private var librarySearchFocused = false
   @State private var billing: BillingDestination?
   @State private var path: [AppLink] = []
   @State private var stampMessage: String?
 
-  private var showsMap: Bool { !access.loading && !access.locked && !library }
-  private var tabBar: HomeTabBar {
-    HomeTabBar(library: library, switchTab: { library.toggle() },
-      add: { open("/add-spots") }, plan: { open("/go-out") })
+  private enum HomeTab {
+    case map, library, add, plan, passport
+
+    init?(root link: AppLink) {
+      guard link.query.isEmpty else { return nil }
+      switch link.path {
+      case ["map"]: self = .map
+      case ["home"]: self = .library
+      case ["add-spots"]: self = .add
+      case ["go-out"]: self = .plan
+      case ["passport"]: self = .passport
+      default: return nil
+      }
+    }
+
+    var titleKey: String {
+      switch self {
+      case .map: "navigation.map"
+      case .library: "navigation.library"
+      case .add: "addSheet.title"
+      case .plan: "plan.goOut"
+      case .passport: "passport.title"
+      }
+    }
+  }
+
+  private var homeTabs: some View {
+    TabView(selection: $tab) {
+      Tab(copy("navigation.map"), systemImage: "map", value: HomeTab.map) {
+        SavedPlacesMap(open: open)
+      }
+      Tab(copy("navigation.library"), systemImage: "books.vertical", value: HomeTab.library) {
+        LibraryView(screen: .home, searchFocusChanged: { librarySearchFocused = $0 })
+          .toolbar(librarySearchFocused ? .hidden : .visible, for: .tabBar)
+      }
+      Tab(copy("common.add"), systemImage: "plus", value: HomeTab.add) { addSpots }
+      Tab(copy("plan.goOut"), systemImage: "shoeprints.fill", value: HomeTab.plan) { PlanCityView(trip: false) }
+      Tab(copy("passport.title"), systemImage: "book.closed", value: HomeTab.passport) { PassportView(open: open) }
+    }
   }
 
   var body: some View {
-    NavigationStack(path: $path) {
+    NavigationStack(path: Binding(get: { path }, set: setPath)) {
       Group {
-        if access.loading { loadingPlan } else if access.locked { PlanGateView() } else if library {
-          LibraryView(screen: .home, searchFocusChanged: { librarySearchFocused = $0 })
-        } else {
-          SavedPlacesMap(open: open, tabBar: tabBar)
-        }
+        if access.loading { loadingPlan }
+        else if access.locked { PlanGateView() }
+        else { homeTabs }
       }
-      .navigationTitle(copy(library ? "navigation.library" : "navigation.map"))
-      .toolbar(showsMap ? .hidden : .visible, for: .navigationBar)
+      .navigationTitle(copy(tab.titleKey))
+      .toolbar(!access.loading && !access.locked && tab == .map ? .hidden : .visible, for: .navigationBar)
       .toolbar {
         ToolbarItem(placement: .topBarTrailing) {
           Button { open("/profile") } label: {
             Label(copy("navigation.profile"), systemImage: "person.crop.circle")
           }
-        }
-      }
-      .safeAreaInset(edge: .bottom) {
-        if library && !librarySearchFocused && !access.loading && !access.locked {
-          tabBar
         }
       }
       .navigationDestination(for: AppLink.self) { link in
@@ -49,19 +77,7 @@ struct SignedInView: View {
         else { switch link.path.first {
         case "settings": AccountSettingsView()
         case "profile": AccountView().navigationTitle(copy("navigation.profile"))
-        case "add-spots":
-          List {
-            entry("/add", "addSheet.pasteLink", "link")
-            entry("/add", "addSheet.googleMapsList", "map")
-            entry("/new-shared-list", "sharedLists.newTitle", "person.2")
-            entry("/new-trip", "homePlaces.planTrip", "suitcase")
-            entry("/photo", "item.photo", "photo")
-            entry("/how-to-share", "addSheet.howToShare", "square.and.arrow.up")
-            if Locale.preferredLanguages.first?.hasPrefix("en") == true {
-              entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
-            }
-          }
-          .navigationTitle(copy("addSheet.title"))
+        case "add-spots": addSpots
         case "passport-story": PassportStoryView()
         case "trips": TripsTabView()
         case "shared-trip-links": ActiveTripLinksView()
@@ -81,9 +97,9 @@ struct SignedInView: View {
         case "passport-invite" where link.path.count == 2: FriendPassportView(token: link.path[1], compareInitially: link.query.contains { $0.name == "compare" && $0.value == "1" }).id(link)
         case "already-been", "next-to-stamp":
           StampPlacesView(city: link.path.first == "next-to-stamp" ? link.query.first { $0.name == "city" }?.value ?? "" : nil) { message in
-            guard path.last == link, let passport = AppLink("/passport") else { return }
-            if let i = path.lastIndex(of: passport) { path = Array(path.prefix(i + 1)) }
-            else { path = [passport] }
+            guard path.last == link else { return }
+            tab = .passport
+            path = []
             stampMessage = message
           }.id(link)
         case "city-stamps":
@@ -106,7 +122,7 @@ struct SignedInView: View {
         case "spots" where link.path.count == 2:
           SaveSpotRevealView(id: link.path[1]) { city in
             guard path.last == link else { return }
-            library = false
+            tab = .map
             if let city, let encoded = city.addingPercentEncoding(withAllowedCharacters: .alphanumerics),
               let destination = AppLink("/city/" + encoded) { path = [destination] }
             else { path = [] }
@@ -174,8 +190,8 @@ struct SignedInView: View {
         } }
       }
     }
-    .modifier(CancelSurveyCard(home: library && path.isEmpty))
-    .modifier(TrialReminderObserver(home: library && path.isEmpty))
+    .modifier(CancelSurveyCard(home: tab == .library && path.isEmpty))
+    .modifier(TrialReminderObserver(home: tab == .library && path.isEmpty))
     .environment(access)
     .sheet(item: $billing) { BillingSheet(destination: $0, confirmed: { access.retry += 1 }) }
     .task(id: access.retry) { await access.readPlan(backend) }
@@ -204,12 +220,27 @@ struct SignedInView: View {
 
   private func navigate(to link: AppLink) {
     switch link.path {
-    case ["map"], ["share"], ["plan-gate"]: library = false; path = []
-    case ["home"]: library = true; path = []
+    case ["map"], ["share"], ["plan-gate"]: tab = .map; path = []
+    case ["home"]: tab = .library; path = []
     case ["paywall"]: billing = .paywall
     case ["sign-in"]: break
-    default: path = [link]
+    default: setPath([link])
     }
+  }
+
+  private var addSpots: some View {
+    List {
+      entry("/add", "addSheet.pasteLink", "link")
+      entry("/add", "addSheet.googleMapsList", "map")
+      entry("/new-shared-list", "sharedLists.newTitle", "person.2")
+      entry("/new-trip", "homePlaces.planTrip", "suitcase")
+      entry("/photo", "item.photo", "photo")
+      entry("/how-to-share", "addSheet.howToShare", "square.and.arrow.up")
+      if Locale.preferredLanguages.first?.hasPrefix("en") == true {
+        entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
+      }
+    }
+    .navigationTitle(copy("addSheet.title"))
   }
 
   @ViewBuilder private var loadingPlan: some View {
@@ -221,8 +252,17 @@ struct SignedInView: View {
     }
   }
 
+  private func setPath(_ next: [AppLink]) {
+    if let link = next.last, let destination = HomeTab(root: link) {
+      tab = destination
+      path = []
+    } else {
+      path = next
+    }
+  }
+
   private func open(_ route: String) {
-    if let link = AppLink(route) { path.append(link) }
+    if let link = AppLink(route) { setPath(path + [link]) }
   }
 
   private func entry(_ route: String, _ title: String, _ symbol: String) -> some View {
