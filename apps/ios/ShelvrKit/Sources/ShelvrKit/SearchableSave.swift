@@ -55,7 +55,7 @@ public struct SearchableSavePage: Decodable, Sendable {
   public let continueCursor: String
   public let isDone: Bool
 
-  public static func latestReady(fetch: (String?) async -> Self?) async -> [SearchableSave]? {
+  public static func latestReady(fetch: @Sendable (String?) async -> Self?) async -> [SearchableSave]? {
     var saves: [SearchableSave] = []
     var cursor: String?
     var visited = Set<String>()
