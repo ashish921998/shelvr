@@ -191,7 +191,11 @@ struct SignedInView: View {
                 if let target = route.string.flatMap({ AppLink($0) }) { NavigationLink(city, value: target) }
               }
             }
-          } else { PlanCityView(trip: link.path.first == "new-trip") }
+          } else {
+            PlanCityView(trip: link.path.first == "new-trip") { target in
+              if link.path == ["go-out"], path.last == link { path[path.count - 1] = target }
+            }
+          }
         case "trip-plan" where link.path.count == 2: CityTripView(id: link.path[1], sharedOnly: access.restrictsPersonalAccess).id(link.path[1])
         case "add-trip-stop":
           if let id = link.query.first(where: { $0.name == "tripId" })?.value {
@@ -308,6 +312,7 @@ private struct ShellDestination: View {
 
 private struct PlanCityView: View {
   let trip: Bool
+  let singleCity: (AppLink) -> Void
   struct City: Decodable {
     let city: String
     let placeCount: Int?
@@ -337,6 +342,9 @@ private struct PlanCityView: View {
             }
             if let link = url.string.flatMap({ AppLink($0) }) {
               NavigationLink(city.city, value: link)
+                .task(id: cities.count == 1 ? link : nil) {
+                  if cities.count == 1 { singleCity(link) }
+                }
             }
           }
         }
