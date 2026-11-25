@@ -4,17 +4,16 @@ import SwiftUI
 
 struct MapCanvas: UIViewRepresentable {
   let places: [MapPlace]
-  let location: CLLocation?
+  let cameraCommand: MapCameraCommand?
   let filters: MapFilters
   let opening: [MapPlace]?
   let visited: Set<String>
   let selectedLabelID: String?
   let copy: Copy
-  let overview: Int
-  let overviewPlaces: [MapPlace]
   let topControlsHeight: CGFloat
   let bottomControlsHeight: CGFloat
   let onArea: (DiscoverBox, MapViewport) -> Void
+  let onUserMove: () -> Void
   let onPick: (MapPlace) -> Void
   let onCluster: ([MapPlace]) -> Void
 
@@ -67,32 +66,38 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     func update(_ parent: MapCanvas, map: MKMapView) {
-      let changedLocation = self.parent.location !== parent.location
-      let changedFilter = self.parent.filters != parent.filters
-      let changedOverview = self.parent.overview != parent.overview
       self.parent = parent
       synchronizePins(on: map)
-      if changedLocation, let location = parent.location {
-        opened = true
-        queryingNearby = true
-        map.showsUserLocation = true
-        map.setRegion(.init(center: location.coordinate, latitudinalMeters: 6000, longitudinalMeters: 6000),
-          animated: true)
-      }
-      if changedFilter, opened, !parent.places.isEmpty,
-        !parent.places.contains(where: { map.visibleMapRect.contains(MKMapPoint($0.coordinate)) }) {
-        fit(parent.places, on: map, animated: true)
-      }
-      if changedOverview {
-        opened = true
-        queryingNearby = false
-        fit(parent.overviewPlaces, on: map, animated: true)
-      }
+      applyPendingCamera(on: map)
+      scheduleNames(on: map)
+    }
+
+    private func applyPendingCamera(on map: MKMapView) {
+      guard !map.bounds.isEmpty else { return }
+      if let action = parent.cameraCommand?.consume() { apply(action, on: map) }
       if !opened, let places = parent.opening {
         opened = true
         fit(places, on: map, animated: false)
       }
-      scheduleNames(on: map)
+    }
+
+    private func apply(_ action: MapCameraCommand.Action, on map: MKMapView) {
+      switch action {
+      case let .locate(coordinate):
+        opened = true
+        queryingNearby = true
+        map.showsUserLocation = true
+        map.setRegion(.init(center: coordinate, latitudinalMeters: 6000, longitudinalMeters: 6000), animated: true)
+      case let .overview(places):
+        opened = true
+        queryingNearby = false
+        fit(places, on: map, animated: true)
+      case .fitFilteredPlaces:
+        guard opened, !parent.places.isEmpty,
+          !parent.places.contains(where: { map.visibleMapRect.contains(MKMapPoint($0.coordinate)) })
+        else { return }
+        fit(parent.places, on: map, animated: true)
+      }
     }
 
     private var usesOverviewDensity: Bool {
@@ -145,7 +150,11 @@ struct MapCanvas: UIViewRepresentable {
       clearNames()
       nameLayout?.cancel()
       nameLayout = nil
-      if hasActiveGesture(map) { opened = true; queryingNearby = false }
+      if hasActiveGesture(map) {
+        opened = true
+        queryingNearby = false
+        parent.onUserMove()
+      }
     }
 
     private func hasActiveGesture(_ view: UIView) -> Bool {
@@ -184,6 +193,7 @@ struct MapCanvas: UIViewRepresentable {
     }
 
     func mapViewDidFinishRenderingMap(_ map: MKMapView, fullyRendered: Bool) {
+      applyPendingCamera(on: map)
       scheduleNames(on: map)
     }
 
