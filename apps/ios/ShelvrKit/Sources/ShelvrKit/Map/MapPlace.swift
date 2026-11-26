@@ -146,16 +146,19 @@ public struct MapPlace: Hashable, Identifiable, Sendable {
   static func search(_ local: [Self], catalog: [Self], query: String) -> [Self] {
     let nearby = search(local, query: query)
     guard !catalog.isEmpty else { return nearby }
-    let representatives = local + catalog.filter { $0.appleId != nil }
+    let personal = local.filter(\.isSaved)
+    let shared = local.filter { !$0.isSaved } + catalog.filter { $0.appleId != nil }
     let indexed = catalog.map { hit in
-      let exact = representatives.first {
-        $0.id == hit.id || ($0.appleId != nil && $0.appleId == hit.appleId)
-      }
-      return exact ?? representatives.first { $0.isNearbyCatalogVenue(hit) } ?? hit
+      hit.catalogRepresentative(in: personal) ?? hit.catalogRepresentative(in: shared) ?? hit
     }
     let found = nearby.filter(\.isSaved) + indexed + nearby.filter { !$0.isSaved }
     var ids = Set<String>()
     return (found.filter(\.isSaved) + found.filter { !$0.isSaved }).filter { ids.insert($0.id).inserted }
+  }
+
+  private func catalogRepresentative(in candidates: [Self]) -> Self? {
+    candidates.first { $0.id == id || (appleId != nil && $0.appleId == appleId) } ??
+      candidates.first { $0.isNearbyCatalogVenue(self) }
   }
 
   private func isNearbyCatalogVenue(_ other: Self) -> Bool {

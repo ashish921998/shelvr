@@ -129,4 +129,11 @@ import Testing
   let personal = try JSONDecoder().decode(MapPlace.SavedRow.self, from: save).place
   let savedMatch = MapScene(saved: [personal], discover: [], visits: [], filters: .init(search: "tea-house"), catalog: [catalog.place])
   #expect(savedMatch.visible == [personal])
+
+  let noApple = Data(#"{"itemId":"unkeyed","name":"Tea House","city":"Taipei","lat":25,"lng":121,"kinds":["coffee"]}"#.utf8)
+  let unkeyed = try JSONDecoder().decode(MapPlace.SavedRow.self, from: noApple).place
+  for query in ["tea house", "tea-house"] {
+    let hit = MapScene(saved: [unkeyed], discover: [], visits: [], filters: .init(search: query), catalog: [branches[0]])
+    #expect(hit.visible == [unkeyed])
+  }
 }
