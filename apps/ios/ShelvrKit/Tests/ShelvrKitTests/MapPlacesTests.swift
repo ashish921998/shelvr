@@ -107,3 +107,20 @@ import Testing
     try JSONDecoder().decode(MapVisit.self, from: Data("{}".utf8))
   }
 }
+
+@Test func catalogSearchUsesSharedIdentityAndKeepsTheOwnersSave() throws {
+  let queryResult = Data(#"{"_id":"shared","name":"Tea House","city":"Taipei","lat":25,"lng":121,"kinds":["coffee"],"source":"overture"}"#.utf8)
+  let catalog = try JSONDecoder().decode(MapPlace.CatalogRow.self, from: queryResult)
+  #expect(catalog.place.appleId == nil)
+  #expect(catalog.place.id == "discover:shared")
+  #expect(catalog.source == "overture")
+
+  let discover = Data(#"{"_id":"shared","name":"Tea House","city":"Taipei","lat":25,"lng":121,"appleId":"tea","kinds":["coffee"]}"#.utf8)
+  let nearby = try JSONDecoder().decode(MapPlace.DiscoverRow.self, from: discover).place
+  let merged = MapPlace.mergingCatalog([catalog.place], with: [nearby])
+  #expect(merged == [catalog.place])
+
+  let save = Data(#"{"itemId":"private","name":"Tea House","city":"Taipei","lat":25,"lng":121,"appleId":"tea","kinds":["coffee"]}"#.utf8)
+  let personal = try JSONDecoder().decode(MapPlace.SavedRow.self, from: save).place
+  #expect(MapPlace.combined(saved: [personal], discover: merged) == [personal])
+}

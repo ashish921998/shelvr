@@ -13,6 +13,8 @@ struct SavedPlacesMap: View {
   @AppStorage("swift.appearance") private var appearance = "system"
   @State private var saved: [MapPlace]?
   @State private var discoverResponse: AreaResponse?
+  @State private var catalogResponse: CatalogResponse?
+  @State private var catalogGeneration = UUID()
   @State private var visits: [MapVisit] = []
   @State private var discoverRequest = AreaRequest(area: .world)
   @State private var filters = MapFilters()
@@ -36,7 +38,10 @@ struct SavedPlacesMap: View {
     let request = discoverRequest
     let discover = discoverResponse?.places ?? []
     let complete = discoverResponse?.request == request ? discoverResponse?.complete : nil
-    let scene = MapScene(saved: saved, discover: discover, visits: visits, filters: filters)
+    let search = catalogRequest
+    let catalog = catalogResponse?.request == search ? catalogResponse?.results : nil
+    let remote = MapPlace.mergingCatalog(catalog?.places ?? [], with: discover)
+    let scene = MapScene(saved: saved, discover: remote, visits: visits, filters: filters)
     let palette = HomeChromePalette(scheme, appearance: appearance)
     let personalPlaces = saved ?? []
     let overviewPlaces = scene.visible.filter(\.isSaved)
@@ -48,7 +53,11 @@ struct SavedPlacesMap: View {
       .ignoresSafeArea(.container)
       .overlay(alignment: .top) {
         Group {
-          if searching { searchPanel(scene, palette: palette) }
+          if searching {
+            searchPanel(scene, palette: palette,
+              catalogLoading: scene.filters.went == .all && search != nil && catalog == nil && !errors.contains("catalog"),
+              showAttribution: scene.filters.went == .all && catalog?.includesOverture == true)
+          }
           else { mapHeader(personalPlaces: personalPlaces, overviewPlaces: overviewPlaces, palette: palette) }
         }.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topControlsHeight = $0 }
       }
@@ -106,6 +115,7 @@ struct SavedPlacesMap: View {
           }
         }
       }
+      .task(id: search) { await searchCatalog(search) }
       .task(id: selected) {
         guard let place = selected else { return }
         guard let owner = backend.userID else { return }
@@ -273,7 +283,8 @@ struct SavedPlacesMap: View {
     }
   }
 
-  private func searchPanel(_ scene: MapScene, palette: HomeChromePalette) -> some View {
+  private func searchPanel(_ scene: MapScene, palette: HomeChromePalette, catalogLoading: Bool,
+    showAttribution: Bool) -> some View {
     VStack(spacing: 8) {
       HStack(spacing: 8) {
         HStack(spacing: 8) {
@@ -306,13 +317,30 @@ struct SavedPlacesMap: View {
               resultsOpen = false
               selectPlace(place)
             } label: {
-              Label(place.name, systemImage: place.isSaved ? "bookmark" : "mappin")
-                .lineLimit(1).frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+              HStack(spacing: 8) {
+                Image(systemName: place.isSaved ? "bookmark" : "mappin").accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 2) {
+                  Text(place.name).lineLimit(1)
+                  if !place.isSaved, let city = place.city {
+                    Text(city).font(.caption).foregroundStyle(palette.muted).lineLimit(1)
+                  }
+                }
+              }
+              .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+              .contentShape(Rectangle())
             }
           }
           if scene.visible.isEmpty {
-            Text(copy("map.searchNoResults", ["query": filters.search])).font(.caption)
-              .padding(.vertical, 8).frame(maxWidth: .infinity, alignment: .leading)
+            if catalogLoading {
+              ProgressView(copy("common.loading")).font(.caption).padding(.vertical, 8)
+            } else {
+              Text(copy("map.searchNoResults", ["query": filters.search])).font(.caption)
+                .padding(.vertical, 8).frame(maxWidth: .infinity, alignment: .leading)
+            }
+          }
+          if showAttribution, !scene.visible.isEmpty, let url = URL(string: "https://docs.overturemaps.org/attribution/") {
+            Link("Overture Maps", destination: url).font(.caption)
+              .foregroundStyle(palette.muted).padding(.vertical, 6)
           }
         }
         .padding(.horizontal, 16).padding(.vertical, 6)
@@ -416,6 +444,8 @@ struct SavedPlacesMap: View {
   }
 
   private func updateSearch(_ text: String) {
+    guard filters.search != text else { return }
+    catalogGeneration = UUID()
     var next = filters
     next.search = text
     applyFilters(next)
@@ -477,6 +507,36 @@ struct SavedPlacesMap: View {
     let request: AreaRequest
     let places: [MapPlace]
     let complete: Bool
+  }
+
+  private struct CatalogRequest: Equatable {
+    let text: String
+    let generation: UUID
+    let session: UUID
+    let retry: Int
+  }
+
+  private struct CatalogResponse {
+    let request: CatalogRequest
+    let results: Backend.CatalogPlaces
+  }
+
+  private var catalogRequest: CatalogRequest? {
+    let text = filters.search.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard searching, !text.isEmpty else { return nil }
+    return CatalogRequest(text: text, generation: catalogGeneration, session: backend.sessionGeneration, retry: retry)
+  }
+
+  private func searchCatalog(_ request: CatalogRequest?) async {
+    await subscribe("catalog") {
+      guard let request else { return }
+      try await Task.sleep(for: .milliseconds(250))
+      for try await results in backend.catalogPlaces(matching: request.text) {
+        try Task.checkCancellation()
+        guard request == catalogRequest else { return }
+        catalogResponse = CatalogResponse(request: request, results: results)
+      }
+    }
   }
 
   private func subscribe(_ key: String, _ update: () async throws -> Void) async {
