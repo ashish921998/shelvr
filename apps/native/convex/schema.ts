@@ -102,6 +102,26 @@ export default defineSchema({
     lng: v.number(),
     appleId: v.optional(v.string()),
     overtureId: v.optional(v.string()),
+    inferredAlias: v.optional(
+      v.union(
+        v.object({
+          provider: v.literal("overture"),
+          name: v.string(),
+          city: v.string(),
+          lat: v.number(),
+          lng: v.number(),
+          kind: placeKindValidator,
+        }),
+        v.object({
+          provider: v.literal("apple"),
+          lat: v.number(),
+          lng: v.number(),
+          category: v.optional(v.string()),
+          catalogKind: v.optional(placeKindValidator),
+          catalogStatus: v.union(v.literal("catalog"), v.literal("hidden")),
+        }),
+      ),
+    ),
     source: v.optional(v.literal("overture")),
     category: v.optional(v.string()),
     cuisine: v.optional(cuisineValidator),
