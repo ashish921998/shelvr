@@ -56,6 +56,14 @@ struct SavedPlacesMap: View {
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bottomControlsHeight = $0 }
         }
       }
+      .overlay(alignment: .bottomTrailing) {
+        if !searching {
+          roundButton("location", label: copy("map.showMyLocation"), palette: palette) { location.locate() }
+            .buttonStyle(HomeChromePressStyle())
+            .padding(.trailing, 20)
+            .padding(.bottom, bottomControlsHeight + 8)
+        }
+      }
       .onChange(of: viewport?.city(among: personalPlaces), initial: true) { _, city in cityInView = city }
       .onChange(of: location.latestFix?.id) {
         if let fix = location.latestFix { moveCamera(.locate(fix.coordinate)) }
@@ -129,43 +137,66 @@ struct SavedPlacesMap: View {
     palette: HomeChromePalette) -> some View {
     let city = viewport?.city(among: personalPlaces)
     return VStack(spacing: 6) {
-      HStack(spacing: 7) {
+      HStack(spacing: 12) {
         if let city {
-          if overviewPlaces.contains(where: { place in
-            guard let other = place.city, !other.isEmpty else { return false }
-            return other.caseInsensitiveCompare(city) != .orderedSame
-          }) {
-            roundButton("chevron.left", label: copy("map.showAllCities"), palette: palette) {
-              location.cancel()
-              moveCamera(.overview(overviewPlaces))
-            }
-          }
-          Button {
-            if let encoded = city.addingPercentEncoding(withAllowedCharacters: .alphanumerics) { open("/city/" + encoded) }
-          } label: {
-            Text(city).font(.custom("Satoshi-Bold", size: 32, relativeTo: .largeTitle))
-              .tracking(-0.8).lineLimit(1).minimumScaleFactor(0.6)
-              .shadow(color: palette.frame, radius: 4)
-              .frame(maxWidth: .infinity, alignment: .leading)
-          }
+          cityControl(city, overviewPlaces: overviewPlaces, palette: palette)
         } else {
           Text("shelvr").font(.custom("CrimsonProRoman-Regular", size: 28, relativeTo: .title2))
-            .tracking(0.5).frame(maxWidth: .infinity, alignment: .leading)
+            .tracking(0.5)
         }
+        Spacer(minLength: 0)
         roundButton("magnifyingglass", label: copy("map.searchPlaceholder"), palette: palette) {
           searching = true
           resultsOpen = true
         }
-        roundButton("person", label: copy("navigation.profile"), palette: palette) { open("/profile") }
       }
       .frame(minHeight: 50)
-      roundButton("location", label: copy("map.showMyLocation"), palette: palette) { location.locate() }
-        .frame(maxWidth: .infinity, alignment: .trailing)
       retryControl(palette)
     }
     .padding(.horizontal, 20)
     .foregroundStyle(palette.foreground)
     .buttonStyle(HomeChromePressStyle())
+  }
+
+  @ViewBuilder
+  private func cityControl(_ city: String, overviewPlaces: [MapPlace], palette: HomeChromePalette) -> some View {
+    if overviewPlaces.contains(where: { place in
+      guard let other = place.city, !other.isEmpty else { return false }
+      return other.caseInsensitiveCompare(city) != .orderedSame
+    }) {
+      Menu {
+        Button { openCity(city) } label: { Label(city, systemImage: "building.2") }
+        Button {
+          location.cancel()
+          moveCamera(.overview(overviewPlaces))
+        } label: {
+          Label(copy("map.showAllCities"), systemImage: "map")
+        }
+      } label: {
+        cityTitle(city, palette: palette, showsMenu: true)
+      }
+    } else {
+      Button { openCity(city) } label: { cityTitle(city, palette: palette, showsMenu: false) }
+    }
+  }
+
+  private func cityTitle(_ city: String, palette: HomeChromePalette, showsMenu: Bool) -> some View {
+    HStack(spacing: 6) {
+      Text(city).font(.custom("Satoshi-Bold", size: 30, relativeTo: .largeTitle))
+        .tracking(-0.75).lineLimit(1).minimumScaleFactor(0.6)
+        .layoutPriority(1)
+      if showsMenu {
+        Image(systemName: "chevron.down").font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(palette.muted).accessibilityHidden(true)
+      }
+    }
+    .shadow(color: palette.frame, radius: 4)
+    .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+    .contentShape(Rectangle())
+  }
+
+  private func openCity(_ city: String) {
+    if let encoded = city.addingPercentEncoding(withAllowedCharacters: .alphanumerics) { open("/city/" + encoded) }
   }
 
   private func mapFooter(_ scene: MapScene, complete: Bool?, discoverIsEmpty: Bool,
