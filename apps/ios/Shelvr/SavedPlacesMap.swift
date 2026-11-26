@@ -46,7 +46,7 @@ struct SavedPlacesMap: View {
       .overlay(alignment: .top) {
         Group {
           if searching { searchPanel(scene, palette: palette) }
-          else { mapHeader(personalPlaces: personalPlaces, overviewPlaces: overviewPlaces, palette: palette) }
+          else { mapHeader(scene, personalPlaces: personalPlaces, overviewPlaces: overviewPlaces, palette: palette) }
         }.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topControlsHeight = $0 }
       }
       .overlay(alignment: .bottom) {
@@ -124,7 +124,8 @@ struct SavedPlacesMap: View {
     selected = place
   }
 
-  private func mapHeader(personalPlaces: [MapPlace], overviewPlaces: [MapPlace], palette: HomeChromePalette) -> some View {
+  private func mapHeader(_ scene: MapScene, personalPlaces: [MapPlace], overviewPlaces: [MapPlace],
+    palette: HomeChromePalette) -> some View {
     let city = viewport?.city(among: personalPlaces)
     return VStack(spacing: 6) {
       HStack(spacing: 7) {
@@ -157,8 +158,11 @@ struct SavedPlacesMap: View {
         roundButton("person", label: copy("navigation.profile"), palette: palette) { open("/profile") }
       }
       .frame(minHeight: 50)
-      roundButton("location", label: copy("map.showMyLocation"), palette: palette) { location.locate() }
-        .frame(maxWidth: .infinity, alignment: .trailing)
+      HStack(spacing: 6) {
+        filterStrip(scene, palette: palette)
+        Spacer(minLength: 0)
+        roundButton("location", label: copy("map.showMyLocation"), palette: palette) { location.locate() }
+      }
       retryControl(palette)
     }
     .padding(.horizontal, 20)
@@ -189,7 +193,6 @@ struct SavedPlacesMap: View {
           .background(palette.surface, in: RoundedRectangle(cornerRadius: 16))
           .padding(.horizontal, 20)
         }
-        filterStrip(scene, palette: palette).padding(.horizontal, 20)
       }
     }
     .padding(.bottom, 36)
@@ -201,23 +204,26 @@ struct SavedPlacesMap: View {
     if scene.showsWentSwitch || !scene.chips.isEmpty {
       ScrollView(.horizontal) {
         HStack(spacing: 8) {
-          if scene.showsWentSwitch {
-            wentChip(.all, "map.filterAll", palette: palette)
-            wentChip(.want, "passport.wantToGo", palette: palette)
-            wentChip(.went, "passport.wentNoDate", palette: palette)
-          }
+          scopeChip(scene, palette: palette)
           ForEach(scene.chips, id: \.self) { kind in
-            filterChip(copy(kind.labelKey), selected: filters.kinds.contains(kind), palette: palette,
-              color: Color(uiColor: MapPinPalette.color(for: kind))) {
+            let selected = filters.kinds.contains(kind)
+            Button {
+
               var next = filters
               if next.kinds.insert(kind).inserted {
                 Analytics.capture("map_filter_selected", ["kind": kind.rawValue])
               } else { next.kinds.remove(kind) }
               applyFilters(next)
-            }
+            } label: {
+              chipLabel(copy(kind.labelKey), symbol: categorySymbol(kind), selected: selected,
+                palette: palette, color: Color(uiColor: MapPinPalette.color(for: kind)))
+            }.accessibilityAddTraits(selected ? .isSelected : [])
           }
         }
-      }.scrollIndicators(.hidden)
+        .padding(.vertical, 2)
+      }
+      .scrollIndicators(.hidden)
+      .accessibilityLabel(copy("map.filters"))
     }
   }
 
@@ -299,11 +305,60 @@ struct SavedPlacesMap: View {
     }.accessibilityLabel(label)
   }
 
-  private func wentChip(_ value: WentFilter, _ title: String, palette: HomeChromePalette) -> some View {
-    filterChip(copy(title), selected: filters.went == value, palette: palette) {
-      var next = filters
-      next.went = value
-      applyFilters(next)
+  @ViewBuilder
+  private func scopeChip(_ scene: MapScene, palette: HomeChromePalette) -> some View {
+    let scope = scene.filters.went
+    let title = switch scope {
+    case .all: copy("map.allPlaces")
+    case .want: copy("passport.wantToGo")
+    case .went: copy("passport.wentNoDate")
+    }
+    if scene.showsWentSwitch {
+      Menu {
+        Button { resetMapFilters() } label: {
+          Label(copy("map.allPlaces"), systemImage: scope == .all && filters.kinds.isEmpty ? "checkmark" : "map")
+        }
+        Button { setWentFilter(.want) } label: {
+          Label(copy("passport.wantToGo"), systemImage: scope == .want ? "checkmark" : "bookmark")
+        }
+        Button { setWentFilter(.went) } label: {
+          Label(copy("passport.wentNoDate"), systemImage: scope == .went ? "checkmark" : "checkmark.circle")
+        }
+      } label: {
+        chipLabel(title, symbol: "map", selected: scope != .all, palette: palette, chevron: true)
+      }
+      .accessibilityValue(title)
+    } else {
+      Button { resetMapFilters() } label: {
+        chipLabel(title, symbol: "map", selected: false, palette: palette)
+      }
+      .accessibilityAddTraits(filters.kinds.isEmpty ? .isSelected : [])
+    }
+  }
+
+  private func resetMapFilters() {
+    var next = filters
+    next.went = .all
+    next.kinds = []
+    applyFilters(next)
+  }
+
+  private func setWentFilter(_ value: WentFilter) {
+    var next = filters
+    next.went = value
+    applyFilters(next)
+  }
+
+  private func categorySymbol(_ kind: PlaceKind) -> String {
+    switch kind {
+    case .food: "fork.knife"
+    case .coffee: "cup.and.saucer.fill"
+    case .dessert: "birthday.cake"
+    case .drinks: "wineglass"
+    case .dateNight: "heart"
+    case .activities: "ticket"
+    case .shopping: "bag"
+    case .stay: "bed.double"
     }
   }
 
@@ -331,25 +386,27 @@ struct SavedPlacesMap: View {
     moveCamera(.fitFilteredPlaces)
   }
 
-  private func filterChip(_ title: String, selected: Bool, palette: HomeChromePalette, color: Color? = nil,
-    action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      HStack(spacing: 5) {
-        if let color {
-          Circle().fill(color)
-            .overlay { Circle().strokeBorder(palette.background.opacity(0.8), lineWidth: 0.5) }
-            .frame(width: 8, height: 8)
-            .accessibilityHidden(true)
-        }
-        Text(title).font(.custom("Satoshi-Bold", size: 13, relativeTo: .footnote))
+  private func chipLabel(_ title: String, symbol: String, selected: Bool, palette: HomeChromePalette,
+    color: Color? = nil, chevron: Bool = false) -> some View {
+    HStack(spacing: 6) {
+      Image(systemName: symbol)
+        .font(.system(size: 12, weight: .semibold))
+        .foregroundStyle(selected ? palette.background : color ?? palette.muted)
+        .accessibilityHidden(true)
+      Text(title).font(.custom("Satoshi-Bold", size: 13, relativeTo: .footnote))
+        .fixedSize(horizontal: true, vertical: false)
+      if chevron {
+        Image(systemName: "chevron.down")
+          .font(.system(size: 8, weight: .bold))
+          .accessibilityHidden(true)
       }
-        .foregroundStyle(selected ? palette.background : palette.foreground)
-        .padding(.horizontal, 11).padding(.vertical, 6)
-        .background(selected ? palette.foreground : palette.frame, in: Capsule())
-        .overlay { Capsule().strokeBorder(selected ? palette.foreground : palette.border, lineWidth: 0.5) }
-        .shadow(color: palette.shadow.opacity(0.12), radius: 4, y: 2)
-        .frame(minHeight: 44).contentShape(Rectangle())
-    }.accessibilityAddTraits(selected ? .isSelected : [])
+    }
+    .foregroundStyle(selected ? palette.background : palette.foreground)
+    .padding(.horizontal, 10).padding(.vertical, 7)
+    .background(selected ? palette.foreground : palette.surface, in: Capsule())
+    .overlay { Capsule().strokeBorder(selected ? palette.foreground : palette.border, lineWidth: 0.5) }
+    .shadow(color: palette.shadow.opacity(0.12), radius: 4, y: 2)
+    .frame(minHeight: 44).contentShape(Rectangle())
   }
 
   private func updateDiscoverArea(_ area: DiscoverBox) {
