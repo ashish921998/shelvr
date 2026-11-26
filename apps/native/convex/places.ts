@@ -97,10 +97,10 @@ export const searchCatalog = authedQuery({
   returns: v.array(catalogPlaceValidator),
   handler: async (ctx, { text }) => {
     if (text.length > MAX_SEARCH_LENGTH) return [];
-    const indexedTerms = searchTerms(text).slice(0, MAX_SEARCH_TERMS);
-    if (!indexedTerms.length) return [];
-    const search = indexedTerms.join(" ");
-    const terms = indexedTerms.map(foldTerm);
+    const queryTerms = searchTerms(text);
+    if (!queryTerms.length) return [];
+    const search = queryTerms.slice(0, MAX_SEARCH_TERMS).join(" ");
+    const terms = queryTerms.map(foldTerm);
     const phrase = terms.join(" ");
 
     const groups = await Promise.all(

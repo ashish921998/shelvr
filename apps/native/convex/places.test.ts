@@ -277,6 +277,21 @@ describe("places:searchCatalog", () => {
     ]);
   });
 
+  it("checks words beyond the full-text index term limit", async () => {
+    const { base, user } = await signedIn();
+    await base.mutation(internal.places.storeCatalog, {
+      places: [
+        catalogCafe("coffee", "Black Sugar Coffee"),
+        catalogCafe("bakery", "Black Sugar Bakery"),
+      ],
+    });
+    const text = ["Black", ...Array<string>(15).fill("Sugar"), "Coffee"].join(
+      " ",
+    );
+    const result = await user.query(api.places.searchCatalog, { text });
+    expect(result.map((row) => row.name)).toEqual(["Black Sugar Coffee"]);
+  });
+
   it("caps results and puts an exact match first across the two indexed scopes", async () => {
     const { base, user } = await signedIn();
     await base.mutation(internal.places.storeCatalog, {
