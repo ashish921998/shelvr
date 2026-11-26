@@ -921,6 +921,8 @@
   "map.kindStay": "Unterkünfte",
   "map.filters": "Orte filtern",
   "map.filterAll": "Alle",
+  "map.clearCategoryFilters": "Zurücksetzen",
+  "map.visitStatus": "Besuchsstatus",
   "map.searchPlaceholder": "Orte durchsuchen",
   "map.searchNoResults": "Keine Orte passen zu „%{query}“.",
   "map.searchMore": "%{count} von %{total} angezeigt. Tippe weiter, um einzugrenzen.",

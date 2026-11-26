@@ -2,7 +2,7 @@ import MapKit
 import ShelvrKit
 import SwiftUI
 
-struct MapCanvas: UIViewRepresentable {
+struct MapCanvas: UIViewControllerRepresentable {
   let places: [MapPlace]
   let cameraCommand: MapCameraCommand?
   let filters: MapFilters
@@ -12,6 +12,7 @@ struct MapCanvas: UIViewRepresentable {
   let copy: Copy
   let topControlsHeight: CGFloat
   let bottomControlsHeight: CGFloat
+  let locateFrame: CGRect?
   let onArea: (DiscoverBox, MapViewport) -> Void
   let onUserMove: () -> Void
   let onPick: (MapPlace) -> Void
@@ -19,18 +20,28 @@ struct MapCanvas: UIViewRepresentable {
 
   func makeCoordinator() -> Coordinator { Coordinator(self) }
 
-  func makeUIView(context: Context) -> MKMapView {
-    let map = MKMapView()
+  func makeUIViewController(context: Context) -> Container {
+    let controller = Container()
+    let map = controller.map
     map.delegate = context.coordinator
     map.register(PlaceAnnotationView.self, forAnnotationViewWithReuseIdentifier: PlaceAnnotationView.placeIdentifier)
     map.register(PlaceAnnotationView.self, forAnnotationViewWithReuseIdentifier: MKMapViewDefaultClusterAnnotationViewReuseIdentifier)
     map.pointOfInterestFilter = .excludingAll
     context.coordinator.installNames(on: map)
-    return map
+    return controller
   }
 
-  func updateUIView(_ map: MKMapView, context: Context) {
-    context.coordinator.update(self, map: map)
+  func updateUIViewController(_ controller: Container, context: Context) {
+    if controller.additionalSafeAreaInsets.bottom != bottomControlsHeight {
+      controller.additionalSafeAreaInsets.bottom = bottomControlsHeight
+    }
+    context.coordinator.update(self, map: controller.map)
+  }
+
+  final class Container: UIViewController {
+    let map = MKMapView()
+
+    override func loadView() { view = map }
   }
 
   final class Pin: NSObject, MKAnnotation {
@@ -142,7 +153,7 @@ struct MapCanvas: UIViewRepresentable {
       let maxInset = map.bounds.height * 0.35
       map.setVisibleMapRect(rect.insetBy(dx: -pad, dy: -pad), edgePadding:
         .init(top: min(maxInset, map.safeAreaInsets.top + parent.topControlsHeight + 8), left: 32,
-          bottom: min(maxInset, map.safeAreaInsets.bottom + parent.bottomControlsHeight + 8), right: 32),
+          bottom: min(maxInset, map.safeAreaInsets.bottom + 8), right: 32),
         animated: animated)
     }
 
@@ -214,8 +225,9 @@ struct MapCanvas: UIViewRepresentable {
 
     private func layoutNames(on map: MKMapView) {
       clearNames()
+      let attributionClearance: CGFloat = 24
       let usable = map.bounds.inset(by: UIEdgeInsets(top: map.safeAreaInsets.top + parent.topControlsHeight + 8,
-        left: 8, bottom: map.safeAreaInsets.bottom + parent.bottomControlsHeight + 8, right: 8))
+        left: 8, bottom: map.safeAreaInsets.bottom + attributionClearance, right: 8))
       let visible = addedViews.allObjects.filter { view in
         guard let annotation = view.annotation else { return false }
         return map.view(for: annotation) === view && !view.isHidden &&
@@ -223,6 +235,9 @@ struct MapCanvas: UIViewRepresentable {
       }
       let targets = visible.map { (view: $0, frame: $0.convert($0.pinHitBounds, to: map)) }
       var occupied: [CGRect] = []
+      if let locateFrame = parent.locateFrame, let window = map.window {
+        occupied.append(map.convert(locateFrame, from: window).insetBy(dx: -4, dy: -4))
+      }
       if let location = map.view(for: map.userLocation) {
         occupied.append(location.convert(location.bounds, to: map).insetBy(dx: -2, dy: -2))
       }

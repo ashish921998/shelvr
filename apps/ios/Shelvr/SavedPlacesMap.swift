@@ -9,6 +9,7 @@ struct SavedPlacesMap: View {
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.colorScheme) private var scheme
+  @Environment(\.dynamicTypeSize) private var typeSize
   @AppStorage("swift.appearance") private var appearance = "system"
   @State private var saved: [MapPlace]?
   @State private var discoverResponse: AreaResponse?
@@ -26,6 +27,7 @@ struct SavedPlacesMap: View {
   @State private var cameraCommand: MapCameraCommand?
   @State private var topControlsHeight: CGFloat = 50
   @State private var bottomControlsHeight: CGFloat = 48
+  @State private var locateFrame: CGRect?
   @State private var searching = false
   @State private var resultsOpen = true
   @FocusState private var focusedSearch: Bool
@@ -40,7 +42,8 @@ struct SavedPlacesMap: View {
     let overviewPlaces = scene.visible.filter(\.isSaved)
     MapCanvas(places: scene.visible, cameraCommand: cameraCommand, filters: scene.filters, opening: scene.opening,
       visited: scene.visited, selectedLabelID: selectedLabelID, copy: copy, topControlsHeight: topControlsHeight,
-      bottomControlsHeight: bottomControlsHeight, onArea: { updateDiscoverArea($0); viewport = $1 },
+      bottomControlsHeight: focusedSearch ? 0 : bottomControlsHeight, locateFrame: searching ? nil : locateFrame,
+      onArea: { updateDiscoverArea($0); viewport = $1 },
       onUserMove: cancelCameraRequests, onPick: selectPlace, onCluster: { cluster = $0 })
       .ignoresSafeArea(.container)
       .overlay(alignment: .top) {
@@ -53,6 +56,15 @@ struct SavedPlacesMap: View {
         if !focusedSearch {
           mapFooter(scene, complete: complete, discoverIsEmpty: discover.isEmpty, palette: palette)
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { bottomControlsHeight = $0 }
+        }
+      }
+      .overlay(alignment: .bottomTrailing) {
+        if !searching {
+          roundButton("location", label: copy("map.showMyLocation"), palette: palette) { location.locate() }
+            .buttonStyle(HomeChromePressStyle())
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { locateFrame = $0 }
+            .padding(.trailing, 20)
+            .padding(.bottom, bottomControlsHeight + 8)
         }
       }
       .onChange(of: viewport?.city(among: personalPlaces), initial: true) { _, city in cityInView = city }
@@ -124,46 +136,70 @@ struct SavedPlacesMap: View {
     selected = place
   }
 
-  private func mapHeader(personalPlaces: [MapPlace], overviewPlaces: [MapPlace], palette: HomeChromePalette) -> some View {
+  private func mapHeader(personalPlaces: [MapPlace], overviewPlaces: [MapPlace],
+    palette: HomeChromePalette) -> some View {
     let city = viewport?.city(among: personalPlaces)
     return VStack(spacing: 6) {
-      HStack(spacing: 7) {
+      HStack(spacing: 12) {
         if let city {
-          if overviewPlaces.contains(where: { place in
-            guard let other = place.city, !other.isEmpty else { return false }
-            return other.caseInsensitiveCompare(city) != .orderedSame
-          }) {
-            roundButton("chevron.left", label: copy("map.showAllCities"), palette: palette) {
-              location.cancel()
-              moveCamera(.overview(overviewPlaces))
-            }
-          }
-          Button {
-            if let encoded = city.addingPercentEncoding(withAllowedCharacters: .alphanumerics) { open("/city/" + encoded) }
-          } label: {
-            Text(city).font(.custom("Satoshi-Bold", size: 32, relativeTo: .largeTitle))
-              .tracking(-0.8).lineLimit(1).minimumScaleFactor(0.6)
-              .shadow(color: palette.frame, radius: 4)
-              .frame(maxWidth: .infinity, alignment: .leading)
-          }
+          cityControl(city, overviewPlaces: overviewPlaces, palette: palette)
         } else {
           Text("shelvr").font(.custom("CrimsonProRoman-Regular", size: 28, relativeTo: .title2))
-            .tracking(0.5).frame(maxWidth: .infinity, alignment: .leading)
+            .tracking(0.5)
         }
+        Spacer(minLength: 0)
         roundButton("magnifyingglass", label: copy("map.searchPlaceholder"), palette: palette) {
           searching = true
           resultsOpen = true
         }
-        roundButton("person", label: copy("navigation.profile"), palette: palette) { open("/profile") }
       }
       .frame(minHeight: 50)
-      roundButton("location", label: copy("map.showMyLocation"), palette: palette) { location.locate() }
-        .frame(maxWidth: .infinity, alignment: .trailing)
       retryControl(palette)
     }
     .padding(.horizontal, 20)
     .foregroundStyle(palette.foreground)
     .buttonStyle(HomeChromePressStyle())
+  }
+
+  @ViewBuilder
+  private func cityControl(_ city: String, overviewPlaces: [MapPlace], palette: HomeChromePalette) -> some View {
+    if overviewPlaces.contains(where: { place in
+      guard let other = place.city, !other.isEmpty else { return false }
+      return other.caseInsensitiveCompare(city) != .orderedSame
+    }) {
+      Menu {
+        Button { openCity(city) } label: { Label(city, systemImage: "building.2") }
+        Button {
+          location.cancel()
+          moveCamera(.overview(overviewPlaces))
+        } label: {
+          Label(copy("map.showAllCities"), systemImage: "map")
+        }
+      } label: {
+        cityTitle(city, palette: palette, showsMenu: true)
+      }
+    } else {
+      Button { openCity(city) } label: { cityTitle(city, palette: palette, showsMenu: false) }
+    }
+  }
+
+  private func cityTitle(_ city: String, palette: HomeChromePalette, showsMenu: Bool) -> some View {
+    HStack(spacing: 6) {
+      Text(city).font(.custom("Satoshi-Bold", size: 30, relativeTo: .largeTitle))
+        .tracking(-0.75).lineLimit(1).minimumScaleFactor(0.6)
+        .layoutPriority(1)
+      if showsMenu {
+        Image(systemName: "chevron.down").font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(palette.muted).accessibilityHidden(true)
+      }
+    }
+    .shadow(color: palette.frame, radius: 4)
+    .frame(minWidth: 44, minHeight: 44, alignment: .leading)
+    .contentShape(Rectangle())
+  }
+
+  private func openCity(_ city: String) {
+    if let encoded = city.addingPercentEncoding(withAllowedCharacters: .alphanumerics) { open("/city/" + encoded) }
   }
 
   private func mapFooter(_ scene: MapScene, complete: Bool?, discoverIsEmpty: Bool,
@@ -189,35 +225,51 @@ struct SavedPlacesMap: View {
           .background(palette.surface, in: RoundedRectangle(cornerRadius: 16))
           .padding(.horizontal, 20)
         }
-        filterStrip(scene, palette: palette).padding(.horizontal, 20)
       }
+      filterStrip(scene, palette: palette)
     }
-    .padding(.bottom, 36)
     .buttonStyle(HomeChromePressStyle())
   }
 
   @ViewBuilder
   private func filterStrip(_ scene: MapScene, palette: HomeChromePalette) -> some View {
-    if scene.showsWentSwitch || !scene.chips.isEmpty {
-      ScrollView(.horizontal) {
-        HStack(spacing: 8) {
-          if scene.showsWentSwitch {
-            wentChip(.all, "map.filterAll", palette: palette)
-            wentChip(.want, "passport.wantToGo", palette: palette)
-            wentChip(.went, "passport.wentNoDate", palette: palette)
-          }
-          ForEach(scene.chips, id: \.self) { kind in
-            filterChip(copy(kind.labelKey), selected: filters.kinds.contains(kind), palette: palette,
-              color: Color(uiColor: MapPinPalette.color(for: kind))) {
-              var next = filters
-              if next.kinds.insert(kind).inserted {
-                Analytics.capture("map_filter_selected", ["kind": kind.rawValue])
-              } else { next.kinds.remove(kind) }
-              applyFilters(next)
+    let showClear = filters.kinds.count > 1
+    let scrollClear = showClear && typeSize.isAccessibilitySize
+    let pinClear = showClear && !scrollClear
+    let hasActions = pinClear || scene.showsWentSwitch
+    if showClear || hasActions || !scene.chips.isEmpty {
+      HStack(spacing: 5) {
+        ScrollView(.horizontal) {
+          HStack(spacing: 5) {
+            ForEach(scene.chips, id: \.self) { kind in
+              let selected = filters.kinds.contains(kind)
+              Button {
+                var next = filters
+                if next.kinds.insert(kind).inserted {
+                  Analytics.capture("map_filter_selected", ["kind": kind.rawValue])
+                } else { next.kinds.remove(kind) }
+                applyFilters(next)
+              } label: {
+                chipLabel(copy(kind.labelKey), symbol: categorySymbol(kind), selected: selected,
+                  palette: palette, color: Color(uiColor: MapPinPalette.color(for: kind)))
+              }.accessibilityAddTraits(selected ? .isSelected : [])
             }
+            if scrollClear { clearCategoryButton(palette) }
           }
+          .padding(.vertical, 2)
         }
-      }.scrollIndicators(.hidden)
+        .contentMargins(.leading, 14, for: .scrollContent)
+        .contentMargins(.trailing, hasActions ? 3 : 14, for: .scrollContent)
+        .scrollIndicators(.hidden)
+        .accessibilityLabel(copy("map.filters"))
+        if hasActions {
+          HStack(spacing: 5) {
+            if pinClear { clearCategoryButton(palette) }
+            if scene.showsWentSwitch { visitStatusMenu(scene.filters.went, palette: palette) }
+          }
+          .padding(.trailing, 14)
+        }
+      }
     }
   }
 
@@ -243,7 +295,7 @@ struct SavedPlacesMap: View {
         }.padding(.horizontal, 12).frame(minHeight: 44)
           .background(palette.surface, in: Capsule())
       }
-      filterStrip(scene, palette: palette)
+      if focusedSearch { filterStrip(scene, palette: palette).padding(.horizontal, -20) }
       retryControl(palette)
       if scene.filters.hasSearch && resultsOpen && (!scene.visible.isEmpty || errors.isEmpty) {
         VStack(alignment: .leading, spacing: 0) {
@@ -299,11 +351,57 @@ struct SavedPlacesMap: View {
     }.accessibilityLabel(label)
   }
 
-  private func wentChip(_ value: WentFilter, _ title: String, palette: HomeChromePalette) -> some View {
-    filterChip(copy(title), selected: filters.went == value, palette: palette) {
-      var next = filters
-      next.went = value
-      applyFilters(next)
+  private func visitStatusMenu(_ scope: WentFilter, palette: HomeChromePalette) -> some View {
+    let (title, symbol) = switch scope {
+    case .all: (copy("map.filterAll"), "clock")
+    case .want: (copy("passport.wantToGo"), "bookmark.fill")
+    case .went: (copy("passport.wentNoDate"), "checkmark.circle.fill")
+    }
+    return Menu {
+      Button { setWentFilter(.all) } label: {
+        Label(copy("map.filterAll"), systemImage: scope == .all ? "checkmark" : "map")
+      }
+      Button { setWentFilter(.want) } label: {
+        Label(copy("passport.wantToGo"), systemImage: scope == .want ? "checkmark" : "bookmark")
+      }
+      Button { setWentFilter(.went) } label: {
+        Label(copy("passport.wentNoDate"), systemImage: scope == .went ? "checkmark" : "checkmark.circle")
+      }
+    } label: {
+      chipLabel(nil, symbol: symbol, selected: scope != .all, palette: palette, chevron: true)
+    }
+    .accessibilityLabel(copy("map.visitStatus"))
+    .accessibilityValue(title)
+  }
+
+  private func clearCategoryFilters() {
+    var next = filters
+    next.kinds = []
+    applyFilters(next)
+  }
+
+  private func clearCategoryButton(_ palette: HomeChromePalette) -> some View {
+    Button(action: clearCategoryFilters) {
+      chipLabel(copy("map.clearCategoryFilters"), symbol: "xmark", selected: false, palette: palette)
+    }
+  }
+
+  private func setWentFilter(_ value: WentFilter) {
+    var next = filters
+    next.went = value
+    applyFilters(next)
+  }
+
+  private func categorySymbol(_ kind: PlaceKind) -> String {
+    switch kind {
+    case .food: "fork.knife"
+    case .coffee: "cup.and.saucer.fill"
+    case .dessert: "birthday.cake.fill"
+    case .drinks: "wineglass.fill"
+    case .dateNight: "heart.fill"
+    case .activities: "ticket.fill"
+    case .shopping: "bag.fill"
+    case .stay: "bed.double.fill"
     }
   }
 
@@ -331,25 +429,38 @@ struct SavedPlacesMap: View {
     moveCamera(.fitFilteredPlaces)
   }
 
-  private func filterChip(_ title: String, selected: Bool, palette: HomeChromePalette, color: Color? = nil,
-    action: @escaping () -> Void) -> some View {
-    Button(action: action) {
-      HStack(spacing: 5) {
-        if let color {
-          Circle().fill(color)
-            .overlay { Circle().strokeBorder(palette.background.opacity(0.8), lineWidth: 0.5) }
-            .frame(width: 8, height: 8)
-            .accessibilityHidden(true)
-        }
+  private func chipLabel(_ title: String?, symbol: String, selected: Bool, palette: HomeChromePalette,
+    color: Color? = nil, chevron: Bool = false) -> some View {
+    let glyph = color.map { scheme == .dark ? $0.mix(with: palette.foreground, by: 0.55) : $0 }
+    return HStack(spacing: 4) {
+      Image(systemName: symbol)
+        .font(.system(size: 15, weight: .medium))
+        .foregroundStyle(glyph ?? palette.foreground)
+        .frame(width: 18)
+        .accessibilityHidden(true)
+      if let title {
         Text(title).font(.custom("Satoshi-Bold", size: 13, relativeTo: .footnote))
+          .fixedSize(horizontal: true, vertical: false)
       }
-        .foregroundStyle(selected ? palette.background : palette.foreground)
-        .padding(.horizontal, 11).padding(.vertical, 6)
-        .background(selected ? palette.foreground : palette.frame, in: Capsule())
-        .overlay { Capsule().strokeBorder(selected ? palette.foreground : palette.border, lineWidth: 0.5) }
-        .shadow(color: palette.shadow.opacity(0.12), radius: 4, y: 2)
-        .frame(minHeight: 44).contentShape(Rectangle())
-    }.accessibilityAddTraits(selected ? .isSelected : [])
+      if chevron {
+        Image(systemName: "chevron.down")
+          .font(.system(size: 8, weight: .bold))
+          .accessibilityHidden(true)
+      }
+    }
+    .foregroundStyle(palette.foreground)
+    .padding(.horizontal, 8).padding(.vertical, 4)
+    .frame(minHeight: 30)
+    .background {
+      Capsule().fill(palette.surface)
+      if selected { Capsule().fill(Color("AccentColor").opacity(0.24)) }
+    }
+    .overlay {
+      Capsule().strokeBorder(selected ? palette.primaryText : palette.border,
+        lineWidth: selected ? 1.25 : 0.5)
+    }
+    .shadow(color: palette.shadow.opacity(0.14), radius: 3, y: 2)
+    .frame(minHeight: 44).contentShape(Rectangle())
   }
 
   private func updateDiscoverArea(_ area: DiscoverBox) {

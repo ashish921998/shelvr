@@ -946,6 +946,8 @@
   "map.kindStay": "Hébergements",
   "map.filters": "Filtrer les lieux",
   "map.filterAll": "Tout",
+  "map.clearCategoryFilters": "Effacer",
+  "map.visitStatus": "Statut de visite",
   "map.searchPlaceholder": "Rechercher des lieux",
   "map.searchNoResults": "Aucun lieu ne correspond à « %{query} ».",
   "map.searchMore": "%{count} sur %{total} affichés. Continuez à taper pour affiner.",
