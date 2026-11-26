@@ -1,7 +1,11 @@
-import { v } from "convex/values";
+import { type Infer, v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
-import { internalAction, internalMutation } from "./_generated/server";
+import {
+  internalAction,
+  internalMutation,
+  type MutationCtx,
+} from "./_generated/server";
 import { authedQuery } from "./model/auth";
 import {
   cuisineValidator,
@@ -24,6 +28,10 @@ import { placeKinds } from "./model/placeKinds";
 const MAX_SOURCES = 3;
 const MAX_NAMES = 100;
 const REINDEX_PAGE = 50;
+const MAX_CATALOG_IMPORT = 100;
+const MAX_CATALOG_RESULTS = 20;
+const MAX_SEARCH_LENGTH = 160;
+const MAX_SEARCH_TERMS = 16;
 
 const mapPlaceValidator = v.object({
   _id: v.id("places"),
@@ -38,7 +46,12 @@ const mapPlaceValidator = v.object({
   features: v.optional(v.array(placeFeatureValidator)),
 });
 
-const mapPlace = (row: Doc<"places">) => {
+const catalogPlaceValidator = mapPlaceValidator.omit("appleId").extend({
+  appleId: v.optional(v.string()),
+  source: v.optional(v.literal("overture")),
+});
+
+const placeCard = (row: Doc<"places">) => {
   const category = row.kind ? undefined : row.category;
   return {
     _id: row._id,
@@ -46,13 +59,59 @@ const mapPlace = (row: Doc<"places">) => {
     lat: row.lat,
     lng: row.lng,
     city: row.city,
-    appleId: row.appleId,
     ...(category ? { category } : {}),
     ...(row.cuisine ? { cuisine: row.cuisine } : {}),
     kinds: row.kind ? [row.kind] : placeKinds(category, [], row.cuisine),
     ...(row.features ? { features: row.features } : {}),
   };
 };
+
+const mapPlace = (row: Doc<"places">) => {
+  if (row.status !== "live") throw new Error("Expected a Discover place");
+  return { ...placeCard(row), appleId: row.appleId };
+};
+
+const searchTerms = (text: string) =>
+  text
+    .normalize("NFC")
+    .toLowerCase()
+    .match(/[\p{L}\p{N}]+/gu) ?? [];
+
+const nameRank = (name: string, search: string) => {
+  const candidate = searchTerms(name).join(" ");
+  if (candidate === search) return 0;
+  return candidate.startsWith(search) ? 1 : 2;
+};
+
+export const searchCatalog = authedQuery({
+  args: { text: v.string() },
+  returns: v.array(catalogPlaceValidator),
+  handler: async (ctx, { text }) => {
+    if (text.length > MAX_SEARCH_LENGTH) return [];
+    const search = searchTerms(text).slice(0, MAX_SEARCH_TERMS).join(" ");
+    if (!search) return [];
+
+    const groups = await Promise.all(
+      (["live", "catalog"] as const).map((status) =>
+        ctx.db
+          .query("places")
+          .withSearchIndex("search_name", (q) =>
+            q.search("name", search).eq("status", status),
+          )
+          .take(MAX_CATALOG_RESULTS),
+      ),
+    );
+    return groups
+      .flat()
+      .sort((a, b) => nameRank(a.name, search) - nameRank(b.name, search))
+      .slice(0, MAX_CATALOG_RESULTS)
+      .map((row) => ({
+        ...placeCard(row),
+        ...(row.appleId ? { appleId: row.appleId } : {}),
+        ...(row.source ? { source: row.source } : {}),
+      }));
+  },
+});
 
 export const forMap = authedQuery({
   args: {},
@@ -75,6 +134,92 @@ export const inArea = authedQuery({
   handler: async (ctx, args) => {
     const { rows, complete } = await discoverPlaces(ctx, args.box);
     return { places: rows.map(mapPlace), complete };
+  },
+});
+
+const catalogImportValidator = v.object({
+  overtureId: v.string(),
+  name: v.string(),
+  city: v.string(),
+  lat: v.number(),
+  lng: v.number(),
+  kind: placeKindValidator,
+  appleId: v.optional(v.string()),
+});
+
+type CatalogImport = Infer<typeof catalogImportValidator>;
+
+function validateCatalogImport(place: CatalogImport) {
+  const bounds = [
+    [place.lat, 90],
+    [place.lng, 180],
+  ] as const;
+  const fields = [place.overtureId, place.name, place.city, place.appleId];
+  if (
+    fields.some(
+      (value) =>
+        value !== undefined &&
+        (!value || value.length > 200 || value !== value.trim()),
+    ) ||
+    bounds.some(
+      ([value, limit]) => !Number.isFinite(value) || Math.abs(value) > limit,
+    )
+  ) {
+    throw new Error("Invalid catalog place");
+  }
+}
+
+async function storeCatalogPlace(ctx: MutationCtx, place: CatalogImport) {
+  validateCatalogImport(place);
+  const { overtureId, appleId } = place;
+  const byOverture = await ctx.db
+    .query("places")
+    .withIndex("by_overture_id", (q) => q.eq("overtureId", overtureId))
+    .unique();
+  const byApple =
+    appleId === undefined
+      ? null
+      : await ctx.db
+          .query("places")
+          .withIndex("by_apple_id", (q) => q.eq("appleId", appleId))
+          .unique();
+
+  if (
+    (byApple && byOverture && byApple._id !== byOverture._id) ||
+    (byApple?.overtureId && byApple.overtureId !== overtureId) ||
+    (appleId && byOverture?.appleId && byOverture.appleId !== appleId)
+  ) {
+    throw new Error("Conflicting catalog place identifiers");
+  }
+  const row = byOverture ?? byApple;
+  if (!row) {
+    await ctx.db.insert("places", {
+      ...place,
+      source: "overture",
+      status: "catalog",
+      addedAt: Date.now(),
+    });
+    return true;
+  }
+  if (!row.overtureId || (!row.appleId && appleId)) {
+    await ctx.db.patch(row._id, {
+      overtureId,
+      ...(appleId ? { appleId } : {}),
+    });
+  }
+  return false;
+}
+
+export const storeCatalog = internalMutation({
+  args: { places: v.array(catalogImportValidator) },
+  returns: v.object({ added: v.number(), existing: v.number() }),
+  handler: async (ctx, { places }) => {
+    if (places.length > MAX_CATALOG_IMPORT)
+      throw new Error("Catalog batch is too large");
+    let added = 0;
+    for (const place of places)
+      if (await storeCatalogPlace(ctx, place)) added++;
+    return { added, existing: places.length - added };
   },
 });
 
@@ -112,14 +257,22 @@ export const store = internalMutation({
       }
       existing++;
       const sources = row.sources ?? [];
-      if (
+      const source =
         args.source &&
         sources.length < MAX_SOURCES &&
         !sources.some((s) => s.url === args.source)
-      )
+          ? [...sources, { url: args.source }]
+          : undefined;
+      if (row.status === "catalog") {
         await ctx.db.patch(row._id, {
-          sources: [...sources, { url: args.source }],
+          status: "live",
+          appleId: place.appleId,
+          ...(source ? { sources: source } : {}),
         });
+        await indexPlace(ctx, { ...row, status: "live" });
+      } else if (source) {
+        await ctx.db.patch(row._id, { sources: source });
+      }
     }
     return { added, existing };
   },

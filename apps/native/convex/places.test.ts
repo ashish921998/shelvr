@@ -170,6 +170,198 @@ async function indexed(t: ReturnType<typeof newConvexTest>, key: string) {
   );
 }
 
+const catalogCafe = (overtureId: string, name = "Juniper Café") => ({
+  overtureId,
+  name,
+  city: "Lisbon",
+  ...LISBON,
+  kind: "coffee" as const,
+});
+
+describe("places:searchCatalog", () => {
+  it("returns the same public place to independent accounts and keeps it out of Discover", async () => {
+    const { base, user } = await signedIn();
+    const otherId = await base.run((ctx) => ctx.db.insert("users", {}));
+    const other = base.withIdentity({ subject: `${otherId}|session-2` });
+    await base.mutation(internal.places.storeCatalog, {
+      places: [catalogCafe("overture-a")],
+    });
+    await base.mutation(internal.places.store, {
+      city: "Lisbon",
+      places: [{ ...cafe("legacy", "Curated Café"), ...LISBON }],
+      source: "https://example.com/source",
+    });
+    await base.run((ctx) =>
+      ctx.db.insert("items", {
+        userId: otherId,
+        type: "link",
+        status: "ready",
+        title: "Private Juniper save",
+        url: "https://example.com/private",
+        placePins: [{ name: "Private Juniper pin", ...LISBON }],
+        tags: [],
+        searchText: "Private Juniper save",
+      }),
+    );
+
+    const [shared] = await rows(base);
+    const result = [
+      {
+        _id: shared._id,
+        name: "Juniper Café",
+        city: "Lisbon",
+        ...LISBON,
+        kinds: ["coffee"],
+        source: "overture",
+      },
+    ];
+    await expect(
+      user.query(api.places.searchCatalog, { text: "Junip" }),
+    ).resolves.toEqual(result);
+    await expect(
+      other.query(api.places.searchCatalog, { text: "Junip" }),
+    ).resolves.toEqual(result);
+    await expect(
+      user.query(api.places.searchCatalog, { text: "Private" }),
+    ).resolves.toEqual([]);
+    const [curated] = await user.query(api.places.searchCatalog, {
+      text: "Curated",
+    });
+    expect(curated).toMatchObject({ name: "Curated Café", appleId: "legacy" });
+    expect(curated).not.toHaveProperty("sources");
+    expect(curated).not.toHaveProperty("source");
+    expect(await indexed(base, shared._id)).toBeNull();
+    expect(await names(user, LISBON_BOX)).toEqual(["Curated Café"]);
+    expect(await names(user, WORLD)).toEqual(["Curated Café"]);
+    expect(
+      (await user.query(api.places.forMap, {})).map((row) => row.name),
+    ).toEqual(["Curated Café"]);
+  });
+
+  it("excludes hidden rows and supports a one-character prefix", async () => {
+    const { base, user } = await signedIn();
+    await base.mutation(internal.places.storeCatalog, {
+      places: [
+        catalogCafe("hidden", "東京 Hidden"),
+        catalogCafe("found", "東京本店"),
+      ],
+    });
+    const [hidden] = await rows(base);
+    await base.run((ctx) => ctx.db.patch(hidden._id, { status: "hidden" }));
+    const result = await user.query(api.places.searchCatalog, { text: "東" });
+    expect(result.map((row) => row.name)).toEqual(["東京本店"]);
+    const args = { text: "..." };
+    await expect(user.query(api.places.searchCatalog, args)).resolves.toEqual(
+      [],
+    );
+    await expect(base.query(api.places.searchCatalog, args)).rejects.toThrow(
+      "Not authenticated",
+    );
+  });
+
+  it("caps results and puts an exact match first across the two indexed scopes", async () => {
+    const { base, user } = await signedIn();
+    await base.mutation(internal.places.storeCatalog, {
+      places: Array.from({ length: 21 }, (_, index) =>
+        catalogCafe(`catalog-${index}`, `Juniper ${index}`),
+      ),
+    });
+    await base.mutation(internal.places.store, {
+      city: "Lisbon",
+      places: [cafe("exact", "Juniper")],
+    });
+    const result = await user.query(api.places.searchCatalog, {
+      text: "Juniper",
+    });
+    expect(result).toHaveLength(20);
+    expect(result[0].name).toBe("Juniper");
+  });
+});
+
+describe("places:storeCatalog", () => {
+  it("reuses a curated place and preserves its curated data and visibility", async () => {
+    const { base, user } = await signedIn();
+    await base.mutation(internal.places.store, {
+      city: "Lisbon",
+      places: [
+        { ...cafe("curated", "Curated Café"), ...LISBON, category: "Cafe" },
+      ],
+      source: "https://example.com/source",
+    });
+    const [curated] = await rows(base);
+    const places = [{ ...catalogCafe("overture-a"), appleId: "curated" }];
+    await expect(
+      base.mutation(internal.places.storeCatalog, { places }),
+    ).resolves.toEqual({ added: 0, existing: 1 });
+    await expect(
+      base.mutation(internal.places.storeCatalog, { places }),
+    ).resolves.toEqual({ added: 0, existing: 1 });
+    expect(await rows(base)).toEqual([
+      { ...curated, overtureId: "overture-a" },
+    ]);
+    expect(await names(user, LISBON_BOX)).toEqual(["Curated Café"]);
+  });
+
+  it("deduplicates catalog IDs, attaches a verified Apple ID, and supports curation", async () => {
+    const { base, user } = await signedIn();
+    const place = catalogCafe("overture-a");
+    await expect(
+      base.mutation(internal.places.storeCatalog, {
+        places: [place, { ...place, appleId: "apple-a" }],
+      }),
+    ).resolves.toEqual({ added: 1, existing: 1 });
+    const [catalog] = await rows(base);
+    expect(catalog).toMatchObject({
+      overtureId: "overture-a",
+      appleId: "apple-a",
+    });
+    await base.mutation(internal.places.store, {
+      city: "Lisbon",
+      places: [cafe("apple-a", "Apple label")],
+    });
+    expect(await rows(base)).toEqual([{ ...catalog, status: "live" }]);
+    const [result] = await user.query(api.places.searchCatalog, {
+      text: "Juniper",
+    });
+    expect(result).toMatchObject({ _id: catalog._id, source: "overture" });
+    expect(await names(user, LISBON_BOX)).toEqual(["Juniper Café"]);
+  });
+
+  it("rejects conflicting identities without applying any of the batch", async () => {
+    const t = newConvexTest();
+    const a = { ...catalogCafe("overture-a"), appleId: "apple-a" };
+    const b = { ...catalogCafe("overture-b"), appleId: "apple-b" };
+    await t.mutation(internal.places.storeCatalog, { places: [a, b] });
+    const existing = await rows(t);
+    await expect(
+      t.mutation(internal.places.storeCatalog, {
+        places: [catalogCafe("overture-c"), { ...a, appleId: "apple-b" }],
+      }),
+    ).rejects.toThrow("Conflicting catalog place identifiers");
+    expect(await rows(t)).toEqual(existing);
+  });
+
+  it("rejects an oversized batch or malformed rows", async () => {
+    const t = newConvexTest();
+    const place = catalogCafe("overture-a");
+    await expect(
+      t.mutation(internal.places.storeCatalog, {
+        places: Array.from({ length: 101 }, () => place),
+      }),
+    ).rejects.toThrow("Catalog batch is too large");
+    for (const invalid of [
+      { ...place, lat: 91 },
+      { ...place, lng: NaN },
+      { ...place, name: " " },
+    ]) {
+      await expect(
+        t.mutation(internal.places.storeCatalog, { places: [invalid] }),
+      ).rejects.toThrow("Invalid catalog place");
+    }
+    expect(await rows(t)).toEqual([]);
+  });
+});
+
 describe("places:forMap", () => {
   it("returns live rows with kinds", async () => {
     const { base, user } = await signedIn();

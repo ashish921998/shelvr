@@ -38,6 +38,21 @@ import {
 } from "./model/tripPlan";
 import { visitSpotValidator } from "./model/placeVisits";
 
+const placeFields = {
+  name: v.string(),
+  city: v.string(),
+  lat: v.number(),
+  lng: v.number(),
+  category: v.optional(v.string()),
+  cuisine: v.optional(cuisineValidator),
+  kind: v.optional(placeKindValidator),
+  features: v.optional(v.array(placeFeatureValidator)),
+  sources: v.optional(v.array(v.object({ url: v.string() }))),
+  overtureId: v.optional(v.string()),
+  source: v.optional(v.literal("overture")),
+  addedAt: v.number(),
+};
+
 export default defineSchema({
   ...authTables,
 
@@ -95,22 +110,34 @@ export default defineSchema({
     ["eventId"],
   ),
 
-  places: defineTable({
-    name: v.string(),
-    city: v.string(),
-    lat: v.number(),
-    lng: v.number(),
-    appleId: v.string(),
-    category: v.optional(v.string()),
-    cuisine: v.optional(cuisineValidator),
-    kind: v.optional(placeKindValidator),
-    features: v.optional(v.array(placeFeatureValidator)),
-    sources: v.optional(v.array(v.object({ url: v.string() }))),
-    status: v.union(v.literal("live"), v.literal("hidden")),
-    addedAt: v.number(),
-  })
+  places: defineTable(
+    v.union(
+      v.object({
+        ...placeFields,
+        appleId: v.string(),
+        status: v.literal("live"),
+      }),
+      v.object({
+        ...placeFields,
+        appleId: v.optional(v.string()),
+        status: v.literal("hidden"),
+      }),
+      v.object({
+        ...placeFields,
+        appleId: v.optional(v.string()),
+        overtureId: v.string(),
+        source: v.literal("overture"),
+        status: v.literal("catalog"),
+      }),
+    ),
+  )
     .index("by_status", ["status"])
-    .index("by_apple_id", ["appleId"]),
+    .index("by_apple_id", ["appleId"])
+    .index("by_overture_id", ["overtureId"])
+    .searchIndex("search_name", {
+      searchField: "name",
+      filterFields: ["status"],
+    }),
 
   placeRemovals: defineTable({
     userId: v.string(),
