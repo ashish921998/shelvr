@@ -203,6 +203,7 @@ struct SavedPlacesMap: View {
       ScrollView(.horizontal) {
         HStack(spacing: 5) {
           scopeChip(scene, palette: palette)
+            .padding(.trailing, 3)
           ForEach(scene.chips, id: \.self) { kind in
             let selected = filters.kinds.contains(kind)
             Button {
@@ -386,13 +387,12 @@ struct SavedPlacesMap: View {
 
   private func chipLabel(_ title: String, symbol: String, selected: Bool, palette: HomeChromePalette,
     color: Color? = nil, chevron: Bool = false) -> some View {
-    let foreground = selected ? palette.background : palette.foreground
+    let glyph = color.map { scheme == .dark ? $0.mix(with: palette.foreground, by: 0.55) : $0 }
     return HStack(spacing: 4) {
       Image(systemName: symbol)
-        .font(.system(size: 13, weight: .semibold))
-        .foregroundStyle(color == nil ? foreground : .white)
-        .frame(width: 24, height: 24)
-        .background(color ?? foreground.opacity(0.12), in: Circle())
+        .font(.system(size: 15, weight: .medium))
+        .foregroundStyle(glyph ?? palette.foreground)
+        .frame(width: 18)
         .accessibilityHidden(true)
       Text(title).font(.custom("Satoshi-Bold", size: 13, relativeTo: .footnote))
         .fixedSize(horizontal: true, vertical: false)
@@ -402,11 +402,18 @@ struct SavedPlacesMap: View {
           .accessibilityHidden(true)
       }
     }
-    .foregroundStyle(foreground)
-    .padding(.leading, 4).padding(.trailing, 6).padding(.vertical, 5)
-    .background(selected ? palette.foreground : palette.surface, in: Capsule())
-    .overlay { Capsule().strokeBorder(selected ? palette.foreground : palette.border, lineWidth: 0.5) }
-    .shadow(color: palette.shadow.opacity(0.12), radius: 4, y: 2)
+    .foregroundStyle(palette.foreground)
+    .padding(.horizontal, 8).padding(.vertical, 4)
+    .frame(minHeight: 30)
+    .background {
+      Capsule().fill(palette.surface)
+      if selected { Capsule().fill(Color("AccentColor").opacity(0.24)) }
+    }
+    .overlay {
+      Capsule().strokeBorder(selected ? palette.primaryText.opacity(0.55) : palette.border,
+        lineWidth: selected ? 1.25 : 0.5)
+    }
+    .shadow(color: palette.shadow.opacity(0.14), radius: 3, y: 2)
     .frame(minHeight: 44).contentShape(Rectangle())
   }
 
