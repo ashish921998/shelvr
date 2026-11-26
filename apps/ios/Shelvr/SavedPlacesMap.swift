@@ -40,13 +40,13 @@ struct SavedPlacesMap: View {
     let overviewPlaces = scene.visible.filter(\.isSaved)
     MapCanvas(places: scene.visible, cameraCommand: cameraCommand, filters: scene.filters, opening: scene.opening,
       visited: scene.visited, selectedLabelID: selectedLabelID, copy: copy, topControlsHeight: topControlsHeight,
-      bottomControlsHeight: bottomControlsHeight, onArea: { updateDiscoverArea($0); viewport = $1 },
+      bottomControlsHeight: focusedSearch ? 0 : bottomControlsHeight, onArea: { updateDiscoverArea($0); viewport = $1 },
       onUserMove: cancelCameraRequests, onPick: selectPlace, onCluster: { cluster = $0 })
       .ignoresSafeArea(.container)
       .overlay(alignment: .top) {
         Group {
           if searching { searchPanel(scene, palette: palette) }
-          else { mapHeader(scene, personalPlaces: personalPlaces, overviewPlaces: overviewPlaces, palette: palette) }
+          else { mapHeader(personalPlaces: personalPlaces, overviewPlaces: overviewPlaces, palette: palette) }
         }.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topControlsHeight = $0 }
       }
       .overlay(alignment: .bottom) {
@@ -124,7 +124,7 @@ struct SavedPlacesMap: View {
     selected = place
   }
 
-  private func mapHeader(_ scene: MapScene, personalPlaces: [MapPlace], overviewPlaces: [MapPlace],
+  private func mapHeader(personalPlaces: [MapPlace], overviewPlaces: [MapPlace],
     palette: HomeChromePalette) -> some View {
     let city = viewport?.city(among: personalPlaces)
     return VStack(spacing: 6) {
@@ -158,8 +158,6 @@ struct SavedPlacesMap: View {
         roundButton("person", label: copy("navigation.profile"), palette: palette) { open("/profile") }
       }
       .frame(minHeight: 50)
-      filterStrip(scene, palette: palette)
-        .padding(.horizontal, -6)
       roundButton("location", label: copy("map.showMyLocation"), palette: palette) { location.locate() }
         .frame(maxWidth: .infinity, alignment: .trailing)
       retryControl(palette)
@@ -193,6 +191,7 @@ struct SavedPlacesMap: View {
           .padding(.horizontal, 20)
         }
       }
+      filterStrip(scene, palette: palette)
     }
     .padding(.bottom, 36)
     .buttonStyle(HomeChromePressStyle())
@@ -220,6 +219,7 @@ struct SavedPlacesMap: View {
         }
         .padding(.vertical, 2)
       }
+      .contentMargins(.horizontal, 14, for: .scrollContent)
       .scrollIndicators(.hidden)
       .accessibilityLabel(copy("map.filters"))
     }
@@ -247,7 +247,7 @@ struct SavedPlacesMap: View {
         }.padding(.horizontal, 12).frame(minHeight: 44)
           .background(palette.surface, in: Capsule())
       }
-      filterStrip(scene, palette: palette)
+      if focusedSearch { filterStrip(scene, palette: palette).padding(.horizontal, -20) }
       retryControl(palette)
       if scene.filters.hasSearch && resultsOpen && (!scene.visible.isEmpty || errors.isEmpty) {
         VStack(alignment: .leading, spacing: 0) {
@@ -351,12 +351,12 @@ struct SavedPlacesMap: View {
     switch kind {
     case .food: "fork.knife"
     case .coffee: "cup.and.saucer.fill"
-    case .dessert: "birthday.cake"
-    case .drinks: "wineglass"
-    case .dateNight: "heart"
-    case .activities: "ticket"
-    case .shopping: "bag"
-    case .stay: "bed.double"
+    case .dessert: "birthday.cake.fill"
+    case .drinks: "wineglass.fill"
+    case .dateNight: "heart.fill"
+    case .activities: "ticket.fill"
+    case .shopping: "bag.fill"
+    case .stay: "bed.double.fill"
     }
   }
 
@@ -386,10 +386,13 @@ struct SavedPlacesMap: View {
 
   private func chipLabel(_ title: String, symbol: String, selected: Bool, palette: HomeChromePalette,
     color: Color? = nil, chevron: Bool = false) -> some View {
-    HStack(spacing: 6) {
+    let foreground = selected ? palette.background : palette.foreground
+    return HStack(spacing: 5) {
       Image(systemName: symbol)
-        .font(.system(size: 12, weight: .semibold))
-        .foregroundStyle(selected ? palette.background : color ?? palette.muted)
+        .font(.system(size: 13, weight: .semibold))
+        .foregroundStyle(color == nil ? foreground : .white)
+        .frame(width: 24, height: 24)
+        .background(color ?? foreground.opacity(0.12), in: Circle())
         .accessibilityHidden(true)
       Text(title).font(.custom("Satoshi-Bold", size: 13, relativeTo: .footnote))
         .fixedSize(horizontal: true, vertical: false)
@@ -399,8 +402,8 @@ struct SavedPlacesMap: View {
           .accessibilityHidden(true)
       }
     }
-    .foregroundStyle(selected ? palette.background : palette.foreground)
-    .padding(.horizontal, 8).padding(.vertical, 7)
+    .foregroundStyle(foreground)
+    .padding(.leading, 5).padding(.trailing, 9).padding(.vertical, 5)
     .background(selected ? palette.foreground : palette.surface, in: Capsule())
     .overlay { Capsule().strokeBorder(selected ? palette.foreground : palette.border, lineWidth: 0.5) }
     .shadow(color: palette.shadow.opacity(0.12), radius: 4, y: 2)
