@@ -279,6 +279,37 @@ describe("places:searchCatalog", () => {
 });
 
 describe("places:storeCatalog", () => {
+  it("refreshes catalog metadata at the same ID and retains its verified Apple ID", async () => {
+    const { base, user } = await signedIn();
+    const place = catalogCafe("overture-a");
+    await base.mutation(internal.places.storeCatalog, {
+      places: [{ ...place, appleId: "apple-a" }],
+    });
+    const [before] = await rows(base);
+    const refreshed = {
+      ...place,
+      name: "Cedar Bakery",
+      city: "Porto",
+      ...PORTO,
+      kind: "dessert" as const,
+    };
+    await expect(
+      base.mutation(internal.places.storeCatalog, {
+        places: [refreshed],
+      }),
+    ).resolves.toEqual({ added: 0, existing: 1 });
+    expect(await rows(base)).toEqual([{ ...before, ...refreshed }]);
+    await expect(
+      user.query(api.places.searchCatalog, { text: "Juniper" }),
+    ).resolves.toEqual([]);
+    const result = await user.query(api.places.searchCatalog, {
+      text: "Cedar",
+    });
+    expect(result).toMatchObject([
+      { _id: before._id, kinds: ["dessert"], ...PORTO },
+    ]);
+  });
+
   it("reuses a curated place and preserves its curated data and visibility", async () => {
     const { base, user } = await signedIn();
     await base.mutation(internal.places.store, {

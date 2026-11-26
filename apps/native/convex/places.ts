@@ -66,10 +66,12 @@ const placeCard = (row: Doc<"places">) => {
   };
 };
 
-const mapPlace = (row: Doc<"places">) => {
-  if (row.status !== "live") throw new Error("Expected a Discover place");
-  return { ...placeCard(row), appleId: row.appleId };
-};
+const discoverCards = (rows: Doc<"places">[]) =>
+  rows.flatMap((row) =>
+    row.status === "live" && row.appleId
+      ? [{ ...placeCard(row), appleId: row.appleId }]
+      : [],
+  );
 
 const searchTerms = (text: string) =>
   text
@@ -117,12 +119,12 @@ export const forMap = authedQuery({
   args: {},
   returns: v.array(mapPlaceValidator),
   handler: async (ctx) =>
-    (
+    discoverCards(
       await ctx.db
         .query("places")
         .withIndex("by_status", (q) => q.eq("status", "live"))
-        .take(MAX_MAP_PLACES)
-    ).map(mapPlace),
+        .take(MAX_MAP_PLACES),
+    ),
 });
 
 export const inArea = authedQuery({
@@ -133,7 +135,7 @@ export const inArea = authedQuery({
   }),
   handler: async (ctx, args) => {
     const { rows, complete } = await discoverPlaces(ctx, args.box);
-    return { places: rows.map(mapPlace), complete };
+    return { places: discoverCards(rows), complete };
   },
 });
 
@@ -201,10 +203,19 @@ async function storeCatalogPlace(ctx: MutationCtx, place: CatalogImport) {
     });
     return true;
   }
-  if (!row.overtureId || (!row.appleId && appleId)) {
+  const { name, city, lat, lng, kind } = place;
+  const refresh =
+    row.status === "catalog" &&
+    (row.name !== name ||
+      row.city !== city ||
+      row.lat !== lat ||
+      row.lng !== lng ||
+      row.kind !== kind);
+  if (refresh || !row.overtureId || (!row.appleId && appleId)) {
     await ctx.db.patch(row._id, {
       overtureId,
       ...(appleId ? { appleId } : {}),
+      ...(refresh ? { name, city, lat, lng, kind } : {}),
     });
   }
   return false;
