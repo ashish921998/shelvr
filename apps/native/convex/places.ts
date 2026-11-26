@@ -298,6 +298,10 @@ export const curate = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, { id, kind, cuisine, features }) => {
+    const row = await ctx.db.get(id);
+    if (!row) throw new Error("Place not found");
+    if (row.status === "catalog")
+      throw new Error("Only Discover places can be curated");
     await ctx.db.patch(id, {
       ...(kind === undefined ? {} : { kind: kind ?? undefined }),
       ...(cuisine === undefined ? {} : { cuisine: cuisine ?? undefined }),

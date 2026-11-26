@@ -652,6 +652,22 @@ describe("places:forMap read limits", () => {
 });
 
 describe("places:curate", () => {
+  it("refuses to edit catalog-only places", async () => {
+    const base = newConvexTest();
+    await base.mutation(internal.places.storeCatalog, {
+      places: [catalogCafe("overture-a")],
+    });
+    const [row] = await rows(base);
+    await expect(
+      base.mutation(internal.places.curate, {
+        id: row._id,
+        kind: "drinks",
+        features: ["rooftop"],
+      }),
+    ).rejects.toThrow("Only Discover places can be curated");
+    expect(await rows(base)).toEqual([row]);
+  });
+
   it("shows a bar inside a hotel as a bar with its features", async () => {
     const { base, user } = await signedIn();
     await base.mutation(internal.places.store, {
