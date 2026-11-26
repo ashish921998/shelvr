@@ -117,7 +117,7 @@ struct SignedInView: View {
         else { switch link.path.first {
         case "settings": AccountSettingsView()
         case "profile": AccountView().navigationTitle(copy("navigation.profile"))
-        case "add-spots": addSpots
+        case "add-spots": AddSpotsView(open: open)
         case "passport-story": PassportStoryView()
         case "trips": TripsTabView()
         case "shared-trip-links": ActiveTripLinksView()
@@ -290,21 +290,6 @@ struct SignedInView: View {
     case ["sign-in"]: break
     default: setPath([link])
     }
-  }
-
-  private var addSpots: some View {
-    List {
-      entry("/add", "addSheet.pasteLink", "link")
-      entry("/add", "addSheet.googleMapsList", "map")
-      entry("/new-shared-list", "sharedLists.newTitle", "person.2")
-      entry("/new-trip", "homePlaces.planTrip", "suitcase")
-      entry("/photo", "item.photo", "photo")
-      entry("/how-to-share", "addSheet.howToShare", "square.and.arrow.up")
-      if Locale.preferredLanguages.first?.hasPrefix("en") == true {
-        entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
-      }
-    }
-    .navigationTitle(copy("addSheet.title"))
   }
 
   @ViewBuilder private var loadingPlan: some View {

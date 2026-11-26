@@ -6,6 +6,56 @@ struct HomeChromePressStyle: ButtonStyle {
   }
 }
 
+struct HomeActionCard: View {
+  enum Emphasis { case primary, standard, secondary }
+
+  let title: String
+  let detail: String
+  let symbol: String
+  let palette: HomeChromePalette
+  var emphasis: Emphasis = .standard
+  let action: () -> Void
+
+  var body: some View {
+    let primary = emphasis == .primary
+    let secondary = emphasis == .secondary
+    let shape = RoundedRectangle(cornerRadius: 18)
+    Button(action: action) {
+      HStack(spacing: 14) {
+        Image(systemName: symbol)
+          .font(.system(size: secondary ? 19 : 24, weight: .medium))
+          .foregroundStyle(secondary ? palette.muted : palette.primaryText)
+          .frame(width: secondary ? 40 : 52, height: secondary ? 40 : 52)
+          .background(secondary ? palette.background : palette.primaryText.opacity(0.10),
+            in: RoundedRectangle(cornerRadius: 12))
+          .accessibilityHidden(true)
+        VStack(alignment: .leading, spacing: 3) {
+          Text(title).font(.custom("Satoshi-Bold", size: secondary ? 16 : 21, relativeTo: .headline))
+            .foregroundStyle(palette.foreground)
+          Text(detail).font(.custom("Satoshi-Regular", size: 14, relativeTo: .subheadline))
+            .foregroundStyle(palette.muted)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        Image(systemName: "chevron.right")
+          .font(.system(size: 12, weight: .semibold))
+          .foregroundStyle(palette.muted)
+          .accessibilityHidden(true)
+      }
+      .padding(secondary ? 12 : 16)
+      .background {
+        shape.fill(palette.surface)
+        if primary { shape.fill(Color("AccentColor").opacity(0.13)) }
+      }
+      .overlay { shape.strokeBorder(primary ? palette.primaryText.opacity(0.30) : palette.border) }
+      .contentShape(shape)
+    }
+    .buttonStyle(HomeChromePressStyle())
+    .accessibilityLabel(Text(title))
+    .accessibilityHint(Text(detail))
+  }
+}
+
 struct HomeChromePalette {
   let background, frame, surface, foreground, muted, primaryText, border: Color
   let shadow = Color(rgb: 0x2b2418)
