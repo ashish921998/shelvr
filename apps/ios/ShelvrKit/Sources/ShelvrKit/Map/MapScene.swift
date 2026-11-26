@@ -28,18 +28,28 @@ public struct MapScene {
 
   public var showsWentSwitch: Bool { !visited.isEmpty }
 
-  public init(saved: [MapPlace]?, discover: [MapPlace], visits: [MapVisit], filters: MapFilters) {
+  public init(saved: [MapPlace]?, discover: [MapPlace], visits: [MapVisit], filters: MapFilters,
+    catalog: [MapPlace] = []) {
     let own = saved ?? []
     let visited = MapVisit.visitedIDs(visits, among: own)
     var effective = filters
     if visited.isEmpty { effective.went = .all }
 
-    let entries = MapPlace.combined(saved: own, discover: effective.went == .all ? discover : [])
+    let remote = effective.went == .all ? MapPlace.mergingCatalog(catalog, with: discover) : []
+    let personal = catalog.isEmpty ? own : MapPlace.search(own, query: effective.search)
+    let entries = MapPlace.combined(saved: personal, discover: remote)
     let matches = entries.filter { place in
       (effective.went == .all || visited.contains(place.id) == (effective.went == .went)) &&
         (effective.kinds.isEmpty || !effective.kinds.isDisjoint(with: place.kinds))
     }
-    let visible = MapPlace.search(matches, query: effective.search)
+    let visible: [MapPlace]
+    if catalog.isEmpty {
+      visible = MapPlace.search(matches, query: effective.search)
+    } else {
+      let indexedIDs = Set(catalog.map(\.id))
+      let local = MapPlace.search(matches.filter { !indexedIDs.contains($0.id) }, query: effective.search)
+      visible = local.filter(\.isSaved) + matches.filter { indexedIDs.contains($0.id) } + local.filter { !$0.isSaved }
+    }
 
     self.filters = effective
     self.visited = visited

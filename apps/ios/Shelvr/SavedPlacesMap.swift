@@ -14,6 +14,7 @@ struct SavedPlacesMap: View {
   @State private var saved: [MapPlace]?
   @State private var discoverResponse: AreaResponse?
   @State private var catalogResponse: CatalogResponse?
+  @State private var failedCatalogRequest: CatalogRequest?
   @State private var catalogGeneration = UUID()
   @State private var visits: [MapVisit] = []
   @State private var discoverRequest = AreaRequest(area: .world)
@@ -40,8 +41,8 @@ struct SavedPlacesMap: View {
     let complete = discoverResponse?.request == request ? discoverResponse?.complete : nil
     let search = catalogRequest
     let catalog = catalogResponse?.request == search ? catalogResponse?.results : nil
-    let remote = MapPlace.mergingCatalog(catalog?.places ?? [], with: discover)
-    let scene = MapScene(saved: saved, discover: remote, visits: visits, filters: filters)
+    let catalogFailed = search != nil && failedCatalogRequest == search
+    let scene = MapScene(saved: saved, discover: discover, visits: visits, filters: filters, catalog: catalog?.places ?? [])
     let palette = HomeChromePalette(scheme, appearance: appearance)
     let personalPlaces = saved ?? []
     let overviewPlaces = scene.visible.filter(\.isSaved)
@@ -55,8 +56,8 @@ struct SavedPlacesMap: View {
         Group {
           if searching {
             searchPanel(scene, palette: palette,
-              catalogLoading: scene.filters.went == .all && search != nil && catalog == nil && !errors.contains("catalog"),
-              showAttribution: scene.filters.went == .all && catalog?.includesOverture == true)
+              catalogLoading: search != nil && catalog == nil && !catalogFailed, catalogFailed: catalogFailed,
+              showAttribution: catalog?.includesOverture == true)
           }
           else { mapHeader(personalPlaces: personalPlaces, overviewPlaces: overviewPlaces, palette: palette) }
         }.onGeometryChange(for: CGFloat.self) { $0.size.height } action: { topControlsHeight = $0 }
@@ -284,7 +285,7 @@ struct SavedPlacesMap: View {
   }
 
   private func searchPanel(_ scene: MapScene, palette: HomeChromePalette, catalogLoading: Bool,
-    showAttribution: Bool) -> some View {
+    catalogFailed: Bool, showAttribution: Bool) -> some View {
     VStack(spacing: 8) {
       HStack(spacing: 8) {
         HStack(spacing: 8) {
@@ -307,14 +308,15 @@ struct SavedPlacesMap: View {
           .background(palette.surface, in: Capsule())
       }
       if focusedSearch { filterStrip(scene, palette: palette).padding(.horizontal, -20) }
-      retryControl(palette)
-      if scene.filters.hasSearch && resultsOpen && (!scene.visible.isEmpty || errors.isEmpty) {
+      retryControl(palette, catalogFailed: catalogFailed)
+      if scene.filters.hasSearch && resultsOpen && (!scene.visible.isEmpty || (errors.isEmpty && !catalogFailed)) {
         VStack(alignment: .leading, spacing: 0) {
           ForEach(scene.visible.prefix(5)) { place in
             Button {
               Analytics.capture("map_search_result_opened")
               focusedSearch = false
               resultsOpen = false
+              if !place.isSaved { moveCamera(.overview([place])) }
               selectPlace(place)
             } label: {
               HStack(spacing: 8) {
@@ -357,8 +359,8 @@ struct SavedPlacesMap: View {
   }
 
   @ViewBuilder
-  private func retryControl(_ palette: HomeChromePalette) -> some View {
-    if !errors.isEmpty {
+  private func retryControl(_ palette: HomeChromePalette, catalogFailed: Bool = false) -> some View {
+    if !errors.isEmpty || catalogFailed {
       Button(copy("common.retry")) {
         retry += 1
         discoverRequest = AreaRequest(area: discoverRequest.area)
@@ -524,18 +526,22 @@ struct SavedPlacesMap: View {
   private var catalogRequest: CatalogRequest? {
     let text = filters.search.trimmingCharacters(in: .whitespacesAndNewlines)
     guard searching, !text.isEmpty else { return nil }
+    if filters.went != .all, !MapVisit.visitedIDs(visits, among: saved ?? []).isEmpty { return nil }
     return CatalogRequest(text: text, generation: catalogGeneration, session: backend.sessionGeneration, retry: retry)
   }
 
   private func searchCatalog(_ request: CatalogRequest?) async {
-    await subscribe("catalog") {
-      guard let request else { return }
+    guard let request else { return }
+    do {
       try await Task.sleep(for: .milliseconds(250))
       for try await results in backend.catalogPlaces(matching: request.text) {
         try Task.checkCancellation()
         guard request == catalogRequest else { return }
         catalogResponse = CatalogResponse(request: request, results: results)
+        failedCatalogRequest = nil
       }
+    } catch {
+      if !Task.isCancelled, request == catalogRequest { failedCatalogRequest = request }
     }
   }
 

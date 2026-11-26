@@ -143,9 +143,24 @@ public struct MapPlace: Hashable, Identifiable, Sendable {
     }
   }
 
-  public static func mergingCatalog(_ catalog: [Self], with discover: [Self]) -> [Self] {
-    let catalogIDs = Set(catalog.map(\.id))
-    return catalog + discover.filter { !catalogIDs.contains($0.id) }
+  static func mergingCatalog(_ catalog: [Self], with discover: [Self]) -> [Self] {
+    guard !catalog.isEmpty else { return discover }
+    var ids = Set<String>()
+    var appleIDs = Set<String>()
+    var byName: [String: [Self]] = [:]
+    return (catalog + discover).filter { place in
+      if ids.contains(place.id) || place.appleId.map(appleIDs.contains) == true { return false }
+      let name = key(place.name)
+      let hasNearbyMatch = byName[name]?.contains {
+        ($0.appleId == nil) != (place.appleId == nil) && $0.city.map(key) == place.city.map(key) &&
+          km($0.lat, $0.lng, place.lat, place.lng) <= 0.025
+      } == true
+      guard !hasNearbyMatch else { return false }
+      ids.insert(place.id)
+      if let appleId = place.appleId { appleIDs.insert(appleId) }
+      byName[name, default: []].append(place)
+      return true
+    }
   }
 
   public enum LabelPriority: Int {
