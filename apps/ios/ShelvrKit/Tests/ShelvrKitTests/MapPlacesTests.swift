@@ -114,21 +114,19 @@ import Testing
   #expect(catalog.place.appleId == nil)
   #expect(catalog.place.id == "discover:shared")
   #expect(catalog.source == "overture")
-  #expect(MapPlace.mergingCatalog([catalog.place], with: [catalog.place]) == [catalog.place])
+  #expect(MapPlace.search([catalog.place], catalog: [catalog.place], query: "tea house") == [catalog.place])
 
   let discover = Data("""
     [{"_id":"near","name":"Tea House","city":"Taipei","lat":25,"lng":121,"appleId":"tea","kinds":["coffee"]},
     {"_id":"far","name":"Tea House","city":"Taipei","lat":25.01,"lng":121,"appleId":"different","kinds":["coffee"]}]
     """.utf8)
   let branches = try JSONDecoder().decode([MapPlace.DiscoverRow].self, from: discover).map(\.place)
-  let merged = MapPlace.mergingCatalog([catalog.place], with: branches)
-  #expect(merged == [catalog.place, branches[1]])
+  #expect(MapPlace.search(branches, catalog: [catalog.place], query: "tea house") == branches)
   let indexed = MapScene(saved: [], discover: branches, visits: [], filters: .init(search: "tea-house"), catalog: [catalog.place])
-  #expect(indexed.visible == [catalog.place])
+  #expect(indexed.visible == [branches[0]])
 
   let save = Data(#"{"itemId":"private","name":"Tea House","city":"Taipei","lat":25,"lng":121,"appleId":"tea","kinds":["coffee"]}"#.utf8)
   let personal = try JSONDecoder().decode(MapPlace.SavedRow.self, from: save).place
-  #expect(MapPlace.combined(saved: [personal], discover: merged) == [personal, branches[1]])
-  let savedMatch = MapScene(saved: [personal], discover: [], visits: [], filters: .init(search: "tea house"), catalog: [catalog.place])
+  let savedMatch = MapScene(saved: [personal], discover: [], visits: [], filters: .init(search: "tea-house"), catalog: [catalog.place])
   #expect(savedMatch.visible == [personal])
 }

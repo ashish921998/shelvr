@@ -143,24 +143,27 @@ public struct MapPlace: Hashable, Identifiable, Sendable {
     }
   }
 
-  static func mergingCatalog(_ catalog: [Self], with discover: [Self]) -> [Self] {
-    guard !catalog.isEmpty else { return discover }
-    var ids = Set<String>()
-    var appleIDs = Set<String>()
-    var byName: [String: [Self]] = [:]
-    return (catalog + discover).filter { place in
-      if ids.contains(place.id) || place.appleId.map(appleIDs.contains) == true { return false }
-      let name = key(place.name)
-      let hasNearbyMatch = byName[name]?.contains {
-        ($0.appleId == nil) != (place.appleId == nil) && $0.city.map(key) == place.city.map(key) &&
-          km($0.lat, $0.lng, place.lat, place.lng) <= 0.025
-      } == true
-      guard !hasNearbyMatch else { return false }
-      ids.insert(place.id)
-      if let appleId = place.appleId { appleIDs.insert(appleId) }
-      byName[name, default: []].append(place)
-      return true
+  static func search(_ local: [Self], catalog: [Self], query: String) -> [Self] {
+    let nearby = search(local, query: query)
+    guard !catalog.isEmpty else { return nearby }
+    let representatives = local + catalog.filter { $0.appleId != nil }
+    let indexed = catalog.map { hit in
+      let exact = representatives.first {
+        $0.id == hit.id || ($0.appleId != nil && $0.appleId == hit.appleId)
+      }
+      return exact ?? representatives.first { $0.isNearbyCatalogVenue(hit) } ?? hit
     }
+    let found = nearby.filter(\.isSaved) + indexed + nearby.filter { !$0.isSaved }
+    var ids = Set<String>()
+    return (found.filter(\.isSaved) + found.filter { !$0.isSaved }).filter { ids.insert($0.id).inserted }
+  }
+
+  private func isNearbyCatalogVenue(_ other: Self) -> Bool {
+    guard (isSaved || appleId != nil), appleId == nil || other.appleId == nil,
+      let city, let otherCity = other.city, Self.key(city) == Self.key(otherCity),
+      Self.key(name) == Self.key(other.name)
+    else { return false }
+    return Self.km(lat, lng, other.lat, other.lng) <= 0.025
   }
 
   public enum LabelPriority: Int {
