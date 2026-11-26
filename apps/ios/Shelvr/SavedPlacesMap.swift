@@ -27,6 +27,7 @@ struct SavedPlacesMap: View {
   @State private var cameraCommand: MapCameraCommand?
   @State private var topControlsHeight: CGFloat = 50
   @State private var bottomControlsHeight: CGFloat = 48
+  @State private var locateFrame: CGRect?
   @State private var searching = false
   @State private var resultsOpen = true
   @FocusState private var focusedSearch: Bool
@@ -41,7 +42,8 @@ struct SavedPlacesMap: View {
     let overviewPlaces = scene.visible.filter(\.isSaved)
     MapCanvas(places: scene.visible, cameraCommand: cameraCommand, filters: scene.filters, opening: scene.opening,
       visited: scene.visited, selectedLabelID: selectedLabelID, copy: copy, topControlsHeight: topControlsHeight,
-      bottomControlsHeight: focusedSearch ? 0 : bottomControlsHeight, onArea: { updateDiscoverArea($0); viewport = $1 },
+      bottomControlsHeight: focusedSearch ? 0 : bottomControlsHeight, locateFrame: searching ? nil : locateFrame,
+      onArea: { updateDiscoverArea($0); viewport = $1 },
       onUserMove: cancelCameraRequests, onPick: selectPlace, onCluster: { cluster = $0 })
       .ignoresSafeArea(.container)
       .overlay(alignment: .top) {
@@ -60,6 +62,7 @@ struct SavedPlacesMap: View {
         if !searching {
           roundButton("location", label: copy("map.showMyLocation"), palette: palette) { location.locate() }
             .buttonStyle(HomeChromePressStyle())
+            .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { locateFrame = $0 }
             .padding(.trailing, 20)
             .padding(.bottom, bottomControlsHeight + 8)
         }

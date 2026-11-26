@@ -12,6 +12,7 @@ struct MapCanvas: UIViewControllerRepresentable {
   let copy: Copy
   let topControlsHeight: CGFloat
   let bottomControlsHeight: CGFloat
+  let locateFrame: CGRect?
   let onArea: (DiscoverBox, MapViewport) -> Void
   let onUserMove: () -> Void
   let onPick: (MapPlace) -> Void
@@ -234,6 +235,9 @@ struct MapCanvas: UIViewControllerRepresentable {
       }
       let targets = visible.map { (view: $0, frame: $0.convert($0.pinHitBounds, to: map)) }
       var occupied: [CGRect] = []
+      if let locateFrame = parent.locateFrame, let window = map.window {
+        occupied.append(map.convert(locateFrame, from: window).insetBy(dx: -4, dy: -4))
+      }
       if let location = map.view(for: map.userLocation) {
         occupied.append(location.convert(location.bounds, to: map).insetBy(dx: -2, dy: -2))
       }
