@@ -34,6 +34,7 @@ public struct ShareInboxProcessor {
   public enum Event: Equatable, Sendable {
     case started(Attempt)
     case failed(Attempt, SaveFailure)
+    case saved(count: Int)
   }
 
   public struct Failure: Sendable {
@@ -82,6 +83,7 @@ public struct ShareInboxProcessor {
     try checkpoint()
     if inbox.activeOwner != owner { try updateOwner() }
     try inbox.prune(keeping: owner)
+    var saved = 0
     let refusal = try await inbox.drain(owner: owner) { delivery in
       try checkpoint()
       let attempt = Attempt(delivery)
@@ -90,12 +92,14 @@ public struct ShareInboxProcessor {
         try await send(delivery, owner: owner, source: attempt.source, analyticsSessionID: analyticsSessionID,
           deliverSiri: deliverSiri, checkpoint: checkpoint)
         try checkpoint()
+        if !delivery.siri { saved += 1 }
       } catch {
         try checkpoint()
         observe(.failed(attempt, SaveFailure(error)))
         throw error
       }
     }
+    if refusal == nil, saved > 0 { observe(.saved(count: saved)) }
     return refusal.map {
       if ($0.error as? ShareInboxError) == .longNoteNeedsRecovery {
         return Failure(share: $0.share, copyKey: "share.longNoteRecovery", canRecoverNote: true)

@@ -166,8 +166,10 @@ struct BlankTripView: View {
     request = Task {
       defer { busy = false }
       do {
-        let id = try await backend.createBlankTrip(name: name, countries: countries, city: city, days: dated ? BlankTrip.dayCount(start: start, end: end) : days,
+        let count = dated ? BlankTrip.dayCount(start: start, end: end) : days
+        let id = try await backend.createBlankTrip(name: name, countries: countries, city: city, days: count,
           start: dated ? start : nil, stay: stay, cover: cover?.base64EncodedString())
+        Analytics.capture("trip_blank_created", ["days": count, "dated": dated, "has_stay": stay != nil])
         if !Task.isCancelled, let link = AppLink("/trip-plan/" + id) { created(link) }
       } catch { if !Task.isCancelled { message = copy("tripPlanner.editFailed") } }
     }

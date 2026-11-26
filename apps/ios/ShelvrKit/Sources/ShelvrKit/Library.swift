@@ -6,6 +6,7 @@ import Foundation
 public struct LibrarySave: Decodable, Identifiable, Sendable {
   public let _id: String
   public let _creationTime: Double
+  public let fixtureKey: String?
   public let title: String?
   public let siteName: String?
   public let url: String?

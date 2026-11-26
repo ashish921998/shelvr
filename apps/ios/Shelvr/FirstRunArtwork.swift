@@ -92,6 +92,7 @@ struct LisbonSignInHero: View {
 
 struct OnboardingOpener: View {
   let palette: HomeChromePalette
+  @Binding var viewedPages: Set<Int>
   @Environment(\.copy) private var copy
   @Environment(\.accessibilityReduceMotion) private var reduced
   @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
@@ -168,6 +169,9 @@ struct OnboardingOpener: View {
         }
       }.accessibilityHidden(true)
     }.frame(maxWidth: .infinity)
+    .onChange(of: page, initial: true) { _, page in
+      if viewedPages.insert(page).inserted { Analytics.capture("onboarding_opener_page_viewed", ["page_index": page]) }
+    }
     .task(id: phase == .active && !interacted && !reduced && !voiceOver && !type.isAccessibilitySize) {
       guard phase == .active && !interacted && !reduced && !voiceOver && !type.isAccessibilitySize else { return }
       while !Task.isCancelled {

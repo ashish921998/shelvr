@@ -11,7 +11,7 @@ struct StampPlacesView: View {
   @State private var card: MKMapItem?
   @State private var lookupFailed = false
   @State private var picked: Set<UnstampedPlace.ID> = []
-  @State private var operation = SocialOperation()
+  @State private var operation = SocialOperation(placement: "passport")
 
   var body: some View {
     SocialQuery(query: city == nil ? "placeVisits:listUnstampedPlaces" : "placeVisits:listUnstampedPlacesInCity",

@@ -78,7 +78,7 @@ struct AccountView: View {
     }
     .scrollContentBackground(appearance.hasSuffix("Dark") ? .hidden : .visible)
     .background(appearance == "neutralDark" ? Color(red: 17/255, green: 20/255, blue: 23/255) : Color(.background))
-    .sheet(item: $billing) { BillingSheet(destination: $0) }
+    .sheet(item: $billing) { BillingSheet(destination: $0, placement: plan?.status == "lapsed" ? "profile_lapsed" : "profile") }
     .task {
       do {
         for try await user in backend.query("users:getCurrentUser", as: CurrentUser?.self) { self.user = user; userLoaded = true }

@@ -90,7 +90,9 @@ private final class RecordingPhotoMutations: PhotoMutationClient {
     #expect(attempt.kind == "link" && attempt.source == .shareExtension)
 
     saver.refuseLink = false
-    #expect(try await processor.drain(owner: "first", analyticsSessionID: "fixture") == nil)
+    events = []
+    #expect(try await processor.drain(owner: "first", analyticsSessionID: "fixture", observe: { events.append($0) }) == nil)
+    #expect(events == [.started(attempt), .saved(count: 1)])
     #expect(saver.sentLinks == [link.value])
     #expect(saver.linkSessions == ["fixture"])
     #expect(try inbox.batches().isEmpty)

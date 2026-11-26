@@ -21,6 +21,12 @@ public enum SaveSpotReveal: Equatable, Sendable {
     return (save.cities ?? []).isEmpty || readyFor >= 10 ? .map : .finding
   }
 
+  public static func skipReason(save: LibrarySave?, loaded: Bool, waited: TimeInterval) -> String {
+    guard let save else { return loaded ? "missing" : "timeout" }
+    if save.status == "failed" || save.status == "unavailable" { return "failed" }
+    return save.status == "ready" ? "no_place" : "timeout"
+  }
+
   private static func key(_ value: String) -> String {
     value.split(whereSeparator: \.isWhitespace).joined(separator: " ").lowercased()
   }

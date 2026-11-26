@@ -1,3 +1,4 @@
+import CoreLocation
 import MapKit
 import ShelvrKit
 import SwiftUI
@@ -30,6 +31,7 @@ struct SavedPlacesMap: View {
   @State private var locateFrame: CGRect?
   @State private var searching = false
   @State private var resultsOpen = true
+  @State private var reportedOpen = false
   @FocusState private var focusedSearch: Bool
 
   var body: some View {
@@ -72,6 +74,14 @@ struct SavedPlacesMap: View {
         if let fix = location.latestFix { moveCamera(.locate(fix.coordinate)) }
       }
       .onChange(of: focusedSearch) { _, focused in searchFocusChanged(focused) }
+      .onChange(of: saved != nil && (discoverResponse != nil || errors.contains("discover")), initial: true) { _, settled in
+        guard settled, !reportedOpen, let saved else { return }
+        reportedOpen = true
+        let status = CLLocationManager().authorizationStatus
+        Analytics.capture("map_opened", ["count": saved.count, "discover": discover.count,
+          "located": status == .authorizedWhenInUse || status == .authorizedAlways,
+          "opening": saved.isEmpty ? "default" : "fit"])
+      }
       .onDisappear { searchFocusChanged(false) }
       .alert(copy("common.unavailable"), isPresented: $location.unavailable) {
         Button(copy("common.close")) {}

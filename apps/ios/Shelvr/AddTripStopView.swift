@@ -83,6 +83,7 @@ struct AddTripStopView: View {
         try await Task.sleep(for: .milliseconds(300))
         let match = try await backend.searchTripPlaces(id, query: phrase, locale: copy.locale)
         guard !Task.isCancelled else { return }
+        Analytics.capture("trip_plan_place_searched", ["results": match.places.count, "available": match.available])
         found = match.places
         if found.isEmpty { searchMessage = copy(match.available ? "tripPlanner.searchEmpty" : "tripPlanner.searchUnavailable") }
       } catch { if !Task.isCancelled { searchMessage = copy("tripPlanner.searchUnavailable") } }
@@ -101,6 +102,9 @@ struct AddTripStopView: View {
       defer { busy = false }
       do {
         try await backend.addTripStop(id, day: day, choice: place)
+        let from: String
+        switch place { case .saved: from = "save"; case .search: from = "search" }
+        Analytics.capture("trip_plan_stop_added", ["from": from, "unplanned": day == 0])
         if !Task.isCancelled { dismiss() }
       } catch { if !Task.isCancelled { searchMessage = copy("tripPlanner.addFailed") } }
     }

@@ -64,6 +64,7 @@ struct OnboardingReplay: ViewModifier {
             try Task.checkCancellation()
             guard generation == backend.sessionGeneration else { return }
             let _: String = try await backend.client.mutation("items:createLinkItem", with: args)
+            Analytics.capture("onboarding_demo_submitted")
             saved = true
             break
           }

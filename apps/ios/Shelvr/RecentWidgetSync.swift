@@ -37,7 +37,7 @@ struct RecentWidgetSync: ViewModifier {
         if backend.status == .signedOut {
           owner = nil
           plan = nil
-          publish(nil)
+          if publish(nil) { Analytics.capture("widget_cleared") }
           return
         }
         guard backend.status == .signedIn else { return }
@@ -84,8 +84,10 @@ struct RecentWidgetSync: ViewModifier {
               let host = card.url.flatMap { URL(string: $0)?.host() }
               let type = copy(card.type == "image" ? "item.photo" : card.type == "note" ? "item.note" : "item.link")
               let title = card.title ?? card.note?.components(separatedBy: .newlines).first ?? host ?? type
-              let thumbnail = await SavedThumbnail.load(card.imageUrl ?? card.heroImageUrl, pixels: 512)
+              let imageURL = card.imageUrl ?? card.heroImageUrl
+              let thumbnail = await SavedThumbnail.load(imageURL, pixels: 512)
               try Task.checkCancellation()
+              if imageURL != nil, thumbnail == nil { Analytics.capture("widget_sync_failed", ["reason": "error"]) }
               items.append(.init(id: card._id, title: title, kind: card.type,
                 subtitle: card.siteName ?? host ?? type, thumbnail: thumbnail))
             }
@@ -96,9 +98,10 @@ struct RecentWidgetSync: ViewModifier {
       }
   }
 
-  private func publish(_ snapshot: RecentSavesSnapshot?) {
+  @discardableResult
+  private func publish(_ snapshot: RecentSavesSnapshot?) -> Bool {
     let invalidate = { WidgetCenter.shared.reloadTimelines(ofKind: "RecentSaves") }
-    guard let file = RecentSavesSnapshot.location else { invalidate(); return }
+    guard let file = RecentSavesSnapshot.location else { invalidate(); return false }
     do {
       if let snapshot {
         try JSONEncoder().encode(snapshot).write(to: file, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
@@ -106,6 +109,7 @@ struct RecentWidgetSync: ViewModifier {
       } else {
         try RecentSavesSnapshot.clear(file, invalidate: invalidate)
       }
-    } catch {}
+      return true
+    } catch { return false }
   }
 }

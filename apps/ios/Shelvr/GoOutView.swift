@@ -20,6 +20,7 @@ struct GoOutView: View {
   @State private var current: GoOutPlace?
   @State private var failed = false
   @State private var attempt = 0
+  @State private var opened = false
 
   var body: some View {
     List {
@@ -46,12 +47,15 @@ struct GoOutView: View {
         } else { ProgressView() }
         Button(copy("common.back")) { picking = false }
       } else {
-        Button(copy("homePlaces.planDate")) { plan("/date-plan") }
-        Button(copy("homePlaces.planTrip")) { plan("/new-trip") }
-        Button(copy("goOut.quickPick")) { picking = true }
+        Button(copy("homePlaces.planDate")) { Analytics.capture("city_plan_started", ["kind": "date", "from": "go_out"]); plan("/date-plan") }
+        Button(copy("homePlaces.planTrip")) { Analytics.capture("city_plan_started", ["kind": "trip", "from": "go_out"]); plan("/new-trip") }
+        Button(copy("goOut.quickPick")) { Analytics.capture("go_out_spot_opened"); picking = true }
       }
     }
     .navigationTitle(copy(picking ? "goOut.question" : "plan.goOut"))
+    .task {
+      if !opened { opened = true; Analytics.capture("go_out_opened", ["shared": listID != nil]) }
+    }
     .task(id: attempt) {
       guard listID == nil, !city.isEmpty else { return }
       do {

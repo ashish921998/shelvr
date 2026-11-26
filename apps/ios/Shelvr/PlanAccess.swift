@@ -22,6 +22,9 @@ final class PlanAccess {
         try Task.checkCancellation()
         plan = row
         pro = row.entitled
+        if let event = PaywallFunnel.shared.observe(account: backend.userID, status: row.entitled ? row.status : nil) {
+          Analytics.capture("entitlement_activated", event)
+        }
       }
     } catch { if !Task.isCancelled { failed = true } }
   }
@@ -62,6 +65,6 @@ struct PlanGateView: View {
       if let route = AppLink("/profile") { NavigationLink(copy("navigation.profile"), value: route) }
     }
     .padding(24)
-    .sheet(item: $sheet) { BillingSheet(destination: $0, confirmed: { access.retry += 1 }) }
+    .sheet(item: $sheet) { BillingSheet(destination: $0, placement: "plan_gate", confirmed: { access.retry += 1 }) }
   }
 }

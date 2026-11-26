@@ -15,6 +15,7 @@ struct CityVotesView: View {
   @State private var attempt = 0
   @State private var presenting = false
   @State private var message = ""
+  @State private var seen = false
 
   var body: some View {
     Section {
@@ -80,7 +81,10 @@ struct CityVotesView: View {
     .task(id: attempt) {
       failed = false
       do {
-        for try await votes in backend.cityVotes(city) { self.votes = votes; loaded = true }
+        for try await votes in backend.cityVotes(city) {
+          self.votes = votes; loaded = true
+          if !seen, let votes { seen = true; Analytics.capture("plan_votes_seen", ["voters": votes.voters, "open": votes.isOpen(at: .now)]) }
+        }
       } catch { if !Task.isCancelled { failed = true } }
     }
   }

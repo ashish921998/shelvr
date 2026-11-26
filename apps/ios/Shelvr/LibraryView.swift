@@ -134,7 +134,7 @@ struct LibraryView: View {
 
   @ViewBuilder private func homeSections(_ palette: HomeChromePalette) -> some View {
     if let id = unplacedID, rows.contains(where: { $0.id == id && $0.needsReview }),
-      let destination = AppLink("/item/" + id) {
+      let destination = AppLink("/item/" + id + "?from=home") {
       HStack {
         NavigationLink(value: destination) {
           Label(copy("homePlaces.toastNoPlace"), systemImage: "mappin.slash")
@@ -177,7 +177,7 @@ struct LibraryView: View {
           Text(dayTitle(day)).font(.custom("Satoshi-Bold", size: 13, relativeTo: .footnote))
             .foregroundStyle(palette.muted).accessibilityAddTraits(.isHeader)
           ForEach(saves) { save in
-            if let link = AppLink("/item/" + save.id) {
+            if let link = AppLink("/item/" + save.id + "?from=home") {
               NavigationLink(value: link) {
                 LibrarySaveRow(save: save, featured: true)
                   .padding(10)
@@ -206,7 +206,7 @@ struct LibraryView: View {
       ForEach(LibrarySave.days(visible), id: \.0) { day, saves in
         Section(dayTitle(day)) {
           ForEach(saves) { save in
-            if let link = AppLink("/item/" + save.id) {
+            if let link = AppLink("/item/" + save.id + "?from=home") {
               NavigationLink(value: link) { LibrarySaveRow(save: save) }
             }
           }

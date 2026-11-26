@@ -117,3 +117,21 @@ import Testing
   #expect(!defaults.bool(forKey: "swift.onboarded.new"))
   #expect(defaults.data(forKey: WelcomeHandoff.progressKey("new")) == Data([1]))
 }
+
+@Test func completedPropertiesMatchTheExpoEvent() {
+  var progress = OnboardingProgress()
+  progress.goals = ["food", "travel"]
+  progress.savedCount = "TenToFifty"
+  progress.city = "lisbon"
+  progress.visitedCities = ["paris", "rome"]
+  let properties = progress.completedProperties
+  #expect(properties["goals"] as? [String] == ["travel", "food"])
+  #expect(properties["goal"] as? String == "travel")
+  #expect(properties["saved_count"] as? String == "tenToFifty")
+  #expect(properties["space_names"] as? [String] == ["Travel", "Restaurants to try"])
+  #expect(properties["interests"] as? [String] == ["Travel"])
+  #expect(properties["travel_vibes"] as? [String] == [])
+  #expect(properties["been_count"] as? Int == 2)
+  #expect(properties["sample_city"] as? String == "lisbon")
+  #expect(OnboardingProgress.flowVersion == 27)
+}
