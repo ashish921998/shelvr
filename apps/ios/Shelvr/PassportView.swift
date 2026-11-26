@@ -16,6 +16,7 @@ struct PassportView: View {
   @State private var retry = 0
   @Environment(\.colorScheme) private var scheme
   @AppStorage("swift.appearance") private var appearance = "system"
+  @Environment(\.dynamicTypeSize) private var dynamicType
 
   private static let tilts = [-6.0, 4, -3, 7]
 
@@ -29,76 +30,32 @@ struct PassportView: View {
             PassportCard(section: section)
           } else { Text(copy("passport.nextEmpty", ["city": cardCity])) }
         } else {
-          List {
-            let counts = StampCity.counts(places: stamps, stamps: cities ?? [])
-            HStack {
-              count(stamps.count, "passport.places")
-              count(counts.cities, "passport.cities")
-              if counts.countries > 0 { count(counts.countries, "passport.countries") }
-            }
-            if let cities, !errors.contains("placeVisits:cityCompletion") {
-              PassportBadgeView(cities: cities, completion: completion)
-            }
-            if !pages.standalone.isEmpty {
-              let palette = HomeChromePalette(scheme, appearance: appearance)
-              Section(copy("cityStamps.title")) {
-                Button { showBooklet = true } label: {
-                  LazyVGrid(columns: [GridItem(.adaptive(minimum: 112), spacing: 8)], spacing: 8) {
-                    ForEach(Array(pages.standalone.enumerated()), id: \.element.id) { index, city in
-                      CityStampView(city: city, tilt: .degrees(Self.tilts[index % Self.tilts.count]), palette: palette)
-                    }
-                  }
-                  .frame(maxWidth: .infinity)
-                  .padding(.vertical, 8)
-                  .background { ContourPaper(seed: 7, palette: palette) }
-                }
-                .buttonStyle(.plain)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel(copy("cityStamps.title"))
+          let palette = HomeChromePalette(scheme, appearance: appearance)
+          ScrollView {
+            LazyVStack(alignment: .leading, spacing: 18) {
+              cover(places: stamps.count, StampCity.counts(places: stamps, stamps: cities ?? []), palette: palette)
+              if let cities, !cities.isEmpty { stampsCard(cities, palette: palette) }
+              if let cities, !errors.contains("placeVisits:cityCompletion") {
+                PassportBadgeView(cities: cities, completion: completion).paperCard(palette)
               }
-            }
-            if let already = AppLink("/already-been") {
-              NavigationLink(value: already) { Label(copy("passport.beenSomewhere"), systemImage: "checkmark.seal") }
-            }
-            ForEach(sections) { section in
-              Section {
-                ForEach(section.places) { stamp in
-                  Button { selected = stamp } label: { stampRow(stamp) }.buttonStyle(.plain)
-                }
-                if let city = section.city, let counts = section.completion, counts.stamped < counts.total {
-                  var url: URLComponents {
-                    var parts = URLComponents()
-                    parts.path = "/next-to-stamp"
-                    parts.queryItems = [URLQueryItem(name: "city", value: city)]
-                    return parts
-                  }
-                  if let link = url.string.flatMap({ AppLink($0) }) {
-                    NavigationLink(copy("passport.nextTitle"), value: link)
-                  }
-                }
-                if let city = section.city, !section.places.isEmpty {
-                  NavigationLink {
-                    PassportCard(section: section)
-                  } label: {
-                    Label(copy("passport.shareCity", ["city": city]), systemImage: "square.and.arrow.up")
-                  }
-                }
-              } header: {
-                HStack {
-                  if section.cityStamp != nil { Image(systemName: "seal.fill") }
-                  Text(section.city ?? copy("passport.elsewhere"))
-                  Spacer()
-                  if let row = section.completion {
-                    Text(copy("passport.ringCount", ["visited": String(row.stamped), "total": String(row.total)]))
-                  }
+              if let already = AppLink("/already-been") {
+                NavigationLink(value: already) {
+                  Label(copy("passport.beenSomewhere"), systemImage: "checkmark.seal")
+                    .font(.custom("Satoshi-Bold", size: 16, relativeTo: .headline))
+                    .paperCard(palette)
                 }
               }
+              ForEach(sections) { cityCard($0, palette: palette) }
+              if sections.isEmpty, cities?.isEmpty == true {
+                ContentUnavailableView(copy("passport.beenSomewhere"), systemImage: "book.closed",
+                  description: Text(copy("passport.beenBody")))
+              }
             }
-            if sections.isEmpty, cities?.isEmpty == true {
-              ContentUnavailableView(copy("passport.beenSomewhere"), systemImage: "book.closed",
-                description: Text(copy("passport.beenBody")))
-            }
+            .padding(.horizontal, 20).padding(.vertical, 12)
           }
+          .foregroundStyle(palette.foreground)
+          .background(palette.background.ignoresSafeArea())
+          .buttonStyle(HomeChromePressStyle())
         }
       } else if errors.isEmpty { ProgressView() }
     }
@@ -147,25 +104,129 @@ struct PassportView: View {
     } catch { if !Task.isCancelled { errors.insert(name) } }
   }
 
-  private func count(_ number: Int, _ key: String) -> some View {
-    VStack {
-      Text(number, format: .number).font(.title.bold())
-      Text(copy(key)).font(.caption)
+  private func cover(places: Int, _ counts: (cities: Int, countries: Int), palette: HomeChromePalette) -> some View {
+    HStack(alignment: .top, spacing: 0) {
+      count(places, "passport.places", palette)
+      count(counts.cities, "passport.cities", palette)
+      if counts.countries > 0 { count(counts.countries, "passport.countries", palette) }
+    }
+    .padding(.vertical, 22).padding(.horizontal, 12)
+    .background { ZStack { palette.surface; ContourPaper(seed: 3, palette: palette) } }
+    .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+    .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(palette.border, lineWidth: 0.5) }
+    .accessibilityElement(children: .combine)
+  }
+
+  private func count(_ number: Int, _ key: String, _ palette: HomeChromePalette) -> some View {
+    VStack(spacing: 2) {
+      Text(number, format: .number)
+        .font(.custom("Satoshi-Bold", size: 34, relativeTo: .largeTitle)).foregroundStyle(palette.primaryText)
+      Text(copy(key).uppercased())
+        .font(.custom("Satoshi-Bold", size: 11, relativeTo: .caption2)).tracking(1.5).foregroundStyle(palette.muted)
     }.frame(maxWidth: .infinity)
   }
 
-  private func stampRow(_ stamp: PassportStamp) -> some View {
-    HStack {
+  private func stampsCard(_ cities: [PassportCityStamp], palette: HomeChromePalette) -> some View {
+    let stamped = PassportBooklet.pages(cities: cities).compactMap { page -> StampCity? in
+      if case .city(let city, _) = page { return city }
+      return nil
+    }
+    return Button { showBooklet = true } label: {
+      VStack(alignment: .leading, spacing: 12) {
+        HStack {
+          Text(copy("cityStamps.title")).font(.custom("Satoshi-Bold", size: 20, relativeTo: .title3))
+          Spacer()
+          Image(systemName: "book.pages").foregroundStyle(palette.primaryText)
+        }
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 96), spacing: 8)], spacing: 12) {
+          ForEach(Array(stamped.enumerated()), id: \.element.id) { index, city in
+            CityStampView(city: city, size: 96, tilt: .degrees(Self.tilts[index % Self.tilts.count]), palette: palette)
+          }
+        }
+      }
+      .padding(14).frame(maxWidth: .infinity, alignment: .leading)
+      .background { ZStack { palette.surface; ContourPaper(seed: 7, palette: palette) } }
+      .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+      .overlay { RoundedRectangle(cornerRadius: 20, style: .continuous).strokeBorder(palette.border, lineWidth: 0.5) }
+    }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(copy("cityStamps.title"))
+    .accessibilityAddTraits(.isButton)
+  }
+
+  private func cityCard(_ section: PassportSection, palette: HomeChromePalette) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      HStack(spacing: 12) {
+        if let stamp = section.cityStamp {
+          CityStampView(city: stamp, size: 56, tilt: .degrees(-6), palette: palette).accessibilityHidden(true)
+        }
+        VStack(alignment: .leading, spacing: 2) {
+          Text(section.city ?? copy("passport.elsewhere")).font(.custom("Satoshi-Bold", size: 20, relativeTo: .title3))
+          if let row = section.completion {
+            Text(copy("passport.ringCount", ["visited": String(row.stamped), "total": String(row.total)]))
+              .font(.footnote).monospacedDigit().foregroundStyle(palette.muted)
+          }
+        }
+      }
+      .accessibilityElement(children: .combine).accessibilityAddTraits(.isHeader)
+      ForEach(section.places) { stamp in
+        Button { selected = stamp } label: { stampRow(stamp, palette) }
+      }
+      let layout = dynamicType.isAccessibilitySize
+        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
+      layout {
+        if let city = section.city, let counts = section.completion, counts.stamped < counts.total,
+          let link = nextLink(city) {
+          NavigationLink(value: link) { pill(copy("passport.nextTitle"), "seal", palette) }
+        }
+        if let city = section.city, !section.places.isEmpty {
+          NavigationLink { PassportCard(section: section) } label: {
+            pill(copy("passport.shareCity", ["city": city]), "square.and.arrow.up", palette)
+          }
+        }
+      }
+    }
+    .paperCard(palette)
+  }
+
+  private func nextLink(_ city: String) -> AppLink? {
+    var parts = URLComponents()
+    parts.path = "/next-to-stamp"
+    parts.queryItems = [URLQueryItem(name: "city", value: city)]
+    return parts.string.flatMap { AppLink($0) }
+  }
+
+  private func pill(_ title: String, _ symbol: String, _ palette: HomeChromePalette) -> some View {
+    Label(title, systemImage: symbol)
+      .font(.custom("Satoshi-Bold", size: 14, relativeTo: .subheadline)).foregroundStyle(palette.primaryText)
+      .padding(.horizontal, 12).padding(.vertical, 8).frame(minHeight: 44)
+      .background(palette.background, in: Capsule())
+  }
+
+  private func stampRow(_ stamp: PassportStamp, _ palette: HomeChromePalette) -> some View {
+    HStack(spacing: 12) {
       AsyncImage(url: stamp.cover.flatMap(URL.init(string:))) { image in
         image.resizable().scaledToFill()
       } placeholder: {
-        Image(systemName: "seal").foregroundStyle(.secondary)
-      }.frame(width: 46, height: 46).clipShape(Circle())
-      VStack(alignment: .leading) {
-        Text(stamp.name)
-        if let date = stamp.date { Text(date, style: .date).font(.caption).foregroundStyle(.secondary) }
+        Image(systemName: "seal").foregroundStyle(palette.muted)
+      }.frame(width: 46, height: 46).background(palette.background).clipShape(Circle())
+      VStack(alignment: .leading, spacing: 2) {
+        Text(stamp.name).font(.custom("Satoshi-Regular", size: 16, relativeTo: .body)).multilineTextAlignment(.leading)
+        if let date = stamp.date { Text(date, style: .date).font(.caption).foregroundStyle(palette.muted) }
       }
+      Spacer(minLength: 0)
+      Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(palette.muted)
+        .accessibilityHidden(true)
     }
+    .contentShape(Rectangle())
+  }
+}
+
+private extension View {
+  func paperCard(_ palette: HomeChromePalette) -> some View {
+    padding(14).frame(maxWidth: .infinity, alignment: .leading)
+      .background(palette.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+      .overlay { RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(palette.border, lineWidth: 0.5) }
   }
 }
 

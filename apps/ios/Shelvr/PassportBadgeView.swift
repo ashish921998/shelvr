@@ -15,7 +15,9 @@ struct PassportBadgeView: View {
   @State private var attempt = 0
 
   var body: some View {
-    Section(copy("badges.title")) {
+    VStack(alignment: .leading, spacing: 12) {
+      Text(copy("badges.title")).font(.custom("Satoshi-Bold", size: 20, relativeTo: .title3))
+        .accessibilityAddTraits(.isHeader)
       VStack(alignment: .leading, spacing: 12) {
         if let entitlement {
           if let stamps {
