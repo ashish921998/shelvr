@@ -9,6 +9,7 @@ struct SavedPlacesMap: View {
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.colorScheme) private var scheme
+  @Environment(\.dynamicTypeSize) private var typeSize
   @AppStorage("swift.appearance") private var appearance = "system"
   @State private var saved: [MapPlace]?
   @State private var discoverResponse: AreaResponse?
@@ -200,8 +201,10 @@ struct SavedPlacesMap: View {
   @ViewBuilder
   private func filterStrip(_ scene: MapScene, palette: HomeChromePalette) -> some View {
     let showClear = filters.kinds.count > 1
-    let hasActions = showClear || scene.showsWentSwitch
-    if hasActions || !scene.chips.isEmpty {
+    let scrollClear = showClear && typeSize.isAccessibilitySize
+    let pinClear = showClear && !scrollClear
+    let hasActions = pinClear || scene.showsWentSwitch
+    if showClear || hasActions || !scene.chips.isEmpty {
       HStack(spacing: 5) {
         ScrollView(.horizontal) {
           HStack(spacing: 5) {
@@ -218,6 +221,7 @@ struct SavedPlacesMap: View {
                   palette: palette, color: Color(uiColor: MapPinPalette.color(for: kind)))
               }.accessibilityAddTraits(selected ? .isSelected : [])
             }
+            if scrollClear { clearCategoryButton(palette) }
           }
           .padding(.vertical, 2)
         }
@@ -227,11 +231,7 @@ struct SavedPlacesMap: View {
         .accessibilityLabel(copy("map.filters"))
         if hasActions {
           HStack(spacing: 5) {
-            if showClear {
-              Button(action: clearCategoryFilters) {
-                chipLabel(copy("map.clearCategoryFilters"), symbol: "xmark", selected: false, palette: palette)
-              }
-            }
+            if pinClear { clearCategoryButton(palette) }
             if scene.showsWentSwitch { visitStatusMenu(scene.filters.went, palette: palette) }
           }
           .padding(.trailing, 14)
@@ -319,10 +319,10 @@ struct SavedPlacesMap: View {
   }
 
   private func visitStatusMenu(_ scope: WentFilter, palette: HomeChromePalette) -> some View {
-    let title = switch scope {
-    case .all: copy("map.filterAll")
-    case .want: copy("passport.wantToGo")
-    case .went: copy("passport.wentNoDate")
+    let (title, symbol) = switch scope {
+    case .all: (copy("map.filterAll"), "clock")
+    case .want: (copy("passport.wantToGo"), "bookmark.fill")
+    case .went: (copy("passport.wentNoDate"), "checkmark.circle.fill")
     }
     return Menu {
       Button { setWentFilter(.all) } label: {
@@ -335,7 +335,7 @@ struct SavedPlacesMap: View {
         Label(copy("passport.wentNoDate"), systemImage: scope == .went ? "checkmark" : "checkmark.circle")
       }
     } label: {
-      chipLabel(nil, symbol: "clock", selected: scope != .all, palette: palette, chevron: true)
+      chipLabel(nil, symbol: symbol, selected: scope != .all, palette: palette, chevron: true)
     }
     .accessibilityLabel(copy("map.visitStatus"))
     .accessibilityValue(title)
@@ -345,6 +345,12 @@ struct SavedPlacesMap: View {
     var next = filters
     next.kinds = []
     applyFilters(next)
+  }
+
+  private func clearCategoryButton(_ palette: HomeChromePalette) -> some View {
+    Button(action: clearCategoryFilters) {
+      chipLabel(copy("map.clearCategoryFilters"), symbol: "xmark", selected: false, palette: palette)
+    }
   }
 
   private func setWentFilter(_ value: WentFilter) {
