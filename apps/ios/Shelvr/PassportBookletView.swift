@@ -9,6 +9,7 @@ struct PassportBookletView: View {
   @Environment(\.dismiss) private var dismiss
   @Environment(\.copy) private var copy
   @Environment(\.colorScheme) private var scheme
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @AppStorage("swift.appearance") private var appearance = "system"
 
   init(cities: [PassportCityStamp], counts: (cities: Int, countries: Int)) {
@@ -25,12 +26,13 @@ struct PassportBookletView: View {
         ForEach([6.0, 3.0], id: \.self) { offset in
           page.fill(palette.surface).overlay(page.stroke(palette.border, lineWidth: 1)).offset(x: offset, y: offset)
         }
-        BookletPager(pages: pages, index: $index, copy: copy) { page, position in
+        BookletPager(pages: pages, index: $index, copy: copy, reduceMotion: reduceMotion) { page, position in
           BookletPageView(page: page, position: position, total: pages.count, counts: counts, palette: palette) { step in
             index = min(max(index + step, 0), pages.count - 1)
           }
           .environment(\.copy, copy)
         }
+        .id(reduceMotion)
         .clipShape(page)
         .overlay(page.stroke(palette.border, lineWidth: 1))
       }
@@ -122,12 +124,13 @@ private struct BookletPager<Page: View>: UIViewControllerRepresentable {
   let pages: [PassportBooklet.Page]
   @Binding var index: Int
   let copy: Copy
+  let reduceMotion: Bool
   let page: (PassportBooklet.Page, Int) -> Page
 
   func makeCoordinator() -> Coordinator { Coordinator(self) }
 
   func makeUIViewController(context: Context) -> UIPageViewController {
-    let style: UIPageViewController.TransitionStyle = UIAccessibility.isReduceMotionEnabled ? .scroll : .pageCurl
+    let style: UIPageViewController.TransitionStyle = reduceMotion ? .scroll : .pageCurl
     let controller = UIPageViewController(transitionStyle: style, navigationOrientation: .horizontal)
     controller.dataSource = context.coordinator
     controller.delegate = context.coordinator
@@ -138,7 +141,9 @@ private struct BookletPager<Page: View>: UIViewControllerRepresentable {
       host.view.backgroundColor = .clear
       return host
     }
-    controller.setViewControllers([context.coordinator.controllers[0]], direction: .forward, animated: false)
+    let start = min(max(index, 0), context.coordinator.controllers.count - 1)
+    context.coordinator.current = start
+    controller.setViewControllers([context.coordinator.controllers[start]], direction: .forward, animated: false)
     return controller
   }
 
