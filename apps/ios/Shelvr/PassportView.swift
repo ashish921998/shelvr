@@ -10,6 +10,7 @@ struct PassportView: View {
   @State private var cities: [PassportCityStamp]?
   @State private var completion: [PassportCompletion] = []
   @State private var selected: PassportStamp?
+  @State private var showBooklet = false
   @State private var afterStamp: String?
   @State private var errors = Set<String>()
   @State private var retry = 0
@@ -41,14 +42,19 @@ struct PassportView: View {
             if !pages.standalone.isEmpty {
               let palette = HomeChromePalette(scheme, appearance: appearance)
               Section(copy("cityStamps.title")) {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 112), spacing: 8)], spacing: 8) {
-                  ForEach(Array(pages.standalone.enumerated()), id: \.element.id) { index, city in
-                    CityStampView(city: city, tilt: .degrees(Self.tilts[index % Self.tilts.count]), palette: palette)
+                Button { showBooklet = true } label: {
+                  LazyVGrid(columns: [GridItem(.adaptive(minimum: 112), spacing: 8)], spacing: 8) {
+                    ForEach(Array(pages.standalone.enumerated()), id: \.element.id) { index, city in
+                      CityStampView(city: city, tilt: .degrees(Self.tilts[index % Self.tilts.count]), palette: palette)
+                    }
                   }
+                  .frame(maxWidth: .infinity)
+                  .padding(.vertical, 8)
+                  .background { ContourPaper(seed: 7, palette: palette) }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
-                .background { ContourPaper(seed: 7, palette: palette) }
+                .buttonStyle(.plain)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(copy("cityStamps.title"))
               }
             }
             if let already = AppLink("/already-been") {
@@ -98,6 +104,9 @@ struct PassportView: View {
     }
     .safeAreaInset(edge: .bottom) {
       if !errors.isEmpty { Button(copy("common.retry")) { retry += 1 } }
+    }
+    .fullScreenCover(isPresented: $showBooklet) {
+      PassportBookletView(cities: cities ?? [], counts: StampCity.counts(places: stamps ?? [], stamps: cities ?? []))
     }
     .sheet(item: $selected, onDismiss: {
       if let afterStamp { self.afterStamp = nil; open?(afterStamp) }
