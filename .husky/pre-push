@@ -13,5 +13,5 @@ while read -r _ local_sha remote_ref remote_sha; do
       base=$(git merge-base "$local_sha" refs/remotes/origin/main 2>/dev/null) ||
       base=$(git hash-object -t tree -w /dev/null)
   fi
-  git diff --check --no-ext-diff --no-textconv "$base" "$local_sha" -- >&2 || exit $?
+  GIT_ATTR_SOURCE="$local_sha" git diff --check --no-ext-diff --no-textconv "$base" "$local_sha" -- >&2 || exit $?
 done

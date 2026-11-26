@@ -3,6 +3,7 @@ import {
   chmodSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -78,4 +79,28 @@ test("pre-push checks branch diffs using Git alone", (t) => {
   work.git("push", "--quiet", "origin", "HEAD:refs/heads/above-main");
   work.git("remote", "add", "backup", remote.dir);
   work.git("push", "--quiet", "backup", "HEAD:refs/heads/backup-feature");
+
+  const attributes = readFileSync(new URL("../.gitattributes", import.meta.url), "utf8");
+  work.commit("generated patch and verbatim font license", {
+    ".gitattributes": attributes,
+    "patches/example.patch": "--- a/example.txt\n+++ b/example.txt\n@@ -1,2 +1,2 @@\n \n-old\n+new\n",
+    "apps/web/public/fonts/CrimsonPro-OFL.txt": "Keep the distributed license as written. \n",
+  });
+  const generated = work.git("rev-parse", "HEAD").trim();
+  work.git("checkout", "--quiet", "--detach", upstream);
+  work.git("push", "--quiet", "origin", `${generated}:refs/heads/generated`);
+
+  remote.commit("a remote-only change", { "remote.txt": "remote\n" });
+  remote.git("update-ref", "refs/heads/missing-tip", "HEAD");
+  work.git("push", "--quiet", "--force", "origin", `${generated}:refs/heads/missing-tip`);
+  assert.equal(remote.git("rev-parse", "refs/heads/missing-tip").trim(), generated);
+
+  work.git("checkout", "--quiet", "--detach", generated);
+  work.commit("an actual conflict in a patch", {
+    "patches/example.patch": "<<<<<<< HEAD\npatch\n=======\nother patch\n>>>>>>> branch\n",
+  });
+  assert.throws(
+    () => work.git("push", "--quiet", "origin", "HEAD:refs/heads/conflict"),
+    /leftover conflict marker/,
+  );
 });
