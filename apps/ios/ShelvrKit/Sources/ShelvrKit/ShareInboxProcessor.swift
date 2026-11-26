@@ -84,7 +84,8 @@ public struct ShareInboxProcessor {
     if inbox.activeOwner != owner { try updateOwner() }
     try inbox.prune(keeping: owner)
     var saved = 0
-    let refusal = try await inbox.drain(owner: owner) { delivery in
+    var failed = false
+    let refusal = try await inbox.drain(owner: owner, send: { delivery in
       try checkpoint()
       let attempt = Attempt(delivery)
       observe(.started(attempt))
@@ -96,10 +97,14 @@ public struct ShareInboxProcessor {
       } catch {
         try checkpoint()
         observe(.failed(attempt, SaveFailure(error)))
+        failed = true
         throw error
       }
-    }
-    if refusal == nil, saved > 0 { observe(.saved(count: saved)) }
+    }, batchFinished: {
+      if !failed, saved > 0 { observe(.saved(count: saved)) }
+      saved = 0
+      failed = false
+    })
     return refusal.map {
       if ($0.error as? ShareInboxError) == .longNoteNeedsRecovery {
         return Failure(share: $0.share, copyKey: "share.longNoteRecovery", canRecoverNote: true)

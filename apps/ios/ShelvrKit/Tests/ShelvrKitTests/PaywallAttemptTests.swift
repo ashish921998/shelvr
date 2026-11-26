@@ -98,7 +98,19 @@ import Testing
     funnel.block("passport", now: start)
     #expect(funnel.resume("passport", now: start.addingTimeInterval(30 * 60 + 1)) == nil)
     funnel.block("passport", now: start)
+    #expect(funnel.resume("passport", now: start) == nil)
+    _ = funnel.observe(account: "a", status: "pro", now: start)
+    funnel.block("passport", now: start)
     let unpaid = try #require(funnel.resume("passport", now: start))
     #expect(unpaid["purchased_since_block"] as? Bool == false)
+  }
+
+  @MainActor @Test func resetForgetsTheSignedOutAccount() throws {
+    let funnel = PaywallFunnel()
+    _ = funnel.observe(account: "a", status: "pro", now: start)
+    funnel.reset()
+    #expect(funnel.recordAccess(.purchase, now: start) == nil)
+    let event = try #require(funnel.observe(account: "b", status: "trialing", now: start.addingTimeInterval(2)))
+    #expect(event["delay_ms"] as? Int == 2_000)
   }
 }

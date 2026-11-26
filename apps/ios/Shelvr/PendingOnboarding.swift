@@ -64,7 +64,6 @@ struct OnboardingReplay: ViewModifier {
             try Task.checkCancellation()
             guard generation == backend.sessionGeneration else { return }
             let _: String = try await backend.client.mutation("items:createLinkItem", with: args)
-            Analytics.capture("onboarding_demo_submitted")
             saved = true
             break
           }
@@ -74,6 +73,7 @@ struct OnboardingReplay: ViewModifier {
         guard generation == backend.sessionGeneration, let latest = read(), latest.operation == entry.operation else { return }
         if let pending = latest.remaining(afterStamps: stamps) { try pending.save(account) }
         else { UserDefaults.standard.removeObject(forKey: key) }
+        if !stamps { Analytics.capture("onboarding_demo_submitted") }
         return
       } catch {
         if Task.isCancelled { return }

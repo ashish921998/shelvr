@@ -8,6 +8,7 @@ final class SocialOperation {
   var failed = false
   private(set) var busy = false
   private var resume: (@MainActor () async throws -> Void)?
+  private var resumeCounts = false
 
   init(placement: String = "pro_gate") { self.placement = placement }
 
@@ -18,11 +19,12 @@ final class SocialOperation {
       defer { busy = false }
       do {
         try await action()
-        if !allowPurchase, let event = PaywallFunnel.shared.resume(placement) { Analytics.capture("paywall_blocked_action_resumed", event) }
+        if !allowPurchase, resumeCounts, let event = PaywallFunnel.shared.resume(placement) { Analytics.capture("paywall_blocked_action_resumed", event) }
       } catch {
         if allowPurchase && SaveFailure(error) == .proRequired {
           PaywallFunnel.shared.block(placement)
           resume = action
+          resumeCounts = true
           billing = .paywall
         } else { failed = true }
       }
@@ -30,8 +32,8 @@ final class SocialOperation {
   }
 
   func askToPurchase(then action: (@MainActor () async throws -> Void)? = nil) {
-    PaywallFunnel.shared.block(placement)
     resume = action
+    resumeCounts = false
     billing = .paywall
   }
 

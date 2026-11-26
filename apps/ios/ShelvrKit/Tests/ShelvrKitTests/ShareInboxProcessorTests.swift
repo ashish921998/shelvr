@@ -204,3 +204,18 @@ private func tinyPNG() throws -> Data {
     #expect(try failure.share?.delivery.get().operationID == note.operationID)
   }
 }
+
+@MainActor @Test func eachSavedShareBatchReportsItsOwnCount() async throws {
+  try await withShareInbox { inbox in
+    try inbox.activate("first")
+    let one = try inbox.stage(owner: "first")
+    try inbox.publish([InboxPayload(kind: .link, value: "https://example.com/a"),
+      InboxPayload(kind: .note, value: "note")], in: one)
+    let two = try inbox.stage(owner: "first")
+    try inbox.publish([InboxPayload(kind: .link, value: "https://example.com/b")], in: two)
+    let processor = ShareInboxProcessor(inbox: inbox, saver: RecordingShareSaver())
+    var counts: [Int] = []
+    _ = try await processor.drain(owner: "first", observe: { if case .saved(let count) = $0 { counts.append(count) } })
+    #expect(counts.sorted() == [1, 2])
+  }
+}

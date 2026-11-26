@@ -89,6 +89,8 @@ public final class PaywallFunnel {
     return Self.activation(active, access.source, now.timeIntervalSince(access.at))
   }
 
+  public func reset() { pending = nil; blocked = nil; active = nil; account = nil }
+
   public func block(_ placement: String, now: Date = .now) {
     blocked = (placement, now, false)
   }
@@ -97,7 +99,7 @@ public final class PaywallFunnel {
     guard let entry = blocked, entry.placement == placement else { return nil }
     blocked = nil
     let delay = now.timeIntervalSince(entry.at)
-    guard delay <= 30 * 60 else { return nil }
+    guard delay <= 30 * 60, entry.purchased || active != nil else { return nil }
     return ["placement": placement, "delay_ms": PaywallAttempt.milliseconds(delay), "purchased_since_block": entry.purchased]
   }
 
