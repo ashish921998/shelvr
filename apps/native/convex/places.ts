@@ -353,18 +353,34 @@ export const addByName = internalAction({
 });
 
 export const reindexPage = internalMutation({
-  args: { cursor: v.union(v.string(), v.null()) },
+  args: {
+    cursor: v.union(v.string(), v.null()),
+    status: v.optional(v.union(v.literal("hidden"), v.literal("live"))),
+  },
   returns: v.null(),
   handler: async (ctx, args) => {
-    const { page, isDone, continueCursor } = await ctx.db
-      .query("places")
-      .paginate({ numItems: REINDEX_PAGE, cursor: args.cursor });
-    for (const row of page) await indexPlace(ctx, row);
-    logEvent("info", "places_reindexed", { count: page.length, done: isDone });
-    if (!isDone)
-      await ctx.scheduler.runAfter(0, internal.places.reindexPage, {
-        cursor: continueCursor,
-      });
+    const status = args.status ?? (args.cursor === null ? "hidden" : undefined);
+    const table = ctx.db.query("places");
+    const places = status
+      ? table.withIndex("by_status", (q) => q.eq("status", status))
+      : table;
+    const { page, isDone, continueCursor } = await places.paginate({
+      numItems: REINDEX_PAGE,
+      cursor: args.cursor,
+    });
+    const rows = page.filter((row) => row.status !== "catalog");
+    for (const row of rows) await indexPlace(ctx, row);
+    const next = !isDone
+      ? { cursor: continueCursor, status }
+      : status === "hidden"
+        ? { cursor: null, status: "live" as const }
+        : null;
+    logEvent("info", "places_reindexed", {
+      count: rows.length,
+      done: next === null,
+    });
+    if (next)
+      await ctx.scheduler.runAfter(0, internal.places.reindexPage, next);
     return null;
   },
 });

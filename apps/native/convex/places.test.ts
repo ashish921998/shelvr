@@ -727,6 +727,22 @@ describe("places:store indexing", () => {
 });
 
 describe("places:reindexPage", () => {
+  it("finishes bounded status passes without paging through catalog rows", async () => {
+    vi.useFakeTimers();
+    const { base, user } = await signedIn();
+    await base.mutation(internal.places.storeCatalog, {
+      places: Array.from({ length: 60 }, (_, i) => catalogCafe(`catalog-${i}`)),
+    });
+    await storeAll(base, [venue("Live", LISBON.lat, LISBON.lng)]);
+    await base.mutation(internal.places.reindexPage, { cursor: null });
+    await base.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
+    const reindexJobs = await base.run((ctx) =>
+      ctx.db.system.query("_scheduled_functions").collect(),
+    );
+    expect(reindexJobs).toHaveLength(1);
+    expect(await names(user, LISBON_BOX)).toEqual(["Live"]);
+  });
+
   it("indexes rows stored without it, across pages, and twice changes nothing", async () => {
     vi.useFakeTimers();
     const { base, user } = await signedIn();
