@@ -159,7 +159,7 @@ struct SavedPlacesMap: View {
       }
       .frame(minHeight: 50)
       filterStrip(scene, palette: palette)
-        .padding(.horizontal, -4)
+        .padding(.horizontal, -6)
       roundButton("location", label: copy("map.showMyLocation"), palette: palette) { location.locate() }
         .frame(maxWidth: .infinity, alignment: .trailing)
       retryControl(palette)
@@ -400,7 +400,7 @@ struct SavedPlacesMap: View {
       }
     }
     .foregroundStyle(selected ? palette.background : palette.foreground)
-    .padding(.horizontal, 9).padding(.vertical, 7)
+    .padding(.horizontal, 8).padding(.vertical, 7)
     .background(selected ? palette.foreground : palette.surface, in: Capsule())
     .overlay { Capsule().strokeBorder(selected ? palette.foreground : palette.border, lineWidth: 0.5) }
     .shadow(color: palette.shadow.opacity(0.12), radius: 4, y: 2)
