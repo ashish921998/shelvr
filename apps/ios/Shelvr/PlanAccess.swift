@@ -9,6 +9,7 @@ final class PlanAccess {
   private(set) var receivedAllowance = false
   private(set) var failed = false
   var retry = 0
+  private var account: String?
 
   private(set) var pro = false
   var loading: Bool { failed || plan == nil || (!pro && !receivedAllowance) }
@@ -17,6 +18,7 @@ final class PlanAccess {
 
   func readPlan(_ backend: Backend) async {
     plan = nil; pro = false; receivedAllowance = false; failed = false
+    account = backend.userID
     do {
       for try await row in backend.query("subscriptions:getEntitlement", as: ServerPlan.self) {
         try Task.checkCancellation()
@@ -34,6 +36,9 @@ final class PlanAccess {
     if remaining > 0 { try? await Task.sleep(for: .seconds(remaining)) }
     guard !Task.isCancelled, plan?.expiresAt == milliseconds else { return }
     pro = plan?.entitled ?? false
+    if let event = PaywallFunnel.shared.observe(account: account, status: pro ? plan?.status : nil) {
+      Analytics.capture("entitlement_activated", event)
+    }
   }
 
   func readAllowance(_ backend: Backend) async {

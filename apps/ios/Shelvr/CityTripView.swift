@@ -19,6 +19,7 @@ struct NewCityTripView: View {
   @State private var gate = SocialOperation(placement: "plan_trip")
   @State private var generation: Task<Void, Never>?
   @State private var visible = false
+  @State private var savedCity = false
   private let options = ["food", "coffee", "drinks", "culture", "sights", "outdoors", "shopping"]
 
   var body: some View {
@@ -49,6 +50,7 @@ struct NewCityTripView: View {
       if !message.isEmpty { Text(message) }
     }.socialOperation(gate, failure: copy("errors.tryAgain"), close: copy("common.close"))
       .onAppear { visible = true }
+      .task { do { for try await saves in backend.citySaves(city) { savedCity = !saves.isEmpty } } catch {} }
       .onDisappear {
         visible = false
         generation?.cancel()
@@ -62,8 +64,6 @@ struct NewCityTripView: View {
     busy = true
     defer { busy = false }
     message = ""
-    var savedCity = false
-    do { for try await saves in backend.citySaves(city) { savedCity = !saves.isEmpty; break } } catch {}
     let format = DateFormatter()
     format.locale = Locale(identifier: "en_US_POSIX")
     format.calendar = Calendar(identifier: .gregorian)

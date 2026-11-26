@@ -108,8 +108,7 @@ struct AddListPlaceView: View {
                 Button(place.name) {
                   operation.run {
                     let added = try await backend.addSavedPlace(place, to: detail._id)
-                    Analytics.capture("shared_list_place_added", ["from": "save"])
-                    if added { dismiss() } else { noAddition = true }
+                    if added { Analytics.capture("shared_list_place_added", ["from": "save"]); dismiss() } else { noAddition = true }
                   }
                 }
               }
