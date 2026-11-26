@@ -34,7 +34,7 @@ struct PaywallOffer {
         }
       }
     }
-    if eligibility.useAlternate, let alternate { return Self(offering: alternate, variables: [:], trialEligible: nil) }
+    if eligibility.useAlternate, let alternate { return Self(offering: alternate, variables: [:], trialEligible: trialEligible) }
 
     let locale = Locale(identifier: copy.locale)
     var variables: [String: CustomVariableValue] = [:]
