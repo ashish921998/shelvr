@@ -28,7 +28,7 @@ test("pre-push checks branch diffs using Git alone", (t) => {
   }
   // Husky starts the hook with `sh -e`; so does this stand-in.
   mkdirSync(hooks);
-  writeFileSync(join(hooks, "pre-push"), `#!/bin/sh\nexec sh -e "${HOOK}"\n`);
+  writeFileSync(join(hooks, "pre-push"), `#!/bin/sh\nexec sh -e "${HOOK}" "$@"\n`);
   chmodSync(join(hooks, "pre-push"), 0o755);
 
   const path = process.env.PATH;
@@ -76,4 +76,6 @@ test("pre-push checks branch diffs using Git alone", (t) => {
   work.git("update-ref", "refs/remotes/origin/main", upstream);
   work.commit("clean change above upstream", { "new.txt": "clean\n" });
   work.git("push", "--quiet", "origin", "HEAD:refs/heads/above-main");
+  work.git("remote", "add", "backup", remote.dir);
+  work.git("push", "--quiet", "backup", "HEAD:refs/heads/backup-feature");
 });
