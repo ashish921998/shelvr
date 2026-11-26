@@ -285,7 +285,8 @@ struct SavedPlacesMap: View {
   }
 
   private func searchPanel(_ scene: MapScene, palette: HomeChromePalette) -> some View {
-    VStack(spacing: 8) {
+    let controlHeight = max(44, searchControlHeight)
+    return VStack(spacing: 8) {
       HStack(spacing: 8) {
         HStack(spacing: 8) {
           Image(systemName: "magnifyingglass").accessibilityHidden(true)
@@ -296,7 +297,7 @@ struct SavedPlacesMap: View {
             .onSubmit { focusedSearch = false }
             .onChange(of: focusedSearch) { if focusedSearch { resultsOpen = true } }
         }
-        .padding(.horizontal, 16).frame(minHeight: searchControlHeight)
+        .padding(.horizontal, 16).frame(minHeight: controlHeight)
         .background(palette.surface, in: Capsule())
         .overlay { Capsule().strokeBorder(palette.border, lineWidth: 0.5) }
         Button {
@@ -305,7 +306,7 @@ struct SavedPlacesMap: View {
           updateSearch("")
         } label: {
           Text(copy("common.cancel"))
-            .padding(.horizontal, 12).frame(minHeight: searchControlHeight)
+            .padding(.horizontal, 12).frame(minHeight: controlHeight)
             .background(palette.surface, in: Capsule())
             .overlay { Capsule().strokeBorder(palette.border, lineWidth: 0.5).allowsHitTesting(false) }
             .contentShape(Capsule())
