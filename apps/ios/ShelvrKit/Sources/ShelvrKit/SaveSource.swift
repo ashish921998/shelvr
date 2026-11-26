@@ -7,11 +7,11 @@ public enum SaveSource: String, Sendable {
 
 extension Backend {
   public func saveLink(_ url: String, operationID: String, source: SaveSource, analyticsSessionID: String? = nil,
-    checkpoint: () throws -> Void = { try Task.checkCancellation() }) async throws {
+    checkpoint: () throws -> Void = { try Task.checkCancellation() }) async throws -> String {
     try checkpoint()
     var args = ["url": url, "operationId": operationID, "saveSource": source.rawValue]
     args["analyticsSessionId"] = analyticsSessionID
-    let _: String = try await client.mutation("items:createLinkItem", with: args)
+    return try await client.mutation("items:createLinkItem", with: args)
   }
 
   public func saveNote(_ text: String, operationID: String, checkpoint: () throws -> Void) async throws {

@@ -14,12 +14,13 @@ import Testing
   var refuseLink = false
   var onUpload: (() async -> Void)?
 
-  func saveLink(_ url: String, operationID: String, source: SaveSource, analyticsSessionID: String?, checkpoint: () throws -> Void) throws {
+  func saveLink(_ url: String, operationID: String, source: SaveSource, analyticsSessionID: String?, checkpoint: () throws -> Void) throws -> String {
     try checkpoint()
     if refuseLink { throw ClientError.ConvexError(data: #"{"code":"pro_required"}"#) }
     #expect(source == .shareExtension)
     sentLinks.append(url)
     linkSessions.append(analyticsSessionID)
+    return operationID
   }
 
   func saveNote(_ text: String, operationID: String, checkpoint: () throws -> Void) throws {

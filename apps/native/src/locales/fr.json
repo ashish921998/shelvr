@@ -96,6 +96,8 @@
   "common.back": "Retour",
   "capture.linkPlaceholder": "Collez ou saisissez un lien…",
   "capture.linkHint": "Un reel, un TikTok ou une page qui cite des lieux. Shelvr les range sous leur ville.",
+  "capture.linkSaved": "Lien enregistré. Recherche de lieux…",
+  "capture.viewSave": "Voir le lien enregistré",
   "item.note": "Note",
   "item.article": "Lien",
   "errors.upload": "L'envoi a échoué. Réessayez.",

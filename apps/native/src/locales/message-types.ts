@@ -93,6 +93,8 @@ type MessageParams = {
   "common.back": undefined;
   "capture.linkPlaceholder": undefined;
   "capture.linkHint": undefined;
+  "capture.linkSaved": undefined;
+  "capture.viewSave": undefined;
   "item.note": undefined;
   "item.article": undefined;
   "errors.upload": undefined;

@@ -94,6 +94,8 @@
   "common.back": "戻る",
   "capture.linkPlaceholder": "リンクを貼り付けるか入力…",
   "capture.linkHint": "場所が出てくるリール、TikTok、ページ。Shelvrが都市ごとに整理します。",
+  "capture.linkSaved": "リンクを保存しました。場所を検索中…",
+  "capture.viewSave": "保存した項目を見る",
   "item.note": "メモ",
   "item.article": "リンク",
   "errors.upload": "アップロードに失敗しました。もう一度お試しください。",

@@ -95,6 +95,8 @@
   "common.back": "Zurück",
   "capture.linkPlaceholder": "Link einfügen oder eingeben…",
   "capture.linkHint": "Ein Reel, TikTok oder eine Seite, die Orte nennt. Shelvr ordnet sie ihrer Stadt zu.",
+  "capture.linkSaved": "Link gespeichert. Orte werden gesucht…",
+  "capture.viewSave": "Eintrag ansehen",
   "item.note": "Notiz",
   "item.article": "Link",
   "errors.upload": "Hochladen fehlgeschlagen. Versuche es erneut.",
