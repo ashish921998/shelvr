@@ -193,36 +193,50 @@ struct SavedPlacesMap: View {
       }
       filterStrip(scene, palette: palette)
     }
-    .padding(.bottom, 36)
+    .padding(.bottom, 22)
     .buttonStyle(HomeChromePressStyle())
   }
 
   @ViewBuilder
   private func filterStrip(_ scene: MapScene, palette: HomeChromePalette) -> some View {
-    if scene.showsWentSwitch || !scene.chips.isEmpty {
-      ScrollView(.horizontal) {
-        HStack(spacing: 5) {
-          scopeChip(scene, palette: palette)
-            .padding(.trailing, 3)
-          ForEach(scene.chips, id: \.self) { kind in
-            let selected = filters.kinds.contains(kind)
-            Button {
-              var next = filters
-              if next.kinds.insert(kind).inserted {
-                Analytics.capture("map_filter_selected", ["kind": kind.rawValue])
-              } else { next.kinds.remove(kind) }
-              applyFilters(next)
-            } label: {
-              chipLabel(copy(kind.labelKey), symbol: categorySymbol(kind), selected: selected,
-                palette: palette, color: Color(uiColor: MapPinPalette.color(for: kind)))
-            }.accessibilityAddTraits(selected ? .isSelected : [])
+    let showClear = filters.kinds.count > 1
+    let hasActions = showClear || scene.showsWentSwitch
+    if hasActions || !scene.chips.isEmpty {
+      HStack(spacing: 5) {
+        ScrollView(.horizontal) {
+          HStack(spacing: 5) {
+            ForEach(scene.chips, id: \.self) { kind in
+              let selected = filters.kinds.contains(kind)
+              Button {
+                var next = filters
+                if next.kinds.insert(kind).inserted {
+                  Analytics.capture("map_filter_selected", ["kind": kind.rawValue])
+                } else { next.kinds.remove(kind) }
+                applyFilters(next)
+              } label: {
+                chipLabel(copy(kind.labelKey), symbol: categorySymbol(kind), selected: selected,
+                  palette: palette, color: Color(uiColor: MapPinPalette.color(for: kind)))
+              }.accessibilityAddTraits(selected ? .isSelected : [])
+            }
           }
+          .padding(.vertical, 2)
         }
-        .padding(.vertical, 2)
+        .contentMargins(.leading, 14, for: .scrollContent)
+        .contentMargins(.trailing, hasActions ? 3 : 14, for: .scrollContent)
+        .scrollIndicators(.hidden)
+        .accessibilityLabel(copy("map.filters"))
+        if hasActions {
+          HStack(spacing: 5) {
+            if showClear {
+              Button(action: clearCategoryFilters) {
+                chipLabel(copy("map.clearCategoryFilters"), symbol: "xmark", selected: false, palette: palette)
+              }
+            }
+            if scene.showsWentSwitch { visitStatusMenu(scene.filters.went, palette: palette) }
+          }
+          .padding(.trailing, 14)
+        }
       }
-      .contentMargins(.horizontal, 14, for: .scrollContent)
-      .scrollIndicators(.hidden)
-      .accessibilityLabel(copy("map.filters"))
     }
   }
 
@@ -304,40 +318,31 @@ struct SavedPlacesMap: View {
     }.accessibilityLabel(label)
   }
 
-  @ViewBuilder
-  private func scopeChip(_ scene: MapScene, palette: HomeChromePalette) -> some View {
-    let scope = scene.filters.went
+  private func visitStatusMenu(_ scope: WentFilter, palette: HomeChromePalette) -> some View {
     let title = switch scope {
-    case .all: copy("map.allPlaces")
+    case .all: copy("map.filterAll")
     case .want: copy("passport.wantToGo")
     case .went: copy("passport.wentNoDate")
     }
-    if scene.showsWentSwitch {
-      Menu {
-        Button { setWentFilter(.all) } label: {
-          Label(copy("map.allPlaces"), systemImage: scope == .all ? "checkmark" : "map")
-        }
-        Button { setWentFilter(.want) } label: {
-          Label(copy("passport.wantToGo"), systemImage: scope == .want ? "checkmark" : "bookmark")
-        }
-        Button { setWentFilter(.went) } label: {
-          Label(copy("passport.wentNoDate"), systemImage: scope == .went ? "checkmark" : "checkmark.circle")
-        }
-      } label: {
-        chipLabel(title, symbol: "map", selected: scope != .all, palette: palette, chevron: true)
+    return Menu {
+      Button { setWentFilter(.all) } label: {
+        Label(copy("map.filterAll"), systemImage: scope == .all ? "checkmark" : "map")
       }
-      .accessibilityValue(title)
-    } else {
-      Button { resetMapFilters() } label: {
-        chipLabel(title, symbol: "map", selected: false, palette: palette)
+      Button { setWentFilter(.want) } label: {
+        Label(copy("passport.wantToGo"), systemImage: scope == .want ? "checkmark" : "bookmark")
       }
-      .accessibilityAddTraits(filters.kinds.isEmpty ? .isSelected : [])
+      Button { setWentFilter(.went) } label: {
+        Label(copy("passport.wentNoDate"), systemImage: scope == .went ? "checkmark" : "checkmark.circle")
+      }
+    } label: {
+      chipLabel(nil, symbol: "clock", selected: scope != .all, palette: palette, chevron: true)
     }
+    .accessibilityLabel(copy("map.visitStatus"))
+    .accessibilityValue(title)
   }
 
-  private func resetMapFilters() {
+  private func clearCategoryFilters() {
     var next = filters
-    next.went = .all
     next.kinds = []
     applyFilters(next)
   }
@@ -385,7 +390,7 @@ struct SavedPlacesMap: View {
     moveCamera(.fitFilteredPlaces)
   }
 
-  private func chipLabel(_ title: String, symbol: String, selected: Bool, palette: HomeChromePalette,
+  private func chipLabel(_ title: String?, symbol: String, selected: Bool, palette: HomeChromePalette,
     color: Color? = nil, chevron: Bool = false) -> some View {
     let glyph = color.map { scheme == .dark ? $0.mix(with: palette.foreground, by: 0.55) : $0 }
     return HStack(spacing: 4) {
@@ -394,8 +399,10 @@ struct SavedPlacesMap: View {
         .foregroundStyle(glyph ?? palette.foreground)
         .frame(width: 18)
         .accessibilityHidden(true)
-      Text(title).font(.custom("Satoshi-Bold", size: 13, relativeTo: .footnote))
-        .fixedSize(horizontal: true, vertical: false)
+      if let title {
+        Text(title).font(.custom("Satoshi-Bold", size: 13, relativeTo: .footnote))
+          .fixedSize(horizontal: true, vertical: false)
+      }
       if chevron {
         Image(systemName: "chevron.down")
           .font(.system(size: 8, weight: .bold))
