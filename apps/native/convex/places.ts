@@ -5,6 +5,7 @@ import {
   internalAction,
   internalMutation,
   type MutationCtx,
+  type QueryCtx,
 } from "./_generated/server";
 import { authedQuery } from "./model/auth";
 import {
@@ -95,6 +96,64 @@ const matchingNameRank = (name: string, terms: string[], phrase: string) => {
   return candidate.startsWith(phrase) ? 1 : 2;
 };
 
+type VenueLocation = Pick<Doc<"places">, "city" | "name" | "lat" | "lng">;
+
+const sameNearbyVenue = (a: VenueLocation, b: VenueLocation) =>
+  a.city === b.city &&
+  a.name === b.name &&
+  distanceKm(a, b) <= IDENTITY_DISTANCE_KM;
+
+const unlinkedAppleVenue = (row: Doc<"places">) =>
+  row.status === "live" && row.appleId && !row.overtureId;
+
+const unlinkedOvertureVenue = (row: Doc<"places">) =>
+  row.status === "catalog" &&
+  row.source === "overture" &&
+  row.overtureId &&
+  !row.appleId;
+
+function soleNearbyPeer(row: Doc<"places">, peers: Doc<"places">[]) {
+  const nearby = peers.filter(
+    (peer) => peer._id !== row._id && sameNearbyVenue(peer, row),
+  );
+  return nearby.length === 1 ? nearby[0] : null;
+}
+
+async function deduplicateCatalogResults(ctx: QueryCtx, rows: Doc<"places">[]) {
+  const candidates = rows.slice(0, MAX_CATALOG_RESULTS * 2);
+  const buckets = new Map<string, Doc<"places">[]>();
+  for (const row of candidates) {
+    const key = JSON.stringify([row.city, row.name]);
+    const group = buckets.get(key) ?? [];
+    group.push(row);
+    buckets.set(key, group);
+  }
+
+  const duplicates = new Set<string>();
+  for (const group of buckets.values()) {
+    const apple = group.filter(unlinkedAppleVenue);
+    const overture = group.filter(unlinkedOvertureVenue);
+    if (!apple.length || !overture.length) continue;
+    const { city, name } = group[0];
+    const peers = await ctx.db
+      .query("places")
+      .withIndex("by_city_and_name", (q) => q.eq("city", city).eq("name", name))
+      .take(MAX_IDENTITY_CANDIDATES + 1);
+    if (peers.length > MAX_IDENTITY_CANDIDATES) continue;
+    for (const open of overture) {
+      const match = soleNearbyPeer(open, peers);
+      if (
+        match &&
+        apple.some((candidate) => candidate._id === match._id) &&
+        soleNearbyPeer(match, peers)?._id === open._id
+      ) {
+        duplicates.add(open._id);
+      }
+    }
+  }
+  return candidates.filter((row) => !duplicates.has(row._id));
+}
+
 export const searchCatalog = authedQuery({
   args: { text: v.string() },
   returns: v.array(catalogPlaceValidator),
@@ -116,19 +175,20 @@ export const searchCatalog = authedQuery({
           .take(MAX_CATALOG_CANDIDATES),
       ),
     );
-    return groups
+    const ranked = groups
       .flat()
       .flatMap((row) => {
         const rank = matchingNameRank(row.name, terms, phrase);
         return rank === null ? [] : [{ row, rank }];
       })
       .sort((a, b) => a.rank - b.rank)
-      .slice(0, MAX_CATALOG_RESULTS)
-      .map(({ row }) => ({
-        ...placeCard(row),
-        ...(row.appleId ? { appleId: row.appleId } : {}),
-        ...(row.source ? { source: row.source } : {}),
-      }));
+      .map(({ row }) => row);
+    const matched = await deduplicateCatalogResults(ctx, ranked);
+    return matched.slice(0, MAX_CATALOG_RESULTS).map((row) => ({
+      ...placeCard(row),
+      ...(row.appleId ? { appleId: row.appleId } : {}),
+      ...(row.source ? { source: row.source } : {}),
+    }));
   },
 });
 
@@ -167,68 +227,6 @@ const catalogImportValidator = v.object({
 });
 
 type CatalogImport = Infer<typeof catalogImportValidator>;
-type VenueLocation = Pick<Doc<"places">, "city" | "name" | "lat" | "lng">;
-type CatalogFacts = Omit<CatalogImport, "appleId" | "overtureId">;
-
-const sameNearbyVenue = (a: VenueLocation, b: VenueLocation) =>
-  a.city === b.city &&
-  a.name === b.name &&
-  distanceKm(a, b) <= IDENTITY_DISTANCE_KM;
-
-const venueBucket = ({ city, name }: VenueLocation) =>
-  JSON.stringify([city, name]);
-
-function uniqueInBatch<T extends VenueLocation>(
-  places: T[],
-  providerId: (place: T) => string,
-) {
-  const buckets = new Map<string, T[]>();
-  for (const place of places) {
-    const key = venueBucket(place);
-    const bucket = buckets.get(key) ?? [];
-    if (bucket.length <= MAX_IDENTITY_CANDIDATES) bucket.push(place);
-    buckets.set(key, bucket);
-  }
-  return (place: T, matched: VenueLocation) => {
-    const bucket = buckets.get(venueBucket(place)) ?? [];
-    return (
-      bucket.length <= MAX_IDENTITY_CANDIDATES &&
-      !bucket.some(
-        (candidate) =>
-          providerId(candidate) !== providerId(place) &&
-          sameNearbyVenue(candidate, matched),
-      )
-    );
-  };
-}
-
-async function uniqueNearbyVenue(ctx: MutationCtx, place: VenueLocation) {
-  const candidates = await ctx.db
-    .query("places")
-    .withIndex("by_city_and_name", (q) =>
-      q.eq("city", place.city).eq("name", place.name),
-    )
-    .take(MAX_IDENTITY_CANDIDATES + 1);
-  if (candidates.length > MAX_IDENTITY_CANDIDATES) return null;
-  const nearby = candidates.filter((candidate) =>
-    sameNearbyVenue(candidate, place),
-  );
-  return nearby.length === 1 ? nearby[0] : null;
-}
-
-async function findUnlinkedCuratedVenue(
-  ctx: MutationCtx,
-  place: CatalogImport,
-  mayInfer: (place: CatalogImport, matched: VenueLocation) => boolean,
-) {
-  const nearby = await uniqueNearbyVenue(ctx, place);
-  return nearby?.appleId &&
-    nearby.status !== "catalog" &&
-    !nearby.overtureId &&
-    mayInfer(place, nearby)
-    ? nearby
-    : null;
-}
 
 function validateCatalogImport(place: CatalogImport) {
   const bounds = [
@@ -270,149 +268,20 @@ async function reconcileVerifiedPair(
   await ctx.db.delete(catalog._id);
 }
 
-function catalogFacts({ name, city, lat, lng, kind }: CatalogFacts) {
-  return { name, city, lat, lng, kind };
-}
-
-function catalogFactsChanged(
-  a: Omit<CatalogFacts, "kind"> & { kind?: CatalogFacts["kind"] },
-  b: CatalogFacts,
-) {
-  return (
-    a.name !== b.name ||
-    a.city !== b.city ||
-    a.lat !== b.lat ||
-    a.lng !== b.lng ||
-    a.kind !== b.kind
-  );
-}
-
-async function restoreInferredVenue(ctx: MutationCtx, row: Doc<"places">) {
-  const alias = row.inferredAlias;
-  if (alias?.provider === "overture" && row.overtureId) {
-    await ctx.db.insert("places", {
-      ...catalogFacts(alias),
-      overtureId: row.overtureId,
-      source: "overture",
-      status: "catalog",
-      addedAt: row.addedAt,
-    });
-    await ctx.db.patch(row._id, {
-      overtureId: undefined,
-      inferredAlias: undefined,
-    });
-    return;
-  }
-  if (alias?.provider === "apple" && row.appleId) {
-    const curated = {
-      name: row.name,
-      city: row.city,
-      lat: alias.lat,
-      lng: alias.lng,
-      appleId: row.appleId,
-      category: alias.category,
-      kind: row.kind,
-      cuisine: row.cuisine,
-      features: row.features,
-      sources: row.sources,
-      status: row.status === "hidden" ? ("hidden" as const) : ("live" as const),
-      addedAt: row.addedAt,
-    };
-    const status = row.status === "hidden" ? "hidden" : alias.catalogStatus;
-    await ctx.db.patch(row._id, {
-      status,
-      appleId: undefined,
-      kind: alias.catalogKind,
-      cuisine: undefined,
-      features: undefined,
-      sources: undefined,
-      inferredAlias: undefined,
-    });
-    await indexPlace(ctx, { ...row, status });
-    const _id = await ctx.db.insert("places", curated);
-    await indexPlace(ctx, { ...curated, _id });
-    return;
-  }
-  throw new Error("Invalid inferred place alias");
-}
-
-function lookupProviderPair(
-  ctx: MutationCtx,
-  overtureId: string,
-  appleId: string | undefined,
-) {
-  return Promise.all([
-    ctx.db
-      .query("places")
-      .withIndex("by_overture_id", (q) => q.eq("overtureId", overtureId))
-      .unique(),
-    appleId === undefined
-      ? null
-      : ctx.db
-          .query("places")
-          .withIndex("by_apple_id", (q) => q.eq("appleId", appleId))
-          .unique(),
-  ] as const);
-}
-
-async function resolveProviderPair(
-  ctx: MutationCtx,
-  { overtureId, appleId }: CatalogImport,
-) {
-  const pair = await lookupProviderPair(ctx, overtureId, appleId);
-  if (!appleId) return pair;
-  const [byOverture, byApple] = pair;
-  const restoreOverture =
-    byOverture?.inferredAlias && byOverture.appleId !== appleId;
-  const restoreApple =
-    byApple?.inferredAlias && byApple.overtureId !== overtureId;
-  if (restoreOverture) await restoreInferredVenue(ctx, byOverture);
-  if (restoreApple) await restoreInferredVenue(ctx, byApple);
-  return restoreOverture || restoreApple
-    ? await lookupProviderPair(ctx, overtureId, appleId)
-    : pair;
-}
-
-async function applyCatalogImport(
-  ctx: MutationCtx,
-  row: Doc<"places">,
-  place: CatalogImport,
-) {
-  const { overtureId, appleId } = place;
-  const refresh = row.status === "catalog" && catalogFactsChanged(row, place);
-  const alias = row.inferredAlias;
-  const saveAlias =
-    !appleId &&
-    (!row.overtureId ||
-      (alias?.provider === "overture" && catalogFactsChanged(alias, place)));
-  const confirmAlias = Boolean(appleId && alias);
-  if (
-    refresh ||
-    saveAlias ||
-    confirmAlias ||
-    !row.overtureId ||
-    (!row.appleId && appleId)
-  ) {
-    await ctx.db.patch(row._id, {
-      overtureId,
-      ...(appleId ? { appleId } : {}),
-      ...(refresh ? catalogFacts(place) : {}),
-      ...(saveAlias
-        ? { inferredAlias: { provider: "overture", ...catalogFacts(place) } }
-        : {}),
-      ...(confirmAlias ? { inferredAlias: undefined } : {}),
-    });
-  }
-}
-
-async function storeCatalogPlace(
-  ctx: MutationCtx,
-  place: CatalogImport,
-  mayInfer: (place: CatalogImport, matched: VenueLocation) => boolean,
-) {
+async function storeCatalogPlace(ctx: MutationCtx, place: CatalogImport) {
   validateCatalogImport(place);
   const { overtureId, appleId } = place;
-  const [byOverture, byApple] = await resolveProviderPair(ctx, place);
+  const byOverture = await ctx.db
+    .query("places")
+    .withIndex("by_overture_id", (q) => q.eq("overtureId", overtureId))
+    .unique();
+  const byApple =
+    appleId === undefined
+      ? null
+      : await ctx.db
+          .query("places")
+          .withIndex("by_apple_id", (q) => q.eq("appleId", appleId))
+          .unique();
 
   if (byApple && byOverture && byApple._id !== byOverture._id) {
     await reconcileVerifiedPair(ctx, byApple, byOverture, overtureId);
@@ -424,10 +293,7 @@ async function storeCatalogPlace(
   ) {
     throw new Error("Conflicting catalog place identifiers");
   }
-  const row =
-    byOverture ??
-    byApple ??
-    (!appleId ? await findUnlinkedCuratedVenue(ctx, place, mayInfer) : null);
+  const row = byOverture ?? byApple;
   if (!row) {
     await ctx.db.insert("places", {
       ...place,
@@ -437,7 +303,21 @@ async function storeCatalogPlace(
     });
     return true;
   }
-  await applyCatalogImport(ctx, row, place);
+  const { name, city, lat, lng, kind } = place;
+  const refresh =
+    row.status === "catalog" &&
+    (row.name !== name ||
+      row.city !== city ||
+      row.lat !== lat ||
+      row.lng !== lng ||
+      row.kind !== kind);
+  if (refresh || !row.overtureId || (!row.appleId && appleId)) {
+    await ctx.db.patch(row._id, {
+      overtureId,
+      ...(appleId ? { appleId } : {}),
+      ...(refresh ? { name, city, lat, lng, kind } : {}),
+    });
+  }
   return false;
 }
 
@@ -447,10 +327,9 @@ export const storeCatalog = internalMutation({
   handler: async (ctx, { places }) => {
     if (places.length > MAX_CATALOG_IMPORT)
       throw new Error("Catalog batch is too large");
-    const mayInfer = uniqueInBatch(places, (place) => place.overtureId);
     let added = 0;
     for (const place of places)
-      if (await storeCatalogPlace(ctx, place, mayInfer)) added++;
+      if (await storeCatalogPlace(ctx, place)) added++;
     return { added, existing: places.length - added };
   },
 });
@@ -463,27 +342,13 @@ export const store = internalMutation({
   },
   returns: v.object({ added: v.number(), existing: v.number() }),
   handler: async (ctx, args) => {
-    const places = args.places.map((place) => ({ ...place, city: args.city }));
-    const mayInfer = uniqueInBatch(places, (place) => place.appleId);
     let added = 0;
     let existing = 0;
-    for (const place of places) {
-      let row = await ctx.db
+    for (const place of args.places) {
+      const row = await ctx.db
         .query("places")
         .withIndex("by_apple_id", (q) => q.eq("appleId", place.appleId))
         .first();
-      if (!row) {
-        const nearby = await uniqueNearbyVenue(ctx, place);
-        if (
-          nearby?.overtureId &&
-          nearby.status !== "live" &&
-          nearby.source === "overture" &&
-          !nearby.appleId &&
-          mayInfer(place, nearby)
-        ) {
-          row = nearby;
-        }
-      }
       if (row === null) {
         const fresh = {
           name: place.name,
@@ -502,17 +367,6 @@ export const store = internalMutation({
         continue;
       }
       existing++;
-      const inferredAlias =
-        !row.appleId && row.status !== "live"
-          ? {
-              provider: "apple" as const,
-              lat: place.lat,
-              lng: place.lng,
-              ...(place.category ? { category: place.category } : {}),
-              ...(row.kind ? { catalogKind: row.kind } : {}),
-              catalogStatus: row.status,
-            }
-          : undefined;
       const sources = row.sources ?? [];
       const source =
         args.source &&
@@ -525,15 +379,10 @@ export const store = internalMutation({
           status: "live",
           appleId: place.appleId,
           ...(source ? { sources: source } : {}),
-          ...(inferredAlias ? { inferredAlias } : {}),
         });
         await indexPlace(ctx, { ...row, status: "live" });
-      } else if (source || !row.appleId) {
-        await ctx.db.patch(row._id, {
-          ...(source ? { sources: source } : {}),
-          appleId: place.appleId,
-          ...(inferredAlias ? { inferredAlias } : {}),
-        });
+      } else if (source) {
+        await ctx.db.patch(row._id, { sources: source });
       }
     }
     return { added, existing };
