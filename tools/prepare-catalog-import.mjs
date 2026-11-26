@@ -41,7 +41,13 @@ function publicVenue(feature, city) {
   const { id, geometry, properties } = feature;
   if (geometry?.type !== "Point" || !Array.isArray(geometry.coordinates))
     return null;
-  if (typeof id !== "string" || id.length === 0 || id.length > 128) return null;
+  if (
+    typeof id !== "string" ||
+    id.length === 0 ||
+    id.length > 128 ||
+    id !== id.trim()
+  )
+    return null;
   if (
     properties?.operating_status !== "open" ||
     !Number.isFinite(properties.confidence) ||

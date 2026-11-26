@@ -33,6 +33,8 @@ test("catalog import keeps only indexed fields for eligible public venues", () =
     feature("closed", { operating_status: "permanently_closed" }),
     feature("wrong-city", { addresses: [{ locality: "Oakland" }] }),
     feature("unlicensed", { sources: [{ license: "unknown" }] }),
+    feature(" "),
+    feature(" padded"),
     feature("private-category", { taxonomy: { hierarchy: ["residential"] } }),
     feature("low-confidence", { confidence: 0.5 }),
     null,
