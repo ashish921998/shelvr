@@ -313,8 +313,8 @@ struct SavedPlacesMap: View {
     }
     if scene.showsWentSwitch {
       Menu {
-        Button { resetMapFilters() } label: {
-          Label(copy("map.allPlaces"), systemImage: scope == .all && filters.kinds.isEmpty ? "checkmark" : "map")
+        Button { setWentFilter(.all) } label: {
+          Label(copy("map.allPlaces"), systemImage: scope == .all ? "checkmark" : "map")
         }
         Button { setWentFilter(.want) } label: {
           Label(copy("passport.wantToGo"), systemImage: scope == .want ? "checkmark" : "bookmark")
