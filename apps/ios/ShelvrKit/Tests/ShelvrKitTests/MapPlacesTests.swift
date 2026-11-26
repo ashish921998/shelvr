@@ -30,6 +30,8 @@ import Testing
   }
   let scene = MapScene(saved: places, discover: [], visits: [], filters: .init())
   #expect(scene.chips == [.food, .coffee, .activities, .drinks, .dessert, .shopping])
+  let searched = MapScene(saved: places, discover: [], visits: [], filters: .init(search: "shopping"))
+  #expect(searched.chips == [.shopping])
 
   let sparse = places.filter { $0.kinds == [.shopping] }
   let selected = MapScene(saved: sparse, discover: [], visits: [], filters: .init(kinds: [.dessert]))
@@ -97,6 +99,7 @@ import Testing
   let went = MapScene(saved: saved, discover: discover, visits: visits, filters: .init(went: .went))
   #expect(went.showsWentSwitch && went.filters.went == .went)
   #expect(went.visible == [saved[0]] && went.opening == [saved[0]])
+  #expect(went.chips == [.food])
 
   let want = MapScene(saved: saved, discover: discover, visits: visits, filters: .init(went: .want))
   #expect(want.visible == [saved[1]])

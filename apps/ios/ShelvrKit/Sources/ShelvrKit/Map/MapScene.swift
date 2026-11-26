@@ -35,16 +35,18 @@ public struct MapScene {
     if visited.isEmpty { effective.went = .all }
 
     let entries = MapPlace.combined(saved: own, discover: effective.went == .all ? discover : [])
-    let matches = entries.filter { place in
-      (effective.went == .all || visited.contains(place.id) == (effective.went == .went)) &&
-        (effective.kinds.isEmpty || !effective.kinds.isDisjoint(with: place.kinds))
+    let scoped = entries.filter { place in
+      effective.went == .all || visited.contains(place.id) == (effective.went == .went)
     }
-    let visible = MapPlace.search(matches, query: effective.search)
+    let matches = MapPlace.search(scoped, query: effective.search)
+    let visible = matches.filter { place in
+      effective.kinds.isEmpty || !effective.kinds.isDisjoint(with: place.kinds)
+    }
 
     self.filters = effective
     self.visited = visited
     self.visible = visible
-    self.chips = Self.filterKinds(entries, selected: effective.kinds)
+    self.chips = Self.filterKinds(matches, selected: effective.kinds)
     self.opening = saved.flatMap { saved in
       if effective.isActive { return visible.isEmpty ? nil : visible }
       return Self.busiestCity(in: saved.isEmpty ? discover : saved)
