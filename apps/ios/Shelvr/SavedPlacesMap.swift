@@ -410,7 +410,7 @@ struct SavedPlacesMap: View {
       if selected { Capsule().fill(Color("AccentColor").opacity(0.24)) }
     }
     .overlay {
-      Capsule().strokeBorder(selected ? palette.primaryText.opacity(0.55) : palette.border,
+      Capsule().strokeBorder(selected ? palette.primaryText : palette.border,
         lineWidth: selected ? 1.25 : 0.5)
     }
     .shadow(color: palette.shadow.opacity(0.14), radius: 3, y: 2)
