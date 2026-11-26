@@ -24,6 +24,7 @@ import {
   type StoredPlace,
 } from "./model/placeImport";
 import { placeKinds } from "./model/placeKinds";
+import { distanceKm } from "./model/trip";
 
 const MAX_SOURCES = 3;
 const MAX_NAMES = 100;
@@ -31,6 +32,8 @@ const REINDEX_PAGE = 50;
 const MAX_CATALOG_IMPORT = 100;
 const MAX_CATALOG_RESULTS = 20;
 const MAX_CATALOG_CANDIDATES = 80;
+const MAX_IDENTITY_CANDIDATES = 16;
+const IDENTITY_DISTANCE_KM = 0.02;
 const MAX_SEARCH_LENGTH = 160;
 const MAX_SEARCH_TERMS = 16;
 
@@ -164,6 +167,36 @@ const catalogImportValidator = v.object({
 });
 
 type CatalogImport = Infer<typeof catalogImportValidator>;
+type VenueLocation = Pick<Doc<"places">, "city" | "name" | "lat" | "lng">;
+
+const sameNearbyVenue = (a: VenueLocation, b: VenueLocation) =>
+  a.city === b.city &&
+  a.name === b.name &&
+  distanceKm(a, b) <= IDENTITY_DISTANCE_KM;
+
+async function uniqueNearbyVenue(ctx: MutationCtx, place: VenueLocation) {
+  const candidates = await ctx.db
+    .query("places")
+    .withIndex("by_city_and_name", (q) =>
+      q.eq("city", place.city).eq("name", place.name),
+    )
+    .take(MAX_IDENTITY_CANDIDATES + 1);
+  if (candidates.length > MAX_IDENTITY_CANDIDATES) return null;
+  const nearby = candidates.filter((candidate) =>
+    sameNearbyVenue(candidate, place),
+  );
+  return nearby.length === 1 ? nearby[0] : null;
+}
+
+async function findUnlinkedCuratedVenue(
+  ctx: MutationCtx,
+  place: VenueLocation,
+) {
+  const nearby = await uniqueNearbyVenue(ctx, place);
+  return nearby?.appleId && nearby.status !== "catalog" && !nearby.overtureId
+    ? nearby
+    : null;
+}
 
 function validateCatalogImport(place: CatalogImport) {
   const bounds = [
@@ -185,6 +218,26 @@ function validateCatalogImport(place: CatalogImport) {
   }
 }
 
+async function reconcileVerifiedPair(
+  ctx: MutationCtx,
+  curated: Doc<"places">,
+  catalog: Doc<"places">,
+  overtureId: string,
+) {
+  if (
+    curated.status === "catalog" ||
+    curated.overtureId ||
+    catalog.status !== "catalog" ||
+    catalog.source !== "overture" ||
+    catalog.appleId ||
+    !sameNearbyVenue(curated, catalog)
+  ) {
+    throw new Error("Conflicting catalog place identifiers");
+  }
+  await ctx.db.patch(curated._id, { overtureId });
+  await ctx.db.delete(catalog._id);
+}
+
 async function storeCatalogPlace(ctx: MutationCtx, place: CatalogImport) {
   validateCatalogImport(place);
   const { overtureId, appleId } = place;
@@ -200,14 +253,20 @@ async function storeCatalogPlace(ctx: MutationCtx, place: CatalogImport) {
           .withIndex("by_apple_id", (q) => q.eq("appleId", appleId))
           .unique();
 
+  if (byApple && byOverture && byApple._id !== byOverture._id) {
+    await reconcileVerifiedPair(ctx, byApple, byOverture, overtureId);
+    return false;
+  }
   if (
-    (byApple && byOverture && byApple._id !== byOverture._id) ||
     (byApple?.overtureId && byApple.overtureId !== overtureId) ||
     (appleId && byOverture?.appleId && byOverture.appleId !== appleId)
   ) {
     throw new Error("Conflicting catalog place identifiers");
   }
-  const row = byOverture ?? byApple;
+  const row =
+    byOverture ??
+    byApple ??
+    (appleId ? null : await findUnlinkedCuratedVenue(ctx, place));
   if (!row) {
     await ctx.db.insert("places", {
       ...place,
@@ -259,10 +318,24 @@ export const store = internalMutation({
     let added = 0;
     let existing = 0;
     for (const place of args.places) {
-      const row = await ctx.db
+      let row = await ctx.db
         .query("places")
         .withIndex("by_apple_id", (q) => q.eq("appleId", place.appleId))
         .first();
+      if (!row) {
+        const nearby = await uniqueNearbyVenue(ctx, {
+          ...place,
+          city: args.city,
+        });
+        if (
+          nearby?.overtureId &&
+          nearby.status !== "live" &&
+          nearby.source === "overture" &&
+          !nearby.appleId
+        ) {
+          row = nearby;
+        }
+      }
       if (row === null) {
         const fresh = {
           name: place.name,
@@ -295,8 +368,11 @@ export const store = internalMutation({
           ...(source ? { sources: source } : {}),
         });
         await indexPlace(ctx, { ...row, status: "live" });
-      } else if (source) {
-        await ctx.db.patch(row._id, { sources: source });
+      } else if (source || !row.appleId) {
+        await ctx.db.patch(row._id, {
+          ...(source ? { sources: source } : {}),
+          appleId: place.appleId,
+        });
       }
     }
     return { added, existing };

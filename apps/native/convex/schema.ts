@@ -118,6 +118,7 @@ export default defineSchema({
     .index("by_status", ["status"])
     .index("by_apple_id", ["appleId"])
     .index("by_overture_id", ["overtureId"])
+    .index("by_city_and_name", ["city", "name"])
     .searchIndex("search_name", {
       searchField: "name",
       filterFields: ["status"],

@@ -312,6 +312,119 @@ describe("places:searchCatalog", () => {
 });
 
 describe("places:storeCatalog", () => {
+  it("links a nearby exact venue to the curated row without an Apple ID in the import", async () => {
+    const { base, user } = await signedIn();
+    const imported = catalogCafe("overture-a");
+    await base.mutation(internal.places.store, {
+      city: imported.city,
+      places: [
+        {
+          ...cafe("curated", imported.name),
+          lat: imported.lat + 0.00005,
+          lng: imported.lng,
+          category: "Cafe",
+        },
+      ],
+    });
+    const [curated] = await rows(base);
+    await expect(
+      base.mutation(internal.places.storeCatalog, { places: [imported] }),
+    ).resolves.toEqual({ added: 0, existing: 1 });
+    expect(await rows(base)).toEqual([
+      { ...curated, overtureId: imported.overtureId },
+    ]);
+    expect(
+      await user.query(api.places.searchCatalog, { text: "Juniper" }),
+    ).toMatchObject([{ _id: curated._id, appleId: "curated" }]);
+    expect(await names(user, LISBON_BOX)).toEqual([imported.name]);
+  });
+
+  it("promotes a unique Overture venue when it is later curated", async () => {
+    const { base, user } = await signedIn();
+    const imported = catalogCafe("overture-a");
+    await base.mutation(internal.places.storeCatalog, { places: [imported] });
+    const [catalog] = await rows(base);
+    expect(await names(user, LISBON_BOX)).toEqual([]);
+    await expect(
+      base.mutation(internal.places.store, {
+        city: imported.city,
+        places: [
+          {
+            ...cafe("curated", imported.name),
+            lat: imported.lat + 0.00005,
+            lng: imported.lng,
+            category: "Restaurant",
+          },
+        ],
+      }),
+    ).resolves.toEqual({ added: 0, existing: 1 });
+    expect(await rows(base)).toEqual([
+      { ...catalog, appleId: "curated", status: "live" },
+    ]);
+    const { places } = await user.query(api.places.inArea, { box: LISBON_BOX });
+    expect(places).toMatchObject([
+      { _id: catalog._id, ...LISBON, appleId: "curated", kinds: ["coffee"] },
+    ]);
+  });
+
+  it("preserves distinct and ambiguous venues", async () => {
+    const base = newConvexTest();
+    const imported = catalogCafe("overture-a");
+    await base.mutation(internal.places.store, {
+      city: imported.city,
+      places: [
+        { ...cafe("branch-1", imported.name), ...LISBON },
+        { ...cafe("branch-2", imported.name), ...LISBON },
+      ],
+    });
+    const separate = catalogCafe("overture-b", "Juniper");
+    await expect(
+      base.mutation(internal.places.storeCatalog, {
+        places: [imported, separate],
+      }),
+    ).resolves.toEqual({ added: 2, existing: 0 });
+    expect((await rows(base)).map((row) => row.status).sort()).toEqual([
+      "catalog",
+      "catalog",
+      "live",
+      "live",
+    ]);
+  });
+
+  it("reconciles a verified legacy duplicate while importing the rest of its batch", async () => {
+    const { base, user } = await signedIn();
+    const imported = catalogCafe("overture-a");
+    await base.mutation(internal.places.store, {
+      city: imported.city,
+      places: [{ ...cafe("curated", imported.name), ...LISBON }],
+    });
+    const [curated] = await rows(base);
+    await base.run((ctx) =>
+      ctx.db.insert("places", {
+        ...imported,
+        source: "overture",
+        status: "catalog",
+        addedAt: 1,
+      }),
+    );
+    await expect(
+      base.mutation(internal.places.storeCatalog, {
+        places: [
+          { ...imported, appleId: "curated" },
+          catalogCafe("overture-b", "Another Café"),
+        ],
+      }),
+    ).resolves.toEqual({ added: 1, existing: 1 });
+    expect(await rows(base)).toMatchObject([
+      { ...curated, overtureId: imported.overtureId },
+      { overtureId: "overture-b", status: "catalog" },
+    ]);
+    expect(
+      await user.query(api.places.searchCatalog, { text: "Juniper" }),
+    ).toMatchObject([{ _id: curated._id }]);
+    expect(await names(user, LISBON_BOX)).toEqual([imported.name]);
+  });
+
   it("refreshes catalog metadata at the same ID and retains its verified Apple ID", async () => {
     const { base, user } = await signedIn();
     const place = catalogCafe("overture-a");
