@@ -24,7 +24,7 @@ struct GoOutView: View {
   @State private var attempt = 0
 
   var body: some View {
-    Group {
+    VStack(spacing: 0) {
       if picking { spotPicker }
       else { planCards }
     }
