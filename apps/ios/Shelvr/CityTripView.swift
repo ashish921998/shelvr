@@ -19,7 +19,7 @@ struct NewCityTripView: View {
   @State private var gate = SocialOperation(placement: "plan_trip")
   @State private var generation: Task<Void, Never>?
   @State private var visible = false
-  @State private var savedCity = false
+  @State private var savedCity: Bool?
   private let options = ["food", "coffee", "drinks", "culture", "sights", "outdoors", "shopping"]
 
   var body: some View {
@@ -68,8 +68,10 @@ struct NewCityTripView: View {
     format.locale = Locale(identifier: "en_US_POSIX")
     format.calendar = Calendar(identifier: .gregorian)
     format.dateFormat = "yyyy-MM-dd"
-    Analytics.capture("trip_plan_started", ["days": days, "pace": pace, "interest_count": interests.count,
-      "dated": dated, "has_stay": !stay.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "saved_city": savedCity])
+    var started: [String: Any] = ["days": days, "pace": pace, "interest_count": interests.count,
+      "dated": dated, "has_stay": !stay.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty]
+    if let savedCity { started["saved_city"] = savedCity }
+    Analytics.capture("trip_plan_started", started)
     do {
       let result = try await backend.planTrip(city: city, days: days, pace: pace, interests: options.filter(interests.contains),
         start: dated ? format.string(from: start) : nil, stay: stay.trimmingCharacters(in: .whitespacesAndNewlines),

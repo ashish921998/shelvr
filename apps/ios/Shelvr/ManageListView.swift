@@ -57,9 +57,10 @@ struct CreateListView: View {
 
   private func create(_ cities: [String]) {
     let title = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    let session = backend.sessionGeneration
     operation.run {
       let id = try await backend.createList(name: title, cities: cities)
-      Analytics.capture("shared_list_created", ["cities": cities.count])
+      if session == backend.sessionGeneration { Analytics.capture("shared_list_created", ["cities": cities.count]) }
       created(id)
     }
   }
@@ -106,9 +107,11 @@ struct AddListPlaceView: View {
                   !alreadyIncluded(place.name, place.lat, place.lng, place.appleId, item: place.itemId)
               }) { place in
                 Button(place.name) {
+                  let session = backend.sessionGeneration
                   operation.run {
                     let added = try await backend.addSavedPlace(place, to: detail._id)
-                    if added { Analytics.capture("shared_list_place_added", ["from": "save"]); dismiss() } else { noAddition = true }
+                    if added, session == backend.sessionGeneration { Analytics.capture("shared_list_place_added", ["from": "save"]) }
+                    if added { dismiss() } else { noAddition = true }
                   }
                 }
               }
@@ -117,9 +120,10 @@ struct AddListPlaceView: View {
           ForEach(result?.places ?? []) { place in
             let included = alreadyIncluded(place.name, place.lat, place.lng, place.appleId)
             Button(place.name) {
+              let session = backend.sessionGeneration
               operation.run { try await backend.addFoundPlace(place, city: selected, to: detail._id)
-              Analytics.capture("shared_list_place_added", ["from": "search"])
-              dismiss() }
+                if session == backend.sessionGeneration { Analytics.capture("shared_list_place_added", ["from": "search"]) }
+                dismiss() }
             }.disabled(included)
             if included { Text(copy("sharedLists.onList")).font(.caption).foregroundStyle(.secondary) }
           }
