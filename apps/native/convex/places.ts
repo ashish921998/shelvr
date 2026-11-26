@@ -30,6 +30,7 @@ const MAX_NAMES = 100;
 const REINDEX_PAGE = 50;
 const MAX_CATALOG_IMPORT = 100;
 const MAX_CATALOG_RESULTS = 20;
+const MAX_CATALOG_CANDIDATES = 80;
 const MAX_SEARCH_LENGTH = 160;
 const MAX_SEARCH_TERMS = 16;
 
@@ -79,10 +80,16 @@ const searchTerms = (text: string) =>
     .toLowerCase()
     .match(/[\p{L}\p{N}]+/gu) ?? [];
 
-const nameRank = (name: string, search: string) => {
-  const candidate = searchTerms(name).join(" ");
-  if (candidate === search) return 0;
-  return candidate.startsWith(search) ? 1 : 2;
+const foldTerm = (term: string) =>
+  term.normalize("NFD").replace(/\p{M}/gu, "").normalize("NFC");
+
+const matchingNameRank = (name: string, terms: string[], phrase: string) => {
+  const words = searchTerms(name).map(foldTerm);
+  if (!terms.every((term) => words.some((word) => word.startsWith(term))))
+    return null;
+  const candidate = words.join(" ");
+  if (candidate === phrase) return 0;
+  return candidate.startsWith(phrase) ? 1 : 2;
 };
 
 export const searchCatalog = authedQuery({
@@ -90,8 +97,11 @@ export const searchCatalog = authedQuery({
   returns: v.array(catalogPlaceValidator),
   handler: async (ctx, { text }) => {
     if (text.length > MAX_SEARCH_LENGTH) return [];
-    const search = searchTerms(text).slice(0, MAX_SEARCH_TERMS).join(" ");
-    if (!search) return [];
+    const indexedTerms = searchTerms(text).slice(0, MAX_SEARCH_TERMS);
+    if (!indexedTerms.length) return [];
+    const search = indexedTerms.join(" ");
+    const terms = indexedTerms.map(foldTerm);
+    const phrase = terms.join(" ");
 
     const groups = await Promise.all(
       (["live", "catalog"] as const).map((status) =>
@@ -100,14 +110,18 @@ export const searchCatalog = authedQuery({
           .withSearchIndex("search_name", (q) =>
             q.search("name", search).eq("status", status),
           )
-          .take(MAX_CATALOG_RESULTS),
+          .take(MAX_CATALOG_CANDIDATES),
       ),
     );
     return groups
       .flat()
-      .sort((a, b) => nameRank(a.name, search) - nameRank(b.name, search))
+      .flatMap((row) => {
+        const rank = matchingNameRank(row.name, terms, phrase);
+        return rank === null ? [] : [{ row, rank }];
+      })
+      .sort((a, b) => a.rank - b.rank)
       .slice(0, MAX_CATALOG_RESULTS)
-      .map((row) => ({
+      .map(({ row }) => ({
         ...placeCard(row),
         ...(row.appleId ? { appleId: row.appleId } : {}),
         ...(row.source ? { source: row.source } : {}),

@@ -259,6 +259,24 @@ describe("places:searchCatalog", () => {
     );
   });
 
+  it("requires every query word to match a venue name prefix", async () => {
+    const { base, user } = await signedIn();
+    await base.mutation(internal.places.storeCatalog, {
+      places: [
+        catalogCafe("exact", "Black Sugar"),
+        catalogCafe("accented", "Bláck Sugar Coffee"),
+        catalogCafe("unrelated", "White House Black Market"),
+      ],
+    });
+    const result = await user.query(api.places.searchCatalog, {
+      text: "BLACK sug",
+    });
+    expect(result.map((row) => row.name)).toEqual([
+      "Black Sugar",
+      "Bláck Sugar Coffee",
+    ]);
+  });
+
   it("caps results and puts an exact match first across the two indexed scopes", async () => {
     const { base, user } = await signedIn();
     await base.mutation(internal.places.storeCatalog, {
