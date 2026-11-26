@@ -169,6 +169,7 @@ struct InviteEntryView: View {
         let result: AcceptedInvite.Resolution?
         if request.invite.kind == .list {
           let listID = try await backend.joinList(token: request.invite.token)
+          guard current() else { return }
           Analytics.capture("shared_list_joined", ["joined": listID != nil,
             "onboarded_before": UserDefaults.standard.bool(forKey: "swift.onboarded." + account)])
           result = listID.map(AcceptedInvite.Resolution.joinedList)

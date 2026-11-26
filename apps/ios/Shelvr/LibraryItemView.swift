@@ -162,9 +162,10 @@ struct LibraryItemView: View {
     busy = true
     defer { busy = false }
     let deleted = save
+    let generation = backend.sessionGeneration
     do {
       try await backend.deleteSave(id)
-      if let deleted { Analytics.itemDeleted(deleted, surface: "item_detail") }
+      if let deleted, generation == backend.sessionGeneration { Analytics.itemDeleted(deleted, surface: "item_detail") }
       dismiss()
     }
     catch { message = copy("item.deleteFailed") }
