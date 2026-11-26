@@ -30,6 +30,8 @@ struct MapCanvas: UIViewRepresentable {
   }
 
   func updateUIView(_ map: MKMapView, context: Context) {
+    let bottomMargin = max(0, bottomControlsHeight - 8)
+    if map.layoutMargins.bottom != bottomMargin { map.layoutMargins.bottom = bottomMargin }
     context.coordinator.update(self, map: map)
   }
 

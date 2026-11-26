@@ -194,7 +194,6 @@ struct SavedPlacesMap: View {
       }
       filterStrip(scene, palette: palette)
     }
-    .padding(.bottom, 22)
     .buttonStyle(HomeChromePressStyle())
   }
 
