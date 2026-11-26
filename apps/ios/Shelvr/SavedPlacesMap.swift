@@ -158,10 +158,10 @@ struct SavedPlacesMap: View {
         roundButton("person", label: copy("navigation.profile"), palette: palette) { open("/profile") }
       }
       .frame(minHeight: 50)
-      HStack(spacing: 6) {
-        filterStrip(scene, palette: palette).frame(maxWidth: .infinity, alignment: .leading)
-        roundButton("location", label: copy("map.showMyLocation"), palette: palette) { location.locate() }
-      }
+      filterStrip(scene, palette: palette)
+        .padding(.horizontal, -4)
+      roundButton("location", label: copy("map.showMyLocation"), palette: palette) { location.locate() }
+        .frame(maxWidth: .infinity, alignment: .trailing)
       retryControl(palette)
     }
     .padding(.horizontal, 20)
@@ -202,7 +202,7 @@ struct SavedPlacesMap: View {
   private func filterStrip(_ scene: MapScene, palette: HomeChromePalette) -> some View {
     if scene.showsWentSwitch || !scene.chips.isEmpty {
       ScrollView(.horizontal) {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
           scopeChip(scene, palette: palette)
           ForEach(scene.chips, id: \.self) { kind in
             let selected = filters.kinds.contains(kind)
@@ -400,7 +400,7 @@ struct SavedPlacesMap: View {
       }
     }
     .foregroundStyle(selected ? palette.background : palette.foreground)
-    .padding(.horizontal, 10).padding(.vertical, 7)
+    .padding(.horizontal, 9).padding(.vertical, 7)
     .background(selected ? palette.foreground : palette.surface, in: Capsule())
     .overlay { Capsule().strokeBorder(selected ? palette.foreground : palette.border, lineWidth: 0.5) }
     .shadow(color: palette.shadow.opacity(0.12), radius: 4, y: 2)
