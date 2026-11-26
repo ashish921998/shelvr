@@ -201,7 +201,7 @@ struct SavedPlacesMap: View {
   private func filterStrip(_ scene: MapScene, palette: HomeChromePalette) -> some View {
     if scene.showsWentSwitch || !scene.chips.isEmpty {
       ScrollView(.horizontal) {
-        HStack(spacing: 6) {
+        HStack(spacing: 5) {
           scopeChip(scene, palette: palette)
           ForEach(scene.chips, id: \.self) { kind in
             let selected = filters.kinds.contains(kind)
@@ -387,7 +387,7 @@ struct SavedPlacesMap: View {
   private func chipLabel(_ title: String, symbol: String, selected: Bool, palette: HomeChromePalette,
     color: Color? = nil, chevron: Bool = false) -> some View {
     let foreground = selected ? palette.background : palette.foreground
-    return HStack(spacing: 5) {
+    return HStack(spacing: 4) {
       Image(systemName: symbol)
         .font(.system(size: 13, weight: .semibold))
         .foregroundStyle(color == nil ? foreground : .white)
@@ -403,7 +403,7 @@ struct SavedPlacesMap: View {
       }
     }
     .foregroundStyle(foreground)
-    .padding(.leading, 5).padding(.trailing, 9).padding(.vertical, 5)
+    .padding(.leading, 4).padding(.trailing, 6).padding(.vertical, 5)
     .background(selected ? palette.foreground : palette.surface, in: Capsule())
     .overlay { Capsule().strokeBorder(selected ? palette.foreground : palette.border, lineWidth: 0.5) }
     .shadow(color: palette.shadow.opacity(0.12), radius: 4, y: 2)
