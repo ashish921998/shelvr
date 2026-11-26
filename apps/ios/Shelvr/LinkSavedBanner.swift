@@ -1,3 +1,4 @@
+import ShelvrInbox
 import SwiftUI
 
 struct LinkSavedBanner: View {
@@ -7,6 +8,7 @@ struct LinkSavedBanner: View {
   @Environment(\.copy) private var copy
   @Environment(\.colorScheme) private var scheme
   @Environment(\.accessibilityVoiceOverEnabled) private var voiceOver
+  @Environment(\.accessibilitySwitchControlEnabled) private var switchControl
   @AppStorage("swift.appearance") private var appearance = "system"
 
   var body: some View {
@@ -33,12 +35,13 @@ struct LinkSavedBanner: View {
     .background(palette.surface, in: shape)
     .overlay { shape.strokeBorder(palette.border).allowsHitTesting(false) }
     .shadow(color: palette.shadow.opacity(0.19), radius: 8, y: 3)
-    .task(id: voiceOver) {
-      if voiceOver { AccessibilityNotification.Announcement(message).post() }
-      else {
-        try? await Task.sleep(for: .seconds(8))
-        if !Task.isCancelled { dismiss() }
-      }
+    .onChange(of: voiceOver, initial: true) { _, enabled in
+      if enabled { AccessibilityNotification.Announcement(message).post() }
+    }
+    .task(id: voiceOver || switchControl) {
+      guard !voiceOver, !switchControl else { return }
+      try? await Task.sleep(for: .seconds(8))
+      if !Task.isCancelled { dismiss() }
     }
   }
 
