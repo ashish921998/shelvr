@@ -159,8 +159,7 @@ struct SavedPlacesMap: View {
       }
       .frame(minHeight: 50)
       HStack(spacing: 6) {
-        filterStrip(scene, palette: palette)
-        Spacer(minLength: 0)
+        filterStrip(scene, palette: palette).frame(maxWidth: .infinity, alignment: .leading)
         roundButton("location", label: copy("map.showMyLocation"), palette: palette) { location.locate() }
       }
       retryControl(palette)
@@ -208,7 +207,6 @@ struct SavedPlacesMap: View {
           ForEach(scene.chips, id: \.self) { kind in
             let selected = filters.kinds.contains(kind)
             Button {
-
               var next = filters
               if next.kinds.insert(kind).inserted {
                 Analytics.capture("map_filter_selected", ["kind": kind.rawValue])
