@@ -93,12 +93,11 @@ struct ContourPaper: View {
 
   var body: some View {
     Canvas { context, canvasSize in
-      let scale = min(canvasSize.width, canvasSize.height) / 100
-      let offset = CGSize(width: (canvasSize.width - 100 * scale) / 2, height: (canvasSize.height - 100 * scale) / 2)
+      let scale = CGSize(width: canvasSize.width / 100, height: canvasSize.height / 100)
       for loop in ContourLoops.loops(seed: seed) {
         var path = Path()
         for (index, point) in loop.enumerated() {
-          let mapped = CGPoint(x: offset.width + point.x * scale, y: offset.height + point.y * scale)
+          let mapped = CGPoint(x: point.x * scale.width, y: point.y * scale.height)
           if index == 0 { path.move(to: mapped) } else { path.addLine(to: mapped) }
         }
         context.stroke(path, with: .color(palette.primaryText.opacity(0.12)), lineWidth: 1)

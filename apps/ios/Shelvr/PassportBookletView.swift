@@ -18,15 +18,26 @@ struct PassportBookletView: View {
 
   var body: some View {
     let palette = HomeChromePalette(scheme, appearance: appearance)
+    let page = RoundedRectangle(cornerRadius: 22, style: .continuous)
     ZStack {
-      palette.surface.ignoresSafeArea()
-      BookletPager(pages: pages, index: $index, copy: copy) { page, position in
-        BookletPageView(page: page, position: position, total: pages.count, counts: counts, palette: palette) { step in
-          index = min(max(index + step, 0), pages.count - 1)
+      palette.background.ignoresSafeArea()
+      ZStack {
+        ForEach([6.0, 3.0], id: \.self) { offset in
+          page.fill(palette.surface).overlay(page.stroke(palette.border, lineWidth: 1)).offset(x: offset, y: offset)
         }
-        .environment(\.copy, copy)
+        BookletPager(pages: pages, index: $index, copy: copy) { page, position in
+          BookletPageView(page: page, position: position, total: pages.count, counts: counts, palette: palette) { step in
+            index = min(max(index + step, 0), pages.count - 1)
+          }
+          .environment(\.copy, copy)
+        }
+        .clipShape(page)
+        .overlay(page.stroke(palette.border, lineWidth: 1))
       }
-      .ignoresSafeArea()
+      .shadow(color: palette.shadow.opacity(0.18), radius: 18, y: 8)
+      .padding(.horizontal, 24)
+      .padding(.top, 72)
+      .padding(.bottom, 56)
     }
     .overlay(alignment: .topTrailing) {
       Button { dismiss() } label: {
@@ -57,7 +68,7 @@ private struct BookletPageView: View {
   var body: some View {
     content
       .frame(maxWidth: .infinity, maxHeight: .infinity)
-      .background { palette.surface.ignoresSafeArea() }
+      .background { ZStack { palette.surface; ContourPaper(seed: seed, palette: palette) } }
       .accessibilityValue("\(position + 1) / \(total)")
       .accessibilityScrollAction { edge in
         switch edge {
@@ -70,6 +81,11 @@ private struct BookletPageView: View {
       }
   }
 
+  private var seed: UInt32 {
+    guard case .city(let city, _) = page else { return 1000 }
+    return UInt32(StampCity.catalog.firstIndex { $0.id == city.id } ?? 0) + 1
+  }
+
   @ViewBuilder private var content: some View {
     switch page {
     case .cover:
@@ -80,10 +96,8 @@ private struct BookletPageView: View {
           if counts.countries > 0 { count(counts.countries, "passport.countries") }
         }
       }
-      .background { ContourPaper(seed: 1000, palette: palette) }
       .accessibilityElement(children: .combine)
     case .city(let city, let stamped):
-      let seed = UInt32(StampCity.catalog.firstIndex { $0.id == city.id } ?? 0) + 1
       VStack(spacing: 28) {
         Text(copy("cityStamps.title").uppercased()).font(.caption.weight(.semibold)).tracking(4)
           .foregroundStyle(palette.muted)
@@ -91,7 +105,6 @@ private struct BookletPageView: View {
         Text(stamped, format: .dateTime.day().month(.wide).year())
           .font(.title3).foregroundStyle(palette.primaryText)
       }
-      .background { ContourPaper(seed: seed, palette: palette) }
       .accessibilityElement(children: .ignore)
       .accessibilityLabel("\(copy(city.labelKey)), \(stamped.formatted(date: .long, time: .omitted))")
     }
