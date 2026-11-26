@@ -13,6 +13,10 @@ struct PassportView: View {
   @State private var afterStamp: String?
   @State private var errors = Set<String>()
   @State private var retry = 0
+  @Environment(\.colorScheme) private var scheme
+  @AppStorage("swift.appearance") private var appearance = "system"
+
+  private static let tilts = [-6.0, 4, -3, 7]
 
   var body: some View {
     let pages = PassportPages(stamps: stamps ?? [], completion: completion, cities: cities ?? [])
@@ -35,10 +39,16 @@ struct PassportView: View {
               PassportBadgeView(cities: cities, completion: completion)
             }
             if !pages.standalone.isEmpty {
+              let palette = HomeChromePalette(scheme, appearance: appearance)
               Section(copy("cityStamps.title")) {
-                ForEach(pages.standalone) { city in
-                  Label(copy(city.labelKey), systemImage: "seal")
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 112), spacing: 8)], spacing: 8) {
+                  ForEach(Array(pages.standalone.enumerated()), id: \.element.id) { index, city in
+                    CityStampView(city: city, tilt: .degrees(Self.tilts[index % Self.tilts.count]), palette: palette)
+                  }
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background { ContourPaper(seed: 7, palette: palette) }
               }
             }
             if let already = AppLink("/already-been") {
