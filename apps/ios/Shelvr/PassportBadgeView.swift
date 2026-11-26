@@ -41,7 +41,7 @@ struct PassportBadgeView: View {
             }
           } else if failures.isEmpty { ProgressView() }
         } else if failures.isEmpty { ProgressView() }
-        if !failures.isEmpty { Button(copy("common.retry")) { attempt += 1 } }
+        if !failures.isEmpty { Button(copy("common.retry")) { attempt += 1 }.buttonStyle(.bordered) }
       }
       .task(id: attempt) {
         await watch("subscriptions:getEntitlement", PassportEntitlement.self) { entitlement = $0; now = Date() }
@@ -84,5 +84,6 @@ struct PassportBadgeView: View {
       if state.earned { Image(systemName: "square.and.arrow.up") }
       else { Text("\(state.have) / \(state.badge.goal)").monospacedDigit() }
     }
+    .contentShape(Rectangle())
   }
 }

@@ -34,7 +34,11 @@ struct PassportView: View {
           ScrollView {
             LazyVStack(alignment: .leading, spacing: 18) {
               cover(places: stamps.count, StampCity.counts(places: stamps, stamps: cities ?? []), palette: palette)
-              if let cities, !cities.isEmpty { stampsCard(cities, palette: palette) }
+              let stamped = PassportBooklet.pages(cities: cities ?? []).compactMap { page -> StampCity? in
+                if case .city(let city, _) = page { return city }
+                return nil
+              }
+              if !stamped.isEmpty { stampsCard(stamped, palette: palette) }
               if let cities, !errors.contains("placeVisits:cityCompletion") {
                 PassportBadgeView(cities: cities, completion: completion).paperCard(palette)
               }
@@ -126,12 +130,8 @@ struct PassportView: View {
     }.frame(maxWidth: .infinity)
   }
 
-  private func stampsCard(_ cities: [PassportCityStamp], palette: HomeChromePalette) -> some View {
-    let stamped = PassportBooklet.pages(cities: cities).compactMap { page -> StampCity? in
-      if case .city(let city, _) = page { return city }
-      return nil
-    }
-    return Button { showBooklet = true } label: {
+  private func stampsCard(_ stamped: [StampCity], palette: HomeChromePalette) -> some View {
+    Button { showBooklet = true } label: {
       VStack(alignment: .leading, spacing: 12) {
         HStack {
           Text(copy("cityStamps.title")).font(.custom("Satoshi-Bold", size: 20, relativeTo: .title3))
@@ -151,6 +151,7 @@ struct PassportView: View {
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(copy("cityStamps.title"))
+    .accessibilityValue(stamped.map { copy($0.labelKey) }.formatted(.list(type: .and)))
     .accessibilityAddTraits(.isButton)
   }
 
@@ -169,8 +170,10 @@ struct PassportView: View {
         }
       }
       .accessibilityElement(children: .combine).accessibilityAddTraits(.isHeader)
-      ForEach(section.places) { stamp in
-        Button { selected = stamp } label: { stampRow(stamp, palette) }
+      LazyVStack(alignment: .leading, spacing: 12) {
+        ForEach(section.places) { stamp in
+          Button { selected = stamp } label: { stampRow(stamp, palette) }
+        }
       }
       let layout = dynamicType.isAccessibilitySize
         ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8)) : AnyLayout(HStackLayout(spacing: 8))
