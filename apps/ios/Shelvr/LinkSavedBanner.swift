@@ -50,12 +50,15 @@ struct LinkSavedBanner: View {
       Button(action: viewSave) {
         Text(copy("capture.viewSave")).fontWeight(.semibold)
           .fixedSize(horizontal: false, vertical: true)
-          .frame(minHeight: 44)
+          .padding(.horizontal, 8)
+          .frame(minWidth: 44, minHeight: 44)
+          .contentShape(Rectangle())
       }
       .foregroundStyle(palette.primaryText)
       Button(action: dismiss) {
         Image(systemName: "xmark").font(.footnote.weight(.semibold))
           .frame(width: 44, height: 44)
+          .contentShape(Rectangle())
       }
       .foregroundStyle(palette.muted)
       .accessibilityLabel(copy("common.dismiss"))
