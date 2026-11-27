@@ -27,12 +27,12 @@ struct OnboardingReplay: ViewModifier {
 
   func body(content: Content) -> some View {
     content
-      .task(id: phase) { await replay(stamps: true) }
+      .task { await replay(stamps: true) }
       .task(id: phase) { await replay(stamps: false) }
   }
 
   private func replay(stamps: Bool) async {
-    guard phase == .active else { return }
+    guard stamps || phase == .active else { return }
     let key = OnboardingHandoff.key(account)
     let generation = backend.sessionGeneration
     var delay = 2
