@@ -32,10 +32,12 @@ final class ShareViewController: UIViewController {
       stack.leadingAnchor.constraint(equalTo: view.layoutMarginsGuide.leadingAnchor),
       stack.trailingAnchor.constraint(equalTo: view.layoutMarginsGuide.trailingAnchor)
     ])
-    if ShareInbox.system()?.activeOwner == nil {
-      message.text = copy("share.openToSignIn")
+    guard let inbox = ShareInbox.system() else {
+      message.text = copy("share.itemFailure")
       save.isHidden = true
+      return
     }
+    if inbox.activeOwner == nil { message.text = copy("share.openToSignIn") }
   }
 
   @objc private func close() {
@@ -43,7 +45,8 @@ final class ShareViewController: UIViewController {
   }
 
   @objc private func submit() {
-    guard save.isEnabled, let inbox = ShareInbox.system(), let owner = inbox.activeOwner else { return }
+    guard save.isEnabled, let inbox = ShareInbox.system() else { return }
+    let owner = inbox.activeOwner
     save.isEnabled = false
     cancel.isEnabled = false
     message.text = copy("share.reading")
@@ -59,7 +62,7 @@ final class ShareViewController: UIViewController {
         try inbox.publish(payloads, in: stage)
         close()
       } catch ShareInboxError.ownerChanged {
-        message.text = copy("share.openToSignIn")
+        message.text = copy("share.itemFailure")
         save.isHidden = true
         cancel.isEnabled = true
       } catch {
