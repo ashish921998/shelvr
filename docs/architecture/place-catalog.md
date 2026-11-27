@@ -398,3 +398,14 @@ reasons. Each one is a constraint on this design:
 5. **Counts.** `placeStats`, "Saved by N people", and Discover sorted by them. This replaces step 1
    of [the social Map plan](../plans/social-map.md).
 6. **Provider refresh,** and a second provider when one is needed.
+
+## Search catalog import
+
+Download a bounded city area from the official Overture places release. Prepare a batch file and inspect it before any database write.
+
+```sh
+overturemaps download --bbox=-122.4105,37.7827,-122.4050,37.7880 -f geojson --type=place -o /tmp/shelvr-venues.geojson
+node tools/prepare-catalog-import.mjs /tmp/shelvr-venues.geojson 'San Francisco' > /tmp/shelvr-catalog-batches.jsonl
+```
+
+Each line can be passed as JSON arguments to the internal `places:storeCatalog` mutation through `convex run` from `apps/native`, using an explicitly selected deployment. The importer accepts open venues in the named locality with a supported category and recognized license. It emits public venue facts and stable IDs only. Search-only imports are separate from the editor-picked Discover feed. Keep the [Overture Places attributions and license notices](https://docs.overturemaps.org/attribution/#places) with the dataset.
