@@ -113,6 +113,7 @@ struct SignedInView: View {
       }
       .navigationDestination(for: AppLink.self) { link in
         if access.loading && PlanRoutes.needsLoadedPlan(link) { loadingPlan }
+        else if !access.pro, let placement = PlanRoutes.proPlacement(link) { ProActionGateView(placement: placement).id(link) }
         else if access.locked && !PlanRoutes.allowedWithoutPersonalAccess(link) { PlanGateView() }
         else { switch link.path.first {
         case "settings": AccountSettingsView()

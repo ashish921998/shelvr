@@ -20,6 +20,7 @@ struct LibraryItemView: View {
   @State private var failed = false
   @State private var attempt = 0
   @State private var recorded = false
+  @State private var retryGate = SocialOperation(placement: "item_detail")
 
   private var openable: Bool { save?.status == "ready" && phase == .active }
 
@@ -70,7 +71,8 @@ struct LibraryItemView: View {
             }
             TimelineView(.periodic(from: .now, by: 30)) { time in
               if save.canRetry(at: time.date) {
-                Button(copy("common.retry")) { Task { await retry() } }.disabled(busy)
+                Button(copy("common.retry")) { retryGate.run { try await retry() } }
+                  .disabled(busy || retryGate.busy)
               }
             }
             if !message.isEmpty { Text(message).foregroundStyle(.secondary) }
@@ -91,6 +93,7 @@ struct LibraryItemView: View {
       } else if loaded { ContentUnavailableView(copy("common.unavailable"), systemImage: "bookmark.slash") }
       else { ProgressView() }
     }
+    .socialOperation(retryGate, failure: copy("errors.retryTitle"), close: copy("common.close"))
     .confirmationDialog(copy("item.deleteTitle"), isPresented: $confirmingDelete, titleVisibility: .visible) {
       Button(copy("item.deleteEverywhere"), role: .destructive) { Task { await remove() } }
       Button(copy("common.cancel"), role: .cancel) {}
@@ -143,12 +146,19 @@ struct LibraryItemView: View {
     }
   }
 
-  private func retry() async {
-    guard !busy else { return }
+  private func retry() async throws {
+    guard !busy, let owner = backend.userID else { return }
+    let session = backend.sessionGeneration
     busy = true
     defer { busy = false }
-    do { message = try await backend.retrySave(id) ? "" : copy("item.stillWorking") }
-    catch { message = copy("errors.retryTitle") }
+    do {
+      let scheduled = try await backend.retrySave(id)
+      guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
+      message = scheduled ? "" : copy("item.stillWorking")
+    } catch {
+      guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
+      throw error
+    }
   }
 
   private func recordOpen() {
