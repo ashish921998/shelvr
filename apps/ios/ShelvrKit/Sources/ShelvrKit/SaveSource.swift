@@ -14,10 +14,11 @@ extension Backend {
     return try await client.mutation("items:createLinkItem", with: args)
   }
 
-  public func saveNote(_ text: String, operationID: String, checkpoint: () throws -> Void) async throws {
+  public func saveNote(_ text: String, operationID: String, source: SaveSource, analyticsSessionID: String?,
+    checkpoint: () throws -> Void) async throws {
     try checkpoint()
-    let _: String = try await client.mutation("items:createNoteItem", with: [
-      "text": text, "operationId": operationID, "saveSource": SaveSource.siri.rawValue
-    ])
+    var args = ["text": text, "operationId": operationID, "saveSource": source.rawValue]
+    args["analyticsSessionId"] = analyticsSessionID
+    let _: String = try await client.mutation("items:createNoteItem", with: args)
   }
 }

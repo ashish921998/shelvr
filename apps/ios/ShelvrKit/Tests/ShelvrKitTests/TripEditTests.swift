@@ -22,3 +22,10 @@ import Testing
   #expect(TripEdit.alreadyOnTrip(candidate("Locke de Santa Joana", nil, 0.001), trip: trip))
   #expect(!TripEdit.alreadyOnTrip(candidate("Santa Joana", nil, 1), trip: trip))
 }
+
+@Test func renameCountsOnlyARealChange() {
+  #expect(!TripEdit.renamed("  Lisbon   trip ", from: "Lisbon trip"))
+  #expect(TripEdit.renamed("Lisbon", from: "Lisbon trip"))
+  #expect(TripEdit.renamed("", from: "Lisbon trip"))
+  #expect(!TripEdit.renamed(" ", from: nil))
+}

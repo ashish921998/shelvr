@@ -37,7 +37,7 @@ struct PasteLinkView: View {
     .sheet(item: $billing, onDismiss: {
       if resumeSave { resumeSave = false; save() }
     }) { destination in
-      BillingSheet(destination: destination, confirmed: { resumeSave = true })
+      BillingSheet(destination: destination, placement: "add", confirmed: { resumeSave = true })
     }
     .onAppear { presented = true; focused = true }
     .onDisappear { presented = false }
@@ -69,6 +69,7 @@ struct PasteLinkView: View {
         }
         guard ownsSaveSession() else { return }
         Analytics.capture("article_saved", sessionProperties, distinctId: owner)
+        if let resumed = PaywallFunnel.shared.resume("add") { Analytics.capture("paywall_blocked_action_resumed", resumed) }
         if presented {
           focused = false
           didSave(id)
@@ -82,6 +83,7 @@ struct PasteLinkView: View {
         guard presented else { return }
         if SaveFailure(error) == .proRequired {
           errorMessage = copy("freePlan.leftBody")
+          PaywallFunnel.shared.block("add")
           billing = .paywall
         } else { errorMessage = copy("errors.tryAgain") }
       }

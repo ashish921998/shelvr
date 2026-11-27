@@ -110,6 +110,24 @@ enum Analytics {
     PostHogSDK.shared.capture(event, distinctId: distinctId ?? unidentifiedOfflineID, properties: properties)
   }
 
+  static func itemOpened(_ save: LibrarySave, source: String?) {
+    guard var properties = ItemAnalytics.properties(save) else { return }
+    properties["source"] = ItemAnalytics.source(source)
+    capture("item_opened", properties)
+  }
+
+  static func itemAction(_ save: LibrarySave, _ action: String) {
+    guard var properties = ItemAnalytics.properties(save) else { return }
+    properties["action"] = action
+    capture("item_action", properties)
+  }
+
+  static func itemDeleted(_ save: LibrarySave, surface: String) {
+    guard var properties = ItemAnalytics.properties(save) else { return }
+    properties["surface"] = surface
+    capture("item_deleted", properties)
+  }
+
   static func failure(_ event: String) {
     guard enabled else { return }
     PostHogSDK.shared.captureException(NSError(domain: "Shelvr", code: 1), properties: [

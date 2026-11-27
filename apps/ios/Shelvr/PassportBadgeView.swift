@@ -6,7 +6,7 @@ struct PassportBadgeView: View {
   let completion: [PassportCompletion]
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
-  @State private var operation = SocialOperation()
+  @State private var operation = SocialOperation(placement: "passport")
   @State private var token: String?
   @State private var entitlement: PassportEntitlement?
   @State private var stamps: [BadgeStamp]?

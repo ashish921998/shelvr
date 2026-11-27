@@ -5,7 +5,7 @@ import ShelvrInbox
 protocol ShareSaver {
   var userID: String? { get }
   func saveLink(_ url: String, operationID: String, source: SaveSource, analyticsSessionID: String?, checkpoint: () throws -> Void) async throws -> String
-  func saveNote(_ text: String, operationID: String, checkpoint: () throws -> Void) async throws
+  func saveNote(_ text: String, operationID: String, source: SaveSource, analyticsSessionID: String?, checkpoint: () throws -> Void) async throws
   func savePhoto(_ photo: ImportPhoto, operationID: String, source: SaveSource, analyticsSessionID: String?, checkpoint: () throws -> Void) async throws -> String
 }
 
@@ -34,6 +34,7 @@ public struct ShareInboxProcessor {
   public enum Event: Equatable, Sendable {
     case started(Attempt)
     case failed(Attempt, SaveFailure)
+    case saved(count: Int)
   }
 
   public struct Failure: Sendable {
@@ -80,9 +81,11 @@ public struct ShareInboxProcessor {
       guard saver.userID == owner else { throw ShareInboxError.ownerChanged }
     }
     try checkpoint()
-    if inbox.activeOwner != owner { try updateOwner() }
+    try updateOwner()
     try inbox.prune(keeping: owner)
-    let refusal = try await inbox.drain(owner: owner) { delivery in
+    var saved = 0
+    var failed = false
+    let refusal = try await inbox.drain(owner: owner, send: { delivery in
       try checkpoint()
       let attempt = Attempt(delivery)
       observe(.started(attempt))
@@ -90,12 +93,18 @@ public struct ShareInboxProcessor {
         try await send(delivery, owner: owner, source: attempt.source, analyticsSessionID: analyticsSessionID,
           deliverSiri: deliverSiri, checkpoint: checkpoint)
         try checkpoint()
+        if !delivery.siri { saved += 1 }
       } catch {
         try checkpoint()
         observe(.failed(attempt, SaveFailure(error)))
+        failed = true
         throw error
       }
-    }
+    }, batchFinished: {
+      if !failed, saved > 0 { observe(.saved(count: saved)) }
+      saved = 0
+      failed = false
+    })
     return refusal.map {
       if ($0.error as? ShareInboxError) == .longNoteNeedsRecovery {
         return Failure(share: $0.share, copyKey: "share.longNoteRecovery", canRecoverNote: true)
@@ -117,7 +126,9 @@ public struct ShareInboxProcessor {
       _ = try await saver.saveLink(url, operationID: delivery.operationID, source: source,
         analyticsSessionID: analyticsSessionID, checkpoint: checkpoint)
     case .note(let text):
-      try await saver.saveNote(text, operationID: delivery.operationID, checkpoint: checkpoint)
+      guard SiriText.fitsLibrary(text) else { throw ShareInboxError.longNoteNeedsRecovery }
+      try await saver.saveNote(text, operationID: delivery.operationID, source: source,
+        analyticsSessionID: analyticsSessionID, checkpoint: checkpoint)
     case .image(let file):
       let photo = try await Task.detached { try ImportPhoto(Data(contentsOf: file, options: .mappedIfSafe)) }.value
       _ = try await saver.savePhoto(photo, operationID: delivery.operationID, source: source,

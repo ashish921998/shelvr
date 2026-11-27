@@ -18,7 +18,7 @@ struct FriendPassportView: View {
   @State private var compareAttempt = 0
   @State private var saved: Int?
   @State private var inactive = false
-  @State private var operation = SocialOperation()
+  @State private var operation = SocialOperation(placement: "passport_friend_places")
 
   var body: some View {
     SocialQuery(query: "passportShares:passportPreview", arguments: ["token": token], type: FriendPassport?.self) { passport in

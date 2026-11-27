@@ -13,7 +13,7 @@ struct CityDateView: View {
   @State private var triedSecond = Set<Int>()
   @State private var busy = false
   @State private var failed = false
-  @State private var gate = SocialOperation()
+  @State private var gate = SocialOperation(placement: "make_plan")
   @State private var picking = false
   @State private var starts: [DateStart]?
   @State private var lockedFirst = false
@@ -92,6 +92,7 @@ struct CityDateView: View {
       Text(spot.name).font(.headline)
       if let why = spot.why { Text(why).font(.subheadline) }
       Button(copy("plan.openMaps")) {
+        Analytics.capture("date_plan_stop_opened", ["source": spot.source, "action": "maps"])
         let item = MKMapItem(placemark: MKPlacemark(coordinate: .init(latitude: spot.lat, longitude: spot.lng)))
         item.name = spot.name
         item.openInMaps()

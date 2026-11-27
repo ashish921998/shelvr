@@ -22,6 +22,7 @@ struct GoOutView: View {
   @State private var current: GoOutPlace?
   @State private var failed = false
   @State private var attempt = 0
+  @State private var opened = false
 
   var body: some View {
     VStack(spacing: 0) {
@@ -29,6 +30,9 @@ struct GoOutView: View {
       else { planCards }
     }
     .navigationTitle(copy(picking ? "goOut.question" : "plan.goOut"))
+    .task {
+      if !opened { opened = true; Analytics.capture("go_out_opened", ["shared": listID != nil]) }
+    }
     .task(id: attempt) {
       guard listID == nil, !city.isEmpty else { return }
       do {
@@ -59,11 +63,20 @@ struct GoOutView: View {
             .padding(.bottom, 2)
         }
         HomeActionCard(title: copy("homePlaces.planDate"), detail: copy("goOut.dateDetail"),
-          symbol: "heart.fill", palette: palette) { plan("/date-plan") }
+          symbol: "heart.fill", palette: palette) {
+          Analytics.capture("city_plan_started", ["kind": "date", "from": "go_out"])
+          plan("/date-plan")
+        }
         HomeActionCard(title: copy("homePlaces.planTrip"), detail: copy("goOut.tripDetail"),
-          symbol: "suitcase.fill", palette: palette) { plan("/new-trip") }
+          symbol: "suitcase.fill", palette: palette) {
+          Analytics.capture("city_plan_started", ["kind": "trip", "from": "go_out"])
+          plan("/new-trip")
+        }
         HomeActionCard(title: copy("goOut.quickPick"), detail: copy("goOut.quickPickBody"),
-          symbol: "dice.fill", palette: palette, emphasis: .secondary) { picking = true }
+          symbol: "dice.fill", palette: palette, emphasis: .secondary) {
+          Analytics.capture("go_out_spot_opened")
+          picking = true
+        }
           .padding(.top, 4)
       }
       .padding(.horizontal, 20)
