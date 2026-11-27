@@ -12,7 +12,7 @@ struct CreateListView: View {
   @State private var continueCreation = false
   @State private var name = ""
   @State private var cities = ""
-  @State private var operation = SocialOperation()
+  @State private var operation = SocialOperation(placement: "shared_list")
 
   var body: some View {
     let options = cities.split(separator: ",").map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }.filter { !$0.isEmpty }
@@ -47,7 +47,7 @@ struct CreateListView: View {
     }
     .sheet(isPresented: $askingName, onDismiss: {
       if continueCreation { continueCreation = false; create(options) }
-    }) { MemberNamePrompt(creating: true) { continueCreation = true } }
+    }) { MemberNamePrompt(kind: "create") { continueCreation = true } }
     .socialOperation(operation, failure: copy("sharedLists.createFailed"), close: copy("common.close"))
   }
   private func decide(_ cities: [String]) {
@@ -57,8 +57,10 @@ struct CreateListView: View {
 
   private func create(_ cities: [String]) {
     let title = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    let session = backend.sessionGeneration
     operation.run {
       let id = try await backend.createList(name: title, cities: cities)
+      if session == backend.sessionGeneration { Analytics.capture("shared_list_created", ["cities": cities.count]) }
       created(id)
     }
   }
@@ -80,7 +82,7 @@ struct AddListPlaceView: View {
   @State private var searchFailed = false
   @State private var noAddition = false
   @State private var retry = 0
-  @State private var operation = SocialOperation()
+  @State private var operation = SocialOperation(placement: "shared_list_search")
 
   var body: some View {
     let selected = city.isEmpty ? detail.cities.first ?? "" : city
@@ -105,9 +107,11 @@ struct AddListPlaceView: View {
                   !alreadyIncluded(place.name, place.lat, place.lng, place.appleId, item: place.itemId)
               }) { place in
                 Button(place.name) {
+                  let session = backend.sessionGeneration
                   operation.run {
-                    if try await backend.addSavedPlace(place, to: detail._id) { dismiss() }
-                    else { noAddition = true }
+                    let added = try await backend.addSavedPlace(place, to: detail._id)
+                    if added, session == backend.sessionGeneration { Analytics.capture("shared_list_place_added", ["from": "save"]) }
+                    if added { dismiss() } else { noAddition = true }
                   }
                 }
               }
@@ -116,7 +120,10 @@ struct AddListPlaceView: View {
           ForEach(result?.places ?? []) { place in
             let included = alreadyIncluded(place.name, place.lat, place.lng, place.appleId)
             Button(place.name) {
-              operation.run { try await backend.addFoundPlace(place, city: selected, to: detail._id); dismiss() }
+              let session = backend.sessionGeneration
+              operation.run { try await backend.addFoundPlace(place, city: selected, to: detail._id)
+                if session == backend.sessionGeneration { Analytics.capture("shared_list_place_added", ["from": "search"]) }
+                dismiss() }
             }.disabled(included)
             if included { Text(copy("sharedLists.onList")).font(.caption).foregroundStyle(.secondary) }
           }

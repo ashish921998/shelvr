@@ -268,7 +268,8 @@ public struct ShareInbox: Sendable {
     return nil
   }
 
-  @MainActor public func drain(owner: String, send: (PendingShare.Delivery) async throws -> Void) async throws -> FailedShare? {
+  @MainActor public func drain(owner: String, send: (PendingShare.Delivery) async throws -> Void,
+    batchFinished: () -> Void = {}) async throws -> FailedShare? {
     guard activeOwner == owner else { throw ShareInboxError.ownerChanged }
     var firstFailure: FailedShare?
     for batch in try batches() where (try? self.owner(of: batch)) == owner {
@@ -289,6 +290,7 @@ public struct ShareInbox: Sendable {
         }
       }
       if try manifests(in: batch).isEmpty { try removeIfPresent(batch) }
+      batchFinished()
     }
     return firstFailure
   }
