@@ -35,6 +35,7 @@ const MAX_CATALOG_RESULTS = 20;
 const MAX_CATALOG_CANDIDATES = 80;
 const MAX_IDENTITY_CANDIDATES = 16;
 const IDENTITY_DISTANCE_KM = 0.02;
+const RECIPROCAL_LATITUDE_RANGE = (2 * IDENTITY_DISTANCE_KM) / 110;
 const MAX_SEARCH_LENGTH = 160;
 const MAX_SEARCH_TERMS = 16;
 
@@ -82,7 +83,7 @@ const searchTerms = (text: string) =>
   text
     .normalize("NFC")
     .toLowerCase()
-    .match(/[\p{L}\p{N}]+/gu) ?? [];
+    .match(/[\p{L}\p{N}][\p{L}\p{N}\p{M}]*/gu) ?? [];
 
 const foldTerm = (term: string) =>
   term.normalize("NFD").replace(/\p{M}/gu, "").normalize("NFC");
@@ -134,13 +135,20 @@ async function deduplicateCatalogResults(ctx: QueryCtx, rows: Doc<"places">[]) {
     const apple = group.filter(unlinkedAppleVenue);
     const overture = group.filter(unlinkedOvertureVenue);
     if (!apple.length || !overture.length) continue;
-    const { city, name } = group[0];
-    const peers = await ctx.db
-      .query("places")
-      .withIndex("by_city_and_name", (q) => q.eq("city", city).eq("name", name))
-      .take(MAX_IDENTITY_CANDIDATES + 1);
-    if (peers.length > MAX_IDENTITY_CANDIDATES) continue;
     for (const open of overture) {
+      if (!apple.some((candidate) => sameNearbyVenue(open, candidate)))
+        continue;
+      const peers = await ctx.db
+        .query("places")
+        .withIndex("by_city_and_name_and_lat", (q) =>
+          q
+            .eq("city", open.city)
+            .eq("name", open.name)
+            .gte("lat", open.lat - RECIPROCAL_LATITUDE_RANGE)
+            .lte("lat", open.lat + RECIPROCAL_LATITUDE_RANGE),
+        )
+        .take(MAX_IDENTITY_CANDIDATES + 1);
+      if (peers.length > MAX_IDENTITY_CANDIDATES) continue;
       const match = soleNearbyPeer(open, peers);
       if (
         match &&
@@ -259,8 +267,7 @@ async function reconcileVerifiedPair(
     curated.overtureId ||
     catalog.status !== "catalog" ||
     catalog.source !== "overture" ||
-    catalog.appleId ||
-    !sameNearbyVenue(curated, catalog)
+    catalog.appleId
   ) {
     throw new Error("Conflicting catalog place identifiers");
   }
@@ -382,7 +389,9 @@ export const store = internalMutation({
           lng: place.lng,
           appleId: place.appleId,
           category: place.category,
-          kind: undefined,
+          kind: placeKinds(place.category, [], row.cuisine).length
+            ? undefined
+            : row.kind,
           status: "live" as const,
           ...(source ? { sources: source } : {}),
         };

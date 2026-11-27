@@ -253,6 +253,28 @@ describe("places:searchCatalog", () => {
     },
   );
 
+  it("deduplicates a local pair when a chain has many distant namesakes", async () => {
+    const { base, user } = await signedIn();
+    const venue = catalogCafe("overture-a");
+    await base.mutation(internal.places.store, {
+      city: venue.city,
+      places: [
+        { ...cafe("nearby", venue.name), ...LISBON },
+        ...Array.from({ length: 17 }, (_, index) => ({
+          ...cafe(`branch-${index}`, venue.name),
+          lat: LISBON.lat + (index + 1) / 100,
+          lng: LISBON.lng,
+        })),
+      ],
+    });
+    await base.mutation(internal.places.storeCatalog, { places: [venue] });
+    const result = await user.query(api.places.searchCatalog, {
+      text: "Juniper",
+    });
+    expect(result).toHaveLength(18);
+    expect(result.every((row) => row.appleId !== undefined)).toBe(true);
+  });
+
   it("keeps known distinct and distant venues separate", async () => {
     const { base, user } = await signedIn();
     const venue = catalogCafe("overture-a");
@@ -369,6 +391,20 @@ describe("places:searchCatalog", () => {
     ]);
   });
 
+  it("keeps the combining dot inside a lowercased Turkish venue token", async () => {
+    const { base, user } = await signedIn();
+    await base.mutation(internal.places.storeCatalog, {
+      places: [catalogCafe("istanbul", "İstanbul Sweets")],
+    });
+    const result = await user.query(api.places.searchCatalog, {
+      text: "istanbul sweets",
+    });
+    expect(result.map((row) => row.name)).toEqual(["İstanbul Sweets"]);
+    expect(
+      await user.query(api.places.searchCatalog, { text: "\u0307" }),
+    ).toEqual([]);
+  });
+
   it("checks words beyond the full-text index term limit", async () => {
     const { base, user } = await signedIn();
     await base.mutation(internal.places.storeCatalog, {
@@ -404,32 +440,59 @@ describe("places:searchCatalog", () => {
 });
 
 describe("places:storeCatalog", () => {
-  it("reconciles a verified exact pair while importing the rest of its batch", async () => {
-    const { base, user } = await signedIn();
-    const venue = catalogCafe("overture-a");
-    await base.mutation(internal.places.store, {
-      city: venue.city,
-      places: [{ ...cafe("curated", venue.name), ...LISBON }],
-    });
-    const [curated] = await rows(base);
-    await base.mutation(internal.places.storeCatalog, { places: [venue] });
-    await expect(
-      base.mutation(internal.places.storeCatalog, {
-        places: [
-          { ...venue, appleId: "curated" },
-          catalogCafe("overture-b", "Another Café"),
-        ],
-      }),
-    ).resolves.toEqual({ added: 1, existing: 1 });
-    expect(await rows(base)).toMatchObject([
-      { ...curated, overtureId: venue.overtureId },
-      { overtureId: "overture-b", status: "catalog" },
-    ]);
-    expect(
-      await user.query(api.places.searchCatalog, { text: "Juniper" }),
-    ).toMatchObject([{ _id: curated._id }]);
-    expect(await names(user, LISBON_BOX)).toEqual([venue.name]);
-  });
+  it.each([false, true])(
+    "reconciles a verified ID pair despite metadata drift (Overture first: %s)",
+    async (overtureFirst) => {
+      const { base, user } = await signedIn();
+      const venue = catalogCafe("overture-a");
+      const importOverture = () =>
+        base.mutation(internal.places.storeCatalog, { places: [venue] });
+      const curateApple = () =>
+        base.mutation(internal.places.store, {
+          city: "Porto",
+          places: [
+            {
+              ...cafe("curated", "Verified Bakery"),
+              ...PORTO,
+              category: "Bakery",
+            },
+          ],
+        });
+      if (overtureFirst) {
+        await importOverture();
+        await curateApple();
+      } else {
+        await curateApple();
+        await importOverture();
+      }
+      const before = await rows(base);
+      expect(before).toHaveLength(2);
+      const curated = before.find((row) => row.appleId === "curated");
+      expect(curated).toBeDefined();
+      await expect(
+        base.mutation(internal.places.storeCatalog, {
+          places: [
+            { ...venue, appleId: "curated" },
+            catalogCafe("overture-b", "Another Café"),
+          ],
+        }),
+      ).resolves.toEqual({ added: 1, existing: 1 });
+      expect(await rows(base)).toMatchObject([
+        { ...curated, overtureId: venue.overtureId },
+        { overtureId: "overture-b", status: "catalog" },
+      ]);
+      expect(
+        await user.query(api.places.searchCatalog, { text: "Verified" }),
+      ).toMatchObject([{ _id: curated?._id, ...PORTO, kinds: ["dessert"] }]);
+      expect(
+        await user.query(api.places.searchCatalog, { text: "Juniper" }),
+      ).toEqual([]);
+      expect(await names(user, LISBON_BOX)).toEqual([]);
+      expect(
+        await names(user, { west: -8.7, south: 41.1, east: -8.5, north: 41.2 }),
+      ).toEqual(["Verified Bakery"]);
+    },
+  );
 
   it("refreshes catalog metadata at the same ID and retains its verified Apple ID", async () => {
     const { base, user } = await signedIn();
@@ -531,6 +594,24 @@ describe("places:storeCatalog", () => {
       await names(user, { west: -8.7, south: 41.1, east: -8.5, north: 41.2 }),
     ).toEqual(["Verified Bakery"]);
   });
+
+  it.each([undefined, "UnmappedCategory"])(
+    "retains the catalog category on promotion when Apple category is %s",
+    async (category) => {
+      const { base, user } = await signedIn();
+      const place = catalogCafe("overture-a");
+      await base.mutation(internal.places.storeCatalog, {
+        places: [{ ...place, appleId: "apple-a" }],
+      });
+      await base.mutation(internal.places.store, {
+        city: place.city,
+        places: [{ ...cafe("apple-a", place.name), ...LISBON, category }],
+      });
+      expect(await user.query(api.places.forMap, {})).toMatchObject([
+        { appleId: "apple-a", kinds: ["coffee"] },
+      ]);
+    },
+  );
 
   it("rejects conflicting identities without applying any of the batch", async () => {
     const t = newConvexTest();
