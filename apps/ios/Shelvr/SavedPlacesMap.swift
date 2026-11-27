@@ -570,9 +570,9 @@ struct SavedPlacesMap: View {
       for try await results in backend.catalogPlaces(matching: request.text) {
         try Task.checkCancellation()
         guard request == catalogRequest else { return }
-        cameraCommand?.catalogArrived()
         catalogResponse = CatalogResponse(request: request, results: results)
         failedCatalogRequest = nil
+        if cameraCommand?.takeCatalogRefit() == true { moveCamera(.fitFilteredPlaces) }
       }
     } catch {
       if !Task.isCancelled, request == catalogRequest { failedCatalogRequest = request }

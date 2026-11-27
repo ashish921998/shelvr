@@ -16,10 +16,9 @@ import Foundation
     self.refitWhenCatalogArrives = refitWhenCatalogArrives
   }
 
-  public func catalogArrived() {
-    guard refitWhenCatalogArrives else { return }
-    refitWhenCatalogArrives = false
-    pending = .fitFilteredPlaces
+  public func takeCatalogRefit() -> Bool {
+    defer { refitWhenCatalogArrives = false }
+    return refitWhenCatalogArrives
   }
 
   public func cancel() {

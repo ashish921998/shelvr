@@ -30,26 +30,21 @@ import Testing
     return
   }
 
-  search.catalogArrived()
-
-  guard case .fitFilteredPlaces? = search.consume() else {
-    Issue.record("New catalog pins must get a chance to fit")
-    return
-  }
-  search.catalogArrived()
+  #expect(search.takeCatalogRefit())
   #expect(search.consume() == nil)
+  #expect(!search.takeCatalogRefit())
 }
 
 @MainActor @Test func cancelledAndOrdinaryFitsIgnoreCatalogResponses() {
   let search = MapCameraCommand(action: .fitFilteredPlaces, refitWhenCatalogArrives: true)
   _ = search.consume()
   search.cancel()
-  search.catalogArrived()
+  #expect(!search.takeCatalogRefit())
   #expect(search.consume() == nil)
 
   let category = MapCameraCommand(action: .fitFilteredPlaces)
   _ = category.consume()
-  category.catalogArrived()
+  #expect(!category.takeCatalogRefit())
   #expect(category.consume() == nil)
 }
 
