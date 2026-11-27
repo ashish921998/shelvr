@@ -55,6 +55,33 @@ final class PlanAccess {
   }
 }
 
+struct ProActionGateView: View {
+  @Environment(\.copy) private var copy
+  @State private var operation: SocialOperation
+  @State private var offered = false
+
+  init(placement: String) {
+    _operation = State(initialValue: SocialOperation(placement: placement))
+  }
+
+  var body: some View {
+    ContentUnavailableView {
+      Label(copy("planGate.title"), systemImage: "sparkles")
+    } description: {
+      Text(copy("planGate.body"))
+    } actions: {
+      Button(copy("planGate.seePlans")) { operation.askToPurchase() }
+        .buttonStyle(.borderedProminent)
+    }
+    .socialOperation(operation, failure: copy("errors.tryAgain"), close: copy("common.close"))
+    .task {
+      guard !offered else { return }
+      offered = true
+      operation.askToPurchase()
+    }
+  }
+}
+
 struct PlanGateView: View {
   @Environment(\.copy) private var copy
   @Environment(PlanAccess.self) private var access

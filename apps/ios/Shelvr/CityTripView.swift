@@ -83,7 +83,7 @@ struct NewCityTripView: View {
     } catch {
       guard !Task.isCancelled else { return }
       Analytics.capture("trip_plan_failed", ["reason": PastedLink.planningFailure(error)])
-      if canOffer, listID != nil, SaveFailure(error) == .proRequired {
+      if canOffer, SaveFailure(error) == .proRequired {
         gate.askToPurchase {
           guard visible else { return }
           let retry = Task { await generate(canOffer: false) }
