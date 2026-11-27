@@ -15,6 +15,7 @@ struct LibraryPlaceEditor: View {
   @State private var busy = false
   @State private var message = ""
   @State private var attempt = 0
+  @State private var gate = SocialOperation(placement: "edit_places")
 
   var body: some View {
     Group {
@@ -69,6 +70,7 @@ struct LibraryPlaceEditor: View {
       } else { ProgressView() }
     }
     .navigationTitle(copy("placeCorrection.title"))
+    .socialOperation(gate, failure: copy("placeCorrection.retry"), close: copy("common.close"))
     .onChange(of: city) { matches = [] }
     .onChange(of: query) { matches = [] }
     .task(id: attempt) {
@@ -108,7 +110,10 @@ struct LibraryPlaceEditor: View {
       if matches.isEmpty {
         message = copy(result.available ? "tripPlanner.searchEmpty" : "tripPlanner.searchUnavailable")
       }
-    } catch { message = copy("errors.retrySoon") }
+    } catch {
+      if SaveFailure(error) == .proRequired { gate.askToPurchase() }
+      else { message = copy("errors.retrySoon") }
+    }
   }
 
   private func commit(_ original: SavePlaces) async {
@@ -118,6 +123,9 @@ struct LibraryPlaceEditor: View {
     do {
       try await backend.savePlaces(places, version: original.version, id: id)
       dismiss()
-    } catch { message = copy("placeCorrection.retry") }
+    } catch {
+      if SaveFailure(error) == .proRequired { gate.askToPurchase() }
+      else { message = copy("placeCorrection.retry") }
+    }
   }
 }
