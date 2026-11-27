@@ -8,6 +8,8 @@ struct GoOutView: View {
   let plan: (String) -> Void
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
+  @Environment(\.colorScheme) private var scheme
+  @AppStorage("swift.appearance") private var appearance = "system"
   @State private var picking = false
   @State private var mapped: [GoOutPlace]?
   @State private var citySaves: [LibrarySave]?
@@ -23,34 +25,9 @@ struct GoOutView: View {
   @State private var opened = false
 
   var body: some View {
-    List {
-      if picking {
-        if failed { Button(copy("common.retry")) { failed = false; attempt += 1 } }
-        else if let places {
-          let candidates = places.filter { $0.matches(kind) }
-          Picker(copy("map.filters"), selection: $kind) {
-            Text(copy("goOut.any")).tag(nil as String?)
-            ForEach(["food", "drinks", "activities", "shopping"], id: \.self) { kind in
-              Text(copy("map.kind\(kind.capitalized)")).tag(Optional(kind))
-            }
-          }.onChange(of: kind) { current = nil }
-          if let current, candidates.contains(current) {
-            Text(current.name).font(.title2)
-            Button(copy("plan.openMaps")) {
-              let map = MKMapItem(placemark: .init(coordinate: .init(latitude: current.lat, longitude: current.lng)))
-              map.name = current.name; map.openInMaps()
-            }
-          }
-          Button(copy(current == nil ? "goOut.roll" : "goOut.rollAgain")) { current = GoOutPlace.rolled(candidates, previous: current) }
-            .disabled(candidates.isEmpty)
-          if candidates.isEmpty { Text(copy("plan.emptyTitle")) }
-        } else { ProgressView() }
-        Button(copy("common.back")) { picking = false }
-      } else {
-        Button(copy("homePlaces.planDate")) { Analytics.capture("city_plan_started", ["kind": "date", "from": "go_out"]); plan("/date-plan") }
-        Button(copy("homePlaces.planTrip")) { Analytics.capture("city_plan_started", ["kind": "trip", "from": "go_out"]); plan("/new-trip") }
-        Button(copy("goOut.quickPick")) { Analytics.capture("go_out_spot_opened"); picking = true }
-      }
+    VStack(spacing: 0) {
+      if picking { spotPicker }
+      else { planCards }
     }
     .navigationTitle(copy(picking ? "goOut.question" : "plan.goOut"))
     .task {
@@ -72,6 +49,66 @@ struct GoOutView: View {
           }
         }
       } catch { if !Task.isCancelled { failed = true } }
+    }
+  }
+
+  private var planCards: some View {
+    let palette = HomeChromePalette(scheme, appearance: appearance)
+    return ScrollView {
+      VStack(alignment: .leading, spacing: 12) {
+        if !city.isEmpty {
+          Label(city, systemImage: "mappin")
+            .font(.custom("Satoshi-Bold", size: 15, relativeTo: .subheadline))
+            .foregroundStyle(palette.muted)
+            .padding(.bottom, 2)
+        }
+        HomeActionCard(title: copy("homePlaces.planDate"), detail: copy("goOut.dateDetail"),
+          symbol: "heart.fill", palette: palette) {
+          Analytics.capture("city_plan_started", ["kind": "date", "from": "go_out"])
+          plan("/date-plan")
+        }
+        HomeActionCard(title: copy("homePlaces.planTrip"), detail: copy("goOut.tripDetail"),
+          symbol: "suitcase.fill", palette: palette) {
+          Analytics.capture("city_plan_started", ["kind": "trip", "from": "go_out"])
+          plan("/new-trip")
+        }
+        HomeActionCard(title: copy("goOut.quickPick"), detail: copy("goOut.quickPickBody"),
+          symbol: "dice.fill", palette: palette, emphasis: .secondary) {
+          Analytics.capture("go_out_spot_opened")
+          picking = true
+        }
+          .padding(.top, 4)
+      }
+      .padding(.horizontal, 20)
+      .padding(.top, 8)
+      .padding(.bottom, 24)
+    }
+    .background(palette.background.ignoresSafeArea())
+  }
+
+  private var spotPicker: some View {
+    List {
+      if failed { Button(copy("common.retry")) { failed = false; attempt += 1 } }
+      else if let places {
+        let candidates = places.filter { $0.matches(kind) }
+        Picker(copy("map.filters"), selection: $kind) {
+          Text(copy("goOut.any")).tag(nil as String?)
+          ForEach(["food", "drinks", "activities", "shopping"], id: \.self) { kind in
+            Text(copy("map.kind\(kind.capitalized)")).tag(Optional(kind))
+          }
+        }.onChange(of: kind) { current = nil }
+        if let current, candidates.contains(current) {
+          Text(current.name).font(.title2)
+          Button(copy("plan.openMaps")) {
+            let map = MKMapItem(placemark: .init(coordinate: .init(latitude: current.lat, longitude: current.lng)))
+            map.name = current.name; map.openInMaps()
+          }
+        }
+        Button(copy(current == nil ? "goOut.roll" : "goOut.rollAgain")) { current = GoOutPlace.rolled(candidates, previous: current) }
+          .disabled(candidates.isEmpty)
+        if candidates.isEmpty { Text(copy("plan.emptyTitle")) }
+      } else { ProgressView() }
+      Button(copy("common.back")) { picking = false }
     }
   }
 }

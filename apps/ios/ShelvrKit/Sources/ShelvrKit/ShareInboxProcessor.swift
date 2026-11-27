@@ -4,7 +4,7 @@ import ShelvrInbox
 @MainActor
 protocol ShareSaver {
   var userID: String? { get }
-  func saveLink(_ url: String, operationID: String, source: SaveSource, analyticsSessionID: String?, checkpoint: () throws -> Void) async throws
+  func saveLink(_ url: String, operationID: String, source: SaveSource, analyticsSessionID: String?, checkpoint: () throws -> Void) async throws -> String
   func saveNote(_ text: String, operationID: String, source: SaveSource, analyticsSessionID: String?, checkpoint: () throws -> Void) async throws
   func savePhoto(_ photo: ImportPhoto, operationID: String, source: SaveSource, analyticsSessionID: String?, checkpoint: () throws -> Void) async throws -> String
 }
@@ -123,7 +123,7 @@ public struct ShareInboxProcessor {
     }
     switch delivery.content {
     case .link(let url):
-      try await saver.saveLink(url, operationID: delivery.operationID, source: source,
+      _ = try await saver.saveLink(url, operationID: delivery.operationID, source: source,
         analyticsSessionID: analyticsSessionID, checkpoint: checkpoint)
     case .note(let text):
       guard SiriText.fitsLibrary(text) else { throw ShareInboxError.longNoteNeedsRecovery }

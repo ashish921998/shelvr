@@ -18,6 +18,7 @@ struct SignedInView: View {
   @State private var billing: BillingDestination?
   @State private var path: [AppLink] = []
   @State private var stampMessage: String?
+  @State private var savedLink: AppLink?
 
   private enum HomeTab {
     case map, library
@@ -88,6 +89,18 @@ struct SignedInView: View {
         else if access.locked { PlanGateView() }
         else { homeViews }
       }
+      .overlay(alignment: .bottom) {
+        if let savedLink, path.isEmpty, !access.loading, !access.locked {
+          LinkSavedBanner {
+            self.savedLink = nil
+            setPath([savedLink])
+          } dismiss: {
+            self.savedLink = nil
+          }
+          .padding(.horizontal, 20)
+          .padding(.bottom, tab == .map ? 100 : 12)
+        }
+      }
       .navigationTitle(copy(tab == .map ? "navigation.map" : "navigation.library"))
       .toolbar(!access.loading && !access.locked && tab == .map ? .hidden : .visible, for: .navigationBar)
       .toolbar(showHomeActions ? .visible : .hidden, for: .bottomBar)
@@ -118,7 +131,7 @@ struct SignedInView: View {
         else { switch link.path.first {
         case "settings": AccountSettingsView()
         case "profile": AccountView().navigationTitle(copy("navigation.profile"))
-        case "add-spots": addSpots
+        case "add-spots": AddSpotsView(open: open)
         case "passport-story": PassportStoryView()
         case "trips": TripsTabView()
         case "shared-trip-links": ActiveTripLinksView()
@@ -157,7 +170,12 @@ struct SignedInView: View {
           } else { SharedListsView() }
         case "passport": PassportView(open: open)
         case "passport-card": PassportView(cardCity: link.query.first { $0.name == "city" }?.value)
-        case "add": PasteLinkView()
+        case "add":
+          PasteLinkView { id in
+            guard path.last == link else { return }
+            path = []
+            savedLink = AppLink("/item/" + id)
+          }
         case "saves": LibraryView(screen: .saves)
         case "review-saves": LibraryView(screen: .review)
         case "spots" where link.path.count == 2:
@@ -257,7 +275,10 @@ struct SignedInView: View {
       if !canSeed { librarySearchSeed = nil }
     }
     .onChange(of: path) { _, path in
-      if !path.isEmpty { librarySearchSeed = nil }
+      if !path.isEmpty {
+        librarySearchSeed = nil
+        savedLink = nil
+      }
     }
     .onChange(of: tab) { _, destination in
       if destination != .library { librarySearchSeed = nil }
@@ -291,21 +312,6 @@ struct SignedInView: View {
     case ["sign-in"]: break
     default: setPath([link])
     }
-  }
-
-  private var addSpots: some View {
-    List {
-      entry("/add", "addSheet.pasteLink", "link")
-      entry("/add", "addSheet.googleMapsList", "map")
-      entry("/new-shared-list", "sharedLists.newTitle", "person.2")
-      entry("/new-trip", "homePlaces.planTrip", "suitcase")
-      entry("/photo", "item.photo", "photo")
-      entry("/how-to-share", "addSheet.howToShare", "square.and.arrow.up")
-      if Locale.preferredLanguages.first?.hasPrefix("en") == true {
-        entry("/save-with-siri", "addSheet.saveWithSiri", "mic")
-      }
-    }
-    .navigationTitle(copy("addSheet.title"))
   }
 
   @ViewBuilder private var loadingPlan: some View {

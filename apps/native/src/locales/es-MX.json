@@ -96,6 +96,8 @@
   "common.back": "Atrás",
   "capture.linkPlaceholder": "Pega o escribe un enlace…",
   "capture.linkHint": "Un reel, TikTok o página que mencione lugares. Shelvr los pone bajo su ciudad.",
+  "capture.linkSaved": "Enlace guardado. Buscando lugares…",
+  "capture.viewSave": "Ver enlace guardado",
   "item.note": "Nota",
   "item.article": "Enlace",
   "errors.upload": "La subida ha fallado. Vuelve a intentarlo.",

@@ -95,6 +95,8 @@
   "common.back": "Back",
   "capture.linkPlaceholder": "Paste or type a link…",
   "capture.linkHint": "A reel, TikTok or page that names places. Shelvr puts them under their city.",
+  "capture.linkSaved": "Link saved. Finding places…",
+  "capture.viewSave": "View save",
   "item.note": "Note",
   "item.article": "Link",
   "errors.upload": "Uploading failed. Try again.",

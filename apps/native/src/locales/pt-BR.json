@@ -96,6 +96,8 @@
   "common.back": "Voltar",
   "capture.linkPlaceholder": "Cole ou digite um link…",
   "capture.linkHint": "Um reel, TikTok ou página que cite lugares. O Shelvr coloca cada um na sua cidade.",
+  "capture.linkSaved": "Link salvo. Buscando lugares…",
+  "capture.viewSave": "Ver link salvo",
   "item.note": "Nota",
   "item.article": "Link",
   "errors.upload": "O envio falhou. Tente novamente.",

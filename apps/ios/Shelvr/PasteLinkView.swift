@@ -2,9 +2,9 @@ import ShelvrKit
 import SwiftUI
 
 struct PasteLinkView: View {
+  let didSave: (String) -> Void
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
-  @Environment(\.dismiss) private var dismiss
   @State private var input = ""
   @State private var pending: PastedLink?
   @State private var presented = false
@@ -63,14 +63,17 @@ struct PasteLinkView: View {
     Task {
       defer { saving = false }
       do {
-        try await backend.saveLink(link.url, operationID: link.operationID, source: .manualLink,
+        let id = try await backend.saveLink(link.url, operationID: link.operationID, source: .manualLink,
           analyticsSessionID: analyticsSessionID) {
           guard ownsSaveSession() else { throw CancellationError() }
         }
         guard ownsSaveSession() else { return }
         Analytics.capture("article_saved", sessionProperties, distinctId: owner)
         if let resumed = PaywallFunnel.shared.resume("add") { Analytics.capture("paywall_blocked_action_resumed", resumed) }
-        if presented { dismiss() }
+        if presented {
+          focused = false
+          didSave(id)
+        }
       } catch {
         guard ownsSaveSession() else { return }
         var failure = properties
