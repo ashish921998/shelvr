@@ -1,5 +1,10 @@
+import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { catalogImportBatches } from "./prepare-catalog-import.mjs";
 
 const feature = (id, overrides = {}) => ({
@@ -64,5 +69,36 @@ test("catalog import batches at most 100 venues per mutation", () => {
   assert.deepEqual(
     argumentsPerBatch.map((batch) => batch.places.length),
     [100, 7],
+  );
+});
+
+test("catalog import treats cafés under casual eatery as coffee", () => {
+  const cafe = feature("cafe", {
+    taxonomy: {
+      primary: "cafe",
+      hierarchy: ["food_and_drink", "casual_eatery", "cafe"],
+    },
+  });
+  const [batch] = catalogImportBatches(collection([cafe]), "San Francisco");
+  assert.equal(batch.places[0].kind, "coffee");
+});
+
+test("running the importer via a symlink emits batch JSON", (t) => {
+  const directory = mkdtempSync(join(tmpdir(), "shelvr-catalog-import-"));
+  t.after(() => rmSync(directory, { recursive: true }));
+  const entry = join(directory, "import.mjs");
+  const input = join(directory, "places.geojson");
+  symlinkSync(
+    fileURLToPath(new URL("./prepare-catalog-import.mjs", import.meta.url)),
+    entry,
+  );
+  const places = collection([feature("open")]);
+  writeFileSync(input, JSON.stringify(places));
+  const output = execFileSync(process.execPath, [entry, input, "San Francisco"], {
+    encoding: "utf8",
+  });
+  assert.deepEqual(
+    JSON.parse(output),
+    catalogImportBatches(places, "San Francisco")[0],
   );
 });

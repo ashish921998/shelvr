@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { isMainModule } from "./main-module.mjs";
 
 const MAX_BATCH = 100;
 const LICENSES = new Set(["CC0-1.0", "CDLA-Permissive-2.0", "Apache-2.0"]);
@@ -17,7 +17,8 @@ function kindFor(taxonomy) {
     case "food_and_drink":
       if (DESSERTS.has(taxonomy.primary)) return "dessert";
       if (group === "alcoholic_beverage_venue") return "drinks";
-      if (group === "non_alcoholic_beverage_venue") return "coffee";
+      if (taxonomy.primary === "cafe" || group === "non_alcoholic_beverage_venue")
+        return "coffee";
       if (group === "restaurant" || group === "casual_eatery") return "food";
       return null;
     case "arts_and_entertainment":
@@ -107,10 +108,7 @@ export function catalogImportBatches(collection, city) {
   return batches;
 }
 
-if (
-  process.argv[1] &&
-  import.meta.url === pathToFileURL(process.argv[1]).href
-) {
+if (isMainModule(import.meta.url)) {
   const [file, city] = process.argv.slice(2);
   if (!file || !city) {
     process.stderr.write(
