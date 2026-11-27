@@ -8,9 +8,10 @@ while read -r _ local_sha remote_ref remote_sha; do
   case "$local_sha" in *[!0]*) ;; *) continue ;; esac
 
   base=$remote_sha
-  if ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+  if ! git merge-base --is-ancestor "$base" "$local_sha" 2>/dev/null; then
     base=$(git merge-base "$local_sha" "refs/remotes/${1:-origin}/main" 2>/dev/null) ||
       base=$(git merge-base "$local_sha" refs/remotes/origin/main 2>/dev/null) ||
+      base=$(git merge-base "$local_sha" "$remote_sha" 2>/dev/null) ||
       base=$(git hash-object -t tree -w /dev/null)
   fi
   GIT_ATTR_SOURCE="$local_sha" git diff --check --no-ext-diff --no-textconv "$base" "$local_sha" -- >&2 || exit $?

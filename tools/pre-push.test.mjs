@@ -103,4 +103,20 @@ test("pre-push checks branch diffs using Git alone", (t) => {
     () => work.git("push", "--quiet", "origin", "HEAD:refs/heads/conflict"),
     /leftover conflict marker/,
   );
+
+  work.git("checkout", "--quiet", "--detach", tip);
+  work.commit("old feature before rebase", { "rebased.txt": "old branch\n" });
+  work.git("push", "--quiet", "origin", "HEAD:refs/heads/rebased");
+  work.git("checkout", "--quiet", "--detach", upstream);
+  work.commit("clean feature after rebase", { "rebased.txt": "rebased branch\n" });
+  work.git("push", "--quiet", "--force", "origin", "HEAD:refs/heads/rebased");
+  const rebased = work.git("rev-parse", "HEAD").trim();
+
+  work.git("checkout", "--quiet", "--detach", upstream);
+  work.commit("bad feature after rebase", { "rebased.txt": "new whitespace \n" });
+  assert.throws(
+    () => work.git("push", "--quiet", "--force", "origin", "HEAD:refs/heads/rebased"),
+    /rebased.txt:1: trailing whitespace/,
+  );
+  assert.equal(remote.git("rev-parse", "refs/heads/rebased").trim(), rebased);
 });
