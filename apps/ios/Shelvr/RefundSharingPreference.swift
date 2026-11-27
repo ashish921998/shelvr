@@ -51,7 +51,7 @@ struct RefundSharingPreference: View {
         if !Task.isCancelled { loadFailed = true; loaded = false }
       }
     }
-    .sheet(isPresented: $reviewing) {
+    .sheet(isPresented: $reviewing, onDismiss: { saveFailed = false }) {
       NavigationStack {
         Form {
           Section {
@@ -69,7 +69,7 @@ struct RefundSharingPreference: View {
         .navigationTitle(copy("refundConsent.title"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-          Button(copy("common.close")) { saveFailed = false; reviewing = false }.disabled(saving)
+          Button(copy("common.close")) { reviewing = false }.disabled(saving)
         }
       }
       .interactiveDismissDisabled(saving)
