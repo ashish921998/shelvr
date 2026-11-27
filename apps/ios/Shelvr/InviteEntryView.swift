@@ -75,7 +75,7 @@ struct InviteEntryView: View {
             entry.previewRevision == offer.revision else { return }
           entry.accept(offer.invite, account: offer.account)
         }) { offer in
-          MemberNamePrompt(creating: false) { approvedName = offer }
+          MemberNamePrompt(kind: "join") { approvedName = offer }
         }
         .safeAreaInset(edge: .bottom) { if entry.failed { Text(copy("errors.tryAgain")).foregroundStyle(.secondary) } }
         .toolbar { ToolbarItem(placement: .cancellationAction) { Button(copy("common.close")) { entry.preview = nil } } }
@@ -168,7 +168,11 @@ struct InviteEntryView: View {
       if bound.resolution == nil {
         let result: AcceptedInvite.Resolution?
         if request.invite.kind == .list {
-          result = try await backend.joinList(token: request.invite.token).map(AcceptedInvite.Resolution.joinedList)
+          let listID = try await backend.joinList(token: request.invite.token)
+          guard current() else { return }
+          Analytics.capture("shared_list_joined", ["joined": listID != nil,
+            "onboarded_before": UserDefaults.standard.bool(forKey: "swift.onboarded." + account)])
+          result = listID.map(AcceptedInvite.Resolution.joinedList)
         } else {
           result = try await passportAvailable(request.invite.token) ? .passportComparison : nil
         }

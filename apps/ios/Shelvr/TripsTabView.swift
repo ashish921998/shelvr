@@ -56,7 +56,10 @@ struct TripsTabView: View {
       titleVisibility: .visible, presenting: removing) { trip in
       Button(copy("tripPlanner.delete"), role: .destructive) {
         Task {
-          do { try await backend.deleteTrip(trip.id) }
+          do {
+            try await backend.deleteTrip(trip.id)
+            Analytics.capture("trip_plan_deleted")
+          }
           catch { failed = true }
         }
       }

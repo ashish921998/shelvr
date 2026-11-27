@@ -82,7 +82,7 @@ struct PassportCityPicker: View {
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.dismiss) private var dismiss
-  @State private var operation = SocialOperation()
+  @State private var operation = SocialOperation(placement: "passport")
   @State private var search = ""
 
   var body: some View {

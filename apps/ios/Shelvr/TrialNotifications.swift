@@ -109,14 +109,16 @@ struct TrialReminderObserver: ViewModifier {
       .alert(copy("notifications.trialPrimerTitle"), isPresented: $primer) {
         Button(copy("notifications.trialPrimerAllow")) {
           let session = backend.sessionGeneration
+          Analytics.capture("trial_reminder_primer", ["outcome": "accepted"])
           Task {
-            _ = try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
+            let granted = (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])) == true
+            Analytics.capture("trial_reminder_permission", ["granted": granted])
             if backend.status == .signedIn && backend.sessionGeneration == session {
               refresh(.init(subscription: subscription, nudges: preferences?.remindersEnabled, active: true, user: backend.userID))
             }
           }
         }
-        Button(copy("common.notNow"), role: .cancel) {}
+        Button(copy("common.notNow"), role: .cancel) { Analytics.capture("trial_reminder_primer", ["outcome": "declined"]) }
       } message: { Text(copy("notifications.trialPrimerBody")) }
   }
 

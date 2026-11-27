@@ -113,6 +113,7 @@ struct SignedInView: View {
       }
       .navigationDestination(for: AppLink.self) { link in
         if access.loading && PlanRoutes.needsLoadedPlan(link) { loadingPlan }
+        else if !access.pro, let placement = PlanRoutes.proPlacement(link) { ProActionGateView(placement: placement).id(link) }
         else if access.locked && !PlanRoutes.allowedWithoutPersonalAccess(link) { PlanGateView() }
         else { switch link.path.first {
         case "settings": AccountSettingsView()
@@ -169,7 +170,7 @@ struct SignedInView: View {
           }.id(link)
         case "city" where link.path.count == 2: CityPlacesView(city: link.path[1]).id(link.path[1])
         case "cities": LibraryCitiesView()
-        case "item" where link.path.count == 2: LibraryItemView(id: link.path[1])
+        case "item" where link.path.count == 2: LibraryItemView(id: link.path[1], from: link.query.first { $0.name == "from" }?.value)
         case "edit-save-places":
           if let id = link.query.first(where: { $0.name == "itemId" })?.value {
             LibraryPlaceEditor(id: id).id(id)

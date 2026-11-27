@@ -55,6 +55,11 @@ public enum TripEdit {
     }
   }
 
+  public static func renamed(_ input: String, from current: String?) -> Bool {
+    let name = input.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+    return name != (current ?? "")
+  }
+
   public static func validTime(_ input: String) -> Bool {
     input.isEmpty || input.range(of: #"^(?:[01][0-9]|2[0-3]):[0-5][0-9]$"#, options: .regularExpression) != nil
   }

@@ -97,20 +97,37 @@ export default defineSchema({
 
   places: defineTable({
     name: v.string(),
+    searchName: v.optional(v.string()),
     city: v.string(),
     lat: v.number(),
     lng: v.number(),
-    appleId: v.string(),
+    appleId: v.optional(v.string()),
+    overtureId: v.optional(v.string()),
+    source: v.optional(v.literal("overture")),
     category: v.optional(v.string()),
     cuisine: v.optional(cuisineValidator),
     kind: v.optional(placeKindValidator),
     features: v.optional(v.array(placeFeatureValidator)),
     sources: v.optional(v.array(v.object({ url: v.string() }))),
-    status: v.union(v.literal("live"), v.literal("hidden")),
+    status: v.union(
+      v.literal("live"),
+      v.literal("hidden"),
+      v.literal("catalog"),
+    ),
     addedAt: v.number(),
   })
     .index("by_status", ["status"])
-    .index("by_apple_id", ["appleId"]),
+    .index("by_apple_id", ["appleId"])
+    .index("by_overture_id", ["overtureId"])
+    .index("by_city_and_name_and_lat", ["city", "name", "lat"])
+    .searchIndex("search_name", {
+      searchField: "name",
+      filterFields: ["status", "searchName"],
+    })
+    .searchIndex("search_folded_name", {
+      searchField: "searchName",
+      filterFields: ["status"],
+    }),
 
   placeRemovals: defineTable({
     userId: v.string(),

@@ -30,11 +30,11 @@ struct SharedInboxReceiver: ViewModifier {
           InboxSignal.shared.wake()
         }
       }) { destination in
-        BillingSheet(destination: destination, confirmed: { retryAfterBilling = true })
+        BillingSheet(destination: destination, placement: "share", confirmed: { retryAfterBilling = true })
       }
       .alert(copy("share.singleFailure"), isPresented: Binding(get: { failure != nil }, set: { if !$0 { failure = nil } })) {
         if failure?.requiresPro == true {
-          Button(copy("freePlan.seePlans")) { billing = .paywall }
+          Button(copy("freePlan.seePlans")) { PaywallFunnel.shared.block("share"); billing = .paywall }
         } else if let failure, failure.canRecoverNote, let share = failure.share {
           Button(copy("share.copyNote")) { copyRecoveredNote(share) }
         } else {
@@ -63,9 +63,9 @@ struct SharedInboxReceiver: ViewModifier {
   }
 
   private func syncOwner() {
-    if let inbox = ShareInbox.system(), backend.status == .signedOut || backend.status == .signedIn {
+    if let inbox = ShareInbox.system(), backend.status == .signedOut || backend.userID != nil {
       do { try ShareInboxProcessor(inbox: inbox, backend: backend).updateOwner() }
-      catch { try? inbox.activate(nil) }
+      catch { Analytics.failure("share_inbox_owner_update_failed") }
     }
     InboxSignal.shared.wake()
   }
@@ -78,6 +78,12 @@ struct SharedInboxReceiver: ViewModifier {
     case .failed(let attempt, let failure):
       Analytics.capture("save_failed", ["save_kind": attempt.kind, "save_source": attempt.source.rawValue,
         "operation_id": attempt.operationID, "stage": failure.stage])
+      if attempt.kind == "image" {
+        Analytics.capture("images_save_failed", ["reason": failure.imageReason, "image_count": 1])
+      }
+    case .saved(let count):
+      Analytics.capture("shared_content_saved", ["item_count": count])
+      if let resumed = PaywallFunnel.shared.resume("share") { Analytics.capture("paywall_blocked_action_resumed", resumed) }
     }
   }
 

@@ -99,6 +99,8 @@ struct OnboardingForm: View {
   @State private var cityQuery = ""
   @State private var practiceShare = false
   @State private var carousel = 0
+  @State private var openerPages = Set<Int>()
+  @State private var completion = OnboardingCompletion()
 
   init(account: String?, onSignIn: ((WelcomeHandoff.Purpose) -> Void)?, onFinished: @escaping () -> Void = {}) {
     self.account = account
@@ -118,8 +120,8 @@ struct OnboardingForm: View {
       Group {
         if progress.step == .opener {
           ViewThatFits(in: .vertical) {
-            OnboardingOpener(palette: palette)
-            ScrollView { OnboardingOpener(palette: palette).fixedSize(horizontal: false, vertical: true) }
+            OnboardingOpener(palette: palette, viewedPages: $openerPages)
+            ScrollView { OnboardingOpener(palette: palette, viewedPages: $openerPages).fixedSize(horizontal: false, vertical: true) }
           }
           .padding(.horizontal, 24).padding(.top, 12).padding(.bottom, 8)
         } else {
@@ -205,7 +207,7 @@ struct OnboardingForm: View {
         if purchased || free || unavailable { finish() }
         else if progress.step == .notifications { progress.step = .carousel; carousel = 2; persist() }
       }) {
-        BillingSheet(destination: .paywall, goalVariables: goalVariables,
+        BillingSheet(destination: .paywall, placement: "onboarding", goalVariables: goalVariables,
           availabilityChanged: { available in
             unavailable = !available
             if !available { paywall = false }
@@ -415,11 +417,8 @@ struct OnboardingForm: View {
   }
 
   private func stepProperties(_ step: OnboardingProgress.Step) -> [String: Any] {
-    let ids: [OnboardingProgress.Step: String] = [.savedCount: "saved_count", .been: "been_cities",
-      .chart: "progress_chart", .cityEcho: "city_echo", .ahaShare: "aha_share", .firstSave: "first_save",
-      .ahaSpots: "aha_spots", .notifications: "notification_ask"]
-    return ["step_id": ids[step] ?? step.rawValue, "step_index": OnboardingProgress.Step.allCases.firstIndex(of: step) ?? 0,
-      "flow_version": 27]
+    ["step_id": OnboardingProgress.stepIDs[step] ?? step.rawValue, "step_index": OnboardingProgress.Step.allCases.firstIndex(of: step) ?? 0,
+      "flow_version": OnboardingProgress.flowVersion]
   }
 
   private func recordCompletion(skipped skip: Bool) {
@@ -439,9 +438,9 @@ struct OnboardingForm: View {
     if progress.step == .notifications {
       busy = true
       Task {
-        if !skip, (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])) == true {
-          pushDevice.retryEnrollment()
-        }
+        let granted = skip ? false : (try? await pushDevice.requestAuthorization()) == true
+        Analytics.capture("onboarding_notifications", ["action": skip ? "skip" : "allow", "granted": granted])
+        if granted { pushDevice.retryEnrollment() }
         await checkAccess(skipped: skip)
       }
     } else if progress.step == .carousel {
@@ -503,11 +502,12 @@ struct OnboardingForm: View {
   }
 
   private func finish() {
-    guard let account, backend.userID == account else { return }
+    guard let account else { return }
     let entry = OnboardingHandoff(cities: progress.visitedCities.sorted(), url: progress.skippedShare ? nil : reel?.url,
       operation: progress.demoOperationID, space: nil)
     do {
-      try entry.save(account)
+      guard let owner = try completion.commit(for: account, currentAccount: backend.userID, save: { try entry.save(account) }) else { return }
+      Analytics.capture("onboarding_completed", progress.completedProperties, distinctId: owner)
       onFinished()
       UserDefaults.standard.removeObject(forKey: WelcomeHandoff.progressKey(account))
     } catch { errorKey = "errors.tryAgain" }
