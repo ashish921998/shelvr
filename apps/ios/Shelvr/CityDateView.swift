@@ -126,7 +126,7 @@ struct CityDateView: View {
     } catch {
       guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
       Analytics.capture("date_plan_failed", ["reason": PastedLink.planningFailure(error)])
-      if canOffer, listID != nil, SaveFailure(error) == .proRequired {
+      if canOffer, SaveFailure(error) == .proRequired {
         gate.askToPurchase { await generate(kind, firstSpot: firstSpot, canOffer: false) }
       } else { failed = true }
     }

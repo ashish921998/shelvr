@@ -5,6 +5,7 @@ struct CityVotesView: View {
   let city: String
   let pins: [CityPlace]
   @Environment(Backend.self) private var backend
+  @Environment(PlanAccess.self) private var access
   @Environment(\.copy) private var copy
   @State private var votes: CityVotes?
   @State private var selection = Set<CityPlace>()
@@ -16,6 +17,8 @@ struct CityVotesView: View {
   @State private var presenting = false
   @State private var message = ""
   @State private var seen = false
+  @State private var askGate = SocialOperation(placement: "plan_vote")
+  @State private var linkGate = SocialOperation(placement: "plan_vote")
 
   var body: some View {
     Section {
@@ -40,6 +43,7 @@ struct CityVotesView: View {
       if failed { Button(copy("common.retry")) { attempt += 1 } }
       else {
         Button(copy("plan.ask")) {
+          guard access.pro else { askGate.askToPurchase(); return }
           let existing = openLink
           Analytics.capture("plan_ask_opened", ["has_link": existing != nil])
           let mapped = pins.filter { existing?.match($0, among: pins) != nil }
@@ -47,9 +51,10 @@ struct CityVotesView: View {
           share = nil
           message = ""
           presenting = true
-        }.disabled(!loaded || pins.isEmpty)
+        }.disabled(access.loading || !loaded || pins.isEmpty)
       }
     }
+    .socialOperation(askGate, failure: copy("plan.askFailedTitle"), close: copy("common.close"))
     .sheet(isPresented: $presenting) {
       NavigationStack {
         Form {
@@ -69,7 +74,8 @@ struct CityVotesView: View {
           if let share {
             ShareLink(item: share) { Label(copy("plan.shareLink"), systemImage: "square.and.arrow.up") }
           } else {
-            Button(copy("plan.askSend")) { Task { await prepare() } }.disabled(chosen.isEmpty)
+            Button(copy("plan.askSend")) { linkGate.run { try await prepare() } }
+              .disabled(chosen.isEmpty || linkGate.busy)
           }
           if !message.isEmpty { Text(message) }
         }.disabled(busy)
@@ -77,6 +83,7 @@ struct CityVotesView: View {
         .toolbar { Button(copy("common.done")) { presenting = false } }
         .interactiveDismissDisabled(busy)
       }
+      .socialOperation(linkGate, failure: copy("plan.askFailedTitle"), close: copy("common.close"))
     }
     .task(id: attempt) {
       failed = false
@@ -92,7 +99,7 @@ struct CityVotesView: View {
   private var openLink: CityVotes? { votes.flatMap { $0.isOpen(at: .now) ? $0 : nil } }
   private var chosen: [CityPlace] { pins.filter(selection.contains) }
 
-  private func prepare() async {
+  private func prepare() async throws {
     guard !busy, !chosen.isEmpty, let owner = backend.userID else { return }
     let session = backend.sessionGeneration
     busy = true
@@ -108,6 +115,7 @@ struct CityVotesView: View {
       message = ""
     } catch {
       guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
+      if SaveFailure(error) == .proRequired { throw error }
       Analytics.capture("plan_ask_failed", ["reason": "link"])
       message = copy("plan.askFailedTitle")
     }
