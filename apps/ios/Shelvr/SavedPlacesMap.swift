@@ -53,10 +53,7 @@ struct SavedPlacesMap: View {
       visited: scene.visited, selectedLabelID: selectedLabelID, copy: copy, topControlsHeight: topControlsHeight,
       bottomControlsHeight: focusedSearch ? 0 : bottomControlsHeight, locateFrame: searching ? nil : locateFrame,
       onArea: { updateDiscoverArea($0); viewport = $1 },
-      onUserMove: cancelCameraRequests, onPick: selectPlace, onCluster: { places in
-        cancelCameraRequests()
-        cluster = places
-      })
+      onUserMove: cancelCameraRequests, onPick: selectPlace, onCluster: { cluster = $0 })
       .ignoresSafeArea(.container)
       .overlay(alignment: .top) {
         Group {
