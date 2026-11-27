@@ -327,8 +327,18 @@ struct SavedPlacesMap: View {
       .frame(minHeight: 50)
       if focusedSearch { filterStrip(scene, palette: palette).padding(.horizontal, -20) }
       retryControl(palette, catalogFailed: catalogFailed)
+      if showAttribution, !scene.visible.isEmpty, let url = URL(string: "https://docs.overturemaps.org/attribution/") {
+        Link("Overture Maps", destination: url)
+          .font(.caption)
+          .foregroundStyle(palette.muted)
+          .padding(.horizontal, 12)
+          .frame(minHeight: 44)
+          .background(palette.surface, in: Capsule())
+          .frame(maxWidth: .infinity, alignment: .leading)
+          .layoutPriority(1)
+      }
       if scene.filters.hasSearch && resultsOpen && (!scene.visible.isEmpty || (errors.isEmpty && !catalogFailed)) {
-        VStack(alignment: .leading, spacing: 0) {
+        let results = VStack(alignment: .leading, spacing: 0) {
           ForEach(scene.visible.prefix(5)) { place in
             Button {
               Analytics.capture("map_search_result_opened")
@@ -358,10 +368,10 @@ struct SavedPlacesMap: View {
                 .padding(.vertical, 8).frame(maxWidth: .infinity, alignment: .leading)
             }
           }
-          if showAttribution, !scene.visible.isEmpty, let url = URL(string: "https://docs.overturemaps.org/attribution/") {
-            Link("Overture Maps", destination: url).font(.caption)
-              .foregroundStyle(palette.muted).padding(.vertical, 6)
-          }
+        }
+        ViewThatFits(in: .vertical) {
+          results
+          ScrollView { results }.scrollBounceBehavior(.basedOnSize)
         }
         .padding(.horizontal, 16).padding(.vertical, 6)
         .background(palette.surface, in: RoundedRectangle(cornerRadius: 16))

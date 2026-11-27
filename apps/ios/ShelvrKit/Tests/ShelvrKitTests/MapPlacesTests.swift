@@ -117,23 +117,21 @@ import Testing
   #expect(MapPlace.search([catalog.place], catalog: [catalog.place], query: "tea house") == [catalog.place])
 
   let discover = Data("""
-    [{"_id":"near","name":"Tea House","city":"Taipei","lat":25,"lng":121,"appleId":"tea","kinds":["coffee"]},
-    {"_id":"far","name":"Tea House","city":"Taipei","lat":25.01,"lng":121,"appleId":"different","kinds":["coffee"]}]
+    [{"_id":"north","name":"Tea House","city":"Taipei","lat":25.0001,"lng":121,"appleId":"tea","kinds":["coffee"]},
+    {"_id":"south","name":"Tea House","city":"Taipei","lat":24.9999,"lng":121,"appleId":"different","kinds":["coffee"]}]
     """.utf8)
   let branches = try JSONDecoder().decode([MapPlace.DiscoverRow].self, from: discover).map(\.place)
-  #expect(MapPlace.search(branches, catalog: [catalog.place], query: "tea house") == branches)
+  #expect(MapPlace.search(branches, catalog: [catalog.place], query: "tea house") == [catalog.place] + branches)
   let indexed = MapScene(saved: [], discover: branches, visits: [], filters: .init(search: "tea-house"), catalog: [catalog.place])
-  #expect(indexed.visible == [branches[0]])
+  #expect(indexed.visible == [catalog.place])
 
   let save = Data(#"{"itemId":"private","name":"Tea House","city":"Taipei","lat":25,"lng":121,"appleId":"tea","kinds":["coffee"]}"#.utf8)
   let personal = try JSONDecoder().decode(MapPlace.SavedRow.self, from: save).place
-  let savedMatch = MapScene(saved: [personal], discover: [], visits: [], filters: .init(search: "tea-house"), catalog: [catalog.place])
+  let savedMatch = MapScene(saved: [personal], discover: [], visits: [], filters: .init(search: "tea-house"), catalog: [branches[0]])
   #expect(savedMatch.visible == [personal])
 
   let noApple = Data(#"{"itemId":"unkeyed","name":"Tea House","city":"Taipei","lat":25,"lng":121,"kinds":["coffee"]}"#.utf8)
   let unkeyed = try JSONDecoder().decode(MapPlace.SavedRow.self, from: noApple).place
-  for query in ["tea house", "tea-house"] {
-    let hit = MapScene(saved: [unkeyed], discover: [], visits: [], filters: .init(search: query), catalog: [branches[0]])
-    #expect(hit.visible == [unkeyed])
-  }
+  let found = MapScene(saved: [unkeyed], discover: [], visits: [], filters: .init(search: "tea house"), catalog: [branches[0]])
+  #expect(found.visible == [unkeyed, branches[0]])
 }

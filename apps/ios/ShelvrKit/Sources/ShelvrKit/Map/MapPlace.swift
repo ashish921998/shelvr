@@ -157,16 +157,7 @@ public struct MapPlace: Hashable, Identifiable, Sendable {
   }
 
   private func catalogRepresentative(in candidates: [Self]) -> Self? {
-    candidates.first { $0.id == id || (appleId != nil && $0.appleId == appleId) } ??
-      candidates.first { $0.isNearbyCatalogVenue(self) }
-  }
-
-  private func isNearbyCatalogVenue(_ other: Self) -> Bool {
-    guard (isSaved || appleId != nil), appleId == nil || other.appleId == nil,
-      let city, let otherCity = other.city, Self.key(city) == Self.key(otherCity),
-      Self.key(name) == Self.key(other.name)
-    else { return false }
-    return Self.km(lat, lng, other.lat, other.lng) <= 0.025
+    candidates.first { $0.id == id || (appleId != nil && $0.appleId == appleId) }
   }
 
   public enum LabelPriority: Int {
