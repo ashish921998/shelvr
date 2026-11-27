@@ -162,17 +162,12 @@ struct SignInView: View {
   }
 
   private func appleCredential(_ authorization: ASAuthorization) -> SignInCredential? {
-    guard
-      let apple = authorization.credential as? ASAuthorizationAppleIDCredential,
-      let identityToken = apple.identityToken.flatMap({ String(data: $0, encoding: .utf8) })
-    else { return nil }
-    let name = [apple.fullName?.givenName, apple.fullName?.familyName]
-      .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " ")
+    guard let apple = authorization.credential as? ASAuthorizationAppleIDCredential else {
+      return nil
+    }
     return .apple(
-      identityToken: identityToken,
-      nonce: nonce.raw,
-      name: name,
-      authorizationCode: apple.authorizationCode.flatMap { String(data: $0, encoding: .utf8) })
+      identityToken: apple.identityToken, nonce: nonce.raw, fullName: apple.fullName,
+      authorizationCode: apple.authorizationCode)
   }
 
   private func googleCredential() async throws -> SignInCredential? {
@@ -187,11 +182,7 @@ struct SignInView: View {
     } catch ASWebAuthenticationSessionError.canceledLogin {
       return nil
     }
-    guard
-      let code = URLComponents(url: callback, resolvingAgainstBaseURL: false)?
-        .queryItems?.first(where: { $0.name == "code" })?.value
-    else { throw AuthSessionError.signInRefused }
-    return .oauthCode(provider: "google", code: code, verifier: start.verifier)
+    return try .oauthCode(provider: "google", callback: callback, start: start)
   }
 }
 

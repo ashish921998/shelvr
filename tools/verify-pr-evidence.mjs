@@ -40,7 +40,7 @@ const OWNER_PATTERNS = [
   /^apps\/native\/src\/lib\/(entitlement|revenuecat-[\w-]+|paywall-[\w-]+|onboarding-paywall|plan-gate|trial-[\w-]+|purchase-[\w-]+|use-restore-purchases|manage-subscription|list-gate)\.ts$/,
   /^apps\/native\/src\/app\/\(app\)\/(paywall|plan-gate)\.tsx$/,
   /^apps\/native\/(eas\.json|app\.json|app\.config\.js|released-builds\.json)$/,
-  /^apps\/ios\/(Config\/|Shelvr\.xcodeproj\/|ShelvrKit\/Sources\/ShelvrKit\/(Auth\/|Backend\.swift$))/,
+  /^apps\/ios\/(Config\/|Shelvr\.xcodeproj\/|ShelvrKit\/Sources\/ShelvrKit\/(Auth\/|(Backend|AppEnvironment)\.swift$))/,
   /^\.github\/(workflows|actions)\//,
   /^\.github\/CODEOWNERS$/,
   /^tools\/verify-pr-evidence\.mjs$/,
@@ -295,10 +295,15 @@ export function evidenceProblems(
   return problems;
 }
 
-function changedFilesSince(base, head) {
-  return execFileSync("git", ["diff", "--name-only", `${base}...${head}`], {
-    encoding: "utf8",
-  })
+export function changedFilesSince(base, head, cwd) {
+  return execFileSync(
+    "git",
+    ["diff", "--name-only", "--no-renames", `${base}...${head}`],
+    {
+      cwd,
+      encoding: "utf8",
+    },
+  )
     .split("\n")
     .filter(Boolean);
 }

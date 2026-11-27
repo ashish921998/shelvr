@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
+import { createRepo } from "./temp-repo.mjs";
+
 import {
+  changedFilesSince,
   evidenceProblems,
   hasContent,
   hasVisualEvidence,
@@ -149,6 +152,7 @@ test("the owner paths cover billing, auth, release and CI", () => {
     "apps/ios/Config/Shelvr.entitlements",
     "apps/ios/ShelvrKit/Sources/ShelvrKit/Auth/AuthSession.swift",
     "apps/ios/ShelvrKit/Sources/ShelvrKit/Backend.swift",
+    "apps/ios/ShelvrKit/Sources/ShelvrKit/AppEnvironment.swift",
     "apps/ios/Shelvr.xcodeproj/project.pbxproj",
     ".github/workflows/ci.yml",
     ".github/actions/secure-review/action.yml",
@@ -408,4 +412,24 @@ test("a subsection ends at the next heading of its level", () => {
   assert.equal(section(body, "What I ran").trim(), "ran it");
   assert.equal(section(body, "not verified:").trim(), "nothing");
   assert.equal(section(body, "Missing"), null);
+});
+
+test("a renamed owner file lists its old path too", () => {
+  const { dir, git, commit, remove } = createRepo("verify-pr-evidence-");
+  try {
+    const owner = "apps/ios/ShelvrKit/Sources/ShelvrKit/AppEnvironment.swift";
+    commit("base", { [owner]: "struct AppEnvironment {}\n".repeat(20) });
+    const base = git("rev-parse", "HEAD").trim();
+    git("mv", owner, "apps/ios/ShelvrKit/Sources/ShelvrKit/Environment.swift");
+    commit("move it out of the owner paths");
+    const changed = changedFilesSince(base, "HEAD", dir);
+    assert.ok(changed.includes(owner), changed.join(", "));
+    assert.ok(
+      changed.includes(
+        "apps/ios/ShelvrKit/Sources/ShelvrKit/Environment.swift",
+      ),
+    );
+  } finally {
+    remove();
+  }
 });
