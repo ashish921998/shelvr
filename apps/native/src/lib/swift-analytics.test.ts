@@ -128,7 +128,7 @@ const SWIFT: Record<keyof AnalyticsEventProperties, SwiftStatus> = {
   passport_story_share_opened: { missing: PASSPORT },
   passport_city_completed: { missing: PASSPORT },
   passport_city_stamp_changed: { missing: PASSPORT },
-  passport_city_stamps_claimed: { missing: PASSPORT },
+  passport_city_stamps_claimed: "sent",
   passport_city_stamps_opened: { missing: PASSPORT },
   passport_compare_opened: { missing: PASSPORT },
   passport_compare_resumed: { missing: PASSPORT },

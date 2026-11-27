@@ -58,6 +58,7 @@ struct HomeActionCard: View {
 
 struct HomeChromePalette {
   let background, frame, surface, foreground, muted, primaryText, border: Color
+  let stampInks: [Color]
   let shadow = Color(rgb: 0x2b2418)
 
   init(_ scheme: ColorScheme, appearance: String) {
@@ -70,6 +71,7 @@ struct HomeChromePalette {
       muted = Color(.muted)
       primaryText = Color(rgb: 0x935d09)
       border = Color(rgb: 0xece3d1)
+      stampInks = [0xb3261e, 0x176b3a, 0x1f56b8, 0x6b3fb0, 0x095f63, 0x7d5100].map(Color.init(rgb:))
     } else if neutralDark {
       background = Color(rgb: 0x111417)
       frame = Color(rgb: 0x1b1f24)
@@ -78,6 +80,7 @@ struct HomeChromePalette {
       muted = Color(rgb: 0xa2abb5)
       primaryText = Color(rgb: 0xffd60a)
       border = Color(rgb: 0x2c3238)
+      stampInks = [0xf08b80, 0x6fcf8c, 0x7fabf5, 0xb79af2, 0x52cbd0, 0xe3b45a].map(Color.init(rgb:))
     } else {
       background = Color(.background)
       frame = Color(rgb: 0x231e16)
@@ -86,6 +89,7 @@ struct HomeChromePalette {
       muted = Color(.muted)
       primaryText = Color(rgb: 0xf0c078)
       border = Color(rgb: 0x332c20)
+      stampInks = [0xf08b80, 0x6fcf8c, 0x7fabf5, 0xb79af2, 0x52cbd0, 0xe3b45a].map(Color.init(rgb:))
     }
   }
 }

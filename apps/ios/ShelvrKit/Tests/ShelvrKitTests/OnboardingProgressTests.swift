@@ -135,3 +135,80 @@ import Testing
   #expect(properties["sample_city"] as? String == "lisbon")
   #expect(OnboardingProgress.flowVersion == 27)
 }
+
+private enum OnboardingReplayTestError: Error { case temporarilyUnavailable }
+
+@Test func onboardingCompletesOnceAfterPersistingForTheCurrentAccount() throws {
+  var completion = OnboardingCompletion()
+  var writes = 0
+  #expect(completion.commit(for: "alice", currentAccount: "bob", save: { writes += 1 }) == nil)
+  #expect(throws: OnboardingReplayTestError.self) {
+    _ = try completion.commit(for: "alice", currentAccount: "alice") {
+      throw OnboardingReplayTestError.temporarilyUnavailable
+    }
+  }
+  #expect(completion.commit(for: "alice", currentAccount: "alice", save: { writes += 1 }) == "alice")
+  #expect(completion.commit(for: "alice", currentAccount: "alice", save: { writes += 1 }) == nil)
+  #expect(writes == 1)
+}
+
+@MainActor @Test func temporarilyUnavailableAccountsResumeAnUnfinishedStampClaim() async throws {
+  let reel = try #require(URL(string: "https://example.com/reel"))
+  var pending: OnboardingHandoff? = .init(cities: ["austin", "lisbon"], url: reel, operation: "link:fixture", space: nil)
+  var scope = OnboardingStampReplay.Scope.active
+  var requests = 0
+  var delays: [Int] = []
+  var events: [OnboardingStampReplay.Claim] = []
+
+  await OnboardingStampReplay.run(account: "alice", scope: { scope }, pending: { pending }, claim: { cities in
+    #expect(cities == ["austin", "lisbon"])
+    requests += 1
+    if requests == 1 {
+      scope = .suspended
+      throw OnboardingReplayTestError.temporarilyUnavailable
+    }
+    return 1
+  }, store: { pending = $0 }, record: { events.append($0) }, pause: { delay in
+    delays.append(delay)
+    if delays.count == 2 { scope = .active }
+  })
+
+  #expect(requests == 2)
+  #expect(delays == [2, 4])
+  #expect(events == [.init(account: "alice", picked: 2, stamped: 1)])
+  #expect(pending?.cities == [])
+  #expect(pending?.url == reel)
+}
+
+@MainActor @Test func aSuccessfulClaimKeepsItsCountThroughASuspensionWithoutMakingASecondRequest() async {
+  var pending: OnboardingHandoff? = .init(cities: ["austin"], url: nil, operation: "link:fixture", space: nil)
+  var scope = OnboardingStampReplay.Scope.active
+  var requests = 0
+  var events: [OnboardingStampReplay.Claim] = []
+
+  await OnboardingStampReplay.run(account: "alice", scope: { scope }, pending: { pending }, claim: { _ in
+    requests += 1
+    scope = .suspended
+    return 1
+  }, store: { pending = $0 }, record: { events.append($0) }, pause: { _ in
+    #expect(events.isEmpty)
+    #expect(pending?.cities == ["austin"])
+    scope = .active
+  })
+
+  #expect(requests == 1)
+  #expect(events == [.init(account: "alice", picked: 1, stamped: 1)])
+  #expect(pending == nil)
+}
+
+@MainActor @Test func aStampResponseFromAnEndedSessionDoesNotClearOrRecordTheHandoff() async {
+  let pending = OnboardingHandoff(cities: ["austin"], url: nil, operation: "link:fixture", space: nil)
+  var scope = OnboardingStampReplay.Scope.active
+
+  await OnboardingStampReplay.run(account: "alice", scope: { scope }, pending: { pending }, claim: { _ in
+    scope = .ended
+    return 1
+  }, store: { _ in Issue.record("Ended session must keep the stored handoff") },
+    record: { _ in Issue.record("Ended session must not emit a claim event") },
+    pause: { _ in Issue.record("Ended session must stop replay") })
+}
