@@ -7,7 +7,7 @@ struct StampDetail: View {
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @State private var remove = false
-  @State private var operation = SocialOperation()
+  @State private var operation = SocialOperation(placement: "passport")
 
   var body: some View {
     NavigationStack {

@@ -34,7 +34,7 @@ struct RootView: View {
       if let queued = invites.discardNavigation(unless: session) { route(queued) }
     }
     .task(id: backend.sessionGeneration) {
-      if backend.status == .signedOut { Analytics.identify(nil) }
+      if backend.status == .signedOut { Analytics.identify(nil); PaywallFunnel.shared.reset() }
       if backend.status == .offline {
         let id = await backend.offlineAccountID()
         guard !Task.isCancelled, backend.status == .offline else { return }

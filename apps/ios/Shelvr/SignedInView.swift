@@ -169,7 +169,7 @@ struct SignedInView: View {
           }.id(link)
         case "city" where link.path.count == 2: CityPlacesView(city: link.path[1]).id(link.path[1])
         case "cities": LibraryCitiesView()
-        case "item" where link.path.count == 2: LibraryItemView(id: link.path[1])
+        case "item" where link.path.count == 2: LibraryItemView(id: link.path[1], from: link.query.first { $0.name == "from" }?.value)
         case "edit-save-places":
           if let id = link.query.first(where: { $0.name == "itemId" })?.value {
             LibraryPlaceEditor(id: id).id(id)

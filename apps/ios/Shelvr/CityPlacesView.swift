@@ -9,10 +9,11 @@ struct CityPlacesView: View {
   @State private var saves: [LibrarySave]?
   @State private var marks: [MapVisit]?
   @State private var visitFailure = false
-  @State private var operation = SocialOperation()
+  @State private var operation = SocialOperation(placement: "mark_visited")
   @State private var selected: CityPlace?
   @State private var attempt = 0
   @State private var failed = false
+  @State private var opened = false
 
   var body: some View {
     Group {
@@ -33,7 +34,7 @@ struct CityPlacesView: View {
             planLink("/city-card", "cityCard.share", "square.and.arrow.up")
             CityVotesView(city: city, pins: pins)
             planLink("/go-out", "plan.goOut", "figure.walk")
-            planLink("/new-trip", "homePlaces.planTrip", "suitcase")
+            planLink("/new-trip", "homePlaces.planTrip", "suitcase", trip: true)
           }
           ForEach(pins) { pin in
             if let link = AppLink("/item/" + pin.itemID) {
@@ -42,7 +43,8 @@ struct CityPlacesView: View {
                 if marks != nil, !visitFailure {
                   Button {
                     let next = !went.contains(pin)
-                    operation.run { try await backend.changeVisit(pin, went: next) }
+                    operation.run { try await backend.changeVisit(pin, went: next)
+                      Analytics.capture("city_place_visited", ["visited": next]) }
                   } label: {
                     Image(systemName: went.contains(pin) ? "checkmark.seal.fill" : "seal").frame(width: 44, height: 44)
                   }.buttonStyle(.borderless).disabled(operation.busy)
@@ -80,18 +82,22 @@ struct CityPlacesView: View {
     .task(id: attempt) {
       failed = false
       do {
-        for try await saves in backend.citySaves(city) { self.saves = saves }
+        for try await saves in backend.citySaves(city) {
+          self.saves = saves
+          if !opened { opened = true; Analytics.capture("city_opened", ["count": saves.count]) }
+        }
       } catch { if !Task.isCancelled { failed = true } }
     }
   }
 
-  private func planLink(_ route: String, _ key: String, _ symbol: String) -> some View {
+  private func planLink(_ route: String, _ key: String, _ symbol: String, trip: Bool = false) -> some View {
     var parts = URLComponents()
     parts.path = route
     parts.queryItems = [URLQueryItem(name: "city", value: city)]
     return Group {
       if let link = parts.string.flatMap({ AppLink($0) }) {
         NavigationLink(value: link) { Label(copy(key), systemImage: symbol) }
+          .simultaneousGesture(TapGesture().onEnded { if trip { Analytics.capture("city_plan_started", ["kind": "trip", "from": "direct"]) } })
       }
     }
   }

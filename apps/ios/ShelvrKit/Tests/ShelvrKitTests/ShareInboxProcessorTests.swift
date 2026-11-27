@@ -90,7 +90,9 @@ private final class RecordingPhotoMutations: PhotoMutationClient {
     #expect(attempt.kind == "link" && attempt.source == .shareExtension)
 
     saver.refuseLink = false
-    #expect(try await processor.drain(owner: "first", analyticsSessionID: "fixture") == nil)
+    events = []
+    #expect(try await processor.drain(owner: "first", analyticsSessionID: "fixture", observe: { events.append($0) }) == nil)
+    #expect(events == [.started(attempt), .saved(count: 1)])
     #expect(saver.sentLinks == [link.value])
     #expect(saver.linkSessions == ["fixture"])
     #expect(try inbox.batches().isEmpty)
@@ -200,5 +202,20 @@ private func tinyPNG() throws -> Data {
     #expect(failure.copyKey == "freePlan.leftBody")
     #expect(!failure.canRecoverNote)
     #expect(try failure.share?.delivery.get().operationID == note.operationID)
+  }
+}
+
+@MainActor @Test func eachSavedShareBatchReportsItsOwnCount() async throws {
+  try await withShareInbox { inbox in
+    try inbox.activate("first")
+    let one = try inbox.stage(owner: "first")
+    try inbox.publish([InboxPayload(kind: .link, value: "https://example.com/a"),
+      InboxPayload(kind: .note, value: "note")], in: one)
+    let two = try inbox.stage(owner: "first")
+    try inbox.publish([InboxPayload(kind: .link, value: "https://example.com/b")], in: two)
+    let processor = ShareInboxProcessor(inbox: inbox, saver: RecordingShareSaver())
+    var counts: [Int] = []
+    _ = try await processor.drain(owner: "first", observe: { if case .saved(let count) = $0 { counts.append(count) } })
+    #expect(counts.sorted() == [1, 2])
   }
 }
