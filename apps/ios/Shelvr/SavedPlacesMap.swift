@@ -53,7 +53,10 @@ struct SavedPlacesMap: View {
       visited: scene.visited, selectedLabelID: selectedLabelID, copy: copy, topControlsHeight: topControlsHeight,
       bottomControlsHeight: focusedSearch ? 0 : bottomControlsHeight, locateFrame: searching ? nil : locateFrame,
       onArea: { updateDiscoverArea($0); viewport = $1 },
-      onUserMove: cancelCameraRequests, onPick: selectPlace, onCluster: { cluster = $0 })
+      onUserMove: cancelCameraRequests, onPick: selectPlace, onCluster: { places in
+        cancelCameraRequests()
+        cluster = places
+      })
       .ignoresSafeArea(.container)
       .overlay(alignment: .top) {
         Group {
@@ -154,6 +157,7 @@ struct SavedPlacesMap: View {
   }
 
   private func selectPlace(_ place: MapPlace) {
+    cancelCameraRequests()
     selectedLabelID = place.id
     selected = place
   }
@@ -344,8 +348,8 @@ struct SavedPlacesMap: View {
               Analytics.capture("map_search_result_opened")
               focusedSearch = false
               resultsOpen = false
-              if !place.isSaved { moveCamera(.overview([place])) }
               selectPlace(place)
+              if !place.isSaved { moveCamera(.overview([place])) }
             } label: {
               HStack(spacing: 8) {
                 Image(systemName: place.isSaved ? "bookmark" : "mappin").accessibilityHidden(true)
@@ -468,9 +472,9 @@ struct SavedPlacesMap: View {
     cameraCommand?.cancel()
   }
 
-  private func moveCamera(_ action: MapCameraCommand.Action) {
+  private func moveCamera(_ action: MapCameraCommand.Action, refitWhenCatalogArrives: Bool = false) {
     cameraCommand?.cancel()
-    cameraCommand = .init(action: action)
+    cameraCommand = .init(action: action, refitWhenCatalogArrives: refitWhenCatalogArrives)
   }
 
   private func updateSearch(_ text: String) {
@@ -486,7 +490,8 @@ struct SavedPlacesMap: View {
     location.cancel()
     filters = next
     selectedLabelID = nil
-    moveCamera(.fitFilteredPlaces)
+    let request = catalogRequest
+    moveCamera(.fitFilteredPlaces, refitWhenCatalogArrives: request != nil && catalogResponse?.request != request)
   }
 
   private func chipLabel(_ title: String?, symbol: String, selected: Bool, palette: HomeChromePalette,
@@ -565,6 +570,7 @@ struct SavedPlacesMap: View {
       for try await results in backend.catalogPlaces(matching: request.text) {
         try Task.checkCancellation()
         guard request == catalogRequest else { return }
+        cameraCommand?.catalogArrived()
         catalogResponse = CatalogResponse(request: request, results: results)
         failedCatalogRequest = nil
       }
