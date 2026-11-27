@@ -75,6 +75,19 @@ public struct MapPlace: Hashable, Identifiable, Sendable {
     }
   }
 
+  struct CatalogRow: Decodable {
+    let _id, name, city: String
+    let lat, lng: Double
+    let appleId, category, cuisine, source: String?
+    let kinds: [String]
+    let features: [String]?
+
+    var place: MapPlace {
+      MapPlace(source: .discover(placeID: _id, features: features ?? []), name: name, lat: lat, lng: lng,
+        appleId: appleId, city: city, category: category, cuisine: cuisine, kinds: kinds.compactMap(PlaceKind.init(rawValue:)))
+    }
+  }
+
   static func words(_ name: String) -> [String] {
     let scalars = name.decomposedStringWithCompatibilityMapping.unicodeScalars.filter {
       !CharacterSet.nonBaseCharacters.contains($0)
@@ -130,6 +143,23 @@ public struct MapPlace: Hashable, Identifiable, Sendable {
     }
   }
 
+  static func search(_ local: [Self], catalog: [Self], query: String) -> [Self] {
+    let nearby = search(local, query: query)
+    guard !catalog.isEmpty else { return nearby }
+    let personal = local.filter(\.isSaved)
+    let shared = local.filter { !$0.isSaved } + catalog.filter { $0.appleId != nil }
+    let indexed = catalog.map { hit in
+      hit.catalogRepresentative(in: personal) ?? hit.catalogRepresentative(in: shared) ?? hit
+    }
+    let found = nearby.filter(\.isSaved) + indexed + nearby.filter { !$0.isSaved }
+    var ids = Set<String>()
+    return (found.filter(\.isSaved) + found.filter { !$0.isSaved }).filter { ids.insert($0.id).inserted }
+  }
+
+  private func catalogRepresentative(in candidates: [Self]) -> Self? {
+    candidates.first { $0.id == id || (appleId != nil && $0.appleId == appleId) }
+  }
+
   public enum LabelPriority: Int {
     case selected, exactMatch, saved
   }
@@ -177,6 +207,11 @@ extension Backend {
     public let complete: Bool
   }
 
+  public struct CatalogPlaces: Sendable {
+    public let places: [MapPlace]
+    public let includesOverture: Bool
+  }
+
   private struct AreaRows: Decodable {
     let places: [MapPlace.DiscoverRow]
     let complete: Bool
@@ -189,5 +224,10 @@ extension Backend {
   public func discover(in box: DiscoverBox) -> some AsyncSequence<AreaPlaces, any Error> {
     client.subscribe(to: "places:inArea", with: ["box": box], yielding: AreaRows.self).values
       .map { AreaPlaces(places: $0.places.map(\.place), complete: $0.complete) }
+  }
+
+  public func catalogPlaces(matching text: String) -> some AsyncSequence<CatalogPlaces, any Error> {
+    query("places:searchCatalog", with: ["text": text], as: [MapPlace.CatalogRow].self)
+      .map { CatalogPlaces(places: $0.map(\.place), includesOverture: $0.contains { $0.source == "overture" }) }
   }
 }

@@ -9,13 +9,21 @@ import Foundation
   }
 
   private var pending: Action?
+  private var refitWhenCatalogArrives: Bool
 
-  public init(action: Action) {
+  public init(action: Action, refitWhenCatalogArrives: Bool = false) {
     pending = action
+    self.refitWhenCatalogArrives = refitWhenCatalogArrives
+  }
+
+  public func takeCatalogRefit() -> Bool {
+    defer { refitWhenCatalogArrives = false }
+    return refitWhenCatalogArrives
   }
 
   public func cancel() {
     pending = nil
+    refitWhenCatalogArrives = false
   }
 
   public func consume() -> Action? {

@@ -107,3 +107,31 @@ import Testing
     try JSONDecoder().decode(MapVisit.self, from: Data("{}".utf8))
   }
 }
+
+@Test func catalogSearchUsesSharedIdentityAndKeepsTheOwnersSave() throws {
+  let queryResult = Data(#"{"_id":"shared","name":"Tea House","city":"Taipei","lat":25,"lng":121,"kinds":["coffee"],"source":"overture"}"#.utf8)
+  let catalog = try JSONDecoder().decode(MapPlace.CatalogRow.self, from: queryResult)
+  #expect(catalog.place.appleId == nil)
+  #expect(catalog.place.id == "discover:shared")
+  #expect(catalog.source == "overture")
+  #expect(MapPlace.search([catalog.place], catalog: [catalog.place], query: "tea house") == [catalog.place])
+
+  let discover = Data("""
+    [{"_id":"north","name":"Tea House","city":"Taipei","lat":25.0001,"lng":121,"appleId":"tea","kinds":["coffee"]},
+    {"_id":"south","name":"Tea House","city":"Taipei","lat":24.9999,"lng":121,"appleId":"different","kinds":["coffee"]}]
+    """.utf8)
+  let branches = try JSONDecoder().decode([MapPlace.DiscoverRow].self, from: discover).map(\.place)
+  #expect(MapPlace.search(branches, catalog: [catalog.place], query: "tea house") == [catalog.place] + branches)
+  let indexed = MapScene(saved: [], discover: branches, visits: [], filters: .init(search: "tea-house"), catalog: [catalog.place])
+  #expect(indexed.visible == [catalog.place])
+
+  let save = Data(#"{"itemId":"private","name":"Tea House","city":"Taipei","lat":25,"lng":121,"appleId":"tea","kinds":["coffee"]}"#.utf8)
+  let personal = try JSONDecoder().decode(MapPlace.SavedRow.self, from: save).place
+  let savedMatch = MapScene(saved: [personal], discover: [], visits: [], filters: .init(search: "tea-house"), catalog: [branches[0]])
+  #expect(savedMatch.visible == [personal])
+
+  let noApple = Data(#"{"itemId":"unkeyed","name":"Tea House","city":"Taipei","lat":25,"lng":121,"kinds":["coffee"]}"#.utf8)
+  let unkeyed = try JSONDecoder().decode(MapPlace.SavedRow.self, from: noApple).place
+  let found = MapScene(saved: [unkeyed], discover: [], visits: [], filters: .init(search: "tea house"), catalog: [branches[0]])
+  #expect(found.visible == [unkeyed, branches[0]])
+}
