@@ -40,7 +40,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      # The command .husky/pre-push runs, so a check added to it reaches CI.
+      # Run the full monorepo gate on GitHub.
       - name: Gate
         run: pnpm run check:code
 

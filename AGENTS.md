@@ -200,16 +200,16 @@ use `expo lint`, which silently skips the `convex/` backend.
 1. Inspect the relevant files and preserve existing user changes.
 2. Make the smallest complete change that matches nearby patterns.
 3. Add or update behavior-focused tests for changed entry points and regressions.
-4. Run the narrowest relevant check, then run `pnpm run check` before finishing.
+4. Run the narrowest relevant local check and use GitHub CI for the full code gate.
 5. Report the files changed, checks run, warnings, and anything intentionally skipped.
 
 `pnpm run check` is `check:code` (lint, typecheck, codegen drift,
 tooling tests, coverage thresholds, Knip, Syncpack) followed by the dependency
-audit (`pnpm run audit`, blocks on high/critical). CI and the pre-push hook
-both run `check:code`, the hook before a push leaves the machine. The app-level
-`check` scripts stop at lint, typecheck and tests, so run the root one; they stay
-that way because a script change in `apps/native/package.json` moves the native
-fingerprint. The audit is left out of both: CI
+audit (`pnpm run audit`, blocks on high/critical). GitHub CI runs `check:code`.
+The pre-push hook checks branch diffs with Git. Use `pnpm run check` when
+you need the whole gate locally, and run one full gate at a time. The app-level
+`check` scripts cover lint, typecheck and tests. A script change in
+`apps/native/package.json` moves the native fingerprint. GitHub CI
 audits a pull request only when it changes a `package.json`, the lockfile or
 `pnpm-workspace.yaml`, and `audit.yml` runs it daily, where a failed run is the
 alert for a new advisory. Knip's
@@ -305,9 +305,9 @@ cannot happen.
 | File and identifier naming                                                                                   | ESLint `check-file`, `naming-convention`                                                                         | `lint`                               |
 | Complexity limits, zero lint warnings                                                                        | ESLint `complexity`, `max-*`, `--max-warnings 0`                                                                 | `lint`                               |
 | No `console.*` in app code outside the loggers                                                               | ESLint `no-console` (native `src/` allows `warn`)                                                                | `lint`                               |
-| `check:code` is the one gate                                                                                 | Wiring only: `.husky/pre-push` and the CI `Gate` step call it                                                    | nowhere if they stop                 |
+| GitHub runs the full `check:code` gate                                                                       | CI `Gate` step                                                                                                   | CI `check`                           |
 | Local E2E settings precede launch values; overrides and CI semantics hold                                    | `tools/e2e-config.test.mjs` imports config and launch settings in isolated processes                             | `check:code`                         |
-| The pre-push hook gates a push of branch commits, not deletes or tags                                        | `tools/pre-push.test.mjs` pushes through the real hook                                                           | `check:code`                         |
+| Pre-push checks branch diffs with Git and skips deletes and tags                                             | `tools/pre-push.test.mjs` pushes through the real hook                                                           | `check:code`                         |
 | Convex modules the app imports pull in no server-only package (zod, ai, linkedom)                            | `src/lib/client-bundle-imports.test.ts` walks their imports                                                      | `check:code`                         |
 | `_generated/api.d.ts` lists every Convex module                                                              | `tools/verify-convex-codegen.mjs`                                                                                | `check:code`                         |
 | Copy lives in `en.json`; generated catalogs untouched                                                        | `localization-source.test.ts`, `localization-catalogs.test.ts`                                                   | `check:code`                         |

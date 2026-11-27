@@ -27,8 +27,9 @@ snapshots and store media live in the separate `shelvr-notes` repo; do not add t
 
 ## Commands
 
-Use `pnpm`. `pnpm run check` from the repo root is the whole gate; `check:code` (everything but
-the dependency audit) is what CI and the pre-push hook run. `pnpm dev` does not start the
+Use `pnpm`. `pnpm run check` from the repo root runs the full local gate, including the dependency
+audit. GitHub CI runs `check:code`. The pre-push hook runs Git's whitespace and conflict-marker check
+on the branch changes. Use focused local checks while iterating. `pnpm dev` does not start the
 backend: run `pnpm --filter native-app exec convex dev` in a second terminal, which also keeps
 `convex/_generated/*` in sync. After changing copy, run `pnpm localization:generate`.
 
