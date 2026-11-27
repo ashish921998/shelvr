@@ -1,6 +1,6 @@
 {
   "ios": {
-    "NSPhotoLibraryUsageDescription": "Shelvr lets you save photos and screenshots from your library into your hub, and tidy your photo library.",
+    "NSPhotoLibraryUsageDescription": "Shelvr lets you choose a photo from your library to use as a trip cover.",
     "NSPhotoLibraryAddUsageDescription": "Shelvr saves images you share, like your Passport story, to your photos.",
     "NSCalendarsUsageDescription": "Shelvr adds events to your calendar from things you've saved.",
     "NSCalendarsFullAccessUsageDescription": "Shelvr adds events to your calendar from things you've saved.",

@@ -662,7 +662,7 @@
   "errors.saveFallback": "Speichern fehlgeschlagen. Bitte versuche es erneut.",
   "widget.title": "Zuletzt gespeichert",
   "widget.description": "Deine neuesten Inhalte auf einen Blick.",
-  "permissions.photosUsage": "Mit Shelvr kannst du Fotos und Bildschirmfotos aus deiner Mediathek in deiner Bibliothek speichern und deine Fotomediathek aufräumen.",
+  "permissions.photosUsage": "Mit Shelvr kannst du ein Foto aus deiner Mediathek als Titelbild für eine Reise auswählen.",
   "permissions.photosAddUsage": "Shelvr speichert Bilder, die du teilst, wie deine Pass-Story, in deinen Fotos.",
   "permissions.calendarUsage": "Shelvr fügt deinem Kalender Ereignisse aus deinen gespeicherten Inhalten hinzu.",
   "permissions.locationUsage": "Shelvr zeigt deinen Standort auf der Karte, damit du gespeicherte Orte in deiner Nähe findest.",

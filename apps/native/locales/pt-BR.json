@@ -1,6 +1,6 @@
 {
   "ios": {
-    "NSPhotoLibraryUsageDescription": "O Shelvr permite salvar fotos e capturas de tela da fototeca na sua biblioteca e organizar suas fotos.",
+    "NSPhotoLibraryUsageDescription": "O Shelvr permite escolher uma foto da fototeca como capa de uma viagem.",
     "NSPhotoLibraryAddUsageDescription": "O Shelvr salva nas suas fotos as imagens que você compartilha, como o story do seu Passaporte.",
     "NSCalendarsUsageDescription": "O Shelvr adiciona eventos ao calendário a partir dos conteúdos que você salvou.",
     "NSCalendarsFullAccessUsageDescription": "O Shelvr adiciona eventos ao calendário a partir dos conteúdos que você salvou.",

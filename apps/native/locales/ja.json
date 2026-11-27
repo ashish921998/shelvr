@@ -1,6 +1,6 @@
 {
   "ios": {
-    "NSPhotoLibraryUsageDescription": "Shelvrでは、ライブラリの写真やスクリーンショットをハブに保存したり、写真ライブラリを整理したりできます。",
+    "NSPhotoLibraryUsageDescription": "Shelvrでは、写真ライブラリから旅行のカバー写真を選べます。",
     "NSPhotoLibraryAddUsageDescription": "Shelvrは、パスポートのストーリーなど、シェアした画像を写真に保存します。",
     "NSCalendarsUsageDescription": "Shelvrは保存した内容からカレンダーに予定を追加します。",
     "NSCalendarsFullAccessUsageDescription": "Shelvrは保存した内容からカレンダーに予定を追加します。",

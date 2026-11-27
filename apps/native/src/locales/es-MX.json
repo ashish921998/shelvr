@@ -681,7 +681,7 @@
   "errors.saveFallback": "No se ha podido guardar. Vuelve a intentarlo.",
   "widget.title": "Guardados recientes",
   "widget.description": "Tus últimos contenidos de un vistazo.",
-  "permissions.photosUsage": "Shelvr permite guardar fotos y capturas de tu fototeca en tu biblioteca y ordenar tus fotos.",
+  "permissions.photosUsage": "Shelvr te permite elegir una foto de tu fototeca como portada de un viaje.",
   "permissions.photosAddUsage": "Shelvr guarda en tus fotos las imágenes que compartes, como tu historia del Pasaporte.",
   "permissions.calendarUsage": "Shelvr agrega eventos a tu calendario a partir de contenidos que has guardado.",
   "permissions.locationUsage": "Shelvr muestra dónde estás en el mapa para que encuentres los lugares guardados cerca de ti.",

@@ -1,6 +1,6 @@
 {
   "ios": {
-    "NSPhotoLibraryUsageDescription": "Shelvr permite guardar fotos y capturas de tu fototeca en tu biblioteca y ordenar tus fotos.",
+    "NSPhotoLibraryUsageDescription": "Shelvr te permite elegir una foto de tu fototeca como portada de un viaje.",
     "NSPhotoLibraryAddUsageDescription": "Shelvr guarda en tus fotos las imágenes que compartes, como tu historia del Pasaporte.",
     "NSCalendarsUsageDescription": "Shelvr añade eventos a tu calendario a partir de contenidos que has guardado.",
     "NSCalendarsFullAccessUsageDescription": "Shelvr añade eventos a tu calendario a partir de contenidos que has guardado.",

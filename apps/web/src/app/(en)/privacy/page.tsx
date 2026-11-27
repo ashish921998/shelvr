@@ -11,7 +11,7 @@ export const metadata: Metadata = pageMetadata(
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" lastUpdated="November 22, 2026">
+    <LegalPage title="Privacy Policy" lastUpdated="November 24, 2026">
       <section>
         <h2 className="font-semibold text-ink text-lg">What Shelvr is</h2>
         <p className="mt-2">
@@ -47,7 +47,10 @@ export default function PrivacyPage() {
             in our backend (Convex) so it syncs to your devices. We do not store
             the video itself. If you share a photo or text to Shelvr, including
             through Siri or Shortcuts, we store that too. Photos and notes stay
-            in your account until you delete them.
+            in your account until you delete them. If you add a cover photo to a
+            trip, we store a smaller copy of it with that trip. We do not send
+            it to AI providers or show it on a shared trip link, and we delete
+            it when you delete the trip or your account.
           </li>
           <li>
             <strong>Cities you’ve been to.</strong> If you pick cities you have
@@ -229,6 +232,15 @@ export default function PrivacyPage() {
           vote page, their first name. Only you see that name, in the app and in
           one notification about the first vote. The link closes after a week,
           and we delete it, its votes and those names about a week after that.
+        </p>
+        <p className="mt-2">
+          If you share a trip, anyone with the link can see the trip’s name,
+          city and start date, and the stops you scheduled for each day, with
+          their times, your notes and links to their locations in Apple Maps. It
+          does not show your name or the trip’s cover photo, and search engines
+          are asked not to index it. To turn off the link, open the trip, choose
+          “Share trip”, then “Revoke link”. Deleting the trip or your account
+          also turns it off.
         </p>
         <p className="mt-2">
           If you share your Shelvr Passport, anyone with the link can see your
