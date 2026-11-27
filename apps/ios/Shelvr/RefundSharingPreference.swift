@@ -16,6 +16,7 @@ struct RefundSharingPreference: View {
   @State private var reviewing = false
   @State private var saving = false
   @State private var saveFailed = false
+  @State private var reviewFailed = false
   @State private var attempt = 0
 
   private var sharing: Bool { consent?.refundSharing == true }
@@ -26,7 +27,9 @@ struct RefundSharingPreference: View {
         Button(copy("common.retry")) { attempt += 1 }
       } else if loaded {
         Text(copy(sharing ? "refundConsent.enabled" : "refundConsent.disabled"))
-        if let consent, consent.syncFailed || consent.syncPending {
+        if saving && !reviewing {
+          ProgressView(copy("common.loading"))
+        } else if let consent, consent.syncFailed || consent.syncPending {
           Text(copy(consent.syncFailed ? "refundConsent.syncFailed" : "refundConsent.syncPending"))
             .font(.footnote).foregroundStyle(.secondary)
         }
@@ -51,7 +54,7 @@ struct RefundSharingPreference: View {
         if !Task.isCancelled { loadFailed = true; loaded = false }
       }
     }
-    .sheet(isPresented: $reviewing, onDismiss: { saveFailed = false }) {
+    .sheet(isPresented: $reviewing, onDismiss: { reviewFailed = false }) {
       NavigationStack {
         Form {
           Section {
@@ -63,7 +66,7 @@ struct RefundSharingPreference: View {
           Section {
             Button(copy("refundConsent.accept")) { save(accepted: true) }
             Button(copy("refundConsent.later")) { save(accepted: false) }
-            if saveFailed { Text(copy("refundConsent.error")).foregroundStyle(.red) }
+            if reviewFailed { Text(copy("refundConsent.error")).foregroundStyle(.red) }
           }.disabled(saving)
         }
         .navigationTitle(copy("refundConsent.title"))
@@ -81,6 +84,8 @@ struct RefundSharingPreference: View {
     let session = backend.sessionGeneration
     saving = true
     saveFailed = false
+    reviewFailed = false
+    if accepted == false { reviewing = false }
     Task {
       defer { saving = false }
       guard backend.userID == owner, backend.sessionGeneration == session else { return }
@@ -95,7 +100,8 @@ struct RefundSharingPreference: View {
       } catch {
         guard backend.userID == owner, backend.sessionGeneration == session else { return }
         Analytics.failure(accepted == nil ? "refund_consent_withdraw_failed" : "legal_consent_save_failed")
-        saveFailed = true
+        if accepted == true { reviewFailed = true }
+        else { saveFailed = true }
       }
     }
   }
