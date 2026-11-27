@@ -16,9 +16,10 @@ struct NewCityTripView: View {
   @State private var stay = ""
   @State private var busy = false
   @State private var message = ""
-  @State private var gate = SocialOperation()
+  @State private var gate = SocialOperation(placement: "plan_trip")
   @State private var generation: Task<Void, Never>?
   @State private var visible = false
+  @State private var savedCity = false
   private let options = ["food", "coffee", "drinks", "culture", "sights", "outdoors", "shopping"]
 
   var body: some View {
@@ -49,6 +50,7 @@ struct NewCityTripView: View {
       if !message.isEmpty { Text(message) }
     }.socialOperation(gate, failure: copy("errors.tryAgain"), close: copy("common.close"))
       .onAppear { visible = true }
+      .task { do { for try await saves in backend.citySaves(city) { savedCity = !saves.isEmpty } } catch {} }
       .onDisappear {
         visible = false
         generation?.cancel()
@@ -66,16 +68,22 @@ struct NewCityTripView: View {
     format.locale = Locale(identifier: "en_US_POSIX")
     format.calendar = Calendar(identifier: .gregorian)
     format.dateFormat = "yyyy-MM-dd"
+    let started: [String: Any] = ["days": days, "pace": pace, "interest_count": interests.count,
+      "dated": dated, "has_stay": !stay.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, "saved_city": savedCity]
+    Analytics.capture("trip_plan_started", started)
     do {
-      let id = try await backend.planTrip(city: city, days: days, pace: pace, interests: options.filter(interests.contains),
+      let result = try await backend.planTrip(city: city, days: days, pace: pace, interests: options.filter(interests.contains),
         start: dated ? format.string(from: start) : nil, stay: stay.trimmingCharacters(in: .whitespacesAndNewlines),
         locale: copy.locale, listID: listID)
+      Analytics.capture("trip_plan_made", ["days": days, "pace": pace, "saves": result.saves,
+        "suggested": result.suggested, "made": result.tripId != nil])
       guard !Task.isCancelled else { return }
-      if let id, let route = AppLink("/trip-plan/" + id) { open(route) }
+      if let id = result.tripId, let route = AppLink("/trip-plan/" + id) { open(route) }
       else { message = copy("tripPlanner.emptyResult", ["city": city]) }
     } catch {
       guard !Task.isCancelled else { return }
-      if canOffer, listID != nil, SaveFailure(error) == .proRequired {
+      Analytics.capture("trip_plan_failed", ["reason": PastedLink.planningFailure(error)])
+      if canOffer, SaveFailure(error) == .proRequired {
         gate.askToPurchase {
           guard visible else { return }
           let retry = Task { await generate(canOffer: false) }
@@ -98,7 +106,8 @@ struct CityTripView: View {
   @State private var editing: CityTrip.Stop?
   @State private var editFailed = false
   @State private var busy = false
-  @State private var undo: (String, TripPosition)?
+  @State private var undo: (String, TripPosition, String)?
+  @State private var opened = false
   @State private var undoGeneration = 0
   @State private var renaming = false
   @State private var newName = ""
@@ -130,6 +139,7 @@ struct CityTripView: View {
           if let undo {
             Button(copy("common.undo")) { change(clearPrevious: false) {
               _ = try await backend.moveTripStop(undo.0, day: undo.1.day, index: undo.1.index)
+              Analytics.capture("trip_plan_edit_undone", ["action": undo.2])
               self.undo = nil
             } }
           }
@@ -144,13 +154,20 @@ struct CityTripView: View {
         .confirmationDialog(copy("tripPlanner.deleteTitle"), isPresented: $confirmingDeletion, titleVisibility: .visible) {
           Button(copy("tripPlanner.delete"), role: .destructive) { change {
             try await backend.client.mutation("tripPlannerData:deleteTripPlan", with: ["tripId": id])
+            Analytics.capture("trip_plan_deleted")
             dismiss()
           } }
           Button(copy("common.cancel"), role: .cancel) {}
         } message: { Text(copy("tripPlanner.deleteBody")) }
         .alert(copy("tripPlanner.nameLabel"), isPresented: $renaming) {
           TextField(copy("tripPlanner.nameLabel"), text: $newName)
-          Button(copy("common.save")) { change { try await backend.renameTrip(id, name: newName) } }
+          Button(copy("common.save")) {
+            let changed = TripEdit.renamed(newName, from: trip.name)
+            change {
+              try await backend.renameTrip(id, name: newName)
+              if changed { Analytics.capture("trip_plan_renamed", ["cleared": newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty]) }
+            }
+          }
             .disabled(newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || newName.utf16.count > 80)
           Button(copy("common.cancel"), role: .cancel) {}
         }
@@ -174,6 +191,12 @@ struct CityTripView: View {
           try Task.checkCancellation()
           self.trip = trip
           loaded = true
+          if let trip, !opened {
+            opened = true
+            let stops = trip.days.flatMap { $0 }
+            Analytics.capture("trip_plan_opened", ["days": trip.days.count, "stops": stops.count,
+              "saved": stops.filter { $0.source == "save" }.count])
+          }
         }
       } catch { if !Task.isCancelled { failed = true } }
     }
@@ -194,19 +217,22 @@ struct CityTripView: View {
       Spacer()
       Menu {
         Button(copy("tripPlanner.stopDetails")) { editing = stop }
-        if index > 0 { Button(copy("tripPlanner.moveUp")) { move(stop.id, day: day, index: index - 1) } }
-        if index + 1 < count { Button(copy("tripPlanner.moveDown")) { move(stop.id, day: day, index: index + 1) } }
+        if index > 0 { Button(copy("tripPlanner.moveUp")) { move(stop.id, from: day, day: day, index: index - 1) } }
+        if index + 1 < count { Button(copy("tripPlanner.moveDown")) { move(stop.id, from: day, day: day, index: index + 1) } }
         ForEach(0...trip.days.count, id: \.self) { target in
           if target != day {
             Button(target == 0 ? copy("tripPlanner.moveToUnplanned") :
               copy("tripPlanner.moveToDay", ["day": copy("trip.dayTab", ["day": target.formatted()])])) {
-              move(stop.id, day: target, index: target == 0 ? trip.unplanned.count : trip.days[target - 1].count)
+              move(stop.id, from: day, day: target, index: target == 0 ? trip.unplanned.count : trip.days[target - 1].count)
             }
           }
         }
         if day != 0 {
           Button(copy("tripPlanner.removeStop", ["name": stop.name]), role: .destructive) {
-            change { offerUndo(stop.id, try await backend.removeTripStop(stop.id)) }
+            change {
+              offerUndo(stop.id, try await backend.removeTripStop(stop.id), kind: "remove")
+              Analytics.capture("trip_plan_stop_removed", ["source": stop.source ?? "added"])
+            }
           }
         }
       } label: { Image(systemName: "ellipsis.circle") }
@@ -214,13 +240,16 @@ struct CityTripView: View {
     }
   }
 
-  private func offerUndo(_ id: String, _ position: TripPosition) {
+  private func offerUndo(_ id: String, _ position: TripPosition, kind: String) {
     undoGeneration += 1
-    undo = (id, position)
+    undo = (id, position, kind)
   }
 
-  private func move(_ stop: String, day: Int, index: Int) {
-    change { offerUndo(stop, try await backend.moveTripStop(stop, day: day, index: index)) }
+  private func move(_ stop: String, from: Int, day: Int, index: Int) {
+    change {
+      offerUndo(stop, try await backend.moveTripStop(stop, day: day, index: index), kind: "move")
+      Analytics.capture("trip_plan_stop_moved", ["across_days": from != day, "method": "menu"])
+    }
   }
 
   private func change(clearPrevious: Bool = true, _ operation: @escaping @MainActor () async throws -> Void) {
@@ -236,6 +265,7 @@ struct CityTripView: View {
 
   private func row(_ stop: CityTrip.Stop) -> some View {
     Button {
+      Analytics.capture("trip_plan_stop_opened", ["source": stop.source ?? "added", "action": "maps"])
       let item = MKMapItem(placemark: .init(coordinate: .init(latitude: stop.lat, longitude: stop.lng)))
       item.name = stop.name
       item.openInMaps()

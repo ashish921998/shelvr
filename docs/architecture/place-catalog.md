@@ -161,6 +161,14 @@ move to plain strings before the list grows.
 - **Google's written confirmation** of rules 1 and 2 under "Provider data".
 - **Which 60 types.** The Lisbon counts above are a first cut; a second city should confirm them.
 
+## Shared search rollout
+
+Deploy the catalog backend before shipping the Swift search client in PR #911. Run
+`places:backfillSearchName` with `{"cursor":null}` on the target deployment and wait for
+`places_search_names_backfilled` with `done: true`. The job fills the folded search index
+for existing places in batches and can be restarted. During the rollout, search also reads
+the raw-name index for rows awaiting backfill. Discover remains limited to curated rows.
+
 ## Reading by area
 
 `places:inArea({ box })` returns up to 300 Discover places inside a map area, and `complete`, which is

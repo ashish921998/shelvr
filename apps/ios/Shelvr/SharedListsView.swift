@@ -54,13 +54,17 @@ struct JoinListView: View {
           }
           Section {
             Button(copy("sharedLists.join")) {
+              Analytics.capture("shared_list_join_tapped", ["signed_in": backend.status == .signedIn])
               if let requestJoin { requestJoin(); return }
               guard !busy else { return }
               busy = true
               Task {
                 defer { busy = false }
                 do {
-                  if let id = try await backend.joinList(token: token) { open("/shared-list/" + id + "?joined=1") }
+                  let listID = try await backend.joinList(token: token)
+                  Analytics.capture("shared_list_joined", ["joined": listID != nil,
+                    "onboarded_before": UserDefaults.standard.bool(forKey: "swift.onboarded." + (backend.userID ?? ""))])
+                  if let id = listID { open("/shared-list/" + id + "?joined=1") }
                   else { expired = true }
                 } catch { failed = true }
               }
@@ -82,6 +86,7 @@ struct SharedListView: View {
   var joined = false
   @Environment(MemberNamePrompts.self) private var prompts
   @State private var askingName = false
+  @State private var reported = false
   @State private var selectedCity: String?
   @State private var presentedNewPlaces: Set<String> = []
   @Environment(Backend.self) private var backend
@@ -90,7 +95,7 @@ struct SharedListView: View {
   @State private var writing: Set<String> = []
   @State private var add = false
   @State private var removal: Removal?
-  @State private var operation = SocialOperation()
+  @State private var operation = SocialOperation(placement: "shared_list")
   @Environment(\.dismiss) private var dismiss
 
   private struct Removal {
@@ -185,9 +190,16 @@ struct SharedListView: View {
             removal = Removal(title: copy("sharedLists.leaveTitle", ["name": detail.name]),
               message: copy("sharedLists.leaveBody"), confirm: copy("sharedLists.leave")) {
               try await backend.leaveList(id)
+              Analytics.capture("shared_list_left", ["owner": detail.isOwner])
               dismiss()
             }
           }
+        }
+        .onAppear {
+          guard !reported else { return }
+          reported = true
+          Analytics.capture("shared_list_opened", ["places": detail.places.count, "members": detail.members.count,
+            "fresh": detail.places.filter(\.isNew).count])
         }
         .sheet(isPresented: $add) { AddListPlaceView(detail: detail, initialCity: city) }
         .navigationTitle(detail.name)
@@ -207,7 +219,7 @@ struct SharedListView: View {
           description: Text(copy("sharedLists.goneBody")))
       }
     }
-    .sheet(isPresented: $askingName) { MemberNamePrompt(creating: false) {} }
+    .sheet(isPresented: $askingName) { MemberNamePrompt(kind: "joined") {} }
     .task(id: id) {
       guard joined else { return }
       do {

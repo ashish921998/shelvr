@@ -52,7 +52,7 @@ struct SaveReminderPreference: View {
     message = ""
     do {
       if enabled {
-        let allowed = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
+        let allowed = try await pushDevice.requestAuthorization()
         permitted = allowed
         if allowed { pushDevice.retryEnrollment() }
         guard allowed else { message = copy(weekly ? "notifications.disabledBody" : "notifications.remindersDisabledBody"); return }
@@ -63,6 +63,7 @@ struct SaveReminderPreference: View {
       } else {
         try await backend.client.mutation("notifications:setSaveReminders", with: ["enabled": enabled, "timezone": TimeZone.current.identifier])
       }
+      if !enabled { Analytics.capture("notification_disabled", ["notification_kind": weekly ? "weekly_shelf" : "save_reminders"]) }
       for try await saved in backend.query("notifications:getPreferences", as: TrialNotificationPreferences.self) {
         guard backend.status == .signedIn, session == backend.sessionGeneration else { return }
         preferences = saved

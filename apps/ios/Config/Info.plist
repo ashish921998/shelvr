@@ -20,6 +20,8 @@
 	<string>$(SHELVR_VARIANT)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Shelvr shows where you are on the map so you can find the places you saved nearby.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Shelvr saves images you share, like your Passport story, to your photos.</string>
 	<key>UIAppFonts</key>
 	<array>
 		<string>CrimsonProRoman-Regular.ttf</string>

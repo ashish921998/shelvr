@@ -3,6 +3,8 @@ import SwiftUI
 
 struct LibraryItemView: View {
   let id: String
+  var from: String?
+  @Environment(\.scenePhase) private var phase
   @Environment(Backend.self) private var backend
   @Environment(\.copy) private var copy
   @Environment(\.dismiss) private var dismiss
@@ -17,6 +19,10 @@ struct LibraryItemView: View {
   @State private var loaded = false
   @State private var failed = false
   @State private var attempt = 0
+  @State private var recorded = false
+  @State private var retryGate = SocialOperation(placement: "item_detail")
+
+  private var openable: Bool { save?.status == "ready" && phase == .active }
 
   var body: some View {
     Group {
@@ -38,6 +44,10 @@ struct LibraryItemView: View {
                   Label(copy("item.openSite", ["site": save.siteName ?? host]), systemImage: "arrow.up.right.square")
                     .frame(minHeight: 44)
                 }.foregroundStyle(palette.primaryText)
+                  .environment(\.openURL, OpenURLAction { _ in
+                    Analytics.itemAction(save, "open_source")
+                    return .systemAction
+                  })
               }
             }
             if save.status == "processing" { Label(copy("item.reading"), systemImage: "clock") }
@@ -61,7 +71,8 @@ struct LibraryItemView: View {
             }
             TimelineView(.periodic(from: .now, by: 30)) { time in
               if save.canRetry(at: time.date) {
-                Button(copy("common.retry")) { Task { await retry() } }.disabled(busy)
+                Button(copy("common.retry")) { retryGate.run { try await retry() } }
+                  .disabled(busy || retryGate.busy)
               }
             }
             if !message.isEmpty { Text(message).foregroundStyle(.secondary) }
@@ -82,10 +93,14 @@ struct LibraryItemView: View {
       } else if loaded { ContentUnavailableView(copy("common.unavailable"), systemImage: "bookmark.slash") }
       else { ProgressView() }
     }
+    .socialOperation(retryGate, failure: copy("errors.retryTitle"), close: copy("common.close"))
     .confirmationDialog(copy("item.deleteTitle"), isPresented: $confirmingDelete, titleVisibility: .visible) {
       Button(copy("item.deleteEverywhere"), role: .destructive) { Task { await remove() } }
       Button(copy("common.cancel"), role: .cancel) {}
     } message: { Text(copy("item.deleteBody")) }
+    .onAppear(perform: recordOpen)
+    .onDisappear { recorded = false }
+    .onChange(of: openable) { recordOpen() }
     .task(id: "\(id)-\(attempt)") {
       save = nil; loaded = false; failed = false; expandedDetails = false
       do {
@@ -131,19 +146,38 @@ struct LibraryItemView: View {
     }
   }
 
-  private func retry() async {
-    guard !busy else { return }
+  private func retry() async throws {
+    guard !busy, let owner = backend.userID else { return }
+    let session = backend.sessionGeneration
     busy = true
     defer { busy = false }
-    do { message = try await backend.retrySave(id) ? "" : copy("item.stillWorking") }
-    catch { message = copy("errors.retryTitle") }
+    do {
+      let scheduled = try await backend.retrySave(id)
+      guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
+      message = scheduled ? "" : copy("item.stillWorking")
+    } catch {
+      guard !Task.isCancelled, backend.userID == owner, backend.sessionGeneration == session else { return }
+      throw error
+    }
+  }
+
+  private func recordOpen() {
+    guard !recorded, openable, let save else { return }
+    recorded = true
+    Analytics.itemOpened(save, source: from)
   }
 
   private func remove() async {
     guard !busy else { return }
     busy = true
     defer { busy = false }
-    do { try await backend.deleteSave(id); dismiss() }
+    let deleted = save
+    let generation = backend.sessionGeneration
+    do {
+      try await backend.deleteSave(id)
+      if let deleted, generation == backend.sessionGeneration { Analytics.itemDeleted(deleted, surface: "item_detail") }
+      dismiss()
+    }
     catch { message = copy("item.deleteFailed") }
   }
 }

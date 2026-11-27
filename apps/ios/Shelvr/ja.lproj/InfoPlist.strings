@@ -1,1 +1,2 @@
 "NSLocationWhenInUseUsageDescription" = "保存した場所を近くで見つけられるよう、Shelvrは地図に現在地を表示します。";
+"NSPhotoLibraryAddUsageDescription" = "Shelvrは、パスポートのストーリーなど、シェアした画像を写真に保存します。";

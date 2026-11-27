@@ -229,7 +229,7 @@
   "pro.checking": "サブスクリプションを確認中…",
   "pro.unlockShelvr": "Shelvr Proを利用する",
   "share.openToFinish": "共有後、Shelvrを開いて保存を完了してください。",
-  "share.openToSignIn": "共有する前にShelvrを開いてサインインしてください。",
+  "share.openToSignIn": "あとで保存できます。Shelvrを開いてサインインすると、保存が完了します。",
   "share.copyNote": "メモをコピーして削除",
   "share.longNoteRecovery": "このメモは長すぎるため、Shelvrに保存できません。クリップボードにコピーして保存待ちの項目から削除できます。",
   "share.reading": "共有コンテンツを読み取り中…",

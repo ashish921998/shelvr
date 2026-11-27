@@ -6,14 +6,26 @@ import ShelvrKit
 struct PaywallOffer {
   let offering: Offering
   let variables: [String: CustomVariableValue]
+  let trialEligible: PaywallAttempt.TrialEligibility?
 
   static func load(copy: Copy) async throws -> Self? {
     let offerings = try await Purchases.shared.offerings()
     guard let current = offerings.current else { return nil }
     let products = current.availablePackages.map(\.storeProduct)
     let alternate = offerings.all["weekly_annual_draft"].flatMap { $0.identifier == current.identifier ? nil : $0 }
+    var trialEligible: PaywallAttempt.TrialEligibility?
     let eligibility = await PaywallEligibility.check(products: products.map(\.productIdentifier), hasAlternate: alternate != nil) { ids in
       let results = await Purchases.shared.checkTrialOrIntroDiscountEligibility(productIdentifiers: ids)
+      trialEligible = .folding(ids.map { id in
+        results[id].map { result -> PaywallAttempt.TrialEligibility in
+          switch result.status {
+          case .eligible: .eligible
+          case .ineligible: .ineligible
+          case .noIntroOfferExists: .noIntro
+          default: .unknown
+          }
+        }
+      })
       return results.mapValues { result in
         switch result.status {
         case .eligible: .eligible
@@ -22,7 +34,7 @@ struct PaywallOffer {
         }
       }
     }
-    if eligibility.useAlternate, let alternate { return Self(offering: alternate, variables: [:]) }
+    if eligibility.useAlternate, let alternate { return Self(offering: alternate, variables: [:], trialEligible: trialEligible) }
 
     let locale = Locale(identifier: copy.locale)
     var variables: [String: CustomVariableValue] = [:]
@@ -46,7 +58,7 @@ struct PaywallOffer {
       let zero = Decimal.zero.formatted(.currency(code: currency).locale(locale))
       variables["trial_offer"] = .string(copy("paywall.trialOffer", ["zero": zero, "price": annual.localizedPriceString]))
     }
-    return Self(offering: current, variables: variables)
+    return Self(offering: current, variables: variables, trialEligible: trialEligible)
   }
 
   private static func component(_ unit: SubscriptionPeriod.Unit) -> Calendar.Component {

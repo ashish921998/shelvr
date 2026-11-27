@@ -5,10 +5,10 @@ final class PlaceAnnotationView: MKAnnotationView {
   static let placeIdentifier = "shelvr-place"
   private static let ink = UIColor(red: 45/255, green: 35/255, blue: 23/255, alpha: 1)
   private static let paper = UIColor(red: 255/255, green: 249/255, blue: 234/255, alpha: 1)
-  private static let amber = UIColor(red: 225/255, green: 165/255, blue: 65/255, alpha: 1)
   private static let discoverPaper = UIColor(red: 245/255, green: 248/255, blue: 247/255, alpha: 1)
   private static let discoverRim = UIColor(red: 125/255, green: 147/255, blue: 140/255, alpha: 1)
 
+  private let rearDot = UIView()
   private let disc = UIView()
   private let glyph = UILabel()
   private let symbol = UIImageView()
@@ -22,6 +22,10 @@ final class PlaceAnnotationView: MKAnnotationView {
     collisionMode = .circle
     isAccessibilityElement = true
     accessibilityTraits = .button
+    rearDot.isUserInteractionEnabled = false
+    rearDot.isHidden = true
+    rearDot.layer.borderWidth = 1.5
+    rearDot.layer.borderColor = Self.paper.cgColor
     disc.isUserInteractionEnabled = false
     disc.layer.shadowColor = Self.ink.cgColor
     disc.layer.shadowOpacity = 0.18
@@ -40,6 +44,7 @@ final class PlaceAnnotationView: MKAnnotationView {
     check.layer.cornerRadius = 7
     check.layer.borderWidth = 1
     check.layer.borderColor = Self.paper.cgColor
+    addSubview(rearDot)
     addSubview(disc)
     disc.addSubview(glyph)
     disc.addSubview(symbol)
@@ -68,16 +73,25 @@ final class PlaceAnnotationView: MKAnnotationView {
       let category = kind.map { copy($0.labelKey) }
       let visit = pin.visited ? copy("passport.wentNoDate") : nil
       let status = [source, category, visit].compactMap { $0 }.joined(separator: ", ")
-      let color = kind == nil && !pin.place.isSaved ? Self.discoverRim : MapPinPalette.color(for: kind)
       showPlace(emoji: pin.place.emoji, saved: pin.place.isSaved, visited: pin.visited,
-        title: pin.place.name, status: status, color: color)
+        title: pin.place.name, status: status, color: color(for: kind, saved: pin.place.isSaved))
     } else if let cluster = annotation as? MKClusterAnnotation {
       let count = cluster.memberAnnotations.count
-      let savedCount = cluster.memberAnnotations.count { ($0 as? MapCanvas.Pin)?.place.isSaved == true }
+      let members = cluster.memberAnnotations.compactMap { ($0 as? MapCanvas.Pin)?.place }
+      let savedCount = members.count { $0.isSaved }
       let status = savedCount == 0 ? copy("tripPlanner.badgeSuggested") :
         copy("share.savedFragment") + ": " + savedCount.formatted()
-      showCluster(label: copy("passport.placesCount", count: count), status: status, saved: savedCount > 0)
+      let colors = members.sorted {
+        $0.isSaved == $1.isSaved ? $0.id < $1.id : $0.isSaved
+      }.prefix(2).map { color(for: MapPinPalette.primaryKind(for: $0), saved: $0.isSaved) }
+      let front = colors.first ?? Self.discoverRim
+      showCluster(label: copy("passport.placesCount", count: count), status: status, saved: savedCount > 0,
+        front: front, rear: colors.last ?? front)
     }
+  }
+
+  private func color(for kind: PlaceKind?, saved: Bool) -> UIColor {
+    kind == nil && !saved ? Self.discoverRim : MapPinPalette.color(for: kind)
   }
 
   private func badge(width: CGFloat, height: CGFloat, fill: UIColor, rim: UIColor, border: CGFloat) {
@@ -94,6 +108,7 @@ final class PlaceAnnotationView: MKAnnotationView {
   }
 
   private func showPlace(emoji: String?, saved: Bool, visited: Bool, title: String, status: String, color: UIColor) {
+    rearDot.isHidden = true
     displayPriority = saved ? .defaultHigh : .defaultLow
     clusteringIdentifier = "places"
     collisionMode = .circle
@@ -130,17 +145,22 @@ final class PlaceAnnotationView: MKAnnotationView {
     accessibilityValue = status
   }
 
-  private func showCluster(label: String, status: String, saved: Bool) {
+  private func showCluster(label: String, status: String, saved: Bool, front: UIColor, rear: UIColor) {
     displayPriority = saved ? .defaultHigh : .defaultLow
     clusteringIdentifier = nil
-    glyph.font = .systemFont(ofSize: 12, weight: .semibold)
-    glyph.textColor = Self.paper
-    glyph.text = label
-    glyph.isHidden = false
-    let width = ceil(glyph.intrinsicContentSize.width) + 16
-    bounds.size = CGSize(width: width, height: 34)
-    collisionMode = .rectangle
-    badge(width: width, height: 26, fill: Self.ink, rim: saved ? Self.amber : Self.discoverPaper, border: 1.5)
+    collisionMode = .circle
+    let frontSize: CGFloat = compact ? 15 : 20
+    let rearSize: CGFloat = compact ? 13 : 17
+    let offset: CGFloat = compact ? 4 : 5
+    bounds.size = CGSize(width: frontSize + 2 * offset + 2, height: frontSize + 2 * offset + 2)
+    badge(width: frontSize, height: frontSize, fill: front, rim: Self.paper, border: 1.5)
+    disc.center = CGPoint(x: bounds.midX + offset, y: bounds.midY + offset * 0.75)
+    rearDot.bounds = CGRect(x: 0, y: 0, width: rearSize, height: rearSize)
+    rearDot.center = CGPoint(x: bounds.midX - offset, y: bounds.midY - offset * 0.75)
+    rearDot.backgroundColor = rear
+    rearDot.layer.cornerRadius = rearSize / 2
+    rearDot.isHidden = false
+    glyph.isHidden = true
     symbol.isHidden = true
     check.isHidden = true
     accessibilityLabel = label
