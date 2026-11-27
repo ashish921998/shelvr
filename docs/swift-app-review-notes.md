@@ -1,12 +1,12 @@
 # Review notes for the Swift iOS build
 
-Walk through these notes on the selected Swift TestFlight build before copying them into App Store Connect. The [Expo review notes](app-review-notes.md) apply while an Expo build is selected.
+Before copying the walkthrough into App Store Connect, run it on the selected Swift TestFlight build and verify the demo account or Apple-approved demo mode that App Review will use. The [Expo review notes](app-review-notes.md) apply while an Expo build is selected.
 
 ## App Review Information
 
 Shelvr saves links and photos, identifies places, and helps people plan dates and trips. This update uses SwiftUI and keeps the same Shelvr account and subscription. After updating, sign in with your original Apple or Google account to see your existing saves.
 
-1. On the welcome screen, tap Get started for a new account or Sign in for an existing account. New users can answer or skip the questions about saves, goals and cities. They can share the practice reel to Shelvr or skip it. Choose Continue with Apple or Continue with Google when prompted. App Review can use its own Apple account.
+1. On the welcome screen, tap Get started for a new account or Sign in for an existing account. New users can answer or skip the questions about saves, goals and cities. They can share the practice reel to Shelvr or skip it. Choose Continue with Apple or Continue with Google when prompted.
 2. An eligible account sees the RevenueCat offering. It shows the storefront price, renewal terms, Restore, Terms and Privacy. An existing Pro account skips the onboarding paywall. When free access is available, closing the paywall lets the reviewer open Map and Library.
 3. On Map, tap +, then Paste a link. Paste a public reel or webpage naming a place and tap Save. Or share a public page from Safari to Shelvr, confirm in the extension and return to the app. A share queued before sign-in finishes after sign-in. Shared text without a link saves as a note. Find the saved item in Library after it finishes processing.
 4. On Map, tap Search places to find a saved or shared place. Tap a result or a pin to see the place. Use Go out to plan from saved places. Use Passport to view visited cities and their cards. A shared-list link opens a preview. Joining requires an explicit action and sign-in.
