@@ -485,7 +485,7 @@ describe("places:storeCatalog", () => {
     expect(await names(user, LISBON_BOX)).toEqual(["Curated Café"]);
   });
 
-  it("deduplicates catalog IDs, attaches a verified Apple ID, and supports curation", async () => {
+  it("promotes the same catalog ID using the verified venue facts and point", async () => {
     const { base, user } = await signedIn();
     const place = catalogCafe("overture-a");
     await expect(
@@ -498,16 +498,38 @@ describe("places:storeCatalog", () => {
       overtureId: "overture-a",
       appleId: "apple-a",
     });
+    const verified = {
+      ...cafe("apple-a", "Verified Bakery"),
+      ...PORTO,
+      category: "Bakery",
+    };
     await base.mutation(internal.places.store, {
-      city: "Lisbon",
-      places: [cafe("apple-a", "Apple label")],
+      city: "Porto",
+      places: [verified],
     });
-    expect(await rows(base)).toEqual([{ ...catalog, status: "live" }]);
+    const [live] = await rows(base);
+    expect(live).toMatchObject({
+      ...verified,
+      _id: catalog._id,
+      city: "Porto",
+      status: "live",
+      overtureId: "overture-a",
+      source: "overture",
+    });
+    expect(live).not.toHaveProperty("kind");
     const [result] = await user.query(api.places.searchCatalog, {
-      text: "Juniper",
+      text: "Verified",
     });
-    expect(result).toMatchObject({ _id: catalog._id, source: "overture" });
-    expect(await names(user, LISBON_BOX)).toEqual(["Juniper Café"]);
+    expect(result).toMatchObject({
+      ...verified,
+      _id: catalog._id,
+      source: "overture",
+      kinds: ["dessert"],
+    });
+    expect(await names(user, LISBON_BOX)).toEqual([]);
+    expect(
+      await names(user, { west: -8.7, south: 41.1, east: -8.5, north: 41.2 }),
+    ).toEqual(["Verified Bakery"]);
   });
 
   it("rejects conflicting identities without applying any of the batch", async () => {

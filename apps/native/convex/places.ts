@@ -375,12 +375,19 @@ export const store = internalMutation({
           ? [...sources, { url: args.source }]
           : undefined;
       if (row.status === "catalog") {
-        await ctx.db.patch(row._id, {
-          status: "live",
+        const promotion = {
+          name: place.name,
+          city: args.city,
+          lat: place.lat,
+          lng: place.lng,
           appleId: place.appleId,
+          category: place.category,
+          kind: undefined,
+          status: "live" as const,
           ...(source ? { sources: source } : {}),
-        });
-        await indexPlace(ctx, { ...row, status: "live" });
+        };
+        await ctx.db.patch(row._id, promotion);
+        await indexPlace(ctx, { ...row, ...promotion });
       } else if (source) {
         await ctx.db.patch(row._id, { sources: source });
       }
