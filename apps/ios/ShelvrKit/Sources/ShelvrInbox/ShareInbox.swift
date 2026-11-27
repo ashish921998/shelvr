@@ -1,4 +1,5 @@
 import CoreFoundation
+import Darwin
 import Foundation
 import UniformTypeIdentifiers
 
@@ -61,15 +62,27 @@ public enum ShareAttachment: Sendable {
       guard case let .payload(item) = attachment, item.kind == .link else { return nil }
       return item.value
     }
-    var links = Set<String>()
-    return attachments.compactMap { attachment -> InboxPayload? in
+    let resolved = attachments.compactMap { attachment -> InboxPayload? in
       switch attachment {
       case .payload(let item): return item
       case .caption(let text):
-        return SharedWebLink.first(in: text, explicitLinks: explicit)
-          .map { InboxPayload(kind: .link, value: $0) }
+        let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else { return nil }
+        if let url = SharedWebLink.first(in: text, explicitLinks: explicit) {
+          return InboxPayload(kind: .link, value: url)
+        }
+        return InboxPayload(kind: .note, value: text)
       }
-    }.filter { $0.kind != .link || links.insert($0.value).inserted }
+    }
+    let containsLink = resolved.contains { $0.kind == .link }
+    var links = Set<String>()
+    return resolved.filter { item in
+      switch item.kind {
+      case .image: true
+      case .link: links.insert(item.value).inserted
+      case .note: !containsLink
+      }
+    }
   }
 }
 
@@ -131,7 +144,7 @@ public struct PendingShare: Sendable {
     try inbox.checkOwner(owner, of: batch)
     let current = try PendingShare(manifest: manifest, inbox: inbox, owner: owner).delivery.get()
     guard case .success(let expected) = delivery, current.operationID == expected.operationID,
-      current.siri, case let .note(text) = current.content, copy(text) else { return false }
+      case let .note(text) = current.content, copy(text) else { return false }
     try removeManifest()
     return true
   }
@@ -145,6 +158,7 @@ public struct PendingShare: Sendable {
 public struct ShareInbox: Sendable {
   public static let notification = "app.shelvr.share-inbox.ready"
   private static let stagingLifetime: TimeInterval = 24 * 60 * 60
+  private static let unsignedOwner = "awaiting-sign-in"
   let directory: URL
 
   public struct FailedShare: Sendable {
@@ -164,25 +178,39 @@ public struct ShareInbox: Sendable {
   public var activeOwner: String? { try? owner(of: directory) }
 
   public func activate(_ owner: String?) throws {
-    let marker = directory.appending(path: "owner")
-    guard let owner else { try removeIfPresent(marker); return }
-
-    let manager = FileManager.default
-    try manager.createDirectory(at: directory, withIntermediateDirectories: true)
-    var location = URL(filePath: directory.path, directoryHint: .isDirectory)
-    var values = URLResourceValues()
-    values.isExcludedFromBackup = true
-    try location.setResourceValues(values)
-    if activeOwner != owner { try Data(owner.utf8).write(to: marker, options: .atomic) }
+    try withLock {
+      let previous = try currentOwner()
+      let marker = directory.appending(path: "owner")
+      if previous != owner { try removeIfPresent(directory.appending(path: "capture-session")) }
+      let pending = try batches().filter { (try? self.owner(of: $0)) == Self.unsignedOwner }
+      if let owner {
+        if let previous, previous != owner {
+          for batch in pending { try removeIfPresent(batch) }
+        }
+        if previous != owner { try Data(owner.utf8).write(to: marker, options: .atomic) }
+        if previous == nil || previous == owner {
+          for batch in pending { try Data(owner.utf8).write(to: batch.appending(path: "owner"), options: .atomic) }
+        }
+      } else {
+        try pruneBatches(keeping: previous == nil ? Self.unsignedOwner : nil)
+        try removeIfPresent(marker)
+      }
+    }
   }
 
   public func prune(keeping owner: String?) throws {
-    guard activeOwner == owner else { throw ShareInboxError.ownerChanged }
+    try withLock {
+      guard try currentOwner() == owner else { throw ShareInboxError.ownerChanged }
+      try pruneBatches(keeping: owner ?? Self.unsignedOwner)
+    }
+  }
+
+  private func pruneBatches(keeping owner: String?) throws {
     let entries = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.creationDateKey])
     for batch in entries {
       switch batch.pathExtension {
       case "ready":
-        if (try? self.owner(of: batch)) != owner { try removeIfPresent(batch) }
+        if owner == nil || (try? self.owner(of: batch)) != owner { try removeIfPresent(batch) }
       case "staging":
         if let created = try? batch.resourceValues(forKeys: [.creationDateKey]).creationDate,
           Date().timeIntervalSince(created) > Self.stagingLifetime { try removeIfPresent(batch) }
@@ -191,13 +219,19 @@ public struct ShareInbox: Sendable {
     }
   }
 
-  public func stage(owner: String) throws -> URL {
-    guard activeOwner == owner else { throw ShareInboxError.ownerChanged }
-    let folder = directory.appending(path: UUID().uuidString + ".staging")
-    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
-    do { try Data(owner.utf8).write(to: folder.appending(path: "owner")) }
-    catch { try? removeIfPresent(folder); throw error }
-    return folder
+  public func stage(owner: String?) throws -> URL {
+    try withLock {
+      guard try currentOwner() == owner else { throw ShareInboxError.ownerChanged }
+      let folder = directory.appending(path: UUID().uuidString + ".staging")
+      let session = try captureSession()
+      try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+      do {
+        try Data((owner ?? Self.unsignedOwner).utf8).write(to: folder.appending(path: "owner"))
+        try session.write(to: folder.appending(path: "capture-session"))
+      }
+      catch { try? removeIfPresent(folder); throw error }
+      return folder
+    }
   }
 
   public func newImage(in stage: URL) -> (file: URL, payload: InboxPayload) {
@@ -208,12 +242,15 @@ public struct ShareInbox: Sendable {
   public func publish(_ payloads: [InboxPayload], in stage: URL) throws {
     guard !payloads.isEmpty else { throw ShareInboxError.nothingToSave }
     let owner = try owner(of: stage)
-    try checkOwner(owner, of: stage)
     for (index, payload) in payloads.enumerated() {
       try JSONEncoder().encode(payload).write(to: stage.appending(path: "\(index).json"))
     }
-    try checkOwner(owner, of: stage)
-    try FileManager.default.moveItem(at: stage, to: stage.deletingPathExtension().appendingPathExtension("ready"))
+    try withLock {
+      let active = try currentOwner() ?? Self.unsignedOwner
+      let stagedSession = try Data(contentsOf: stage.appending(path: "capture-session"))
+      guard active == owner, stagedSession == (try captureSession()) else { throw ShareInboxError.ownerChanged }
+      try FileManager.default.moveItem(at: stage, to: stage.deletingPathExtension().appendingPathExtension("ready"))
+    }
     CFNotificationCenterPostNotification(CFNotificationCenterGetDarwinNotifyCenter(),
       CFNotificationName(Self.notification as CFString), nil, nil, true)
   }
@@ -269,6 +306,37 @@ public struct ShareInbox: Sendable {
     let value = try String(contentsOf: batch.appending(path: "owner"), encoding: .utf8)
     guard !value.isEmpty else { throw ShareInboxError.ownerChanged }
     return value
+  }
+
+  private func currentOwner() throws -> String? {
+    do { return try owner(of: directory) }
+    catch let error as CocoaError where error.code == .fileReadNoSuchFile { return nil }
+  }
+
+  private func captureSession() throws -> Data {
+    let marker = directory.appending(path: "capture-session")
+    do { return try Data(contentsOf: marker) }
+    catch let error as CocoaError where error.code == .fileReadNoSuchFile {
+      let session = Data(UUID().uuidString.utf8)
+      try session.write(to: marker, options: .atomic)
+      return session
+    }
+  }
+
+  private func withLock<T>(_ operation: () throws -> T) throws -> T {
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    var location = URL(filePath: directory.path, directoryHint: .isDirectory)
+    var values = URLResourceValues()
+    values.isExcludedFromBackup = true
+    try location.setResourceValues(values)
+
+    let lock = open(directory.appending(path: "inbox.lock").path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
+    guard lock >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+    defer { close(lock) }
+    while flock(lock, LOCK_EX) == -1 {
+      if errno != EINTR { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+    }
+    return try operation()
   }
 
   func manifests(in batch: URL) throws -> [URL] {

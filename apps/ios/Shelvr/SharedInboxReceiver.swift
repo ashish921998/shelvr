@@ -63,9 +63,9 @@ struct SharedInboxReceiver: ViewModifier {
   }
 
   private func syncOwner() {
-    if let inbox = ShareInbox.system(), backend.status == .signedOut || backend.status == .signedIn {
+    if let inbox = ShareInbox.system(), backend.status == .signedOut || backend.userID != nil {
       do { try ShareInboxProcessor(inbox: inbox, backend: backend).updateOwner() }
-      catch { try? inbox.activate(nil) }
+      catch { Analytics.failure("share_inbox_owner_update_failed") }
     }
     InboxSignal.shared.wake()
   }

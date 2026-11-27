@@ -47,6 +47,45 @@ func withShareInbox(_ run: (ShareInbox) async throws -> Void) async throws {
   }
 }
 
+@MainActor @Test func sharesQueuedBeforeSignInArePrivateToTheFirstAccountAndClearedAtSignOut() async throws {
+  try await withShareInbox { inbox in
+    let old = try inbox.stage(owner: "first")
+    try inbox.publish([InboxPayload(kind: .link, value: "https://example.com/previous")], in: old)
+    try inbox.activate(nil)
+    #expect(try inbox.batches().isEmpty)
+
+    let stage = try inbox.stage(owner: nil)
+    let incoming = InboxPayload(kind: .link, value: "https://example.com/pending")
+    try inbox.publish([incoming], in: stage)
+    try inbox.prune(keeping: nil)
+    try inbox.activate(nil)
+    #expect(try inbox.batches().count == 1)
+
+    try inbox.activate("second")
+    let failure = try #require(await inbox.drain(owner: "second") { delivery in
+      #expect(delivery.operationID == incoming.operationID)
+      throw CocoaError(.fileReadNoPermission)
+    })
+    try inbox.activate(nil)
+    try inbox.activate("third")
+    #expect(throws: ShareInboxError.ownerChanged) { try failure.share.discard() }
+    #expect(try inbox.batches().isEmpty)
+  }
+}
+
+@MainActor @Test func unsignedStagingCannotPublishAfterAnInterveningAccountSession() async throws {
+  try await withShareInbox { inbox in
+    try inbox.activate(nil)
+    let stage = try inbox.stage(owner: nil)
+    try inbox.activate("second")
+    try inbox.activate(nil)
+    #expect(throws: ShareInboxError.ownerChanged) {
+      try inbox.publish([InboxPayload(kind: .link, value: "https://example.com")], in: stage)
+    }
+    #expect(try inbox.batches().isEmpty)
+  }
+}
+
 @MainActor @Test func activationExcludesAnExistingDirectoryFromBackupAndPublishesItsOwner() async throws {
   try await withShareInbox { inbox in
     try inbox.activate(nil)
@@ -85,6 +124,12 @@ func withShareInbox(_ run: (ShareInbox) async throws -> Void) async throws {
     .caption("Another: https://example.com/reel-other")])
   #expect(incoming.count == 2)
   #expect(incoming.first?.operationID == first.operationID)
+}
+
+@Test func aPlainCaptionInALinkShareDoesNotCreateAnExtraNote() {
+  let link = InboxPayload(kind: .link, value: "https://example.com/reel")
+  let result = ShareAttachment.payloads([.caption("Check this out"), .payload(link), .caption(" \n ")])
+  #expect(result.map(\.operationID) == [link.operationID])
 }
 
 @Test func captionKeepsItsLongerExplicitURLAndUnsupportedURLAllowsImageFallback() {

@@ -11,6 +11,7 @@ import Testing
   var sentLinks: [String] = []
   var linkSessions: [String?] = []
   var sentNotes: [String] = []
+  var noteSources: [SaveSource] = []
   var refuseLink = false
   var onUpload: (() async -> Void)?
 
@@ -22,9 +23,10 @@ import Testing
     linkSessions.append(analyticsSessionID)
   }
 
-  func saveNote(_ text: String, operationID: String, checkpoint: () throws -> Void) throws {
+  func saveNote(_ text: String, operationID: String, source: SaveSource, analyticsSessionID: String?, checkpoint: () throws -> Void) throws {
     try checkpoint()
     sentNotes.append(operationID + ":" + text)
+    noteSources.append(source)
   }
 
   func savePhoto(_ photo: ImportPhoto, operationID: String, source: SaveSource, analyticsSessionID: String?, checkpoint: () throws -> Void) async throws -> String {
@@ -46,6 +48,25 @@ private final class RecordingPhotoMutations: PhotoMutationClient {
     calls.withLock { $0.append(name) }
     #expect(name == "items:beginImageImport")
     return try JSONDecoder().decode(T.self, from: Data(#"{"kind":"upload","uploadUrl":"https://example.com/photo"}"#.utf8))
+  }
+}
+
+@MainActor @Test func signedOutTextShareSavesExactlyOnceAsAShareExtensionNote() async throws {
+  try await withShareInbox { inbox in
+    try inbox.activate(nil)
+    let note = try #require(ShareAttachment.payloads([.caption(" Café près du parc \n")]).first)
+    let stage = try inbox.stage(owner: nil)
+    try inbox.publish([note], in: stage)
+
+    let saver = RecordingShareSaver()
+    saver.userID = "next"
+    let processor = ShareInboxProcessor(inbox: inbox, saver: saver)
+    try processor.updateOwner()
+    #expect(try await processor.drain(owner: "next") == nil)
+    #expect(try await processor.drain(owner: "next") == nil)
+    #expect(saver.sentNotes == ["\(note.operationID):Café près du parc"])
+    #expect(saver.noteSources == [.shareExtension])
+    #expect(saver.sentLinks.isEmpty)
   }
 }
 
@@ -161,11 +182,11 @@ private func tinyPNG() throws -> Data {
 
     let saver = RecordingShareSaver()
     let processor = ShareInboxProcessor(inbox: inbox, saver: saver)
-    try inbox.activate(nil)
     let marker = inbox.directory.appending(path: "owner")
+    try FileManager.default.removeItem(at: marker)
     try FileManager.default.createDirectory(at: marker, withIntermediateDirectories: false)
     #expect(throws: (any Error).self) { try processor.updateOwner() }
-    try inbox.activate(nil)
+    try FileManager.default.removeItem(at: marker)
     #expect(inbox.activeOwner == nil)
 
     #expect(try await processor.drain(owner: "first") == nil)
