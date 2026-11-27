@@ -97,6 +97,7 @@ export default defineSchema({
 
   places: defineTable({
     name: v.string(),
+    searchName: v.optional(v.string()),
     city: v.string(),
     lat: v.number(),
     lng: v.number(),
@@ -121,6 +122,10 @@ export default defineSchema({
     .index("by_city_and_name_and_lat", ["city", "name", "lat"])
     .searchIndex("search_name", {
       searchField: "name",
+      filterFields: ["status", "searchName"],
+    })
+    .searchIndex("search_folded_name", {
+      searchField: "searchName",
       filterFields: ["status"],
     }),
 

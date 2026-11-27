@@ -88,6 +88,9 @@ const searchTerms = (text: string) =>
 const foldTerm = (term: string) =>
   term.normalize("NFD").replace(/\p{M}/gu, "").normalize("NFC");
 
+const foldedSearchName = (name: string) =>
+  searchTerms(name).map(foldTerm).join(" ");
+
 const matchingNameRank = (name: string, terms: string[], phrase: string) => {
   const words = searchTerms(name).map(foldTerm);
   if (!terms.every((term) => words.some((word) => word.startsWith(term))))
@@ -169,22 +172,32 @@ export const searchCatalog = authedQuery({
     if (text.length > MAX_SEARCH_LENGTH) return [];
     const queryTerms = searchTerms(text);
     if (!queryTerms.length) return [];
-    const search = queryTerms.slice(0, MAX_SEARCH_TERMS).join(" ");
+    const rawSearch = queryTerms.slice(0, MAX_SEARCH_TERMS).join(" ");
     const terms = queryTerms.map(foldTerm);
+    const foldedSearch = terms.slice(0, MAX_SEARCH_TERMS).join(" ");
     const phrase = terms.join(" ");
 
     const groups = await Promise.all(
-      (["live", "catalog"] as const).map((status) =>
+      (["live", "catalog"] as const).flatMap((status) => [
+        ctx.db
+          .query("places")
+          .withSearchIndex("search_folded_name", (q) =>
+            q.search("searchName", foldedSearch).eq("status", status),
+          )
+          .take(MAX_CATALOG_CANDIDATES),
         ctx.db
           .query("places")
           .withSearchIndex("search_name", (q) =>
-            q.search("name", search).eq("status", status),
+            q
+              .search("name", rawSearch)
+              .eq("status", status)
+              .eq("searchName", undefined),
           )
           .take(MAX_CATALOG_CANDIDATES),
-      ),
+      ]),
     );
-    const ranked = groups
-      .flat()
+    const candidates = new Map(groups.flat().map((row) => [row._id, row]));
+    const ranked = [...candidates.values()]
       .flatMap((row) => {
         const rank = matchingNameRank(row.name, terms, phrase);
         return rank === null ? [] : [{ row, rank }];
@@ -304,6 +317,7 @@ async function storeCatalogPlace(ctx: MutationCtx, place: CatalogImport) {
   if (!row) {
     await ctx.db.insert("places", {
       ...place,
+      searchName: foldedSearchName(place.name),
       source: "overture",
       status: "catalog",
       addedAt: Date.now(),
@@ -322,7 +336,9 @@ async function storeCatalogPlace(ctx: MutationCtx, place: CatalogImport) {
     await ctx.db.patch(row._id, {
       overtureId,
       ...(appleId ? { appleId } : {}),
-      ...(refresh ? { name, city, lat, lng, kind } : {}),
+      ...(refresh
+        ? { name, searchName: foldedSearchName(name), city, lat, lng, kind }
+        : {}),
     });
   }
   return false;
@@ -359,6 +375,7 @@ export const store = internalMutation({
       if (row === null) {
         const fresh = {
           name: place.name,
+          searchName: foldedSearchName(place.name),
           city: args.city,
           lat: place.lat,
           lng: place.lng,
@@ -384,6 +401,7 @@ export const store = internalMutation({
       if (row.status === "catalog") {
         const promotion = {
           name: place.name,
+          searchName: foldedSearchName(place.name),
           city: args.city,
           lat: place.lat,
           lng: place.lng,
@@ -469,6 +487,30 @@ export const addByName = internalAction({
     );
     logEvent("info", "places_imported", { ...stored, missed: missed.length });
     return { ...stored, missed };
+  },
+});
+
+export const backfillSearchName = internalMutation({
+  args: { cursor: v.union(v.string(), v.null()) },
+  returns: v.null(),
+  handler: async (ctx, { cursor }) => {
+    const { page, isDone, continueCursor } = await ctx.db
+      .query("places")
+      .paginate({ numItems: REINDEX_PAGE, cursor });
+    for (const row of page) {
+      const searchName = foldedSearchName(row.name);
+      if (row.searchName !== searchName)
+        await ctx.db.patch(row._id, { searchName });
+    }
+    logEvent("info", "places_search_names_backfilled", {
+      count: page.length,
+      done: isDone,
+    });
+    if (!isDone)
+      await ctx.scheduler.runAfter(0, internal.places.backfillSearchName, {
+        cursor: continueCursor,
+      });
+    return null;
   },
 });
 

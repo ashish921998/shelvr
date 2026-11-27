@@ -396,10 +396,10 @@ describe("places:searchCatalog", () => {
     await base.mutation(internal.places.storeCatalog, {
       places: [catalogCafe("istanbul", "İstanbul Sweets")],
     });
-    const result = await user.query(api.places.searchCatalog, {
-      text: "istanbul sweets",
-    });
-    expect(result.map((row) => row.name)).toEqual(["İstanbul Sweets"]);
+    for (const text of ["istanbul", "istanbul sweets"]) {
+      const result = await user.query(api.places.searchCatalog, { text });
+      expect(result.map((row) => row.name)).toEqual(["İstanbul Sweets"]);
+    }
     expect(
       await user.query(api.places.searchCatalog, { text: "\u0307" }),
     ).toEqual([]);
@@ -513,7 +513,9 @@ describe("places:storeCatalog", () => {
         places: [refreshed],
       }),
     ).resolves.toEqual({ added: 0, existing: 1 });
-    expect(await rows(base)).toEqual([{ ...before, ...refreshed }]);
+    expect(await rows(base)).toEqual([
+      { ...before, ...refreshed, searchName: "cedar bakery" },
+    ]);
     await expect(
       user.query(api.places.searchCatalog, { text: "Juniper" }),
     ).resolves.toEqual([]);
@@ -994,6 +996,44 @@ describe("places:store indexing", () => {
     expect(first).toMatchObject({ coordinates: { latitude: 38.7 } });
     await storeAll(t, [venue("A", 10, 10)]);
     expect(await indexed(t, (await rows(t))[0]._id)).toEqual(first);
+  });
+});
+
+describe("places:backfillSearchName", () => {
+  it("keeps raw legacy results visible and folds curated names across bounded pages", async () => {
+    vi.useFakeTimers();
+    const { base, user } = await signedIn();
+    const legacyId = await base.run(async (ctx) => {
+      for (let i = 0; i < 55; i++) {
+        await ctx.db.insert("places", {
+          ...cafe(`legacy-${i}`, `Legacy Café ${i}`),
+          city: "Lisbon",
+          status: "live",
+          addedAt: i,
+        });
+      }
+      return await ctx.db.insert("places", {
+        ...cafe("legacy-istanbul", "İstanbul Modern"),
+        city: "Istanbul",
+        status: "live",
+        addedAt: 55,
+      });
+    });
+    expect(
+      await user.query(api.places.searchCatalog, { text: "Legacy" }),
+    ).toHaveLength(20);
+    await base.mutation(internal.places.backfillSearchName, { cursor: null });
+    await base.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
+    const results = await user.query(api.places.searchCatalog, {
+      text: "istanbul",
+    });
+    expect(results).toMatchObject([{ _id: legacyId, name: "İstanbul Modern" }]);
+    expect(results[0]).not.toHaveProperty("searchName");
+    const indexed = await rows(base);
+    expect(indexed.every((row) => row.searchName !== undefined)).toBe(true);
+    await base.mutation(internal.places.backfillSearchName, { cursor: null });
+    await base.finishAllScheduledFunctions(vi.runOnlyPendingTimers);
+    expect(await rows(base)).toEqual(indexed);
   });
 });
 
